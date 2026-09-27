@@ -2,9 +2,36 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://mada-trips.vercel.app/</loc>
-    <lastmod>2026-09-27</lastmod>
+    <lastmod>2026-09-28</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <image:image><image:loc>https://mada-trips.vercel.app/og-image.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://mada-trips.vercel.app/events</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://mada-trips.vercel.app/assets/media/events-stage.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://mada-trips.vercel.app/services</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://mada-trips.vercel.app/assets/img/wing.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://mada-trips.vercel.app/about</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+    <image:image><image:loc>https://mada-trips.vercel.app/assets/img/founder.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://mada-trips.vercel.app/contact</loc>
+    <lastmod>2026-09-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
 </urlset>
