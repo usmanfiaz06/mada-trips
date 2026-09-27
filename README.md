@@ -46,7 +46,7 @@ Assets/             original brand files as supplied
 5. **Services.** Nine service cards in a pinned horizontal scroll.
 6. **How it works.** A pinned four-step sequence with a ruler timeline: typed brief, then itinerary, then live status board, then a "delivered" gauge.
 7. **Vision 2030.** "2030" knocked out of the video, then an AlUla night-sky panel.
-8. **About.** Bader Sulaiman Almutairi, Founder & CEO, with his portrait (`assets/img/founder.jpg`).
+8. **About.** Bader Al Sulaiman, Founder & CEO, with his portrait (`assets/img/founder.jpg`).
 9. **Contact CTA.** Animated sun rays.
 10. **Footer.**
 
