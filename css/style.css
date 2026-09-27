@@ -49,6 +49,7 @@ body {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
+@supports (overflow: clip) { html, body { overflow-x: clip; } }
 body.is-loading { overflow: hidden; }
 img, video, svg { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
@@ -517,13 +518,13 @@ body.menu-open .nav { color: var(--sand); }
 }
 .ruler__dot { position: absolute; left: -6px; top: 0; width: 11px; height: 11px; border-radius: 50%; background: var(--sand); box-shadow: 0 0 0 6px rgba(233, 226, 216, .1), 0 0 20px rgba(233, 226, 216, .6); }
 .ruler__dot::before { content: ""; position: absolute; right: 100%; top: 5px; width: 30px; height: 1px; background: var(--sand); }
-.process__steps { position: relative; height: 340px; padding-left: clamp(20px, 3vw, 60px); }
+.process__steps { position: relative; min-width: 0; height: 340px; padding-left: clamp(20px, 3vw, 60px); }
 .pstep { position: absolute; inset: 0 0 auto clamp(20px, 3vw, 60px); opacity: 0; pointer-events: none; }
 .pstep.is-on { pointer-events: auto; }
 .pstep__n { font-family: var(--f-mono); font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
 .pstep h3 { margin: 18px 0 18px; font-size: clamp(38px, 4vw, 64px); letter-spacing: -.045em; line-height: 1; font-weight: 500; }
 .pstep p { margin: 0 0 30px; color: var(--muted-l); font-size: clamp(16px, 1.3vw, 19px); max-width: 22em; }
-.process__visuals { position: relative; height: 72vh; margin-right: clamp(20px, 5vw, 90px); }
+.process__visuals { position: relative; min-width: 0; height: 72vh; margin-right: clamp(20px, 5vw, 90px); }
 .pvis { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; }
 
 .brief { width: min(520px, 100%); }
@@ -707,7 +708,20 @@ body.menu-open .nav { color: var(--sand); }
   .ruler { margin-top: 0; margin-bottom: 8vh; }
   .ruler { margin-left: 12px; }
   .process__steps { padding-left: 10px; height: 230px; }
-  .pstep { left: 10px; }
+  .pstep { left: 10px; right: 14px; }
+  .field small { display: none; }
+  .vision__mask span { font-size: 30vw; }
+  .stay { top: 7%; }
+  .ticket { width: 90%; }
+  .ticket__route b { font-size: 28px; }
+  .msg p { padding: 14px 18px; }
+  .avatar { width: 44px; height: 44px; border-radius: 13px; }
+  .founder__card { aspect-ratio: 4 / 5; max-height: 78svh; }
+  .founder__text .signature--dark { font-size: 54px; }
+  .footer__brand { min-height: 440px; }
+  .footer__links { padding: 28px 24px; gap: 24px 16px; }
+  .footer__links a { font-size: 15.5px; }
+  .cta { padding-top: 110px; }
   .pstep h3 { font-size: 34px; margin: 10px 0; }
   .pstep p { margin-bottom: 16px; font-size: 15px; }
   .pstep .btn { display: none; }
