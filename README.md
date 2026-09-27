@@ -1,6 +1,6 @@
 # Mada Trips website
 
-A single-page site for Mada Trips (مدى): travel, ticketing, hotels, visa support, business services, manpower, specialist supply, events and IT.
+A single-page site for Mada Trips (مادا): travel, ticketing, hotels, visa support, business services, manpower, specialist supply, events and IT.
 
 ## Run it
 

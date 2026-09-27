@@ -310,6 +310,8 @@ body.menu-open .nav { color: var(--sand); }
 }
 .manifesto p { margin: 0; }
 .manifesto__a { font-family: var(--f-ar); font-size: clamp(36px, 3.6vw, 56px); line-height: 1; color: var(--green-800); }
+.manifesto__a { display: flex; align-items: center; gap: 14px; }
+.manifesto__word { height: clamp(34px, 3.4vw, 50px); width: auto; flex: none; }
 .manifesto__a span { font-family: var(--f-mono); font-size: 13px; color: var(--green-500); vertical-align: middle; margin-left: 6px; }
 .manifesto__b { font-size: clamp(20px, 1.9vw, 28px); letter-spacing: -.03em; line-height: 1.15; margin-top: 22px !important; }
 .manifesto__c { font-size: clamp(20px, 1.9vw, 28px); letter-spacing: -.03em; line-height: 1.15; color: var(--green-500); }
