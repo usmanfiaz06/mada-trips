@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mada Trips — Every horizon, within reach</title>
+  <meta name="description" content="Mada Trips — travel, ticketing, hotels, visas, manpower, specialists, events and IT. One Saudi partner for everything that moves." />
+  <meta name="theme-color" content="#10201a" />
+  <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Reem+Kufi:wght@400;500;600;700&family=Mrs+Saint+Delafield&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="assets/media/hero-poster.jpg" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="is-loading">
+
+  <!-- ============ PRELOADER ============ -->
+  <div class="loader" aria-hidden="true">
+    <div class="loader__sun">
+      <svg viewBox="0 0 132.31 88.61" class="sun-svg">
+        <g class="rays">
+          <path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/>
+          <path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/>
+          <path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/>
+          <path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/>
+          <path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/>
+          <path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/>
+          <path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/>
+          <path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/>
+          <path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/>
+        </g>
+      </svg>
+    </div>
+    <div class="loader__word"><span>M</span><span>A</span><span>D</span><span>A</span><span>&nbsp;</span><span>T</span><span>R</span><span>I</span><span>P</span><span>S</span></div>
+    <div class="loader__count"><span class="js-count">0</span></div>
+  </div>
+
+  <!-- ============ CURSOR ============ -->
+  <div class="cursor" aria-hidden="true"><span class="cursor__label"></span></div>
+
+  <!-- ============ TOP BAR + NAV ============ -->
+  <a class="topbar" href="#vision">
+    <span class="topbar__dot"></span>
+    Moving with the Kingdom toward Vision 2030
+    <svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+
+  <header class="nav" data-theme="light">
+    <a href="#top" class="nav__logo" aria-label="Mada Trips — home">
+      <svg fill="currentColor" class="logo-svg" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320.13 82.79"><g id="Layer_1-2" data-name="Layer 1"><g><g><path d="M317.31,29.62c3.14,4.72,3.08,11.27,1.84,16.76-6.82,3.25-14.61,2.8-19.97-2.58-1.91,2.24-4.32,3.62-7.35,3.62h-92.02c-5.1-.01-8.42-3.37-8.43-8.45l-.03-31.13h6.47s.02,30.31.02,30.31c0,1.55,1.04,2.89,2.76,2.89h90.69c1.38.01,2.67-.33,3.34-1.41l2.86-4.6c1.64-2.64,3.21-5.25,5.51-7.3,4.39-3.94,10.98-3.1,14.29,1.89ZM313.98,41.98c.37-4.47-1.29-10.13-5-10.23-2.7-.07-4.99,4.26-6.68,7.21,3.22,2.89,7.48,3.67,11.69,3.02Z"/><path d="M164.64,47.42l-1.18-6.35,15.53-.02c-1-5.79-4.08-10.58-8.6-14.29l4.75-6c2.63,2.74,4.91,5.63,6.87,8.9,3.14,5.67,3.63,11.28,2.73,17.75h-20.09Z"/><rect x="151.81" y="7.82" width="6.46" height="39.59"/><path d="M162.25,82.56l.06-8.93-3.31,5.09c-.38.13-1.25.11-1.61-.05l-3.16-4.91v8.81s-2.38,0-2.38,0v-13.32s2.3,0,2.3,0l4.1,6.73,4.21-6.73h2.19s0,13.29,0,13.29l-2.41.02Z"/><path d="M203.56,79.63c-1.09,1.78-2.85,2.88-4.91,2.9l-5.76.04v-13.38s5.83.06,5.83.06c2.24.02,4.04,1.32,5,3.26,1.02,2.26.98,4.78-.17,7.12ZM202.06,75.79c-.06-1.9-.92-4.07-2.88-4.14l-3.9-.12v8.74s2.92-.01,2.92-.01c2.47-.01,3.94-1.87,3.86-4.46Z"/><path d="M267.44,82.65l-2.75-4.87-2.74-.11v4.89s-2.39-.04-2.39-.04v-13.3s5.31-.05,5.31-.05c2.09-.02,3.87,1.08,4.48,2.95.65,2.02-.23,4.07-2.19,5.13l3.04,5.24-2.76.15ZM265.91,75.27c1.06-.04,1.38-1.51,1.21-2.2-.2-.8-1.02-1.53-1.96-1.54l-3.23-.02.03,3.9,3.95-.14Z"/><path d="M220.19,79.39l-5.23-.04-1.23,3.2-2.45.02,5.16-13.33h2.35s5.12,13.34,5.12,13.34h-2.53s-1.19-3.19-1.19-3.19ZM219.23,77.03l-1.65-4.72-1.74,4.73h3.4Z"/><path d="M181.39,79.37l-5.25-.02-1.21,3.2-2.45.03,5.16-13.33h2.35s5.12,13.32,5.12,13.32h-2.54s-1.17-3.2-1.17-3.2ZM180.44,77.03l-1.68-4.73-1.72,4.74h3.4Z"/><path d="M318.76,81.62c-2.81,2.07-6.75,1.33-8.64-1.58l1.63-1.95c1.24,2.27,3.41,3.28,5.58,1.9.31-.2.54-1.07.39-1.41s-.72-.99-1.1-1.1l-3.17-.95c-1.84-.55-2.8-2.25-2.66-3.93.16-1.88,1.67-3.17,3.56-3.47,2.3-.36,4.58.29,5.7,2.42l-1.63,1.61c-1.02-1.58-2.53-2.38-4.36-1.7-.38.14-.9.9-.93,1.3-.03.45.55,1.31,1.04,1.46l3.37,1.05c1.19.37,2.29,1.53,2.49,2.51.27,1.37-.04,2.92-1.28,3.84Z"/><path d="M295.68,77.56l-.04,4.99-2.38-.02v-13.34s6.09.1,6.09.1c2.04.03,3.36,2.18,3.4,3.95.04,2.01-1.23,4.16-3.41,4.22l-3.66.1ZM299.45,75.08c.55-.03.95-1.31.92-1.8s-.48-1.61-1.01-1.63l-3.69-.15v3.77s3.79-.19,3.79-.19Z"/><polygon points="284.49 82.58 277.96 82.58 277.91 80.33 280.02 80.31 280.03 71.43 277.92 71.37 277.95 69.21 284.48 69.21 284.51 71.4 282.4 71.39 282.4 80.31 284.51 80.33 284.49 82.58"/><polygon points="247.74 82.54 245.36 82.57 245.37 71.53 241.71 71.52 241.73 69.21 251.49 69.2 251.5 71.52 247.74 71.51 247.74 82.54"/></g><g><g><path d="M41.99,54.33c-.12.14-.25.29-.38.42-.23.25-.54.51-.92.79-1.32.98-2.87,1.61-4.49,1.92L0,64.47l4.43-10.56,37.56.41Z"/><path d="M68.03,0l-4.54,38.69c-.68-.08-1.37-.13-2.07-.13s-1.39.04-2.07.13L54.8,0h13.23Z"/><path d="M54.03,40.26c-1.42.69-2.74,1.58-3.9,2.63l-23.54-21.86,9.49-7.86,17.95,27.1Z"/><path d="M16.77,32.85l30.14,13.94c-.6.99-1.36,2.12-1.98,3.07l-34.51-5.87,6.35-11.15Z"/><path d="M80.84,54.33c.12.14.25.29.38.42.23.25.54.51.92.79,1.32.98,2.87,1.61,4.49,1.92l36.21,7.01-4.43-10.56-37.56.41Z"/><path d="M68.8,40.26c1.42.69,2.74,1.58,3.9,2.63l23.54-21.86-9.49-7.86-17.95,27.1Z"/><path d="M106.06,32.85l-30.14,13.94c.6.99,1.36,2.12,1.98,3.07l34.51-5.87-6.35-11.15Z"/></g><g><path d="M58.8,56.8l-.21.83-6.09,24.63h-17.42l19.92-24.63.02-.02c.42-.52,1.05-.82,1.71-.82h2.07Z"/><path d="M87.76,82.26h-17.41l-6.09-24.63-.21-.83h2.07c.67,0,1.29.29,1.71.82l.02.02,19.92,24.63Z"/></g></g></g></g></svg>
+    </a>
+    <nav class="nav__links" aria-label="Primary">
+      <a href="#services" class="nav__link is-active">Services</a>
+      <a href="#why" class="nav__link">Why Mada</a>
+      <a href="#process" class="nav__link">How it works</a>
+      <a href="#vision" class="nav__link">Vision 2030 <span class="tag">KSA</span></a>
+      <a href="#founder" class="nav__link">Founder</a>
+    </nav>
+    <div class="nav__cta">
+      <a href="#contact" class="nav__ar" lang="ar" dir="rtl">تواصل</a>
+      <a href="#contact" class="btn btn--ghost magnetic"><span>Plan with us</span><i class="btn__arrow">↗</i></a>
+    </div>
+    <button class="nav__burger" aria-label="Open menu"><span></span><span></span></button>
+  </header>
+
+  <div class="menu" aria-hidden="true">
+    <a href="#services">Services</a><a href="#why">Why Mada</a><a href="#process">How it works</a><a href="#vision">Vision 2030</a><a href="#founder">Founder</a><a href="#contact">Contact</a>
+  </div>
+
+  <main id="smooth">
+
+    <!-- ============ HERO → CARD (pinned) ============ -->
+    <section class="reach" id="top">
+      <div class="reach__stage">
+
+        <div class="frame">
+          <div class="frame__media">
+            <video class="frame__video" autoplay muted loop playsinline preload="auto" poster="assets/media/hero-poster.jpg">
+              <source src="assets/media/hero-dunes.mp4" type="video/mp4" />
+            </video>
+            <img class="frame__slide" src="assets/img/resort.jpg" alt="" />
+            <img class="frame__slide" src="assets/img/crew.jpg" alt="" />
+            <img class="frame__slide" src="assets/img/concert.jpg" alt="" />
+          </div>
+          <div class="frame__shade"></div>
+          <div class="frame__label"><span class="js-frame-label">Arabian Dunes · 24°N</span></div>
+          <div class="frame__chip"><span class="spark">✦</span> Mada</div>
+        </div>
+
+        <div class="hero-copy">
+          <div class="pills" role="tablist">
+            <span class="pill is-on">Travel</span><span class="pill">Stay</span><span class="pill">Work</span><span class="pill">Celebrate</span>
+          </div>
+          <h1 class="hero-title">
+            <span class="line"><span>Every horizon,</span></span>
+            <span class="line"><span>within <em>reach.</em></span></span>
+          </h1>
+          <p class="hero-sub">Mada is Arabic for <em>reach</em>. We carry travellers, talent and ideas across the Kingdom — and far beyond it.</p>
+          <form class="search magnetic-soft" onsubmit="event.preventDefault();document.querySelector('#contact').scrollIntoView({behavior:'smooth'})">
+            <span class="search__icon">⌖</span>
+            <input type="text" class="search__input" aria-label="Where to?" placeholder="Where to?" />
+            <button class="search__btn" type="submit">Begin the journey</button>
+          </form>
+        </div>
+
+        <aside class="pass" aria-hidden="true">
+          <div class="pass__top"><span>Boarding</span><span class="pass__live"><i></i>Live</span></div>
+          <div class="pass__route">
+            <div><b>RUH</b><small>Riyadh</small></div>
+            <div class="pass__path"><svg viewBox="0 0 120 30"><path d="M2 26 Q60 -8 118 26" fill="none" stroke="currentColor" stroke-dasharray="3 4"/></svg><span class="pass__plane">✈</span></div>
+            <div><b>ULH</b><small>AlUla</small></div>
+          </div>
+          <div class="pass__meta"><span>Gate <b>A7</b></span><span>Seat <b>2A</b></span><span>06:40</span></div>
+        </aside>
+
+        <div class="scroll-hint"><span class="scroll-hint__box">⌄</span> Scroll to explore</div>
+
+        <!-- chapters that appear once the video becomes a card -->
+        <div class="chapter">
+          <div class="chapter__items">
+            <div class="chapter__item is-on">
+              <span class="idx">[ 1 ]</span>
+              <h2>Go further<br><span class="muted">than the itinerary.</span></h2>
+              <p>Flights, visas and routes — planned around you, not a template.</p>
+            </div>
+            <div class="chapter__item">
+              <span class="idx">[ 2 ]</span>
+              <h2>Arrive<br><span class="muted">to a room that's ready.</span></h2>
+              <p>Hotels, resorts and desert camps — hand-picked, confirmed, waiting.</p>
+            </div>
+            <div class="chapter__item">
+              <span class="idx">[ 3 ]</span>
+              <h2>Build<br><span class="muted">with people who deliver.</span></h2>
+              <p>Skilled crews and rare specialists — sourced, vetted, deployed.</p>
+            </div>
+            <div class="chapter__item">
+              <span class="idx">[ 4 ]</span>
+              <h2>Celebrate<br><span class="muted">at the scale of a kingdom.</span></h2>
+              <p>Events and the technology beneath them — flawless from the front row.</p>
+            </div>
+          </div>
+          <div class="chapter__progress"><i></i><i></i><i></i><i></i></div>
+        </div>
+
+        <div class="manifesto">
+          <p class="manifesto__a">مدى <span>/ma·da/</span></p>
+          <p class="manifesto__b">The distance a glance can travel.</p>
+          <p class="manifesto__c">We turned it into a promise.</p>
+          <p class="signature">Mada Trips</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ DESTINATION MARQUEE ============ -->
+    <section class="marquee-wrap" aria-label="Destinations">
+      <div class="marquee" data-speed="1">
+        <div class="marquee__track">
+          <span>Riyadh</span><i>✦</i><span lang="ar" dir="rtl" class="ar">العُلا</span><i>✦</i><span>Jeddah</span><i>✦</i><span class="outline">The Red Sea</span><i>✦</i><span>Diriyah</span><i>✦</i><span lang="ar" dir="rtl" class="ar">نيوم</span><i>✦</i><span>Abha</span><i>✦</i><span class="outline">Hegra</span><i>✦</i><span>Dammam</span><i>✦</i>
+        </div>
+      </div>
+      <div class="marquee marquee--rev" data-speed="-1">
+        <div class="marquee__track">
+          <span class="outline">London</span><i>✦</i><span>Paris</span><i>✦</i><span lang="ar" dir="rtl" class="ar">الرياض</span><i>✦</i><span>Dubai</span><i>✦</i><span class="outline">Istanbul</span><i>✦</i><span>Tokyo</span><i>✦</i><span lang="ar" dir="rtl" class="ar">جدة</span><i>✦</i><span>Cairo</span><i>✦</i><span class="outline">Kuala Lumpur</span><i>✦</i>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ WHY MADA (bento) ============ -->
+    <section class="why" id="why">
+      <div class="why__curve" aria-hidden="true"></div>
+      <div class="container">
+        <div class="why__head">
+          <p class="eyebrow reveal-up">Why Mada</p>
+          <div>
+            <h2 class="h2 split">One call.<br>Everything moves.</h2>
+            <p class="lead reveal-up">Flights, visas, stays, crews, stages, servers — orchestrated by one team that still picks up at 3 a.m.</p>
+          </div>
+        </div>
+
+        <div class="bento">
+          <!-- A: flight -->
+          <article class="card card--sky tilt" data-cursor="Fly">
+            <img src="assets/img/clouds.jpg" alt="Clouds seen from an aircraft window at dawn" class="card__bg" loading="lazy" />
+            <div class="card__glow"></div>
+            <h3 class="card__title">Every seat.<br>Every sky.</h3>
+            <div class="ticket">
+              <div class="ticket__row">
+                <span class="chip">Issued 2m ago</span>
+                <span class="chip chip--gold">✦ Priority</span>
+              </div>
+              <div class="ticket__route">
+                <div><b>RUH</b><small>Riyadh</small></div>
+                <div class="ticket__arc">
+                  <svg viewBox="0 0 200 60"><path class="arc-path" d="M6 54 C60 -10 140 -10 194 54" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 5"/></svg>
+                  <span class="ticket__plane">✈</span>
+                </div>
+                <div><b>CDG</b><small>Paris</small></div>
+              </div>
+              <div class="ticket__row ticket__foot">
+                <span>Business · 2 guests</span>
+                <span class="btn-mini">Confirmed ✓</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- B: network map -->
+          <article class="card card--dots">
+            <svg class="ksa-map" viewBox="0 0 400 300" aria-hidden="true">
+              <g class="routes" fill="none" stroke="currentColor" stroke-width="1">
+                <path d="M235 150 L95 185" /><path d="M235 150 L110 95" /><path d="M235 150 L55 45" /><path d="M235 150 L315 110" /><path d="M235 150 L150 255" /><path d="M95 185 L110 95" />
+              </g>
+              <g class="cities">
+                <g transform="translate(235 150)"><circle r="5"/><circle r="5" class="pulse"/><text x="10" y="4">Riyadh</text></g>
+                <g transform="translate(95 185)"><circle r="4"/><circle r="4" class="pulse"/><text x="-50" y="18">Jeddah</text></g>
+                <g transform="translate(110 95)"><circle r="4"/><circle r="4" class="pulse"/><text x="10" y="4">AlUla</text></g>
+                <g transform="translate(55 45)"><circle r="4"/><circle r="4" class="pulse"/><text x="10" y="4">NEOM</text></g>
+                <g transform="translate(315 110)"><circle r="4"/><circle r="4" class="pulse"/><text x="10" y="4">Dammam</text></g>
+                <g transform="translate(150 255)"><circle r="4"/><circle r="4" class="pulse"/><text x="10" y="4">Abha</text></g>
+              </g>
+            </svg>
+            <div class="card__foot">
+              <h3 class="card__title">From NEOM to Dammam.<br><span class="muted">One partner, every city.</span></h3>
+              <div class="chips-row">
+                <div class="chips-scroll"><span>✈ Ticketing</span><span>▣ Visas</span><span>⌂ Hotels</span><span>✦ Events</span><span>⚙ IT</span><span>✈ Ticketing</span><span>▣ Visas</span><span>⌂ Hotels</span><span>✦ Events</span><span>⚙ IT</span></div>
+                <a href="#services" class="btn btn--light">Explore services <i>›</i></a>
+              </div>
+            </div>
+          </article>
+
+          <!-- C: visa -->
+          <article class="card card--visa">
+            <h3 class="card__title">Visas, without<br>the waiting room.</h3>
+            <div class="visa">
+              <div class="visa__search">
+                <span class="visa__icon">⌕</span>
+                <span class="visa__typed js-visa-typed"></span><span class="caret"></span>
+                <span class="kbd">⌘</span><span class="kbd">K</span>
+              </div>
+              <div class="visa__ai">✦</div>
+              <div class="visa__stamp js-stamp">Approved</div>
+              <div class="visa__ghosts" aria-hidden="true">
+                <span>Schengen · 12 days</span><span>UK Standard · 3 wks</span><span>Umrah · 48 hrs</span><span>Business eVisa · 24 hrs</span>
+              </div>
+            </div>
+          </article>
+
+          <!-- D: talent chat -->
+          <article class="card card--chat">
+            <h3 class="card__title">Talent that shows up.</h3>
+            <div class="chat">
+              <div class="msg msg--in">
+                <span class="avatar">PM</span>
+                <p>We need 40 certified welders on site by Sunday.</p>
+              </div>
+              <div class="msg msg--out">
+                <p><span class="typing"><i></i><i></i><i></i></span><span class="msg__text">Mobilised. Arriving Friday, 6 a.m.</span></p>
+                <span class="avatar avatar--mada"><img src="assets/brand/symbol-sand.svg" alt="" /></span>
+              </div>
+            </div>
+          </article>
+
+          <!-- E: stay -->
+          <article class="card card--stay tilt" data-cursor="Stay">
+            <img src="assets/img/resort.jpg" alt="Resort terrace overlooking the sea at sunset" class="card__bg" loading="lazy" />
+            <div class="stay">
+              <div class="stay__head"><div><b>Confirm stay</b><small>Zero hidden fees</small></div><span class="x">×</span></div>
+              <label>Property</label>
+              <div class="field"><span>⌂</span> Desert Suite · AlUla</div>
+              <div class="stay__row"><span>Nights</span><b class="js-nights">3</b></div>
+              <label>Arrival</label>
+              <div class="field field--select"><span>✈</span> Private transfer <small>met at the gate</small> <em>⌄</em></div>
+              <div class="stay__row"><span>Status</span><span class="chip chip--ok">Room ready</span></div>
+            </div>
+            <div class="stay__float">+ Late checkout<br><small>added</small></div>
+            <div class="card__bottom">
+              <h3 class="card__title card__title--xl">Stays that already<br>know your name.</h3>
+              <p>Hand-picked hotels, resorts and desert camps — arranged down to the pickup.</p>
+            </div>
+          </article>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><b><span class="count" data-to="9">0</span></b><span>Disciplines under one roof</span></div>
+          <div class="stat"><b><span class="count" data-to="1">0</span></b><span>Point of contact. Always.</span></div>
+          <div class="stat"><b><span class="count" data-to="24">0</span>/7</b><span>On the ground, every day</span></div>
+          <div class="stat"><b><span class="count" data-to="2030" data-from="2000">2000</span></b><span>The horizon we build toward</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SERVICES (horizontal) ============ -->
+    <section class="services" id="services">
+      <div class="services__pin">
+        <div class="services__head container">
+          <div>
+            <p class="eyebrow eyebrow--dark reveal-up">What we do</p>
+            <h2 class="h2 h2--dark split">Nine ways<br>to move <span class="accent">a kingdom.</span></h2>
+          </div>
+          <div class="services__aside">
+            <p>Each one could be a company. Together, they're a single promise: it's handled.</p>
+            <div class="services__bar"><i class="js-sbar"></i></div>
+          </div>
+        </div>
+        <div class="services__track">
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/wing.jpg" alt="Aircraft wing above clouds" loading="lazy" /></div>
+            <span class="svc__n">01</span><h3>Travel</h3><p>Journeys designed, not booked.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/terminal.jpg" alt="Modern airport terminal" loading="lazy" /></div>
+            <span class="svc__n">02</span><h3>Ticketing</h3><p>Any airline. Any hour. Any change.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/resort.jpg" alt="Seaside resort at sunset" loading="lazy" /></div>
+            <span class="svc__n">03</span><h3>Hotels</h3><p>The right room, already waiting.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/passport.jpg" alt="Passport filled with stamps" loading="lazy" /></div>
+            <span class="svc__n">04</span><h3>Visa Support</h3><p>Paperwork, handled end to end.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/kingdom-tower.jpg" alt="Kingdom Centre tower in Riyadh at dusk" loading="lazy" /></div>
+            <span class="svc__n">05</span><h3>Business Services</h3><p>Setup, permits, logistics — cleared.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/crew.jpg" alt="Construction crew on site" loading="lazy" /></div>
+            <span class="svc__n">06</span><h3>Manpower</h3><p>Skilled hands, at any scale.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/site.jpg" alt="Engineers on a construction site" loading="lazy" /></div>
+            <span class="svc__n">07</span><h3>Specialist Supply</h3><p>The expert you couldn't find — found.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/concert.jpg" alt="Concert crowd under stage lights" loading="lazy" /></div>
+            <span class="svc__n">08</span><h3>Events</h3><p>Moments the Kingdom remembers.</p><span class="svc__go">↗</span>
+          </a>
+          <a class="svc" href="#contact" data-cursor="Explore">
+            <div class="svc__img"><img src="assets/img/network.jpg" alt="Network cables in a server rack" loading="lazy" /></div>
+            <span class="svc__n">09</span><h3>IT Solutions</h3><p>Systems that never sleep.</p><span class="svc__go">↗</span>
+          </a>
+          <div class="svc svc--end">
+            <p>Need something<br>that isn't listed?</p>
+            <a href="#contact" class="btn btn--dark magnetic"><span>Ask us</span><i class="btn__arrow">↗</i></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PROCESS (pinned steps) ============ -->
+    <section class="process" id="process">
+      <div class="process__intro container">
+        <p class="eyebrow eyebrow--dark reveal-up">How it works</p>
+        <h2 class="scrub-text">You set the destination.<br>We handle the distance.</h2>
+      </div>
+
+      <div class="process__panel">
+        <div class="ruler" aria-hidden="true"><span class="ruler__dot"></span></div>
+
+        <div class="process__steps">
+          <div class="pstep is-on">
+            <span class="pstep__n">Step 1</span>
+            <h3>Tell us the goal.</h3>
+            <p>One conversation. A trip, a team, a launch — or all three.</p>
+            <a href="#contact" class="btn btn--light">Start here <i>→</i></a>
+          </div>
+          <div class="pstep">
+            <span class="pstep__n">Step 2</span>
+            <h3>We design the plan.</h3>
+            <p>Routes, rooms, people and timing — shaped into one clear plan.</p>
+          </div>
+          <div class="pstep">
+            <span class="pstep__n">Step 3</span>
+            <h3>We deliver on the ground.</h3>
+            <p>Our people are there before you are. Every detail, confirmed live.</p>
+          </div>
+          <div class="pstep">
+            <span class="pstep__n">Step 4</span>
+            <h3>You see everything.</h3>
+            <p>One report. Every booking, every hire, every riyal — accounted for.</p>
+          </div>
+        </div>
+
+        <div class="process__visuals">
+          <!-- v1 -->
+          <div class="pvis pvis--1 is-on">
+            <div class="brief">
+              <div class="brief__bar"><span>⌕</span><span class="js-brief"></span><span class="caret"></span><b>Send</b></div>
+              <div class="brief__tabs"><span>Travel</span><span class="on">Event</span><span>Talent</span></div>
+              <div class="brief__card">
+                <img src="assets/img/alula-rocks.jpg" alt="" />
+                <div><b>AlUla</b><small>Suggested destination</small></div>
+              </div>
+            </div>
+          </div>
+          <!-- v2 -->
+          <div class="pvis pvis--2">
+            <div class="plan">
+              <div class="plan__row"><span class="plan__day">Day 1</span><div><b>Arrival · RUH → ULH</b><small>Charter, 06:40 · transfers on standby</small></div></div>
+              <div class="plan__row"><span class="plan__day">Day 2</span><div><b>Hegra at sunrise</b><small>Private access · guided</small></div></div>
+              <div class="plan__row"><span class="plan__day">Day 3</span><div><b>Gala under the stars</b><small>Stage, light, sound · 60 guests</small></div></div>
+              <div class="plan__row"><span class="plan__day">Day 4</span><div><b>Home</b><small>Door to door</small></div></div>
+            </div>
+          </div>
+          <!-- v3 -->
+          <div class="pvis pvis--3">
+            <div class="live">
+              <div class="live__head"><span>Live status</span><span class="chip chip--ok">On track</span></div>
+              <div class="live__row"><span>Flights</span><span class="dot dot--ok"></span><span>Confirmed</span><b>60/60</b></div>
+              <div class="live__row"><span>Visas</span><span class="dot dot--ok"></span><span>Issued</span><b>12/12</b></div>
+              <div class="live__row"><span>Suites</span><span class="dot dot--ok"></span><span>Ready</span><b>32</b></div>
+              <div class="live__row"><span>Stage build</span><span class="dot dot--run"></span><span>In progress</span><b>84%</b></div>
+              <div class="live__row"><span>Crew</span><span class="dot dot--run"></span><span>On site</span><b>41</b></div>
+              <div class="live__row"><span>Network</span><span class="dot dot--ok"></span><span>Online</span><b>99.9%</b></div>
+            </div>
+          </div>
+          <!-- v4 -->
+          <div class="pvis pvis--4">
+            <div class="gauge">
+              <svg viewBox="0 0 240 140" class="gauge__svg"><g class="gauge__ticks"></g></svg>
+              <div class="gauge__val"><b><span class="js-gauge">0</span>%</b><small>Delivered</small></div>
+            </div>
+            <div class="ledger">
+              <div class="ledger__row"><span>Travel & ticketing</span><span class="dot dot--ok"></span><b>Closed</b></div>
+              <div class="ledger__row"><span>Hospitality</span><span class="dot dot--ok"></span><b>Closed</b></div>
+              <div class="ledger__row"><span>Event production</span><span class="dot dot--ok"></span><b>Closed</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VISION 2030 ============ -->
+    <section class="vision" id="vision">
+      <div class="vision__knock">
+        <video autoplay muted loop playsinline preload="none" poster="assets/media/hero-poster.jpg" class="vision__video">
+          <source src="assets/media/hero-dunes.mp4" type="video/mp4" />
+        </video>
+        <div class="vision__mask"><span>2030</span></div>
+      </div>
+      <div class="vision__body container">
+        <p class="eyebrow eyebrow--dark reveal-up">Vision 2030</p>
+        <h2 class="scrub-text scrub-text--left">A date on a calendar to some.<br>A direction to us.</h2>
+      </div>
+
+      <div class="vision__stage">
+        <img src="assets/img/alula-stars.jpg" alt="AlUla rock formations beneath the Milky Way" class="vision__bg" />
+        <div class="vision__shade"></div>
+        <div class="vision__content container">
+          <div class="vision__big">
+            <b><span class="count" data-to="150">0</span>M</b>
+            <span>visits a year — the Kingdom's 2030 ambition.</span>
+          </div>
+          <p class="vision__line">The doors are opening.<br><em>We make sure the world walks through them.</em></p>
+          <div class="vision__tags">
+            <span>Tourism</span><span>Talent</span><span>Events</span><span>Digital</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FOUNDER ============ -->
+    <section class="founder" id="founder">
+      <div class="container founder__grid">
+        <div class="founder__card tilt">
+          <img src="assets/img/diriyah.jpg" alt="Traditional Najdi architecture reflected in water" class="founder__img" loading="lazy" />
+          <div class="founder__overlay">
+            <img src="assets/brand/symbol-sand.svg" alt="" class="founder__sym" />
+            <p class="founder__ar" lang="ar" dir="rtl">بدر سليمان المطيري</p>
+            <p class="founder__name">Bader Sulaiman Almutairi</p>
+            <p class="founder__role">Founder & CEO</p>
+          </div>
+        </div>
+        <div class="founder__text">
+          <p class="eyebrow eyebrow--dark reveal-up">A word from the founder</p>
+          <blockquote class="scrub-text scrub-text--left scrub-text--quote">“Whoever comes to the Kingdom — to visit, to work, to build — should find it already waiting for them. That's the whole job.”</blockquote>
+          <p class="signature signature--dark">Bader Almutairi</p>
+          <p class="founder__meta">Founder & CEO, Mada Trips · Riyadh</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CTA ============ -->
+    <section class="cta" id="contact">
+      <div class="cta__sun" aria-hidden="true">
+        <svg viewBox="0 0 132.31 88.61" class="sun-svg sun-svg--big">
+          <g class="rays">
+            <path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/>
+            <path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/>
+            <path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/>
+            <path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/>
+            <path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/>
+            <path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/>
+            <path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/>
+            <path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/>
+            <path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/>
+          </g>
+        </svg>
+      </div>
+      <div class="container cta__inner">
+        <p class="eyebrow reveal-up">Your move</p>
+        <h2 class="cta__title split">Where will you<br><em>reach</em> next?</h2>
+        <form class="cta__form" onsubmit="event.preventDefault(); this.classList.add('is-sent');">
+          <div class="cta__need" role="group" aria-label="What do you need?">
+            <label><input type="checkbox" checked /><span>Travel</span></label>
+            <label><input type="checkbox" /><span>Hotels</span></label>
+            <label><input type="checkbox" /><span>Visas</span></label>
+            <label><input type="checkbox" /><span>Manpower</span></label>
+            <label><input type="checkbox" /><span>Events</span></label>
+            <label><input type="checkbox" /><span>IT</span></label>
+          </div>
+          <div class="cta__fields">
+            <input type="text" placeholder="Your name" aria-label="Your name" required />
+            <input type="email" placeholder="Email" aria-label="Email" required />
+            <button class="btn btn--sun magnetic" type="submit"><span>Send</span><i class="btn__arrow">→</i></button>
+          </div>
+          <p class="cta__done">Received. We'll be in touch within the day. ✦</p>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="footer__grid container">
+      <div class="footer__brand">
+        <img src="assets/brand/logo-h-sand.svg" alt="Mada Trips" class="footer__logo" />
+        <div class="footer__orb">
+          <div class="footer__ring"></div>
+          <img src="assets/brand/symbol-sand.svg" alt="" class="footer__sym" />
+        </div>
+        <p>Every horizon, within reach.<br><span lang="ar" dir="rtl">كل أفق، في متناولك.</span></p>
+      </div>
+      <div class="footer__links">
+        <div>
+          <h4>Services</h4>
+          <a href="#services">Travel & Ticketing</a><a href="#services">Hotels</a><a href="#services">Visa Support</a><a href="#services">Events</a>
+        </div>
+        <div>
+          <h4>For business</h4>
+          <a href="#services">Business Services</a><a href="#services">Manpower</a><a href="#services">Specialist Supply</a><a href="#services">IT Solutions</a>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <a href="#founder">Founder</a><a href="#vision">Vision 2030</a><a href="#process">How it works</a><a href="#contact">Contact</a>
+        </div>
+        <div class="footer__bottom">
+          <span>© <span class="js-year">2026</span> Mada Trips. Riyadh, Kingdom of Saudi Arabia.</span>
+          <div class="footer__social">
+            <a href="#" aria-label="X"><svg viewBox="0 0 24 24"><path d="M4 4l16 16M20 4 4 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></a>
+            <a href="#" aria-label="Instagram"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17" cy="7" r="1.1" fill="currentColor"/></svg></a>
+            <a href="#" aria-label="LinkedIn"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5v5M8.5 8v.01M12 15.5v-5m0 2.2c0-1.4 1-2.2 2-2.2s2 .6 2 2.2v2.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer__mega" aria-hidden="true">MADA</div>
+  </footer>
+
+  <div class="grain" aria-hidden="true"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
