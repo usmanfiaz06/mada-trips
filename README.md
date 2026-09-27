@@ -16,7 +16,7 @@ Then open http://localhost:8080.
 
 ## Deploy (Vercel)
 
-Import the repo in Vercel with Framework Preset **Other**, no build command, output directory left empty (root). `vercel.json` sets caching and security headers; `.vercelignore` keeps the original `Assets/` source files out of the deployment. Serve it over HTTP rather than opening the file directly, because the video and fonts need it. It also works on GitHub Pages, Netlify or Vercel as-is.
+Import the repo in Vercel with Framework Preset **Other**, no build command, output directory left empty (root). `vercel.json` sets caching and security headers. Serve it over HTTP rather than opening the file directly, because the video and fonts need it. It also works on GitHub Pages, Netlify or Vercel as-is.
 
 ## Structure
 
