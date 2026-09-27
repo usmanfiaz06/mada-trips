@@ -1,4 +1,4 @@
-# Mada Trips — website
+# Mada Trips website
 
 A single-page site for Mada Trips (مدى): travel, ticketing, hotels, visa support, business services, manpower, specialist supply, events and IT.
 
@@ -35,7 +35,7 @@ Assets/             original brand files as supplied
 5. **Services.** Nine service cards in a pinned horizontal scroll.
 6. **How it works.** A pinned four-step sequence with a ruler timeline: typed brief, then itinerary, then live status board, then a "delivered" gauge.
 7. **Vision 2030.** "2030" knocked out of the video, then an AlUla night-sky panel.
-8. **Founder.** Bader Sulaiman Almutairi, Founder & CEO.
+8. **About.** Bader Sulaiman Almutairi, Founder & CEO, with his portrait (`assets/img/founder.jpg`).
 9. **Contact CTA.** Animated sun rays.
 10. **Footer.**
 
@@ -43,8 +43,7 @@ Respects `prefers-reduced-motion`.
 
 ## Before going live
 
-- **Founder quote.** The line on the page is draft copy. Have Bader approve or rewrite it.
-- **Founder photo.** The card uses a Najdi architecture image. Replace `assets/img/diriyah.jpg`, or the `.founder__img` source, with a portrait.
+- **Founder quote.** The line in the About section is draft copy. Have Bader approve it.
 - **Contact form.** It is front-end only and shows a confirmation without sending anything. Wire it to email, a CRM or WhatsApp.
 - **Social links.** They point to `#`.
 - **Stats.** The only external figure is the 150M-visits Vision 2030 tourism target. Everything else is qualitative.

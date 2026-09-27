@@ -1,5 +1,5 @@
 /* =========================================================
-   MADA TRIPS — motion
+   MADA TRIPS: motion
    GSAP + ScrollTrigger + Lenis
    ========================================================= */
 (() => {
@@ -132,7 +132,7 @@
 
   /* ---------------- Visa typing + stamp ---------------- */
   const visaEl = $('.js-visa-typed'), stamp = $('.js-stamp');
-  typeLoop(t => (visaEl.textContent = t), ['Schengen — France', 'UK Standard Visitor', 'Umrah — 4 guests', 'Business eVisa — KSA'], {
+  typeLoop(t => (visaEl.textContent = t), ['Schengen · France', 'UK Standard Visitor', 'Umrah · 4 guests', 'Business eVisa · KSA'], {
     hold: 1900,
     onFull: () => {
       gsap.fromTo(stamp, { scale: 2.2, opacity: 0, rotate: -24 }, { scale: 1, opacity: 1, rotate: -12, duration: .45, ease: 'back.out(2.2)' });
@@ -472,7 +472,7 @@
     ScrollTrigger.create({ trigger: el, start: 'top 45px', end: 'bottom 45px', onToggle: s => s.isActive && setTheme(theme) });
   });
   const links = $$('.nav__link');
-  ['#services', '#why', '#process', '#vision', '#founder'].forEach(id => {
+  ['#services', '#why', '#process', '#vision', '#about'].forEach(id => {
     ScrollTrigger.create({
       trigger: id, start: 'top 50%', end: 'bottom 50%',
       onToggle: s => s.isActive && links.forEach(l => l.classList.toggle('is-active', l.getAttribute('href') === id))
