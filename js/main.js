@@ -59,22 +59,6 @@
   $$('.split').forEach(el => splitWords(el, true));
   $$('.scrub-text').forEach(el => splitWords(el, false));
 
-  /* ---------------- Cursor ---------------- */
-  const cursor = $('.cursor');
-  if (cursor && matchMedia('(hover: hover)').matches) {
-    const label = $('.cursor__label', cursor);
-    const xTo = gsap.quickTo(cursor, 'x', { duration: .45, ease: 'power3' });
-    const yTo = gsap.quickTo(cursor, 'y', { duration: .45, ease: 'power3' });
-    addEventListener('pointermove', e => { cursor.classList.add('is-live'); xTo(e.clientX); yTo(e.clientY); });
-    document.addEventListener('pointerover', e => {
-      const t = e.target.closest('[data-cursor], a, button, label, input');
-      cursor.classList.remove('is-hover', 'is-label');
-      if (!t) return;
-      if (t.dataset.cursor) { label.textContent = t.dataset.cursor; cursor.classList.add('is-label'); }
-      else cursor.classList.add('is-hover');
-    });
-  }
-
   /* ---------------- Magnetic buttons ---------------- */
   if (matchMedia('(hover: hover)').matches) {
     $$('.magnetic').forEach(el => {
@@ -239,7 +223,6 @@
       pin: true, scrub: 1, invalidateOnRefresh: true,
       onUpdate(self) {
         const t = self.progress * reachTl.duration();
-        setTheme(t > .45 ? 'dark' : 'light');
         const idx = t < CH_START ? 0 : Math.min(3, 1 + Math.floor((t - CH_START) / CH_LEN));
         dots.forEach((d, k) => {
           d.classList.toggle('is-on', k === idx);
@@ -339,17 +322,7 @@
   const steps = $$('.pstep'), vis = $$('.pvis');
   const briefEl = $('.js-brief');
   const briefText = 'Board retreat · 60 guests · AlUla · March';
-  const ticksG = $('.gauge__ticks');
-  const NT = 38;
-  for (let i = 0; i < NT; i++) {
-    const a = Math.PI + (i / (NT - 1)) * Math.PI;
-    const cx = 120, cy = 128, r1 = 84, r2 = 108;
-    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.setAttribute('x1', cx + Math.cos(a) * r1); l.setAttribute('y1', cy + Math.sin(a) * r1);
-    l.setAttribute('x2', cx + Math.cos(a) * r2); l.setAttribute('y2', cy + Math.sin(a) * r2);
-    ticksG.appendChild(l);
-  }
-  const ticks = $$('line', ticksG), gaugeNum = $('.js-gauge');
+  const rays = $$('.gauge__sun path'), gaugeWrap = $('.gauge'), gaugeNum = $('.js-gauge');
 
   gsap.set(steps[0], { opacity: 1 }); gsap.set(vis[0], { opacity: 1 });
   const procTl = gsap.timeline({
@@ -365,8 +338,9 @@
         briefEl.textContent = briefText.slice(0, Math.round(tp * briefText.length));
         // step 4: gauge
         const gp = gsap.utils.clamp(0, 1, (t - 3.1) / .7);
-        const lit = Math.round(gp * NT);
-        ticks.forEach((l, k) => l.classList.toggle('on', k < lit));
+        const lit = Math.round(gp * rays.length);
+        rays.forEach((r, k) => r.classList.toggle('on', k < lit));
+        gaugeWrap.classList.toggle('is-full', gp >= 1);
         gaugeNum.textContent = Math.round(gp * 100);
       }
     }
@@ -463,21 +437,27 @@
   /* nav triggers are created last so pinned sections above are measured first */
   const onScrollNav = () => nav.classList.toggle('is-scrolled', scrollY > 40);
   addEventListener('scroll', onScrollNav, { passive: true }); onScrollNav();
-  [
-    ['.marquee-wrap', 'dark'], ['.why', 'light'], ['.services', 'dark'], ['.process__intro', 'dark'],
-    ['.process__panel', 'light'], ['.vision__knock', 'dark'], ['.vision__body', 'dark'], ['.vision__stage', 'light'],
-    ['.founder', 'dark'], ['.cta', 'light'], ['.footer', 'dark']
-  ].forEach(([sel, theme]) => {
-    const el = $(sel); if (!el) return;
-    ScrollTrigger.create({ trigger: el, start: 'top 45px', end: 'bottom 45px', onToggle: s => s.isActive && setTheme(theme) });
-  });
+  const themeOf = y => {
+    const hit = document.elementsFromPoint(innerWidth / 2, y).find(el => !el.closest('.nav, .menu, .topbar'));
+    return hit?.closest('[data-nav]')?.dataset.nav;
+  };
   const links = $$('.nav__link');
-  ['#services', '#why', '#process', '#vision', '#about'].forEach(id => {
-    ScrollTrigger.create({
-      trigger: id, start: 'top 50%', end: 'bottom 50%',
-      onToggle: s => s.isActive && links.forEach(l => l.classList.toggle('is-active', l.getAttribute('href') === id))
-    });
-  });
+  const sectionIds = ['#services', '#why', '#process', '#vision', '#about'];
+  let navQueued = false;
+  const syncNav = () => {
+    navQueued = false;
+    const nr = nav.getBoundingClientRect();
+    const t = themeOf(nr.top + nr.height / 2);
+    if (t) setTheme(t);
+    const mid = document.elementsFromPoint(innerWidth / 2, innerHeight / 2).find(el => !el.closest('.nav, .menu'));
+    const sec = mid?.closest('section');
+    const id = sec && sectionIds.find(s => sec.matches(s));
+    links.forEach(l => l.classList.toggle('is-active', !!id && l.getAttribute('href') === id));
+  };
+  const queueNav = () => { if (!navQueued) { navQueued = true; requestAnimationFrame(syncNav); } };
+  addEventListener('scroll', queueNav, { passive: true });
+  ScrollTrigger.addEventListener('refresh', queueNav);
+  queueNav();
 
   /* pause off-screen videos */
   $$('video').forEach(v => {

@@ -117,21 +117,6 @@ em { font-family: var(--f-serif); font-style: italic; font-weight: 400; letter-s
 .loader__word span { display: inline-block; }
 .loader__count { position: absolute; bottom: 28px; right: var(--gutter); font-family: var(--f-mono); font-size: 12px; color: var(--muted-l); }
 
-/* ---------- Cursor ---------- */
-.cursor {
-  position: fixed; top: 0; left: 0; z-index: 150; pointer-events: none;
-  width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%;
-  background: var(--gold); display: grid; place-items: center;
-  transition: width .45s var(--ease), height .45s var(--ease), margin .45s var(--ease), background .3s;
-  opacity: 0;
-}
-.cursor.is-live { opacity: 1; }
-.cursor__label { font-size: 12px; font-weight: 600; color: var(--green-900); opacity: 0; transition: opacity .2s; letter-spacing: .02em; }
-.cursor.is-hover { width: 44px; height: 44px; margin: -22px 0 0 -22px; background: rgba(217, 183, 122, .35); backdrop-filter: blur(2px); }
-.cursor.is-label { width: 86px; height: 86px; margin: -43px 0 0 -43px; background: var(--gold); }
-.cursor.is-label .cursor__label { opacity: 1; }
-@media (hover: none), (pointer: coarse) { .cursor { display: none; } }
-
 /* ---------- Top bar + Nav ---------- */
 .topbar {
   position: absolute; top: 0; left: 0; right: 0; z-index: 30; height: 38px;
@@ -557,12 +542,15 @@ body.menu-open .nav { color: var(--sand); }
 .dot--run { background: var(--gold); box-shadow: 0 0 10px rgba(217, 183, 122, .6); animation: ping2 1.2s infinite; }
 .ledger__row { grid-template-columns: 1fr 14px auto; }
 
-.gauge { position: relative; width: min(380px, 90%); }
-.gauge__svg { width: 100%; overflow: visible; }
-.gauge__ticks line { stroke: rgba(233, 226, 216, .12); stroke-width: 5; stroke-linecap: round; transition: stroke .3s; }
-.gauge__ticks line.on { stroke: var(--gold); }
-.gauge__val { position: absolute; left: 0; right: 0; bottom: 6%; text-align: center; }
-.gauge__val b { display: block; font-size: 52px; font-weight: 400; letter-spacing: -.04em; }
+.gauge { position: relative; width: min(360px, 90%); display: flex; flex-direction: column; align-items: center; }
+.gauge::before { content: ""; position: absolute; left: 50%; top: 58%; width: 70%; aspect-ratio: 1; transform: translate(-50%, -50%) scale(.6); border-radius: 50%; background: radial-gradient(circle, rgba(217, 183, 122, .35), transparent 65%); opacity: 0; transition: opacity 1s, transform 1.2s var(--ease); pointer-events: none; }
+.gauge.is-full::before { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+.gauge__sun { position: relative; width: 100%; overflow: visible; }
+.gauge__sun path { fill: rgba(233, 226, 216, .1); transform-box: fill-box; transform-origin: center; transition: fill .45s var(--ease), transform .6s var(--ease), filter .6s; }
+.gauge__sun path.on { fill: var(--gold); transform: scale(1.04); }
+.gauge.is-full .gauge__sun path { filter: drop-shadow(0 0 10px rgba(217, 183, 122, .45)); }
+.gauge__val { position: relative; margin-top: 22px; text-align: center; }
+.gauge__val b { display: block; font-size: 52px; font-weight: 400; letter-spacing: -.04em; line-height: 1.05; }
 .gauge__val small { color: var(--muted-l); font-size: 15px; }
 .ledger { width: min(460px, 100%); margin-top: 26px; }
 
