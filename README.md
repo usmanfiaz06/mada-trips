@@ -18,6 +18,13 @@ Then open http://localhost:8080. Serve it over HTTP rather than opening the file
 
 Import the repo in Vercel with Framework Preset **Other**, no build command, output directory left empty (root). `vercel.json` sets caching and security headers.
 
+## SEO and link previews
+
+- Open Graph and X/Twitter tags, canonical URL and Organization/TravelAgency structured data are in the `<head>` of `index.html`.
+- `og-image.jpg` (1200×630) is the image shown when the link is shared.
+- `sitemap.xml`, `robots.txt`, `site.webmanifest`, app icons in `assets/brand/`, and a branded `404.html`.
+- **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in `index.html`, `sitemap.xml` and `robots.txt`.
+
 ## Structure
 
 ```

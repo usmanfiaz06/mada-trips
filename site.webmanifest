@@ -1,0 +1,26 @@
+{
+  "name": "Mada Trips",
+  "short_name": "Mada",
+  "description": "Travel, ticketing, hotels, visas, manpower, specialists, events and IT. One Saudi partner for everything that moves, from Riyadh to every horizon.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f2ec",
+  "theme_color": "#10201a",
+  "icons": [
+    {
+      "src": "/assets/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
