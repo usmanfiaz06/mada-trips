@@ -21,7 +21,7 @@ Import the repo in Vercel with Framework Preset **Other**, no build command, out
 ## SEO and link previews
 
 - Open Graph and X/Twitter tags, canonical URL and Organization/TravelAgency structured data are in the `<head>` of `index.html`.
-- `og-image.jpg` (1200×630) is the image shown when the link is shared.
+- Link-preview images (1200×630): `og-image.jpg` for the home page, and `assets/og/events.jpg`, `services.jpg`, `about.jpg`, `contact.jpg` for the other pages.
 - `sitemap.xml`, `robots.txt`, `site.webmanifest`, app icons in `assets/brand/`, and a branded `404.html`.
 - **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in every `.html` page, `sitemap.xml` and `robots.txt`.
 - The nav, menu and footer are repeated in each page. If you change one, change them all.
@@ -64,7 +64,8 @@ Respects `prefers-reduced-motion`.
 ## Before going live
 
 - **Founder quote.** The line in the About section is draft copy. Have Bader approve it.
-- **Contact forms** (home and /contact). They are front-end only and shows a confirmation without sending anything. Wire it to email, a CRM or WhatsApp.
+- **Phone.** +966 56 668 2662 appears in every footer, the mobile menu, /contact (call and WhatsApp buttons) and the home contact section.
+- **Contact forms** (home and /contact). They are front-end only and show a confirmation without sending anything. Wire it to email, a CRM or WhatsApp.
 - **Social links.** They point to `#`.
 - **Stats.** The only external figure is the 150M-visits Vision 2030 tourism target. Everything else is qualitative.
 
