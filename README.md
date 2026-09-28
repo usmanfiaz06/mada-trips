@@ -38,6 +38,8 @@ css/style.css       design tokens (brand green #1e352d, sand #e9e2d8, sun gold) 
 js/site.js          shared motion on every page: GSAP + ScrollTrigger + Lenis (jsDelivr), nav, reveals, menu
 js/home.js          home-only motion: hero-to-card, services scroll, events spotlight, process, loader
 js/pages.js         inner-page motion: events hero, run of show, event flow, gallery, services index
+js/chat-kb.js       concierge knowledge base: answers, trigger words, guided questions (edit this)
+js/chat.js          concierge engine: understanding, Arabic/English, memory, WhatsApp handoff
 assets/brand/       logo and symbol SVGs recoloured from /Assets
 assets/media/       videos (dunes, events stage, fireworks) and posters
 assets/img/events/  event photography
@@ -60,6 +62,22 @@ Assets/             original brand files as supplied
 10. **Footer.**
 
 Respects `prefers-reduced-motion`.
+
+## Concierge chat
+
+A free, built-in assistant on every page (bottom-right "Ask Mada"). No accounts, API keys or monthly fees.
+
+- Understands free text in English and Arabic, typos and plurals, and pulls details out of sentences
+  ("a gala for 300 in Riyadh in March" fills event type, guests, city and date).
+- 40+ topics: prices, payment, invoices, refunds, visas and documents, Umrah, Hajj, events, hiring, jobs,
+  suppliers, complaints, urgent requests, location, hours, languages and more.
+- Guided requests for trips, events, talent, visas, hotels and IT, with back, edit, start over and cancel.
+- Handles gibberish, repeats, very long messages, questions asked mid-request and requests for a real person.
+- Validates names and Saudi or international phone numbers, then sends a ready-written summary to WhatsApp.
+- Remembers the conversation while the visitor moves between pages.
+
+**To change answers**, edit `js/chat-kb.js`: add trigger words to `keys`, change `en`/`ar` replies, or add a new
+topic by copying an existing block. Test in the browser console with `MadaConcierge.say('your message')`.
 
 ## Before going live
 
