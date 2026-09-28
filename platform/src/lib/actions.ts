@@ -1,12 +1,13 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { BASE } from "@/lib/base";
 import { z } from "zod";
 
 export type ActionState = { error?: string; ok?: string; fields?: Record<string, string> } | null;
 
 /** A short message shown as a toast on the next page the user lands on. */
 export async function flash(message: string) {
-  (await cookies()).set("mada_flash", encodeURIComponent(message), { path: "/", maxAge: 20, sameSite: "lax" });
+  (await cookies()).set("mada_flash", encodeURIComponent(message), { path: BASE || "/", maxAge: 20, sameSite: "lax" });
 }
 
 export function zodError(e: z.ZodError): ActionState {

@@ -21,7 +21,7 @@ export function CommandPalette({ pages }: { pages: { label: string; href: string
     const onKey = (e: KeyboardEvent) => {
       const typing = /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName) || (e.target as HTMLElement)?.isContentEditable;
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen((o) => !o); }
-      else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "n" && pages.some((p) => p.href === "/sales/new")) { e.preventDefault(); router.push("/sales/new"); }
+      else if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "n" && pages.some((p) => p.href === "/adminwork/sales/new")) { e.preventDefault(); router.push("/adminwork/sales/new"); }
       else if (!typing && e.key === "/") { e.preventDefault(); setOpen(true); }
       else if (e.key === "Escape") setOpen(false);
     };
@@ -36,7 +36,7 @@ export function CommandPalette({ pages }: { pages: { label: string; href: string
   useEffect(() => {
     if (q.trim().length < 2) { setRemote([]); return; }
     const c = new AbortController();
-    const h = setTimeout(() => fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: c.signal }).then((r) => r.json()).then(setRemote).catch(() => {}), 140);
+    const h = setTimeout(() => fetch(`/adminwork/api/search?q=${encodeURIComponent(q)}`, { signal: c.signal }).then((r) => r.json()).then(setRemote).catch(() => {}), 140);
     return () => { clearTimeout(h); c.abort(); };
   }, [q]);
 

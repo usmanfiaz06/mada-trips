@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2, Moon, Sun, X } from "lucide-react";
 import { btn, cx } from "./ui";
 import { useT } from "@/lib/i18n/client";
+import { BASE } from "@/lib/base";
 
 type State = { error?: string; ok?: string; fields?: Record<string, string> } | null;
 type Action = (prev: State, fd: FormData) => Promise<State>;
@@ -55,7 +56,7 @@ export function Toaster() {
     const check = () => {
       const m = document.cookie.split("; ").find((c) => c.startsWith("mada_flash="));
       if (!m) return;
-      document.cookie = "mada_flash=; Max-Age=0; path=/";
+      document.cookie = `mada_flash=; Max-Age=0; path=${BASE || "/"}`;
       setMsg(decodeURIComponent(decodeURIComponent(m.split("=")[1])));
       clearTimeout(hide);
       hide = setTimeout(() => setMsg(null), 4200);
@@ -81,7 +82,7 @@ export function ThemeToggle() {
   const toggle = () => {
     const dark = !document.documentElement.classList.contains("dark");
     document.documentElement.classList.toggle("dark", dark);
-    document.cookie = `mada_theme=${dark ? "dark" : "light"}; path=/; max-age=31536000; samesite=lax`;
+    document.cookie = `mada_theme=${dark ? "dark" : "light"}; path=${BASE || "/"}; max-age=31536000; samesite=lax`;
   };
   return (
     <button onClick={toggle} className="grid size-10 place-items-center rounded-full text-tile-ink-3 transition hover:bg-white/10 hover:text-tile-ink" aria-label={t("Toggle theme")} title={t("Toggle theme")}>
@@ -97,7 +98,7 @@ export function LocaleSwitch({ dark = true }: { dark?: boolean }) {
   const next = t.locale === "ar" ? "en" : "ar";
   return (
     <button disabled={pending} className={cx("grid h-10 min-w-10 place-items-center rounded-full px-2.5 text-[13px] font-medium transition", dark ? "text-tile-ink-3 hover:bg-white/10 hover:text-tile-ink" : "text-ink-2 hover:bg-surface")} title={t("Language")}
-      onClick={() => { document.cookie = `mada_locale=${next}; path=/; max-age=31536000; samesite=lax`; start(() => router.refresh()); }}>
+      onClick={() => { document.cookie = `mada_locale=${next}; path=${BASE || "/"}; max-age=31536000; samesite=lax`; start(() => router.refresh()); }}>
       {next === "ar" ? "عربي" : "EN"}
     </button>
   );

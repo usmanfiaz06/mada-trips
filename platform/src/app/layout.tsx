@@ -14,7 +14,7 @@ import { Toaster } from "@/components/client";
 export const metadata: Metadata = {
   title: { default: "Mada Ops", template: "%s · Mada Ops" },
   description: "Mada Trips internal operations platform",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/adminwork/favicon.svg" },
   robots: { index: false, follow: false },
 };
 export const viewport: Viewport = { themeColor: [{ media: "(prefers-color-scheme: dark)", color: "#0a100e" }, { color: "#f4f2ed" }] };

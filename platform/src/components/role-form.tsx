@@ -2,7 +2,7 @@ import { getT } from "@/lib/i18n";
 import { PERMISSIONS, PERMISSION_GROUPS, type Permission } from "@/lib/permissions";
 import { Card, Field, Input } from "./ui";
 import { ActionForm, SubmitButton } from "./client";
-import { saveRole } from "@/app/(app)/team/actions";
+import { saveRole } from "@/app/adminwork/(app)/team/actions";
 
 /** Role editor: the permission matrix, grouped by area, as switches. */
 export async function RoleForm({ role }: { role?: { id: string; name: string; nameAr: string; description: string | null; permissions: string[] } }) {

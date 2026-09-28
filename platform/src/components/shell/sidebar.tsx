@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { withBase } from "@/lib/base";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -15,7 +16,7 @@ export type NavSection = { label: string; items: NavItem[] };
 
 function Nav({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: () => void }) {
   const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
+  const active = (href: string) => (href === "/adminwork" ? path === "/adminwork" : path === href || path.startsWith(href + "/"));
   // Most specific match wins so /team/roles doesn't also light up /team.
   const current = sections.flatMap((s) => s.items).filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
@@ -58,9 +59,9 @@ function Nav({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: ()
 
 function Brand() {
   return (
-    <Link href="/" className="flex h-20 items-center gap-3 px-7">
-      <img src="/symbol-green.svg" alt="" className="h-[18px] dark:hidden" />
-      <img src="/symbol-sand.svg" alt="" className="hidden h-[18px] dark:block" />
+    <Link href="/adminwork" className="flex h-20 items-center gap-3 px-7">
+      <img src={withBase("/symbol-green.svg")} alt="" className="h-[18px] dark:hidden" />
+      <img src={withBase("/symbol-sand.svg")} alt="" className="hidden h-[18px] dark:block" />
       <span className="text-[16px] font-medium tracking-[-0.02em] text-ink">Mada <span className="text-ink-3">Ops</span></span>
     </Link>
   );
@@ -70,7 +71,7 @@ function UserBlock({ name, role, logout }: { name: string; role: string; logout:
   const t = useT();
   return (
     <div className="m-4 flex items-center gap-3 rounded-[20px] bg-surface p-2 shadow-card">
-      <Link href="/me" className="flex min-w-0 flex-1 items-center gap-3">
+      <Link href="/adminwork/me" className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-ink text-[12px] font-medium text-bg">
           {name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
         </span>

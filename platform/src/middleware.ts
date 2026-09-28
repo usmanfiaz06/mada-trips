@@ -1,16 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Cheap gate: no session cookie → login. The real check (valid, unexpired, active user) happens server-side.
+// Cheap gate for the platform: no session cookie → login. The real check (valid, unexpired, active user)
+// happens server-side. The public website is never gated.
 export function middleware(req: NextRequest) {
-  const has = req.cookies.has("mada_session");
-  const { pathname } = req.nextUrl;
-  if (!has && pathname !== "/login") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
-    return NextResponse.redirect(url);
-  }
-  return NextResponse.next();
+  const { pathname, search } = req.nextUrl;
+  if (pathname === "/adminwork/login" || req.cookies.has("mada_session")) return NextResponse.next();
+  const url = req.nextUrl.clone();
+  url.pathname = "/adminwork/login";
+  url.search = pathname === "/adminwork" ? "" : `?next=${encodeURIComponent(pathname + search)}`;
+  return NextResponse.redirect(url);
 }
 
-export const config = { matcher: ["/((?!_next|favicon|symbol|wordmark|api/health).*)"] };
+export const config = { matcher: ["/adminwork", "/adminwork/((?!symbol|wordmark|favicon).*)"] };

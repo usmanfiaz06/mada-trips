@@ -5,7 +5,7 @@ import { getT } from "@/lib/i18n";
 import { fmtDate, timeAgo } from "@/lib/dates";
 import { Avatar, Card, cx } from "./ui";
 import { ActionForm, SubmitButton } from "./client";
-import { addRemark, uploadAttachment } from "@/app/(app)/record-actions";
+import { addRemark, uploadAttachment } from "@/app/adminwork/(app)/record-actions";
 
 /** Everything that happened to a record, oldest last: logged changes and people's remarks, in one stream. */
 export async function Timeline({ entityType, entityId, path, refLabel }: { entityType: string; entityId: string; path: string; refLabel: string }) {
@@ -87,7 +87,7 @@ export async function Attachments({ entityType, entityId, path, refLabel, canAdd
       <ul className="space-y-2">
         {files.map((f) => (
           <li key={f.id}>
-            <a href={`/api/files/${f.id}`} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-2.5 transition hover:bg-sunken">
+            <a href={`/adminwork/api/files/${f.id}`} target="_blank" rel="noopener" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-2.5 transition hover:bg-sunken">
               <span className={cx("grid size-10 shrink-0 place-items-center rounded-xl", f.mime === "application/pdf" ? "bg-bad-soft text-bad" : "bg-info-soft text-info")}>
                 {f.mime === "application/pdf" ? <FileText className="size-4" /> : <ImageIcon className="size-4" />}
               </span>

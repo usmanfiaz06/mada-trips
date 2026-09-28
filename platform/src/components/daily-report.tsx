@@ -34,7 +34,7 @@ export async function ReportTable({ r }: { r: R }) {
             const coll = x.status === "void" ? ["neutral", "Void"] : x.paid >= x.sell_price ? ["ok", "Collected"] : x.on_credit ? ["info", "On credit"] : x.paid > 0 ? ["warn", "Part paid"] : ["bad", "Not collected"];
             return (
               <tr key={x.id} className={cx(x.status === "void" && "opacity-50")}>
-                <Td><Link href={`/sales/${x.id}`} className="num whitespace-nowrap font-medium text-ink hover:underline">{x.ref}</Link><span className="block text-[11.5px] text-ink-3">{x.preparer.split(" ")[0]}</span></Td>
+                <Td><Link href={`/adminwork/sales/${x.id}`} className="num whitespace-nowrap font-medium text-ink hover:underline">{x.ref}</Link><span className="block text-[11.5px] text-ink-3">{x.preparer.split(" ")[0]}</span></Td>
                 <Td><span className="num block whitespace-nowrap tracking-wider" dir="ltr">{x.pnr ?? "—"}</span><span className="num block whitespace-nowrap text-[11.5px] text-ink-3" dir="ltr">{x.ticket_numbers ?? t(BOOKING_STATUS[x.status].label)}</span></Td>
                 <Td><span className="block max-w-[200px] truncate text-ink">{x.client}</span><span className="block max-w-[200px] truncate text-[12px] text-ink-3">{x.passengers}</span></Td>
                 <Td align="end"><span className="num" dir="ltr">{sar(x.net_cost)}</span></Td>

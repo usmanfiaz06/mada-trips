@@ -2,14 +2,16 @@
   "name": "mada-ops",
   "version": "1.0.0",
   "scripts": {
-    "dev": "next dev -p 3100",
-    "build": "next build",
+    "dev": "node scripts/copy-site.mjs && next dev -p 3100",
+    "build": "node scripts/copy-site.mjs && next build",
     "start": "next start -p 3100",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:setup": "npm run db:migrate && npm run db:seed"
+    "db:setup": "npm run db:migrate && npm run db:seed",
+    "db:bootstrap": "tsx src/db/seed.ts --bootstrap",
+    "vercel-build": "npm run db:migrate && npm run db:bootstrap && npm run build"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

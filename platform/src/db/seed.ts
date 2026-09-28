@@ -14,7 +14,8 @@ const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mad
 const client = postgres(url, { max: 1 });
 const db = drizzle(client, { schema });
 const args = new Set(process.argv.slice(2));
-const PASSWORD = process.env.SEED_PASSWORD ?? "Mada@2026";
+const IS_PROD = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+const PASSWORD = process.env.SEED_PASSWORD ?? (IS_PROD ? "" : "Mada@2026");
 
 const TZ_OFFSET = 3; // Riyadh is UTC+3 all year
 const riyadhDay = (d: Date) => new Date(d.getTime() + TZ_OFFSET * 3600_000).toISOString().slice(0, 10);
@@ -33,8 +34,11 @@ async function main() {
     await db.execute(sql`CREATE TRIGGER audit_events_no_update BEFORE UPDATE OR DELETE ON audit_events FOR EACH ROW EXECUTE FUNCTION audit_events_immutable()`);
     console.log("Wiped.");
   }
+  if (IS_PROD && args.has("--reset")) throw new Error("Refusing to wipe a production database");
+  if (IS_PROD && !args.has("--bootstrap")) throw new Error("Demo data is never loaded in production; use --bootstrap");
   const existing = await db.select().from(schema.users).limit(1);
-  if (existing.length) { console.log("Already seeded. Use --reset to start over."); return; }
+  if (existing.length) { console.log("Already set up. Nothing to do."); return; }
+  if (!PASSWORD) { console.log("Skipping first-time setup: set SEED_PASSWORD (the partners' first password) and redeploy."); return; }
 
   const roleRows = await db.insert(schema.roles).values(SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }))).returning();
   const role = (k: string) => roleRows.find((r) => r.key === k)!.id;

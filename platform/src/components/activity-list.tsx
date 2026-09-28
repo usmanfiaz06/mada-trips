@@ -6,8 +6,8 @@ import { Avatar } from "./ui";
 export type ActivityItem = { id: number; at: Date; actorName: string | null; action: string; entityType: string; entityId: string | null; entityRef: string | null; summary: string; changes: unknown; ip: string | null };
 
 const HREF: Record<string, (id: string) => string> = {
-  booking: (id) => `/sales/${id}`, expense: (id) => `/expenses/${id}`, client: (id) => `/clients/${id}`, approval: (id) => `/approvals/${id}`,
-  settlement: (id) => `/settlement/${id}`, user: (id) => `/team/${id}`, role: (id) => `/team/roles/${id}`,
+  booking: (id) => `/adminwork/sales/${id}`, expense: (id) => `/adminwork/expenses/${id}`, client: (id) => `/adminwork/clients/${id}`, approval: (id) => `/adminwork/approvals/${id}`,
+  settlement: (id) => `/adminwork/settlement/${id}`, user: (id) => `/adminwork/team/${id}`, role: (id) => `/adminwork/team/roles/${id}`,
 };
 const DOT: Record<string, string> = { approval: "bg-gold", booking: "bg-[var(--chart-1)]", expense: "bg-[var(--chart-2)]", user: "bg-info", role: "bg-info", close: "bg-ink-3", settlement: "bg-gold", auth: "bg-ink-4" };
 

@@ -6,6 +6,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { Permission } from "./permissions";
+import { BASE } from "./base";
 
 export const SESSION_COOKIE = "mada_session";
 const SESSION_DAYS = 14;
@@ -22,7 +23,7 @@ export async function createSession(userId: string) {
     userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
   });
   (await cookies()).set(SESSION_COOKIE, token, {
-    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", expires: expiresAt,
+    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: BASE || "/", expires: expiresAt,
   });
 }
 
@@ -30,7 +31,7 @@ export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) await db.delete(schema.sessions).where(eq(schema.sessions.id, hash(token)));
-  jar.delete(SESSION_COOKIE);
+  jar.set(SESSION_COOKIE, "", { path: BASE || "/", maxAge: 0 });
 }
 
 export type CurrentUser = {
@@ -67,7 +68,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
 export async function requireUser() {
   const u = await getCurrentUser();
-  if (!u) redirect("/login");
+  if (!u) redirect("/adminwork/login");
   return u;
 }
 
@@ -75,7 +76,7 @@ export const can = (u: CurrentUser, p: Permission) => u.permissions.has(p);
 
 export async function requirePerm(p: Permission) {
   const u = await requireUser();
-  if (!can(u, p)) redirect("/?denied=1");
+  if (!can(u, p)) redirect("/adminwork?denied=1");
   return u;
 }
 

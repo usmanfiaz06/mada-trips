@@ -28,5 +28,5 @@ export async function voteBoard(reqs: Req[]): Promise<Map<string, Board>> {
 }
 
 export function entityHref(r: Req) {
-  return r.entityType === "booking" ? `/sales/${r.entityId}` : r.entityType === "expense" ? `/expenses/${r.entityId}` : r.entityType === "client" ? `/clients/${r.entityId}` : r.entityType === "settlement" ? `/settlement/${r.entityId}` : "#";
+  return r.entityType === "booking" ? `/adminwork/sales/${r.entityId}` : r.entityType === "expense" ? `/adminwork/expenses/${r.entityId}` : r.entityType === "client" ? `/adminwork/clients/${r.entityId}` : r.entityType === "settlement" ? `/adminwork/settlement/${r.entityId}` : "#";
 }

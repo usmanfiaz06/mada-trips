@@ -14,7 +14,7 @@ cp .env.example .env            # set DATABASE_URL
 npm install
 npm run db:migrate              # create tables (+ the append-only trigger on the activity log)
 npm run db:seed                 # demo data; or: npm run db:seed -- --bootstrap  (partners only, no demo)
-npm run dev                     # http://localhost:3100
+npm run dev                     # website on http://localhost:3100, platform on /adminwork
 ```
 
 Demo sign-ins (password `Mada@2026`, override with `SEED_PASSWORD`):
@@ -29,9 +29,18 @@ Demo sign-ins (password `Mada@2026`, override with `SEED_PASSWORD`):
 
 `npm run db:seed -- --reset` wipes everything and reseeds.
 
-## Deploy
+## Deploy (same Vercel project as the website)
 
-Any Postgres works (Supabase, Neon, RDS). On Vercel: import the repo, set **Root Directory** to `platform`, add `DATABASE_URL`, deploy. Run `npm run db:migrate` and `npm run db:seed -- --bootstrap` once against the production database, then have each partner change their password from **My profile**.
+One Vercel project serves both: the public website at `madatrips.sa` and Mada Ops at `madatrips.sa/adminwork`. The website isn't changed; at build time `scripts/copy-site.mjs` copies it from the repo root into `public/`, and Next.js serves it with the same clean URLs and headers as before. Nothing on the website links to `/adminwork`, and the platform tells search engines not to index it.
+
+One-time setup in the existing Vercel project:
+
+1. **Settings → Build and Deployment → Root Directory:** `platform`. Framework Preset switches to **Next.js**. Leave "Include files outside the root directory" on (the website lives there).
+2. **Storage → Create Database → Neon (Postgres)** and connect it to the project. This adds `DATABASE_URL`.
+3. **Settings → Environment Variables:** add `SEED_PASSWORD`, the first password for the three partner logins.
+4. **Redeploy.** Each build runs `vercel-build`: migrations, first-time setup (roles, the three partners, bank accounts; skipped once anyone exists), then the build. Demo data is never loaded in production.
+
+Then open `/adminwork`, sign in as a partner (e.g. `abdulaziz@madatrips.com`), change the password under **My profile**, and add the team under **Team**. With the root directory set to `platform`, the root `vercel.json` is no longer read; its headers now live in `next.config.ts`.
 
 ## How the governance rules are enforced
 
