@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+.env.local
+next-env.d.ts
+*.tsbuildinfo
+# The website is copied in at build time (scripts/copy-site.mjs)
+/public/*
+!/public/adminwork/
