@@ -1130,3 +1130,5 @@ body.menu-open .nav { color: var(--sand); }
 .mc-panel[dir="rtl"] .mc-sum b { text-align: left; }
 .mc-panel[dir="rtl"] .mc-input button { transform: scaleX(-1); }
 .mc-msg[dir="rtl"], .mc-panel[dir="rtl"] .mc-chip, .mc-panel[dir="rtl"] input { font-family: var(--f-sans), "Reem Kufi", system-ui; }
+.mc-chip--wa-soft { background: rgba(31, 157, 85, .1); color: #17864a; box-shadow: inset 0 0 0 1px rgba(31, 157, 85, .3); }
+.mc-chip--wa-soft:hover { background: #1f9d55; color: #fff; }

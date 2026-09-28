@@ -53,6 +53,21 @@ window.MADA_KB = {
     { id: 'vision', keys: ['vision 2030', '2030', 'vision', 'رؤيه 2030', 'الرؤيه'],
       en: 'Vision 2030 is opening the Kingdom to the world. We build around it: tourism, talent, events and digital services.', ar: 'رؤية 2030 تفتح المملكة للعالم، ونحن نعمل معها: السياحة والكفاءات والفعاليات والخدمات الرقمية.', chips: ['menu'] },
 
+    { id: 'experience', keys: ['experience', 'past experience', 'previous work', 'past work', 'portfolio', 'track record', 'references', 'reference', 'case study', 'case studies', 'previous events', 'past events', 'clients', 'who have you worked with', 'examples', 'how long have you', 'years in business', 'خبره', 'خبرتكم', 'اعمال سابقه', 'مشاريع سابقه', 'عملاء', 'سابقه اعمال', 'امثله'],
+      en: 'Yes. Our team brings hands-on experience across travel, events and manpower in the Kingdom. We’re happy to share examples and references that match your request. Ask the team on WhatsApp.', ar: 'نعم، لدى فريقنا خبرة عملية في السفر والفعاليات والعمالة داخل المملكة، ويسعدنا مشاركة أمثلة ومراجع تناسب طلبك. اطلبها من الفريق عبر واتساب.', chips: ['human', 'menu'] },
+    { id: 'licensed', keys: ['licensed', 'license number', 'registered', 'legit', 'legitimate', 'trusted', 'certified', 'commercial registration', 'مرخص', 'مرخصين', 'سجلكم', 'موثوق'],
+      en: 'The team can share our company registration and licence details on request, before you commit to anything.', ar: 'يمكن للفريق مشاركة بيانات السجل التجاري والتراخيص عند الطلب وقبل أي التزام.', chips: ['human'] },
+    { id: 'venue', then: 'Events', keys: ['venue', 'venues', 'hall', 'ballroom', 'location for event', 'find a venue', 'قاعه', 'قاعات', 'مكان الحفل', 'موقع الفعاليه'],
+      en: 'Yes, we find and book venues: hotels, halls, outdoor and desert sites, matched to your guest count and style.', ar: 'نعم، نبحث ونحجز القاعات: الفنادق والقاعات والمواقع الخارجية والصحراوية بما يناسب عدد الضيوف وطابع الفعالية.', chips: ['Events'] },
+    { id: 'leadtime', keys: ['how far in advance', 'how early', 'lead time', 'short notice', 'last minute', 'how long does it take', 'how much time', 'in time', 'كم تحتاجون وقت', 'قبل كم', 'وقت قصير', 'اخر لحظه'],
+      en: 'The earlier the better, especially for large events and peak seasons, but we regularly work to short deadlines. Share your date and we’ll tell you honestly what’s possible.', ar: 'كلما كان أبكر كان أفضل، خصوصاً للفعاليات الكبيرة والمواسم، لكننا نعمل كثيراً بمواعيد قصيرة. شاركنا الموعد وسنخبرك بصراحة بما هو ممكن.', chips: ['menu'] },
+    { id: 'production', then: 'Events', keys: ['catering', 'food', 'stage', 'sound', 'lighting', 'screens', 'decor', 'decoration', 'photography', 'videography', 'live stream', 'ضيافه', 'بوفيه', 'مسرح', 'صوتيات', 'اضاءه', 'شاشات', 'ديكور', 'تصوير', 'بث مباشر'],
+      en: 'We handle the full production: stage, light, sound, screens, décor, catering, photography and live streams, with one team running it all.', ar: 'نتولى الإنتاج بالكامل: المسرح والإضاءة والصوت والشاشات والديكور والضيافة والتصوير والبث المباشر، بفريق واحد.', chips: ['Events'] },
+    { id: 'custom', keys: ['customise', 'customize', 'custom', 'tailor', 'tailored', 'flexible', 'my own plan', 'تفصيل', 'حسب الطلب', 'مخصص'],
+      en: 'Everything is tailored. Tell us what matters to you and we build the plan around it.', ar: 'كل شيء مصمم حسب طلبك. أخبرنا بما يهمك ونبني الخطة حوله.', chips: ['menu'] },
+    { id: 'government', keys: ['government', 'ministry', 'semi government', 'public sector', 'tender', 'حكومي', 'حكوميه', 'وزاره', 'مناقصه'],
+      en: 'We work with private and public sector clients. For tenders or formal proposals, send the details to the team.', ar: 'نعمل مع عملاء القطاعين الخاص والعام. للمناقصات أو العروض الرسمية أرسل التفاصيل للفريق.', chips: ['human'] },
+
     /* ---------- commercial ---------- */
     { id: 'price', keys: ['price', 'prices', 'pricing', 'cost', 'costs', 'how much', 'quote', 'quotation', 'budget', 'rate', 'rates', 'fees', 'expensive', 'cheap', 'السعر', 'الاسعار', 'كم التكلفه', 'بكم', 'عرض سعر', 'تكلفه', 'الميزانيه'],
       en: 'Every plan is tailored, so we quote once we know the details. It takes a minute: tell me what you need and the team sends a proposal.', ar: 'كل خطة مصممة حسب طلبك، لذلك نرسل عرض السعر بعد معرفة التفاصيل. أخبرني ماذا تحتاج وسيرسل لك الفريق عرضاً.', chips: ['menu'] },

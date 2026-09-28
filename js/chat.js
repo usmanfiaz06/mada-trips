@@ -81,6 +81,19 @@
     }
     return best && best.label;
   };
+  const WORDNUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, dozen: 12,
+    واحد: 1, اثنين: 2, ثلاث: 3, ثلاثه: 3, اربع: 4, اربعه: 4, خمس: 5, خمسه: 5, سته: 6, سبع: 7, سبعه: 7, ثمان: 8, ثمانيه: 8, تسع: 9, تسعه: 9, عشر: 10, عشره: 10, عشرين: 20, ثلاثين: 30, اربعين: 40, خمسين: 50, ستين: 60, سبعين: 70, ثمانين: 80, تسعين: 90 };
+  // "two hundred", "around eighty", "a few thousand", "خمسين"
+  const wordsToNum = n => {
+    const toks = n.split(' '); let total = 0, cur = 0, seen = false;
+    for (const w of toks) {
+      if (WORDNUM[w] !== undefined) { cur += WORDNUM[w]; seen = true; }
+      else if (w === 'hundred' || w === 'مئه' || w === 'ميه') { cur = (cur || 1) * 100; seen = true; }
+      else if (w === 'thousand' || w === 'الف') { total += (cur || 1) * 1000; cur = 0; seen = true; }
+      else if (w === 'few' || w === 'several') { cur = cur || 3; }
+    }
+    return seen ? total + cur : null;
+  };
   const PEOPLE_WORDS = /(people|persons?|pax|guests?|travell?ers?|adults?|visitors?|attendees?|delegates?|workers?|staff|employees?|engineers?|technicians?|men|heads?|applicants?|ضيف|ضيوف|شخص|اشخاص|افراد|فرد|عامل|عمال|موظف|موظفين|مسافر|مسافرين|نفر)/;
   const ROOM_WORDS = /(rooms?|غرفه|غرف)/;
   const numberNear = (P, words, anyNumber) => {
@@ -89,7 +102,9 @@
     if (/(just me|only me|myself|alone|لوحدي|انا فقط|شخص واحد)/.test(P.n)) return 1;
     if (/(couple|two of us|me and my (wife|husband)|انا وزوجتي|شخصين)/.test(P.n)) return 2;
     const fam = P.n.match(/(family|group|team|party) of (\d+)|عائله من (\d+)|(\d+) افراد/); if (fam) return +(fam[2] || fam[3] || fam[4]);
-    if (anyNumber) { const k = P.n.match(/\b(\d[\d,]*)\s*(k|الف)?\b/); if (k) return parseInt(k[1].replace(/,/g, ''), 10) * (k[2] ? 1000 : 1); }
+    if (anyNumber) { const k = P.n.match(/\b(\d[\d,]*)\s*(k|الف)?\b/); if (k) return parseInt(k[1].replace(/,/g, ''), 10) * (k[2] ? 1000 : 1); const w = wordsToNum(P.n); if (w) return w; }
+    // "for 200", "لـ 200"
+    if (words === PEOPLE_WORDS) { const f = P.n.match(/\b(for|لـ|ل|حوالي|تقريبا) (\d{2,5})\b(?! (days?|nights?|rooms?|sar|riyals?|hours?|يوم|ايام|ليله|ريال|غرف))/); if (f) return +f[2]; }
     // "40 welders", "12 hosts": a number followed by a noun that isn't a unit
     if (words === PEOPLE_WORDS) { const g = P.n.match(/\b(\d{1,5})\s+([a-z\u0600-\u06ff]{3,})/); if (g && !/^(day|days|week|weeks|month|months|year|years|hour|hours|min|mins|minutes|am|pm|sar|riyal|riyals|rooms?|nights?|km|percent|star|stars|st|nd|rd|th|يوم|ايام|اسبوع|شهر|اشهر|سنه|ساعه|ريال|غرفه|غرف|ليله|ليالي)$/.test(g[2]) && !MONTHS.flat().includes(g[2])) return +g[1]; }
     return null;
@@ -159,6 +174,27 @@
     if (/^(asdf|qwer|zxcv|hjkl|sdfg|jkl)/i.test(letters)) return true;
     return false;
   };
+  // is this a question rather than an answer?
+  const QWORDS_EN = /^(do|does|did|can|could|would|will|should|is|are|was|were|have|has|had|may|might|how|what|whats|where|when|why|which|who|whom|whose|any|anything|tell me|explain|is there|are there)\b/;
+  const QWORDS_AR = /^(هل|كم|وين|فين|اين|متى|كيف|شلون|ايش|وش|شو|ليش|لماذا|ماذا|ما هي|ما هو|من|مين|عندكم|تقدرون|ممكن|تسوون|تشتغلون)\b/;
+  const isQuestion = (raw, n) => /[?؟]\s*$/.test(raw.trim()) || QWORDS_EN.test(n) || QWORDS_AR.test(n);
+  // does free text look like a sensible answer to this step?
+  const NUMWORDS = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|hundred|thousand|dozen|dozens|few|several|many|hundreds|thousands)\b|واحد|اثنين|ثلاث|اربع|خمس|ست|سبع|ثمان|تسع|عشر|عشرين|مئه|ميه|الف|كثير|قليل/;
+  const plausible = (st, raw, P) => {
+    const words = P.toks.length;
+    if (isQuestion(raw, P.n) || isGibberish(raw)) return false;
+    switch (st.entity) {
+      case 'date': return !!findDate(P) || /\d/.test(P.n) || /\b(soon|later|next|this|end of|early|mid|late|season|year|month|week)\b|قريب|بعدين|نهايه|بدايه|منتصف/.test(P.n);
+      case 'people': case 'rooms': return /\d/.test(P.n) || NUMWORDS.test(P.n);
+      case 'city': return words <= 4;
+      default: return words <= 6;
+    }
+  };
+  const HINT = {
+    en: { date: 'I just need a rough date here, like “March”, “next month” or “15/3”.', people: 'I just need a rough number here, like “120”.', rooms: 'I just need the number of rooms, like “4”.', city: 'I just need the city here, like “Riyadh” or “AlUla”.', other: 'Pick one below, or type a short answer.' },
+    ar: { date: 'أحتاج موعداً تقريبياً فقط، مثل "مارس" أو "الشهر القادم" أو "15/3".', people: 'أحتاج رقماً تقريبياً فقط، مثل "120".', rooms: 'أحتاج عدد الغرف فقط، مثل "4".', city: 'أحتاج اسم المدينة فقط، مثل "الرياض" أو "العلا".', other: 'اختر من الخيارات أو اكتب إجابة قصيرة.' }
+  };
+
   const CMD = {
     restart: /^(start over|restart|reset|new request|begin again|from the start|ابدا من جديد|من جديد|اعاده|ابدا)$/,
     menu: /^(menu|main menu|options|help|القائمه|مساعده|الخيارات)$/,
@@ -188,7 +224,9 @@
       otherAsk: 'Of course. Tell me in a sentence what you need.', gotIt: 'Got it. I’ll pass that straight to the team.',
       anything: 'Anything else I can help with?', cancelled: 'No problem, I’ve cleared that. What else can I help with?', long: 'Thanks for the detail. I’ll include all of it for the team.',
       also: 'Also interested in', details: 'Details', name: 'Name', phone: 'Phone', service: 'Request', sentFrom: 'Sent from',
-      hello2: 'Hello Mada Trips,', helpWith: 'I’d like help with:'
+      hello2: 'Hello Mada Trips,', helpWith: 'I’d like help with:',
+      qNoted: 'Good question. I’ve added it to your request so the team answers it personally.', qNotedOpen: 'Good question, and one the team should answer personally. Want me to send it to them?',
+      sendQ: 'Send my question', questions: 'Questions', notSure: k => `I didn’t catch the ${k.toLowerCase()}.`
     },
     ar: {
       title: 'كونسيرج مادا', sub: 'رد فوري · الفريق على واتساب', placeholder: 'اسأل أي سؤال أو صف خطتك', langBtn: 'EN',
@@ -205,7 +243,9 @@
       otherAsk: 'بكل سرور. أخبرني في جملة ماذا تحتاج.', gotIt: 'تمام، سأرسلها للفريق مباشرة.',
       anything: 'هل هناك شيء آخر أساعدك فيه؟', cancelled: 'لا مشكلة، تم الإلغاء. بماذا أساعدك؟', long: 'شكراً على التفاصيل، سأرسلها كاملة للفريق.',
       also: 'مهتم أيضاً بـ', details: 'تفاصيل', name: 'الاسم', phone: 'الجوال', service: 'الطلب', sentFrom: 'أُرسل من',
-      hello2: 'مرحباً مادا تربس،', helpWith: 'أحتاج مساعدة في:'
+      hello2: 'مرحباً مادا تربس،', helpWith: 'أحتاج مساعدة في:',
+      qNoted: 'سؤال مهم. أضفته إلى طلبك ليجيبك الفريق شخصياً.', qNotedOpen: 'سؤال مهم، والأفضل أن يجيبك عليه الفريق شخصياً. هل أرسله لهم؟',
+      sendQ: 'أرسل سؤالي', questions: 'أسئلة', notSure: k => `لم أفهم ${k}.`
     }
   };
   const VAL_AR = { Riyadh: 'الرياض', Jeddah: 'جدة', 'Jeddah & the Red Sea': 'جدة والبحر الأحمر', AlUla: 'العلا', 'Makkah or Madinah': 'مكة أو المدينة', 'Eastern Province': 'المنطقة الشرقية', NEOM: 'نيوم', Abha: 'أبها', Taif: 'الطائف', Abroad: 'خارج المملكة', Umrah: 'عمرة', Flights: 'طيران',
@@ -227,7 +267,7 @@
   /* ================================================================
      STATE (persists across pages for this visit)
      ================================================================ */
-  let S = { lang: /^ar/i.test(navigator.language || '') ? 'ar' : 'en', flow: null, step: 0, answers: {}, name: '', phone: '', note: '', also: '', awaiting: null, editing: false, misses: 0, last: '', lastCount: 0, phoneTries: 0, nameTries: 0, started: false, log: [], chips: [], open: false };
+  let S = { questions: [], lang: /^ar/i.test(navigator.language || '') ? 'ar' : 'en', flow: null, step: 0, answers: {}, name: '', phone: '', note: '', also: '', awaiting: null, editing: false, misses: 0, last: '', lastCount: 0, phoneTries: 0, nameTries: 0, started: false, log: [], chips: [], open: false };
   try { const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null'); if (saved && saved.log) S = Object.assign(S, saved); } catch (_) {}
   const save = () => { try { sessionStorage.setItem(STORE, JSON.stringify(S)); } catch (_) {} };
   const t = () => T[S.lang];
@@ -326,6 +366,7 @@
     Object.entries(S.answers).forEach(([k, v]) => lines.push(`${keyName(k)}: ${showVal(k, v)}`));
     if (S.also) lines.push(`${x.also}: ${S.also}`);
     if (S.note) lines.push(`${x.details}: ${S.note}`);
+    if (S.questions && S.questions.length) lines.push(`${x.questions}: ${S.questions.join(' | ')}`);
     if (S.name || S.phone) lines.push('');
     if (S.name) lines.push(`${x.name}: ${S.name}`);
     if (S.phone) lines.push(`${x.phone}: ${S.phone}`);
@@ -340,7 +381,7 @@
     chipsAfter(menuChips());
   }
 
-  function resetRequest() { Object.assign(S, { flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0 }); }
+  function resetRequest() { Object.assign(S, { questions: [], flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0 }); }
 
   function startFlow(id, P, preset) {
     resetRequest();
@@ -368,6 +409,7 @@
   }
 
   function answerStep(value) {
+    S.stepMiss = 0;
     const st = KB.flows[S.flow].steps[S.step];
     S.answers[st.key] = value;
     S.step++;
@@ -392,6 +434,7 @@
     const rows = Object.entries(S.answers).map(([k, v]) => `<div><span>${esc(keyName(k))}</span><b>${esc(showVal(k, v))}</b></div>`).join('')
       + (S.also ? `<div><span>${esc(t().also)}</span><b>${esc(S.also)}</b></div>` : '')
       + (S.note ? `<div><span>${esc(t().details)}</span><b>${esc(S.note.length > 140 ? S.note.slice(0, 140) + '…' : S.note)}</b></div>` : '')
+      + (S.questions && S.questions.length ? `<div><span>${esc(t().questions)}</span><b>${esc(S.questions.join(' · ').slice(0, 140))}</b></div>` : '')
       + (S.phone ? `<div><span>${esc(t().phone)}</span><b>${esc(S.phone)}</b></div>` : '');
     say(`${t().wrap(esc((S.name || '').split(' ')[0]))}<div class="mc-sum">${rows || `<div><span>${esc(t().service)}</span><b>${esc(flowName(S.flow || 'Other'))}</b></div>`}</div>${t().wrapTail}`);
     const editable = S.flow && KB.flows[S.flow].steps.length;
@@ -443,6 +486,8 @@
       case 'editname': me(label); S.name = ''; S.editing = true; S.awaiting = 'name'; say(t().askName); return chipsAfter([]);
       case 'editphone': me(label); S.phone = ''; S.editing = true; return askPhone();
       case 'sendnote': me(label); S.flow = S.flow || 'Other'; return S.name ? wrapUp() : askName();
+      case 'skipstep': me(label); return answerStep(S.lang === 'ar' ? 'غير محدد' : 'Not sure yet');
+      case 'sendq': me(label); S.flow = 'Other'; return S.name ? wrapUp() : askName();
     }
   }
 
@@ -510,7 +555,10 @@
     if (S.awaiting === 'name') {
       const digits = text.replace(/\D/g, '');
       if (digits.length >= 8 && digits.length <= 15) { const ph = parsePhone(text); if (ph) { S.phone = ph; say(t().nameAgain, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]); } }
-      if (/\?|؟/.test(text) && top && top.s >= 2) { answerIntent(top.it, P); return queue.then(() => { S.awaiting = 'name'; say(t().askName, { fast: true }); chipsAfter([{ label: t().skip, act: 'skip' }]); }); }
+      if ((isQuestion(text, n) && (/[?؟]/.test(text) || P.toks.length >= 4)) || (top && top.s >= 2.5 && !top.it.weak && P.toks.length >= 3)) {
+        if (top && top.s >= 2 && !top.it.flow) answerIntent(top.it, P, true); else { S.questions.push(text.slice(0, 200)); say(t().qNoted); }
+        return queue.then(() => { S.awaiting = 'name'; say(t().askName, { fast: true }); chipsAfter([{ label: t().skip, act: 'skip' }]); });
+      }
       let nm = text.replace(/^(hi|hello|hey)[, ]+/i, '').replace(/^(my name is|my name's|i am|i'm|im|this is|it's|its|name is|name:?|call me)\s+/i, '').replace(/^(اسمي|انا|معك|أنا)\s+/, '').replace(/[.!,]+$/, '').trim();
       if (!nm || nm.split(' ').length > 5 || nm.length > 40 || isGibberish(nm)) {
         if (++S.nameTries < 2) { say(t().nameAgain, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]); }
@@ -525,7 +573,10 @@
     if (S.awaiting === 'phone') {
       const ph = parsePhone(text);
       if (ph) { S.phone = ph; S.editing = false; return wrapUp(); }
-      if (top && top.s >= 2.5 && !/\d/.test(text)) { answerIntent(top.it, P); return queue.then(askPhone); }
+      if (!/\d/.test(text) && (isQuestion(text, n) || (top && top.s >= 2.5))) {
+        if (top && top.s >= 2 && !top.it.flow) answerIntent(top.it, P, true); else { S.questions.push(text.slice(0, 200)); say(t().qNoted); }
+        return queue.then(askPhone);
+      }
       if (++S.phoneTries >= 2) { S.phone = ''; return wrapUp(); }
       say(t().badPhone, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]);
     }
@@ -550,6 +601,8 @@
         f.steps.forEach((s2, i) => { if (i > S.step && !S.answers[s2.key]) { const v2 = extractFor(s2, P, false); if (v2) S.answers[s2.key] = v2; } });
         return answerStep(v);
       }
+      // skip or not sure
+      if (/^(skip|skip it|skip this|pass|not sure|no idea|dont know|i dont know|unsure|n a|na|تخطي|ما ادري|مدري|لا اعرف|مو متاكد)$/.test(n)) return answerStep(S.lang === 'ar' ? 'غير محدد' : 'Not sure yet');
       // small talk or filler: don't record it as an answer
       if ((top && ['thanks', 'greeting', 'howareyou', 'bye'].includes(top.it.id)) || /^(ok|okay|k|yes|yeah|yep|sure|fine|alright|cool|hmm+|hm+|تمام|اوكي|ok+|طيب|نعم|اي|ايوه|ماشي)$/.test(n)) {
         say(S.lang === 'ar' ? 'اختر أحد الخيارات أو اكتب إجابتك.' : 'Pick an option below, or type your own answer.', { fast: true });
@@ -568,10 +621,23 @@
         say(t().switchQ(esc(flowName(top.it.flow))));
         return chipsAfter([{ label: t().switchYes(flowName(top.it.flow)), act: 'switch:' + top.it.flow }, { label: t().carryOn, act: 'carry' }]);
       }
-      // 5. free-form answer: accept it as written
-      if (!isGibberish(text) && text.length <= 80) return answerStep(text);
+      // 5. a question we don't have an answer for: note it for the team, then carry on
+      if (isQuestion(text, n)) {
+        S.questions.push(text.slice(0, 200));
+        say(t().qNoted);
+        say(t().back, { fast: true });
+        return queue.then(nextStep);
+      }
+      // 6. a sensible free-form answer
+      if (plausible(st, text, P) && text.length <= 80) return answerStep(text);
+      // 7. long message: keep it as details and move on
       if (text.length > 80) { S.note = (S.note ? S.note + ' ' : '') + text; return answerStep(S.lang === 'ar' ? 'انظر التفاصيل' : 'See details'); }
-      say(t().huh, { fast: true }); return nextStep();
+      // 8. doesn't fit this question: ask again with an example
+      S.stepMiss = (S.stepMiss || 0) + 1;
+      say(HINT[S.lang][st.entity] || HINT[S.lang].other, { fast: true });
+      nextStep();
+      if (S.stepMiss >= 2) queue = queue.then(() => setChips(S.chips.concat({ label: S.lang === 'ar' ? 'تخطَّ هذا السؤال' : 'Skip this question', act: 'skipstep', cls: 'mc-chip--ghost' })));
+      return;
     }
 
     /* ----- open conversation ----- */
@@ -591,6 +657,7 @@
         if (second && !(top.it.id === 'visa' && second.it.id === 'umrah')) S.also = flowName(second.it.flow);
         return;
       }
+      if (top.it.then) { answerIntent(top.it, P, true); return startFlow(top.it.then, P); }
       answerIntent(top.it, P, !!second || !!ranked.find(r => r.it.flow && r.s >= 2));
       // an info question that also names a service, e.g. "how much is a hotel in Riyadh"
       const svc = ranked.find(r => r.it.flow && r.s >= 2);
@@ -607,6 +674,13 @@
       S.pendingP = text;
       say(t().fallback);
       return chipsAfter(Object.keys(KB.flows).filter(id => id !== 'Other').map(id => ({ label: flowName(id), act: 'switch:' + id })));
+    }
+
+    // a question we can't answer: offer to send it to the team
+    if (isQuestion(text, n)) {
+      S.questions = [text.slice(0, 200)];
+      say(t().qNotedOpen);
+      return chipsAfter([{ label: t().sendQ, act: 'sendq', cls: 'mc-chip--wa-soft' }, ...menuChips()]);
     }
 
     // long message with no match: treat it as a request
