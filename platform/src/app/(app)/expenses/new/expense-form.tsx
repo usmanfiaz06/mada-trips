@@ -34,7 +34,7 @@ export function ExpenseForm({ categories, isPartner, today }: { categories: [str
         <section className="rounded-card bg-surface p-6 shadow-card">
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="sm:col-span-2"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Amount paid")} <span className="text-gold-2">*</span></span>
-              <div className="relative"><input name="amount" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="field field-lg pe-14" placeholder="0.00" dir="ltr" autoFocus />
+              <div className="relative" dir="ltr"><input name="amount" value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" className="field field-lg pe-14" placeholder="0.00" dir="ltr" autoFocus />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3">SAR</span></div></label>
             <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("of which VAT")}</span>
               <input name="vatAmount" defaultValue="0" inputMode="decimal" className="field field-lg" dir="ltr" /></label>

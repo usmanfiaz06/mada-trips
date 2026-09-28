@@ -183,10 +183,10 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
         <Step n={3} title={t("Price")} done={sellH > 0 && netH > 0}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Net cost (what we pay)")} <span className="text-gold-2">*</span></span>
-              <div className="relative"><input name="netCost" inputMode="decimal" value={net} onChange={(e) => setNet(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.netCost} />
+              <div className="relative" dir="ltr"><input name="netCost" inputMode="decimal" value={net} onChange={(e) => setNet(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.netCost} />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3">SAR</span></div></label>
             <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Selling price (what they pay)")} <span className="text-gold-2">*</span></span>
-              <div className="relative"><input name="sellPrice" inputMode="decimal" value={sell} onChange={(e) => setSell(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.sellPrice} />
+              <div className="relative" dir="ltr"><input name="sellPrice" inputMode="decimal" value={sell} onChange={(e) => setSell(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.sellPrice} />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3">SAR</span></div></label>
           </div>
           {sellH > 0 && netH > 0 && marginTone !== "ok" && (
@@ -199,7 +199,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
         <Step n={4} title={t("Payment & issuing")} done={!!ctype && sellH > 0}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Received now")}</span>
-              <div className="relative"><input name="paidNow" inputMode="decimal" value={paid ?? (paidH ? show(paidH).replace(/,/g, "") : "0")} onChange={(e) => setPaid(e.target.value)} className="field h-12 pe-14 text-[17px] num" dir="ltr" />
+              <div className="relative" dir="ltr"><input name="paidNow" inputMode="decimal" value={paid ?? (paidH ? show(paidH).replace(/,/g, "") : "0")} onChange={(e) => setPaid(e.target.value)} className="field h-12 pe-14 text-[17px] num" dir="ltr" />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3">SAR</span></div>
               <span className="mt-1.5 flex gap-2 text-[12px]">
                 <button type="button" onClick={() => setPaid(show(sellH).replace(/,/g, ""))} className="text-ink-3 underline-offset-2 hover:text-ink hover:underline">{t("Full amount")}</button>
