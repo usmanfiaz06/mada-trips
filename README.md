@@ -21,7 +21,7 @@ Import the repo in Vercel with Framework Preset **Other**, no build command, out
 ## SEO and link previews
 
 - Open Graph and X/Twitter tags, canonical URL and Organization/TravelAgency structured data are in the `<head>` of `index.html`.
-- `og-image.jpg` (1200×630) is the image shown when the link is shared.
+- Link-preview images (1200×630): `og-image.jpg` for the home page, and `assets/og/events.jpg`, `services.jpg`, `about.jpg`, `contact.jpg` for the other pages.
 - `sitemap.xml`, `robots.txt`, `site.webmanifest`, app icons in `assets/brand/`, and a branded `404.html`.
 - **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in every `.html` page, `sitemap.xml` and `robots.txt`.
 - The nav, menu and footer are repeated in each page. If you change one, change them all.
@@ -38,6 +38,8 @@ css/style.css       design tokens (brand green #1e352d, sand #e9e2d8, sun gold) 
 js/site.js          shared motion on every page: GSAP + ScrollTrigger + Lenis (jsDelivr), nav, reveals, menu
 js/home.js          home-only motion: hero-to-card, services scroll, events spotlight, process, loader
 js/pages.js         inner-page motion: events hero, run of show, event flow, gallery, services index
+js/chat-kb.js       concierge knowledge base: answers, trigger words, guided questions (edit this)
+js/chat.js          concierge engine: understanding, Arabic/English, memory, WhatsApp handoff
 assets/brand/       logo and symbol SVGs recoloured from /Assets
 assets/media/       videos (dunes, events stage, fireworks) and posters
 assets/img/events/  event photography
@@ -61,10 +63,27 @@ Assets/             original brand files as supplied
 
 Respects `prefers-reduced-motion`.
 
+## Concierge chat
+
+A free, built-in assistant on every page (bottom-right "Ask Mada"). No accounts, API keys or monthly fees.
+
+- Understands free text in English and Arabic, typos and plurals, and pulls details out of sentences
+  ("a gala for 300 in Riyadh in March" fills event type, guests, city and date).
+- 40+ topics: prices, payment, invoices, refunds, visas and documents, Umrah, Hajj, events, hiring, jobs,
+  suppliers, complaints, urgent requests, location, hours, languages and more.
+- Guided requests for trips, events, talent, visas, hotels and IT, with back, edit, start over and cancel.
+- Handles gibberish, repeats, very long messages, questions asked mid-request and requests for a real person.
+- Validates names and Saudi or international phone numbers, then sends a ready-written summary to WhatsApp.
+- Remembers the conversation while the visitor moves between pages.
+
+**To change answers**, edit `js/chat-kb.js`: add trigger words to `keys`, change `en`/`ar` replies, or add a new
+topic by copying an existing block. Test in the browser console with `MadaConcierge.say('your message')`.
+
 ## Before going live
 
 - **Founder quote.** The line in the About section is draft copy. Have Bader approve it.
-- **Contact forms** (home and /contact). They are front-end only and shows a confirmation without sending anything. Wire it to email, a CRM or WhatsApp.
+- **Phone.** +966 56 668 2662 appears in every footer, the mobile menu, /contact (call and WhatsApp buttons) and the home contact section.
+- **Contact forms** (home and /contact). They are front-end only and show a confirmation without sending anything. Wire it to email, a CRM or WhatsApp.
 - **Social links.** They point to `#`.
 - **Stats.** The only external figure is the 150M-visits Vision 2030 tourism target. Everything else is qualitative.
 
