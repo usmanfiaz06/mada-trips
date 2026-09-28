@@ -1,0 +1,71 @@
+import Link from "next/link";
+import { Bell } from "lucide-react";
+import { requireUser, can } from "@/lib/auth";
+import { getT } from "@/lib/i18n";
+import { navCounts } from "@/lib/counts";
+import { canSeeIssuance } from "@/lib/issuance";
+import { getSettings } from "@/lib/settings";
+import { Sidebar, type NavSection } from "@/components/shell/sidebar";
+import { CommandPalette, CommandTrigger } from "@/components/shell/command";
+import { CloseClock, LocaleSwitch, ThemeToggle } from "@/components/client";
+import { logout } from "../login/actions";
+
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const u = await requireUser();
+  const t = await getT();
+  const [counts, issuer, s] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings()]);
+
+  const sections: NavSection[] = [
+    { label: t("Workspace"), items: [
+      ...(can(u, "sales.create") ? [{ href: "/sales/new", label: t("New sale"), icon: "Plus" as const, accent: true }] : []),
+      { href: "/", label: t("Dashboard"), icon: "LayoutDashboard" as const },
+      { href: "/approvals", label: t("Approvals"), icon: "Stamp" as const, count: counts.approvals },
+    ] },
+    { label: t("Operations"), items: [
+      { href: "/sales", label: t("Sales & bookings"), icon: "ReceiptText" as const },
+      ...(issuer ? [{ href: "/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
+      { href: "/clients", label: t("Clients & credit"), icon: "Users2" as const },
+      ...(can(u, "close.submit") || can(u, "close.verify") ? [{ href: "/close", label: t("Daily close"), icon: "MoonStar" as const, count: counts.closes }] : []),
+      ...(can(u, "expenses.create") || can(u, "expenses.view_all") ? [{ href: "/expenses", label: t("Expenses"), icon: "Wallet" as const }] : []),
+    ] },
+    ...(can(u, "finance.view") || u.partnerId ? [{ label: t("Finance"), items: [
+      ...(can(u, "finance.view") ? [
+        { href: "/finance", label: t("Banks & cash"), icon: "Landmark" as const },
+        { href: "/settlement", label: t("Day-25 settlement"), icon: "CalendarRange" as const },
+      ] : []),
+      { href: "/partners", label: t("Partners"), icon: "Handshake" as const },
+    ] }] : []),
+    ...(can(u, "team.manage") || can(u, "roles.manage") || can(u, "activity.view") || can(u, "settings.manage") ? [{ label: t("Admin"), items: [
+      ...(can(u, "team.manage") ? [{ href: "/team", label: t("Team"), icon: "UserCog" as const }] : []),
+      ...(can(u, "roles.manage") ? [{ href: "/team/roles", label: t("Roles & access"), icon: "ShieldCheck" as const }] : []),
+      ...(can(u, "activity.view") ? [{ href: "/activity", label: t("Activity log"), icon: "History" as const }] : []),
+      ...(can(u, "settings.manage") ? [{ href: "/settings", label: t("Rules & limits"), icon: "SlidersHorizontal" as const }] : []),
+    ] }] : []),
+  ];
+  const pages = sections.flatMap((sec) => sec.items.map((i) => ({ label: i.label, href: i.href, section: sec.label })));
+  pages.push({ label: t("My profile"), href: "/me", section: t("Account") });
+
+  return (
+    <div className="min-h-dvh">
+      <Sidebar sections={sections} user={{ name: u.name, role: t.locale === "ar" ? u.role.nameAr : u.role.name }} logout={logout} />
+      <div className="lg:ps-[272px]">
+        <header className="sticky top-0 z-30 px-4 pt-3 ps-16 lg:ps-4 lg:pe-6 lg:pt-4">
+          <div className="flex h-14 items-center gap-2 rounded-full bg-tile ps-2 pe-2 text-tile-ink shadow-float">
+            <CommandTrigger />
+            <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
+              <CloseClock closeHour={s.closeHour} showPk={u.team === "pakistan" || u.team === "management"} />
+              <Link href="/approvals" className="relative grid size-10 place-items-center rounded-full text-tile-ink-3 transition hover:bg-white/10 hover:text-tile-ink" aria-label={t("Approvals")}>
+                <Bell className="size-[18px]" />
+                {counts.approvals > 0 && <span className="absolute end-2 top-2 size-2 rounded-full bg-glow-gold ring-2 ring-tile" />}
+              </Link>
+              <LocaleSwitch />
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-[1440px] px-4 pb-16 pt-8 lg:pe-6 lg:ps-4">{children}</main>
+      </div>
+      <CommandPalette pages={pages} />
+    </div>
+  );
+}

@@ -2,7 +2,7 @@
 
 The internal operating system for Mada Trips. It turns the *Operational & Financial Governance Document* into software: every booking, riyal, approval and partner payout goes through one place, and the governance rules run as system behaviour instead of relying on people to remember them.
 
-Status: **plan / pre-design**. No code yet. Design direction to come from the partners.
+Status: **v1 built** in [`platform/`](../../platform). See its README to run it.
 
 ---
 
@@ -280,3 +280,20 @@ Answers to these change the build; everything else can use sensible defaults.
 8. **Tools today**: which GDS do you use, which banks, and is there an existing Excel/POS whose data we should import?
 9. **Language**: should Arabic be the default for Riyadh staff?
 10. **Design direction**: share references (apps you like, mood, colours). Default: Mada brand, calm, data-first.
+
+
+---
+
+## 11. Decisions since the first draft
+
+- **Partner repayments follow equity.** The Priority 3 pool is split 33.33 / 33.33 / 33.34 among partners who are still owed money, never paying anyone more than their balance; any leftover goes to dividends.
+- **English and Arabic**, with full right-to-left support; each person picks their language.
+- **Sans-serif only** for the internal platform (Geist + IBM Plex Sans Arabic), unlike the website.
+- **Visual direction:** bento layout on a neutral canvas, near-black "ink" tiles for the hero numbers, oversized light numerals, and charts designed around Mada's own data:
+  - *cycle barcode*: every sale in the cycle as one line, coloured by margin
+  - *Day-25 arc*: how far through the cycle we are
+  - *sun gauge*: IATA reserve coverage, echoing the Mada sun mark
+  - *dot columns*: margin per day
+  - *waterfall*: the Day-25 cash allocation
+- **Roles are editable** (permission matrix), with safeguards so nobody can remove the last administrator.
+- **Everything is logged** (sign-ins, sales, issues, payments, votes, remarks, role and rule changes) in an append-only activity log with CSV export.
