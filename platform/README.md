@@ -36,7 +36,7 @@ One Vercel project serves both: the public website at `madatrips.sa` and Mada Op
 One-time setup in the existing Vercel project:
 
 1. **Settings → Build and Deployment → Root Directory:** `platform`. Framework Preset switches to **Next.js**. Leave "Include files outside the root directory" on (the website lives there).
-2. **Storage → Create Database → Neon (Postgres)** and connect it to the project. This adds `DATABASE_URL`.
+2. **Database.** Either create a **Supabase** project (turn off "Enable Data API"; the platform connects to Postgres directly) and add its **Transaction pooler** connection string as `DATABASE_URL` in Vercel, or use **Storage → Create Database → Neon**, which adds `DATABASE_URL` for you.
 3. **Settings → Environment Variables:** add `SEED_PASSWORD`, the first password for the three partner logins.
 4. **Redeploy.** Each build runs `vercel-build`: migrations, first-time setup (roles, the three partners, bank accounts; skipped once anyone exists), then the build. Demo data is never loaded in production.
 
