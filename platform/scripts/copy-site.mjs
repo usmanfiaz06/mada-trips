@@ -1,6 +1,6 @@
 // The public website (repo root) and Mada Ops deploy as one Vercel project.
 // Before each build, copy the website into public/ so Next.js serves it at "/". public/adminwork is the app's own.
-import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,4 +19,6 @@ for (const name of readdirSync(root)) {
   n++;
 }
 if (!existsSync(join(out, "index.html"))) throw new Error("Website index.html not found at repo root");
+// Vercel treats a file named index.html specially, so "/" is served from a copy under another name.
+copyFileSync(join(out, "index.html"), join(out, "site-home.html"));
 console.log(`Copied ${n} website entries into public/`);
