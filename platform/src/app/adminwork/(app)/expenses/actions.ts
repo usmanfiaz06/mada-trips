@@ -1,15 +1,16 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { requirePerm } from "@/lib/auth";
+import { requirePerm, requireUser, can } from "@/lib/auth";
 import { audit } from "@/lib/audit";
-import { createApproval } from "@/lib/approvals";
+import { cancelApproval, createApproval } from "@/lib/approvals";
 import { nextRef } from "@/lib/refs";
 import { toHalalas, sar } from "@/lib/money";
-import { flash, toState, zodError, type ActionState } from "@/lib/actions";
+import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
+import { riyadhDate } from "@/lib/dates";
 import { EXPENSE_CATEGORY } from "@/lib/labels";
 
 const money = z.string().transform((v, ctx) => { try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; } });
@@ -53,6 +54,64 @@ export async function submitExpense(_: ActionState, fd: FormData): Promise<Actio
       await tx.update(schema.expenses).set({ approvalId: r.id }).where(eq(schema.expenses.id, e.id));
       await flash(`${ref} submitted for verification`);
       return e.id;
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/expenses/${id}`);
+}
+
+/** Pull back an expense that hasn't been verified yet. The record stays in the log; it just stops counting. */
+export async function withdrawExpense(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  const id = str(fd, "id");
+  try {
+    await db.transaction(async (tx) => {
+      const [e] = await tx.select().from(schema.expenses).where(eq(schema.expenses.id, id)).for("update");
+      if (!e) throw new Error("Expense not found");
+      if (e.submittedBy !== u.id) throw new Error("Only the person who submitted it can withdraw it");
+      if (e.status !== "pending") throw new Error("Only expenses still waiting for verification can be withdrawn");
+      await tx.update(schema.expenses).set({ status: "withdrawn" }).where(eq(schema.expenses.id, id));
+      if (e.approvalId) {
+        const [req] = await tx.select().from(schema.approvalRequests).where(eq(schema.approvalRequests.id, e.approvalId));
+        if (req?.status === "pending") await cancelApproval(tx, req.id, u.id);
+      }
+      await audit(tx, { actorId: u.id, action: "expense.withdrawn", entityType: "expense", entityId: id, entityRef: e.ref, summary: `Withdrew ${e.ref} · ${e.description}${str(fd, "reason") ? `: "${str(fd, "reason")}"` : ""}` });
+      await flash(`${e.ref} withdrawn`);
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/expenses/${id}`);
+}
+
+/** Cancel an approved expense that was a mistake. Reverses the partner ledger if a partner paid it. */
+export async function voidExpense(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  const id = str(fd, "id"), reason = str(fd, "reason");
+  if (!can(u, "expenses.verify")) return { error: "Only verifiers can void an approved expense" };
+  if (!reason) return { error: "Give a reason for voiding" };
+  try {
+    await db.transaction(async (tx) => {
+      const [e] = await tx.select().from(schema.expenses).where(eq(schema.expenses.id, id)).for("update");
+      if (!e) throw new Error("Expense not found");
+      if (e.status !== "approved") throw new Error("Only approved expenses can be voided");
+      // Overheads that were part of a signed settlement already shaped the payout; changing them would rewrite history.
+      if (!e.isStartup) {
+        const [closed] = await tx.select().from(schema.settlementCycles).where(and(
+          lte(schema.settlementCycles.startDate, e.expenseDate), gte(schema.settlementCycles.endDate, e.expenseDate),
+          inArray(schema.settlementCycles.status, ["pending_approval", "approved", "paid"])));
+        if (closed) throw new Error("This expense is part of a settlement that's already signed. Record a correcting entry in the next cycle instead");
+      }
+      await tx.update(schema.expenses).set({ status: "void" }).where(eq(schema.expenses.id, id));
+      if (e.paidBy === "partner" && e.partnerId) {
+        await tx.insert(schema.ledgerEntries).values({
+          partnerId: e.partnerId, type: e.isStartup ? "advance" : "expense", amount: -e.amount,
+          description: `Reversal of ${e.ref} (voided) · ${e.description}`, sourceType: "expense", sourceId: e.id, entryDate: riyadhDate(), createdBy: u.id,
+        });
+      }
+      await audit(tx, { actorId: u.id, action: "expense.voided", entityType: "expense", entityId: id, entityRef: e.ref,
+        summary: `Voided ${e.ref} · SAR ${sar(e.amount)}: "${reason}"${e.paidBy === "partner" ? " · partner ledger reversed" : ""}` });
+      await tx.insert(schema.remarks).values({ entityType: "expense", entityId: id, userId: u.id, body: `Voided: ${reason}` });
+      await flash(`${e.ref} voided`);
     });
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
