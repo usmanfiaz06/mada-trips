@@ -15,6 +15,20 @@
       "when": 1790601578333,
       "tag": "0001_audit_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790657728769,
+      "tag": "0002_commission_and_service_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790658130829,
+      "tag": "0003_unify_partner_roles",
+      "breakpoints": true
     }
   ]
 }

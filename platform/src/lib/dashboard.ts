@@ -82,11 +82,25 @@ export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "
       AND ((b.service_type = 'flight' AND (b.pnr IS NULL OR b.pnr = '')) OR b.status = 'pending_issue' OR (NOT b.on_credit AND coalesce(p.paid,0) < b.sell_price))
     LIMIT 8`);
 
+  // This person's commission for the current cycle: earned (fully paid and cleared) and still on the way.
+  const [me] = await db.select({ rate: schema.users.commissionBps }).from(schema.users).where(eq(schema.users.id, u.id));
+  const comm = await db.execute<{ earned: number; pending: number; n: number }>(sql`
+    SELECT
+      coalesce(SUM(CASE WHEN p.paid >= b.sell_price AND p.last_cleared BETWEEN ${current.start} AND ${current.end}
+        THEN floor(GREATEST(b.sell_price - b.net_cost, 0) * b.commission_bps / 10000) ELSE 0 END),0)::bigint AS earned,
+      coalesce(SUM(CASE WHEN NOT (p.paid >= b.sell_price AND p.last_cleared IS NOT NULL) OR p.paid IS NULL
+        THEN floor(GREATEST(b.sell_price - b.net_cost, 0) * b.commission_bps / 10000) ELSE 0 END),0)::bigint AS pending,
+      count(*) FILTER (WHERE p.paid >= b.sell_price AND p.last_cleared BETWEEN ${current.start} AND ${current.end})::int AS n
+    FROM bookings b
+    LEFT JOIN (SELECT booking_id, SUM(amount) FILTER (WHERE cleared_on IS NOT NULL) AS paid, MAX(cleared_on) AS last_cleared FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
+    WHERE b.prepared_by = ${u.id} AND b.status IN ('issued','pending_issue') AND b.recognized_cycle_id IS NULL AND b.commission_bps > 0`);
+  const commission = { rate: me?.rate ?? 0, earned: Number(comm[0]?.earned ?? 0), pending: Number(comm[0]?.pending ?? 0), sales: comm[0]?.n ?? 0 };
+
   const myExpenses = await db.select({ n: sql<number>`count(*)::int` }).from(schema.expenses)
     .where(and(eq(schema.expenses.submittedBy, u.id), inArray(schema.expenses.status, ["pending"])));
 
   return {
     s, today, cycle, current, view, days, todayIdx, cycleBookings, todayRows, last14, waiting, issuer, issueQueue, finance,
-    closesToVerify, activity, myOpenToday: [...myOpenToday].filter((o) => !issueQueue.some((q) => q.id === o.id)), myPendingExpenses: myExpenses[0]?.n ?? 0,
+    closesToVerify, activity, commission, myOpenToday: [...myOpenToday].filter((o) => !issueQueue.some((q) => q.id === o.id)), myPendingExpenses: myExpenses[0]?.n ?? 0,
   };
 }

@@ -51,9 +51,9 @@ async function main() {
 
   const hash = await bcrypt.hash(PASSWORD, 10);
   const users = await db.insert(schema.users).values([
-    { name: "Abdulaziz", email: "abdulaziz@madatrips.com", passwordHash: hash, roleId: role("chairman"), partnerId: abdulaziz.id, team: "management" },
-    { name: "Bader Al Sulaiman", email: "bader@madatrips.com", passwordHash: hash, roleId: role("ceo"), partnerId: bader.id, team: "management" },
-    { name: "Haneef", email: "haneef@madatrips.com", passwordHash: hash, roleId: role("director"), partnerId: haneef.id, team: "management" },
+    { name: "Abdulaziz", email: "abdulaziz@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: abdulaziz.id, team: "management" },
+    { name: "Bader Al Sulaiman", email: "bader@madatrips.com", passwordHash: hash, roleId: role("partner_issuer"), partnerId: bader.id, team: "management" },
+    { name: "Haneef", email: "haneef@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: haneef.id, team: "management" },
   ]).returning();
   const [uA, uB, uH] = users;
 
@@ -67,9 +67,9 @@ async function main() {
 
   /* ─────────── Demo data ─────────── */
   const staff = await db.insert(schema.users).values([
-    { name: "Riyadh Counter", email: "counter@madatrips.com", passwordHash: hash, roleId: role("retail_agent"), team: "riyadh" },
-    { name: "Pakistan Desk 1", email: "desk1@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
-    { name: "Pakistan Desk 2", email: "desk2@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
+    { name: "Riyadh Counter", email: "counter@madatrips.com", passwordHash: hash, roleId: role("retail_agent"), team: "riyadh", commissionBps: 1000 },
+    { name: "Pakistan Desk 1", email: "desk1@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan", commissionBps: 500 },
+    { name: "Pakistan Desk 2", email: "desk2@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan", commissionBps: 500 },
   ]).returning();
   const [counter, desk1, desk2] = staff;
 
@@ -125,12 +125,16 @@ async function main() {
       const due = isCorp ? riyadhDay(at(daysAgo - client.paymentTermsDays, 12)) : null;
       const [b] = await db.insert(schema.bookings).values({
         ref, channel: isCorp ? "corporate" : "retail", account: isCorp ? "corporate" : "retail", serviceType: service, clientId: client.id,
-        passengers: pax, paxCount: 1 + (rnd() < 0.2 ? 1 : 0), description: service === "flight" ? pick(routes) : service === "hotel" ? "Hotel · 3 nights" : service === "visa" ? "Schengen visa" : "Holiday package",
+        passengers: pax, paxCount: 1 + (rnd() < 0.2 ? 1 : 0), description: service === "flight" ? pick(routes)
+          : service === "hotel" ? pick(["Makkah · Swissôtel Makkah · 3 nights · BB", "Dubai · Rove Downtown · 2 nights · RO", "Madinah · Pullman Zamzam · 4 nights · HB"])
+          : service === "visa" ? pick(["Schengen area · Tourist visa · Single entry", "United Kingdom · Tourist visa · Multiple entry", "Azerbaijan · Tourist visa · Single entry · Express"])
+          : service === "transport" ? pick(["Airport transfer · Jeddah", "Car with driver · Madinah"])
+          : pick(["Istanbul package · 5 nights · Flight + Hotel + Transfers", "Baku package · 4 nights · Flight + Hotel"]),
         supplier: service === "flight" ? pick(["Saudia (SV)", "flynas (XY)", "flyadeal (F3)", "Emirates (EK)", "Qatar Airways (QR)", "Turkish Airlines (TK)"]) : pick(["Hotelbeds", "Expedia TAAP", "VFS"]),
         pnr: service === "flight" ? Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(rnd() * 32)]).join("") : null,
         ticketNumbers: status === "issued" && service === "flight" ? `065-${Math.floor(1e9 + rnd() * 8e9)}` : null,
         travelDate: riyadhDay(at(daysAgo - 5 - Math.floor(rnd() * 30), 12)),
-        netCost: sar(net), sellPrice: sar(sell), status, onCredit: isCorp, dueDate: due, businessDate: bdate,
+        netCost: sar(net), sellPrice: sar(sell), status, onCredit: isCorp, commissionBps: preparer.commissionBps, dueDate: due, businessDate: bdate,
         preparedBy: preparer.id, issuedBy: issuer?.id ?? null, issuedAt: issuer ? new Date(created.getTime() + 25 * 60_000) : null,
         issuedUnderDelegation: null, createdAt: created, updatedAt: created,
       }).returning();

@@ -6,6 +6,7 @@ import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
 import { createSale } from "../actions";
 import { Picker, type PickerItem } from "@/components/picker";
+import { ServiceDetails } from "./service-details";
 import { AIRLINES, AIRPORTS, airlineLabel } from "@/lib/travel-data";
 
 const AIRPORT_ITEMS: PickerItem[] = AIRPORTS.map((a) => ({
@@ -209,19 +210,16 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                 </div>
               </>
             ) : (
-              <>
-                <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Description")}</span>
-                  <input name="description" className="field" placeholder={t("e.g. 3 nights, Hilton Dubai")} /></label>
-                <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Supplier")}</span>
-                  <input name="supplier" className="field" placeholder="Hotelbeds" /></label>
-              </>
+              <ServiceDetails key={service} service={service} invalid={!!state?.fields?.details} />
             )}
             {service === "flight" && (
               <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">PNR <span className="text-gold-2">*</span></span>
                 <input name="pnr" value={pnr} onChange={(e) => setPnr(e.target.value.toUpperCase())} maxLength={8} className="field num uppercase tracking-[0.2em]" placeholder="ABC123" dir="ltr" aria-invalid={!!state?.fields?.pnr} /></label>
             )}
-            <label className={service === "flight" ? "sm:col-span-3" : "sm:col-span-3"}><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Travel date")}</span>
+{service !== "hotel" && (
+            <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Travel date")}</span>
               <input name="travelDate" type="date" className="field" /></label>
+            )}
           </div>
         </Step>
 

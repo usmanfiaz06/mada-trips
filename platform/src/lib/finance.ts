@@ -79,6 +79,7 @@ export type SettlementFigures = {
   bookingIds: string[]; bookingCount: number;
   revenue: number; directCost: number; grossProfit: number;
   overheads: number; overheadsByCategory: Record<string, number>;
+  commissions: { userId: string; name: string; amount: number; bookings: number }[];
   netProfit: number;
   waterfall: { key: "overheads" | "reserve" | "repayment" | "dividend"; amount: number; remainingAfter: number }[];
   suggestedReserve: number; upcomingBsp: number; reserveHeldBefore: number;
@@ -117,8 +118,9 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   // A booking belongs to the cycle in which its last payment cleared (issued, fully paid, cleared by the cut-off).
   // The very first settlement also sweeps in anything that cleared before it, so nothing is ever lost.
   const [{ n: priorCycles }] = await q.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM settlement_cycles WHERE end_date < ${end}`);
-  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number }>(sql`
-    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint FROM bookings b
+  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; prepared_by: string; commission_bps: number; preparer: string }>(sql`
+    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, b.prepared_by, b.commission_bps, u.name AS preparer FROM bookings b
+    JOIN users u ON u.id = b.prepared_by
     JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL AND cleared_on <= ${end} GROUP BY booking_id) p ON p.booking_id = b.id
     WHERE b.status = 'issued' AND p.paid >= b.sell_price
       AND ${Number(priorCycles) === 0 && !cycleOnly ? sql`true` : sql`p.last_cleared >= ${start}`}
@@ -131,7 +133,18 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
     .from(schema.expenses)
     .where(and(eq(schema.expenses.status, "approved"), eq(schema.expenses.isStartup, false), gte(schema.expenses.expenseDate, start), lte(schema.expenses.expenseDate, end)))
     .groupBy(schema.expenses.category);
-  const overheads = exp.reduce((s, e) => s + e.total, 0);
+  // Team commission: a share of the margin on each settled sale, at the rate frozen on the sale.
+  const commissionMap = new Map<string, { userId: string; name: string; amount: number; bookings: number }>();
+  for (const b of settled) {
+    const amount = Math.floor((Math.max(0, Number(b.sell_price) - Number(b.net_cost)) * Number(b.commission_bps)) / 10000);
+    if (amount <= 0) continue;
+    const c = commissionMap.get(b.prepared_by) ?? { userId: b.prepared_by, name: b.preparer, amount: 0, bookings: 0 };
+    c.amount += amount; c.bookings += 1;
+    commissionMap.set(b.prepared_by, c);
+  }
+  const commissions = [...commissionMap.values()].sort((a, b) => b.amount - a.amount);
+  const commissionTotal = commissions.reduce((s, c) => s + c.amount, 0);
+  const overheads = exp.reduce((s, e) => s + e.total, 0) + commissionTotal;
   const netProfit = grossProfit - overheads;
 
   const upcoming = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -172,7 +185,8 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
     rolledOver: rolled[0]?.total ?? 0,
     bookingIds: settled.map((b) => b.id), bookingCount: settled.length,
     revenue, directCost, grossProfit, overheads,
-    overheadsByCategory: Object.fromEntries(exp.map((e) => [e.category, e.total])),
+    overheadsByCategory: { ...Object.fromEntries(exp.map((e) => [e.category, e.total])), ...(commissionTotal ? { commission: commissionTotal } : {}) },
+    commissions,
     netProfit, waterfall, suggestedReserve, upcomingBsp, reserveHeldBefore: reserveHeld,
     repayments, dividends, shortfall: netProfit < 0 ? -netProfit : 0, payoutAccount,
   };

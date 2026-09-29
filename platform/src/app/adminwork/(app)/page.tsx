@@ -174,13 +174,28 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       )}
 
+      {(d.commission.rate > 0 || d.commission.earned > 0) && (
+        <div className="grid gap-4 md:grid-cols-3 stagger">
+          <InkCard className="md:col-span-1">
+            <div className="text-[13px] text-tile-ink-3">{t("Your commission this cycle")}</div>
+            <div className="figure mt-6 text-[48px]" dir="ltr">{sar(d.commission.earned)}<span className="figure-unit">SAR</span></div>
+            <div className="mt-2 text-[12.5px] text-tile-ink-3">{t("{n} sales fully paid and cleared · {p}% of margin", { n: d.commission.sales, p: d.commission.rate / 100 })}</div>
+          </InkCard>
+          <Card className="flex flex-col md:col-span-2">
+            <CardHead title={t("On the way")} hint={t("Commission on your sales that aren't fully paid or cleared yet. It counts once the money is in the bank.")} />
+            <div className="figure mt-auto text-[36px]" dir="ltr">{sar(d.commission.pending)}<span className="figure-unit">SAR</span></div>
+            <p className="mt-3 text-[12.5px] text-ink-3">{t("Paid with salaries after the {d} cut-off.", { d: fmtDate(d.current.end, L) })}</p>
+          </Card>
+        </div>
+      )}
+
       {/* Row 3 · work */}
       <div className="grid gap-4 lg:grid-cols-12 stagger">
         <Card className="lg:col-span-5" pad={false}>
           <div className="flex items-center justify-between p-6 pb-3">
             <div>
               <h2 className="text-[17px] font-[450] tracking-[-0.02em]">{t("Waiting for you")}</h2>
-              <p className="mt-0.5 text-[13px] text-ink-3">{tasks.length ? t("{n} things need your attention", { n: tasks.length }) : t("You're all caught up")}</p>
+              <p className="mt-0.5 text-[13px] text-ink-3">{tasks.length === 1 ? t("1 thing needs your attention") : tasks.length ? t("{n} things need your attention", { n: tasks.length }) : t("You're all caught up")}</p>
             </div>
             <span className="figure text-[34px] text-ink">{tasks.length}</span>
           </div>
