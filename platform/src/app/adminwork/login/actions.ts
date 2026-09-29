@@ -7,7 +7,17 @@ import { createSession, destroySession, getCurrentUser } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import type { ActionState } from "@/lib/actions";
 
-export async function login(_: ActionState, fd: FormData): Promise<ActionState> {
+export async function login(prev: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    return await doLogin(prev, fd);
+  } catch (e) {
+    if (e && typeof e === "object" && "digest" in e && String((e as { digest: string }).digest).startsWith("NEXT_REDIRECT")) throw e;
+    console.error("Sign-in failed", e);
+    return { error: "The platform can't reach its database right now. Open /adminwork/api/health for details." };
+  }
+}
+
+async function doLogin(_: ActionState, fd: FormData): Promise<ActionState> {
   const email = String(fd.get("email") ?? "").trim().toLowerCase();
   const password = String(fd.get("password") ?? "");
   const next = String(fd.get("next") || "/adminwork");

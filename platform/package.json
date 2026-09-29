@@ -11,7 +11,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:bootstrap": "tsx src/db/seed.ts --bootstrap",
-    "vercel-build": "npm run db:migrate && npm run db:bootstrap && npm run build"
+    "vercel-build": "npm run db:deploy || echo 'WARNING: database setup failed (see error above). The website still deploys; open /adminwork/api/health to diagnose.'; npm run build",
+    "db:deploy": "npm run db:migrate && npm run db:bootstrap"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
