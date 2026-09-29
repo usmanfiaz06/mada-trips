@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from i18n_ar import HEADLINES, TEXT, KEEP
 
-URL = 'https://mada-trips.vercel.app'
+URL = 'https://www.madatrips.sa'
 PAGES = {'index.html': '/', 'events.html': '/events', 'services.html': '/services', 'about.html': '/about', 'contact.html': '/contact'}
 NON_PAGE = ('/assets', '/css', '/js', '/og-image', '/site.webmanifest', '/favicon', '/robots', '/sitemap')
 ARABIC_FONTS = '&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Aref+Ruqaa:wght@400;700'

@@ -23,7 +23,7 @@ Import the repo in Vercel with Framework Preset **Other**, no build command, out
 - Open Graph and X/Twitter tags, canonical URL and Organization/TravelAgency structured data are in the `<head>` of `index.html`.
 - Link-preview images (1200×630): `og-image.jpg` for the home page, and `assets/og/events.jpg`, `services.jpg`, `about.jpg`, `contact.jpg` for the other pages.
 - `sitemap.xml`, `robots.txt`, `site.webmanifest`, app icons in `assets/brand/`, and a branded `404.html`.
-- **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in every English `.html` page, `tools/build_ar.py`, `sitemap.xml` and `robots.txt`, then rebuild the Arabic pages.
+- **When you add a custom domain**, replace `https://www.madatrips.sa` with the new one in every English `.html` page, `tools/build_ar.py`, `sitemap.xml` and `robots.txt`, then rebuild the Arabic pages.
 - The nav, menu and footer are repeated in each page. If you change one, change them all.
 
 ## Structure

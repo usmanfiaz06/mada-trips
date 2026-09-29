@@ -1,93 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>https://mada-trips.vercel.app/</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/"/>
+    <loc>https://www.madatrips.sa/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/"/>
     <lastmod>2026-09-29</lastmod>
     <priority>1.0</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/og-image.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/og-image.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/ar</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/"/>
+    <loc>https://www.madatrips.sa/ar</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/"/>
     <lastmod>2026-09-29</lastmod>
     <priority>1.0</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/ar-home.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-home.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/events</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/events"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/events"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/events"/>
+    <loc>https://www.madatrips.sa/events</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/events"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/events"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/events"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.9</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/events.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/events.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/ar/events</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/events"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/events"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/events"/>
+    <loc>https://www.madatrips.sa/ar/events</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/events"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/events"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/events"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.9</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/ar-events.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-events.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/services</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/services"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/services"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/services"/>
+    <loc>https://www.madatrips.sa/services</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/services"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/services"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/services"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.9</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/services.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/services.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/ar/services</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/services"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/services"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/services"/>
+    <loc>https://www.madatrips.sa/ar/services</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/services"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/services"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/services"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.9</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/ar-services.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-services.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/about</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/about"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/about"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/about"/>
+    <loc>https://www.madatrips.sa/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/about"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.7</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/about.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/about.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/ar/about</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/about"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/about"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/about"/>
+    <loc>https://www.madatrips.sa/ar/about</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/about"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/about"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/about"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.7</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/ar-about.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-about.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/contact</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/contact"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/contact"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/contact"/>
+    <loc>https://www.madatrips.sa/contact</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/contact"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/contact"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/contact"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.7</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/contact.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/contact.jpg</image:loc></image:image>
   </url>
   <url>
-    <loc>https://mada-trips.vercel.app/ar/contact</loc>
-    <xhtml:link rel="alternate" hreflang="en" href="https://mada-trips.vercel.app/contact"/>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mada-trips.vercel.app/ar/contact"/>
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://mada-trips.vercel.app/contact"/>
+    <loc>https://www.madatrips.sa/ar/contact</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/contact"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/contact"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/contact"/>
     <lastmod>2026-09-29</lastmod>
     <priority>0.7</priority>
-    <image:image><image:loc>https://mada-trips.vercel.app/assets/og/ar-contact.jpg</image:loc></image:image>
+    <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-contact.jpg</image:loc></image:image>
   </url>
 </urlset>
