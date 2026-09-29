@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { ArrowLeft, Ban, Check, Undo2, X } from "lucide-react";
 import { db, schema } from "@/db";
-import { requireUser, can } from "@/lib/auth";
+import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { voteBoard } from "@/lib/approval-view";
 import { EXPENSE_CATEGORY, EXPENSE_STATUS, PAID_BY } from "@/lib/labels";
@@ -65,9 +65,9 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
           <InkCard><div className="text-[12.5px] text-tile-ink-3">{t("Amount")}</div><div className="figure mt-3 text-[56px]" dir="ltr">{sar(e.amount)}</div><div className="mt-1 text-[12.5px] text-tile-ink-3">SAR</div></InkCard>
           {req && board && (
             <Card>
-              <CardHead title={t("Verification")} hint={t(req.rule)} action={<Link href={`/adminwork/approvals/${req.id}`} className="num text-[12.5px] text-ink-3 hover:text-ink">{req.ref}</Link>} />
-              <VoteDots approvers={board.approvers} required={req.requiredApprovals} />
-              {board.approvers.filter((a) => a.remark).map((a) => <p key={a.id} className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-[13px]"><span className="text-ink-3">{a.name}:</span> “{a.remark}”</p>)}
+              <CardHead title={t("Verification")} hint={isOversight(u) ? t(req.rule) : undefined} action={<Link href={`/adminwork/approvals/${req.id}`} className="num text-[12.5px] text-ink-3 hover:text-ink">{req.ref}</Link>} />
+              {isOversight(u) ? <VoteDots approvers={board.approvers} required={req.requiredApprovals} /> : <Badge tone={EXPENSE_STATUS[e.status].tone} dot>{t(EXPENSE_STATUS[e.status].label)}</Badge>}
+              {board.approvers.filter((a) => a.remark).map((a) => <p key={a.id} className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-[13px]">{isOversight(u) && <span className="text-ink-3">{a.name}: </span>}“{a.remark}”</p>)}
               {canVote && (
                 <ActionForm action={vote} className="mt-4 space-y-2 border-t border-line pt-4">
                   <input type="hidden" name="id" value={req.id} /><input type="hidden" name="next" value={path} />

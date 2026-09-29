@@ -806,4 +806,13 @@ export const AR: Record<string, string> = {
   "Only verifiers can void an approved expense": "لا يمكن إلغاء مصروف معتمد إلا من قِبل المدققين",
   "Only approved expenses can be voided": "يمكن إلغاء المصروفات المعتمدة فقط",
   "This expense is part of a settlement that's already signed. Record a correcting entry in the next cycle instead": "هذا المصروف ضمن تسوية موقّعة بالفعل. سجّل قيدًا تصحيحيًا في الدورة التالية بدلًا من ذلك",
+  "Credit up to SAR {v} needs any two directors; above that, all directors. Expenses are verified by someone other than the submitter.": "الائتمان حتى {v} ريال يحتاج موافقة عضوين من المجلس، وما فوق ذلك يحتاج موافقة جميع الأعضاء. يتحقق من المصروفات شخص غير مقدّمها.",
+  "Requests you've sent for approval and where each one stands.": "الطلبات التي أرسلتها للموافقة وحالة كل منها.",
+  "Waiting for management approval": "بانتظار موافقة الإدارة",
+  "You'll see the outcome here and on the record as soon as it's decided.": "ستظهر النتيجة هنا وفي السجل فور اتخاذ القرار.",
+  "Needs approval before issuing": "يحتاج موافقة قبل الإصدار",
+  "Management reviews pay-later sales. You'll see the decision on the sale.": "تراجع الإدارة المبيعات الآجلة. سيظهر القرار على عملية البيع.",
+  "Management will read this before approving": "ستقرأ الإدارة هذا قبل الموافقة",
+  "Management reviews pay-later sales before they're issued.": "تراجع الإدارة المبيعات الآجلة قبل إصدارها.",
+  "See status": "عرض الحالة",
 };

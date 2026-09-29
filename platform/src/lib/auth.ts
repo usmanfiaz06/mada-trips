@@ -74,6 +74,9 @@ export async function requireUser() {
 
 export const can = (u: CurrentUser, p: Permission) => u.permissions.has(p);
 
+/** People who run approvals. Only they see the internal rules, thresholds and who voted; everyone else sees their request's status. */
+export const isOversight = (u: CurrentUser) => u.permissions.has("approvals.decide") || u.permissions.has("expenses.verify");
+
 export async function requirePerm(p: Permission) {
   const u = await requireUser();
   if (!can(u, p)) redirect("/adminwork?denied=1");

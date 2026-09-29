@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { ArrowLeft, ArrowUpRight, Check, Clock3, X } from "lucide-react";
 import { db, schema } from "@/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { entityHref, voteBoard } from "@/lib/approval-view";
 import { APPROVAL_KIND, APPROVAL_STATUS } from "@/lib/labels";
@@ -25,7 +25,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
   const v = (await voteBoard([r])).get(r.id)!;
   const [requester] = await db.select().from(schema.users).where(eq(schema.users.id, r.requestedBy));
   const me = v.approvers.find((a) => a.id === u.id);
-  const oversight = u.permissions.has("approvals.decide") || u.permissions.has("expenses.verify") || u.permissions.has("finance.view");
+  const oversight = isOversight(u) || u.permissions.has("finance.view");
   if (!oversight && !me && r.requestedBy !== u.id) notFound();
   const canVote = r.status === "pending" && !!me && !me.decision;
   const st = APPROVAL_STATUS[r.status];
@@ -53,10 +53,18 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
           </InkCard>
-          <Timeline entityType="approval" entityId={r.id} path={`/adminwork/approvals/${r.id}`} refLabel={r.ref} />
+          {oversight && <Timeline entityType="approval" entityId={r.id} path={`/adminwork/approvals/${r.id}`} refLabel={r.ref} />}
         </div>
 
         <aside className="space-y-4">
+          {!oversight ? (
+            <Card>
+              <CardHead title={t("Status")} />
+              <Badge tone={st.tone} dot>{r.status === "pending" ? t("Waiting for management approval") : t(st.label)}</Badge>
+              {v.approvers.filter((a) => a.remark).map((a, i) => <p key={i} className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-[13px] text-ink-2">“{a.remark}”</p>)}
+              <p className="mt-4 text-[12.5px] text-ink-3">{t("You'll see the outcome here and on the record as soon as it's decided.")}</p>
+            </Card>
+          ) : (
           <Card>
             <CardHead title={t("Votes")} hint={t(r.rule)} />
             <div className="mb-5 flex items-center gap-3">
@@ -86,6 +94,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ id: s
             </ul>
             {r.status === "pending" && <p className="mt-5 border-t border-line pt-4 text-[13px] text-ink-3">{remaining === 1 ? t("1 more approval needed.") : t("{n} more approvals needed.", { n: remaining })}</p>}
           </Card>
+          )}
 
           {canVote && (
             <Card className="ring-2 ring-gold/40">

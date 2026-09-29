@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { requirePerm, can } from "@/lib/auth";
+import { requirePerm, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
 import { activeDelegation } from "@/lib/issuance";
@@ -31,7 +31,7 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
     <>
       <PageHeader eyebrow={t("Point of sale")} title={t("New sale")} subtitle={t("Four quick steps. The summary tells you exactly what will happen when you save.")} />
       <SaleForm clients={rows.map((r) => ({ id: r.id, name: r.name, type: r.type, phone: r.phone, creditLimit: Number(r.credit_limit), exposure: Number(r.exposure), terms: r.terms }))}
-        targetBps={s.targetMarginBps} creditDualLimit={s.creditDualLimit} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} />
+        targetBps={s.targetMarginBps} creditDualLimit={s.creditDualLimit} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} />
     </>
   );
 }

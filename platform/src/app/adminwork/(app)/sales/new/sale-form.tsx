@@ -8,7 +8,7 @@ import { createSale } from "../actions";
 
 type Client = { id: string; name: string; type: string; phone: string | null; creditLimit: number; exposure: number; terms: number };
 type Props = {
-  clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number;
+  clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number; showRules: boolean;
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
 };
 
@@ -42,7 +42,7 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, delegation, defaultClientId }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId }: Props) {
   const t = useT();
   const [state, action] = useActionState(createSale, null);
   const [q, setQ] = useState("");
@@ -73,6 +73,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
   const creditNeeded = unpaid > 0 && (ctype !== "contracted" || (client ? client.exposure + unpaid > client.creditLimit : true));
   const canIssue = canIssueAll || service !== "flight" || (!!delegation && (delegation.scope === "all" || channel === "retail") && sellH <= delegation.maxTicket && sellH <= delegation.dailyLeft);
   const outcome = !ctype || !sellH ? null
+    : creditNeeded && !showRules ? { icon: ShieldCheck, tone: "warn", title: t("Needs approval before issuing"), body: t("Management reviews pay-later sales. You'll see the decision on the sale.") }
     : creditNeeded ? { icon: ShieldCheck, tone: "warn", title: t("Goes to directors for credit approval"), body: unpaid <= creditDualLimit ? t("Any 2 directors must approve the unpaid SAR {v}.", { v: show(unpaid) }) : t("Above SAR {limit}: all directors must agree.", { limit: show(creditDualLimit) }) }
     : issueNow && canIssue ? { icon: Ticket, tone: "ok", title: service === "flight" ? t("You'll issue it now") : t("Confirmed on save"), body: t("It appears in tonight's report straight away.") }
     : { icon: Hourglass, tone: "gold", title: t("Sent to the issuance queue"), body: canIssue ? t("You chose to issue later.") : t("Flights need Bader or a delegated issuer. They'll be notified.") };
@@ -218,7 +219,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
 
           {creditNeeded && ctype !== "contracted" && (
             <label className="mt-4 block animate-rise"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Why should they pay later?")} <span className="text-gold-2">*</span></span>
-              <textarea name="creditReason" rows={2} className="field" placeholder={t("Directors will read this before approving")} /></label>
+              <textarea name="creditReason" rows={2} className="field" placeholder={showRules ? t("Directors will read this before approving") : t("Management will read this before approving")} /></label>
           )}
 
           <div className="mt-5 flex items-start gap-3 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
