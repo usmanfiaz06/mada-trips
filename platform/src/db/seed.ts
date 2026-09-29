@@ -126,7 +126,7 @@ async function main() {
       const [b] = await db.insert(schema.bookings).values({
         ref, channel: isCorp ? "corporate" : "retail", account: isCorp ? "corporate" : "retail", serviceType: service, clientId: client.id,
         passengers: pax, paxCount: 1 + (rnd() < 0.2 ? 1 : 0), description: service === "flight" ? pick(routes) : service === "hotel" ? "Hotel · 3 nights" : service === "visa" ? "Schengen visa" : "Holiday package",
-        supplier: service === "flight" ? pick(["Saudia", "flynas", "Emirates", "Qatar Airways", "Turkish Airlines"]) : pick(["Hotelbeds", "Expedia TAAP", "VFS"]),
+        supplier: service === "flight" ? pick(["Saudia (SV)", "flynas (XY)", "flyadeal (F3)", "Emirates (EK)", "Qatar Airways (QR)", "Turkish Airlines (TK)"]) : pick(["Hotelbeds", "Expedia TAAP", "VFS"]),
         pnr: service === "flight" ? Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(rnd() * 32)]).join("") : null,
         ticketNumbers: status === "issued" && service === "flight" ? `065-${Math.floor(1e9 + rnd() * 8e9)}` : null,
         travelDate: riyadhDay(at(daysAgo - 5 - Math.floor(rnd() * 30), 12)),
@@ -189,7 +189,7 @@ async function main() {
   const creditAmt = sar(14800);
   const [cb] = await db.insert(schema.bookings).values({
     ref: `S-${++n}`, channel: "corporate", account: "corporate", serviceType: "flight", clientId: gulf.id, passengers: "Omar Nasser + 3", paxCount: 4,
-    description: "RUH → IST · business trip", supplier: "Turkish Airlines", pnr: "Q7K2MX", netCost: sar(13900), sellPrice: creditAmt, status: "awaiting_credit", onCredit: true,
+    description: "RUH ⇄ IST", supplier: "Turkish Airlines (TK)", pnr: "Q7K2MX", netCost: sar(13900), sellPrice: creditAmt, status: "awaiting_credit", onCredit: true,
     dueDate: riyadhDay(at(-14, 12)), businessDate: riyadhDay(new Date()), preparedBy: desk1.id, createdAt: new Date(Date.now() - 150 * 60_000), updatedAt: new Date(Date.now() - 150 * 60_000),
   }).returning();
   const [cr] = await db.insert(schema.approvalRequests).values({
