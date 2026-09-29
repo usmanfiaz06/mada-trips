@@ -99,6 +99,12 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
   const eligible = await eligibleApprovers(tx, probe);
   if (requiresAll) required = await allDirectorsRequired(tx, probe);
+  // A partner reimbursement recorded by another partner leaves fewer uninvolved directors (neither the one who
+  // recorded it nor the one being repaid may vote). Then every director who isn't involved must approve.
+  if (input.kind === "expense" && pool === "directors" && eligible.length >= 1 && eligible.length < required) {
+    required = eligible.length;
+    rule = "Partner reimbursement: every director not involved approves";
+  }
   if (required < 1 || eligible.length < required) {
     throw new Error("Not enough approvers are available for this request. Ask a partner to check the team's roles");
   }

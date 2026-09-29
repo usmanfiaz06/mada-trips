@@ -111,6 +111,8 @@ export const bookings = pgTable("bookings", {
   description: text("description"),
   // Structured answers for the service (visa type, hotel dates, meal plan, ...). description is built from them.
   details: jsonb("details"),
+  // Everyone on the sale: [{ name, passport?, nationality?, expiry?, dob? }]. passengers/paxCount are derived from it.
+  travellers: jsonb("travellers"),
   supplier: text("supplier"),
   pnr: text("pnr"),
   ticketNumbers: text("ticket_numbers"),

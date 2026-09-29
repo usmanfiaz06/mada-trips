@@ -3,6 +3,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { AlertCircle, CalendarDays, Check, Link2, ListPlus, X } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx } from "@/components/ui";
+import { useSubmit } from "@/components/client";
 import type { ActionState } from "@/lib/actions";
 
 type Person = { id: string; name: string; team: string };
@@ -19,6 +20,7 @@ export function TaskForm({ action, people, meId, today, link, autoFocus }: {
 }) {
   const t = useT();
   const [state, run, pending] = useActionState(action, null);
+  const onSubmit = useSubmit(run);
   const form = useRef<HTMLFormElement>(null);
   const title = useRef<HTMLInputElement>(null);
   const [due, setDue] = useState<string>(today);
@@ -42,7 +44,7 @@ export function TaskForm({ action, people, meId, today, link, autoFocus }: {
   const teams = [...new Set(people.map((p) => p.team))];
 
   return (
-    <form ref={form} action={run} className="space-y-3">
+    <form ref={form} onSubmit={onSubmit} className="space-y-3">
       {state?.error && <div role="alert" className="flex items-start gap-2 rounded-xl bg-bad-soft px-3.5 py-2.5 text-[13.5px] text-bad animate-rise"><AlertCircle className="mt-0.5 size-4 shrink-0" />{t(state.error)}</div>}
       {state?.ok && <div role="status" className="flex items-start gap-2 rounded-xl bg-ok-soft px-3.5 py-2.5 text-[13.5px] text-ok animate-rise"><Check className="mt-0.5 size-4 shrink-0" />{t(state.ok)}</div>}
 

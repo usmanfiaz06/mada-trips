@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { createContext, useActionState, useContext, useEffect, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2, Moon, Sun, X } from "lucide-react";
@@ -10,10 +10,29 @@ import { BASE } from "@/lib/base";
 type State = { error?: string; ok?: string; fields?: Record<string, string> } | null;
 type Action = (prev: State, fd: FormData) => Promise<State>;
 
+/** Pending state for forms submitted through useSubmit (useFormStatus only sees native form actions). */
+export const PendingContext = createContext(false);
+
+/**
+ * Submit a form to a server action without React's automatic reset, so a rejected save keeps everything the
+ * person typed. Forms that should clear after success reset themselves explicitly.
+ */
+export function useSubmit(run: (fd: FormData) => void) {
+  const [, start] = useTransition();
+  return (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null;
+    const fd = new FormData(e.currentTarget, submitter && submitter.getAttribute("name") ? submitter : undefined);
+    start(() => run(fd));
+  };
+}
+
 export function SubmitButton({ children, variant = "primary", size = "md", className, name, value, confirm }: {
   children: ReactNode; variant?: Parameters<typeof btn>[0]; size?: Parameters<typeof btn>[1]; className?: string; name?: string; value?: string; confirm?: string;
 }) {
-  const { pending } = useFormStatus();
+  const native = useFormStatus().pending;
+  const viaContext = useContext(PendingContext);
+  const pending = native || viaContext;
   return (
     <button type="submit" name={name} value={value} disabled={pending} className={btn(variant, size, className)}
       onClick={(e) => { if (confirm && !window.confirm(confirm)) e.preventDefault(); }}>
@@ -25,11 +44,13 @@ export function SubmitButton({ children, variant = "primary", size = "md", class
 
 export function ActionForm({ action, children, className, resetOnOk }: { action: Action; children: ReactNode; className?: string; resetOnOk?: boolean }) {
   const t = useT();
-  const [state, run] = useActionState(action, null);
+  const [state, run, pending] = useActionState(action, null);
   const ref = useRef<HTMLFormElement>(null);
+  const onSubmit = useSubmit(run);
   useEffect(() => { if (state?.ok && resetOnOk) ref.current?.reset(); }, [state, resetOnOk]);
   return (
-    <form ref={ref} action={run} className={className}>
+    <PendingContext.Provider value={pending}>
+    <form ref={ref} onSubmit={onSubmit} className={className}>
       {state?.error && (
         <div role="alert" className="mb-4 flex items-start gap-2 rounded-xl bg-bad-soft px-3.5 py-2.5 text-[13.5px] text-bad animate-rise">
           <AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{t(state.error)}</span>
@@ -42,6 +63,7 @@ export function ActionForm({ action, children, className, resetOnOk }: { action:
       )}
       {children}
     </form>
+    </PendingContext.Provider>
   );
 }
 

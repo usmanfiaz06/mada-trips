@@ -190,3 +190,80 @@ export function cleanDetails(service: string, d: Details): Details {
   }
   return out;
 }
+
+/* ───────── Travellers: everyone on one sale (several visas, tickets or guests at once) ───────── */
+
+export type Traveller = { name: string; passport?: string; nationality?: string; expiry?: string; dob?: string };
+
+// Passport details: needed to process a visa; useful (optional) for flights and packages; not asked for the rest.
+export const PASSPORT_RULE: Record<string, "required" | "optional" | "none"> = {
+  visa: "required", flight: "optional", package: "optional", hotel: "none", transport: "none", event: "none", other: "none",
+};
+// Every name is needed where each person gets their own ticket or visa; elsewhere only the lead name.
+export const ALL_NAMES = new Set(["visa", "flight", "package"]);
+export const COUNT_LABEL: Record<string, string> = {
+  visa: "Number of visas", flight: "Passengers", package: "Travellers", hotel: "Guests", transport: "People", event: "People", other: "People",
+};
+
+// Nationalities most often seen at the counters in Riyadh and on the Pakistan desk, then the rest alphabetically.
+export const NATIONALITIES: { code: string; en: string; ar: string }[] = [
+  { code: "SA", en: "Saudi", ar: "سعودي" }, { code: "PK", en: "Pakistani", ar: "باكستاني" }, { code: "IN", en: "Indian", ar: "هندي" },
+  { code: "EG", en: "Egyptian", ar: "مصري" }, { code: "YE", en: "Yemeni", ar: "يمني" }, { code: "JO", en: "Jordanian", ar: "أردني" },
+  { code: "SY", en: "Syrian", ar: "سوري" }, { code: "SD", en: "Sudanese", ar: "سوداني" }, { code: "BD", en: "Bangladeshi", ar: "بنغلاديشي" },
+  { code: "PH", en: "Filipino", ar: "فلبيني" }, { code: "ID", en: "Indonesian", ar: "إندونيسي" }, { code: "LB", en: "Lebanese", ar: "لبناني" },
+  { code: "AE", en: "Emirati", ar: "إماراتي" }, { code: "KW", en: "Kuwaiti", ar: "كويتي" }, { code: "BH", en: "Bahraini", ar: "بحريني" },
+  { code: "QA", en: "Qatari", ar: "قطري" }, { code: "OM", en: "Omani", ar: "عماني" }, { code: "IQ", en: "Iraqi", ar: "عراقي" },
+  { code: "PS", en: "Palestinian", ar: "فلسطيني" }, { code: "MA", en: "Moroccan", ar: "مغربي" }, { code: "TN", en: "Tunisian", ar: "تونسي" },
+  { code: "DZ", en: "Algerian", ar: "جزائري" }, { code: "LY", en: "Libyan", ar: "ليبي" }, { code: "TR", en: "Turkish", ar: "تركي" },
+  { code: "AF", en: "Afghan", ar: "أفغاني" }, { code: "LK", en: "Sri Lankan", ar: "سريلانكي" }, { code: "NP", en: "Nepali", ar: "نيبالي" },
+  { code: "ET", en: "Ethiopian", ar: "إثيوبي" }, { code: "ER", en: "Eritrean", ar: "إريتري" }, { code: "SO", en: "Somali", ar: "صومالي" },
+  { code: "NG", en: "Nigerian", ar: "نيجيري" }, { code: "KE", en: "Kenyan", ar: "كيني" }, { code: "MY", en: "Malaysian", ar: "ماليزي" },
+  { code: "CN", en: "Chinese", ar: "صيني" }, { code: "GB", en: "British", ar: "بريطاني" }, { code: "US", en: "American", ar: "أمريكي" },
+  { code: "CA", en: "Canadian", ar: "كندي" }, { code: "FR", en: "French", ar: "فرنسي" }, { code: "DE", en: "German", ar: "ألماني" },
+  { code: "IT", en: "Italian", ar: "إيطالي" }, { code: "ES", en: "Spanish", ar: "إسباني" }, { code: "AU", en: "Australian", ar: "أسترالي" },
+  { code: "RU", en: "Russian", ar: "روسي" }, { code: "IR", en: "Iranian", ar: "إيراني" }, { code: "UZ", en: "Uzbek", ar: "أوزبكي" },
+  { code: "KZ", en: "Kazakh", ar: "كازاخي" }, { code: "AZ", en: "Azerbaijani", ar: "أذربيجاني" }, { code: "OT", en: "Other", ar: "أخرى" },
+];
+const NAT_SET = new Set(NATIONALITIES.map((n) => n.code));
+
+const addMonths = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10); };
+/** Many countries refuse passports with less than six months left. Shown as a warning, never a block. */
+export const expiresSoon = (expiry: string | undefined, from: string) => !!expiry && expiry < addMonths(from, 6);
+
+/** Check and tidy the traveller list for a sale. Returns the clean list, or the first problem in plain words. */
+export function cleanTravellers(service: string, raw: unknown, today: string): { ok: true; travellers: Traveller[] } | { ok: false; error: string } {
+  if (!Array.isArray(raw) || raw.length < 1) return { ok: false, error: "Add at least one traveller" };
+  if (raw.length > 30) return { ok: false, error: "Up to 30 travellers per sale. Split larger groups" };
+  const passports = PASSPORT_RULE[service] ?? "none";
+  const out: Traveller[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < raw.length; i++) {
+    const r = (raw[i] ?? {}) as Record<string, unknown>;
+    const s = (k: string) => (typeof r[k] === "string" ? (r[k] as string).trim() : "");
+    const n = i + 1;
+    const name = s("name").replace(/\s+/g, " ").slice(0, 80);
+    const needName = i === 0 || ALL_NAMES.has(service);
+    if (!name && needName) return { ok: false, error: raw.length > 1 ? `Enter the name of traveller ${n}` : "Add the passenger or guest name" };
+    if (name && name.length < 2) return { ok: false, error: `Enter the full name of traveller ${n}` };
+    const t: Traveller = { name };
+    if (passports !== "none") {
+      const passport = s("passport").toUpperCase().replace(/[\s-]/g, "");
+      const any = passport || s("nationality") || s("expiry");
+      if (passports === "required" || any) {
+        if (!/^[A-Z0-9]{5,15}$/.test(passport)) return { ok: false, error: `Enter the passport number of traveller ${n}` };
+        if (seen.has(passport)) return { ok: false, error: `Passport ${passport} is entered twice` };
+        seen.add(passport);
+        if (!NAT_SET.has(s("nationality"))) return { ok: false, error: `Choose the nationality of traveller ${n}` };
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(s("expiry"))) return { ok: false, error: `Enter the passport expiry of traveller ${n}` };
+        if (s("expiry") <= today) return { ok: false, error: `Traveller ${n}'s passport has expired` };
+        Object.assign(t, { passport, nationality: s("nationality"), expiry: s("expiry") });
+        if (s("dob")) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(s("dob")) || s("dob") >= today || s("dob") < "1900-01-01") return { ok: false, error: `Check the date of birth of traveller ${n}` };
+          t.dob = s("dob");
+        }
+      }
+    }
+    out.push(t);
+  }
+  return { ok: true, travellers: out };
+}

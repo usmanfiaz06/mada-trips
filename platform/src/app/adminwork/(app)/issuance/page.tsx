@@ -14,6 +14,7 @@ import { Avatar, Badge, Card, CardHead, Empty, Field, Input, Meter, PageHeader, 
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { issueBooking, returnBooking } from "../sales/actions";
 import { grantDelegation, revokeDelegation } from "./actions";
+import { TicketInputs } from "@/components/tickets";
 
 export const metadata = { title: "Issuance" };
 
@@ -85,7 +86,7 @@ export default async function IssuancePage({ searchParams }: { searchParams: Pro
                   <div className="mt-4 grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto_auto]">
                     <ActionForm action={issueBooking} className="contents">
                       <input type="hidden" name="id" value={b.id} /><input type="hidden" name="back" value="/adminwork/issuance" />
-                      {b.serviceType === "flight" ? <input name="ticketNumbers" required className="field num" placeholder={t("Ticket number(s)")} dir="ltr" /> : <span className="self-center text-[13px] text-ink-3">{t("No ticket number needed")}</span>}
+                      {b.serviceType === "flight" ? <TicketInputs booking={b} /> : <span className="self-center text-[13px] text-ink-3">{t("No ticket number needed")}</span>}
                       <SubmitButton variant="gold"><Ticket className="size-4" />{b.serviceType === "flight" ? t("Issue") : t("Confirm")}</SubmitButton>
                     </ActionForm>
                     <details className="relative">

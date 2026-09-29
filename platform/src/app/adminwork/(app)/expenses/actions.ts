@@ -13,7 +13,7 @@ import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
 import { riyadhDate } from "@/lib/dates";
 import { EXPENSE_CATEGORY } from "@/lib/labels";
 import { partnerBalances } from "@/lib/finance";
-import { detectFileType, isIsoDate } from "@/lib/security";
+import { detectFileType, isIsoDate, isUuid } from "@/lib/security";
 
 const money = z.string().transform((v, ctx) => { try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; } });
 const S = z.object({
@@ -40,6 +40,15 @@ export async function submitExpense(_: ActionState, fd: FormData): Promise<Actio
   const mime = detectFileType(data); // from the file's own bytes, never the browser's claim
   if (!mime) return { error: "Proof must be a PDF or photo" };
   if (v.paidBy === "partner" && !u.partnerId) return { error: "Only partners can record personal payments for reimbursement" };
+  // Partners may record what any partner paid (Abdulaziz entering Bader's receipt). It goes to that partner's ledger.
+  let payerId: string | null = null;
+  if (v.paidBy === "partner") {
+    const chosen = str(fd, "partnerId") || u.partnerId!;
+    if (!isUuid(chosen)) return { error: "Choose which partner paid" };
+    const [pp] = await db.select({ id: schema.partners.id }).from(schema.partners).where(eq(schema.partners.id, chosen));
+    if (!pp) return { error: "Choose which partner paid" };
+    payerId = pp.id;
+  }
   if (v.vatAmount > v.amount) return { error: "VAT can't be more than the amount" };
   if (!isIsoDate(v.expenseDate) || v.expenseDate > riyadhDate()) return { error: "The payment date can't be in the future" };
   let id = "";
@@ -49,10 +58,12 @@ export async function submitExpense(_: ActionState, fd: FormData): Promise<Actio
       const [e] = await tx.insert(schema.expenses).values({
         ref, category: v.category, description: v.description, justification: v.justification, vendor: v.vendor || null,
         amount: v.amount, vatAmount: v.vatAmount, expenseDate: v.expenseDate, paidBy: v.paidBy,
-        partnerId: v.paidBy === "partner" ? u.partnerId : null, isStartup: v.paidBy === "partner" && v.isStartup === "on", submittedBy: u.id,
+        partnerId: payerId, isStartup: v.paidBy === "partner" && v.isStartup === "on", submittedBy: u.id,
       }).returning();
       await tx.insert(schema.attachments).values({ entityType: "expense", entityId: e.id, filename: file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 200) || "proof", mime, size: data.length, data, uploadedBy: u.id });
-      await audit(tx, { actorId: u.id, action: "expense.submitted", entityType: "expense", entityId: e.id, entityRef: ref, summary: `Submitted ${ref} · ${v.description} · SAR ${sar(v.amount)}${v.paidBy === "partner" ? " (paid personally)" : ""}` });
+      const payerName = payerId ? (await tx.select({ n: schema.partners.name }).from(schema.partners).where(eq(schema.partners.id, payerId)))[0]?.n : null;
+      await audit(tx, { actorId: u.id, action: "expense.submitted", entityType: "expense", entityId: e.id, entityRef: ref,
+        summary: `Submitted ${ref} · ${v.description} · SAR ${sar(v.amount)}${payerId ? (payerId === u.partnerId ? " (paid personally)" : ` (paid personally by ${payerName})`) : ""}` });
       const r = await createApproval(tx, { kind: "expense", entityType: "expense", entityId: e.id, title: `${ref} · ${v.description}`, amount: v.amount, reason: v.justification, requestedBy: u.id });
       await tx.update(schema.expenses).set({ approvalId: r.id }).where(eq(schema.expenses.id, e.id));
       await flash(`${ref} submitted for verification`);

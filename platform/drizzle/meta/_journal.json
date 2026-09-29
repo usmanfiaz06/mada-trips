@@ -43,6 +43,13 @@
       "when": 1790716260111,
       "tag": "0005_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790717376986,
+      "tag": "0006_travellers",
+      "breakpoints": true
     }
   ]
 }

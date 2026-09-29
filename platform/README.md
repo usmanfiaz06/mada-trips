@@ -64,6 +64,12 @@ Money is stored in halalas (integers), so totals and splits are exact.
 
 `/adminwork/tasks`: anyone can add a task for themselves or someone on their own team; partners (`tasks.manage`) assign to anyone and see everyone's work. Tasks have a due date, priority, optional steps, notes, files and remarks, and can be tied to a sale, client or expense (they then show on that record). The list groups work into Overdue / Today / Next 7 days / Later; partners get a "Who's behind" board with each person's late, due-today and finished work. Overdue and due-today tasks appear on the dashboard and as a count in the sidebar. Every change is in the activity log.
 
+## Several travellers on one sale
+
+A sale can cover several visas, tickets or guests for the same client. Set the number (e.g. 4 visas) and that many rows appear. Visas need each traveller's name, passport number, nationality and expiry (a warning shows when a passport has under 6 months left). Flights and packages can add passport details. Hotels and other services need only the lead name. Issuing a flight asks for one ticket number per passenger.
+
+Partners can record an expense another partner paid personally ("Which partner paid?"). It goes to that partner's ledger, and neither the one who recorded it nor the one being repaid can approve it.
+
 ## Security
 
 - **One login per partner.** A partner is one director vote (unique index on `users.partner_id`). Votes are counted per partner, only from people still eligible, and never from the requester's partner or a partner who benefits (an expense reimbursed to them, an advance from them).

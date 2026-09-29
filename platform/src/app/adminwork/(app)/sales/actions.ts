@@ -17,7 +17,8 @@ import { canViewRecord } from "@/lib/access";
 import { isUuid, safeNext } from "@/lib/security";
 import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/actions";
 import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
-import { cleanDetails, describeService } from "@/lib/services";
+import { cleanDetails, cleanTravellers, describeService, type Traveller } from "@/lib/services";
+import { riyadhDate } from "@/lib/dates";
 
 const money = z.string().transform((v, ctx) => {
   try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; }
@@ -29,8 +30,9 @@ const SaleSchema = z.object({
   newClientPhone: z.string().max(40).optional(),
   newClientType: z.enum(["retail", "noncontracted"]).optional(),
   serviceType: z.enum(["flight", "hotel", "visa", "package", "transport", "event", "other"]),
-  passengers: z.string().trim().min(2, "Add the passenger or guest name"),
-  paxCount: z.coerce.number().int().min(1).max(99),
+  passengers: z.string().trim().max(2000).optional(),
+  paxCount: z.coerce.number().int().min(1).max(30).catch(1),
+  travellers: z.string().max(20000).optional(),
   description: z.string().trim().max(200).optional(),
   supplier: z.string().trim().max(100).optional(),
   pnr: z.string().trim().max(20).optional(),
@@ -53,6 +55,17 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
   const parsed = SaleSchema.safeParse(Object.fromEntries(fd));
   if (!parsed.success) return zodError(parsed.error);
   const v = parsed.data;
+  // Travellers: one row per visa, ticket or guest. Names (and passports where needed) are checked here again.
+  let travellers: Traveller[];
+  {
+    let raw: unknown = null;
+    try { raw = v.travellers ? JSON.parse(v.travellers) : [{ name: v.passengers ?? "" }]; } catch { return { error: "Something went wrong with the form. Reload and try again" }; }
+    const r = cleanTravellers(v.serviceType, raw, riyadhDate());
+    if (!r.ok) return { error: r.error, fields: { travellers: "x" } };
+    travellers = r.travellers;
+  }
+  const passengers = travellers.map((x) => x.name).filter(Boolean).join(", ").slice(0, 1000);
+  const tickets = ticketsFrom(fd);
   if (v.paidNow < 0 || v.paidNow > v.sellPrice) return { error: "Amount paid can't be more than the selling price", fields: { paidNow: "x" } };
   if (v.serviceType === "flight" && !v.pnr) return { error: "Flights need a PNR", fields: { pnr: "x" } };
   // Non-flight services: the server builds the description from the structured answers.
@@ -114,7 +127,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       const [{ rate: preparerRate }] = await tx.select({ rate: schema.users.commissionBps }).from(schema.users).where(eq(schema.users.id, u.id));
       const ref = await nextRef(tx, "S", 10000);
       const [b] = await tx.insert(schema.bookings).values({
-        ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers: v.passengers, paxCount: v.paxCount,
+        ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers, paxCount: travellers.length, travellers,
         description: v.description || null, details, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
         commissionBps: preparerRate,
         netCost: v.netCost, sellPrice: v.sellPrice, status: needsCredit ? "awaiting_credit" : "pending_issue",
@@ -122,7 +135,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
         businessDate: bdate, preparedBy: u.id,
       }).returning();
       await audit(tx, { actorId: u.id, action: "booking.created", entityType: "booking", entityId: b.id, entityRef: ref,
-        summary: `Created ${ref} · ${v.passengers}${v.description ? ` · ${v.description}` : ""} · sell ${sar(v.sellPrice)}, margin ${sar(v.sellPrice - v.netCost)}` });
+        summary: `Created ${ref} · ${travellers.length > 1 ? `${travellers.length} × ` : ""}${passengers}${v.description ? ` · ${v.description}` : ""} · sell ${sar(v.sellPrice)}, margin ${sar(v.sellPrice - v.netCost)}` });
 
       if (v.paidNow > 0) {
         await tx.insert(schema.payments).values({ bookingId: b.id, clientId: client.id, account, method: v.method, amount: v.paidNow, reference: v.paymentRef || null, businessDate: bdate, recordedBy: u.id });
@@ -146,10 +159,11 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
           await flash(`${ref} saved and sent to issuance (${chk.reason})`);
           return b.id;
         }
-        if (v.serviceType === "flight" && !v.ticketNumbers) throw new Error("Enter the ticket number to issue now, or untick Issue now");
-        await tx.update(schema.bookings).set({ status: "issued", issuedBy: u.id, issuedAt: new Date(), ticketNumbers: v.ticketNumbers || null, issuedUnderDelegation: chk.delegationId }).where(eq(schema.bookings.id, b.id));
+        const tk = tickets ?? v.ticketNumbers ?? null;
+        if (v.serviceType === "flight") assertTickets(tk, travellers.length);
+        await tx.update(schema.bookings).set({ status: "issued", issuedBy: u.id, issuedAt: new Date(), ticketNumbers: tk, issuedUnderDelegation: chk.delegationId }).where(eq(schema.bookings.id, b.id));
         await audit(tx, { actorId: u.id, action: "booking.issued", entityType: "booking", entityId: b.id, entityRef: ref,
-          summary: `Issued ${ref}${v.ticketNumbers ? ` · ticket ${v.ticketNumbers}` : ""}${chk.delegationId ? " (under delegation)" : ""}` });
+          summary: `Issued ${ref}${tk ? ` · ticket${travellers.length > 1 ? "s" : ""} ${tk}` : ""}${chk.delegationId ? " (under delegation)" : ""}` });
         await flash(`${ref} issued`);
         return b.id;
       }
@@ -159,6 +173,20 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);
+}
+
+/** Ticket numbers typed one per passenger (inputs named "ticket"), joined for storage. */
+function ticketsFrom(fd: FormData): string | null {
+  const list = fd.getAll("ticket").map((x) => String(x).trim().slice(0, 30)).filter(Boolean);
+  return list.length ? list.join(", ").slice(0, 1000) : null;
+}
+
+/** Flights: one ticket number for every passenger, no duplicates. */
+function assertTickets(joined: string | null, pax: number) {
+  const list = (joined ?? "").split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
+  if (!list.length) throw new Error(pax > 1 ? "Enter a ticket number for each passenger" : "Enter the ticket number(s)");
+  if (list.length < pax) throw new Error(`Enter a ticket number for each passenger (${list.length} of ${pax})`);
+  if (new Set(list).size !== list.length) throw new Error("The same ticket number is entered twice");
 }
 
 /** A sale this person may act on: it exists and they can see it (their team's, or everyone's with sales.view_all). */
@@ -175,7 +203,7 @@ const paidOn = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], i
 export async function issueBooking(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requireUser();
   const id = str(fd, "id");
-  const tickets = optStr(fd, "ticketNumbers")?.slice(0, 200) ?? null;
+  const tickets = ticketsFrom(fd) ?? optStr(fd, "ticketNumbers")?.slice(0, 1000) ?? null;
   const pnr = optStr(fd, "pnr")?.slice(0, 20) ?? null;
   try {
     await loadScopedBooking(u, id);
@@ -185,7 +213,7 @@ export async function issueBooking(_: ActionState, fd: FormData): Promise<Action
       if (b.status !== "pending_issue") throw new Error("This sale is not waiting to issue");
       const chk = await issueCheck(tx, u, b, { lock: true });
       if (!chk.ok) throw new Error(chk.reason);
-      if (b.serviceType === "flight" && !tickets) throw new Error("Enter the ticket number(s)");
+      if (b.serviceType === "flight") assertTickets(tickets, b.paxCount);
       await tx.update(schema.bookings).set({ status: "issued", issuedBy: u.id, issuedAt: new Date(), ticketNumbers: tickets ?? b.ticketNumbers, pnr: pnr?.toUpperCase() ?? b.pnr, issuedUnderDelegation: chk.delegationId, returnNote: null, updatedAt: new Date() }).where(eq(schema.bookings.id, id));
       await audit(tx, { actorId: u.id, action: "booking.issued", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Issued ${b.ref}${tickets ? ` · ticket ${tickets}` : ""}${chk.delegationId ? " (under delegation)" : ""}` });
       await flash(`${b.ref} issued`);

@@ -1,12 +1,13 @@
 "use client";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { PendingContext, useSubmit } from "@/components/client";
 import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
 import { createSale } from "../actions";
 import { Picker, type PickerItem } from "@/components/picker";
 import { ServiceDetails } from "./service-details";
+import { Travellers } from "./travellers";
 import { AIRLINES, AIRPORTS, airlineLabel } from "@/lib/travel-data";
 
 const AIRPORT_ITEMS: PickerItem[] = AIRPORTS.map((a) => ({
@@ -46,7 +47,7 @@ function Step({ n, title, done, children }: { n: number; title: string; done?: b
 }
 
 function Submit({ label }: { label: string }) {
-  const { pending } = useFormStatus();
+  const pending = useContext(PendingContext);
   return (
     <button type="submit" disabled={pending} className={btn("gold", "lg", "w-full")}>
       {pending ? <Loader2 className="size-4 animate-spin" /> : null}{label}<ArrowRight className="size-4 rtl:rotate-180" />
@@ -56,7 +57,8 @@ function Submit({ label }: { label: string }) {
 
 export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId }: Props) {
   const t = useT();
-  const [state, action] = useActionState(createSale, null);
+  const [state, action, pending] = useActionState(createSale, null);
+  const onSubmit = useSubmit(action);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [client, setClient] = useState<Client | null>(() => clients.find((c) => c.id === defaultClientId) ?? null);
@@ -67,7 +69,11 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [paid, setPaid] = useState<string | null>(null);
   const [method, setMethod] = useState("mada");
   const [issueNow, setIssueNow] = useState(true);
-  const [pax, setPax] = useState("");
+  const [names, setNames] = useState<string[]>([]);
+  const [count, setCount] = useState(1);
+  const [tickets, setTickets] = useState<string[]>([]); // kept in state so a failed save doesn't wipe them
+  const onNames = useCallback((n: string[], c: number) => { setNames((old) => (old.join("|") === n.join("|") ? old : n)); setCount(c); }, []);
+  const pax = names.join(", ");
   const [pnr, setPnr] = useState("");
   const [from, setFrom] = useState("RUH");
   const [to, setTo] = useState("");
@@ -103,7 +109,8 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   useEffect(() => { if (!client && !newClient) searchRef.current?.focus(); }, [client, newClient]);
 
   return (
-    <form action={action} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <PendingContext.Provider value={pending}>
+    <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
         {state?.error && (
           <div role="alert" className="flex items-start gap-2 rounded-2xl bg-bad-soft px-4 py-3 text-[13.5px] text-bad animate-rise"><AlertCircle className="mt-0.5 size-4 shrink-0" />{t(state.error)}</div>
@@ -181,10 +188,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <input type="hidden" name="serviceType" value={service} />
           </div>
           <div className="grid gap-4 sm:grid-cols-6">
-            <label className="sm:col-span-4"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Passenger / guest name")} <span className="text-gold-2">*</span></span>
-              <input name="passengers" value={pax} onChange={(e) => setPax(e.target.value)} className="field" placeholder={t("As on passport")} required /></label>
-            <label className="sm:col-span-2"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Travellers")}</span>
-              <input name="paxCount" type="number" min={1} defaultValue={1} className="field num" /></label>
+            <Travellers service={service} invalid={!!state?.fields?.travellers} onNames={onNames} />
             {service === "flight" ? (
               <>
                 <div className="sm:col-span-6">
@@ -232,6 +236,9 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
               <div className="relative" dir="ltr"><input name="sellPrice" inputMode="decimal" value={sell} onChange={(e) => setSell(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.sellPrice} />
                 <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[12px] text-ink-3">SAR</span></div></label>
           </div>
+          {count > 1 && sellH > 0 && (
+            <p className="mt-3 text-[13px] text-ink-3">{t("{n} × SAR {v} each", { n: count, v: show(Math.round(sellH / count)) })}{netH > 0 ? ` · ${t("cost SAR {v} each", { v: show(Math.round(netH / count)) })}` : ""}</p>
+          )}
           {sellH > 0 && netH > 0 && marginTone !== "ok" && (
             <p className={cx("mt-3 text-[13px]", marginTone === "bad" ? "text-bad" : "text-warn")}>
               {marginTone === "bad" ? t("This sale loses money. Double-check the prices.") : t("Margin is below the {p}% target.", { p: (targetBps / 100).toFixed(0) })}
@@ -274,7 +281,12 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                   : service === "flight" ? t("You can't issue flights. It will go to the issuance queue.") : t("Non-flight services are confirmed by the preparer.")}
               </span>
               {issueNow && canIssue && !creditNeeded && service === "flight" && (
-                <input name="ticketNumbers" className="field mt-3 num" placeholder={t("Ticket number, e.g. 065-1234567890")} dir="ltr" />
+                <span className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {(names.length ? names : [""]).map((n, i) => (
+                    <input key={i} name="ticket" value={tickets[i] ?? ""} onChange={(e) => setTickets((x) => { const y = [...x]; y[i] = e.target.value; return y; })} className="field num" dir="ltr" aria-label={t("Ticket number for {name}", { name: n || String(i + 1) })}
+                      placeholder={names.length > 1 ? `${n} · 065-1234567890` : t("Ticket number, e.g. 065-1234567890")} />
+                  ))}
+                </span>
               )}
             </label>
           </div>
@@ -291,7 +303,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <div className="flex items-center justify-between text-[12.5px] text-tile-ink-3"><span>{t("Summary")}</span>{ctype && <span>{t(channel === "retail" ? "Retail / B2C account" : "Corporate / B2B account")}</span>}</div>
             <div className="mt-4 min-h-[44px]">
               <div className="truncate text-[18px] font-[420]">{client?.name ?? newClient?.name ?? <span className="text-tile-ink-3">{t("No client yet")}</span>}</div>
-              <div className="truncate text-[13px] text-tile-ink-3">{pax || "—"} {pnr && <span dir="ltr">· {pnr}</span>}</div>
+              <div className="truncate text-[13px] text-tile-ink-3">{count > 1 && <span className="num">{count} × </span>}{pax || "—"} {pnr && <span dir="ltr">· {pnr}</span>}</div>
             </div>
 
             <div className="mt-6 text-[12px] text-tile-ink-3">{t("Margin")}</div>
@@ -326,5 +338,6 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
         <p className="mt-3 text-center text-[12px] text-ink-3">{t("Saved sales appear in tonight's 10 PM report automatically.")}</p>
       </aside>
     </form>
+    </PendingContext.Provider>
   );
 }
