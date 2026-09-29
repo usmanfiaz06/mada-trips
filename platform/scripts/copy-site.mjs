@@ -1,10 +1,13 @@
 // The public website (repo root) and Mada Ops deploy as one Vercel project.
 // Before each build, copy the website into public/ so Next.js serves it at "/". public/adminwork is the app's own.
 import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(import.meta.dirname, "../..");
-const out = resolve(import.meta.dirname, "../public");
+const here = dirname(fileURLToPath(import.meta.url));
+
+const root = resolve(here, "../..");
+const out = resolve(here, "../public");
 const SKIP = new Set(["platform", "docs", ".git", ".github", ".vercel", "node_modules", "README.md", "vercel.json", ".gitignore"]);
 
 // Clear the previous copy but keep the app's own assets.

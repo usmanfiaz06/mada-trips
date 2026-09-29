@@ -11,4 +11,4 @@ export function middleware(req: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-export const config = { matcher: ["/adminwork", "/adminwork/((?!symbol|wordmark|favicon).*)"] };
+export const config = { matcher: ["/adminwork", "/adminwork/((?!symbol|wordmark|favicon|api/health).*)"] };
