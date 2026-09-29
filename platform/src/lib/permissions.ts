@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   "settlement.run":      { group: "finance",   en: "Prepare the Day-25 settlement",      ar: "إعداد تسوية اليوم ٢٥" },
   "ledger.view_all":     { group: "partners",  en: "See all partner ledgers",            ar: "عرض دفاتر جميع الشركاء" },
   "ledger.manage":       { group: "partners",  en: "Record partner advances",            ar: "تسجيل سلف الشركاء" },
+  "tasks.manage":        { group: "admin",     en: "See & assign everyone's tasks",      ar: "عرض مهام الجميع وإسنادها" },
   "team.manage":         { group: "admin",     en: "Add & manage team members",          ar: "إدارة أعضاء الفريق" },
   "roles.manage":        { group: "admin",     en: "Create & edit roles",                ar: "إنشاء وتعديل الأدوار" },
   "activity.view":       { group: "admin",     en: "See the full activity log",          ar: "عرض سجل النشاط الكامل" },

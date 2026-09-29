@@ -14,6 +14,7 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
 import { issueBooking, recordPayment, requestRefund, resubmitBooking, returnBooking, voidBooking } from "../actions";
+import { LinkedTasks } from "@/components/tasks";
 
 export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -197,6 +198,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
             </Card>
           )}
 
+          <LinkedTasks me={u} type="booking" id={b.id} />
           <Attachments entityType="booking" entityId={b.id} path={path} refLabel={b.ref} title={t("Tickets & documents")} />
         </aside>
       </div>

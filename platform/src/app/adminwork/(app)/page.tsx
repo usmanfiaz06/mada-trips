@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { ArrowUpRight, Check, CircleAlert, Clock3, FileWarning, Ticket, Stamp, MoonStar, Plus, Wallet } from "lucide-react";
+import { ArrowUpRight, Check, CircleAlert, Clock3, FileWarning, ListChecks, Ticket, Stamp, MoonStar, Plus, Wallet } from "lucide-react";
 import { requireUser, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { dashboardData } from "@/lib/dashboard";
 import { Card, CardHead, InkCard, Money, Badge, Avatar, LinkButton, Empty, cx } from "@/components/ui";
 import { ArcGauge, CycleBarcode, DotColumns, SunGauge, SplitBar } from "@/components/charts";
-import { addDays, daysBetween, fmtDate, timeAgo } from "@/lib/dates";
+import { addDays, daysBetween, fmtDate, riyadhDate, timeAgo } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { APPROVAL_KIND } from "@/lib/labels";
 
@@ -49,7 +49,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const dayLabels = [0, 5, 10, 15, 20, 25, d.days - 1].filter((x, i, a) => x < d.days && a.indexOf(x) === i)
     .map((i) => fmtDate(addDays(d.cycle.start, i), "en").split(" ").slice(0, 2).join(" "));
 
+  const calToday = riyadhDate(); // tasks are due on calendar days, not business days
   const tasks: { href: string; icon: React.ReactNode; title: string; sub: string; tone: "gold" | "warn" | "bad" | "info" }[] = [
+    ...d.myTasks.map((k) => {
+      const late = !!k.dueDate && k.dueDate < calToday;
+      const days = k.dueDate ? daysBetween(k.dueDate, calToday) : 0;
+      return { href: `/adminwork/tasks/${k.id}`, icon: <ListChecks className="size-4" />, title: `${k.ref} · ${k.title}`,
+        sub: late ? (days === 1 ? t("Overdue since yesterday") : t("Overdue {n} days", { n: days })) : t("Due today"), tone: late ? "bad" as const : "gold" as const };
+    }),
     ...d.waiting.map((a) => ({ href: `/adminwork/approvals/${a.id}`, icon: <Stamp className="size-4" />, title: a.title, sub: `${t(APPROVAL_KIND[a.kind])} · SAR ${sar(a.amount)} · ${timeAgo(a.createdAt, L)}`, tone: "gold" as const })),
     ...d.issueQueue.map((b) => ({ href: `/adminwork/issuance?focus=${b.id}`, icon: <Ticket className="size-4" />, title: `${t("Issue")} ${b.ref} · ${b.passengers}`, sub: `${b.description ?? ""} · SAR ${sar(b.sell)} · ${timeAgo(b.createdAt, L)}`, tone: "info" as const })),
     ...d.closesToVerify.map((c) => ({ href: `/adminwork/close/${c.businessDate}?team=${c.team}`, icon: <MoonStar className="size-4" />, title: t("Verify {team} close · {date}", { team: t(c.team === "riyadh" ? "Riyadh" : "Pakistan"), date: fmtDate(c.businessDate, L) }), sub: c.lateSubmission ? t("Submitted late") : t("Submitted on time"), tone: c.lateSubmission ? "warn" as const : "gold" as const })),

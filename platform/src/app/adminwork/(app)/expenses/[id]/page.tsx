@@ -16,6 +16,7 @@ import { VoteDots } from "@/components/votes";
 import { Attachments, Timeline } from "@/components/record";
 import { vote } from "../../approvals/actions";
 import { voidExpense, withdrawExpense } from "../actions";
+import { LinkedTasks } from "@/components/tasks";
 
 export default async function ExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -105,6 +106,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
               )}
             </Card>
           )}
+          <LinkedTasks me={u} type="expense" id={e.id} />
           <Attachments entityType="expense" entityId={e.id} path={path} refLabel={e.ref} title={t("Proof & files")} canAdd={e.status === "pending"} />
         </aside>
       </div>

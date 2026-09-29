@@ -26,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"} className={theme === "dark" ? "dark" : undefined} suppressHydrationWarning>
       <head>
-        {!theme && <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')` }} />}
+        {!theme && <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `if(matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')` }} />}
       </head>
       <body className="min-h-dvh font-sans text-[14px] antialiased">
         <I18nProvider locale={locale} dict={locale === "ar" ? AR : {}}>

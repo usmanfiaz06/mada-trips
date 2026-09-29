@@ -2,7 +2,8 @@ import "server-only";
 import { and, desc, eq, gte, inArray, lte, notInArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
-import { addDays, businessDate, cycleFor, daysBetween } from "./dates";
+import { addDays, businessDate, cycleFor, daysBetween, riyadhDate } from "./dates";
+import { myUrgentTasks } from "./tasks";
 import { cashPosition, computeSettlement, receivables } from "./finance";
 import { getSettings } from "./settings";
 import { pendingForUser } from "./approvals";
@@ -96,11 +97,13 @@ export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "
     WHERE b.prepared_by = ${u.id} AND b.status IN ('issued','pending_issue') AND b.recognized_cycle_id IS NULL AND b.commission_bps > 0`);
   const commission = { rate: me?.rate ?? 0, earned: Number(comm[0]?.earned ?? 0), pending: Number(comm[0]?.pending ?? 0), sales: comm[0]?.n ?? 0 };
 
+  const myTasks = await myUrgentTasks(u.id, riyadhDate());
+
   const myExpenses = await db.select({ n: sql<number>`count(*)::int` }).from(schema.expenses)
     .where(and(eq(schema.expenses.submittedBy, u.id), inArray(schema.expenses.status, ["pending"])));
 
   return {
     s, today, cycle, current, view, days, todayIdx, cycleBookings, todayRows, last14, waiting, issuer, issueQueue, finance,
-    closesToVerify, activity, commission, myOpenToday: [...myOpenToday].filter((o) => !issueQueue.some((q) => q.id === o.id)), myPendingExpenses: myExpenses[0]?.n ?? 0,
+    closesToVerify, activity, commission, myTasks, myOpenToday: [...myOpenToday].filter((o) => !issueQueue.some((q) => q.id === o.id)), myPendingExpenses: myExpenses[0]?.n ?? 0,
   };
 }

@@ -283,6 +283,33 @@ export const settlementCycles = pgTable("settlement_cycles", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("cycle_end_once").on(t.endDate)]);
 
+/* ───────────── Tasks ───────────── */
+
+// Work assigned to a person: who, what, by when, and where it stands. Optionally tied to a sale, client or expense.
+export const tasks = pgTable("tasks", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("open"), // open | in_progress | waiting | done | cancelled
+  priority: text("priority").notNull().default("normal"), // normal | high | urgent
+  assigneeId: uuid("assignee_id").notNull().references(() => users.id),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  dueDate: date("due_date"),
+  waitingOn: text("waiting_on"), // what it's stuck on, while status is "waiting"
+  checklist: jsonb("checklist").notNull().default([]), // [{ id, text, done }]
+  linkType: text("link_type"), // booking | client | expense
+  linkId: uuid("link_id"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedBy: uuid("completed_by").references(() => users.id),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("tasks_assignee_status_idx").on(t.assigneeId, t.status),
+  index("tasks_due_idx").on(t.dueDate),
+  index("tasks_link_idx").on(t.linkType, t.linkId),
+]);
+
 /* ───────────── Cross-cutting: remarks, files, audit, settings ───────────── */
 
 export const remarks = pgTable("remarks", {

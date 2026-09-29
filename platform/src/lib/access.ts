@@ -5,7 +5,7 @@ import type { CurrentUser } from "./auth";
 import { eligibleApprovers } from "./approvals";
 import { isUuid } from "./security";
 
-export const RECORD_TYPES = ["booking", "expense", "client", "approval", "close", "settlement", "user"] as const;
+export const RECORD_TYPES = ["booking", "expense", "client", "approval", "close", "settlement", "user", "task"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
 
 /**
@@ -44,6 +44,10 @@ export async function canViewRecord(u: CurrentUser, type: string, id: string): P
       return p.has("finance.view");
     case "user":
       return p.has("team.manage") || id === u.id;
+    case "task": {
+      const [t] = await db.select({ a: schema.tasks.assigneeId, c: schema.tasks.createdBy }).from(schema.tasks).where(eq(schema.tasks.id, id));
+      return !!t && (p.has("tasks.manage") || t.a === u.id || t.c === u.id);
+    }
     default:
       return false;
   }
@@ -70,6 +74,7 @@ export async function recordLabel(type: string, id: string): Promise<string | nu
     case "client": return (await db.select({ l: schema.clients.name }).from(schema.clients).where(eq(schema.clients.id, id)))[0]?.l ?? null;
     case "approval": return (await db.select({ l: schema.approvalRequests.ref }).from(schema.approvalRequests).where(eq(schema.approvalRequests.id, id)))[0]?.l ?? null;
     case "settlement": return (await db.select({ l: schema.settlementCycles.label }).from(schema.settlementCycles).where(eq(schema.settlementCycles.id, id)))[0]?.l ?? null;
+    case "task": return (await db.select({ l: schema.tasks.ref }).from(schema.tasks).where(eq(schema.tasks.id, id)))[0]?.l ?? null;
     case "user": return (await db.select({ l: schema.users.name }).from(schema.users).where(eq(schema.users.id, id)))[0]?.l ?? null;
     default: return null;
   }
@@ -77,6 +82,6 @@ export async function recordLabel(type: string, id: string): Promise<string | nu
 
 /** Where each record lives, so revalidation never uses a browser-supplied path. */
 export function recordPath(type: string, id: string): string {
-  const base: Record<string, string> = { booking: "sales", expense: "expenses", client: "clients", approval: "approvals", settlement: "settlement", user: "team" };
+  const base: Record<string, string> = { booking: "sales", expense: "expenses", client: "clients", approval: "approvals", settlement: "settlement", user: "team", task: "tasks" };
   return base[type] ? `/adminwork/${base[type]}/${id}` : "/adminwork";
 }

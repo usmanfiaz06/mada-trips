@@ -60,6 +60,10 @@ Then open `/adminwork`, sign in as a partner (e.g. `abdulaziz@madatrips.com`), c
 
 Money is stored in halalas (integers), so totals and splits are exact.
 
+## Tasks
+
+`/adminwork/tasks`: anyone can add a task for themselves or someone on their own team; partners (`tasks.manage`) assign to anyone and see everyone's work. Tasks have a due date, priority, optional steps, notes, files and remarks, and can be tied to a sale, client or expense (they then show on that record). The list groups work into Overdue / Today / Next 7 days / Later; partners get a "Who's behind" board with each person's late, due-today and finished work. Overdue and due-today tasks appear on the dashboard and as a count in the sidebar. Every change is in the activity log.
+
 ## Security
 
 - **One login per partner.** A partner is one director vote (unique index on `users.partner_id`). Votes are counted per partner, only from people still eligible, and never from the requester's partner or a partner who benefits (an expense reimbursed to them, an advance from them).

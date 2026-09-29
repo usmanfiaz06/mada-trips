@@ -242,10 +242,32 @@ async function main() {
 
   ev.push({ at: at(59, 10), actorId: uA.id, action: "user.created", entityType: "user", entityId: counter.id, entityRef: counter.name, summary: `Added Riyadh Counter as Retail agent (Riyadh)` });
   ev.push({ at: at(45, 11), actorId: uB.id, action: "delegation.granted", entityType: "user", entityId: counter.id, entityRef: counter.name, summary: `Granted Riyadh Counter retail issuing up to SAR 8,000 per ticket` });
+  // Tasks: a realistic mix of late, due today, upcoming, waiting and done work across both teams.
+  const day = (n: number) => riyadhDay(at(-n, 12));
+  const T = (i: number) => `T-${1001 + i}`;
+  const taskRows: (typeof schema.tasks.$inferInsert)[] = [
+    { title: "Chase Al Noor Engineering for the August invoice", assigneeId: desk1.id, createdBy: uA.id, dueDate: day(-3), priority: "high", status: "in_progress" },
+    { title: "Collect passport copies for the Istanbul group (6 pax)", assigneeId: counter.id, createdBy: uB.id, dueDate: day(-1), priority: "urgent" },
+    { title: "Re-quote Riyadh Medical Group conference hotels", assigneeId: desk2.id, createdBy: uH.id, dueDate: day(0), notes: "They want 4-star options within 2 km of the venue.",
+      checklist: [{ id: "a", text: "Shortlist 3 hotels", done: true }, { id: "b", text: "Get net rates", done: false }, { id: "c", text: "Send quote", done: false }] },
+    { title: "Confirm Umrah visa slots for next week", assigneeId: counter.id, createdBy: counter.id, dueDate: day(0) },
+    { title: "Send Vision Events the signed rate sheet", assigneeId: desk1.id, createdBy: uH.id, dueDate: day(2), status: "waiting", waitingOn: "Their procurement to confirm the contract number" },
+    { title: "Reconcile last week's mada terminal receipts", assigneeId: counter.id, createdBy: uA.id, dueDate: day(3) },
+    { title: "Prepare Q4 corporate fares comparison", assigneeId: desk2.id, createdBy: uB.id, dueDate: day(12), priority: "normal" },
+    { title: "Renew IATA bank guarantee paperwork", assigneeId: uB.id, createdBy: uA.id, dueDate: day(5), priority: "high" },
+    { title: "Review the new retail refund policy draft", assigneeId: uH.id, createdBy: uH.id, dueDate: null },
+    { title: "Update Gulf Horizon contact details", assigneeId: desk1.id, createdBy: desk1.id, dueDate: day(-4), status: "done" },
+    { title: "Print receipt rolls for the counter", assigneeId: counter.id, createdBy: counter.id, dueDate: day(-2), status: "done" },
+  ].map((r, i) => ({ ref: T(i), checklist: [], ...r, ...(r.status === "done" ? { completedAt: at(1, 15), completedBy: r.assigneeId } : {}), createdAt: at(6 - (i % 5), 9 + i % 6) }));
+  const tk = await db.insert(schema.tasks).values(taskRows).returning();
+  await db.insert(schema.counters).values({ key: "T", value: 1000 + tk.length }).onConflictDoNothing();
+  for (const x of tk) ev.push({ at: x.createdAt, actorId: x.createdBy, action: "task.created", entityType: "task", entityId: x.id, entityRef: x.ref,
+    summary: x.createdBy === x.assigneeId ? `Added ${x.ref} for themselves: ${x.title}` : `Assigned ${x.ref} to ${[counter, desk1, desk2, uA, uB, uH].find((p) => p.id === x.assigneeId)!.name}: ${x.title}` });
+
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 
-  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
+  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses, ${tk.length} tasks. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
 }
 
 main().then(() => client.end()).catch(async (e) => { console.error(e); await client.end(); process.exit(1); });

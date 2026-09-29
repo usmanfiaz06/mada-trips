@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CornerDownLeft, Search, FileText, User, Receipt, Ticket } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, FileText, User, Receipt, Ticket, ListChecks } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-type Item = { id: string; label: string; hint?: string; href: string; kind: "page" | "booking" | "client" | "expense" | "approval" };
-const KIND_ICON = { page: ArrowRight, booking: Ticket, client: User, expense: Receipt, approval: FileText };
+type Item = { id: string; label: string; hint?: string; href: string; kind: "page" | "booking" | "client" | "expense" | "approval" | "task" };
+const KIND_ICON = { page: ArrowRight, booking: Ticket, client: User, expense: Receipt, approval: FileText, task: ListChecks };
 
 export function CommandPalette({ pages }: { pages: { label: string; href: string; section: string }[] }) {
   const t = useT();

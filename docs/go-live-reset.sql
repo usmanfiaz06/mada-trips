@@ -9,7 +9,7 @@ TRUNCATE
   ledger_entries, expenses,
   approval_decisions, approval_requests,
   payments, bookings, clients,
-  delegations, sessions, counters
+  delegations, sessions, counters, tasks
 RESTART IDENTITY;
 
 -- The IATA reserve "held" came from test settlements; start from zero.
