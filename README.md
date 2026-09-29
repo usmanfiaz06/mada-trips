@@ -23,7 +23,7 @@ Import the repo in Vercel with Framework Preset **Other**, no build command, out
 - Open Graph and X/Twitter tags, canonical URL and Organization/TravelAgency structured data are in the `<head>` of `index.html`.
 - Link-preview images (1200×630): `og-image.jpg` for the home page, and `assets/og/events.jpg`, `services.jpg`, `about.jpg`, `contact.jpg` for the other pages.
 - `sitemap.xml`, `robots.txt`, `site.webmanifest`, app icons in `assets/brand/`, and a branded `404.html`.
-- **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in every `.html` page, `sitemap.xml` and `robots.txt`.
+- **When you add a custom domain**, replace `https://mada-trips.vercel.app` with it in every English `.html` page, `tools/build_ar.py`, `sitemap.xml` and `robots.txt`, then rebuild the Arabic pages.
 - The nav, menu and footer are repeated in each page. If you change one, change them all.
 
 ## Structure
@@ -62,6 +62,24 @@ Assets/             original brand files as supplied
 10. **Footer.**
 
 Respects `prefers-reduced-motion`.
+
+## Arabic site
+
+Every page has an Arabic version under `/ar` (`/ar`, `/ar/events`, `/ar/services`, `/ar/about`, `/ar/contact`),
+right-to-left with Arabic typography (IBM Plex Sans Arabic, Reem Kufi accents, Aref Ruqaa signatures). The
+"العربية" / "English" link in the menu and footer switches to the same page in the other language.
+
+The Arabic pages are **generated** from the English ones, so don't edit `ar/*.html` by hand:
+
+```bash
+pip install beautifulsoup4
+python3 tools/build_ar.py
+```
+
+- Arabic copy lives in `tools/i18n_ar.py` (`HEADLINES` for styled headings, `TEXT` for everything else).
+- Run the build after changing any English page or the Arabic copy. It lists any English it couldn't translate.
+- Text written by scripts (typing effects, card labels) is in `js/home.js`; the chat follows the page language.
+- Arabic link previews: `assets/og/ar-*.jpg`.
 
 ## Concierge chat
 

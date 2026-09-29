@@ -269,6 +269,10 @@
      ================================================================ */
   let S = { questions: [], lang: /^ar/i.test(navigator.language || '') ? 'ar' : 'en', flow: null, step: 0, answers: {}, name: '', phone: '', note: '', also: '', awaiting: null, editing: false, misses: 0, last: '', lastCount: 0, phoneTries: 0, nameTries: 0, started: false, log: [], chips: [], open: false };
   try { const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null'); if (saved && saved.log) S = Object.assign(S, saved); } catch (_) {}
+  // the chat speaks the language of the page it's on
+  const PAGE_AR = document.documentElement.lang === 'ar';
+  S.lang = PAGE_AR ? 'ar' : (S.log.length ? S.lang : 'en');
+  const localUrl = u => (PAGE_AR && u.startsWith('/') && !u.startsWith('/ar') ? (u === '/' ? '/ar' : '/ar' + u) : u);
   const save = () => { try { sessionStorage.setItem(STORE, JSON.stringify(S)); } catch (_) {} };
   const t = () => T[S.lang];
   const L = obj => obj[S.lang] || obj.en;
@@ -307,8 +311,10 @@
   const launch = q('.mc-launch'), panel = q('.mc-panel'), body = q('.mc-body'), chipsEl = q('.mc-chips'), form = q('.mc-input'), input = form.querySelector('input');
 
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const md = s => s.replace(/\[([^\]]+)\]\(((?:\/|tel:|https:\/\/)[^)\s]*)\)/g, (_, txt, url) => `<a href="${url}"${url.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${txt}</a>`);
+  const md = s => s.replace(/\[([^\]]+)\]\(((?:\/|tel:|https:\/\/)[^)\s]*)\)/g, (_, txt, url) => `<a href="${localUrl(url)}"${url.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${txt}</a>`);
   const paintUI = () => {
+    q('.mc-launch__label').textContent = S.lang === 'ar' ? 'اسأل مادا' : 'Ask Mada';
+    launch.setAttribute('aria-label', S.lang === 'ar' ? 'افتح المحادثة مع مادا' : 'Open chat with Mada');
     q('.js-t-title').textContent = t().title; q('.js-t-sub').textContent = t().sub;
     q('.js-lang').textContent = t().langBtn; input.placeholder = t().placeholder;
     panel.setAttribute('dir', S.lang === 'ar' ? 'rtl' : 'ltr');
@@ -355,7 +361,7 @@
   const handoffChips = () => [
     { label: t().wa, href: waLink(), cls: 'mc-chip--wa' },
     { label: t().call, href: 'tel:+' + PHONE },
-    { label: t().form, href: '/contact' + (S.flow && S.flow !== 'Other' ? '?topic=' + encodeURIComponent(S.flow) : '') },
+    { label: t().form, href: localUrl('/contact') + (S.flow && S.flow !== 'Other' ? '?topic=' + encodeURIComponent(S.flow) : '') },
     { label: t().menuChip, act: 'menu' }
   ];
   const expandChips = (list = []) => list.flatMap(c => c === 'menu' ? menuChips() : c === 'human' ? [{ label: t().human, act: 'human' }] : KB.flows[c] ? [{ label: flowName(c), act: 'flow:' + c }] : []);
@@ -442,7 +448,7 @@
       { label: t().wa, href: waLink(), cls: 'mc-chip--wa' },
       { label: t().call, href: 'tel:+' + PHONE },
       ...(editable ? [{ label: t().edit, act: 'edit' }] : []),
-      { label: t().form, href: '/contact' + (S.flow && S.flow !== 'Other' ? '?topic=' + encodeURIComponent(S.flow) : '') },
+      { label: t().form, href: localUrl('/contact') + (S.flow && S.flow !== 'Other' ? '?topic=' + encodeURIComponent(S.flow) : '') },
       { label: t().restart, act: 'restart', cls: 'mc-chip--ghost' }
     ]);
   }

@@ -3,17 +3,18 @@
    ========================================================= */
 (() => {
   const { $, $$, reduce, isMobile, typeLoop, start, SUN_ORIGIN } = window.MADA;
+  const AR = document.documentElement.lang === 'ar';
 
   /* ---------------- Hero: rotating pills + typed placeholder ---------------- */
   const pills = $$('.pill');
   let pi = 0;
   setInterval(() => { pills[pi].classList.remove('is-on'); pi = (pi + 1) % pills.length; pills[pi].classList.add('is-on'); }, 2200);
   const heroInput = $('.search__input');
-  typeLoop(t => heroInput.setAttribute('placeholder', 'Where to?  ' + t), ['AlUla', 'The Red Sea', 'Riyadh', 'Diriyah', 'Paris', 'NEOM', 'Abha'], { hold: 1300 });
+  typeLoop(t => heroInput.setAttribute('placeholder', (AR ? 'إلى أين؟  ' : 'Where to?  ') + t), AR ? ['العلا', 'البحر الأحمر', 'الرياض', 'الدرعية', 'باريس', 'نيوم', 'أبها'] : ['AlUla', 'The Red Sea', 'Riyadh', 'Diriyah', 'Paris', 'NEOM', 'Abha'], { hold: 1300 });
 
   /* ---------------- Visa typing + stamp ---------------- */
   const visaEl = $('.js-visa-typed'), stamp = $('.js-stamp');
-  typeLoop(t => (visaEl.textContent = t), ['Schengen · France', 'UK Standard Visitor', 'Umrah · 4 guests', 'Business eVisa · KSA'], {
+  typeLoop(t => (visaEl.textContent = t), AR ? ['شنغن · فرنسا', 'زيارة · بريطانيا', 'عمرة · 4 أشخاص', 'تأشيرة أعمال · السعودية'] : ['Schengen · France', 'UK Standard Visitor', 'Umrah · 4 guests', 'Business eVisa · KSA'], {
     hold: 1900,
     onFull: () => {
       gsap.fromTo(stamp, { scale: 2.2, opacity: 0, rotate: -24 }, { scale: 1, opacity: 1, rotate: -12, duration: .45, ease: 'back.out(2.2)' });
@@ -63,7 +64,7 @@
     } else {
       w = Math.min(Math.max(vw * .25, 300), 440);
       h = Math.min(vh * .68, w * 1.45);
-      x = vw * .46 - w / 2;
+      x = (AR ? vw * .54 : vw * .46) - w / 2; // mirrored for Arabic
       y = (vh - h) / 2 + 12;
     }
     const s = Math.min(1, Math.max(h / vh, w / vw) * 1.14);
@@ -83,7 +84,7 @@
   const slides = $$('.frame__slide');
   const dots = $$('.chapter__progress i');
   const frameLabel = $('.js-frame-label');
-  const labels = ['Arabian Dunes · 24°N', 'Red Sea Coast · Stay', 'On site · Riyadh', 'Main Stage · Live'];
+  const labels = AR ? ['كثبان الجزيرة · 24° شمالاً', 'ساحل البحر الأحمر · إقامة', 'في الموقع · الرياض', 'المسرح الرئيسي · مباشر'] : ['Arabian Dunes · 24°N', 'Red Sea Coast · Stay', 'On site · Riyadh', 'Main Stage · Live'];
   const CH_START = 1.5, CH_LEN = 1.1;
 
   const reachTl = gsap.timeline({
@@ -145,7 +146,7 @@
     const track = $('.services__track');
     const dist = () => track.scrollWidth - innerWidth + 40;
     const tween = gsap.to(track, {
-      x: () => -dist(), ease: 'none',
+      x: () => (AR ? dist() : -dist()), ease: 'none',
       scrollTrigger: {
         trigger: '.services', start: 'top top', end: () => '+=' + dist(), pin: '.services__pin',
         scrub: 1, invalidateOnRefresh: true
@@ -154,11 +155,11 @@
     gsap.to('.js-sbar', { scaleX: 1, ease: 'none', scrollTrigger: { trigger: '.services', start: 'top top', end: () => '+=' + dist(), scrub: true } });
     $$('.svc__img img').forEach(img => gsap.fromTo(img, { xPercent: -6 }, {
       xPercent: 6, ease: 'none',
-      scrollTrigger: { trigger: img.closest('.svc'), containerAnimation: tween, start: 'left right', end: 'right left', scrub: true }
+      scrollTrigger: { trigger: img.closest('.svc'), containerAnimation: tween, start: AR ? 'right left' : 'left right', end: AR ? 'left right' : 'right left', scrub: true }
     }));
     $$('.svc').forEach(card => gsap.from(card, {
-      rotate: 4, y: 60, opacity: .3, ease: 'power2.out',
-      scrollTrigger: { trigger: card, containerAnimation: tween, start: 'left 105%', end: 'left 65%', scrub: true }
+      rotate: AR ? -4 : 4, y: 60, opacity: .3, ease: 'power2.out',
+      scrollTrigger: { trigger: card, containerAnimation: tween, start: AR ? 'right -5%' : 'left 105%', end: AR ? 'right 35%' : 'left 65%', scrub: true }
     }));
   });
 
@@ -192,7 +193,7 @@
      ================================================================ */
   const steps = $$('.pstep'), vis = $$('.pvis');
   const briefEl = $('.js-brief');
-  const briefText = 'Board retreat · 60 guests · AlUla · March';
+  const briefText = AR ? 'ملتقى مجلس الإدارة · 60 ضيفاً · العلا · مارس' : 'Board retreat · 60 guests · AlUla · March';
   const rays = $$('.gauge__sun path'), gaugeWrap = $('.gauge'), gaugeNum = $('.js-gauge');
 
   gsap.set(steps[0], { opacity: 1 }); gsap.set(vis[0], { opacity: 1 });

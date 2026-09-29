@@ -69,7 +69,7 @@ window.MADA_KB = {
       en: 'We work with private and public sector clients. For tenders or formal proposals, send the details to the team.', ar: 'نعمل مع عملاء القطاعين الخاص والعام. للمناقصات أو العروض الرسمية أرسل التفاصيل للفريق.', chips: ['human'] },
 
     /* ---------- commercial ---------- */
-    { id: 'price', keys: ['price', 'prices', 'pricing', 'cost', 'costs', 'how much', 'quote', 'quotation', 'budget', 'rate', 'rates', 'fees', 'expensive', 'cheap', 'السعر', 'الاسعار', 'كم التكلفه', 'بكم', 'عرض سعر', 'تكلفه', 'الميزانيه'],
+    { id: 'price', keys: ['price', 'prices', 'pricing', 'cost', 'costs', 'how much', 'quote', 'quotation', 'budget', 'rate', 'rates', 'fees', 'expensive', 'cheap', 'السعر', 'الاسعار', 'كم التكلفه', 'كم سعر', 'كم تكلفه', 'بكم', 'كم يكلف', 'عرض سعر', 'تكلفه', 'الميزانيه'],
       en: 'Every plan is tailored, so we quote once we know the details. It takes a minute: tell me what you need and the team sends a proposal.', ar: 'كل خطة مصممة حسب طلبك، لذلك نرسل عرض السعر بعد معرفة التفاصيل. أخبرني ماذا تحتاج وسيرسل لك الفريق عرضاً.', chips: ['menu'] },
     { id: 'discount', keys: ['discount', 'offer', 'deal', 'promo', 'group rate', 'corporate rate', 'خصم', 'عروض', 'تخفيض'],
       en: 'We secure corporate and group rates wherever possible. Share your plans and we’ll find the best value.', ar: 'نوفر أسعار الشركات والمجموعات متى ما أمكن. شاركنا خطتك وسنجد لك أفضل قيمة.', chips: ['menu'] },

@@ -29,7 +29,7 @@ window.MADA = (() => {
     const href = a.getAttribute('href');
     const [path, hash] = href.split('#');
     if (!hash) return;
-    const samePage = path === '' || (isHome && (path === '/' || path === '/index.html'));
+    const samePage = path === '' || (isHome && ['/', '/index.html', '/ar', '/ar/', '/ar/index.html'].includes(path));
     if (!samePage || !$('#' + hash)) return;
     e.preventDefault();
     document.body.classList.remove('menu-open');

@@ -3,6 +3,7 @@
    ========================================================= */
 (() => {
   const { $, $$, reduce } = window.MADA;
+  const AR = document.documentElement.lang === 'ar';
 
   /* ---------------- Events hero ---------------- */
   const evHero = $('.evp-hero');
@@ -31,7 +32,7 @@
     gsap.matchMedia().add('(min-width: 821px)', () => {
       const track = $('.flow__track');
       const dist = () => track.scrollWidth - innerWidth + 40;
-      gsap.to(track, { x: () => -dist(), ease: 'none', scrollTrigger: { trigger: '.evp-flow', start: 'top top', end: () => '+=' + dist(), pin: '.flow__pin', scrub: 1, invalidateOnRefresh: true } });
+      gsap.to(track, { x: () => (AR ? dist() : -dist()), ease: 'none', scrollTrigger: { trigger: '.evp-flow', start: 'top top', end: () => '+=' + dist(), pin: '.flow__pin', scrub: 1, invalidateOnRefresh: true } });
       gsap.to('.flow__line i', { scaleX: 1, ease: 'none', scrollTrigger: { trigger: '.evp-flow', start: 'top top', end: () => '+=' + dist(), scrub: true } });
     });
   }
