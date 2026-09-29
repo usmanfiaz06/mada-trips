@@ -669,8 +669,13 @@ body.menu-open .nav { color: var(--sand); }
 }
 @media (max-width: 820px) {
   .nav { top: 50px; height: 60px; padding: 0 6px 0 18px; }
-  .nav__cta { display: none; }
-  .nav__burger { display: block; }
+  /* phones: keep the language switch visible next to the menu button */
+  .nav__cta { display: flex; gap: 0; }
+  .nav__cta .btn { display: none; }
+  .nav__lang { font-size: 14px; opacity: 1; padding: 9px 14px; border-radius: 99px; background: rgba(233, 226, 216, .14); }
+  .nav[data-theme="dark"] .nav__lang { background: rgba(15, 26, 22, .07); }
+  .nav__burger { display: block; margin-left: 8px; }
+  [dir="rtl"] .nav__burger { margin-left: 0; margin-right: 8px; }
   .logo-svg { height: 28px; }
   .topbar { font-size: 12px; }
   .hero-copy { top: auto; bottom: 90px; transform: none; right: 24px; left: 24px; }
