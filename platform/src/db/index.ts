@@ -6,7 +6,9 @@ const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mad
 
 // Reuse one pool across hot reloads in dev.
 const g = globalThis as unknown as { __madaSql?: ReturnType<typeof postgres> };
-export const sql = g.__madaSql ?? postgres(url, { max: 10, prepare: false });
+// Remote databases (Supabase, Neon) need SSL; prepare:false keeps us compatible with transaction poolers.
+const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+export const sql = g.__madaSql ?? postgres(url, { max: 10, prepare: false, ssl: local ? false : "require" });
 if (process.env.NODE_ENV !== "production") g.__madaSql = sql;
 
 export const db = drizzle(sql, { schema });

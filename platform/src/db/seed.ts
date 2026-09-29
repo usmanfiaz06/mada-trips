@@ -11,7 +11,7 @@ import * as schema from "./schema";
 import { SYSTEM_ROLES } from "../lib/permissions";
 
 const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mada_ops";
-const client = postgres(url, { max: 1 });
+const client = postgres(url, { max: 1, prepare: false, ssl: /@(localhost|127\.0\.0\.1)[:/]/.test(url) ? false : "require" });
 const db = drizzle(client, { schema });
 const args = new Set(process.argv.slice(2));
 const IS_PROD = !!process.env.VERCEL || process.env.NODE_ENV === "production";
