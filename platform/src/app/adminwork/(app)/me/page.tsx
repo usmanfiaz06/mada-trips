@@ -24,6 +24,12 @@ export default async function MePage() {
   const events = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.actorId, u.id)).orderBy(desc(schema.auditEvents.at)).limit(25);
   return (
     <>
+      {u.mustChangePassword && (
+        <div className="mb-6 rounded-[22px] bg-gold-soft px-5 py-4 text-[14px] text-ink" role="alert">
+          <strong className="font-[550]">{t("Welcome. Choose your own password to continue.")}</strong>{" "}
+          {t("Your current password was set by someone else. Until you change it, the rest of the platform stays locked.")}
+        </div>
+      )}
       <header className="mb-6 flex items-center gap-5">
         <Avatar name={u.name} size={64} />
         <div><h1 className="text-[34px] font-[380] leading-none tracking-[-0.035em]">{u.name}</h1>

@@ -34,8 +34,6 @@ export async function Timeline({ entityType, entityId, path, refLabel }: { entit
       <ActionForm action={addRemark} resetOnOk className="mb-5">
         <input type="hidden" name="entityType" value={entityType} />
         <input type="hidden" name="entityId" value={entityId} />
-        <input type="hidden" name="path" value={path} />
-        <input type="hidden" name="ref" value={refLabel} />
         <div className="rounded-[18px] bg-surface-2 p-2 ring-1 ring-line focus-within:ring-gold">
           <textarea name="body" rows={2} placeholder={t("Add a remark for the team…")} className="w-full resize-none bg-transparent px-2 py-1.5 text-[14px] outline-none placeholder:text-ink-4" />
           <div className="flex justify-end"><SubmitButton size="sm">{t("Add remark")}</SubmitButton></div>
@@ -104,8 +102,6 @@ export async function Attachments({ entityType, entityId, path, refLabel, canAdd
         <ActionForm action={uploadAttachment} resetOnOk className="mt-4">
           <input type="hidden" name="entityType" value={entityType} />
           <input type="hidden" name="entityId" value={entityId} />
-          <input type="hidden" name="path" value={path} />
-          <input type="hidden" name="ref" value={refLabel} />
           <div className="flex gap-2">
             <input type="file" name="file" accept="application/pdf,image/*" className="field min-w-0 flex-1 text-[13px]" />
             <SubmitButton variant="outline">{t("Upload")}</SubmitButton>

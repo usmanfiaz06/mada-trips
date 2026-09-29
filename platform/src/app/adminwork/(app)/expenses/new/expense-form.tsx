@@ -1,21 +1,25 @@
 "use client";
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
+import { useActionState, useContext, useState } from "react";
+import { PendingContext, useSubmit } from "@/components/client";
 import { AlertCircle, Building2, Check, FileUp, Loader2, UserRound } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { btn, cx } from "@/components/ui";
 import { submitExpense } from "../actions";
 
 function Submit({ ready, label }: { ready: boolean; label: string }) {
-  const { pending } = useFormStatus();
+  const pending = useContext(PendingContext);
   return <button type="submit" disabled={pending || !ready} className={btn("gold", "lg", "w-full")}>{pending && <Loader2 className="size-4 animate-spin" />}{label}</button>;
 }
 
-export function ExpenseForm({ categories, isPartner, today }: { categories: [string, string][]; isPartner: boolean; today: string }) {
+export function ExpenseForm({ categories, isPartner, myPartnerId, partners, today }: { categories: [string, string][]; isPartner: boolean; myPartnerId: string | null; partners: { id: string; name: string }[]; today: string }) {
   const t = useT();
-  const [state, action] = useActionState(submitExpense, null);
+  const [state, action, pending] = useActionState(submitExpense, null);
+  const onSubmit = useSubmit(action);
   const [cat, setCat] = useState("");
   const [paidBy, setPaidBy] = useState(isPartner ? "partner" : "retail");
+  const [payer, setPayer] = useState(myPartnerId ?? "");
+  const payerName = partners.find((p) => p.id === payer)?.name ?? "";
+  const forSelf = payer === myPartnerId;
   const [amount, setAmount] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [desc, setDesc] = useState("");
@@ -28,7 +32,8 @@ export function ExpenseForm({ categories, isPartner, today }: { categories: [str
   const ready = checks.every((c) => c.ok) && !!cat;
 
   return (
-    <form action={action} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <PendingContext.Provider value={pending}>
+    <form onSubmit={onSubmit} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-4">
         {state?.error && <div role="alert" className="flex items-start gap-2 rounded-2xl bg-bad-soft px-4 py-3 text-[13.5px] text-bad"><AlertCircle className="mt-0.5 size-4" />{t(state.error)}</div>}
         <section className="rounded-card bg-surface p-6 shadow-card">
@@ -60,7 +65,7 @@ export function ExpenseForm({ categories, isPartner, today }: { categories: [str
         <section className="rounded-card bg-surface p-6 shadow-card">
           <span className="mb-3 block text-[12.5px] text-ink-3">{t("Who paid?")}</span>
           <div className="grid gap-2 sm:grid-cols-3">
-            {[...(isPartner ? [["partner", t("I paid personally"), t("Added to your partner ledger once verified"), UserRound] as const] : []),
+            {[...(isPartner ? [["partner", t("A partner paid personally"), t("Added to that partner's ledger once verified"), UserRound] as const] : []),
               ["retail", t("Retail account"), t("Company B2C account"), Building2] as const,
               ["corporate", t("Corporate account"), t("Company B2B account"), Building2] as const].map(([k, title, sub, Icon]) => (
               <button key={k} type="button" onClick={() => setPaidBy(k)} className={cx("rounded-2xl p-4 text-start ring-1 transition", paidBy === k ? "bg-ink text-bg ring-ink" : "bg-surface-2 ring-line hover:ring-line-strong")}>
@@ -69,6 +74,21 @@ export function ExpenseForm({ categories, isPartner, today }: { categories: [str
             ))}
           </div>
           <input type="hidden" name="paidBy" value={paidBy} />
+          {paidBy === "partner" && (
+            <div className="mt-4 animate-rise">
+              <span className="mb-2 block text-[12.5px] text-ink-3">{t("Which partner paid?")}</span>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("Which partner paid?")}>
+                {partners.map((p) => (
+                  <button key={p.id} type="button" role="radio" aria-checked={payer === p.id} onClick={() => setPayer(p.id)}
+                    className={cx("flex h-10 items-center gap-2 rounded-full px-4 text-[13.5px] transition", payer === p.id ? "bg-ink text-bg" : "bg-surface-2 text-ink-2 ring-1 ring-line hover:ring-line-strong")}>
+                    {payer === p.id && <Check className="size-3.5" />}{p.name}{p.id === myPartnerId && <span className={cx("text-[12px]", payer === p.id ? "opacity-60" : "text-ink-3")}>({t("me")})</span>}
+                  </button>
+                ))}
+              </div>
+              <input type="hidden" name="partnerId" value={payer} />
+              {!forSelf && payerName && <p className="mt-2 text-[12.5px] text-ink-3">{t("You're recording this for {name}. It goes to {name}'s ledger, and neither of you can approve it: the other partners verify it.", { name: payerName })}</p>}
+            </div>
+          )}
           {paidBy === "partner" && (
             <label className="mt-4 flex items-start gap-3 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
               <input type="checkbox" name="isStartup" className="mt-1 size-4 accent-[var(--gold)]" />
@@ -102,5 +122,6 @@ export function ExpenseForm({ categories, isPartner, today }: { categories: [str
         </div>
       </aside>
     </form>
+    </PendingContext.Provider>
   );
 }

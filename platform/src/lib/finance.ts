@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gte, isNotNull, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 
 type Q = Tx | typeof db;
@@ -56,7 +56,7 @@ export async function receivables(q: Q = db) {
     FROM bookings b
     JOIN clients c ON c.id = b.client_id
     LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
-    WHERE b.status IN ('issued','pending_issue','awaiting_credit') AND b.sell_price > coalesce(p.paid,0)
+    WHERE b.status IN ('issued','pending_issue','awaiting_credit','returned') AND b.sell_price > coalesce(p.paid,0)
     GROUP BY c.id ORDER BY owed DESC`);
   return rows.map((r) => ({ ...r, credit_limit: Number(r.credit_limit), owed: Number(r.owed), overdue: Number(r.overdue) }));
 }
@@ -65,7 +65,7 @@ export async function clientExposure(q: Q, clientId: string) {
   const r = await q.execute<{ owed: number }>(sql`
     SELECT coalesce(SUM(b.sell_price - coalesce(p.paid,0)),0)::bigint AS owed FROM bookings b
     LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
-    WHERE b.client_id = ${clientId} AND b.status IN ('issued','pending_issue','awaiting_credit')`);
+    WHERE b.client_id = ${clientId} AND b.status IN ('issued','pending_issue','awaiting_credit','returned')`);
   return Number(r[0]?.owed ?? 0);
 }
 
@@ -76,7 +76,7 @@ export type SettlementFigures = {
   start: string; end: string;
   clearedByAccount: { retail: number; corporate: number };
   rolledOver: number;
-  bookingIds: string[]; bookingCount: number;
+  bookingIds: string[]; bookingCount: number; expenseIds?: string[];
   revenue: number; directCost: number; grossProfit: number;
   overheads: number; overheadsByCategory: Record<string, number>;
   commissions: { userId: string; name: string; amount: number; bookings: number }[];
@@ -96,10 +96,12 @@ export function repayByEquity(pool: number, partners: { id: string; name: string
   for (let guard = 0; guard < 10 && left > 0; guard++) {
     const open = partners.filter((p) => p.outstanding - (pay.get(p.id) ?? 0) > 0);
     if (!open.length) break;
-    const w = open.reduce((s, p) => s + p.equityBps, 0);
+    // By equity; if everyone still owed has 0% equity, equally (never divide by zero).
+    const weight = (p: { equityBps: number }) => (open.some((q) => q.equityBps > 0) ? p.equityBps : 1);
+    const w = open.reduce((s, p) => s + weight(p), 0);
     let given = 0;
     const shares = open.map((p, i) => {
-      const raw = i === open.length - 1 ? left - open.slice(0, -1).reduce((s, q) => s + Math.floor((left * q.equityBps) / w), 0) : Math.floor((left * p.equityBps) / w);
+      const raw = i === open.length - 1 ? left - open.slice(0, -1).reduce((s, q) => s + Math.floor((left * weight(q)) / w), 0) : Math.floor((left * weight(p)) / w);
       return [p, Math.min(raw, p.outstanding - (pay.get(p.id) ?? 0))] as const;
     });
     for (const [p, amt] of shares) { pay.set(p.id, (pay.get(p.id) ?? 0) + amt); given += amt; }
@@ -115,24 +117,27 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   const rolled = await q.select({ total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.payments).where(and(gte(schema.payments.businessDate, start), lte(schema.payments.businessDate, end), sql`(${schema.payments.clearedOn} IS NULL OR ${schema.payments.clearedOn} > ${end})`));
 
-  // A booking belongs to the cycle in which its last payment cleared (issued, fully paid, cleared by the cut-off).
-  // The very first settlement also sweeps in anything that cleared before it, so nothing is ever lost.
-  const [{ n: priorCycles }] = await q.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM settlement_cycles WHERE end_date < ${end}`);
+  // A booking is counted in the first cycle after it is issued, fully paid and cleared by the cut-off, whenever that happens
+  // (paid in one cycle and issued in the next still counts, in the next). Each booking is counted exactly once.
+  const mine = excludeCycleId ? sql`OR b.recognized_cycle_id = ${excludeCycleId}` : sql``;
   const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; prepared_by: string; commission_bps: number; preparer: string }>(sql`
     SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, b.prepared_by, b.commission_bps, u.name AS preparer FROM bookings b
     JOIN users u ON u.id = b.prepared_by
     JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL AND cleared_on <= ${end} GROUP BY booking_id) p ON p.booking_id = b.id
-    WHERE b.status = 'issued' AND p.paid >= b.sell_price
-      AND ${Number(priorCycles) === 0 && !cycleOnly ? sql`true` : sql`p.last_cleared >= ${start}`}
-      AND (b.recognized_cycle_id IS NULL ${excludeCycleId ? sql`OR b.recognized_cycle_id = ${excludeCycleId}` : sql``})`);
+    WHERE b.status = 'issued' AND p.paid >= b.sell_price AND (b.recognized_cycle_id IS NULL ${mine})`);
+  void cycleOnly;
   const revenue = settled.reduce((s, b) => s + Number(b.sell_price), 0);
   const directCost = settled.reduce((s, b) => s + Number(b.net_cost), 0);
   const grossProfit = revenue - directCost;
 
-  const exp = await q.select({ category: schema.expenses.category, total: sql<number>`coalesce(sum(${schema.expenses.amount}),0)::bigint`.mapWith(Number) })
+  // Overheads: every approved expense up to the cut-off that no signed cycle has counted yet, so one approved late still counts.
+  const expRows = await q.select({ id: schema.expenses.id, category: schema.expenses.category, amount: schema.expenses.amount })
     .from(schema.expenses)
-    .where(and(eq(schema.expenses.status, "approved"), eq(schema.expenses.isStartup, false), gte(schema.expenses.expenseDate, start), lte(schema.expenses.expenseDate, end)))
-    .groupBy(schema.expenses.category);
+    .where(and(eq(schema.expenses.status, "approved"), eq(schema.expenses.isStartup, false), lte(schema.expenses.expenseDate, end),
+      excludeCycleId ? or(isNull(schema.expenses.recognizedCycleId), eq(schema.expenses.recognizedCycleId, excludeCycleId)) : isNull(schema.expenses.recognizedCycleId)));
+  const expByCat = new Map<string, number>();
+  for (const e of expRows) expByCat.set(e.category, (expByCat.get(e.category) ?? 0) + Number(e.amount));
+  const exp = [...expByCat].map(([category, total]) => ({ category, total }));
   // Team commission: a share of the margin on each settled sale, at the rate frozen on the sale.
   const commissionMap = new Map<string, { userId: string; name: string; amount: number; bookings: number }>();
   for (const b of settled) {
@@ -183,7 +188,7 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   return {
     start, end, clearedByAccount: { retail: pickAcc("retail"), corporate: pickAcc("corporate") },
     rolledOver: rolled[0]?.total ?? 0,
-    bookingIds: settled.map((b) => b.id), bookingCount: settled.length,
+    bookingIds: settled.map((b) => b.id), bookingCount: settled.length, expenseIds: expRows.map((e) => e.id),
     revenue, directCost, grossProfit, overheads,
     overheadsByCategory: { ...Object.fromEntries(exp.map((e) => [e.category, e.total])), ...(commissionTotal ? { commission: commissionTotal } : {}) },
     commissions,

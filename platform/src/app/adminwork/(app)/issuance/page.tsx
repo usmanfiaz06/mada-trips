@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lt, sql } from "drizzle-orm";
 import { CornerUpLeft, Ticket, TicketCheck, ShieldCheck, Clock3 } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
-import { canSeeIssuance, issueCheck } from "@/lib/issuance";
+import { businessDayWindow, canSeeIssuance, issueCheck } from "@/lib/issuance";
+import { getSettings } from "@/lib/settings";
 import { businessDate, fmtDate, timeAgo } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { SERVICE } from "@/lib/labels";
@@ -13,6 +14,7 @@ import { Avatar, Badge, Card, CardHead, Empty, Field, Input, Meter, PageHeader, 
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { issueBooking, returnBooking } from "../sales/actions";
 import { grantDelegation, revokeDelegation } from "./actions";
+import { TicketInputs } from "@/components/tickets";
 
 export const metadata = { title: "Issuance" };
 
@@ -23,21 +25,27 @@ export default async function IssuancePage({ searchParams }: { searchParams: Pro
   const L = t.locale;
   const { focus } = await searchParams;
 
-  const queue = await db.select({ b: schema.bookings, client: schema.clients.name, clientType: schema.clients.type, preparer: schema.users.name, team: schema.users.team })
+  const queueAll = await db.select({ b: schema.bookings, client: schema.clients.name, clientType: schema.clients.type, preparer: schema.users.name, team: schema.users.team })
     .from(schema.bookings).innerJoin(schema.clients, eq(schema.clients.id, schema.bookings.clientId)).innerJoin(schema.users, eq(schema.users.id, schema.bookings.preparedBy))
     .where(eq(schema.bookings.status, "pending_issue")).orderBy(schema.bookings.createdAt);
-  const checks = await Promise.all(queue.map((q) => issueCheck(db, u, q.b)));
+  const checksAll = await Promise.all(queueAll.map((q) => issueCheck(db, u, q.b)));
+  // Issuers with full authority see the whole queue; a delegated issuer sees only what they can act on.
+  const seeAll = can(u, "issue.unlimited") || can(u, "issue.delegate") || can(u, "sales.view_all");
+  const keep = queueAll.map((_, i) => seeAll || checksAll[i].ok);
+  const queue = queueAll.filter((_, i) => keep[i]);
+  const checks = checksAll.filter((_, i) => keep[i]);
+  const s = await getSettings();
 
-  const today = businessDate();
   const delegations = can(u, "issue.delegate") ? await db.select({ d: schema.delegations, name: schema.users.name, team: schema.users.team })
     .from(schema.delegations).innerJoin(schema.users, eq(schema.users.id, schema.delegations.userId))
     .where(and(isNull(schema.delegations.revokedAt), gt(schema.delegations.expiresAt, new Date()))).orderBy(desc(schema.delegations.createdAt)) : [];
+  const win = businessDayWindow(businessDate(new Date(), s.closeHour), s.closeHour);
   const usage = await Promise.all(delegations.map(async ({ d }) => (await db.select({ total: sql<number>`coalesce(sum(${schema.bookings.sellPrice}),0)::bigint`.mapWith(Number), n: sql<number>`count(*)::int` })
-    .from(schema.bookings).where(and(eq(schema.bookings.issuedUnderDelegation, d.id), sql`(${schema.bookings.issuedAt} AT TIME ZONE 'Asia/Riyadh')::date = ${today}`)))[0]));
+    .from(schema.bookings).where(and(eq(schema.bookings.issuedBy, d.userId), sql`${schema.bookings.issuedUnderDelegation} IS NOT NULL`, gte(schema.bookings.issuedAt, win.from), lt(schema.bookings.issuedAt, win.to))))[0]));
   const staff = can(u, "issue.delegate") ? await db.select({ id: schema.users.id, name: schema.users.name, team: schema.users.team }).from(schema.users)
     .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).where(and(eq(schema.users.active, true), sql`NOT ('issue.unlimited' = ANY(${schema.roles.permissions}))`)) : [];
   const recent = await db.select({ b: schema.bookings, issuer: schema.users.name }).from(schema.bookings).innerJoin(schema.users, eq(schema.users.id, schema.bookings.issuedBy))
-    .where(sql`${schema.bookings.issuedAt} > now() - interval '2 days'`).orderBy(desc(schema.bookings.issuedAt)).limit(8);
+    .where(and(sql`${schema.bookings.issuedAt} > now() - interval '2 days'`, seeAll ? undefined : eq(schema.bookings.issuedBy, u.id))).orderBy(desc(schema.bookings.issuedAt)).limit(8);
 
   return (
     <>
@@ -71,14 +79,14 @@ export default async function IssuancePage({ searchParams }: { searchParams: Pro
                   <div className="grid grid-cols-3 gap-5 text-end">
                     <div><div className="text-[11.5px] text-ink-3">PNR</div><div className="num mt-0.5 tracking-wider" dir="ltr">{b.pnr ?? "—"}</div></div>
                     <div><div className="text-[11.5px] text-ink-3">{t("Sell")}</div><div className="num mt-0.5" dir="ltr">{sar(b.sellPrice)}</div></div>
-                    <div><div className="text-[11.5px] text-ink-3">{t("Margin")}</div><div className={cx("num mt-0.5", margin < 0 && "text-bad")} dir="ltr">{sar(margin)}</div></div>
+                    {seeAll && <div><div className="text-[11.5px] text-ink-3">{t("Margin")}</div><div className={cx("num mt-0.5", margin < 0 && "text-bad")} dir="ltr">{sar(margin)}</div></div>}
                   </div>
                 </div>
                 {chk.ok ? (
                   <div className="mt-4 grid gap-2 border-t border-line pt-4 sm:grid-cols-[1fr_auto_auto]">
                     <ActionForm action={issueBooking} className="contents">
                       <input type="hidden" name="id" value={b.id} /><input type="hidden" name="back" value="/adminwork/issuance" />
-                      {b.serviceType === "flight" ? <input name="ticketNumbers" required className="field num" placeholder={t("Ticket number(s)")} dir="ltr" /> : <span className="self-center text-[13px] text-ink-3">{t("No ticket number needed")}</span>}
+                      {b.serviceType === "flight" ? <TicketInputs booking={b} /> : <span className="self-center text-[13px] text-ink-3">{t("No ticket number needed")}</span>}
                       <SubmitButton variant="gold"><Ticket className="size-4" />{b.serviceType === "flight" ? t("Issue") : t("Confirm")}</SubmitButton>
                     </ActionForm>
                     <details className="relative">

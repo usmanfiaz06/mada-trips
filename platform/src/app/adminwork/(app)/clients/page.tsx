@@ -7,6 +7,7 @@ import { getT } from "@/lib/i18n";
 import { CLIENT_TYPE } from "@/lib/labels";
 import { sar } from "@/lib/money";
 import { Badge, Card, Empty, LinkButton, Meter, PageHeader, Table, Td, Th, Tabs, cx } from "@/components/ui";
+import { likeContains } from "@/lib/security";
 
 export const metadata = { title: "Clients & credit" };
 
@@ -14,13 +15,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const u = await requireUser();
   const t = await getT();
   const { type = "all", q } = await searchParams;
-  const like = q ? `%${q.replace(/[%_]/g, "")}%` : null;
+  const like = q ? likeContains(q) : null;
   const rows = await db.execute<{ id: string; name: string; type: string; phone: string | null; contact_person: string | null; credit_limit: number; terms: number; owed: number; overdue: number; sales: number; last: string | null }>(sql`
     SELECT c.id, c.name, c.type, c.phone, c.contact_person, c.credit_limit::bigint, c.payment_terms_days AS terms,
       coalesce(x.owed,0)::bigint AS owed, coalesce(x.overdue,0)::bigint AS overdue, coalesce(x.sales,0)::int AS sales, x.last::text
     FROM clients c LEFT JOIN (
       SELECT b.client_id, count(*) AS sales, max(b.business_date) AS last,
-        SUM(CASE WHEN b.status IN ('issued','pending_issue','awaiting_credit') THEN b.sell_price - coalesce(p.paid,0) ELSE 0 END) AS owed,
+        SUM(CASE WHEN b.status IN ('issued','pending_issue','awaiting_credit','returned') THEN b.sell_price - coalesce(p.paid,0) ELSE 0 END) AS owed,
         SUM(CASE WHEN b.status IN ('issued','pending_issue') AND b.due_date < (now() AT TIME ZONE 'Asia/Riyadh')::date THEN b.sell_price - coalesce(p.paid,0) ELSE 0 END) AS overdue
       FROM bookings b LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
       WHERE b.status NOT IN ('void') GROUP BY b.client_id) x ON x.client_id = c.id

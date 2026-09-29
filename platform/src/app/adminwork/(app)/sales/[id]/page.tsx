@@ -7,13 +7,16 @@ import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { issueCheck } from "@/lib/issuance";
 import { ACCOUNT, BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
 import { issueBooking, recordPayment, requestRefund, resubmitBooking, returnBooking, voidBooking } from "../actions";
+import { LinkedTasks } from "@/components/tasks";
+import { TicketInputs } from "@/components/tickets";
+import { NATIONALITIES, expiresSoon, type Traveller } from "@/lib/services";
 
 export default async function SalePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -57,13 +60,16 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     { label: t("In settlement"), state: cycle ? "done" : closed ? "skipped" : "todo", meta: cycle?.label },
   ];
 
+  const travellers = (Array.isArray(b.travellers) ? b.travellers : []) as Traveller[];
+  const tickets = (b.ticketNumbers ?? "").split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
+  const natName = (code?: string) => { const n = NATIONALITIES.find((x) => x.code === code); return n ? (L === "ar" ? n.ar : n.en) : "—"; };
   return (
     <>
       <Link href="/adminwork/sales" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("Sales & bookings")}</Link>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4 animate-rise">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2"><Badge tone={st.tone} dot>{t(st.label)}</Badge><Badge>{t(SERVICE[b.serviceType])}</Badge><Badge>{t(ACCOUNT[b.account])}</Badge></div>
-          <h1 className="text-[34px] font-[380] leading-none tracking-[-0.035em]"><span className="num">{b.ref}</span> <span className="text-ink-3">· {b.passengers}</span></h1>
+          <h1 className="text-[34px] font-[380] leading-none tracking-[-0.035em]"><span className="num">{b.ref}</span> <span className="text-ink-3">· {b.paxCount > 2 ? t("{name} and {n} others", { name: b.passengers.split(",")[0], n: b.paxCount - 1 }) : b.passengers}</span></h1>
           <p className="mt-2 text-[14px] text-ink-3">{b.description ?? ""}{b.pnr && <> · PNR <span className="num tracking-wider text-ink" dir="ltr">{b.pnr}</span></>}</p>
         </div>
       </header>
@@ -101,6 +107,28 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               [t("Due date"), b.onCredit ? fmtDate(b.dueDate, L) : t("Paid at sale")],
             ]} />
           </Card>
+          {travellers.length > 0 && (travellers.length > 1 || travellers.some((x) => x.passport)) && (
+            <Card pad={false}>
+              <div className="px-6 pt-6"><CardHead title={t("Travellers")} hint={t("{n} on this sale", { n: travellers.length })} /></div>
+              <Table>
+                <thead><tr><Th>#</Th><Th>{t("Name")}</Th>{travellers.some((x) => x.passport) && <><Th>{t("Passport no.")}</Th><Th>{t("Nationality")}</Th><Th>{t("Expiry")}</Th></>}{tickets.length > 0 && <Th>{t("Ticket no.")}</Th>}</tr></thead>
+                <tbody>
+                  {travellers.map((x, i) => (
+                    <tr key={i} className="border-t border-line">
+                      <Td className="num text-ink-3">{i + 1}</Td>
+                      <Td>{x.name || "—"}</Td>
+                      {travellers.some((y) => y.passport) && <>
+                        <Td className="num tracking-wider" ><span dir="ltr">{x.passport ?? "—"}</span></Td>
+                        <Td>{natName(x.nationality)}</Td>
+                        <Td>{x.expiry ? <span className={cx(expiresSoon(x.expiry, b.travelDate ?? riyadhDate()) && "text-warn")}>{fmtDate(x.expiry, L)}{expiresSoon(x.expiry, b.travelDate ?? riyadhDate()) ? ` · ${t("under 6 months")}` : ""}</span> : "—"}</Td>
+                      </>}
+                      {tickets.length > 0 && <Td className="num"><span dir="ltr">{tickets[i] ?? "—"}</span></Td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Card>
+          )}
 
           <Card pad={false}>
             <div className="p-6 pb-3"><CardHead className="mb-0" title={t("Payments")} hint={owed > 0 && !closed ? t("{v} SAR still owed", { v: sar(owed) }) : t("Fully paid")} /></div>
@@ -160,7 +188,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               <CardHead title={b.serviceType === "flight" ? t("Issue ticket") : t("Confirm booking")} hint={issuable.delegationId ? t("Under your delegated limit") : t("You have issuing authority")} />
               <ActionForm action={issueBooking} className="space-y-3">
                 <input type="hidden" name="id" value={b.id} />
-                {b.serviceType === "flight" && <input name="ticketNumbers" required className="field num" placeholder={t("Ticket number(s)")} dir="ltr" />}
+                {b.serviceType === "flight" && <TicketInputs booking={b} />}
                 <SubmitButton variant="gold" className="w-full"><Ticket className="size-4" />{b.serviceType === "flight" ? t("Issue now") : t("Confirm now")}</SubmitButton>
               </ActionForm>
               <details className="mt-4 group">
@@ -197,6 +225,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
             </Card>
           )}
 
+          <LinkedTasks me={u} type="booking" id={b.id} />
           <Attachments entityType="booking" entityId={b.id} path={path} refLabel={b.ref} title={t("Tickets & documents")} />
         </aside>
       </div>

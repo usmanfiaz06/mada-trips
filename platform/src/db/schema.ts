@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, customType, serial,
 } from "drizzle-orm/pg-core";
@@ -48,9 +49,14 @@ export const users = pgTable("users", {
   active: boolean("active").notNull().default(true),
   // Commission as a share of margin, in basis points (1000 = 10%). Only managers and the person see it.
   commissionBps: integer("commission_bps").notNull().default(0),
+  // Set when someone else chose the password (new member, reset): they must pick their own before doing anything.
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: createdAt(),
-});
+}, (t) => [
+  // One login per partner: a partner is one director vote, never two.
+  uniqueIndex("users_one_per_partner").on(t.partnerId).where(sql`${t.partnerId} IS NOT NULL`),
+]);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(), // sha256 of the token
@@ -105,6 +111,8 @@ export const bookings = pgTable("bookings", {
   description: text("description"),
   // Structured answers for the service (visa type, hotel dates, meal plan, ...). description is built from them.
   details: jsonb("details"),
+  // Everyone on the sale: [{ name, passport?, nationality?, expiry?, dob? }]. passengers/paxCount are derived from it.
+  travellers: jsonb("travellers"),
   supplier: text("supplier"),
   pnr: text("pnr"),
   ticketNumbers: text("ticket_numbers"),
@@ -166,6 +174,8 @@ export const approvalRequests = pgTable("approval_requests", {
   requiresAll: boolean("requires_all").notNull().default(false),
   approverPool: text("approver_pool").notNull(), // directors | permission:<perm>
   rule: text("rule").notNull(), // human readable rule that applied, frozen at request time
+  // For governance changes (equity, thresholds, advances): exactly what will be applied once everyone agrees.
+  payload: jsonb("payload"),
   status: text("status").notNull().default("pending"), // pending | approved | rejected | cancelled
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -198,6 +208,8 @@ export const expenses = pgTable("expenses", {
   status: text("status").notNull().default("pending"), // pending | approved | rejected
   approvalId: uuid("approval_id"),
   submittedBy: uuid("submitted_by").notNull().references(() => users.id),
+  // The Day-25 cycle whose P&L counted this expense, so late approvals land in the next cycle and nothing counts twice.
+  recognizedCycleId: uuid("recognized_cycle_id"),
   createdAt: createdAt(),
 }, (t) => [index("expenses_status_idx").on(t.status), index("expenses_date_idx").on(t.expenseDate)]);
 
@@ -272,6 +284,33 @@ export const settlementCycles = pgTable("settlement_cycles", {
   createdAt: createdAt(),
   paidAt: timestamp("paid_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("cycle_end_once").on(t.endDate)]);
+
+/* ───────────── Tasks ───────────── */
+
+// Work assigned to a person: who, what, by when, and where it stands. Optionally tied to a sale, client or expense.
+export const tasks = pgTable("tasks", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("open"), // open | in_progress | waiting | done | cancelled
+  priority: text("priority").notNull().default("normal"), // normal | high | urgent
+  assigneeId: uuid("assignee_id").notNull().references(() => users.id),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  dueDate: date("due_date"),
+  waitingOn: text("waiting_on"), // what it's stuck on, while status is "waiting"
+  checklist: jsonb("checklist").notNull().default([]), // [{ id, text, done }]
+  linkType: text("link_type"), // booking | client | expense
+  linkId: uuid("link_id"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  completedBy: uuid("completed_by").references(() => users.id),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("tasks_assignee_status_idx").on(t.assigneeId, t.status),
+  index("tasks_due_idx").on(t.dueDate),
+  index("tasks_link_idx").on(t.linkType, t.linkId),
+]);
 
 /* ───────────── Cross-cutting: remarks, files, audit, settings ───────────── */
 

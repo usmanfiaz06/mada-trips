@@ -20,7 +20,10 @@ export function zodError(e: z.ZodError): ActionState {
 export function toState(e: unknown): ActionState {
   if (e && typeof e === "object" && "digest" in e && String((e as { digest: string }).digest).startsWith("NEXT_REDIRECT")) throw e;
   console.error(e);
-  return { error: e instanceof Error ? e.message : "Something went wrong" };
+  // Our own checks throw plain Errors with a message meant for the user. Database and driver errors can
+  // carry table names, values or constraint details, so those get a generic message instead.
+  const isDbError = e && typeof e === "object" && ("severity" in e || "code" in e || (e as Error).name === "PostgresError" || "cause" in e);
+  return { error: e instanceof Error && !isDbError && e.message.length < 200 ? e.message : "Something went wrong. Please try again." };
 }
 
 export const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();

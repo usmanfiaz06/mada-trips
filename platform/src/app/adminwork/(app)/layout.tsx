@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { label: t("Workspace"), items: [
       ...(can(u, "sales.create") ? [{ href: "/adminwork/sales/new", label: t("New sale"), icon: "Plus" as const, accent: true }] : []),
       { href: "/adminwork", label: t("Dashboard"), icon: "LayoutDashboard" as const },
+      { href: "/adminwork/tasks", label: t("Tasks"), icon: "ListChecks" as const, count: counts.tasks },
       { href: "/adminwork/approvals", label: t("Approvals"), icon: "Stamp" as const, count: counts.approvals },
     ] },
     { label: t("Operations"), items: [

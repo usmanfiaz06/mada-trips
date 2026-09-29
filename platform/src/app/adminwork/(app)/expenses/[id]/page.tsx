@@ -16,6 +16,7 @@ import { VoteDots } from "@/components/votes";
 import { Attachments, Timeline } from "@/components/record";
 import { vote } from "../../approvals/actions";
 import { voidExpense, withdrawExpense } from "../actions";
+import { LinkedTasks } from "@/components/tasks";
 
 export default async function ExpensePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,7 +33,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
   const board = req ? (await voteBoard([req])).get(req.id)! : null;
   const me = board?.approvers.find((a) => a.id === u.id);
   const canVote = req?.status === "pending" && me && !me.decision;
-  const [proof] = await db.select({ id: schema.attachments.id, mime: schema.attachments.mime }).from(schema.attachments).where(and(eq(schema.attachments.entityType, "expense"), eq(schema.attachments.entityId, id))).limit(1);
+  const [proof] = await db.select({ id: schema.attachments.id, mime: schema.attachments.mime }).from(schema.attachments).where(and(eq(schema.attachments.entityType, "expense"), eq(schema.attachments.entityId, id))).orderBy(schema.attachments.createdAt).limit(1);
   const st = EXPENSE_STATUS[e.status];
   const path = `/adminwork/expenses/${id}`;
 
@@ -105,6 +106,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
               )}
             </Card>
           )}
+          <LinkedTasks me={u} type="expense" id={e.id} />
           <Attachments entityType="expense" entityId={e.id} path={path} refLabel={e.ref} title={t("Proof & files")} canAdd={e.status === "pending"} />
         </aside>
       </div>

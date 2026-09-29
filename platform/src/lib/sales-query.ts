@@ -2,6 +2,7 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import type { CurrentUser } from "./auth";
+import { isIsoDate, isUuid, likeContains } from "@/lib/security";
 
 export type SaleRow = {
   id: string; ref: string; business_date: string; created_at: Date; channel: string; service_type: string; status: string;
@@ -16,15 +17,21 @@ export async function querySales(u: CurrentUser, f: { status?: string; q?: strin
   if (f.status === "unpaid") where.push(sql`b.status NOT IN ('void','refunded') AND coalesce(p.paid,0) < b.sell_price`);
   else if (f.status && f.status !== "all") where.push(sql`b.status = ${f.status}`);
   if (f.channel) where.push(sql`b.channel = ${f.channel}`);
+  // Filters come from the address bar; malformed ones are ignored.
+  if (f.from && !isIsoDate(f.from)) f = { ...f, from: undefined };
+  if (f.to && !isIsoDate(f.to)) f = { ...f, to: undefined };
+  if (f.clientId && !isUuid(f.clientId)) f = { ...f, clientId: undefined };
   if (f.from) where.push(sql`b.business_date >= ${f.from}`);
   if (f.to) where.push(sql`b.business_date <= ${f.to}`);
   if (f.clientId) where.push(sql`b.client_id = ${f.clientId}`);
   if (f.q) {
-    const like = `%${f.q.replace(/[%_]/g, "")}%`;
+    const like = likeContains(f.q);
     where.push(sql`(b.ref ILIKE ${like} OR b.pnr ILIKE ${like} OR b.passengers ILIKE ${like} OR c.name ILIKE ${like} OR b.ticket_numbers ILIKE ${like} OR b.description ILIKE ${like})`);
   }
   const cond = sql.join(where, sql` AND `);
-  const limit = f.limit ?? 50, offset = ((f.page ?? 1) - 1) * limit;
+  const limit = Math.min(Math.max(1, Math.floor(f.limit ?? 50)), 500);
+  const page = Number.isFinite(f.page) && f.page! >= 1 ? Math.min(Math.floor(f.page!), 10_000) : 1;
+  const offset = (page - 1) * limit;
   const base = sql`FROM bookings b JOIN clients c ON c.id = b.client_id JOIN users pu ON pu.id = b.prepared_by
     LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id WHERE ${cond}`;
   const [rows, agg] = await Promise.all([

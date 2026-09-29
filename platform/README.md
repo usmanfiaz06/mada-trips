@@ -53,12 +53,33 @@ Then open `/adminwork`, sign in as a partner (e.g. `abdulaziz@madatrips.com`), c
 | Expenses need amount, proof and justification, verified by someone else | the form won't submit without all three; the submitter can never verify their own |
 | Partner-paid expenses become partner loans | on verification they're posted to the Partner Equity Ledger (startup costs as capital advances) |
 | 10 PM daily report, both teams | `src/lib/daily.ts`; the submitted report is a locked snapshot; late submissions are marked |
-| Day-25 cut-off on cleared funds | a booking belongs to the cycle in which its last payment **cleared** in the bank |
+| Day-25 cut-off on cleared funds | a booking is counted in the first cycle after it is issued, fully paid and **cleared**; each booking and expense is counted exactly once (`recognized_cycle_id`) |
 | Waterfall: overheads → IATA reserve → repayments → dividends | `computeSettlement` in `src/lib/finance.ts`; repayments and dividends are split **by equity**; repayments never exceed what a partner is owed |
 | Settlement signed by all directors | approval kind `settlement`; on approval, ledger entries are posted and the IATA reserve updated |
 | Who did what | every write calls `audit()` in the same transaction; a database trigger makes `audit_events` append-only |
 
 Money is stored in halalas (integers), so totals and splits are exact.
+
+## Tasks
+
+`/adminwork/tasks`: anyone can add a task for themselves or someone on their own team; partners (`tasks.manage`) assign to anyone and see everyone's work. Tasks have a due date, priority, optional steps, notes, files and remarks, and can be tied to a sale, client or expense (they then show on that record). The list groups work into Overdue / Today / Next 7 days / Later; partners get a "Who's behind" board with each person's late, due-today and finished work. Overdue and due-today tasks appear on the dashboard and as a count in the sidebar. Every change is in the activity log.
+
+## Several travellers on one sale
+
+A sale can cover several visas, tickets or guests for the same client. Set the number (e.g. 4 visas) and that many rows appear. Visas need each traveller's name, passport number, nationality and expiry (a warning shows when a passport has under 6 months left). Flights and packages can add passport details. Hotels and other services need only the lead name. Issuing a flight asks for one ticket number per passenger.
+
+Partners can record an expense another partner paid personally ("Which partner paid?"). It goes to that partner's ledger, and neither the one who recorded it nor the one being repaid can approve it.
+
+## Security
+
+- **One login per partner.** A partner is one director vote (unique index on `users.partner_id`). Votes are counted per partner, only from people still eligible, and never from the requester's partner or a partner who benefits (an expense reimbursed to them, an advance from them).
+- **No one acts alone on governance.** Equity, approval thresholds, the IATA reserve, bank opening balances and partner advances open an approval that every other director must accept (`src/lib/governance.ts`).
+- **Partner accounts belong to the partner.** Nobody else can change a partner's role, switch them off or reset their password in the app. A locked-out partner is reset on the server: `DATABASE_URL=… npm run user:reset -- name@madatrips.com` prints a one-time password.
+- **Access you hand out is access you hold.** Roles can only grant permissions the editor has; ticket issuing is never granted through a role, only as a time-limited delegation (6 months, SAR 100k/ticket, SAR 500k/day at most, never to yourself).
+- **Passwords.** bcrypt cost 12, 80-bit temporary passwords, a forced change after any reset or first sign-in, other sessions ended on change. Sign-in is throttled per address, per network and per pair.
+- **Every record is scoped.** Files, remarks and sale actions check the same visibility rule as the record's page (`src/lib/access.ts`). Uploads are identified from their bytes (PDF, PNG, JPEG, WebP, HEIC only).
+- **Browser hardening.** A per-request nonce Content Security Policy on `/adminwork` (set in `src/middleware.ts`), HSTS, COOP, `frame-ancestors 'none'`; CSV exports neutralise spreadsheet formulas; website CDN scripts carry SRI hashes.
+- **Database.** Set `DATABASE_CA` (the provider's CA certificate, PEM) to verify the database server's identity. `db:seed -- --reset` only runs against a local database (or with `ALLOW_DB_RESET=yes`), never in production.
 
 ## Structure
 

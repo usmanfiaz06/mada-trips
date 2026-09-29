@@ -16,6 +16,7 @@ import { ArcGauge } from "@/components/charts";
 import { ClientFields } from "@/components/client-fields";
 import { Timeline } from "@/components/record";
 import { requestCreditLimit, updateClient } from "../actions";
+import { LinkedTasks } from "@/components/tasks";
 
 export default async function ClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -96,6 +97,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
             </Card>
           )}
           <Card><KV cols={1} items={[[t("Client since"), fmtDate(c.createdAt, L)], [t("Payment terms"), c.paymentTermsDays ? t("{n} days", { n: c.paymentTermsDays }) : t("Pays at sale")], [t("Contract"), c.contractRef]]} /></Card>
+          <LinkedTasks me={u} type="client" id={c.id} />
         </aside>
       </div>
     </>

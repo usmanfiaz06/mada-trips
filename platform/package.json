@@ -11,7 +11,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:setup": "npm run db:migrate && npm run db:seed",
     "db:bootstrap": "tsx src/db/seed.ts --bootstrap",
-    "vercel-build": "npm run db:deploy || echo 'WARNING: database setup failed (see error above). The website still deploys; open /adminwork/api/health to diagnose.'; npm run build",
+    "user:reset": "tsx src/db/reset-password.ts",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"production\" ]; then npm run db:deploy || echo \"WARNING: database setup failed (see error above). The site still deploys; open /adminwork/api/health to diagnose.\"; else echo \"Preview build ($VERCEL_ENV): skipping database migrations so unmerged changes never touch the live database.\"; fi; npm run build",
     "db:deploy": "npm run db:migrate && npm run db:bootstrap"
   },
   "dependencies": {
