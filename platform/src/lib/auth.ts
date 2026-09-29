@@ -19,7 +19,7 @@ export async function createSession(userId: string) {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
   await db.insert(schema.sessions).values({
     id: hash(token), userId, expiresAt,
-    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    ip: (h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0])?.trim().slice(0, 64) || null,
     userAgent: h.get("user-agent")?.slice(0, 300) ?? null,
   });
   (await cookies()).set(SESSION_COOKIE, token, {
@@ -36,7 +36,7 @@ export async function destroySession() {
 
 export type CurrentUser = {
   id: string; name: string; email: string; team: string; locale: string;
-  partnerId: string | null; isDirector: boolean;
+  partnerId: string | null; isDirector: boolean; mustChangePassword: boolean;
   role: { id: string; key: string; name: string; nameAr: string };
   permissions: Set<Permission>;
 };
@@ -60,7 +60,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   }
   return {
     id: row.u.id, name: row.u.name, email: row.u.email, team: row.u.team, locale: row.u.locale,
-    partnerId: row.u.partnerId, isDirector: !!row.p?.isDirector,
+    partnerId: row.u.partnerId, isDirector: !!row.p?.isDirector, mustChangePassword: row.u.mustChangePassword,
     role: { id: row.r.id, key: row.r.key, name: row.r.name, nameAr: row.r.nameAr },
     permissions: new Set(row.r.permissions as Permission[]),
   };
@@ -69,6 +69,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 export async function requireUser() {
   const u = await getCurrentUser();
   if (!u) redirect("/adminwork/login");
+  // Someone else chose this password: nothing else works until they pick their own.
+  if (u.mustChangePassword && (await headers()).get("x-pathname") !== "/adminwork/me") redirect("/adminwork/me?welcome=1");
   return u;
 }
 
@@ -83,6 +85,8 @@ export async function requirePerm(p: Permission) {
   return u;
 }
 
+/** The caller's IP. On Vercel, x-real-ip and x-forwarded-for are set by the edge, not the browser. */
 export async function clientIp() {
-  return (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  const h = await headers();
+  return (h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",")[0])?.trim().slice(0, 64) || null;
 }

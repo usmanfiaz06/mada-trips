@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, customType, serial,
 } from "drizzle-orm/pg-core";
@@ -48,9 +49,14 @@ export const users = pgTable("users", {
   active: boolean("active").notNull().default(true),
   // Commission as a share of margin, in basis points (1000 = 10%). Only managers and the person see it.
   commissionBps: integer("commission_bps").notNull().default(0),
+  // Set when someone else chose the password (new member, reset): they must pick their own before doing anything.
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: createdAt(),
-});
+}, (t) => [
+  // One login per partner: a partner is one director vote, never two.
+  uniqueIndex("users_one_per_partner").on(t.partnerId).where(sql`${t.partnerId} IS NOT NULL`),
+]);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(), // sha256 of the token
@@ -166,6 +172,8 @@ export const approvalRequests = pgTable("approval_requests", {
   requiresAll: boolean("requires_all").notNull().default(false),
   approverPool: text("approver_pool").notNull(), // directors | permission:<perm>
   rule: text("rule").notNull(), // human readable rule that applied, frozen at request time
+  // For governance changes (equity, thresholds, advances): exactly what will be applied once everyone agrees.
+  payload: jsonb("payload"),
   status: text("status").notNull().default("pending"), // pending | approved | rejected | cancelled
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   createdAt: createdAt(),
@@ -198,6 +206,8 @@ export const expenses = pgTable("expenses", {
   status: text("status").notNull().default("pending"), // pending | approved | rejected
   approvalId: uuid("approval_id"),
   submittedBy: uuid("submitted_by").notNull().references(() => users.id),
+  // The Day-25 cycle whose P&L counted this expense, so late approvals land in the next cycle and nothing counts twice.
+  recognizedCycleId: uuid("recognized_cycle_id"),
   createdAt: createdAt(),
 }, (t) => [index("expenses_status_idx").on(t.status), index("expenses_date_idx").on(t.expenseDate)]);
 

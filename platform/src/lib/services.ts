@@ -135,7 +135,7 @@ export function describeService(service: string, d: Details): { ok: true; descri
     }
     case "hotel": {
       if (!CITY_SET.has(s("city"))) return { ok: false, error: "Choose the hotel city" };
-      if (s("hotel").length < 2) return { ok: false, error: "Enter the hotel name" };
+      if (s("hotel").length < 2 || s("hotel").length > 100) return { ok: false, error: "Enter the hotel name" };
       if (!/^\d{4}-\d{2}-\d{2}$/.test(s("checkIn")) || !/^\d{4}-\d{2}-\d{2}$/.test(s("checkOut"))) return { ok: false, error: "Enter check-in and check-out dates" };
       const nights = nightsBetween(s("checkIn"), s("checkOut"));
       if (nights < 1 || nights > 90) return { ok: false, error: "Check-out must be after check-in" };
@@ -161,9 +161,32 @@ export function describeService(service: string, d: Details): { ok: true; descri
     case "event": {
       if (!has(EVENT_TYPES, s("type"))) return { ok: false, error: "Choose the event type" };
       if (!CITY_SET.has(s("city"))) return { ok: false, error: "Choose the city" };
+      if (s("venue").length > 100) return { ok: false, error: "Keep the venue under 100 characters" };
       return { ok: true, description: `${en(EVENT_TYPES, s("type"))} · ${s("city")}${s("venue") ? ` · ${s("venue")}` : ""}` };
     }
     default:
+      if (s("text").length < 2 || s("text").length > 200) return { ok: false, error: "Describe what was sold" };
       return { ok: true, description: s("text") };
   }
+}
+
+// The answers kept for each service. Anything else the browser sends is dropped before saving.
+const DETAIL_KEYS: Record<string, string[]> = {
+  visa: ["country", "type", "entries", "speed", "provider"],
+  hotel: ["city", "hotel", "checkIn", "checkOut", "rooms", "board", "provider"],
+  package: ["city", "nights", "includes"],
+  transport: ["type", "city"],
+  event: ["type", "city", "venue"],
+  other: ["text"],
+};
+
+export function cleanDetails(service: string, d: Details): Details {
+  const out: Details = {};
+  for (const k of DETAIL_KEYS[service] ?? []) {
+    const v = d[k];
+    if (typeof v === "string") out[k] = v.trim().slice(0, 120);
+    else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    else if (Array.isArray(v)) out[k] = v.filter((x): x is string => typeof x === "string").slice(0, 10).map((x) => x.slice(0, 30));
+  }
+  return out;
 }

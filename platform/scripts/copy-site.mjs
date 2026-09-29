@@ -8,14 +8,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 const root = resolve(here, "../..");
 const out = resolve(here, "../public");
-const SKIP = new Set(["platform", "docs", ".git", ".github", ".vercel", "node_modules", "README.md", "vercel.json", ".gitignore"]);
+// Allow-list: only what a visitor's browser needs is published. Anything else at the repo root (notes, config,
+// a stray .env or backup) is never copied into the public site.
+const DIRS = new Set(["assets", "Assets", "css", "js"]);
+const FILE = /\.(html|xml|txt|webmanifest|jpe?g|png|webp|svg|ico|gif|avif|woff2?)$/i;
+const publicFile = (src) => { const base = src.split(/[\\/]/).pop(); return !base.startsWith(".") && !/\.(map|md|env|json|ya?ml|log|bak|sql|sh)$/i.test(base); };
 
 // Clear the previous copy but keep the app's own assets.
 for (const name of readdirSync(out)) if (name !== "adminwork") rmSync(join(out, name), { recursive: true, force: true });
 let n = 0;
-for (const name of readdirSync(root)) {
-  if (SKIP.has(name) || name.startsWith(".") || name === "adminwork") continue;
-  cpSync(join(root, name), join(out, name), { recursive: true });
+for (const name of readdirSync(root, { withFileTypes: true })) {
+  const ok = name.isDirectory() ? DIRS.has(name.name) : name.isFile() && FILE.test(name.name) && !name.name.startsWith(".");
+  if (!ok) continue;
+  cpSync(join(root, name.name), join(out, name.name), { recursive: true, filter: publicFile });
   n++;
 }
 if (!existsSync(join(out, "index.html"))) throw new Error("Website index.html not found at repo root");

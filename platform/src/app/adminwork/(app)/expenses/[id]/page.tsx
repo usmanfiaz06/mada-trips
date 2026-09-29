@@ -32,7 +32,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
   const board = req ? (await voteBoard([req])).get(req.id)! : null;
   const me = board?.approvers.find((a) => a.id === u.id);
   const canVote = req?.status === "pending" && me && !me.decision;
-  const [proof] = await db.select({ id: schema.attachments.id, mime: schema.attachments.mime }).from(schema.attachments).where(and(eq(schema.attachments.entityType, "expense"), eq(schema.attachments.entityId, id))).limit(1);
+  const [proof] = await db.select({ id: schema.attachments.id, mime: schema.attachments.mime }).from(schema.attachments).where(and(eq(schema.attachments.entityType, "expense"), eq(schema.attachments.entityId, id))).orderBy(schema.attachments.createdAt).limit(1);
   const st = EXPENSE_STATUS[e.status];
   const path = `/adminwork/expenses/${id}`;
 

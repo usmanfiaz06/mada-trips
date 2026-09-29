@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { desc, ilike, or, eq, and } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
+import { likeContains } from "@/lib/security";
 
 export async function GET(req: Request) {
   const u = await getCurrentUser();
-  if (!u) return NextResponse.json([], { status: 401 });
+  if (!u || u.mustChangePassword) return NextResponse.json([], { status: 401 });
   const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
   if (q.length < 2) return NextResponse.json([]);
-  const like = `%${q.replace(/[%_]/g, "")}%`;
+  const like = likeContains(q);
   const seeAll = u.permissions.has("sales.view_all");
   const [bookings, clients, expenses] = await Promise.all([
     db.select({ id: schema.bookings.id, ref: schema.bookings.ref, pax: schema.bookings.passengers, pnr: schema.bookings.pnr })

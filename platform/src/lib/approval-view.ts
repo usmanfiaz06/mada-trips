@@ -14,7 +14,7 @@ export async function voteBoard(reqs: Req[]): Promise<Map<string, Board>> {
     .innerJoin(schema.users, eq(schema.users.id, schema.approvalDecisions.userId)).where(inArray(schema.approvalDecisions.requestId, reqs.map((r) => r.id)));
   const out = new Map<string, Board>();
   for (const r of reqs) {
-    const pool = await db.transaction((tx) => eligibleApprovers(tx, r.approverPool, r.requestedBy, r.kind));
+    const pool = await db.transaction((tx) => eligibleApprovers(tx, r));
     const mine = decisions.filter((d) => d.d.requestId === r.id);
     const approvers: Board["approvers"] = pool.map((p) => {
       const d = mine.find((m) => m.d.userId === p.id);
@@ -22,11 +22,12 @@ export async function voteBoard(reqs: Req[]): Promise<Map<string, Board>> {
     });
     // People who voted but have since lost eligibility still show.
     for (const m of mine) if (!approvers.some((a) => a.id === m.d.userId)) approvers.push({ id: m.d.userId, name: m.name, decision: m.d.decision, remark: m.d.remark, at: m.d.createdAt });
-    out.set(r.id, { approvers, approvals: approvers.filter((a) => a.decision === "approve").length });
+    // Only votes from people still eligible count, the same rule the engine uses.
+    out.set(r.id, { approvers, approvals: approvers.filter((a) => a.decision === "approve" && pool.some((p) => p.id === a.id)).length });
   }
   return out;
 }
 
 export function entityHref(r: Req) {
-  return r.entityType === "booking" ? `/adminwork/sales/${r.entityId}` : r.entityType === "expense" ? `/adminwork/expenses/${r.entityId}` : r.entityType === "client" ? `/adminwork/clients/${r.entityId}` : r.entityType === "settlement" ? `/adminwork/settlement/${r.entityId}` : "#";
+  return r.entityType === "booking" ? `/adminwork/sales/${r.entityId}` : r.entityType === "expense" ? `/adminwork/expenses/${r.entityId}` : r.entityType === "client" ? `/adminwork/clients/${r.entityId}` : r.entityType === "settlement" ? `/adminwork/settlement/${r.entityId}` : r.entityType === "governance" ? ((r.payload as { type?: string } | null)?.type === "advance" ? "/adminwork/partners" : "/adminwork/settings") : "#";
 }

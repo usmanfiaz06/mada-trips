@@ -1,14 +1,15 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { desc, eq, gt, lt } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { computeSettlement, type SettlementFigures, type SettlementInputs } from "@/lib/finance";
 import { getSettings } from "@/lib/settings";
 import { createApproval } from "@/lib/approvals";
-import { cycleFor, fmtDate, businessDate } from "@/lib/dates";
+import { addDays, cycleFor, fmtDate, businessDate } from "@/lib/dates";
+import { isIsoDate } from "@/lib/security";
 import { toHalalas, sar } from "@/lib/money";
 import { flash, str, toState, type ActionState } from "@/lib/actions";
 
@@ -16,11 +17,18 @@ export async function prepareCycle(fd: FormData) {
   const u = await requirePerm("settlement.run");
   const end = str(fd, "end");
   const s = await getSettings();
-  const { start } = cycleFor(end, s.cutoffDay);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(end) || businessDate(new Date(), s.closeHour) <= end) { await flash("This cycle hasn't passed its cut-off yet"); redirect("/adminwork/settlement"); }
+  if (!isIsoDate(end) || cycleFor(end, s.cutoffDay).end !== end) { await flash("Pick a cycle that ends on the cut-off day"); redirect("/adminwork/settlement"); }
+  if (businessDate(new Date(), s.closeHour) <= end) { await flash("This cycle hasn't passed its cut-off yet"); redirect("/adminwork/settlement"); }
+  let problem = "";
   const id = await db.transaction(async (tx) => {
     const [exists] = await tx.select().from(schema.settlementCycles).where(eq(schema.settlementCycles.endDate, end));
     if (exists) return exists.id;
+    // Cycles run in order with no gaps or overlaps: the previous one must be signed, and nothing later may exist.
+    const [later] = await tx.select().from(schema.settlementCycles).where(gt(schema.settlementCycles.endDate, end)).limit(1);
+    if (later) { problem = "A later cycle already exists"; return ""; }
+    const [prev] = await tx.select().from(schema.settlementCycles).where(lt(schema.settlementCycles.endDate, end)).orderBy(desc(schema.settlementCycles.endDate)).limit(1);
+    if (prev && !["approved", "paid"].includes(prev.status)) { problem = `Finish ${prev.label} first`; return ""; }
+    const start = prev ? addDays(prev.endDate, 1) : cycleFor(end, s.cutoffDay).start;
     const inputs: SettlementInputs = { reserveTopUp: -1, repaymentPctBps: s.repaymentPctBps, payoutAccount: "retail" };
     const figures = await computeSettlement(tx, start, end, { repaymentPctBps: inputs.repaymentPctBps, payoutAccount: "retail" }, s.iataReserveHeld, s.repaymentPctBps, s.iataBuffer);
     inputs.reserveTopUp = figures.waterfall.find((w) => w.key === "reserve")!.amount;
@@ -29,6 +37,7 @@ export async function prepareCycle(fd: FormData) {
     await audit(tx, { actorId: u.id, action: "settlement.prepared", entityType: "settlement", entityId: c.id, entityRef: label, summary: `Prepared ${label}: net profit SAR ${sar(figures.netProfit)}` });
     return c.id;
   });
+  if (problem) { await flash(problem); redirect("/adminwork/settlement"); }
   redirect(`/adminwork/settlement/${id}`);
 }
 
@@ -60,7 +69,10 @@ export async function submitSettlement(fd: FormData) {
   await db.transaction(async (tx) => {
     const [c] = await tx.select().from(schema.settlementCycles).where(eq(schema.settlementCycles.id, id)).for("update");
     if (!c || c.status !== "draft") throw new Error("Already submitted");
-    const f = c.figures as SettlementFigures;
+    // Recalculated at the moment of sending, so directors sign today's numbers, not a stale draft.
+    const s = await getSettings(tx);
+    const f = await computeSettlement(tx, c.startDate, c.endDate, c.inputs as SettlementInputs, s.iataReserveHeld, s.repaymentPctBps, s.iataBuffer, c.id);
+    await tx.update(schema.settlementCycles).set({ figures: f }).where(eq(schema.settlementCycles.id, id));
     const r = await createApproval(tx, { kind: "settlement", entityType: "settlement", entityId: c.id, title: `${c.label} · distribute SAR ${sar(f.waterfall[2].amount + f.waterfall[3].amount)}`, amount: f.netProfit, reason: `Net profit ${sar(f.netProfit)}; reserve ${sar(f.waterfall[1].amount)}; repayments ${sar(f.waterfall[2].amount)}; dividends ${sar(f.waterfall[3].amount)}`, requestedBy: u.id });
     await tx.update(schema.settlementCycles).set({ status: "pending_approval", approvalId: r.id }).where(eq(schema.settlementCycles.id, id));
     await flash(`Sent to all directors to sign (${r.ref})`);
@@ -80,7 +92,7 @@ export async function markPaid(_: ActionState, fd: FormData): Promise<ActionStat
       const refs: Record<string, string> = {};
       for (const d of f.dividends) {
         const total = d.amount + (f.repayments.find((r) => r.partnerId === d.partnerId)?.amount ?? 0);
-        const ref = str(fd, `ref_${d.partnerId}`);
+        const ref = str(fd, `ref_${d.partnerId}`).slice(0, 80);
         if (total > 0 && !ref) throw new Error(`Enter the transfer reference for ${d.name}`);
         refs[d.partnerId] = ref;
       }

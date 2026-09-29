@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { requirePerm } from "@/lib/auth";
+import { can, requirePerm } from "@/lib/auth";
+import { isUuid } from "@/lib/security";
 import { audit, diff } from "@/lib/audit";
 import { createApproval } from "@/lib/approvals";
 import { toHalalas, sar } from "@/lib/money";
@@ -25,6 +26,8 @@ export async function createClient(_: ActionState, fd: FormData): Promise<Action
   const u = await requirePerm("clients.manage");
   const p = ClientSchema.safeParse(Object.fromEntries(fd));
   if (!p.success) return zodError(p.error);
+  // Payment terms are a credit decision.
+  if (!can(u, "clients.credit")) p.data.paymentTermsDays = 0;
   let id = "";
   try {
     id = await db.transaction(async (tx) => {
@@ -47,8 +50,11 @@ export async function updateClient(_: ActionState, fd: FormData): Promise<Action
   const p = ClientSchema.safeParse(Object.fromEntries(fd));
   if (!p.success) return zodError(p.error);
   try {
+    if (!isUuid(id)) throw new Error("Client not found");
     const [before] = await db.select().from(schema.clients).where(eq(schema.clients.id, id));
     if (!before) throw new Error("Client not found");
+    // Type decides the channel, bank account and credit rules; terms decide when money is due. Both are credit decisions.
+    if (!can(u, "clients.credit") && (p.data.type !== before.type || p.data.paymentTermsDays !== before.paymentTermsDays)) throw new Error("Only management can change a client's type or payment terms");
     const changes = diff(before, p.data);
     if (!Object.keys(changes).length) return { ok: "No changes" };
     await db.transaction(async (tx) => {
@@ -64,6 +70,7 @@ export async function requestCreditLimit(_: ActionState, fd: FormData): Promise<
   const u = await requirePerm("clients.manage");
   const id = str(fd, "id");
   try {
+    if (!isUuid(id) || !str(fd, "amount")) throw new Error("Enter a limit");
     const amount = toHalalas(str(fd, "amount"));
     if (amount < 0) throw new Error("Enter a limit");
     const [c] = await db.select().from(schema.clients).where(eq(schema.clients.id, id));
@@ -75,6 +82,7 @@ export async function requestCreditLimit(_: ActionState, fd: FormData): Promise<
       if (open) throw new Error(`A limit change (${open.ref}) is already waiting for approval`);
       // Lowering a limit reduces risk, so it applies immediately; raising it needs directors.
       if (amount < c.creditLimit) {
+        if (!can(u, "clients.credit")) throw new Error("Only management can lower a credit limit");
         await tx.update(schema.clients).set({ creditLimit: amount }).where(eq(schema.clients.id, id));
         await audit(tx, { actorId: u.id, action: "client.credit_limit_changed", entityType: "client", entityId: id, entityRef: c.name, summary: `Lowered credit limit for ${c.name} to SAR ${sar(amount)}`, changes: { creditLimit: { from: c.creditLimit, to: amount } } });
         await flash("Limit lowered");

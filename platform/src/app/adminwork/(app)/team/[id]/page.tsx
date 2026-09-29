@@ -30,6 +30,11 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
     db.select().from(schema.delegations).where(and(eq(schema.delegations.userId, id), isNull(schema.delegations.revokedAt), gt(schema.delegations.expiresAt, new Date()))),
   ]);
 
+  const isPartner = !!m.partnerId, isSelf = m.id === me.id;
+  const locked = isPartner && !isSelf; // another partner's own account
+  const partner = partners.find((p) => p.id === m.partnerId);
+  const assignable = roles.filter((r) => r.id === m.roleId || (r.key !== "partner" && r.key !== "partner_issuer" && (r.permissions as Permission[]).every((x) => !x.startsWith("issue.") && me.permissions.has(x))));
+
   return (
     <>
       <Link href="/adminwork/team" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("Team")}</Link>
@@ -52,19 +57,24 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
         </div>
         <aside className="space-y-4">
           <Card>
-            <CardHead title={t("Profile & role")} />
+            <CardHead title={t("Profile & role")} hint={partner ? t("Partner account: {name}", { name: partner.name }) : undefined} />
+            {locked ? (
+              <p className="rounded-2xl bg-surface-2 px-4 py-3 text-[13px] text-ink-2">{t("Each partner manages their own account. Their role, access and password can't be changed by anyone else.")}</p>
+            ) : (
             <ActionForm action={updateMember} className="space-y-3">
               <input type="hidden" name="id" value={m.id} />
               <Field label={t("Full name")}><Input name="name" defaultValue={m.name} /></Field>
               <Field label={t("Email")}><Input name="email" defaultValue={m.email} dir="ltr" /></Field>
               <Field label={t("Phone")}><Input name="phone" defaultValue={m.phone ?? ""} dir="ltr" /></Field>
-              <Field label={t("Role")}><Select name="roleId" defaultValue={m.roleId} options={roles.map((r) => ({ value: r.id, label: L === "ar" ? r.nameAr : r.name }))} /></Field>
+              {isSelf || isPartner
+                ? <input type="hidden" name="roleId" value={m.roleId} />
+                : <Field label={t("Role")}><Select name="roleId" defaultValue={m.roleId} options={assignable.map((r) => ({ value: r.id, label: L === "ar" ? r.nameAr : r.name }))} /></Field>}
               <Field label={t("Team")}><Select name="team" defaultValue={m.team} options={Object.entries(TEAM).map(([k, v]) => ({ value: k, label: t(v) }))} /></Field>
-              <Field label={t("Linked partner")}><Select name="partnerId" defaultValue={m.partnerId ?? ""} placeholder={t("None")} options={partners.map((p) => ({ value: p.id, label: p.name }))} /></Field>
               <SubmitButton className="w-full">{t("Save")}</SubmitButton>
             </ActionForm>
+            )}
           </Card>
-          <Card>
+          {!isPartner && !isSelf && <Card>
             <CardHead title={t("Commission")} hint={t("Share of the margin on sales this person makes, paid at Day-25 once the money has cleared.")} />
             <ActionForm action={setCommission} className="flex items-end gap-2">
               <input type="hidden" name="id" value={m.id} />
@@ -73,14 +83,14 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
               <SubmitButton variant="outline">{t("Save")}</SubmitButton>
             </ActionForm>
             <p className="mt-2 text-[12px] text-ink-3">{t("A new rate applies to sales made from now on. Earlier sales keep the rate they were made at.")}</p>
-          </Card>
+          </Card>}
           <Card>
             <CardHead title={t("Sign-in & security")} hint={t("{n} active sessions", { n: sessions.length })} />
             <ul className="mb-4 space-y-2 text-[12.5px] text-ink-3">
               {sessions.slice(0, 4).map((s) => <li key={s.id} className="truncate">{timeAgo(s.createdAt, L)} · <span dir="ltr">{s.ip ?? "?"}</span> · {s.userAgent?.split(")")[0]?.split("(")[1] ?? ""}</li>)}
             </ul>
-            <ActionForm action={resetPassword}><input type="hidden" name="id" value={m.id} /><SubmitButton variant="outline" className="w-full" confirm={t("Reset the password and sign them out everywhere?")}>{t("Reset password")}</SubmitButton></ActionForm>
-            {m.id !== me.id && (
+            {!isPartner && !isSelf && <ActionForm action={resetPassword}><input type="hidden" name="id" value={m.id} /><SubmitButton variant="outline" className="w-full" confirm={t("Reset the password and sign them out everywhere?")}>{t("Reset password")}</SubmitButton></ActionForm>}
+            {!isPartner && !isSelf && (
               <div className="mt-3">
                 <ConfirmAction action={setActive} fields={{ id: m.id, active: String(!m.active) }} variant={m.active ? "danger" : "outline"} size="md"
                   label={m.active ? t("Deactivate") : t("Reactivate")} confirm={m.active ? t("Deactivate {name}? They'll be signed out immediately.", { name: m.name }) : t("Let {name} sign in again?", { name: m.name })} />

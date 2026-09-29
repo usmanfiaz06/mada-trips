@@ -1,11 +1,20 @@
 // All amounts are integers in halalas. These helpers are the only place that converts.
 
+// Largest amount any single entry may carry: SAR 100 million. Keeps every sum far inside exact integer range.
+export const MAX_HALALAS = 100_000_000_00;
+
 export function toHalalas(input: string | number | null | undefined): number {
   if (input === null || input === undefined || input === "") return 0;
-  const s = String(input).replace(/[,\s]/g, "").replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
-  if (!/^-?\d+(\.\d{0,2})?$/.test(s)) throw new Error(`Invalid amount: ${input}`);
-  const [whole, frac = ""] = s.replace("-", "").split(".");
+  const s = String(input).trim().slice(0, 40)
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))   // Arabic-Indic digits
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))   // Persian / Urdu digits
+    .replace(/٫/g, ".").replace(/٬/g, ",").replace(/\s/g, "");
+  // Commas only as thousands separators ("12,500.50"); "12,5" is ambiguous, so it is refused rather than guessed.
+  if (!/^-?(\d{1,3}(,\d{3})+|\d+)(\.\d{0,2})?$/.test(s)) throw new Error(`Invalid amount: ${String(input).slice(0, 40)}`);
+  const [whole, frac = ""] = s.replace("-", "").replace(/,/g, "").split(".");
+  if (whole.length > 12) throw new Error("Amount is too large");
   const v = Number(whole) * 100 + Number((frac + "00").slice(0, 2));
+  if (v > MAX_HALALAS) throw new Error("Amount is too large");
   return s.startsWith("-") ? -v : v;
 }
 

@@ -9,9 +9,10 @@ import postgres from "postgres";
 import { sql } from "drizzle-orm";
 import * as schema from "./schema";
 import { SYSTEM_ROLES } from "../lib/permissions";
+import { sslFor } from "./ssl";
 
 const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mada_ops";
-const client = postgres(url, { max: 1, prepare: false, ssl: /@(localhost|127\.0\.0\.1)[:/]/.test(url) ? false : "require" });
+const client = postgres(url, { max: 1, prepare: false, ssl: sslFor(url) });
 const db = drizzle(client, { schema });
 const args = new Set(process.argv.slice(2));
 const IS_PROD = !!process.env.VERCEL || process.env.NODE_ENV === "production";
@@ -27,14 +28,19 @@ const rnd = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147
 const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
 const sar = (n: number) => Math.round(n * 100);
 
+// A wipe only ever runs against a database on this machine, or when ALLOW_DB_RESET=yes is set on purpose.
+const LOCAL_DB = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+
 async function main() {
+  if (args.has("--reset") && (IS_PROD || (!LOCAL_DB && process.env.ALLOW_DB_RESET !== "yes"))) {
+    throw new Error("Refusing to wipe this database. --reset only runs against a local database (or with ALLOW_DB_RESET=yes, never in production)");
+  }
   if (args.has("--reset")) {
     await db.execute(sql`DROP TRIGGER IF EXISTS audit_events_no_update ON audit_events`);
     await db.execute(sql`TRUNCATE audit_events, attachments, remarks, settlement_cycles, bank_accounts, bsp_obligations, daily_closes, ledger_entries, expenses, approval_decisions, approval_requests, payments, bookings, clients, delegations, sessions, users, partners, roles, settings, counters RESTART IDENTITY CASCADE`);
     await db.execute(sql`CREATE TRIGGER audit_events_no_update BEFORE UPDATE OR DELETE ON audit_events FOR EACH ROW EXECUTE FUNCTION audit_events_immutable()`);
     console.log("Wiped.");
   }
-  if (IS_PROD && args.has("--reset")) throw new Error("Refusing to wipe a production database");
   if (IS_PROD && !args.has("--bootstrap")) throw new Error("Demo data is never loaded in production; use --bootstrap");
   const existing = await db.select().from(schema.users).limit(1);
   if (existing.length) { console.log("Already set up. Nothing to do."); return; }
@@ -49,11 +55,13 @@ async function main() {
     { name: "Haneef", nameAr: "حنيف", title: "Board Member · Managing Partner", titleAr: "عضو مجلس الإدارة · شريك مدير", equityBps: 3334, sort: 3 },
   ]).returning();
 
-  const hash = await bcrypt.hash(PASSWORD, 10);
+  const hash = await bcrypt.hash(PASSWORD, 12);
+  // The shared first password must be replaced by each partner on first sign-in.
+  const mustChangePassword = args.has("--bootstrap");
   const users = await db.insert(schema.users).values([
-    { name: "Abdulaziz", email: "abdulaziz@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: abdulaziz.id, team: "management" },
-    { name: "Bader Al Sulaiman", email: "bader@madatrips.com", passwordHash: hash, roleId: role("partner_issuer"), partnerId: bader.id, team: "management" },
-    { name: "Haneef", email: "haneef@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: haneef.id, team: "management" },
+    { name: "Abdulaziz", email: "abdulaziz@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: abdulaziz.id, team: "management", mustChangePassword },
+    { name: "Bader Al Sulaiman", email: "bader@madatrips.com", passwordHash: hash, roleId: role("partner_issuer"), partnerId: bader.id, team: "management", mustChangePassword },
+    { name: "Haneef", email: "haneef@madatrips.com", passwordHash: hash, roleId: role("partner"), partnerId: haneef.id, team: "management", mustChangePassword },
   ]).returning();
   const [uA, uB, uH] = users;
 
@@ -63,7 +71,7 @@ async function main() {
     { key: "corporate", name: "Corporate / B2B", bank: "Saudi National Bank", iban: "SA00 1000 0000 1234 5678 9012", openingBalance: 0, openingDate },
   ]);
 
-  if (args.has("--bootstrap")) { console.log(`Bootstrap done. Partners sign in with password ${PASSWORD}; change it on first login.`); return; }
+  if (args.has("--bootstrap")) { console.log("Bootstrap done. Partners sign in with the SEED_PASSWORD you set and must choose their own password on first sign-in."); return; }
 
   /* ─────────── Demo data ─────────── */
   const staff = await db.insert(schema.users).values([
@@ -237,7 +245,7 @@ async function main() {
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 
-  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses. Password for every demo user: ${PASSWORD}`);
+  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
 }
 
 main().then(() => client.end()).catch(async (e) => { console.error(e); await client.end(); process.exit(1); });

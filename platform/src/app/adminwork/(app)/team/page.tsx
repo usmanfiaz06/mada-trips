@@ -9,6 +9,7 @@ import { timeAgo } from "@/lib/dates";
 import { Avatar, Badge, Card, CardHead, Field, Input, LinkButton, PageHeader, Select, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { addMember } from "./actions";
+import type { Permission } from "@/lib/permissions";
 
 export const metadata = { title: "Team" };
 
@@ -16,11 +17,10 @@ export default async function TeamPage() {
   const u = await requirePerm("team.manage");
   const t = await getT();
   const L = t.locale;
-  const [members, roles, partners] = await Promise.all([
+  const [members, roles] = await Promise.all([
     db.select({ m: schema.users, role: schema.roles.name, roleAr: schema.roles.nameAr, partner: schema.partners.name }).from(schema.users)
       .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId)).orderBy(schema.users.createdAt),
     db.select().from(schema.roles).orderBy(schema.roles.createdAt),
-    db.select().from(schema.partners).orderBy(schema.partners.sort),
   ]);
   const teams = ["management", "riyadh", "pakistan"] as const;
   const online = (d: Date | null) => !!d && Date.now() - d.getTime() < 5 * 60_000;
@@ -62,9 +62,8 @@ export default async function TeamPage() {
             <Field label={t("Full name")} required><Input name="name" /></Field>
             <Field label={t("Work email")} required><Input name="email" type="email" dir="ltr" /></Field>
             <Field label={t("Phone")}><Input name="phone" dir="ltr" /></Field>
-            <Field label={t("Role")} required hint={t("Decides everything they can see and do.")}><Select name="roleId" placeholder={t("Choose…")} options={roles.map((r) => ({ value: r.id, label: L === "ar" ? r.nameAr : r.name }))} /></Field>
+            <Field label={t("Role")} required hint={t("Decides everything they can see and do.")}><Select name="roleId" placeholder={t("Choose…")} options={roles.filter((r) => r.key !== "partner" && r.key !== "partner_issuer" && (r.permissions as Permission[]).every((x) => !x.startsWith("issue.") && u.permissions.has(x))).map((r) => ({ value: r.id, label: L === "ar" ? r.nameAr : r.name }))} /></Field>
             <Field label={t("Team")}><Select name="team" defaultValue="riyadh" options={teams.map((x) => ({ value: x, label: t(TEAM[x]) }))} /></Field>
-            <Field label={t("Linked partner")} hint={t("Only for the three partners.")}><Select name="partnerId" placeholder={t("None")} options={partners.map((p) => ({ value: p.id, label: p.name }))} /></Field>
             <SubmitButton className="w-full">{t("Add member")}</SubmitButton>
           </ActionForm>
         </Card>

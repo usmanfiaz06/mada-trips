@@ -6,12 +6,29 @@ import { randomBytes } from "node:crypto";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
-import { requirePerm } from "@/lib/auth";
+import { requirePerm, type CurrentUser } from "@/lib/auth";
 import { audit, diff } from "@/lib/audit";
 import { ALL_PERMISSIONS, type Permission } from "@/lib/permissions";
 import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
 
-const tempPassword = () => `Mada-${randomBytes(4).toString("hex")}`;
+// 80 bits, readable: Mada-xxxx-xxxx-xxxx-xxxx-xxxx. They must replace it on first sign-in.
+const tempPassword = () => `Mada-${randomBytes(10).toString("hex").match(/.{4}/g)!.join("-")}`;
+const BCRYPT_COST = 12;
+
+// Governance guard rails for anyone with team.manage (every partner):
+//  • partner accounts are each partner's own: nobody else changes their role, link, status or password here
+//    (a lost partner password is reset on the server: npm run user:reset -- <email>)
+//  • nobody changes their own role or commission
+//  • you can only hand out access you hold yourself, and never ticket issuing (TTP stays with the issuing partner)
+//  • links between logins and partners are set up once, outside the app, so no one can mint a second director vote
+async function assertCanAssignRole(u: CurrentUser, roleId: string) {
+  const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, roleId));
+  if (!role) throw new Error("Choose a role");
+  if (role.key === "partner" || role.key === "partner_issuer") throw new Error("Partner roles belong to the partners' own logins and can't be given to team members");
+  const extra = (role.permissions as Permission[]).filter((x) => !u.permissions.has(x) || x.startsWith("issue."));
+  if (extra.length) throw new Error("That role includes access you can't hand out");
+  return role;
+}
 
 const Member = z.object({
   name: z.string().trim().min(2, "Enter a name"),
@@ -19,7 +36,6 @@ const Member = z.object({
   phone: z.string().trim().max(40).optional().transform((v) => v || null),
   roleId: z.string().uuid("Choose a role"),
   team: z.enum(["management", "riyadh", "pakistan"]),
-  partnerId: z.string().optional().transform((v) => (v ? v : null)),
 });
 
 export async function addMember(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -30,9 +46,9 @@ export async function addMember(_: ActionState, fd: FormData): Promise<ActionSta
   try {
     const [dupe] = await db.select().from(schema.users).where(eq(sql`lower(${schema.users.email})`, p.data.email));
     if (dupe) throw new Error("Someone already uses that email");
-    const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, p.data.roleId));
+    const role = await assertCanAssignRole(u, p.data.roleId);
     await db.transaction(async (tx) => {
-      const [m] = await tx.insert(schema.users).values({ ...p.data, passwordHash: await bcrypt.hash(pw, 10) }).returning();
+      const [m] = await tx.insert(schema.users).values({ ...p.data, passwordHash: await bcrypt.hash(pw, BCRYPT_COST), mustChangePassword: true }).returning();
       await audit(tx, { actorId: u.id, action: "user.created", entityType: "user", entityId: m.id, entityRef: m.name, summary: `Added ${m.name} as ${role?.name ?? "member"}` });
     });
   } catch (e) { return toState(e); }
@@ -57,7 +73,13 @@ export async function updateMember(_: ActionState, fd: FormData): Promise<Action
   try {
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     if (!before) throw new Error("Not found");
-    if (p.data.roleId !== before.roleId) await assertAdminsRemain(id, p.data.roleId);
+    if (before.partnerId && id !== u.id) throw new Error("Partner accounts are managed by that partner only");
+    if (p.data.roleId !== before.roleId) {
+      if (id === u.id) throw new Error("You can't change your own role");
+      if (before.partnerId) throw new Error("A partner's role can't be changed here");
+      await assertCanAssignRole(u, p.data.roleId);
+      await assertAdminsRemain(id, p.data.roleId);
+    }
     const changes = diff(before, p.data);
     if (!Object.keys(changes).length) return { ok: "No changes" };
     const roles = await db.select().from(schema.roles);
@@ -78,8 +100,10 @@ export async function setActive(fd: FormData) {
   const id = str(fd, "id");
   const active = str(fd, "active") === "true";
   if (id === u.id && !active) { await flash("You can't deactivate yourself"); redirect(`/adminwork/team/${id}`); }
-  if (!active) await assertAdminsRemain(id);
   const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+  if (!m) redirect("/adminwork/team");
+  if (m.partnerId) { await flash("Partner accounts can't be switched off here"); redirect(`/adminwork/team/${id}`); }
+  if (!active) await assertAdminsRemain(id);
   await db.transaction(async (tx) => {
     await tx.update(schema.users).set({ active }).where(eq(schema.users.id, id));
     if (!active) await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
@@ -96,12 +120,14 @@ export async function resetPassword(_: ActionState, fd: FormData): Promise<Actio
   const pw = tempPassword();
   const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
   if (!m) return { error: "Not found" };
+  if (id === u.id) return { error: "Change your own password from your profile" };
+  if (m.partnerId) return { error: "A partner's password can only be reset on the server, so no one can take over a partner's vote" };
   await db.transaction(async (tx) => {
-    await tx.update(schema.users).set({ passwordHash: await bcrypt.hash(pw, 10) }).where(eq(schema.users.id, id));
+    await tx.update(schema.users).set({ passwordHash: await bcrypt.hash(pw, BCRYPT_COST), mustChangePassword: true }).where(eq(schema.users.id, id));
     await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
     await audit(tx, { actorId: u.id, action: "user.password_reset", entityType: "user", entityId: id, entityRef: m.name, summary: `Reset ${m.name}'s password and signed them out everywhere` });
   });
-  return { ok: `New temporary password: ${pw}` };
+  return { ok: `New temporary password: ${pw}. They'll choose their own on sign-in.` };
 }
 
 /* ───────── Roles ───────── */
@@ -120,9 +146,14 @@ export async function saveRole(_: ActionState, fd: FormData): Promise<ActionStat
   const permissions = fd.getAll("permissions").map(String).filter((x): x is Permission => (ALL_PERMISSIONS as string[]).includes(x));
   let newId = id;
   try {
+    // You can only grant access you have yourself, and ticket issuing is never granted through a role.
+    const beyond = permissions.filter((x) => x.startsWith("issue.") || !u.permissions.has(x));
     if (id) {
       const [before] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
       if (!before) throw new Error("Role not found");
+      if (before.key === "partner" || before.key === "partner_issuer") throw new Error("The partner roles are fixed by the governance document and can't be edited");
+      if (id === u.role.id) throw new Error("You can't edit the role you're on");
+      if (beyond.some((x) => !before.permissions.includes(x))) throw new Error("You can only grant access you have yourself. Ticket issuing is granted from Issuance, never through a role");
       // Don't let an edit lock everyone out of administration.
       const losesAdmin = before.permissions.includes("roles.manage") && !permissions.includes("roles.manage") || before.permissions.includes("team.manage") && !permissions.includes("team.manage");
       if (losesAdmin) {
@@ -139,6 +170,7 @@ export async function saveRole(_: ActionState, fd: FormData): Promise<ActionStat
           changes: { permissions: { from: before.permissions.join(", "), to: permissions.join(", ") } } });
       });
     } else {
+      if (beyond.length) throw new Error("You can only grant access you have yourself. Ticket issuing is granted from Issuance, never through a role");
       const key = p.data.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") + "_" + randomBytes(2).toString("hex");
       newId = await db.transaction(async (tx) => {
         const [r] = await tx.insert(schema.roles).values({ key, ...p.data, permissions }).returning();
@@ -170,11 +202,13 @@ export async function setCommission(_: ActionState, fd: FormData): Promise<Actio
   const u = await requirePerm("team.manage");
   const id = str(fd, "id");
   const pct = Number(str(fd, "rate"));
-  if (!(pct >= 0 && pct <= 50)) return { error: "Commission must be between 0% and 50% of margin" };
+  if (!/^\d{1,2}(\.\d{1,2})?$/.test(str(fd, "rate")) || !(pct >= 0 && pct <= 50)) return { error: "Commission must be between 0% and 50% of margin" };
+  if (id === u.id) return { error: "Someone else sets your commission" };
   const bps = Math.round(pct * 100);
   try {
     const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     if (!m) throw new Error("Not found");
+    if (m.partnerId) throw new Error("Partners are paid through dividends, not commission");
     if (m.commissionBps === bps) return { ok: "No change" };
     await db.transaction(async (tx) => {
       await tx.update(schema.users).set({ commissionBps: bps }).where(eq(schema.users.id, id));
