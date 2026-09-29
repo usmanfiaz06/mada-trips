@@ -21,9 +21,9 @@ Demo sign-ins (password `Mada@2026`, override with `SEED_PASSWORD`):
 
 | Person | Email | Role |
 |---|---|---|
-| Abdulaziz | abdulaziz@madatrips.com | Chairman · Finance |
-| Bader | bader@madatrips.com | CEO · Issuing authority |
-| Haneef | haneef@madatrips.com | Director |
+| Abdulaziz | abdulaziz@madatrips.com | Partner |
+| Bader | bader@madatrips.com | Partner · Issuing authority (TTP) |
+| Haneef | haneef@madatrips.com | Partner |
 | Riyadh Counter | counter@madatrips.com | Retail agent (Riyadh), delegated issuer |
 | Pakistan Desk 1, 2 | desk1@ / desk2@madatrips.com | Corporate desk (Pakistan) |
 

@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { TEAM } from "@/lib/labels";
+import { sar } from "@/lib/money";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { Avatar, Badge, Card, CardHead, Field, Input } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
@@ -15,6 +16,11 @@ export default async function MePage() {
   const u = await requireUser();
   const t = await getT();
   const L = t.locale;
+  const cycles = await db.select({ label: schema.settlementCycles.label, figures: schema.settlementCycles.figures, status: schema.settlementCycles.status }).from(schema.settlementCycles).orderBy(desc(schema.settlementCycles.endDate)).limit(12);
+  const myComm = cycles.flatMap((c) => {
+    const row = ((c.figures as { commissions?: { userId: string; amount: number; bookings: number }[] }).commissions ?? []).find((x) => x.userId === u.id);
+    return row ? [{ label: c.label, status: c.status, ...row }] : [];
+  });
   const events = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.actorId, u.id)).orderBy(desc(schema.auditEvents.at)).limit(25);
   return (
     <>
@@ -30,6 +36,18 @@ export default async function MePage() {
           <div><h2 className="mb-3 px-1 text-[17px] font-[450] tracking-[-0.02em]">{t("Your recent activity")}</h2><ActivityList items={events.map((e) => ({ ...e, actorName: u.name }))} /></div>
         </div>
         <aside className="space-y-4">
+          {myComm.length > 0 && (
+            <Card><CardHead title={t("Commission history")} />
+              <ul className="space-y-2.5">
+                {myComm.map((c) => (
+                  <li key={c.label} className="flex items-center justify-between gap-3 text-[13.5px]">
+                    <span className="min-w-0"><span className="block truncate">{c.label}</span><span className="block text-[12px] text-ink-3">{t("{n} settled sales", { n: c.bookings })} · {t(c.status === "paid" ? "Paid" : "Approved")}</span></span>
+                    <span className="num shrink-0" dir="ltr">{sar(c.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <Card><CardHead title={t("Language")} />
             <form action={setLanguage} className="grid grid-cols-2 gap-2">
               <button name="locale" value="en" className={`h-11 rounded-full text-[14px] ${L === "en" ? "bg-ink text-bg" : "bg-surface-2 ring-1 ring-line"}`}>English</button>

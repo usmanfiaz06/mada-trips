@@ -13,7 +13,7 @@ export default async function NewExpense() {
   return (
     <>
       <PageHeader eyebrow={t("Expenses")} title={t("Add expense")} subtitle={t("Amount, proof and reason. That's all verification needs.")} />
-      <ExpenseForm categories={Object.entries(EXPENSE_CATEGORY)} isPartner={!!u.partnerId} today={riyadhDate()} />
+      <ExpenseForm categories={Object.entries(EXPENSE_CATEGORY).filter(([k]) => k !== "commission")} isPartner={!!u.partnerId} today={riyadhDate()} />
     </>
   );
 }

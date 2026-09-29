@@ -15,6 +15,7 @@ import { clientExposure } from "@/lib/finance";
 import { issueCheck } from "@/lib/issuance";
 import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/actions";
 import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
+import { describeService } from "@/lib/services";
 
 const money = z.string().transform((v, ctx) => {
   try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; }
@@ -41,6 +42,7 @@ const SaleSchema = z.object({
   ticketNumbers: z.string().trim().max(200).optional(),
   creditReason: z.string().trim().max(500).optional(),
   note: z.string().trim().max(1000).optional(),
+  details: z.string().max(4000).optional(),
 });
 
 export async function createSale(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -51,6 +53,16 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
   const v = parsed.data;
   if (v.paidNow < 0 || v.paidNow > v.sellPrice) return { error: "Amount paid can't be more than the selling price", fields: { paidNow: "x" } };
   if (v.serviceType === "flight" && !v.pnr) return { error: "Flights need a PNR", fields: { pnr: "x" } };
+  // Non-flight services: the server builds the description from the structured answers.
+  let details: Record<string, unknown> | null = null;
+  if (v.serviceType !== "flight") {
+    try { details = v.details ? JSON.parse(v.details) : {}; } catch { return { error: "Something went wrong with the form. Reload and try again" }; }
+    const r = describeService(v.serviceType, details ?? {});
+    if (!r.ok) return { error: r.error, fields: { details: "x" } };
+    v.description = r.description || undefined;
+    if (r.supplier) v.supplier = r.supplier;
+    if (r.travelDate) v.travelDate = r.travelDate;
+  }
   if (v.serviceType === "flight") {
     const m = /^([A-Z]{3}) (→|⇄) ([A-Z]{3})$/.exec(v.description ?? "");
     if (!m || !AIRPORT_CODES.has(m[1]) || !AIRPORT_CODES.has(m[3])) return { error: "Pick both airports from the list", fields: { description: "x" } };
@@ -93,10 +105,12 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
         }
       }
 
+      const [{ rate: preparerRate }] = await tx.select({ rate: schema.users.commissionBps }).from(schema.users).where(eq(schema.users.id, u.id));
       const ref = await nextRef(tx, "S", 10000);
       const [b] = await tx.insert(schema.bookings).values({
         ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers: v.passengers, paxCount: v.paxCount,
-        description: v.description || null, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
+        description: v.description || null, details, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
+        commissionBps: preparerRate,
         netCost: v.netCost, sellPrice: v.sellPrice, status: needsCredit ? "awaiting_credit" : "pending_issue",
         onCredit: unpaid > 0, dueDate: unpaid > 0 ? addDays(bdate, client.paymentTermsDays || 14) : null,
         businessDate: bdate, preparedBy: u.id,

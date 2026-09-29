@@ -45,6 +45,7 @@ export default async function TeamPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2"><span className="truncate text-[15px]">{m.name}</span>{partner && <Badge tone="gold">{t("Partner")}</Badge>}{!m.active && <Badge tone="bad">{t("Inactive")}</Badge>}</div>
                           <div className="truncate text-[12.5px] text-ink-3">{L === "ar" ? roleAr : role}</div>
+                          {m.commissionBps > 0 && <div className="mt-0.5 text-[12px] text-gold-2">{t("Commission {p}% of margin", { p: m.commissionBps / 100 })}</div>}
                           <div className="mt-0.5 text-[12px] text-ink-4">{m.lastSeenAt ? (online(m.lastSeenAt) ? t("Online now") : t("Active {ago}", { ago: timeAgo(m.lastSeenAt, L) })) : t("Never signed in")}</div>
                         </div>
                       </Card>

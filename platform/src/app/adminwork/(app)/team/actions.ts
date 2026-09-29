@@ -165,3 +165,24 @@ export async function deleteRole(fd: FormData) {
   await flash("Role deleted");
   redirect("/adminwork/team/roles");
 }
+
+export async function setCommission(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("team.manage");
+  const id = str(fd, "id");
+  const pct = Number(str(fd, "rate"));
+  if (!(pct >= 0 && pct <= 50)) return { error: "Commission must be between 0% and 50% of margin" };
+  const bps = Math.round(pct * 100);
+  try {
+    const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    if (!m) throw new Error("Not found");
+    if (m.commissionBps === bps) return { ok: "No change" };
+    await db.transaction(async (tx) => {
+      await tx.update(schema.users).set({ commissionBps: bps }).where(eq(schema.users.id, id));
+      await audit(tx, { actorId: u.id, action: "user.commission_changed", entityType: "user", entityId: id, entityRef: m.name,
+        summary: `Changed ${m.name}'s commission from ${m.commissionBps / 100}% to ${pct}% of margin (applies to new sales)`,
+        changes: { commission: { from: `${m.commissionBps / 100}%`, to: `${pct}%` } } });
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath(`/adminwork/team/${id}`);
+  return { ok: "Commission rate saved. It applies to sales made from now on" };
+}

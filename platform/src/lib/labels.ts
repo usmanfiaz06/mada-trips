@@ -21,7 +21,7 @@ export const CLIENT_TYPE: Record<string, { label: string; tone: Tone }> = {
 export const TEAM: Record<string, string> = { management: "Management", riyadh: "Riyadh office", pakistan: "Pakistan desk" };
 export const EXPENSE_CATEGORY: Record<string, string> = {
   salaries: "Salaries", rent: "Rent", utilities: "Utilities", communications: "Communications", systems: "System licences",
-  licences: "Government & licences", furnishing: "Furnishing", marketing: "Marketing", office: "Office supplies", travel: "Business travel", bank: "Bank charges", other: "Other",
+  licences: "Government & licences", furnishing: "Furnishing", marketing: "Marketing", office: "Office supplies", travel: "Business travel", bank: "Bank charges", commission: "Team commission", other: "Other",
 };
 export const EXPENSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Waiting for verification", tone: "gold" },

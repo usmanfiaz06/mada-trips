@@ -18,7 +18,7 @@ const S = z.object({
   amount: money.refine((v) => v > 0, "Enter the exact amount paid in SAR"),
   vatAmount: money,
   expenseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick the date it was paid"),
-  category: z.string().refine((v) => v in EXPENSE_CATEGORY, "Choose a category"),
+  category: z.string().refine((v) => v in EXPENSE_CATEGORY && v !== "commission", "Choose a category"),
   description: z.string().trim().min(3, "Describe what was paid for"),
   justification: z.string().trim().min(5, "Explain the business reason"),
   vendor: z.string().trim().max(120).optional(),

@@ -76,6 +76,20 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
           </div>
         </Card>
 
+        {(f.commissions ?? []).length > 0 && (
+          <Card className="lg:col-span-12">
+            <CardHead title={t("Team commission")} hint={t("Share of margin on each person's settled sales. Included in P1 overheads and paid with salaries.")} />
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(f.commissions ?? []).map((c) => (
+                <div key={c.userId} className="rounded-2xl bg-surface-2 p-4">
+                  <div className="text-[14px]">{c.name}</div>
+                  <div className="figure mt-3 text-[28px]" dir="ltr">{sar(c.amount)}</div>
+                  <div className="mt-1 text-[12px] text-ink-3">{t("{n} settled sales", { n: c.bookings })}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
         <Card className="lg:col-span-8">
           <CardHead title={t("3 · Cash allocation waterfall")} hint={t("Each priority is paid in full before the next gets anything.")} />
           <Waterfall gross={Math.max(0, f.grossProfit)} steps={f.waterfall} labels={labels} />

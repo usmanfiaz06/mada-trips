@@ -12,7 +12,7 @@ import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { Avatar, Badge, Card, CardHead, Field, Input, Select } from "@/components/ui";
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { ActivityList } from "@/components/activity-list";
-import { resetPassword, setActive, updateMember } from "../actions";
+import { resetPassword, setActive, setCommission, updateMember } from "../actions";
 
 export default async function MemberPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -63,6 +63,16 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
               <Field label={t("Linked partner")}><Select name="partnerId" defaultValue={m.partnerId ?? ""} placeholder={t("None")} options={partners.map((p) => ({ value: p.id, label: p.name }))} /></Field>
               <SubmitButton className="w-full">{t("Save")}</SubmitButton>
             </ActionForm>
+          </Card>
+          <Card>
+            <CardHead title={t("Commission")} hint={t("Share of the margin on sales this person makes, paid at Day-25 once the money has cleared.")} />
+            <ActionForm action={setCommission} className="flex items-end gap-2">
+              <input type="hidden" name="id" value={m.id} />
+              <label className="flex-1"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("% of margin")}</span>
+                <input name="rate" type="number" min={0} max={50} step="0.5" defaultValue={m.commissionBps / 100} className="field num" /></label>
+              <SubmitButton variant="outline">{t("Save")}</SubmitButton>
+            </ActionForm>
+            <p className="mt-2 text-[12px] text-ink-3">{t("A new rate applies to sales made from now on. Earlier sales keep the rate they were made at.")}</p>
           </Card>
           <Card>
             <CardHead title={t("Sign-in & security")} hint={t("{n} active sessions", { n: sessions.length })} />

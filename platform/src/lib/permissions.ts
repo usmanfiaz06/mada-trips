@@ -39,10 +39,13 @@ export const PERMISSION_GROUPS = {
   admin: { en: "Administration", ar: "الإدارة" },
 } as const;
 
+// All three partners share one level of access. Ticket issuing (TTP) stays with the issuing partner, as the
+// governance document requires; it can be delegated to staff from the Issuance page.
+export const PARTNER_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== "issue.unlimited" && p !== "issue.delegate");
+
 export const SYSTEM_ROLES: { key: string; name: string; nameAr: string; description: string; permissions: Permission[] }[] = [
-  { key: "chairman", name: "Chairman · Finance", nameAr: "رئيس مجلس الإدارة · المالية", description: "Receives daily reports, verifies expenses, runs reconciliation and the Day-25 close.", permissions: ALL_PERMISSIONS.filter((p) => p !== "issue.unlimited" && p !== "issue.delegate") },
-  { key: "ceo", name: "CEO · Issuing authority", nameAr: "الرئيس التنفيذي · صلاحية الإصدار", description: "Holds ticketing authority (TTP) and delegates it. Full operational access.", permissions: ALL_PERMISSIONS },
-  { key: "director", name: "Director", nameAr: "عضو مجلس الإدارة", description: "Votes on approvals, sees all numbers and the partner ledger.", permissions: ["sales.view_all", "approvals.decide", "expenses.create", "expenses.view_all", "expenses.verify", "finance.view", "ledger.view_all", "activity.view", "close.verify"] },
+  { key: "partner", name: "Partner", nameAr: "شريك", description: "Full access: team, roles, approvals, finance, settlement and settings.", permissions: PARTNER_PERMISSIONS },
+  { key: "partner_issuer", name: "Partner · Issuing authority", nameAr: "شريك · صلاحية الإصدار", description: "Full partner access, plus ticket issuing (TTP) and delegating it to staff.", permissions: ALL_PERMISSIONS },
   { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "expenses.create", "close.submit"] },
   { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "close.submit"] },
 ];

@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   team: text("team").notNull().default("management"), // management | riyadh | pakistan
   locale: text("locale").notNull().default("en"),
   active: boolean("active").notNull().default(true),
+  // Commission as a share of margin, in basis points (1000 = 10%). Only managers and the person see it.
+  commissionBps: integer("commission_bps").notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   createdAt: createdAt(),
 });
@@ -101,6 +103,8 @@ export const bookings = pgTable("bookings", {
   passengers: text("passengers").notNull(),
   paxCount: integer("pax_count").notNull().default(1),
   description: text("description"),
+  // Structured answers for the service (visa type, hotel dates, meal plan, ...). description is built from them.
+  details: jsonb("details"),
   supplier: text("supplier"),
   pnr: text("pnr"),
   ticketNumbers: text("ticket_numbers"),
@@ -108,6 +112,8 @@ export const bookings = pgTable("bookings", {
   netCost: money("net_cost").notNull(),
   sellPrice: money("sell_price").notNull(),
   vatAmount: money("vat_amount").notNull().default(0),
+  // The preparer's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
+  commissionBps: integer("commission_bps").notNull().default(0),
   status: text("status").notNull().default("pending_issue"), // draft | pending_issue | issued | returned | void | refunded
   onCredit: boolean("on_credit").notNull().default(false),
   creditApprovalId: uuid("credit_approval_id"),
