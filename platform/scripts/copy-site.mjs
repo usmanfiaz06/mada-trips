@@ -10,7 +10,7 @@ const root = resolve(here, "../..");
 const out = resolve(here, "../public");
 // Allow-list: only what a visitor's browser needs is published. Anything else at the repo root (notes, config,
 // a stray .env or backup) is never copied into the public site.
-const DIRS = new Set(["assets", "Assets", "css", "js"]);
+const DIRS = new Set(["assets", "Assets", "css", "js", "ar"]);
 const FILE = /\.(html|xml|txt|webmanifest|jpe?g|png|webp|svg|ico|gif|avif|woff2?)$/i;
 const publicFile = (src) => { const base = src.split(/[\\/]/).pop(); return !base.startsWith(".") && !/\.(map|md|env|json|ya?ml|log|bak|sql|sh)$/i.test(base); };
 
@@ -26,4 +26,6 @@ for (const name of readdirSync(root, { withFileTypes: true })) {
 if (!existsSync(join(out, "index.html"))) throw new Error("Website index.html not found at repo root");
 // Vercel treats a file named index.html specially, so "/" is served from a copy under another name.
 copyFileSync(join(out, "index.html"), join(out, "site-home.html"));
+// Same for the Arabic home page at /ar.
+if (existsSync(join(out, "ar", "index.html"))) copyFileSync(join(out, "ar", "index.html"), join(out, "ar", "site-home.html"));
 console.log(`Copied ${n} website entries into public/`);

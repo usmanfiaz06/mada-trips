@@ -18,6 +18,10 @@ const config: NextConfig = {
       { source: "/index.html", destination: "/", permanent: true },
       { source: "/site-home", destination: "/", permanent: true },
       { source: "/:page((?!adminwork|index|site-home)[^/.]+)\\.html", destination: "/:page", permanent: true },
+      // Arabic site under /ar
+      { source: "/ar/index.html", destination: "/ar", permanent: true },
+      { source: "/ar/site-home", destination: "/ar", permanent: true },
+      { source: "/ar/:page((?!index|site-home)[^/.]+)\\.html", destination: "/ar/:page", permanent: true },
     ];
   },
   async rewrites() {
@@ -26,6 +30,8 @@ const config: NextConfig = {
       // Vercel won't rewrite to a file named index.html. /about → about.html, and so on.
       fallback: [
         { source: "/", destination: "/site-home.html" },
+        { source: "/ar", destination: "/ar/site-home.html" },
+        { source: "/ar/:page((?!site-home)[^/.]+)", destination: "/ar/:page.html" },
         { source: "/:page((?!adminwork|site-home)[^/.]+)", destination: "/:page.html" },
       ],
     };
