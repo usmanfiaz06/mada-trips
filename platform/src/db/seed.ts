@@ -67,13 +67,13 @@ async function main() {
 
   /* ─────────── Demo data ─────────── */
   const staff = await db.insert(schema.users).values([
-    { name: "Sara Al Qahtani", email: "sara@madatrips.com", passwordHash: hash, roleId: role("retail_agent"), team: "riyadh", phone: "+966 55 000 1122" },
-    { name: "Ali Raza", email: "ali@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
-    { name: "Fatima Noor", email: "fatima@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
+    { name: "Riyadh Counter", email: "counter@madatrips.com", passwordHash: hash, roleId: role("retail_agent"), team: "riyadh" },
+    { name: "Pakistan Desk 1", email: "desk1@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
+    { name: "Pakistan Desk 2", email: "desk2@madatrips.com", passwordHash: hash, roleId: role("corporate_agent"), team: "pakistan" },
   ]).returning();
-  const [sara, ali, fatima] = staff;
+  const [counter, desk1, desk2] = staff;
 
-  await db.insert(schema.delegations).values({ userId: sara.id, grantedBy: uB.id, scope: "retail", maxTicket: sar(8000), dailyCap: sar(40000), expiresAt: at(-60, 23), note: "Retail walk-ins during office hours" });
+  await db.insert(schema.delegations).values({ userId: counter.id, grantedBy: uB.id, scope: "retail", maxTicket: sar(8000), dailyCap: sar(40000), expiresAt: at(-60, 23), note: "Retail walk-ins during office hours" });
 
   // Initial IATA working-capital injection by Bader and startup costs.
   const openingInjection = sar(150000);
@@ -87,11 +87,11 @@ async function main() {
     { name: "Riyadh Medical Group", type: "contracted", contactPerson: "Dr. Mona Saleh", email: "admin@rmg.sa", creditLimit: sar(180000), paymentTermsDays: 30, contractRef: "CT-2026-007", createdBy: uA.id },
     { name: "Vision Events Co.", type: "contracted", contactPerson: "Faisal Otaibi", email: "ops@visionevents.sa", creditLimit: sar(120000), paymentTermsDays: 15, contractRef: "CT-2026-011", createdBy: uA.id },
     { name: "Gulf Horizon Trading", type: "noncontracted", contactPerson: "Omar Nasser", phone: "+966 50 777 1212", createdBy: uB.id },
-    { name: "Sultan Al Dosari", type: "retail", phone: "+966 55 123 9876", createdBy: sara.id },
-    { name: "Nora Al Shehri", type: "retail", phone: "+966 54 222 3344", createdBy: sara.id },
-    { name: "Ahmed Hassan", type: "retail", phone: "+966 56 111 0099", createdBy: sara.id },
-    { name: "Layla Mansour", type: "retail", phone: "+966 53 909 4411", createdBy: sara.id },
-    { name: "Walk-in customer", type: "retail", createdBy: sara.id },
+    { name: "Sultan Al Dosari", type: "retail", phone: "+966 55 123 9876", createdBy: counter.id },
+    { name: "Nora Al Shehri", type: "retail", phone: "+966 54 222 3344", createdBy: counter.id },
+    { name: "Ahmed Hassan", type: "retail", phone: "+966 56 111 0099", createdBy: counter.id },
+    { name: "Layla Mansour", type: "retail", phone: "+966 53 909 4411", createdBy: counter.id },
+    { name: "Walk-in customer", type: "retail", createdBy: counter.id },
   ]).returning();
   const corp = clientRows.filter((c) => c.type === "contracted");
   const retail = clientRows.filter((c) => c.type === "retail");
@@ -115,11 +115,11 @@ async function main() {
       let created = at(daysAgo, hour, Math.floor(rnd() * 60));
       if (created > new Date()) created = new Date(Date.now() - (k + 1) * 17 * 60_000);
       const bdate = riyadhDay(created);
-      const preparer = isCorp ? pick([ali, fatima]) : sara;
+      const preparer = isCorp ? pick([desk1, desk2]) : counter;
       const client = isCorp ? pick(corp) : pick(retail);
       const recent = daysAgo === 0 && k >= 2;
       const status = recent ? "pending_issue" : "issued";
-      const issuer = !recent ? (isCorp || service === "flight" && sell > 8000 ? uB : service === "flight" ? sara : preparer) : null;
+      const issuer = !recent ? (isCorp || service === "flight" && sell > 8000 ? uB : service === "flight" ? counter : preparer) : null;
       const pax = pick(names);
       const ref = `S-${++n}`;
       const due = isCorp ? riyadhDay(at(daysAgo - client.paymentTermsDays, 12)) : null;
@@ -159,12 +159,12 @@ async function main() {
     { ref: "EX-1002", category: "rent", description: "Office lease · first year advance", justification: "Riyadh branch lease", amount: sar(64000), expenseDate: riyadhDay(at(57, 12)), paidBy: "partner", partnerId: haneef.id, isStartup: true, status: "approved", submittedBy: uH.id },
     { ref: "EX-1003", category: "furnishing", description: "Office furniture & fit-out", justification: "Retail counter and desks", amount: sar(27300), expenseDate: riyadhDay(at(55, 12)), paidBy: "partner", partnerId: bader.id, isStartup: true, status: "approved", submittedBy: uB.id },
     { ref: "EX-1004", category: "salaries", description: "Salaries · Riyadh & Pakistan team", justification: "Monthly payroll", amount: sar(21500), expenseDate: riyadhDay(at(36, 12)), paidBy: "retail", status: "approved", submittedBy: uA.id },
-    { ref: "EX-1005", category: "utilities", description: "Electricity, water & internet", justification: "Monthly utilities", amount: sar(1850), expenseDate: riyadhDay(at(30, 12)), paidBy: "retail", status: "approved", submittedBy: sara.id },
+    { ref: "EX-1005", category: "utilities", description: "Electricity, water & internet", justification: "Monthly utilities", amount: sar(1850), expenseDate: riyadhDay(at(30, 12)), paidBy: "retail", status: "approved", submittedBy: counter.id },
     { ref: "EX-1006", category: "systems", description: "GDS & booking system licence", justification: "Monthly licence", amount: sar(4200), expenseDate: riyadhDay(at(20, 12)), paidBy: "corporate", status: "approved", submittedBy: uB.id },
     { ref: "EX-1007", category: "communications", description: "Mobile lines & WhatsApp Business", justification: "Team communications", amount: sar(950), expenseDate: riyadhDay(at(12, 12)), paidBy: "retail", status: "approved", submittedBy: uA.id },
     { ref: "EX-1008", category: "salaries", description: "Salaries · Riyadh & Pakistan team", justification: "Monthly payroll", amount: sar(21500), expenseDate: riyadhDay(at(3, 12)), paidBy: "retail", status: "approved", submittedBy: uA.id },
     { ref: "EX-1009", category: "marketing", description: "Instagram campaign · Umrah season", justification: "Retail lead generation", amount: sar(3500), expenseDate: riyadhDay(at(1, 12)), paidBy: "partner", partnerId: bader.id, status: "pending", submittedBy: uB.id },
-    { ref: "EX-1010", category: "office", description: "Printer toner & stationery", justification: "Counter supplies", amount: sar(420), expenseDate: riyadhDay(at(0, 12)), paidBy: "retail", status: "pending", submittedBy: sara.id },
+    { ref: "EX-1010", category: "office", description: "Printer toner & stationery", justification: "Counter supplies", amount: sar(420), expenseDate: riyadhDay(at(0, 12)), paidBy: "retail", status: "pending", submittedBy: counter.id },
   ];
   const ex = await db.insert(schema.expenses).values(expRows).returning();
   for (const e of ex) {
@@ -190,18 +190,18 @@ async function main() {
   const [cb] = await db.insert(schema.bookings).values({
     ref: `S-${++n}`, channel: "corporate", account: "corporate", serviceType: "flight", clientId: gulf.id, passengers: "Omar Nasser + 3", paxCount: 4,
     description: "RUH → IST · business trip", supplier: "Turkish Airlines", pnr: "Q7K2MX", netCost: sar(13900), sellPrice: creditAmt, status: "awaiting_credit", onCredit: true,
-    dueDate: riyadhDay(at(-14, 12)), businessDate: riyadhDay(new Date()), preparedBy: ali.id, createdAt: new Date(Date.now() - 150 * 60_000), updatedAt: new Date(Date.now() - 150 * 60_000),
+    dueDate: riyadhDay(at(-14, 12)), businessDate: riyadhDay(new Date()), preparedBy: desk1.id, createdAt: new Date(Date.now() - 150 * 60_000), updatedAt: new Date(Date.now() - 150 * 60_000),
   }).returning();
   const [cr] = await db.insert(schema.approvalRequests).values({
     ref: `AP-${++ap}`, kind: "credit", entityType: "booking", entityId: cb.id, title: `Credit for Gulf Horizon Trading · ${cb.ref}`, amount: creditAmt,
-    reason: "New corporate lead, 4 pax to Istanbul. Wants 14 days to pay by wire.", requestedBy: ali.id, requiredApprovals: 2, approverPool: "directors",
+    reason: "New corporate lead, 4 pax to Istanbul. Wants 14 days to pay by wire.", requestedBy: desk1.id, requiredApprovals: 2, approverPool: "directors",
     rule: "Up to SAR 20,000.00: any 2 directors approve", createdAt: new Date(Date.now() - 148 * 60_000),
   }).returning();
   await db.insert(schema.approvalDecisions).values({ requestId: cr.id, userId: uB.id, decision: "approve", remark: "Known contact, fine for 14 days.", createdAt: new Date(Date.now() - 90 * 60_000) });
   await db.update(schema.bookings).set({ creditApprovalId: cr.id }).where(sql`id = ${cb.id}`);
   await db.update(schema.counters).set({ value: n }).where(sql`key = 'S'`);
   await db.insert(schema.counters).values({ key: "AP", value: ap });
-  ev.push({ at: new Date(Date.now() - 148 * 60_000), actorId: ali.id, action: "approval.requested", entityType: "approval", entityId: cr.id, entityRef: cr.ref, summary: `Requested credit approval: ${cr.title}` });
+  ev.push({ at: new Date(Date.now() - 148 * 60_000), actorId: desk1.id, action: "approval.requested", entityType: "approval", entityId: cr.id, entityRef: cr.ref, summary: `Requested credit approval: ${cr.title}` });
   ev.push({ at: new Date(Date.now() - 90 * 60_000), actorId: uB.id, action: "approval.approved_vote", entityType: "approval", entityId: cr.id, entityRef: cr.ref, summary: `Approved ${cr.ref}: ${cr.title} · "Known contact, fine for 14 days."` });
 
   // BSP remittances: paid ones in the past, upcoming ones ahead.
@@ -217,7 +217,7 @@ async function main() {
   // Daily closes for the past week.
   for (let d = 7; d >= 1; d--) {
     const bd = riyadhDay(at(d, 12));
-    for (const [team, who] of [["riyadh", sara], ["pakistan", ali]] as const) {
+    for (const [team, who] of [["riyadh", counter], ["pakistan", desk1]] as const) {
       const late = d === 4 && team === "pakistan";
       await db.insert(schema.dailyCloses).values({
         businessDate: bd, team, status: d > 1 ? "verified" : "submitted", cashExpected: team === "riyadh" ? sar(1200 + d * 90) : 0, cashCounted: team === "riyadh" ? sar(1200 + d * 90 - (d === 3 ? 50 : 0)) : 0,
@@ -228,8 +228,8 @@ async function main() {
     }
   }
 
-  ev.push({ at: at(59, 10), actorId: uA.id, action: "user.created", entityType: "user", entityId: sara.id, entityRef: sara.name, summary: `Added Sara Al Qahtani as Retail agent (Riyadh)` });
-  ev.push({ at: at(45, 11), actorId: uB.id, action: "delegation.granted", entityType: "user", entityId: sara.id, entityRef: sara.name, summary: `Granted Sara Al Qahtani retail issuing up to SAR 8,000 per ticket` });
+  ev.push({ at: at(59, 10), actorId: uA.id, action: "user.created", entityType: "user", entityId: counter.id, entityRef: counter.name, summary: `Added Riyadh Counter as Retail agent (Riyadh)` });
+  ev.push({ at: at(45, 11), actorId: uB.id, action: "delegation.granted", entityType: "user", entityId: counter.id, entityRef: counter.name, summary: `Granted Riyadh Counter retail issuing up to SAR 8,000 per ticket` });
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 
