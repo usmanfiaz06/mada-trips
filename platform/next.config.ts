@@ -16,14 +16,18 @@ const config: NextConfig = {
     // The website's clean URLs (/about, not /about.html), as Vercel's cleanUrls did before.
     return [
       { source: "/index.html", destination: "/", permanent: true },
-      { source: "/:page((?!adminwork)[^/.]+)\\.html", destination: "/:page", permanent: true },
+      { source: "/site-home", destination: "/", permanent: true },
+      { source: "/:page((?!adminwork|index|site-home)[^/.]+)\\.html", destination: "/:page", permanent: true },
     ];
   },
   async rewrites() {
     return {
-      beforeFiles: [{ source: "/", destination: "/index.html" }],
-      // After real files and app routes: /about → about.html. Anything else falls through to the 404 page.
-      fallback: [{ source: "/:page((?!adminwork)[^/.]+)", destination: "/:page.html" }],
+      // After real files and app routes. "/" is served from site-home.html, a copy of index.html:
+      // Vercel won't rewrite to a file named index.html. /about → about.html, and so on.
+      fallback: [
+        { source: "/", destination: "/site-home.html" },
+        { source: "/:page((?!adminwork|site-home)[^/.]+)", destination: "/:page.html" },
+      ],
     };
   },
   async headers() {
