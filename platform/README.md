@@ -24,8 +24,8 @@ Demo sign-ins (password `Mada@2026`, override with `SEED_PASSWORD`):
 | Abdulaziz | abdulaziz@madatrips.com | Chairman · Finance |
 | Bader | bader@madatrips.com | CEO · Issuing authority |
 | Haneef | haneef@madatrips.com | Director |
-| Sara | sara@madatrips.com | Retail agent (Riyadh), delegated issuer |
-| Ali, Fatima | ali@ / fatima@madatrips.com | Corporate desk (Pakistan) |
+| Riyadh Counter | counter@madatrips.com | Retail agent (Riyadh), delegated issuer |
+| Pakistan Desk 1, 2 | desk1@ / desk2@madatrips.com | Corporate desk (Pakistan) |
 
 `npm run db:seed -- --reset` wipes everything and reseeds.
 

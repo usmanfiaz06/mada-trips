@@ -27,6 +27,8 @@ export const EXPENSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Waiting for verification", tone: "gold" },
   approved: { label: "Approved", tone: "ok" },
   rejected: { label: "Rejected", tone: "bad" },
+  withdrawn: { label: "Withdrawn", tone: "neutral" },
+  void: { label: "Void", tone: "neutral" },
 };
 export const PAID_BY: Record<string, string> = { retail: "Company · Retail account", corporate: "Company · Corporate account", partner: "Partner, personally" };
 export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement" };

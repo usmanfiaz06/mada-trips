@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, notInArray, sql } from "drizzle-orm";
 import { Plus, Wallet } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
@@ -21,7 +21,9 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
   const s = await getSettings();
   const cyc = cycleFor(businessDate(new Date(), s.closeHour), s.cutoffDay);
 
-  const where = tab === "mine" ? eq(schema.expenses.submittedBy, u.id) : tab === "pending" ? eq(schema.expenses.status, "pending") : tab === "startup" ? eq(schema.expenses.isStartup, true) : undefined;
+  const hidden = notInArray(schema.expenses.status, ["withdrawn", "void"]);
+  const where = tab === "mine" ? eq(schema.expenses.submittedBy, u.id) : tab === "pending" ? eq(schema.expenses.status, "pending")
+    : tab === "startup" ? and(eq(schema.expenses.isStartup, true), hidden) : tab === "cancelled" ? inArray(schema.expenses.status, ["withdrawn", "void"]) : hidden;
   const rows = await db.select({ e: schema.expenses, name: schema.users.name, partner: schema.partners.name }).from(schema.expenses)
     .innerJoin(schema.users, eq(schema.users.id, schema.expenses.submittedBy)).leftJoin(schema.partners, eq(schema.partners.id, schema.expenses.partnerId))
     .where(all ? where : and(eq(schema.expenses.submittedBy, u.id), where)).orderBy(desc(schema.expenses.expenseDate), desc(schema.expenses.createdAt)).limit(200);
@@ -57,6 +59,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
         ...(all ? [{ key: "all", label: t("All"), href: "/adminwork/expenses?tab=all" }] : []),
         { key: "mine", label: t("Submitted by me"), href: "/adminwork/expenses?tab=mine" },
         ...(all ? [{ key: "pending", label: t("Waiting"), count: pendingN, href: "/adminwork/expenses?tab=pending" }, { key: "startup", label: t("Startup costs"), href: "/adminwork/expenses?tab=startup" }] : []),
+        { key: "cancelled", label: t("Withdrawn & void"), href: "/adminwork/expenses?tab=cancelled" },
       ]} />
       <Card pad={false}>
         {rows.length === 0 ? <Empty icon={<Wallet className="size-5" />} title={t("No expenses yet")} action={can(u, "expenses.create") && <LinkButton href="/adminwork/expenses/new" variant="outline">{t("Add expense")}</LinkButton>} /> : (

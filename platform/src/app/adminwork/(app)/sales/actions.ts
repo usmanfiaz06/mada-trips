@@ -14,6 +14,7 @@ import { createApproval } from "@/lib/approvals";
 import { clientExposure } from "@/lib/finance";
 import { issueCheck } from "@/lib/issuance";
 import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/actions";
+import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
 
 const money = z.string().transform((v, ctx) => {
   try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; }
@@ -50,6 +51,12 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
   const v = parsed.data;
   if (v.paidNow < 0 || v.paidNow > v.sellPrice) return { error: "Amount paid can't be more than the selling price", fields: { paidNow: "x" } };
   if (v.serviceType === "flight" && !v.pnr) return { error: "Flights need a PNR", fields: { pnr: "x" } };
+  if (v.serviceType === "flight") {
+    const m = /^([A-Z]{3}) (→|⇄) ([A-Z]{3})$/.exec(v.description ?? "");
+    if (!m || !AIRPORT_CODES.has(m[1]) || !AIRPORT_CODES.has(m[3])) return { error: "Pick both airports from the list", fields: { description: "x" } };
+    if (m[1] === m[3]) return { error: "From and To can't be the same airport", fields: { description: "x" } };
+    if (!v.supplier || !AIRLINE_LABELS.has(v.supplier)) return { error: "Pick the airline from the list", fields: { supplier: "x" } };
+  }
 
   let id = "";
   try {

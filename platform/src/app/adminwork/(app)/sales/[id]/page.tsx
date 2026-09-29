@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { ArrowLeft, Ban, Building2, CornerUpLeft, Receipt, RotateCcw, ShieldCheck, Ticket } from "lucide-react";
 import { db, schema } from "@/db";
-import { requireUser, can } from "@/lib/auth";
+import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { issueCheck } from "@/lib/issuance";
 import { ACCOUNT, BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
@@ -150,8 +150,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
           {credit && credit.status === "pending" && (
             <Card className="ring-2 ring-warn/30">
               <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 text-warn" />
-                <div><div className="text-[15px]">{t("Waiting for credit approval")}</div><div className="mt-1 text-[13px] text-ink-3">{credit.rule}</div>
-                  <Link href={`/adminwork/approvals/${credit.id}`} className="mt-3 inline-block text-[13px] text-ink underline decoration-gold decoration-2 underline-offset-4">{t("See votes")} · {credit.ref}</Link></div></div>
+                <div><div className="text-[15px]">{t("Waiting for credit approval")}</div><div className="mt-1 text-[13px] text-ink-3">{isOversight(u) ? credit.rule : t("Management reviews pay-later sales before they're issued.")}</div>
+                  <Link href={`/adminwork/approvals/${credit.id}`} className="mt-3 inline-block text-[13px] text-ink underline decoration-gold decoration-2 underline-offset-4">{isOversight(u) ? t("See votes") : t("See status")} · {credit.ref}</Link></div></div>
             </Card>
           )}
 

@@ -1,14 +1,25 @@
 "use client";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { AlertCircle, ArrowRight, Building2, Check, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
 import { createSale } from "../actions";
+import { Picker, type PickerItem } from "@/components/picker";
+import { AIRLINES, AIRPORTS, airlineLabel } from "@/lib/travel-data";
+
+const AIRPORT_ITEMS: PickerItem[] = AIRPORTS.map((a) => ({
+  value: a.code, code: a.code, primary: a.city, secondary: `${a.name} · ${a.country}`,
+  keywords: `${a.code} ${a.city} ${a.cityAr ?? ""} ${a.name} ${a.country}`,
+}));
+const AIRLINE_ITEMS: PickerItem[] = AIRLINES.map((a) => ({
+  value: airlineLabel(a), code: a.code, primary: a.name, secondary: a.nameAr,
+  keywords: `${a.code} ${a.name} ${a.nameAr ?? ""} ${a.country}`,
+}));
 
 type Client = { id: string; name: string; type: string; phone: string | null; creditLimit: number; exposure: number; terms: number };
 type Props = {
-  clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number;
+  clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number; showRules: boolean;
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
 };
 
@@ -42,7 +53,7 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, delegation, defaultClientId }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId }: Props) {
   const t = useT();
   const [state, action] = useActionState(createSale, null);
   const [q, setQ] = useState("");
@@ -57,6 +68,11 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
   const [issueNow, setIssueNow] = useState(true);
   const [pax, setPax] = useState("");
   const [pnr, setPnr] = useState("");
+  const [from, setFrom] = useState("RUH");
+  const [to, setTo] = useState("");
+  const [trip, setTrip] = useState<"oneway" | "return">("return");
+  const [airline, setAirline] = useState("");
+  const route = from && to ? `${from} ${trip === "return" ? "⇄" : "→"} ${to}` : "";
   const searchRef = useRef<HTMLInputElement>(null);
 
   const ctype = client?.type ?? (newClient ? newClient.type : null);
@@ -73,6 +89,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
   const creditNeeded = unpaid > 0 && (ctype !== "contracted" || (client ? client.exposure + unpaid > client.creditLimit : true));
   const canIssue = canIssueAll || service !== "flight" || (!!delegation && (delegation.scope === "all" || channel === "retail") && sellH <= delegation.maxTicket && sellH <= delegation.dailyLeft);
   const outcome = !ctype || !sellH ? null
+    : creditNeeded && !showRules ? { icon: ShieldCheck, tone: "warn", title: t("Needs approval before issuing"), body: t("Management reviews pay-later sales. You'll see the decision on the sale.") }
     : creditNeeded ? { icon: ShieldCheck, tone: "warn", title: t("Goes to directors for credit approval"), body: unpaid <= creditDualLimit ? t("Any 2 directors must approve the unpaid SAR {v}.", { v: show(unpaid) }) : t("Above SAR {limit}: all directors must agree.", { limit: show(creditDualLimit) }) }
     : issueNow && canIssue ? { icon: Ticket, tone: "ok", title: service === "flight" ? t("You'll issue it now") : t("Confirmed on save"), body: t("It appears in tonight's report straight away.") }
     : { icon: Hourglass, tone: "gold", title: t("Sent to the issuance queue"), body: canIssue ? t("You chose to issue later.") : t("Flights need Bader or a delegated issuer. They'll be notified.") };
@@ -167,10 +184,38 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
               <input name="passengers" value={pax} onChange={(e) => setPax(e.target.value)} className="field" placeholder={t("As on passport")} required /></label>
             <label className="sm:col-span-2"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Travellers")}</span>
               <input name="paxCount" type="number" min={1} defaultValue={1} className="field num" /></label>
-            <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{service === "flight" ? t("Route") : t("Description")}</span>
-              <input name="description" className="field" placeholder={service === "flight" ? "RUH → DXB" : t("e.g. 3 nights, Hilton Dubai")} /></label>
-            <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Supplier / airline")}</span>
-              <input name="supplier" className="field" placeholder={service === "flight" ? "Saudia" : "Hotelbeds"} /></label>
+            {service === "flight" ? (
+              <>
+                <div className="sm:col-span-6">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[12.5px] text-ink-3">{t("Route")} <span className="text-gold-2">*</span></span>
+                    <div className="flex rounded-full bg-sunken p-0.5 text-[12px]">
+                      {(["return", "oneway"] as const).map((k) => (
+                        <button key={k} type="button" onClick={() => setTrip(k)} className={cx("h-7 rounded-full px-3 transition", trip === k ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{k === "return" ? t("Return") : t("One way")}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
+                    <Picker items={AIRPORT_ITEMS} value={from} onChange={setFrom} label={t("From")} placeholder={t("From: city or code, e.g. Riyadh")} invalid={!!state?.fields?.description && !from} />
+                    <button type="button" onClick={() => { setFrom(to); setTo(from); }} className="mx-auto grid size-9 place-items-center rounded-full text-ink-3 ring-1 ring-line transition hover:bg-surface-2 hover:text-ink" aria-label={t("Swap")} title={t("Swap")}><ArrowLeftRight className="size-4" /></button>
+                    <Picker items={AIRPORT_ITEMS} value={to} onChange={setTo} label={t("To")} placeholder={t("To: city or code, e.g. Dubai")} invalid={!!state?.fields?.description && !to} />
+                  </div>
+                  {from && to && from === to && <p className="mt-1.5 text-[12.5px] text-bad">{t("From and To can't be the same airport")}</p>}
+                  <input type="hidden" name="description" value={route} />
+                </div>
+                <div className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Airline")} <span className="text-gold-2">*</span></span>
+                  <Picker items={AIRLINE_ITEMS} value={airline} onChange={setAirline} label={t("Airline")} placeholder={t("Airline name or code, e.g. flynas")} invalid={!!state?.fields?.supplier && !airline} />
+                  <input type="hidden" name="supplier" value={airline} />
+                </div>
+              </>
+            ) : (
+              <>
+                <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Description")}</span>
+                  <input name="description" className="field" placeholder={t("e.g. 3 nights, Hilton Dubai")} /></label>
+                <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Supplier")}</span>
+                  <input name="supplier" className="field" placeholder="Hotelbeds" /></label>
+              </>
+            )}
             {service === "flight" && (
               <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">PNR <span className="text-gold-2">*</span></span>
                 <input name="pnr" value={pnr} onChange={(e) => setPnr(e.target.value.toUpperCase())} maxLength={8} className="field num uppercase tracking-[0.2em]" placeholder="ABC123" dir="ltr" aria-invalid={!!state?.fields?.pnr} /></label>
@@ -218,7 +263,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, del
 
           {creditNeeded && ctype !== "contracted" && (
             <label className="mt-4 block animate-rise"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Why should they pay later?")} <span className="text-gold-2">*</span></span>
-              <textarea name="creditReason" rows={2} className="field" placeholder={t("Directors will read this before approving")} /></label>
+              <textarea name="creditReason" rows={2} className="field" placeholder={showRules ? t("Directors will read this before approving") : t("Management will read this before approving")} /></label>
           )}
 
           <div className="mt-5 flex items-start gap-3 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">

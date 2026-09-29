@@ -231,7 +231,7 @@ Sidebar on desktop, bottom tabs on phone. Everyone sees only what their role all
 4. **Nothing gets lost**: every draft autosaves; incomplete items follow the user to the close checklist.
 5. **Cash ≠ profit, always visibly separate.**
 6. **Deadlines are visible**: countdown to 10 PM, to ticketing time limits, to Day 25, to the next BSP debit.
-7. **Trust by design**: audit trail on every record ("Edited by Sara at 21:14: sell 1,850 → 1,900"), locked periods, no self-approval.
+7. **Trust by design**: audit trail on every record ("Edited by the Riyadh counter at 21:14: sell 1,850 → 1,900"), locked periods, no self-approval.
 8. **Bilingual from day one**: English + Arabic with full RTL, SAR formatting, Hijri date shown alongside Gregorian where useful.
 9. **Brand-consistent but calm**: uses Mada green `#1e352d`, sand `#e9e2d8`, gold `#d9b77a`, with a clean, dense, data-first layout (not the marketing site's cinematic motion). Light and dark mode.
 
