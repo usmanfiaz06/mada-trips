@@ -1,18 +1,19 @@
 import { desc, eq, isNull } from "drizzle-orm";
-import { Landmark } from "lucide-react";
+import { Check, Clock, Landmark } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { bankMovements, cashPosition } from "@/lib/finance";
+import { bspClosings } from "@/lib/bsp";
 import { getSettings } from "@/lib/settings";
-import { ACCOUNT, METHOD } from "@/lib/labels";
+import { ACCOUNT, ACCOUNTS, METHOD } from "@/lib/labels";
 import { daysBetween, fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
-import { addBsp, payBsp, updateBank } from "./actions";
+import { settleBsp, updateBank } from "./actions";
 
 const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense" };
 export const metadata = { title: "Banks & cash" };
@@ -22,16 +23,16 @@ export default async function FinancePage() {
   const t = await getT();
   const L = t.locale;
   const today = riyadhDate();
-  const [cash, s, uncleared, bsp] = await Promise.all([
+  const [cash, s, uncleared] = await Promise.all([
     cashPosition(), getSettings(),
     db.select({ p: schema.payments, ref: schema.bookings.ref, client: schema.clients.name }).from(schema.payments)
       .leftJoin(schema.bookings, eq(schema.bookings.id, schema.payments.bookingId)).innerJoin(schema.clients, eq(schema.clients.id, schema.payments.clientId))
       .where(isNull(schema.payments.clearedOn)).orderBy(schema.payments.collectedAt),
-    db.select().from(schema.bspObligations).orderBy(desc(schema.bspObligations.dueDate)),
   ]);
   const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 12) })));
-  const upcoming = bsp.filter((b) => b.status === "upcoming").sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const canRec = can(u, "finance.reconcile");
+  const bspRows = await bspClosings(db, s, 6);
+  const partnerList = canRec ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
 
   return (
     <>
@@ -71,48 +72,48 @@ export default async function FinancePage() {
         </Card>
 
         <Card id="bsp">
-          <CardHead title={t("BSP debits")} hint={t("IATA settles tickets by auto-debit. Keep the reserve above what's coming.")} />
-          <ul className="space-y-2">
-            {upcoming.map((b) => {
-              const d = daysBetween(today, b.dueDate);
+          <CardHead title={t("IATA BSP closings")} hint={t("Every 15 days, flights ticketed through BSP are billed by IATA. Pay within {n} days ({g} grace).", { n: s.bspPaymentDays, g: s.bspGraceDays })} />
+          <ul className="space-y-2.5">
+            {bspRows.map((c) => {
+              const d = daysBetween(today, c.dueDate);
+              const settled = c.settlements.find((x) => x.status === "paid");
+              const pending = c.settlements.find((x) => x.status === "pending_approval");
               return (
-                <li key={b.id} className="rounded-2xl bg-surface-2 p-3.5">
+                <li key={c.end} className={cx("rounded-2xl p-3.5 ring-1", c.overdue ? "bg-bad-soft ring-bad/30" : c.inGrace ? "bg-warn-soft ring-warn/30" : "bg-surface-2 ring-transparent")}>
                   <div className="flex items-center justify-between gap-2">
-                    <div><div className="text-[14px]">{b.period}</div><div className={cx("text-[12px]", d <= 3 ? "text-warn" : "text-ink-3")}>{d < 0 ? t("{n} days overdue", { n: -d }) : d === 0 ? t("Due today") : t("Due in {n} days", { n: d })} · {fmtDate(b.dueDate, L)}</div></div>
-                    <span className="num text-[15px]" dir="ltr">{sar(b.amount)}</span>
+                    <div>
+                      <div className="text-[14px]">{fmtDate(c.start, L)} → {fmtDate(c.end, L)}</div>
+                      <div className={cx("text-[12px]", c.overdue ? "text-bad" : c.inGrace ? "text-warn" : d <= 3 ? "text-warn" : "text-ink-3")}>
+                        {c.unsettled > 0 ? (c.overdue ? t("Overdue since {d}", { d: fmtDate(c.graceUntil, L) }) : c.inGrace ? t("Grace until {d}", { d: fmtDate(c.graceUntil, L) }) : d < 0 ? t("{n} days overdue", { n: -d }) : d === 0 ? t("Due today") : t("Due in {n} days", { n: d })) + ` · ${t("{n} tickets", { n: c.count })}` : t("Settled")}
+                      </div>
+                    </div>
+                    <span className="num text-[15px]" dir="ltr">{sar(c.unsettled > 0 ? c.unsettled : settled?.amount ?? pending?.amount ?? 0)}</span>
                   </div>
-                  {canRec && (
-                    <ActionForm action={payBsp} className="mt-3 flex gap-2">
-                      <input type="hidden" name="id" value={b.id} />
-                      <input type="date" name="paidOn" defaultValue={today} className="field h-9 flex-1" />
-                      <SubmitButton size="sm" variant="outline">{t("Mark debited")}</SubmitButton>
-                    </ActionForm>
-                  )}
+                  {settled ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-[12px] text-ok"><Check className="size-3.5" />{settled.source === "partner" ? t("Paid by {name}", { name: settled.partner ?? "—" }) : t("Paid from {bank}", { bank: settled.account ? t(ACCOUNT[settled.account]) : t("a company bank") })}</p>
+                  ) : pending ? (
+                    <p className="mt-2 flex items-center gap-1.5 text-[12px] text-warn"><Clock className="size-3.5" />{t("{name} paid it — waiting for the other directors to approve", { name: pending.partner ?? "—" })}</p>
+                  ) : canRec && c.unsettled > 0 ? (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <ActionForm action={settleBsp} className="flex flex-col gap-2 rounded-xl bg-surface p-2.5 ring-1 ring-line">
+                        <input type="hidden" name="start" value={c.start} /><input type="hidden" name="end" value={c.end} /><input type="hidden" name="source" value="bank" />
+                        <select name="account" className="field h-9" defaultValue="corporate">{ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}</select>
+                        <SubmitButton size="sm" variant="outline">{t("Pay IATA")}</SubmitButton>
+                      </ActionForm>
+                      {u.partnerId && (
+                        <ActionForm action={settleBsp} className="flex flex-col gap-2 rounded-xl bg-surface p-2.5 ring-1 ring-line">
+                          <input type="hidden" name="start" value={c.start} /><input type="hidden" name="end" value={c.end} /><input type="hidden" name="source" value="partner" />
+                          <select name="partnerId" className="field h-9" defaultValue={u.partnerId}>{partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                          <SubmitButton size="sm" variant="outline">{t("A partner paid")}</SubmitButton>
+                        </ActionForm>
+                      )}
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
-            {upcoming.length === 0 && <li className="text-[13px] text-ink-3">{t("No upcoming BSP debits recorded.")}</li>}
+            {bspRows.length === 0 && <li className="text-[13px] text-ink-3">{t("No BSP tickets yet this period.")}</li>}
           </ul>
-          {bsp.some((b) => b.status === "paid") && (
-            <div className="mt-5 border-t border-line pt-4">
-              <div className="mb-2 text-[12px] text-ink-3">{t("Debited")}</div>
-              {bsp.filter((b) => b.status === "paid").slice(0, 4).map((b) => (
-                <div key={b.id} className="flex justify-between py-1 text-[13px]"><span className="text-ink-2">{b.period}</span><span className="num text-ink-3" dir="ltr">{sar(b.amount)}</span></div>
-              ))}
-            </div>
-          )}
-          {canRec && (
-            <details className="mt-4 border-t border-line pt-4">
-              <summary className="cursor-pointer list-none text-[13.5px] underline decoration-gold decoration-2 underline-offset-4">{t("Add a BSP debit")}</summary>
-              <ActionForm action={addBsp} resetOnOk className="mt-3 grid grid-cols-2 gap-3">
-                <Field label={t("Period")} className="col-span-2"><Input name="period" placeholder={t("e.g. BSP · 1st half October")} /></Field>
-                <Field label={t("Due date")}><Input type="date" name="dueDate" /></Field>
-                <Field label={t("Amount (SAR)")}><Input name="amount" inputMode="decimal" dir="ltr" /></Field>
-                <Field label={t("Debited from")} className="col-span-2"><Select name="account" defaultValue="corporate" options={[{ value: "corporate", label: t("Alinma") }, { value: "retail", label: t("Al Rajhi") }]} /></Field>
-                <div className="col-span-2"><SubmitButton className="w-full">{t("Add")}</SubmitButton></div>
-              </ActionForm>
-            </details>
-          )}
         </Card>
       </div>
 

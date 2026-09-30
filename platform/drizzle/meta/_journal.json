@@ -64,6 +64,13 @@
       "when": 1790765892318,
       "tag": "0008_supplier_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790774180750,
+      "tag": "0009_bsp_closings",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ import { flash, str, optStr, toState, type ActionState } from "@/lib/actions";
 import { getSettings, setSetting } from "@/lib/settings";
 import { proposeGovernance } from "@/lib/governance";
 import { isIsoDate, isUuid } from "@/lib/security";
+import { settleBspClosing } from "@/lib/bsp";
 
 export async function clearPayments(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
@@ -101,4 +102,19 @@ export async function updateBank(_: ActionState, fd: FormData): Promise<ActionSt
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork/finance");
   return { ok: proposed ? `Saved. The opening balance change was sent to the other directors as ${proposed}` : "Saved" };
+}
+
+export async function settleBsp(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const source = str(fd, "source") === "partner" ? "partner" : "bank";
+  const start = str(fd, "start"), end = str(fd, "end");
+  if (!isIsoDate(start) || !isIsoDate(end)) return { error: "Bad BSP period" };
+  try {
+    if (source === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid BSP settlement");
+    await db.transaction(async (tx) => {
+      await settleBspClosing(tx, { periodStart: start, periodEnd: end, source, account: str(fd, "account") || "corporate", partnerId: optStr(fd, "partnerId"), reference: optStr(fd, "reference"), settledBy: u.id });
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  return { ok: source === "partner" ? "Sent to the other directors to approve" : "IATA BSP marked paid" };
 }
