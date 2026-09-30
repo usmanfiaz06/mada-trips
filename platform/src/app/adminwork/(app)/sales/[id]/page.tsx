@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
-import { ArrowLeft, Ban, Building2, CornerUpLeft, Receipt, RotateCcw, ShieldCheck, Ticket } from "lucide-react";
+import { ArrowLeft, Ban, Building2, Check, Clock, CornerUpLeft, Receipt, RotateCcw, ShieldCheck, Ticket } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { issueCheck } from "@/lib/issuance";
-import { ACCOUNT, BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
+import { ACCOUNT, ACCOUNTS, BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
 import { fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
-import { issueBooking, recordPayment, requestRefund, resubmitBooking, returnBooking, voidBooking } from "../actions";
+import { issueBooking, paySupplier, recordPayment, requestRefund, resubmitBooking, returnBooking, voidBooking } from "../actions";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
 import { NATIONALITIES, expiresSoon, type Traveller } from "@/lib/services";
@@ -35,6 +35,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     db.select().from(schema.approvalRequests).where(eq(schema.approvalRequests.entityId, id)).orderBy(desc(schema.approvalRequests.createdAt)),
     b.recognizedCycleId ? db.select().from(schema.settlementCycles).where(eq(schema.settlementCycles.id, b.recognizedCycleId)).then((r) => r[0]) : Promise.resolve(undefined),
   ]);
+  const [supplierPay] = await db.select({ sp: schema.supplierPayments, partner: schema.partners.name }).from(schema.supplierPayments).leftJoin(schema.partners, eq(schema.partners.id, schema.supplierPayments.partnerId)).where(eq(schema.supplierPayments.bookingId, id)).orderBy(desc(schema.supplierPayments.createdAt)).limit(1);
+  const partnerList = can(u, "finance.reconcile") ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
   const who = (uid: string | null) => people.find((p) => p.id === uid)?.name ?? "—";
   const preparer = people.find((p) => p.id === b.preparedBy);
   if (!can(u, "sales.view_all") && preparer?.team !== u.team) notFound();
@@ -148,17 +150,56 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               </Table>
             )}
             {owed > 0 && !closed && b.status !== "awaiting_credit" && (
-              <ActionForm action={recordPayment} resetOnOk className="grid gap-2 border-t border-line p-6 sm:grid-cols-[1fr_160px_1fr_auto]">
+              <ActionForm action={recordPayment} resetOnOk className="grid gap-2 border-t border-line p-6 sm:grid-cols-[1fr_130px_150px_1fr_auto]">
                 <input type="hidden" name="id" value={b.id} />
                 <input name="amount" defaultValue={amountInput(owed)} inputMode="decimal" className="field num" dir="ltr" aria-label={t("Amount")} />
-                <select name="method" className="field" defaultValue={b.channel === "corporate" ? "transfer" : "mada"}>
+                <select name="method" className="field" defaultValue={b.channel === "corporate" ? "transfer" : "mada"} aria-label={t("Method")}>
                   {Object.entries(METHOD).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}
+                </select>
+                <select name="account" className="field" defaultValue={b.account} aria-label={t("Into which bank account?")}>
+                  {ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}
                 </select>
                 <input name="reference" className="field" placeholder={t("Reference (optional)")} dir="ltr" />
                 <SubmitButton>{t("Record payment")}</SubmitButton>
               </ActionForm>
             )}
           </Card>
+
+          {b.netCost > 0 && (
+            <Card>
+              <CardHead title={t("Supplier cost")} hint={b.supplier ?? undefined}
+                action={<span className="num text-[15px]" dir="ltr">{sar(b.netCost)}</span>} />
+              {b.supplierPaid ? (
+                <p className="flex items-center gap-2 text-[13.5px] text-ok"><Check className="size-4" />{supplierPay?.sp.source === "partner"
+                  ? t("Paid by {name} (on their ledger)", { name: supplierPay.partner ?? "—" })
+                  : t("Paid from {bank}", { bank: supplierPay?.sp.account ? t(ACCOUNT[supplierPay.sp.account]) : t("a company bank") })}</p>
+              ) : supplierPay?.sp.status === "pending_approval" ? (
+                <p className="flex items-center gap-2 text-[13.5px] text-warn"><Clock className="size-4" />{t("{name} paid it — waiting for the other directors to approve", { name: supplierPay.partner ?? "—" })}</p>
+              ) : (
+                <>
+                  <p className="mb-3 text-[13.5px] text-ink-3">{t("Not paid yet — in “Money we owe”.")}</p>
+                  {can(u, "finance.reconcile") ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <ActionForm action={paySupplier} className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-3 ring-1 ring-line">
+                        <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="bank" />
+                        <span className="text-[12.5px] text-ink-2">{t("Pay from a company bank")}</span>
+                        <select name="account" className="field h-10" defaultValue={b.account}>{ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}</select>
+                        <SubmitButton variant="outline" size="sm">{t("Mark paid")}</SubmitButton>
+                      </ActionForm>
+                      {u.partnerId && (
+                        <ActionForm action={paySupplier} className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-3 ring-1 ring-line">
+                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="partner" />
+                          <span className="text-[12.5px] text-ink-2">{t("A partner paid it in cash")}</span>
+                          <select name="partnerId" className="field h-10" defaultValue={u.partnerId}>{partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                          <SubmitButton variant="outline" size="sm">{t("Send for approval")}</SubmitButton>
+                        </ActionForm>
+                      )}
+                    </div>
+                  ) : <p className="text-[12.5px] text-ink-4">{t("Finance will settle this with the supplier.")}</p>}
+                </>
+              )}
+            </Card>
+          )}
 
           <Timeline entityType="booking" entityId={b.id} path={path} refLabel={b.ref} />
         </div>

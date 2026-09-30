@@ -17,6 +17,7 @@ import { Waterfall } from "@/components/waterfall";
 import { VoteDots } from "@/components/votes";
 import { Timeline } from "@/components/record";
 import { markPaid, recompute, submitSettlement } from "../actions";
+import { ACCOUNT, ACCOUNTS } from "@/lib/labels";
 
 export default async function SettlementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -53,8 +54,8 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
           <CardHead title={t("1 · Cleared funds")} hint={t("Deposits cleared by {d}", { d: fmtDate(c.endDate, L) })} />
           <div className="figure text-[40px]" dir="ltr">{sar(f.clearedByAccount.retail + f.clearedByAccount.corporate, { compact: true })}<span className="figure-unit">SAR</span></div>
           <div className="mt-5 space-y-2.5 text-[13px]">
-            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t("Retail / B2C")}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.retail)}</span></div>
-            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t("Corporate / B2B")}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.corporate)}</span></div>
+            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT.retail)}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.retail)}</span></div>
+            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT.corporate)}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.corporate)}</span></div>
             <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t("Rolls to next cycle")}</span><span className="num text-ink-3" dir="ltr">{sar(f.rolledOver)}</span></div>
           </div>
           <p className="mt-4 text-[12px] text-ink-3">{t("Most of this belongs to IATA and airlines. Profit is below.")}</p>
@@ -102,7 +103,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
             <Field label={t("P2 · IATA reserve top-up (SAR)")} hint={t("Suggested {v}: upcoming BSP {b} + buffer − held {h}", { v: sar(f.suggestedReserve), b: sar(f.upcomingBsp), h: sar(f.reserveHeldBefore) })}>
               <Input name="reserveTopUp" defaultValue={amountInput(inp.reserveTopUp)} disabled={!draft} dir="ltr" /></Field>
             <Field label={t("P3 · Share of the rest for repayments (%)")}><Input name="repaymentPct" type="number" min={0} max={100} step="1" defaultValue={inp.repaymentPctBps / 100} disabled={!draft} /></Field>
-            <Field label={t("Pay partners from")}><Select name="payoutAccount" defaultValue={inp.payoutAccount} disabled={!draft} options={[{ value: "retail", label: t("Retail / B2C") }, { value: "corporate", label: t("Corporate / B2B") }]} /></Field>
+            <Field label={t("Pay partners from")}><Select name="payoutAccount" defaultValue={inp.payoutAccount} disabled={!draft} options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} /></Field>
             {draft && <SubmitButton variant="outline" className="w-full">{t("Recalculate")}</SubmitButton>}
           </ActionForm>
         </Card>

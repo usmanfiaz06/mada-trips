@@ -118,6 +118,8 @@ export const bookings = pgTable("bookings", {
   ticketNumbers: text("ticket_numbers"),
   travelDate: date("travel_date"),
   netCost: money("net_cost").notNull(),
+  // Whether the supplier's cost has been settled. Until then the booking sits in "money we owe".
+  supplierPaid: boolean("supplier_paid").notNull().default(false),
   sellPrice: money("sell_price").notNull(),
   vatAmount: money("vat_amount").notNull().default(0),
   // The preparer's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
@@ -157,6 +159,25 @@ export const payments = pgTable("payments", {
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),
 }, (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_cleared_idx").on(t.clearedOn)]);
+
+// Money paid OUT to a supplier for a booking's cost. Source is a company bank, or a partner's own cash
+// (which then becomes owed back to that partner, after the other directors approve).
+export const supplierPayments = pgTable("supplier_payments", {
+  id: id(),
+  bookingId: uuid("booking_id").notNull().references(() => bookings.id),
+  supplier: text("supplier").notNull(),
+  amount: money("amount").notNull(),
+  source: text("source").notNull(), // bank | partner
+  account: text("account"),         // retail | corporate, when source = bank
+  partnerId: uuid("partner_id").references(() => partners.id), // when source = partner
+  method: text("method").notNull().default("transfer"), // cash | transfer
+  status: text("status").notNull().default("settled"),  // settled | pending_approval
+  approvalId: uuid("approval_id"),
+  reference: text("reference"),
+  paidOn: date("paid_on").notNull(),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("supplier_payments_booking_idx").on(t.bookingId), index("supplier_payments_account_idx").on(t.account)]);
 
 /* ───────────── Approvals ───────────── */
 

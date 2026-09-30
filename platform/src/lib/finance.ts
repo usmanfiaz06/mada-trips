@@ -30,15 +30,18 @@ export async function cashPosition(q: Q = db) {
     .from(schema.expenses).where(and(eq(schema.expenses.status, "approved"), ne(schema.expenses.paidBy, "partner"))).groupBy(schema.expenses.paidBy);
   const bsp = await q.select({ account: schema.bspObligations.account, total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspObligations).where(eq(schema.bspObligations.status, "paid")).groupBy(schema.bspObligations.account);
+  // Supplier costs paid out of a company bank.
+  const supp = await q.select({ account: schema.supplierPayments.account, total: sql<number>`coalesce(sum(${schema.supplierPayments.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.supplierPayments).where(and(eq(schema.supplierPayments.status, "settled"), eq(schema.supplierPayments.source, "bank"))).groupBy(schema.supplierPayments.account);
   const payouts = await q.select({ figures: schema.settlementCycles.figures }).from(schema.settlementCycles).where(eq(schema.settlementCycles.status, "paid"));
 
-  const pick = (list: { account: string; total: number }[], k: string) => list.find((r) => r.account === k)?.total ?? 0;
+  const pick = (list: { account: string | null; total: number }[], k: string) => list.find((r) => r.account === k)?.total ?? 0;
   const out = accounts.map((a) => {
     const paidOut = payouts.reduce((s, p) => {
       const f = p.figures as SettlementFigures;
       return s + (f.payoutAccount === a.key ? f.repayments.reduce((x, r) => x + r.amount, 0) + f.dividends.reduce((x, d) => x + d.amount, 0) : 0);
     }, 0);
-    const balance = a.openingBalance + pick(inflow, a.key) - pick(exp, a.key) - pick(bsp, a.key) - paidOut;
+    const balance = a.openingBalance + pick(inflow, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - paidOut;
     return { ...a, balance, uncleared: pick(uncleared, a.key) };
   });
   const upcomingBsp = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -67,6 +70,54 @@ export async function clientExposure(q: Q, clientId: string) {
     LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
     WHERE b.client_id = ${clientId} AND b.status IN ('issued','pending_issue','awaiting_credit','returned')`);
   return Number(r[0]?.owed ?? 0);
+}
+
+/** Supplier costs the company still owes: bookings whose supplier hasn't been paid. "Money we owe." */
+export async function payables(q: Q = db) {
+  const rows = await q.execute<{ id: string; ref: string; supplier: string | null; net_cost: number; status: string; client: string; business_date: string; pending: boolean }>(sql`
+    SELECT b.id, b.ref, b.supplier, b.net_cost::bigint, b.status, c.name AS client, b.business_date,
+      EXISTS (SELECT 1 FROM supplier_payments sp WHERE sp.booking_id = b.id AND sp.status = 'pending_approval') AS pending
+    FROM bookings b JOIN clients c ON c.id = b.client_id
+    WHERE b.net_cost > 0 AND b.supplier_paid = false AND b.status NOT IN ('void','refunded','draft')
+    ORDER BY b.business_date ASC, b.ref ASC`);
+  return rows.map((r) => ({ ...r, net_cost: Number(r.net_cost), supplier: r.supplier ?? "—" }));
+}
+
+/** Client money still to collect: unpaid issued/booked sales, soonest due first, overdue flagged. */
+export async function collections(q: Q, opts: { team?: string } = {}) {
+  const rows = await q.execute<{ id: string; ref: string; client: string; phone: string | null; owed: number; due_date: string | null; overdue: boolean; status: string; preparer: string }>(sql`
+    SELECT b.id, b.ref, c.name AS client, c.phone, (b.sell_price - coalesce(p.paid,0))::bigint AS owed,
+      b.due_date, (b.due_date IS NOT NULL AND b.due_date < (now() AT TIME ZONE 'Asia/Riyadh')::date) AS overdue, b.status, u.name AS preparer
+    FROM bookings b
+    JOIN clients c ON c.id = b.client_id
+    JOIN users u ON u.id = b.prepared_by
+    LEFT JOIN (SELECT booking_id, SUM(amount) AS paid FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
+    WHERE b.status IN ('issued','pending_issue') AND b.sell_price > coalesce(p.paid,0)
+      ${opts.team ? sql`AND u.team = ${opts.team}` : sql``}
+    ORDER BY (b.due_date IS NULL), b.due_date ASC, owed DESC`);
+  return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
+}
+
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense"; label: string; ref: string | null; amount: number; cleared: boolean };
+
+/** Money in and out of one bank account, most recent first — the account's statement. */
+export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
+  const rows = await q.execute<Movement>(sql`
+    (SELECT p.collected_at::date::text AS date, 'receipt' AS kind, c.name AS label, b.ref, p.amount::bigint AS amount, (p.cleared_on IS NOT NULL) AS cleared
+       FROM payments p JOIN clients c ON c.id = p.client_id LEFT JOIN bookings b ON b.id = p.booking_id
+       WHERE p.account = ${account})
+    UNION ALL
+    (SELECT sp.paid_on::text, 'supplier', sp.supplier, b.ref, -sp.amount::bigint, true
+       FROM supplier_payments sp JOIN bookings b ON b.id = sp.booking_id
+       WHERE sp.source = 'bank' AND sp.account = ${account} AND sp.status = 'settled')
+    UNION ALL
+    (SELECT coalesce(o.paid_on::text, o.due_date::text), 'bsp', o.period, NULL, -o.amount::bigint, true
+       FROM bsp_obligations o WHERE o.account = ${account} AND o.status = 'paid')
+    UNION ALL
+    (SELECT e.expense_date::text, 'expense', e.description, e.ref, -e.amount::bigint, true
+       FROM expenses e WHERE e.paid_by = ${account} AND e.status = 'approved')
+    ORDER BY date DESC LIMIT ${limit}`);
+  return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
 }
 
 /* ─────────────── Day-25 settlement ─────────────── */
