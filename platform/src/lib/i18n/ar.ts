@@ -1105,4 +1105,12 @@ export const AR: Record<string, string> = {
   "The same ticket number is entered twice": "أُدخل رقم التذكرة نفسه مرتين",
   "Add the passenger or guest name": "أضف اسم المسافر أو النزيل",
   "{name} and {n} others": "{name} و{n} آخرون",
+  "Islamabad": "إسلام آباد",
+  "Offices": "المكاتب",
+  "Settlement day": "يوم التسوية",
+  "Al Rajhi": "الراجحي",
+  "Alinma": "الإنماء",
+  "Into which bank account?": "إلى أي حساب بنكي؟",
+  "Company account": "حساب الشركة",
+  "Sales, issuance, approvals, daily close and settlement — one calm, secure workspace.": "المبيعات والإصدار والموافقات والإقفال اليومي والتسوية — مساحة عمل واحدة آمنة ومنظمة.",
 };

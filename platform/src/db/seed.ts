@@ -67,8 +67,8 @@ async function main() {
 
   const openingDate = riyadhDay(at(60, 12));
   await db.insert(schema.bankAccounts).values([
-    { key: "retail", name: "Retail / B2C", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
-    { key: "corporate", name: "Corporate / B2B", bank: "Saudi National Bank", iban: "SA00 1000 0000 1234 5678 9012", openingBalance: 0, openingDate },
+    { key: "retail", name: "Al Rajhi", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
+    { key: "corporate", name: "Alinma", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate },
   ]);
 
   if (args.has("--bootstrap")) { console.log("Bootstrap done. Partners sign in with the SEED_PASSWORD you set and must choose their own password on first sign-in."); return; }

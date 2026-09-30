@@ -147,7 +147,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
             <div className="mt-auto space-y-3 pt-6">
               {f.cash.accounts.map((a) => (
                 <div key={a.key} className="flex items-center justify-between gap-3 border-t border-line pt-3 text-[13px]">
-                  <span className="flex items-center gap-2 text-ink-2"><i className={cx("size-2 rounded-full", a.key === "retail" ? "bg-[var(--chart-1)]" : "bg-[var(--chart-2)]")} />{t(a.key === "retail" ? "Retail / B2C" : "Corporate / B2B")}</span>
+                  <span className="flex items-center gap-2 text-ink-2"><i className={cx("size-2 rounded-full", a.key === "retail" ? "bg-[var(--chart-1)]" : "bg-[var(--chart-2)]")} />{t(a.key === "retail" ? "Al Rajhi" : "Alinma")}</span>
                   <span className="num text-ink" dir="ltr">{sar(a.balance)}</span>
                 </div>
               ))}

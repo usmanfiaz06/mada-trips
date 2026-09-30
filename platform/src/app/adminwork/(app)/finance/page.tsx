@@ -106,7 +106,7 @@ export default async function FinancePage() {
                 <Field label={t("Period")} className="col-span-2"><Input name="period" placeholder={t("e.g. BSP · 1st half October")} /></Field>
                 <Field label={t("Due date")}><Input type="date" name="dueDate" /></Field>
                 <Field label={t("Amount (SAR)")}><Input name="amount" inputMode="decimal" dir="ltr" /></Field>
-                <Field label={t("Debited from")} className="col-span-2"><Select name="account" defaultValue="corporate" options={[{ value: "corporate", label: t("Corporate / B2B") }, { value: "retail", label: t("Retail / B2C") }]} /></Field>
+                <Field label={t("Debited from")} className="col-span-2"><Select name="account" defaultValue="corporate" options={[{ value: "corporate", label: t("Alinma") }, { value: "retail", label: t("Al Rajhi") }]} /></Field>
                 <div className="col-span-2"><SubmitButton className="w-full">{t("Add")}</SubmitButton></div>
               </ActionForm>
             </details>
