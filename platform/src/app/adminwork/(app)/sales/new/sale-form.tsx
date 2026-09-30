@@ -24,6 +24,7 @@ type Client = { id: string; name: string; type: string; phone: string | null; cr
 type Props = {
   clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number; showRules: boolean;
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
+  partners: { id: string; name: string }[]; myPartnerId: string | null;
 };
 
 const SERVICES = [
@@ -56,7 +57,7 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId }: Props) {
   const t = useT();
   const [state, action, pending] = useActionState(createSale, null);
   const onSubmit = useSubmit(action);
@@ -71,6 +72,8 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [method, setMethod] = useState("mada");
   const [issueNow, setIssueNow] = useState(true);
   const [account, setAccount] = useState<"retail" | "corporate">("retail");
+  const [supplierPay, setSupplierPay] = useState("unpaid");
+  const [supplierAccount, setSupplierAccount] = useState<"retail" | "corporate">("retail");
   const [names, setNames] = useState<string[]>([]);
   const [count, setCount] = useState(1);
   const [tickets, setTickets] = useState<string[]>([]); // kept in state so a failed save doesn't wipe them
@@ -240,6 +243,37 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
           </div>
           {count > 1 && sellH > 0 && (
             <p className="mt-3 text-[13px] text-ink-3">{t("{n} × SAR {v} each", { n: count, v: show(Math.round(sellH / count)) })}{netH > 0 ? ` · ${t("cost SAR {v} each", { v: show(Math.round(netH / count)) })}` : ""}</p>
+          )}
+
+          {netH > 0 && (
+            <div className="mt-4 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
+              <span className="mb-2 block text-[12.5px] text-ink-3">{t("Supplier cost — have we paid it?")}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setSupplierPay(k)} className={cx("h-9 rounded-full px-4 text-[13px] transition", supplierPay === k ? "bg-ink text-bg" : "bg-surface text-ink-2 ring-1 ring-line hover:ring-line-strong")}>{label}</button>
+                ))}
+              </div>
+              <input type="hidden" name="supplierPay" value={supplierPay} />
+              {supplierPay === "bank" && (
+                <div className="mt-3">
+                  <span className="mb-1.5 block text-[12px] text-ink-3">{t("From which bank?")}</span>
+                  <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-xs">
+                    {ACCOUNTS.map((a) => <button key={a.value} type="button" onClick={() => setSupplierAccount(a.value)} className={cx("h-9 rounded-full text-[13px] transition", supplierAccount === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>)}
+                  </div>
+                  <input type="hidden" name="supplierAccount" value={supplierAccount} />
+                </div>
+              )}
+              {supplierPay === "partner" && (
+                <div className="mt-3">
+                  <span className="mb-1.5 block text-[12px] text-ink-3">{t("Which partner paid?")}</span>
+                  <select name="supplierPartnerId" defaultValue={myPartnerId ?? ""} className="field h-10 sm:max-w-xs">
+                    {partners.map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === myPartnerId ? ` (${t("me")})` : ""}</option>)}
+                  </select>
+                  <p className="mt-1.5 text-[12px] text-ink-3">{t("Goes to that partner's ledger once the other directors approve.")}</p>
+                </div>
+              )}
+              {supplierPay === "unpaid" && <p className="mt-2 text-[12px] text-ink-3">{t("It will show in “Money we owe” until you mark it paid.")}</p>}
+            </div>
           )}
           {sellH > 0 && netH > 0 && marginTone !== "ok" && (
             <p className={cx("mt-3 text-[13px]", marginTone === "bad" ? "text-bad" : "text-warn")}>

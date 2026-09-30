@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange,
-  Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Menu, X, LogOut,
+  Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Menu, X, LogOut,
 } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks };
+const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall };
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number; accent?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 

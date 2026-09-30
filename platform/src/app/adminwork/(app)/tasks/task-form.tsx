@@ -28,12 +28,12 @@ export function TaskForm({ action, people, meId, today, link, autoFocus }: {
   const [who, setWho] = useState(meId);
   const [more, setMore] = useState(false);
   const [linked, setLinked] = useState(link ?? null);
+  const [expanded, setExpanded] = useState(!!link);
 
   useEffect(() => {
     if (!state?.ok) return;
     form.current?.reset();
-    setPriority("normal"); setMore(false);
-    title.current?.focus();
+    setPriority("normal"); setMore(false); setExpanded(false);
   }, [state]);
   useEffect(() => { if (autoFocus) title.current?.focus(); }, [autoFocus]);
 
@@ -53,14 +53,15 @@ export function TaskForm({ action, people, meId, today, link, autoFocus }: {
       {linked && <><input type="hidden" name="linkType" value={linked.type} /><input type="hidden" name="linkId" value={linked.id} /></>}
 
       <div className="flex items-center gap-2 rounded-[18px] bg-surface-2 p-1.5 ps-4 ring-1 ring-line focus-within:ring-gold">
-        <input ref={title} name="title" required minLength={2} maxLength={160} autoComplete="off" placeholder={t("What needs doing?")}
+        <input ref={title} name="title" required minLength={2} maxLength={160} autoComplete="off" placeholder={t("What needs doing?")} onFocus={() => setExpanded(true)}
           className="h-11 min-w-0 flex-1 bg-transparent text-[15.5px] outline-none placeholder:text-ink-4" />
         <button type="submit" disabled={pending} className="flex h-11 shrink-0 items-center gap-1.5 rounded-[14px] bg-ink px-4 text-[14px] text-bg transition hover:opacity-90 disabled:opacity-60">
           <ListPlus className="size-4" />{pending ? t("Adding…") : t("Add task")}
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+      {expanded && (<>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 animate-rise">
         <label className="flex items-center gap-2 text-[13px] text-ink-3">
           {t("For")}
           <select name="assigneeId" value={who} onChange={(e) => setWho(e.target.value)} className="h-9 rounded-full bg-surface-2 px-3 text-[13.5px] text-ink ring-1 ring-line outline-none focus:ring-gold">
@@ -111,6 +112,7 @@ export function TaskForm({ action, people, meId, today, link, autoFocus }: {
             <textarea name="steps" rows={3} className="field" placeholder={t("Call the client\nSend the invoice")} /></label>
         </div>
       )}
+      </>)}
     </form>
   );
 }

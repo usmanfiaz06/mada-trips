@@ -20,6 +20,7 @@ import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
 import { cleanDetails, cleanTravellers, describeService, type Traveller } from "@/lib/services";
 import { riyadhDate } from "@/lib/dates";
 import { ACCOUNT } from "@/lib/labels";
+import { recordSupplierPayment } from "@/lib/suppliers";
 
 const money = z.string().transform((v, ctx) => {
   try { return toHalalas(v); } catch { ctx.addIssue({ code: "custom", message: "Enter a valid amount" }); return z.NEVER; }
@@ -43,6 +44,9 @@ const SaleSchema = z.object({
   paidNow: money,
   method: z.enum(["cash", "mada", "card", "transfer"]),
   account: z.enum(["retail", "corporate"]).catch("retail"), // which company bank account received the money
+  supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
+  supplierAccount: z.enum(["retail", "corporate"]).catch("retail"),
+  supplierPartnerId: z.string().optional(),
 
   paymentRef: z.string().trim().max(60).optional(),
   issueNow: z.string().optional(),
@@ -146,6 +150,12 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       }
       if (v.note) {
         await tx.insert(schema.remarks).values({ entityType: "booking", entityId: b.id, userId: u.id, body: v.note });
+      }
+
+      // Supplier cost: paid now (from a bank, or a partner's cash → approval), or left as a payable.
+      if (v.supplierPay !== "unpaid" && v.netCost > 0) {
+        if (v.supplierPay === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
+        await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, recordedBy: u.id });
       }
 
       if (needsCredit) {
@@ -372,6 +382,24 @@ export async function requestRefund(_: ActionState, fd: FormData): Promise<Actio
       const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id });
       await flash(`Refund request ${r.ref} sent`);
     });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/sales/${id}`);
+}
+
+export async function paySupplier(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  if (!can(u, "finance.reconcile")) return { error: "You can't record supplier payments" };
+  const id = str(fd, "id"), source = str(fd, "source");
+  try {
+    await loadScopedBooking(u, id);
+    if (source === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
+    await db.transaction(async (tx) => {
+      const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
+      if (!b) throw new Error("Sale not found");
+      await recordSupplierPayment(tx, b, { source: source === "partner" ? "partner" : "bank", account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id });
+    });
+    await flash(source === "partner" ? "Sent to the other directors to approve" : "Supplier marked paid");
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);

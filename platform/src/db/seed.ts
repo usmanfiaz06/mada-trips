@@ -264,6 +264,11 @@ async function main() {
   for (const x of tk) ev.push({ at: x.createdAt, actorId: x.createdBy, action: "task.created", entityType: "task", entityId: x.id, entityRef: x.ref,
     summary: x.createdBy === x.assigneeId ? `Added ${x.ref} for themselves: ${x.title}` : `Assigned ${x.ref} to ${[counter, desk1, desk2, uA, uB, uH].find((p) => p.id === x.assigneeId)!.name}: ${x.title}` });
 
+  // Historical bookings: assume the supplier was already paid, so demo "Money we owe" shows only a realistic few.
+  await db.execute(sql`UPDATE bookings SET supplier_paid = true WHERE status IN ('issued','void','refunded') AND random() < 0.85`);
+  await db.execute(sql`INSERT INTO supplier_payments (booking_id, supplier, amount, source, account, method, status, paid_on, recorded_by)
+    SELECT b.id, coalesce(b.supplier,'Supplier'), b.net_cost, 'bank', b.account, 'transfer', 'settled', b.business_date, ${uB.id}
+    FROM bookings b WHERE b.supplier_paid = true AND b.net_cost > 0`);
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 

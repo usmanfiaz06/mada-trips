@@ -57,6 +57,13 @@
       "when": 1790765546882,
       "tag": "0007_bank_names",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790765892318,
+      "tag": "0008_supplier_payments",
+      "breakpoints": true
     }
   ]
 }
