@@ -312,6 +312,39 @@ export const tasks = pgTable("tasks", {
   index("tasks_link_idx").on(t.linkType, t.linkId),
 ]);
 
+/* ───────────── Website leads ───────────── */
+
+// Enquiries from the public website (chat bot and enquiry forms). Written by the public intake endpoint, worked by staff.
+export const leads = pgTable("leads", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  source: text("source").notNull(), // chat | form
+  // The chat's conversation id: it sends a partial lead once it has a phone, then updates the same row.
+  sessionKey: text("session_key"),
+  name: text("name"),
+  email: text("email"),
+  phone: text("phone"),
+  services: text("services").array().notNull().default([]),
+  details: jsonb("details").notNull().default({}), // { question: answer }
+  message: text("message"),
+  questions: jsonb("questions").notNull().default([]), // what they asked the chat bot
+  lang: text("lang"), // en | ar
+  page: text("page"), // the website page it came from
+  status: text("status").notNull().default("new"), // new | contacted | qualified | won | lost
+  assignedTo: uuid("assigned_to").references(() => users.id),
+  notes: text("notes"),
+  clientId: uuid("client_id").references(() => clients.id), // set once the lead becomes a client
+  userAgent: text("user_agent"),
+  ipHash: text("ip_hash"), // sha256 of the sender's IP; the raw address is never stored
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("leads_status_idx").on(t.status),
+  index("leads_created_idx").on(t.createdAt),
+  index("leads_session_idx").on(t.source, t.sessionKey),
+  index("leads_ip_idx").on(t.ipHash, t.createdAt),
+]);
+
 /* ───────────── Cross-cutting: remarks, files, audit, settings ───────────── */
 
 export const remarks = pgTable("remarks", {

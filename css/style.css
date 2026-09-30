@@ -735,7 +735,7 @@ body.menu-open .nav { color: var(--sand); }
   .vision__content { grid-template-columns: 1fr; }
   .founder__grid { grid-template-columns: 1fr; }
   .cta__fields { flex-direction: column; border-radius: 26px; }
-  .cta__fields input { height: 52px; }
+  .cta__fields input { flex: none; height: 52px; }
   .cta__fields input + input { border-left: 0; border-top: 1px solid rgba(233, 226, 216, .12); }
   .cta__fields .btn { justify-content: space-between; }
   .footer__links { grid-template-columns: 1fr 1fr; }
@@ -1141,15 +1141,23 @@ body.menu-open .nav { color: var(--sand); }
 /* =========================================================
    ARABIC (lang="ar", dir="rtl")
    ========================================================= */
+/* Arabic display face for the gold accents (em, .accent). Arabic-only font, so
+   Latin, digits and a few marks fall back to Reem Kufi. */
+@font-face {
+  font-family: "Guesswhat Exceptional";
+  src: url("../assets/fonts/guesswhat-exceptional.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0600-06FF, U+FB50-FDFF, U+FE70-FEFF;
+}
 html[lang="ar"] {
   --f-sans: "IBM Plex Sans Arabic", "Inter Tight", system-ui, sans-serif;
-  --f-serif: "Reem Kufi", "IBM Plex Sans Arabic", serif;
+  --f-serif: "Guesswhat Exceptional", "Reem Kufi", "IBM Plex Sans Arabic", serif;
   --f-mono: "IBM Plex Sans Arabic", "JetBrains Mono", monospace;
   --f-sig: "Aref Ruqaa", "Reem Kufi", serif;
 }
 /* joined Arabic letters must never be spaced apart */
 html[lang="ar"] body, html[lang="ar"] body * { letter-spacing: 0 !important; }
-html[lang="ar"] em, html[lang="ar"] .accent { font-style: normal; font-weight: 500; }
+html[lang="ar"] em, html[lang="ar"] .accent { font-style: normal; font-weight: 400 !important; font-synthesis: none; }
 html[lang="ar"] .eyebrow, html[lang="ar"] .pill, html[lang="ar"] .idx, html[lang="ar"] .pstep__n, html[lang="ar"] .flow-step__n,
 html[lang="ar"] .type-row__n, html[lang="ar"] .svc-block__n, html[lang="ar"] .frame__label, html[lang="ar"] .founder__role,
 html[lang="ar"] .footer__links h4, html[lang="ar"] .ros__head, html[lang="ar"] .pass__top, html[lang="ar"] .evp-hero__meta,
@@ -1262,3 +1270,16 @@ bdi[dir="ltr"] { unicode-bidi: isolate; direction: ltr; }
   [dir="rtl"] .cta__fields input + input { border-right: 0; }
   html[lang="ar"] .hero-title { font-size: 13vw; }
 }
+
+/* ---------- enquiry forms: validation, sending, fallback ---------- */
+.hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.form-err { margin: 14px 0 0; font-size: 14.5px; line-height: 1.5; color: #b4442e; }
+.form-err a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.cta__form .form-err { text-align: center; color: #f0b79f; }
+.is-missing { animation: need-shake .45s; }
+.is-missing span { box-shadow: inset 0 0 0 1px rgba(240, 150, 120, .7) !important; }
+@keyframes need-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+.js-enquiry.is-sending button[type="submit"] { opacity: .6; cursor: progress; }
+.js-enquiry.is-sending button[type="submit"] .btn__arrow { animation: send-pulse 1s infinite; }
+@keyframes send-pulse { 50% { opacity: .3; } }
+.cta__form .cta__need { max-width: 720px; margin-left: auto; margin-right: auto; }

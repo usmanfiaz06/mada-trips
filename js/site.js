@@ -198,8 +198,48 @@ window.MADA = (() => {
 
   /* ---------------- Enquiry forms ---------------- */
   const topic = new URLSearchParams(location.search).get('topic');
-  if (topic) $$(`.need input[value="${CSS.escape(topic)}"]`).forEach(i => (i.checked = true));
-  $$('form.js-enquiry').forEach(f => f.addEventListener('submit', e => { e.preventDefault(); f.classList.add('is-sent'); }));
+  if (topic) $$(`input[name="need"][value="${CSS.escape(topic)}"]`).forEach(i => (i.checked = true));
+  // every enquiry is recorded in Mada Ops (/adminwork → Leads). If that fails the
+  // visitor gets the same enquiry ready to send on WhatsApp, so nothing is lost.
+  const AR = document.documentElement.lang === 'ar';
+  const FT = AR
+    ? { need: 'اختر خدمة واحدة على الأقل.', phone: 'أدخل رقم جوال صحيح، مثل 05X XXX XXXX.', sending: 'جارٍ الإرسال', fail: 'تعذّر الإرسال الآن. أرسل طلبك عبر واتساب وسيصلنا فوراً:', wa: 'إرسال عبر واتساب', hello: 'مرحباً مادا تربس،' }
+    : { need: 'Pick at least one service.', phone: 'Enter a valid phone number, like 05X XXX XXXX.', sending: 'Sending', fail: 'We couldn’t send that just now. Send it on WhatsApp instead and it reaches us straight away:', wa: 'Send on WhatsApp', hello: 'Hello Mada Trips,' };
+  const phoneOk = v => { const d = v.replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/\D/g, ''); return d.length >= 8 && d.length <= 15; };
+  $$('form.js-enquiry').forEach(f => {
+    const needs = $$('input[name="need"]', f), phone = $('input[name="phone"]', f), btn = $('button[type="submit"]', f);
+    const err = document.createElement('p'); err.className = 'form-err'; err.setAttribute('role', 'alert'); err.hidden = true;
+    (btn.closest('.cta__fields') || btn).insertAdjacentElement('afterend', err);
+    const check = () => {
+      if (phone) phone.setCustomValidity(!phone.value.trim() || phoneOk(phone.value) ? '' : FT.phone);
+    };
+    const needBox = needs.length && needs[0].closest('[role="group"]');
+    needs.forEach(i => i.addEventListener('change', () => { if (needs.some(x => x.checked)) { needBox.classList.remove('is-missing'); if (err.dataset.kind === 'need') err.hidden = true; } }));
+    if (phone) phone.addEventListener('input', check);
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      check();
+      if (needs.length && !needs.some(i => i.checked)) {
+        err.textContent = FT.need; err.dataset.kind = 'need'; err.hidden = false;
+        needBox.classList.remove('is-missing'); void needBox.offsetWidth; needBox.classList.add('is-missing');
+        return;
+      }
+      if (!f.reportValidity()) return;
+      const d = new FormData(f), v = k => String(d.get(k) || '').trim();
+      const details = {};
+      [['company', 'Company'], ['date', 'Date'], ['size', 'Guests or team size']].forEach(([k, label]) => { if (v(k)) details[label] = v(k); });
+      const lead = { source: 'form', name: v('name'), email: v('email'), phone: v('phone'), services: d.getAll('need').map(String), details, message: v('message'), lang: AR ? 'ar' : 'en', page: location.pathname, website: v('website') };
+      btn.disabled = true; f.classList.add('is-sending'); err.hidden = true;
+      let ok = false;
+      try { const r = await fetch('/adminwork/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); ok = r.ok; } catch (_) {}
+      btn.disabled = false; f.classList.remove('is-sending');
+      if (ok) { f.classList.add('is-sent'); return; }
+      const text = [FT.hello, '', lead.services.join(', '), ...Object.entries(details).map(([k, x]) => `${k}: ${x}`), lead.message, '', lead.name, lead.email, lead.phone].filter((x, i, a) => x || (i && a[i - 1])).join('\n');
+      err.dataset.kind = 'fail';
+      err.innerHTML = `${FT.fail} <a href="https://wa.me/966566682662?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">${FT.wa} ↗</a>`;
+      err.hidden = false;
+    });
+  });
 
   /* ---------------- Reveals ---------------- */
   const revealAll = () => {

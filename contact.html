@@ -79,15 +79,15 @@
             <a href="https://wa.me/966566682662" target="_blank" rel="noopener" class="btn btn--outline-light magnetic"><span>WhatsApp</span><i class="btn__arrow">↗</i></a>
           </div>
         </div>
-        <form class="form-card js-enquiry" data-intro>
+        <form class="form-card js-enquiry" data-intro novalidate>
           <div class="form-body">
             <h2>Start a conversation</h2>
             <p>No forms within forms. Just the essentials.</p>
             <div class="fgrid">
-              <div class="field2"><label for="f-name">Full name</label><input id="f-name" name="name" required autocomplete="name" /></div>
-              <div class="field2"><label for="f-co">Company</label><input id="f-co" name="company" autocomplete="organization" /></div>
-              <div class="field2"><label for="f-mail">Email</label><input id="f-mail" name="email" type="email" required autocomplete="email" /></div>
-              <div class="field2"><label for="f-tel">Phone</label><input id="f-tel" name="phone" type="tel" autocomplete="tel" placeholder="+966" /></div>
+              <div class="field2"><label for="f-name">Full name</label><input id="f-name" name="name" maxlength="80" required autocomplete="name" /></div>
+              <div class="field2"><label for="f-co">Company</label><input id="f-co" name="company" maxlength="120" autocomplete="organization" /></div>
+              <div class="field2"><label for="f-mail">Email</label><input id="f-mail" name="email" maxlength="120" type="email" required autocomplete="email" /></div>
+              <div class="field2"><label for="f-tel">Phone</label><input id="f-tel" name="phone" maxlength="32" type="tel" autocomplete="tel" inputmode="tel" placeholder="+966" required /></div>
               <div class="field2 field2--full">
                 <span class="need__label">What do you need?</span>
                 <div class="need" role="group" aria-label="What do you need?">
@@ -104,7 +104,8 @@
               </div>
               <div class="field2"><label for="f-date">Date</label><input id="f-date" name="date" type="date" /></div>
               <div class="field2"><label for="f-size">Guests or team size</label><select id="f-size" name="size"><option value="">Select</option><option>1 to 10</option><option>11 to 50</option><option>51 to 250</option><option>251 to 1,000</option><option>1,000+</option></select></div>
-              <div class="field2 field2--full"><label for="f-msg">Tell us more</label><textarea id="f-msg" name="message" placeholder="Where, when, and what success looks like."></textarea></div>
+              <div class="field2 field2--full"><label for="f-msg">Tell us more</label><textarea id="f-msg" name="message" maxlength="3000" placeholder="Where, when, and what success looks like."></textarea></div>
+              <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
             </div>
             <button class="btn btn--dark magnetic" type="submit"><span>Send enquiry</span><i class="btn__arrow">→</i></button>
           </div>

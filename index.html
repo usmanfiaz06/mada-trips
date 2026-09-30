@@ -291,7 +291,7 @@
                 <p>We need 40 certified welders on site by Sunday.</p>
               </div>
               <div class="msg msg--out">
-                <p><span class="typing"><i></i><i></i><i></i></span><span class="msg__text">Mobilised. Arriving Friday, 6 a.m.</span></p>
+                <p><span class="typing"><i></i><i></i><i></i></span><span class="msg__text">Mobilised. Arriving Saturday, 6 a.m.</span></p>
                 <span class="avatar avatar--mada"><img src="assets/brand/symbol-sand.svg" alt="" /></span>
               </div>
             </div>
@@ -575,18 +575,23 @@
       <div class="container cta__inner">
         <p class="eyebrow reveal-up">Your move</p>
         <h2 class="cta__title split">Where will you<br><em>reach</em> next?</h2>
-        <form class="cta__form" onsubmit="event.preventDefault(); this.classList.add('is-sent');">
+        <form class="cta__form js-enquiry" novalidate>
           <div class="cta__need" role="group" aria-label="What do you need?">
-            <label><input type="checkbox" checked /><span>Travel</span></label>
-            <label><input type="checkbox" /><span>Hotels</span></label>
-            <label><input type="checkbox" /><span>Visas</span></label>
-            <label><input type="checkbox" /><span>Manpower</span></label>
-            <label><input type="checkbox" /><span>Events</span></label>
-            <label><input type="checkbox" /><span>IT</span></label>
+            <label><input type="checkbox" name="need" value="Travel" /><span>Travel</span></label>
+            <label><input type="checkbox" name="need" value="Ticketing" /><span>Ticketing</span></label>
+            <label><input type="checkbox" name="need" value="Hotels" /><span>Hotels</span></label>
+            <label><input type="checkbox" name="need" value="Visa" /><span>Visas</span></label>
+            <label><input type="checkbox" name="need" value="Business" /><span>Business services</span></label>
+            <label><input type="checkbox" name="need" value="Manpower" /><span>Manpower</span></label>
+            <label><input type="checkbox" name="need" value="Specialist" /><span>Specialists</span></label>
+            <label><input type="checkbox" name="need" value="Events" /><span>Events</span></label>
+            <label><input type="checkbox" name="need" value="IT" /><span>IT</span></label>
           </div>
           <div class="cta__fields">
-            <input type="text" placeholder="Your name" aria-label="Your name" required />
-            <input type="email" placeholder="Email" aria-label="Email" required />
+            <input type="text" name="name" maxlength="80" placeholder="Your name" aria-label="Your name" autocomplete="name" required />
+            <input type="email" name="email" maxlength="120" placeholder="Email" aria-label="Email" autocomplete="email" required />
+            <input type="tel" name="phone" maxlength="32" placeholder="Phone" aria-label="Phone" autocomplete="tel" inputmode="tel" required />
+            <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
             <button class="btn btn--sun magnetic" type="submit"><span>Send</span><i class="btn__arrow">→</i></button>
           </div>
           <p class="cta__done">Received. We'll be in touch within the day. ✦</p>

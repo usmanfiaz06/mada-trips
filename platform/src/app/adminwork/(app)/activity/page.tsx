@@ -9,7 +9,7 @@ import { ActivityList } from "@/components/activity-list";
 
 export const metadata = { title: "Activity log" };
 
-const AREAS = [["booking", "Sales"], ["approval", "Approvals"], ["expense", "Expenses"], ["client", "Clients"], ["close", "Daily close"], ["settlement", "Settlement"], ["ledger", "Partner ledger"], ["bsp", "BSP"], ["user", "Team"], ["role", "Roles"], ["auth", "Sign-ins"]] as const;
+const AREAS = [["booking", "Sales"], ["approval", "Approvals"], ["expense", "Expenses"], ["client", "Clients"], ["lead", "Website leads"], ["close", "Daily close"], ["settlement", "Settlement"], ["ledger", "Partner ledger"], ["bsp", "BSP"], ["user", "Team"], ["role", "Roles"], ["auth", "Sign-ins"]] as const;
 
 export default async function ActivityPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requirePerm("activity.view");

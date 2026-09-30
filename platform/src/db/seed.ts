@@ -264,10 +264,26 @@ async function main() {
   for (const x of tk) ev.push({ at: x.createdAt, actorId: x.createdBy, action: "task.created", entityType: "task", entityId: x.id, entityRef: x.ref,
     summary: x.createdBy === x.assigneeId ? `Added ${x.ref} for themselves: ${x.title}` : `Assigned ${x.ref} to ${[counter, desk1, desk2, uA, uB, uH].find((p) => p.id === x.assigneeId)!.name}: ${x.title}` });
 
+  // Website leads: a few enquiries from the chat and the forms, at different stages.
+  const leadRows: (typeof schema.leads.$inferInsert)[] = [
+    { source: "chat", sessionKey: "demo-chat-1", name: "Faisal Al Harbi", phone: "0551234567", services: ["Umrah"], lang: "ar", page: "/ar", createdAt: at(0, 10, 20),
+      details: { "Travel month": "Ramadan", "Travellers": "4 adults, 2 children", "Departure city": "Riyadh" }, questions: ["Do you arrange hotels near the Haram?", "Is transport from Jeddah included?"] },
+    { source: "form", name: "Sarah Khan", email: "sarah.khan@example.com", phone: "+966 50 765 4321", services: ["Visa", "Flight"], lang: "en", page: "/contact", createdAt: at(1, 16, 5),
+      details: { Destination: "United Kingdom", "Visa type": "Visit" }, message: "Hi, I need a UK visit visa appointment and return flights for early December.", status: "contacted", assignedTo: counter.id },
+    { source: "chat", sessionKey: "demo-chat-2", name: "Omar", phone: "0509876543", services: ["Holiday package"], lang: "en", page: "/", createdAt: at(3, 20, 40),
+      details: { Destination: "Maldives", Budget: "SAR 15,000" }, questions: ["Can you do a honeymoon package?"], status: "qualified", assignedTo: counter.id },
+    { source: "form", name: "Al Noor Trading", email: "travel@alnoor.example", services: ["Corporate travel"], lang: "en", page: "/services", createdAt: at(9, 11, 0),
+      message: "We'd like a quote for regular staff travel between Riyadh and Karachi.", status: "lost", notes: "Went with their existing agency." },
+  ].map((r, i) => ({ ref: `LD-${1001 + i}`, updatedAt: r.createdAt, ...r }));
+  const ld = await db.insert(schema.leads).values(leadRows).returning();
+  await db.insert(schema.counters).values({ key: "LD", value: 1000 + ld.length }).onConflictDoNothing();
+  for (const x of ld) ev.push({ at: x.createdAt, actorId: null, action: "lead.received", entityType: "lead", entityId: x.id, entityRef: x.ref,
+    summary: `New website lead ${x.ref} from the ${x.source === "chat" ? "chat" : "enquiry form"}${x.name ? `: ${x.name}` : ""}` });
+
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 
-  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses, ${tk.length} tasks. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
+  console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses, ${tk.length} tasks, ${ld.length} leads. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
 }
 
 main().then(() => client.end()).catch(async (e) => { console.error(e); await client.end(); process.exit(1); });
