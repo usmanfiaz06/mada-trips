@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@700&family=Reem+Kufi:wght@600&family=Oswald:wght@500&family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@500&display=block" rel="stylesheet">
+<style>
+*{margin:0;box-sizing:border-box}
+body{width:1200px;height:800px;overflow:hidden;position:relative;background:#d9cbb4}
+/* linen surface + window light */
+.surface{position:absolute;inset:0;background:
+  radial-gradient(120% 90% at 18% 8%, #f3ebdd 0%, #e6d9c4 38%, #cdbb9f 78%, #b9a585 100%)}
+.weave{position:absolute;inset:0;opacity:.5;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9 .06' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .28  0 0 0 .55 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>")}
+.weave2{position:absolute;inset:0;opacity:.35;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.06 .9' numOctaves='2' seed='8'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .28  0 0 0 .5 0'/></filter><rect width='300' height='300' filter='url(%23n)'/></svg>")}
+.window{position:absolute;inset:-200px;background:repeating-linear-gradient(118deg,transparent 0 180px,rgba(80,55,25,.10) 180px 200px,transparent 200px 330px);filter:blur(22px)}
+
+/* boarding pass */
+.bp{position:absolute;left:600px;top:270px;width:470px;height:190px;border-radius:14px;background:linear-gradient(180deg,#fbf8f2,#f1ebe0);transform:rotate(13deg);
+  box-shadow:0 1px 1px rgba(60,40,15,.15),0 18px 30px -8px rgba(60,40,15,.35);font-family:"JetBrains Mono";color:#1e352d;overflow:hidden;filter:blur(.6px)}
+.bp .band{position:absolute;left:0;top:0;bottom:0;width:30px;background:#1e352d}
+.bp .t{position:absolute;left:58px;top:26px;font-size:12px;letter-spacing:.2em;color:#8a7a60}
+.bp .r{position:absolute;left:56px;top:52px;font-family:"Oswald";font-size:62px;letter-spacing:.02em}
+.bp .r i{font-style:normal;color:#c9a15a;font-size:40px;vertical-align:10px;margin:0 14px}
+.bp .m{position:absolute;left:58px;top:140px;font-size:12px;letter-spacing:.14em;color:#6f644f}
+.bp .perf{position:absolute;right:120px;top:0;bottom:0;border-left:2px dashed rgba(30,53,45,.25)}
+.bp .code{position:absolute;right:28px;top:30px;width:70px;height:130px;background:repeating-linear-gradient(0deg,#1e352d 0 2px,transparent 2px 4px,#1e352d 4px 7px,transparent 7px 9px,#1e352d 9px 10px,transparent 10px 13px)}
+
+/* passport */
+.stage{position:absolute;left:380px;top:95px;perspective:1600px}
+.pp{position:relative;width:410px;height:580px;transform:scale(.84) rotateX(14deg) rotateY(-8deg) rotateZ(-9deg);transform-style:preserve-3d}
+.shadow{position:absolute;inset:18px -6px -26px 24px;border-radius:30px;background:rgba(45,30,10,.55);filter:blur(26px);transform:translateZ(-12px)}
+.pages{position:absolute;inset:0;border-radius:20px 26px 26px 20px;background:repeating-linear-gradient(90deg,#efe8da 0 1px,#dcd3c1 1px 2px);transform:translate(7px,8px);box-shadow:2px 3px 2px rgba(50,32,10,.35),14px 30px 40px -6px rgba(50,32,10,.45),30px 60px 90px -10px rgba(50,32,10,.35)}
+.cover{position:absolute;inset:0;border-radius:18px 24px 24px 18px;overflow:hidden;
+  background:radial-gradient(130% 90% at 25% 10%,#1d5b40 0%,#124430 45%,#0b3122 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),inset 10px 0 18px -10px rgba(0,0,0,.6),inset -2px -3px 6px rgba(0,0,0,.35),inset 2px 2px 3px rgba(255,255,255,.08)}
+.grain{position:absolute;inset:0;mix-blend-mode:overlay;opacity:.9;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='3' seed='5'/><feColorMatrix type='saturate' values='0'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>")}
+.pebble{position:absolute;inset:0;opacity:.35;mix-blend-mode:multiply;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='turbulence' baseFrequency='.18' numOctaves='2' seed='11'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 .1  0 0 0 0 .05  0 0 0 .6 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>")}
+.sheen{position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 32%,rgba(255,255,255,0) 64%,rgba(255,255,255,.07) 100%)}
+.spine{position:absolute;left:0;top:0;bottom:0;width:26px;background:linear-gradient(90deg,rgba(0,0,0,.35),rgba(0,0,0,0) 70%,rgba(255,255,255,.06) 85%,rgba(0,0,0,0))}
+.foil{background:linear-gradient(120deg,#f4dfa0 0%,#c9a15a 38%,#f0d68f 55%,#a67c39 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.45)) drop-shadow(0 -1px 0 rgba(255,236,190,.12))}
+.emb{position:absolute;left:50%;top:62px;width:150px;margin-left:-75px;filter:drop-shadow(0 1px 0 rgba(0,0,0,.5)) drop-shadow(0 -.5px 0 rgba(255,236,190,.15))}
+.ar1{position:absolute;left:0;right:0;top:238px;text-align:center;font-family:"Aref Ruqaa";font-size:50px;line-height:1.2}
+.en1{position:absolute;left:0;right:0;top:320px;text-align:center;font-family:"Oswald";font-size:30px;letter-spacing:.01em}
+.ar2{position:absolute;left:0;right:0;top:382px;text-align:center;font-family:"Aref Ruqaa";font-size:38px}
+.en2{position:absolute;left:0;right:0;top:448px;text-align:center;font-family:"Inter Tight";font-weight:400;font-size:25px;letter-spacing:.06em}
+.chip{position:absolute;left:50%;top:506px;width:46px;height:30px;margin-left:-23px;border-radius:5px;border:3px solid #cfa962;filter:drop-shadow(0 1px 0 rgba(0,0,0,.5))}
+.chip:before{content:"";position:absolute;left:-3px;right:-3px;top:10px;height:3px;background:#cfa962}
+.chip:after{content:"";position:absolute;left:13px;top:5px;width:14px;height:14px;border-radius:50%;border:3px solid #cfa962;background:#124430}
+.vig{position:absolute;inset:0;background:radial-gradient(90% 80% at 50% 45%,transparent 55%,rgba(40,28,12,.35) 100%)}
+.warm{position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,220,160,.12),rgba(255,220,160,0) 50%);mix-blend-mode:screen}
+</style></head><body>
+<div class="surface"></div><div class="weave"></div><div class="weave2"></div><div class="window"></div>
+<div class="bp"><div class="band"></div><div class="t">BOARDING PASS · MADA TRIPS</div><div class="r">RUH<i>✈</i>CDG</div><div class="m">SEAT 2A · GATE 14 · 06:40</div><div class="perf"></div><div class="code"></div></div>
+<div class="stage"><div class="pp">
+  <div class="shadow"></div><div class="pages"></div>
+  <div class="cover">
+    <div class="pebble"></div><div class="grain"></div>
+    <img class="emb" src="emblem-gold.svg">
+    <div class="ar1 foil">المملكة العربية السعودية</div>
+    <div class="en1 foil">KINGDOM OF SAUDI ARABIA</div>
+    <div class="ar2 foil">جواز سفر</div>
+    <div class="en2 foil">PASSPORT</div>
+    <div class="chip"></div>
+    <div class="spine"></div><div class="sheen"></div>
+  </div>
+</div></div>
+<div class="warm"></div><div class="vig"></div>
+</body></html>

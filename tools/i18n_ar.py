@@ -221,7 +221,7 @@ TEXT = {
     'ALT::Construction crew on site': 'طاقم عمل في موقع إنشاءات', 'ALT::Engineers on a construction site': 'مهندسون في موقع إنشاءات',
     'ALT::Kingdom Centre tower in Riyadh at dusk': 'برج المملكة في الرياض عند الغروب', 'ALT::Mada Trips': 'مادا تربس',
     'ALT::Modern airport terminal': 'صالة مطار حديثة', 'ALT::Network cables in a server rack': 'كابلات شبكة في خزانة خوادم',
-    'ALT::Passport filled with stamps': 'جواز سفر مليء بالأختام',
+    'ALT::Saudi passport with a boarding pass': 'جواز سفر سعودي مع بطاقة صعود الطائرة',
     'ALT::Portrait of Bader Al Sulaiman, Founder and CEO of Mada Trips, wearing a red shemagh': 'صورة بدر السليمان، المؤسس والرئيس التنفيذي لمادا تربس، بالشماغ الأحمر',
     'ALT::Resort terrace overlooking the sea at sunset': 'شرفة منتجع تطل على البحر عند الغروب', 'ALT::Seaside resort at sunset': 'منتجع ساحلي عند الغروب',
     'ALT::Stage with instruments under blue light': 'مسرح بآلات موسيقية تحت ضوء أزرق',
