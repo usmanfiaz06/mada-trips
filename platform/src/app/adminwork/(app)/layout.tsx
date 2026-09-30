@@ -27,12 +27,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ...(issuer ? [{ href: "/adminwork/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
       ...(can(u, "leads.view") ? [{ href: "/adminwork/leads", label: t("Leads"), icon: "Inbox" as const, count: counts.leads }] : []),
       { href: "/adminwork/clients", label: t("Clients & credit"), icon: "Users2" as const },
+      ...(can(u, "sales.create") || can(u, "sales.view_all") ? [{ href: "/adminwork/collections", label: t("Collections"), icon: "PhoneCall" as const }] : []),
       ...(can(u, "close.submit") || can(u, "close.verify") ? [{ href: "/adminwork/close", label: t("Daily close"), icon: "MoonStar" as const, count: counts.closes }] : []),
       ...(can(u, "expenses.create") || can(u, "expenses.view_all") ? [{ href: "/adminwork/expenses", label: t("Expenses"), icon: "Wallet" as const }] : []),
     ] },
     ...(can(u, "finance.view") || u.partnerId ? [{ label: t("Finance"), items: [
       ...(can(u, "finance.view") ? [
         { href: "/adminwork/finance", label: t("Banks & cash"), icon: "Landmark" as const },
+        { href: "/adminwork/payables", label: t("Money we owe"), icon: "Coins" as const },
         { href: "/adminwork/settlement", label: t("Day-25 settlement"), icon: "CalendarRange" as const },
       ] : []),
       { href: "/adminwork/partners", label: t("Partners"), icon: "Handshake" as const },

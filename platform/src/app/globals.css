@@ -181,7 +181,13 @@ body {
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes spin-rev { to { transform: rotate(-360deg); } }
 @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+/* The login hero's sun: a slow, barely-there breathing glow. */
+@keyframes aurora { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: .9; transform: scale(1.08); } }
+.animate-aurora { animation: aurora 9s ease-in-out infinite; }
+.animate-orbit { animation: spin-slow 90s linear infinite; }
+.animate-orbit-rev { animation: spin-rev 140s linear infinite; }
 .animate-rise { animation: rise .45s cubic-bezier(.2,.7,.2,1) both; }
 .animate-fade { animation: fade .3s ease both; }
 .stagger > * { animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }

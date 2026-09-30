@@ -3,7 +3,7 @@ import { Landmark } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
-import { cashPosition } from "@/lib/finance";
+import { bankMovements, cashPosition } from "@/lib/finance";
 import { getSettings } from "@/lib/settings";
 import { ACCOUNT, METHOD } from "@/lib/labels";
 import { daysBetween, fmtDate, riyadhDate } from "@/lib/dates";
@@ -14,6 +14,7 @@ import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
 import { addBsp, payBsp, updateBank } from "./actions";
 
+const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense" };
 export const metadata = { title: "Banks & cash" };
 
 export default async function FinancePage() {
@@ -28,6 +29,7 @@ export default async function FinancePage() {
       .where(isNull(schema.payments.clearedOn)).orderBy(schema.payments.collectedAt),
     db.select().from(schema.bspObligations).orderBy(desc(schema.bspObligations.dueDate)),
   ]);
+  const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 12) })));
   const upcoming = bsp.filter((b) => b.status === "upcoming").sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const canRec = can(u, "finance.reconcile");
 
@@ -106,12 +108,36 @@ export default async function FinancePage() {
                 <Field label={t("Period")} className="col-span-2"><Input name="period" placeholder={t("e.g. BSP · 1st half October")} /></Field>
                 <Field label={t("Due date")}><Input type="date" name="dueDate" /></Field>
                 <Field label={t("Amount (SAR)")}><Input name="amount" inputMode="decimal" dir="ltr" /></Field>
-                <Field label={t("Debited from")} className="col-span-2"><Select name="account" defaultValue="corporate" options={[{ value: "corporate", label: t("Corporate / B2B") }, { value: "retail", label: t("Retail / B2C") }]} /></Field>
+                <Field label={t("Debited from")} className="col-span-2"><Select name="account" defaultValue="corporate" options={[{ value: "corporate", label: t("Alinma") }, { value: "retail", label: t("Al Rajhi") }]} /></Field>
                 <div className="col-span-2"><SubmitButton className="w-full">{t("Add")}</SubmitButton></div>
               </ActionForm>
             </details>
           )}
         </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {movements.map(({ key, rows }) => (
+          <Card key={key} pad={false}>
+            <div className="p-6 pb-3"><CardHead className="mb-0" title={t(ACCOUNT[key])} hint={t("Recent money in and out")} /></div>
+            {rows.length === 0 ? <p className="px-6 pb-6 text-[13px] text-ink-3">{t("No movements yet.")}</p> : (
+              <ul className="px-3 pb-3">
+                {rows.map((m, i) => (
+                  <li key={i} className="flex items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-surface-2">
+                    <span className={cx("grid size-7 shrink-0 place-items-center rounded-full text-[11px]", m.amount >= 0 ? "bg-ok-soft text-ok" : "bg-surface-2 text-ink-3")}>
+                      {m.amount >= 0 ? "＋" : "－"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px]">{MOVE_LABEL[m.kind] ? t(MOVE_LABEL[m.kind]) : m.kind}{m.label ? ` · ${m.label}` : ""}</span>
+                      <span className="block text-[11.5px] text-ink-3">{fmtDate(m.date, L)}{m.ref ? ` · ${m.ref}` : ""}{m.kind === "receipt" && !m.cleared ? ` · ${t("not cleared")}` : ""}</span>
+                    </span>
+                    <span className={cx("num shrink-0 text-[13.5px]", m.amount >= 0 ? "text-ok" : "text-ink-2")} dir="ltr">{sar(Math.abs(m.amount))}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ))}
       </div>
 
       {can(u, "settings.manage") && (

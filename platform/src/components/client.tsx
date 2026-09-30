@@ -147,6 +147,30 @@ export function CloseClock({ closeHour, showPk }: { closeHour: number; showPk: b
   );
 }
 
+/** Live clocks for the two offices, side by side. Used on the sign-in hero. */
+export function CityClocks() {
+  const t = useT();
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => { setNow(new Date()); const i = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(i); }, []);
+  const cities = [{ city: t("Riyadh"), tz: "Asia/Riyadh" }, { city: t("Islamabad"), tz: "Asia/Karachi" }];
+  const fmt = (tz: string, o: Intl.DateTimeFormatOptions) => (now ? new Intl.DateTimeFormat("en-GB", { timeZone: tz, ...o }).format(now) : "");
+  return (
+    <div className="flex items-stretch gap-6">
+      {cities.map((c, i) => (
+        <div key={c.tz} className={cx("flex flex-col gap-1", i > 0 && "border-s border-tile-line ps-6")}>
+          <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-tile-ink-3">
+            <span className="size-1 rounded-full bg-glow-green live-dot" />{c.city}
+          </span>
+          <span className="num text-[19px] tabular-nums text-tile-ink" dir="ltr">
+            {fmt(c.tz, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) || "—:—"}
+            <span className="ms-0.5 text-[12px] text-tile-ink-3">{fmt(c.tz, { second: "2-digit" })}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Submit a hidden form after confirming. For destructive one-click actions. */
 export function ConfirmAction({ action, fields, label, confirm, variant = "outline", size = "sm" }: {
   action: (fd: FormData) => Promise<void>; fields: Record<string, string>; label: ReactNode; confirm: string; variant?: Parameters<typeof btn>[0]; size?: Parameters<typeof btn>[1];

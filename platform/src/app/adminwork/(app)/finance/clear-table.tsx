@@ -21,7 +21,7 @@ export function ClearTable({ rows, today }: { rows: Row[]; today: string }) {
       <div className="flex flex-wrap items-center gap-2 px-6 pb-4">
         {(["all", "retail", "corporate"] as const).map((k) => (
           <button key={k} type="button" onClick={() => setAcc(k)} className={cx("h-8 rounded-full px-3.5 text-[13px]", acc === k ? "bg-ink text-bg" : "bg-surface-2 text-ink-2 ring-1 ring-line")}>
-            {t(k === "all" ? "Both accounts" : k === "retail" ? "Retail / B2C" : "Corporate / B2B")}
+            {t(k === "all" ? "Both accounts" : k === "retail" ? "Al Rajhi" : "Alinma")}
           </button>
         ))}
         <button type="button" onClick={() => setSel(new Set(list.map((r) => r.id)))} className="ms-auto text-[13px] text-ink-3 hover:text-ink">{t("Select all")}</button>

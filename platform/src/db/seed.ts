@@ -67,8 +67,8 @@ async function main() {
 
   const openingDate = riyadhDay(at(60, 12));
   await db.insert(schema.bankAccounts).values([
-    { key: "retail", name: "Retail / B2C", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
-    { key: "corporate", name: "Corporate / B2B", bank: "Saudi National Bank", iban: "SA00 1000 0000 1234 5678 9012", openingBalance: 0, openingDate },
+    { key: "retail", name: "Al Rajhi", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
+    { key: "corporate", name: "Alinma", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate },
   ]);
 
   if (args.has("--bootstrap")) { console.log("Bootstrap done. Partners sign in with the SEED_PASSWORD you set and must choose their own password on first sign-in."); return; }
@@ -280,6 +280,11 @@ async function main() {
   for (const x of ld) ev.push({ at: x.createdAt, actorId: null, action: "lead.received", entityType: "lead", entityId: x.id, entityRef: x.ref,
     summary: `New website lead ${x.ref} from the ${x.source === "chat" ? "chat" : "enquiry form"}${x.name ? `: ${x.name}` : ""}` });
 
+  // Historical bookings: assume the supplier was already paid, so demo "Money we owe" shows only a realistic few.
+  await db.execute(sql`UPDATE bookings SET supplier_paid = true WHERE status IN ('issued','void','refunded') AND random() < 0.85`);
+  await db.execute(sql`INSERT INTO supplier_payments (booking_id, supplier, amount, source, account, method, status, paid_on, recorded_by)
+    SELECT b.id, coalesce(b.supplier,'Supplier'), b.net_cost, 'bank', b.account, 'transfer', 'settled', b.business_date, ${uB.id}
+    FROM bookings b WHERE b.supplier_paid = true AND b.net_cost > 0`);
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
 
