@@ -1141,7 +1141,7 @@ body.menu-open .nav { color: var(--sand); }
 /* =========================================================
    ARABIC (lang="ar", dir="rtl")
    ========================================================= */
-/* Arabic display face for the gold accents (em, .accent). Arabic-only font, so
+/* Arabic display face for the gold accents (em, .accent) and the captions. Arabic-only font, so
    Latin, digits and a few marks fall back to Reem Kufi. */
 @font-face {
   font-family: "Guesswhat Exceptional";
@@ -1152,7 +1152,7 @@ body.menu-open .nav { color: var(--sand); }
 html[lang="ar"] {
   --f-sans: "IBM Plex Sans Arabic", "Inter Tight", system-ui, sans-serif;
   --f-serif: "Guesswhat Exceptional", "Reem Kufi", "IBM Plex Sans Arabic", serif;
-  --f-mono: "IBM Plex Sans Arabic", "JetBrains Mono", monospace;
+  --f-mono: "Guesswhat Exceptional", "IBM Plex Sans Arabic", "JetBrains Mono", monospace; /* captions and labels */
   --f-sig: "Aref Ruqaa", "Reem Kufi", serif;
 }
 /* joined Arabic letters must never be spaced apart */
@@ -1161,7 +1161,7 @@ html[lang="ar"] em, html[lang="ar"] .accent { font-style: normal; font-weight: 4
 html[lang="ar"] .eyebrow, html[lang="ar"] .pill, html[lang="ar"] .idx, html[lang="ar"] .pstep__n, html[lang="ar"] .flow-step__n,
 html[lang="ar"] .type-row__n, html[lang="ar"] .svc-block__n, html[lang="ar"] .frame__label, html[lang="ar"] .founder__role,
 html[lang="ar"] .footer__links h4, html[lang="ar"] .ros__head, html[lang="ar"] .pass__top, html[lang="ar"] .evp-hero__meta,
-html[lang="ar"] .footer__phone small, html[lang="ar"] .plan__day { text-transform: none; font-size: max(13px, .95em); font-weight: 500; }
+html[lang="ar"] .footer__phone small, html[lang="ar"] .plan__day { text-transform: none; font-size: max(14px, 1.05em); font-weight: 400; font-synthesis: none; }
 /* taller lines so dots and marks aren't clipped */
 html[lang="ar"] .hero-title, html[lang="ar"] .h2, html[lang="ar"] .page-hero__title, html[lang="ar"] .evp-hero__title,
 html[lang="ar"] .ct__title, html[lang="ar"] .cta__title, html[lang="ar"] .ev-home__title, html[lang="ar"] .ab-hero__def,
@@ -1181,6 +1181,7 @@ html[lang="ar"] .signature { font-size: clamp(40px, 3.6vw, 54px); transform: rot
 html[lang="ar"] .signature--dark { font-size: clamp(46px, 4.2vw, 68px); }
 html[lang="ar"] .lead, html[lang="ar"] .hero-sub, html[lang="ar"] p { line-height: 1.75; }
 html[lang="ar"] .marquee span { font-weight: 600; line-height: 1.35; }
+html[lang="ar"] .visa__stamp, html[lang="ar"] .footer__links h4 { font-weight: 400; font-synthesis: none; }
 html[lang="ar"] .nav__lang { font-family: "Inter Tight", system-ui, sans-serif; }
 html[lang="en"] .nav__lang, html[lang="en"] .menu__lang, html[lang="en"] .footer__lang { font-family: "IBM Plex Sans Arabic", "Reem Kufi", sans-serif; }
 
