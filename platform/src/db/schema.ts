@@ -313,6 +313,20 @@ export const bspClosings = pgTable("bsp_closings", {
   createdAt: createdAt(),
 }, (t) => [index("bsp_closings_period_idx").on(t.periodEnd)]);
 
+// Manual money movements on a bank account that aren't a sale or expense: deposits, withdrawals, transfers.
+export const bankTransactions = pgTable("bank_transactions", {
+  id: id(),
+  account: text("account").notNull(),        // retail | corporate
+  direction: text("direction").notNull(),    // in | out
+  kind: text("kind").notNull(),              // deposit | withdrawal | transfer | adjustment
+  amount: money("amount").notNull(),
+  counterparty: text("counterparty"),        // the other account, for a transfer
+  note: text("note"),
+  txnDate: date("txn_date").notNull(),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("bank_txn_account_idx").on(t.account)]);
+
 export const settlementCycles = pgTable("settlement_cycles", {
   id: id(),
   label: text("label").notNull(),

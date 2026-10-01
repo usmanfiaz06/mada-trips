@@ -13,9 +13,9 @@ import { Badge, Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } 
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
-import { settleBsp, updateBank } from "./actions";
+import { addBankTxn, settleBsp, transferFunds, updateBank } from "./actions";
 
-const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense" };
+const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense", deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
 export const metadata = { title: "Banks & cash" };
 
 export default async function FinancePage() {
@@ -116,6 +116,43 @@ export default async function FinancePage() {
           </ul>
         </Card>
       </div>
+
+      {canRec && (
+        <Card className="mt-4">
+          <CardHead title={t("Move money")} hint={t("Deposits, withdrawals and transfers that aren't a sale or expense.")} />
+          <div className="grid gap-4 md:grid-cols-3">
+            <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
+              <div className="text-[13px] font-[450]">{t("Deposit")}</div>
+              <input type="hidden" name="kind" value="deposit" />
+              <Select name="account" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+              <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
+              <Input name="note" placeholder={t("Note (optional)")} />
+              <Input type="date" name="date" defaultValue={today} />
+              <SubmitButton size="sm" variant="outline" className="w-full">{t("Record deposit")}</SubmitButton>
+            </ActionForm>
+            <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
+              <div className="text-[13px] font-[450]">{t("Withdrawal")}</div>
+              <input type="hidden" name="kind" value="withdrawal" />
+              <Select name="account" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+              <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
+              <Input name="note" placeholder={t("Note (optional)")} />
+              <Input type="date" name="date" defaultValue={today} />
+              <SubmitButton size="sm" variant="outline" className="w-full">{t("Record withdrawal")}</SubmitButton>
+            </ActionForm>
+            <ActionForm action={transferFunds} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
+              <div className="text-[13px] font-[450]">{t("Transfer between banks")}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <Select name="from" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+                <Select name="to" defaultValue="corporate" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+              </div>
+              <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
+              <Input name="note" placeholder={t("Note (optional)")} />
+              <Input type="date" name="date" defaultValue={today} />
+              <SubmitButton size="sm" variant="outline" className="w-full">{t("Record transfer")}</SubmitButton>
+            </ActionForm>
+          </div>
+        </Card>
+      )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {movements.map(({ key, rows }) => (

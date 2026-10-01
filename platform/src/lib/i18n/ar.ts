@@ -1173,4 +1173,13 @@ export const AR: Record<string, string> = {
   "Company · SNB": "الشركة · الأهلي السعودي",
   "Alinma (B2B Account)": "الإنماء (حساب الشركات)",
   "Company · Alinma (B2B Account)": "الشركة · الإنماء (حساب الشركات)",
+  // Bank transactions
+  "Deposit": "إيداع",
+  "Withdrawal": "سحب",
+  "Move money": "تحريك الأموال",
+  "Deposits, withdrawals and transfers that aren't a sale or expense.": "إيداعات وسحوبات وتحويلات ليست بيعًا أو مصروفًا.",
+  "Record deposit": "تسجيل إيداع",
+  "Record withdrawal": "تسجيل سحب",
+  "Record transfer": "تسجيل تحويل",
+  "Transfer between banks": "تحويل بين البنوك",
 };

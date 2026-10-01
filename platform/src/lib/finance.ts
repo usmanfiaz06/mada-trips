@@ -37,6 +37,11 @@ export async function cashPosition(q: Q = db) {
   // IATA BSP closings paid out of a company bank.
   const bspPaid = await q.select({ account: schema.bspClosings.account, total: sql<number>`coalesce(sum(${schema.bspClosings.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspClosings).where(and(eq(schema.bspClosings.status, "paid"), eq(schema.bspClosings.source, "bank"))).groupBy(schema.bspClosings.account);
+  // Manual deposits / withdrawals / transfers.
+  const txnIn = await q.select({ account: schema.bankTransactions.account, total: sql<number>`coalesce(sum(${schema.bankTransactions.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.bankTransactions).where(eq(schema.bankTransactions.direction, "in")).groupBy(schema.bankTransactions.account);
+  const txnOut = await q.select({ account: schema.bankTransactions.account, total: sql<number>`coalesce(sum(${schema.bankTransactions.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.bankTransactions).where(eq(schema.bankTransactions.direction, "out")).groupBy(schema.bankTransactions.account);
   const payouts = await q.select({ figures: schema.settlementCycles.figures }).from(schema.settlementCycles).where(eq(schema.settlementCycles.status, "paid"));
 
   const pick = (list: { account: string | null; total: number }[], k: string) => list.find((r) => r.account === k)?.total ?? 0;
@@ -45,7 +50,7 @@ export async function cashPosition(q: Q = db) {
       const f = p.figures as SettlementFigures;
       return s + (f.payoutAccount === a.key ? f.repayments.reduce((x, r) => x + r.amount, 0) + f.dividends.reduce((x, d) => x + d.amount, 0) : 0);
     }, 0);
-    const balance = a.openingBalance + pick(inflow, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - paidOut;
+    const balance = a.openingBalance + pick(inflow, a.key) + pick(txnIn, a.key) - pick(txnOut, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - paidOut;
     return { ...a, balance, uncleared: pick(uncleared, a.key) };
   });
   const legacyBsp = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -103,7 +108,7 @@ export async function collections(q: Q, opts: { team?: string } = {}) {
   return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
 }
 
-export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense"; label: string; ref: string | null; amount: number; cleared: boolean };
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer"; label: string; ref: string | null; amount: number; cleared: boolean };
 
 /** Money in and out of one bank account, most recent first — the account's statement. */
 export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
@@ -124,6 +129,9 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
     UNION ALL
     (SELECT e.expense_date::text, 'expense', e.description, e.ref, -e.amount::bigint, true
        FROM expenses e WHERE e.paid_by = ${account} AND e.status = 'approved')
+    UNION ALL
+    (SELECT bt.txn_date::text, bt.kind, coalesce(bt.note, bt.kind), NULL, (CASE WHEN bt.direction='in' THEN bt.amount ELSE -bt.amount END)::bigint, true
+       FROM bank_transactions bt WHERE bt.account = ${account})
     ORDER BY date DESC LIMIT ${limit}`);
   return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
 }
