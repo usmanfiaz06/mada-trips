@@ -12,6 +12,7 @@ import { proposeGovernance } from "@/lib/governance";
 import { isIsoDate, isUuid } from "@/lib/security";
 import { settleBspClosing } from "@/lib/bsp";
 import { ACCOUNT } from "@/lib/labels";
+import { proposeCashMove } from "@/lib/cash";
 
 export async function clearPayments(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
@@ -130,16 +131,14 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
   try {
     const amount = toHalalas(str(fd, "amount"));
     if (amount <= 0) return { error: "Enter an amount" };
-    const direction = kind === "deposit" ? "in" : "out";
+    const direction = kind === "deposit" ? "in" as const : "out" as const;
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.bankTransactions).values({ account, direction, kind, amount, note, txnDate: date, recordedBy: u.id });
-      await audit(tx, { actorId: u.id, action: `bank.${kind}`, entityType: "bank", entityRef: ACCOUNT[account],
-        summary: `${kind === "deposit" ? "Deposit into" : kind === "withdrawal" ? "Withdrawal from" : "Adjustment on"} ${ACCOUNT[account]}: SAR ${sar(amount)}${note ? ` · ${note}` : ""}` });
-    });
+    const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
+      `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${ACCOUNT[account]} · SAR ${sar(amount)}`,
+      { op: "txn", account, direction, kind, amount, note, date }, amount));
+    revalidatePath("/adminwork", "layout");
+    return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/finance");
-  return { ok: "Recorded" };
 }
 
 export async function transferFunds(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -153,15 +152,10 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
     const amount = toHalalas(str(fd, "amount"));
     if (amount <= 0) return { error: "Enter an amount" };
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
-    await db.transaction(async (tx) => {
-      await tx.insert(schema.bankTransactions).values([
-        { account: from, direction: "out", kind: "transfer", amount, counterparty: to, note, txnDate: date, recordedBy: u.id },
-        { account: to, direction: "in", kind: "transfer", amount, counterparty: from, note, txnDate: date, recordedBy: u.id },
-      ]);
-      await audit(tx, { actorId: u.id, action: "bank.transfer", entityType: "bank", entityRef: `${ACCOUNT[from]} → ${ACCOUNT[to]}`,
-        summary: `Transferred SAR ${sar(amount)} from ${ACCOUNT[from]} to ${ACCOUNT[to]}${note ? ` · ${note}` : ""}` });
-    });
+    const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
+      `Transfer ${ACCOUNT[from]} → ${ACCOUNT[to]} · SAR ${sar(amount)}`,
+      { op: "transfer", from, to, amount, note, date }, amount));
+    revalidatePath("/adminwork", "layout");
+    return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/finance");
-  return { ok: "Transfer recorded" };
 }
