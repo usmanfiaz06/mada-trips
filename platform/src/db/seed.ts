@@ -67,7 +67,7 @@ async function main() {
 
   const openingDate = riyadhDay(at(60, 12));
   await db.insert(schema.bankAccounts).values([
-    { key: "retail", name: "Al Rajhi", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
+    { key: "retail", name: "SNB", bank: "Saudi National Bank (Al Ahli)", iban: "SA00 1000 0000 6080 1016 7519", openingBalance: 0, openingDate },
     { key: "corporate", name: "Alinma", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate },
   ]);
 

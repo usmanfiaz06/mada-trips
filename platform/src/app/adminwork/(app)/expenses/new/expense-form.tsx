@@ -66,7 +66,7 @@ export function ExpenseForm({ categories, isPartner, myPartnerId, partners, toda
           <span className="mb-3 block text-[12.5px] text-ink-3">{t("Who paid?")}</span>
           <div className="grid gap-2 sm:grid-cols-3">
             {[...(isPartner ? [["partner", t("A partner paid personally"), t("Added to that partner's ledger once verified"), UserRound] as const] : []),
-              ["retail", t("Al Rajhi"), t("Company account"), Building2] as const,
+              ["retail", t("SNB"), t("Company account"), Building2] as const,
               ["corporate", t("Alinma"), t("Company account"), Building2] as const].map(([k, title, sub, Icon]) => (
               <button key={k} type="button" onClick={() => setPaidBy(k)} className={cx("rounded-2xl p-4 text-start ring-1 transition", paidBy === k ? "bg-ink text-bg ring-ink" : "bg-surface-2 ring-line hover:ring-line-strong")}>
                 <Icon className="size-4 opacity-70" /><div className="mt-3 text-[14px]">{title}</div><div className={cx("mt-0.5 text-[12px]", paidBy === k ? "opacity-60" : "text-ink-3")}>{sub}</div>
