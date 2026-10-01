@@ -5,7 +5,7 @@ import type { CurrentUser } from "./auth";
 import { eligibleApprovers } from "./approvals";
 import { isUuid } from "./security";
 
-export const RECORD_TYPES = ["booking", "expense", "client", "approval", "close", "settlement", "user", "task"] as const;
+export const RECORD_TYPES = ["booking", "expense", "client", "approval", "close", "settlement", "user", "task", "lead"] as const;
 export type RecordType = (typeof RECORD_TYPES)[number];
 
 /**
@@ -48,6 +48,11 @@ export async function canViewRecord(u: CurrentUser, type: string, id: string): P
       const [t] = await db.select({ a: schema.tasks.assigneeId, c: schema.tasks.createdBy }).from(schema.tasks).where(eq(schema.tasks.id, id));
       return !!t && (p.has("tasks.manage") || t.a === u.id || t.c === u.id);
     }
+    case "lead": {
+      if (!p.has("leads.view")) return false;
+      const [l] = await db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.id, id));
+      return !!l;
+    }
     default:
       return false;
   }
@@ -61,7 +66,7 @@ export async function canAnnotateRecord(u: CurrentUser, type: string, id: string
     const [e] = await db.select({ status: schema.expenses.status, by: schema.expenses.submittedBy }).from(schema.expenses).where(eq(schema.expenses.id, id));
     return !!e && e.status === "pending" && e.by === u.id;
   }
-  if (what === "file" && (type === "settlement" || type === "approval" || type === "user")) return false;
+  if (what === "file" && (type === "settlement" || type === "lead" || type === "approval" || type === "user")) return false;
   return true;
 }
 
@@ -75,6 +80,7 @@ export async function recordLabel(type: string, id: string): Promise<string | nu
     case "approval": return (await db.select({ l: schema.approvalRequests.ref }).from(schema.approvalRequests).where(eq(schema.approvalRequests.id, id)))[0]?.l ?? null;
     case "settlement": return (await db.select({ l: schema.settlementCycles.label }).from(schema.settlementCycles).where(eq(schema.settlementCycles.id, id)))[0]?.l ?? null;
     case "task": return (await db.select({ l: schema.tasks.ref }).from(schema.tasks).where(eq(schema.tasks.id, id)))[0]?.l ?? null;
+    case "lead": return (await db.select({ l: schema.leads.ref }).from(schema.leads).where(eq(schema.leads.id, id)))[0]?.l ?? null;
     case "user": return (await db.select({ l: schema.users.name }).from(schema.users).where(eq(schema.users.id, id)))[0]?.l ?? null;
     default: return null;
   }
@@ -82,6 +88,6 @@ export async function recordLabel(type: string, id: string): Promise<string | nu
 
 /** Where each record lives, so revalidation never uses a browser-supplied path. */
 export function recordPath(type: string, id: string): string {
-  const base: Record<string, string> = { booking: "sales", expense: "expenses", client: "clients", approval: "approvals", settlement: "settlement", user: "team", task: "tasks" };
+  const base: Record<string, string> = { booking: "sales", expense: "expenses", client: "clients", approval: "approvals", settlement: "settlement", user: "team", task: "tasks", lead: "leads" };
   return base[type] ? `/adminwork/${base[type]}/${id}` : "/adminwork";
 }

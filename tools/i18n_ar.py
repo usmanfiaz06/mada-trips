@@ -11,17 +11,17 @@ HEADLINES = {
     # ---------- home ----------
     'Every horizon, within reach.': '<span class="line"><span>كل أفق،</span></span><span class="line"><span>في <em>المتناول.</em></span></span>',
     'Mada is Arabic for reach. We carry travellers, talent and ideas across the Kingdom and far beyond it.':
-        'مادا تعني <em>المدى</em>. ننقل المسافرين والكفاءات والأفكار عبر المملكة وإلى ما هو أبعد منها.',
+        'من <em>المدى</em> جاء اسمنا، ومنه وعدنا: أن نقرّب لك كل بعيد، في أرجاء المملكة وما وراءها.',
     'Go further than the itinerary.': 'اذهب أبعد<br><span class="muted">من مجرد برنامج رحلة.</span>',
     "Arrive to a room that's ready.": 'تصل<br><span class="muted">إلى غرفة جاهزة.</span>',
     'Build with people who deliver.': 'ابنِ<br><span class="muted">مع من يُنجز.</span>',
-    'Celebrate at the scale of a kingdom.': 'احتفل<br><span class="muted">بحجم مملكة.</span>',
+    'Celebrate at the scale of a kingdom.': 'احتفل<br><span class="muted">بما يليق بالمملكة.</span>',
     'One call. Everything moves.': 'اتصال واحد.<br>وكل شيء يتحرك.',
     'Every seat. Every sky.': 'كل مقعد.<br>كل سماء.',
     'From NEOM to Dammam. One partner, every city.': 'من نيوم إلى الدمام.<br><span class="muted">شريك واحد في كل مدينة.</span>',
     'Visas, without the waiting room.': 'تأشيرات<br>بلا طوابير انتظار.',
     'Stays that already know your name.': 'إقامة<br>تعرف اسمك مسبقاً.',
-    'Whatever you need, it’s already moving.': 'مهما كان ما تحتاجه،<br><span class="accent">فهو يتحرك الآن.</span>',
+    'Whatever you need, it’s already moving.': 'مهما كان ما تحتاجه،<br><span class="accent">بدأنا العمل عليه.</span>',
     "Need something that isn't listed?": 'تحتاج شيئاً<br>غير مذكور هنا؟',
     'Where the Kingdom gathers.': 'حيث تجتمع<br><em>المملكة.</em>',
     'You set the destination. We handle the distance.': 'أنت تحدد الوجهة.<br>ونحن نختصر المسافة.',
@@ -30,7 +30,7 @@ HEADLINES = {
     'Where will you reach next?': 'إلى أين<br>ستصل <em>بعدها؟</em>',
     # ---------- events ----------
     'We build the night everyone remembers.': 'نصنع الليلة<br>التي <em>لا تُنسى.</em>',
-    'Six stages. One crew.': 'ستة مسارح.<br><em>وطاقم واحد.</em>',
+    'Six stages. One crew.': 'ست مراحل.<br><em>وفريق واحد.</em>',
     'Everything it takes, under one roof.': 'كل ما يلزم،<br><span class="accent">تحت سقف واحد.</span>',
     'Six steps from idea to encore.': 'ست خطوات<br><span class="accent">من الفكرة إلى التصفيق.</span>',
     'Have a date in mind?': 'هل لديك<br><em>موعد محدد؟</em>',
@@ -63,8 +63,8 @@ TEXT = {
     'Mada Trips': 'مادا تربس',
     'Flights, visas and routes, planned around you. Never a template.': 'رحلات وتأشيرات ومسارات مصممة حولك. لا قوالب جاهزة.',
     'Hotels, resorts and desert camps. Hand-picked, confirmed, waiting.': 'فنادق ومنتجعات ومخيمات صحراوية. مختارة بعناية، مؤكدة، وبانتظارك.',
-    'Skilled crews and rare specialists. Sourced, vetted, deployed.': 'طواقم ماهرة وكفاءات نادرة. نختارها ونتحقق منها ونرسلها.',
-    'Events and the technology beneath them, flawless from the front row.': 'فعاليات والتقنية التي تديرها، بلا خطأ من الصف الأول.',
+    'Skilled crews and rare specialists. Sourced, vetted, deployed.': 'طواقم ماهرة وكفاءات نادرة. نختار أصحابها بعناية، ونتحقق من خبراتهم، ونضعهم حيث يصنعون الفرق.',
+    'Events and the technology beneath them, flawless from the front row.': 'فعاليات تديرها تقنية متقنة، تُبهر ضيوفك من الصف الأول.',
 
     # ---------- home: marquee ----------
     'Jeddah': 'جدة', 'The Red Sea': 'البحر الأحمر', 'Diriyah': 'الدرعية', 'Abha': 'أبها', 'Hegra': 'الحِجر', 'Dammam': 'الدمام',
@@ -80,7 +80,7 @@ TEXT = {
     'Schengen · 12 days': 'شنغن · 12 يوماً', 'UK Standard · 3 wks': 'بريطانيا · 3 أسابيع', 'Umrah · 48 hrs': 'عمرة · 48 ساعة', 'Business eVisa · 24 hrs': 'تأشيرة أعمال · 24 ساعة',
     'Talent that shows up.': 'كفاءات تحضر في موعدها.',
     'We need 40 certified welders on site by Sunday.': 'نحتاج 40 لحّاماً معتمداً في الموقع قبل الأحد.',
-    'Mobilised. Arriving Friday, 6 a.m.': 'تم التجهيز. يصلون الجمعة الساعة 6 صباحاً.',
+    'Mobilised. Arriving Saturday, 6 a.m.': 'الفريق جاهز. يباشرون السبت الساعة 6 صباحاً.',
     'Confirm stay': 'تأكيد الإقامة', 'Zero hidden fees': 'بلا رسوم خفية', 'Property': 'المكان', 'Desert Suite · AlUla': 'جناح صحراوي · العلا',
     'Nights': 'الليالي', 'Arrival': 'الوصول', 'Private transfer': 'توصيل خاص', 'met at the gate': 'استقبال عند البوابة', 'Status': 'الحالة',
     'Room ready': 'الغرفة جاهزة', '+ Late checkout': '+ مغادرة متأخرة', 'added': 'أُضيفت',
@@ -94,8 +94,8 @@ TEXT = {
     'Journeys designed, not booked.': 'رحلات تُصمَّم، لا تُحجَز فقط.', 'Ticketing': 'التذاكر', 'Any airline. Any hour. Any change.': 'أي طيران. أي ساعة. أي تعديل.',
     'Hotels': 'الفنادق', 'The right room, already waiting.': 'الغرفة المناسبة، بانتظارك.', 'Visa Support': 'خدمات التأشيرات',
     'Paperwork, handled end to end.': 'كل الأوراق، من البداية إلى النهاية.', 'Business Services': 'خدمات الأعمال',
-    'Setup, permits, logistics. Cleared.': 'تأسيس وتصاريح ولوجستيات. منجزة.', 'Manpower': 'توريد العمالة', 'Skilled hands, at any scale.': 'أيادٍ ماهرة، بأي حجم.',
-    'Specialist Supply': 'توريد الكفاءات', "The expert you couldn't find. Found.": 'الخبير الذي لم تجده. وجدناه.',
+    'Setup, permits, logistics. Cleared.': 'تأسيس وتصاريح ولوجستيات. منجزة.', 'Manpower': 'القوى العاملة', 'Skilled hands, at any scale.': 'أيادٍ ماهرة، مهما كان حجم مشروعك.',
+    'Specialist Supply': 'الكفاءات المتخصصة', "The expert you couldn't find. Found.": 'الخبير الذي لم تجده. وجدناه.',
     'Moments the Kingdom remembers.': 'لحظات تتذكرها المملكة.', 'IT Solutions': 'حلول تقنية المعلومات', 'Systems that never sleep.': 'أنظمة لا تنام.',
     'Ask us': 'اسألنا',
 
@@ -169,7 +169,7 @@ TEXT = {
 
     # ---------- services page ----------
     'Tailored itineraries, local and abroad': 'برامج مصممة داخل المملكة وخارجها', 'Corporate and group travel': 'سفر الشركات والمجموعات',
-    'Umrah and religious journeys': 'رحلات العمرة والرحلات الدينية', 'Tours across the Kingdom': 'جولات في أنحاء المملكة',
+    'Umrah and religious journeys': 'رحلات العمرة والزيارة', 'Tours across the Kingdom': 'جولات في أنحاء المملكة',
     'Enquire about Travel': 'استفسر عن السفر', 'Local and international flights': 'رحلات داخلية ودولية', 'Group and charter bookings': 'حجوزات المجموعات والطيران الخاص',
     'Changes, reissues and refunds': 'التعديل وإعادة الإصدار والاسترداد', 'Round-the-clock support': 'دعم على مدار الساعة', 'Enquire about Ticketing': 'استفسر عن التذاكر',
     'Hotels, resorts and desert camps': 'فنادق ومنتجعات ومخيمات صحراوية', 'Corporate rates and long stays': 'أسعار الشركات والإقامات الطويلة',
@@ -178,11 +178,11 @@ TEXT = {
     'Document checks and live tracking': 'تدقيق المستندات ومتابعة مباشرة', 'Enquire about Visa Support': 'استفسر عن التأشيرات',
     'Company setup support': 'دعم تأسيس الشركات', 'Government relations services': 'خدمات العلاقات الحكومية', 'Permits and licences': 'التصاريح والتراخيص',
     'Logistics and transport': 'اللوجستيات والنقل', 'Enquire about Business Services': 'استفسر عن خدمات الأعمال',
-    'Skilled and semi-skilled crews': 'طواقم ماهرة وشبه ماهرة', 'Short and long-term staffing': 'توظيف قصير وطويل المدى', 'Recruitment and mobilisation': 'الاستقدام والتجهيز',
-    'Housing and transport for teams': 'السكن والنقل للفرق', 'Enquire about Manpower': 'استفسر عن توريد العمالة',
+    'Skilled and semi-skilled crews': 'طواقم ماهرة وشبه ماهرة', 'Short and long-term staffing': 'توظيف قصير وطويل المدى', 'Recruitment and mobilisation': 'الاستقطاب وتهيئة الفرق للمباشرة',
+    'Housing and transport for teams': 'السكن والنقل للفرق', 'Enquire about Manpower': 'استفسر عن القوى العاملة',
     'Engineering and technical specialists': 'متخصصون في الهندسة والتقنية', 'Consultants and project leads': 'مستشارون ومديرو مشاريع',
-    'Healthcare and hospitality professionals': 'كفاءات الرعاية الصحية والضيافة', 'Short-notice deployment': 'إرسال خلال وقت قصير',
-    'Enquire about Specialist Supply': 'استفسر عن توريد الكفاءات',
+    'Healthcare and hospitality professionals': 'كفاءات الرعاية الصحية والضيافة', 'Short-notice deployment': 'جاهزية للمباشرة خلال وقت قصير',
+    'Enquire about Specialist Supply': 'استفسر عن الكفاءات المتخصصة',
     'Conferences and summits': 'المؤتمرات والقمم', 'Concerts and festivals': 'الحفلات والمهرجانات', 'Galas, weddings and launches': 'حفلات العشاء والأعراس والتدشينات',
     'National and cultural days': 'الأيام الوطنية والثقافية', 'Visit Mada Events': 'زر مادا للفعاليات', 'Enquire': 'استفسر',
     'Networks and infrastructure': 'الشبكات والبنية التحتية', 'Software, web and apps': 'البرمجيات والمواقع والتطبيقات', 'Cloud and cybersecurity': 'السحابة والأمن السيبراني',
@@ -193,11 +193,11 @@ TEXT = {
     # ---------- about page ----------
     '/ma·da/ · noun · reach; the distance a glance can travel': '/مَدى/ · اسم · المدى؛ المسافة التي تبلغها نظرة',
     'The Kingdom is opening to the world, and the world deserves to arrive well. So we built one team that can fly you in, house you, staff your project, stage your event and keep your systems running.':
-        'المملكة تنفتح على العالم، والعالم يستحق أن يصل على أحسن وجه. لذلك بنينا فريقاً واحداً يُحضرك جواً، ويُسكنك، ويوفر طاقم مشروعك، ويقيم فعاليتك، ويُبقي أنظمتك تعمل.',
+        'المملكة تنفتح على العالم، والعالم يستحق أن يصل على أحسن وجه. لذلك بنينا فريقاً واحداً يرتّب رحلتك وإقامتك، ويوفّر الكفاءات لمشروعك، ويقيم فعاليتك، ويُبقي أنظمتك تعمل بلا انقطاع.',
     'What we stand for': 'ما نؤمن به', 'Hospitality first': 'الضيافة أولاً', 'Every guest is ours, from the first call to the final goodbye.': 'كل ضيف ضيفنا، من الاتصال الأول حتى الوداع الأخير.',
     'One team, one line': 'فريق واحد، خط واحد', 'No handoffs. No chasing. One point of contact who owns the outcome.': 'لا تحويلات ولا ملاحقة. نقطة تواصل واحدة مسؤولة عن النتيجة.',
-    'Kingdom ready': 'جاهزون للمملكة', 'Local knowledge, global standards, and Vision 2030 in every plan.': 'معرفة محلية ومعايير عالمية، ورؤية 2030 في كل خطة.',
-    'Built for 2030': 'مصممون لعام 2030', 'Welcoming the world to AlUla, the Red Sea, Riyadh and beyond.': 'نستقبل العالم في العلا والبحر الأحمر والرياض وما بعدها.',
+    'Kingdom ready': 'نعرف المملكة', 'Local knowledge, global standards, and Vision 2030 in every plan.': 'معرفة محلية ومعايير عالمية، ورؤية 2030 في كل خطة.',
+    'Built for 2030': 'على خطى رؤية 2030', 'Welcoming the world to AlUla, the Red Sea, Riyadh and beyond.': 'نستقبل العالم في العلا والبحر الأحمر والرياض وما بعدها.',
     'Crews and specialists for the projects shaping the country.': 'طواقم وكفاءات للمشاريع التي تصنع مستقبل البلاد.',
     'Stages for the moments the Kingdom celebrates together.': 'مسارح للحظات التي تحتفل بها المملكة معاً.',
     'Systems that keep every operation online and secure.': 'أنظمة تُبقي كل عملية متصلة وآمنة.',
@@ -239,19 +239,19 @@ TEXT = {
     'TITLE::Contact | Mada Trips': 'تواصل معنا | مادا تربس', 'META::Contact | Mada Trips': 'تواصل معنا | مادا تربس',
     'META::Mada Trips': 'مادا تربس',
     'META::Travel, ticketing, hotels, visas, manpower, specialists, events and IT. One Saudi partner for everything that moves, from Riyadh to every horizon.':
-        'السفر والتذاكر والفنادق والتأشيرات والعمالة والكفاءات والفعاليات والتقنية. شريك سعودي واحد لكل ما يتحرك، من الرياض إلى كل أفق.',
+        'السفر والتذاكر والفنادق والتأشيرات والقوى العاملة والكفاءات والفعاليات والتقنية. شريك سعودي واحد لكل ما يتحرك، من الرياض إلى كل أفق.',
     'META::Mada Trips. Every horizon, within reach.': 'مادا تربس. كل أفق، في المتناول.',
     'META::Mada Trips. Every horizon, within reach. Golden Arabian dunes at sunset.': 'مادا تربس. كل أفق، في المتناول. كثبان ذهبية عند الغروب.',
     'META::Mada Events: conferences, concerts, galas, exhibitions, weddings and national celebrations across Saudi Arabia. Designed, produced and hosted end to end.':
         'مادا للفعاليات: مؤتمرات وحفلات وحفلات عشاء ومعارض وأعراس واحتفالات وطنية في أنحاء المملكة. تصميم وإنتاج واستضافة من البداية إلى النهاية.',
     'META::Mada Events. We build the night everyone remembers.': 'مادا للفعاليات. نصنع الليلة التي لا تُنسى.',
     'META::Travel, ticketing, hotels, visa support, business services, manpower, specialist supply, events and IT solutions. One Saudi partner for everything that moves.':
-        'السفر والتذاكر والفنادق والتأشيرات وخدمات الأعمال وتوريد العمالة والكفاءات والفعاليات وحلول التقنية. شريك سعودي واحد لكل ما يتحرك.',
-    'META::Mada Trips services: travel, ticketing, hotels, visas, business, manpower, specialists, events and IT.': 'خدمات مادا تربس: السفر والتذاكر والفنادق والتأشيرات والأعمال والعمالة والكفاءات والفعاليات والتقنية.',
+        'السفر والتذاكر والفنادق والتأشيرات وخدمات الأعمال والقوى العاملة والكفاءات المتخصصة والفعاليات وحلول التقنية. شريك سعودي واحد لكل ما يتحرك.',
+    'META::Mada Trips services: travel, ticketing, hotels, visas, business, manpower, specialists, events and IT.': 'خدمات مادا تربس: السفر والتذاكر والفنادق والتأشيرات والأعمال والقوى العاملة والكفاءات والفعاليات والتقنية.',
     'META::Mada means reach. Meet the Riyadh team behind travel, talent, events and technology, led by founder and CEO Bader Al Sulaiman.':
-        'مادا تعني المدى. تعرّف على فريق الرياض وراء السفر والكفاءات والفعاليات والتقنية، بقيادة المؤسس والرئيس التنفيذي بدر السليمان.',
+        'من المدى جاء اسمنا. تعرّف على فريق الرياض وراء السفر والكفاءات والفعاليات والتقنية، بقيادة المؤسس والرئيس التنفيذي بدر السليمان.',
     'META::About Mada Trips. We turned a word into a promise. Founder and CEO Bader Al Sulaiman.': 'عن مادا تربس. حوّلنا كلمة إلى وعد. المؤسس والرئيس التنفيذي بدر السليمان.',
-    'META::Plan travel, events, manpower or IT with Mada Trips. Tell us once and our Riyadh team takes it from there.': 'خطط للسفر أو الفعاليات أو العمالة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي.',
+    'META::Plan travel, events, manpower or IT with Mada Trips. Tell us once and our Riyadh team takes it from there.': 'خطط للسفر أو الفعاليات أو القوى العاملة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي.',
     "META::Contact Mada Trips. Let's plan the next horizon. +966 56 668 2662.": 'تواصل مع مادا تربس. لنخطط للأفق القادم. 2662 668 56 966+',
 }
 

@@ -7,6 +7,8 @@ export const PERMISSIONS = {
   "issue.delegate":      { group: "issuance",  en: "Grant & revoke issuing rights",      ar: "منح وسحب صلاحية الإصدار" },
   "clients.manage":      { group: "clients",   en: "Add & edit clients",                 ar: "إضافة وتعديل العملاء" },
   "clients.credit":      { group: "clients",   en: "Set contract credit limits",         ar: "تحديد حدود ائتمان العقود" },
+  "leads.view":          { group: "clients",   en: "See website leads",                  ar: "عرض عملاء الموقع المحتملين" },
+  "leads.manage":        { group: "clients",   en: "Work website leads",                 ar: "متابعة عملاء الموقع المحتملين" },
   "approvals.decide":    { group: "approvals", en: "Vote on approvals (directors)",      ar: "التصويت على الموافقات (أعضاء المجلس)" },
   "expenses.create":     { group: "expenses",  en: "Submit expenses",                    ar: "تقديم المصروفات" },
   "expenses.view_all":   { group: "expenses",  en: "See all expenses",                   ar: "عرض جميع المصروفات" },
@@ -47,6 +49,6 @@ export const PARTNER_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== "issue.un
 export const SYSTEM_ROLES: { key: string; name: string; nameAr: string; description: string; permissions: Permission[] }[] = [
   { key: "partner", name: "Partner", nameAr: "شريك", description: "Full access: team, roles, approvals, finance, settlement and settings.", permissions: PARTNER_PERMISSIONS },
   { key: "partner_issuer", name: "Partner · Issuing authority", nameAr: "شريك · صلاحية الإصدار", description: "Full partner access, plus ticket issuing (TTP) and delegating it to staff.", permissions: ALL_PERMISSIONS },
-  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "expenses.create", "close.submit"] },
-  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "close.submit"] },
+  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit"] },
+  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit"] },
 ];

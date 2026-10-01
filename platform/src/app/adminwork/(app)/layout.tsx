@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { label: t("Operations"), items: [
       { href: "/adminwork/sales", label: t("Sales & bookings"), icon: "ReceiptText" as const },
       ...(issuer ? [{ href: "/adminwork/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
+      ...(can(u, "leads.view") ? [{ href: "/adminwork/leads", label: t("Leads"), icon: "Inbox" as const, count: counts.leads }] : []),
       { href: "/adminwork/clients", label: t("Clients & credit"), icon: "Users2" as const },
       ...(can(u, "sales.create") || can(u, "sales.view_all") ? [{ href: "/adminwork/collections", label: t("Collections"), icon: "PhoneCall" as const }] : []),
       ...(can(u, "close.submit") || can(u, "close.verify") ? [{ href: "/adminwork/close", label: t("Daily close"), icon: "MoonStar" as const, count: counts.closes }] : []),

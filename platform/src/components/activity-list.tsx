@@ -8,9 +8,9 @@ export type ActivityItem = { id: number; at: Date; actorName: string | null; act
 const HREF: Record<string, (id: string) => string> = {
   booking: (id) => `/adminwork/sales/${id}`, expense: (id) => `/adminwork/expenses/${id}`, client: (id) => `/adminwork/clients/${id}`, approval: (id) => `/adminwork/approvals/${id}`,
   settlement: (id) => `/adminwork/settlement/${id}`, user: (id) => `/adminwork/team/${id}`, role: (id) => `/adminwork/team/roles/${id}`,
-  task: (id) => `/adminwork/tasks/${id}`,
+  task: (id) => `/adminwork/tasks/${id}`, lead: (id) => `/adminwork/leads/${id}`,
 };
-const DOT: Record<string, string> = { approval: "bg-gold", booking: "bg-[var(--chart-1)]", expense: "bg-[var(--chart-2)]", user: "bg-info", role: "bg-info", close: "bg-ink-3", settlement: "bg-gold", auth: "bg-ink-4", task: "bg-ok" };
+const DOT: Record<string, string> = { approval: "bg-gold", booking: "bg-[var(--chart-1)]", expense: "bg-[var(--chart-2)]", user: "bg-info", role: "bg-info", close: "bg-ink-3", settlement: "bg-gold", auth: "bg-ink-4", task: "bg-ok", lead: "bg-gold" };
 
 /** Activity grouped by day: who did what, when, with a link to the record. */
 export async function ActivityList({ items, showIp }: { items: ActivityItem[]; showIp?: boolean }) {

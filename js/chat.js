@@ -213,6 +213,12 @@
       title: 'Mada Concierge', sub: 'Replies in seconds · team on WhatsApp', placeholder: 'Ask anything or describe your plan', langBtn: 'ع',
       hello: '<b>Marhaba.</b> <span lang="ar" dir="rtl">مرحبا</span><br>I’m Mada’s concierge. Ask me anything, or tell me what you’re planning. Something like <i>“a gala for 300 in Riyadh in March”</i> works.',
       menu: 'What can we help with?', noted: 'Noted:', askName: 'Great. What name should the team use?', askPhone: 'And the best number to reach you? <span class="mc-muted">(optional)</span>',
+      leadName: s => `Happy to help with <b>${s}</b>. Before we start, may I have your name?`, leadNameOpen: 'Of course. May I have your name?',
+      leadPhone: n => `Nice to meet you, <b>${n}</b>. What’s the best number to reach you on? WhatsApp is ideal.`, leadPhoneAnon: 'What’s the best number for the team to reach you on? WhatsApp is ideal.',
+      phoneWhy: n => `No pressure${n ? ', ' + n : ''}. It only lets a specialist call you back with options, and it’s never shared. Type your number, or skip for now.`,
+      thanksLead: n => `Thank you${n ? ', ' + n : ''}. A few quick questions so the team comes prepared.`, gotPhone: p => `Got your number: <b>${p}</b>.`,
+      otherAskN: n => `${n ? n + ', tell' : 'Tell'} me in a sentence what you need.`, callback: 'Have the team call me', callbackNote: 'Call back request',
+      wrapTailSent: p => `The team has your request and will call you on <b dir="ltr">${p}</b> shortly. For the fastest reply, send it on WhatsApp too.`,
       badPhone: 'That doesn’t look like a phone number. Try something like 05X XXX XXXX, or skip.', nameAgain: 'Just your name is perfect.',
       back: 'Back to your request.', switchQ: n => `Switch to <b>${n}</b>, or carry on with your current request?`, switchYes: n => `Switch to ${n}`, carryOn: 'Carry on',
       wrap: n => `All set${n ? ', ' + n : ''}. Here’s your request:`, wrapTail: 'Send it on WhatsApp and the team will pick it up right away.',
@@ -244,6 +250,12 @@
       anything: 'هل هناك شيء آخر أساعدك فيه؟', cancelled: 'لا مشكلة، تم الإلغاء. بماذا أساعدك؟', long: 'شكراً على التفاصيل، سأرسلها كاملة للفريق.',
       also: 'مهتم أيضاً بـ', details: 'تفاصيل', name: 'الاسم', phone: 'الجوال', service: 'الطلب', sentFrom: 'أُرسل من',
       hello2: 'مرحباً مادا تربس،', helpWith: 'أحتاج مساعدة في:',
+      leadName: s => `يسعدنا مساعدتك في <b>${s}</b>. قبل أن نبدأ، ممكن أعرف اسمك الكريم؟`, leadNameOpen: 'بكل سرور. ممكن أعرف اسمك الكريم؟',
+      leadPhone: n => `تشرفنا يا <b>${n}</b>. ما أفضل رقم للتواصل معك؟ يفضّل رقم الواتساب.`, leadPhoneAnon: 'ما أفضل رقم ليتواصل معك الفريق؟ يفضّل رقم الواتساب.',
+      phoneWhy: n => `لا بأس${n ? ' يا ' + n : ''}. الرقم فقط ليتصل بك أحد المختصين بالخيارات، ولا نشاركه مع أي جهة. اكتب رقمك أو تخطَّ الآن.`,
+      thanksLead: n => `شكراً${n ? ' يا ' + n : ''}. بعض الأسئلة السريعة ليأتي الفريق مستعداً.`, gotPhone: p => `سجّلت رقمك: <b dir="ltr">${p}</b>.`,
+      otherAskN: n => `${n ? 'يا ' + n + '، ' : ''}أخبرني في جملة ماذا تحتاج.`, callback: 'اطلب اتصالاً من الفريق', callbackNote: 'طلب اتصال',
+      wrapTailSent: p => `وصل طلبك للفريق وسيتصل بك على <b dir="ltr">${p}</b> قريباً. ولأسرع رد، أرسله عبر واتساب أيضاً.`,
       qNoted: 'سؤال مهم. أضفته إلى طلبك ليجيبك الفريق شخصياً.', qNotedOpen: 'سؤال مهم، والأفضل أن يجيبك عليه الفريق شخصياً. هل أرسله لهم؟',
       sendQ: 'أرسل سؤالي', questions: 'أسئلة', notSure: k => `لم أفهم ${k}.`
     }
@@ -262,12 +274,14 @@
     if ((m = v.match(/^In (\d+) (days|weeks|months)$/))) return `بعد ${m[1]} ${{ days: 'أيام', weeks: 'أسابيع', months: 'أشهر' }[m[2]]}`;
     return v;
   };
+  // how we refer to each request in a sentence: "Happy to help with your event"
+  const ABOUT = { Travel: ['your trip', 'رحلتك'], Events: ['your event', 'فعاليتك'], Manpower: ['your team', 'فريقك'], Visa: ['your visa', 'تأشيرتك'], Hotels: ['your stay', 'إقامتك'], IT: ['your project', 'مشروعك'] };
   const KEY_AR = { Destination: 'الوجهة', Travellers: 'عدد المسافرين', When: 'الموعد', 'Event type': 'نوع الفعالية', Guests: 'عدد الضيوف', City: 'المدينة', Need: 'الاحتياج', 'Team size': 'حجم الفريق', Start: 'البدء', 'Visa type': 'نوع التأشيرة', Applicants: 'عدد المتقدمين', Rooms: 'عدد الغرف', Service: 'الخدمة' };
 
   /* ================================================================
      STATE (persists across pages for this visit)
      ================================================================ */
-  let S = { questions: [], lang: /^ar/i.test(navigator.language || '') ? 'ar' : 'en', flow: null, step: 0, answers: {}, name: '', phone: '', note: '', also: '', awaiting: null, editing: false, misses: 0, last: '', lastCount: 0, phoneTries: 0, nameTries: 0, started: false, log: [], chips: [], open: false };
+  let S = { questions: [], lang: /^ar/i.test(navigator.language || '') ? 'ar' : 'en', flow: null, step: 0, answers: {}, name: '', phone: '', note: '', also: '', awaiting: null, editing: false, misses: 0, last: '', lastCount: 0, phoneTries: 0, nameTries: 0, leadAsked: false, phoneAsked: false, phoneSkips: 0, key: '', leadSent: false, started: false, log: [], chips: [], open: false };
   try { const saved = JSON.parse(sessionStorage.getItem(STORE) || 'null'); if (saved && saved.log) S = Object.assign(S, saved); } catch (_) {}
   // the chat speaks the language of the page it's on
   const PAGE_AR = document.documentElement.lang === 'ar';
@@ -359,6 +373,7 @@
      ================================================================ */
   const menuChips = () => Object.keys(KB.flows).map(id => ({ label: flowName(id), act: 'flow:' + id }));
   const handoffChips = () => [
+    ...(S.phone ? [] : [{ label: t().callback, act: 'callback', cls: 'mc-chip--wa-soft' }]),
     { label: t().wa, href: waLink(), cls: 'mc-chip--wa' },
     { label: t().call, href: 'tel:+' + PHONE },
     { label: t().form, href: localUrl('/contact') + (S.flow && S.flow !== 'Other' ? '?topic=' + encodeURIComponent(S.flow) : '') },
@@ -380,6 +395,42 @@
     return `https://wa.me/${PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
   };
 
+  /* ---------------- lead capture ----------------
+     As soon as we have a number, the request is saved to Mada Ops (and updated
+     as it fills in), so no lead is lost even if WhatsApp is never opened. */
+  const LEADS_URL = KB.company.leadsUrl || '/adminwork/api/leads';
+  const first = () => (S.name || '').split(' ')[0];
+  let lastLead = '';
+  function sendLead() {
+    if (!S.phone) return Promise.resolve();
+    if (!S.key) S.key = Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    const f = S.flow && KB.flows[S.flow];
+    const details = Object.assign({}, S.answers);
+    if (S.also) details['Also interested in'] = S.also;
+    const payload = { source: 'chat', sessionKey: S.key, name: S.name, phone: S.phone, services: f && S.flow !== 'Other' ? [S.flow] : [], details, message: (S.note || '').slice(0, 3000), questions: (S.questions || []).slice(-10), lang: S.lang, page: location.pathname };
+    const body = JSON.stringify(payload);
+    if (body === lastLead) return Promise.resolve();
+    lastLead = body;
+    try {
+      return fetch(LEADS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+        .then(r => { if (r.ok) { S.leadSent = true; save(); } else lastLead = ''; }).catch(() => { lastLead = ''; });
+    } catch (_) { return Promise.resolve(); }
+  }
+  // name first, then number, then back to whatever we were doing
+  function toLead() {
+    if (!S.name && !S.leadAsked) return askName();
+    if (!S.phone && !S.phoneAsked) return askPhone();
+    return afterLead();
+  }
+  function afterLead() {
+    S.awaiting = null;
+    if (S.editing) { S.editing = false; return wrapUp(); }
+    if (S.flow === 'Other' && !S.note && !(S.questions && S.questions.length)) { S.awaiting = 'note'; say(t().otherAskN(esc(first()))); return chipsAfter([{ label: t().menuChip, act: 'menu' }]); }
+    const f = S.flow && KB.flows[S.flow];
+    if (f && f.steps.some(st => !S.answers[st.key])) { sendLead(); say(t().thanksLead(esc(first())), { fast: true }); return nextStep(); }
+    return wrapUp();
+  }
+
   function greet() {
     S.started = true;
     say(t().hello, { fast: true });
@@ -387,7 +438,7 @@
     chipsAfter(menuChips());
   }
 
-  function resetRequest() { Object.assign(S, { questions: [], flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0 }); }
+  function resetRequest() { Object.assign(S, { questions: [], flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0, key: '', leadSent: false }); }
 
   function startFlow(id, P, preset) {
     resetRequest();
@@ -398,7 +449,8 @@
     const got = [];
     if (P) f.steps.forEach(st => { if (S.answers[st.key]) return; const v = extractFor(st, P, false); if (v) { S.answers[st.key] = v; got.push(`${keyName(st.key)}: <b>${esc(showVal(st.key, v))}</b>`); } });
     if (got.length) say(`${t().noted} ${got.join(' · ')}`, { fast: true });
-    if (id === 'Other') { S.awaiting = 'note'; say(t().otherAsk); chipsAfter([{ label: t().menuChip, act: 'menu' }]); return; }
+    if (id === 'Other') { S.awaiting = 'note'; say(S.name ? t().otherAskN(esc(first())) : t().otherAsk); chipsAfter([{ label: t().menuChip, act: 'menu' }]); return; }
+    if ((!S.name && !S.leadAsked) || (!S.phone && !S.phoneAsked)) return toLead();
     nextStep();
   }
 
@@ -406,7 +458,7 @@
     const f = KB.flows[S.flow];
     while (S.step < f.steps.length && S.answers[f.steps[S.step].key]) S.step++;
     const st = f.steps[S.step];
-    if (!st) { S.editing = false; return S.name ? wrapUp() : askName(); }
+    if (!st) { S.editing = false; return toLead(); }
     S.awaiting = 'opt';
     say(L(st));
     const opts = st.opts.map(([en, ar]) => ({ label: S.lang === 'ar' ? ar : en, act: 'opt:' + (S.lang === 'ar' ? ar : en) }));
@@ -424,25 +476,37 @@
   }
 
   function askName() {
-    S.awaiting = 'name';
-    say(t().askName);
-    chipsAfter([{ label: t().skip, act: 'skip' }]);
+    S.awaiting = 'name'; S.leadAsked = true;
+    const f = S.flow && S.flow !== 'Other' && KB.flows[S.flow];
+    say(S.editing ? t().askName : f && ABOUT[S.flow] ? t().leadName(ABOUT[S.flow][S.lang === 'ar' ? 1 : 0]) : t().leadNameOpen);
+    chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]);
     setTimeout(() => input.focus({ preventScroll: true }), 50);
   }
+  // no skip button on the first ask: most people just type it
   function askPhone() {
-    S.awaiting = 'phone';
-    say(t().askPhone);
-    chipsAfter([{ label: t().skip, act: 'skip' }]);
+    S.awaiting = 'phone'; S.phoneAsked = true;
+    say(S.name ? t().leadPhone(esc(first())) : t().leadPhoneAnon);
+    chipsAfter(S.phoneSkips ? [{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }] : []);
+    setTimeout(() => input.focus({ preventScroll: true }), 50);
+  }
+  // first "skip" gets one reason why, the second is respected
+  function skipPhone() {
+    if (!S.phoneSkips++) { say(t().phoneWhy(esc(first())), { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]); }
+    S.phone = ''; return afterLead();
   }
 
   function wrapUp() {
     S.awaiting = null;
+    const saving = sendLead();
+    queue = queue.then(() => Promise.race([saving, wait(3000)])).then(showSummary);
+  }
+  function showSummary() {
     const rows = Object.entries(S.answers).map(([k, v]) => `<div><span>${esc(keyName(k))}</span><b>${esc(showVal(k, v))}</b></div>`).join('')
       + (S.also ? `<div><span>${esc(t().also)}</span><b>${esc(S.also)}</b></div>` : '')
       + (S.note ? `<div><span>${esc(t().details)}</span><b>${esc(S.note.length > 140 ? S.note.slice(0, 140) + '…' : S.note)}</b></div>` : '')
       + (S.questions && S.questions.length ? `<div><span>${esc(t().questions)}</span><b>${esc(S.questions.join(' · ').slice(0, 140))}</b></div>` : '')
       + (S.phone ? `<div><span>${esc(t().phone)}</span><b>${esc(S.phone)}</b></div>` : '');
-    say(`${t().wrap(esc((S.name || '').split(' ')[0]))}<div class="mc-sum">${rows || `<div><span>${esc(t().service)}</span><b>${esc(flowName(S.flow || 'Other'))}</b></div>`}</div>${t().wrapTail}`);
+    say(`${t().wrap(esc((S.name || '').split(' ')[0]))}<div class="mc-sum">${rows || `<div><span>${esc(t().service)}</span><b>${esc(flowName(S.flow || 'Other'))}</b></div>`}</div>${S.leadSent && S.phone ? t().wrapTailSent(esc(S.phone)) : t().wrapTail}`);
     const editable = S.flow && KB.flows[S.flow].steps.length;
     chipsAfter([
       { label: t().wa, href: waLink(), cls: 'mc-chip--wa' },
@@ -477,8 +541,8 @@
       case 'carry': me(label); say(t().back, { fast: true }); S.step = Math.max(0, S.step); return nextStep();
       case 'skip':
         me(label);
-        if (S.awaiting === 'name') { S.name = ''; return askPhone(); }
-        if (S.awaiting === 'phone') { S.phone = ''; return wrapUp(); }
+        if (S.awaiting === 'name') { S.name = ''; return S.editing ? wrapUp() : toLead(); }
+        if (S.awaiting === 'phone') return skipPhone();
         return nextStep();
       case 'edit': {
         me(label);
@@ -489,11 +553,12 @@
           { label: t().name, act: 'editname' }, { label: t().phone, act: 'editphone' }
         ]);
       }
-      case 'editname': me(label); S.name = ''; S.editing = true; S.awaiting = 'name'; say(t().askName); return chipsAfter([]);
+      case 'editname': me(label); S.name = ''; S.editing = true; return askName();
       case 'editphone': me(label); S.phone = ''; S.editing = true; return askPhone();
-      case 'sendnote': me(label); S.flow = S.flow || 'Other'; return S.name ? wrapUp() : askName();
+      case 'sendnote': me(label); S.flow = S.flow || 'Other'; return toLead();
+      case 'callback': me(label); if (!S.flow) S.flow = 'Other'; if (!S.note && !Object.keys(S.answers).length) S.note = t().callbackNote; return toLead();
       case 'skipstep': me(label); return answerStep(S.lang === 'ar' ? 'غير محدد' : 'Not sure yet');
-      case 'sendq': me(label); S.flow = 'Other'; return S.name ? wrapUp() : askName();
+      case 'sendq': me(label); S.flow = 'Other'; return toLead();
     }
   }
 
@@ -501,13 +566,14 @@
     if (!S.flow) { say(t().menu, { fast: true }); return chipsAfter(menuChips()); }
     const f = KB.flows[S.flow];
     let i = Math.min(S.step, f.steps.length) - 1;
-    if (S.awaiting === 'phone') { S.awaiting = 'name'; say(t().askName); return chipsAfter([{ label: t().skip, act: 'skip' }]); }
+    if (S.awaiting === 'phone') return askName();
+    if (S.awaiting === 'name') { resetRequest(); say(t().menu, { fast: true }); return chipsAfter(menuChips()); }
     if (i < 0) { resetRequest(); say(t().menu, { fast: true }); return chipsAfter(menuChips()); }
     delete S.answers[f.steps[i].key]; S.step = i; nextStep();
   }
 
   function restart() {
-    resetRequest(); Object.assign(S, { name: '', phone: '', misses: 0, lastCount: 0 });
+    resetRequest(); Object.assign(S, { name: '', phone: '', misses: 0, lastCount: 0, leadAsked: false, phoneAsked: false, phoneSkips: 0 });
     say(t().menu, { fast: true }); chipsAfter(menuChips());
   }
 
@@ -525,10 +591,31 @@
 
   /* ---------------- free text ---------------- */
   function onText(raw) {
-    const text = raw.replace(/\s+/g, ' ').trim().slice(0, 800);
+    let text = raw.replace(/\s+/g, ' ').trim().slice(0, 800);
     if (!text) return;
     me(text);
     setChips([]);
+    // a number or name dropped into any message is kept, wherever we are
+    if (S.awaiting !== 'phone' && S.awaiting !== 'name') {
+      const found = [];
+      const pm = !S.phone && text.replace(/[٠-٩]/g, d => AR_DIGITS.indexOf(d)).match(/(?:\+|00)?(?:966[\s-]?)?0?5\d(?:[\s-]?\d){7}(?!\d)/);
+      const ph = pm && parsePhone(pm[0]);
+      if (ph) { S.phone = ph; S.phoneAsked = true; found.push(t().gotPhone(esc(ph))); text = text.replace(/[٠-٩]/g, d => AR_DIGITS.indexOf(d)).replace(pm[0], ' ').replace(/\s+/g, ' ').trim(); }
+      const nm = !S.name && (text.match(/\b(?:my name is|my names|my name's|i am called|i'm called)\s+([a-z][a-z'-]+(?: [a-z][a-z'-]+)?)/i) || text.match(/اسمي\s+([\u0621-\u064A]+(?: [\u0621-\u064A]+)?)/));
+      if (nm) {
+        const name = nm[1].split(/\s+(?:and|from|i|we|here|looking|need|want|with|و|من|ابي|ابغى|احتاج)\b/i)[0].trim();
+        if (name && !isGibberish(name)) { S.name = hasArabic(name) ? name : name.replace(/\b\p{L}/gu, c => c.toUpperCase()); S.leadAsked = true; text = text.replace(nm[0].slice(0, nm[0].indexOf(nm[1]) + name.length), ' ').replace(/\s+/g, ' ').trim(); }
+      }
+      if (nm && S.name && !S.flow) found.push(S.lang === 'ar' ? `أهلاً ${esc(first())}.` : `Thanks, ${esc(first())}.`);
+      if (ph) sendLead();
+      if (found.length) say(found.join(' '), { fast: true });
+      if (!text || /^[\s,.!?؟،:;-]*(and|و)?[\s,.!?؟،:;-]*$/i.test(text)) {
+        if (S.awaiting === 'opt' && S.flow) return nextStep();
+        if (S.awaiting === 'note') { say(t().otherAskN(esc(first()))); return; }
+        if (!S.flow) { S.flow = 'Other'; S.note = t().callbackNote; }
+        return toLead();
+      }
+    }
     // explicit language switch
     const n0 = norm(text);
     if (CMD.ar.test(n0)) { S.last = ''; return S.lang === 'ar' ? (S.awaiting === 'opt' ? nextStep() : (say(t().menu, { fast: true }), chipsAfter(menuChips()))) : setLang('ar'); }
@@ -550,8 +637,8 @@
     if (CMD.menu.test(n)) { resetRequest(); say(t().menu, { fast: true }); return chipsAfter(menuChips()); }
     if (CMD.cancel.test(n)) { resetRequest(); say(t().cancelled, { fast: true }); return chipsAfter(menuChips()); }
     if (CMD.back.test(n) && S.flow) return goBack();
-    if (CMD.skip.test(n) && S.awaiting === 'name') { S.name = ''; return askPhone(); }
-    if (CMD.skip.test(n) && S.awaiting === 'phone') { S.phone = ''; return wrapUp(); }
+    if (CMD.skip.test(n) && S.awaiting === 'name') { S.name = ''; return S.editing ? wrapUp() : toLead(); }
+    if (CMD.skip.test(n) && S.awaiting === 'phone') return skipPhone();
 
     const ranked = rankIntents(P);
     // greetings and thanks give way to any real topic in the same message
@@ -559,39 +646,43 @@
 
     /* ----- waiting for a name ----- */
     if (S.awaiting === 'name') {
-      const digits = text.replace(/\D/g, '');
-      if (digits.length >= 8 && digits.length <= 15) { const ph = parsePhone(text); if (ph) { S.phone = ph; say(t().nameAgain, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]); } }
+      const digits = text.replace(/[٠-٩]/g, c => AR_DIGITS.indexOf(c)).replace(/\D/g, '');
+      if (digits.length >= 8 && digits.length <= 15) { const ph = parsePhone(text); if (ph) { S.phone = ph; S.phoneAsked = true; sendLead(); say(`${t().gotPhone(esc(ph))} ${t().nameAgain}`, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]); } }
       if ((isQuestion(text, n) && (/[?؟]/.test(text) || P.toks.length >= 4)) || (top && top.s >= 2.5 && !top.it.weak && P.toks.length >= 3)) {
         if (top && top.s >= 2 && !top.it.flow) answerIntent(top.it, P, true); else { S.questions.push(text.slice(0, 200)); say(t().qNoted); }
-        return queue.then(() => { S.awaiting = 'name'; say(t().askName, { fast: true }); chipsAfter([{ label: t().skip, act: 'skip' }]); });
+        return queue.then(() => { S.awaiting = 'name'; say(t().nameAgain, { fast: true }); chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]); });
       }
       let nm = text.replace(/^(hi|hello|hey)[, ]+/i, '').replace(/^(my name is|my name's|i am|i'm|im|this is|it's|its|name is|name:?|call me)\s+/i, '').replace(/^(اسمي|انا|معك|أنا)\s+/, '').replace(/[.!,]+$/, '').trim();
       if (!nm || nm.split(' ').length > 5 || nm.length > 40 || isGibberish(nm)) {
-        if (++S.nameTries < 2) { say(t().nameAgain, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]); }
+        if (++S.nameTries < 2) { say(t().nameAgain, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]); }
         nm = nm.split(' ').slice(0, 3).join(' ').slice(0, 40);
       }
       S.name = hasArabic(nm) ? nm : nm.replace(/\b\p{L}/gu, c => c.toUpperCase());
       if (S.editing) { S.editing = false; return wrapUp(); }
-      return S.phone ? wrapUp() : askPhone();
+      return toLead();
     }
 
     /* ----- waiting for a phone ----- */
     if (S.awaiting === 'phone') {
       const ph = parsePhone(text);
-      if (ph) { S.phone = ph; S.editing = false; return wrapUp(); }
+      if (ph) { S.phone = ph; return afterLead(); }
       if (!/\d/.test(text) && (isQuestion(text, n) || (top && top.s >= 2.5))) {
-        if (top && top.s >= 2 && !top.it.flow) answerIntent(top.it, P, true); else { S.questions.push(text.slice(0, 200)); say(t().qNoted); }
+        if (top && top.s >= 2 && !top.it.flow) { answerIntent(top.it, P, true); return queue.then(askPhone); }
+        // "why?", "what for?": explain once, then let them choose
+        if (P.toks.length <= 5) { S.phoneSkips = Math.max(S.phoneSkips, 1); say(t().phoneWhy(esc(first())), { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]); }
+        S.questions.push(text.slice(0, 200)); say(t().qNoted);
         return queue.then(askPhone);
       }
-      if (++S.phoneTries >= 2) { S.phone = ''; return wrapUp(); }
-      say(t().badPhone, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip' }]);
+      if (/^(no|nope|no thanks|dont|i dont|rather not|لا|لا شكرا|ما ابي|ما ودي)$/.test(n)) return skipPhone();
+      if (++S.phoneTries >= 3) { S.phone = ''; return afterLead(); }
+      say(t().badPhone, { fast: true }); return chipsAfter([{ label: t().skip, act: 'skip', cls: 'mc-chip--ghost' }]);
     }
 
     /* ----- waiting for "tell me what you need" ----- */
     if (S.awaiting === 'note') {
       S.note = text; S.awaiting = null;
       if (text.length > 300) say(t().long, { fast: true });
-      return askName();
+      return toLead();
     }
 
     /* ----- inside a guided request ----- */
@@ -650,7 +741,7 @@
     if (isGibberish(text)) return miss();
 
     // a long message that only opens with a greeting is a request, not small talk
-    if (top && top.it.weak && !top.it.flow && text.length > 40 && !ranked.some(r => !r.it.weak && r.s >= 2)) { resetRequest(); S.flow = 'Other'; S.note = text; say(t().gotIt, { fast: true }); return askName(); }
+    if (top && top.it.weak && !top.it.flow && text.length > 40 && !ranked.some(r => !r.it.weak && r.s >= 2)) { resetRequest(); S.flow = 'Other'; S.note = text; say(t().gotIt, { fast: true }); return toLead(); }
 
     if (top) {
       S.misses = 0;
@@ -690,14 +781,14 @@
     }
 
     // long message with no match: treat it as a request
-    if (text.length > 60) { resetRequest(); S.flow = 'Other'; S.note = text; say(t().gotIt, { fast: true }); return askName(); }
+    if (text.length > 60) { resetRequest(); S.flow = 'Other'; S.note = text; say(t().gotIt, { fast: true }); return toLead(); }
     return miss(text);
   }
 
   function answerIntent(it, P, quiet) {
     if (it.action === 'human') return handoff(it.en ? L(it) : null);
     say(L(it));
-    if (!quiet) chipsAfter(expandChips(it.chips || ['menu']));
+    if (!quiet) chipsAfter(expandChips(it.chips || ['menu']).concat(S.phone ? [] : [{ label: t().callback, act: 'callback', cls: 'mc-chip--wa-soft' }]));
   }
 
   function miss(text) {
@@ -710,7 +801,7 @@
   }
 
   function parsePhone(raw) {
-    const d = raw.replace(/[^\d+]/g, '').replace(/^00/, '+');
+    const d = raw.replace(/[٠-٩]/g, c => AR_DIGITS.indexOf(c)).replace(/[^\d+]/g, '').replace(/^00/, '+');
     let m;
     if ((m = d.match(/^(?:\+?966|0)?(5\d{8})$/))) return '+966 ' + m[1].replace(/(\d{2})(\d{3})(\d{4})/, '$1 $2 $3');
     if ((m = d.match(/^\+?(\d{8,15})$/)) && !/^0/.test(m[1])) return '+' + m[1];
@@ -736,7 +827,7 @@
   launch.addEventListener('click', () => setOpen(!root.classList.contains('is-open')));
   q('.mc-head__x').addEventListener('click', () => { setOpen(false); launch.focus(); });
   q('.js-lang').addEventListener('click', () => setLang(S.lang === 'ar' ? 'en' : 'ar'));
-  q('.js-restart').addEventListener('click', () => { body.innerHTML = ''; S.log = []; resetRequest(); Object.assign(S, { name: '', phone: '', misses: 0 }); greet(); });
+  q('.js-restart').addEventListener('click', () => { body.innerHTML = ''; S.log = []; resetRequest(); Object.assign(S, { name: '', phone: '', misses: 0, leadAsked: false, phoneAsked: false, phoneSkips: 0 }); greet(); });
   addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('is-open')) { setOpen(false); launch.focus(); } });
   form.addEventListener('submit', e => { e.preventDefault(); const v = input.value; input.value = ''; onText(v); });
   document.addEventListener('click', e => { const tr = e.target.closest('[data-chat]'); if (tr) { e.preventDefault(); setOpen(true); } });

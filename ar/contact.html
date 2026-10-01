@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <title>تواصل معنا | مادا تربس</title>
-<meta content="خطط للسفر أو الفعاليات أو العمالة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." name="description"/>
+<meta content="خطط للسفر أو الفعاليات أو القوى العاملة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." name="description"/>
 <link href="https://www.madatrips.sa/ar/contact" rel="canonical"/>
 <link href="https://www.madatrips.sa/contact" hreflang="en" rel="alternate"/>
 <link href="https://www.madatrips.sa/ar/contact" hreflang="ar" rel="alternate"/>
@@ -16,7 +16,7 @@
 <meta content="Mada Trips" property="og:site_name"/><meta content="ar_SA" property="og:locale"/>
 <meta content="https://www.madatrips.sa/ar/contact" property="og:url"/>
 <meta content="تواصل معنا | مادا تربس" property="og:title"/>
-<meta content="خطط للسفر أو الفعاليات أو العمالة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." property="og:description"/>
+<meta content="خطط للسفر أو الفعاليات أو القوى العاملة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." property="og:description"/>
 <meta content="https://www.madatrips.sa/assets/og/ar-contact.jpg" property="og:image"/>
 <meta content="1200" property="og:image:width"/>
 <meta content="630" property="og:image:height"/>
@@ -24,7 +24,7 @@
 <meta content="تواصل مع مادا تربس. لنخطط للأفق القادم. 2662 668 56 966+" property="og:image:alt"/>
 <meta content="summary_large_image" name="twitter:card"/>
 <meta content="تواصل معنا | مادا تربس" name="twitter:title"/>
-<meta content="خطط للسفر أو الفعاليات أو العمالة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." name="twitter:description"/>
+<meta content="خطط للسفر أو الفعاليات أو القوى العاملة أو التقنية مع مادا تربس. أخبرنا مرة واحدة ويتولى فريقنا في الرياض الباقي." name="twitter:description"/>
 <meta content="تواصل مع مادا تربس. لنخطط للأفق القادم. 2662 668 56 966+" name="twitter:image:alt"/>
 <meta content="https://www.madatrips.sa/assets/og/ar-contact.jpg" name="twitter:image"/>
 <link href="/assets/brand/favicon.svg" rel="icon" type="image/svg+xml"/>
@@ -77,15 +77,15 @@
 <a class="btn btn--outline-light magnetic" href="https://wa.me/966566682662" rel="noopener" target="_blank"><span>واتساب</span><i class="btn__arrow">↖</i></a>
 </div>
 </div>
-<form class="form-card js-enquiry" data-intro="">
+<form class="form-card js-enquiry" data-intro="" novalidate="">
 <div class="form-body">
 <h2>ابدأ محادثة</h2>
 <p>بلا تعقيد. الأساسيات فقط.</p>
 <div class="fgrid">
-<div class="field2"><label for="f-name">الاسم الكامل</label><input autocomplete="name" id="f-name" name="name" required=""/></div>
-<div class="field2"><label for="f-co">الشركة</label><input autocomplete="organization" id="f-co" name="company"/></div>
-<div class="field2"><label for="f-mail">البريد الإلكتروني</label><input autocomplete="email" id="f-mail" name="email" required="" type="email"/></div>
-<div class="field2"><label for="f-tel">الجوال</label><input autocomplete="tel" id="f-tel" name="phone" placeholder="+966" type="tel"/></div>
+<div class="field2"><label for="f-name">الاسم الكامل</label><input autocomplete="name" id="f-name" maxlength="80" name="name" required=""/></div>
+<div class="field2"><label for="f-co">الشركة</label><input autocomplete="organization" id="f-co" maxlength="120" name="company"/></div>
+<div class="field2"><label for="f-mail">البريد الإلكتروني</label><input autocomplete="email" id="f-mail" maxlength="120" name="email" required="" type="email"/></div>
+<div class="field2"><label for="f-tel">الجوال</label><input autocomplete="tel" id="f-tel" inputmode="tel" maxlength="32" name="phone" placeholder="+966" required="" type="tel"/></div>
 <div class="field2 field2--full">
 <span class="need__label">ماذا تحتاج؟</span>
 <div aria-label="ماذا تحتاج؟" class="need" role="group">
@@ -94,7 +94,7 @@
 <label><input name="need" type="checkbox" value="Hotels"/><span>الفنادق</span></label>
 <label><input name="need" type="checkbox" value="Visa"/><span>التأشيرات</span></label>
 <label><input name="need" type="checkbox" value="Business"/><span>خدمات الأعمال</span></label>
-<label><input name="need" type="checkbox" value="Manpower"/><span>توريد العمالة</span></label>
+<label><input name="need" type="checkbox" value="Manpower"/><span>القوى العاملة</span></label>
 <label><input name="need" type="checkbox" value="Specialist"/><span>الكفاءات</span></label>
 <label><input name="need" type="checkbox" value="Events"/><span>الفعاليات</span></label>
 <label><input name="need" type="checkbox" value="IT"/><span>التقنية</span></label>
@@ -102,7 +102,8 @@
 </div>
 <div class="field2"><label for="f-date">التاريخ</label><input id="f-date" name="date" type="date"/></div>
 <div class="field2"><label for="f-size">عدد الضيوف أو حجم الفريق</label><select id="f-size" name="size"><option value="">اختر</option><option>1 إلى 10</option><option>11 إلى 50</option><option>51 إلى 250</option><option>251 إلى 1,000</option><option>1,000+</option></select></div>
-<div class="field2 field2--full"><label for="f-msg">أخبرنا أكثر</label><textarea id="f-msg" name="message" placeholder="أين، ومتى، وكيف يبدو النجاح بالنسبة لك."></textarea></div>
+<div class="field2 field2--full"><label for="f-msg">أخبرنا أكثر</label><textarea id="f-msg" maxlength="3000" name="message" placeholder="أين، ومتى، وكيف يبدو النجاح بالنسبة لك."></textarea></div>
+<input aria-hidden="true" autocomplete="off" class="hp" name="website" tabindex="-1" type="text"/>
 </div>
 <button class="btn btn--dark magnetic" type="submit"><span>إرسال الطلب</span><i class="btn__arrow">←</i></button>
 </div>
@@ -140,7 +141,7 @@
 </div>
 <div>
 <h4>للأعمال</h4>
-<a href="/ar/services#business">خدمات الأعمال</a><a href="/ar/services#manpower">توريد العمالة</a><a href="/ar/services#specialists">توريد الكفاءات</a><a href="/ar/services#it">حلول تقنية المعلومات</a>
+<a href="/ar/services#business">خدمات الأعمال</a><a href="/ar/services#manpower">القوى العاملة</a><a href="/ar/services#specialists">الكفاءات المتخصصة</a><a href="/ar/services#it">حلول تقنية المعلومات</a>
 </div>
 <div>
 <h4>الشركة</h4>
