@@ -1171,4 +1171,6 @@ export const AR: Record<string, string> = {
   "{n} tickets": "{n} تذكرة",
   "SNB": "البنك الأهلي السعودي",
   "Company · SNB": "الشركة · الأهلي السعودي",
+  "Alinma (B2B Account)": "الإنماء (حساب الشركات)",
+  "Company · Alinma (B2B Account)": "الشركة · الإنماء (حساب الشركات)",
 };
