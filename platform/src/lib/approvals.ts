@@ -8,7 +8,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -22,7 +22,7 @@ async function conflictedPartner(tx: Tx, r: ReqLike): Promise<string | null> {
     return e?.by === "partner" ? e.p : null;
   }
   const p = r.payload as { partnerId?: string } | null | undefined;
-  return (r.kind === "governance" || r.kind === "supplier") && p?.partnerId ? p.partnerId : null;
+  return (r.kind === "governance" || r.kind === "supplier" || r.kind === "bsp") && p?.partnerId ? p.partnerId : null;
 }
 
 /**
@@ -97,6 +97,13 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   } else if (input.kind === "supplier") {
     pool = "directors"; required = 1;
     rule = "Supplier cost fronted by a partner: every director not involved approves";
+  } else if (input.kind === "bsp") {
+    pool = "directors"; required = 1;
+    rule = "IATA BSP fronted by a partner: every director not involved approves";
+  } else if (input.kind === "cash") {
+    pool = "directors";
+    if (input.amount < s.cashMoveLimit) { required = 1; rule = `Bank move under SAR ${sar(s.cashMoveLimit)}: one director approves`; }
+    else { requiresAll = true; rule = `SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -104,7 +111,7 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   if (requiresAll) required = await allDirectorsRequired(tx, probe);
   // A partner reimbursement recorded by another partner leaves fewer uninvolved directors (neither the one who
   // recorded it nor the one being repaid may vote). Then every director who isn't involved must approve.
-  if ((input.kind === "expense" || input.kind === "supplier") && pool === "directors" && eligible.length >= 1 && eligible.length < required) {
+  if ((input.kind === "expense" || input.kind === "supplier" || input.kind === "bsp") && pool === "directors" && eligible.length >= 1 && eligible.length < required) {
     required = eligible.length;
     rule = "Partner reimbursement: every director not involved approves";
   }
@@ -238,6 +245,17 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
     case "supplier": {
       const { finalizeSupplierPayment } = await import("./suppliers");
       await finalizeSupplierPayment(tx, req, ok, actorId);
+      return;
+    }
+    case "bsp": {
+      const { finalizeBspClosing } = await import("./bsp");
+      await finalizeBspClosing(tx, req, ok, actorId);
+      return;
+    }
+    case "cash": {
+      if (!ok) return;
+      const { applyCashMove } = await import("./cash");
+      await applyCashMove(tx, req, actorId);
       return;
     }
     case "settlement": {

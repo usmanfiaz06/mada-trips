@@ -25,6 +25,7 @@ export default async function SettingsPage() {
           <Group title={t("Approvals")} hint={t("Who must agree before money goes out on credit")}>
             <Field label={t("Credit any 2 directors can approve up to (SAR)")} hint={t("Above this, all directors must agree.")}><Input name="creditDualLimit" defaultValue={amountInput(s.creditDualLimit)} dir="ltr" /></Field>
             <Field label={t("Expenses one verifier can approve up to (SAR)")} hint={t("Above this, two verifiers.")}><Input name="expenseDualLimit" defaultValue={amountInput(s.expenseDualLimit)} dir="ltr" /></Field>
+            <Field label={t("Bank move one director can approve up to (SAR)")} hint={t("Deposits, withdrawals and transfers. Above this, all directors must agree.")}><Input name="cashMoveLimit" defaultValue={amountInput(s.cashMoveLimit)} dir="ltr" /></Field>
             <Field label={t("Directors needed for a refund")}><Input name="refundApprovals" type="number" min={1} max={3} defaultValue={s.refundApprovals} /></Field>
           </Group>
           <Group title={t("Day-25 waterfall")} hint={t("Defaults used when preparing each settlement")}>

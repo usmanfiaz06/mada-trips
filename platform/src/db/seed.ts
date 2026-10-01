@@ -67,7 +67,7 @@ async function main() {
 
   const openingDate = riyadhDay(at(60, 12));
   await db.insert(schema.bankAccounts).values([
-    { key: "retail", name: "Al Rajhi", bank: "Al Rajhi Bank", iban: "SA00 8000 0000 6080 1016 7519", openingBalance: 0, openingDate },
+    { key: "retail", name: "SNB", bank: "Saudi National Bank (Al Ahli)", iban: "SA00 1000 0000 6080 1016 7519", openingBalance: 0, openingDate },
     { key: "corporate", name: "Alinma", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate },
   ]);
 
@@ -264,6 +264,11 @@ async function main() {
   for (const x of tk) ev.push({ at: x.createdAt, actorId: x.createdBy, action: "task.created", entityType: "task", entityId: x.id, entityRef: x.ref,
     summary: x.createdBy === x.assigneeId ? `Added ${x.ref} for themselves: ${x.title}` : `Assigned ${x.ref} to ${[counter, desk1, desk2, uA, uB, uH].find((p) => p.id === x.assigneeId)!.name}: ${x.title}` });
 
+  // Flights are billed by IATA through BSP; everything else is a direct supplier.
+  await db.execute(sql`UPDATE bookings SET via_bsp = true WHERE service_type = 'flight'`);
+  // Historical non-flight bookings: assume the supplier was already paid, so demo "Money we owe" shows only a realistic few.
+  await db.execute(sql`UPDATE bookings SET supplier_paid = true WHERE service_type <> 'flight' AND status IN ('issued','void','refunded') AND random() < 0.85`);
+
   // Website leads: a few enquiries from the chat and the forms, at different stages.
   const leadRows: (typeof schema.leads.$inferInsert)[] = [
     { source: "chat", sessionKey: "demo-chat-1", name: "Faisal Al Harbi", phone: "0551234567", services: ["Umrah"], lang: "ar", page: "/ar", createdAt: at(0, 10, 20),
@@ -279,9 +284,6 @@ async function main() {
   await db.insert(schema.counters).values({ key: "LD", value: 1000 + ld.length }).onConflictDoNothing();
   for (const x of ld) ev.push({ at: x.createdAt, actorId: null, action: "lead.received", entityType: "lead", entityId: x.id, entityRef: x.ref,
     summary: `New website lead ${x.ref} from the ${x.source === "chat" ? "chat" : "enquiry form"}${x.name ? `: ${x.name}` : ""}` });
-
-  // Historical bookings: assume the supplier was already paid, so demo "Money we owe" shows only a realistic few.
-  await db.execute(sql`UPDATE bookings SET supplier_paid = true WHERE status IN ('issued','void','refunded') AND random() < 0.85`);
   await db.execute(sql`INSERT INTO supplier_payments (booking_id, supplier, amount, source, account, method, status, paid_on, recorded_by)
     SELECT b.id, coalesce(b.supplier,'Supplier'), b.net_cost, 'bank', b.account, 'transfer', 'settled', b.business_date, ${uB.id}
     FROM bookings b WHERE b.supplier_paid = true AND b.net_cost > 0`);

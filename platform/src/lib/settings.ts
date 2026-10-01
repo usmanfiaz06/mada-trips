@@ -11,6 +11,9 @@ export const DEFAULT_SETTINGS = {
   targetMarginBps: 800,             // 8%: margins below this show amber in the POS
   closeHour: 22,                    // 10:00 PM Riyadh
   cutoffDay: 25,
+  bspPaymentDays: 14,               // IATA BSP: standard days from a 15-day closing to the payment due date
+  bspGraceDays: 1,                  // one grace day the partners may use before a BSP payment counts as overdue
+  cashMoveLimit: 2_000_000,         // SAR 20,000: a bank deposit/withdrawal/transfer under this needs 1 director, at or above it all directors
   refundApprovals: 1,
 };
 export type Settings = typeof DEFAULT_SETTINGS;

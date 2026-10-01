@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
-import { ArrowLeft, Ban, Building2, Check, Clock, CornerUpLeft, Receipt, RotateCcw, ShieldCheck, Ticket } from "lucide-react";
+import { ArrowLeft, Ban, Building2, Check, Clock, CornerUpLeft, Landmark, Receipt, RotateCcw, ShieldCheck, Ticket } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -167,9 +167,11 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
 
           {b.netCost > 0 && (
             <Card>
-              <CardHead title={t("Supplier cost")} hint={b.supplier ?? undefined}
+              <CardHead title={t("Supplier cost")} hint={b.viaBsp ? t("IATA (BSP)") : b.supplier ?? undefined}
                 action={<span className="num text-[15px]" dir="ltr">{sar(b.netCost)}</span>} />
-              {b.supplierPaid ? (
+              {b.viaBsp ? (
+                <p className="flex items-center gap-2 text-[13.5px] text-ink-2"><Landmark className="size-4 text-ink-3" />{b.supplierPaid ? t("Paid to IATA in a BSP closing") : t("Billed by IATA — settled in the 15-day BSP closing")}</p>
+              ) : b.supplierPaid ? (
                 <p className="flex items-center gap-2 text-[13.5px] text-ok"><Check className="size-4" />{supplierPay?.sp.source === "partner"
                   ? t("Paid by {name} (on their ledger)", { name: supplierPay.partner ?? "—" })
                   : t("Paid from {bank}", { bank: supplierPay?.sp.account ? t(ACCOUNT[supplierPay.sp.account]) : t("a company bank") })}</p>

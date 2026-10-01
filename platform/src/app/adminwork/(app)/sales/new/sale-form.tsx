@@ -2,7 +2,7 @@
 import { useActionState, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { PendingContext, useSubmit } from "@/components/client";
 import { ACCOUNT, ACCOUNTS } from "@/lib/labels";
-import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Landmark, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
 import { createSale } from "../actions";
@@ -74,6 +74,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [account, setAccount] = useState<"retail" | "corporate">("retail");
   const [supplierPay, setSupplierPay] = useState("unpaid");
   const [supplierAccount, setSupplierAccount] = useState<"retail" | "corporate">("retail");
+  const [viaBsp, setViaBsp] = useState(true);
   const [names, setNames] = useState<string[]>([]);
   const [count, setCount] = useState(1);
   const [tickets, setTickets] = useState<string[]>([]); // kept in state so a failed save doesn't wipe them
@@ -247,6 +248,19 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
 
           {netH > 0 && (
             <div className="mt-4 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
+              {service === "flight" && (
+                <div className="mb-3">
+                  <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Settled through")}</span>
+                  <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-sm">
+                    <button type="button" onClick={() => setViaBsp(true)} className={cx("h-9 rounded-full text-[13px] transition", viaBsp ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t("IATA (BSP)")}</button>
+                    <button type="button" onClick={() => setViaBsp(false)} className={cx("h-9 rounded-full text-[13px] transition", !viaBsp ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t("Directly with airline")}</button>
+                  </div>
+                </div>
+              )}
+              <input type="hidden" name="viaBsp" value={service === "flight" && viaBsp ? "1" : ""} />
+              {service === "flight" && viaBsp ? (
+                <p className="flex items-start gap-2 text-[12.5px] text-ink-3"><Landmark className="mt-0.5 size-3.5 shrink-0" />{t("Billed by IATA — this cost rolls into the 15-day BSP closing.")}</p>
+              ) : (<>
               <span className="mb-2 block text-[12.5px] text-ink-3">{t("Supplier cost — have we paid it?")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
@@ -258,7 +272,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                 <div className="mt-3">
                   <span className="mb-1.5 block text-[12px] text-ink-3">{t("From which bank?")}</span>
                   <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-xs">
-                    {ACCOUNTS.map((a) => <button key={a.value} type="button" onClick={() => setSupplierAccount(a.value)} className={cx("h-9 rounded-full text-[13px] transition", supplierAccount === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>)}
+                    {ACCOUNTS.map((a) => <button key={a.value} type="button" onClick={() => setSupplierAccount(a.value)} className={cx("h-9 rounded-full text-[13px] transition", supplierAccount === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t(a.label)}</button>)}
                   </div>
                   <input type="hidden" name="supplierAccount" value={supplierAccount} />
                 </div>
@@ -273,6 +287,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                 </div>
               )}
               {supplierPay === "unpaid" && <p className="mt-2 text-[12px] text-ink-3">{t("It will show in “Money we owe” until you mark it paid.")}</p>}
+              </>)}
             </div>
           )}
           {sellH > 0 && netH > 0 && marginTone !== "ok" && (
@@ -306,7 +321,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Into which bank account?")}</span>
             <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-xs">
               {ACCOUNTS.map((a) => (
-                <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>
+                <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t(a.label)}</button>
               ))}
             </div>
             <input type="hidden" name="account" value={account} />

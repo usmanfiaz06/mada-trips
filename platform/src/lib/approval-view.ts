@@ -29,5 +29,5 @@ export async function voteBoard(reqs: Req[]): Promise<Map<string, Board>> {
 }
 
 export function entityHref(r: Req) {
-  return r.entityType === "booking" ? `/adminwork/sales/${r.entityId}` : r.entityType === "expense" ? `/adminwork/expenses/${r.entityId}` : r.entityType === "client" ? `/adminwork/clients/${r.entityId}` : r.entityType === "settlement" ? `/adminwork/settlement/${r.entityId}` : r.entityType === "governance" ? ((r.payload as { type?: string } | null)?.type === "advance" ? "/adminwork/partners" : "/adminwork/settings") : "#";
+  return r.entityType === "booking" ? `/adminwork/sales/${r.entityId}` : r.entityType === "expense" ? `/adminwork/expenses/${r.entityId}` : r.entityType === "client" ? `/adminwork/clients/${r.entityId}` : r.entityType === "settlement" ? `/adminwork/settlement/${r.entityId}` : r.entityType === "governance" ? ((r.payload as { type?: string } | null)?.type === "advance" ? "/adminwork/partners" : "/adminwork/settings") : r.entityType === "cash" || r.entityType === "bsp" ? "/adminwork/finance" : "#";
 }

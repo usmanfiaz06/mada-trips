@@ -47,6 +47,7 @@ const SaleSchema = z.object({
   supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
   supplierAccount: z.enum(["retail", "corporate"]).catch("retail"),
   supplierPartnerId: z.string().optional(),
+  viaBsp: z.string().optional(),
 
   paymentRef: z.string().trim().max(60).optional(),
   issueNow: z.string().optional(),
@@ -136,7 +137,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       const [b] = await tx.insert(schema.bookings).values({
         ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers, paxCount: travellers.length, travellers,
         description: v.description || null, details, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
-        commissionBps: preparerRate,
+        commissionBps: preparerRate, viaBsp: v.serviceType === "flight" && v.viaBsp === "1",
         netCost: v.netCost, sellPrice: v.sellPrice, status: needsCredit ? "awaiting_credit" : "pending_issue",
         onCredit: unpaid > 0, dueDate: unpaid > 0 ? addDays(bdate, client.paymentTermsDays || 14) : null,
         businessDate: bdate, preparedBy: u.id,
@@ -152,8 +153,9 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
         await tx.insert(schema.remarks).values({ entityType: "booking", entityId: b.id, userId: u.id, body: v.note });
       }
 
-      // Supplier cost: paid now (from a bank, or a partner's cash → approval), or left as a payable.
-      if (v.supplierPay !== "unpaid" && v.netCost > 0) {
+      // Supplier cost: BSP flights roll into the 15-day IATA closing; everything else is a direct supplier payable.
+      const viaBsp = v.serviceType === "flight" && v.viaBsp === "1";
+      if (!viaBsp && v.supplierPay !== "unpaid" && v.netCost > 0) {
         if (v.supplierPay === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
         await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, recordedBy: u.id });
       }

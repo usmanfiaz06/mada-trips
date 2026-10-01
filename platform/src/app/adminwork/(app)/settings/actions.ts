@@ -9,13 +9,13 @@ import { toHalalas, sar } from "@/lib/money";
 import { str, toState, type ActionState } from "@/lib/actions";
 import { proposeGovernance, type GovernancePayload } from "@/lib/governance";
 
-const MONEY: (keyof Settings)[] = ["creditDualLimit", "expenseDualLimit", "iataBuffer", "iataReserveHeld"];
+const MONEY: (keyof Settings)[] = ["creditDualLimit", "expenseDualLimit", "cashMoveLimit", "iataBuffer", "iataReserveHeld"];
 const PCT: (keyof Settings)[] = ["repaymentPctBps", "targetMarginBps"];
 const INT: [keyof Settings, number, number][] = [["closeHour", 12, 23], ["cutoffDay", 1, 28], ["refundApprovals", 1, 3]];
 // Everyday settings apply at once. The rest decide who approves what and how profit is shared, so every other director must agree.
 const OPERATIONAL: (keyof Settings)[] = ["targetMarginBps", "closeHour"];
 const LABEL: Record<string, string> = {
-  creditDualLimit: "2-director credit limit", expenseDualLimit: "Single-verifier expense limit", iataBuffer: "IATA safety buffer", iataReserveHeld: "IATA reserve held",
+  creditDualLimit: "2-director credit limit", cashMoveLimit: "All-director bank-move limit", expenseDualLimit: "Single-verifier expense limit", iataBuffer: "IATA safety buffer", iataReserveHeld: "IATA reserve held",
   repaymentPctBps: "Default repayment share", targetMarginBps: "Target margin", closeHour: "Daily close hour", cutoffDay: "Settlement cut-off day", refundApprovals: "Refund approvals",
 };
 

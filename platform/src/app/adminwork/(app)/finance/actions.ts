@@ -10,6 +10,9 @@ import { flash, str, optStr, toState, type ActionState } from "@/lib/actions";
 import { getSettings, setSetting } from "@/lib/settings";
 import { proposeGovernance } from "@/lib/governance";
 import { isIsoDate, isUuid } from "@/lib/security";
+import { settleBspClosing } from "@/lib/bsp";
+import { ACCOUNT } from "@/lib/labels";
+import { proposeCashMove } from "@/lib/cash";
 
 export async function clearPayments(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
@@ -101,4 +104,58 @@ export async function updateBank(_: ActionState, fd: FormData): Promise<ActionSt
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork/finance");
   return { ok: proposed ? `Saved. The opening balance change was sent to the other directors as ${proposed}` : "Saved" };
+}
+
+export async function settleBsp(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const source = str(fd, "source") === "partner" ? "partner" : "bank";
+  const start = str(fd, "start"), end = str(fd, "end");
+  if (!isIsoDate(start) || !isIsoDate(end)) return { error: "Bad BSP period" };
+  try {
+    if (source === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid BSP settlement");
+    await db.transaction(async (tx) => {
+      await settleBspClosing(tx, { periodStart: start, periodEnd: end, source, account: str(fd, "account") || "corporate", partnerId: optStr(fd, "partnerId"), reference: optStr(fd, "reference"), settledBy: u.id });
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  return { ok: source === "partner" ? "Sent to the other directors to approve" : "IATA BSP marked paid" };
+}
+
+export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const account = str(fd, "account"), kind = str(fd, "kind");
+  const date = str(fd, "date") || riyadhDate();
+  if (!["retail", "corporate"].includes(account)) return { error: "Choose the bank account" };
+  if (!["deposit", "withdrawal", "adjustment"].includes(kind)) return { error: "Choose deposit or withdrawal" };
+  if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
+  try {
+    const amount = toHalalas(str(fd, "amount"));
+    if (amount <= 0) return { error: "Enter an amount" };
+    const direction = kind === "deposit" ? "in" as const : "out" as const;
+    const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
+      `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${ACCOUNT[account]} · SAR ${sar(amount)}`,
+      { op: "txn", account, direction, kind, amount, note, date }, amount));
+    revalidatePath("/adminwork", "layout");
+    return { ok: `Sent to the directors to approve (${ref.ref})` };
+  } catch (e) { return toState(e); }
+}
+
+export async function transferFunds(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const from = str(fd, "from"), to = str(fd, "to");
+  const date = str(fd, "date") || riyadhDate();
+  if (!["retail", "corporate"].includes(from) || !["retail", "corporate"].includes(to)) return { error: "Choose both accounts" };
+  if (from === to) return { error: "Choose two different accounts" };
+  if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
+  try {
+    const amount = toHalalas(str(fd, "amount"));
+    if (amount <= 0) return { error: "Enter an amount" };
+    const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
+      `Transfer ${ACCOUNT[from]} → ${ACCOUNT[to]} · SAR ${sar(amount)}`,
+      { op: "transfer", from, to, amount, note, date }, amount));
+    revalidatePath("/adminwork", "layout");
+    return { ok: `Sent to the directors to approve (${ref.ref})` };
+  } catch (e) { return toState(e); }
 }

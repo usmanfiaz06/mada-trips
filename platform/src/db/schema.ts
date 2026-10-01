@@ -120,6 +120,9 @@ export const bookings = pgTable("bookings", {
   netCost: money("net_cost").notNull(),
   // Whether the supplier's cost has been settled. Until then the booking sits in "money we owe".
   supplierPaid: boolean("supplier_paid").notNull().default(false),
+  // Flights are billed by IATA through BSP: their cost rolls into the 15-day BSP closing instead of a direct payable.
+  viaBsp: boolean("via_bsp").notNull().default(false),
+  bspClosingId: uuid("bsp_closing_id"),
   sellPrice: money("sell_price").notNull(),
   vatAmount: money("vat_amount").notNull().default(0),
   // The preparer's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
@@ -291,6 +294,38 @@ export const bankAccounts = pgTable("bank_accounts", {
   openingBalance: money("opening_balance").notNull().default(0),
   openingDate: date("opening_date").notNull(),
 });
+
+// A 15-day IATA/BSP closing: the total owed to IATA for flights issued in the window, and how it was settled.
+export const bspClosings = pgTable("bsp_closings", {
+  id: id(),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  dueDate: date("due_date").notNull(),        // period end + standard payment days
+  amount: money("amount").notNull(),          // frozen at settlement time
+  status: text("status").notNull().default("pending_approval"), // pending_approval | paid
+  source: text("source").notNull(),           // bank | partner
+  account: text("account"),                   // retail | corporate, when source = bank
+  partnerId: uuid("partner_id").references(() => partners.id),
+  approvalId: uuid("approval_id"),
+  reference: text("reference"),
+  paidOn: date("paid_on"),
+  settledBy: uuid("settled_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("bsp_closings_period_idx").on(t.periodEnd)]);
+
+// Manual money movements on a bank account that aren't a sale or expense: deposits, withdrawals, transfers.
+export const bankTransactions = pgTable("bank_transactions", {
+  id: id(),
+  account: text("account").notNull(),        // retail | corporate
+  direction: text("direction").notNull(),    // in | out
+  kind: text("kind").notNull(),              // deposit | withdrawal | transfer | adjustment
+  amount: money("amount").notNull(),
+  counterparty: text("counterparty"),        // the other account, for a transfer
+  note: text("note"),
+  txnDate: date("txn_date").notNull(),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("bank_txn_account_idx").on(t.account)]);
 
 export const settlementCycles = pgTable("settlement_cycles", {
   id: id(),
