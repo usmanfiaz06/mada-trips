@@ -30,7 +30,7 @@ export async function whatsDue(u: CurrentUser): Promise<Alert[]> {
   const t = await getT();
   const today = riyadhDate();
 
-  const [approvals, tasks, leads, issuance, closes] = await Promise.all([
+  const [approvals, tasks, leads, issuance, closes, flightReview] = await Promise.all([
     db.transaction((tx) => pendingForUser(tx, u.id)),
     myUrgentTasks(u.id, today),
     u.permissions.has("leads.view")
@@ -41,6 +41,12 @@ export async function whatsDue(u: CurrentUser): Promise<Alert[]> {
       : 0),
     u.permissions.has("close.verify")
       ? db.select({ n: sql<number>`count(*)::int` }).from(schema.dailyCloses).where(eq(schema.dailyCloses.status, "submitted")).then((r) => r[0].n)
+      : Promise.resolve(0),
+    // Flights recorded before the IATA/Direct choice, still sitting in the IATA balance unconfirmed.
+    u.permissions.has("finance.reconcile")
+      ? db.select({ n: sql<number>`count(*)::int` }).from(schema.bookings)
+          .where(and(eq(schema.bookings.serviceType, "flight"), eq(schema.bookings.viaBsp, true), eq(schema.bookings.supplierReviewed, false),
+            sql`${schema.bookings.status} not in ('void','refunded','draft')`)).then((r) => r[0].n)
       : Promise.resolve(0),
   ]);
 
@@ -95,6 +101,16 @@ export async function whatsDue(u: CurrentUser): Promise<Alert[]> {
       key: `issuance:${issuance}`, tone: "warn", icon: "Ticket",
       title: issuance === 1 ? t("1 booking is waiting to be issued") : t("{n} bookings are waiting to be issued", { n: issuance }),
       href: "/adminwork/issuance",
+    });
+  }
+
+  // Older flight tickets to confirm as IATA or direct (one-time cleanup after the settlement fix).
+  if (flightReview > 0) {
+    out.push({
+      key: `flight-review:${flightReview}`, tone: "warn", icon: "Ticket",
+      title: flightReview === 1 ? t("1 older ticket needs a settlement check") : t("{n} older tickets need a settlement check", { n: flightReview }),
+      detail: t("Confirm each was bought through IATA or direct"),
+      href: "/adminwork/sales/review",
     });
   }
 

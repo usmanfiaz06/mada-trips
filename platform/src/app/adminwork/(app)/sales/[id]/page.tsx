@@ -13,7 +13,7 @@ import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
-import { issueBooking, paySupplier, recordPayment, requestRefund, resubmitBooking, returnBooking, voidBooking } from "../actions";
+import { issueBooking, paySupplier, recordPayment, requestRefund, resubmitBooking, returnBooking, reviewFlightSettlement, voidBooking } from "../actions";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
 import { NATIONALITIES, expiresSoon, type Traveller } from "@/lib/services";
@@ -169,6 +169,27 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
             <Card>
               <CardHead title={t("Supplier cost")} hint={b.viaBsp ? t("IATA (BSP)") : b.supplier ?? undefined}
                 action={<span className="num text-[15px]" dir="ltr">{sar(b.netCost)}</span>} />
+              {b.serviceType === "flight" && can(u, "finance.reconcile") && !b.bspClosingId && supplierPay?.sp.status !== "settled" && supplierPay?.sp.status !== "pending_approval" && (
+                !b.supplierReviewed ? (
+                  <div className="mb-3 rounded-2xl bg-gold/10 p-3 ring-1 ring-gold/30">
+                    <p className="mb-2 text-[13px] text-ink-2">{t("This ticket predates the IATA / Direct choice. How was it bought?")}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {([["bsp", t("IATA / BSP")], ["direct", t("Direct / other supplier")]] as [string, string][]).map(([c, label]) => (
+                        <ActionForm key={c} action={reviewFlightSettlement} className="inline-flex">
+                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="choice" value={c} />
+                          <SubmitButton variant="outline" size="sm">{label}</SubmitButton>
+                        </ActionForm>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <ActionForm action={reviewFlightSettlement} className="mb-3 flex items-center gap-2 text-[12px] text-ink-3">
+                    <input type="hidden" name="id" value={b.id} /><input type="hidden" name="choice" value={b.viaBsp ? "direct" : "bsp"} />
+                    <span>{t("Recorded wrong?")}</span>
+                    <button type="submit" className="underline decoration-dotted underline-offset-2 hover:text-ink">{b.viaBsp ? t("Move to a direct supplier") : t("Move to IATA / BSP")}</button>
+                  </ActionForm>
+                )
+              )}
               {b.viaBsp ? (
                 <p className="flex items-center gap-2 text-[13.5px] text-ink-2"><Landmark className="size-4 text-ink-3" />{b.supplierPaid ? t("Paid to IATA in a BSP closing") : t("Billed by IATA — settled in the 15-day BSP closing")}</p>
               ) : b.supplierPaid ? (
