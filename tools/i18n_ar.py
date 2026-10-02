@@ -11,11 +11,11 @@ HEADLINES = {
     # ---------- home ----------
     'Every horizon, within reach.': '<span class="line"><span>كل أفق،</span></span><span class="line"><span>في <em>المتناول.</em></span></span>',
     'Mada is Arabic for reach. We carry travellers, talent and ideas across the Kingdom and far beyond it.':
-        'من <em>المدى</em> جاء اسمنا، ومنه وعدنا: أن نقرّب لك كل بعيد، في أرجاء المملكة وما وراءها.',
+        'مادا تعني <em>مدى</em>؛ ننقل المسافرين والكفاءات والأفكار والحلول، ونختصر الطريق للجميع.',
     'Go further than the itinerary.': 'اذهب أبعد<br><span class="muted">من مجرد برنامج رحلة.</span>',
     "Arrive to a room that's ready.": 'تصل<br><span class="muted">إلى غرفة جاهزة.</span>',
     'Build with people who deliver.': 'ابنِ<br><span class="muted">مع من يُنجز.</span>',
-    'Celebrate at the scale of a kingdom.': 'احتفل<br><span class="muted">بما يليق بالمملكة.</span>',
+    'Celebrate at the scale of a kingdom.': 'احتفل<br><span class="muted">بحجم يليق بفعاليتك.</span>',
     'One call. Everything moves.': 'اتصال واحد.<br>وكل شيء يتحرك.',
     'Every seat. Every sky.': 'كل مقعد.<br>كل سماء.',
     'From NEOM to Dammam. One partner, every city.': 'من نيوم إلى الدمام.<br><span class="muted">شريك واحد في كل مدينة.</span>',
