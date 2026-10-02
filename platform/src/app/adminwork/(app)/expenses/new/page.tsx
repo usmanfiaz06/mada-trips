@@ -16,7 +16,7 @@ export default async function NewExpense() {
     .map((p) => ({ id: p.id, name: t.locale === "ar" ? p.nameAr : p.name })) : [];
   return (
     <>
-      <PageHeader eyebrow={t("Expenses")} title={t("Add expense")} subtitle={t("Amount, proof and reason. That's all verification needs.")} />
+      <PageHeader eyebrow={t("Expenses")} title={t("Add expense")} subtitle={t("Enter the amount, attach proof, and add a reason. That's all a verifier needs.")} />
       <ExpenseForm categories={Object.entries(EXPENSE_CATEGORY).filter(([k]) => k !== "commission")} isPartner={!!u.partnerId} myPartnerId={u.partnerId} partners={partners} today={riyadhDate()} />
     </>
   );

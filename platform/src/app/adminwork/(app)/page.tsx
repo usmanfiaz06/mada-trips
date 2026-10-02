@@ -94,7 +94,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                       className={cx("rounded-full px-3 py-1 transition", d.view === k ? "bg-tile-ink text-tile" : "text-tile-ink-3 hover:text-tile-ink")}>{label}</Link>
                   ))}
                 </div>
-                <h2 className="mt-4 text-[20px] font-[420] tracking-[-0.02em]">{t("Every sale, one line")}</h2>
+                <h2 className="mt-4 text-[20px] font-[420] tracking-[-0.02em]">{t("One bar for each sale")}</h2>
                 <p className="mt-1 text-[12.5px] text-tile-ink-3">{fmtDate(d.cycle.start, L)} → {fmtDate(d.cycle.end, L)}</p>
               </div>
               <div className="flex gap-8">
@@ -227,7 +227,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </Card>
 
         <Card className="flex flex-col lg:col-span-4">
-          <CardHead title={t("Margin, last 14 days")} hint={t("Each dot ≈ SAR {v} of margin", { v: (dotUnit / 100).toLocaleString("en-US") })} />
+          <CardHead title={t("Margin, last 14 days")} hint={t("Each dot is about SAR {v} of margin", { v: (dotUnit / 100).toLocaleString("en-US") })} />
           <div className="mt-auto">
             <DotColumns rows={10} unit={dotUnit * 10} data={d.last14.map((x) => ({ label: fmtDate(x.d, "en").split(" ").slice(0, 2).join(" "), value: x.margin, display: `${sar(x.margin)} · ${x.sales} ${t("sales")}` }))} />
           </div>

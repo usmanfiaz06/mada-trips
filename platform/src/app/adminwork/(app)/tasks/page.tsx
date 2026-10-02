@@ -124,7 +124,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         {manager && (
           <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <Card>
-              <CardHead title={t("Who's behind")} hint={t("Open work per person. Late first.")} />
+              <CardHead title={t("Who's behind")} hint={t("Open tasks for each person, overdue ones first.")} />
               {board.length === 0 ? <p className="text-[13px] text-ink-3">{t("No one has tasks yet.")}</p> : (
                 <ul className="-mx-2 space-y-0.5">
                   {board.map((p) => {
