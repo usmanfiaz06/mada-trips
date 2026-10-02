@@ -26,7 +26,7 @@ HEADLINES = {
     'Where the Kingdom gathers.': 'حيث تجتمع<br><em>المملكة.</em>',
     'You set the destination. We handle the distance.': 'أنت تحدد الوجهة.<br>ونحن نختصر المسافة.',
     'A date on a calendar to some. A direction to us.': 'عند البعض تاريخ في التقويم.<br>وعندنا اتجاه.',
-    'The doors are opening. We make sure the world walks through them.': 'الأبواب تُفتح.<br><em>ونحن نضمن أن يعبرها العالم.</em>',
+    'The doors are opening. We make sure the world walks through them.': 'الأبواب تُفتح<br><em>ونحنُ نمهد طريق العبور للعالم.</em>',
     'Where will you reach next?': 'إلى أين<br>ستصل <em>بعدها؟</em>',
     # ---------- events ----------
     'We build the night everyone remembers.': 'نصنع الليلة<br>التي <em>لا تُنسى.</em>',
