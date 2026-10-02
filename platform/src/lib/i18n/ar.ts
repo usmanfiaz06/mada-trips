@@ -1244,4 +1244,14 @@ export const AR: Record<string, string> = {
   "{n} bookings are waiting to be issued": "{n} حجوزات بانتظار الإصدار",
   "1 daily close needs verifying": "إقفال يومي واحد بحاجة للتحقق",
   "{n} daily closes need verifying": "{n} إقفالات يومية بحاجة للتحقق",
+  // Flight supplier settlement
+  "How did we buy this ticket{from}?": "كيف اشترينا هذه التذكرة{from}؟",
+  "from": "من",
+  "IATA / BSP": "آياتا / BSP",
+  "Rolls into the 15-day IATA closing": "تُدرج ضمن إقفال آياتا كل 15 يومًا",
+  "Direct / other supplier": "مباشرة / مورد آخر",
+  "Paid to the airline or a wholesaler": "تُدفع لشركة الطيران أو لموزّع",
+  "Pick how this ticket was bought.": "اختر طريقة شراء هذه التذكرة.",
+  "Billed by IATA — this cost rolls into the 15-day BSP closing, not “Money we owe”.": "مفوترة عبر آياتا — تُدرج ضمن إقفال BSP كل 15 يومًا، وليست في «أموال مستحقة علينا».",
+  "Choose how this ticket was bought — IATA (BSP) or direct from the airline": "اختر طريقة شراء التذكرة — آياتا (BSP) أو مباشرة من شركة الطيران",
 };

@@ -93,6 +93,8 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
     if (!m || !AIRPORT_CODES.has(m[1]) || !AIRPORT_CODES.has(m[3])) return { error: "Pick both airports from the list", fields: { description: "x" } };
     if (m[1] === m[3]) return { error: "From and To can't be the same airport", fields: { description: "x" } };
     if (!v.supplier || !AIRLINE_LABELS.has(v.supplier)) return { error: "Pick the airline from the list", fields: { supplier: "x" } };
+    // No silent IATA: a flight only lands in the IATA balance when it was explicitly bought through BSP.
+    if (v.viaBsp !== "1" && v.viaBsp !== "0") return { error: "Choose how this ticket was bought — IATA (BSP) or direct from the airline", fields: { viaBsp: "x" } };
   }
 
   let id = "";
