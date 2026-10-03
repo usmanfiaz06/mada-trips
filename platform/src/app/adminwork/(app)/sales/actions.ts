@@ -340,6 +340,37 @@ export async function recordPayment(_: ActionState, fd: FormData): Promise<Actio
   return null;
 }
 
+/**
+ * Ask a director to void (delete) a sale. The record is kept but, once one director approves, the sale
+ * leaves the books: it drops out of receivables, payables and the IATA balance, and any money received
+ * on it comes back out of the bank balance. For issued tickets, use a refund instead.
+ */
+export async function requestVoid(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  if (!can(u, "sales.create") && !can(u, "sales.edit")) return { error: "You can't void sales" };
+  const id = str(fd, "id"), reason = str(fd, "reason");
+  if (!reason) return { error: "Give a reason so the director can decide" };
+  if (reason.length > 1000) return { error: "Keep the reason under 1,000 characters" };
+  try {
+    await loadScopedBooking(u, id);
+    const s = await getSettings();
+    await db.transaction(async (tx) => {
+      const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
+      if (!b) throw new Error("Sale not found");
+      if (["void", "refunded"].includes(b.status)) throw new Error("This sale is already closed");
+      if (b.recognizedCycleId) throw new Error("This sale is part of a signed Day-25 settlement. Request a refund instead");
+      if (b.status === "issued" && (!b.issuedAt || businessDate(b.issuedAt, s.closeHour) !== businessDate(new Date(), s.closeHour)))
+        throw new Error("Issued tickets can only be voided on the day they were issued. Request a refund instead");
+      const [open] = await tx.select().from(schema.approvalRequests).where(and(eq(schema.approvalRequests.entityId, id), eq(schema.approvalRequests.kind, "void"), eq(schema.approvalRequests.status, "pending")));
+      if (open) throw new Error(`A void request (${open.ref}) is already open`);
+      const r = await createApproval(tx, { kind: "void", entityType: "booking", entityId: id, title: `Void ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id });
+      await flash(`Void request ${r.ref} sent to a director`);
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/sales/${id}`);
+}
+
 export async function voidBooking(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requireUser();
   const id = str(fd, "id"), reason = str(fd, "reason");

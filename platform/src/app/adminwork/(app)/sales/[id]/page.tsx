@@ -13,7 +13,7 @@ import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
-import { issueBooking, paySupplier, recordPayment, requestRefund, resubmitBooking, returnBooking, reviewFlightSettlement, voidBooking } from "../actions";
+import { issueBooking, paySupplier, recordPayment, requestRefund, requestVoid, resubmitBooking, returnBooking, reviewFlightSettlement } from "../actions";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
 import { NATIONALITIES, expiresSoon, type Traveller } from "@/lib/services";
@@ -50,6 +50,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   const issuable = b.status === "pending_issue" && (await issueCheck(db, u, b));
   const credit = approvals.find((a) => a.kind === "credit");
   const refund = approvals.find((a) => a.kind === "refund" && a.status === "pending");
+  const voidReq = approvals.find((a) => a.kind === "void" && a.status === "pending");
   const path = `/adminwork/sales/${id}`;
 
   const steps: JourneyStep[] = [
@@ -279,10 +280,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                       <textarea name="reason" rows={2} className="field" placeholder={t("Why? Directors approve refunds")} /><SubmitButton variant="outline" size="sm">{t("Send refund request")}</SubmitButton></ActionForm></details>
                 )}
                 {refund && <Link href={`/adminwork/approvals/${refund.id}`} className="flex items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><RotateCcw className="size-4" />{t("Refund requested")} · {refund.ref}</Link>}
-                {b.status !== "issued" && paid === 0 && (b.preparedBy === u.id || can(u, "sales.edit")) && (
-                  <details><summary className="flex cursor-pointer list-none items-center gap-2 text-[13.5px] text-bad"><Ban className="size-4" />{t("Void this sale")}</summary>
-                    <ActionForm action={voidBooking} className="mt-3 space-y-2"><input type="hidden" name="id" value={b.id} />
-                      <input name="reason" className="field" placeholder={t("Reason")} /><SubmitButton variant="danger" size="sm">{t("Void sale")}</SubmitButton></ActionForm></details>
+                {voidReq ? (
+                  <Link href={`/adminwork/approvals/${voidReq.id}`} className="flex items-center gap-2 text-[13.5px] text-bad hover:opacity-80"><Ban className="size-4" />{t("Void requested")} · {voidReq.ref}</Link>
+                ) : b.status !== "issued" && (b.preparedBy === u.id || can(u, "sales.edit")) && (
+                  <details><summary className="flex cursor-pointer list-none items-center gap-2 text-[13.5px] text-bad"><Ban className="size-4" />{t("Void (delete) this sale")}</summary>
+                    <ActionForm action={requestVoid} className="mt-3 space-y-2"><input type="hidden" name="id" value={b.id} />
+                      <textarea name="reason" rows={2} className="field" placeholder={t("Why void it? A director must approve")} />
+                      <p className="text-[12px] text-ink-3">{t("Kept on record but removed from the books once a director approves. Any money recorded against it comes back out of the balance.")}</p>
+                      <SubmitButton variant="danger" size="sm">{t("Send void request")}</SubmitButton></ActionForm></details>
                 )}
                 <Link href={`/adminwork/sales/new?client=${c.id}`} className="flex items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><Receipt className="size-4" />{t("New sale for this client")}</Link>
               </div>

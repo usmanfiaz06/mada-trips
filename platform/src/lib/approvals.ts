@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { nextRef } from "./refs";
@@ -8,7 +8,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -104,6 +104,8 @@ export async function createApproval(tx: Tx, input: CreateInput) {
     pool = "directors";
     if (input.amount < s.cashMoveLimit) { required = 1; rule = `Bank move under SAR ${sar(s.cashMoveLimit)}: one director approves`; }
     else { requiresAll = true; rule = `SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
+  } else if (input.kind === "void") {
+    pool = "directors"; required = 1; rule = "Voiding a sale: one director approves";
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -234,6 +236,18 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       if (!b || !ok) return;
       await tx.update(schema.bookings).set({ status: "refunded", updatedAt: new Date() }).where(eq(schema.bookings.id, b.id));
       await audit(tx, { actorId: null, action: "booking.refunded", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `${b.ref} refunded` });
+      return;
+    }
+    case "void": {
+      if (!ok) return;
+      const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, req.entityId));
+      if (!b || b.status === "void" || b.status === "refunded") return;
+      // Soft delete: the record stays, but it leaves the books. Receivables, payables and the IATA balance
+      // all ignore void sales, and a void sale's received payments drop out of the bank balance too.
+      await tx.update(schema.bookings).set({ status: "void", returnNote: req.reason, updatedAt: new Date() }).where(eq(schema.bookings.id, b.id));
+      await tx.update(schema.approvalRequests).set({ status: "cancelled", decidedAt: new Date() })
+        .where(and(eq(schema.approvalRequests.entityId, b.id), eq(schema.approvalRequests.status, "pending"), ne(schema.approvalRequests.id, req.id)));
+      await audit(tx, { actorId: null, action: "booking.voided", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `${b.ref} voided after approval${req.reason ? `: "${req.reason}"` : ""}` });
       return;
     }
     case "governance": {
