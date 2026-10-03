@@ -32,13 +32,21 @@ export async function clearPayments(_: ActionState, fd: FormData): Promise<Actio
   if (date > riyadhDate()) return { error: "Funds can't clear in the future" };
   try {
     const n = await db.transaction(async (tx) => {
-      const rows = await tx.select({ p: schema.payments, ref: schema.bookings.ref }).from(schema.payments).leftJoin(schema.bookings, eq(schema.bookings.id, schema.payments.bookingId))
+      // Lock only the payment rows — FOR UPDATE can't be applied across the nullable side of a LEFT JOIN,
+      // so booking refs (just for the audit note) are fetched separately below.
+      const rows = await tx.select().from(schema.payments)
         .where(and(inArray(schema.payments.id, ids), isNull(schema.payments.clearedOn))).for("update");
-      if (rows.some((r) => date < r.p.businessDate)) throw new Error("A receipt can't clear before it was collected");
       if (!rows.length) return 0;
-      await tx.update(schema.payments).set({ clearedOn: date, clearedBy: u.id }).where(and(inArray(schema.payments.id, rows.map((r) => r.p.id)), isNull(schema.payments.clearedOn)));
+      if (rows.some((r) => date < r.businessDate)) throw new Error("A receipt can't clear before it was collected");
+      await tx.update(schema.payments).set({ clearedOn: date, clearedBy: u.id }).where(and(inArray(schema.payments.id, rows.map((r) => r.id)), isNull(schema.payments.clearedOn)));
+      const bookingIds = [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))];
+      const refs = new Map<string, string>();
+      if (bookingIds.length) {
+        for (const bk of await tx.select({ id: schema.bookings.id, ref: schema.bookings.ref }).from(schema.bookings).where(inArray(schema.bookings.id, bookingIds))) refs.set(bk.id, bk.ref);
+      }
       for (const r of rows) {
-        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.p.bookingId, entityRef: r.ref, summary: `Marked ${sar(r.p.amount)} for ${r.ref ?? "receipt"} as cleared in the ${r.p.account} account on ${date}` });
+        const ref = r.bookingId ? refs.get(r.bookingId) ?? null : null;
+        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.bookingId, entityRef: ref, summary: `Marked ${sar(r.amount)} for ${ref ?? "receipt"} as cleared in the ${r.account} account on ${date}` });
       }
       return rows.length;
     });
