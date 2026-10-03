@@ -23,10 +23,12 @@ export async function partnerBalances(q: Q = db) {
 /** Cash in each bank account from what the platform knows has cleared or been paid out. */
 export async function cashPosition(q: Q = db) {
   const accounts = await q.select().from(schema.bankAccounts);
+  // A voided or refunded sale leaves the books: its received money no longer counts as cash on hand.
+  const notVoided = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
   const inflow = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
-    .from(schema.payments).where(isNotNull(schema.payments.clearedOn)).groupBy(schema.payments.account);
+    .from(schema.payments).where(and(isNotNull(schema.payments.clearedOn), notVoided)).groupBy(schema.payments.account);
   const uncleared = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
-    .from(schema.payments).where(isNull(schema.payments.clearedOn)).groupBy(schema.payments.account);
+    .from(schema.payments).where(and(isNull(schema.payments.clearedOn), notVoided)).groupBy(schema.payments.account);
   const exp = await q.select({ account: schema.expenses.paidBy, total: sql<number>`coalesce(sum(${schema.expenses.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.expenses).where(and(eq(schema.expenses.status, "approved"), ne(schema.expenses.paidBy, "partner"))).groupBy(schema.expenses.paidBy);
   const bsp = await q.select({ account: schema.bspObligations.account, total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -115,7 +117,7 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
   const rows = await q.execute<Movement>(sql`
     (SELECT p.collected_at::date::text AS date, 'receipt' AS kind, c.name AS label, b.ref, p.amount::bigint AS amount, (p.cleared_on IS NOT NULL) AS cleared, NULL::text AS by
        FROM payments p JOIN clients c ON c.id = p.client_id LEFT JOIN bookings b ON b.id = p.booking_id
-       WHERE p.account = ${account})
+       WHERE p.account = ${account} AND (b.id IS NULL OR b.status NOT IN ('void','refunded')))
     UNION ALL
     (SELECT sp.paid_on::text, 'supplier', sp.supplier, b.ref, -sp.amount::bigint, true, NULL
        FROM supplier_payments sp JOIN bookings b ON b.id = sp.booking_id

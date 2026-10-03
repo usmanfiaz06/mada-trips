@@ -1278,4 +1278,14 @@ export const AR: Record<string, string> = {
   "Cost": "التكلفة",
   "Who made it? (optional)": "من قام بها؟ (اختياري)",
   "Choose who made the transaction": "اختر من قام بالعملية",
+  // Void (delete) a sale
+  "Void (delete) this sale": "إلغاء (حذف) هذا البيع",
+  "Why void it? A director must approve": "لماذا تريد إلغاءه؟ يجب أن يعتمده مدير",
+  "Kept on record but removed from the books once a director approves. Any money recorded against it comes back out of the balance.": "يبقى في السجل لكنه يُزال من الحسابات بعد اعتماد مدير. وأي مبلغ سُجّل عليه يُخصم من الرصيد.",
+  "Send void request": "إرسال طلب الإلغاء",
+  "Void requested": "طُلب الإلغاء",
+  "You can't void sales": "لا يمكنك إلغاء المبيعات",
+  "Give a reason so the director can decide": "اذكر سببًا ليتمكن المدير من البت",
+  "This sale is already closed": "هذا البيع مُغلق بالفعل",
+  "Issued tickets can only be voided on the day they were issued. Request a refund instead": "لا يمكن إلغاء التذاكر الصادرة إلا في يوم إصدارها. اطلب استردادًا بدلًا من ذلك",
 };
