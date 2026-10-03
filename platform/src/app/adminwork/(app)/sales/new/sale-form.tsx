@@ -74,7 +74,9 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [account, setAccount] = useState<"retail" | "corporate">("retail");
   const [supplierPay, setSupplierPay] = useState("unpaid");
   const [supplierAccount, setSupplierAccount] = useState<"retail" | "corporate">("retail");
-  const [viaBsp, setViaBsp] = useState(true);
+  // How a flight's cost is settled. Empty until the salesperson picks — nothing lands in the IATA
+  // balance by default; only a ticket explicitly bought through BSP rolls into the closing.
+  const [settle, setSettle] = useState<"bsp" | "direct" | "">("");
   const [names, setNames] = useState<string[]>([]);
   const [count, setCount] = useState(1);
   const [tickets, setTickets] = useState<string[]>([]); // kept in state so a failed save doesn't wipe them
@@ -250,17 +252,27 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <div className="mt-4 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
               {service === "flight" && (
                 <div className="mb-3">
-                  <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Settled through")}</span>
-                  <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-sm">
-                    <button type="button" onClick={() => setViaBsp(true)} className={cx("h-9 rounded-full text-[13px] transition", viaBsp ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t("IATA (BSP)")}</button>
-                    <button type="button" onClick={() => setViaBsp(false)} className={cx("h-9 rounded-full text-[13px] transition", !viaBsp ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t("Directly with airline")}</button>
+                  <span className="mb-2 block text-[12.5px] text-ink-3">{t("How did we buy this ticket{from}?", { from: airline ? ` ${t("from")} ${airline}` : "" })}</span>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {([
+                      ["bsp", t("IATA / BSP"), t("Rolls into the 15-day IATA closing")],
+                      ["direct", t("Direct / other supplier"), t("Paid to the airline or a wholesaler")],
+                    ] as ["bsp" | "direct", string, string][]).map(([k, title, sub]) => (
+                      <button key={k} type="button" onClick={() => setSettle(k)}
+                        className={cx("flex flex-col items-start gap-0.5 rounded-xl p-3 text-start ring-1 transition",
+                          settle === k ? "bg-ink text-bg ring-ink" : state?.fields?.viaBsp && !settle ? "bg-surface text-ink-2 ring-bad" : "bg-surface text-ink-2 ring-line hover:ring-line-strong")}>
+                        <span className="flex items-center gap-1.5 text-[13px] font-medium">{k === "bsp" ? <Landmark className="size-3.5" /> : <Building2 className="size-3.5" />}{title}</span>
+                        <span className={cx("text-[11.5px]", settle === k ? "text-bg/70" : "text-ink-3")}>{sub}</span>
+                      </button>
+                    ))}
                   </div>
+                  {state?.fields?.viaBsp && !settle && <p className="mt-1.5 text-[12px] text-bad">{t("Pick how this ticket was bought.")}</p>}
                 </div>
               )}
-              <input type="hidden" name="viaBsp" value={service === "flight" && viaBsp ? "1" : ""} />
-              {service === "flight" && viaBsp ? (
-                <p className="flex items-start gap-2 text-[12.5px] text-ink-3"><Landmark className="mt-0.5 size-3.5 shrink-0" />{t("Billed by IATA — this cost rolls into the 15-day BSP closing.")}</p>
-              ) : (<>
+              <input type="hidden" name="viaBsp" value={service === "flight" ? (settle === "bsp" ? "1" : settle === "direct" ? "0" : "") : ""} />
+              {service === "flight" && settle === "bsp" ? (
+                <p className="flex items-start gap-2 text-[12.5px] text-ink-3"><Landmark className="mt-0.5 size-3.5 shrink-0" />{t("Billed by IATA — this cost rolls into the 15-day BSP closing, not “Money we owe”.")}</p>
+              ) : (service !== "flight" || settle === "direct") ? (<>
               <span className="mb-2 block text-[12.5px] text-ink-3">{t("Supplier cost — have we paid it?")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
@@ -287,7 +299,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                 </div>
               )}
               {supplierPay === "unpaid" && <p className="mt-2 text-[12px] text-ink-3">{t("It will show in “Money we owe” until you mark it paid.")}</p>}
-              </>)}
+              </>) : null}
             </div>
           )}
           {sellH > 0 && netH > 0 && marginTone !== "ok" && (

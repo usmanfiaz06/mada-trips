@@ -41,7 +41,7 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-4">
           <Card pad={false}>
-            <div className="p-6 pb-4"><CardHead className="mb-4" title={t("Today · {date}", { date: fmtDate(today, L) })} hint={t("Live. Updates as the team works.")} /><ReportTotals r={report} /></div>
+            <div className="p-6 pb-4"><CardHead className="mb-4" title={t("Today · {date}", { date: fmtDate(today, L) })} hint={t("Updates live as the team works.")} /><ReportTotals r={report} /></div>
             {report.rows.length ? <ReportTable r={report} /> : <Empty icon={<MoonStar className="size-5" />} title={t("No sales yet today")} />}
           </Card>
         </div>
@@ -56,7 +56,7 @@ export default async function ClosePage({ searchParams }: { searchParams: Promis
             </InkCard>
           ) : canSubmit && (u.team === team || u.team === "management") ? (
             <Card className="ring-2 ring-gold/30">
-              <CardHead title={t("Close today")} hint={t("Check the list, count the cash, submit.")} />
+              <CardHead title={t("Close today")} hint={t("Go through the list, count the cash, then submit.")} />
               <ul className="mb-5 space-y-2">
                 {report.issues.length === 0 ? (
                   <li className="flex items-center gap-2 rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[13.5px] text-ok"><Check className="size-4" />{t("Everything is complete")}</li>

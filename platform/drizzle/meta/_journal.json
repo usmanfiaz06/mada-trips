@@ -92,6 +92,20 @@
       "when": 1790851550234,
       "tag": "0012_bank_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790851551234,
+      "tag": "0013_supplier_reviewed",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790851552234,
+      "tag": "0014_bank_txn_partner",
+      "breakpoints": true
     }
   ]
 }

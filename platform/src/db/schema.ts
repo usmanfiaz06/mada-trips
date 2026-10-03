@@ -120,6 +120,9 @@ export const bookings = pgTable("bookings", {
   netCost: money("net_cost").notNull(),
   // Whether the supplier's cost has been settled. Until then the booking sits in "money we owe".
   supplierPaid: boolean("supplier_paid").notNull().default(false),
+  // A director has confirmed how this flight was bought (IATA/BSP vs direct). New sales set this on
+  // creation; older tickets default to false so they can be reviewed once and routed correctly.
+  supplierReviewed: boolean("supplier_reviewed").notNull().default(false),
   // Flights are billed by IATA through BSP: their cost rolls into the 15-day BSP closing instead of a direct payable.
   viaBsp: boolean("via_bsp").notNull().default(false),
   bspClosingId: uuid("bsp_closing_id"),
@@ -322,6 +325,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   amount: money("amount").notNull(),
   counterparty: text("counterparty"),        // the other account, for a transfer
   note: text("note"),
+  // The partner who physically made the deposit / withdrawal / transfer (for attribution).
+  partnerId: uuid("partner_id").references(() => partners.id),
   txnDate: date("txn_date").notNull(),
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),

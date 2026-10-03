@@ -14,6 +14,15 @@ import { settleBspClosing } from "@/lib/bsp";
 import { ACCOUNT } from "@/lib/labels";
 import { proposeCashMove } from "@/lib/cash";
 
+/** Validate an optional "which partner did this" id — must be a real partner, or nothing. */
+async function validPartner(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  if (!isUuid(id)) throw new Error("Choose who made the transaction");
+  const [p] = await db.select({ id: schema.partners.id }).from(schema.partners).where(eq(schema.partners.id, id));
+  if (!p) throw new Error("Choose who made the transaction");
+  return p.id;
+}
+
 export async function clearPayments(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
   const ids = fd.getAll("ids").map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x));
@@ -23,13 +32,21 @@ export async function clearPayments(_: ActionState, fd: FormData): Promise<Actio
   if (date > riyadhDate()) return { error: "Funds can't clear in the future" };
   try {
     const n = await db.transaction(async (tx) => {
-      const rows = await tx.select({ p: schema.payments, ref: schema.bookings.ref }).from(schema.payments).leftJoin(schema.bookings, eq(schema.bookings.id, schema.payments.bookingId))
+      // Lock only the payment rows — FOR UPDATE can't be applied across the nullable side of a LEFT JOIN,
+      // so booking refs (just for the audit note) are fetched separately below.
+      const rows = await tx.select().from(schema.payments)
         .where(and(inArray(schema.payments.id, ids), isNull(schema.payments.clearedOn))).for("update");
-      if (rows.some((r) => date < r.p.businessDate)) throw new Error("A receipt can't clear before it was collected");
       if (!rows.length) return 0;
-      await tx.update(schema.payments).set({ clearedOn: date, clearedBy: u.id }).where(and(inArray(schema.payments.id, rows.map((r) => r.p.id)), isNull(schema.payments.clearedOn)));
+      if (rows.some((r) => date < r.businessDate)) throw new Error("A receipt can't clear before it was collected");
+      await tx.update(schema.payments).set({ clearedOn: date, clearedBy: u.id }).where(and(inArray(schema.payments.id, rows.map((r) => r.id)), isNull(schema.payments.clearedOn)));
+      const bookingIds = [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))];
+      const refs = new Map<string, string>();
+      if (bookingIds.length) {
+        for (const bk of await tx.select({ id: schema.bookings.id, ref: schema.bookings.ref }).from(schema.bookings).where(inArray(schema.bookings.id, bookingIds))) refs.set(bk.id, bk.ref);
+      }
       for (const r of rows) {
-        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.p.bookingId, entityRef: r.ref, summary: `Marked ${sar(r.p.amount)} for ${r.ref ?? "receipt"} as cleared in the ${r.p.account} account on ${date}` });
+        const ref = r.bookingId ? refs.get(r.bookingId) ?? null : null;
+        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.bookingId, entityRef: ref, summary: `Marked ${sar(r.amount)} for ${ref ?? "receipt"} as cleared in the ${r.account} account on ${date}` });
       }
       return rows.length;
     });
@@ -133,9 +150,10 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
     if (amount <= 0) return { error: "Enter an amount" };
     const direction = kind === "deposit" ? "in" as const : "out" as const;
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const partnerId = await validPartner(optStr(fd, "partnerId"));
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
       `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${ACCOUNT[account]} · SAR ${sar(amount)}`,
-      { op: "txn", account, direction, kind, amount, note, date }, amount));
+      { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }
@@ -152,9 +170,10 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
     const amount = toHalalas(str(fd, "amount"));
     if (amount <= 0) return { error: "Enter an amount" };
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const partnerId = await validPartner(optStr(fd, "partnerId"));
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
       `Transfer ${ACCOUNT[from]} → ${ACCOUNT[to]} · SAR ${sar(amount)}`,
-      { op: "transfer", from, to, amount, note, date }, amount));
+      { op: "transfer", from, to, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }

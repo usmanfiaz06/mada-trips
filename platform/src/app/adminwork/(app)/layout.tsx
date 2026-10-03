@@ -1,19 +1,19 @@
-import Link from "next/link";
-import { Bell } from "lucide-react";
 import { requireUser, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { navCounts } from "@/lib/counts";
 import { canSeeIssuance } from "@/lib/issuance";
+import { whatsDue } from "@/lib/briefing";
 import { getSettings } from "@/lib/settings";
 import { Sidebar, type NavSection } from "@/components/shell/sidebar";
 import { CommandPalette, CommandTrigger } from "@/components/shell/command";
 import { CloseClock, LocaleSwitch, ThemeToggle } from "@/components/client";
+import { NotificationBell, DueToasts } from "@/components/notify";
 import { logout } from "../login/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await requireUser();
   const t = await getT();
-  const [counts, issuer, s] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings()]);
+  const [counts, issuer, s, alerts] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u)]);
 
   const sections: NavSection[] = [
     { label: t("Workspace"), items: [
@@ -58,10 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <CommandTrigger />
             <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
               <CloseClock closeHour={s.closeHour} showPk={u.team === "pakistan" || u.team === "management"} />
-              <Link href="/adminwork/approvals" className="relative grid size-10 place-items-center rounded-full text-tile-ink-3 transition hover:bg-white/10 hover:text-tile-ink" aria-label={t("Approvals")}>
-                <Bell className="size-[18px]" />
-                {counts.approvals > 0 && <span className="absolute end-2 top-2 size-2 rounded-full bg-glow-gold ring-2 ring-tile" />}
-              </Link>
+              <NotificationBell alerts={alerts} />
               <LocaleSwitch />
               <ThemeToggle />
             </div>
@@ -69,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </header>
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-16 pt-8 lg:pe-6 lg:ps-4">{children}</main>
       </div>
+      <DueToasts alerts={alerts} />
       <CommandPalette pages={pages} />
     </div>
   );

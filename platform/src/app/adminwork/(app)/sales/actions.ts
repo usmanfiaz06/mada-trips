@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
@@ -93,6 +93,8 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
     if (!m || !AIRPORT_CODES.has(m[1]) || !AIRPORT_CODES.has(m[3])) return { error: "Pick both airports from the list", fields: { description: "x" } };
     if (m[1] === m[3]) return { error: "From and To can't be the same airport", fields: { description: "x" } };
     if (!v.supplier || !AIRLINE_LABELS.has(v.supplier)) return { error: "Pick the airline from the list", fields: { supplier: "x" } };
+    // No silent IATA: a flight only lands in the IATA balance when it was explicitly bought through BSP.
+    if (v.viaBsp !== "1" && v.viaBsp !== "0") return { error: "Choose how this ticket was bought — IATA (BSP) or direct from the airline", fields: { viaBsp: "x" } };
   }
 
   let id = "";
@@ -137,7 +139,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       const [b] = await tx.insert(schema.bookings).values({
         ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers, paxCount: travellers.length, travellers,
         description: v.description || null, details, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
-        commissionBps: preparerRate, viaBsp: v.serviceType === "flight" && v.viaBsp === "1",
+        commissionBps: preparerRate, viaBsp: v.serviceType === "flight" && v.viaBsp === "1", supplierReviewed: true,
         netCost: v.netCost, sellPrice: v.sellPrice, status: needsCredit ? "awaiting_credit" : "pending_issue",
         onCredit: unpaid > 0, dueDate: unpaid > 0 ? addDays(bdate, client.paymentTermsDays || 14) : null,
         businessDate: bdate, preparedBy: u.id,
@@ -384,6 +386,37 @@ export async function requestRefund(_: ActionState, fd: FormData): Promise<Actio
       const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id });
       await flash(`Refund request ${r.ref} sent`);
     });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/sales/${id}`);
+}
+
+/**
+ * Confirm or correct how an older flight ticket was bought. Tickets recorded before the IATA/Direct
+ * choice existed were all marked "via BSP"; a director reviews each and either confirms it really is
+ * IATA, or switches it to a direct supplier cost so it leaves the IATA balance and can be paid.
+ */
+export async function reviewFlightSettlement(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  if (!can(u, "finance.reconcile")) return { error: "Only a director can change how a ticket was settled" };
+  const id = str(fd, "id"), choice = str(fd, "choice");
+  if (choice !== "bsp" && choice !== "direct") return { error: "Choose IATA (BSP) or direct" };
+  try {
+    await loadScopedBooking(u, id);
+    await db.transaction(async (tx) => {
+      const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
+      if (!b) throw new Error("Sale not found");
+      if (b.serviceType !== "flight") throw new Error("This only applies to flight tickets");
+      if (b.bspClosingId) throw new Error("This ticket is already locked into a BSP closing and can't be re-routed");
+      const [sp] = await tx.select().from(schema.supplierPayments).where(and(eq(schema.supplierPayments.bookingId, id), inArray(schema.supplierPayments.status, ["settled", "pending_approval"])));
+      if (sp) throw new Error("This ticket already has a supplier payment — undo it before changing the route");
+      const viaBsp = choice === "bsp";
+      if (b.viaBsp === viaBsp && b.supplierReviewed) return;
+      await tx.update(schema.bookings).set({ viaBsp, supplierPaid: false, supplierReviewed: true, updatedAt: new Date() }).where(eq(schema.bookings.id, id));
+      await audit(tx, { actorId: u.id, action: "booking.settlement", entityType: "booking", entityId: id, entityRef: b.ref,
+        summary: viaBsp ? `Confirmed ${b.ref} is bought through IATA (BSP)` : `Moved ${b.ref} off IATA — ${b.supplier ?? "supplier"} cost to settle directly` });
+    });
+    await flash(choice === "bsp" ? "Confirmed — stays in the IATA closing" : "Moved to a direct supplier cost");
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);
