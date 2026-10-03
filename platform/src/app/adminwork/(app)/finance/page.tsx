@@ -128,6 +128,7 @@ export default async function FinancePage() {
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
+              <Select name="partnerId" defaultValue={u.partnerId ?? ""} placeholder={t("Who made it? (optional)")} options={partnerList.map((p) => ({ value: p.id, label: p.name }))} />
               <SubmitButton size="sm" variant="outline" className="w-full">{t("Record deposit")}</SubmitButton>
             </ActionForm>
             <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
@@ -137,6 +138,7 @@ export default async function FinancePage() {
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
+              <Select name="partnerId" defaultValue={u.partnerId ?? ""} placeholder={t("Who made it? (optional)")} options={partnerList.map((p) => ({ value: p.id, label: p.name }))} />
               <SubmitButton size="sm" variant="outline" className="w-full">{t("Record withdrawal")}</SubmitButton>
             </ActionForm>
             <ActionForm action={transferFunds} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
@@ -148,6 +150,7 @@ export default async function FinancePage() {
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
+              <Select name="partnerId" defaultValue={u.partnerId ?? ""} placeholder={t("Who made it? (optional)")} options={partnerList.map((p) => ({ value: p.id, label: p.name }))} />
               <SubmitButton size="sm" variant="outline" className="w-full">{t("Record transfer")}</SubmitButton>
             </ActionForm>
           </div>
@@ -167,7 +170,7 @@ export default async function FinancePage() {
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13.5px]">{MOVE_LABEL[m.kind] ? t(MOVE_LABEL[m.kind]) : m.kind}{m.label ? ` · ${m.label}` : ""}</span>
-                      <span className="block text-[11.5px] text-ink-3">{fmtDate(m.date, L)}{m.ref ? ` · ${m.ref}` : ""}{m.kind === "receipt" && !m.cleared ? ` · ${t("not cleared")}` : ""}</span>
+                      <span className="block text-[11.5px] text-ink-3">{fmtDate(m.date, L)}{m.ref ? ` · ${m.ref}` : ""}{m.by ? ` · ${t("by {name}", { name: m.by })}` : ""}{m.kind === "receipt" && !m.cleared ? ` · ${t("not cleared")}` : ""}</span>
                     </span>
                     <span className={cx("num shrink-0 text-[13.5px]", m.amount >= 0 ? "text-ok" : "text-ink-2")} dir="ltr">{sar(Math.abs(m.amount))}</span>
                   </li>

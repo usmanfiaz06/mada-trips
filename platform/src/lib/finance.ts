@@ -108,30 +108,30 @@ export async function collections(q: Q, opts: { team?: string } = {}) {
   return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
 }
 
-export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer"; label: string; ref: string | null; amount: number; cleared: boolean };
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
 
 /** Money in and out of one bank account, most recent first — the account's statement. */
 export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
   const rows = await q.execute<Movement>(sql`
-    (SELECT p.collected_at::date::text AS date, 'receipt' AS kind, c.name AS label, b.ref, p.amount::bigint AS amount, (p.cleared_on IS NOT NULL) AS cleared
+    (SELECT p.collected_at::date::text AS date, 'receipt' AS kind, c.name AS label, b.ref, p.amount::bigint AS amount, (p.cleared_on IS NOT NULL) AS cleared, NULL::text AS by
        FROM payments p JOIN clients c ON c.id = p.client_id LEFT JOIN bookings b ON b.id = p.booking_id
        WHERE p.account = ${account})
     UNION ALL
-    (SELECT sp.paid_on::text, 'supplier', sp.supplier, b.ref, -sp.amount::bigint, true
+    (SELECT sp.paid_on::text, 'supplier', sp.supplier, b.ref, -sp.amount::bigint, true, NULL
        FROM supplier_payments sp JOIN bookings b ON b.id = sp.booking_id
        WHERE sp.source = 'bank' AND sp.account = ${account} AND sp.status = 'settled')
     UNION ALL
-    (SELECT coalesce(o.paid_on::text, o.due_date::text), 'bsp', o.period, NULL, -o.amount::bigint, true
+    (SELECT coalesce(o.paid_on::text, o.due_date::text), 'bsp', o.period, NULL, -o.amount::bigint, true, NULL
        FROM bsp_obligations o WHERE o.account = ${account} AND o.status = 'paid')
     UNION ALL
-    (SELECT coalesce(bc.paid_on::text, bc.due_date::text), 'bsp', 'IATA BSP', NULL, -bc.amount::bigint, true
+    (SELECT coalesce(bc.paid_on::text, bc.due_date::text), 'bsp', 'IATA BSP', NULL, -bc.amount::bigint, true, NULL
        FROM bsp_closings bc WHERE bc.account = ${account} AND bc.status = 'paid' AND bc.source = 'bank')
     UNION ALL
-    (SELECT e.expense_date::text, 'expense', e.description, e.ref, -e.amount::bigint, true
+    (SELECT e.expense_date::text, 'expense', e.description, e.ref, -e.amount::bigint, true, NULL
        FROM expenses e WHERE e.paid_by = ${account} AND e.status = 'approved')
     UNION ALL
-    (SELECT bt.txn_date::text, bt.kind, coalesce(bt.note, bt.kind), NULL, (CASE WHEN bt.direction='in' THEN bt.amount ELSE -bt.amount END)::bigint, true
-       FROM bank_transactions bt WHERE bt.account = ${account})
+    (SELECT bt.txn_date::text, bt.kind, coalesce(bt.note, bt.kind), NULL, (CASE WHEN bt.direction='in' THEN bt.amount ELSE -bt.amount END)::bigint, true, pt.name
+       FROM bank_transactions bt LEFT JOIN partners pt ON pt.id = bt.partner_id WHERE bt.account = ${account})
     ORDER BY date DESC LIMIT ${limit}`);
   return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
 }

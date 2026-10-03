@@ -14,6 +14,15 @@ import { settleBspClosing } from "@/lib/bsp";
 import { ACCOUNT } from "@/lib/labels";
 import { proposeCashMove } from "@/lib/cash";
 
+/** Validate an optional "which partner did this" id — must be a real partner, or nothing. */
+async function validPartner(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  if (!isUuid(id)) throw new Error("Choose who made the transaction");
+  const [p] = await db.select({ id: schema.partners.id }).from(schema.partners).where(eq(schema.partners.id, id));
+  if (!p) throw new Error("Choose who made the transaction");
+  return p.id;
+}
+
 export async function clearPayments(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
   const ids = fd.getAll("ids").map(String).filter((x) => /^[0-9a-f-]{36}$/.test(x));
@@ -133,9 +142,10 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
     if (amount <= 0) return { error: "Enter an amount" };
     const direction = kind === "deposit" ? "in" as const : "out" as const;
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const partnerId = await validPartner(optStr(fd, "partnerId"));
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
       `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${ACCOUNT[account]} · SAR ${sar(amount)}`,
-      { op: "txn", account, direction, kind, amount, note, date }, amount));
+      { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }
@@ -152,9 +162,10 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
     const amount = toHalalas(str(fd, "amount"));
     if (amount <= 0) return { error: "Enter an amount" };
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const partnerId = await validPartner(optStr(fd, "partnerId"));
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
       `Transfer ${ACCOUNT[from]} → ${ACCOUNT[to]} · SAR ${sar(amount)}`,
-      { op: "transfer", from, to, amount, note, date }, amount));
+      { op: "transfer", from, to, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }

@@ -325,6 +325,8 @@ export const bankTransactions = pgTable("bank_transactions", {
   amount: money("amount").notNull(),
   counterparty: text("counterparty"),        // the other account, for a transfer
   note: text("note"),
+  // The partner who physically made the deposit / withdrawal / transfer (for attribution).
+  partnerId: uuid("partner_id").references(() => partners.id),
   txnDate: date("txn_date").notNull(),
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),

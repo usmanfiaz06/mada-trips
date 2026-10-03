@@ -1276,4 +1276,6 @@ export const AR: Record<string, string> = {
   "{n} to review": "{n} للمراجعة",
   "In the IATA balance": "ضمن رصيد آياتا",
   "Cost": "التكلفة",
+  "Who made it? (optional)": "من قام بها؟ (اختياري)",
+  "Choose who made the transaction": "اختر من قام بالعملية",
 };
