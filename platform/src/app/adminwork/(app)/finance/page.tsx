@@ -1,4 +1,4 @@
-import { desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { Check, Clock, Landmark } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
@@ -27,7 +27,8 @@ export default async function FinancePage() {
     cashPosition(), getSettings(),
     db.select({ p: schema.payments, ref: schema.bookings.ref, client: schema.clients.name }).from(schema.payments)
       .leftJoin(schema.bookings, eq(schema.bookings.id, schema.payments.bookingId)).innerJoin(schema.clients, eq(schema.clients.id, schema.payments.clientId))
-      .where(isNull(schema.payments.clearedOn)).orderBy(schema.payments.collectedAt),
+      // A voided or refunded sale's receipt can't be cleared — it's off the books.
+      .where(and(isNull(schema.payments.clearedOn), sql`(${schema.payments.bookingId} IS NULL OR ${schema.bookings.status} NOT IN ('void','refunded'))`)).orderBy(schema.payments.collectedAt),
   ]);
   const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 12) })));
   const canRec = can(u, "finance.reconcile");
