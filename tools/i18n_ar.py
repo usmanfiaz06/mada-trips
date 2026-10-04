@@ -206,6 +206,7 @@ TEXT = {
 
     # ---------- contact page ----------
     'A trip, a team, a launch or all three. Tell us once and the right people take it from there.': 'رحلة، أو فريق، أو تدشين، أو كلها معاً. أخبرنا مرة واحدة ويتولى الأشخاص المناسبون الباقي.',
+    'Office': 'مكتبنا', '7134 Prince Mohammed bin Saad bin Abdulaziz Rd, Hittin, Riyadh 13516': '7134 طريق الأمير محمد بن سعد بن عبدالعزيز، حطين، الرياض 13516',
     'Based in': 'مقرنا', 'Riyadh, Kingdom of Saudi Arabia': 'الرياض، المملكة العربية السعودية', 'We cover': 'نغطي', 'Every region of the Kingdom': 'جميع مناطق المملكة',
     'Call': 'اتصال', 'Reply': 'الرد', 'Within one working day': 'خلال يوم عمل واحد', 'Call us': 'اتصل بنا',
     'No forms within forms. Just the essentials.': 'بلا تعقيد. الأساسيات فقط.', 'Full name': 'الاسم الكامل', 'Email': 'البريد الإلكتروني', 'Phone': 'الجوال',
