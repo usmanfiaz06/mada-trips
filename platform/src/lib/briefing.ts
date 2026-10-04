@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
 import { pendingForUser } from "./approvals";
@@ -46,7 +46,9 @@ export async function whatsDue(u: CurrentUser): Promise<Alert[]> {
     u.permissions.has("finance.reconcile")
       ? db.select({ n: sql<number>`count(*)::int` }).from(schema.bookings)
           .where(and(eq(schema.bookings.serviceType, "flight"), eq(schema.bookings.viaBsp, true), eq(schema.bookings.supplierReviewed, false),
-            sql`${schema.bookings.status} not in ('void','refunded','draft')`)).then((r) => r[0].n)
+            sql`${schema.bookings.status} not in ('void','refunded','draft')`,
+            isNull(schema.bookings.bspClosingId),
+            sql`NOT EXISTS (SELECT 1 FROM ${schema.supplierPayments} sp WHERE sp.booking_id = ${schema.bookings.id} AND sp.status IN ('settled','pending_approval'))`)).then((r) => r[0].n)
       : Promise.resolve(0),
   ]);
 

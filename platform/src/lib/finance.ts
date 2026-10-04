@@ -181,10 +181,12 @@ export function repayByEquity(pool: number, partners: { id: string; name: string
 }
 
 export async function computeSettlement(q: Q, start: string, end: string, inputs: Partial<SettlementInputs>, reserveHeld: number, defaultRepaymentBps: number, iataBuffer: number, excludeCycleId?: string, cycleOnly = false): Promise<SettlementFigures> {
+  // Voided/refunded sales' money never counts as cleared cash for the settlement.
+  const liveReceipt = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
   const cleared = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
-    .from(schema.payments).where(and(gte(schema.payments.clearedOn, start), lte(schema.payments.clearedOn, end))).groupBy(schema.payments.account);
+    .from(schema.payments).where(and(gte(schema.payments.clearedOn, start), lte(schema.payments.clearedOn, end), liveReceipt)).groupBy(schema.payments.account);
   const rolled = await q.select({ total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
-    .from(schema.payments).where(and(gte(schema.payments.businessDate, start), lte(schema.payments.businessDate, end), sql`(${schema.payments.clearedOn} IS NULL OR ${schema.payments.clearedOn} > ${end})`));
+    .from(schema.payments).where(and(gte(schema.payments.businessDate, start), lte(schema.payments.businessDate, end), sql`(${schema.payments.clearedOn} IS NULL OR ${schema.payments.clearedOn} > ${end})`, liveReceipt));
 
   // A booking is counted in the first cycle after it is issued, fully paid and cleared by the cut-off, whenever that happens
   // (paid in one cycle and issued in the next still counts, in the next). Each booking is counted exactly once.

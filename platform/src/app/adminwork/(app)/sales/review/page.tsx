@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { CheckCheck } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
@@ -22,7 +22,10 @@ export default async function SettlementReviewPage() {
     netCost: schema.bookings.netCost, businessDate: schema.bookings.businessDate, client: schema.clients.name,
   }).from(schema.bookings).innerJoin(schema.clients, eq(schema.clients.id, schema.bookings.clientId))
     .where(and(eq(schema.bookings.serviceType, "flight"), eq(schema.bookings.viaBsp, true), eq(schema.bookings.supplierReviewed, false),
-      sql`${schema.bookings.status} not in ('void','refunded','draft')`))
+      sql`${schema.bookings.status} not in ('void','refunded','draft')`,
+      // Only tickets that can actually be re-routed: not already settled in a BSP closing, and without a supplier payment.
+      isNull(schema.bookings.bspClosingId),
+      sql`NOT EXISTS (SELECT 1 FROM ${schema.supplierPayments} sp WHERE sp.booking_id = ${schema.bookings.id} AND sp.status IN ('settled','pending_approval'))`))
     .orderBy(desc(schema.bookings.businessDate));
 
   const total = rows.reduce((s, r) => s + r.netCost, 0);

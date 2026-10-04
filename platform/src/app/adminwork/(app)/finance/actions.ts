@@ -38,6 +38,10 @@ export async function clearPayments(_: ActionState, fd: FormData): Promise<Actio
         .where(and(inArray(schema.payments.id, ids), isNull(schema.payments.clearedOn))).for("update");
       if (!rows.length) return 0;
       if (rows.some((r) => date < r.businessDate)) throw new Error("A receipt can't clear before it was collected");
+      // Can't clear a receipt whose sale has been voided or refunded — it's off the books.
+      const closedIds = new Set((await tx.select({ id: schema.bookings.id }).from(schema.bookings)
+        .where(and(inArray(schema.bookings.id, [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))]), inArray(schema.bookings.status, ["void", "refunded"])))).map((b) => b.id));
+      if (closedIds.size && rows.some((r) => r.bookingId && closedIds.has(r.bookingId))) throw new Error("One of these sales has been voided or refunded. Refresh the page and try again");
       await tx.update(schema.payments).set({ clearedOn: date, clearedBy: u.id }).where(and(inArray(schema.payments.id, rows.map((r) => r.id)), isNull(schema.payments.clearedOn)));
       const bookingIds = [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))];
       const refs = new Map<string, string>();
