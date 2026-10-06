@@ -5,11 +5,14 @@ import { sslFor } from "./ssl";
 
 const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mada_ops";
 
-// Reuse one pool across hot reloads in dev.
+// Reuse one pool across hot reloads in dev, and across warm serverless invocations in prod.
 const g = globalThis as unknown as { __madaSql?: ReturnType<typeof postgres> };
-// Remote databases (Supabase, Neon) need SSL; prepare:false keeps us compatible with transaction poolers.
-export const sql = g.__madaSql ?? postgres(url, { max: 10, prepare: false, ssl: sslFor(url) });
-if (process.env.NODE_ENV !== "production") g.__madaSql = sql;
+// On a serverless host each warm instance keeps its own pool, so a big `max` multiplied by many instances
+// exhausts the database's connection limit (slowness + "client-side exception" errors). One connection per
+// instance, fronted by Supabase's transaction pooler, scales cleanly. prepare:false is required by the pooler.
+// idle_timeout frees connections the pooler can reuse; connect_timeout fails fast instead of hanging a page.
+export const sql = g.__madaSql ?? postgres(url, { max: 1, prepare: false, idle_timeout: 20, connect_timeout: 10, ssl: sslFor(url) });
+g.__madaSql = sql;
 
 export const db = drizzle(sql, { schema });
 export type DB = typeof db;
