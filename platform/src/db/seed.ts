@@ -11,7 +11,8 @@ import * as schema from "./schema";
 import { SYSTEM_ROLES } from "../lib/permissions";
 import { sslFor } from "./ssl";
 
-const url = process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mada_ops";
+// Seeding/bootstrap also runs best over the direct connection (DIRECT_URL) when the app uses the pooler.
+const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL ?? "postgres://mada:mada@localhost:5432/mada_ops";
 const client = postgres(url, { max: 1, prepare: false, ssl: sslFor(url) });
 const db = drizzle(client, { schema });
 const args = new Set(process.argv.slice(2));
