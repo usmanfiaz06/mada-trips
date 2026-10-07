@@ -47,8 +47,11 @@ export async function addMember(_: ActionState, fd: FormData): Promise<ActionSta
     const [dupe] = await db.select().from(schema.users).where(eq(sql`lower(${schema.users.email})`, p.data.email));
     if (dupe) throw new Error("Someone already uses that email");
     const role = await assertCanAssignRole(u, p.data.roleId);
+    // Hash outside the transaction — bcrypt is slow, and hashing inside would hold the connection
+    // "idle in transaction" (with its locks) for the whole hash.
+    const passwordHash = await bcrypt.hash(pw, BCRYPT_COST);
     await db.transaction(async (tx) => {
-      const [m] = await tx.insert(schema.users).values({ ...p.data, passwordHash: await bcrypt.hash(pw, BCRYPT_COST), mustChangePassword: true }).returning();
+      const [m] = await tx.insert(schema.users).values({ ...p.data, passwordHash, mustChangePassword: true }).returning();
       await audit(tx, { actorId: u.id, action: "user.created", entityType: "user", entityId: m.id, entityRef: m.name, summary: `Added ${m.name} as ${role?.name ?? "member"}` });
     });
   } catch (e) { return toState(e); }
@@ -122,8 +125,11 @@ export async function resetPassword(_: ActionState, fd: FormData): Promise<Actio
   if (!m) return { error: "Not found" };
   if (id === u.id) return { error: "Change your own password from your profile" };
   if (m.partnerId) return { error: "A partner's password can only be reset on the server, so no one can take over a partner's vote" };
+  // Hash outside the transaction — bcrypt is slow, and hashing inside would hold the connection
+  // "idle in transaction" (with its locks) for the whole hash.
+  const passwordHash = await bcrypt.hash(pw, BCRYPT_COST);
   await db.transaction(async (tx) => {
-    await tx.update(schema.users).set({ passwordHash: await bcrypt.hash(pw, BCRYPT_COST), mustChangePassword: true }).where(eq(schema.users.id, id));
+    await tx.update(schema.users).set({ passwordHash, mustChangePassword: true }).where(eq(schema.users.id, id));
     await tx.delete(schema.sessions).where(eq(schema.sessions.userId, id));
     await audit(tx, { actorId: u.id, action: "user.password_reset", entityType: "user", entityId: id, entityRef: m.name, summary: `Reset ${m.name}'s password and signed them out everywhere` });
   });

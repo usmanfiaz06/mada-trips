@@ -23,8 +23,11 @@ export async function changePassword(_: ActionState, fd: FormData): Promise<Acti
   if (next === current) return { error: "Choose a password different from the current one" };
   const token = (await cookies()).get(SESSION_COOKIE)?.value ?? "";
   const thisSession = createHash("sha256").update(token).digest("hex");
+  // Hash before opening the transaction: bcrypt is deliberately slow, and computing it inside the
+  // transaction would hold the connection "idle in transaction" (with its locks) for the whole hash.
+  const passwordHash = await bcrypt.hash(next, 12);
   await db.transaction(async (tx) => {
-    await tx.update(schema.users).set({ passwordHash: await bcrypt.hash(next, 12), mustChangePassword: false }).where(eq(schema.users.id, u.id));
+    await tx.update(schema.users).set({ passwordHash, mustChangePassword: false }).where(eq(schema.users.id, u.id));
     // Anyone else signed in as this person (another device, or whoever knew the old password) is signed out.
     await tx.delete(schema.sessions).where(and(eq(schema.sessions.userId, u.id), ne(schema.sessions.id, thisSession)));
     await audit(tx, { actorId: u.id, action: "user.password_changed", entityType: "user", entityId: u.id, entityRef: u.name, summary: `${u.name} changed their password and signed out other devices` });
