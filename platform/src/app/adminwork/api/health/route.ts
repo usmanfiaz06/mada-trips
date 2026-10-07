@@ -68,5 +68,31 @@ async function probeWrites() {
     out.blocking_sessions = `could not read pg_stat_activity: ${(e as Error).message?.slice(0, 120)}`;
   }
 
+  // Time the post-login page: load a real director and run the dashboard's full data query.
+  // This is what renders right after sign-in; if it's slow/hangs, the login spinner never ends.
+  try {
+    const { db, schema } = await import("@/db");
+    const { eq } = await import("drizzle-orm");
+    const { dashboardData } = await import("@/lib/dashboard");
+    const rows = await db.select({ u: schema.users, r: schema.roles, p: schema.partners })
+      .from(schema.users)
+      .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId))
+      .leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId))
+      .where(eq(schema.users.active, true)).limit(50);
+    const pick = rows.find((x) => x.p?.isDirector) ?? rows[0];
+    if (!pick) { out.dashboard = "no active users"; }
+    else {
+      const cu = {
+        id: pick.u.id, name: pick.u.name, email: pick.u.email, team: pick.u.team, locale: pick.u.locale,
+        partnerId: pick.u.partnerId, isDirector: !!pick.p?.isDirector, mustChangePassword: pick.u.mustChangePassword,
+        role: { id: pick.r.id, key: pick.r.key, name: pick.r.name, nameAr: pick.r.nameAr },
+        permissions: new Set(pick.r.permissions as string[]),
+      };
+      await ms(`dashboard_for_${pick.u.name}`, () => dashboardData(cu as never));
+    }
+  } catch (e) {
+    out.dashboard = `FAIL ${(e as Error).message?.slice(0, 160)}`;
+  }
+
   return Response.json(out, { status: 200, headers: { "cache-control": "no-store" } });
 }
