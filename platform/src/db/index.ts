@@ -11,7 +11,13 @@ const g = globalThis as unknown as { __madaSql?: ReturnType<typeof postgres> };
 // exhausts the database's connection limit (slowness + "client-side exception" errors). One connection per
 // instance, fronted by Supabase's transaction pooler, scales cleanly. prepare:false is required by the pooler.
 // idle_timeout frees connections the pooler can reuse; connect_timeout fails fast instead of hanging a page.
-export const sql = g.__madaSql ?? postgres(url, { max: 1, prepare: false, idle_timeout: 20, connect_timeout: 10, ssl: sslFor(url) });
+// statement_timeout/idle_in_transaction_session_timeout cap how long a query — or a half-finished transaction
+// whose function got killed — can hold a lock, so a single stuck write can't jam the whole database.
+export const sql = g.__madaSql ?? postgres(url, {
+  max: 1, prepare: false, idle_timeout: 20, connect_timeout: 10,
+  connection: { statement_timeout: 8_000, idle_in_transaction_session_timeout: 10_000 },
+  ssl: sslFor(url),
+});
 g.__madaSql = sql;
 
 export const db = drizzle(sql, { schema });
