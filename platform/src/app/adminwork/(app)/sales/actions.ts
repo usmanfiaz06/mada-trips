@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
@@ -407,6 +407,11 @@ export async function requestRefund(_: ActionState, fd: FormData): Promise<Actio
   const id = str(fd, "id"), reason = str(fd, "reason");
   if (!reason) return { error: "Explain the refund so directors can decide" };
   if (reason.length > 1000) return { error: "Keep the reason under 1,000 characters" };
+  // Cancellation fees (optional): what the supplier keeps of the money we paid them, and what we keep of
+  // the money the client paid us. Zero means a clean full refund both ways.
+  let supplierFee: number, clientFee: number;
+  try { supplierFee = Math.max(0, toHalalas(optStr(fd, "supplierFee") ?? "")); clientFee = Math.max(0, toHalalas(optStr(fd, "clientFee") ?? "")); }
+  catch { return { error: "Enter the cancellation fees as plain amounts, e.g. 150 or 150.00" }; }
   try {
     await loadScopedBooking(u, id);
     await db.transaction(async (tx) => {
@@ -414,7 +419,17 @@ export async function requestRefund(_: ActionState, fd: FormData): Promise<Actio
       if (b.status !== "issued") throw new Error("Only issued sales can be refunded");
       const [open] = await tx.select().from(schema.approvalRequests).where(and(eq(schema.approvalRequests.entityId, id), eq(schema.approvalRequests.kind, "refund"), eq(schema.approvalRequests.status, "pending")));
       if (open) throw new Error(`A refund request (${open.ref}) is already open`);
-      const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id });
+      // A fee can't exceed the money that actually moved on each side.
+      const [sp] = await tx.select().from(schema.supplierPayments).where(and(eq(schema.supplierPayments.bookingId, id), eq(schema.supplierPayments.status, "settled")));
+      const supplierPaid = sp?.amount ?? 0;
+      const clearedReceived = (await tx.select({ total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) }).from(schema.payments).where(and(eq(schema.payments.bookingId, id), isNotNull(schema.payments.clearedOn))))[0].total;
+      if (supplierFee > supplierPaid) throw new Error(`The supplier's fee can't be more than the SAR ${sar(supplierPaid)} paid to the supplier`);
+      if (clientFee > clearedReceived) throw new Error(`The client's fee can't be more than the SAR ${sar(clearedReceived)} the client paid`);
+      const notes: string[] = [];
+      if (supplierFee > 0) notes.push(`Supplier keeps SAR ${sar(supplierFee)}`);
+      if (clientFee > 0) notes.push(`We keep SAR ${sar(clientFee)} from the client`);
+      const fullReason = notes.length ? `${reason}\n\n${notes.join(" · ")}.` : reason;
+      const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason: fullReason, requestedBy: u.id, payload: { supplierFee, clientFee } });
       await flash(`Refund request ${r.ref} sent`);
     });
   } catch (e) { return toState(e); }
