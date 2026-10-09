@@ -1,7 +1,8 @@
 # Mada Trips app: product scope
 
-**Status:** Draft v1 for review. This is the plan before any code is written. Design direction comes next.
-**Platforms:** iOS and Android.
+**Status:** Draft v2. Adds the community, prediction and loyalty layers and records the decisions made so far. This is the plan before any code is written. Design references come next.
+**Platforms:** iOS and Android. **Saudi first, made for the world.**
+**Integrations to start with:** [INTEGRATIONS.md](INTEGRATIONS.md).
 **Evidence:** [RESEARCH.md](RESEARCH.md), covering competitors, traveller reviews, the Saudi market, technical feasibility and UX case studies.
 **Built on:** the existing Mada Ops platform ([platform/](../../platform), [docs/ops-platform/PLAN.md](../ops-platform/PLAN.md)).
 
@@ -9,9 +10,18 @@
 
 ## 1. The idea in one line
 
-**A travel partner that sees problems coming, has the fix ready, and puts a named human behind every commitment.**
+**A travel partner that sees problems coming, has the fix ready, and puts a named human behind every commitment. It knows your next move, makes paying a single tap, and keeps the people you travel with close.**
 
 Most travel apps stop being useful once you have paid. Mada's app becomes useful from that point on.
+
+The app rests on four ideas:
+
+| Layer | What it means | Where it is specified |
+|---|---|---|
+| **Partner** | Sees problems in advance. A named human fixes them, 24/7. | §4, §5.2 |
+| **Next move** | Predicts what you need before you ask and offers it as one tap. | §5.6 |
+| **Circles** | A private travel social network: your household, your trip groups, your friends. "I'm in Amsterdam, who's around?" | §5.5 |
+| **Rewards** | Rewards exploring and travelling well, not spending. | §5.7 |
 
 | | Booking apps (Almosafer, Wego, Booking) | Trackers (Flighty, TripIt) | AI planners (Mindtrip, ChatGPT) | **Mada** |
 |---|---|---|---|---|
@@ -21,6 +31,8 @@ Most travel apps stop being useful once you have paid. Mada's app becomes useful
 | **Fixes it** | Slowly, through a call centre | ✗ | ✗ | **✓ Fix prepared, human owns it** |
 | Your documents | – | Basic | – | ✓ Whole household, with entry-rule checks |
 | Arabic-first, family-first | Partly | ✗ | ✗ | ✓ |
+| Your people (groups, friends nearby, shared saves) | ✗ | ✗ | Group planning only | ✓ Private circles |
+| Predicts your next move, one-tap pay | ✗ | ✗ | ✗ | ✓ |
 
 ### Why Mada can win
 - **The biggest gap in the market is accountability.** The top complaint across every booking site is the blame game between airline and agent. Almosafer's TrustScore is 1.7.
@@ -63,14 +75,16 @@ These are the rules every screen is judged against.
 
 ## 4. What the app looks like
 
-### 4.1 Four places, plus help that is always there
+### 4.1 Four tabs, the concierge everywhere, and help that is always there
 
 | Tab | What it is | It answers |
 |---|---|---|
-| **Today** (home) | One living card that changes with the moment (see §4.2). Below it, only what matters next. | "What do I need to know or do right now?" |
-| **Trips** | Every trip as a timeline: flights, stays, transfers, plans, documents needed, a checklist per traveller. Shared with the household. | "What is the plan?" |
-| **Wallet** | The household's documents (passports, IDs, iqamas, visas, insurance) plus every ticket and voucher. Encrypted, biometric lock, works offline. | "Do we have everything, and is it valid?" |
-| **Ask** | The concierge, by text or voice, Arabic or English. AI and your human agent in **one thread**. Replies as cards. | "Can you find, book, change or fix this?" |
+| **Today** (home) | One living card that changes with the moment (see §4.2), then your **next move** (§5.6). Below that, only what matters next. | "What do I need to know or do right now?" |
+| **Trips** | Every trip as a timeline: flights, stays, transfers, plans, documents needed, a checklist per traveller. Shared with the household and the trip group. | "What is the plan?" |
+| **Circles** | Your household, trip groups and friends. Saved places and collections. "Who's around." Your travel map and passport (§5.5, §5.7). | "Who am I travelling with, and who's near?" |
+| **Wallet** | The household's documents (passports, IDs, iqamas, visas, insurance), every ticket and voucher, your payment methods and your rewards balance. Encrypted, biometric lock, works offline. | "Do we have everything, is it valid, how do I pay?" |
+
+**Ask** (the concierge) is not a tab. It is a floating bar on every screen: tap to type, hold to speak, Arabic or English. AI and your human agent share **one thread**, replies come as cards, and Ask always knows which screen you are on.
 
 - **Help now:** during an active trip, a persistent one-tap button reaches a human with the full context already attached.
 - **Outside the app:** Live Activities and Dynamic Island, Android Live Updates, home and lock-screen widgets, Apple and Google Wallet passes for Mada bookings, WhatsApp, and a read-only live trip link for family.
@@ -123,7 +137,7 @@ These are what make the app recognisable. Design should prototype these first.
 | B2 | Profile and preferences | MVP | Name exactly as on the passport, seat, meal, airlines, loyalty numbers, budget band, language, Hijri or Gregorian dates, digit style. |
 | B3 | Flight search and booking | MVP | Live search through the GDS and Duffel. Results as cards. All-in price. Fare rules in plain language. The request goes to Mada Ops for a human to issue. |
 | B4 | Hotel search and booking | MVP | RateHawk and WebBeds. Family room combinations (connecting rooms, suites). Halal and family filters. |
-| B5 | Visas | MVP as a concierge request, V1 guided | Requirements by nationality, document checklist built from the Wallet, appointment help from an agent. |
+| B5 | Visas | MVP as a concierge request, V1 guided | **In scope as a Mada service.** Requirements by nationality, a document checklist built from the Wallet, appointments booked and applications prepared by a Mada agent. |
 | B6 | Car rental | MVP as a concierge request, V2 live (CarTrawler) | |
 | B7 | Activities and events | MVP as a concierge request, V1 live (Viator / GetYourGuide) | Riyadh Season, AlUla and Mada Events tie-ins. |
 | B8 | Restaurant booking | MVP as a concierge request | No public reservation API in Saudi Arabia. The AI gathers the request, an agent books it. Eat App partnership later. |
@@ -167,7 +181,7 @@ These are what make the app recognisable. Design should prototype these first.
 |---|---|---|
 | S1 | Domestic helper as a traveller type: iqama validity, exit/re-entry reminder (link to Absher), helper-visa guidance | V1 |
 | S2 | Schengen journey: prompt to apply 45+ days ahead, document checklist, aim for the 5-year multi-entry visa, then track its expiry. UK ETA tied to the passport (warn on passport renewal). | V1 |
-| S3 | Umrah trips **built around** the Nusuk permit (flights, Makkah and Madinah hotels, Haramain train), never reselling permits unless licensed | V1 |
+| S3 | **Umrah (in scope).** Full Umrah trips: flights, Makkah and Madinah hotels, Haramain train, transfers, the Nusuk permit step, and group Umrah with a trip group (C2). For Saudis and residents first, then pilgrims from abroad (made for the world) within Mada's Umrah licence. | V1 |
 | S4 | Prayer times and qibla direction at the destination, halal dining, women-only spa and pool filters, connecting rooms and villas | MVP (prayer times), V1 (the rest) |
 | S5 | Saudi-calendar planning: Eid and school holidays, "book by" deadlines, short GCC weekend trips | V1 |
 | S6 | WhatsApp as a full second channel (confirmations, documents, the agent thread) | V1 |
@@ -175,11 +189,83 @@ These are what make the app recognisable. Design should prototype these first.
 
 ### 5.4 Out of scope (deliberately)
 
-- Scraping VFS or TLS for visa appointment slots. It is a legal and terms-of-service risk; Mada helps users book appointments themselves instead.
-- Reselling Hajj or Umrah permits.
+- Scraping VFS or TLS for visa appointment slots. It is a legal and terms-of-service risk. Visa appointments are booked by Mada agents (now in scope) or by the user.
+- Reselling Hajj or Umrah permits outside what Mada's Umrah licence allows.
 - Selling paid "price freeze" or "cancel for any reason" products.
 - Ads, or marketing pushes during a trip.
 - Full read access to Gmail at launch.
+- **A public feed, open "meet strangers now" or live location maps.** Couchsurfing Hangouts drifted into dating and safety problems. Snap Map and Strava's heatmap leaked people's locations.
+- **Leaderboards ranked by money spent.** They feel like showing off, sit badly with Saudi media norms, and reward the wrong behaviour.
+- **A stored-money wallet** (top-ups held by Mada). It would most likely need a SAMA e-money licence; we use saved cards, Apple Pay and BNPL instead.
+
+### 5.5 Circles: a private travel social network
+
+**Principle:** private circles, not a public network. Every social object belongs to a **household**, a **trip** or a **booked experience**. Nothing is public by default, and a person only ever sees what someone chose to show them.
+
+**What works elsewhere** (details in [RESEARCH.md §8](RESEARCH.md#8-community-loyalty-and-prediction)):
+- **Polarsteps** grew to about 20M users on private trip journals for friends and family, not by connecting strangers.
+- **Mindtrip** puts an AI into the group chat to merge everyone's preferences into one plan.
+- **Airbnb (2025)** shows "who's going" on a booked experience, opt-in only, with connections made after the event.
+
+| # | Feature | Release | What it does |
+|---|---|---|---|
+| C1 | **Household** | MVP | Family members, their documents, shared trips. The organiser manages everyone (already P11). |
+| C2 | **Trip groups** | MVP | Every trip can become a group: shared timeline, group chat **with the AI concierge and the named Mada agent inside it**, polls ("which hotel?"), a shared checklist, and who-has-paid. Invite by link, so friends join from WhatsApp in one tap. |
+| C3 | **Save and collections** | MVP | Save anything (a hotel, a restaurant, a reel, a link, a tip from a friend) into collections like "Istanbul with the kids" or "Honeymoon ideas". Share a collection by private link. The concierge plans from what you saved: "Book the 3 places I saved in Baku." |
+| C4 | **Share to Mada** | MVP | From Instagram, TikTok, Snapchat, Safari or Google Maps, share into Mada. It recognises the place and drops it into a collection or trip. |
+| C5 | **Friends** | V1 | Mutual connections only: contacts who are on Mada, people met in a trip group, people from a booked event. No follower counts. |
+| C6 | **Trip journal and posts** | V1 | A private journal with photos and an automatic route map, shared with chosen circles (household, a trip group, close friends). Before posting, Mada asks to confirm that people in the photo agreed and offers a face blur (the Saudi Anti-Cyber Crime Law covers publishing people's photos without consent). |
+| C7 | **Who's around** | V1, behind a feature flag, after a safety review | "I'm in Amsterdam, 12–15 Oct." **Off by default**, switched on per trip, ends automatically when the trip ends. **City only**: never a pin, a hotel or a live map. Visible only to friends and circles you choose. Visibility options include women only, family only, or hidden from everyone except contacts. People send a **request** and the other person must accept before any chat. Requires a verified identity. |
+| C8 | **Who's going** | V2 | On Mada-booked tours, Umrah groups, concerts and Riyadh Season events: opt in to show your first name and city, then connect after the event. |
+| C9 | **Hosted meetups** | V2 | Small meetups run by Mada agents in big destinations (London in summer, Istanbul, Baku), instead of open hangouts. |
+| C10 | **Tips from people you trust** | V2 | "Abdullah went to this restaurant in Tbilisi in May and loved it." Recommendations from your own circles are given more weight than anonymous reviews. |
+
+**Safety rules, applied from day one** (App Store 1.2, Google Play UGC policy, the Saudi data law PDPL, the Anti-Cyber Crime Law):
+- Report, block and filter on every user, post and message. Reports reach a human queue and are resolved within **24 hours**.
+- Moderation runs in Arabic (including Gulf dialect) and English: an automatic first pass, then a policy classifier for Saudi and cultural rules, then a person.
+- Location gets its **own separate consent**, is never sold (written into the privacy policy), and is used only for the trip it was given for.
+- No dating framing anywhere. Women have full visibility control.
+- A panic button during a trip shares your live trip with your household and alerts the Mada agent on duty.
+
+### 5.6 Next move: prediction and one-tap spending
+
+**Principle:** predict logistics, not private life. Every prediction says **why** you are seeing it, and offers **"don't suggest this again"**. Predictions use only what the traveller gave Mada for a trip: bookings, saves, preferences and documents. Never background location tracking.
+
+**What Mada can predict**
+
+| The moment | What Mada already has ready |
+|---|---|
+| A flight is booked | "Hotel near the venue like last time? Airport pickup at 14:20? eSIM for Türkiye?" One card, tick what you want, pay once. |
+| Eid or the school holidays are 10 weeks away | "Last Eid you went to Baku with 5 people. Prices for the same week are rising. Want the usual?" |
+| A passport or visa is about to expire | "Sara's passport expires before your summer trip. An agent can book the renewal." |
+| You saved 4 places in Istanbul | "These 3 are open on Thursday, near your hotel. Book a table at 9?" |
+| You land | Driver, eSIM, hotel check-in and today's plan, already arranged. |
+| A delay is predicted | Rebooking options are prepared before you even open the app (P8). |
+| The trip ends | "Same hotel next time? Save Sara's window seat?" |
+
+**One-tap spending**
+- **Mada Pay sheet.** A single confirmation sheet: what you get, the all-in price, the cancellation rule and the payment method, then pay with Face ID. One sheet whatever the service.
+- **Saved household payment method.** A tokenised card, Apple Pay or Google Pay. The organiser pays, and family members can request an item for the organiser to approve.
+- **Smart default plan.** Trip packages above about SAR 2,000 show the Tabby or Tamara instalment price on the card.
+- **Small add-ons inside a booked trip** (seats, bags, eSIM, transfers, lounge) can be set to **"approve automatically up to SAR X"**. Flights and hotels always ask for one-tap confirmation.
+- **Group split.** Each member's share appears in the trip group with a pay link (Apple Pay, mada, STC Pay). Mada keeps a who-owes-whom ledger but never holds the money.
+- **No pre-ticked extras, ever** (the Hopper lesson).
+
+### 5.7 Rewards: loyalty that rewards travelling well
+
+**Principle:** reward exploring, preparing and helping, not spending. Rank only among friends, and only if they opt in.
+
+| Element | Design |
+|---|---|
+| **Points** | A Mada currency (name to choose: see D10). Spent only on Mada services, best value on hotels, upgrades and agent services. No cash-out, no transfers between users, no fixed riyal value in the terms, expiry after 18–24 months that activity extends. This keeps it out of SAMA's e-money rules; counsel to confirm. Earn more on hotels and packages and less on flights, because flight margins can't fund cashback. |
+| **Tiers** | Based on **trips completed**, not riyals, and kept for life (as Booking Genius does). Perks are about service: faster human response, delay care (lounge access or credit when a flight is delayed), a document concierge, upgrades on request. |
+| **Mada Passport** | A personal travel map with countries, cities, flights, distance and Saudi destinations explored. A shareable year-in-review card for Instagram and Snapchat, in the style of Flighty's Passport. |
+| **Badges** | Exploration ("Discover Saudi": AlUla, Abha, the Red Sea; first trip to Europe; ten countries). Preparation ("documents complete", "visa done early"). Helpfulness (tips saved by others, friends referred). |
+| **Leaderboards** | Friends and circles only, opt-in, on **countries and cities explored**. Never on money. |
+| **Referrals** | Invite a friend: both get points once the friend completes a trip. Links work through the trip group invite. |
+| **Partner programmes** | Earn AlFursan miles on Saudia (pass-through). Later, pay with or earn stc Qitaf, Al Rajhi mokafaa, Neqaty and Shukran through partner agreements, as Almosafer does. **Integrate with existing programmes rather than building a rival coalition.** |
+
+There are no daily streaks, because people travel 2–6 times a year. Trip-readiness checklists do that job instead.
 
 ---
 
@@ -220,8 +306,15 @@ Mada Ops already has clients, bookings (`draft → pending_issue → issued`), p
 | `alerts` | Flight and trip events, and what was sent to whom. |
 | Payment methods | Add `apple_pay`, `tabby`, `tamara`, `myfatoorah` to `payments.method`. Online payments settle to the Retail account. |
 | Response-time board | Who is on duty, request ages, breaches of the promised response time. |
+| Circles and rewards (app side, not Ops) | `groups`, `group_members`, `saves`, `collections`, `posts`, `connections`, `reports` (moderation queue), `points_ledger`, `badges`. Ops sees only the moderation queue and the points liability. |
+| 24/7 desk | A rota, on-call paging for disruptions at night, and handover notes between Riyadh and Pakistan. |
 
-**Compliance flag:** Ops currently stores traveller passport details in `bookings.travellers` (jsonb), in a serverless Postgres database that is most likely hosted outside Saudi Arabia (confirm the region). Before the app collects passports at scale, decide whether Ops moves to a Saudi region or keeps only references (see D4).
+**Data location (decided, D4):** start on the current Ops stack (Supabase Postgres + Vercel) to move fast. Move to a Saudi region later.
+
+To keep that move cheap:
+- Keep documents in a separate storage bucket with their own encryption keys and a `documents` service boundary, so the vault can move to a Saudi region without touching the rest.
+- Collect explicit consent for storage outside the Kingdom in the meantime, as the Saudi data law (PDPL) requires.
+- Set a trigger for the move: before the public launch, or before 10,000 stored passports, whichever comes first.
 
 ---
 
@@ -242,6 +335,8 @@ Mada Ops already has clients, bookings (`draft → pending_issue → issued`), p
 ---
 
 ## 8. Technology (recommended)
+
+The vendor-by-vendor list, including what to open and sign first, is in [INTEGRATIONS.md](INTEGRATIONS.md).
 
 | Layer | Choice | Why |
 |---|---|---|
@@ -276,10 +371,10 @@ Mada Ops already has clients, bookings (`draft → pending_issue → issued`), p
 
 | Phase | What ships | Done when |
 |---|---|---|
-| **0. Foundations and design** | Your design direction · clickable prototype of the 10 signature moments · supplier contracts (GDS Enterprise, Duffel, RateHawk/WebBeds, FlightAware, MyFatoorah) · legal checks (licence scope, PDPL, insurance) · Saudi-dialect voice test · agent-desk staffing plan | Prototype tested with 8–10 Saudi travellers (families included). Contracts signed. |
-| **1. MVP: companion + booking** | B1–B4, B10, B11, B13–B16 · B5–B9 and B12 as concierge requests · P1 (text), P2, P3, P4, P5 (iOS), P6 (MRZ), P9, P11 (basics), P12 · Ops app inbox · prayer times | Closed beta with existing Mada clients. Real bookings issued through Ops. Every promised response time met. |
-| **2. V1: travel partner** | P7 entry check · P8 prepared fix · P10 refunds and claims · P13 recommendations · P14 arrival pack · P15–P17 · Android Live Updates · NFC passport · voice · Tabby and Tamara · WhatsApp · S1–S6 · activities bookable live (Viator / GetYourGuide) | Public launch. |
-| **3. V2: scale** | Nafath · Gmail sync · Watch and Siri · cars live · corporate module · Mada Plus · trip memory · ChatGPT / AI-platform distribution (search in, service stays in the app) | |
+| **0. Foundations and design** | Your design references · clickable prototype of the 10 signature moments · day-one integrations signed and in sandbox ([INTEGRATIONS.md](INTEGRATIONS.md)) · legal checks (PDPL, points under SAMA rules, user-generated content and the Anti-Cyber Crime Law, insurance) · Saudi-dialect voice test · 24/7 agent-desk rota | Prototype tested with 8–10 Saudi travellers (families included). Contracts signed. |
+| **1. MVP: companion + booking + groups** | B1–B4, B10, B11, B13–B16 · B5–B9 and B12 as concierge requests · P1 (text), P2, P3, P4, P5 (iOS), P6 (MRZ), P9, P11 (basics), P12 · **C1–C4** (household, trip groups with the agent inside, save and collections, share to Mada) · **Mada Pay sheet** with saved cards and Apple Pay · **points earned from day one** (simple ledger) · Ops app inbox · prayer times · 24/7 disruption desk | Closed beta with existing Mada clients. Real bookings issued through Ops. Every promised response time met. |
+| **2. V1: travel partner** | P7 entry check · P8 prepared fix · P10 refunds and claims · P13 recommendations · P14 arrival pack · P15–P17 · Android Live Updates · NFC passport · voice · Tabby and Tamara · WhatsApp · S1–S6 (Umrah and visas) · activities bookable live (Viator / GetYourGuide) · **C5–C7** (friends, journal, Who's around behind a flag) · **Next move** predictions · group split · tiers, badges, Mada Passport, friends leaderboard, referrals | Public launch. |
+| **3. V2: scale and the world** | Nafath · Gmail sync · Watch and Siri · cars live · corporate module · Mada Plus · trip memory · **C8–C10** (who's going, hosted meetups, tips from your circles) · partner loyalty programmes (AlFursan, Qitaf, mokafaa) · Saudi-region data move · inbound pilgrims and visitors (more languages) · ChatGPT / AI-platform distribution | |
 
 ---
 
@@ -295,22 +390,39 @@ Mada Ops already has clients, bookings (`draft → pending_issue → issued`), p
 | Repeat booking within 12 months | Track by household |
 | Trips imported vs booked with Mada | Shows the companion is useful beyond Mada's own sales |
 | Entry-check catches (problems found before travel) | Track. This is the "saved my trip" metric. |
+| Trips with a group (2+ members) | Shows Circles is working |
+| Next-move cards accepted | Acceptance rate per type. Turn off types people dismiss. |
+| Time from "I want this" to paid | Median under 30 seconds for add-ons |
+| Safety reports resolved | 100% within 24 hours |
 
 ---
 
-## 12. Decisions we need from you
+## 12. Decisions
 
-| # | Decision | Why it matters | Our recommendation |
-|---|---|---|---|
-| D1 | **Human coverage hours.** The Riyadh counter runs 12 PM–10 PM and Pakistan is 2 hours ahead. Do we promise 24/7 for disruptions? | The promise of a human who fixes it is the product. | 24/7 for active-trip disruptions (on-call rota) from day one. Bookings within working hours, with an honest response time shown. |
-| D2 | **Response-time promise.** E.g. booking confirmed in ≤ 15 minutes during working hours, disruption answered in ≤ 10 minutes, any time. | It is shown in the app, so it has to be true. | Start conservative and tighten as data comes in. |
-| D3 | **Named agents.** Show the agent's first name, photo and voice note? | Biggest trust signal in the research. | Yes. First name and photo. Voice notes optional per agent. |
-| D4 | **Where passport data lives.** Saudi-region vault, with Ops keeping only references, or move Ops to a Saudi region as well? | PDPL, and a marketing message. | Vault in a Saudi region now. Move Ops when AWS or Azure Saudi regions are live. |
-| D5 | **Launch services.** Live search only for flights and hotels at MVP, everything else as concierge requests? | Scope and time to launch. | Yes. |
-| D6 | **App name and AI persona.** Is the assistant simply "Mada", or does it get its own name? | Brand and voice. | Call it "Mada". Humans are "your Mada agent". |
-| D7 | **Licence scope.** Does the current Ministry of Tourism licence cover online sales, Umrah packages and visa services? | Rules what we can sell in the app. | Confirm before Phase 1. |
-| D8 | **Tech stack.** React Native + Expo (recommended) or Flutter? | Hiring and code sharing with Ops. | React Native + Expo. |
-| D9 | **Mada Plus.** Plan a membership at all? | Pricing page and how we design the free tier. | Decide after V1 data. Keep the radar and Wallet free regardless. |
+### Decided
+
+| # | Decision | Answer |
+|---|---|---|
+| D1 | Human coverage hours | **24/7.** Bookings and disruptions, with a rota across Riyadh and Pakistan plus on-call cover. |
+| D4 | Where data lives | **Current database (Supabase + Vercel) first, Saudi region later.** See §6.1 for how we keep the move cheap. |
+| D7 | Umrah and visas | **In scope** as Mada services (B5, S3). |
+| D11 | Positioning | **Saudi first, made for the world.** |
+| D12 | Brand | **Carry over the Mada brand.** Design references are coming. |
+| D13 | Community, prediction and loyalty | **In scope, phased** (§5.5–5.7, §10). |
+
+### Still open
+
+| # | Decision | Our recommendation |
+|---|---|---|
+| D2 | **Response-time promise** shown in the app (e.g. booking ≤ 15 min, disruption ≤ 10 min, any hour) | Start conservative and tighten as data comes in. |
+| D3 | **Named agents:** show first name, photo and voice note? | Yes to first name and photo. Voice notes optional per agent. |
+| D5 | **Live search at MVP** only for flights and hotels; everything else as concierge requests? | Yes. |
+| D6 | **AI persona name** | Call it "Mada". Humans are "your Mada agent". |
+| D8 | **Tech stack** | React Native + Expo. |
+| D9 | **Mada Plus** membership | Decide after V1. Radar, Wallet and Circles stay free regardless. |
+| D10 | **Name of the points currency** | Avoid "Mada Points" or "Mada Pay" on their own: **mada** is also Saudi Arabia's national debit network, and users will confuse the two. Pick a travel-flavoured name, for example *Miles*, *Stars* or *Suns* after the brand's sun symbol. |
+| D14 | **Who's around: who can see whom by default** | Contacts only. Same-gender and family-only circles available. Strangers only through a booked event (V2). |
+| D15 | **Which GDS Mada uses** (Amadeus, Sabre or Travelport) | Needed to start the flight integration; see INTEGRATIONS.md. |
 
 ---
 
@@ -319,9 +431,9 @@ Mada Ops already has clients, bookings (`draft → pending_issue → issued`), p
 When you send the design direction, these are the things that shape everything else:
 
 1. **Mood and references:** apps, hotels, brands or objects whose feel you want, and what you don't want.
-2. **Brand:** do we carry the website's identity into the app (brand green `#1e352d`, sand `#e9e2d8`, sun-gold, the sun symbol, Instrument Serif and Inter Tight; IBM Plex Sans Arabic and Reem Kufi for Arabic), or evolve it?
+2. **Brand (decided: carry it over):** brand green `#1e352d`, sand `#e9e2d8`, sun-gold, the sun symbol, Instrument Serif and Inter Tight; IBM Plex Sans Arabic and Reem Kufi for Arabic. The references will tell us how far to push it in the app.
 3. **Tone of voice** in Arabic and English: formal, warm, playful? Gulf dialect in copy, or Modern Standard Arabic?
 4. **Motion:** the website is motion-heavy (GSAP, the sun-ray preloader). How much of that energy belongs in an app people use at the gate under stress?
 5. **iOS Liquid Glass and Android Material 3 Expressive:** follow each platform natively (recommended), or one custom look on both?
 6. **Photography and illustration** for destinations and empty states.
-7. **The first three screens to design:** we suggest Today on travel day, the concierge's "request → confirmed by Faisal" moment, and the household Wallet.
+7. **The first screens to design:** we suggest Today on travel day, the concierge's "request → confirmed by Faisal" moment, the household Wallet, a trip group with the agent inside it, and the Mada Pay sheet.

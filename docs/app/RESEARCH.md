@@ -1,12 +1,13 @@
 # Mada Trips app: research findings
 
-The evidence behind [SCOPE.md](SCOPE.md). Gathered October 2026 from five research tracks:
+The evidence behind [SCOPE.md](SCOPE.md). Gathered October 2026 from six research tracks:
 
 1. Competitors
 2. What travellers say
 3. The Saudi and GCC market
 4. Technical feasibility
 5. UX case studies
+6. Community, loyalty and prediction
 
 Items marked **[unverified]** rest on a single secondary source, or the sources disagree. Check them before they go into an investor deck or a contract.
 
@@ -286,7 +287,65 @@ Use envelope encryption, a biometric lock, and audit every time an agent views a
 
 ---
 
-## 7. Open items to verify
+## 8. Community, loyalty and prediction
+
+**Travel social: what worked and what died**
+- **Polarsteps** (about 15M to 20M users during 2025, company figures): grew on automatic private trip journals for friends and family and printed books, not on meeting strangers.
+- **Airbnb "who's going" (2025):** shows guests booked on the same experience. Off unless you opt in, home city only, connect after the event. More than 7 in 10 users wanted to know who else was going. **The closest template for Mada.**
+- **Mindtrip group chat:** an AI inside the group merges preferences. 90% of travellers go with at least one other person.
+- **Couchsurfing Hangouts** (open "who's around now"): drifted into a dating tool and faded.
+- **Foursquare:** City Guide shut in Dec 2024. Swarm survives as a private check-in diary.
+- **Tripadvisor forums:** declining as AI search grows **[traffic figures unverified]**. Don't build a public forum.
+- **Nomads.com:** a paid membership is what keeps spam out and members safe.
+- **Bumble BFF Travel Mode:** shows you at the centre of a city, never your real position (city-level fuzzing).
+
+**Location privacy failures**
+- **Strava heatmap (2018):** revealed military bases. Defaults become policy, and sparse data is not anonymous.
+- **Snap Map (2017):** off by default, yet still caused panic among parents.
+- **Life360 (2021):** sold precise location to data brokers.
+
+**What makes "who's around" safe rather than creepy**
+- Off by default; switched on per trip, and it expires when the trip ends.
+- City level only: no pin, no live map, no heatmap or "X people near you" counts.
+- Visible to mutual contacts and chosen circles only. Strangers only through a booked event.
+- People send a request, and chat starts only once it is accepted.
+- Same-gender and family-only circles. Women can hide from all non-contacts.
+- Identity verification required.
+- A promise, in writing, that location is never sold.
+
+**Compliance**
+- **App stores:** Apple guideline 1.2 and Google Play's user-generated content (UGC) policy require filtering, report, block and published contact details. Reviewers have asked for action on reports within 24 hours (taken from a quoted rejection).
+- **Saudi data law (PDPL):** whether location counts as sensitive data is disputed between sources. Treat it as sensitive, with its own separate consent.
+- **Anti-Cyber Crime Law, Art. 3:** publishing people's photos without consent can mean up to 1 year in prison and/or SAR 500k. That means consent prompts and face blur before photos are shared.
+- **Paid creators:** if Mada pays people to promote it, they need a GCAM *Mawthooq* licence.
+
+**Loyalty**
+- **Expedia One Key (Jul 2026):** stopped earning on flights and added a "delay care" perk. **Lesson:** flight margins can't fund cashback. Fund rewards from hotels and add-ons, and differentiate with service perks.
+- **Booking Genius:** lifetime levels based on number of stays, funded by hotels.
+- **Hopper Carrot Cash:** closed-loop, no cash value, expires. The regulatory-safe pattern.
+- **Almosafer:** plugs into Qitaf, mokafaa and Shukran rather than running its own coalition.
+- **SAMA (Saudi central bank):** points with a fixed riyal value, transferability or a broad redemption network can fall under e-money rules (Latham & Watkins, Aug 2026). Holding customer top-up balances most likely needs an e-money licence.
+- **Duolingo leagues:** +17% learning time. Daily streaks don't fit travel, which happens 2–6 times a year.
+- **Flighty Passport:** the year-in-review stats card is a proven, shareable growth loop.
+
+**Prediction and spending**
+- **What works:** invisible payment with one confirmation moment. One-tap with a saved card or Apple Pay; automatic charging only for small add-ons.
+- **What predictions should cover:** logistics (transfers, renewals, the usual Eid trip), always with "why am I seeing this".
+- **What they must never do:** infer from location that wasn't given for the trip.
+- **Group spending:** IOU ledgers that hold no money avoid licensing questions.
+- **Tabby:** holds a SAMA licence (Nov 2025) for 12-month plans on SAR 2k–50k, with Almosafer and flynas as launch partners.
+
+**Vendors:** see [INTEGRATIONS.md](INTEGRATIONS.md).
+- Stream (chat, feeds, moderation)
+- Google Maps and Places
+- AppsFlyer OneLink (Firebase Dynamic Links shut down in Aug 2025)
+- PostHog
+- OpenAI omni-moderation (free) and Hive for images
+- Voucherify, later
+
+---
+
+## 9. Open items to verify
 
 **Licences**
 1. Mada's Ministry of Tourism licence scope: online sales, Umrah packages, inbound visas.
@@ -307,3 +366,7 @@ Use envelope encryption, a biometric lock, and audit every time an agent views a
 **Technical tests**
 11. Benchmark speech recognition on Saudi dialect audio.
 12. Gate-data accuracy at Saudi airports.
+13. Whether rewards points are e-money under SAMA rules, and whether location is sensitive data under the PDPL.
+14. Whether Tabby and Tamara cover airline tickets.
+15. What Nusuk system access Mada's Umrah licence gives.
+16. Arabic moderation quality across vendors.
