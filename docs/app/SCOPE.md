@@ -3,6 +3,7 @@
 **Status:** Draft v2. Adds the community, prediction and loyalty layers and records the decisions made so far. This is the plan before any code is written. Design references come next.
 **Platforms:** iOS and Android. **Saudi first, made for the world.**
 **Integrations to start with:** [INTEGRATIONS.md](INTEGRATIONS.md).
+**Experience design, psychology and layout rules:** [EXPERIENCE.md](EXPERIENCE.md).
 **Evidence:** [RESEARCH.md](RESEARCH.md), covering competitors, traveller reviews, the Saudi market, technical feasibility and UX case studies.
 **Built on:** the existing Mada Ops platform ([platform/](../../platform), [docs/ops-platform/PLAN.md](../ops-platform/PLAN.md)).
 
