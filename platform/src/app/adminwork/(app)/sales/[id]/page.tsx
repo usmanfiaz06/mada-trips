@@ -277,7 +277,20 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 {b.status === "issued" && !refund && (
                   <details><summary className="flex cursor-pointer list-none items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><RotateCcw className="size-4" />{t("Request a refund")}</summary>
                     <ActionForm action={requestRefund} className="mt-3 space-y-2"><input type="hidden" name="id" value={b.id} />
-                      <textarea name="reason" rows={2} className="field" placeholder={t("Why? Directors approve refunds")} /><SubmitButton variant="outline" size="sm">{t("Send refund request")}</SubmitButton></ActionForm></details>
+                      <textarea name="reason" rows={2} className="field" placeholder={t("Why? Directors approve refunds")} />
+                      {supplierPay && supplierPay.sp.status === "settled" && (
+                        <label className="block">
+                          <span className="mb-1 block text-[12px] text-ink-3">{t("Supplier's cancellation fee")} <span className="text-ink-4">· {t("leave blank if they refund the full {amt}", { amt: `SAR ${sar(b.netCost)}` })}</span></span>
+                          <input name="supplierFee" inputMode="decimal" placeholder="0.00" className="field h-10" dir="ltr" />
+                        </label>
+                      )}
+                      {cleared > 0 && (
+                        <label className="block">
+                          <span className="mb-1 block text-[12px] text-ink-3">{t("Fee you keep from the client")} <span className="text-ink-4">· {t("leave blank if you refund the full {amt}", { amt: `SAR ${sar(cleared)}` })}</span></span>
+                          <input name="clientFee" inputMode="decimal" placeholder="0.00" className="field h-10" dir="ltr" />
+                        </label>
+                      )}
+                      <SubmitButton variant="outline" size="sm">{t("Send refund request")}</SubmitButton></ActionForm></details>
                 )}
                 {refund && <Link href={`/adminwork/approvals/${refund.id}`} className="flex items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><RotateCcw className="size-4" />{t("Refund requested")} · {refund.ref}</Link>}
                 {voidReq ? (

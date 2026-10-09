@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { nextRef } from "./refs";
@@ -236,6 +236,28 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       if (!b || !ok) return;
       await tx.update(schema.bookings).set({ status: "refunded", updatedAt: new Date() }).where(eq(schema.bookings.id, b.id));
       await audit(tx, { actorId: null, action: "booking.refunded", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `${b.ref} refunded` });
+      // A refunded sale fully leaves the books (its supplier payment and client receipts drop out of the
+      // bank). Cancellation fees are the exceptions to that clean reversal:
+      //   supplierFee — money the supplier KEPT (we didn't get all of it back): a real cost out of the bank.
+      //   clientFee   — money we KEPT from the client (we didn't give it all back): retained, back into the bank.
+      const fees = req.payload as { supplierFee?: number; clientFee?: number } | null;
+      const supplierFee = Math.max(0, Math.round(fees?.supplierFee ?? 0));
+      const clientFee = Math.max(0, Math.round(fees?.clientFee ?? 0));
+      if (supplierFee > 0) {
+        const [sp] = await tx.select().from(schema.supplierPayments).where(and(eq(schema.supplierPayments.bookingId, b.id), eq(schema.supplierPayments.status, "settled")));
+        if (sp?.source === "bank" && sp.account) {
+          await tx.insert(schema.bankTransactions).values({ account: sp.account, direction: "out", kind: "adjustment", amount: supplierFee, note: `Supplier cancellation fee · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
+        } else if (sp?.source === "partner" && sp.partnerId) {
+          // The partner fronted the cost; the supplier kept this much, so the partner is still owed it.
+          await tx.insert(schema.ledgerEntries).values({ partnerId: sp.partnerId, type: "expense", amount: supplierFee, description: `Supplier cancellation fee · ${b.ref}`, sourceType: "refund_fee", sourceId: b.id, entryDate: riyadhDate(), createdBy: actorId });
+        }
+        await audit(tx, { actorId: null, action: "refund.supplier_fee", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Supplier kept SAR ${sar(supplierFee)} on ${b.ref}` });
+      }
+      if (clientFee > 0) {
+        const [pay] = await tx.select({ account: schema.payments.account }).from(schema.payments).where(and(eq(schema.payments.bookingId, b.id), isNotNull(schema.payments.clearedOn))).limit(1);
+        await tx.insert(schema.bankTransactions).values({ account: pay?.account ?? "retail", direction: "in", kind: "adjustment", amount: clientFee, note: `Kept from client (cancellation fee) · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
+        await audit(tx, { actorId: null, action: "refund.client_fee", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `We kept SAR ${sar(clientFee)} from the client on ${b.ref}` });
+      }
       return;
     }
     case "void": {
