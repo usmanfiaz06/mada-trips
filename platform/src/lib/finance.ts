@@ -8,10 +8,14 @@ type Q = Tx | typeof db;
 /** What each partner is owed back (advances + verified personal expenses − repayments). */
 export async function partnerBalances(q: Q = db) {
   const partners = await q.select().from(schema.partners).orderBy(schema.partners.sort);
+  // A supplier cost a partner fronted stops being owed once its booking is voided/refunded: the supplier
+  // returns the money, so the cost drops off the partner's ledger (mirrors the bank side in cashPosition).
+  const liveLedger = sql`NOT (${schema.ledgerEntries.sourceType} = 'supplier' AND EXISTS (
+    SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.ledgerEntries.sourceId} AND bx.status IN ('void','refunded')))`;
   const rows = await q.select({
     partnerId: schema.ledgerEntries.partnerId, type: schema.ledgerEntries.type,
     total: sql<number>`coalesce(sum(${schema.ledgerEntries.amount}),0)::bigint`.mapWith(Number),
-  }).from(schema.ledgerEntries).groupBy(schema.ledgerEntries.partnerId, schema.ledgerEntries.type);
+  }).from(schema.ledgerEntries).where(liveLedger).groupBy(schema.ledgerEntries.partnerId, schema.ledgerEntries.type);
   return partners.map((p) => {
     const get = (t: string) => rows.find((r) => r.partnerId === p.id && r.type === t)?.total ?? 0;
     const lent = get("advance") + get("expense");
@@ -33,9 +37,13 @@ export async function cashPosition(q: Q = db) {
     .from(schema.expenses).where(and(eq(schema.expenses.status, "approved"), ne(schema.expenses.paidBy, "partner"))).groupBy(schema.expenses.paidBy);
   const bsp = await q.select({ account: schema.bspObligations.account, total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspObligations).where(eq(schema.bspObligations.status, "paid")).groupBy(schema.bspObligations.account);
-  // Supplier costs paid out of a company bank.
+  // Supplier costs paid out of a company bank. A void or refunded sale leaves the books: the supplier
+  // returns the money, so that payment no longer counts against the bank (mirrors how a cancelled sale's
+  // received money drops out of inflow above). If the supplier keeps a cancellation fee, record that fee
+  // as an expense so the bank still reflects the real net.
+  const suppLive = sql`NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.supplierPayments.bookingId} AND bx.status IN ('void','refunded'))`;
   const supp = await q.select({ account: schema.supplierPayments.account, total: sql<number>`coalesce(sum(${schema.supplierPayments.amount}),0)::bigint`.mapWith(Number) })
-    .from(schema.supplierPayments).where(and(eq(schema.supplierPayments.status, "settled"), eq(schema.supplierPayments.source, "bank"))).groupBy(schema.supplierPayments.account);
+    .from(schema.supplierPayments).where(and(eq(schema.supplierPayments.status, "settled"), eq(schema.supplierPayments.source, "bank"), suppLive)).groupBy(schema.supplierPayments.account);
   // IATA BSP closings paid out of a company bank.
   const bspPaid = await q.select({ account: schema.bspClosings.account, total: sql<number>`coalesce(sum(${schema.bspClosings.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspClosings).where(and(eq(schema.bspClosings.status, "paid"), eq(schema.bspClosings.source, "bank"))).groupBy(schema.bspClosings.account);
@@ -121,7 +129,7 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
     UNION ALL
     (SELECT sp.paid_on::text, 'supplier', sp.supplier, b.ref, -sp.amount::bigint, true, NULL
        FROM supplier_payments sp JOIN bookings b ON b.id = sp.booking_id
-       WHERE sp.source = 'bank' AND sp.account = ${account} AND sp.status = 'settled')
+       WHERE sp.source = 'bank' AND sp.account = ${account} AND sp.status = 'settled' AND b.status NOT IN ('void','refunded'))
     UNION ALL
     (SELECT coalesce(o.paid_on::text, o.due_date::text), 'bsp', o.period, NULL, -o.amount::bigint, true, NULL
        FROM bsp_obligations o WHERE o.account = ${account} AND o.status = 'paid')
