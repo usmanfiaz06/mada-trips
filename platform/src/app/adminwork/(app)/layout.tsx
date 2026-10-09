@@ -35,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ...(can(u, "finance.view") ? [
         { href: "/adminwork/finance", label: t("Banks & cash"), icon: "Landmark" as const },
         { href: "/adminwork/payables", label: t("Money we owe"), icon: "Coins" as const },
+        { href: "/adminwork/reports", label: t("Profit & reports"), icon: "LineChart" as const },
         { href: "/adminwork/settlement", label: t("Day-25 settlement"), icon: "CalendarRange" as const },
       ] : []),
       { href: "/adminwork/partners", label: t("Partners"), icon: "Handshake" as const },
