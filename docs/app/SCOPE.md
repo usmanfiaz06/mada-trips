@@ -31,7 +31,7 @@ The app rests on four ideas:
 | Warns you early | Rarely | ✓ | – | ✓ |
 | **Fixes it** | Slowly, through a call centre | ✗ | ✗ | **✓ Fix prepared, human owns it** |
 | Your documents | – | Basic | – | ✓ Whole household, with entry-rule checks |
-| Arabic-first, family-first | Partly | ✗ | ✗ | ✓ |
+| Fully bilingual, family-first | Partly | ✗ | ✗ | ✓ English first, fully Arabic |
 | Your people (groups, friends nearby, shared saves) | ✗ | ✗ | Group planning only | ✓ Private circles |
 | Predicts your next move, one-tap pay | ✗ | ✗ | ✗ | ✓ |
 
@@ -53,7 +53,7 @@ The app rests on four ideas:
 7. **Documents that know the rules.** Check each person on each trip: the 6-month passport rule, visas, the iqama (residence permit) and exit/re-entry visa, and that the name matches the passport character for character.
 8. **Few, high-value notifications.** No promotions during a trip. Every status shows its source ("airline says", "Mada predicts").
 9. **Honest money.** All-in prices, holds with a stated time limit, no pre-ticked extras, and refunds tracked in stages. Hopper's $35M FTC settlement is a design spec for what not to do.
-10. **Arabic and Saudi by default.** Right-to-left done properly, Hijri dates, Gulf-dialect voice, WhatsApp as a channel, mada cards, Tabby and Tamara.
+10. **Saudi by default, fully bilingual.** English first with complete Arabic, right-to-left done properly, Hijri dates, Gulf-dialect voice, WhatsApp as a channel, mada cards, Tabby and Tamara.
 
 ---
 
@@ -68,9 +68,11 @@ These are the rules every screen is judged against.
 5. **A human name on every commitment.** "Confirmed by Faisal · 4 min." Handover never makes the traveller repeat themselves.
 6. **Earn every interruption.** A strict notification budget (§7). Time-sensitive alerts only when the traveller must act.
 7. **Design the bad day first.** Delays, missed connections, lost bags and expired passports get the most design care. Every alert carries its fix.
-8. **Arabic-native and bidi-perfect.** Design in Arabic first, then English. Flight numbers, PNRs (airline booking codes), times and prices are isolated so mixed-language text never scrambles.
+8. **English first, fully Arabic, mixed text that never scrambles.** Every screen ships in both languages. Flight numbers, PNRs (airline booking codes), times and prices are isolated so mixed-language text never scrambles.
 9. **Works offline and on the lock screen.** Documents, the timeline and next steps all work in airplane mode. Live Activities, widgets and Wallet passes are first-class surfaces.
 10. **Calm and premium.** No banners, no upsell carousels, no fake urgency. The app feels like a quiet five-star concierge, not a marketplace.
+11. **It breathes with the real world.** Every movement has a real cause, either your touch or the world (light, weather, the flight, the sun). Every haptic is a consistent word. See [EXPERIENCE.md §4.5–4.6](EXPERIENCE.md).
+12. **Measured, not guessed.** Every flow is a funnel, with heatmaps and friction signals from the first beta ([EXPERIENCE.md §10.2](EXPERIENCE.md)).
 
 ---
 
@@ -148,7 +150,7 @@ These are what make the app recognisable. Design should prototype these first.
 | B12 | Change and cancel | MVP as a request, V1 self-serve where the supplier allows | Every change goes through the same human-confirmed flow, with the fare difference shown before approval. |
 | B13 | Notifications | MVP | Push, plus email receipts. WhatsApp in V1. |
 | B14 | Support | MVP | The Ask thread includes your human agent. A promised response time is shown honestly. |
-| B15 | Arabic and English | MVP | Arabic-first design, full right-to-left support, language switch. |
+| B15 | English and Arabic | MVP | English-first design, complete Arabic with full right-to-left support, follows the phone's language with an in-app switch. |
 | B16 | Account and data | MVP | Export my data, delete my account, consent controls (required by the Saudi data law, PDPL). |
 
 ### 5.2 Partner layer: what makes it a travel partner
@@ -410,6 +412,8 @@ The vendor-by-vendor list, including what to open and sign first, is in [INTEGRA
 | D11 | Positioning | **Saudi first, made for the world.** |
 | D12 | Brand | **Carry over the Mada brand.** Design references are coming. |
 | D13 | Community, prediction and loyalty | **In scope, phased** (§5.5–5.7, §10). |
+| D16 | Language | **English first, fully available in Arabic.** |
+| D17 | Analytics | **Heatmaps, funnels and friction signals from the first beta**, with privacy masking ([EXPERIENCE.md §10.2](EXPERIENCE.md)). |
 
 ### Still open
 

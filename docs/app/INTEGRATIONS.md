@@ -90,6 +90,8 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 | Background jobs and alert fan-out | **A queue on Postgres** (pg-boss) or **Upstash QStash** | Redis + BullMQ | FlightAware webhook → queue → push, WhatsApp, email. |
 | Deep links, invites, referrals, install attribution | **AppsFlyer OneLink** | Branch | Firebase Dynamic Links shut down in Aug 2025. Group invites and referrals depend on this. |
 | Product analytics, feature flags, A/B tests, session replay | **PostHog** | Amplitude, Mixpanel | One tool, generous free tier. The flags gate Who's around and every prediction type. |
+| Mobile tap heatmaps | **PostHog**, if its mobile heatmaps cover React Native well enough | **UXCam** | Confirm in the sandbox week. Masking rules are in [EXPERIENCE.md §10.2](EXPERIENCE.md). |
+| Motion and haptics | **Reanimated 4**, **Skia**, **Rive** (the sun's states), a small native haptics module | Lottie | No vendor contract. Rive is free to start. |
 | Crash and error reporting | **Sentry** | Crashlytics | |
 
 ---

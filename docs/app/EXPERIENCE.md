@@ -113,12 +113,14 @@ Every screen is designed by first writing down **the question in the traveller's
 | Trip group | "What's decided, and who has paid?" | The plan, plus the open poll | Vote / pay my share |
 | Who's around | "Is anyone I know here?" | Friends in the same city (if they opted in) | Send request |
 
-### 3.3 Arabic and English
+### 3.3 English first, fully available in Arabic
 
-- **Design in Arabic first, then mirror for English.** Each layout is checked in both directions.
+- **Decided: English is the primary design language.** Arabic is complete and first-class, not a translation layer: every screen ships in both, and every layout is checked in both directions before release.
+- **The app follows the phone's language by default.** A switch in settings changes it, with no need to restart the app.
 - **Some things never mirror:** clocks, progress rings, media controls, flight numbers, PNRs (booking references), times and prices. They sit in isolated left-to-right runs inside Arabic text.
 - **The primary action stays centred and full width**, so mirroring never moves it away from the thumb.
 - **Arabic text is set about 10–15% larger, with roomier line height.** Body text is never below 15 pt in Arabic.
+- **The concierge replies in whichever language the traveller writes or speaks**, whatever the app's language is set to.
 
 ---
 
@@ -169,11 +171,68 @@ The FitBite reference's "Get started" slider becomes Mada's **signature commitme
 | Confirmed | A short burst of sun rays, about 600 ms | Success |
 | Problem | No shaking and no red flashing. A calm card slides up | Warning |
 
+### 4.5 Living motion: an app that breathes with the real world
+
+**The rule: every movement has a real cause.** It comes either from the traveller's touch or from something happening in the world. Nothing moves just to decorate. That is why the motion feels alive rather than busy: the app moves because the world did.
+
+| Real-world cause | What moves | How it feels |
+|---|---|---|
+| **The time of day where you are** | The canvas warms and cools very slightly through the day: soft warm sand at dawn, bright at noon, golden in the late afternoon, green-black at night. The shift is only a few percent, so it registers without being noticed. | The app lives in the same day as you. |
+| **The time of day at the destination** | Each trip card shows the light of its own city. Istanbul's card is at dusk while it's dusk in Istanbul. | You can feel the place before you get there. |
+| **The real sun** | The sun symbol in the Today header sits at the sun's actual height in the sky where you are: low at Fajr, high at noon, set at night. | The brand symbol is literally the sun. |
+| **Weather at the destination** | A faint weather layer on the hero card only: a cloud shadow drifting, light rain streaks, heat shimmer at 45°C. Rendered on the GPU, very low opacity, and it pauses when the card is off-screen. | "It's raining in London" without reading a word. |
+| **A flight in the air** | An arc with the plane at its real position. Arrival-time digits roll smoothly into place. On landing the arc settles and fades. | You can see the flight progressing, not just read it. |
+| **Time running down** | Countdowns roll, never jump. The "Leave in" ring empties continuously. | Calm, steady, trustworthy. |
+| **Live data arriving** | A small dot pulses beside the source ("Live · airline"). When something changes, the old value **morphs** into the new one (gate B12 → C4) and stays briefly highlighted. | You notice the change without being alarmed. |
+| **Mada thinking or listening** | The sun **breathes** when idle: a 10-second cycle, about the pace of calm breathing, so the cycle quietly slows the viewer down. While you speak, its rays follow your voice. While it works, the rays turn, then burst on success. | Mada is present and attentive. No face is needed. |
+| **Your hand moving the phone** | 1–3 pt parallax on photography and 3D objects, using the gyroscope. Documents in the Wallet catch the light like a real card when you tilt the phone, with a subtle sheen on the passport (in the style of Apple Card). | The objects feel physical, as if they're in your hand. |
+| **Your finger** | Everything follows spring physics. Motion can be interrupted mid-way, carries the speed of the swipe, and has weight. Sheets stretch slightly at their limits. | Direct and tactile. Nothing feels canned. |
+| **People arriving** | A friend's face fades into the trip group as they land. "Abdullah is in Istanbul too" arrives as a soft appearance, not a ping. | The circle feels alive. |
+| **Occasions** | Once per occasion, never repeated: a crescent on the sun through Ramadan nights, one quiet Eid moment, green on National Day. | The app shares your calendar. |
+
 **Motion rules**
-- Motion never blocks a tap.
-- Every animation lasts under 400 ms, except the confirmation peak.
-- Motion turns off when the device has **Reduce Motion** switched on.
-- The website's large scroll animations are kept for marketing pages and the onboarding story. They don't belong in the working app, where people use it under stress.
+- **Motion never blocks a tap.** Every transition can be interrupted.
+- **Interaction motion stays under 400 ms**, except the confirmation peak.
+- **Ambient motion lives only in the Glance zone and on hero cards.** Nothing moves in the Act zone except what the traveller is touching.
+- **Ambient motion pauses while the traveller scrolls** and resumes when they stop.
+- **Stress mode is still.** During a disruption, every ambient layer stops. Stillness tells the traveller this is serious, and it keeps the screen readable.
+- **Accessibility and battery:** Reduce Motion replaces movement with crossfades. Low Power Mode switches off the ambient layers.
+- **Frame rate:** 120 fps on screens that support it, 60 fps minimum. Animations run off the JavaScript thread. Dropped frames are monitored in production (§10.2).
+- **The website's big scroll animations stay on the website and in the onboarding story.** In the working app, the motion is quieter and more physical.
+
+### 4.6 Haptics: a vocabulary you can feel
+
+Each haptic is a word. The same event always feels the same, so after a week travellers know what happened without looking. iOS uses custom Core Haptics patterns; Android uses composed vibration effects, falling back to system presets.
+
+| Event | Pattern | Why |
+|---|---|---|
+| Tap a card or chip | Light tick | Confirms the touch was received |
+| Picker or chip snaps into place | Selection tick at each step | A feeling of precision |
+| **Slide to book: dragging** | Ticks that get stronger as the knob nears the end | You feel the commitment building |
+| **Slide to book: release** | One deep, solid "thunk" | The decision is made |
+| Agent picks up your request | One soft "knock" | Someone is here |
+| **Confirmed** | A heartbeat: soft, then strong | The peak moment (§2.3) |
+| Gate change (with the app open) | Two even taps | Attention without alarm |
+| Boarding opens | A gentle rising pattern | Time to move |
+| **Landed** | A soft thud, then a fading rumble ("touchdown") | You feel the arrival |
+| Points or a refund credited | A quick sparkle of three | A small reward |
+| Something can't be done | Two soft, low taps | Never a harsh buzz |
+| Pull to refresh | One detent at the threshold | Tells you when to let go |
+
+**Haptic rules**
+- **At most one haptic per action.** None while scrolling, except picker detents.
+- **The haptic and the visual land together**, within about 10 ms.
+- **The phone's own haptics setting is respected.**
+- **Never used for marketing.**
+- **Sound is off by default.** There is one optional sound: a soft chime when a booking is confirmed.
+
+### 4.7 How motion and haptics are built
+
+- **React Native Reanimated 4** with Gesture Handler: animations that run on the UI thread and can be interrupted.
+- **Skia:** GPU shaders for light, weather and the Wallet sheen.
+- **Rive:** the sun's states (idle breathing, listening, thinking, celebrating) as one interactive state machine, driven by the app.
+- **Gyroscope:** read through Expo Sensors for parallax, sampled only while a screen is visible.
+- **A small native haptics module** for Core Haptics and Android compositions. The standard Expo library only has presets.
 
 ---
 
@@ -320,15 +379,40 @@ Things that are common in other apps and never appear in Mada:
 | App icon | The sun symbol on a deep green gradient | Taken from the Homely icon treatment. |
 | Dark mode | Green-black canvas, with sun-gold as the accent | For night flights and the evening digest. |
 
-### 9.3 Still open, for the next references
-1. **Arabic references:** apps or brands whose Arabic typography you love.
-2. **Motion references:** how alive the app should feel.
-3. **Density:** whether Today stays as sparse as Homely, or gets closer to FitBite.
-4. **Illustration and 3D:** whether Mada gets a character or 3D objects (as Humwork does), or stays with photography only.
+### 9.3 Imagery: no mascot. Photography, the sun, faces and 3D objects
+
+**Recommendation: no mascot character.** Use four layers instead, each with one job:
+
+| Layer | Its job | Where it appears |
+|---|---|---|
+| **Photography: the world** | Real places in real light. Warm, people-first, including Saudi families and Saudi destinations. Hotel and activity photos come from suppliers; Circles uses travellers' own photos. **We never use AI-generated images of real places**, because a traveller who books a view and finds a different one stops trusting us. | Trip cards, destination ideas, collections, hotel choices |
+| **The sun: Mada** | Mada's presence. It has personality through motion alone (breathing, listening, thinking, celebrating, §4.5) and needs no face. It is a character with no cartoon. | The Ask orb, the Today header, loading and confirmation |
+| **Faces: the people** | The real characters in the app: Faisal and the other named agents, your family, your friends. | Confirmations, trip groups, the Wallet, Who's around |
+| **3D objects: your things and your rewards** | A small, consistent set of tactile objects in Mada materials (matte sand ceramic, green glass, gold): passport, boarding pass, suitcase, key card, compass, camera and the Mada stamp. | Onboarding, empty states, the Wallet, rewards, the Mada Passport, App Store screenshots |
+
+**Why not a mascot like Humwork's robot**
+- **Humwork's product is AI agents, so its robot *is* the product.** Mada's promise is the opposite: AI does the work, a **real person** owns it. A cartoon helper on screen would undercut "Confirmed by Faisal" and make Mada look like the chatbots travellers already distrust ([RESEARCH.md §3](RESEARCH.md)).
+- **A mascot can't stay dignified in stress mode.** Nobody wants a cartoon telling them their connection is at risk.
+- **A premium brand ages better with symbols and objects** than with a cartoon. Characters also invite cultural debate about how figures are depicted.
+
+**Where the 3D objects earn their place**
+- **Rewards as passport stamps.** Every new city or country stamps a 3D page in your **Mada Passport**. Saudi destinations get special stamps (AlUla, Diriyah, the Red Sea, Abha). They are collectible, tactile and shareable, which makes them the heart of the rewards layer.
+- **Floating glass chips for good news**, in the style of the Humwork reference: "+120 points", "Refund SAR 640 ✓", "Upgrade secured".
+- **Empty states with one object and one line.** For example: an open suitcase with "Nothing planned yet. Where to?"
+- **App Store screenshots and onboarding** borrow Humwork's energy: oversized type, the 3D objects, and dark and light panels.
+
+**Icons:** one custom set of rounded line icons matching the dock. No mixing of icon styles.
+
+### 9.4 Still open, for the next references
+1. **Arabic typography**, for the Arabic version.
+2. **Density:** whether Today stays as sparse as Homely, or gets closer to FitBite.
+3. **The 3D material:** ceramic and matte, or glass and glossy. A reference for each would settle it.
 
 ---
 
 ## 10. How we'll know it's working
+
+### 10.1 Usability rounds
 
 **Who tests it.** Rounds of five people each (five per round finds most usability problems, per Nielsen), always including:
 - a mother managing children's documents
@@ -349,3 +433,42 @@ Things that are common in other apps and never appear in Mada:
 | "Where would you tap to…?" with no hesitation | The answer is in the Act zone every time |
 
 **The test that matters most.** After a session with Mada, give the tester the same task in Almosafer or Booking.com and watch for frustration. That reaction is the goal the founder set.
+
+### 10.2 Instrumentation: heatmaps and friction signals in production
+
+Every flow is measured from the first beta build, so we know **which flow, which step and which screen** is causing trouble, rather than guessing.
+
+**Each flow is a funnel**
+- Every flow (book, change, add document, join group, pay share, and so on) gets named steps.
+- The same four events are used everywhere: `flow_started`, `step_viewed`, `step_completed` and `flow_abandoned`. The abandon event records the step and the reason when one is known.
+- Funnels, drop-off by step, and the most common paths come from these events.
+
+**What we capture on screen**
+- **Tap heatmaps per screen:** where people tap, including taps on things that aren't buttons.
+- **Scroll depth:** whether the important card is ever seen.
+- **Session replay:** to watch real sessions behind a problem. Privacy rules apply (see below).
+
+**Friction signals, detected automatically and ranked weekly**
+
+| Signal | Detected when | Usually means |
+|---|---|---|
+| Rage taps | 3+ taps in the same spot within 1 s | Something looks tappable but isn't, or it's too slow |
+| Dead taps | A tap on something that isn't interactive | A false signal in the design |
+| Back-and-forth | Returning to the previous step within 5 s | The step didn't answer the question in the traveller's head |
+| Hesitation | Time on a step above the 75th percentile | Too many choices, or something unclear |
+| Abandoned typing | The keyboard opened and closed with nothing typed | We asked for something we should have known |
+| **"How do I…" in Ask** | The traveller asks the concierge how to use the app itself | The interface failed. This is the most valuable signal we have. |
+| Dropped frames | An animation runs below 55 fps | Motion jank, which breaks the feeling of quality |
+| Stress-mode outcomes | Time from a disruption alert to the traveller's decision | Whether the hard moments work |
+
+**The friction board.** Every week: the top 5 flows by drop-off, each linked to its replays and heatmap, with an owner and a fix. One change is tested at a time, behind a feature flag (A/B).
+
+**Privacy rules (Saudi data law, PDPL)**
+- **Session replay needs consent** and is sampled, not recorded for everyone.
+- **All typed text is masked.**
+- **Never recorded at all:** the Wallet, passports, payment screens and chat contents.
+- Replays are kept for 30 days.
+- Heatmaps and funnels contain no personal data.
+
+**Tools.** PostHog for events, funnels, paths, feature flags, experiments and replay. Sentry for crashes and performance, including slow frames. For tap heatmaps on mobile, use PostHog if its mobile heatmaps cover React Native well enough; otherwise UXCam, which is built for mobile heatmaps. **[Confirm PostHog's mobile heatmap support in the sandbox week.]**
+
