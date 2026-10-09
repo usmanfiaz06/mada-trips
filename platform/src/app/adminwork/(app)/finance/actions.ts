@@ -37,7 +37,10 @@ export async function clearPayments(_: ActionState, fd: FormData): Promise<Actio
       const rows = await tx.select().from(schema.payments)
         .where(and(inArray(schema.payments.id, ids), isNull(schema.payments.clearedOn))).for("update");
       if (!rows.length) return 0;
-      if (rows.some((r) => date < r.businessDate)) throw new Error("A receipt can't clear before it was collected");
+      // Compare against the real day the money came in (collectedAt), not the business day — a receipt
+      // entered after the 10 PM close is booked to the next business day, so businessDate can sit a day
+      // ahead of today and would otherwise make the receipt impossible to clear until the calendar catches up.
+      if (rows.some((r) => date < riyadhDate(r.collectedAt))) throw new Error("A receipt can't clear before it was collected");
       // Can't clear a receipt whose sale has been voided or refunded — it's off the books.
       const closedIds = new Set((await tx.select({ id: schema.bookings.id }).from(schema.bookings)
         .where(and(inArray(schema.bookings.id, [...new Set(rows.map((r) => r.bookingId).filter((x): x is string => !!x))]), inArray(schema.bookings.status, ["void", "refunded"])))).map((b) => b.id));
