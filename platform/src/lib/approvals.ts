@@ -246,7 +246,7 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       if (supplierFee > 0) {
         const [sp] = await tx.select().from(schema.supplierPayments).where(and(eq(schema.supplierPayments.bookingId, b.id), eq(schema.supplierPayments.status, "settled")));
         if (sp?.source === "bank" && sp.account) {
-          await tx.insert(schema.bankTransactions).values({ account: sp.account, direction: "out", kind: "adjustment", amount: supplierFee, note: `Supplier cancellation fee · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
+          await tx.insert(schema.bankTransactions).values({ account: sp.account, direction: "out", kind: "refund_fee", amount: supplierFee, note: `Supplier cancellation fee · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
         } else if (sp?.source === "partner" && sp.partnerId) {
           // The partner fronted the cost; the supplier kept this much, so the partner is still owed it.
           await tx.insert(schema.ledgerEntries).values({ partnerId: sp.partnerId, type: "expense", amount: supplierFee, description: `Supplier cancellation fee · ${b.ref}`, sourceType: "refund_fee", sourceId: b.id, entryDate: riyadhDate(), createdBy: actorId });
@@ -255,7 +255,7 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       }
       if (clientFee > 0) {
         const [pay] = await tx.select({ account: schema.payments.account }).from(schema.payments).where(and(eq(schema.payments.bookingId, b.id), isNotNull(schema.payments.clearedOn))).limit(1);
-        await tx.insert(schema.bankTransactions).values({ account: pay?.account ?? "retail", direction: "in", kind: "adjustment", amount: clientFee, note: `Kept from client (cancellation fee) · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
+        await tx.insert(schema.bankTransactions).values({ account: pay?.account ?? "retail", direction: "in", kind: "refund_fee", amount: clientFee, note: `Kept from client (cancellation fee) · ${b.ref}`, txnDate: riyadhDate(), recordedBy: req.requestedBy });
         await audit(tx, { actorId: null, action: "refund.client_fee", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `We kept SAR ${sar(clientFee)} from the client on ${b.ref}` });
       }
       return;
