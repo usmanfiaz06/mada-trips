@@ -3,7 +3,7 @@ import { DESK_PHONE } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { discardItem, retryItem, useOutboxStore, type OutboxItem } from '@/lib/net/outbox';
-import { isOffline, useNet } from '@/lib/net/state';
+import { useNet } from '@/lib/net/state';
 import { callDesk } from '@/lib/net/talk';
 import { toast } from '@/lib/toast';
 import { colors, ff, font } from '@/theme';
@@ -48,7 +48,7 @@ function Row({ item }: { item: OutboxItem }) {
 export function OutboxSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const items = useOutboxStore((s) => s.items);
   const online = useNet((s) => s.online);
-  const offline = online === false && isOffline();
+  const offline = useNet((s) => s.deviceOffline);
   const line = online === false ? (offline ? t('outbox.offline') : t('outbox.down')) : items.length ? t('outbox.down') : t('outbox.allSent');
   return (
     <Sheet visible={visible} onClose={onClose} label={t('outbox.title')}>

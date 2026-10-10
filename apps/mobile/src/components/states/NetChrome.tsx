@@ -8,7 +8,7 @@ import { useReduceMotion } from '@/lib/motion';
 import { useGates } from '@/lib/net/gates';
 import { useStorageHealth } from '@/lib/net/kv';
 import { flushOutbox, useOutboxStore } from '@/lib/net/outbox';
-import { isOffline, useNet } from '@/lib/net/state';
+import { useNet } from '@/lib/net/state';
 import { useSession } from '@/lib/session';
 import { buzz } from '@/lib/haptics';
 import { toast } from '@/lib/toast';
@@ -40,7 +40,7 @@ export function NetChrome({ children }: { children: ReactNode }) {
   const inApp = status === 'signedIn' || status === 'guest';
   const online = useNet((s) => s.online);
   const weak = useNet((s) => s.weak);
-  const osOffline = useNet((s) => s.simulated) || isOffline();
+  const osOffline = useNet((s) => s.deviceOffline);
   const items = useOutboxStore((s) => s.items);
   const maintenance = useGates((s) => s.maintenance);
   const maintenanceSetAside = useGates((s) => s.maintenanceDismissed);

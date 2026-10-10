@@ -31,12 +31,14 @@ export type NetState = {
   simulated: boolean;
   /** Our requests' consecutive network failures while the OS says online. */
   strikes: number;
+  /** The phone itself has no connection (or the demo switch). False with online === false means our server isn't answering. */
+  deviceOffline: boolean;
 };
 
 type Os = { connected: boolean | null; reachable: boolean | null; type: string; weak: boolean };
 let os: Os = { connected: null, reachable: null, type: 'unknown', weak: false };
 
-export const useNet = create<NetState>(() => ({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0 }));
+export const useNet = create<NetState>(() => ({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, deviceOffline: false }));
 
 function recompute() {
   const s = useNet.getState();
@@ -44,7 +46,7 @@ function recompute() {
   const online = s.simulated || osOnline === false || s.strikes >= 2 ? false : osOnline;
   const weak = !!online && (os.weak || (s.rtt !== null && s.rtt > 2500));
   const was = s.online;
-  useNet.setState({ online, weak, type: os.type, ...(was !== online ? { since: Date.now() } : null) });
+  useNet.setState({ online, weak, type: os.type, deviceOffline: s.simulated || os.connected === false, ...(was !== online ? { since: Date.now() } : null) });
   if (was !== online) onlineManager.setOnline(online !== false);
   if (online === false && !s.simulated && os.connected !== false) scheduleProbe();
 }
@@ -146,6 +148,6 @@ export function startNet(): () => void {
 /** Tests: reset everything. */
 export function resetNet(next: Partial<Os> = {}) {
   os = { connected: null, reachable: null, type: 'unknown', weak: false, ...next };
-  useNet.setState({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0 });
+  useNet.setState({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, deviceOffline: false });
   recompute();
 }

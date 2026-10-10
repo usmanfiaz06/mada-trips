@@ -127,6 +127,9 @@ const scenarios = {
     // Fonts and photos ship inside the app on a phone; on the web they load first, then the radio goes off.
     await p.page.evaluate(() => document.fonts.ready);
     await p.page.waitForTimeout(2500);
+    // The phone has signal but our server doesn't answer: "Can't reach Mada right now", the saved copy on screen.
+    await p.see('Can’t reach Mada right now', 'server unreachable pill');
+    await p.shot('reopened-server-unreachable');
     await p.context.setOffline(true);
     await p.see('Offline · your trips are on this phone', 'offline pill after reload');
     await p.page.waitForTimeout(1200);
