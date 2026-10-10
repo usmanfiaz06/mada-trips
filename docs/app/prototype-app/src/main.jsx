@@ -1,0 +1,162 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, PEOPLE, seedTrip, buzz, HAPTIC } from './store.jsx';
+import { Dock, Icon, Sun } from './ui.jsx';
+import Onboarding from './screens/Onboarding.jsx';
+import Today from './screens/Today.jsx';
+import Ask from './screens/Ask.jsx';
+import Pay, { Waiting } from './screens/Pay.jsx';
+import Trips, { TripDetail } from './screens/Trips.jsx';
+import Disruption from './screens/Disruption.jsx';
+import Wallet from './screens/Wallet.jsx';
+import Circles, { Group } from './screens/Circles.jsx';
+import Profile from './screens/Profile.jsx';
+import Plan from './screens/Plan.jsx';
+
+const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
+const STACK = { ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan };
+
+/* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
+function useBackgroundProgress() {
+  const { s, set, banner } = useStore();
+  const prevOffline = useRef(s.demo.offline);
+  useEffect(() => {
+    if (prevOffline.current && !s.demo.offline) {
+      set((p) => ({ requests: p.requests.map((r) => (r.status === 'queued' ? { ...r, status: 'sent', created: Date.now() } : r)) }));
+    }
+    prevOffline.current = s.demo.offline;
+  }, [s.demo.offline]);
+  useEffect(() => {
+    if (s.demo.offline) return undefined;
+    const t = setInterval(() => {
+      const now = Date.now();
+      set((p) => {
+        let changed = false;
+        const requests = p.requests.map((r) => {
+          const age = now - (r.created || now);
+          if (r.status === 'sent' && age > 4000) { changed = true; return { ...r, status: 'reviewing' }; }
+          if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Faisal replied', body: `Your ${r.short}: tap Trips to see it.`, haptic: HAPTIC.knock }), 0); return { ...r, status: 'quote' }; }
+          if (r.status === 'paid' && age > 15000) { changed = true; return { ...r, status: 'done' }; }
+          return r;
+        });
+        const refunds = p.refunds.map((r) => {
+          if (r.stage < 2 && !r.t) { changed = true; return { ...r, t: now }; }
+          if (r.stage === 0 && now - r.t > 5000) { changed = true; return { ...r, stage: 1 }; }
+          if (r.stage === 1 && now - r.t > 11000) { changed = true; setTimeout(() => banner({ title: 'Refund sent', body: `SAR ${Math.round(r.amount).toLocaleString('en-US')} is on its way to your card.`, haptic: HAPTIC.soft }), 0); return { ...r, stage: 2 }; }
+          return r;
+        });
+        return changed ? { requests, refunds } : {};
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [s.demo.offline]);
+}
+
+function Phone() {
+  const store = useStore();
+  const { s, bannerMsg, toastMsg, dismissBanner, set } = store;
+  useBackgroundProgress();
+  useEffect(() => { if (s.tab !== 'wallet' && s.walletUnlocked) set({ walletUnlocked: false }); }, [s.tab]);
+  const top = s.stack[s.stack.length - 1];
+  const TabScreen = TABS[s.tab] || Today;
+  const Top = top ? STACK[top.name] : null;
+  return (
+    <div className="phone" aria-label="Mada Trips app">
+      <div className="app">
+        {!s.onboarded ? <Onboarding /> : (
+          <>
+            <div style={{ position: 'absolute', inset: 0 }} {...(top ? { inert: '', 'aria-hidden': 'true' } : {})}>
+              <TabScreen />
+              {!top && <Dock />}
+            </div>
+            {s.stack.map((st, i) => {
+              const C = STACK[st.name];
+              const covered = i < s.stack.length - 1;
+              return C ? <div key={st.key} style={{ position: 'absolute', inset: 0, zIndex: 10 + i }} {...(covered ? { inert: '', 'aria-hidden': 'true' } : {})}><C params={st.params} /></div> : null;
+            })}
+          </>
+        )}
+        {s.demo.offline && s.onboarded && (
+          <div className="offline" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 80, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} role="status">
+            <Icon name="wifiOff" size={16} color="#f6f2ec" />You're offline. Everything for your trips is on this phone.
+          </div>
+        )}
+        {bannerMsg && (
+          <button type="button" className="banner" key={bannerMsg.id} onClick={dismissBanner} aria-live="polite">
+            <span className="app-ic"><Sun width={24} /></span>
+            <span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>{bannerMsg.title}</span><span className="small" style={{ color: '#3f4f48' }}>{bannerMsg.body}</span></span>
+          </button>
+        )}
+        {toastMsg && <div className="toast" key={toastMsg.id} role="status">{toastMsg.text}</div>}
+      </div>
+    </div>
+  );
+}
+
+function Demo() {
+  const { s, set, hardReset, banner } = useStore();
+  const [open, setOpen] = useState(false);
+  const jump = (phase) => {
+    buzz(HAPTIC.tap);
+    set((p) => {
+      const household = p.household.length ? p.household : ['omar', 'hessa', 'sara', 'ahmed'];
+      const base = { onboarded: true, guest: false, user: p.user || { name: 'Omar' }, household, passportSaved: true, stack: [], tab: 'today' };
+      if (phase === 'none') return { ...base, phase: 'none' };
+      const trip = p.trip && p.trip.flight ? { ...p.trip } : seedTrip({ ...p, household });
+      if (phase === 'travelday' || phase === 'delayed' || phase === 'cancelled') { delete trip.rebooked; trip.flight = seedTrip({ ...p, household }).flight; }
+      return { ...base, trip, phase };
+    });
+    if (phase === 'delayed') setTimeout(() => banner({ title: 'SV263 may leave late', body: 'The plane coming from Cairo is late. We have a plan ready.' }), 600);
+    if (phase === 'cancelled') setTimeout(() => banner({ title: 'Saudia cancelled SV263', body: 'We’re holding seats on two other flights. Tap to choose.' }), 600);
+    if (phase === 'landed') setTimeout(() => banner({ title: 'Ahmet is at Door 3', body: 'He has a sign with your name. Bags on carousel 7.', haptic: HAPTIC.soft }), 600);
+    setOpen(false);
+  };
+  return (
+    <>
+      <button type="button" className="demo-fab" onClick={() => setOpen(!open)}>{open ? 'Close demo' : 'Demo'}</button>
+      <aside className="demo" data-open={open ? 'true' : 'false'} aria-label="Demo controls">
+        <div className="col" style={{ gap: 6 }}>
+          <h2>Mada Trips · clickable prototype</h2>
+          <p>Every screen works. Use these controls to jump through a trip and to trigger the hard cases. Nothing here is real: no bookings, payments or messages leave this page.</p>
+        </div>
+        <div className="col" style={{ gap: 8 }}>
+          <h3>Start</h3>
+          <div className="demo-grid">
+            <button type="button" className="demo-btn" onClick={() => { hardReset(); setOpen(false); }}>Fresh install</button>
+            <button type="button" className="demo-btn" onClick={() => jump('none')}>Skip sign-up</button>
+          </div>
+        </div>
+        <div className="col" style={{ gap: 8 }}>
+          <h3>Jump to a moment</h3>
+          <div className="demo-grid">
+            {PHASES.filter((p) => p.id !== 'none').map((p) => (
+              <button key={p.id} type="button" className="demo-btn" aria-pressed={s.onboarded && s.phase === p.id ? 'true' : 'false'} onClick={() => jump(p.id)}>{p.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="col" style={{ gap: 8 }}>
+          <h3>Make it go wrong</h3>
+          <div className="demo-grid">
+            {DEMO_SWITCHES.map((d) => (
+              <button key={d.id} type="button" className="demo-btn" aria-pressed={s.demo[d.id] ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.tap); set((p) => ({ demo: { ...p.demo, [d.id]: !p.demo[d.id] } })); }}>{d.label}</button>
+            ))}
+          </div>
+        </div>
+        <p>Sign-in code: <b>123456</b>. Passcode: any 6 digits. Vibration works on Android browsers; the app uses native haptics.</p>
+      </aside>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <StoreProvider>
+      <div className="stage">
+        <Phone />
+        <Demo />
+      </div>
+    </StoreProvider>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<App />);

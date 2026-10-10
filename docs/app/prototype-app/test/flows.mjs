@@ -1,0 +1,193 @@
+// Walks the main flows end to end in headless Chromium and saves screenshots.
+// Usage: node test/flows.mjs [screenshot-dir]
+import { chromium } from 'playwright-core';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
+import { mkdirSync } from 'node:fs';
+
+const OUT = process.argv[2] || 'test/shots';
+mkdirSync(OUT, { recursive: true });
+const exe = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const browser = await chromium.launch({ executablePath: exe });
+const page = await browser.newPage({ viewport: { width: 1200, height: 920 } });
+const errors = [];
+page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) errors.push('console: ' + m.text()); });
+await page.goto(pathToFileURL(resolve('dist/index.html')).href);
+
+const phone = page.locator('.phone');
+let n = 0;
+const shot = async (name) => { n += 1; await phone.screenshot({ path: `${OUT}/${String(n).padStart(2, '0')}-${name}.png` }); };
+const click = async (text, opts = {}) => { await phone.getByRole(opts.role || 'button', { name: text, exact: opts.exact ?? true }).first().click(); await page.waitForTimeout(opts.wait ?? 350); };
+const demo = async (text) => { await page.locator('.demo').getByRole('button', { name: text, exact: true }).click(); await page.waitForTimeout(500); };
+const step = (t) => console.log('·', t);
+
+try {
+  step('onboarding: welcome');
+  await shot('welcome');
+  await click('Start');
+  await click('Use my phone number');
+  await phone.locator('#phone').fill('51234');
+  await phone.locator('#phone').blur();
+  await shot('phone-invalid');
+  await phone.locator('#phone').fill('512345678');
+  await click('Text me a code');
+  await phone.locator('#otp').fill('111111');
+  await page.waitForTimeout(300);
+  await shot('otp-wrong');
+  await phone.locator('#otp').fill('123456');
+  await page.waitForTimeout(500);
+  step('onboarding: passport scan');
+  await click('Scan passport');
+  await click('Allow', { exact: true, wait: 2800 });
+  await shot('passport-confirm');
+  await click('Yes, save it');
+  for (const who of ['Hessa', 'Sara', 'Ahmed']) await phone.getByRole('button', { name: new RegExp(who + ' ') }).click();
+  await shot('household');
+  await click('Continue with 4 people');
+  await click('Allow alerts');
+  await click('Allow', { exact: true, wait: 800 });
+  await shot('today-nothing');
+
+  step('book: flights via the composer');
+  await click('Flights');
+  await click('Istanbul');
+  await click('Eid al-Fitr · 9–15 Mar');
+  await click('These 4', { wait: 2800 });
+  await shot('ask-results');
+  await phone.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.waitForTimeout(200);
+  await phone.getByRole('button', { name: /^Review · SAR/ }).last().click();
+  await page.waitForTimeout(700);
+  await shot('pay');
+  await phone.locator('.slider').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1800);
+  await shot('waiting');
+  await page.waitForTimeout(4500);
+  await shot('confirmed');
+  await click('See the trip', { wait: 600 });
+  await shot('today-booked');
+
+  step('trips: detail, cancel stay, refund tracker');
+  await phone.getByRole('button', { name: 'Trips' }).click();
+  await page.waitForTimeout(400);
+  await phone.locator('.photo').first().click();
+  await page.waitForTimeout(500);
+  await shot('trip-detail');
+  await phone.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.waitForTimeout(400);
+  await click('Cancel the stay', { wait: 600 });
+  await phone.getByRole('button', { name: 'Back' }).first().click();
+  await page.waitForTimeout(300);
+  await click('Requests', { role: 'tab', exact: false, wait: 6000 });
+  await shot('refund-tracker');
+
+  step('request: visa via Ask');
+  await phone.getByRole('button', { name: 'Ask Mada' }).click();
+  await page.waitForTimeout(400);
+  await phone.locator('#ask-input').fill('Schengen visa for Sara');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(400);
+  await click('Schengen');
+  await click('Done');
+  await click('This summer');
+  await click('Send to Faisal', { wait: 600 });
+  await shot('visa-sent');
+
+  step('edge: card declined + price rise');
+  await click('Close');
+  await demo('Card declines');
+  await demo('Price rises at payment');
+  await phone.getByRole('button', { name: 'Ask Mada' }).click();
+  await page.waitForTimeout(300);
+  await click('Add a hotel in Istanbul', { wait: 1800 });
+  await phone.getByRole('button', { name: /^Review · SAR/ }).last().click();
+  await page.waitForTimeout(700);
+  await phone.locator('.slider').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1700);
+  await shot('declined');
+  await click('Use another card', { wait: 300 });
+  await phone.getByRole('button', { name: /mada ending 07/ }).click();
+  await page.waitForTimeout(300);
+  await phone.locator('.slider').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1700);
+  await shot('price-rose');
+  await demo('Card declines');
+  await demo('Price rises at payment');
+
+  step('travel day + delay');
+  await demo('Travel day');
+  await page.waitForTimeout(6800);
+  await shot('travel-day-gate');
+  await demo('Delay predicted');
+  await page.waitForTimeout(800);
+  await shot('delay-today');
+  await click('See the plan', { wait: 500 });
+  await shot('disruption');
+  await click('Take the 10:25', { wait: 2600 });
+  await shot('disruption-done');
+  await click('Back to today', { wait: 500 });
+
+  step('cancelled → refund');
+  await demo('Flight cancelled');
+  await click('See your options', { wait: 500 });
+  await phone.getByRole('radio', { name: /Get a refund instead/ }).click();
+  await click('Get the refund', { wait: 2600 });
+  await shot('cancel-refund');
+  await click('Back to today', { wait: 400 });
+
+  step('wallet + passport problem');
+  await demo('Passport problem');
+  await demo('Weeks before');
+  await shot('booked-problem');
+  await phone.getByRole('button', { name: 'Wallet' }).click();
+  await page.waitForTimeout(1400);
+  await phone.getByRole('button', { name: /Ahmed/ }).first().click();
+  await page.waitForTimeout(500);
+  await shot('wallet-ahmed');
+  await phone.getByRole('button', { name: 'Add a document' }).click();
+  await page.waitForTimeout(300);
+  await click('Visa', { exact: true });
+  await shot('upload-sheet');
+  await page.keyboard.press('Escape');
+  await phone.locator('.backdrop').click({ position: { x: 20, y: 20 } });
+  await demo('Passport problem');
+
+  step('circles: discover, plan, post');
+  await phone.getByRole('button', { name: 'Circles' }).click();
+  await page.waitForTimeout(500);
+  await shot('discover');
+  await phone.locator('.photo', { hasText: 'Two days in AlUla' }).first().click();
+  await page.waitForTimeout(600);
+  await shot('plan');
+  await phone.getByRole('button', { name: /^Book it all/ }).click();
+  await page.waitForTimeout(700);
+  await shot('plan-pay');
+  await phone.getByRole('button', { name: 'Back' }).first().click();
+  await phone.getByRole('button', { name: 'Back' }).first().click();
+  await page.waitForTimeout(400);
+  await click('Your circles', { role: 'tab' });
+  await shot('circles');
+
+  step('offline');
+  await demo('Offline');
+  await phone.getByRole('button', { name: 'Today' }).click();
+  await page.waitForTimeout(400);
+  await shot('offline');
+  await demo('Offline');
+
+  step('profile');
+  await phone.getByRole('button', { name: 'Profile and settings' }).click();
+  await page.waitForTimeout(500);
+  await shot('profile');
+} catch (e) {
+  errors.push('flow: ' + e.message.split('\n')[0]);
+  await shot('FAILED');
+}
+
+console.log(errors.length ? '\nPROBLEMS:\n' + errors.join('\n') : '\nAll flows passed with no page errors.');
+await browser.close();
+process.exit(errors.length ? 1 : 0);
