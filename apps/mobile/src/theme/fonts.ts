@@ -10,11 +10,13 @@ import { IBMPlexSansArabic_700Bold } from '@expo-google-fonts/ibm-plex-sans-arab
 import { ReemKufi_500Medium } from '@expo-google-fonts/reem-kufi/500Medium';
 import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono/400Regular';
 import { fontFamilies } from '@mada/shared';
+import { thmanyah } from './arabic-fonts';
 import type { CopyLocale } from '@mada/shared';
 
 /*
- * Typefaces (COPY.md §7.1). Interface: Inter Tight, and IBM Plex Sans Arabic in Arabic (it carries Latin too, so
- * codes and names inside Arabic lines match). Display: Instrument Serif, and Reem Kufi in Arabic.
+ * Typefaces (COPY.md §7.1). Interface: Inter Tight. Display: Instrument Serif. Arabic: Thmanyah (Serif Display for
+ * display, Sans for the interface) when its files are present (theme/arabic-fonts.ts); until then IBM Plex Sans Arabic
+ * and Reem Kufi.
  *
  * In Arabic the Arabic files load under the same family names the styles already use, so every Text, TextInput and
  * SVG label picks them up without each screen knowing the language. The language is fixed for a launch (switching
@@ -22,6 +24,16 @@ import type { CopyLocale } from '@mada/shared';
  */
 export function fontsFor(locale: CopyLocale): Record<string, number> {
   const f = fontFamilies;
+  if (locale === 'ar' && thmanyah) {
+    return {
+      [f.display]: thmanyah.display,
+      [f.ui400]: thmanyah.ui400,
+      [f.ui500]: thmanyah.ui500,
+      [f.ui600]: thmanyah.ui600,
+      [f.ui700]: thmanyah.ui700,
+      [f.mono]: JetBrainsMono_400Regular,
+    };
+  }
   if (locale === 'ar') {
     return {
       [f.display]: ReemKufi_500Medium,

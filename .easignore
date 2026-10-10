@@ -1,0 +1,22 @@
+# EAS uploads what git would, except the Thmanyah font files: they ship inside the app (Thmanyah's licence allows
+# that) but stay out of git (no re-hosting, and this repo is public). Keep in step with .gitignore files.
+__pycache__/
+*.pyc
+node_modules/
+.expo/
+dist-web/
+*.log
+.env
+.env.local
+apps/mobile/dist/
+apps/mobile/web-build/
+.vitest-pg/
+*.tsbuildinfo
+
+apps/mobile/src/theme/arabic-fonts.local.ts
+apps/mobile/dist/
+apps/mobile/.expo/
+apps/mobile/expo-env.d.ts.bak
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/public/ocr/

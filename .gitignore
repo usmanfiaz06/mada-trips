@@ -10,3 +10,7 @@ apps/mobile/dist/
 apps/mobile/web-build/
 .vitest-pg/
 *.tsbuildinfo
+
+# Thmanyah font files: licence forbids re-hosting, and this repo is public (apps/mobile/src/theme/arabic-fonts.ts)
+apps/mobile/assets/fonts/thmanyah/
+apps/mobile/src/theme/arabic-fonts.local.ts
