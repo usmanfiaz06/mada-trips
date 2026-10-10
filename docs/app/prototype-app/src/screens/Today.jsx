@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue, appDay, toDate, daysBetween, addDays, dayLabel, shortDay, weekday, dayOf, monthOf, seatText, pickupPlan, boardsAt, termShort, stayOf, stayEnd, signName, ofYou, NUM_WORD, lookupFlight, FLIGHT_NO, AIRPORTS, STAY_NIGHTS, makePickup } from '../store.jsx';
 import { MoveNotice } from './TripManage.jsx';
-import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark } from '../ui.jsx';
+import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark, EmptyState, ArtFriends, ArtCircles, ArtPass } from '../ui.jsx';
 
 const SERVICES = [
   { id: 'flight', label: 'Flights', icon: 'flight' },
@@ -189,7 +189,7 @@ function Nothing() {
       {(s.trackedFlights || []).length > 0 && <TrackedFlights />}
       {!s.passportSaved && (
         <button type="button" className="notice rise" style={{ border: 0, textAlign: 'left' }} onClick={() => push('passportSetup', { later: true })}>
-          <Icon name="visa" color="#7d5d27" />
+          <span className="td-pp-mini" aria-hidden="true"><i /></span>
           <span className="grow"><span className="h3">Add your passport</span><span className="small">One scan and we'll fill it in on every booking.</span></span>
           <Icon name="chevron" />
         </button>
@@ -221,7 +221,7 @@ function Nothing() {
           </button>
         ) : (
           <button type="button" className="card tap" style={{ minHeight: 104, height: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 10 }} onClick={() => push(fresh && s.household.length <= 1 ? 'household' : 'newCircle')}>
-            <span className="stack"><span className="avatar sm"><Icon name="plus" size={16} /></span></span>
+            <span className="td-mini-art" aria-hidden="true">{s.household.length <= 1 ? <ArtFriends /> : <ArtCircles />}</span>
             <span className="col" style={{ gap: 0 }}><span className="h3">{s.household.length <= 1 ? 'Add your family' : 'Start a circle'}</span><span className="tiny">{s.household.length <= 1 ? 'Book everyone at once' : 'Plan the next trip together'}</span></span>
           </button>
         )}
@@ -345,6 +345,7 @@ function Guest() {
       <h1 className="display rise" style={{ fontSize: 44 }}>Track any flight.</h1>
       <TrackFlight />
       <TrackedFlights />
+      {!(s.trackedFlights || []).length && <EmptyState compact art={<ArtPass />} title="Nothing tracked yet." body="Add a flight number and we’ll watch the gate and the time for you. No account needed." />}
       <div className="card well rise d2">
         <span className="h3">Want us to book and look after the whole trip?</span>
         <span className="small">Sign in to book flights, stays and visas with a named agent behind every booking.{(s.trackedFlights || []).length ? ' Your tracked flights come with you.' : ''}</span>
