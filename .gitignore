@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+node_modules/
+.expo/
+dist-web/
+*.log
+.env
+.env.local

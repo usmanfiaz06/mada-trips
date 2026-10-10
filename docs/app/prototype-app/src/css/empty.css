@@ -43,7 +43,7 @@
 .es.plain { background: transparent; box-shadow: none; padding: 4px 0 0; }
 .es > .es-title, .es > .es-body, .es > .btn, .es > .es-ideas, .es > .es-extra { margin-left: 4px; margin-right: 4px; }
 .es-title { font-size: 30px; line-height: 1.04; margin: 4px 0 0; font-weight: 400; }
-.es-body { margin: -4px 0 2px; color: var(--ink-2); max-width: 32ch; }
+.es-body { margin: -4px 0 2px; color: var(--ink-2); max-width: 38ch; }
 .es.center { align-items: center; text-align: center; }
 .es.center .es-body { margin-left: auto; margin-right: auto; }
 .es.center > .btn { align-self: center; }

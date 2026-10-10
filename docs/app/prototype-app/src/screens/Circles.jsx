@@ -652,7 +652,7 @@ export function Group({ params = {} }) {
             <p className="small">{group.dm ? 'Just you two. A hello, a place you saved, a plan for the weekend.' : 'Every vote, plan and split you make together lives here, in order.'}</p>
             {group.dm && (
               <div className="es-ideas" role="group" aria-label="Ideas">
-                {['Salam', 'Free this weekend?', 'Where to next?'].map((t) => <button key={t} type="button" className="chip" onClick={() => { setDraft(t); buzz(HAPTIC.tap); setTimeout(() => input.current && input.current.focus(), 30); }}>{t}</button>)}
+                {['Salam', 'Free this weekend?'].map((t) => <button key={t} type="button" className="chip" onClick={() => { setDraft(t); buzz(HAPTIC.tap); setTimeout(() => input.current && input.current.focus(), 30); }}>{t}</button>)}
               </div>
             )}
           </div>

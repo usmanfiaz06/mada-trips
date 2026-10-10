@@ -19,7 +19,7 @@ let n = 0;
 const shot = async (name) => { n += 1; await phone.screenshot({ path: `${OUT}/${String(n).padStart(2, '0')}-${name}.png` }); };
 const click = async (text, opts = {}) => { await phone.getByRole(opts.role || 'button', { name: text, exact: opts.exact ?? true }).first().click(); await page.waitForTimeout(opts.wait ?? 350); };
 const demo = async (text) => { await page.locator('.demo').getByRole('button', { name: text, exact: true }).click(); await page.waitForTimeout(400); };
-const push = async (name, params, wait = 700) => { await page.evaluate(([a, b]) => window.__madaPush(a, b), [name, params || {}]); await page.waitForTimeout(wait); };
+const push = async (name, params, wait = 1500) => { await page.evaluate(([a, b]) => window.__madaPush(a, b), [name, params || {}]); await page.waitForTimeout(wait); };
 const tab = async (name, wait = 600) => { await page.locator('.phone .dock').getByRole('button', { name, exact: true }).click(); await page.waitForTimeout(wait); };
 const see = async (text, what) => {
   const ok = await phone.getByText(text, { exact: false }).first().isVisible().catch(() => false);
