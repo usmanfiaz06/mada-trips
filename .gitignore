@@ -6,3 +6,7 @@ dist-web/
 *.log
 .env
 .env.local
+apps/mobile/dist/
+apps/mobile/web-build/
+.vitest-pg/
+*.tsbuildinfo

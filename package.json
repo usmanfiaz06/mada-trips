@@ -1,0 +1,25 @@
+{
+  "name": "mada-trips",
+  "private": true,
+  "description": "Mada Trips monorepo: the mobile app (apps/mobile) and shared code (packages/shared). Mada Ops (platform/) keeps its own package and lockfile so its Vercel deploy is unchanged.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present && npm --prefix platform run typecheck",
+    "test": "npm run test --workspaces --if-present && npm --prefix platform run test",
+    "lint": "eslint apps/mobile packages/shared && npm run lint:copy -w @mada/shared",
+    "build:platform": "npm --prefix platform run build",
+    "export:web": "npm run export:web -w @mada/mobile",
+    "e2e:web": "npm run e2e:web -w @mada/mobile",
+    "setup": "npm install && npm --prefix platform ci"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "eslint-config-expo": "57.0.2"
+  }
+}
