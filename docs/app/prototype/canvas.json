@@ -1,18 +1,96 @@
 {
   "v": 3,
-  "createdOnFiles": { "v": 1, "at": "2026-10-10T00:40:00Z" },
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-10T00:40:00Z"
+  },
   "title": "Mada Trips prototype",
-  "launch": { "view": "canvas" },
+  "launch": {
+    "view": "canvas"
+  },
   "pages": [],
   "boards": {
-    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "1 · Today, nothing planned", "is_interactive": true, "radius": 48 },
-    "Ask.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "2 · Ask: three ways to get there", "is_interactive": true, "radius": 48 },
-    "Pay.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "3 · Pay sheet: slide to book", "is_interactive": true, "radius": 48 },
-    "Confirmed.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "4 · With Faisal, then confirmed", "is_interactive": true, "radius": 48 },
-    "TravelDay.dc.html": { "x": 0, "y": 1300, "w": 390, "h": 844, "title": "5 · Today, travel day", "is_interactive": true, "radius": 48 },
-    "Disruption.dc.html": { "x": 470, "y": 1300, "w": 390, "h": 844, "title": "6 · Stress mode: the fix is ready", "is_interactive": true, "radius": 48 },
-    "Wallet.dc.html": { "x": 940, "y": 1300, "w": 390, "h": 844, "title": "7 · Wallet: the household", "is_interactive": true, "radius": 48 },
-    "Group.dc.html": { "x": 1410, "y": 1300, "w": 390, "h": 844, "title": "8 · Trip group", "is_interactive": true, "radius": 48 }
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "1 · Today, nothing planned",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Ask.dc.html": {
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "2 · Ask: three ways to get there",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Pay.dc.html": {
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "3 · Pay sheet: slide to book",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Confirmed.dc.html": {
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "4 · With Faisal, then confirmed",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "TravelDay.dc.html": {
+      "x": 0,
+      "y": 1300,
+      "w": 390,
+      "h": 844,
+      "title": "5 · Today, travel day",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Disruption.dc.html": {
+      "x": 470,
+      "y": 1300,
+      "w": 390,
+      "h": 844,
+      "title": "6 · Stress mode: the fix is ready",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Wallet.dc.html": {
+      "x": 940,
+      "y": 1300,
+      "w": 390,
+      "h": 844,
+      "title": "7 · Wallet: the household",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Group.dc.html": {
+      "x": 1410,
+      "y": 1300,
+      "w": 390,
+      "h": 844,
+      "title": "8 · Trip group",
+      "is_interactive": true,
+      "radius": 48
+    },
+    "Circles.dc.html": {
+      "x": 1880,
+      "y": 1300,
+      "w": 390,
+      "h": 844,
+      "title": "9 · Circles: your people",
+      "is_interactive": true,
+      "radius": 48
+    }
   },
   "order": [
     "Main.dc.html",
@@ -22,11 +100,24 @@
     "TravelDay.dc.html",
     "Disruption.dc.html",
     "Wallet.dc.html",
-    "Group.dc.html"
+    "Group.dc.html",
+    "Circles.dc.html"
   ],
   "notes": {
-    "row1": { "x": 0, "y": -300, "text": "Plan and book: from a wish to confirmed", "kind": "title1", "maxW": 1800 },
-    "row2": { "x": 0, "y": 1000, "text": "Travel day, the hard moment, and your people", "kind": "title1", "maxW": 1800 }
+    "row1": {
+      "x": 0,
+      "y": -300,
+      "text": "Plan and book: from a wish to confirmed",
+      "kind": "title1",
+      "maxW": 1800
+    },
+    "row2": {
+      "x": 0,
+      "y": 1000,
+      "text": "Travel day, the hard moment, and your people",
+      "kind": "title1",
+      "maxW": 2270
+    }
   },
   "designSystems": []
 }

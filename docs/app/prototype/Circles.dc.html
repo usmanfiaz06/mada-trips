@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Circles: your people</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+button{font-family:inherit}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(217,183,122,.6)}50%{box-shadow:0 0 0 6px rgba(217,183,122,0)}}
+.rise1{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.rise2{animation:rise .6s .08s cubic-bezier(.2,.8,.2,1) both}
+.rise3{animation:rise .6s .16s cubic-bezier(.2,.8,.2,1) both}
+.rise4{animation:rise .6s .24s cubic-bezier(.2,.8,.2,1) both}
+.glow{animation:glow 3s ease-in-out infinite}
+.press{transition:transform .12s ease}.press:active{transform:scale(.97)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+  <div style="position: absolute; inset: 0; overflow-y: auto; padding: 54px 0 120px 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px">
+
+    <div class="rise1" style="display: flex; align-items: center; justify-content: space-between; padding: 0 24px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em">Circles</h1>
+        <span style="font-size: 12px; font-weight: 500; color: #4d5c55">Private. Only people you choose.</span>
+      </div>
+      <button type="button" class="press" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #1e352d; color: #f6f2ec; font-size: 14px; font-weight: 600; cursor: pointer">Invite</button>
+    </div>
+
+    <div class="rise2" style="margin: 0 20px; border-radius: 28px; background: #1e352d; color: #f6f2ec; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 22px 40px -26px rgba(15,26,22,.8)">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div style="position: relative; width: 44px; height: 44px; flex-shrink: 0">
+          <div style="width: 44px; height: 44px; border-radius: 999px; background: #d9b77a; color: #1e352d; display: grid; place-items: center; font-size: 16px; font-weight: 600">N</div>
+          <span class="glow" style="position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 999px; background: #d9b77a; border: 2px solid #1e352d"></span>
+        </div>
+        <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 16px; font-weight: 600">Noor is in Istanbul when you are.</span>
+          <span style="font-size: 13px; color: #c9c1b4">10–14 Mar · she shared it with you</span>
+        </div>
+      </div>
+      <sc-if value="{{helloOpen}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; gap: 8px">
+          <button type="button" class="press" onClick="{{sayHello}}" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: #d9b77a; color: #1e352d; font-size: 14px; font-weight: 600; cursor: pointer">Say hello</button>
+          <button type="button" class="press" onClick="{{notNow}}" style="height: 40px; padding: 0 16px; border-radius: 999px; border: 0; background: rgba(233,226,216,.14); color: #f6f2ec; font-size: 14px; font-weight: 600; cursor: pointer">Not now</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{helloDone}}" hint-placeholder-val="{{ false }}">
+        <span style="font-size: 14px; font-weight: 600; color: #e6c88f">{{helloText}}</span>
+      </sc-if>
+      <div style="height: 1px; background: rgba(233,226,216,.12)"></div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 15px; font-weight: 600">Tell friends you're in Istanbul</span>
+          <span style="font-size: 12px; line-height: 1.4; color: #c9c1b4">{{aroundNote}}</span>
+        </div>
+        <button type="button" role="switch" aria-checked="{{aroundChecked}}" aria-label="Tell friends you're in Istanbul" onClick="{{toggleAround}}" style="flex-shrink: 0; position: relative; width: 52px; height: 32px; border-radius: 999px; border: 0; padding: 0; cursor: pointer; background: {{switchBg}}; transition: background .25s ease">
+          <span style="position: absolute; top: 3px; left: {{knobLeft}}px; width: 26px; height: 26px; border-radius: 999px; background: #f6f2ec; box-shadow: 0 2px 6px rgba(0,0,0,.25); transition: left .3s cubic-bezier(.2,.9,.25,1.2)"></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="rise3" style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 24px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Your groups</h2>
+        <span style="font-size: 13px; color: #4d5c55">3</span>
+      </div>
+      <div style="display: flex; gap: 10px; overflow-x: auto; padding: 0 20px">
+        <a href="Group.dc.html" class="press" style="flex-shrink: 0; position: relative; width: 210px; height: 128px; border-radius: 24px; overflow: hidden; color: #fffdf9; display: block">
+          <img src="/_blob/902d065e4dafba4928acbbed2ea06b3a" alt="Istanbul rooftops" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,26,22,.1) 20%, rgba(15,26,22,.75) 100%)"></div>
+          <span style="position: absolute; top: 10px; left: 10px; height: 24px; padding: 0 9px; border-radius: 999px; background: #d9b77a; color: #1e352d; display: inline-flex; align-items: center; font-size: 11px; font-weight: 700">2 new</span>
+          <div style="position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 22px; line-height: 1">Istanbul for Eid</span>
+            <span style="font-size: 12px; color: rgba(255,253,249,.88)">6 people · vote on the cruise</span>
+          </div>
+        </a>
+        <a href="Group.dc.html" class="press" style="flex-shrink: 0; width: 150px; height: 128px; border-radius: 24px; background: #fffdf9; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between">
+          <div style="display: flex">
+            <span style="width: 30px; height: 30px; border-radius: 999px; border: 2px solid #fffdf9; background: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">O</span>
+            <span style="width: 30px; height: 30px; margin-left: -9px; border-radius: 999px; border: 2px solid #fffdf9; background: #d9b77a; display: grid; place-items: center; font-size: 11px; font-weight: 600">H</span>
+            <span style="width: 30px; height: 30px; margin-left: -9px; border-radius: 999px; border: 2px solid #fffdf9; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">S</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 15px; font-weight: 600">Family</span>
+            <span style="font-size: 12px; color: #4d5c55">4 people · documents</span>
+          </div>
+        </a>
+        <a href="Group.dc.html" class="press" style="flex-shrink: 0; width: 150px; height: 128px; border-radius: 24px; background: #fffdf9; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between">
+          <div style="display: flex">
+            <span style="width: 30px; height: 30px; border-radius: 999px; border: 2px solid #fffdf9; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">A</span>
+            <span style="width: 30px; height: 30px; margin-left: -9px; border-radius: 999px; border: 2px solid #fffdf9; background: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">F</span>
+            <span style="width: 30px; height: 30px; margin-left: -9px; border-radius: 999px; border: 2px solid #fffdf9; background: #f6f2ec; display: grid; place-items: center; font-size: 10px; font-weight: 600">+5</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 15px; font-weight: 600">Riyadh Season</span>
+            <span style="font-size: 12px; color: #4d5c55">8 friends · 2 events</span>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <div class="rise4" style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 24px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Saved</h2>
+        <span style="font-size: 13px; color: #4d5c55">From you and your friends</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 20px">
+        <a href="Ask.dc.html" class="press" style="position: relative; height: 112px; border-radius: 22px; overflow: hidden; color: #fffdf9; display: block">
+          <img src="/_blob/902d065e4dafba4928acbbed2ea06b3a" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 30% 50%">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,26,22,0) 30%, rgba(15,26,22,.72) 100%)"></div>
+          <div style="position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; flex-direction: column">
+            <span style="font-size: 14px; font-weight: 600">Istanbul with the kids</span>
+            <span style="font-size: 12px; color: rgba(255,253,249,.88)">8 places</span>
+          </div>
+        </a>
+        <a href="Ask.dc.html" class="press" style="position: relative; height: 112px; border-radius: 22px; overflow: hidden; color: #fffdf9; display: block">
+          <img src="/_blob/032aac0af6fe389e4b8599b801e93387" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover">
+          <div style="position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,26,22,0) 30%, rgba(15,26,22,.72) 100%)"></div>
+          <div style="position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; flex-direction: column">
+            <span style="font-size: 14px; font-weight: 600">AlUla weekend</span>
+            <span style="font-size: 12px; color: rgba(255,253,249,.88)">5 places · 3 from Abdullah</span>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 24px">
+        <h2 style="margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Your passport</h2>
+        <span style="font-size: 13px; color: #4d5c55">14 countries · 9 Saudi places</span>
+      </div>
+      <div style="margin: 0 20px; border-radius: 24px; background: #fffdf9; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px">
+          <sc-for list="{{stamps}}" as="st" hint-placeholder-count="4">
+            <button type="button" onClick="{{st.press}}" aria-label="{{st.aria}}" style="flex-shrink: 0; width: 76px; height: 76px; border-radius: 999px; border: 2px solid {{st.color}}; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; transform: rotate({{st.rot}}deg) scale({{st.scale}}); transition: transform .35s cubic-bezier(.2,.9,.25,1.3); color: {{st.color}}">
+              <span style="width: 64px; height: 64px; border-radius: 999px; border: 1px dashed {{st.color}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px">
+                <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 15px; line-height: 1">{{st.city}}</span>
+                <span style="font-size: 9px; font-weight: 600; letter-spacing: .08em">{{st.date}}</span>
+              </span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(30,53,45,.08)">
+          <div style="display: flex">
+            <span style="width: 28px; height: 28px; border-radius: 999px; border: 2px solid #fffdf9; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">A</span>
+            <span style="width: 28px; height: 28px; margin-left: -8px; border-radius: 999px; border: 2px solid #fffdf9; background: #d9b77a; display: grid; place-items: center; font-size: 11px; font-weight: 600">N</span>
+            <span style="width: 28px; height: 28px; margin-left: -8px; border-radius: 999px; border: 2px solid #fffdf9; background: #e9e2d8; display: grid; place-items: center; font-size: 11px; font-weight: 600">O</span>
+          </div>
+          <span style="flex-grow: 1; font-size: 13px; line-height: 1.4; color: #3f4f48">You're 2nd among friends for places explored. Abdullah leads with 19.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(255,253,249,.86); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(30,53,45,.08); box-shadow: 0 18px 40px -18px rgba(30,53,45,.35)">
+    <a href="Main.dc.html" aria-label="Today" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a href="TravelDay.dc.html" aria-label="Trips" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>
+    </a>
+    <a href="Ask.dc.html" aria-label="Ask Mada" style="width: 60px; height: 60px; border-radius: 999px; background: #1e352d; display: grid; place-items: center">
+      <svg width="32" height="22" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+    </a>
+    <a href="Circles.dc.html" style="height: 52px; padding: 0 18px 0 14px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg>
+      Circles
+    </a>
+    <a href="Wallet.dc.html" aria-label="Wallet" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"></rect><path d="M3 10h18M16 15h2M6 6V5a2 2 0 0 1 2-2h9"/></svg>
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { around: false, hello: null, pressed: null };
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const defs = [
+      { id: 'ist', city: 'Istanbul', date: 'MAR 27', color: '#b98f4a', rot: -8 },
+      { id: 'ula', city: 'AlUla', date: 'JAN 26', color: '#1e352d', rot: 6 },
+      { id: 'baku', city: 'Baku', date: 'APR 26', color: '#7d5d27', rot: -4 },
+      { id: 'abha', city: 'Abha', date: 'AUG 25', color: '#1e352d', rot: 9 },
+      { id: 'lon', city: 'London', date: 'JUL 25', color: '#7d5d27', rot: -10 }
+    ];
+    const stamps = defs.map((d) => ({
+      ...d,
+      scale: s.pressed === d.id ? '1.12' : '1',
+      rot: s.pressed === d.id ? 0 : d.rot,
+      aria: d.city + ' stamp, ' + d.date,
+      press: () => { this.buzz([0, 10, 40, 10, 40, 10]); this.setState({ pressed: s.pressed === d.id ? null : d.id }); }
+    }));
+    return {
+      stamps,
+      helloOpen: s.hello === null,
+      helloDone: s.hello !== null,
+      helloText: s.hello === 'sent' ? 'Sent. Noor will see it when she next opens Mada.' : 'Okay. We won’t mention it again for this trip.',
+      sayHello: () => { this.buzz(14); this.setState({ hello: 'sent' }); },
+      notNow: () => { this.buzz(8); this.setState({ hello: 'no' }); },
+      aroundChecked: s.around ? 'true' : 'false',
+      switchBg: s.around ? '#d9b77a' : 'rgba(233,226,216,.24)',
+      knobLeft: s.around ? 23 : 3,
+      aroundNote: s.around ? 'On for Abdullah, Noor and Family · city only · ends 15 Mar' : 'Off. Only people you choose, city only, and it ends when you fly home.',
+      toggleAround: () => { this.buzz(10); this.setState({ around: !s.around }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
