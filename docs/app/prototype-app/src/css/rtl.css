@@ -1,0 +1,68 @@
+/* العربية: right to left (COPY.md §7.4). The page sets dir="rtl"; flex rows and text already follow it. These rules
+   handle what doesn't: fonts, physical left/right positions, and directional glyphs. Pictures that aren't reading
+   order (the flight arc, the holding pattern, passports and boarding passes, logos, clocks) stay as drawn. */
+
+[dir="rtl"] {
+  --f-ui: 'IBM Plex Sans Arabic', 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --f-display: 'Reem Kufi', 'IBM Plex Sans Arabic', Georgia, serif;
+}
+/* Arabic never takes letter spacing (it breaks the joins); its marks need taller lines. */
+[dir="rtl"] body, [dir="rtl"] .display, [dir="rtl"] .h1, [dir="rtl"] .h2, [dir="rtl"] .h3, [dir="rtl"] .eyebrow, [dir="rtl"] .caption { letter-spacing: 0; }
+[dir="rtl"] .display { line-height: 1.3; }
+[dir="rtl"] .body, [dir="rtl"] .small, [dir="rtl"] .tiny { line-height: 1.6; }
+[dir="rtl"] .eyebrow { text-transform: none; }
+
+/* Drawings keep their own direction: text anchors in SVGs stay put. */
+[dir="rtl"] svg { direction: ltr; }
+/* Machine-readable lines and codes on documents read left to right, like the paper. */
+[dir="rtl"] .mrz, [dir="rtl"] .pp-mrz, [dir="rtl"] .pp-wait-mrz, [dir="rtl"] .board-code, [dir="rtl"] .pl-code { direction: ltr; text-align: left; unicode-bidi: isolate; }
+/* Inputs for numbers, codes and cards type left to right. */
+[dir="rtl"] input[inputmode="numeric"], [dir="rtl"] input[type="tel"], [dir="rtl"] input[autocomplete="cc-number"], [dir="rtl"] .otp { direction: ltr; text-align: right; }
+
+/* Glyphs that point along the reading direction mirror. The plane on a route line points to where you land. */
+[dir="rtl"] .ic-back, [dir="rtl"] .ic-chevron, [dir="rtl"] .ic-arrow, [dir="rtl"] .route-plane { transform: scaleX(-1); }
+
+/* Physical sides that mean "start" or "end" swap. */
+[dir="rtl"] .slider .fill { left: auto; right: 0; }
+[dir="rtl"] .slider .label { padding-left: 0; padding-right: 44px; }
+[dir="rtl"] .slider.busy .label { padding-right: 0; }
+[dir="rtl"] .toggle::after { left: auto; right: 3px; transition: right .3s var(--spring); }
+[dir="rtl"] .toggle[aria-checked="true"]::after { left: auto; right: 23px; }
+[dir="rtl"] .cx-fill, [dir="rtl"] .up-track i { left: auto; right: 0; }
+[dir="rtl"] .td-step::before { left: auto; right: 10px; }
+[dir="rtl"] .tm-tl::before { left: auto; right: 62px; }
+[dir="rtl"] .td-x { right: auto; left: 0; }
+[dir="rtl"] .td-pola .td-x { right: auto; left: -8px; }
+[dir="rtl"] .td-stamp { right: auto; left: 16px; transform: rotate(14deg); }
+[dir="rtl"] .td-bell-dot, [dir="rtl"] .badge-dot, [dir="rtl"] .inbox-dot { right: auto; left: 9px; }
+[dir="rtl"] .wait-dot, [dir="rtl"] .going-dot, [dir="rtl"] .td-face i, [dir="rtl"] .acc-cam { right: auto; left: -2px; }
+[dir="rtl"] .nc-chosen i { right: auto; left: 2px; }
+[dir="rtl"] .cx-watermark { right: auto; left: -18px; }
+[dir="rtl"] .pl-type .pl-rose { right: auto; left: 14px; }
+
+[dir="rtl"] .card.tap, [dir="rtl"] .address-card, [dir="rtl"] .acc-namebtn, [dir="rtl"] .acc-choice, [dir="rtl"] .flight-opt,
+[dir="rtl"] .cx-empty.row-empty, [dir="rtl"] .credit-card, [dir="rtl"] .sp-topics button, [dir="rtl"] .idea { text-align: right; }
+[dir="rtl"] .cx-row.mine .cx-bubble.bare .cx-name, [dir="rtl"] .cx-n, [dir="rtl"] .cx-amt-in { text-align: left; }
+
+[dir="rtl"] .stack .avatar, [dir="rtl"] .cx-faces .stack .avatar, [dir="rtl"] .cx-voters .avatar, [dir="rtl"] .cx-share .stack .avatar { margin-left: 0; margin-right: -10px; }
+[dir="rtl"] .stack .avatar:first-child, [dir="rtl"] .cx-faces .stack .avatar:first-child, [dir="rtl"] .cx-voters .avatar:first-child, [dir="rtl"] .cx-share .stack .avatar:first-child { margin-right: 0; }
+[dir="rtl"] .pp-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .small-tabs sup { margin-left: 0; margin-right: 3px; }
+[dir="rtl"] .chip svg { margin-right: 0; margin-left: 6px; }
+[dir="rtl"] .acc-list, [dir="rtl"] .req-needs, [dir="rtl"] .cx-list, [dir="rtl"] .dz-rights ul { padding-left: 0; padding-right: 18px; }
+[dir="rtl"] .acc-choice .small { padding-left: 0; padding-right: 46px; }
+[dir="rtl"] .req-quote { padding-left: 0; padding-right: 10px; border-left: 0; border-right: 2px solid var(--gold); }
+[dir="rtl"] .cx-row.wide.mine { padding-left: 0; padding-right: 40px; }
+[dir="rtl"] .cx-seen { padding-right: 0; padding-left: 4px; }
+[dir="rtl"] .cx-typing { padding-left: 0; padding-right: 40px; }
+[dir="rtl"] .cx-more { padding-left: 0; padding-right: 2px; }
+[dir="rtl"] .cx-composer input:first-child, [dir="rtl"] .cx-composer label + input { padding-left: 0; padding-right: 14px; }
+[dir="rtl"] .city-row { padding: 8px 8px 8px 12px; }
+[dir="rtl"] .es-row { padding: 12px 12px 12px 14px; }
+
+/* Screens slide in from the left. */
+@keyframes pushInRtl { from { transform: translateX(-30%); opacity: .4 } to { transform: none; opacity: 1 } }
+[dir="rtl"] .screen.push { animation-name: pushInRtl; }
+
+/* The demo panel and its controls stay where they are on the stage. */
+[dir="rtl"] .stage { direction: rtl; }

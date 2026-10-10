@@ -12,6 +12,7 @@ const emptyAccount = () => ({
 });
 import { Dock, Icon, Sun, NetPill, OutboxSheet, LoadingVeil, MaintenanceScreen, UpdateScreen, SessionSheet, RateLimitSheet, ErrorBoundary, Crasher, CrashScreen, NotFound, useImageFallback } from './ui.jsx';
 import { GALLERY } from './gallery.jsx';
+import { initLang, setLang, useLang } from './lang.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Today from './screens/Today.jsx';
 import Ask from './screens/Ask.jsx';
@@ -250,7 +251,7 @@ function Demo() {
     <>
       {bar('floating')}
       <button type="button" className="demo-fab" onClick={() => setOpen(!open)}>{open ? 'Close demo' : 'Demo'}</button>
-      <aside className="demo" data-open={open ? 'true' : 'false'} aria-label="Demo controls">
+      <aside className="demo" data-open={open ? 'true' : 'false'} aria-label="Demo controls" data-no-translate="">
         {bar('in-panel')}
         <div className="col" style={{ gap: 6 }}>
           <h2>Mada Trips · clickable prototype</h2>
@@ -268,6 +269,7 @@ function Demo() {
             <button type="button" className="demo-btn" onClick={() => { jump('cancelled'); setTimeout(() => window.__madaPush('disruption', { kind: 'night' }), 700); setOpen(false); }}>Cancelled at night</button>
           </div>
         </div>
+        <LangSwitch />
         <div className="col" style={{ gap: 8 }}>
           <h3>Jump to a moment</h3>
           <div className="demo-grid">
@@ -305,7 +307,22 @@ function Demo() {
   );
 }
 
+/** English / العربية: the whole page turns right to left, at once. */
+function LangSwitch() {
+  const lang = useLang();
+  return (
+    <div className="col" style={{ gap: 8 }}>
+      <h3>Language</h3>
+      <div className="demo-grid" data-no-translate="">
+        <button type="button" className="demo-btn" aria-pressed={lang === 'en' ? 'true' : 'false'} onClick={() => setLang('en')} data-testid="lang-en">English</button>
+        <button type="button" className="demo-btn" lang="ar" aria-pressed={lang === 'ar' ? 'true' : 'false'} onClick={() => setLang('ar')} data-testid="lang-ar">العربية</button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  useEffect(() => { initLang(); }, []);
   return (
     <StoreProvider>
       <div className="stage">

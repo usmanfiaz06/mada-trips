@@ -283,7 +283,7 @@ export default function Onboarding({ params = {} }) {
           <div className="field">
             <label htmlFor="phone">Mobile number</label>
             <div className="row">
-              <span className="input" style={{ width: 92, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+966</span>
+              <span className="input" dir="ltr" style={{ width: 92, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+966</span>
               <input id="phone" className={'input' + (phoneTouched && phoneErr ? ' bad' : '')} inputMode="tel" autoComplete="tel-national" placeholder="5X XXX XXXX" value={phone}
                 onChange={(e) => setPhone(e.target.value)} onBlur={() => setPhoneTouched(true)} />
             </div>

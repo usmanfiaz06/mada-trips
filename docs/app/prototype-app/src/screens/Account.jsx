@@ -5,6 +5,7 @@ import { ReturnHero } from './Welcome.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
 import { Icon, TopBar, Sheet, Toggle, AddPersonSheet, Sun, EmptyState, ArtEnvelope, ArtSuitcase, ArtFriends, ArtPhone } from '../ui.jsx';
 import * as Support from './Support.jsx';
+import { setLang, useLang } from '../lang.jsx';
 
 export const DEMO_CODE = '123456';
 const DAY = 86400000;
@@ -352,7 +353,7 @@ function Account() {
 
         <Group label="For bookings">
           <Row label="Home airport" value={`${home[1]} · ${home[0]}`} onClick={() => setSheet('home')} src={<Source kind={a.homeAt ? 'typed' : 'default'} at={a.homeAt} />} />
-          <Row label="Language" value={a.language === 'en' ? 'English' : 'العربية'} onClick={() => setSheet('language')} src={<Source kind="default" />} />
+          <Row label="Language" value={<LangName />} onClick={() => setSheet('language')} src={<Source kind="default" />} />
           <Row label="Prices shown in" value={a.currency === 'SAR' ? 'SAR · Saudi riyal' : `${a.currency} · ${(CURRENCIES.find((c) => c[0] === a.currency) || [])[1]}`} onClick={() => setSheet('currency')} src={<Source kind={a.currency === 'SAR' ? 'default' : 'typed'} />} />
         </Group>
       </div>
@@ -534,20 +535,20 @@ function HomeSheet({ onClose }) {
   );
 }
 
+/** The language in use, in its own script. */
+export function LangName() { return useLang() === 'ar' ? <span lang="ar">العربية</span> : 'English'; }
+
 export function LanguageSheet({ onClose }) {
-  const { toast } = useStore();
-  const [a, save] = useAccount();
+  const lang = useLang();
+  const pick = (l) => { buzz(HAPTIC.select); setLang(l); };
   return (
     <Sheet label="Language" onClose={onClose}>
       <h2 className="h2">Language</h2>
-      <div className="acc-group well">
-        <Row value="English" right={<Icon name="check" color="#2f7a4b" width={2.4} />} />
-        <Row value={<span lang="ar" dir="rtl">العربية</span>} sub="Coming soon. Written by a Saudi writer, not translated by a machine." right={<span className="pill">Soon</span>} />
+      <div className="acc-group well" data-no-translate="">
+        <Row value="English" onClick={() => pick('en')} right={lang === 'en' ? <Icon name="check" color="#2f7a4b" width={2.4} /> : <span />} />
+        <Row value={<span lang="ar" dir="rtl">العربية</span>} onClick={() => pick('ar')} right={lang === 'ar' ? <Icon name="check" color="#2f7a4b" width={2.4} /> : <span />} />
       </div>
-      <div className="spread">
-        <span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Tell me when Arabic is ready</span><span className="tiny">One alert, then never again.</span></span>
-        <Toggle label="Tell me when Arabic is ready" checked={a.arabicNotify} onChange={(v) => { save({ arabicNotify: v }); if (v) toast('We’ll tell you when العربية is ready.'); }} />
-      </div>
+      <p className="tiny">In the app, switching restarts Mada so the whole layout can turn. Here it turns at once.</p>
       <button type="button" className="btn primary block" onClick={onClose}>Done</button>
     </Sheet>
   );

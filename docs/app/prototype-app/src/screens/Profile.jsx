@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
 import { Icon, TopBar, Sheet, PayMark, PermissionDenied } from '../ui.jsx';
 import { CardsSheet } from './Pay.jsx';
-import { UserAvatar, PhotoSheet, LanguageSheet, DeletionBanner, Group, Row, useAccount, SignOutSheet, displayName, passportName, prettyPhone, householdIds, passportStatus, MEALS } from './Account.jsx';
+import { UserAvatar, PhotoSheet, LanguageSheet, LangName, DeletionBanner, Group, Row, useAccount, SignOutSheet, displayName, passportName, prettyPhone, householdIds, passportStatus, MEALS } from './Account.jsx';
 
 export default function Profile() {
   const { s, set, pop, push, toast } = useStore();
@@ -94,7 +94,7 @@ export default function Profile() {
         </Group>
 
         <Group label="App">
-          <Row icon="globe" value="Language" sub={a.arabicNotify ? 'English · we’ll tell you when العربية is ready' : 'English · العربية coming soon'} onClick={() => setSheet('language')} />
+          <Row icon="globe" value="Language" sub={<LangName />} onClick={() => setSheet('language')} />
           <Row icon="lock" value="Security" sub={`${a.faceId ? 'Face ID on' : 'Face ID off'} · ${a.devices.length} ${a.devices.length === 1 ? 'device' : 'devices'}`} onClick={() => push('accountSecurity')} />
           <Row icon="doc" value="Privacy and data" sub={a.exportAt && Date.now() - a.exportAt < 86400000 ? 'Your data is on its way by email' : 'Download, delete, what we keep'} onClick={() => push('accountPrivacy')} />
           <Row icon="bell" value="Help" sub="Questions, talk to Mada, terms" onClick={() => push('accountHelp')} />

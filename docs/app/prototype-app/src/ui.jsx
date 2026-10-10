@@ -45,7 +45,7 @@ const PATHS = {
 
 export function Icon({ name, size = 22, color = 'currentColor', width = 1.8, style }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={style}>
+    <svg className={'ic ic-' + name} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={style}>
       {PATHS[name]}
     </svg>
   );
@@ -53,7 +53,7 @@ export function Icon({ name, size = 22, color = 'currentColor', width = 1.8, sty
 
 export function Plane({ size = 16, color = '#1e352d' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ margin: '0 6px', flexShrink: 0 }}>
+    <svg className="route-plane" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ margin: '0 6px', flexShrink: 0 }}>
       <path d="M22 12c0-.8-.7-1.5-1.5-1.5H15L10 3H8l2.5 7.5H6L4.5 8.5H3l1 3.5-1 3.5h1.5L6 13.5h4.5L8 21h2l5-7.5h5.5c.8 0 1.5-.7 1.5-1.5z" fill={color} />
     </svg>
   );
@@ -114,6 +114,9 @@ export function Toggle({ checked, onChange, label, onDark }) {
 }
 
 /* Slide to confirm: drag the sun across. Enter or Space also confirms, for keyboards and screen readers. */
+/** Where the pointer is along the track, from its start: the left in English, the right in Arabic. */
+const along = (e, r) => (document.documentElement.dir === 'rtl' ? (r.right - e.clientX) / r.width : (e.clientX - r.left) / r.width);
+
 export function SlideToConfirm({ label, onConfirm, busyLabel, busy, disabled }) {
   const [p, setP] = useState(0);
   const [drag, setDrag] = useState(false);
@@ -125,7 +128,7 @@ export function SlideToConfirm({ label, onConfirm, busyLabel, busy, disabled }) 
     if (disabled || busy) return;
     const el = e.currentTarget;
     const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
+    const x = along(e, r);
     const kf = knobFrac(el);
     const centre = (TRACK_PAD / r.width) + kf / 2 + p * (1 - kf - 2 * TRACK_PAD / r.width);
     if (Math.abs(x - centre) > 0.16) return;
@@ -137,7 +140,7 @@ export function SlideToConfirm({ label, onConfirm, busyLabel, busy, disabled }) 
   const move = (e) => {
     if (!drag) return;
     const { r, offset, kf } = ref.current;
-    const x = (e.clientX - r.left) / r.width - offset;
+    const x = along(e, r) - offset;
     const pad = TRACK_PAD / r.width;
     let np = (x - pad - kf / 2) / (1 - kf - 2 * pad);
     np = Math.max(0, Math.min(1, np));
@@ -154,7 +157,7 @@ export function SlideToConfirm({ label, onConfirm, busyLabel, busy, disabled }) 
     if (disabled || busy) return;
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setP(1); buzz(HAPTIC.thunk); onConfirm(); }
   };
-  const trans = drag ? 'none' : 'left .45s cubic-bezier(.2,.9,.25,1.15), width .45s cubic-bezier(.2,.9,.25,1.15)';
+  const trans = drag ? 'none' : 'inset-inline-start .45s cubic-bezier(.2,.9,.25,1.15), width .45s cubic-bezier(.2,.9,.25,1.15)';
   const pct = busy ? 1 : p;
   return (
     <button type="button" className={'slider' + (busy ? ' busy' : '')} aria-label={label + '. Press Enter to confirm.'} disabled={disabled}
@@ -162,10 +165,10 @@ export function SlideToConfirm({ label, onConfirm, busyLabel, busy, disabled }) 
       style={{ opacity: disabled ? 0.45 : 1, cursor: drag ? 'grabbing' : 'grab' }}>
       <span className="fill" style={{ width: `calc(${pct * 100}% - ${pct * 64}px + 64px)`, transition: trans }} />
       <span className="label" style={{ opacity: busy ? 1 : Math.max(0, 1 - p * 1.7), color: busy ? '#1e352d' : undefined }}>
-        {busy ? <><span className="spinner" style={{ marginRight: 10 }} />{busyLabel}</> : label}
+        {busy ? <><span className="spinner" style={{ marginInlineEnd: 10 }} />{busyLabel}</> : label}
       </span>
       {!busy && (
-        <span className="knob" style={{ left: `calc(4px + ${p} * (100% - 64px))`, transition: trans }}>
+        <span className="knob" style={{ insetInlineStart: `calc(4px + ${p} * (100% - 64px))`, transition: trans }}>
           <Sun width={30} color="#1e352d" />
         </span>
       )}

@@ -152,8 +152,14 @@ try {
   await expectText('AlUla · ULH');
   await phone.getByRole('button', { name: /^Language/ }).click();
   await page.waitForTimeout(300);
-  await phone.getByRole('switch', { name: 'Tell me when Arabic is ready' }).click();
+  // Arabic turns the page right to left at once; English turns it back.
+  await phone.getByRole('button', { name: 'العربية' }).click();
+  await page.waitForTimeout(400);
+  if ((await page.evaluate(() => document.documentElement.dir)) !== 'rtl') throw new Error('Arabic did not turn the page right to left');
   await shot('language');
+  await phone.getByRole('button', { name: 'English' }).click();
+  await page.waitForTimeout(400);
+  if ((await page.evaluate(() => document.documentElement.dir)) !== 'ltr') throw new Error('English did not turn the page back');
   await click('Done');
   await phone.getByRole('button', { name: /Prices shown in/ }).click();
   await page.waitForTimeout(300);
