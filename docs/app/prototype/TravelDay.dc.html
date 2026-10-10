@@ -14,6 +14,8 @@ body{margin:0}
 a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
 @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 @keyframes halo{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.6;transform:scale(1.22)}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(217,183,122,.55),0 0 0 3px #1e352d}50%{box-shadow:0 0 0 8px rgba(217,183,122,0),0 0 0 3px #1e352d}}
+.nowpulse{animation:glow 3s ease-in-out infinite}
 @keyframes ping{0%{box-shadow:0 0 0 0 rgba(47,122,75,.45)}70%{box-shadow:0 0 0 7px rgba(47,122,75,0)}100%{box-shadow:0 0 0 0 rgba(47,122,75,0)}}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes out{to{opacity:0;transform:translateY(-14px)}}
@@ -55,15 +57,24 @@ a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
         {{status}}
       </div>
       <div style="border-radius: 28px; background: #1e352d; color: #f6f2ec; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 22px 40px -26px rgba(15,26,22,.8)">
-      <div style="display: flex; align-items: center; gap: 18px">
-        <svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
-          <circle cx="46" cy="46" r="40" fill="none" stroke="rgba(233,226,216,.16)" stroke-width="7"></circle>
-          <circle cx="46" cy="46" r="40" fill="none" stroke="#d9b77a" stroke-width="7" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="{{ringOffset}}" transform="rotate(-90 46 46)" style="transition: stroke-dashoffset 1s linear"></circle>
-        </svg>
+      <div style="display: flex; align-items: flex-end; justify-content: space-between">
         <div style="display: flex; flex-direction: column">
           <span style="font-size: 15px; font-weight: 500; color: #c9c1b4">Leave in</span>
           <span style="font-size: 60px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums">{{mins}} <span style="font-size: 24px; letter-spacing: -0.01em">min</span></span>
         </div>
+        <span style="font-size: 15px; font-weight: 500; color: #c9c1b4; padding-bottom: 6px; font-variant-numeric: tabular-nums">at 07:05</span>
+      </div>
+      <div style="position: relative; height: 54px; margin: 4px 6px 0 6px">
+        <span style="position: absolute; left: 0; right: 0; top: 7px; height: 2px; border-radius: 2px; background: rgba(233,226,216,.16)"></span>
+        <span style="position: absolute; left: 0; top: 7px; width: 21%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, #d9b77a, rgba(217,183,122,.35))"></span>
+        <sc-for list="{{stops}}" as="st" hint-placeholder-count="4">
+          <span style="position: absolute; left: {{st.left}}%; top: 3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 999px; background: {{st.dot}}; box-shadow: 0 0 0 3px #1e352d"></span>
+          <span style="position: absolute; left: {{st.left}}%; top: 20px; transform: translateX({{st.shift}}%); display: flex; flex-direction: column; align-items: {{st.align}}; white-space: nowrap">
+            <span style="font-size: 13px; font-weight: 600; color: #f6f2ec; font-variant-numeric: tabular-nums">{{st.time}}</span>
+            <span style="font-size: 11px; color: #b8b0a3">{{st.label}}</span>
+          </span>
+        </sc-for>
+        <span class="nowpulse" style="position: absolute; left: {{nowLeft}}%; top: 1px; width: 14px; height: 14px; margin-left: -7px; border-radius: 999px; background: #d9b77a"></span>
       </div>
       <div style="font-size: 15px; color: #d6cfc3">31 min to King Khalid. Traffic is light.</div>
       </div>
@@ -207,7 +218,13 @@ class Component extends DCLogic {
     return {
       wash,
       mins: Math.ceil(remaining / 60000),
-      ringOffset: (251.3 * (1 - remaining / this.total)).toFixed(2),
+      nowLeft: (Math.min(1, (this.total - remaining) / (197 * 60000)) * 100).toFixed(3),
+      stops: [
+        { left: 21, time: '07:05', label: 'Leave', shift: -50, align: 'center', dot: '#d9b77a' },
+        { left: 37, time: '07:36', label: 'Airport', shift: -50, align: 'center', dot: '#e9e2d8' },
+        { left: 77, time: '08:55', label: 'Boards', shift: -50, align: 'center', dot: '#e9e2d8' },
+        { left: 100, time: '09:40', label: 'Takeoff', shift: -100, align: 'flex-end', dot: '#e9e2d8' }
+      ],
       gateChanged: s.gateChanged,
       oldGateAnim: s.gateChanged ? 'out' : '',
       gateFlash: s.gateChanged ? 'flash' : '',

@@ -8,30 +8,32 @@
 <body>
 <x-dc>
 <helmet>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
 <style>
 body{margin:0}
 a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
 button{font-family:inherit}
-@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-@keyframes halo{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.6;transform:scale(1.22)}}
 @keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.breathe{animation:breathe 10s ease-in-out infinite;transform-origin:50% 62%}
-.halo{animation:halo 10s ease-in-out infinite}
+@keyframes swap{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(217,183,122,.55)}50%{box-shadow:0 0 0 6px rgba(217,183,122,0)}}
 .rise1{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
 .rise2{animation:rise .6s .08s cubic-bezier(.2,.8,.2,1) both}
 .rise3{animation:rise .6s .16s cubic-bezier(.2,.8,.2,1) both}
+.swap{animation:swap .45s cubic-bezier(.2,.8,.2,1) both}
+.grow{animation:grow .8s .1s cubic-bezier(.2,.8,.2,1) both;transform-origin:0 50%}
+.glow{animation:glow 3s ease-in-out infinite}
 .press{transition:transform .12s ease}.press:active{transform:scale(.98)}
 @media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
 </style>
 </helmet>
 <div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
-  <div style="padding: 54px 24px 0 24px; display: flex; flex-direction: column; gap: 16px">
-    <div class="rise1" style="display: flex; align-items: center; justify-content: space-between">
+  <div style="padding: 54px 20px 0 20px; display: flex; flex-direction: column; gap: 14px">
+    <div class="rise1" style="display: flex; align-items: center; justify-content: space-between; padding: 0 4px">
       <div style="display: flex; flex-direction: column; gap: 2px">
         <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em">Wallet</h1>
-        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #56655e">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56655e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #4d5c55">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4d5c55" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
           Locked with Face ID · works offline
         </span>
       </div>
@@ -40,47 +42,76 @@ button{font-family:inherit}
       </button>
     </div>
 
-    <div class="rise2" style="height: 196px; perspective: 900px">
-      <div onPointerMove="{{tilt}}" onPointerLeave="{{untilt}}" style="position: relative; height: 196px; border-radius: 22px; background: linear-gradient(145deg, #24423a 0%, #1e352d 55%, #172b24 100%); color: #e9e2d8; padding: 18px 20px; box-sizing: border-box; overflow: hidden; transform: rotateX({{rx}}deg) rotateY({{ry}}deg); transition: {{tiltTrans}}; box-shadow: 0 24px 40px -24px rgba(15,26,22,.7); display: flex; flex-direction: column; justify-content: space-between">
-        <div style="position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(233,210,160,.28) 50%, rgba(255,255,255,0) 70%); background-size: 250% 100%; background-position: {{sheen}}% 0; pointer-events: none"></div>
-        <div style="position: relative; display: flex; justify-content: space-between; align-items: flex-start">
-          <span style="font-size: 12px; font-weight: 600; letter-spacing: .14em; color: #d9b77a">PASSPORT</span>
-          <span style="font-size: 12px; font-weight: 500; letter-spacing: .08em; color: #c9c1b4">SAU</span>
-        </div>
-        <div style="position: relative; display: flex; flex-direction: column; gap: 10px">
-          <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1; color: #f6f2ec">{{card.name}}</div>
-          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-variant-numeric: tabular-nums">
-            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Number</span><span style="font-size: 14px; font-weight: 600; letter-spacing: .04em">{{card.number}}</span></div>
-            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Born</span><span style="font-size: 14px; font-weight: 600">{{card.born}}</span></div>
-            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Expires</span><span style="font-size: 14px; font-weight: 600; color: {{card.expColor}}">{{card.expires}}</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="rise3" style="display: flex; flex-direction: column; gap: 4px">
-      <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px">Everyone is ready for Istanbul.</div>
+    <div style="display: flex; gap: 6px; padding: 0 2px" role="group" aria-label="Whose documents">
       <sc-for list="{{people}}" as="p" hint-placeholder-count="4">
-        <button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" class="press" style="text-align: left; cursor: pointer; border: 0; border-radius: 18px; background: {{p.bg}}; padding: 10px 12px; display: flex; align-items: center; gap: 12px; color: #1e352d; transition: background .2s ease">
-          <span style="width: 36px; height: 36px; border-radius: 999px; background: #f6f2ec; display: grid; place-items: center; font-size: 14px; font-weight: 600; flex-shrink: 0">{{p.initial}}</span>
-          <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
-            <span style="font-size: 15px; font-weight: 600">{{p.name}}</span>
-            <span style="font-size: 13px; line-height: 1.35; color: #4d5c55">{{p.note}}</span>
-          </span>
-          <span style="width: 10px; height: 10px; border-radius: 999px; background: {{p.dot}}; flex-shrink: 0"></span>
+        <button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" class="press" style="flex: 1 1 0; height: 44px; border-radius: 999px; border: 0; cursor: pointer; background: {{p.bg}}; color: {{p.fg}}; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 600; transition: background .25s ease, color .25s ease">
+          <span style="width: 8px; height: 8px; border-radius: 999px; background: {{p.dot}}"></span>
+          {{p.name}}
         </button>
       </sc-for>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 8px">
-      <div style="font-size: 15px; font-weight: 600">For this trip</div>
-      <div style="border-radius: 20px; background: #fffdf9; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
-        <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
-          <span style="font-size: 15px; font-weight: 600">SV263 · 4 boarding passes</span>
-          <span style="font-size: 13px; color: #4d5c55">Ready at check-in, 24 hours before</span>
-        </span>
-        <button type="button" class="press" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 999px; border: 0; background: #0f1a16; color: #f6f2ec; font-size: 13px; font-weight: 600; cursor: pointer">Add to Wallet</button>
+    <div class="rise2" style="position: relative; height: 262px; perspective: 1000px">
+      <div style="position: absolute; left: 22px; right: 22px; top: 0; height: 60px; border-radius: 20px; background: #d9b77a; padding: 8px 16px; box-sizing: border-box; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #1e352d">
+        <span>Travel insurance · family</span><span>Valid in Türkiye</span>
       </div>
+      <div style="position: absolute; left: 11px; right: 11px; top: 22px; height: 60px; border-radius: 20px; background: #fffdf9; padding: 8px 16px; box-sizing: border-box; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #1e352d; box-shadow: 0 -6px 16px -10px rgba(15,26,22,.3)">
+        <span>SV263 · 4 boarding passes</span><span style="color: #4d5c55">Opens at check-in</span>
+      </div>
+
+      <div onPointerMove="{{tilt}}" onPointerLeave="{{untilt}}" style="position: absolute; left: 0; right: 0; top: 44px; height: 218px; border-radius: 22px; overflow: hidden; background: linear-gradient(150deg, #2a4a40 0%, #1e352d 50%, #142720 100%); color: #e9e2d8; transform: rotateX({{rx}}deg) rotateY({{ry}}deg); transition: {{tiltTrans}}; box-shadow: 0 28px 44px -26px rgba(15,26,22,.8), 0 -6px 16px -10px rgba(15,26,22,.35)">
+        <svg width="350" height="218" viewBox="0 0 360 218" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%"><g fill="none" stroke="#d9b77a" stroke-width=".7" opacity=".16"><polyline points="0,53.0 6,59.8 12,65.6 18,69.6 24,71.5 30,71.4 36,69.9 42,67.7 48,65.5 54,64.1 60,63.5 66,63.7 72,63.9 78,63.6 84,62.0 90,58.8 96,54.0 102,47.9 108,41.6 114,35.9 120,31.8 126,29.9 132,30.4 138,32.9 144,36.9 150,41.3 156,45.4 162,48.6 168,50.5 174,51.5 180,52.2 186,53.1 192,54.9 198,58.0 204,62.2 210,67.0 216,71.6 222,75.1 228,76.6 234,75.8 240,72.6 246,67.6 252,61.6 258,55.6 264,50.5 270,46.8 276,44.7 282,43.9 288,43.8 294,43.8 300,43.0 306,41.4 312,39.0 318,36.3 324,34.0 330,33.1 336,34.1 342,37.3 348,42.5 354,49.0 360,55.9"></polyline><polyline points="0,82.6 6,86.2 12,87.5 18,86.6 24,84.1 30,80.8 36,77.5 42,74.9 48,73.2 54,72.5 60,72.1 66,71.5 72,69.9 78,66.9 84,62.5 90,57.0 96,51.4 102,46.4 108,43.1 114,42.0 120,43.4 126,46.9 132,51.8 138,57.2 144,62.2 150,66.1 156,68.6 162,69.9 168,70.5 174,71.0 180,72.3 186,74.5 192,77.7 198,81.4 204,85.0 210,87.5 216,88.2 222,86.6 228,82.7 234,77.1 240,70.5 246,64.0 252,58.6 258,54.7 264,52.8 270,52.4 276,53.0 282,53.8 288,54.2 294,53.8 300,52.6 306,51.0 312,49.7 318,49.5 324,51.1 330,54.7 336,60.1 342,66.6 348,73.5 354,79.5 360,83.9"></polyline><polyline points="0,102.2 6,100.4 12,96.9 18,92.5 24,88.1 30,84.5 36,82.0 42,80.6 48,79.8 54,79.1 60,77.8 66,75.3 72,71.6 78,67.0 84,62.3 90,58.2 96,55.8 102,55.6 108,57.8 114,62.1 120,67.8 126,74.0 132,79.6 138,84.0 144,86.8 150,88.1 156,88.4 162,88.3 168,88.7 174,89.8 180,91.9 186,94.5 192,97.0 198,98.6 204,98.5 210,96.2 216,91.8 222,85.8 228,78.9 234,72.3 240,66.8 246,63.1 252,61.6 258,61.8 264,63.2 270,65.1 276,66.7 282,67.5 288,67.5 294,67.0 300,66.5 306,67.0 312,68.9 318,72.5 324,77.8 330,84.2 336,90.6 342,96.2 348,100.1 354,101.7 360,101.0"></polyline><polyline points="0,108.4 6,103.0 12,97.7 18,93.2 24,90.1 30,88.3 36,87.5 42,87.0 48,86.2 54,84.5 60,81.7 66,78.2 72,74.5 78,71.4 84,69.9 90,70.5 96,73.5 102,78.5 108,84.8 114,91.4 120,97.5 126,102.0 132,104.8 138,105.8 144,105.5 150,104.7 156,104.0 162,103.9 168,104.8 174,106.2 180,107.7 186,108.4 192,107.6 198,104.9 204,100.3 210,94.1 216,87.3 222,80.8 228,75.6 234,72.3 240,71.3 246,72.4 252,74.8 258,77.8 264,80.6 270,82.6 276,83.7 282,84.0 288,84.2 294,85.0 300,87.0 306,90.4 312,95.4 318,101.2 324,107.0 330,111.9 336,115.0 342,115.8 348,114.2 354,110.6 360,105.8"></polyline><polyline points="0,106.5 6,101.5 12,97.9 18,96.0 24,95.4 30,95.4 36,95.4 42,94.7 48,93.0 54,90.7 60,88.1 66,86.0 72,85.4 78,86.7 84,90.2 90,95.6 96,102.3 102,109.1 108,115.2 114,119.7 120,122.2 126,122.7 132,121.6 138,119.8 144,117.9 150,116.7 156,116.3 162,116.6 168,117.1 174,117.2 180,115.9 186,113.1 192,108.4 198,102.5 204,96.0 210,89.9 216,85.2 222,82.6 228,82.4 234,84.3 240,87.8 246,91.9 252,95.8 258,98.9 264,100.9 270,101.9 276,102.5 282,103.3 288,105.0 294,108.0 300,112.3 306,117.3 312,122.3 318,126.4 324,128.6 330,128.5 336,126.0 342,121.6 348,115.9 354,110.0 360,104.8"></polyline><polyline points="0,105.9 6,104.2 12,104.0 18,104.8 24,105.7 30,106.1 36,105.7 42,104.5 48,103.0 54,101.9 60,102.0 66,103.9 72,107.7 78,113.3 84,119.9 90,126.7 96,132.6 102,136.7 108,138.6 114,138.4 120,136.4 126,133.5 132,130.5 138,128.0 144,126.5 150,125.9 156,125.7 162,125.2 168,123.8 174,121.0 180,116.7 186,111.3 192,105.3 198,99.9 204,96.0 210,94.2 216,94.8 222,97.7 228,102.1 234,107.2 240,112.1 246,116.1 252,118.7 258,120.1 264,120.8 270,121.5 276,122.7 282,125.0 288,128.3 294,132.3 300,136.3 306,139.4 312,140.7 318,139.8 324,136.6 330,131.4 336,125.1 342,118.6 348,112.9 354,108.8 360,106.4"></polyline><polyline points="0,113.6 6,115.3 12,117.3 18,118.9 24,119.7 30,119.7 36,119.3 42,119.0 48,119.6 54,121.7 60,125.6 66,131.0 72,137.4 78,143.8 84,149.1 90,152.7 96,153.9 102,152.8 108,149.9 114,145.9 120,141.7 126,138.2 132,135.7 138,134.2 144,133.5 150,132.9 156,131.6 162,129.2 168,125.5 174,120.8 180,115.7 186,111.2 192,108.1 198,107.2 204,108.7 210,112.4 216,117.7 222,123.6 228,129.3 234,133.8 240,136.9 246,138.4 252,139.0 258,139.1 264,139.6 270,140.9 276,143.2 282,146.1 288,149.0 294,151.0 300,151.5 306,149.9 312,146.0 318,140.3 324,133.6 330,126.9 336,121.1 342,117.0 348,114.9 354,114.6 360,115.6"></polyline><polyline points="0,130.3 6,133.1 12,135.1 18,136.1 24,136.5 30,136.8 36,137.7 42,139.8 48,143.4 54,148.4 60,154.2 66,160.0 72,164.6 78,167.4 84,167.8 90,165.8 96,161.9 102,156.9 108,151.8 114,147.3 120,144.1 126,142.1 132,141.2 138,140.6 144,139.7 150,138.0 156,135.1 162,131.4 168,127.3 174,123.8 180,121.6 186,121.6 192,123.9 198,128.3 204,134.3 210,140.8 216,147.0 222,151.8 228,155.0 234,156.4 240,156.5 246,155.9 252,155.5 258,155.6 264,156.7 270,158.4 276,160.2 282,161.4 288,161.1 294,158.9 300,154.7 306,148.8 312,142.0 318,135.3 324,129.6 330,125.8 336,124.2 342,124.7 348,126.6 354,129.2 360,131.8"></polyline><polyline points="0,151.6 6,153.5 12,154.5 18,155.1 24,156.0 30,157.8 36,160.9 42,165.2 48,170.2 54,175.0 60,178.8 66,180.7 72,180.2 78,177.4 84,172.6 90,166.8 96,160.9 102,155.8 108,152.0 114,149.8 120,148.9 126,148.7 132,148.5 138,147.6 144,145.9 150,143.2 156,140.3 162,137.8 168,136.6 174,137.3 180,140.2 186,145.2 192,151.6 198,158.4 204,164.8 210,169.7 216,172.6 222,173.7 228,173.1 234,171.6 240,170.0 246,169.0 252,168.8 258,169.3 264,170.2 270,170.5 276,169.7 282,167.2 288,162.9 294,157.1 300,150.5 306,144.1 312,138.9 318,135.6 324,134.7 330,136.0 336,138.9 342,142.7 348,146.4 354,149.4 360,151.3"></polyline></g></svg>
+        <svg width="150" height="100" viewBox="0 0 132.31 88.61" aria-hidden="true" style="position: absolute; right: -18px; top: 46px; opacity: .07"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+        <div style="position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(233,210,160,.30) 48%, rgba(170,220,210,.12) 54%, rgba(255,255,255,0) 70%); background-size: 260% 100%; background-position: {{sheen}}% 0; pointer-events: none"></div>
+
+        <div key="{{card.id}}" class="swap" style="position: relative; height: 100%; padding: 16px 18px 12px 18px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between">
+          <div style="display: flex; align-items: center; justify-content: space-between">
+            <div style="display: flex; flex-direction: column; gap: 1px">
+              <span style="font-size: 11px; font-weight: 600; letter-spacing: .16em; color: #d9b77a">PASSPORT</span>
+              <span style="font-size: 11px; color: #b8b0a3">Kingdom of Saudi Arabia</span>
+            </div>
+            <span style="height: 26px; padding: 0 10px; border-radius: 999px; background: {{card.chipBg}}; color: {{card.chipFg}}; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600">
+              <span class="{{card.chipAnim}}" style="width: 6px; height: 6px; border-radius: 999px; background: {{card.chipFg}}"></span>
+              {{card.chip}}
+            </span>
+          </div>
+
+          <div style="display: flex; gap: 14px; align-items: center">
+            <div style="width: 62px; height: 78px; border-radius: 12px; flex-shrink: 0; background: linear-gradient(160deg, #e9e2d8 0%, #cfc4b2 100%); display: grid; place-items: center; font-family: 'Instrument Serif', Georgia, serif; font-size: 34px; color: #1e352d; box-shadow: inset 0 0 0 1px rgba(255,255,255,.4)">{{card.initial}}</div>
+            <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+              <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; line-height: 1; color: #f6f2ec">{{card.name}}</div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-variant-numeric: tabular-nums">
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; color: #b8b0a3">Number</span><span style="font-size: 13px; font-weight: 600; letter-spacing: .03em">{{card.number}}</span></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; color: #b8b0a3">Born</span><span style="font-size: 13px; font-weight: 600">{{card.born}}</span></div>
+                <div style="display: flex; flex-direction: column; gap: 1px"><span style="font-size: 10px; color: #b8b0a3">Expires</span><span style="font-size: 13px; font-weight: 600; color: {{card.expColor}}">{{card.expires}}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px; line-height: 1.45; letter-spacing: .02em; color: rgba(233,226,216,.55); white-space: pre; overflow: hidden">{{card.mrz1}}
+{{card.mrz2}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div key="{{card.id}}" class="rise3" style="border-radius: 24px; background: #fffdf9; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <span style="font-size: 15px; font-weight: 600">{{card.checkTitle}}</span>
+        <span style="font-size: 13px; line-height: 1.4; color: #4d5c55">{{card.checkBody}}</span>
+      </div>
+      <div style="position: relative; height: 40px; margin: 0 4px">
+        <span style="position: absolute; left: 0; right: 0; top: 8px; height: 6px; border-radius: 999px; background: #efe9e0"></span>
+        <span class="grow" style="position: absolute; left: 0; top: 8px; width: {{card.validPct}}%; height: 6px; border-radius: 999px; background: {{card.barColor}}"></span>
+        <span style="position: absolute; left: {{card.tripPct}}%; top: 4px; width: 2px; height: 14px; margin-left: -1px; border-radius: 2px; background: #1e352d"></span>
+        <span style="position: absolute; left: {{card.tripPct}}%; top: 22px; transform: translateX(-50%); font-size: 11px; font-weight: 600; white-space: nowrap">Trip · 9 Mar</span>
+        <span style="position: absolute; left: {{card.needPct}}%; top: 4px; width: 2px; height: 14px; margin-left: -1px; border-radius: 2px; background: #b98f4a"></span>
+        <span style="position: absolute; left: {{card.needPct}}%; top: 22px; transform: translateX({{card.needShift}}%); font-size: 11px; font-weight: 600; color: #7d5d27; white-space: nowrap">Needed until {{card.needDate}}</span>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px">
+      <button type="button" class="press" style="flex: 1 1 0; height: 44px; border-radius: 999px; border: 0; background: #fffdf9; color: #1e352d; font-size: 14px; font-weight: 600; cursor: pointer">Copy number</button>
+      <button type="button" class="press" style="flex: 1 1 0; height: 44px; border-radius: 999px; border: 0; background: #fffdf9; color: #1e352d; font-size: 14px; font-weight: 600; cursor: pointer">{{card.action}}</button>
     </div>
   </div>
 
@@ -91,8 +122,8 @@ button{font-family:inherit}
     <a href="TravelDay.dc.html" aria-label="Trips" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>
     </a>
-    <a href="Ask.dc.html" aria-label="Ask Mada" style="width: 60px; height: 60px; border-radius: 999px; background: #1e352d; display: grid; place-items: center; position: relative">
-            <svg width="32" height="22" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+    <a href="Ask.dc.html" aria-label="Ask Mada" style="width: 60px; height: 60px; border-radius: 999px; background: #1e352d; display: grid; place-items: center">
+      <svg width="32" height="22" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
     </a>
     <a href="Group.dc.html" aria-label="Circles" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg>
@@ -116,22 +147,42 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state;
     const data = [
-      { id: 'omar', initial: 'O', name: 'Omar', note: 'Passport valid until 2031', full: 'Omar Alharbi', number: 'A08•••41', born: '1984', expires: 'Jun 2031', watch: false },
-      { id: 'hessa', initial: 'H', name: 'Hessa', note: 'Passport valid until 2029', full: 'Hessa Alharbi', number: 'A11•••07', born: '1988', expires: 'Jan 2029', watch: false },
-      { id: 'sara', initial: 'S', name: 'Sara', note: 'Fine for Istanbul: Turkey needs 150 days after arrival, Sara has 158. Renew before summer.', full: 'Sara Alharbi', number: 'A23•••96', born: '2013', expires: '14 Aug 2027', watch: true },
-      { id: 'ahmed', initial: 'A', name: 'Ahmed', note: 'Passport valid until 2030', full: 'Ahmed Alharbi', number: 'A23•••97', born: '2016', expires: 'Mar 2030', watch: false }
+      { id: 'omar', name: 'Omar', full: 'Omar Alharbi', number: 'A08•••41', born: '1984', expires: 'Jun 2031', sex: 'M', tight: false,
+        mrz1: 'P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', mrz2: 'A08•••41<6SAU8403117M3106228<<<<<<<<<<<<<<02' },
+      { id: 'hessa', name: 'Hessa', full: 'Hessa Alharbi', number: 'A11•••07', born: '1988', expires: 'Jan 2029', sex: 'F', tight: false,
+        mrz1: 'P<SAUALHARBI<<HESSA<<<<<<<<<<<<<<<<<<<<<<<<', mrz2: 'A11•••07<3SAU8807244F2901159<<<<<<<<<<<<<<06' },
+      { id: 'sara', name: 'Sara', full: 'Sara Alharbi', number: 'A23•••96', born: '2013', expires: '14 Aug 2027', sex: 'F', tight: true,
+        mrz1: 'P<SAUALHARBI<<SARA<<<<<<<<<<<<<<<<<<<<<<<<<', mrz2: 'A23•••96<1SAU1305128F2708147<<<<<<<<<<<<<<04' },
+      { id: 'ahmed', name: 'Ahmed', full: 'Ahmed Alharbi', number: 'A23•••97', born: '2016', expires: 'Mar 2030', sex: 'M', tight: false,
+        mrz1: 'P<SAUALHARBI<<AHMED<<<<<<<<<<<<<<<<<<<<<<<<', mrz2: 'A23•••97<9SAU1609032M3003211<<<<<<<<<<<<<<08' }
     ];
     const people = data.map((p) => ({
       ...p,
       pressed: s.who === p.id ? 'true' : 'false',
-      bg: s.who === p.id ? '#fffdf9' : 'transparent',
-      dot: p.watch ? '#d9b77a' : '#2f7a4b',
+      bg: s.who === p.id ? '#1e352d' : '#f6f2ec',
+      fg: s.who === p.id ? '#f6f2ec' : '#1e352d',
+      dot: p.tight ? '#d9b77a' : '#3f9a63',
       pick: () => { this.buzz(8); this.setState({ who: p.id }); }
     }));
     const c = data.find((p) => p.id === s.who);
+    const card = c.tight
+      ? {
+          chip: 'Ready · 8 days to spare', chipBg: 'rgba(217,183,122,.18)', chipFg: '#e6c88f', chipAnim: 'glow',
+          checkTitle: 'Fine for Istanbul, with 8 days to spare.',
+          checkBody: 'Türkiye asks for 150 days after you land. Sara has 158. Renew before summer travel.',
+          validPct: 100, barColor: 'linear-gradient(90deg, #3f9a63 0%, #3f9a63 80%, #d9b77a 100%)', tripPct: 36, needPct: 95, needShift: -88,
+          needDate: '6 Aug', action: 'Book a renewal', expColor: '#e6c88f'
+        }
+      : {
+          chip: 'Ready for Istanbul', chipBg: 'rgba(63,154,99,.22)', chipFg: '#9fd5b2', chipAnim: '',
+          checkTitle: 'Ready for Istanbul.',
+          checkBody: 'Valid well beyond the 150 days Türkiye asks for after you land.',
+          validPct: 100, barColor: '#3f9a63', tripPct: 14, needPct: 38, needShift: -50,
+          needDate: '6 Aug', action: 'Visas and stamps', expColor: '#e9e2d8'
+        };
     return {
       people,
-      card: { name: c.full, number: c.number, born: c.born, expires: c.expires, expColor: c.watch ? '#e6c88f' : '#e9e2d8' },
+      card: { ...card, id: c.id, initial: c.name.charAt(0), name: c.full, number: c.number, born: c.born, expires: c.expires, mrz1: c.mrz1, mrz2: c.mrz2 },
       rx: s.rx.toFixed(2),
       ry: s.ry.toFixed(2),
       sheen: s.sheen.toFixed(1),
