@@ -339,15 +339,15 @@ Things that are common in other apps and never appear in Mada:
 - Error codes shown to travellers. Write "Saudia's system is slow. Faisal is on it." instead of "Error 502".
 - Asking for something Mada already knows.
 - A form with more than 3 fields.
+- **Anything that looks or sounds like AI:** sparkles, "AI" badges, glowing purple-and-blue gradients, answers that type themselves out, a chat screen as the home screen, regenerate buttons, prompts dressed up as suggestions. The full rules are in [COPY.md §6](COPY.md).
 
 ---
 
 ## 8. Voice and tone
 
-- **A warm, capable friend who happens to be a travel expert.** Short sentences. The answer first, then the reason.
-- **Arabic:** warm, neutral Gulf Arabic in the conversation (the "white dialect" understood across the Gulf), and clear Modern Standard Arabic for legal text and fare rules.
-- **Faisal, not "our team".** People, not departments.
-- **Calm, especially when things go wrong.** Precise numbers and times; no exclamation marks in alerts.
+In short: a warm, capable friend who happens to be a travel expert. The answer comes first; the tone stays calm, with precise numbers. Software says "we" and only named people say "I". No exclamation marks, anywhere.
+
+The full standard, covering words, mechanics, every key string, the no-AI-feel rules, typography and the review process, is in **[COPY.md](COPY.md)**.
 
 ---
 
@@ -403,10 +403,16 @@ Things that are common in other apps and never appear in Mada:
 
 **Icons:** one custom set of rounded line icons matching the dock. No mixing of icon styles.
 
-### 9.4 Still open, for the next references
-1. **Arabic typography**, for the Arabic version.
-2. **Density:** whether Today stays as sparse as Homely, or gets closer to FitBite.
-3. **The 3D material:** ceramic and matte, or glass and glossy. A reference for each would settle it.
+### 9.4 Decided now that the references are in
+
+1. **Typography:** an editorial serif for the emotional moments and a quiet sans for everything else, with Arabic to match. The full system is in [COPY.md §7](COPY.md).
+2. **Density:**
+   - **Today is as sparse as Homely:** one answer, then at most 4 tiles.
+   - **Working lists** (trip timeline, Wallet, group) **may go as dense as FitBite**, but never denser.
+3. **The 3D material:** **matte sand ceramic, with green glass and gold as accents.**
+   - Matte reads calm and physical.
+   - Glossy, glowing 3D is what makes many apps look AI-made, which is what we avoid ([COPY.md §6](COPY.md)).
+4. **No AI feel anywhere** in visuals or words ([COPY.md §6](COPY.md)).
 
 ---
 
@@ -470,5 +476,10 @@ Every flow is measured from the first beta build, so we know **which flow, which
 - Replays are kept for 30 days.
 - Heatmaps and funnels contain no personal data.
 
-**Tools.** PostHog for events, funnels, paths, feature flags, experiments and replay. Sentry for crashes and performance, including slow frames. For tap heatmaps on mobile, use PostHog if its mobile heatmaps cover React Native well enough; otherwise UXCam, which is built for mobile heatmaps. **[Confirm PostHog's mobile heatmap support in the sandbox week.]**
+**Tools, at minimum cost:**
+- PostHog's free tier for events, funnels, paths, feature flags, experiments and replay.
+- Sentry's free tier for crashes and performance, including slow frames.
+- **Tap heatmaps are built in-house.** Every tap is logged with its screen, element and x/y position, and an internal page in Ops draws the heatmap. There is no paid heatmap vendor.
+
+See the [cost rule in INTEGRATIONS.md](INTEGRATIONS.md#the-cost-rule-decided).
 

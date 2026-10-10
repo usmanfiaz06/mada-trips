@@ -4,6 +4,7 @@
 **Platforms:** iOS and Android. **Saudi first, made for the world.**
 **Integrations to start with:** [INTEGRATIONS.md](INTEGRATIONS.md).
 **Experience design, psychology and layout rules:** [EXPERIENCE.md](EXPERIENCE.md).
+**Words and typography:** [COPY.md](COPY.md).
 **Evidence:** [RESEARCH.md](RESEARCH.md), covering competitors, traveller reviews, the Saudi market, technical feasibility and UX case studies.
 **Built on:** the existing Mada Ops platform ([platform/](../../platform), [docs/ops-platform/PLAN.md](../ops-platform/PLAN.md)).
 
@@ -347,7 +348,7 @@ The vendor-by-vendor list, including what to open and sign first, is in [INTEGRA
 | Backend | A new **Mada Core API** (TypeScript) next to Mada Ops, sharing Postgres for bookings and clients. Queue for alerts. | Keeps the consumer traffic away from the Ops back office. |
 | PII vault | **GCP Dammam (via CNTXT) or Oracle Jeddah.** Envelope encryption with per-user keys. Move to AWS or Azure Saudi regions when they are live. | Required by the Saudi data law (PDPL). Also a trust message for marketing. |
 | AI | Claude agent with strict tool schemas. A larger model for disruption replanning, a mid model for chat, a small model for routing and document extraction. No raw passport data goes to the model. | Strong in Arabic and English, reliable at calling tools. Cost per conversation is measured in the pilot. |
-| Voice | Choose after a 2-hour test on Najdi, Hijazi and Gulf recordings (ElevenLabs Scribe v2, Deepgram, Azure ar-SA, Google Chirp). | Off-the-shelf models do badly on Saudi dialects. |
+| Voice | **On-device speech recognition first** (free). Only if a 2-hour test on Najdi, Hijazi and Gulf recordings shows it falls short do we add a paid service (ElevenLabs Scribe v2, Deepgram, Azure ar-SA). | Follows the cost rule. Off-the-shelf models can struggle with Saudi dialects. |
 | Flight data | FlightAware AeroAPI (alerts, webhooks, inbound aircraft). Cirium or OAG as volume grows. | |
 | Flights | Mada's GDS with Enterprise access, plus Duffel for NDC fares and low-cost carriers. | The Amadeus self-service APIs shut down in July 2026. |
 | Hotels | RateHawk and WebBeds, then Hotelbeds. Apply for Expedia Rapid. | |
@@ -413,7 +414,12 @@ The vendor-by-vendor list, including what to open and sign first, is in [INTEGRA
 | D12 | Brand | **Carry over the Mada brand.** Design references are coming. |
 | D13 | Community, prediction and loyalty | **In scope, phased** (§5.5–5.7, §10). |
 | D16 | Language | **English first, fully available in Arabic.** |
-| D17 | Analytics | **Heatmaps, funnels and friction signals from the first beta**, with privacy masking ([EXPERIENCE.md §10.2](EXPERIENCE.md)). |
+| D17 | Analytics | **Heatmaps, funnels and friction signals from the first beta**, with privacy masking ([EXPERIENCE.md §10.2](EXPERIENCE.md)). Tap heatmaps built in-house. |
+| D18 | Running costs | **Minimum spend.** Build in-house or use free tiers first, then pay per use. A fixed subscription only where nothing else works ([INTEGRATIONS.md](INTEGRATIONS.md#the-cost-rule-decided)). |
+| D19 | Imagery | **No mascot.** Photography for the world, the sun for Mada, real faces for people, matte 3D objects for things and rewards. |
+| D20 | AI in the experience | **No AI feel in design or copy.** It stays honest: software never passes as a person ([COPY.md §6](COPY.md)). |
+| D21 | Copy and typography | **Every string is written by a person** and reviewed against [COPY.md](COPY.md). Engineers never write user-facing words. |
+| D22 | Design references | **Complete.** |
 
 ### Still open
 
