@@ -60,7 +60,7 @@ const PLURAL_EXTRA = /\.(zero|two|few|many)$/;
 function latinOnlyOk(v: string): boolean {
   const bare = v.replace(/\{\w+\}/g, '');
   if (!/[A-Za-z]/.test(bare)) return true;
-  return AR_LATIN_OK.some((re) => re.test(v.trim()));
+  return AR_LATIN_OK.some((re) => re.test(v.trim()) || re.test(bare.trim()));
 }
 
 /** Every rule CI enforces on the Arabic catalogue, against the English one. */

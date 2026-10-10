@@ -14,7 +14,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint:copy": "vitest run test/copy.test.ts"
+    "lint:copy": "vitest run test/copy.test.ts test/copy-ar.test.ts"
   },
   "dependencies": {
     "zod": "4.6.5"
