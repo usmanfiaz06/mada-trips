@@ -211,7 +211,7 @@ function Nothing() {
         ) : (
           <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => push('ask', { prefill: 'Istanbul' })}>
             <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
-            <span className="col" style={{ gap: 0 }}><span className="h3">Istanbul</span><span className="tiny" style={{ color: '#c9c1b4' }}>Popular this month · 4h 15m</span></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">Istanbul</span><span className="tiny" style={{ color: '#c9c1b4' }}>4h 15m from Riyadh</span></span>
           </button>
         )}
         {known ? (

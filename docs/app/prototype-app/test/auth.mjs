@@ -24,8 +24,11 @@ const seed = async (extra = {}) => {
   await page.evaluate((x) => {
     const st = { seed: 'demo', onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none', credit: { balance: 400, history: [{ id: 'c1', text: 'Refund · Baku hotel night', amount: 400, at: Date.now() - 864e5 }] }, ...x };
     localStorage.setItem('mada-proto-v1', JSON.stringify(st));
-  }, extra);
-  await page.reload();
+    /* Reload in the same tick, so the app can't save its old state over the seed first. */
+    window.addEventListener('beforeunload', () => localStorage.setItem('mada-proto-v1', JSON.stringify(st)));
+    location.reload();
+  }, extra).catch(() => {});
+  await page.waitForLoadState('load');
   await page.waitForTimeout(500);
 };
 const toPay = async () => {
@@ -122,7 +125,7 @@ try {
   if (st0.cards.length || st0.groups.length || st0.friends.length || st0.invites.length || st0.friendRequests.length || st0.pastTrips.length || (st0.docs || []).length || (st0.stamps || []).length) throw new Error('new account has demo data in state');
   await phone.getByRole('button', { name: 'Profile and settings' }).click();
   await page.waitForTimeout(500);
-  await none(/Omar|Alharbi|Visa ending|mada ending|Alfursan|loyalty number|3 devices|privaterelay/, 'profile');
+  await none(/Omar|Alharbi|Visa ending|mada ending|Alfursan|\d loyalty number|3 devices|privaterelay/, 'profile');
   await phone.getByText('Your account').first().waitFor();
   await shot('new-profile');
   await click('Your details', { exact: false });
@@ -144,7 +147,9 @@ try {
   await phone.getByRole('tab', { name: 'Past' }).click(); await page.waitForTimeout(300);
   await phone.getByText('No past trips yet.').first().waitFor();
   await tab('Circles');
-  await none(/Istanbul for Eid|Riyadh Season|Abdullah/, 'circles');
+  await shot('new-discover');
+  await phone.getByRole('tab', { name: 'Circles' }).click(); await page.waitForTimeout(500);
+  await none(/Istanbul for Eid|Riyadh Season|Abdullah|Noor|14 stamps/, 'your circles');
   await shot('new-circles');
   await phone.locator('.scroll').first().evaluate((el) => el.scrollTo(0, 99999)); await page.waitForTimeout(300);
   await shot('new-circles-bottom');

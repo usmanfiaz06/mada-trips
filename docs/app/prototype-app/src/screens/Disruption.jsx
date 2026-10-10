@@ -7,24 +7,47 @@ import { DESK, DESK_TEL, PhoneIcon } from './Support.jsx';
    State this file owns: disruptionQueue (a choice made offline, sent when back online),
    disruptionVouchers (hotel and meal vouchers from a night cancellation, for the Wallet). */
 
+/* What comes back: what was charged for this trip, not a made-up figure. */
+export function tripRefundAmount(t) {
+  if (!t) return 0;
+  if (t.paid?.charged != null) return t.paid.charged;
+  if (Array.isArray(t.lines) && t.lines.length) return t.lines.reduce((a, l) => a + (l.price || 0), 0);
+  return (t.flightPrice || 0) + (t.stay?.status === 'booked' ? t.stay.price || 0 : 0) + (t.pickup?.price || 0);
+}
+
 function optionsFor(kind, t) {
   const flynas = FLIGHTS.find((f) => f.id === 'low');
   const saudia = FLIGHTS.find((f) => f.id === 'best');
   const city = t?.city || 'Istanbul';
   if (kind === 'night') return [
-    { id: 'morning', flight: saudia, title: 'Saudia SV261 · tomorrow', times: 'Leaves 07:15 · lands 11:30 at Istanbul', note: 'The first flight out. Same seats together. A hotel near the airport tonight, paid by the airline.', patch: { code: 'SV261', dep: '07:15', arr: '11:30', date: 'Tomorrow' } },
-    { id: 'xy', flight: flynas, title: 'flynas XY127 · tomorrow', times: 'Leaves 09:50 · lands 14:30 at Sabiha Gökçen', note: 'A longer sleep. Same hotel tonight. Your pickup moves with you.', patch: { ...flynas, code: 'XY127', dep: '09:50', arr: '14:30', to: 'SAW', date: 'Tomorrow' } },
-    { id: 'refund', title: 'Go home and get a refund', times: `SAR ${fmt(t?.flightPrice || 8640)} back to your card`, note: 'Your stay and pickup are cancelled for free too. The airline pays the taxi home.' },
+    { id: 'morning', flight: saudia, title: 'Saudia SV261 · tomorrow', times: 'Leaves 07:15 · lands 11:30 at Istanbul', note: 'The first flight out. Same seats together. A hotel near the airport tonight, paid by the airline.', patch: { code: 'SV261', dep: '07:15', arr: '11:30', nextDay: true } },
+    { id: 'xy', flight: flynas, title: 'flynas XY127 · tomorrow', times: 'Leaves 09:50 · lands 14:30 at Sabiha Gökçen', note: 'A longer sleep. Same hotel tonight. Your pickup moves with you.', patch: { ...flynas, code: 'XY127', dep: '09:50', arr: '14:30', to: 'SAW', nextDay: true } },
+    { id: 'refund', title: 'Go home and get a refund', times: `SAR ${fmt(tripRefundAmount(t))} back to your card`, note: 'Your stay and pickup are cancelled for free too. The airline pays the taxi home.' },
   ];
   if (kind === 'cancel') return [
     { id: 'next', flight: saudia, title: 'Saudia SV265 · direct', times: `Leaves 13:30 · lands 17:45 at ${city}`, note: 'Same seats together. No extra cost.', patch: { code: 'SV265', dep: '13:30', arr: '17:45' } },
     { id: 'xy', flight: flynas, title: 'flynas XY125 · direct', times: 'Leaves 10:25 · lands 15:05 at Sabiha Gökçen', note: 'Earlier. No extra cost to you. Your pickup moves with you.', patch: { ...flynas, code: 'XY125', dep: '10:25', arr: '15:05', to: 'SAW' } },
-    { id: 'refund', title: 'Get a refund instead', times: `SAR ${fmt(t?.flightPrice || 8640)} back to your card`, note: 'Your stay and pickup are cancelled for free too.' },
+    { id: 'refund', title: 'Get a refund instead', times: `SAR ${fmt(tripRefundAmount(t))} back to your card`, note: 'Your stay and pickup are cancelled for free too.' },
   ];
   return [
     { id: 'xy', flight: flynas, title: 'flynas XY125 · direct', times: 'Leaves 10:25 · lands 15:05 at Sabiha Gökçen', note: 'No extra cost to you. Your pickup moves with you.', patch: { ...flynas, code: 'XY125', dep: '10:25', arr: '15:05', to: 'SAW' } },
     { id: 'stay', flight: saudia, title: `Stay on ${t?.flight?.code || 'SV263'}`, times: 'Likely leaves 12:40 · lands 16:55', note: 'Same seats, same airport. You land 3 hours later.' },
   ];
+}
+
+/* Only the flight and times change. The trip's own date stays, or moves one day on for a night cancellation. */
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function rebook(flight, patch) {
+  const { nextDay, ...rest } = patch;
+  const out = { ...flight, ...rest };
+  if (nextDay && flight.dateISO) {
+    const d = new Date(flight.dateISO + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + 1);
+    out.dateISO = d.toISOString().slice(0, 10);
+    out.date = `${WD[d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`;
+  }
+  return out;
 }
 
 /* Applies a choice to the trip. Exported so a choice queued offline can be sent from anywhere once the phone reconnects. */
@@ -40,10 +63,10 @@ export function applyDisruptionChoice(set, { kind, pick }) {
       ],
     } : {};
     if (pick === 'refund') {
-      const amount = (t?.flightPrice || 0) + (t?.stay?.status === 'booked' ? t.stay.price : 0) + (t?.pickup?.price || 0);
-      return { disruptionQueue: null, refunds: [...p.refunds, { id: 'rf' + Date.now(), title: `${t?.flight?.code || 'Flight'} cancelled · flights, stay and pickup`, amount, stage: 0, airline: 'Saudia', card: 'Visa ending 41', created: Date.now() }], trip: null, phase: 'none' };
+      const amount = tripRefundAmount(t);
+      return { disruptionQueue: null, refunds: [...p.refunds, { id: 'rf' + Date.now(), title: `${t?.flight?.code || 'Flight'} cancelled · flights, stay and pickup`, amount, stage: 0, airline: t?.flight?.airline || 'Saudia', card: t?.paid?.card || 'your card', created: Date.now() }], trip: null, phase: 'none' };
     }
-    if (cur.patch && t) return { disruptionQueue: null, ...vouchers, trip: { ...t, rebooked: true, flight: { ...t.flight, ...cur.patch, date: cur.patch.date || t.flight.date || 'Tue 9 Mar' } }, phase: 'travelday' };
+    if (cur.patch && t) return { disruptionQueue: null, ...vouchers, trip: { ...t, rebooked: true, flight: rebook(t.flight, cur.patch) }, phase: 'travelday' };
     return { disruptionQueue: null, ...vouchers, phase: 'travelday' };
   });
 }
@@ -76,7 +99,7 @@ export default function Disruption({ params }) {
     buzz(HAPTIC.knock);
     setStage('working');
     setTimeout(() => {
-      if (cur.id === 'refund') setRefundAmount((t?.flightPrice || 0) + (t?.stay?.status === 'booked' ? t.stay.price : 0) + (t?.pickup?.price || 0));
+      if (cur.id === 'refund') setRefundAmount(tripRefundAmount(t));
       applyDisruptionChoice(set, { kind, pick: cur.id });
       setStage('done');
       buzz(HAPTIC.success);

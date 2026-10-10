@@ -17,7 +17,7 @@ export const FRIENDS = {
 const CONTACTS = ['maha', 'yousef', 'reem'];
 
 export const person = (id) => {
-  if (id === 'omar') return { short: 'You', name: 'You', initial: 'O', tone: 'green' };
+  if (id === 'omar') return { short: 'You', name: 'You', initial: PEOPLE.omar?.initial || 'Y', tone: 'green' };
   if (FRIENDS[id]) return FRIENDS[id];
   const p = PEOPLE[id];
   return p ? { short: p.name, name: p.full || p.name, initial: p.initial || p.name.charAt(0), tone: '', household: true } : { short: 'Someone', name: 'Someone', initial: '?', tone: '' };
@@ -260,7 +260,7 @@ export function NewCircle({ params = {} }) {
     const id = 'g' + Date.now();
     const dest = where.trim() ? where.trim().replace(/\b\w/g, (c) => c.toUpperCase()) : null;
     /* People are invited, not added: they're in once they say yes. */
-    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: trip === 'trip' ? 'Istanbul · 9–15 Mar' : trip === 'new' ? (dest || 'Somewhere new') : null, dest, muted: false, fresh: true };
+    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: trip === 'trip' ? `${s.trip?.city || 'Istanbul'} · ${s.trip?.dates || ''}` : trip === 'new' ? (dest || 'Somewhere new') : null, dest, muted: false, fresh: true };
     set((p) => ({ groups: [g, ...p.groups] }));
     buzz(HAPTIC.success);
     toast(picked.length ? `Circle made. Invite sent to ${names(picked)}.` : 'Circle made. Share the link to bring people in.');

@@ -33,7 +33,7 @@ function CitySheet({ current, onPick, onClose }) {
   const [q, setQ] = useState('');
   const groups = [
     ['Where you are', [['Riyadh', 'Here now']]],
-    ...(s.trip ? [['Your trips', [['Istanbul', '9–15 Mar']]]] : []),
+    ...(s.trip ? [['Your trips', [[s.trip.city || 'Istanbul', s.trip.dates || '']]]] : []),
     ['Worth a look', [['AlUla', 'A trip we’ve planned'], ...(s.trip ? [] : [['Istanbul', 'Popular this month']])]],
   ];
   const term = q.trim().toLowerCase();
@@ -1097,7 +1097,7 @@ function Discover({ posts, setPosts }) {
         </button>
       </h2>
       {picking && <CitySheet current={city} onPick={(c) => { setCity(c); setPicking(false); }} onClose={() => setPicking(false)} />}
-      {s.trip && city === 'Istanbul' && <span className="tiny" style={{ marginTop: -8 }}>While you're there, 9–15 Mar</span>}
+      {s.trip && city === 'Istanbul' && <span className="tiny" style={{ marginTop: -8 }}>While you're there, {s.trip.dates}</span>}
       <div className="chips scrollx" style={{ gap: 12 }}>
         {EVENTS[city].map((e, i) => (
           <button key={e.id} type="button" className="story" style={{ width: 236, minHeight: 300, flexShrink: 0, border: 0, padding: 0, textAlign: 'left' }} onClick={() => push('ask', { prefill: `${e.title} in ${city}` })}>

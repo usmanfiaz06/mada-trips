@@ -7,13 +7,16 @@ import { MEALS, ageBand } from './Account.jsx';
 /* What the traveller picked in Ask, as real dates. Flex on Eid moves the 9th to the 10th, the way Ask shows it. */
 export function searchDates(params) {
   const sr = params.search || {};
-  const month = MONTHS.includes(sr.month) ? sr.month : 'Mar';
-  const year = sr.year || TRIP_YEAR;
-  let dep = sr.dep ?? 9;
-  if (params.flex && month === 'Mar' && dep === 9) dep = 10;
   const oneway = sr.type === 'oneway';
-  const outISO = isoDate(year, month, dep);
-  const backISO = oneway ? null : isoDate(year, month, sr.ret ?? 15);
+  let outISO; let backISO;
+  if (sr.depISO) { outISO = sr.depISO; backISO = oneway ? null : sr.retISO || null; }
+  else {
+    const month = MONTHS.includes(sr.month) ? sr.month : 'Mar';
+    const year = sr.year || TRIP_YEAR;
+    outISO = isoDate(year, month, sr.dep ?? 9);
+    backISO = oneway ? null : isoDate(sr.retYear || year, MONTHS.includes(sr.retMonth) ? sr.retMonth : month, sr.ret ?? 15);
+  }
+  if (params.flex && !oneway && backISO && daysBetween(addDays(outISO, 1), backISO) > 0) outISO = addDays(outISO, 1);
   return { outISO, backISO, oneway, cabin: sr.cabin || 'Economy', infants: sr.infants || 0 };
 }
 /* Free to cancel until a week before the first night or flight. */
@@ -32,7 +35,7 @@ function useOrder(params, travellers) {
     const lines = [{ key: 'flight', icon: 'flight', text: `${n} ${n === 1 ? 'traveller' : 'travellers'} · ${f.airline}, direct${d.cabin !== 'Economy' ? ' · ' + d.cabin : ''}${d.oneway ? ' · one way' : ''}`, price: pp * n }];
     if (d.infants) lines.push({ key: 'infants', icon: 'flight', text: `${d.infants} ${d.infants === 1 ? 'baby' : 'babies'} on a lap`, price: Math.round(pp * 0.1) * d.infants });
     if (params.bundle) {
-      const b = bundleQuote(n, { ...sr, dep: Number(d.outISO.slice(8)), ret: d.backISO ? Number(d.backISO.slice(8)) : null });
+      const b = bundleQuote(n, { type: sr.type, nights: sr.nights || (d.backISO ? daysBetween(d.outISO, d.backISO) : 0) });
       lines.push({ key: 'stay', icon: 'stay', text: `${n > 2 ? 'Connecting rooms' : 'A room'} near Galata Tower · ${b.nights} nights`, price: b.stay, nights: b.nights });
       lines.push({ key: 'pickup', icon: 'car', text: d.oneway ? 'Airport pickups on the way there' : 'Airport pickup both ways', price: b.pickup });
     }
@@ -66,7 +69,7 @@ function useOrder(params, travellers) {
     const r = s.requests.find((x) => x.id === params.requestId);
     return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Mada', price: r?.quote || 0 }], rule: 'Refunded in full if we can’t deliver it.', agent: false, requestId: params.requestId, img: r?.trip || ['food', 'todo', 'car', 'hotel'].includes(r?.kind) ? (s.trip?.img || 'img/istanbul.jpg') : 'img/clouds.jpg' };
   }
-  if (params.kind === 'share') return { title: 'Your share of the cruise', lines: [{ icon: 'star', text: 'Bosphorus dinner cruise · Abdullah’s family', price: params.amount }], rule: 'Free to cancel until 48 hours before.', agent: false, img: 'img/istanbul.jpg' };
+  if (params.kind === 'share') return { title: params.title ? `Your share · ${params.title}` : 'Your share of the cruise', lines: [{ icon: 'star', text: params.title ? `${params.title}${params.payee ? ` · paid to ${params.payee}` : ''}` : 'Bosphorus dinner cruise · Abdullah’s family', price: params.amount }], rule: 'Free to cancel until 48 hours before.', agent: false, img: 'img/istanbul.jpg' };
   if (params.kind === 'change') return { title: 'Change your flight', lines: [{ icon: 'flight', text: params.label, price: params.amount }], rule: 'The new fare follows the same rules.', agent: true, img: s.trip?.img || 'img/istanbul.jpg' };
   return { title: 'Payment', lines: [], rule: '', agent: false, img: 'img/clouds.jpg' };
 }
@@ -88,7 +91,7 @@ export function prefsLine(s, travellers) {
   };
   const byMeal = {};
   travellers.forEach((id) => { const m = mealOf(id); if (m) (byMeal[m] = byMeal[m] || []).push(id); });
-  const name = (m) => ((MEALS.find((x) => x[0] === m) || [])[1] || m).toLowerCase();
+  const name = (m) => ((MEALS.find((x) => x[0] === m) || [])[1] || m).toLowerCase().replace(/ meal$/, '');
   const kinds = Object.keys(byMeal).sort((a, b) => byMeal[b].length - byMeal[a].length);
   kinds.forEach((m, i) => {
     const ids = byMeal[m];
@@ -167,9 +170,9 @@ export default function Pay({ params }) {
     }
     buzz(HAPTIC.success);
     if (params.kind === 'quote') set((p) => ({ requests: p.requests.map((r) => (r.id === params.requestId ? { ...r, status: 'paid' } : r)) }));
-    if (params.kind === 'share') set((p) => ({ circles: { ...p.circles, sharePaid: true } }));
+    if (params.kind === 'share') set((p) => ({ circles: { ...p.circles, sharePaid: true }, ...(params.circle ? { circlePay: { ...(p.circlePay || {}), [params.circle]: true } } : {}) }));
     pop();
-    toast(params.kind === 'esim' ? 'Done. The eSIMs install before you fly.' : params.kind === 'share' ? 'Paid. Abdullah sees it in the group.' : 'Paid. We’ll take it from here.');
+    toast(params.kind === 'esim' ? 'Done. The eSIMs install before you fly.' : params.kind === 'share' ? `Paid. ${params.payee || 'Abdullah'} sees it in the group.` : 'Paid. We’ll take it from here.');
   };
 
   return (

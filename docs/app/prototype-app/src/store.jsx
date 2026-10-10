@@ -199,7 +199,7 @@ export const stayEnd = (st) => (st?.fromISO ? addDays(st.fromISO, st.nights) : n
 
 /* Price of the rooms and pickups offered next to a flight. Ask and Pay both read this, so the numbers match. */
 export function bundleQuote(n, search = {}) {
-  const nights = search.type !== 'oneway' && search.dep && search.ret ? Math.max(1, search.ret - search.dep) : STAY_NIGHTS;
+  const nights = search.nights ? search.nights : search.type !== 'oneway' && search.dep && search.ret ? Math.max(1, search.ret - search.dep) : STAY_NIGHTS;
   const stay = Math.round(HOTELS[0].night * nights * (n > 2 ? 1 : 0.55));
   const pickup = search.type === 'oneway' ? PICKUP / 2 : PICKUP;
   return { nights, stay, pickup, total: stay + pickup };

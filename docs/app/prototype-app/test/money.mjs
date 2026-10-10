@@ -24,8 +24,11 @@ const seed = async (extra = {}) => {
   await page.evaluate((x) => {
     const st = { seed: 'demo', onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none', credit: { balance: 400, history: [{ id: 'c1', text: 'Refund · Baku hotel night', amount: 400, at: Date.now() - 864e5 }] }, ...x };
     localStorage.setItem('mada-proto-v1', JSON.stringify(st));
-  }, extra);
-  await page.reload();
+    /* Reload in the same tick, so the app can't save its old state over the seed first. */
+    window.addEventListener('beforeunload', () => localStorage.setItem('mada-proto-v1', JSON.stringify(st)));
+    location.reload();
+  }, extra).catch(() => {});
+  await page.waitForLoadState('load');
   await page.waitForTimeout(500);
 };
 const toPay = async () => {
@@ -149,6 +152,71 @@ try {
   await phone.locator('.credit-card').click();
   await page.waitForTimeout(400);
   await shot('credit-sheet');
+
+  step('one way, business, June: the booking keeps exactly what was chosen');
+  const see = async (re, what) => { if (!(await phone.getByText(re).count())) throw new Error('missing: ' + what + ' ' + re); };
+  const notSee = async (re, what) => { if (await phone.getByText(re).count()) throw new Error('should not show: ' + what + ' ' + re); };
+  await seed();
+  await click('Flights');
+  await click('Istanbul');
+  await click('I’ll pick dates');
+  await phone.getByRole('radio', { name: 'One way' }).click();
+  await phone.locator('.cal-months button', { hasText: /^Jun/ }).click();
+  await page.waitForTimeout(200);
+  await phone.locator('.cal-d', { hasText: /^20$/ }).click();
+  await phone.getByRole('radio', { name: 'Business' }).click();
+  await click('Search', { wait: 400 });
+  await click('These 4', { wait: 2800 });
+  await phone.getByRole('button', { name: /^Review · SAR/ }).last().click();
+  await page.waitForTimeout(700);
+  await see(/Istanbul · 20 Jun/, 'pay title');
+  await see(/Business · one way/, 'cabin and one way on the line');
+  await see(/15,208/, '4 × SAR 3,802');
+  await notSee(/Free to cancel until 2 Mar/, 'March rule on a June trip');
+  await notSee(/halal meals, seats together$/, 'fixed preference copy');
+  await shot('oneway-business-pay');
+  await slide();
+  await page.waitForTimeout(1500);
+  await page.waitForTimeout(5000);
+  await click('See the trip', { wait: 700 });
+  await see(/One way · Sun 20 Jun/, 'trip keeps the date, one way');
+  await see(/Business/, 'trip keeps the cabin');
+  await notSee(/^Back · /, 'no way back');
+  await notSee(/Tue 9 Mar|9–15 Mar/, 'March dates');
+  await shot('oneway-trip');
+  await phone.locator('.scroll').last().evaluate((el) => el.scrollTo(0, 500)); await page.waitForTimeout(300);
+  await phone.getByRole('button', { name: /^Payments and invoices/ }).click(); await page.waitForTimeout(500);
+  await see(/SAR 15,208/, 'payments total is what was paid');
+  await notSee(/Tabby|Next payment/, 'no Tabby when paid in full');
+  await shot('oneway-payments');
+  await phone.locator('.tm-pay', { hasText: 'Flights' }).click(); await page.waitForTimeout(500);
+  await see(/one way, Business/, 'invoice line');
+  await see(/and SAR 400 Mada credit/, 'credit on the invoice');
+  await notSee(/14 Feb 2027/, 'demo invoice date');
+  await see(new RegExp(new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).replace(/ (\w{3}) /, ' $1 ')), 'booked today');
+  await shot('oneway-invoice');
+
+  step('invoice for a company: checked, issued, then locked');
+  await phone.getByRole('button', { name: /^Invoice for a company/ }).click(); await page.waitForTimeout(400);
+  await phone.locator('#co-name').fill('Alharbi Trading Co.');
+  await phone.locator('#co-vat').fill('123456789012345');
+  await phone.locator('#co-cr').fill('1010');
+  await phone.locator('#co-address').fill('Olaya St, Riyadh');
+  await click('Save company details');
+  await see(/starts and ends with 3/, 'VAT rule');
+  await see(/A CR number has 10 digits/, 'CR rule');
+  await shot('company-errors');
+  await phone.locator('#co-vat').fill('300123456700003');
+  await phone.locator('#co-cr').fill('1010123456');
+  await phone.locator('#co-address').fill('King Fahd Rd, Al Olaya, Riyadh 12214');
+  await click('Save company details', { wait: 500 });
+  await see(/Tax invoice · draft/, 'draft tax invoice');
+  await see(/300123456700003/, 'buyer VAT on the invoice');
+  await shot('company-draft');
+  await click('Issue the tax invoice', { wait: 500 });
+  await see(/Ask Faisal to reissue/, 'locked after issue');
+  if (await phone.getByRole('button', { name: 'Edit company details' }).count()) throw new Error('issued invoice still editable');
+  await shot('company-issued');
 } catch (e) {
   errors.push('flow: ' + e.message.split('\n')[0]);
   console.log('FIRST ERROR:', e.message.slice(0, 500));

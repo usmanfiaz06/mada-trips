@@ -15,3 +15,5 @@
 .dz-rights b { color: var(--green); font-weight: 600; }
 .dz-callrow { gap: 8px; text-decoration: none; }
 .dz-act { left: 0; right: 0; bottom: 0; padding: 22px 20px 28px; background: linear-gradient(to bottom, rgba(233,226,216,0), var(--sand) 22px); }
+/* The global offline bar is about 38px tall; drop banners below it on these screens. */
+.app:has(.dz.is-offline) .banner, .app:has(.ask.is-offline) .banner, .app:has(.support.is-offline) .banner { top: 46px; }

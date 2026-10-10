@@ -8,7 +8,7 @@ import Today from './screens/Today.jsx';
 import Ask from './screens/Ask.jsx';
 import Pay, { Waiting, commitBooking } from './screens/Pay.jsx';
 import Trips, { TripDetail } from './screens/Trips.jsx';
-import Disruption from './screens/Disruption.jsx';
+import Disruption, { applyDisruptionChoice } from './screens/Disruption.jsx';
 import Wallet from './screens/Wallet.jsx';
 import Circles, { Group } from './screens/Circles.jsx';
 import Profile from './screens/Profile.jsx';
@@ -27,6 +27,7 @@ function useBackgroundProgress() {
   useEffect(() => {
     if (prevOffline.current && !s.demo.offline) {
       set((p) => ({ requests: p.requests.map((r) => (r.status === 'queued' ? { ...r, status: 'sent', created: Date.now() } : r)) }));
+      if (s.disruptionQueue) { applyDisruptionChoice(set, s.disruptionQueue); setTimeout(() => banner({ title: 'Your choice reached Faisal', body: 'Sent now you’re back online. He’s confirming it with the airline.', to: { tab: 'today' } }), 0); }
     }
     prevOffline.current = s.demo.offline;
   }, [s.demo.offline]);
@@ -157,6 +158,7 @@ function Demo() {
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setTimeout(() => set({ pendingInvite: 'ist-8k2' }), 0); setOpen(false); }}>Invite link, new to Mada</button>
             <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'ist-8k2' }), 50); setOpen(false); }}>Invite link, signed in</button>
             <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'old-4q1' }), 50); setOpen(false); }}>Expired invite link</button>
+            <button type="button" className="demo-btn" onClick={() => { jump('cancelled'); setTimeout(() => window.__madaPush('disruption', { kind: 'night' }), 700); setOpen(false); }}>Cancelled at night</button>
           </div>
         </div>
         <div className="col" style={{ gap: 8 }}>

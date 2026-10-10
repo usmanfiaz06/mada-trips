@@ -74,6 +74,7 @@ try {
   step('day before');
   await demo('Day before');
   await expect(has('Tomorrow · 09:40'), 'day-before countdown says Tomorrow');
+  await expect(has('Monday 8 Mar'), 'header date is the day before the flight, not the phone’s date');
   await expect(!(await has('weeks')), 'no weeks countdown on the day before');
   await shotAll('daybefore');
   await scrollTo(0);
@@ -110,6 +111,7 @@ try {
   await demo('Travel day');
   await page.waitForTimeout(6600);
   await expect(has('Khalid at 06:45'), 'travel day uses the moved pickup');
+  await expect(has('Tuesday 9 Mar'), 'header date is the travel day');
   await shotAll('travelday');
 
   step('delay predicted');

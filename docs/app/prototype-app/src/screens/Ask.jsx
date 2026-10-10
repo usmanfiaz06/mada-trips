@@ -55,7 +55,7 @@ const REQUEST_KINDS = {
 };
 
 const CITY_WORDS = [
-  ['istanbul', /istanbul|türkiye|turkiye|turkey/],
+  ['istanbul', /istanbul|t\u00fcrkiye|turkiye|turkey/],
   ['dubai', /dubai/],
   ['cairo', /cairo/],
   ['london', /london/],
@@ -146,7 +146,7 @@ export function parseDetails(text, s) {
   /* dates */
   let dep = null;
   let ret = null;
-  let m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:-|–|to|until|till)\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MRE})\\b`));
+  let m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:-|\\u2013|to|until|till)\\s*(\\d{1,2})(?:st|nd|rd|th)?\\s+(${MRE})\\b`));
   if (m) {
     dep = upcoming(+m[1], mIdx(m[3]));
     if (dep) { const r = new Date(dep.getFullYear(), dep.getMonth(), +m[2]); if (r > dep) ret = r; }
@@ -247,13 +247,14 @@ const RULES = {
 const NAT = { SAU: 'Saudi', PHL: 'Philippine' };
 const IQAMA = { lina: '2027-03-12' };
 
-function natOf(id) {
+function natOf(id, s) {
   const p = PEOPLE[id];
   if (p?.nationality) return p.nationality;
+  if (p?.role === 'You' || p?.self) { const n = s?.user?.passport?.nationality; if (n && !/saudi/i.test(n)) return n.slice(0, 3).toUpperCase(); }
   const mrz = MRZ[id];
-  if (!mrz) return 'SAU';
-  if (p?.helper && mrz[1] === 'Not scanned yet') return null;
-  return mrz[0].slice(2, 5);
+  const code = mrz?.[0]?.slice(2, 5) || '';
+  if (p?.helper && (!mrz || mrz[1] === 'Not scanned yet' || code.length < 3)) return null;
+  return code.length === 3 && !code.includes('<') ? code : 'SAU';
 }
 
 /* Everything that could stop someone boarding, worked out before anyone pays. */
@@ -267,7 +268,7 @@ function entryChecks(s, who, destKey, dep, ret) {
   who.forEach((id) => {
     const p = PEOPLE[id];
     if (!p) return;
-    const nat = natOf(id);
+    const nat = natOf(id, s);
     if (c === 'TR') {
       const pi = passportIssue(s, id);
       if (pi?.blocking) out.push({ id, p, key: 'passport', blocking: true, thing: 'passport', title: `${p.name} can't travel on this passport.`, text: pi.text });
@@ -296,7 +297,7 @@ function entryChecks(s, who, destKey, dep, ret) {
       }
     }
   });
-  if (rule.SAU?.eta && who.some((id) => natOf(id) === 'SAU')) {
+  if (rule.SAU?.eta && who.some((id) => natOf(id, s) === 'SAU')) {
     const k = `eta:${c}`;
     out.unshift(ans[k]
       ? { id: 'eta', key: 'eta', blocking: false, done: true, text: 'Faisal is applying for everyone’s UK ETA. We check them before you fly.' }
@@ -314,7 +315,7 @@ function EntryChecks({ checks, who, setWho, destKey, dep, ret }) {
   const answer = (k, v) => set((p) => ({ askEntry: { ...(p.askEntry || {}), [k]: v } }));
   const ask = (k, r) => { set((p) => ({ askEntry: { ...(p.askEntry || {}), [k]: 'asked' }, requests: [...p.requests, newRequest(s, r)] })); buzz(HAPTIC.success); };
   const range = rangeLabel(dep, ret);
-  const nats = [...new Set(who.map(natOf).filter(Boolean))].map((n) => NAT[n] || n);
+  const nats = [...new Set(who.map((id) => natOf(id, s)).filter(Boolean))].map((n) => NAT[n] || n);
   const without = (id) => { setWho(who.filter((x) => x !== id)); buzz(HAPTIC.select); };
   if (!dest) return null;
   return (
@@ -340,7 +341,7 @@ function EntryChecks({ checks, who, setWho, destKey, dep, ret }) {
               <span className="h3">{c.title}</span>
               <span className="small">{c.text}</span>
               <div className="row" style={{ marginTop: 6, flexWrap: 'wrap', gap: 8 }}>
-                {c.key === 'visa' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: c.need, title: `${c.need} for ${c.p.name}`, detail: `For ${dest.name}, ${range} · ${NAT[natOf(c.id)] || ''} passport`, quote: 350 })}>Ask Faisal to get it</button>}
+                {c.key === 'visa' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: c.need, title: `${c.need} for ${c.p.name}`, detail: `For ${dest.name}, ${range} · ${NAT[natOf(c.id, s)] || ''} passport`, quote: 350 })}>Ask Faisal to get it</button>}
                 {c.key === 'reentry' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: 'exit and re-entry visa', title: `Exit and re-entry visa for ${c.p.name}`, detail: `Single, valid 90 days · covers ${range}`, quote: 200 })}>Ask Faisal to arrange the exit and re-entry visa</button>}
                 {c.key === 'reentry' && <button type="button" className="btn secondary small" onClick={() => answer(c.ansKey, 'has')}>{c.p.name} already has one</button>}
                 {c.key === 'iqama' && <button type="button" className="btn secondary small" onClick={() => answer(`${c.id}:iqama`, iso(addDays(fromIso(ret || dep), 365)))}>It’s been renewed</button>}

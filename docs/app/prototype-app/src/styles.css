@@ -335,3 +335,4 @@ h1, h2, h3 { text-wrap: balance; }
 .friend-chip { border: 0; background: none; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 64px; flex-shrink: 0; }
 .going-dot { position: absolute; right: 1px; bottom: 1px; width: 14px; height: 14px; border-radius: 99px; background: #d9b77a; border: 2.5px solid var(--sand); }
 .sheet .btn.secondary { background: var(--mist); }
+.app:has(.offline) .banner { top: 46px; }

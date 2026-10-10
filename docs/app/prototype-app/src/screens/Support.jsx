@@ -46,7 +46,7 @@ export function Support({ params = {} }) {
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
   const tripName = s.trip ? `${s.trip.city || 'Istanbul'} trip` : null;
-  const about = params.about || (s.trip ? `${tripName} · ${s.trip.dates || ''}`.replace(/ · $/, '') : 'Your account');
+  const about = params.about || (s.trip ? `${tripName} · ${s.trip.dates || ''}`.replace(/ \u00b7 $/, '') : 'Your account');
   const add = (m) => set((p) => ({ support: [...(p.support || []), { id: 'm' + Date.now() + Math.random(), at: Date.now(), ...m }] }));
   const say = (m, ms = 1500) => {
     setTyping(true);

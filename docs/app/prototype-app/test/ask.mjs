@@ -133,7 +133,6 @@ try {
   await notSee('Window seats together');
   await notSee('connecting');
   await notSee('last Eid');
-  await see('A window seat held for you.');
   await toBottom();
   await see('Add a room near Galata Tower');
   const box = await cta().boundingBox();

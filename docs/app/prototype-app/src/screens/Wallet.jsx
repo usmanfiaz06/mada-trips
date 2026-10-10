@@ -186,6 +186,17 @@ function Unlocked() {
           <div className="card well"><span className="h3" style={{ fontSize: 15 }}>{s.trip ? 'Boarding passes' : 'Nothing booked yet'}</span><span className="tiny">{s.trip?.flight ? `For ${s.trip.flight.code} on ${s.trip.flight.date}${s.trip.flight.back ? ` and ${s.trip.flight.back} on ${s.trip.flight.backDate}` : ''}. They open at check-in, 24 hours before you fly.` : s.trip ? 'No flights on this trip.' : 'Tickets and vouchers land here as soon as they’re confirmed.'}</span></div>
         )}
 
+        {(s.disruptionVouchers || []).length > 0 && (<>
+          <span className="eyebrow">Vouchers from the airline</span>
+          {s.disruptionVouchers.map((v) => (
+            <div key={v.id} className="card" style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Icon name={v.kind === 'hotel' ? 'stay' : 'food'} />
+              <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{v.title}</span><span className="tiny">{v.body}</span></span>
+              <span className="num tiny" style={{ fontWeight: 700, color: '#1e352d', letterSpacing: '.04em' }}>{v.code}</span>
+            </div>
+          ))}
+        </>)}
+
         <span className="eyebrow">Money</span>
         <button type="button" className="credit-card" onClick={() => setMoney('credit')}>
           <span className="spread"><span className="eyebrow" style={{ color: '#d9b77a' }}>Mada credit</span><PayMark brand="credit" size={22} /></span>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { RequestThread, QuoteBreakdown } from './Ask.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
 import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
@@ -174,12 +175,15 @@ function Requests() {
               <div className="card well" style={{ gap: 8 }}>
                 <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
                 <span className="small" style={{ color: '#1e352d' }}>{quoteText(r)}</span>
+                <QuoteBreakdown r={r} />
                 {r.quote > 0
                   ? <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('pay', { kind: 'quote', requestId: r.id })}>Pay SAR {fmt(r.quote)}</button>
                   : <span className="tiny">No charge from Mada.</span>}
               </div>
             )}
+            {r.note && <span className="small" style={{ color: '#3f4f48' }}>“{r.note}”</span>}
             {r.status === 'queued' && <span className="tiny">Saved on this phone. Sends when you're back online.</span>}
+            {['quote', 'reviewing', 'paid', 'done'].includes(r.status) && <RequestThread requestId={r.id} />}
           </div>
         );
       })}
