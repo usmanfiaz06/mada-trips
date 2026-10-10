@@ -3,7 +3,7 @@
 //   ocr/tesseract.min.js           browser API (window.Tesseract)
 //   ocr/worker.min.js              web worker
 //   ocr/tesseract-core-simd-lstm.js + .wasm   OCR engine
-//   ocr/eng.traineddata.gz         English "fast" model
+//   ocr/eng-traineddata.b64.txt    English "fast" model, gzipped then base64 (the host serves text, not binary)
 import { findMrz } from './mrz.js';
 
 export const MAX_BYTES = 10 * 1024 * 1024;
@@ -30,12 +30,19 @@ function getWorker() {
     workerPromise = (async () => {
       if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') throw new Error('This browser can’t read passports');
       await loadScript(abs('tesseract.min.js'));
+      const b64 = (await (await fetch(abs('eng-traineddata.b64.txt'))).text()).trim();
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      const model = URL.createObjectURL(new Blob([bytes]));
       const worker = await window.Tesseract.createWorker('eng', 1, {
+        // Tesseract fetches `${langPath}/eng.traineddata`; the # keeps that pointing at our blob.
+        langPath: model + '#',
+        gzip: false,
+        cacheMethod: 'none',
         workerPath: abs('worker.min.js'),
         corePath: abs('tesseract-core-simd-lstm.js'),
-        langPath: new URL(BASE, document.baseURI).href.replace(/\/$/, ''),
         workerBlobURL: false,
-        gzip: true,
         logger: (m) => { if (listener) listener(m); },
       });
       await worker.setParameters({

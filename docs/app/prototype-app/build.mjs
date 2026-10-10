@@ -33,6 +33,7 @@ for (const [from, to] of [
   ['node_modules/tesseract.js/dist/worker.min.js', 'worker.min.js'],
   ['node_modules/tesseract.js-core/tesseract-core-simd-lstm.js', 'tesseract-core-simd-lstm.js'],
   ['node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm', 'tesseract-core-simd-lstm.wasm'],
-  ['ocr-assets/eng.traineddata.gz', 'eng.traineddata.gz'],
 ]) cpSync(from, 'dist/ocr/' + to);
+// The model ships as base64 text: the host serves plain text, not .gz or binary.
+writeFileSync('dist/ocr/eng-traineddata.b64.txt', readFileSync('ocr-assets/eng.traineddata.gz').toString('base64'));
 console.log('built dist/index.html', Math.round(html.length / 1024) + ' KB');
