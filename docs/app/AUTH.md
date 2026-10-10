@@ -145,3 +145,33 @@ No Supabase project is needed to develop, test or take screenshots.
 
 - **Account deletion** clears the Supabase link on our side (`supabase_user_id`, providers). Deleting the Supabase user too needs the service-role key on the platform (`auth.admin.deleteUser`); add it with the deletion job.
 - Supabase has no Saudi region. Only phone numbers and email addresses are stored there; confirm with counsel that this fits PDPL (INTEGRATIONS.md 0.10).
+
+---
+
+## 8. Going live on Mada's existing Supabase project
+
+Mada already runs a Supabase project, so sign-in goes into that one: no new project, and the people who can see Mada's data stay the same. Do it in three passes; each ends with a check that proves it works before the next starts.
+
+**Pass 1: email codes (the beta can start on this alone)**
+1. *Authentication › Sign In / Providers › Email*: on, *Confirm email* on, *Secure email change* off, code length 6, expiry 600 s.
+2. *Authentication › Emails › SMTP Settings*: **custom SMTP is required**. Supabase's built-in mailer only sends to the project's own team members and a handful an hour, so travellers would never get a code. Use the mailbox provider behind `madatrips.sa` (Google Workspace, Microsoft 365 or Zoho all give SMTP details) or Amazon SES. Sender `no-reply@madatrips.sa`, name *Mada Trips*.
+3. DNS for `madatrips.sa`: SPF and DKIM for that sender, and a DMARC record (`p=none` to start). Without them codes land in junk.
+4. *Emails › Templates* (Magic link, Confirm signup, Change email address): replace the link with the code, in English and Arabic:
+   `{{ .Token }} is your Mada Trips code. It expires in 10 minutes. Never share it.`
+   `رمزك في مادا: {{ .Token }}. صالح لعشر دقائق. لا تشاركه مع أحد.`
+5. *URL Configuration*, *Rate limits*, *JWT Keys*: as §2.5 to §2.7.
+6. Keys into the environment settings (never in chat or git): platform `SUPABASE_URL`, plus `SUPABASE_JWT_SECRET` only if the project is on legacy keys; app `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. For removing a deleted account from Supabase, `SUPABASE_SERVICE_ROLE_KEY` on the platform only.
+
+*Check:* a code reaches a Gmail, an Outlook and a madatrips.sa inbox within a minute and not in junk; the code signs in on a test build; a wrong code shows the friendly error; a sixth try is slowed down; the Core API's `/auth/session` creates the account once, and signing in again finds the same one.
+
+**Pass 2: phone codes**
+1. Register the sender "MadaTrips" with CST through Unifonic or Taqnyat (§5); their OTP template in both languages.
+2. *Providers › Phone*: on, no SMS provider. *Hooks › Send SMS*: HTTPS, `https://<ops domain>/api/app/v1/auth/sms-hook`, generate the secret, put it in the platform's `SUPABASE_SMS_HOOK_SECRET`.
+
+*Check:* codes arrive on STC, Mobily and Zain numbers within 30 seconds, from "MadaTrips", in the phone's language; an email account verifies its phone in Profile; booking stays blocked until it does; the hook refuses a call without the right signature.
+
+**Pass 3: Apple and Google** (needs the developer accounts, §3 and §4)
+
+*Check:* each signs in on a real iPhone and Android build; Apple's *Hide my email* still gets receipts; adding and removing them in Profile › Sign-in methods works; a Google account with the same verified email as an existing account links to it instead of making a second one.
+
+**Before inviting testers:** deleting a test account removes it from both our database and Supabase; logs show no codes or tokens; `APP_ALLOW_MOCKS` and `APP_LEGACY_AUTH` are unset on production.
