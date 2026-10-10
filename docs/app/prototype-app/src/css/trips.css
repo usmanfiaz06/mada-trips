@@ -112,3 +112,5 @@ a.btn { text-decoration: none; box-sizing: border-box; }
   .tm-invoice, .tm-invoice * { visibility: visible !important; }
   .tm-invoice { position: fixed !important; left: 0; top: 0; width: 100%; box-shadow: none !important; border-radius: 0; animation: none !important; }
 }
+.tm-add { height: 34px; padding: 0 14px; font-size: 13px; background: var(--green); color: var(--mist); flex-shrink: 0; gap: 4px; }
+.tm-add.on { background: rgba(47, 122, 75, .12); color: var(--ok); }

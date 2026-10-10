@@ -3,7 +3,7 @@
 import { chromium } from 'playwright-core';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 const OUT = process.argv[2] || 'test/shots-trips';
 mkdirSync(OUT, { recursive: true });
@@ -67,12 +67,15 @@ try {
   await shot('itinerary-idea-sheet');
   await closeSheet();
   await click('Add to calendar');
-  const href = await phone.locator('a[download]').getAttribute('href');
-  if (!href || !href.startsWith('blob:')) throw new Error('no calendar blob link');
-  const ics = await page.evaluate(async (u) => (await fetch(u)).text(), href);
+  const links = await phone.locator('a.tm-add').evaluateAll((els) => els.map((e) => [e.href, e.target]));
+  if (links.length < 6 || !links.every(([h, tgt]) => h.startsWith('https://calendar.google.com/') && tgt === '_blank')) throw new Error('calendar links wrong');
+  if (!links.some(([h]) => h.includes('dates=20270309T064000Z/'))) throw new Error('flight time not in UTC');
+  const dlIcs = page.waitForEvent('download', { timeout: 3000 });
+  await click('Add all as a file');
+  const icsFile = await dlIcs;
+  const ics = readFileSync(await icsFile.path(), 'utf8');
   if (!/BEGIN:VCALENDAR/.test(ics) || (ics.match(/BEGIN:VEVENT/g) || []).length < 6) throw new Error('bad ics');
-  if (!/DTSTART:20270309T064000Z/.test(ics)) throw new Error('flight time not in UTC in ics');
-  await click('See them as a list');
+  await expectText(/Saved\. Open it/, 'ics saved');
   await shot('itinerary-calendar');
   await closeSheet();
   await click('Share the itinerary');
@@ -98,12 +101,10 @@ try {
   await expectText(/310245678900003/, 'VAT number');
   await shot('invoice-flight');
   await phone.locator('.tm-pay').count();
-  await click('Share PDF');
-  if (await page.evaluate(() => window.__printed) !== 1) throw new Error('print not called');
-  await click('Email it to me');
   const dl = page.waitForEvent('download', { timeout: 3000 });
-  await click('Save as a file');
+  await click('Share PDF');
   const file = await dl; if (!/MT-27-004181\.html$/.test(file.suggestedFilename())) throw new Error('bad invoice filename');
+  await click('Email it to me');
   await back();
   await phone.locator('.tm-pay', { hasText: 'Rooms near Galata' }).click();
   await page.waitForTimeout(500);

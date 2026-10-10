@@ -345,7 +345,7 @@ export function commitBooking(set, params) {
       t.flight = { ...f, date: params.flex ? 'Wed 10 Mar' : 'Tue 9 Mar', backDep: '15:10', backArr: '19:20', backDate: 'Mon 15 Mar' };
       t.flightPrice = f.pp * params.travellers.length;
       if (!params.bundle) { t.stay = null; t.pickup = null; }
-      return { trip: { ...t, ref: params.ref }, phase: 'booked' };
+      return { trip: { ...t, ref: params.ref, payPlan: params.plan || 'full' }, phase: 'booked' };
     });
   } else if (params.kind === 'stay') {
     set((p) => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, fmt } from '../store.jsx';
-import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTicker, PayMark } from '../ui.jsx';
+import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTicker, PayMark, saveFile, calendarLink } from '../ui.jsx';
 
 /* Trip management: itinerary, payments and VAT invoices, refunds, flight changes, hotel options and special requests.
    State this area owns: tripRequests (requests to Faisal with a live status), tripChangeLog (flight changes sent to pay).
@@ -407,7 +407,7 @@ function buildIcs(days) {
   const evs = [];
   days.forEach((day) => day.items.filter((i) => i.time && i.kind !== 'idea').forEach((i) => {
     const mins = i.kind === 'flight' ? 255 : i.kind === 'pickup' ? 45 : 90;
-    evs.push({ uid: `${i.id}-${day.d}@madatrips.sa`, start: stamp(day.d, i.time), end: stamp(day.d, addMin(i.time, mins)), title: i.title, desc: i.sub || '', day: day.d, time: i.time });
+    evs.push({ where: i.kind === 'flight' ? (i.leg === 'back' ? 'Istanbul Airport' : 'King Khalid International Airport, Riyadh') : i.kind === 'hotel' ? 'Galip Dede Cd. 12, Beyoğlu, İstanbul' : '', uid: `${i.id}-${day.d}@madatrips.sa`, start: stamp(day.d, i.time), end: stamp(day.d, addMin(i.time, mins)), title: i.title, desc: i.sub || '', day: day.d, time: i.time });
   }));
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mada Trips//Itinerary//EN', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Istanbul with Mada'];
   evs.forEach((e) => lines.push('BEGIN:VEVENT', `UID:${e.uid}`, 'DTSTAMP:20270214T074200Z', `DTSTART:${e.start}`, `DTEND:${e.end}`, `SUMMARY:${esc(e.title)}`, `DESCRIPTION:${esc(e.desc)}`, 'END:VEVENT'));
@@ -559,21 +559,33 @@ function ShareSheet({ onClose }) {
 
 function CalendarSheet({ days, onClose }) {
   const ics = useMemo(() => buildIcs(days), [days]);
-  const url = useMemo(() => { try { return URL.createObjectURL(new Blob([ics.text], { type: 'text/calendar' })); } catch (e) { return null; } }, [ics.text]);
-  useEffect(() => () => { try { if (url) URL.revokeObjectURL(url); } catch (e) { /* ignore */ } }, [url]);
-  const [list, setList] = useState(!url);
+  const [fileState, setFileState] = useState(null);
+  const [added, setAdded] = useState([]);
+  /* The moments worth a reminder: flights, pickups and check-in. Each opens in the calendar, one by one. */
+  const key = ics.events.filter((e) => /SV|XY|TK|picks you up|meets you|takes you|Check in/.test(e.title));
+  const all = async () => {
+    buzz(HAPTIC.tap);
+    const r = await saveFile('Istanbul-with-Mada.ics', ics.text);
+    setFileState(r);
+    if (r === 'saved') buzz(HAPTIC.success);
+  };
   return (
     <Sheet label="Add to calendar" onClose={onClose}>
       <h2 className="h2">Add to your calendar</h2>
-      <p className="small" style={{ marginTop: -8 }}>{ics.events.length} events: flights, pickups and check-ins. Free-day ideas stay out.</p>
-      {url ? <a className="btn primary block" href={url} download="Istanbul-with-Mada.ics" onClick={() => buzz(HAPTIC.success)}><Icon name="bell" color="#f6f2ec" size={20} />Download the calendar file</a>
-        : <div className="notice warn"><span className="grow"><span className="h3">Your browser blocked the file.</span><span className="small">Here are the times to add yourself.</span></span></div>}
-      <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setList(!list)}>{list ? 'Hide the list' : 'See them as a list'}</button>
-      {list && (
-        <div className="col tm-evlist" style={{ gap: 0 }}>
-          {ics.events.map((e) => <div key={e.uid} className="spread tm-evrow"><span className="small" style={{ color: '#1e352d' }}>{e.title}</span><span className="tiny num">{dayLabel(e.day)} · {e.time}</span></div>)}
-        </div>
-      )}
+      <p className="small" style={{ marginTop: -8 }}>The {key.length} moments that matter. Free-day ideas stay out.</p>
+      <div className="col tm-evlist" style={{ gap: 0 }}>
+        {key.map((e) => (
+          <div key={e.uid} className="spread tm-evrow" style={{ alignItems: 'center' }}>
+            <span className="col grow" style={{ gap: 1 }}><span className="small" style={{ color: '#1e352d', fontWeight: 600 }}>{e.title}</span><span className="tiny num">{dayLabel(e.day)} · {e.time}</span></span>
+            <a className={'btn small tm-add' + (added.includes(e.uid) ? ' on' : '')} href={calendarLink({ title: e.title, start: e.start, end: e.end, details: e.desc, location: e.where || '' })} target="_blank" rel="noopener noreferrer" aria-label={`Add ${e.title} to your calendar`} onClick={() => { buzz(HAPTIC.tap); setAdded((a) => [...a, e.uid]); }}>
+              {added.includes(e.uid) ? <><Icon name="check" size={16} width={2.4} />Added</> : 'Add'}
+            </a>
+          </div>
+        ))}
+      </div>
+      <button type="button" className="btn secondary block" onClick={all}>Add all as a file</button>
+      {fileState === 'saved' && <span className="small" style={{ color: '#2f7a4b', fontWeight: 600 }}>Saved. Open it and your calendar adds all {ics.events.length}.</span>}
+      {fileState && fileState !== 'saved' && <div className="notice warn"><span className="grow"><span className="small" style={{ color: '#1e352d' }}>Your calendar app can’t take a file here. Add them one by one above.</span></span></div>}
     </Sheet>
   );
 }
@@ -685,26 +697,18 @@ function Invoice({ params }) {
   const vat = lines.reduce((a, l) => a + l.vat, 0);
   const no = isCredit ? p.no.replace('MT-', 'CN-') : p.no;
   const doc = { kind: isCredit ? 'Credit note' : 'Simplified tax invoice', no, date: isCredit ? 'Today' : `${p.date} ${p.time}`, buyer, lines, total, vat, sign: isCredit ? '−' : '' };
-  const print = () => {
+  /* The file is the main path; printing to PDF is the fallback where files can't be handed over. */
+  const share = async () => {
     buzz(HAPTIC.tap);
-    try { window.print(); toast('Choose “Save as PDF” to keep a copy.'); } catch (e) { download(); }
-  };
-  const download = () => {
-    try {
-      const url = URL.createObjectURL(new Blob([invoiceHtml(doc)], { type: 'text/html' }));
-      const a = document.createElement('a'); a.href = url; a.download = `${no}.html`; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast('Saved. Open it and print to PDF.');
-    } catch (e) { toast('Your browser blocked the file. Email it to yourself instead.'); }
+    const r = await saveFile(`${no}.html`, invoiceHtml(doc));
+    if (r === 'saved') { toast('Saved. Open it and print to PDF to share.'); return; }
+    try { window.print(); toast('Choose “Save as PDF” to keep a copy.'); } catch (e) { toast('Couldn’t save here. Use Email it to me.'); }
   };
   const email = () => { buzz(HAPTIC.success); toast(s.demo.offline ? 'Saved. It sends when you’re back online.' : `Sent to ${s.user?.email || 'your email'}. Usually there within a minute.`); };
   return (
     <Screen title={isCredit ? 'Credit note' : 'VAT invoice'} act={<>
-      <button type="button" className="btn primary block" onClick={print}><Icon name="doc" color="#f6f2ec" size={20} />Share PDF</button>
-      <div className="row" style={{ gap: 8 }}>
-        <button type="button" className="btn secondary small grow" onClick={email}>Email it to me</button>
-        <button type="button" className="btn secondary small grow" onClick={download}>Save as a file</button>
-      </div>
+      <button type="button" className="btn primary block" onClick={share}><Icon name="doc" color="#f6f2ec" size={20} />Share PDF</button>
+      <button type="button" className="btn secondary block" onClick={email}>Email it to me</button>
     </>}>
       {p.refund && (
         <div className="chips" role="tablist">
