@@ -161,7 +161,7 @@ How the real app behaves when the network, our server or a supplier lets the tra
 | **Phone full** | A write that fails for space is noticed once. | "Your phone is almost full. We couldn't save your trips for offline use." |
 | **Link to something deleted** | Unknown routes and missing records land on one screen. | "This link doesn't go anywhere now." See your trips · Go to Today. |
 | **Newer or older server** | A response that doesn't match the shared schema is a soft BAD_RESPONSE; unknown fields are ignored; unknown error codes fall back by HTTP status. | "Part of this didn't load." with Try again. Never a crash. |
-| **A crash** | A root error boundary (and expo-router's) catches it and reports to Sentry when a DSN is set. | "Something broke on our side. Your trips are safe." Restart Mada · Talk to Mada. |
+| **A crash** | A root error boundary (and expo-router's) catches it and reports to Sentry when a DSN is set. | "We’re circling for a moment. Your trips are safe." (a plane in a holding pattern) Restart Mada · Talk to Mada. |
 | **A photo that fails or crawls** | `SafeImage` shows a tone from the name with initials until it loads, a thumbnail or blurhash first when there is one. | Never a broken-image icon. |
 
 **Server side.** Every error is `{ error: { code, message, retryAfter?, details?, requestId?, fields? } }` with codes from `packages/shared/src/schemas/errors.ts`. Every response carries `X-Request-Id` (the app's own when it sends a sane one) and `X-Server-Time`, and each request is logged on one line with its id. POST/PATCH/PUT/DELETE with `Idempotency-Key` run once per user and key for 24 hours (`app_idempotency_keys`); a repeat gets the first answer, a different body with the same key gets 422, a repeat while the first runs gets 409 with Retry-After. GET /config and GET /status are public and cached briefly; GET /health also reports open breakers and maintenance.
@@ -183,7 +183,7 @@ Every state below can be reached from the demo panel: its own switch, or the **W
 | Update required | **Update required** | Full screen: "Update Mada to keep booking.", what's new in three lines, trips are safe. | **Update Mada** |
 | Session expired | **Session expired** | A sheet over the current screen: "Sign back in to carry on." Code field (demo 123456). What you typed underneath is kept. | Enter the code |
 | Too many tries | **Too many tries** | "Let's take a short pause." with a draining countdown ring (0:45). Nothing is locked. | **Try again** when it reaches 0, or **Talk to Mada instead** |
-| App crashed | **App crashed** (a real React error boundary) | Full screen: "Something broke on our side. Your trips are safe." | **Restart Mada** or **Talk to Mada** |
+| App crashed | **App crashed** (a real React error boundary) | Full screen: "We’re circling for a moment. Your trips are safe." (a plane in a holding pattern) | **Restart Mada** or **Talk to Mada** |
 | Payment interrupted | **Connection drops while paying** (or **Offline**), then slide to book | Sheet: "The connection dropped while paying. Nothing was charged. Your price is held for 18 more minutes." | **Resume** (disabled while still offline) |
 | Double tap on pay | Confirm twice quickly | The slider locks; "Already paying. You can only be charged once." Only one booking starts. | — |
 | App closed mid-booking | Close the app while "With Faisal" runs (or demo **App closed mid-booking**) | Today: "Your Istanbul booking is still with Faisal." | **Open** resumes the booking screen at the step it reached |

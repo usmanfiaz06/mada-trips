@@ -305,7 +305,7 @@ const scenarios = {
     await go(p, '/states');
     await p.byTest('states-crash').scrollIntoViewIfNeeded();
     await p.byTest('states-crash').click();
-    await p.see('Something broke on our side. Your trips are safe.', 'crash');
+    await p.see('We’re circling for a moment. Your trips are safe.', 'crash');
     await p.shot('crash');
   },
 };

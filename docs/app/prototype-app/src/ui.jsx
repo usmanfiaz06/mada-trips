@@ -866,17 +866,34 @@ export function ArtHourglass() {
 }
 
 /* Two gears, the gold one turning back into step: something broke on our side, and it's being put right. */
-export function ArtGears() {
-  /* Teeth as plain shapes (no SVG transforms, so the CSS rotation below has nothing to fight with). */
-  const teeth = (cx, cy, r, n) => Array.from({ length: n }, (_, i) => {
-    const a = (i * 2 * Math.PI) / n; const w = 0.2; const pt = (rr, aa) => `${(cx + Math.sin(aa) * rr).toFixed(1)} ${(cy - Math.cos(aa) * rr).toFixed(1)}`;
-    return <path key={i} d={`M${pt(r - 2, a - w)} L${pt(r + 6, a - w * 0.7)} L${pt(r + 6, a + w * 0.7)} L${pt(r - 2, a + w)} Z`} strokeLinejoin="round" />;
-  });
+/* A crash, told as a holding pattern: the plane circles the fix while we sort it, the trail following it round,
+   clouds drifting past. Calm, never stuck. Reduced motion parks the plane on the top leg. */
+const HOLD = 'M44 36 H116 A24 24 0 0 1 116 84 H44 A24 24 0 0 1 44 36 Z';
+const HOLD_LEN = 144 + 2 * Math.PI * 24;
+export const PLANE_TOP = 'M9.5 0 C9.5 -1.3 8 -1.6 6.5 -1.6 L2.6 -1.6 L-1.4 -8.6 L-3.8 -8.6 L-1.9 -1.6 L-5.8 -1.6 L-7.6 -4.2 L-9.3 -4.2 L-8.3 -0.8 L-8.3 0.8 L-9.3 4.2 L-7.6 4.2 L-5.8 1.6 L-1.9 1.6 L-3.8 8.6 L-1.4 8.6 L2.6 1.6 L6.5 1.6 C8 1.6 9.5 1.3 9.5 0 Z';
+export function ArtHolding() {
+  const still = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dur = '9s';
   return (
-    <Art className="es-gears">
-      <g className="fs-gear-a" fill="#fffdf9" stroke="#1e352d" strokeWidth="2">{teeth(64, 64, 24, 10)}<circle cx="64" cy="64" r="25" /><circle cx="64" cy="64" r="7" fill="#1e352d" /></g>
-      <g className="fs-gear-b" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.8">{teeth(106, 46, 14, 7)}<circle cx="106" cy="46" r="15" /><circle cx="106" cy="46" r="4.5" fill="#fffdf9" /></g>
-      <path d="M96 84 c6 4 14 4 20 0" fill="none" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 5" />
+    <Art className="es-holding">
+      <g className="hp-cloud hp-cloud-a" fill="#fffdf9" opacity="0.9"><path d="M8 18 a7 7 0 0 1 12 -5 a9 9 0 0 1 16 4 a6 6 0 0 1 0 12 h-26 a6 6 0 0 1 -2 -11 z" /></g>
+      <g className="hp-cloud hp-cloud-b" fill="#fffdf9" opacity="0.75"><path d="M120 98 a6 6 0 0 1 10 -4 a8 8 0 0 1 14 3 a5 5 0 0 1 0 10 h-22 a5 5 0 0 1 -2 -9 z" /></g>
+      <path d={HOLD} fill="none" stroke="#e3d6bf" strokeWidth="1.6" strokeDasharray="2 5" strokeLinecap="round" />
+      <circle className="hp-ping" cx="80" cy="60" r="5" fill="none" stroke="#d9b77a" strokeWidth="1.5" />
+      <circle cx="80" cy="60" r="3.5" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.4" />
+      {still ? (
+        <g transform="translate(98 36) scale(1.4)"><path d={PLANE_TOP} fill="#1e352d" stroke="#fffdf9" strokeWidth="0.8" strokeLinejoin="round" /></g>
+      ) : (
+        <>
+          <path d={HOLD} fill="none" stroke="#d9b77a" strokeWidth="2.4" strokeLinecap="round" strokeDasharray={`44 ${HOLD_LEN}`} opacity="0.75">
+            <animate attributeName="stroke-dashoffset" from="44" to={44 - HOLD_LEN} dur={dur} repeatCount="indefinite" />
+          </path>
+          <g>
+            <path d={PLANE_TOP} transform="scale(1.4)" fill="#1e352d" stroke="#fffdf9" strokeWidth="0.8" strokeLinejoin="round" />
+            <animateMotion dur={dur} repeatCount="indefinite" rotate="auto" path={HOLD} />
+          </g>
+        </>
+      )}
     </Art>
   );
 }
@@ -1367,11 +1384,11 @@ export function Crasher() {
 }
 export function CrashScreen({ onRestart, onTalk }) {
   return (
-    <FullScreenState label="Mada restarted" art={<ArtGears />} eyebrow="Mada stopped"
-      title="Something broke on our side. Your trips are safe."
-      body="Bookings, payments and documents aren’t touched by this. Restart and you’ll be back on Today."
+    <FullScreenState label="Mada restarted" art={<ArtHolding />} eyebrow="Holding pattern"
+      title="We’re circling for a moment. Your trips are safe."
+      body="Something on our side stopped. Your bookings, payments and documents are untouched. Restart and you’ll land back on Today."
       primary={<button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); onRestart && onRestart(); }}>Restart Mada</button>}
       secondary={<button type="button" className="btn secondary block" onClick={() => { buzz(HAPTIC.tap); onTalk && onTalk(); }}>Talk to Mada</button>}
-      note="A report went to our team. Nothing personal is in it." />
+      note="Our team already knows. No personal details were sent." />
   );
 }

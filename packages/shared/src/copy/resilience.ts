@@ -40,9 +40,10 @@ export const resilienceCopy = {
   'problem.ref': 'Reference {ref}',
   'problem.partial.title': 'Part of this didn’t load.',
   'problem.partial.body': 'Updating Mada usually fixes it. Everything else works as normal.',
-  'crash.title': 'Something broke on our side. Your trips are safe.',
-  'crash.body': 'Bookings, payments and documents aren’t touched by this. Restart and you’ll be back on Today.',
-  'crash.note': 'A report went to our team. Nothing personal is in it.',
+  'crash.eyebrow': 'Holding pattern',
+  'crash.title': 'We’re circling for a moment. Your trips are safe.',
+  'crash.body': 'Something on our side stopped. Your bookings, payments and documents are untouched. Restart and you’ll land back on Today.',
+  'crash.note': 'Our team already knows. No personal details were sent.',
   'crash.restart': 'Restart Mada',
 
   // ───────────── suppliers ─────────────

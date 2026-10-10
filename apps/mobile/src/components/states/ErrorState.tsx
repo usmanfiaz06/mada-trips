@@ -4,7 +4,8 @@ import { reportingOn } from '@/lib/net/report';
 import { talkToMada } from '@/lib/net/talk';
 import { t } from '@/lib/i18n';
 import { Button } from '../Button';
-import { ArtFrayed, ArtMissing, ArtNoSignal, ArtRouteGap, ArtSign, ArtUpdate, ArtWaiting } from './art';
+import { ArtMissing, ArtNoSignal, ArtRouteGap, ArtSign, ArtUpdate, ArtWaiting } from './art';
+import { ArtHolding } from './holding';
 import { StateView } from './StateView';
 
 /**
@@ -47,7 +48,7 @@ export function OfflineState({ variant = 'full', body }: { variant?: 'full' | 'c
 /** The app crashed or a screen threw: the frayed cable. Used by the ErrorBoundary. */
 export function CrashState({ onRestart, reference }: { onRestart: () => void; reference?: string | null }) {
   return (
-    <StateView art={<ArtFrayed />} title={t('crash.title')} body={t('crash.body')}
+    <StateView art={<ArtHolding />} eyebrow={t('crash.eyebrow')} title={t('crash.title')} body={t('crash.body')}
       primary={<Button label={t('crash.restart')} onPress={onRestart} testID="crash-restart" />}
       secondary={<Button variant="ghost" label={t('action.talk')} onPress={() => talkToMada()} testID="crash-talk" />}
       note={reportingOn() ? `${t('crash.note')}${reference ? ` ${t('problem.ref', { ref: reference })}` : ''}` : null} testID="state-crash" />

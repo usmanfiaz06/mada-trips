@@ -11,16 +11,19 @@ import { T } from '../Text';
  *   full    fills the screen below the TopBar (a whole screen couldn't load)
  *   card    sits inside a screen (one section couldn't load)
  */
-export function StateView({ art, title, body, works, note, primary, secondary, variant = 'full', gutter = 20, testID }: {
+export function StateView({ art, eyebrow, title, body, works, note, primary, secondary, variant = 'full', gutter = 20, testID }: {
   /** What still works, one short line with a gold dot ("Your trips and Wallet still work offline"). */
   works?: string | null;
   /** Side padding for 'full' (0 when the screen's own scroll already has its gutter). */
   gutter?: number;
+  /** A small gold label over the title (the crash screen's "Holding pattern"). */
+  eyebrow?: string;
   art?: ReactNode; title: string; body?: string; note?: string | null; primary?: ReactNode; secondary?: ReactNode; variant?: 'full' | 'card'; testID?: string;
 }) {
   const inner = (
     <Animated.View entering={FadeIn.duration(300)} style={[styles.card, shadow('card')]} accessibilityRole="summary" testID={testID}>
       {art ? <ArtStage height={variant === 'full' ? 156 : 124}>{art}</ArtStage> : null}
+      {eyebrow ? <T v="eyebrow" color={colors.goldInk} style={[styles.inset, { marginBottom: -6 }]}>{eyebrow}</T> : null}
       <T style={[font('displaySmall'), styles.inset]} accessibilityRole="header">{title}</T>
       {body ? <T v="body" style={[styles.inset, { marginTop: -4 }]}>{body}</T> : null}
       {works ? (

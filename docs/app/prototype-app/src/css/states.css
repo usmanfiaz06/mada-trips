@@ -148,9 +148,12 @@
 @keyframes fs-drain { 0% { transform: scaleY(1) } 84%, 100% { transform: scaleY(.15) } }
 @keyframes fs-fill { 0% { transform: scaleY(.3) } 84%, 100% { transform: scaleY(1) } }
 .fs-stream { animation: es-dot 1s linear infinite; }
-.fs-gear-a { transform-origin: 64px 64px; transform-box: view-box; animation: es-turn 14s linear infinite; }
-.fs-gear-b { transform-origin: 106px 46px; transform-box: view-box; animation: fs-gear-b 7s ease-in-out infinite; }
-@keyframes fs-gear-b { 0%, 20% { transform: rotate(0) } 60%, 100% { transform: rotate(-200deg) } }
+.hp-cloud-a { animation: hp-drift 11s ease-in-out infinite alternate; }
+.hp-cloud-b { animation: hp-drift 14s ease-in-out -5s infinite alternate-reverse; }
+@keyframes hp-drift { from { transform: translateX(-6px) } to { transform: translateX(8px) } }
+.hp-ping { transform-origin: 80px 60px; transform-box: view-box; animation: hp-ping 3s ease-out infinite; }
+@keyframes hp-ping { 0% { transform: scale(0.7); opacity: 0.9 } 100% { transform: scale(3.2); opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .hp-cloud, .hp-ping { animation: none; } }
 .fs-half-l { animation: fs-half-l 5s ease-in-out infinite; }
 .fs-half-r { animation: fs-half-r 5s ease-in-out infinite; }
 @keyframes fs-half-l { 0%, 100% { transform: translate(0, 0) rotate(0) } 50% { transform: translate(-3px, 2px) rotate(-2deg) } }

@@ -6,8 +6,8 @@ import { colors } from '@/theme';
 import { CrashState } from './ErrorState';
 
 /*
- * The last line: a screen that throws while drawing shows the frayed cable ("Something broke on our side. Your trips
- * are safe.") with Restart and Talk to Mada, instead of a white screen. Reported to Sentry when a DSN is set.
+ * The last line: a screen that throws while drawing shows the holding pattern ("We’re circling for a moment. Your
+ * trips are safe.") with Restart and Talk to Mada, instead of a white screen. Reported to Sentry when a DSN is set.
  * Restart reloads the web page; on a phone it clears the broken screen and opens the app from the start, with the
  * offline copy and the outbox untouched.
  */

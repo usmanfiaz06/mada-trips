@@ -40,8 +40,8 @@ const STATES = [
       if (!/baby seat/.test(kept)) t.fail('session: the draft was lost');
     } },
   { id: 'rate', wait: 1200, see: ['Let’s take a short pause.', 'You can try again in'] },
-  { id: 'crash', wait: 900, see: ['Something broke on our side. Your trips are safe.', 'Restart Mada', 'Talk to Mada'],
-    after: async (t) => { await t.click('Restart Mada'); await t.notSee('Something broke on our side'); } },
+  { id: 'crash', wait: 900, see: ['We’re circling for a moment. Your trips are safe.', 'Restart Mada', 'Talk to Mada'],
+    after: async (t) => { await t.click('Restart Mada'); await t.notSee('We’re circling for a moment'); } },
   { id: 'pay-drop', wait: 2600, see: ['The connection dropped while paying.', 'Nothing was charged. Your price is held for', 'Resume'],
     after: async (t) => { await t.click('Resume', 2600); await t.see('Booking now'); } },
   { id: 'double-tap', wait: 1100, see: ['Already paying. You can only be charged once.'],

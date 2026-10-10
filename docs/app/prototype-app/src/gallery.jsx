@@ -77,7 +77,7 @@ export const GALLERY = [
     run: async ({ jump, flags, push }) => { jump('booked'); await wait(150); push('support', {}); await wait(500); await typeInto('#support-msg', 'Can we add a baby seat to the car'); flags({ sessionExpired: true }); } },
   { id: 'rate', title: 'Too many tries', note: 'A short, friendly pause with a countdown. Nothing is locked; there’s a person to call.',
     run: async ({ jump, flags }) => { jump('booked'); await wait(150); flags({ rateLimited: true }); } },
-  { id: 'crash', title: 'App crashed', note: 'A real error boundary. “Something broke on our side. Your trips are safe.” Restart, or talk to Mada.',
+  { id: 'crash', title: 'App crashed', note: 'A real error boundary, told as a holding pattern. “We’re circling for a moment. Your trips are safe.” Restart, or talk to Mada.',
     run: async ({ jump, flags }) => { jump('booked'); await wait(150); flags({ crashed: true }); } },
   { id: 'pay-drop', title: 'Payment interrupted', note: 'Airplane mode mid-payment: nothing was charged, the price is held for the minutes left, Resume.',
     run: async ({ jump, flags, push, s }) => { jump('none', true); await wait(150); flags({ payDrops: true }); push('pay', PAY(s)); await wait(700); await pressSlider(); } },
