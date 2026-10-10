@@ -6,7 +6,23 @@
  * and `test/copy.test.ts` fails the build on banned words, exclamation marks, em dashes, emoji,
  * notification length limits and unfilled placeholders.
  */
+import { walletCopy } from './wallet';
+import { enCircles } from './en-circles';
+import { bookingCopy } from './booking';
+import { deskCopy } from './desk';
+import { enTrips } from './en-trips';
+
 export const en = {
+  // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
+  ...walletCopy,
+  // Circles, Discover and people (M4): packages/shared/src/copy/en-circles.ts
+  ...enCircles,
+  // Booking: Ask, search, requests, plans, the order sheet, payment and the wait (M2): packages/shared/src/copy/booking.ts
+  ...bookingCopy,
+  // The agent desk in Mada Ops, what it sends to travellers: packages/shared/src/copy/desk.ts
+  ...deskCopy,
+  // Trip companion (M3)
+  ...enTrips,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

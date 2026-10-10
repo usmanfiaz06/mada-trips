@@ -13,7 +13,7 @@ export const AIRPORT_NAMES: Record<string, string> = { RUH: 'Riyadh', JED: 'Jedd
 
 /* ───────────── where we sell ───────────── */
 
-export type Destination = {
+export type BookingDestination = {
   key: string;
   name: string;
   /** Main airport. */
@@ -28,7 +28,7 @@ export type Destination = {
   byHand?: { ppSar: number; text: string };
 };
 
-export const DESTINATIONS: Record<string, Destination> = {
+export const DESTINATIONS: Record<string, BookingDestination> = {
   istanbul: { key: 'istanbul', name: 'Istanbul', code: 'IST', country: 'TR', photo: 'istanbul-galata', words: /istanbul|türkiye|turkiye|turkey/ },
   dubai: { key: 'dubai', name: 'Dubai', code: 'DXB', country: 'AE', photo: 'dubai-skyline', words: /dubai/ },
   cairo: { key: 'cairo', name: 'Cairo', code: 'CAI', country: 'EG', photo: 'cairo-pyramids', words: /cairo/ },

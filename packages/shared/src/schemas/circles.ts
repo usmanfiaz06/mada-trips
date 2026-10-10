@@ -30,8 +30,8 @@ export const PersonRef = z.object({
 export type PersonRef = z.infer<typeof PersonRef>;
 
 /** How two people know each other, from the viewer's side. */
-export const Relation = z.enum(['you', 'family', 'friend', 'following', 'mada']);
-export type Relation = z.infer<typeof Relation>;
+export const SocialRelation = z.enum(['you', 'family', 'friend', 'following', 'mada']);
+export type SocialRelation = z.infer<typeof SocialRelation>;
 export const FriendTag = z.enum(['close', 'family']);
 export type FriendTag = z.infer<typeof FriendTag>;
 
@@ -148,7 +148,7 @@ export const CircleSummary = Circle.extend({
 });
 export type CircleSummary = z.infer<typeof CircleSummary>;
 
-export const CircleMemberView = PersonRef.extend({ role: z.enum(['admin', 'member']), relation: Relation, joinedAt: IsoDateTime });
+export const CircleMemberView = PersonRef.extend({ role: z.enum(['admin', 'member']), relation: SocialRelation, joinedAt: IsoDateTime });
 export type CircleMemberView = z.infer<typeof CircleMemberView>;
 export const InvitedView = z.object({ inviteId: Id, person: PersonRef, sentAt: IsoDateTime, remindedAt: IsoDateTime.nullable() });
 export type InvitedView = z.infer<typeof InvitedView>;
@@ -278,7 +278,7 @@ export type PostKind = z.infer<typeof PostKind>;
 export const Post = z.object({
   id: Id,
   author: PersonRef,
-  relation: Relation,
+  relation: SocialRelation,
   /** Trips the author has taken with Mada, for "Mada traveller · 14 trips". */
   authorTrips: z.number().int(),
   city: z.string(),
@@ -317,7 +317,7 @@ export const ProfileResponse = z.object({
 });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;
 
-export const SearchHit = PersonRef.extend({ relation: Relation, mutual: z.number().int() });
+export const SearchHit = PersonRef.extend({ relation: SocialRelation, mutual: z.number().int() });
 export type SearchHit = z.infer<typeof SearchHit>;
 export const SearchResponse = z.object({ people: z.array(SearchHit), byPhone: z.boolean() });
 export type SearchResponse = z.infer<typeof SearchResponse>;

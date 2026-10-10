@@ -233,6 +233,15 @@ export const TripDisruption = z.object({
 });
 export type TripDisruption = z.infer<typeof TripDisruption>;
 
+/** The person on duty for the trip, from the server. `covering` is set when someone else covers tonight. */
+export const TripAgent = z.object({
+  name: z.string(),
+  initial: z.string(),
+  online: z.boolean(),
+  covering: z.object({ name: z.string(), initial: z.string() }).nullable(),
+});
+export type TripAgent = z.infer<typeof TripAgent>;
+
 export const TripPrices = z.object({ flights: Money, stays: Money, pickups: Money, discount: Money, total: Money });
 
 export const TripDetail = Trip.extend({
@@ -248,13 +257,15 @@ export const TripDetail = Trip.extend({
   rebooked: z.boolean(),
   vouchers: z.array(Voucher),
   bagReport: z.string().nullable(),
+  /** First-evening picks chosen in the air; Mada books them on landing. */
+  picks: z.array(z.string()),
   rating: TripRating.nullable(),
   company: Company.nullable(),
   weather: TripWeather.nullable(),
   disruption: TripDisruption.nullable(),
   openRequests: z.number().int(),
-  /** The named agent looking after the trip, for "Talk to Faisal". */
-  agentName: z.string(),
+  /** The agent on duty for this trip (COPY.md §1: buttons say Mada; the person appears as presence or when they acted). */
+  agent: TripAgent,
   bookedAt: IsoDateTime,
 });
 export type TripDetail = z.infer<typeof TripDetail>;
@@ -690,3 +701,4 @@ export const TRIP_ROUTES = {
 
 /** The demo override header: in mock mode the trip clock can be told which moment to show. */
 export const DEMO_PHASE_HEADER = 'x-mada-demo-phase';
+export * from './trips-logic';

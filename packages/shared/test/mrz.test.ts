@@ -14,8 +14,8 @@ function td3(num: string, nat: string, dob: string, sex: string, exp: string, op
 }
 
 describe('mrz', () => {
-const ICAO = ['P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<', 'L898902C36UTO7408122F1204159ZE184226B<<<<<10'];
-const OMAR = ['P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', td3('A08493141', 'SAU', '840311', 'M', '310622')];
+const ICAO: [string, string] = ['P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<', 'L898902C36UTO7408122F1204159ZE184226B<<<<<10'];
+const OMAR: [string, string] = ['P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', td3('A08493141', 'SAU', '840311', 'M', '310622')];
 
 // check digits
 it('ICAO examples', () => {

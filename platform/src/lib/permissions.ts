@@ -25,6 +25,12 @@ export const PERMISSIONS = {
   "roles.manage":        { group: "admin",     en: "Create & edit roles",                ar: "إنشاء وتعديل الأدوار" },
   "activity.view":       { group: "admin",     en: "See the full activity log",          ar: "عرض سجل النشاط الكامل" },
   "settings.manage":     { group: "admin",     en: "Change limits & rules",              ar: "تعديل الحدود والقواعد" },
+  "desk.view":           { group: "desk",      en: "See the app desk",                   ar: "عرض مكتب التطبيق" },
+  "desk.act":            { group: "desk",      en: "Reply, quote and confirm on the desk", ar: "الرد والتسعير والتأكيد في المكتب" },
+  "desk.issue":          { group: "desk",      en: "Issue app tickets & see full passports", ar: "إصدار تذاكر التطبيق ورؤية الجوازات كاملة" },
+  "desk.refund":         { group: "desk",      en: "Approve app refunds & vouchers",     ar: "اعتماد استردادات التطبيق والقسائم" },
+  "desk.moderate":       { group: "desk",      en: "Moderate tips, reports & blocks",    ar: "مراجعة النصائح والبلاغات والحظر" },
+  "desk.admin":          { group: "desk",      en: "Run the rota & assign agents",       ar: "إدارة المناوبات وإسناد الموظفين" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -40,6 +46,7 @@ export const PERMISSION_GROUPS = {
   finance: { en: "Finance", ar: "المالية" },
   partners: { en: "Partners", ar: "الشركاء" },
   admin: { en: "Administration", ar: "الإدارة" },
+  desk: { en: "App desk", ar: "مكتب التطبيق" },
 } as const;
 
 // All three partners share one level of access. Ticket issuing (TTP) stays with the issuing partner, as the
@@ -49,6 +56,6 @@ export const PARTNER_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== "issue.un
 export const SYSTEM_ROLES: { key: string; name: string; nameAr: string; description: string; permissions: Permission[] }[] = [
   { key: "partner", name: "Partner", nameAr: "شريك", description: "Full access: team, roles, approvals, finance, settlement and settings.", permissions: PARTNER_PERMISSIONS },
   { key: "partner_issuer", name: "Partner · Issuing authority", nameAr: "شريك · صلاحية الإصدار", description: "Full partner access, plus ticket issuing (TTP) and delegating it to staff.", permissions: ALL_PERMISSIONS },
-  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit"] },
-  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit"] },
+  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit", "desk.view", "desk.act"] },
+  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit", "desk.view", "desk.act"] },
 ];

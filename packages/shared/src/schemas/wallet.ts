@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay, PhoneE164 } from './common';
+import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay } from './common';
 import { Credit } from './commerce';
 import { PassportInput, Person, Sex } from './people';
 import { MessageAuthor } from './social';
@@ -401,4 +401,3 @@ export const DESK_TEL = 'tel:+966115200000';
 export const DESK_SMS = 'sms:+966115200000';
 export const DESK_WHATSAPP = 'https://wa.me/966115200000';
 
-export const PhoneChange = z.object({ phone: PhoneE164 });

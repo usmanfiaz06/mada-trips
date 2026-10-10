@@ -11,3 +11,6 @@ export * from './offers';
 export * from './health';
 export * from './positions';
 export * from './wallet';
+export * from './circles';
+export * from './desk';
+export * from './booking';

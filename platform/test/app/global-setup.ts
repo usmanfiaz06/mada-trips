@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -22,6 +23,8 @@ export default async function setup(project: TestProject) {
 
   const sql = postgres(url.toString(), { max: 1, onnotice: () => {} });
   await migrate(drizzle(sql), { migrationsFolder: "./drizzle" });
+  // Tables written in parallel, not generated yet (drizzle/pending/*.sql): applied after the real migrations, in name order.
+  for (const f of readdirSync("./drizzle/pending").filter((n) => n.endsWith(".sql")).sort()) await sql.unsafe(readFileSync(`./drizzle/pending/${f}`, "utf8"));
   await sql.end();
   project.provide("databaseUrl", url.toString());
 
