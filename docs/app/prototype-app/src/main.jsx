@@ -13,9 +13,12 @@ import Wallet from './screens/Wallet.jsx';
 import Circles, { Group } from './screens/Circles.jsx';
 import Profile from './screens/Profile.jsx';
 import Plan from './screens/Plan.jsx';
+import { SCREENS as ACCOUNT_SCREENS } from './screens/Account.jsx';
+import { SCREENS as TRIP_SCREENS } from './screens/TripManage.jsx';
+import { SCREENS as SUPPORT_SCREENS } from './screens/Support.jsx';
 
 const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
-const STACK = { saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan };
+const STACK = { saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
 
 /* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
 function useBackgroundProgress() {
