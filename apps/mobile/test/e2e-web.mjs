@@ -121,7 +121,9 @@ async function run({ page, phone, returning }) {
     await see('Welcome back, Omar.', 'welcome back');
     await shot('welcome-back');
     await byTest('welcome-back-open').click();
-    await see('Nowhere planned yet.', 'today after return');
+    // The demo account (mock mode) already has the Istanbul trip; a real server's fresh number has nothing planned.
+    await see(API ? 'Nowhere planned yet.' : 'Istanbul', 'today after return');
+    await shot('today-returning');
     return;
   }
 
@@ -166,7 +168,8 @@ async function run({ page, phone, returning }) {
   await see('Your passport isn’t here yet.', 'wallet');
   await shot('wallet');
   await byTest('dock-ask').click();
-  await see('Instant answers from Mada. Faisal and the team confirm anything you book.', 'ask');
+  await see('Instant answers from Mada.', 'ask');
+  await see('ask only what we need', 'ask heading');
   await shot('ask');
 }
 
