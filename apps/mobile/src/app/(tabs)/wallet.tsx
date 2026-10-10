@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { API_MODE } from '@/lib/config';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { formatSar, type Person, type WalletDocument } from '@mada/shared';
@@ -26,6 +27,9 @@ import { colors, ff, shadow } from '@/theme';
 
 /** The Wallet (prototype Wallet.jsx): locked with Face ID, passports for the whole household, documents, passes, money. */
 export default function Wallet() {
+  const router = useRouter();
+  // Mock builds only: lets the web e2e open the account screens, which Today's avatar links to.
+  useEffect(() => { if (API_MODE === 'mock') (globalThis as { __madaGo?: (p: string) => void }).__madaGo = (p) => router.push(p as '/profile'); }, [router]);
   const status = useSession((s) => s.status);
   const account = useAccount();
   const unlocked = useWalletLock((s) => s.unlocked);

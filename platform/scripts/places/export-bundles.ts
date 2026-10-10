@@ -17,7 +17,7 @@ import { CURATED } from "../../src/lib/app/places/curated";
 const args = process.argv.slice(2);
 const dir = args[args.indexOf("--dir") + 1] && args.includes("--dir") ? args[args.indexOf("--dir") + 1]! : ".cache/places";
 const TOP = Number(args.includes("--top") ? args[args.indexOf("--top") + 1] : 1500);
-const ROOT = join(__dirname, "../../..");
+const ROOT = join(process.cwd(), "..");
 
 async function main() {
   const d = await loadSources({ dir, altNames: true });

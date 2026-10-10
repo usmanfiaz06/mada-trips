@@ -50,13 +50,13 @@ export function Composer({ action, typing, threadKind, threadId, agentName, cann
         {state?.error && <div role="alert" className="mb-2 flex items-center gap-2 rounded-xl bg-bad-soft px-3 py-2 text-[13px] text-bad"><AlertCircle className="size-4" />{t(state.error)}</div>}
         <div className={cx("rounded-[20px] p-2 ring-1 transition focus-within:ring-2", note ? "bg-gold-soft/70 ring-gold/50 focus-within:ring-gold" : "bg-surface-2 ring-line focus-within:ring-gold")}>
           <div className="flex items-center gap-1 px-1 pb-1.5">
-            <div className="flex rounded-full bg-sunken p-0.5 text-[12px]">
+            <div className="flex min-w-0 rounded-full bg-sunken p-0.5 text-[12px] [&>button]:whitespace-nowrap">
               <button type="button" onClick={() => setMode("reply")} className={cx("h-7 rounded-full px-3 transition", !note ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t("Reply as {name}", { name: agentName })}</button>
               <button type="button" onClick={() => setMode("note")} className={cx("inline-flex h-7 items-center gap-1 rounded-full px-3 transition", note ? "bg-gold text-[#1a140a]" : "text-ink-3 hover:text-ink")}><Lock className="size-3" />{t("Note for the team")}</button>
             </div>
             {!note && canned.length > 0 && (
-              <button type="button" onClick={() => setShowCanned((v) => !v)} className="ms-auto inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-3 transition hover:bg-sunken hover:text-ink" aria-expanded={showCanned}>
-                <MessageSquareText className="size-3.5" />{t("Saved replies")}
+              <button type="button" onClick={() => setShowCanned((v) => !v)} className="ms-auto inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-3 transition hover:bg-sunken hover:text-ink" aria-expanded={showCanned} aria-label={t("Saved replies")}>
+                <MessageSquareText className="size-3.5" /><span className="hidden sm:inline">{t("Saved replies")}</span>
               </button>
             )}
           </div>

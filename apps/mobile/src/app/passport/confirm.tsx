@@ -58,8 +58,8 @@ export default function PassportConfirm() {
       await refresh();
       buzz('success');
       toast(r.person.isSelf ? t('passport.saved') : t('passport.savedFor', { name: r.person.firstName }));
-      if (router.canDismiss()) router.dismissAll();
-      router.replace('/wallet');
+      // Back to wherever the scan started (the Wallet tab, a household page), not a second copy of it.
+      router.navigate('/wallet');
     } catch (e) {
       setProblem(e instanceof ApiError ? e.message : t('error.internal'));
     } finally { setBusy(false); }

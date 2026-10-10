@@ -136,3 +136,32 @@ The demo panel can jump to any of these moments.
 - **Offline banner:** "You're offline. Everything for your trips is on this phone."
 - **Toasts and lock-screen-style banners** for events: gate change, driver arrived, refund sent.
 - **Haptics:** vibration on Android browsers only in the prototype. The real app uses native patterns ([EXPERIENCE.md §4.6](EXPERIENCE.md)).
+
+## 13. Failure states in the prototype
+
+Every state below can be reached from the demo panel: its own switch, or the **When things go wrong** walkthrough, which steps through all 27 in order. They share one design family (`EmptyState` stage, the same drawing hand and motion; components in `prototype-app/src/ui.jsx`, styles in `src/css/states.css`). Each one says what happened, what still works, and one next step. Nothing is red, nothing shakes, nobody is blamed. Test: `test/states.mjs` (desktop and 390×844).
+
+| State | Trigger (demo) | What shows | Next step |
+|---|---|---|---|
+| Offline | **Offline** | A small pill in the status strip ("Offline · your trips are on this phone"), clear of Back and of banners. Today, Trips and Wallet carry "Saved on this phone · updated 14 min ago". Trips, Wallet, boarding passes, itinerary and hotel address all open. Discover says "Tips need a connection." | Tap the pill for the Outbox |
+| Outbox | Tap the connection pill | Everything waiting to reach Mada, each with its state: **Queued**, **Sending**, or **Didn't send** (with why). What works offline, and the desk number. | **Send again** or **Discard** on anything that didn't send |
+| Back online | Turn **Offline** off with things queued | The pill reads "Sending 2 things…", then a toast: "Back online. Sent 2 things you did offline." | — |
+| Weak connection | **Weak connection** | Each screen loads under a shimmering skeleton; photos arrive blurred, then sharp. After 4 s: "Still working… slower than usual". | **Cancel** (goes back, or keeps the saved copy) |
+| Server down, cached | **Server down** | Pill "Can't reach Mada right now"; Today, Trips and Wallet show the saved copy with "Last updated 14 min ago". | — |
+| Server down, an action | **Server down**, then search or pay | In place: "We can't reach our flight search right now." / "We can't reach payments right now. Nothing was charged. Your price is held for N more minutes." | **Try again** |
+| Server down, nothing cached | **Server down**, Circles › Discover | Full calm state: "Tips can't load right now.", what still works. | **Try again** |
+| Maintenance | **Maintenance** | Full screen: "Mada is being updated until 03:00.", "Your trips and Wallet still work offline". | **Open my trips** (a small "Maintenance until 03:00" pill stays) or **Talk to Mada by phone** |
+| Update required | **Update required** | Full screen: "Update Mada to keep booking.", what's new in three lines, trips are safe. | **Update Mada** |
+| Session expired | **Session expired** | A sheet over the current screen: "Sign back in to carry on." Code field (demo 123456). What you typed underneath is kept. | Enter the code |
+| Too many tries | **Too many tries** | "Let's take a short pause." with a draining countdown ring (0:45). Nothing is locked. | **Try again** when it reaches 0, or **Talk to Mada instead** |
+| App crashed | **App crashed** (a real React error boundary) | Full screen: "Something broke on our side. Your trips are safe." | **Restart Mada** or **Talk to Mada** |
+| Payment interrupted | **Connection drops while paying** (or **Offline**), then slide to book | Sheet: "The connection dropped while paying. Nothing was charged. Your price is held for 18 more minutes." | **Resume** (disabled while still offline) |
+| Double tap on pay | Confirm twice quickly | The slider locks; "Already paying. You can only be charged once." Only one booking starts. | — |
+| App closed mid-booking | Close the app while "With Faisal" runs (or demo **App closed mid-booking**) | Today: "Your Istanbul booking is still with Faisal." | **Open** resumes the booking screen at the step it reached |
+| Photo doesn't load | **Photos don't load** | Every photo falls back to a tone picked from its name, with its initials (a medallion on big photos, large on thumbnails). Never a broken-image icon. | — |
+| Permission turned off | **Permissions turned off**, then scan (camera), add from contacts, turn on Who's around (location), or Profile › Alerts | One design: switch drawing, "The camera is off for Mada." (or contacts, location, alerts), why it helps. | **Open Settings**, or the way round: upload a photo, share your invite link, choose your city, alerts by SMS |
+| Link to something deleted | Demo **Open a deleted link**, or any unknown screen | "This link doesn't go anywhere now. Nothing of yours has changed." | **See your trips** or **Go to Today** |
+| Search times out | **Search times out** | In place: "The search took too long." Dates and travellers kept. | **Try again** or **Ask Mada to search** |
+| One airline not answering | **Airline not answering** | Same in-place design: "Saudia isn't answering right now. flynas and Turkish Airlines are." | **Show the others** or **Ask Mada** |
+| Message didn't send | **Messages don't send**, then message Mada | The bubble stays, marked "Didn't send"; the pill offers the Outbox. | **Send again** on the bubble |
+| Upload stops midway | **Upload stops midway**, then Wallet › Add › Scan | "Stopped at 62%. The connection dropped." The 1.5 MB that went is kept. | **Carry on from 62%** |

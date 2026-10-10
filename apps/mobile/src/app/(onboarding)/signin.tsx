@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { Button } from '@/components/Button';
+import { AppleMark, GoogleMark } from '@/components/BrandMarks';
 import { Act, Screen, TopBar } from '@/components/Layout';
 import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
@@ -72,8 +73,8 @@ export default function SignIn() {
         <T v="body">{t('signin.body')}</T>
       </View>
       <Act>
-        <Button label={t('signin.apple')} onPress={() => setSheet('apple')} testID="signin-apple" />
-        <Button variant="secondary" label={t('signin.google')} onPress={() => setSheet('google')} />
+        <Button label={t('signin.apple')} icon={<AppleMark size={20} />} onPress={() => setSheet('apple')} testID="signin-apple" />
+        <Button variant="secondary" label={t('signin.google')} icon={<GoogleMark size={19} />} onPress={() => setSheet('google')} />
         <Button variant="ghost" label={t('signin.phone')} onPress={() => { useOnboarding.getState().set({ social: null }); router.push('/phone'); }} testID="signin-phone" />
         <T v="small" color={colors.ink3} style={{ textAlign: 'center' }}>{t('signin.note')}</T>
       </Act>

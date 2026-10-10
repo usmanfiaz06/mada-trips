@@ -12,7 +12,7 @@ import { Box, Grow, H3, Photo, Ring, Rise, Row, Small, SmallButton, Spread, Tag,
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useTrips, useTripMutation, useDemo } from '@/lib/trips';
+import { newKey, tripsApi, useTrips, useTripMutation, useOffline } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
 import { RequestsCard, TripHero } from './common';
 

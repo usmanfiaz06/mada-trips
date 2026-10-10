@@ -10,7 +10,7 @@ import { Landed } from '@/components/today/Landed';
 import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
 import { useSession } from '@/lib/session';
-import { registerForPush, useCarryOverGuestFlights, useOfflineTrips, useOutboxPump, useTrip, useTrips } from '@/lib/trips';
+import { registerForPush, useCarryOverGuestFlights, useTrip, useTrips } from '@/lib/trips';
 import { colors } from '@/theme';
 
 /**
@@ -22,8 +22,6 @@ export default function Today() {
   const top = useTopInset();
   const status = useSession((s) => s.status);
   const scroll = useRef<ScrollView>(null);
-  useOfflineTrips();
-  useOutboxPump();
   useCarryOverGuestFlights();
   useEffect(() => { void registerForPush(); }, [status]);
   const trips = useTrips();

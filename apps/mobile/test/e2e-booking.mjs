@@ -396,8 +396,11 @@ async function requests() {
   await k.shot('quote-pay');
   await k.slide();
   await k.see('Paid. We’ll take it from here.', 'quote paid', 10000);
+  await page.locator('[data-testid="request-pay"]').filter({ visible: true }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => errors.push('quote paid: Pay button still there'));
   await k.shot('quote-paid', 200);
   step('requests: a visa for the helper (add someone)');
+  await k.tap('Close');
+  await page.waitForTimeout(600);
   await openAsk(page);
   await k.ask('A Schengen visa');
   await k.see('For who?', 'visa who');

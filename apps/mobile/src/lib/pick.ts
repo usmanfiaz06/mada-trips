@@ -22,12 +22,15 @@ export async function takePhoto(): Promise<PickedFile | null | 'denied'> {
     const perm = await ImagePicker.requestCameraPermissionsAsync().catch(() => ({ granted: true }));
     if (!perm.granted) return 'denied';
   }
-  const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85, exif: false });
+  let r: ImagePicker.ImagePickerResult;
+  try { r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85, exif: false }); } catch { return { uri: '', name: 'file', type: 'application/octet-stream', size: 0 }; }
   return r.canceled || !r.assets[0] ? null : fromImage(r.assets[0]);
 }
 
 export async function choosePhoto(): Promise<PickedFile | null> {
-  const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9, exif: false });
+  let r: ImagePicker.ImagePickerResult;
+  // The web picker refuses non-images by throwing: report it as the file it was, so the caller can explain.
+  try { r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9, exif: false }); } catch { return { uri: '', name: 'file', type: 'application/octet-stream', size: 0 }; }
   return r.canceled || !r.assets[0] ? null : fromImage(r.assets[0]);
 }
 

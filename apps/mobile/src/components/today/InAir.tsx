@@ -13,7 +13,7 @@ import { AddressSheet } from '@/components/trips/AddressSheet';
 import { request } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { tripsApi, useDemo } from '@/lib/trips';
+import { tripsApi, useOffline } from '@/lib/trips';
 import { colors, ff, radii, shadow } from '@/theme';
 import { useTripLocal } from './local';
 

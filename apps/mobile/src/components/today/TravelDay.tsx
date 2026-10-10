@@ -8,7 +8,7 @@ import { T } from '@/components/Text';
 import { AirlineMark, Box, Cells, Dot, Eyebrow, Grow, H3, IconTile, Num, Photo, Rise, Row, RouteLine, Small, SmallButton, Spread, Tag, TalkLine, Tiny, useTicker } from '@/components/trips/ui';
 import { VGradient } from '@/components/Gradient';
 import { t } from '@/lib/i18n';
-import { tripsApi, useDemo } from '@/lib/trips';
+import { tripsApi, useOffline } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
 import { useBanner } from './common';
 

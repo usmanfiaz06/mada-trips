@@ -66,9 +66,9 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
                   {r.tag && <span className="inline-flex h-5 items-center rounded-full bg-info-soft px-1.5 text-[11px] font-medium text-info">{t(r.tag)}</span>}
                   {r.escalated && <span className="inline-flex h-5 items-center gap-1 rounded-full bg-bad-soft px-1.5 text-[11px] font-medium text-bad" title={r.escalationNote ?? ""}><Flag className="size-3" />{t("Escalated")}</span>}
                 </span>
-                <span dir="auto" className="mt-0.5 block truncate text-start text-[14.5px] text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{r.title}</span>
+                <span className="mt-0.5 block truncate text-[14.5px] text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4"><bdi>{r.title}</bdi></span>
                 <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12.5px] text-ink-3">
-                  <span dir="auto" className="truncate">{r.sub}</span>
+                  <span className="truncate"><bdi>{r.sub}</bdi></span>
                   {r.amount && <span className="num text-ink-2" dir="ltr">{r.amount}</span>}
                 </span>
               </Link>

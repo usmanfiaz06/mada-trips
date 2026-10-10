@@ -10,7 +10,7 @@ import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, Rise, Row, Sm
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { isOfflineError, newKey, type Queued, tripsApi, useDemo, useDisruption, useOutbox, useTripMutation } from '@/lib/trips';
+import { OUTBOX_DISRUPTION, discardQueued, isOfflineError, newKey, queueDisruption, tripsApi, useDisruption, useOffline, useTripMutation, useTripOutbox } from '@/lib/trips';
 import { colors, radii } from '@/theme';
 
 const TEL = `tel:${DESK_PHONE.replace(/\s/g, '')}`;
@@ -33,7 +33,7 @@ export default function Disruption() {
   const kindQ = DisruptionKind.safeParse(kindParam);
   const q = useDisruption(id, kindQ.success ? kindQ.data : undefined);
   const offline = useOffline();
-  const queued = useOutbox((s) => s.items.find((x): x is Extract<Queued, { kind: 'disruption' }> => x.kind === 'disruption' && x.tripId === id));
+  const queued = useTripOutbox(id, OUTBOX_DISRUPTION)[0];
   const [pick, setPick] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>(queued ? 'queued' : 'choose');
   const [result, setResult] = useState<DisruptionChoiceResponse | null>(null);
@@ -49,7 +49,7 @@ export default function Disruption() {
     return <Screen><TopBar onBack={() => router.back()} right={<CallLink />} />{q.isError ? <Box style={{ margin: 16 }}><H3>{t('dz.offTitle')}</H3><Small>{t('dz.offBody', { phone: DESK_PHONE })}</Small><Button label={t('dz.callDesk')} onPress={call} /></Box> : null}</Screen>;
   }
   const night = d.kind === 'night';
-  const cur: DisruptionOption = d.options.find((o) => o.id === (pick ?? queued?.body.optionId)) ?? d.options[0]!;
+  const cur: DisruptionOption = d.options.find((o) => o.id === (pick ?? queued?.meta?.optionId)) ?? d.options[0]!;
 
   const send = () => {
     buzz('knock');
@@ -63,7 +63,7 @@ export default function Disruption() {
     });
   };
   const queue = () => {
-    useOutbox.getState().add({ id: newKey(), kind: 'disruption', tripId: id, body: { kind: d.kind, optionId: cur.id, clientKey }, at: Date.now() });
+    queueDisruption(id, { kind: d.kind, optionId: cur.id, clientKey }, cur.title);
     setStage('queued');
     buzz('soft');
   };
@@ -89,7 +89,7 @@ export default function Disruption() {
   if (shown === 'queued') {
     return (
       <Screen>
-        <TopBar onBack={() => { if (queued) useOutbox.getState().remove(queued.id); setStage('choose'); }} backLabel={t('dz.chooseAgain')} right={<CallLink />} />
+        <TopBar onBack={() => { if (queued) discardQueued(queued.id); setStage('choose'); }} backLabel={t('dz.chooseAgain')} right={<CallLink />} />
         <Scroll top={8} bottomPad={200}>
           <View style={styles.wait}><Icon name="wifiOff" size={28} /></View>
           <T v="h1" accessibilityRole="header">{t('dz.q.title')}</T>

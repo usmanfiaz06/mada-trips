@@ -18,7 +18,7 @@ import { AgentIntro, Box, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, 
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
-import { useOfflineTrips, useOutbox, useOutboxPump, useTrips } from '@/lib/trips';
+import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
 import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
 
@@ -34,10 +34,8 @@ export default function Trips() {
   const router = useRouter();
   const top = useTopInset();
   const params = useLocalSearchParams<{ tab?: string }>();
-  useOfflineTrips();
-  useOutboxPump();
   const { data } = useTrips();
-  const queued = useOutbox((s) => s.items);
+  const queued = useTripOutbox();
   const [tab, setTab] = useState<Tab>(params.tab === 'requests' || params.tab === 'past' ? params.tab : 'upcoming');
   const [seenParam, setSeenParam] = useState(params.tab);
   if (seenParam !== params.tab) { setSeenParam(params.tab); if (params.tab === 'requests' || params.tab === 'past' || params.tab === 'upcoming') setTab(params.tab); }
@@ -129,7 +127,7 @@ function Imports() {
 
 function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; refunds: RefundView[]; ask: (p?: string) => void }) {
   const router = useRouter();
-  const queued = useOutbox((s) => s.items);
+  const queued = useTripOutbox();
   const shown = requests.filter((r) => r.area !== 'refund');
   if (!shown.length && !refunds.length && !queued.length) return (
     <EmptyState art={<ArtPaperPlane width={280} height={112} />} title={t('trips.requests.empty.title')} body={t('trips.requests.empty.body')}
@@ -143,7 +141,7 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
   return (<>
     {queued.map((q) => (
       <Box key={q.id} testID="queued-request">
-        <Spread align="flex-start"><H3>{q.kind === 'ask' ? q.title : t('tr.req.queuedChoice')}</H3><Tag label={t('rq.queued')} /></Spread>
+        <Spread align="flex-start"><H3>{q.kind === OUTBOX_ASK ? q.label : t('tr.req.queuedChoice')}</H3><Tag label={t('rq.queued')} /></Spread>
         <Tiny>{t('tr.req.savedPhone')}</Tiny>
       </Box>
     ))}

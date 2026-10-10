@@ -13,14 +13,13 @@ import { AirlineMark, Box, Display, Divider, Eyebrow, Grow, H3, ListRow, Photo, 
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useOfflineTrips, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
+import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
 import { colors } from '@/theme';
 
 /** One trip (prototype TripDetail): flights, stay, pickups, the Manage list and the travellers. */
 export default function TripDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  useOfflineTrips();
   const q = useTrip(id);
   const pays = usePayments(id);
   const quote = useRefundQuote(id);

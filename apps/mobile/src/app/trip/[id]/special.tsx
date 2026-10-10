@@ -14,7 +14,7 @@ import { Box, H3, IconTile, Num, PickCard, Rise, Row, Small, Spread, Tiny, TripS
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useOutbox, useDemo, useTrip, useTripMutation, useTripRequests } from '@/lib/trips';
+import { OUTBOX_ASK, newKey, queueAsk, tripsApi, useOffline, useTrip, useTripOutbox, useTripMutation, useTripRequests } from '@/lib/trips';
 import { colors, ff } from '@/theme';
 
 type Sid = 'wheelchair' | 'meal' | 'bassinet' | 'seats' | 'celebration' | 'prayer' | 'bags' | 'sports' | 'pet';
@@ -29,7 +29,7 @@ export default function SpecialRequests() {
   const router = useRouter();
   const trip = useTrip(id).data?.trip;
   const reqs = useTripRequests(id);
-  const queued = useOutbox((s) => s.items.filter((q) => q.kind === 'ask' && q.tripId === id));
+  const queued = useTripOutbox(id, OUTBOX_ASK);
   const [forWho, setForWho] = useState<string>('all');
   const [open, setOpen] = useState<Sid | null>(null);
   if (!trip) return <TripScreen title={t('sr.title')}><EmptyState art={<ArtSuitcase />} title={t('sr.emptyTitle')} body={t('sr.emptyBody')} /></TripScreen>;
@@ -53,7 +53,7 @@ export default function SpecialRequests() {
       {mine.length || queued.length ? (
         <Box testID="sr-asked">
           <H3>{t('sr.asked')}</H3>
-          {queued.map((q) => <Spread key={q.id}><Small style={{ flex: 1 }}>{q.kind === 'ask' ? q.title : ''}</Small><RequestStatusPill r={{ id: q.id, tripId: id, kind: 'x', area: 'special', status: 'queued', title: '', short: null, detail: null, withWhom: 'faisal', withName: null, outcome: null, alt: null, yesText: null, quote: null, quoteText: null, createdAt: '', updatedAt: '' }} /></Spread>)}
+          {queued.map((q) => <Spread key={q.id}><Small style={{ flex: 1 }}>{q.label}</Small><RequestStatusPill r={{ id: q.id, tripId: id, kind: 'x', area: 'special', status: 'queued', title: '', short: null, detail: null, withWhom: 'faisal', withName: null, outcome: null, alt: null, yesText: null, quote: null, quoteText: null, createdAt: '', updatedAt: '' }} /></Spread>)}
           {mine.map((r) => (
             <View key={r.id} style={{ gap: 4 }}>
               <Spread><Small style={{ flex: 1 }} color={colors.green}>{r.title}</Small><RequestStatusPill r={r} /></Spread>
@@ -71,7 +71,6 @@ export default function SpecialRequests() {
 function SpecialSheet({ trip, sid, forWho, onClose }: { trip: TripDetail; sid: Sid; forWho: string; onClose: () => void }) {
   const router = useRouter();
   const offline = useOffline();
-  const addQueued = useOutbox((s) => s.add);
   const [opt, setOpt] = useState<string | null>(null);
   const [count, setCount] = useState(1);
   const [note, setNote] = useState('');
@@ -89,7 +88,7 @@ function SpecialSheet({ trip, sid, forWho, onClose }: { trip: TripDetail; sid: S
   const send = (o: Omit<CreateTripAskRequest, 'area' | 'kind' | 'clientKey'>, title: string) => {
     const body: CreateTripAskRequest = { area: 'special', kind: sid, travellerIds: forWho === 'all' ? undefined : [forWho], ...o, clientKey: newKey() };
     if (offline) {
-      addQueued({ id: body.clientKey, kind: 'ask', tripId: trip.id, body, title, at: Date.now() });
+      queueAsk(trip.id, body, title);
       buzz('soft'); toast(t('sr.queued')); onClose(); return;
     }
     ask.mutate(body, { onSuccess: () => { buzz('success'); toast(sid === 'bags' ? t('sr.bags.toast') : t('sr.sentToast')); onClose(); }, onError: (e) => toast(e.message) });

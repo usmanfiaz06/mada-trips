@@ -110,7 +110,7 @@ export async function Thread({ messages, notes, travellerName, empty }: { messag
             {it.type === "note" ? (
               <div className="mx-auto max-w-[560px] rounded-2xl border border-dashed border-gold/60 bg-gold-soft/60 px-3.5 py-2.5 text-[13.5px] text-ink">
                 <div className="mb-0.5 flex items-center gap-1.5 text-[11.5px] font-medium text-gold-2"><Lock className="size-3" />{t("Note for the team")} · {it.n.name} · {timeAgo(it.at, t.locale)}</div>
-                <div className="whitespace-pre-wrap break-words">{it.n.n.body}</div>
+                <div dir="auto" className="whitespace-pre-wrap break-words text-start">{it.n.n.body}</div>
               </div>
             ) : <Bubble m={it.m} traveller={travellerName} />}
           </li>
@@ -132,7 +132,7 @@ async function Bubble({ m, traveller }: { m: Msg; traveller: string }) {
       {m.authorKind === "mada" ? <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand"><img src={withBase("/symbol-sand.svg")} alt="" className="h-3 dark:hidden" /><img src={withBase("/symbol-green.svg")} alt="" className="hidden h-3 dark:block" /></span> : <Avatar name={who} size={28} />}
       <div className={cx("max-w-[78%] min-w-0", mine && "text-end")}>
         <div className="mb-1 text-[11.5px] text-ink-3"><span className="font-medium text-ink-2">{who}</span> · <span title={fmtDate(m.createdAt, t.locale, true)}>{timeAgo(m.createdAt, t.locale)}</span></div>
-        <div className={cx("inline-block max-w-full whitespace-pre-wrap break-words rounded-[18px] px-3.5 py-2 text-start text-[14px] leading-relaxed",
+        <div dir="auto" className={cx("inline-block max-w-full whitespace-pre-wrap break-words rounded-[18px] px-3.5 py-2 text-start text-[14px] leading-relaxed",
           m.authorKind === "user" ? "rounded-es-md bg-surface-2 text-ink ring-1 ring-line" : m.authorKind === "agent" ? "rounded-ee-md bg-ink text-bg" : "rounded-ee-md bg-brand text-brand-ink")}>
           {m.body}
           {att && (

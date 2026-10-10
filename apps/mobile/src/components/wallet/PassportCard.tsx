@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -33,6 +34,7 @@ export function chipFor(p: Person | undefined, v: Validity): Chip {
 const COUNTRY: Record<string, string> = { SAU: 'Kingdom of Saudi Arabia', PHL: 'Republic of the Philippines', IND: 'Republic of India', PAK: 'Islamic Republic of Pakistan', EGY: 'Arab Republic of Egypt', ARE: 'United Arab Emirates', JOR: 'Hashemite Kingdom of Jordan' };
 
 export function PassportCard({ person, validity, isSelf, name, onScan }: { person: Person | undefined; validity: Validity; isSelf: boolean; name: string; onScan: () => void }) {
+  const gid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const rx = useSharedValue(0);
   const ry = useSharedValue(0);
   const sheen = useSharedValue(0.5);
@@ -64,13 +66,13 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
       <Animated.View style={[styles.passport, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
-            <LinearGradient id="ppg" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
-            <LinearGradient id="pps" x1="0" y1="0" x2="1" y2="0.4"><Stop offset="0.3" stopColor="#ffffff" stopOpacity={0} /><Stop offset="0.48" stopColor="#e9d2a0" stopOpacity={0.3} /><Stop offset="0.54" stopColor="#aadcd2" stopOpacity={0.12} /><Stop offset="0.7" stopColor="#ffffff" stopOpacity={0} /></LinearGradient>
+            <LinearGradient id={`ppg${gid}`} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
+            <LinearGradient id={`pps${gid}`} x1="0" y1="0" x2="1" y2="0.4"><Stop offset="0.3" stopColor="#ffffff" stopOpacity={0} /><Stop offset="0.48" stopColor="#e9d2a0" stopOpacity={0.3} /><Stop offset="0.54" stopColor="#aadcd2" stopOpacity={0.12} /><Stop offset="0.7" stopColor="#ffffff" stopOpacity={0} /></LinearGradient>
           </Defs>
-          <Rect width="100%" height="100%" fill="url(#ppg)" />
+          <Rect width="100%" height="100%" fill={`url(#ppg${gid})`} />
         </Svg>
         <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { start: -130, end: -130 }, sheenStyle]}>
-          <Svg width="100%" height="100%" preserveAspectRatio="none"><Rect width="100%" height="100%" fill="url(#pps)" /></Svg>
+          <Svg width="100%" height="100%" preserveAspectRatio="none"><Rect width="100%" height="100%" fill={`url(#pps${gid})`} /></Svg>
         </Animated.View>
         <View style={styles.sunMark} pointerEvents="none"><Sun width={150} color="rgba(217,183,122,0.07)" /></View>
 
