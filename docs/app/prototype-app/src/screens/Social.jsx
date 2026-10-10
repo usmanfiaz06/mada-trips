@@ -53,15 +53,202 @@ function PersonRow({ id, sub, right, onClick, on }) {
 
 const Tick = ({ on }) => <span className={'tickbox' + (on ? ' on' : '')} aria-hidden="true">{on && <Icon name="check" size={14} color="#f6f2ec" width={2.6} />}</span>;
 
+/* ---------- circle threads ----------
+   Everything said and decided in a circle lives in the store, so nothing is lost on leaving:
+   s.circleThreads[groupId] = { msgs, trip, pinned, opened }
+   s.circleQueue = [{ at, gid, type, ... }]  what other people do next (reply, vote, accept, leave, pay), applied when due
+   s.circlePay = { gid, mid, key, amount }   a share being paid on the Pay screen
+   Invites waiting for an answer sit on the group: group.invited = [{ id, at, reminded }]. */
+
+export const newId = () => 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+let OPEN_GID = null;
+export const setOpenCircle = (gid) => { OPEN_GID = gid; };
+
+export const getThread = (st, gid) => (st.circleThreads || {})[gid] || null;
+const withThread = (st, gid, fn) => ({ circleThreads: { ...(st.circleThreads || {}), [gid]: fn(getThread(st, gid) || { msgs: [] }) } });
+/* Small state operations, folded together into one set(): set((p) => fold(p, [opAdd(...), opGroup(...)])). */
+export const opAdd = (gid, ...msgs) => (st) => withThread(st, gid, (t) => ({ ...t, msgs: [...t.msgs, ...msgs.map((m) => ({ id: newId(), at: Date.now(), ...m }))] }));
+export const opMsg = (gid, mid, fn) => (st) => withThread(st, gid, (t) => ({ ...t, msgs: t.msgs.map((m) => (m.id === mid ? fn(m) : m)) }));
+export const opThread = (gid, fn) => (st) => withThread(st, gid, fn);
+export const opGroup = (gid, fn) => (st) => ({ groups: st.groups.map((g) => (g.id === gid ? fn(g) : g)) });
+export const opQueue = (...events) => (st) => ({ circleQueue: [...(st.circleQueue || []), ...events.flat().filter(Boolean)] });
+export const opDrop = (gid) => (st) => {
+  const t = { ...(st.circleThreads || {}) };
+  delete t[gid];
+  return { circleThreads: t, circleQueue: (st.circleQueue || []).filter((e) => e.gid !== gid) };
+};
+export const fold = (st, ops) => {
+  let cur = st;
+  const out = {};
+  ops.filter(Boolean).forEach((op) => { const p = op(cur); cur = { ...cur, ...p }; Object.assign(out, p); });
+  return out;
+};
+export const sys = (text) => ({ t: 'sys', text });
+
+/* "Hessa", "Hessa and Abdullah", "Hessa, Abdullah and 2 others" */
+export const names = (ids, max = 3) => {
+  const n = ids.map((id) => person(id).short);
+  if (n.length <= 1) return n[0] || '';
+  if (n.length <= max) return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
+  return n.slice(0, max - 1).join(', ') + ` and ${n.length - max + 1} others`;
+};
+
+/* Families for "split by family": your household is one family; Noor travels with Abdullah. */
+const FAMILY_OF = { noor: 'abdullah' };
+export const familyOf = (id) => (id === 'omar' || (PEOPLE[id] && !FRIENDS[id]) ? 'omar' : FAMILY_OF[id] || id);
+export const familyLabel = (key, ids) => {
+  if (key === 'omar') return ids.length > 1 ? 'Your family' : 'You';
+  return ids.length > 1 || Object.values(FAMILY_OF).includes(key) ? `${person(key).short}’s family` : person(key).short;
+};
+
+/* A share is settled when everyone in it has paid. */
+export const markPaid = (m, key) => {
+  const shares = m.split.shares.map((sh) => (sh.key === key ? { ...sh, paid: true } : sh));
+  return { ...m, split: { ...m.split, shares, settled: shares.every((sh) => sh.paid) } };
+};
+
+/* What other people do, when it's due. */
+function applyEvent(st, ev) {
+  const g = st.groups.find((x) => x.id === ev.gid);
+  if (!g) return {};
+  const unread = OPEN_GID === ev.gid ? null : opGroup(ev.gid, (x) => ({ ...x, unread: (x.unread || 0) + 1 }));
+  const who = person(ev.who).short;
+  switch (ev.type) {
+    case 'msg':
+      if (ev.who !== 'mada' && !g.members.includes(ev.who)) return {};
+      return fold(st, [opAdd(ev.gid, { who: ev.who, ...ev.msg }), unread]);
+    case 'seen':
+      if (!g.members.includes(ev.who)) return {};
+      return fold(st, [opMsg(ev.gid, ev.mid, (m) => ({ ...m, seen: [...new Set([...(m.seen || []), ev.who])] }))]);
+    case 'vote':
+      if (!g.members.includes(ev.who)) return {};
+      return fold(st, [opMsg(ev.gid, ev.mid, (m) => (m.vote.closed || m.vote.options.some((o) => o.votes.includes(ev.who)) ? m
+        : { ...m, vote: { ...m.vote, options: m.vote.options.map((o) => (o.id === ev.opt ? { ...o, votes: [...o.votes, ev.who] } : o)) } }))]);
+    case 'paid': {
+      const t = getThread(st, ev.gid);
+      const m = t && t.msgs.find((x) => x.id === ev.mid);
+      const sh = m && m.split.shares.find((x) => x.key === ev.key);
+      if (!sh || sh.paid) return {};
+      return fold(st, [opMsg(ev.gid, ev.mid, (x) => markPaid(x, ev.key)), opAdd(ev.gid, sys(`${sh.label} paid ${sh.ids.length > 1 ? 'their' : sh.ids[0] === 'omar' ? 'your' : 'their'} share · SAR ${Math.round(sh.amount).toLocaleString('en-US')}`)), unread]);
+    }
+    case 'accept':
+      if (!(g.invited || []).some((i) => i.id === ev.who)) return {};
+      return fold(st, [opGroup(ev.gid, (x) => ({ ...x, members: [...x.members, ev.who], invited: (x.invited || []).filter((i) => i.id !== ev.who) })), opAdd(ev.gid, sys(`${who} joined`)), unread]);
+    case 'leave':
+      if (!g.members.includes(ev.who)) return {};
+      return fold(st, [opGroup(ev.gid, (x) => {
+        const members = x.members.filter((m) => m !== ev.who);
+        return { ...x, members, admin: x.admin === ev.who ? members[0] : x.admin };
+      }), opAdd(ev.gid, sys(`${who} left the circle`)), unread]);
+    case 'dest':
+      return fold(st, [opGroup(ev.gid, (x) => ({ ...x, dest: x.dest || ev.dest }))]);
+    default:
+      return {};
+  }
+}
+
+/* The first messages of a circle: a real history for the demo circles, a welcome for new ones. */
+const TRIP_IST = { city: 'Istanbul', dates: 'Tue 9 – Mon 15 Mar', img: 'img/istanbul.jpg' };
+function seedThread(g) {
+  const now = Date.now();
+  const mins = (n) => now - n * 60000;
+  if (g.dm) return opThread(g.id, () => ({ msgs: [{ id: newId(), t: 'sys', text: `Messages with ${g.name} stay between you two.`, at: now }] }));
+  if (g.via === 'invite') return (st) => fold(st, [
+    opThread(g.id, () => ({
+      opened: false,
+      trip: { ...TRIP_IST, flights: [{ who: 'abdullah', text: 'Abdullah’s family is on SV263, Tue 9 Mar' }, { who: 'noor', text: 'Noor is on SV263 too' }], same: 'Istanbul for Eid' },
+      pinned: { kind: 'plan', id: 'istanbul3', by: 'abdullah' },
+      msgs: [
+        { id: newId(), t: 'sys', text: `${person(g.admin).short} made the circle`, at: mins(4300) },
+        { id: newId(), t: 'text', who: 'abdullah', text: 'Booked. We’re on SV263, Tue 9 Mar. Galata rooms for the six of us.', at: mins(2900) },
+        { id: newId(), t: 'text', who: 'noor', text: 'Same flight for us. The kids want the ferry and the islands.', at: mins(2860) },
+        { id: newId(), t: 'card', who: 'abdullah', card: { kind: 'plan', id: 'istanbul3' }, at: mins(2800) },
+        { id: newId(), t: 'text', who: 'abdullah', text: 'This is the plan Mada made us. Pinned it.', at: mins(2799) },
+        { id: newId(), t: 'text', who: 'khalid', text: 'I’ll book this week, in sha Allah.', at: mins(600) },
+        { id: newId(), t: 'sys', text: `You joined from ${person(g.admin).short}’s link`, at: now },
+      ],
+    })),
+  ]);
+  if (g.id === 'eid') return opThread(g.id, () => ({
+    trip: { ...TRIP_IST, flights: [{ who: 'abdullah', text: 'Abdullah’s family is on SV263, Tue 9 Mar' }, { who: 'noor', text: 'Noor lands with them, 40 min after you' }], same: 'Istanbul for Eid' },
+    msgs: [
+      { id: newId(), t: 'sys', text: 'You made the circle', at: mins(9000) },
+      { id: 'eid-van', t: 'mada', kind: 'van', text: 'Abdullah and Noor land 40 minutes after you. We’ve put everyone in one van, so it waits for both families.', at: mins(300) },
+      { id: newId(), t: 'text', who: 'hessa', text: 'Can we all do a Bosphorus dinner cruise one evening?', at: mins(95) },
+      { id: 'eid-vote', t: 'vote', who: 'hessa', at: mins(94), vote: { q: 'Which evening for the cruise?', kind: 'dates', closed: false, options: [{ id: 'wed', label: 'Wed 10 Mar', votes: ['hessa', 'abdullah', 'noor'] }, { id: 'thu', label: 'Thu 11 Mar', votes: ['sara'] }] } },
+      { id: 'eid-hold', t: 'faisal', kind: 'hold', at: mins(40) },
+    ],
+  }));
+  if (g.id === 'family') return opThread(g.id, () => ({
+    msgs: [
+      { id: newId(), t: 'sys', text: 'You made the circle', at: mins(40000) },
+      { id: newId(), t: 'text', who: 'hessa', text: 'Sara’s new passport photo is done. I added it in the Wallet.', at: mins(1500) },
+      { id: newId(), t: 'text', who: 'omar', text: 'Thank you. I’ll book the appointment.', at: mins(1490), seen: ['hessa'] },
+    ],
+  }));
+  if (g.id === 'season') return (st) => fold(st, [
+    opThread(g.id, () => ({
+      msgs: [
+        { id: newId(), t: 'sys', text: 'Abdullah made the circle', at: mins(20000) },
+        { id: newId(), t: 'text', who: 'abdullah', text: 'Boulevard World this week. Who’s coming?', at: mins(700) },
+        { id: newId(), t: 'text', who: 'faris', text: 'Me. Thursday is better for me.', at: mins(650) },
+        { id: 'season-vote', t: 'vote', who: 'abdullah', at: mins(640), vote: { q: 'Which night?', kind: 'dates', closed: false, options: [{ id: 'thu', label: 'Thursday', votes: ['abdullah', 'faris', 'maha'] }, { id: 'fri', label: 'Friday', votes: ['yousef', 'noor'] }] } },
+        { id: newId(), t: 'text', who: 'khalid', text: 'I can’t make either, sorry. Have fun.', at: mins(300) },
+      ],
+    })),
+    /* Someone leaves on their own, later, so the case can be seen. */
+    g.members.includes('khalid') ? opQueue({ at: now + 12000, gid: g.id, type: 'leave', who: 'khalid' }) : null,
+  ]);
+  /* A circle made in the app. */
+  return (st) => fold(st, [
+    opThread(g.id, () => ({
+      msgs: [
+        { id: newId(), t: 'sys', text: 'You made the circle', at: now },
+        ...((g.invited || []).length ? [{ id: newId(), t: 'sys', text: `You invited ${names(g.invited.map((i) => i.id))}`, at: now }] : []),
+        { id: newId(), t: 'mada', kind: 'welcome', at: now },
+      ],
+    })),
+    /* One invitee says yes after a few seconds; the others haven't answered yet. */
+    (g.invited || []).length ? opQueue({ at: now + 2500, gid: g.id, type: 'accept', who: g.invited[0].id }) : null,
+  ]);
+}
+
+/* Runs on Circles screens: seeds threads for circles that have none, and plays what others do when it's due. */
+export function useCircleClock() {
+  const { s, set } = useStore();
+  const q = s.circleQueue || [];
+  const ids = s.groups.map((g) => g.id).join();
+  useEffect(() => {
+    if (!s.groups.some((g) => !getThread(s, g.id))) return;
+    set((p) => fold(p, p.groups.filter((g) => !getThread(p, g.id)).map(seedThread)));
+  }, [ids]);
+  useEffect(() => {
+    if (!q.length) return undefined;
+    const next = Math.min(...q.map((e) => e.at));
+    const t = setTimeout(() => set((p) => {
+      const now = Date.now() + 30;
+      const all = p.circleQueue || [];
+      const due = all.filter((e) => e.at <= now).sort((a, b) => a.at - b.at);
+      if (!due.length) return {};
+      let st = { ...p, circleQueue: all.filter((e) => e.at > now) };
+      const out = { circleQueue: st.circleQueue };
+      due.forEach((ev) => { const patch = applyEvent(st, ev); st = { ...st, ...patch }; Object.assign(out, patch); });
+      return out;
+    }), Math.max(20, next - Date.now()));
+    return () => clearTimeout(t);
+  }, [q]);
+}
+
 /* ---------- new circle ---------- */
 
 export function NewCircle({ params = {} }) {
   const { s, set, pop, replace, toast } = useStore();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(params.name || '');
   const [cover, setCover] = useState(s.trip ? 'img/istanbul.jpg' : null);
   const [picked, setPicked] = useState(params.with ? [params.with] : []);
   const [q, setQ] = useState('');
   const [trip, setTrip] = useState(params.with ? 'new' : 'none');
+  const [where, setWhere] = useState('');
   const [invite, setInvite] = useState(false);
   const pool = [...s.household.filter((id) => id !== 'omar'), ...s.friends];
   const term = q.trim().toLowerCase();
@@ -71,10 +258,12 @@ export function NewCircle({ params = {} }) {
   const toggle = (id) => { setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]); buzz(HAPTIC.select); };
   const create = () => {
     const id = 'g' + Date.now();
-    const g = { id, name: name.trim(), img: cover, members: ['omar', ...picked], admin: 'omar', unread: 0, sub: picked.length ? 'just started' : 'only you so far', trip: trip === 'trip' ? 'Istanbul · 9–15 Mar' : trip === 'new' ? 'Somewhere new' : null, muted: false, fresh: true };
+    const dest = where.trim() ? where.trim().replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+    /* People are invited, not added: they're in once they say yes. */
+    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: trip === 'trip' ? 'Istanbul · 9–15 Mar' : trip === 'new' ? (dest || 'Somewhere new') : null, dest, muted: false, fresh: true };
     set((p) => ({ groups: [g, ...p.groups] }));
     buzz(HAPTIC.success);
-    toast(picked.length ? `Circle made. We’ve told ${picked.length === 1 ? person(picked[0]).short : picked.length + ' people'}.` : 'Circle made. Share the link to bring people in.');
+    toast(picked.length ? `Circle made. Invite sent to ${names(picked)}.` : 'Circle made. Share the link to bring people in.');
     replace('group', { id });
   };
   return (
@@ -86,7 +275,7 @@ export function NewCircle({ params = {} }) {
           <label htmlFor="nc-name">Name it</label>
           <input id="nc-name" className={'input' + (dupe ? ' bad' : '')} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer in Baku" />
           {dupe ? <span className="err" role="alert">You already have a circle called {name.trim()}.</span>
-            : <div className="chips">{['Eid trip', 'Weekend crew', 'Work trip', 'Cousins'].map((t) => <button key={t} type="button" className="chip" onClick={() => setName(t)}>{t}</button>)}</div>}
+            : <div className="chips">{['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t) => <button key={t} type="button" className={'chip' + (name === t ? ' on' : '')} onClick={() => setName(t)}>{t}</button>)}</div>}
         </div>
 
         <div className="col" style={{ gap: 8 }}>
@@ -100,12 +289,14 @@ export function NewCircle({ params = {} }) {
         </div>
 
         <div className="col" style={{ gap: 8 }}>
-          <div className="spread"><span className="eyebrow">Who’s in</span><span className="tiny">{picked.length ? `${picked.length} picked` : 'Optional'}</span></div>
+          <div className="spread"><span className="eyebrow">Who’s in</span><span className="tiny">{picked.length ? `${picked.length} to invite` : 'Optional'}</span></div>
           {pool.length > 5 && <input className="input" placeholder="Search friends and family" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search friends and family" />}
           {shown.map((id) => (
             <PersonRow key={id} id={id} sub={person(id).household ? 'Family' : 'Friend'} on={picked.includes(id)} onClick={() => toggle(id)} right={<Tick on={picked.includes(id)} />} />
           ))}
-          {shown.length === 0 && <span className="small">Nobody called “{q.trim()}” yet. Invite them with a link.</span>}
+          {pool.length === 0 && <div className="card well" style={{ gap: 4 }}><span className="h3" style={{ fontSize: 15 }}>Start it on your own.</span><span className="small">Make the circle, then send the link. People join when they open it.</span></div>}
+          {pool.length > 0 && shown.length === 0 && <span className="small">Nobody called “{q.trim()}” yet. Invite them with a link.</span>}
+          {picked.length > 0 && <span className="tiny">They get an invite and join when they say yes.</span>}
           <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setInvite(true)}><Icon name="link" size={18} />Invite someone not on Mada</button>
         </div>
 
@@ -116,7 +307,8 @@ export function NewCircle({ params = {} }) {
               <button key={id} type="button" role="radio" aria-checked={trip === id ? 'true' : 'false'} className={'chip' + (trip === id ? ' on' : '')} onClick={() => setTrip(id)}>{label}</button>
             ))}
           </div>
-          {trip !== 'none' && <span className="tiny">Mada joins the circle to answer questions. A Mada agent confirms anything you book.</span>}
+          {trip === 'new' && <input className="input" aria-label="Where to" placeholder="Where to? Georgia, Baku… (optional)" value={where} maxLength={30} onChange={(e) => setWhere(e.target.value)} />}
+          {trip !== 'none' && <span className="tiny">Mada joins the circle to answer questions. Faisal confirms anything you book.</span>}
         </div>
       </div>
       <div className="act"><button type="button" className="btn primary block" disabled={!ok} onClick={create}>{ok ? `Make ${name.trim()}` : 'Make the circle'}</button></div>
@@ -133,30 +325,40 @@ export function GroupInfo({ group, onClose }) {
   const [rename, setRename] = useState(group.name);
   const [target, setTarget] = useState(null);
   const admin = group.admin === 'omar';
-  const patch = (p) => set((st) => ({ groups: st.groups.map((g) => (g.id === group.id ? { ...g, ...p } : g)) }));
+  const gid = group.id;
+  const run = (...ops) => set((st) => fold(st, ops));
+  const patch = (p) => opGroup(gid, (g) => ({ ...g, ...p }));
   const others = group.members.filter((m) => m !== 'omar');
-  const addable = [...s.household.filter((id) => id !== 'omar'), ...s.friends].filter((id) => !group.members.includes(id));
+  const invited = group.invited || [];
+  const addable = [...s.household.filter((id) => id !== 'omar'), ...s.friends].filter((id) => !group.members.includes(id) && !invited.some((i) => i.id === id));
   const [adding, setAdding] = useState([]);
   const leave = () => {
-    set((st) => ({ groups: others.length ? st.groups.map((g) => (g.id === group.id ? { ...g, members: others, admin: admin ? others[0] : g.admin, left: true } : g)).filter((g) => g.id !== group.id) : st.groups.filter((g) => g.id !== group.id) }));
+    if (others.length) run(patch({ members: others, admin: admin ? others[0] : group.admin }), (st) => ({ groups: st.groups.filter((g) => g.id !== gid) }), opDrop(gid));
+    else run((st) => ({ groups: st.groups.filter((g) => g.id !== gid) }), opDrop(gid));
     buzz(HAPTIC.success); toast(others.length ? `You left ${group.name}.` : `${group.name} is deleted.`); onClose(); pop();
   };
+  const ago = (at) => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)} days ago`; };
 
   if (sheet === 'rename') return (
     <Sheet label="Rename" onClose={() => setSheet(null)}>
       <h2 className="h2">Rename the circle</h2>
       <input className="input" maxLength={40} value={rename} onChange={(e) => setRename(e.target.value)} aria-label="Circle name" />
       <span className="tiny">Everyone in the circle sees the new name.</span>
-      <button type="button" className="btn primary block" disabled={rename.trim().length < 2} onClick={() => { patch({ name: rename.trim() }); setSheet(null); toast('Renamed.'); }}>Save</button>
+      <button type="button" className="btn primary block" disabled={rename.trim().length < 2 || rename.trim() === group.name} onClick={() => { run(patch({ name: rename.trim() }), opAdd(gid, sys(`You renamed the circle to ${rename.trim()}`))); setSheet(null); toast('Renamed.'); }}>Save</button>
     </Sheet>
   );
   if (sheet === 'add') return (
     <Sheet label="Add people" onClose={() => setSheet(null)}>
-      <h2 className="h2">Add people</h2>
-      {addable.length === 0 && <span className="small">Everyone you know on Mada is already here. Invite others with a link.</span>}
+      <h2 className="h2">Invite people</h2>
+      <span className="small">They get an invite and join when they say yes.</span>
+      {addable.length === 0 && <span className="small">Everyone you know on Mada is already here or invited. Invite others with a link.</span>}
       {addable.map((id) => <PersonRow key={id} id={id} on={adding.includes(id)} onClick={() => setAdding(adding.includes(id) ? adding.filter((x) => x !== id) : [...adding, id])} right={<Tick on={adding.includes(id)} />} />)}
       <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setSheet('invite')}><Icon name="link" size={18} />Invite with a link</button>
-      <button type="button" className="btn primary block" disabled={!adding.length} onClick={() => { patch({ members: [...group.members, ...adding] }); buzz(HAPTIC.success); toast(`Added ${adding.map((id) => person(id).short).join(', ')}.`); setAdding([]); setSheet(null); }}>Add {adding.length || ''}</button>
+      <button type="button" className="btn primary block" disabled={!adding.length} onClick={() => {
+        const now = Date.now();
+        run(patch({ invited: [...invited, ...adding.map((id) => ({ id, at: now }))] }), opAdd(gid, sys(`You invited ${names(adding)}`)), opQueue({ at: now + 3000, gid, type: 'accept', who: adding[0] }));
+        buzz(HAPTIC.success); toast(`Invite sent to ${names(adding)}.`); setAdding([]); setSheet(null);
+      }}>{adding.length ? `Invite ${adding.length}` : 'Invite'}</button>
     </Sheet>
   );
   if (sheet === 'invite') return <InviteSheet what={group.name} onClose={() => setSheet(null)} />;
@@ -165,17 +367,18 @@ export function GroupInfo({ group, onClose }) {
     return (
       <Sheet label={p.name} onClose={() => setSheet(null)}>
         <div className="row"><Avatar id={target} size={48} /><div className="col" style={{ gap: 0 }}><span className="h2">{p.name}</span><span className="tiny">{group.admin === target ? 'Admin' : 'Member'}</span></div></div>
-        {admin && <button type="button" className="card tap well" onClick={() => { patch({ admin: target }); setSheet(null); toast(`${p.short} is the admin now.`); }}><span className="h3" style={{ fontSize: 15 }}>Make {p.short} the admin</span><span className="tiny">You stay in the circle.</span></button>}
-        {admin && <button type="button" className="card tap well" onClick={() => { patch({ members: group.members.filter((m) => m !== target) }); setSheet(null); toast(`${p.short} is out of the circle. They aren’t told why.`); }}><span className="h3" style={{ fontSize: 15, color: '#8a3524' }}>Remove from the circle</span><span className="tiny">Their messages stay. They lose access to shared plans.</span></button>}
+        {admin && <button type="button" className="card tap well" onClick={() => { run(patch({ admin: target }), opAdd(gid, sys(`${p.short} is the admin now`))); setSheet(null); toast(`${p.short} is the admin now.`); }}><span className="h3" style={{ fontSize: 15 }}>Make {p.short} the admin</span><span className="tiny">You stay in the circle.</span></button>}
+        {admin && <button type="button" className="card tap well" onClick={() => { run(patch({ members: group.members.filter((m) => m !== target) }), opAdd(gid, sys(`You removed ${p.short}`))); setSheet(null); toast(`${p.short} is out of the circle.`); }}><span className="h3" style={{ fontSize: 15, color: '#8a3524' }}>Remove from the circle</span><span className="tiny">Their messages stay. They lose access to shared plans.</span></button>}
         {!admin && <span className="small">Only the admin, {person(group.admin).short}, can add or remove people.</span>}
       </Sheet>
     );
   }
   if (sheet === 'leave') return (
     <Sheet label="Leave" onClose={() => setSheet(null)}>
-      <h2 className="h2">{others.length ? `Leave ${group.name}?` : `Delete ${group.name}?`}</h2>
-      <p className="body">{!others.length ? 'You’re the only one here, so the circle is deleted.' : admin ? `${person(others[0]).short} becomes the admin. Bookings you made stay yours.` : 'You won’t see new messages. Bookings you made stay yours.'}</p>
-      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={leave}>{others.length ? 'Leave' : 'Delete'}</button>
+      <h2 className="h2">{others.length || invited.length ? `Leave ${group.name}?` : `Delete ${group.name}?`}</h2>
+      <p className="body">{others.length ? (admin ? `${person(others[0]).short} becomes the admin. Bookings you made stay yours.` : 'You won’t see new messages. Bookings you made stay yours.')
+        : invited.length ? 'Nobody has joined yet, so the circle and its invites are deleted.' : 'You’re the only one here, so the circle is deleted.'}</p>
+      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={leave}>{others.length || invited.length ? 'Leave' : 'Delete'}</button>
       <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Stay</button>
     </Sheet>
   );
@@ -183,7 +386,7 @@ export function GroupInfo({ group, onClose }) {
     <Sheet label="Delete for everyone" onClose={() => setSheet(null)}>
       <h2 className="h2">Delete it for everyone?</h2>
       <p className="body">Messages, votes and shared plans go for all {group.members.length}. Bookings stay with whoever made them.</p>
-      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={() => { set((st) => ({ groups: st.groups.filter((g) => g.id !== group.id) })); toast(`${group.name} is deleted.`); onClose(); pop(); }}>Delete for everyone</button>
+      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={() => { run((st) => ({ groups: st.groups.filter((g) => g.id !== gid) }), opDrop(gid)); toast(`${group.name} is deleted.`); onClose(); pop(); }}>Delete for everyone</button>
       <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Keep it</button>
     </Sheet>
   );
@@ -194,11 +397,26 @@ export function GroupInfo({ group, onClose }) {
         <h2 className="h2">{group.name}</h2>
         {admin && <button type="button" className="link" onClick={() => setSheet('rename')}>Rename</button>}
       </div>
-      <span className="tiny">{group.members.length} {group.members.length === 1 ? 'person' : 'people'}{group.trip ? ' · ' + group.trip : ''} · {admin ? 'you’re the admin' : person(group.admin).short + ' is the admin'}</span>
+      <span className="tiny">{group.members.length} {group.members.length === 1 ? 'person' : 'people'}{invited.length ? ` · ${invited.length} invited` : ''}{group.trip ? ' · ' + group.trip : ''} · {admin ? 'you’re the admin' : person(group.admin).short + ' is the admin'}</span>
       <div className="col" style={{ gap: 6 }}>
         {group.members.map((id) => (
           <PersonRow key={id} id={id} sub={id === group.admin ? 'Admin' : person(id).household ? 'Family' : null}
             onClick={id === 'omar' ? undefined : () => { setTarget(id); setSheet('member'); }} right={id === 'omar' ? null : <Icon name="chevron" />} />
+        ))}
+        {invited.map((iv) => (
+          <div key={iv.id} className="person-row cx-invited" aria-label={`${person(iv.id).short}, invited`}>
+            <span className="cx-faded"><Avatar id={iv.id} /></span>
+            <span className="grow col" style={{ gap: 2, minWidth: 0 }}>
+              <span className="row" style={{ gap: 8 }}><span className="h3" style={{ fontSize: 15 }}>{person(iv.id).name}</span><span className="pill">Invited</span></span>
+              <span className="tiny">Sent {ago(iv.at)}{iv.reminded ? ' · reminded' : ' · no answer yet'}</span>
+              {admin && (
+                <span className="row" style={{ gap: 6, marginTop: 4 }}>
+                  <button type="button" className="btn secondary small cx-mini" disabled={iv.reminded} onClick={() => { run(patch({ invited: invited.map((x) => (x.id === iv.id ? { ...x, reminded: true } : x)) })); toast(`Reminder sent to ${person(iv.id).short}.`); }}>{iv.reminded ? 'Reminded' : 'Remind'}</button>
+                  <button type="button" className="btn ghost small cx-mini" style={{ color: '#8a3524' }} onClick={() => { run(patch({ invited: invited.filter((x) => x.id !== iv.id) }), opAdd(gid, sys(`You cancelled ${person(iv.id).short}’s invite`)), (st) => ({ circleQueue: (st.circleQueue || []).filter((e) => !(e.gid === gid && e.type === 'accept' && e.who === iv.id)) })); toast(`Invite cancelled. ${person(iv.id).short} isn’t told.`); }}>Cancel invite</button>
+                </span>
+              )}
+            </span>
+          </div>
         ))}
       </div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -207,9 +425,9 @@ export function GroupInfo({ group, onClose }) {
       </div>
       <div className="spread" style={{ padding: '6px 0' }}>
         <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Mute</span><span className="tiny">Bookings and votes still reach you.</span></span>
-        <Toggle checked={!!group.muted} label="Mute this circle" onChange={(v) => { patch({ muted: v }); toast(v ? 'Muted.' : 'Unmuted.'); }} />
+        <Toggle checked={!!group.muted} label="Mute this circle" onChange={(v) => { run(patch({ muted: v })); toast(v ? 'Muted.' : 'Unmuted.'); }} />
       </div>
-      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={() => setSheet('leave')}>{others.length ? 'Leave the circle' : 'Delete the circle'}</button>
+      <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={() => setSheet('leave')}>{others.length || invited.length ? 'Leave the circle' : 'Delete the circle'}</button>
       {admin && others.length > 0 && <button type="button" className="btn ghost block" style={{ color: '#8a3524' }} onClick={() => setSheet('delete')}>Delete for everyone</button>}
     </Sheet>
   );
@@ -220,7 +438,7 @@ export function GroupInfo({ group, onClose }) {
 export function People({ params = {} }) {
   const { s, set, pop, push, toast } = useStore();
   const [tab, setTab] = useState(params.tab || 'friends');
-  const [sheet, setSheet] = useState(null);
+  const [sheet, setSheet] = useState(params.add ? 'add' : null);
   const [contacts, setContacts] = useState(null);
   const [phone, setPhone] = useState('');
   const [sent, setSent] = useState([]);
@@ -243,7 +461,14 @@ export function People({ params = {} }) {
 
         {tab === 'friends' && (s.friends.length ? s.friends.map((id) => (
           <PersonRow key={id} id={id} sub={FRIENDS[id].going ? `Going to ${FRIENDS[id].going}` : `${FRIENDS[id].places} places explored`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
-        )) : <div className="card well"><span className="h3">No friends here yet.</span><span className="small">Add people you travel with. Only they see your tips and plans.</span></div>)}
+        )) : (
+          <div className="cx-empty">
+            <EmptyArt kind="friends" />
+            <span className="h3">No friends here yet.</span>
+            <span className="small">Add the people you travel with. Only they see your trips, tips and plans.</span>
+            <button type="button" className="btn primary small" onClick={() => setSheet('add')}>Add friends</button>
+          </div>
+        ))}
 
         {tab === 'following' && ((s.following || []).length ? s.following.map((id) => (
           <PersonRow key={id} id={id} sub={`${FRIENDS[id].places} trips · public tips`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
@@ -453,22 +678,6 @@ export function PostDetail({ post, saved, onSave, onClose, onDelete }) {
   );
 }
 
-/* Typing, then a reply: so a message never goes into silence. */
-export function useReply(group, msgs) {
-  const [reply, setReply] = useState([]);
-  const [typing, setTyping] = useState(null);
-  useEffect(() => {
-    if (!msgs.length || !group) return undefined;
-    const others = group.members.filter((m) => m !== 'omar');
-    if (!others.length) return undefined;
-    const who = others[(msgs.length - 1) % others.length];
-    const t1 = setTimeout(() => setTyping(who), 700);
-    const t2 = setTimeout(() => { setTyping(null); setReply((r) => [...r, { at: msgs.length, who, text: ['Sounds good to me.', 'Yes! Which dates work for you?', 'I’m in. Can Mada check flights?', 'Let me ask Hessa and come back to you.'][(msgs.length - 1) % 4] }]); }, 2400);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [msgs.length]);
-  return { reply, typing };
-}
-
 /* Saving a tip keeps a copy, so it stays even if the post goes. */
 export function useSave() {
   const { s, set, toast } = useStore();
@@ -498,7 +707,12 @@ export function Saved({ params = {} }) {
       <div className="scroll no-dock" style={{ gap: 16 }}>
         <h1 className="h1">{params.city ? `Saved in ${params.city}` : 'Saved'}</h1>
         {posts.length === 0 && (s.savedPlans || []).length === 0 && (
-          <div className="card well"><span className="h3">Nothing saved yet.</span><span className="small">Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share.</span></div>
+          <div className="cx-empty">
+            <EmptyArt kind="saved" />
+            <span className="h3">Nothing saved yet.</span>
+            <span className="small">Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share with a circle.</span>
+            <button type="button" className="btn primary small" onClick={() => { pop(); set({ tab: 'circles' }); }}>Look around Discover</button>
+          </div>
         )}
         {list.map((city) => {
           const items = posts.filter((p) => p.city === city);
@@ -543,7 +757,7 @@ export function Saved({ params = {} }) {
 /* ---------- opening an invite link ---------- */
 
 export const INVITES = {
-  'ist-8k2': { code: 'ist-8k2', from: 'abdullah', circle: 'Istanbul for Eid', img: 'img/istanbul.jpg', members: ['abdullah', 'noor', 'khalid'], trip: 'Istanbul · 9–15 Mar' },
+  'ist-8k2': { code: 'ist-8k2', source: 'eid', from: 'abdullah', circle: 'Istanbul for Eid', img: 'img/istanbul.jpg', members: ['abdullah', 'noor', 'khalid'], trip: 'Istanbul · 9–15 Mar' },
   'old-4q1': { code: 'old-4q1', from: 'abdullah', expired: true, circle: 'Summer in Baku' },
 };
 
@@ -587,12 +801,40 @@ export function Join({ params }) {
   const { s, set, pop, replace, toast } = useStore();
   const inv = INVITES[params.code];
   const join = () => {
-    const gid = 'inv-' + params.code;
-    if (s.groups.some((g) => g.id === gid)) { replace('group', { id: gid }); toast('You’re already in this circle.'); return; }
-    set((p) => ({ groups: [{ id: gid, name: inv.circle, img: inv.img, members: [...inv.members, 'omar'], admin: inv.from, unread: 0, sub: 'you just joined', trip: inv.trip, muted: false }, ...p.groups], friends: [...new Set([...p.friends, inv.from])] }));
+    /* Already in the circle this link is for: open it, never a second copy. */
+    const mine = s.groups.find((g) => g.id === inv.source || g.id === 'inv-' + params.code || (g.name === inv.circle && g.members.includes(inv.from)));
+    if (mine) { replace('group', { id: mine.id }); toast(`You’re already in ${mine.name}.`); return; }
+    const gid = s.groups.some((g) => g.id === inv.source) ? 'inv-' + params.code : inv.source;
+    set((p) => ({ groups: [{ id: gid, name: inv.circle, img: inv.img, members: [...inv.members, 'omar'], admin: inv.from, unread: 0, sub: '', trip: inv.trip, muted: false, via: 'invite' }, ...p.groups], friends: [...new Set([...p.friends, inv.from])] }));
     buzz(HAPTIC.success);
     toast(`You’re in. ${FRIENDS[inv.from].short} can see you joined.`);
     replace('group', { id: gid });
   };
   return <div className="screen push"><InvitePreview code={params.code} signedIn onJoin={join} onDecline={pop} /></div>;
+}
+
+/* Small drawings for empty states: friends, saved, circles. */
+export function EmptyArt({ kind }) {
+  if (kind === 'saved') return (
+    <svg className="cx-art" width="96" height="72" viewBox="0 0 96 72" aria-hidden="true">
+      <rect x="10" y="14" width="44" height="52" rx="10" fill="#efe6d6" transform="rotate(-8 32 40)" />
+      <rect x="38" y="8" width="44" height="54" rx="10" fill="#fffdf9" stroke="#e3d6bf" />
+      <path d="M52 20h16v26l-8-5-8 5z" fill="none" stroke="#b98f4a" strokeWidth="2.2" strokeLinejoin="round" />
+    </svg>
+  );
+  if (kind === 'friends') return (
+    <svg className="cx-art" width="104" height="72" viewBox="0 0 104 72" aria-hidden="true">
+      <circle cx="36" cy="38" r="22" fill="#1e352d" /><circle cx="68" cy="38" r="22" fill="#d9b77a" opacity=".9" />
+      <circle cx="52" cy="22" r="14" fill="#fffdf9" stroke="#e3d6bf" strokeDasharray="3 4" />
+      <path d="M52 16v12M46 22h12" stroke="#b98f4a" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+  return (
+    <svg className="cx-art" width="132" height="84" viewBox="0 0 132 84" aria-hidden="true">
+      <circle cx="44" cy="46" r="30" fill="none" stroke="#1e352d" strokeWidth="2" />
+      <circle cx="88" cy="46" r="30" fill="none" stroke="#b98f4a" strokeWidth="2" />
+      <circle cx="66" cy="28" r="22" fill="none" stroke="#d9b77a" strokeWidth="2" strokeDasharray="4 5" />
+      <circle cx="44" cy="46" r="5" fill="#1e352d" /><circle cx="88" cy="46" r="5" fill="#b98f4a" /><circle cx="66" cy="28" r="5" fill="#d9b77a" />
+    </svg>
+  );
 }

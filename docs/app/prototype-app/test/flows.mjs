@@ -46,7 +46,15 @@ try {
   await click('Use the demo passport', { wait: 2800 });
   await shot('passport-confirm');
   await click('Yes, save it');
-  for (const who of ['Hessa', 'Sara', 'Ahmed']) await phone.getByRole('button', { name: new RegExp(who + ' ') }).click();
+  /* A new account never offers someone else's family: they add their own, by name. */
+  if (await phone.getByText(/Hessa|Lina/).count()) throw new Error('household step offers strangers');
+  await shot('household-empty');
+  for (const who of ['Hessa', 'Sara', 'Ahmed']) {
+    await click('Add someone');
+    await phone.locator('#ap-given').fill(who);
+    await phone.locator('#ap-sur').fill('Alharbi');
+    await click('Add ' + who, { wait: 450 });
+  }
   await shot('household');
   await click('Continue with 4 people');
   await click('Allow alerts');
@@ -101,6 +109,10 @@ try {
   await phone.getByRole('button', { name: 'Cancel', exact: true }).click();
   await page.waitForTimeout(400);
   await click('Cancel the stay', { wait: 600 });
+  /* No hotel now: the driver needs to know where to go. */
+  await phone.getByText('No hotel booked. Where are you staying?').first().waitFor();
+  await shot('no-stay-question');
+  await click('Decide later');
   await phone.getByRole('button', { name: 'Back' }).first().click();
   await page.waitForTimeout(300);
   await click('Requests', { role: 'tab', exact: false, wait: 6000 });
@@ -118,8 +130,10 @@ try {
   await click('Send to Mada', { wait: 600 });
   await shot('visa-sent');
 
-  step('edge: card declined + price rise');
+  step('edge: card declined + price rise (demo account)');
   await click('Close');
+  await demo('Skip sign-up');
+  await demo('Weeks before');
   await demo('Card declines');
   await demo('Price rises at payment');
   await phone.getByRole('button', { name: 'Ask Mada' }).click();

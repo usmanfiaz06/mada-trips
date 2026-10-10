@@ -22,7 +22,7 @@ const step = (t) => console.log('·', t);
 /* Start signed in with a household and some Mada credit, so each test reaches its screen fast. */
 const seed = async (extra = {}) => {
   await page.evaluate((x) => {
-    const st = { onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none', credit: { balance: 400, history: [{ id: 'c1', text: 'Refund · Baku hotel night', amount: 400, at: Date.now() - 864e5 }] }, ...x };
+    const st = { seed: 'demo', onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none', credit: { balance: 400, history: [{ id: 'c1', text: 'Refund · Baku hotel night', amount: 400, at: Date.now() - 864e5 }] }, ...x };
     localStorage.setItem('mada-proto-v1', JSON.stringify(st));
   }, extra);
   await page.reload();

@@ -1,7 +1,7 @@
 import { People, NewCircle, Friend, Saved, Join } from './screens/Social.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, PEOPLE, seedTrip, buzz, HAPTIC } from './store.jsx';
+import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, FLIGHTS, seedTrip, withDemo, buzz, HAPTIC } from './store.jsx';
 import { Dock, Icon, Sun } from './ui.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Today from './screens/Today.jsx';
@@ -114,19 +114,31 @@ function Phone() {
 function Demo() {
   const { s, set, hardReset, banner } = useStore();
   const [open, setOpen] = useState(false);
-  const jump = (phase) => {
+  /* "Skip sign-up" always starts the demo account (Omar's family). A phase jump keeps whoever is signed in,
+     and only brings in the demo account when nobody is. */
+  const jump = (phase, demoAccount) => {
     buzz(HAPTIC.tap);
     set((p) => {
-      const household = p.household.length ? p.household : ['omar', 'hessa', 'sara', 'ahmed'];
-      const base = { onboarded: true, guest: false, user: p.user || { name: 'Omar' }, household, passportSaved: true, stack: [], tab: 'today' };
-      if (phase === 'none') return { ...base, phase: 'none' };
-      const trip = p.trip && p.trip.flight ? { ...p.trip } : seedTrip({ ...p, household });
-      if (phase === 'travelday' || phase === 'delayed' || phase === 'cancelled') { delete trip.rebooked; trip.flight = seedTrip({ ...p, household }).flight; }
+      const signedIn = p.onboarded && !p.guest && !demoAccount;
+      const acct = signedIn ? {} : withDemo(p);
+      const cur = { ...p, ...acct };
+      const household = cur.household.length ? cur.household : ['omar'];
+      const base = { ...acct, onboarded: true, guest: false, household, passportSaved: signedIn ? p.passportSaved : true, stack: [], tab: 'today' };
+      if (phase === 'none') return { ...base, phase: 'none', trip: signedIn ? p.trip : null };
+      const trip = signedIn && p.trip && p.trip.flight ? { ...p.trip } : seedTrip({ ...cur, household });
+      if (phase === 'travelday' || phase === 'delayed' || phase === 'cancelled') {
+        /* Undo a rebooking from the disruption flow: back to the flight that was booked, same dates and seats. */
+        if (trip.rebooked) { const f0 = FLIGHTS.find((x) => x.id === trip.flightId) || FLIGHTS[0]; trip.flight = { ...trip.flight, code: f0.code, dep: f0.dep, arr: f0.arr, dur: f0.dur, from: f0.from, to: f0.to }; }
+        delete trip.rebooked;
+      }
       return { ...base, trip, phase };
     });
-    if (phase === 'delayed') setTimeout(() => banner({ title: 'SV263 may leave late', body: 'The plane coming from Cairo is late. We have a plan ready.', to: { push: ['disruption', { kind: 'delay' }] } }), 600);
-    if (phase === 'cancelled') setTimeout(() => banner({ title: 'Saudia cancelled SV263', body: 'We’re holding seats on two other flights. Tap to choose.', to: { push: ['disruption', { kind: 'cancel' }] } }), 600);
-    if (phase === 'landed') setTimeout(() => banner({ title: 'Ahmet is at Door 3', body: 'He has a sign with your name. Bags on carousel 7.', haptic: HAPTIC.soft }), 600);
+    /* The banners name the flight and the driver that are actually booked. */
+    const f = (s.onboarded && !s.guest && s.trip?.flight) || FLIGHTS[0];
+    const arrive = s.onboarded && !s.guest && s.trip ? s.trip.pickup?.arrive : { driver: 'Ahmet', door: 'Door 3' };
+    if (phase === 'delayed') setTimeout(() => banner({ title: `${f.code} may leave late`, body: 'The plane coming from Cairo is late. We have a plan ready.', to: { push: ['disruption', { kind: 'delay' }] } }), 600);
+    if (phase === 'cancelled') setTimeout(() => banner({ title: `${f.airline} cancelled ${f.code}`, body: 'We’re holding seats on two other flights. Tap to choose.', to: { push: ['disruption', { kind: 'cancel' }] } }), 600);
+    if (phase === 'landed') setTimeout(() => banner(arrive?.driver ? { title: `${arrive.driver} is at ${arrive.door || 'Door 3'}`, body: 'He has a sign with your name. Bags on carousel 7.', haptic: HAPTIC.soft } : { title: 'Welcome to Istanbul', body: 'Bags on carousel 7. Your ways to the hotel are in Today.', haptic: HAPTIC.soft }), 600);
     setOpen(false);
   };
   return (
@@ -141,10 +153,10 @@ function Demo() {
           <h3>Start</h3>
           <div className="demo-grid">
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setOpen(false); }}>Fresh install</button>
-            <button type="button" className="demo-btn" onClick={() => jump('none')}>Skip sign-up</button>
+            <button type="button" className="demo-btn" onClick={() => jump('none', true)}>Skip sign-up</button>
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setTimeout(() => set({ pendingInvite: 'ist-8k2' }), 0); setOpen(false); }}>Invite link, new to Mada</button>
-            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none'); setTimeout(() => window.__madaPush('join', { code: 'ist-8k2' }), 50); setOpen(false); }}>Invite link, signed in</button>
-            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none'); setTimeout(() => window.__madaPush('join', { code: 'old-4q1' }), 50); setOpen(false); }}>Expired invite link</button>
+            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'ist-8k2' }), 50); setOpen(false); }}>Invite link, signed in</button>
+            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'old-4q1' }), 50); setOpen(false); }}>Expired invite link</button>
           </div>
         </div>
         <div className="col" style={{ gap: 8 }}>

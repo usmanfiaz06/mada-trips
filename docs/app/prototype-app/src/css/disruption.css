@@ -1,0 +1,17 @@
+/* ---------- disruption ---------- */
+.dz.is-offline .topbar { padding-top: 64px; }
+.dz-pad { padding: 24px 24px 0; display: flex; flex-direction: column; gap: 18px; }
+.dz-scroll { padding-bottom: 130px; }
+.dz-call { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 14px; border-radius: 999px; background: var(--paper); color: var(--green); font-size: 14px; font-weight: 600; text-decoration: none; }
+.dz-call.dark { background: var(--green); color: var(--mist); }
+.dz-radio { width: 22px; height: 22px; border-radius: 999px; border: 2px solid #1e352d; display: grid; place-items: center; flex-shrink: 0; margin-top: 2px; box-sizing: border-box; }
+.dz-radio span { width: 10px; height: 10px; border-radius: 999px; }
+.dz-tick { width: 64px; height: 64px; border-radius: 999px; background: #2f7a4b; display: grid; place-items: center; animation: pop .6s var(--spring) both; }
+.dz-wait { width: 56px; height: 56px; border-radius: 999px; background: var(--paper); display: grid; place-items: center; }
+.dz-tonight { gap: 12px; }
+.dz-ic { width: 34px; height: 34px; border-radius: 12px; background: var(--paper); display: grid; place-items: center; flex-shrink: 0; }
+.dz-rights { gap: 6px; }
+.dz-rights ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.dz-rights b { color: var(--green); font-weight: 600; }
+.dz-callrow { gap: 8px; text-decoration: none; }
+.dz-act { left: 0; right: 0; bottom: 0; padding: 22px 20px 28px; background: linear-gradient(to bottom, rgba(233,226,216,0), var(--sand) 22px); }

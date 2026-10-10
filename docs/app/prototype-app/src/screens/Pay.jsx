@@ -1,32 +1,57 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, PICKUP, fmt, seedTrip } from '../store.jsx';
+import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, fmt, isoDate, addDays, daysBetween, dayLabel, shortDay, rangeLabel, TRIP_YEAR, MONTHS, makeFlight, makePickup, seatsFor, seatText, bundleQuote, stayOf, NUM_WORD } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, Toggle, useTicker, AddPersonSheet, InviteSheet, PayMark, cardBrand, luhn, BRAND_NAME } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
+import { MEALS, ageBand } from './Account.jsx';
+
+/* What the traveller picked in Ask, as real dates. Flex on Eid moves the 9th to the 10th, the way Ask shows it. */
+export function searchDates(params) {
+  const sr = params.search || {};
+  const month = MONTHS.includes(sr.month) ? sr.month : 'Mar';
+  const year = sr.year || TRIP_YEAR;
+  let dep = sr.dep ?? 9;
+  if (params.flex && month === 'Mar' && dep === 9) dep = 10;
+  const oneway = sr.type === 'oneway';
+  const outISO = isoDate(year, month, dep);
+  const backISO = oneway ? null : isoDate(year, month, sr.ret ?? 15);
+  return { outISO, backISO, oneway, cabin: sr.cabin || 'Economy', infants: sr.infants || 0 };
+}
+/* Free to cancel until a week before the first night or flight. */
+const freeUntil = (iso) => shortDay(addDays(iso, -7));
 
 /* Builds the lines, total and rules for anything the traveller can pay for. */
 function useOrder(params, travellers) {
   const { s } = useStore();
   const n = travellers.length;
   if (params.kind === 'trip') {
-    const f = FLIGHTS.find((x) => x.id === params.flightId);
-    const hotelFactor = n > 2 ? 1 : 0.55;
-    const stay = HOTELS[0].night * STAY_NIGHTS * hotelFactor;
+    const f = FLIGHTS.find((x) => x.id === params.flightId) || FLIGHTS[0];
     const sr = params.search || {};
-    const x = (sr.cabin === 'Business' ? 3.2 : sr.cabin === 'Premium' ? 1.7 : 1) * (sr.type === 'oneway' ? 0.55 : 1);
+    const d = searchDates(params);
+    const x = (d.cabin === 'Business' ? 3.2 : d.cabin === 'Premium' ? 1.7 : 1) * (d.oneway ? 0.55 : 1);
     const pp = Math.round(f.pp * x);
-    const lines = [{ icon: 'flight', text: `${n} ${n === 1 ? 'traveller' : 'travellers'} · ${f.airline}, direct${sr.cabin && sr.cabin !== 'Economy' ? ' · ' + sr.cabin : ''}${sr.type === 'oneway' ? ' · one way' : ''}`, price: pp * n }];
-    if (sr.infants) lines.push({ icon: 'flight', text: `${sr.infants} ${sr.infants === 1 ? 'baby' : 'babies'} on a lap`, price: Math.round(pp * 0.1) * sr.infants });
+    const lines = [{ key: 'flight', icon: 'flight', text: `${n} ${n === 1 ? 'traveller' : 'travellers'} · ${f.airline}, direct${d.cabin !== 'Economy' ? ' · ' + d.cabin : ''}${d.oneway ? ' · one way' : ''}`, price: pp * n }];
+    if (d.infants) lines.push({ key: 'infants', icon: 'flight', text: `${d.infants} ${d.infants === 1 ? 'baby' : 'babies'} on a lap`, price: Math.round(pp * 0.1) * d.infants });
     if (params.bundle) {
-      lines.push({ icon: 'stay', text: `${n > 2 ? 'Connecting rooms' : 'A room'} near Galata Tower · 6 nights`, price: stay });
-      lines.push({ icon: 'car', text: 'Airport pickup both ways', price: PICKUP });
+      const b = bundleQuote(n, { ...sr, dep: Number(d.outISO.slice(8)), ret: d.backISO ? Number(d.backISO.slice(8)) : null });
+      lines.push({ key: 'stay', icon: 'stay', text: `${n > 2 ? 'Connecting rooms' : 'A room'} near Galata Tower · ${b.nights} nights`, price: b.stay, nights: b.nights });
+      lines.push({ key: 'pickup', icon: 'car', text: d.oneway ? 'Airport pickups on the way there' : 'Airport pickup both ways', price: b.pickup });
     }
-    const dates = sr.month ? (sr.type === 'oneway' ? `${sr.dep} ${sr.month}` : `${params.flex && sr.dep === 9 ? 10 : sr.dep}–${sr.ret} ${sr.month}`) : `${params.flex ? '10–15' : '9–15'} Mar`;
-    return { title: `Istanbul · ${dates}`, lines, rule: f.refund === 'Not refundable' ? 'Flights can’t be refunded. Changes cost ' + f.change + '.' : 'Free to cancel until 2 Mar. After that, SAR 400 per person.', agent: true, people: true };
+    /* The same rules the refund screen applies later, with this trip's own dates. */
+    const refundable = f.refund !== 'Not refundable';
+    const rule = (refundable
+      ? `If you cancel, the flights come back minus ${f.refund.replace(/^Refund minus /, '')}.`
+      : `Flights can’t be refunded, only the airport taxes. Changes cost ${f.change}.`)
+      + (params.bundle ? ` Rooms and pickups are free to cancel until ${freeUntil(d.outISO)}.` : '');
+    return { title: `Istanbul · ${rangeLabel(d.outISO, d.backISO)}`, lines, rule, agent: true, people: true, img: 'img/istanbul.jpg', dates: d };
   }
   if (params.kind === 'stay') {
-    const h = HOTELS.find((x) => x.id === params.hotelId);
+    const h = HOTELS.find((x) => x.id === params.hotelId) || HOTELS[0];
     const factor = n > 2 ? 1 : 0.55;
-    return { title: `${h.name}`, lines: [{ icon: 'stay', text: `${n > 2 ? '2 connecting rooms' : '1 room'} · 9–15 Mar · 6 nights`, price: h.night * STAY_NIGHTS * factor }], rule: 'Free to cancel until 2 Mar. After that, the first night.', agent: true, people: true };
+    /* Rooms for the trip's own dates when there is one. */
+    const t = s.trip;
+    const fromISO = t?.flight?.dateISO || isoDate(TRIP_YEAR, 'Mar', 9);
+    const nights = t?.flight?.backDateISO ? Math.max(1, daysBetween(fromISO, t.flight.backDateISO)) : STAY_NIGHTS;
+    return { title: `${h.name}`, lines: [{ key: 'stay', icon: 'stay', text: `${n > 2 ? '2 connecting rooms' : '1 room'} · ${rangeLabel(fromISO, addDays(fromISO, nights))} · ${nights} nights`, price: Math.round(h.night * nights * factor), nights }], rule: `Free to cancel until ${freeUntil(fromISO)}. After that, the first night.`, agent: true, people: true, img: 'img/istanbul.jpg', stayDates: { fromISO, nights } };
   }
   if (params.kind === 'package') {
     const pl = PLANS[params.planId];
@@ -34,16 +59,48 @@ function useOrder(params, travellers) {
     if (pl.price.flights) lines.push({ icon: 'flight', text: `Flights for ${n} · Riyadh ⇄ ${pl.city}`, price: pl.price.flights * n / 2 });
     if (pl.price.stay) lines.push({ icon: 'stay', text: `${n > 2 ? 'Connecting rooms' : 'A room'} · ${pl.days - 1 || 1} night${pl.days > 2 ? 's' : ''}`, price: pl.price.stay });
     lines.push({ icon: 'star', text: `Tickets, tours and tables for ${n}`, price: pl.price.experiences * n / 4 });
-    return { title: pl.title, lines, rule: 'Free to cancel until 7 days before. Tours refunded in full until 48 hours before.', agent: true, people: true };
+    return { title: pl.title, lines, rule: 'Free to cancel until 7 days before. Tours refunded in full until 48 hours before.', agent: true, people: true, img: pl.img };
   }
-  if (params.kind === 'esim') return { title: 'Data in Türkiye', lines: [{ icon: 'globe', text: `10 GB for 7 days × ${params.count}`, price: 39 * params.count }], rule: 'Refundable until it’s installed.', agent: false };
+  if (params.kind === 'esim') return { title: 'Data in Türkiye', lines: [{ icon: 'globe', text: `10 GB for 7 days × ${params.count}`, price: 39 * params.count }], rule: 'Refundable until it’s installed.', agent: false, img: 'img/istanbul.jpg' };
   if (params.kind === 'quote') {
     const r = s.requests.find((x) => x.id === params.requestId);
-    return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Mada', price: r?.quote || 0 }], rule: 'Refunded in full if we can’t deliver it.', agent: false, requestId: params.requestId };
+    return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Mada', price: r?.quote || 0 }], rule: 'Refunded in full if we can’t deliver it.', agent: false, requestId: params.requestId, img: r?.trip || ['food', 'todo', 'car', 'hotel'].includes(r?.kind) ? (s.trip?.img || 'img/istanbul.jpg') : 'img/clouds.jpg' };
   }
-  if (params.kind === 'share') return { title: 'Your share of the cruise', lines: [{ icon: 'star', text: 'Bosphorus dinner cruise · Abdullah’s family', price: params.amount }], rule: 'Free to cancel until 48 hours before.', agent: false };
-  if (params.kind === 'change') return { title: 'Change your flight', lines: [{ icon: 'flight', text: params.label, price: params.amount }], rule: 'The new fare follows the same rules.', agent: true };
-  return { title: 'Payment', lines: [], rule: '', agent: false };
+  if (params.kind === 'share') return { title: 'Your share of the cruise', lines: [{ icon: 'star', text: 'Bosphorus dinner cruise · Abdullah’s family', price: params.amount }], rule: 'Free to cancel until 48 hours before.', agent: false, img: 'img/istanbul.jpg' };
+  if (params.kind === 'change') return { title: 'Change your flight', lines: [{ icon: 'flight', text: params.label, price: params.amount }], rule: 'The new fare follows the same rules.', agent: true, img: s.trip?.img || 'img/istanbul.jpg' };
+  return { title: 'Payment', lines: [], rule: '', agent: false, img: 'img/clouds.jpg' };
+}
+
+/* Seats, meals and help from the traveller's own preferences, per person where they differ. Solo travellers get solo words. */
+export function prefsLine(s, travellers) {
+  const p = s.account?.prefs || {};
+  const n = travellers.length;
+  const out = [];
+  const seat = p.seat === 'window' ? 'window' : p.seat === 'aisle' ? 'aisle' : null;
+  if (n === 1) { if (seat) out.push(`${seat} seat`); }
+  else if (p.together !== false) out.push(seat ? `${seat} seats together` : 'seats together');
+  else if (seat) out.push(`${seat} seats`);
+  const mealOf = (id) => {
+    const own = id === 'omar' ? p.meal : s.account?.people?.[id]?.meal;
+    if (own) return own;
+    if (id !== 'omar' && ageBand(id)?.short === 'Child') return 'child';
+    return p.meal || null;
+  };
+  const byMeal = {};
+  travellers.forEach((id) => { const m = mealOf(id); if (m) (byMeal[m] = byMeal[m] || []).push(id); });
+  const name = (m) => ((MEALS.find((x) => x[0] === m) || [])[1] || m).toLowerCase();
+  const kinds = Object.keys(byMeal).sort((a, b) => byMeal[b].length - byMeal[a].length);
+  kinds.forEach((m, i) => {
+    const ids = byMeal[m];
+    if (i === 0 && kinds.length === 1 && ids.length === n) out.push(n === 1 ? `${name(m)} meal` : `${name(m)} meals`);
+    else if (i === 0 && ids.length > 1) out.push(`${name(m)} meals`);
+    else out.push(`${name(m)} ${ids.length > 1 ? 'meals' : 'meal'} for ${ids.map((id) => (id === 'omar' ? 'you' : PEOPLE[id]?.name)).join(' and ')}`);
+  });
+  const assist = p.assist || [];
+  if (assist.includes('wchc')) out.push('wheelchair to the seat');
+  else if (assist.includes('wchr')) out.push('wheelchair to the gate');
+  if (assist.includes('bassinet')) out.push('bassinet');
+  return out;
 }
 
 export default function Pay({ params }) {
@@ -80,7 +137,8 @@ export default function Pay({ params }) {
   useTicker(1000);
   const left = Math.max(0, holdEnds.current - Date.now() - holdSkip);
   const expired = left === 0;
-  const cardObj = card === 'applepay' ? { id: 'applepay', label: 'Apple Pay', brand: 'applepay' } : (s.cards.find((c) => c.id === card) || s.cards[0]);
+  const APPLE = { id: 'applepay', label: 'Apple Pay', brand: 'applepay' };
+  const cardObj = card === 'applepay' ? APPLE : (s.cards.find((c) => c.id === card) || s.cards[0] || APPLE);
   const tabby = Math.ceil(total / 4);
   const tamara = Math.ceil(total / 3);
   const slideLabel = total === 0 ? 'Slide to book · paid with credit' : plan === 'tabby' ? `Slide to book · 4 × SAR ${fmt(tabby)}` : plan === 'tamara' ? `Slide to book · 3 × SAR ${fmt(tamara)}` : `Slide to book · SAR ${fmt(total)}`;
@@ -90,10 +148,10 @@ export default function Pay({ params }) {
     setTimeout(() => {
       setBusy(false);
       if (s.demo.offline) { setSheet('offline'); buzz(HAPTIC.soft); return; }
-      if (s.demo.decline && card === s.cards[0].id && plan === 'full') { setSheet('declined'); buzz(HAPTIC.soft); return; }
+      if (s.demo.decline && s.cards[0] && card === s.cards[0].id && plan === 'full') { setSheet('declined'); buzz(HAPTIC.soft); return; }
       if (s.demo.priceUp && !priceSeen && order.agent) { setSheet('price'); buzz(HAPTIC.soft); return; }
       if (total === 0) { done(); return; }
-      if (card === 'applepay') { setSheet('applepay'); return; }
+      if (cardObj.id === 'applepay') { setSheet('applepay'); return; }
       if (s.demo.needs3ds || cardObj.fresh) { setOtp(''); setOtpTries(0); setSheet('3ds'); buzz(HAPTIC.knock); return; }
       done();
     }, 1300);
@@ -102,7 +160,9 @@ export default function Pay({ params }) {
   const done = () => {
     if (creditUsed > 0) set((p) => ({ credit: { balance: p.credit.balance - creditUsed, history: [{ id: 'cr' + Date.now(), text: order.title, amount: -creditUsed, at: Date.now() }, ...p.credit.history] } }));
     if (order.agent) {
-      replace('waiting', { ...params, travellers, total, card: total === 0 ? 'Mada credit' : cardObj.label, plan, creditUsed, discount });
+      /* Everything that was on this screen goes with the booking: each line as priced, the code, the credit, the plan. */
+      const lines = order.lines.map((l, i) => (i === 0 ? { ...l, price: l.price + bump } : l));
+      replace('waiting', { ...params, travellers, total, card: total === 0 ? 'Mada credit' : cardObj.label, cardId: cardObj.id, plan: total >= 1000 && cardObj.id !== 'applepay' ? plan : 'full', creditUsed, discount, promo, lines, subtotal: base + bump, bookedAt: Date.now() });
       return;
     }
     buzz(HAPTIC.success);
@@ -115,7 +175,7 @@ export default function Pay({ params }) {
   return (
     <div className="screen push" style={{ background: '#0f1a16' }}>
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 240 }}>
-        <img className="drift" src="img/istanbul.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img className="drift" src={order.img || 'img/istanbul.jpg'} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(15,26,22,.4), rgba(15,26,22,.55))' }} />
       </div>
       <div style={{ position: 'relative' }}><TopBar onBack={pop} dark backLabel="Back" /></div>
@@ -134,7 +194,7 @@ export default function Pay({ params }) {
           ))}
           {order.people && (
             <div className="spread card well" style={{ padding: '12px 14px', flexDirection: 'row' }}>
-              <span className="small">{travellers.map((id) => PEOPLE[id].name).join(', ')}{params.kind === 'trip' || params.kind === 'package' ? ` · ${s.account?.prefs?.seat === 'aisle' ? 'aisle seats' : 'seats together'} · ${s.account?.prefs?.meal || 'halal'} meals` : ''}</span>
+              <span className="small">{travellers.length === 1 && travellers[0] === 'omar' ? 'Just you' : travellers.map((id) => PEOPLE[id]?.name).join(', ')}{params.kind === 'trip' || params.kind === 'package' ? prefsLine(s, travellers).map((x) => ' · ' + x).join('') : ''}</span>
               <button type="button" className="link" onClick={() => setSheet('people')}>Edit</button>
             </div>
           )}
@@ -161,7 +221,7 @@ export default function Pay({ params }) {
             <span className="row" style={{ fontSize: 15, fontWeight: 500 }}>{total === 0 ? <><PayMark brand="credit" />Paid with Mada credit</> : <><PayMark brand={cardObj.brand} />{cardObj.label}</>}</span>
             <button type="button" className="link" onClick={() => setSheet('cards')}>Change</button>
           </div>
-          {total >= 1000 && card !== 'applepay' && (
+          {total >= 1000 && cardObj.id !== 'applepay' && (
             <div className="chips" role="radiogroup" aria-label="How to pay">
               {[['full', 'Pay in full'], ['tabby', `Tabby · 4 × ${fmt(tabby)}`], ['tamara', `Tamara · 3 × ${fmt(tamara)}`]].map(([id, label]) => (
                 <button key={id} type="button" role="radio" aria-checked={plan === id ? 'true' : 'false'} className={'chip' + (plan === id ? ' on' : '')} onClick={() => { setPlan(id); buzz(HAPTIC.select); }}>{id !== 'full' && <PayMark brand={id} size={16} />}{label}</button>
@@ -310,6 +370,8 @@ export function CardsSheet({ current, onPick, onClose }) {
 
 /* Apple Pay, the way the system sheet behaves: double-click, Face ID, done. */
 function ApplePaySheet({ amount, label, fail, onDone, onClose }) {
+  const { s } = useStore();
+  const walletCard = (s.cards.find((c) => c.id !== 'applepay') || {}).label || 'Your card';
   const [stage, setStage] = useState('wait');
   useEffect(() => {
     if (stage !== 'wait') return undefined;
@@ -319,7 +381,7 @@ function ApplePaySheet({ amount, label, fail, onDone, onClose }) {
   return (
     <Sheet label="Apple Pay" onClose={onClose}>
       <div className="spread"><PayMark brand="applepay" size={30} /><button type="button" className="link" onClick={onClose}>Cancel</button></div>
-      <div className="spread small" style={{ color: '#1e352d' }}><span>Visa ending 41 · in Wallet</span><span className="num">SAR {fmt(amount)}</span></div>
+      <div className="spread small" style={{ color: '#1e352d' }}><span>{walletCard} · in Wallet</span><span className="num">SAR {fmt(amount)}</span></div>
       <span className="tiny">Pay Mada Trips for {label}</span>
       <div className="col" style={{ alignItems: 'center', gap: 10, padding: '14px 0' }}>
         <span className={'faceid' + (stage === 'ok' ? ' ok' : stage === 'failed' ? ' bad' : '')} aria-hidden="true">
@@ -334,26 +396,55 @@ function ApplePaySheet({ amount, label, fail, onDone, onClose }) {
 
 /* ---------- with Faisal, then confirmed ---------- */
 
-/* Writes a confirmed booking into the traveller's state. Used by Waiting, and in the background if they close it. */
+/* Writes a confirmed booking into the traveller's state. Used by Waiting, and in the background if they close it.
+   The trip keeps exactly what was chosen and paid: dates or one way, cabin, babies, each line's price, the code,
+   the credit, the payment plan, the card, the booking reference and when it was booked. */
+export function buildBookedTrip(p, params) {
+  const f = FLIGHTS.find((x) => x.id === params.flightId) || FLIGHTS[0];
+  const d = searchDates(params);
+  const travellers = params.travellers?.length ? params.travellers : ['omar'];
+  const n = travellers.length;
+  const lines = (params.lines || []).map((l) => ({ ...l }));
+  const extra = params.extra || 0; /* the fare went up while Faisal held the seats, and they said yes */
+  const flightLine = lines.find((l) => l.key === 'flight');
+  if (flightLine && extra) flightLine.price += extra;
+  const sum = (keys) => lines.filter((l) => keys.includes(l.key)).reduce((a, l) => a + l.price, 0);
+  const stayLine = lines.find((l) => l.key === 'stay');
+  const pickupLine = lines.find((l) => l.key === 'pickup');
+  const card = (p.cards || []).find((c) => c.id === params.cardId);
+  const subtotal = lines.reduce((a, l) => a + l.price, 0);
+  return {
+    id: 'ist-' + (params.ref || 'new').toLowerCase(), city: 'Istanbul', country: 'Türkiye', img: 'img/istanbul.jpg',
+    travellers, flightId: f.id, cabin: d.cabin, infants: d.infants, oneway: d.oneway,
+    flight: makeFlight(f, { outISO: d.outISO, backISO: d.backISO, cabin: d.cabin, n }),
+    stay: stayLine ? { ...HOTELS[0], nights: stayLine.nights || STAY_NIGHTS, fromISO: d.outISO, price: stayLine.price, status: 'booked' } : null,
+    pickup: pickupLine ? makePickup(n, pickupLine.price, { outISO: d.outISO, oneway: d.oneway }) : null,
+    flightPrice: sum(['flight', 'infants']),
+    lines,
+    paid: { subtotal, discount: params.discount || 0, promo: params.promo || null, creditUsed: params.creditUsed || 0, charged: (params.total || 0) + extra, card: params.card || card?.label || 'Apple Pay' },
+    payPlan: params.plan || 'full',
+    ref: params.ref, pnr: params.ref,
+    bookedAt: params.bookedAt || Date.now(),
+    invoiceSeq: 4300 + Math.floor(((params.bookedAt || Date.now()) / 1000) % 5000) * 4,
+    card: params.cardId || p.defaultCard,
+  };
+}
+
 export function commitBooking(set, params) {
   if (params.kind === 'trip') {
-    set((p) => {
-      const t = seedTrip({ ...p, household: params.travellers });
-      const f = FLIGHTS.find((x) => x.id === params.flightId);
-      t.travellers = params.travellers;
-      t.flightId = f.id;
-      t.flight = { ...f, date: params.flex ? 'Wed 10 Mar' : 'Tue 9 Mar', backDep: '15:10', backArr: '19:20', backDate: 'Mon 15 Mar' };
-      t.flightPrice = f.pp * params.travellers.length;
-      if (!params.bundle) { t.stay = null; t.pickup = null; }
-      return { trip: { ...t, ref: params.ref, payPlan: params.plan || 'full' }, phase: 'booked' };
-    });
+    set((p) => ({ trip: buildBookedTrip(p, params), phase: 'booked' }));
   } else if (params.kind === 'stay') {
     set((p) => {
-      const h = HOTELS.find((x) => x.id === params.hotelId);
-      const stay = { ...h, nights: STAY_NIGHTS, price: params.total, status: 'booked' };
-      if (p.trip) return { trip: { ...p.trip, stay } };
-      const t = seedTrip({ ...p, household: params.travellers });
-      return { trip: { ...t, travellers: params.travellers, flight: null, flightPrice: 0, stay, pickup: null }, phase: 'booked' };
+      const h = HOTELS.find((x) => x.id === params.hotelId) || HOTELS[0];
+      const line = (params.lines || [])[0] || {};
+      const fromISO = p.trip?.flight?.dateISO || isoDate(TRIP_YEAR, 'Mar', 9);
+      const stay = { ...h, nights: line.nights || STAY_NIGHTS, fromISO, price: line.price || params.total, status: 'booked', plan: params.plan || 'full', bookedAt: params.bookedAt || Date.now(), ref: params.ref };
+      if (p.trip) return { trip: { ...p.trip, stay, noStay: null } };
+      const travellers = params.travellers?.length ? params.travellers : ['omar'];
+      return {
+        trip: { id: 'ist-' + (params.ref || 'stay').toLowerCase(), city: 'Istanbul', country: 'Türkiye', img: 'img/istanbul.jpg', travellers, flight: null, flightPrice: 0, stay, pickup: null, lines: params.lines || [], paid: { subtotal: params.subtotal || params.total, discount: params.discount || 0, creditUsed: params.creditUsed || 0, charged: params.total, card: params.card }, payPlan: params.plan || 'full', ref: params.ref, pnr: params.ref, bookedAt: params.bookedAt || Date.now(), invoiceSeq: 4300 + Math.floor(((params.bookedAt || Date.now()) / 1000) % 5000) * 4, card: params.cardId || p.defaultCard },
+        phase: 'booked',
+      };
     });
   } else if (params.kind === 'package') {
     const pl = PLANS[params.planId];
@@ -397,20 +488,26 @@ export function Waiting({ params }) {
     return () => clearTimeout(t);
   }, [step, question, answered, confirmed, problem, calling]);
   const slow = elapsed >= 8 && !confirmed && !problem;
-  const n = params.travellers?.length || 1;
+  /* Faisal's question is about someone actually on this booking. */
+  const askId = (params.travellers || []).find((id) => id !== 'omar') || (params.travellers || [])[0] || 'omar';
+  const askP = PEOPLE[askId] || {};
+  const askAbout = { name: askP.name || 'You', given: ((askP.full || '').split(' ')[0] + ' ' + (PEOPLE.omar.name !== 'You' ? PEOPLE.omar.name : '')).trim().toUpperCase() };
+  const n = params.travellers?.length || (params.kind === 'change' ? s.trip?.travellers?.length : 0) || 1;
   /* Close and carry on: the booking finishes in the background and a banner says so. */
-  const hide = () => { set({ pendingBooking: { ...params, ref: ref.current, total: (params.total || 0) + extra, at: Date.now() } }); reset('today'); };
+  const hide = () => { set({ pendingBooking: { ...params, ref: ref.current, total: params.total || 0, extra, at: Date.now() } }); reset('today'); };
   const cancelAll = () => { reset('today'); };
 
-  const commit = () => commitBooking(set, { ...params, ref: ref.current, total: (params.total || 0) + extra });
+  const commit = () => commitBooking(set, { ...params, ref: ref.current, total: params.total || 0, extra });
 
   const steps = labels.map((text, i) => ({ text, state: i < step ? 'done' : i === step ? 'now' : 'todo' }));
   const city = params.kind === 'package' ? `You're going to ${PLANS[params.planId].city}.` : params.kind === 'stay' ? 'Your rooms are booked.' : params.kind === 'change' ? 'Your flight is changed.' : "You're going to Istanbul.";
 
   if (!confirmed) {
     const f = FLIGHTS.find((x) => x.id === params.flightId);
-    const n = params.travellers?.length || 1;
-    const seats = Array.from({ length: n }, (_, i) => '14' + 'ABCDEF'[i]).join(', ');
+    const d = params.kind === 'trip' ? searchDates(params) : null;
+    /* The same seats the trip will carry once it's booked. */
+    const seatList = params.kind === 'change' ? (s.trip?.flight?.seats || []) : seatsFor(n, d?.cabin || 'Economy');
+    const seats = seatList.join(', ');
     const hero = params.kind === 'package' ? PLANS[params.planId].img : 'img/istanbul.jpg';
     const place = params.kind === 'package' ? PLANS[params.planId].city : 'Istanbul';
     const withWhom = params.kind === 'stay' ? 'the hotel' : params.kind === 'package' ? 'the hotel and guides' : (f?.airline || 'the airline');
@@ -425,11 +522,11 @@ export function Waiting({ params }) {
       ['Locking the price', `${total}, it can’t go up now`],
       ['Confirming rooms', 'Early check-in requested'],
     ] : params.kind === 'change' ? [
-      ['Holding the new seats', `${nWord} seats together`],
+      ['Holding the new seats', n > 1 ? `${nWord} seats together, ${seats}` : `Seat ${seats}`],
       ['Checking the fare', 'Same rules as before'],
       ['Changing tickets', 'Old tickets released'],
     ] : [
-      [`Holding ${n === 1 ? 'your seat' : nWord.toLowerCase() + ' seats together'}`, `${n === 1 ? 'Seat' : 'Seats'} ${seats}, window side`],
+      [`Holding ${n === 1 ? 'your seat' : nWord.toLowerCase() + ' seats together'}`, `${n === 1 ? 'Seat' : 'Seats'} ${seats}${d?.cabin && d.cabin !== 'Economy' ? ', ' + d.cabin.toLowerCase() : ''}`],
       ['Locking the price', `${total}, it can’t go up now`],
       [`Issuing ${n === 1 ? 'your ticket' : n + ' tickets'}`, `${f?.code || ''} · 065 2214 3301${n > 1 ? ' and ' + (n - 1) + ' more' : ''}`],
     ];
@@ -454,7 +551,7 @@ export function Waiting({ params }) {
         <div className="wait-hero">
           <span className="eyebrow" style={{ color: '#d9b77a' }}>{params.kind === 'change' ? 'Changing your flight' : 'Booking now'}</span>
           <h1 className="display" style={{ fontSize: 52, color: '#fffdf9', lineHeight: .95 }}>{place}<span style={{ color: '#d9b77a' }}>.</span></h1>
-          <span className="wait-sub">{params.kind === 'package' ? PLANS[params.planId].sub : params.kind === 'stay' ? '9–15 March · 6 nights' : `${params.flex ? 'Wed 10' : 'Tue 9'} March · ${f?.dep || ''} from Riyadh`}</span>
+          <span className="wait-sub">{params.kind === 'package' ? PLANS[params.planId].sub : params.kind === 'stay' ? `${(params.lines || [])[0]?.text?.split(' · ').slice(1).join(' · ') || ''}` : params.kind === 'change' ? params.label : `${dayLabel(d.outISO)} · ${f?.dep || ''} from Riyadh${d.oneway ? ' · one way' : ''}`}</span>
         </div>
         <div className="wait-panel" role="status" aria-live="polite">
           {rows.map(([doing, done], i) => {
@@ -495,8 +592,8 @@ export function Waiting({ params }) {
           {question && (
             <div className="wait-q rise">
               <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>Faisal asks</span>
-              <span className="body" style={{ color: '#fffdf9' }}>Sara's passport shows her given names as “SARA OMAR”. Should her ticket say exactly that?</span>
-              {calling ? <span className="small" style={{ color: '#e6c88f', fontWeight: 600 }}>Faisal is calling +966 5• ••• 4127 now…</span> : answered ? <span className="small" style={{ color: '#9fd3b0', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
+              <span className="body" style={{ color: '#fffdf9' }}>{askAbout.name === 'You' ? 'Your' : askAbout.name + '’s'} passport has more than one given name: “{askAbout.given}”. Should the ticket say exactly that?</span>
+              {calling ? <span className="small" style={{ color: '#e6c88f', fontWeight: 600 }}>Faisal is calling {s.account?.phone?.digits ? `+966 5• ••• ${s.account.phone.digits.slice(-4)}` : 'you'} now…</span> : answered ? <span className="small" style={{ color: '#9fd3b0', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
                 <div className="row">
                   <button type="button" className="btn small" style={{ background: '#d9b77a', color: '#1e352d' }} onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Yes, as on the passport</button>
                   <button type="button" className="glass-btn" onClick={() => { setCalling(true); buzz(HAPTIC.tap); setTimeout(() => { setCalling(false); setAnswered(true); }, 3000); }}>Call me</button>

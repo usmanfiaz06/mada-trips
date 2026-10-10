@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
 import { Icon, TopBar, Sheet, PayMark } from '../ui.jsx';
 import { CardsSheet } from './Pay.jsx';
-import { UserAvatar, PhotoSheet, LanguageSheet, DeletionBanner, Group, Row, useAccount, useSignOut, displayName, passportName, prettyPhone, householdIds, passportStatus, MEALS } from './Account.jsx';
+import { UserAvatar, PhotoSheet, LanguageSheet, DeletionBanner, Group, Row, useAccount, SignOutSheet, displayName, passportName, prettyPhone, householdIds, passportStatus, MEALS } from './Account.jsx';
 
 export default function Profile() {
   const { s, set, pop, push, toast } = useStore();
   const [a] = useAccount();
-  const signOut = useSignOut();
   const [sheet, setSheet] = useState(null);
   const [removeId, setRemoveId] = useState(null);
 
@@ -44,8 +43,8 @@ export default function Profile() {
             <span className="acc-cam"><Icon name="plus" size={14} color="#1e352d" width={2.6} /></span>
           </button>
           <button type="button" className="col grow acc-namebtn" onClick={() => push('account')}>
-            <h1 className="h1" style={{ fontSize: 26 }}>{a.preferred || passportName(s)}</h1>
-            <span className="small num">{prettyPhone(a.phone.digits)}</span>
+            <h1 className="h1" style={{ fontSize: 26 }}>{a.preferred || passportName(s) || 'Your account'}</h1>
+            <span className="small num">{a.phone.digits ? prettyPhone(a.phone.digits) : a.email?.address || (s.passportSaved ? 'Add a mobile number' : 'Add your passport to fill in your name')}</span>
             <span className="acc-link">Your details <Icon name="chevron" size={14} width={2.4} /></span>
           </button>
         </div>
@@ -55,13 +54,13 @@ export default function Profile() {
         <Group label="Account">
           <Row icon="user" value="Your details" sub="Name, email, phone, home airport" onClick={() => push('account')} />
           <Row icon="lock" value="Sign-in methods" sub={methods.join(' · ') || 'None'} onClick={() => push('accountSignin')} />
-          <Row icon="flight" value="Travel preferences" sub={`${seat} · ${meal}${p.loyalty.length ? ` · ${p.loyalty.length} loyalty ${p.loyalty.length === 1 ? 'number' : 'numbers'}` : ''}`} onClick={() => push('accountPrefs')} />
+          <Row icon="flight" value="Travel preferences" sub={`${seat} · ${meal}${p.loyalty.length ? ` · ${p.loyalty.length} loyalty ${p.loyalty.length === 1 ? 'number' : 'numbers'}` : ' · no loyalty numbers yet'}`} onClick={() => push('accountPrefs')} />
         </Group>
 
         <Group label="Household">
           <Row lead={<span className="stack">{ids.slice(0, 4).map((id) => (id === 'omar' ? <UserAvatar key={id} size={34} ring="#fffdf9" /> : <span key={id} className="avatar" style={{ width: 34, height: 34, fontSize: 13, boxShadow: '0 0 0 2px #fffdf9' }}>{PEOPLE[id].initial}</span>))}</span>}
-            value={ids.length > 1 ? ids.map((id) => (id === 'omar' ? displayName(s) : PEOPLE[id].name)).join(', ') : 'Just you'}
-            sub={needs ? `${needs} ${needs === 1 ? 'passport needs' : 'passports need'} a look` : 'Everyone’s passport is scanned'}
+            value={ids.length > 1 ? ids.map((id) => (id === 'omar' ? displayName(s) || 'You' : PEOPLE[id].name)).join(', ') : 'Just you'}
+            sub={ids.length <= 1 ? (needs ? 'Your passport isn’t scanned yet · add your family' : 'Add your family to book for everyone') : needs ? `${needs} ${needs === 1 ? 'passport needs' : 'passports need'} a look` : 'Everyone’s passport is scanned'}
             onClick={() => push('household')} />
         </Group>
 
@@ -75,8 +74,10 @@ export default function Profile() {
                 else { set((x) => ({ cards: x.cards.filter((y) => y.id !== c.id) })); toast('Card removed.'); }
               }}>Remove</button></span>} />
           ))}
+          {!s.cards.length && !isApplePay && <Row icon="card" value="No cards saved" sub="Add one when you book, or now." />}
+          {!s.cards.length && isApplePay && <div className="acc-row"><span className="tiny">No cards saved. Apple Pay works on this phone.</span></div>}
           {credit > 0 && <Row lead={<PayMark brand="credit" size={26} />} value={`SAR ${fmt(credit)} Mada credit`} sub="Used first on your next booking." />}
-          <Row icon="card" value="Change default or add a card" onClick={() => setSheet('cards')} />
+          <Row icon="card" value={s.cards.length ? 'Change default or add a card' : 'Add a card'} onClick={() => setSheet('cards')} />
         </Group>
 
         <Group label="Alerts">
@@ -123,14 +124,7 @@ export default function Profile() {
           <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Keep it</button>
         </Sheet>
       )}
-      {sheet === 'signout' && (
-        <Sheet label="Sign out" onClose={() => setSheet(null)}>
-          <h2 className="h2">Sign out?</h2>
-          <p className="body">Your trips stay in your account. Documents stay encrypted on this phone until you sign in again.</p>
-          <button type="button" className="btn primary block" onClick={() => { setSheet(null); signOut(); }}>Sign out</button>
-          <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Cancel</button>
-        </Sheet>
-      )}
+      {sheet === 'signout' && <SignOutSheet onClose={() => setSheet(null)} />}
     </div>
   );
 }

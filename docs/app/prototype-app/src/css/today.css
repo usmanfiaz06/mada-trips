@@ -157,3 +157,11 @@
 .td-rail { scroll-padding-inline: 20px; }
 .td-pola { aspect-ratio: 1 / 1.1; }
 .td-todo.wide .grow { flex-basis: calc(100% - 40px); }
+
+/* Tracked flights: any number, any day, kept on the account */
+.td-track { gap: 12px; }
+.td-track-mark { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .02em; flex-shrink: 0; }
+.td-tracked .eyebrow { padding: 0 4px; }
+.td-ic.big { width: 52px; height: 52px; border-radius: 18px; background: #f3e6c9; color: var(--gold-ink); }
+.field .label-like { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.field input[type="date"] { margin-top: 4px; }

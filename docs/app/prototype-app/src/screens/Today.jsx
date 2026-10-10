@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UserAvatar } from './Account.jsx';
-import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue } from '../store.jsx';
+import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue, appDay, toDate, daysBetween, addDays, dayLabel, shortDay, weekday, dayOf, monthOf, seatText, pickupPlan, boardsAt, termShort, stayOf, stayEnd, signName, ofYou, NUM_WORD, lookupFlight, FLIGHT_NO, AIRPORTS, STAY_NIGHTS, makePickup } from '../store.jsx';
+import { MoveNotice } from './TripManage.jsx';
 import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark } from '../ui.jsx';
 
 const SERVICES = [
@@ -14,13 +15,15 @@ const SERVICES = [
   { id: 'todo', label: 'Things to do', icon: 'star' },
 ];
 
-function dateLine() {
-  const now = new Date();
-  const wd = now.toLocaleDateString('en-GB', { weekday: 'long' });
-  const dm = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+/* The header date follows the moment of the trip: on travel day it's the travel day, not the phone's calendar. */
+function dateLine(s) {
+  const iso = appDay(s);
+  const now = iso ? new Date(toDate(iso).getTime() + 12 * 3600000) : new Date();
+  const wd = now.toLocaleDateString('en-GB', { weekday: 'long', ...(iso ? { timeZone: 'UTC' } : {}) });
+  const dm = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(iso ? { timeZone: 'UTC' } : {}) });
   let hijri = '';
   try {
-    hijri = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'long' }).formatToParts(now)
+    hijri = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { day: 'numeric', month: 'long', ...(iso ? { timeZone: 'UTC' } : {}) }).formatToParts(now)
       .filter((p) => p.type === 'day' || p.type === 'month').map((p) => p.value).join(' ');
   } catch (e) { /* calendar unsupported */ }
   return wd + ' ' + dm + (hijri ? ' · ' + hijri : '');
@@ -39,9 +42,10 @@ function eidLine() {
   return 'Eid al-Fitr is coming.';
 }
 
-function weeksUntilTrip() {
-  const d = new Date(2027, 2, 9);
-  const days = Math.round((d - new Date()) / 86400000);
+function weeksUntilTrip(s) {
+  const out = s.trip?.flight?.dateISO || s.trip?.stay?.fromISO;
+  if (!out) return '';
+  const days = Math.round((toDate(out) - new Date()) / 86400000);
   if (days <= 0) return 'This week';
   if (days < 14) return `In ${days} days`;
   return `In ${Math.round(days / 7)} weeks`;
@@ -52,7 +56,7 @@ function tripWhen(s) {
   const dep = s.trip?.flight?.dep;
   if (s.phase === 'daybefore') return dep ? `Tomorrow · ${dep}` : 'Tomorrow';
   if (['travelday', 'delayed', 'cancelled'].includes(s.phase)) return dep ? `Today · ${dep}` : 'Today';
-  return weeksUntilTrip();
+  return weeksUntilTrip(s);
 }
 
 const addMin = (hhmm, m) => {
@@ -101,7 +105,7 @@ function Header() {
   const { s, push } = useStore();
   return (
     <div className="spread" style={{ paddingTop: 54 }}>
-      <span className="small" style={{ fontWeight: 500 }}>{dateLine()}</span>
+      <span className="small" style={{ fontWeight: 500 }}>{dateLine(s)}</span>
       <span className="row" style={{ gap: 8 }}>
         {!s.guest && (
           <button type="button" className="avatar td-bell" aria-label="Notifications" onClick={() => { buzz(HAPTIC.tap); push('inbox'); }}>
@@ -160,16 +164,29 @@ function RequestsCard() {
 
 /* ---------- states ---------- */
 
+/* "Last Eid, the four of you went to Baku." Only from a trip that really happened. */
+function lastTripLine(s) {
+  const t = (s.pastTrips || [])[0];
+  if (!t) return '';
+  const who = t.who || 1;
+  const you = who > 1 ? ofYou(who) : 'you';
+  return `${t.when || 'Last time'}, ${you} went to ${t.city}.`;
+}
+
 function Nothing() {
   const { s, push, go } = useStore();
+  const known = (s.friends || []).includes('abdullah');
+  const saved = (s.savedPosts || []).length;
+  const fresh = !(s.pastTrips || []).length;
   return (
     <>
       <div className="col" style={{ gap: 8 }}>
         <h1 className="display rise" style={{ fontSize: 46 }}>Nowhere planned yet.</h1>
-        <p className="body rise d1">{eidLine()} {s.pastTrips.length ? 'Last Eid, the four of you went to Baku.' : ''}</p>
+        <p className="body rise d1">{eidLine()} {lastTripLine(s)}</p>
       </div>
       <Composer />
       <RequestsCard />
+      {(s.trackedFlights || []).length > 0 && <TrackedFlights />}
       {!s.passportSaved && (
         <button type="button" className="notice rise" style={{ border: 0, textAlign: 'left' }} onClick={() => go('wallet')}>
           <Icon name="visa" color="#7d5d27" />
@@ -186,45 +203,151 @@ function Nothing() {
             <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>Two days, planned for you. 1h 20m from Riyadh.</span>
           </span>
         </button>
-        <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
-          <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
-          <span className="col" style={{ gap: 0 }}><span className="h3">8 places saved</span><span className="tiny" style={{ color: '#c9c1b4' }}>Istanbul</span></span>
-        </button>
-        <button type="button" className="card tap" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
-          <span className="stack"><span className="avatar sm green">A</span><span className="avatar sm gold">N</span></span>
-          <span className="col" style={{ gap: 0 }}><span className="h3">Abdullah is back</span><span className="tiny">He saved 3 places for you</span></span>
-        </button>
+        {saved > 0 ? (
+          <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
+            <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">{saved} {saved === 1 ? 'place' : 'places'} saved</span><span className="tiny" style={{ color: '#c9c1b4' }}>{[...new Set(s.savedPosts.map((x) => x.city).filter(Boolean))].slice(0, 2).join(', ') || 'In Circles'}</span></span>
+          </button>
+        ) : (
+          <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => push('ask', { prefill: 'Istanbul' })}>
+            <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">Istanbul</span><span className="tiny" style={{ color: '#c9c1b4' }}>Popular this month · 4h 15m</span></span>
+          </button>
+        )}
+        {known ? (
+          <button type="button" className="card tap" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
+            <span className="stack"><span className="avatar sm green">A</span><span className="avatar sm gold">N</span></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">Abdullah is back</span><span className="tiny">He saved 3 places for you</span></span>
+          </button>
+        ) : (
+          <button type="button" className="card tap" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => push(fresh && s.household.length <= 1 ? 'household' : 'newCircle')}>
+            <span className="stack"><span className="avatar sm"><Icon name="plus" size={16} /></span></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">{s.household.length <= 1 ? 'Add your family' : 'Start a circle'}</span><span className="tiny">{s.household.length <= 1 ? 'Book for everyone in one go' : 'Plan the next trip together'}</span></span>
+          </button>
+        )}
       </div>
     </>
   );
 }
 
-function Guest() {
-  const { set } = useStore();
+/* ---------- tracking a flight, signed in or not ---------- */
+
+const trackDay = (when, picked) => {
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10);
+  return when === 'today' ? today : when === 'tomorrow' ? addDays(today, 1) : picked;
+};
+const nowISO = () => trackDay('today');
+
+/* Flights the traveller asked us to watch. Kept on the account, so they survive a tab switch and sign-up. */
+export function TrackedFlights({ title }) {
+  const { s, set, toast } = useStore();
+  const list = s.trackedFlights || [];
+  if (!list.length) return null;
+  return (
+    <div className="col td-tracked" style={{ gap: 10 }}>
+      {title && <span className="eyebrow">{title}</span>}
+      {list.map((t) => {
+        const when = t.dateISO === nowISO() ? 'Today' : t.dateISO === addDays(nowISO(), 1) ? 'Tomorrow' : dayLabel(t.dateISO);
+        return (
+          <div key={t.id} className="card rise td-track">
+            <div className="spread">
+              <span className="row" style={{ gap: 10 }}>
+                <span className="td-track-mark" style={{ background: t.brand || '#1e352d' }}>{t.iata}</span>
+                <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}><span className="code">{t.code}</span>{t.airline ? ` · ${t.airline}` : ''}</span><span className="tiny">{when}</span></span>
+              </span>
+              {t.known ? <span className="pill ok"><span className="dot pulse" style={{ background: '#2f7a4b' }} />On time</span> : <span className="pill">Waiting</span>}
+            </div>
+            {t.known
+              ? <Route dep={t.dep} arr={t.arr} from={t.from} to={t.to} dur={t.dur} />
+              : <span className="small">We’ll find it when it’s in the air. Most airlines share a flight’s route a day before it leaves.</span>}
+            <div className="spread">
+              <span className="tiny">{t.alerts ? 'We’ll alert you if it changes' : s.notifications === false ? 'Alerts are off on this phone' : 'No alerts for this one'}{t.known ? ` · ${AIRPORTS[t.from]?.city || t.from} to ${AIRPORTS[t.to]?.city || t.to}` : ''}</span>
+              <button type="button" className="link" style={{ fontSize: 13 }} onClick={() => { buzz(HAPTIC.tap); set((p) => ({ trackedFlights: (p.trackedFlights || []).filter((x) => x.id !== t.id) })); toast(`Stopped tracking ${t.code}.`); }}>Stop</button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* Number, then the day, then (once) whether to alert. */
+function TrackFlight() {
+  const { s, set, toast } = useStore();
   const [q, setQ] = useState('');
-  const [tracked, setTracked] = useState(null);
-  const ok = /^[a-z]{2}\s?\d{2,4}$/i.test(q.trim());
+  const [touched, setTouched] = useState(false);
+  const [when, setWhen] = useState(null);
+  const [picked, setPicked] = useState('');
+  const [ask, setAsk] = useState(null);
+  const code = q.trim().toUpperCase().replace(/\s+/g, '');
+  const ok = FLIGHT_NO.test(code);
+  const err = !code ? null : /^[A-Z0-9]{2}$/.test(code) ? 'Add the number after the airline code, like SV263.' : !/^[A-Z0-9]{2}/.test(code) ? 'Start with the airline’s two-letter code, like SV or EK.' : !ok ? 'Two letters or a letter and a number, then up to 4 digits. Like SV263 or F3101.' : null;
+  const dateISO = trackDay(when, picked);
+  const ready = ok && dateISO;
+  const add = (alerts) => {
+    const info = lookupFlight(code);
+    const rec = { id: 'tf' + Date.now(), ...info, dateISO, alerts, at: Date.now() };
+    set((p) => ({ trackedFlights: [rec, ...(p.trackedFlights || []).filter((x) => !(x.code === rec.code && x.dateISO === rec.dateISO))] }));
+    buzz(HAPTIC.success);
+    setQ(''); setWhen(null); setPicked(''); setTouched(false); setAsk(null);
+    toast(info.known ? `Tracking ${info.code}.${alerts ? ' We’ll alert you if it changes.' : ''}` : `Saved. We’ll find ${info.code} when it’s in the air.`);
+  };
+  const submit = (e) => {
+    e.preventDefault(); setTouched(true);
+    if (!ready) return;
+    if (s.notifications === null || s.notifications === undefined) { setAsk('pre'); return; }
+    add(!!s.notifications);
+  };
+  const allow = async () => {
+    let granted = true;
+    try { if (typeof Notification !== 'undefined' && Notification.requestPermission) granted = (await Notification.requestPermission()) !== 'denied'; } catch (e) { /* not supported here */ }
+    set({ notifications: granted });
+    add(granted);
+  };
+  return (
+    <>
+      <form className="card rise d1" onSubmit={submit} noValidate>
+        <div className="field">
+          <label htmlFor="track">Flight number</label>
+          <input id="track" className={'input' + (touched && err ? ' bad' : '')} placeholder="SV263" value={q} onChange={(e) => setQ(e.target.value.toUpperCase())} onBlur={() => setTouched(true)} autoCapitalize="characters" autoComplete="off" />
+          {(touched || code.length > 3) && err && <span className="err" role="alert">{err}</span>}
+        </div>
+        <div className="field">
+          <span className="label-like">When does it fly?</span>
+          <div className="chips" role="radiogroup" aria-label="When does it fly">
+            {[['today', 'Today'], ['tomorrow', 'Tomorrow'], ['pick', 'Pick a date']].map(([id, label]) => (
+              <button key={id} type="button" role="radio" aria-checked={when === id ? 'true' : 'false'} className={'chip' + (when === id ? ' on' : '')} onClick={() => { setWhen(id); buzz(HAPTIC.select); }}>{label}</button>
+            ))}
+          </div>
+          {when === 'pick' && <input id="track-date" type="date" aria-label="Flight date" className="input" min={nowISO()} max={addDays(nowISO(), 330)} value={picked} onChange={(e) => setPicked(e.target.value)} />}
+          {touched && ok && !dateISO && <span className="err" role="alert">Pick the day it flies.</span>}
+        </div>
+        <button type="submit" className="btn primary block" disabled={!code}>Track it</button>
+      </form>
+      {ask === 'pre' && (
+        <Sheet label="Alerts for this flight" onClose={() => add(false)}>
+          <span className="td-ic big"><Icon name="bell" size={24} /></span>
+          <h2 className="h2">Want an alert if {code} changes?</h2>
+          <p className="body" style={{ marginTop: -8 }}>Gate changes, delays and cancellations for this flight. Nothing else. Your phone asks next.</p>
+          <button type="button" className="btn primary block" onClick={allow}>Yes, alert me</button>
+          <button type="button" className="btn ghost block" onClick={() => { set({ notifications: false }); add(false); }}>Not now</button>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+function Guest() {
+  const { s, set } = useStore();
   return (
     <>
       <h1 className="display rise" style={{ fontSize: 44 }}>Track any flight.</h1>
-      <form className="card rise d1" onSubmit={(e) => { e.preventDefault(); if (ok) { setTracked(q.trim().toUpperCase().replace(/\s/, '')); buzz(HAPTIC.success); } }}>
-        <div className="field">
-          <label htmlFor="track">Flight number</label>
-          <input id="track" className="input" placeholder="SV263" value={q} onChange={(e) => setQ(e.target.value)} autoCapitalize="characters" />
-          {q && !ok && <span className="err">Two letters and the number, like SV263.</span>}
-        </div>
-        <button type="submit" className="btn primary block" disabled={!ok}>Track it</button>
-      </form>
-      {tracked && (
-        <div className="card rise">
-          <div className="spread"><span className="code">{tracked}</span><span className="pill ok"><span className="dot pulse" style={{ background: '#2f7a4b' }} />On time</span></div>
-          <Route dep="09:40" arr="13:55" from="RUH" to="IST" dur="4h 15m" />
-          <span className="tiny">Live from the airline · we'll alert you if it changes</span>
-        </div>
-      )}
+      <TrackFlight />
+      <TrackedFlights />
       <div className="card well rise d2">
         <span className="h3">Want us to book and look after the whole trip?</span>
-        <span className="small">Sign in to book flights, stays and visas with a named agent behind every booking.</span>
+        <span className="small">Sign in to book flights, stays and visas with a named agent behind every booking.{(s.trackedFlights || []).length ? ' Your tracked flights come with you.' : ''}</span>
         <button type="button" className="btn secondary" onClick={() => set({ onboarded: false, guest: false, signinFrom: { tab: 'today' } })}>Sign in</button>
       </div>
     </>
@@ -238,16 +361,16 @@ function TripHero({ height = 230, children }) {
   const t = s.trip;
   const f = t.flight;
   return (
-    <button type="button" className="photo td-hero rise" style={{ height, border: 0, padding: 0, width: '100%' }} onClick={() => { buzz(HAPTIC.tap); push('trip'); }} aria-label={`Istanbul, ${tripWhen(s)}. Open the trip`}>
-      <img className="drift" src="img/istanbul.jpg" alt="" />
+    <button type="button" className="photo td-hero rise" style={{ height, border: 0, padding: 0, width: '100%' }} onClick={() => { buzz(HAPTIC.tap); push('trip'); }} aria-label={`${t.city}, ${tripWhen(s)}. Open the trip`}>
+      <img className="drift" src={t.img || 'img/istanbul.jpg'} alt="" />
       <span className="td-veil" />
       <span className="td-hero-top">
         <span className="pill glass td-when">{tripWhen(s)}</span>
         {f && <span className="pill glass"><span className="code">{f.from}</span> → <span className="code">{f.to}</span></span>}
       </span>
       <span className="over" style={{ textAlign: 'left' }}>
-        <span className="display" style={{ fontSize: 44, color: '#fffdf9' }}>Istanbul</span>
-        <span className="td-hero-sub">{t.datesLong} · {t.travellers.length} travellers{f ? ' · ' + f.airline : ''}</span>
+        <span className="display" style={{ fontSize: 44, color: '#fffdf9' }}>{t.city}</span>
+        <span className="td-hero-sub">{t.datesLong} · {t.travellers.length === 1 ? 'just you' : `${t.travellers.length} travellers`}{f ? ' · ' + f.airline : ''}{f?.cabin && f.cabin !== 'Economy' ? ' ' + f.cabin : ''}</span>
         {children}
       </span>
     </button>
@@ -261,22 +384,22 @@ function readinessItems(s) {
   const problem = people.map((p) => ({ p, issue: passportIssue(s, p.id) })).find((x) => x.issue?.blocking);
   return [
     t.flight
-      ? { id: 'flight', ok: true, k: 'Flights', v: `${t.flight.code} · seats together` }
+      ? { id: 'flight', ok: true, k: t.flight.back ? 'Flights' : 'Flight', v: `${t.flight.code} · ${n > 1 ? `seats ${seatText(t.flight.seats)}, together` : `seat ${seatText(t.flight.seats)}`}${t.flight.back ? '' : ' · one way'}` }
       : { id: 'flight', ok: false, k: 'No flights yet', v: 'The stay is booked. Add flights when you’re ready.', fix: 'Find flights', act: 'flight' },
     t.stay?.status === 'cancelled'
       ? { id: 'stay', ok: false, k: 'No stay yet', v: 'The rooms were cancelled. We can find another.', fix: 'Find a stay', act: 'stay' }
       : !t.stay
-        ? { id: 'stay', ok: false, k: 'No stay yet', v: 'Want rooms near Galata? We can hold some.', fix: 'Find a stay', act: 'stay' }
+        ? (t.noStay?.address ? { id: 'stay', ok: true, k: 'Where you’re staying', v: t.noStay.address } : { id: 'stay', ok: false, k: 'No stay yet', v: 'Want rooms near Galata? We can hold some.', fix: 'Find a stay', act: 'stay' })
         : { id: 'stay', ok: true, k: 'Stay', v: `${t.stay.name} · ${t.stay.nights} nights` },
     problem
       ? { id: 'pass', ok: false, k: `${problem.p.name}'s passport`, v: problem.issue.text, fix: `Fix ${problem.p.name}'s passport`, act: 'passport', urgent: true }
-      : { id: 'pass', ok: true, k: 'Passports', v: `All ${n} valid for Türkiye` },
-    { id: 'entry', ok: true, k: 'Entry rules', v: `Checked for all ${n}` },
+      : { id: 'pass', ok: true, k: n === 1 ? 'Passport' : 'Passports', v: n === 1 ? 'Valid for Türkiye' : `All ${n} valid for Türkiye` },
+    { id: 'entry', ok: true, k: 'Entry rules', v: n === 1 ? 'Checked for you' : `Checked for all ${n}` },
     s.todayEsim
       ? { id: 'data', ok: true, k: 'Data on landing', v: `eSIM for ${s.todayEsim.count} · installs before you fly` }
-      : { id: 'data', ok: false, k: 'Data on landing', v: `Phones work the minute you land. SAR 39 each.`, fix: 'Set it up', act: 'esim' },
+      : { id: 'data', ok: false, k: 'Data on landing', v: n === 1 ? 'Your phone works the minute you land. SAR 39.' : 'Phones work the minute you land. SAR 39 each.', fix: 'Set it up', act: 'esim' },
     t.pickup
-      ? { id: 'pickup', ok: true, k: 'Airport pickups', v: 'Both ways · driver waits 60 min' }
+      ? { id: 'pickup', ok: true, k: 'Airport pickups', v: `${t.pickup.oneway ? 'On the way there' : 'Both ways'} · driver waits 60 min` }
       : { id: 'pickup', ok: false, k: 'No airport pickup', v: 'A driver at arrivals with your name.', fix: 'Add a pickup', act: 'car' },
   ];
 }
@@ -365,24 +488,35 @@ function EsimSheet({ onClose }) {
   );
 }
 
-const NEXT_UP = [
-  { id: 'cruise', title: 'Bosphorus dinner cruise', note: 'Hessa asked in the group. 4 of 6 voted yes.', img: 'img/istanbul.jpg', pos: '85% 40%', tag: 'Fri evening', go: ['group', { id: 'eid' }] },
-  { id: 'kids', title: 'Three easy days with kids', note: 'Palaces, ferries and the best künefe.', img: 'img/istanbul.jpg', pos: '30% 60%', tag: 'A plan for you', go: ['plan', { id: 'istanbul3' }] },
-  { id: 'table', title: 'A table in Karaköy', note: 'Halal, family seating, by the water.', img: 'img/istanbul.jpg', pos: '60% 85%', tag: 'Any night', go: ['ask', { intent: 'food' }] },
-];
+/* Ideas for the trip, only where they fit who's going and what's really in their circles. */
+function nextUp(s) {
+  const t = s.trip;
+  const n = t.travellers.length;
+  const kids = t.travellers.some((id) => /daughter|son/i.test(PEOPLE[id]?.role || ''));
+  const eid = (s.groups || []).find((g) => g.id === 'eid');
+  return [
+    eid && { id: 'cruise', title: 'Bosphorus dinner cruise', note: 'Hessa asked in the group. 4 of 6 voted yes.', img: 'img/istanbul.jpg', pos: '85% 40%', tag: 'Fri evening', go: ['group', { id: 'eid' }] },
+    !eid && { id: 'cruise2', title: 'Bosphorus dinner cruise', note: n > 1 ? `Dinner on the water for ${n}. From Kabataş pier.` : 'Dinner on the water. From Kabataş pier.', img: 'img/istanbul.jpg', pos: '85% 40%', tag: 'Any evening', go: ['ask', { intent: 'todo', prefill: 'Bosphorus dinner cruise' }] },
+    kids ? { id: 'kids', title: 'Three easy days with kids', note: 'Palaces, ferries and the best künefe.', img: 'img/istanbul.jpg', pos: '30% 60%', tag: 'A plan for you', go: ['plan', { id: 'istanbul3' }] }
+      : { id: 'walk', title: 'Galata to Karaköy on foot', note: 'Coffee, the tower and the water. A slow morning.', img: 'img/istanbul.jpg', pos: '30% 60%', tag: 'Half a day', go: ['ask', { intent: 'todo', prefill: 'A walk from Galata to Karaköy' }] },
+    { id: 'table', title: 'A table in Karaköy', note: n > 2 ? 'Halal, family seating, by the water.' : 'Halal, by the water.', img: 'img/istanbul.jpg', pos: '60% 85%', tag: 'Any night', go: ['ask', { intent: 'food' }] },
+  ].filter(Boolean);
+}
 
 function Booked() {
   const { s, push, go } = useStore();
+  const noor = (s.friends || []).includes('noor');
   return (
     <>
+      <MoveNotice />
       <TripHero />
       <Readiness />
       <RequestsCard />
       <div className="spread" style={{ marginTop: 6 }}>
-        <h2 className="h2" style={{ fontSize: 22 }}>Next for Istanbul</h2>
+        <h2 className="h2" style={{ fontSize: 22 }}>Next for {s.trip.city}</h2>
       </div>
       <div className="td-rail rise d2" role="list">
-        {NEXT_UP.map((c) => (
+        {nextUp(s).map((c) => (
           <button key={c.id} type="button" role="listitem" className="photo td-tile" onClick={() => { buzz(HAPTIC.tap); push(c.go[0], c.go[1]); }}>
             <img src={c.img} alt="" style={{ objectPosition: c.pos }} />
             <span className="td-veil" />
@@ -394,19 +528,27 @@ function Booked() {
           </button>
         ))}
       </div>
-      <button type="button" className="card tap td-circle rise d3" onClick={() => { buzz(HAPTIC.tap); go('circles'); }}>
-        <span className="stack"><span className="avatar sm gold">N</span><span className="avatar sm green">A</span></span>
-        <span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Noor was in Istanbul in May</span><span className="tiny">She left 8 tips for families. Abdullah saved 3 for you.</span></span>
-        <Icon name="chevron" />
-      </button>
+      {noor ? (
+        <button type="button" className="card tap td-circle rise d3" onClick={() => { buzz(HAPTIC.tap); go('circles'); }}>
+          <span className="stack"><span className="avatar sm gold">N</span><span className="avatar sm green">A</span></span>
+          <span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Noor was in Istanbul in May</span><span className="tiny">She left 8 tips for families. Abdullah saved 3 for you.</span></span>
+          <Icon name="chevron" />
+        </button>
+      ) : (
+        <button type="button" className="card tap td-circle rise d3" onClick={() => { buzz(HAPTIC.tap); go('circles'); }}>
+          <span className="stack"><span className="avatar sm"><Icon name="circles" size={16} /></span></span>
+          <span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Tips from people who’ve been</span><span className="tiny">See what travellers saved in {s.trip.city}, in Circles.</span></span>
+          <Icon name="chevron" />
+        </button>
+      )}
     </>
   );
 }
 
 /* ---------- the day before ---------- */
 
-const PICKUP_TIMES = ['06:45', '07:05', '07:20', '07:35'];
-const BAG_DROP_CLOSES = '08:40';
+/* Minutes before take-off that Khalid can come. The second is what we suggest. */
+const PICKUP_OFFSETS = [-175, -155, -140, -125];
 
 function packList(s) {
   const people = tripTravellers(s);
@@ -414,13 +556,13 @@ function packList(s) {
   const kids = people.filter((p) => /daughter|son/i.test(p.role || '')).map((p) => p.name);
   const problem = people.map((p) => ({ p, issue: passportIssue(s, p.id) })).find((x) => x.issue?.blocking);
   return [
-    { id: 'passports', t: `Passports ×${n}`, sub: problem ? `${problem.p.name}'s needs fixing first.` : `All ${n} valid for Türkiye. Checked against the Wallet.`, people, problem },
+    { id: 'passports', t: n === 1 ? 'Your passport' : `Passports ×${n}`, sub: problem ? `${problem.p.name}'s needs fixing first.` : n === 1 ? 'Valid for Türkiye. Checked against the Wallet.' : `All ${n} valid for Türkiye. Checked against the Wallet.`, people, problem },
     { id: 'chargers', t: 'Chargers and a power bank', sub: 'Power banks go in hand luggage.' },
     { id: 'adapter', t: 'Plug adapter, type F', sub: 'Round two-pin plugs in Türkiye, 230 V.' },
     { id: 'umbrella', t: 'An umbrella', sub: 'Light rain when you land.' },
-    { id: 'layer', t: 'A warm layer each', sub: '14° in Istanbul. About 28° here.' },
-    { id: 'mat', t: 'Prayer mat', sub: 'The hotel is 2 minutes from a mosque.' },
-    ...(kids.length ? [{ id: 'snacks', t: `Snacks for ${kids.join(' and ')}`, sub: '4h 15m in the air.' }] : []),
+    { id: 'layer', t: n === 1 ? 'A warm layer' : 'A warm layer each', sub: '14° in Istanbul. About 28° here.' },
+    { id: 'mat', t: 'Prayer mat', sub: stayOf(s.trip) ? 'The hotel is 2 minutes from a mosque.' : 'Mosques are never far in Istanbul.' },
+    ...(kids.length ? [{ id: 'snacks', t: `Snacks for ${kids.join(' and ')}`, sub: `${s.trip?.flight?.dur || '4h 15m'} in the air.` }] : []),
     { id: 'meds', t: 'Medicines', sub: 'In hand luggage, with the prescriptions.' },
     ...(s.todayPackExtra || []).map((x) => ({ id: x.id, t: x.t, sub: 'Added by you', own: true })),
   ];
@@ -478,28 +620,31 @@ function PackingList({ innerRef }) {
 
 function PickupSheet({ onClose }) {
   const { s, set, toast } = useStore();
-  const cur = s.todayPickup || '07:05';
+  const f = s.trip.flight;
+  const pk = pickupPlan(s.trip);
+  const cur = pk.offset ?? -155;
   const [pick, setPick] = useState(cur);
-  const at = addMin(pick, 35);
-  const spare = minsBetween(at, BAG_DROP_CLOSES);
+  const timeOf = (o) => addMin(f.dep, o);
+  const spare = minsBetween(addMin(timeOf(pick), 35), pk.bagDrop);
   return (
     <Sheet label="Change pickup time" onClose={onClose}>
-      <h2 className="h2">When should Khalid come?</h2>
-      <p className="small" style={{ marginTop: -8 }}>31 min to King Khalid at that hour. Bag drop for {s.trip.flight?.code || 'your flight'} closes at {BAG_DROP_CLOSES}.</p>
+      <h2 className="h2">When should {pk.driver} come?</h2>
+      <p className="small" style={{ marginTop: -8 }}>31 min to King Khalid at that hour. Bag drop for {f.code} closes at {pk.bagDrop}.</p>
       <div className="col" style={{ gap: 8 }} role="radiogroup" aria-label="Pickup time">
-        {PICKUP_TIMES.map((t) => {
-          const sp = minsBetween(addMin(t, 35), BAG_DROP_CLOSES);
+        {PICKUP_OFFSETS.map((o) => {
+          const t = timeOf(o);
+          const sp = minsBetween(addMin(t, 35), pk.bagDrop);
           return (
-            <button key={t} type="button" role="radio" aria-checked={pick === t ? 'true' : 'false'} className={'td-time' + (pick === t ? ' on' : '')} onClick={() => { buzz(HAPTIC.select); setPick(t); }}>
+            <button key={o} type="button" role="radio" aria-checked={pick === o ? 'true' : 'false'} className={'td-time' + (pick === o ? ' on' : '')} onClick={() => { buzz(HAPTIC.select); setPick(o); }}>
               <span className="num td-time-t">{t}</span>
-              <span className="grow col" style={{ gap: 0 }}><span className="small" style={{ fontWeight: 600, color: '#1e352d' }}>At T4 by {addMin(t, 35)}</span><span className="tiny">{sp >= 50 ? `${sp} min to spare` : `Only ${sp} min before bag drop closes`}{t === '07:05' ? ' · what we suggest' : ''}</span></span>
-              {pick === t && <Icon name="check" size={18} width={2.4} />}
+              <span className="grow col" style={{ gap: 0 }}><span className="small" style={{ fontWeight: 600, color: '#1e352d' }}>At {termShort(f.terminal)} by {addMin(t, 35)}</span><span className="tiny">{sp >= 50 ? `${sp} min to spare` : `Only ${sp} min before bag drop closes`}{o === -155 ? ' · what we suggest' : ''}</span></span>
+              {pick === o && <Icon name="check" size={18} width={2.4} />}
             </button>
           );
         })}
       </div>
-      <span className="tiny">We’ll wake your phone at {addMin(pick, -45)}.</span>
-      <button type="button" className="btn primary block" disabled={pick === cur} onClick={() => { set({ todayPickup: pick }); buzz(HAPTIC.success); toast(`We’ve told Khalid. Pickup at ${pick}.`); onClose(); }}>{pick === cur ? `Pickup stays at ${cur}` : `Move pickup to ${pick}`}</button>
+      <span className="tiny">We’ll wake your phone at {addMin(timeOf(pick), -45)}.</span>
+      <button type="button" className="btn primary block" disabled={pick === cur} onClick={() => { set((p) => ({ trip: { ...p.trip, pickup: { ...p.trip.pickup, home: { ...p.trip.pickup.home, offset: pick } } } })); buzz(HAPTIC.success); toast(`We’ve told ${pk.driver}. Pickup at ${timeOf(pick)}.`); onClose(); }}>{pick === cur ? `Pickup stays at ${timeOf(cur)}` : `Move pickup to ${timeOf(pick)}`}</button>
       {spare < 50 && <span className="small td-warn">That’s tight on a weekday morning. Faisal would go earlier.</span>}
     </Sheet>
   );
@@ -511,18 +656,21 @@ function DayBefore() {
   const f = t.flight;
   const [sheet, setSheet] = useState(null);
   const packRef = useRef(null);
-  const pickup = s.todayPickup || '07:05';
+  const pk = pickupPlan(t);
+  const n = t.travellers.length;
   const items = packList(s);
   const packed = (s.todayPacked || []).filter((id) => items.some((i) => i.id === id)).length;
   const allPacked = packed === items.length;
+  const wake = pk ? pk.wake : addMin(f?.dep || '09:40', -200);
   const plan = [
     { k: 'tonight', time: 'Tonight', t: allPacked ? 'Packed' : 'Pack the bags', sub: allPacked ? 'All in. Nothing left for the morning.' : `${packed} of ${items.length} done`, state: allPacked ? 'done' : 'now', act: allPacked ? null : ['See the list', () => packRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })] },
-    { k: 'sleep', time: '22:30', t: 'Lights out', sub: `${Math.round(minsBetween('22:30', '24:00') / 60 + minsBetween('00:00', addMin(pickup, -45)) / 60)} hours before the alarm` },
-    { k: 'wake', time: addMin(pickup, -45), t: 'We wake your phone', sub: 'A soft alarm, with the weather and the drive time' },
-    { k: 'pickup', time: pickup, t: 'Khalid at your door', sub: 'Grey Lexus ES · he waits 10 min', act: ['Change pickup time', () => setSheet('pickup')] },
-    { k: 'airport', time: addMin(pickup, 35), t: 'King Khalid, Terminal 4', sub: `Bag drop closes ${BAG_DROP_CLOSES}. You’re already checked in.` },
-    { k: 'board', time: '08:55', t: 'Boarding, gate B12', sub: 'Seats 3A–3D, together' },
-    { k: 'fly', time: f?.dep || '09:40', t: `${f?.code || 'Your flight'} to Istanbul`, sub: `Lands ${f?.arr || '13:55'}, same time as Riyadh` },
+    { k: 'sleep', time: '22:30', t: 'Lights out', sub: `${Math.round(minsBetween('22:30', '24:00') / 60 + minsBetween('00:00', wake) / 60)} hours before the alarm` },
+    { k: 'wake', time: wake, t: 'We wake your phone', sub: 'A soft alarm, with the weather and the drive time' },
+    pk ? { k: 'pickup', time: pk.time, t: `${pk.driver} at your door`, sub: `${pk.car} · he waits ${pk.waits || '10 min'}`, act: ['Change pickup time', () => setSheet('pickup')] }
+      : { k: 'pickup', time: addMin(f.dep, -155), t: 'Leave for the airport', sub: '31 min to King Khalid. No car booked.' },
+    { k: 'airport', time: pk ? pk.airportBy : addMin(f.dep, -120), t: `King Khalid, ${f.terminal}`, sub: `Bag drop closes ${addMin(f.dep, -60)}. You’re already checked in.` },
+    { k: 'board', time: boardsAt(f), t: `Boarding, gate ${f.gate || 'B12'}`, sub: n > 1 ? `Seats ${seatText(f.seats)}, together` : `Seat ${seatText(f.seats)}` },
+    { k: 'fly', time: f.dep, t: `${f.code} to Istanbul`, sub: `Lands ${f.arr}, same time as Riyadh` },
   ];
   return (
     <>
@@ -532,8 +680,8 @@ function DayBefore() {
       <TripHero height={210}>
         <span className="row" style={{ gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
           <span className="pill glass"><Icon name="check" size={13} color="#d9b77a" width={2.6} />Checked in</span>
-          <span className="pill glass">Seats 3A–3D</span>
-          <span className="pill glass">{f?.bags || '2 × 23 kg'} each</span>
+          <span className="pill glass">{n > 1 ? 'Seats' : 'Seat'} {seatText(f.seats)}</span>
+          <span className="pill glass">{f.bags || '2 × 23 kg'} each</span>
         </span>
       </TripHero>
 
@@ -543,7 +691,7 @@ function DayBefore() {
           {plan.map((p, i) => (
             <React.Fragment key={p.k}>
               {i === 1 && <span className="td-split" aria-hidden="true" />}
-              {i === 3 && <span className="td-daymark">Tomorrow, Tue 9 Mar</span>}
+              {i === 3 && <span className="td-daymark">Tomorrow, {f.date}</span>}
               <div className={'td-tl ' + (p.state || 'todo')}>
                 <span className="td-tl-time num">{p.time}</span>
                 <span className="td-tl-rail" aria-hidden="true"><i /></span>
@@ -566,9 +714,9 @@ function DayBefore() {
           <span className="small" style={{ color: '#1e352d', position: 'relative', fontWeight: 500 }}>Light rain. Dry by Thursday.</span>
         </div>
         <button type="button" className="td-oncall" onClick={() => { buzz(HAPTIC.tap); go('wallet'); }}>
-          <span className="row" style={{ gap: 8 }}><Icon name="doc" size={20} color="#d9b77a" /><span className="tiny" style={{ color: '#c9c1b4' }}>4 boarding passes</span></span>
+          <span className="row" style={{ gap: 8 }}><Icon name="doc" size={20} color="#d9b77a" /><span className="tiny" style={{ color: '#c9c1b4' }}>{n} boarding {n === 1 ? 'pass' : 'passes'}</span></span>
           <span className="h3" style={{ fontSize: 16, color: '#fffdf9' }}>Ready offline</span>
-          <span className="td-link light">Open passes</span>
+          <span className="td-link light">Open {n === 1 ? 'pass' : 'passes'}</span>
         </button>
       </div>
 
@@ -596,7 +744,7 @@ function LeaveCard() {
         </span>
         <span className="row" style={{ alignSelf: 'flex-start', height: 38, padding: '0 14px 0 6px', borderRadius: 999, background: 'rgba(255,253,249,.16)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', border: '1px solid rgba(255,253,249,.18)', fontSize: 13, fontWeight: 500, gap: 8 }}>
           <span style={{ width: 28, height: 28, borderRadius: 999, background: '#d9b77a', display: 'grid', placeItems: 'center' }}><Icon name="car" size={16} color="#1e352d" /></span>
-          Khalid at {s.todayPickup || '07:05'} · 31 min to King Khalid
+          {pickupPlan(s.trip) ? `${pickupPlan(s.trip).driver} at ${pickupPlan(s.trip).time}` : 'No car booked'} · 31 min to King Khalid
         </span>
       </div>
     </div>
@@ -606,7 +754,7 @@ function LeaveCard() {
 function FlightCard({ predicted }) {
   const { s, push, banner } = useStore();
   const f = s.trip.flight;
-  const [gate, setGate] = useState(s.trip.gate || 'B12');
+  const [gate, setGate] = useState(s.trip.gate || f.gate || 'B12');
   const [changed, setChanged] = useState(false);
   useEffect(() => {
     if (s.phase !== 'travelday' || s.trip.gate === 'C4' || s.trip.rebooked) return undefined;
@@ -625,8 +773,8 @@ function FlightCard({ predicted }) {
           <span className="k">Gate</span>
           <span className="v" key={gate} style={changed ? { animation: 'in .5s var(--ease) both' } : null}>{s.trip.rebooked ? 'D7' : gate}</span>
         </div>
-        <div className="cell"><span className="k">Boards</span><span className="v">{s.trip.rebooked ? '09:45' : '08:55'}</span></div>
-        <div className="cell"><span className="k">Seats</span><span className="v">3A–D</span></div>
+        <div className="cell"><span className="k">Boards</span><span className="v">{s.trip.rebooked ? addMin(f.dep, -40) : boardsAt(f)}</span></div>
+        <div className="cell"><span className="k">{f.seats?.length > 1 ? 'Seats' : 'Seat'}</span><span className="v">{seatText(f.seats).replace(/\u2013(\d+)/, '\u2013')}</span></div>
       </div>
       <div className="row tiny">
         <span className="dot pulse" style={{ background: s.demo.offline ? '#b98f4a' : '#2f7a4b', width: 6, height: 6 }} />
@@ -653,9 +801,9 @@ function DelayWatch() {
       <span className="eyebrow">What happens next</span>
       <div className="td-steps">
         {[
-          ['done', 'Seats held on the 10:25', 'For all ' + (s.trip.travellers.length || 4) + ', together. No cost to hold.'],
+          ['done', 'Seats held on the 10:25', s.trip.travellers.length > 1 ? `For all ${s.trip.travellers.length}, together. No cost to hold.` : 'A seat for you. No cost to hold.'],
           ['now', 'Watching the plane from Cairo', 'It should land in Riyadh by 08:30. We check every 5 minutes.'],
-          ['todo', 'Khalid hears from us', 'If you move flights, he comes later. Stay home until then.'],
+          ...(pickupPlan(s.trip) ? [['todo', `${pickupPlan(s.trip).driver} hears from us`, 'If you move flights, he comes later. Stay home until then.']] : []),
         ].map(([st, h, sub]) => (
           <div key={h} className={'td-step ' + st + (st === 'now' ? ' now' : '')}>
             <span className="td-step-mark" aria-hidden="true">{st === 'done' ? <Icon name="check" size={13} color="#fffdf9" width={2.8} /> : <i />}</span>
@@ -679,10 +827,17 @@ function TravelDay({ predicted }) {
       <FlightCard predicted={predicted} />
       {!predicted && (
         <div className="rise d2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
-          <div className="card" style={{ height: 96, justifyContent: 'space-between', boxSizing: 'border-box' }}>
-            <span className="row"><span className="avatar sm green">K</span><span className="h3" style={{ fontSize: 14 }}>Khalid · {s.todayPickup || '07:05'}</span></span>
-            <span className="tiny">Grey Lexus ES. He'll wait at your door.</span>
-          </div>
+          {pickupPlan(s.trip) ? (
+            <div className="card" style={{ height: 96, justifyContent: 'space-between', boxSizing: 'border-box' }}>
+              <span className="row"><span className="avatar sm green">{pickupPlan(s.trip).driver.charAt(0)}</span><span className="h3" style={{ fontSize: 14 }}>{pickupPlan(s.trip).driver} · {pickupPlan(s.trip).time}</span></span>
+              <span className="tiny">{pickupPlan(s.trip).car}. He'll wait at your door.</span>
+            </div>
+          ) : (
+            <div className="card" style={{ height: 96, justifyContent: 'space-between', boxSizing: 'border-box' }}>
+              <span className="row"><Icon name="car" size={18} /><span className="h3" style={{ fontSize: 14 }}>Leave by {addMin(s.trip.flight.dep, -155)}</span></span>
+              <span className="tiny">31 min to King Khalid, {s.trip.flight.terminal}.</span>
+            </div>
+          )}
           <div className="card" style={{ height: 96, justifyContent: 'space-between', boxSizing: 'border-box', background: '#e7ecef', position: 'relative', overflow: 'hidden' }}>
             {[22, 54, 88, 118, 146].map((x, i) => <span key={x} aria-hidden="true" style={{ position: 'absolute', left: x, top: 4, width: 1.5, height: 14, borderRadius: 2, background: '#6f8fa6', animation: `rain 1.4s ${i * 0.3}s linear infinite` }} />)}
             <span className="h3" style={{ fontSize: 14, position: 'relative' }}>Istanbul · 14°</span>
@@ -702,25 +857,25 @@ function Cancelled() {
   return (
     <>
     <div className="card focal rise" style={{ padding: 22, gap: 14 }}>
-      <span className="eyebrow" style={{ color: '#d9b77a' }}>{s.trip.flight.code} · Tue 9 Mar</span>
-      <h1 className="h1" style={{ color: '#f6f2ec' }}>Saudia cancelled your flight.</h1>
-      <p className="body" style={{ color: '#d6cfc3' }}>You're owed a full refund. We're already holding seats on the next flight for all {s.trip.travellers.length} of you.</p>
+      <span className="eyebrow" style={{ color: '#d9b77a' }}>{s.trip.flight.code} · {s.trip.flight.date}</span>
+      <h1 className="h1" style={{ color: '#f6f2ec' }}>{s.trip.flight.airline} cancelled your flight.</h1>
+      <p className="body" style={{ color: '#d6cfc3' }}>You're owed a full refund. We're already holding {s.trip.travellers.length > 1 ? `seats on the next flight for all ${s.trip.travellers.length} of you` : 'a seat for you on the next flight'}.</p>
       <button type="button" className="btn gold block" onClick={() => push('disruption', { kind: 'cancel' })}>See your options</button>
     </div>
       <div className="card rise d1">
         <span className="eyebrow">Already taken care of</span>
         {[
-          ['stay', 'The hotel knows', 'Rooms near Galata Tower are held, even if you land late.'],
-          ['car', 'Pickups move with you', 'Khalid and Ahmet follow whichever flight you choose.'],
-          ['refund', 'Or your money back', `SAR ${fmt(s.trip.flightPrice || 0)} for the flights, to your card in about 7 days.`],
-        ].map(([ic, h, sub]) => (
+          stayOf(s.trip) && ['stay', 'The hotel knows', `${stayOf(s.trip).name}: your ${s.trip.travellers.length > 2 ? 'rooms are' : 'room is'} held, even if you land late.`],
+          s.trip.pickup && ['car', 'Pickups move with you', `${s.trip.pickup.home?.driver} and ${s.trip.pickup.arrive?.driver} follow whichever flight you choose.`],
+          ['refund', 'Or your money back', `SAR ${fmt(s.trip.flightPrice || 0)} for the ${s.trip.flight.back ? 'flights' : 'flight'}, to your card in about 7 days.`],
+        ].filter(Boolean).map(([ic, h, sub]) => (
           <div key={h} className="row" style={{ alignItems: 'flex-start', gap: 12 }}>
             <span className="td-ic"><Icon name={ic} size={18} /></span>
             <span className="col" style={{ gap: 1 }}><span className="small" style={{ fontWeight: 600, color: '#1e352d' }}>{h}</span><span className="tiny">{sub}</span></span>
           </div>
         ))}
       </div>
-      <FaisalLine note="Faisal is already on the phone with Saudia." />
+      <FaisalLine note={`Faisal is already on the phone with ${s.trip.flight.airline}.`} />
     </>
   );
 }
@@ -860,10 +1015,10 @@ function InAir() {
 
       <div className="card" style={{ marginTop: 6 }}>
         <span className="h3">When you land</span>
-        {[['visa', 'Passport control, then bags'], ['bag', 'The carousel shows here as you land'], ['car', s.trip?.pickup ? 'Ahmet meets you at Door 3 with your name' : 'No car booked yet. Your options are below.']].map(([ic, t2]) => (
+        {[['visa', 'Passport control, then bags'], ['bag', 'The carousel shows here as you land'], ['car', s.trip?.pickup ? `${s.trip.pickup.arrive?.driver} meets you at ${s.trip.pickup.arrive?.door} with your name` : 'No car booked yet. Your options are below.']].map(([ic, t2]) => (
           <div key={t2} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t2}</div>
         ))}
-        <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>{s.trip?.pickup ? 'Hotel address for the driver' : 'Getting to the hotel'}</button>
+        <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>{!stayOf(s.trip) && !s.trip?.noStay ? 'Where are you staying?' : s.trip?.pickup ? 'The address for the driver' : 'Getting there'}</button>
       </div>
       <FaisalLine note="On-board Wi-Fi? Faisal can still reach you." />
       {sheet && <AddressSheet onClose={() => setSheet(false)} />}
@@ -873,15 +1028,18 @@ function InAir() {
 
 function arrivalSteps(s) {
   const pickup = s.trip?.pickup;
-  const n = s.trip?.travellers?.length || 4;
+  const n = s.trip?.travellers?.length || 1;
+  const st = stayOf(s.trip);
+  const own = s.trip?.noStay?.address;
   const bag = s.bagReport;
   return [
     { id: 'phone', t: 'Phone on', sub: s.todayEsim ? 'Your eSIM switches on by itself. 10 GB each.' : 'Free airport Wi-Fi for 1 hour. Turn on roaming only if you need it.' },
-    { id: 'passport', t: 'Passport control', sub: `Foreign passports lane. Keep all ${n} together. Children stay with you.` },
-    { id: 'bags', t: bag ? 'Bag reported missing' : 'Bags on carousel 7', sub: bag ? `Reference ${bag}. Faisal is chasing it with Saudia.` : 'About 20 minutes after you land.', bag: !bag },
+    { id: 'passport', t: 'Passport control', sub: n > 1 ? `Foreign passports lane. Keep all ${n} together.${s.trip.travellers.some((id) => /daughter|son/i.test(PEOPLE[id]?.role || '')) ? ' Children stay with you.' : ''}` : 'Foreign passports lane. About 20 minutes.' },
+    { id: 'bags', t: bag ? 'Bag reported missing' : 'Bags on carousel 7', sub: bag ? `Reference ${bag}. Faisal is chasing it with ${s.trip?.flight?.airline || 'the airline'}.` : 'About 20 minutes after you land.', bag: !bag },
     { id: 'money', t: 'Money', sub: 'Cards work almost everywhere. For small cash, the ATM by Door 8 beats the exchange desk.' },
-    { id: 'driver', t: pickup ? 'Ahmet at Door 3' : 'Getting to the hotel', sub: pickup ? 'Sign says ALHARBI. He waits 60 min at no cost.' : 'No car booked. A pickup, a taxi or the metro.', address: true },
-    { id: 'hotel', t: 'Rooms ready at 14:00', sub: 'Early check-in asked for. 45 min drive to Galata.' },
+    { id: 'driver', t: pickup ? `${pickup.arrive?.driver} at ${pickup.arrive?.door}` : st ? 'Getting to the hotel' : 'Getting there', sub: pickup ? `Sign says ${signName(s.trip)}. He waits ${pickup.arrive?.waits || '60 min'} at no cost.${!st && !own ? ' Tell us where you’re staying.' : ''}` : 'No car booked. A pickup, a taxi or the metro.', address: true },
+    st ? { id: 'hotel', t: `${n > 2 ? 'Rooms' : 'Room'} ready at 14:00`, sub: `${st.name}. ${st.fromAirport || '45 min'} drive.` }
+      : { id: 'hotel', t: own ? 'To where you’re staying' : 'Where are you staying?', sub: own || 'No hotel booked. Tell us, so the driver and Faisal know.' },
   ];
 }
 
@@ -903,7 +1061,7 @@ function Landed() {
         <img className="drift" src="img/istanbul.jpg" alt="Galata Tower above Istanbul" style={{ objectPosition: '50% 40%' }} />
         <span className="td-veil" />
         <span className="td-hero-top">
-          <span className="pill glass"><span className="dot" style={{ background: '#4fbf7a' }} />Landed 13:52 · IST</span>
+          <span className="pill glass"><span className="dot" style={{ background: '#4fbf7a' }} />Landed {addMin(s.trip?.flight?.arr || '13:55', -3)} · {s.trip?.flight?.to || 'IST'}</span>
           <span className="pill glass">Same time as Riyadh</span>
         </span>
         <span className="over" style={{ textAlign: 'left' }}>
@@ -931,10 +1089,10 @@ function Landed() {
                   {(isNow || st.id === 'bags' && bag) && <span className="small">{st.sub}</span>}
                   {isNow && (
                     <span className="row" style={{ flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                      {st.address && <button type="button" className="btn gold small" onClick={() => setSheet('address')}>{s.trip?.pickup ? 'Hotel address' : 'Getting to the hotel'}</button>}
+                      {st.address && <button type="button" className="btn gold small" onClick={() => setSheet('address')}>{!stayOf(s.trip) && !s.trip?.noStay ? 'Where are you staying?' : s.trip?.pickup ? (stayOf(s.trip) ? 'Hotel address' : 'The address') : 'Getting there'}</button>}
                       {st.bag && <button type="button" className="btn primary small" onClick={() => tick(st.id)}>Got the bags</button>}
                       {st.bag && <button type="button" className="btn secondary small td-soft" onClick={() => setSheet('bag')}>A bag didn’t arrive</button>}
-                      {!st.bag && <button type="button" className={'btn small ' + (st.address ? 'secondary td-soft' : 'primary')} onClick={() => tick(st.id)}>{st.id === 'driver' ? 'With the driver' : st.id === 'hotel' ? 'At the hotel' : 'Done'}</button>}
+                      {!st.bag && <button type="button" className={'btn small ' + (st.address ? 'secondary td-soft' : 'primary')} onClick={() => tick(st.id)}>{st.id === 'driver' ? 'With the driver' : st.id === 'hotel' ? (stayOf(s.trip) ? 'At the hotel' : 'I’m there') : 'Done'}</button>}
                     </span>
                   )}
                 </span>
@@ -945,7 +1103,7 @@ function Landed() {
         {!cur && (
           <div className="col" style={{ gap: 8 }}>
             <span className="small">{picks.length ? 'Rest first. Your picks for tonight are being booked.' : 'Rest first. When you want dinner, ask us.'}</span>
-            <button type="button" className="btn secondary small td-soft" style={{ alignSelf: 'flex-start' }} onClick={() => setSheet('address')}>Hotel address</button>
+            <button type="button" className="btn secondary small td-soft" style={{ alignSelf: 'flex-start' }} onClick={() => setSheet('address')}>{stayOf(s.trip) ? 'Hotel address' : 'The address'}</button>
           </div>
         )}
         {!cur && <button type="button" className="td-link" style={{ alignSelf: 'flex-start' }} onClick={() => { buzz(HAPTIC.tap); set({ todayArrival: [] }); }}>Start the list again</button>}
@@ -955,13 +1113,13 @@ function Landed() {
       {sheet === 'bag' && (
         <Sheet label="Missing bag" onClose={() => setSheet(null)}>
           <h2 className="h2">Before you leave the baggage hall</h2>
-          {['Go to the Saudia baggage desk next to carousel 7.', 'Show your bag tag (it’s on your boarding pass in the Wallet).', 'They give you a reference that looks like ISTSV12345. Type it below.'].map((t, i) => (
+          {[`Go to the ${s.trip?.flight?.airline || 'airline'} baggage desk next to carousel 7.`, 'Show your bag tag (it’s on your boarding pass in the Wallet).', 'They give you a reference that looks like ISTSV12345. Type it below.'].map((t, i) => (
             <div key={t} className="row" style={{ alignItems: 'flex-start' }}><span className="avatar sm" style={{ flexShrink: 0 }}>{i + 1}</span><span className="body">{t}</span></div>
           ))}
           <div className="field"><label htmlFor="pir">Reference from the desk</label><input id="pir" className="input" value={ref} onChange={(e) => setRef(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder="ISTSV12345" />
             {ref.length > 0 && !/^[A-Z]{5}\d{5}$/.test(ref) && <span className="err">It’s 5 letters then 5 numbers, like ISTSV12345.</span>}</div>
-          <button type="button" className="btn primary block" disabled={!/^[A-Z]{5}\d{5}$/.test(ref)} onClick={() => { set((p) => ({ bagReport: ref, todayArrival: [...new Set([...(p.todayArrival || []), 'bags'])] })); setSheet(null); buzz(HAPTIC.success); toast('Faisal is chasing it with Saudia. Keep receipts for essentials, up to SAR 375 a day.'); }}>Let Mada chase it</button>
-          <span className="tiny">Bags usually reach the hotel within 48 hours. Saudia pays for essentials while you wait.</span>
+          <button type="button" className="btn primary block" disabled={!/^[A-Z]{5}\d{5}$/.test(ref)} onClick={() => { set((p) => ({ bagReport: ref, todayArrival: [...new Set([...(p.todayArrival || []), 'bags'])] })); setSheet(null); buzz(HAPTIC.success); toast(`Faisal is chasing it with ${s.trip?.flight?.airline || 'the airline'}. Keep receipts for essentials, up to SAR 375 a day.`); }}>Let Mada chase it</button>
+          <span className="tiny">Bags usually arrive within 48 hours. {s.trip?.flight?.airline || 'The airline'} pays for essentials while you wait.</span>
         </Sheet>
       )}
     </>
@@ -970,37 +1128,46 @@ function Landed() {
 
 /* ---------- back home ---------- */
 
-function Stamp() {
+function Stamp({ iso }) {
   useEffect(() => { const t = setTimeout(() => buzz(HAPTIC.thunk), 520); return () => clearTimeout(t); }, []);
+  const d = iso || '2027-03-09';
   return (
-    <svg className="td-stamp" viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="New passport stamp: Istanbul, 9 March">
+    <svg className="td-stamp" viewBox="0 0 120 120" width="104" height="104" role="img" aria-label={`New passport stamp: Istanbul, ${shortDay(d)}`}>
       <defs><path id="td-arc" d="M60 60 m-41 0 a41 41 0 1 1 82 0 a41 41 0 1 1 -82 0" /></defs>
       <circle cx="60" cy="60" r="55" fill="rgba(255,253,249,.12)" stroke="#e8cf9c" strokeWidth="3" />
       <circle cx="60" cy="60" r="33" fill="none" stroke="#e8cf9c" strokeWidth="1.5" />
       <text fontFamily="Inter Tight, sans-serif" fontSize="10.5" fontWeight="700" letterSpacing="2.2" fill="#e8cf9c"><textPath href="#td-arc">İSTANBUL · TÜRKİYE · ENTRY ·</textPath></text>
-      <text x="60" y="56" textAnchor="middle" fontFamily="Inter Tight, sans-serif" fontSize="13" fontWeight="700" fill="#fffdf9">09 MAR</text>
-      <text x="60" y="72" textAnchor="middle" fontFamily="Inter Tight, sans-serif" fontSize="10" fontWeight="600" fill="#e8cf9c">2027 · IST</text>
+      <text x="60" y="56" textAnchor="middle" fontFamily="Inter Tight, sans-serif" fontSize="13" fontWeight="700" fill="#fffdf9">{String(dayOf(d)).padStart(2, '0')} {monthOf(d).toUpperCase()}</text>
+      <text x="60" y="72" textAnchor="middle" fontFamily="Inter Tight, sans-serif" fontSize="10" fontWeight="600" fill="#e8cf9c">{d.slice(0, 4)} · IST</text>
     </svg>
   );
 }
 
-const IDEAS = {
-  winter: [
-    { id: 'alula', title: 'AlUla', note: 'Cool nights, warm days. 1h 20m away.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
-    { id: 'season', title: 'Riyadh Season', note: 'A weekend at home, done properly.', img: 'img/riyadh.jpg', pos: '50% 40%', go: ['ask', { prefill: 'A weekend at Riyadh Season for the 4 of us' }] },
-    { id: 'cool', title: 'Somewhere with snow', note: 'Gudauri or Erzurum, 4h away.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: 'Somewhere with snow for the kids in January' }] },
-  ],
-  spring: [
-    { id: 'alula', title: 'AlUla', note: 'The last cool weeks before summer.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
-    { id: 'abha', title: 'Abha', note: 'Green mountains, 20° in May.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: 'A long weekend in Abha' }] },
-    { id: 'season', title: 'Riyadh', note: 'Staycation while it’s still mild.', img: 'img/riyadh.jpg', pos: '50% 40%', go: ['ask', { prefill: 'A staycation in Riyadh' }] },
-  ],
-  summer: [
-    { id: 'abha', title: 'Abha', note: 'Escape the heat, 1h 40m away.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: 'A week in Abha this summer' }] },
-    { id: 'baku', title: 'Back to Baku', note: 'You loved it last Eid. 24° in July.', img: 'img/istanbul.jpg', pos: '20% 50%', go: ['ask', { prefill: 'Baku again this summer for the 4 of us' }] },
-    { id: 'alula', title: 'AlUla in October', note: 'Book now, the season fills fast.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
-  ],
-};
+/* Ideas for the next trip. Only remembers trips that really happened, and counts who's really in the family. */
+function ideasFor(s, when) {
+  const n = Math.max(1, (s.household || []).filter((id) => id !== 'lina').length);
+  const us = n > 1 ? `for the ${n} of us` : 'for me';
+  const baku = (s.pastTrips || []).find((t) => t.id === 'baku');
+  const IDEAS = {
+    winter: [
+      { id: 'alula', title: 'AlUla', note: 'Cool nights, warm days. 1h 20m away.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
+      { id: 'season', title: 'Riyadh Season', note: 'A weekend at home, done properly.', img: 'img/riyadh.jpg', pos: '50% 40%', go: ['ask', { prefill: `A weekend at Riyadh Season ${us}` }] },
+      { id: 'cool', title: 'Somewhere with snow', note: 'Gudauri or Erzurum, 4h away.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: `Somewhere with snow in January ${us}` }] },
+    ],
+    spring: [
+      { id: 'alula', title: 'AlUla', note: 'The last cool weeks before summer.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
+      { id: 'abha', title: 'Abha', note: 'Green mountains, 20° in May.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: 'A long weekend in Abha' }] },
+      { id: 'season', title: 'Riyadh', note: 'Staycation while it’s still mild.', img: 'img/riyadh.jpg', pos: '50% 40%', go: ['ask', { prefill: 'A staycation in Riyadh' }] },
+    ],
+    summer: [
+      { id: 'abha', title: 'Abha', note: 'Escape the heat, 1h 40m away.', img: 'img/clouds.jpg', pos: '50% 60%', go: ['ask', { prefill: 'A week in Abha this summer' }] },
+      baku ? { id: 'baku', title: 'Back to Baku', note: `You loved it ${String(baku.when || 'last time').toLowerCase()}. 24° in July.`, img: 'img/istanbul.jpg', pos: '20% 50%', go: ['ask', { prefill: `Baku again this summer ${us}` }] }
+        : { id: 'georgia', title: 'Tbilisi', note: '24° in July. 3h 30m away.', img: 'img/clouds.jpg', pos: '50% 40%', go: ['ask', { prefill: `Tbilisi this summer ${us}` }] },
+      { id: 'alula', title: 'AlUla in October', note: 'Book now, the season fills fast.', img: 'img/alula.jpg', pos: '50% 50%', go: ['plan', { id: 'alula2' }] },
+    ],
+  };
+  return IDEAS[when];
+}
 const season = (m = new Date().getMonth()) => (m >= 9 || m <= 1 ? 'winter' : m <= 4 ? 'spring' : 'summer');
 
 /* Photos are shrunk on the phone before they're kept, so three fit easily. */
@@ -1022,8 +1189,8 @@ function shrink(file) {
 }
 
 const RATE = [
-  { id: 'hotel', q: 'Same hotel next time?', who: 'Rooms near Galata Tower', opts: [['yes', 'Yes, remember it'], ['no', 'Not this one']] },
-  { id: 'driver', q: 'How were the drivers?', who: 'Khalid in Riyadh, Ahmet in Istanbul', opts: [['great', 'Great'], ['fine', 'Fine'], ['poor', 'Not good']] },
+  { id: 'hotel', q: 'Same hotel next time?', who: (t) => t?.stay?.name || 'The hotel', opts: [['yes', 'Yes, remember it'], ['no', 'Not this one']], needs: 'stay' },
+  { id: 'driver', q: 'How were the drivers?', who: (t) => `${t?.pickup?.home?.driver || 'Khalid'} in Riyadh, ${t?.pickup?.arrive?.driver || 'Ahmet'} in Istanbul`, opts: [['great', 'Great'], ['fine', 'Fine'], ['poor', 'Not good']], needs: 'pickup' },
   { id: 'faisal', q: 'And Faisal?', who: 'Your agent for this trip', opts: [['great', 'Great'], ['fine', 'Fine'], ['poor', 'Not good']] },
 ];
 const RATE_REPLY = { hotel: { yes: 'Saved. We’ll suggest it first next time.', no: 'Got it. We won’t suggest it again.' } };
@@ -1032,7 +1199,9 @@ function RateTrip() {
   const { s, set, toast } = useStore();
   const r = s.todayRating || {};
   const [note, setNote] = useState(r.note || '');
-  const step = RATE.find((x) => !r[x.id]);
+  const t = s.trip;
+  const RATE_Q = RATE.filter((x) => !x.needs || (x.needs === 'stay' ? t?.stay : t?.pickup));
+  const step = RATE_Q.find((x) => !r[x.id]);
   const answer = (id, v) => { buzz(HAPTIC.select); set((p) => ({ todayRating: { ...(p.todayRating || {}), [id]: v } })); };
   if (r.sent) {
     return (
@@ -1043,16 +1212,16 @@ function RateTrip() {
       </div>
     );
   }
-  const answered = RATE.filter((x) => r[x.id]).length;
+  const answered = RATE_Q.filter((x) => r[x.id]).length;
   return (
     <div className="card rise d2 td-rate">
       <div className="spread">
         <span className="eyebrow">How was it</span>
-        <span className="td-dots" aria-label={`${answered} of 3 answered`}>{RATE.map((x) => <i key={x.id} className={r[x.id] ? 'on' : step?.id === x.id ? 'now' : ''} />)}</span>
+        <span className="td-dots" aria-label={`${answered} of ${RATE_Q.length} answered`}>{RATE_Q.map((x) => <i key={x.id} className={r[x.id] ? 'on' : step?.id === x.id ? 'now' : ''} />)}</span>
       </div>
       {step ? (
         <div className="col td-q" key={step.id} style={{ gap: 12 }}>
-          <span className="col" style={{ gap: 2 }}><span className="display" style={{ fontSize: 28 }}>{step.q}</span><span className="small">{step.who}</span></span>
+          <span className="col" style={{ gap: 2 }}><span className="display" style={{ fontSize: 28 }}>{step.q}</span><span className="small">{typeof step.who === 'function' ? step.who(t) : step.who}</span></span>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {step.opts.map(([v, label], i) => <button key={v} type="button" className={'btn small ' + (i === 0 ? 'primary' : 'secondary td-soft')} onClick={() => answer(step.id, v)}>{label}</button>)}
           </div>
@@ -1065,7 +1234,7 @@ function RateTrip() {
           <textarea id="td-note" className="input td-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional. The kids loved the ferry…" />
           <div className="row" style={{ gap: 8 }}>
             <button type="button" className="btn primary small" onClick={() => { buzz(HAPTIC.success); set((p) => ({ todayRating: { ...(p.todayRating || {}), note: note.trim(), sent: true } })); toast('Sent to Faisal.'); }}>Send to Faisal</button>
-            <button type="button" className="btn secondary small td-soft" onClick={() => { buzz(HAPTIC.tap); set((p) => ({ todayRating: { ...(p.todayRating || {}), [RATE[RATE.length - 1].id]: undefined } })); }}>Back</button>
+            <button type="button" className="btn secondary small td-soft" onClick={() => { buzz(HAPTIC.tap); set((p) => ({ todayRating: { ...(p.todayRating || {}), [RATE_Q[RATE_Q.length - 1].id]: undefined } })); }}>Back</button>
           </div>
         </div>
       )}
@@ -1084,14 +1253,16 @@ function Memories() {
       const urls = await Promise.all(list.map(shrink));
       set((p) => ({ todayPhotos: [...(p.todayPhotos || []), ...urls].slice(0, 3) }));
       buzz(HAPTIC.success);
-      if (photos.length + urls.length >= 3) toast('Added to the Istanbul trip.');
+      if (photos.length + urls.length >= 3) toast(`Added to the ${s.trip?.city || 'Istanbul'} trip.`);
     } catch (e) { toast('That one didn’t open. Try another photo.'); }
   };
   return (
     <div className="card rise td-mem">
       <div className="col" style={{ gap: 2 }}>
         <span className="h3" style={{ fontSize: 17 }}>{photos.length >= 3 ? 'Three to remember it by.' : 'Add 3 favourite photos'}</span>
-        <span className="small">{photos.length >= 3 ? 'They’re on the trip now, for the four of you.' : 'They go on the trip card, so the four of you can find them.'}</span>
+        <span className="small">{(s.trip?.travellers?.length || 1) > 1
+          ? (photos.length >= 3 ? `They’re on the trip now, for ${ofYou(s.trip.travellers.length)}.` : `They go on the trip card, so ${ofYou(s.trip.travellers.length)} can find them.`)
+          : (photos.length >= 3 ? 'They’re on the trip card now.' : 'They go on the trip card, to find them later.')}</span>
       </div>
       <div className="td-polas">
         {[0, 1, 2].map((i) => photos[i] ? (
@@ -1111,33 +1282,37 @@ function Memories() {
 function Home() {
   const { s, push, go } = useStore();
   const t = s.trip;
-  const total = (t?.flightPrice || 0) + (t?.stay?.status === 'booked' ? t.stay.price : 0) + (t?.pickup?.price || 0);
+  const total = (t?.flightPrice || 0) + (t?.stay?.status === 'booked' ? t.stay.price : 0) + (t?.pickup?.price || 0) - (t?.paid?.discount || 0);
+  const out = t?.flight?.dateISO || t?.stay?.fromISO;
+  const nights = t?.flight?.backDateISO ? daysBetween(out, t.flight.backDateISO) : stayOf(t)?.nights || 0;
+  const n = t?.travellers?.length || 1;
+  const stamps = (s.stamps || []).length;
   const refunds = s.refunds.filter((r) => r.stage < 2);
   const credit = s.credit?.balance || 0;
-  const ideas = IDEAS[season()];
+  const ideas = ideasFor(s, season());
   const photos = s.todayPhotos || [];
   const picks = (s.inflightPicks || []).length;
   return (
     <>
       <div className="col rise" style={{ gap: 6 }}>
         <h1 className="display" style={{ fontSize: 46 }}>Welcome home.</h1>
-        <p className="body">Istanbul runs on Riyadh time, so no jet lag. Rest tonight. Nothing needs you.</p>
+        <p className="body">{t?.flight && !t.flight.back ? 'You flew one way, so there’s no flight home on this trip. Tell Faisal if you want one.' : 'Istanbul runs on Riyadh time, so no jet lag. Rest tonight. Nothing needs you.'}</p>
       </div>
 
       <div className="story td-recap rise d1">
         <img className="bg drift" src={photos[0] || 'img/istanbul.jpg'} alt="" />
         <span className="veil" />
-        <span className="top"><span className="pill glass">{t?.dates || '9–15 Mar'}</span></span>
-        <Stamp />
+        <span className="top"><span className="pill glass">{t?.dates}</span></span>
+        <Stamp iso={out} />
         <div className="body" style={{ gap: 12 }}>
           <span className="col" style={{ gap: 4 }}>
-            <span className="display" style={{ fontSize: 36, lineHeight: 1 }}>6 nights in Istanbul</span>
-            <span style={{ color: 'rgba(255,253,249,.88)', fontSize: 14 }}>New stamp: Türkiye. 15 countries now.</span>
+            <span className="display" style={{ fontSize: 36, lineHeight: 1 }}>{nights ? `${nights} ${nights === 1 ? 'night' : 'nights'} in ${t.city}` : t?.city}</span>
+            <span style={{ color: 'rgba(255,253,249,.88)', fontSize: 14 }}>New stamp: Türkiye.{stamps ? ` ${stamps + 1} countries now.` : ' Your first with Mada.'}</span>
           </span>
           <div className="td-stats">
-            <span><b className="num">4,930</b>km flown</span>
-            <span><b className="num">{8 + picks}</b>places</span>
-            <span><b className="num">{t?.travellers?.length || 4}</b>of you</span>
+            <span><b className="num">{fmt(t?.flight?.back ? 4930 : t?.flight ? 2465 : 0)}</b>km flown</span>
+            <span><b className="num">{nights}</b>{nights === 1 ? 'night' : 'nights'}</span>
+            <span><b className="num">{n}</b>{n === 1 ? 'traveller' : 'of you'}</span>
           </div>
         </div>
       </div>
@@ -1149,7 +1324,7 @@ function Home() {
           <span className="col" style={{ gap: 2 }}><span className="tiny">The whole trip</span><span className="num" style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-.02em' }}>SAR {fmt(total)}</span></span>
           <span className="pill ok">No extra charges</span>
         </div>
-        <span className="tiny">Flights {fmt(t?.flightPrice || 0)} · Stay {fmt(t?.stay?.status === 'booked' ? t.stay.price : 0)} · Pickups {fmt(t?.pickup?.price || 0)}</span>
+        <span className="tiny">{[t?.flight && `${t.flight.back ? 'Flights' : 'Flight'} ${fmt(t.flightPrice || 0)}`, t?.stay?.status === 'booked' && `Stay ${fmt(t.stay.price)}`, t?.pickup && `Pickups ${fmt(t.pickup.price)}`, t?.paid?.discount && `Code −${fmt(t.paid.discount)}`].filter(Boolean).join(' · ')}</span>
         {refunds.map((r) => (
           <div key={r.id} className="td-money-row"><Icon name="refund" size={20} color="#7d5d27" /><span className="grow col" style={{ gap: 1 }}><span className="small" style={{ fontWeight: 600, color: '#1e352d' }}>Refund on its way · SAR {fmt(r.amount)}</span><span className="tiny">{r.stage === 0 ? 'Requested from ' + (r.airline || 'the airline') : 'Approved. Sent to ' + (r.card || 'your card') + ' next.'}</span></span></div>
         ))}
@@ -1209,54 +1384,68 @@ export default function Today() {
   );
 }
 
-const ADDRESS = { local: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', name: 'Rooms near Galata Tower', phone: '+90 212 000 0000' };
-
-/* The hotel address, maps, and a way there whether or not a car is booked. Saved on the phone, so it works without signal. */
+/* Where they're staying, from the booking: the hotel, an address they gave us, or a question. Saved on the phone. */
 export function AddressSheet({ onClose }) {
   const { s, set, toast } = useStore();
   const [big, setBig] = useState(false);
   const [ride, setRide] = useState(null);
-  const q = encodeURIComponent(ADDRESS.local);
-  const pickup = s.trip?.pickup;
+  const [addr, setAddr] = useState('');
+  const t = s.trip;
+  const st = stayOf(t);
+  const place = st ? { local: st.address, name: st.name, phone: st.phone, note: 'check-in from 14:00' } : t?.noStay?.address ? { local: t.noStay.address, name: `With ${t.noStay.label || 'family or friends'}`, phone: null, note: 'the address you gave us' } : null;
+  const pickup = t?.pickup;
+  const arrive = pickup?.arrive || {};
+  if (!place) return (
+    <Sheet label="Where are you staying" onClose={onClose}>
+      <h2 className="h2">No hotel booked. Where are you staying?</h2>
+      <p className="small" style={{ marginTop: -8 }}>{pickup ? `${arrive.driver} needs an address after the airport.` : 'So Faisal knows where to reach you.'}</p>
+      <form className="col" style={{ gap: 10 }} onSubmit={(e) => { e.preventDefault(); if (addr.trim().length < 6) return; set((p) => ({ trip: { ...p.trip, noStay: { label: 'family or friends', address: addr.trim() } } })); buzz(HAPTIC.success); toast('Saved. The driver has the address.'); }}>
+        <div className="field"><label htmlFor="as-addr">Address</label><input id="as-addr" className="input" value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Street, area, İstanbul" autoComplete="street-address" /></div>
+        <button type="submit" className="btn primary block" disabled={addr.trim().length < 6}>Save the address</button>
+      </form>
+      <span className="tiny">Want a hotel instead? Ask Mada and Faisal finds rooms for tonight.</span>
+    </Sheet>
+  );
+  const q = encodeURIComponent(place.local);
   if (big) return createPortal(
     <div className="address-big" role="dialog" aria-label="Address for the driver" onClick={() => setBig(false)}>
       <span className="eyebrow" style={{ color: '#7d5d27' }}>Lütfen bu adrese gidin · Please take me here</span>
-      <span className="display" style={{ fontSize: 44, lineHeight: 1.05 }}>{ADDRESS.local}</span>
+      <span className="display" style={{ fontSize: 44, lineHeight: 1.05 }}>{place.local}</span>
       <span className="small">Tap anywhere to close</span>
     </div>, document.querySelector('.phone') || document.body
   );
   return (
-    <Sheet label="Hotel address" onClose={onClose}>
-      <span className="eyebrow">{ADDRESS.name} · check-in from 14:00</span>
+    <Sheet label={st ? 'Hotel address' : 'The address'} onClose={onClose}>
+      <span className="eyebrow">{place.name} · {place.note}</span>
       <button type="button" className="address-card" onClick={() => setBig(true)} aria-label="Show the address full screen">
-        <span className="display" style={{ fontSize: 26, lineHeight: 1.1 }}>{ADDRESS.local}</span>
+        <span className="display" style={{ fontSize: 26, lineHeight: 1.1 }}>{place.local}</span>
         <span className="tiny">Tap to show it full screen to the driver</span>
       </button>
       <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
         <a className="btn secondary small" href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer"><Icon name="pin" size={18} />Google Maps</a>
         <a className="btn secondary small" href={`https://maps.apple.com/?q=${q}`} target="_blank" rel="noreferrer"><Icon name="pin" size={18} />Apple Maps</a>
-        <button type="button" className="btn secondary small" onClick={async () => { try { await navigator.clipboard.writeText(ADDRESS.local); toast('Address copied.'); } catch (e) { toast('Press and hold the address to copy it.'); } }}>Copy</button>
-        <a className="btn secondary small" href={`tel:${ADDRESS.phone.replace(/\s/g, '')}`}>Call the hotel</a>
+        <button type="button" className="btn secondary small" onClick={async () => { try { await navigator.clipboard.writeText(place.local); toast('Address copied.'); } catch (e) { toast('Press and hold the address to copy it.'); } }}>Copy</button>
+        {place.phone && <a className="btn secondary small" href={`tel:${place.phone.replace(/\s/g, '')}`}>Call the hotel</a>}
       </div>
       {pickup ? (
         <div className="card well" style={{ gap: 6 }}>
-          <span className="h3" style={{ fontSize: 15 }}>Ahmet is meeting you</span>
-          <span className="small">Door 3, arrivals hall, with a sign saying ALHARBI. Grey Mercedes Vito · 34 MDA 21. He waits 60 minutes after you land, at no cost.</span>
-          <div className="row"><a className="btn primary small" href="tel:+905000000000">Call Ahmet</a><button type="button" className="btn secondary small" onClick={() => toast('Message sent. Ahmet replies in English or Turkish.')}>Message</button></div>
+          <span className="h3" style={{ fontSize: 15 }}>{arrive.driver} is meeting you</span>
+          <span className="small">{arrive.door}, arrivals hall, with a sign saying {signName(t)}. {arrive.car} · {arrive.plate}. He waits {arrive.waits || '60 min'} after you land, at no cost.</span>
+          <div className="row"><a className="btn primary small" href={`tel:${(arrive.phone || '').replace(/\s/g, '')}`}>Call {arrive.driver}</a><button type="button" className="btn secondary small" onClick={() => toast(`Message sent. ${arrive.driver} replies in English or Turkish.`)}>Message</button></div>
         </div>
       ) : (
         <div className="col" style={{ gap: 8 }}>
           <span className="eyebrow">No car booked. Three ways there</span>
           {[
-            ['car', 'A Mada pickup', 'SAR 220 for the family · driver waits 60 min · paid now', 'pickup'],
+            ['car', 'A Mada pickup', `SAR 220${(t?.travellers?.length || 1) > 1 ? ' for all of you' : ''} · driver waits 60 min · paid now`, 'pickup'],
             ['car', 'Taxi from the rank', 'About TRY 1,100 (SAR 125) · 45–60 min · yellow rank at Door 14. Ask for the meter: “taksimetre”.', 'taxi'],
-            ['flight', 'Metro', 'M11 to Gayrettepe, then M2 to Şişhane · about 70 min · TRY 60 each · hard with big bags', 'metro'],
-          ].map(([ic, t, sub, id]) => (
+            ['flight', 'Metro', 'M11 to Gayrettepe, then M2 · about 70 min · TRY 60 each · hard with big bags', 'metro'],
+          ].map(([ic, ti, sub, id]) => (
             <button key={id} type="button" className={'card tap well' + (ride === id ? ' selected' : '')} style={{ flexDirection: 'row', alignItems: 'flex-start' }} onClick={() => setRide(id)}>
-              <Icon name={ic} /><span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></span>
+              <Icon name={ic} /><span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>{ti}</span><span className="tiny">{sub}</span></span>
             </button>
           ))}
-          {ride === 'pickup' && <button type="button" className="btn primary block" onClick={() => { set((p) => ({ trip: p.trip ? { ...p.trip, pickup: { price: 220, status: 'booked' } } : p.trip })); buzz(HAPTIC.success); toast('Pickup booked. Ahmet will meet you at Door 3.'); }}>Book the pickup · SAR 220</button>}
+          {ride === 'pickup' && <button type="button" className="btn primary block" onClick={() => { set((p) => { const pk = makeArrivalPickup(p.trip); return { trip: p.trip ? { ...p.trip, pickup: pk } : p.trip }; }); buzz(HAPTIC.success); toast('Pickup booked. Ahmet will meet you at Door 3.'); }}>Book the pickup · SAR 220</button>}
           {ride === 'taxi' && <span className="small">Only take taxis from the rank. If a driver won’t use the meter, take the next one. Show them the address above.</span>}
           {ride === 'metro' && <a className="btn secondary block" href={`https://www.google.com/maps/dir/?api=1&origin=Istanbul+Airport&destination=${q}&travelmode=transit`} target="_blank" rel="noreferrer">Directions in Google Maps</a>}
         </div>
@@ -1264,4 +1453,10 @@ export function AddressSheet({ onClose }) {
       <span className="tiny">Saved on this phone. Works without signal.</span>
     </Sheet>
   );
+}
+
+/* A pickup booked on landing: the airport ride only, no ride from home. */
+function makeArrivalPickup(t) {
+  const pk = makePickup(t?.travellers?.length || 1, 220, { outISO: t?.flight?.dateISO, oneway: true });
+  return { ...pk, arrivalOnly: true, home: null };
 }

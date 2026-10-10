@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, fmt } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, Toggle } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
-import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useReply, useSave } from './Social.jsx';
+import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useSave, EmptyArt, useCircleClock, setOpenCircle, getThread, fold, opAdd, opMsg, opThread, opGroup, opQueue, sys, names, newId, familyOf, familyLabel, markPaid } from './Social.jsx';
 
 const EVENTS = {
   Riyadh: [
@@ -68,6 +68,130 @@ function CitySheet({ current, onPick, onClose }) {
 }
 
 
+/* ---------- what Mada knows about places, for answers in a circle ---------- */
+
+const PLACES = {
+  Istanbul: { fly: '4h 15m direct from Riyadh', from: 1745, nightly: 980, plan: 'istanbul3', ideas: ['A Bosphorus dinner cruise from Kabataş, 19:30', 'Topkapı Palace in the morning. Closed Tuesdays', 'The ferry to Kadıköy for the food walk'], spots: ['Bosphorus cruise', 'Topkapı Palace', 'Kadıköy', 'Princes’ Islands'], when: 'April to June is mild, about 18–24°C. Eid in March is cool, so bring jackets.', visa: 'Saudi passports get an e-visa online in about 10 minutes.', stay: 'Galata or Sultanahmet. Both are walkable with kids.' },
+  Georgia: { fly: '3h 30m direct to Tbilisi', from: 1290, nightly: 620, ideas: ['Old Tbilisi and the cable car up to Narikala', 'A day in Kazbegi, under the mountains', 'Lake Bazaleti for a quiet afternoon by the water'], spots: ['Tbilisi', 'Kazbegi', 'Batumi', 'Gudauri'], when: 'May to October is green and warm. Gudauri has snow from December to March.', visa: 'Saudi passports need no visa for stays up to a year.', stay: 'Old Tbilisi to walk everywhere, then a mountain lodge in Kazbegi.' },
+  Baku: { fly: '3h direct', from: 1150, nightly: 700, ideas: ['The Old City walls at dusk', 'The Flame Towers light show from the Boulevard', 'A day in Gabala: cable cars and lakes'], spots: ['Old City', 'Boulevard', 'Gabala', 'Shahdag'], when: 'April to June, and September to October.', visa: 'Saudi passports get an e-visa in about 3 days.', stay: 'The Old City, or a seafront hotel on the Boulevard.' },
+  AlUla: { fly: '1h 20m direct', from: 690, nightly: 1650, plan: 'alula2', ideas: ['Hegra at golden hour', 'Old Town lanes after 16:00', 'Stargazing at Gharameel'], spots: ['Hegra', 'Old Town', 'Elephant Rock', 'Maraya'], when: 'October to March. Warm days, cool nights.', visa: 'No visa needed.', stay: 'A desert resort with family villas.' },
+  London: { fly: '6h 50m direct', from: 3150, nightly: 1900, ideas: ['Hyde Park and the Diana playground', 'The Natural History Museum. Free, book a slot', 'A Thames boat down to Greenwich'], spots: ['Hyde Park', 'Natural History Museum', 'Greenwich', 'Harrods'], when: 'June to September. Long days, about 20°C.', visa: 'Saudi passports need an electronic travel authorisation. About 3 days.', stay: 'Kensington or Marylebone, near the parks.' },
+  Dubai: { fly: '2h direct', from: 820, nightly: 1100, ideas: ['Dubai Frame and Zabeel Park', 'A day at Aquaventure', 'A desert dinner at sunset'], spots: ['Downtown', 'The Palm', 'Dubai Frame', 'Desert camp'], when: 'November to March.', visa: 'No visa needed.', stay: 'Downtown for the fountains, or the Palm for the beach.' },
+  Riyadh: { fly: null, from: 0, nightly: 800, ideas: ['Boulevard World in the evening', 'Sunset at Bujairi Terrace, Diriyah', 'A desert camp in Thumamah'], spots: ['Boulevard World', 'Diriyah', 'Thumamah', 'Kingdom Centre'], when: 'October to March. Evenings are best.', visa: 'No visa needed.', stay: 'Close to the Boulevard if you’re staying over.' },
+  Abha: { fly: '1h 35m direct', from: 540, nightly: 650, ideas: ['The Al Soudah cable car', 'Rijal Almaa, the stone village', 'Evenings at 20°C in August'], spots: ['Al Soudah', 'Rijal Almaa', 'Abha Dam', 'Art Street'], when: 'June to September, when Riyadh is hot.', visa: 'No visa needed.', stay: 'Al Soudah, up in the clouds.' },
+};
+const ALIASES = [['tbilisi', 'Georgia'], ['georgia', 'Georgia'], ['batumi', 'Georgia'], ['istanbul', 'Istanbul'], ['türkiye', 'Istanbul'], ['turkiye', 'Istanbul'], ['turkey', 'Istanbul'], ['baku', 'Baku'], ['azerbaijan', 'Baku'], ['alula', 'AlUla'], ['al ula', 'AlUla'], ['london', 'London'], ['dubai', 'Dubai'], ['riyadh', 'Riyadh'], ['abha', 'Abha']];
+const findPlace = (text = '') => {
+  const t = ` ${String(text).toLowerCase()} `;
+  const hit = ALIASES.find(([k]) => new RegExp(`[^a-z]${k}[^a-z]`).test(t));
+  return hit ? hit[1] : null;
+};
+/* Where a circle is going: what it was told, its trip, or its name. Never a guess. */
+export const circleDest = (g) => {
+  if (!g) return null;
+  if (g.dest) return findPlace(g.dest) || g.dest;
+  const t = g.trip && g.trip !== 'Somewhere new' ? g.trip.split(' · ')[0] : '';
+  return findPlace(t) || findPlace(g.name) || t || null;
+};
+const roundTo = (n, step) => Math.round(n / step) * step;
+
+/* Mada's answer to "@Mada …" in a circle: about this circle's place, or a question back. */
+function madaReply(g, raw, thread) {
+  const n = g.members.length;
+  const q = raw.replace(/@mada\b/ig, '').trim();
+  const t = q.toLowerCase();
+  const prev = [...thread.msgs].reverse().find((m) => m.t !== 'sys');
+  let dest = findPlace(q) || circleDest(g);
+  if (!dest && prev?.askWhere && q && q.split(/\s+/).length <= 3 && !/[\d@?!.,;:]/.test(q)) dest = q.replace(/\b\w/g, (c) => c.toUpperCase());
+  if (!dest) return { askWhere: true, text: `Where are you thinking? Tell us a place and we’ll bring ideas for ${n === 1 ? 'you' : 'all ' + n}.`, actions: ['Georgia', 'Baku', 'AlUla'].map((p) => ({ label: p, say: p })) };
+  const P = PLACES[dest];
+  const who = n === 1 ? 'you' : `all ${n}`;
+  const planIt = { label: 'Plan it', ask: `Plan a trip to ${dest} for ${n}` };
+  if (!P) return { dest, text: `We don’t have ready ideas for ${dest} yet. Faisal can plan it with you from scratch, for ${who}.`, actions: [planIt] };
+  if (/visa|passport/.test(t)) return { dest, text: `${P.visa} We check every passport in the circle before anything is booked.`, actions: [planIt] };
+  if (/flight|fly|plane|ticket/.test(t)) return P.fly
+    ? { dest, text: `${dest} is ${P.fly}. Flights from SAR ${fmt(P.from)} a person. Faisal can hold seats for ${who}, together.`, actions: [{ label: 'Find flights', ask: `Flights to ${dest} for ${n}` }] }
+    : { dest, text: `${dest} is home. No flights needed.`, actions: [planIt] };
+  if (/hotel|stay|room|villa|sleep/.test(t)) return { dest, text: `Where to stay in ${dest}: ${P.stay}`, actions: [{ label: 'See stays', ask: `A place to stay in ${dest} for ${n}` }] };
+  if (/when|weather|season|best time|cold|hot|warm/.test(t)) return { dest, text: `Best time for ${dest}: ${P.when}`, actions: [planIt] };
+  if (/cost|price|budget|how much|expensive|cheap/.test(t)) {
+    const lo = Math.max(500, roundTo(P.from * n + P.nightly * 4 * Math.ceil(n / 4), 500));
+    return { dest, text: `For ${n === 1 ? 'one person' : n + ' people'}, 4 nights in ${dest} is usually SAR ${fmt(lo)}–${fmt(roundTo(lo * 1.25, 500))} with flights and a hotel. Faisal prices it exactly.`, actions: [planIt] };
+  }
+  return { dest, text: `Three ideas for ${dest}, for ${who}:`, list: P.ideas, foot: P.fly ? `${P.fly}, from SAR ${fmt(P.from)} a person.` : null, actions: [planIt, ...(P.plan ? [{ label: 'See our plan', plan: P.plan }] : [])] };
+}
+
+/* Friends answer some messages, not all. Questions get answers, hellos get hellos, "ok" gets a read receipt. */
+const ACK = /^(ok|okay|k|kk|sure|yes|yeah|yep|no|nope|fine|done|cool|great|good|noted|alright|perfect|👍|🙏)[.! ]*$/i;
+const GREET = /^(salam|assalam|as-salam|assalamu|hi|hello|hey|marhaba|السلام)/i;
+const THANKS = /thank|shukran|thx|jazak/i;
+const QUESTION = /\?\s*$|^(who|what|when|where|why|how|can|could|should|shall|are|is|do|does|did|will|would|which|any|anyone)\b/i;
+function answerFor(text, g) {
+  const t = text.toLowerCase();
+  const dest = circleDest(g);
+  if (/who.*\b(in|coming|joining|free)\b|anyone|are you in|you in/.test(t)) return 'I’m in.';
+  if (/vote/.test(t)) return 'Yes, start a vote. Easier.';
+  if (/how much|cost|price|budget|afford/.test(t)) return 'Under SAR 5,000 a family would be good.';
+  if (/flight|fly|plane/.test(t)) return 'Morning flights, please. The kids sleep better.';
+  if (/hotel|stay|room|villa/.test(t)) return 'Somewhere we can walk to dinner.';
+  if (/food|eat|dinner|lunch|restaurant|breakfast/.test(t)) return 'Anywhere halal with family seating.';
+  if (/where/.test(t)) return dest ? `${dest} still sounds good to me.` : 'Somewhere cooler than Riyadh. Georgia?';
+  if (/when|date|day|week|month|june|july|eid/.test(t)) return 'After the 10th works for us.';
+  return 'Not sure yet. Can we vote on it?';
+}
+const PREF = ['hessa', 'abdullah', 'noor', 'faris', 'khalid', 'maha', 'yousef', 'reem'];
+const rank = (ids) => [...ids].sort((a, b) => (PREF.indexOf(a) + 1 || 99) - (PREF.indexOf(b) + 1 || 99));
+function planResponses(g, text, mid, thread) {
+  const now = Date.now();
+  const evs = [];
+  const others = g.members.filter((m) => m !== 'omar');
+  const prev = [...thread.msgs].reverse().find((m) => m.t !== 'sys');
+  const toMada = /@mada\b/i.test(text) || (prev?.t === 'mada' && prev.askWhere && !circleDest(g));
+  if (toMada) {
+    const r = madaReply(g, text, thread);
+    if (r.dest && !circleDest(g)) evs.push({ at: now + 1500, gid: g.id, type: 'dest', dest: r.dest });
+    evs.push({ at: now + 1600, gid: g.id, type: 'msg', who: 'mada', msg: { t: 'mada', text: r.text, list: r.list || null, foot: r.foot || null, actions: r.actions || [], askWhere: !!r.askWhere } });
+  }
+  if (!others.length) return evs;
+  const ranked = rank(others);
+  const turn = thread.msgs.filter((m) => m.who === 'omar').length;
+  const responder = g.dm ? others[0] : ranked[turn % Math.min(ranked.length, 3)];
+  (g.dm ? others : ranked.slice(0, 3)).forEach((w, i) => evs.push({ at: now + 1100 + i * 900, gid: g.id, type: 'seen', mid, who: w }));
+  if (toMada) return evs;
+  const plain = text.trim();
+  let reply = null;
+  if (ACK.test(plain) || THANKS.test(plain)) reply = null;
+  else if (GREET.test(plain)) reply = 'Wa alaikum assalam.';
+  else if (QUESTION.test(plain)) reply = answerFor(plain, g);
+  else if (/\b(booked|paid)\b/i.test(plain)) reply = 'Thank you.';
+  if (reply) evs.push({ at: now + 3000, gid: g.id, type: 'msg', who: responder, msg: { t: 'text', text: reply } });
+  if (reply === 'I’m in.' && !g.dm && ranked.length > 1) evs.push({ at: now + 4800, gid: g.id, type: 'msg', who: ranked.find((r) => r !== responder), msg: { t: 'text', text: 'Me too, if it’s after the 10th.' } });
+  return evs;
+}
+
+/* Others vote over a few seconds, most for the first choice. */
+const planVotes = (g, mid, options) => {
+  const now = Date.now();
+  return rank(g.members.filter((m) => m !== 'omar')).slice(0, 4).map((who, i) => ({ at: now + 1800 + i * 1400, gid: g.id, type: 'vote', mid, who, opt: options[[0, 0, 1, 0][i] % options.length].id }));
+};
+const DAYS = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+const phrase = (label) => (/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/.test(label) ? DAYS[label.slice(0, 3)] : label);
+
+/* Splits: equally, by family, or custom amounts that add up. */
+function shareUnits(mode, ids) {
+  if (mode === 'family') {
+    const fam = {};
+    ids.forEach((id) => { const k = familyOf(id); (fam[k] = fam[k] || []).push(id); });
+    return Object.entries(fam).map(([key, list]) => ({ key, ids: list, label: familyLabel(key, list) }));
+  }
+  return ids.map((id) => ({ key: id, ids: [id], label: id === 'omar' ? 'You' : person(id).short }));
+}
+function equalAmounts(total, k) {
+  const base = Math.floor(total / k);
+  const rest = Math.round(total - base * k);
+  return Array.from({ length: k }, (_, i) => base + (i < rest ? 1 : 0));
+}
+
 const STAMPS = [
   { city: 'Istanbul', date: 'MAR 27', color: '#b98f4a', rot: -8, upcoming: true },
   { city: 'Baku', date: 'APR 26', color: '#7d5d27', rot: -4 },
@@ -76,8 +200,22 @@ const STAMPS = [
   { city: 'London', date: 'JUL 25', color: '#7d5d27', rot: -10 },
 ];
 
+/* One line under a circle's name: the last thing that happened in it. */
+function lastLine(g, t) {
+  const m = t && [...t.msgs].reverse().find((x) => x.kind !== 'welcome');
+  if (!m) return (g.invited || []).length ? `${g.invited.length} invited` : 'Nothing yet';
+  const who = m.who === 'omar' ? 'You' : m.who === 'mada' ? 'Mada' : person(m.who).short;
+  if (m.t === 'sys') return m.text;
+  if (m.t === 'vote') return `${m.vote.closed ? 'Vote closed' : 'Vote'}: ${m.vote.q}`;
+  if (m.t === 'split') return `${m.split.settled ? 'Settled' : 'Split'}: ${m.split.what}`;
+  if (m.t === 'card') return `${who} shared ${m.card.kind === 'plan' ? PLANS[m.card.id]?.title : m.card.post?.place}`;
+  if (m.t === 'faisal') return 'Faisal: seats held on the cruise';
+  return `${who}: ${m.text || ''}`;
+}
+
 export default function Circles() {
   const { s, set, push, toast } = useStore();
+  useCircleClock();
   const c = s.circles;
   const [sheet, setSheet] = useState(null);
   const [who, setWho] = useState(c.aroundWho || 'picked');
@@ -91,6 +229,12 @@ export default function Circles() {
   const setC = (patch) => set((p) => ({ circles: { ...p.circles, ...patch } }));
   const noorHidden = c.hidden.includes('noor');
   const [view, setView] = useState('discover');
+  const circles = s.groups.filter((g, i, all) => !g.dm && all.findIndex((x) => x.id === g.id) === i);
+  const friends = s.friends || [];
+  const known = posts.filter((p) => friends.includes(p.uid) || (s.following || []).includes(p.uid) || p.who === 'You');
+  const savedCount = (s.savedPosts || []).length + (s.savedPlans || []).length;
+  /* Stamps come from trips taken. A new account has none yet: an empty passport, with the next trip pencilled in. */
+  const stamps = (s.stamps || []).length || (s.pastTrips || []).length ? STAMPS : [];
 
   return (
     <div className="screen">
@@ -110,8 +254,9 @@ export default function Circles() {
         </div>
         {view === 'discover' ? <Discover posts={posts} setPosts={setPosts} /> : (<>
 
+        {friends.length > 0 && (
         <div className="card focal rise" style={{ padding: 18, gap: 14 }}>
-          {!noorHidden && s.trip && (
+          {!noorHidden && s.trip && friends.includes('noor') && (
             <>
               <div className="row" style={{ gap: 12 }}>
                 <span style={{ position: 'relative' }}><span className="avatar gold" style={{ width: 44, height: 44 }}>N</span><span className="pulse" style={{ position: 'absolute', right: 0, bottom: 0, width: 12, height: 12, borderRadius: 999, background: '#4fbf7a', border: '2px solid #1e352d' }} /></span>
@@ -135,28 +280,60 @@ export default function Circles() {
             <Toggle onDark checked={c.around} label={`Tell friends you're in ${city}`} onChange={(v) => { if (v) setSheet('around'); else { setC({ around: false }); toast('Hidden. Nobody can see where you are.'); } }} />
           </div>
         </div>
+        )}
 
-        <div className="spread"><h2 className="h2">Your circles</h2><span className="tiny">{s.groups.filter((g) => !g.dm).length}</span></div>
+        <div className="spread"><h2 className="h2">Your circles</h2>{circles.length > 0 && <span className="tiny">{circles.length}</span>}</div>
+        {circles.length === 0 ? (
+          <div className="cx-empty cx-empty-hero rise">
+            <EmptyArt kind="circles" />
+            <span className="display" style={{ fontSize: 30 }}>Your people, in one place.</span>
+            <span className="small">Make a circle for the people you travel with. Plan together, vote on dates and split the costs.</span>
+            <div className="chips" style={{ justifyContent: 'center' }}>
+              {['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t) => <button key={t} type="button" className="chip" onClick={() => push('newCircle', { name: t })}>{t}</button>)}
+            </div>
+            <button type="button" className="btn primary small" onClick={() => push('newCircle')}>Make your first circle</button>
+          </div>
+        ) : (
         <div className="chips scrollx" style={{ gap: 10 }}>
-          {s.groups.filter((g) => !g.dm).map((g) => g.img ? (
-            <button key={g.id} type="button" className="photo" style={{ width: 210, height: 128, border: 0, padding: 0, flexShrink: 0 }} onClick={() => push('group', { id: g.id })}>
-              <img src={g.img} alt="" /><span className="shade" />
-              {g.unread > 0 && <span className="pill gold" style={{ position: 'absolute', top: 10, left: 10 }}>{g.unread} new</span>}
-              {g.muted && <span className="pill glass" style={{ position: 'absolute', top: 10, right: 10 }}>Muted</span>}
-              <span className="over" style={{ textAlign: 'left', gap: 2 }}><span className="display" style={{ fontSize: 22, color: '#fffdf9' }}>{g.name}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{g.members.length} people · {g.sub}</span></span>
-            </button>
-          ) : (
-            <button key={g.id} type="button" className="card tap" style={{ width: 150, height: 128, flexShrink: 0, justifyContent: 'space-between', boxSizing: 'border-box' }} onClick={() => push('group', { id: g.id })}>
-              <span className="stack">{g.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={30} ring="#fffdf9" />)}</span>
-              <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{g.name}</span><span className="tiny">{g.members.length} {g.members.length === 1 ? 'person' : 'people'} · {g.sub}</span></span>
-            </button>
-          ))}
+          {circles.map((g) => {
+            const line = lastLine(g, getThread(s, g.id));
+            return g.img ? (
+              <button key={g.id} type="button" className="photo cx-tile" onClick={() => push('group', { id: g.id })}>
+                <img src={g.img} alt="" /><span className="cx-veil" />
+                {g.unread > 0 && <span className="pill gold" style={{ position: 'absolute', top: 10, left: 10 }}>{g.unread} new</span>}
+                {g.muted && <span className="pill glass" style={{ position: 'absolute', top: 10, right: 10 }}>Muted</span>}
+                <span className="over" style={{ textAlign: 'left', gap: 2 }}><span className="display" style={{ fontSize: 22, color: '#fffdf9' }}>{g.name}</span><span className="tiny cx-line" style={{ color: 'rgba(255,253,249,.92)' }}>{line}</span></span>
+              </button>
+            ) : (
+              <button key={g.id} type="button" className="card tap cx-tile plain" onClick={() => push('group', { id: g.id })}>
+                <span className="spread" style={{ width: '100%' }}>
+                  <span className="stack">{g.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={30} ring="#fffdf9" />)}</span>
+                  {g.unread > 0 && <span className="pill gold">{g.unread} new</span>}
+                </span>
+                <span className="col" style={{ gap: 0, minWidth: 0, width: '100%' }}><span className="h3" style={{ fontSize: 15 }}>{g.name}</span><span className="tiny cx-line">{line}</span></span>
+              </button>
+            );
+          })}
           <button type="button" className="new-tile" onClick={() => push('newCircle')}><Icon name="plus" />New circle</button>
         </div>
+        )}
 
-        <div className="spread"><h2 className="h2">Friends</h2><button type="button" className="link" onClick={() => push('people')}>{(s.friendRequests || []).length ? `${s.friendRequests.length} request · See all` : 'See all'}</button></div>
+        <div className="spread"><h2 className="h2">Friends</h2>{friends.length > 0 && <button type="button" className="link" onClick={() => push('people')}>{(s.friendRequests || []).length ? `${s.friendRequests.length} request · See all` : 'See all'}</button>}</div>
+        {friends.length === 0 ? (
+          <div className="cx-empty row-empty">
+            <EmptyArt kind="friends" />
+            <span className="col" style={{ gap: 4, alignItems: 'flex-start', textAlign: 'left' }}>
+              <span className="h3">Bring your people.</span>
+              <span className="small">Add the friends you travel with. Only they see your trips and tips.</span>
+              <span className="row" style={{ gap: 8, marginTop: 6 }}>
+                <button type="button" className="btn primary small" onClick={() => push('people', { add: true })}>Add friends</button>
+                {(s.friendRequests || []).length > 0 && <button type="button" className="btn secondary small" onClick={() => push('people', { tab: 'requests' })}>{s.friendRequests.length} request</button>}
+              </span>
+            </span>
+          </div>
+        ) : (
         <div className="chips scrollx" style={{ gap: 14 }}>
-          {s.friends.map((id) => (
+          {friends.map((id) => (
             <button key={id} type="button" className="friend-chip" onClick={() => push('friend', { id })}>
               <span style={{ position: 'relative' }}><PAvatar id={id} size={56} />{FRIENDS[id]?.going && <span className="going-dot" aria-hidden="true" />}</span>
               <span className="tiny" style={{ fontWeight: 600, color: '#1e352d' }}>{person(id).short}</span>
@@ -167,47 +344,73 @@ export default function Circles() {
             <span className="tiny" style={{ fontWeight: 600, color: '#1e352d' }}>Invited</span>
           </button>
         </div>
+        )}
 
-        <div className="spread"><h2 className="h2">From people you know</h2><span className="tiny">Newest first</span></div>
-        {posts.filter((p) => s.friends.includes(p.uid) || (s.following || []).includes(p.uid) || p.who === 'You').length === 0 && <div className="card well"><span className="h3">Nothing from friends yet.</span><span className="small">When friends post tips, they show here first.</span></div>}
-        {posts.filter((p) => s.friends.includes(p.uid) || (s.following || []).includes(p.uid) || p.who === 'You').map((p) => (
-          <button key={p.id} type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }} onClick={() => setOpenPost(p.id)}>
-            {p.img ? <img src={p.img} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} /> : <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: 64, height: 64, borderRadius: 14, fontSize: 24 }}>{p.initial}</span>}
-            <span className="grow col" style={{ gap: 2, minWidth: 0 }}>
-              <span className="tiny"><b style={{ color: '#1e352d' }}>{p.who}</b> · {p.city} · {p.when || 'Just now'}{p.pending ? ' · being checked' : ''}</span>
-              <span className="h3" style={{ fontSize: 15 }}>{p.place}</span>
-              <span className="small" style={{ color: '#3f4f48', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.text}</span>
+        {(friends.length > 0 || known.length > 0) && (<>
+          <div className="spread"><h2 className="h2">From people you know</h2><span className="tiny">Newest first</span></div>
+          {known.length === 0 && <div className="card well"><span className="h3">Nothing from friends yet.</span><span className="small">When friends post tips, they show here first.</span></div>}
+          {known.map((p) => (
+            <button key={p.id} type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }} onClick={() => setOpenPost(p.id)}>
+              {p.img ? <img src={p.img} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} /> : <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: 64, height: 64, borderRadius: 14, fontSize: 24 }}>{p.initial}</span>}
+              <span className="grow col" style={{ gap: 2, minWidth: 0 }}>
+                <span className="tiny"><b style={{ color: '#1e352d' }}>{p.who}</b> · {p.city} · {p.when || 'Just now'}{p.pending ? ' · being checked' : ''}</span>
+                <span className="h3" style={{ fontSize: 15 }}>{p.place}</span>
+                <span className="small" style={{ color: '#3f4f48', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.text}</span>
+              </span>
+            </button>
+          ))}
+        </>)}
+
+        <div className="spread"><h2 className="h2">Saved</h2>{savedCount > 0 && <button type="button" className="link" onClick={() => push('saved')}>See all</button>}</div>
+        {savedCount === 0 ? (
+          <div className="cx-empty row-empty">
+            <EmptyArt kind="saved" />
+            <span className="col" style={{ gap: 4, alignItems: 'flex-start', textAlign: 'left' }}>
+              <span className="h3">Nothing saved yet.</span>
+              <span className="small">Tap the bookmark on any tip or plan in Discover. It lands here, sorted by city.</span>
+              <button type="button" className="link" style={{ padding: '6px 0' }} onClick={() => { setView('discover'); buzz(HAPTIC.select); }}>Look around Discover</button>
             </span>
-          </button>
-        ))}
-
-        <div className="spread"><h2 className="h2">Saved</h2>{((s.savedPosts || []).length + (s.savedPlans || []).length) > 0 && <button type="button" className="link" onClick={() => push('saved')}>See all</button>}</div>
-        {(s.savedPosts || []).length + (s.savedPlans || []).length === 0 ? (
-          <div className="card well"><span className="h3">Nothing saved yet.</span><span className="small">Tap the bookmark on any tip in Discover. It lands here, sorted by city.</span></div>
+          </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-            {[...new Set((s.savedPosts || []).map((p) => p.city))].map((city) => {
-              const n = s.savedPosts.filter((p) => p.city === city).length;
+            {[...new Set((s.savedPosts || []).map((p) => p.city))].map((cty) => {
+              const n = s.savedPosts.filter((p) => p.city === cty).length;
               return (
-                <button key={city} type="button" className="photo" style={{ height: 112, border: 0, padding: 0 }} onClick={() => push('saved', { city })}>
-                  <img src={city === 'Riyadh' ? 'img/riyadh.jpg' : city === 'AlUla' ? 'img/alula.jpg' : 'img/istanbul.jpg'} alt="" /><span className="shade" />
-                  <span className="over" style={{ textAlign: 'left', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 15, color: '#fffdf9' }}>{city}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{n} {n === 1 ? 'place' : 'places'}</span></span>
+                <button key={cty} type="button" className="photo" style={{ height: 112, border: 0, padding: 0 }} onClick={() => push('saved', { city: cty })}>
+                  <img src={cty === 'Riyadh' ? 'img/riyadh.jpg' : cty === 'AlUla' ? 'img/alula.jpg' : 'img/istanbul.jpg'} alt="" /><span className="cx-veil" />
+                  <span className="over" style={{ textAlign: 'left', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 15, color: '#fffdf9' }}>{cty}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{n} {n === 1 ? 'place' : 'places'}</span></span>
                 </button>
               );
             })}
-            {(s.savedPlans || []).map((id) => (
+            {(s.savedPlans || []).filter((id) => PLANS[id]).map((id) => (
               <button key={id} type="button" className="photo" style={{ height: 112, border: 0, padding: 0 }} onClick={() => push('plan', { id })}>
-                <img src={PLANS[id].img} alt="" /><span className="shade" />
+                <img src={PLANS[id].img} alt="" /><span className="cx-veil" />
                 <span className="over" style={{ textAlign: 'left', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 14, color: '#fffdf9' }}>{PLANS[id].title}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>Plan · {PLANS[id].days} days</span></span>
               </button>
             ))}
           </div>
         )}
 
-        <div className="spread"><h2 className="h2">Your passport</h2><span className="tiny">14 countries · 9 Saudi places</span></div>
+        <div className="spread"><h2 className="h2">Your passport</h2><span className="tiny">{stamps.length ? ((s.stamps || []).length ? `${s.stamps.length} countries` : '14 countries · 9 Saudi places') : 'No stamps yet'}</span></div>
+        {stamps.length === 0 ? (
+          <div className="cx-passport" aria-label="An empty passport page">
+            <Sun width={150} color="rgba(185,143,74,.1)" className="cx-watermark" />
+            <div className="cx-passport-head"><span className="eyebrow" style={{ color: '#7d5d27' }}>Visas · Stamps</span><Sun width={26} color="#d9b77a" /></div>
+            <div className="cx-stamp-row">
+              {s.trip ? (
+                <span className="cx-stamp soon" style={{ transform: 'rotate(-7deg)' }}><span><b>{s.trip.city || 'Istanbul'}</b><i>SOON</i></span></span>
+              ) : <span className="cx-stamp ghost" style={{ transform: 'rotate(-7deg)' }} />}
+              <span className="cx-stamp ghost" style={{ transform: 'rotate(5deg)' }} />
+              <span className="cx-stamp ghost" style={{ transform: 'rotate(-3deg)' }} />
+            </div>
+            <span className="h3" style={{ fontSize: 15 }}>{s.trip ? `Your first stamp lands when you’re home from ${s.trip.city || 'Istanbul'}.` : 'Every trip home adds a stamp.'}</span>
+            <span className="small">{s.trip ? 'It fills in by itself. Nothing to do.' : 'Book your first trip and this page starts to fill.'}</span>
+            {!s.trip && <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', {})}>Plan a trip</button>}
+          </div>
+        ) : (
         <div className="card" style={{ gap: 14 }}>
           <div className="chips scrollx" style={{ gap: 12, padding: '4px 18px', margin: '0 -16px' }}>
-            {STAMPS.map((st) => (
+            {stamps.map((st) => (
               <button key={st.city} type="button" aria-label={`${st.city} stamp${st.upcoming ? ', after this trip' : ''}`} onClick={() => { setPressed(pressed === st.city ? null : st.city); buzz([0, 10, 40, 10, 40, 10]); }}
                 style={{ flexShrink: 0, width: 76, height: 76, borderRadius: 999, border: `2px ${st.upcoming ? 'dashed' : 'solid'} ${st.color}`, background: 'transparent', padding: 0, display: 'grid', placeItems: 'center', color: st.color, opacity: st.upcoming ? 0.55 : 1, transform: `rotate(${pressed === st.city ? 0 : st.rot}deg) scale(${pressed === st.city ? 1.12 : 1})`, transition: 'transform .35s var(--spring)' }}>
                 <span style={{ width: 64, height: 64, borderRadius: 999, border: `1px dashed ${st.color}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
@@ -217,11 +420,14 @@ export default function Circles() {
               </button>
             ))}
           </div>
-          <div className="row" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
-            <span className="stack"><span className="avatar sm green" style={{ borderColor: '#fffdf9' }}>A</span><span className="avatar sm gold" style={{ borderColor: '#fffdf9' }}>N</span><span className="avatar sm" style={{ borderColor: '#fffdf9' }}>O</span></span>
-            <span className="small grow" style={{ color: '#3f4f48' }}>You're 2nd among friends for places explored. Abdullah leads with 19.</span>
-          </div>
+          {friends.includes('abdullah') && (
+            <div className="row" style={{ borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+              <span className="stack"><span className="avatar sm green" style={{ borderColor: '#fffdf9' }}>A</span><span className="avatar sm gold" style={{ borderColor: '#fffdf9' }}>N</span><span className="avatar sm" style={{ borderColor: '#fffdf9' }}>O</span></span>
+              <span className="small grow" style={{ color: '#3f4f48' }}>You're 2nd among friends for places explored. Abdullah leads with 19.</span>
+            </div>
+          )}
         </div>
+        )}
         </>)}
       </div>
 
@@ -258,105 +464,618 @@ export default function Circles() {
   );
 }
 
+/* ---------- one circle: the chat, with votes, splits, shared plans and Mada ---------- */
+
 export function Group({ params = {} }) {
-  const { s, set, pop, push, toast } = useStore();
-  const c = s.circles;
+  const { s, set, pop, push, replace, toast } = useStore();
+  useCircleClock();
   const group = s.groups.find((g) => g.id === (params.id || 'eid'));
+  const gid = group?.id;
+  const thread = getThread(s, gid) || { msgs: [] };
   const [info, setInfo] = useState(false);
-  useEffect(() => { if (group?.unread) set((st) => ({ groups: st.groups.map((g) => (g.id === group.id ? { ...g, unread: 0 } : g)) })); }, []);
-  const [van, setVan] = useState(null);
-  const [vote, setVote] = useState(null);
-  const [cruise, setCruise] = useState(false);
-  const [msgs, setMsgs] = useState([]);
+  const [sheet, setSheet] = useState(null);
   const [draft, setDraft] = useState('');
-  const counts = { wed: 3 + (vote === 'wed' ? 1 : 0), thu: 1 + (vote === 'thu' ? 1 : 0) };
-  const total = counts.wed + counts.thu;
-  const day = counts.thu > counts.wed ? 'Thursday' : 'Wednesday';
-  const { reply, typing } = useReply(group, msgs);
+  const scroller = useRef(null);
+  const input = useRef(null);
+  const run = (...ops) => set((st) => fold(st, ops));
+  const queue = s.circleQueue || [];
+  const soon = queue.filter((e) => e.gid === gid && e.type === 'msg');
+  const [, tick] = useState(0);
+  const waiting = soon.length > 0;
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const t = setInterval(() => tick((n) => n + 1), 400);
+    return () => clearInterval(t);
+  }, [waiting]);
+
+  useEffect(() => {
+    if (!gid) return undefined;
+    setOpenCircle(gid);
+    set((st) => fold(st, [opGroup(gid, (g) => (g.unread ? { ...g, unread: 0 } : g)), getThread(st, gid) ? opThread(gid, (t) => ({ ...t, opened: true })) : null]));
+    /* A first look at a circle you just joined starts at the top: the trip, then the story so far. */
+    const el = scroller.current;
+    if (el && !holdTop.current) el.scrollTop = el.scrollHeight;
+    return () => setOpenCircle(null);
+  }, [gid]);
+  const count = thread.msgs.length;
+  const firstRender = useRef(true);
+  /* Someone who just joined by link sees the trip first, not the bottom of the chat. */
+  const holdTop = useRef(!!group && group.via === 'invite' && !(getThread(s, gid) || {}).opened);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    if (holdTop.current) { holdTop.current = false; scroller.current && (scroller.current.scrollTop = 0); return; }
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [count]);
+
+  /* Back from paying a share: mark it paid. */
+  useEffect(() => {
+    const cp = s.circlePay;
+    if (!cp || cp.gid !== gid || !s.circles?.sharePaid) return;
+    run(opMsg(gid, cp.mid, (m) => markPaid(m, cp.key)), opAdd(gid, sys(`You paid your share · SAR ${fmt(cp.amount)}`)), () => ({ circlePay: null }));
+  }, [s.circles?.sharePaid, s.circlePay]);
+
   if (!group) return (
     <div className="screen push"><TopBar onBack={pop} backLabel="Circles" />
-      <div className="scroll no-dock"><h1 className="h1">This circle is gone.</h1><p className="body">You left it, or the admin deleted it. Bookings you made are still in Trips.</p></div>
-    </div>
-  );
-  const rich = group.id === 'eid';
-  const thread = msgs.flatMap((m, i) => [<Bubble key={'m' + i} who="O" name="You" mine>{m}</Bubble>, ...reply.filter((r) => r.at === i + 1).map((r) => <Bubble key={'r' + i} who={person(r.who).initial} name={person(r.who).short} tone={person(r.who).tone} soft>{r.text}</Bubble>)]);
-  return (
-    <div className="screen push">
-      <TopBar onBack={pop} backLabel="Circles" right={<button type="button" className="stack" aria-label={`${group.name} settings and people`} style={{ border: 0, background: 'none', padding: 4 }} onClick={() => setInfo(true)}>{group.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={30} ring="#e9e2d8" />)}{group.members.length > 3 && <span className="avatar sm" style={{ fontSize: 10 }}>+{group.members.length - 3}</span>}</button>} />
-      <div style={{ padding: '0 24px 8px' }}>
-        <h1 className="display" style={{ fontSize: 34 }}>{group.name}</h1>
-        <span className="tiny">{group.trip ? group.trip + ' · ' : ''}{group.members.length} {group.members.length === 1 ? 'person' : 'people'}{group.muted ? ' · muted' : ''}{group.dm ? '' : ' · Mada answers here. A Mada agent confirms anything you book.'}</span>
-      </div>
-      <div className="scroll no-dock" style={{ paddingBottom: 100 }}>
-        {!rich && (<>
-          {!group.dm && <Bubble who="mada"><span>{group.members.length === 1 ? 'It’s just you so far. Share the link and people join when they open it.' : `This is ${group.name}. Plan here, vote on choices, and when you’re ready, ask me to book. Faisal confirms it.`}</span>
-            <span className="row" style={{ flexWrap: 'wrap' }}>
-              {group.members.length === 1 && <button type="button" className="btn primary small" onClick={() => setInfo(true)}>Invite people</button>}
-              <button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => push('ask', { prefill: group.trip && group.trip !== 'Somewhere new' ? 'Things to do in Istanbul' : 'Ideas for a trip for ' + group.members.length })}>Ideas for a trip</button>
-              <button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => push('plan', { id: 'alula2' })}>Share a plan</button>
-            </span>
-          </Bubble>}
-          {group.dm && msgs.length === 0 && <span className="small" style={{ textAlign: 'center', padding: 20 }}>Messages with {group.name} stay between you two.</span>}
-        </>)}
-        {rich && (<>
-        <Bubble who="mada">
-          <span>Abdullah and Noor land 40 minutes after you. We've put everyone in one van, so it waits for both families.</span>
-          {van ? <span className="row tiny" style={{ color: '#2f7a4b', fontWeight: 600 }}><Icon name="check" size={16} color="#2f7a4b" width={2.4} />{van === 'one' ? 'One van for both families' : 'Two cars, one for each family'}</span> : (
-            <span className="row"><button type="button" className="btn primary small" onClick={() => { setVan('one'); buzz(HAPTIC.select); }}>Keep one van</button><button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => { setVan('two'); buzz(HAPTIC.select); }}>Separate cars</button></span>
-          )}
-        </Bubble>
-        <Bubble who="H" name="Hessa" tone="gold" soft>Can we all do a Bosphorus dinner cruise one evening?</Bubble>
-        <div className="card" style={{ marginLeft: 42, gap: 10 }}>
-          <span className="h3" style={{ fontSize: 15 }}>Which evening?</span>
-          {[['wed', 'Wed 10 Mar'], ['thu', 'Thu 11 Mar']].map(([id, label]) => (
-            <button key={id} type="button" aria-pressed={vote === id ? 'true' : 'false'} onClick={() => { setVote(vote === id ? null : id); buzz(HAPTIC.select); }}
-              style={{ position: 'relative', height: 44, borderRadius: 14, border: vote === id ? '2px solid #1e352d' : '1px solid var(--line)', background: '#f6f2ec', overflow: 'hidden', padding: 0, textAlign: 'left' }}>
-              <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round((counts[id] / total) * 100)}%`, background: vote === id ? '#ecd9b0' : '#efe9e0', transition: 'width .5s var(--ease)' }} />
-              <span className="spread" style={{ position: 'relative', height: 44, padding: '0 14px', fontSize: 14, fontWeight: 600 }}><span>{label}</span><span className="num">{counts[id]}</span></span>
-            </button>
-          ))}
-          <span className="tiny">{vote ? `You voted. ${total - 1} others have too.` : 'Hessa asked · 4 of 6 voted'}</span>
-        </div>
-        <Bubble who="F" name="Faisal · your Mada agent" tone="green">
-          <span>I'm holding 6 seats on the {day} cruise at 19:30 until Monday. SAR 1,140 for everyone.</span>
-          {cruise ? <span className="row tiny" style={{ color: '#2f7a4b', fontWeight: 600 }}><Icon name="check" size={16} color="#2f7a4b" width={2.4} />Confirmed by Faisal at Mada</span>
-            : <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={() => { setCruise(true); buzz(HAPTIC.success); }}>Book it</button>}
-        </Bubble>
-        {cruise && (
-          <div className="card rise" style={{ marginLeft: 42 }}>
-            <span className="h3" style={{ fontSize: 15 }}>Split between the families</span>
-            <span className="small">Your share SAR 570 · Abdullah's share SAR 570</span>
-            {c.sharePaid ? <span className="pill ok" style={{ alignSelf: 'flex-start' }}>Abdullah paid his share</span>
-              : <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => push('pay', { kind: 'share', amount: 570 })}>Pay Abdullah's share (demo)</button>}
+      <div className="scroll no-dock">
+        {params.id ? (<>
+          <h1 className="h1">This circle is gone.</h1>
+          <p className="body">You left it, or the admin deleted it. Bookings you made are still in Trips.</p>
+        </>) : (
+          <div className="cx-empty cx-empty-hero">
+            <EmptyArt kind="circles" />
+            <span className="display" style={{ fontSize: 30 }}>No trip circle yet.</span>
+            <span className="small">Make one for the people going with you. Plan, vote and split costs together.</span>
+            <button type="button" className="btn primary small" onClick={() => replace('newCircle', { name: 'Eid trip' })}>Make a circle</button>
           </div>
         )}
-        </>)}
-        {thread}
-        {typing && <span className="tiny rise" style={{ paddingLeft: 42 }}>{person(typing).short} is typing…</span>}
       </div>
-      <form className="act" style={{ bottom: 24 }} onSubmit={(e) => { e.preventDefault(); if (!draft.trim()) return; setMsgs([...msgs, draft.trim()]); setDraft(''); buzz(HAPTIC.tap); }}>
-        <div className="row" style={{ height: 52, borderRadius: 999, background: '#fffdf9', border: '1px solid var(--line)', padding: '0 6px 0 20px' }}>
-          <label htmlFor="msg" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Message the group</label>
-          <input id="msg" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={group.dm ? `Message ${group.name}` : 'Message the circle'} style={{ flex: '1 1 auto', minWidth: 0, border: 0, outline: 'none', background: 'transparent', fontSize: 16 }} />
-          <button type="submit" className="icon-btn dark" aria-label="Send" style={{ width: 40, height: 40 }}><Icon name="up" color="#f6f2ec" size={18} /></button>
+    </div>
+  );
+
+  const invited = group.invited || [];
+  const others = group.members.filter((m) => m !== 'omar');
+  const dest = circleDest(group);
+  const admin = group.admin === 'omar';
+
+  const send = (text) => {
+    const v = (text ?? draft).trim();
+    if (!v) return;
+    const mid = newId();
+    const plan = planResponses(group, v, mid, thread);
+    run(opAdd(gid, { id: mid, t: 'text', who: 'omar', text: v }), opQueue(plan));
+    setDraft('');
+    buzz(HAPTIC.tap);
+  };
+  const askMada = () => { setSheet(null); setDraft('@Mada '); setTimeout(() => input.current && input.current.focus(), 60); };
+
+  const postVote = ({ q, kind, options }) => {
+    const mid = newId();
+    const opts = options.map((label, i) => ({ id: 'o' + i, label, votes: [] }));
+    run(opAdd(gid, { id: mid, t: 'vote', who: 'omar', vote: { q, kind, options: opts, closed: false } }), opQueue(planVotes(group, mid, opts)));
+    setSheet(null); buzz(HAPTIC.success);
+  };
+  const castVote = (m, opt) => {
+    if (m.vote.closed) return;
+    buzz(HAPTIC.select);
+    run(opMsg(gid, m.id, (x) => {
+      const mineNow = x.vote.options.find((o) => o.votes.includes('omar'));
+      return { ...x, vote: { ...x.vote, options: x.vote.options.map((o) => ({ ...o, votes: o.id === opt && mineNow?.id !== opt ? [...o.votes, 'omar'] : o.votes.filter((v) => v !== 'omar') })) } };
+    }));
+  };
+  const bookPrefill = (v, w) => (v.kind === 'places' ? `Plan a trip to ${w.label} for ${group.members.length}` : `${v.q.replace(/\?$/, '')}: ${w.label}${dest ? ' · ' + dest : ''}`);
+  const result = (m, w) => ({ t: 'mada', who: 'mada', kind: 'result', ref: m.id, text: `${phrase(w.label)} it is. Want us to book it?`, actions: [m.id === 'eid-vote' ? { label: 'Book it', hold: true } : { label: 'Book it', ask: bookPrefill(m.vote, w) }, { label: 'Not now', dismiss: true }] });
+  const closeVote = (m) => {
+    const max = Math.max(...m.vote.options.map((o) => o.votes.length));
+    const top = m.vote.options.filter((o) => o.votes.length === max);
+    const w = top.length === 1 ? top[0] : null;
+    buzz(HAPTIC.success);
+    run(opMsg(gid, m.id, (x) => ({ ...x, vote: { ...x.vote, closed: true, winner: w?.id || null } })),
+      opAdd(gid, w ? result(m, w) : { t: 'mada', who: 'mada', kind: 'tie', ref: m.id, text: `It’s a tie between ${top.map((o) => o.label).join(' and ')}. Pick one and we’ll take it from there.`, actions: top.map((o) => ({ label: o.label, pick: o.id })) }));
+  };
+  const pick = (tie, optId) => {
+    const vm = thread.msgs.find((x) => x.id === tie.ref);
+    const w = vm.vote.options.find((o) => o.id === optId);
+    run(opMsg(gid, vm.id, (x) => ({ ...x, vote: { ...x.vote, winner: optId } })), opMsg(gid, tie.id, (x) => ({ ...x, done: true })), opAdd(gid, result(vm, w)));
+  };
+
+  const postSplit = (split) => {
+    const mid = newId();
+    const firstOwing = split.shares.find((sh) => !sh.paid);
+    run(opAdd(gid, { id: mid, t: 'split', who: 'omar', split }), split.paidBy === 'omar' && firstOwing ? opQueue({ at: Date.now() + 6000, gid, type: 'paid', mid, key: firstOwing.key }) : null);
+    setSheet(null); buzz(HAPTIC.success);
+  };
+  const bookCruise = () => {
+    const hold = thread.msgs.find((x) => x.kind === 'hold');
+    if (!hold || hold.booked) return;
+    const units = shareUnits('family', group.members);
+    const amounts = equalAmounts(1140, units.length);
+    const shares = units.map((u, i) => ({ ...u, amount: amounts[i], paid: u.ids.includes('omar') }));
+    const mid = newId();
+    const owing = shares.find((sh) => !sh.paid);
+    buzz(HAPTIC.success);
+    run(opMsg(gid, hold.id, (x) => ({ ...x, booked: true })),
+      ...thread.msgs.filter((x) => x.kind === 'result' && x.ref === 'eid-vote').map((x) => opMsg(gid, x.id, (y) => ({ ...y, done: true, text: y.text.replace(' Want us to book it?', ' Faisal has booked it.') }))),
+      opAdd(gid, { id: mid, t: 'split', who: 'omar', split: { what: 'Bosphorus dinner cruise', total: 1140, paidBy: 'omar', mode: 'family', shares, settled: false } }),
+      owing ? opQueue({ at: Date.now() + 6000, gid, type: 'paid', mid, key: owing.key }) : null);
+  };
+  const payShare = (m, sh) => {
+    set((p) => ({ circlePay: { gid, mid: m.id, key: sh.key, amount: sh.amount }, circles: { ...p.circles, sharePaid: false } }));
+    push('pay', { kind: 'share', amount: sh.amount, title: m.split.what, circle: group.name, payee: person(m.split.paidBy).short });
+  };
+  const remind = (m) => {
+    const owing = m.split.shares.filter((sh) => !sh.paid && !sh.ids.includes('omar'));
+    run(opMsg(gid, m.id, (x) => ({ ...x, split: { ...x.split, reminded: true } })), opAdd(gid, sys(`You reminded ${owing.map((sh) => sh.label).join(' and ')}`)),
+      owing[0] ? opQueue({ at: Date.now() + 4000, gid, type: 'paid', mid: m.id, key: owing[0].key }) : null);
+    toast(`Reminder sent to ${owing.map((sh) => sh.label).join(' and ')}.`);
+  };
+  const markShare = (m, sh) => { buzz(HAPTIC.select); run(opMsg(gid, m.id, (x) => markPaid(x, sh.key)), opAdd(gid, sys(sh.ids.includes('omar') ? `You marked your share as paid · SAR ${fmt(sh.amount)}` : `You marked ${sh.label} as paid`))); };
+
+  const shareCard = (card, pin) => {
+    run(opAdd(gid, { t: 'card', who: 'omar', card }), pin && card.kind === 'plan' ? opThread(gid, (t) => ({ ...t, pinned: { kind: 'plan', id: card.id, by: 'omar' } })) : null,
+      pin && card.kind === 'plan' ? opAdd(gid, sys(`You pinned ${PLANS[card.id].title}`)) : null);
+    setSheet(null); buzz(HAPTIC.success);
+  };
+
+  const act = (m, a) => {
+    buzz(HAPTIC.tap);
+    if (a.ask) push('ask', { prefill: a.ask });
+    else if (a.plan) push('plan', { id: a.plan });
+    else if (a.say) send(a.say);
+    else if (a.pick) pick(m, a.pick);
+    else if (a.hold) bookCruise();
+    else if (a.dismiss) run(opMsg(gid, m.id, (x) => ({ ...x, done: true })));
+  };
+
+  /* One pinned line, never a stack: an open vote first, then a pinned plan. */
+  const openVote = [...thread.msgs].reverse().find((m) => m.t === 'vote' && !m.vote.closed);
+  const pinned = openVote ? { kind: 'vote', m: openVote } : thread.pinned && PLANS[thread.pinned.id] ? { kind: 'plan', id: thread.pinned.id } : null;
+  const jump = (id) => { const el = document.getElementById('msg-' + id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+
+  const typingEv = soon.find((e) => e.at - Date.now() < 1900);
+  const lastMine = [...thread.msgs].reverse().find((m) => m.who === 'omar' && m.t === 'text');
+  const voters = (m) => m.vote.options.reduce((a, o) => a + o.votes.length, 0);
+
+  const faces = (
+    <button type="button" className={'cx-faces' + (group.img ? ' on-photo' : '')} aria-label={`${group.name} settings and people`} onClick={() => setInfo(true)}>
+      <span className="stack">{group.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={28} ring={group.img ? 'rgba(15,26,22,.6)' : '#e9e2d8'} />)}</span>
+      {group.members.length > 3 && <span className="cx-more">+{group.members.length - 3}</span>}
+    </button>
+  );
+
+  return (
+    <div className="screen push">
+      {group.dm ? (
+        <TopBar onBack={pop} backLabel="Circles" title={group.name} right={faces} />
+      ) : (
+        <div className={'cx-head' + (group.img ? ' photo-head' : '')}>
+          {group.img && <><img src={group.img} alt="" className="cx-head-bg" /><span className="cx-head-veil" /></>}
+          <div style={{ position: 'relative', zIndex: 1 }}><TopBar onBack={pop} backLabel="Circles" dark={!!group.img} right={faces} /></div>
+          <div className="cx-head-text">
+            <h1 className="display">{group.name}</h1>
+            <span className="cx-head-sub">{[dest && group.trip ? group.trip.replace('Somewhere new', dest) : dest || null, `${group.members.length} ${group.members.length === 1 ? 'person' : 'people'}`, invited.length ? `${invited.length} invited` : null, group.muted ? 'muted' : null].filter(Boolean).join(' · ')}</span>
+          </div>
         </div>
+      )}
+      {pinned && (
+        <button type="button" className="cx-pin" onClick={() => (pinned.kind === 'vote' ? jump(pinned.m.id) : push('plan', { id: pinned.id }))}>
+          <span className="cx-pin-ic" aria-hidden="true">{pinned.kind === 'vote' ? <VoteIcon /> : <Icon name="pin" size={16} />}</span>
+          <span className="grow col" style={{ gap: 0, minWidth: 0 }}>
+            <span className="cx-pin-k">{pinned.kind === 'vote' ? 'Open vote' : 'Pinned plan'}</span>
+            <span className="cx-pin-t">{pinned.kind === 'vote' ? `${pinned.m.vote.q} · ${voters(pinned.m)} of ${group.members.length} voted` : PLANS[pinned.id].title}</span>
+          </span>
+          <Icon name="chevron" size={18} />
+        </button>
+      )}
+      <div className="scroll no-dock cx-thread" ref={scroller}>
+        {thread.trip && <TripCard trip={thread.trip} group={group} />}
+        {thread.msgs.map((m, i) => {
+          const prev = thread.msgs[i - 1];
+          const cont = prev && prev.who === m.who && prev.t !== 'sys' && m.t === 'text' && prev.t === 'text';
+          const key = 'msg-' + m.id;
+          if (m.t === 'sys') return <div key={m.id} id={key} className="cx-sys">{m.text}</div>;
+          if (m.t === 'vote') return (
+            <Bubble key={m.id} id={key} who={m.who} wide label={`${m.who === 'omar' ? 'You' : person(m.who).short} started a vote`}>
+              <VoteCard m={m} group={group} canClose={m.who === 'omar' || admin} onVote={(o) => castVote(m, o)} onClose={() => closeVote(m)} />
+            </Bubble>
+          );
+          if (m.t === 'split') return (
+            <Bubble key={m.id} id={key} who={m.who} wide label={`${m.who === 'omar' ? 'You' : person(m.who).short} split a cost`}>
+              <SplitCard m={m} onPay={(sh) => payShare(m, sh)} onRemind={() => remind(m)} onMark={(sh) => markShare(m, sh)} />
+            </Bubble>
+          );
+          if (m.t === 'card') return (
+            <Bubble key={m.id} id={key} who={m.who} wide label={`${m.who === 'omar' ? 'You' : person(m.who).short} shared ${m.card.kind === 'plan' ? 'a plan' : 'a place'}`}>
+              <ShareCard card={m.card} group={group} pinned={thread.pinned?.id === m.card.id} onPin={() => run(opThread(gid, (t) => ({ ...t, pinned: { kind: 'plan', id: m.card.id, by: 'omar' } })), opAdd(gid, sys(`You pinned ${PLANS[m.card.id].title}`)))} />
+            </Bubble>
+          );
+          if (m.t === 'faisal') {
+            const vm = thread.msgs.find((x) => x.id === 'eid-vote');
+            const lead = vm && (vm.vote.options.find((o) => o.id === vm.vote.winner) || [...vm.vote.options].sort((a, b) => b.votes.length - a.votes.length)[0]);
+            const day = lead ? phrase(lead.label) : 'Wednesday';
+            return (
+              <Bubble key={m.id} id={key} who="faisal">
+                <span>I’m holding 6 seats on the {day} cruise at 19:30 until Monday. SAR 1,140 for everyone.</span>
+                {m.booked ? <span className="row tiny cx-ok"><Icon name="check" size={16} color="#2f7a4b" width={2.4} />Confirmed by Faisal at Mada</span>
+                  : <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={bookCruise}>Book it</button>}
+              </Bubble>
+            );
+          }
+          if (m.t === 'mada') {
+            if (m.kind === 'welcome') return (
+              <Bubble key={m.id} id={key} who="mada">
+                <span>{others.length ? `This is ${group.name}. Plan here, vote on choices and split costs. Type @Mada to ask us anything. Faisal confirms anything you book.`
+                  : invited.length ? `This is ${group.name}. ${names(invited.map((x) => x.id))} ${invited.length === 1 ? 'is' : 'are'} invited. Start planning while you wait.`
+                    : `This is ${group.name}. It’s just you so far. Share the link and people join when they open it.`}</span>
+                <span className="cx-actions">
+                  {!others.length && !invited.length && <button type="button" className="btn primary small" onClick={() => setInfo(true)}>Invite people</button>}
+                  <button type="button" className="btn secondary small" onClick={() => send(`@Mada ideas for ${dest || 'a trip'}`)}>Ideas for {dest || 'a trip'}</button>
+                  <button type="button" className="btn secondary small" onClick={() => setSheet('vote')}>Start a vote</button>
+                  {others.length > 0 && <button type="button" className="btn secondary small" onClick={() => setSheet('split')}>Split a cost</button>}
+                </span>
+              </Bubble>
+            );
+            if (m.kind === 'van') return (
+              <Bubble key={m.id} id={key} who="mada">
+                <span>{m.text}</span>
+                {m.choice ? <span className="row tiny cx-ok"><Icon name="check" size={16} color="#2f7a4b" width={2.4} />{m.choice === 'one' ? 'One van for both families' : 'Two cars, one for each family'}</span> : (
+                  <span className="cx-actions"><button type="button" className="btn primary small" onClick={() => { run(opMsg(gid, m.id, (x) => ({ ...x, choice: 'one' }))); buzz(HAPTIC.select); }}>Keep one van</button><button type="button" className="btn secondary small" onClick={() => { run(opMsg(gid, m.id, (x) => ({ ...x, choice: 'two' }))); buzz(HAPTIC.select); }}>Separate cars</button></span>
+                )}
+              </Bubble>
+            );
+            return (
+              <Bubble key={m.id} id={key} who="mada">
+                <span>{m.text}</span>
+                {m.list && <ol className="cx-list">{m.list.map((l) => <li key={l}>{l}</li>)}</ol>}
+                {m.foot && <span className="tiny">{m.foot}</span>}
+                {!m.done && m.actions && m.actions.length > 0 && (
+                  <span className="cx-actions">{m.actions.map((a, j) => <button key={a.label} type="button" className={'btn small ' + (j === 0 && !a.say ? 'primary' : 'secondary')} onClick={() => act(m, a)}>{a.label}</button>)}</span>
+                )}
+              </Bubble>
+            );
+          }
+          /* Read receipts under your last message, until someone answers. */
+          const seen = m === lastMine && (m.seen || []).length > 0 && !thread.msgs.slice(i + 1).some((x) => x.t !== 'sys' && x.who !== 'omar' && x.who !== 'mada');
+          return (
+            <React.Fragment key={m.id}>
+              <Bubble id={key} who={m.who} cont={cont}>{m.text}</Bubble>
+              {seen && <span className="cx-seen">{group.dm ? 'Seen' : `Seen by ${names(m.seen)}`}</span>}
+            </React.Fragment>
+          );
+        })}
+        {typingEv && <span className="cx-typing rise"><span className="dots" aria-hidden="true"><i /><i /><i /></span>{typingEv.who === 'mada' ? 'Mada is looking into it' : `${person(typingEv.who).short} is typing`}</span>}
+      </div>
+      <form className="cx-composer" onSubmit={(e) => { e.preventDefault(); send(); }}>
+        {!group.dm && <button type="button" className="cx-plus" aria-label="Circle tools: vote, split, share, ask Mada" onClick={() => setSheet('tools')}><Icon name="plus" size={20} /></button>}
+        <label htmlFor="msg" className="cx-sr">Message the group</label>
+        <input id="msg" ref={input} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={group.dm ? `Message ${group.name}` : 'Message, or @Mada'} autoComplete="off" />
+        <button type="submit" className="icon-btn dark" aria-label="Send" style={{ width: 40, height: 40 }}><Icon name="up" color="#f6f2ec" size={18} /></button>
       </form>
+      {sheet === 'tools' && (
+        <Sheet label="Add to the circle" onClose={() => setSheet(null)}>
+          <h2 className="h2">Add to the circle</h2>
+          {[
+            ['vote', <VoteIcon key="i" />, 'Start a vote', 'Dates, places, anything. Everyone taps once.'],
+            ['split', <Icon key="i" name="card" size={20} />, 'Split a cost', others.length ? 'Who paid, who owes. Pay your share here.' : 'Works once someone joins.'],
+            ['share', <Icon key="i" name="pin" size={20} />, 'Share a plan or place', 'From our plans and your saves.'],
+            ['ask', <Sun key="i" width={24} color="#b98f4a" />, 'Ask Mada', dest ? `Ideas, flights, stays and visas for ${dest}.` : 'Ideas, flights, stays and visas.'],
+          ].map(([id, ic, t, sub]) => (
+            <button key={id} type="button" className="cx-tool" disabled={id === 'split' && !others.length} onClick={() => (id === 'ask' ? askMada() : setSheet(id))}>
+              <span className="cx-tool-ic">{ic}</span>
+              <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></span>
+              <Icon name="chevron" size={18} />
+            </button>
+          ))}
+        </Sheet>
+      )}
+      {sheet === 'vote' && <VoteSheet dest={dest} onClose={() => setSheet(null)} onPost={postVote} />}
+      {sheet === 'split' && <SplitSheet group={group} onClose={() => setSheet(null)} onPost={postSplit} />}
+      {sheet === 'share' && <ShareSheet onClose={() => setSheet(null)} onPick={shareCard} />}
       {info && <GroupInfo group={group} onClose={() => setInfo(false)} />}
     </div>
   );
 }
 
-function Bubble({ who, name, tone, soft, mine, children }) {
+const VoteIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7" /><path d="M17 4.5l1.5 1.5 3-3" /></svg>
+);
+
+function Bubble({ id, who, cont, wide, label, children }) {
+  const mine = who === 'omar';
+  const p = who === 'mada' ? { short: 'Mada' } : who === 'faisal' ? { short: 'Faisal · your Mada agent', initial: 'F', tone: 'green' } : person(who);
+  const face = who === 'mada' ? <span className="avatar sm green"><Sun width={18} /></span> : who === 'faisal' ? <span className="avatar sm green">F</span> : <PAvatar id={who} size={32} />;
   return (
-    <div className="row rise" style={{ alignItems: 'flex-start', gap: 10, flexDirection: mine ? 'row-reverse' : 'row' }}>
-      {who === 'mada'
-        ? <span className="avatar sm green"><Sun width={18} /></span>
-        : <span className={'avatar sm' + (tone ? ' ' + tone : '')}>{who}</span>}
-      <div className="col" style={{ gap: 8, padding: '10px 14px', borderRadius: mine ? '22px 6px 22px 22px' : '6px 22px 22px 22px', background: mine ? '#1e352d' : soft ? '#f6f2ec' : '#fffdf9', color: mine ? '#f6f2ec' : '#1e352d', fontSize: 15, lineHeight: 1.45, maxWidth: '82%' }}>
-        <span className="tiny" style={{ fontWeight: 600, color: mine ? '#c9c1b4' : undefined }}>{who === 'mada' ? 'Mada' : name}</span>
+    <div id={id} className={'cx-row rise' + (mine ? ' mine' : '') + (cont ? ' cont' : '') + (wide ? ' wide' : '')}>
+      {!mine && <span className="cx-face">{cont ? null : face}</span>}
+      <div className={'cx-bubble' + (who === 'mada' ? ' mada' : '') + (wide ? ' bare' : '')}>
+        {!cont && !mine && !wide && <span className="cx-name">{p.short}</span>}
+        {wide && <span className="cx-name">{label}</span>}
         {children}
       </div>
     </div>
+  );
+}
+
+function VoteCard({ m, group, canClose, onVote, onClose }) {
+  const v = m.vote;
+  const total = v.options.reduce((a, o) => a + o.votes.length, 0);
+  const mine = v.options.find((o) => o.votes.includes('omar'));
+  return (
+    <div className={'cx-card cx-vote' + (v.closed ? ' closed' : '')}>
+      <span className="h3" style={{ fontSize: 16 }}>{v.q}</span>
+      {v.options.map((o) => {
+        const pct = total ? Math.round((o.votes.length / total) * 100) : 0;
+        const won = v.closed && v.winner === o.id;
+        return (
+          <button key={o.id} type="button" className={'cx-opt' + (mine?.id === o.id ? ' on' : '') + (won ? ' won' : '')} aria-pressed={mine?.id === o.id ? 'true' : 'false'} disabled={v.closed} onClick={() => onVote(o.id)} aria-label={`${o.label}, ${o.votes.length} ${o.votes.length === 1 ? 'vote' : 'votes'}`}>
+            <span className="cx-fill" style={{ width: pct + '%' }} />
+            <span className="cx-opt-row">
+              <span className="row" style={{ gap: 8, minWidth: 0 }}>{won && <Icon name="check" size={16} width={2.6} />}<span className="cx-opt-l">{o.label}</span></span>
+              <span className="row" style={{ gap: 8 }}>
+                <span className="stack cx-voters">{o.votes.slice(0, 3).map((id) => <PAvatar key={id} id={id} size={20} ring="#fffdf9" />)}</span>
+                <span className="num cx-n">{o.votes.length}</span>
+              </span>
+            </span>
+          </button>
+        );
+      })}
+      <span className="spread">
+        <span className="tiny">{v.closed ? (v.winner ? `Closed · ${v.options.find((o) => o.id === v.winner)?.label} won` : 'Closed · a tie') : `${total} of ${group.members.length} voted${mine ? ' · you picked ' + mine.label : ''}`}</span>
+        {!v.closed && canClose && <button type="button" className="link" style={{ fontSize: 13 }} disabled={!total} onClick={onClose}>Close vote</button>}
+      </span>
+    </div>
+  );
+}
+
+function SplitCard({ m, onPay, onRemind, onMark }) {
+  const sp = m.split;
+  const iPaid = sp.paidBy === 'omar';
+  const owing = sp.shares.filter((sh) => !sh.paid && !sh.ids.includes('omar'));
+  return (
+    <div className={'cx-card cx-split' + (sp.settled ? ' settled' : '')}>
+      <span className="spread" style={{ alignItems: 'flex-start' }}>
+        <span className="col" style={{ gap: 2 }}>
+          <span className="h3" style={{ fontSize: 16 }}>{sp.what}</span>
+          <span className="tiny">Paid by {iPaid ? 'you' : person(sp.paidBy).short} · {sp.mode === 'family' ? 'split by family' : sp.mode === 'custom' ? 'custom amounts' : 'split equally'}</span>
+        </span>
+        <span className="col" style={{ gap: 2, alignItems: 'flex-end' }}>
+          <span className="num cx-amt">SAR {fmt(sp.total)}</span>
+          {sp.settled && <span className="pill ok">Settled</span>}
+        </span>
+      </span>
+      <div className="cx-shares">
+        {sp.shares.map((sh) => {
+          const me = sh.ids.includes('omar');
+          return (
+            <div key={sh.key} className={'cx-share' + (sh.paid ? ' paid' : '')}>
+              <span className="stack">{sh.ids.slice(0, 2).map((id) => <PAvatar key={id} id={id} size={26} ring="#fffdf9" />)}</span>
+              <span className="grow col" style={{ gap: 0, minWidth: 0 }}>
+                <span className="cx-share-l wrap">{sh.label}</span>
+                <span className="tiny">{sh.paid ? (sh.ids.includes(sp.paidBy) ? 'Paid the bill' : 'Paid') : me ? 'Your share' : 'Owes ' + (iPaid ? 'you' : person(sp.paidBy).short)}</span>
+              </span>
+              <span className="col" style={{ gap: 0, alignItems: 'flex-end' }}>
+                <span className="row" style={{ gap: 6 }}><span className="num cx-share-a">SAR {fmt(sh.amount)}</span>{sh.paid && <Icon name="check" size={16} color="#2f7a4b" width={2.6} />}</span>
+                {!sh.paid && iPaid && !me && <button type="button" className="link cx-mark" onClick={() => onMark(sh)}>Mark paid</button>}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {!sp.settled && (() => {
+        const mineSh = sp.shares.find((sh) => sh.ids.includes('omar'));
+        if (mineSh && !mineSh.paid) return (
+          <span className="row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" className="btn primary small" onClick={() => onPay(mineSh)}>Pay my share · SAR {fmt(mineSh.amount)}</button>
+            <button type="button" className="link" style={{ fontSize: 13 }} onClick={() => onMark(mineSh)}>I paid in cash</button>
+          </span>
+        );
+        if (iPaid && owing.length) return <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} disabled={sp.reminded} onClick={onRemind}>{sp.reminded ? 'Reminded today' : `Remind ${owing.map((sh) => sh.label.replace('’s family', '')).join(' and ')}`}</button>;
+        return null;
+      })()}
+      {sp.settled && <span className="tiny">Everyone’s paid. Nothing to chase.</span>}
+    </div>
+  );
+}
+
+function ShareCard({ card, group, pinned, onPin }) {
+  const { s, set, push, toast } = useStore();
+  const { isSaved, toggle } = useSave();
+  if (card.kind === 'plan') {
+    const pl = PLANS[card.id];
+    if (!pl) return null;
+    const saved = (s.savedPlans || []).includes(pl.id);
+    return (
+      <div className="cx-card cx-share-card">
+        <button type="button" className="cx-share-photo" onClick={() => push('plan', { id: pl.id })}>
+          <img src={pl.img} alt="" /><span className="cx-veil" />
+          <span className="pill glass" style={{ position: 'absolute', top: 10, left: 10 }}>Plan · {pl.days} days</span>
+          <span className="cx-share-over"><span className="display" style={{ fontSize: 24 }}>{pl.title}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{pl.sub}</span></span>
+        </button>
+        <span className="cx-actions">
+          <button type="button" className={'btn small ' + (saved ? 'gold' : 'secondary')} aria-pressed={saved ? 'true' : 'false'} onClick={() => { set((p) => ({ savedPlans: saved ? (p.savedPlans || []).filter((x) => x !== pl.id) : [...(p.savedPlans || []), pl.id] })); buzz(HAPTIC.select); toast(saved ? 'Removed from Saved.' : 'Saved. It’s in Circles → Saved.'); }}>{saved ? 'Saved' : 'Save'}</button>
+          <button type="button" className="btn primary small" onClick={() => push('plan', { id: pl.id })}>Plan it</button>
+          {!pinned && !group.dm && <button type="button" className="link" style={{ fontSize: 13 }} onClick={onPin}>Pin</button>}
+        </span>
+      </div>
+    );
+  }
+  const p = card.post;
+  const on = isSaved(p.id);
+  return (
+    <div className="cx-card cx-share-card">
+      {p.img ? (
+        <div className="cx-share-photo small">
+          <img src={p.img} alt="" /><span className="cx-veil" />
+          <span className="cx-share-over"><span className="h3" style={{ fontSize: 17, color: '#fffdf9' }}>{p.place}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{p.city} · {p.who === 'You' ? 'your tip' : `${p.who}’s tip`}</span></span>
+        </div>
+      ) : (
+        <span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 16 }}>{p.place}</span><span className="tiny">{p.city} · {p.who === 'You' ? 'your tip' : `${p.who}’s tip`}</span></span>
+      )}
+      <span className="small cx-clamp">{p.text}</span>
+      <span className="cx-actions">
+        <button type="button" className={'btn small ' + (on ? 'gold' : 'secondary')} aria-pressed={on ? 'true' : 'false'} onClick={() => toggle(p)}>{on ? 'Saved' : 'Save'}</button>
+        <button type="button" className="btn primary small" onClick={() => push('ask', { prefill: (p.kind === 'Food' ? 'A table at ' : '') + p.place })}>Plan it</button>
+      </span>
+    </div>
+  );
+}
+
+/* The circle's trip, as everyone has it: dates, who's booked on what, and the same flights for you. */
+function TripCard({ trip, group }) {
+  const { s, push } = useStore();
+  const mineBooked = s.trip && s.trip.flight;
+  return (
+    <div className="cx-trip rise">
+      <div className="cx-trip-photo">
+        <img src={trip.img} alt="" /><span className="cx-veil" />
+        <span className="cx-trip-over">
+          <span className="pill glass">The trip</span>
+          <span className="display" style={{ fontSize: 30, color: '#fffdf9' }}>{trip.city}</span>
+          <span className="small" style={{ color: 'rgba(255,253,249,.92)' }}>{trip.dates}</span>
+        </span>
+      </div>
+      <div className="cx-trip-rows">
+        {trip.flights.filter((f) => group.members.includes(f.who)).map((f) => (
+          <div key={f.who} className="row" style={{ gap: 10 }}><PAvatar id={f.who} size={28} /><span className="small grow" style={{ color: '#1e352d' }}>{f.text}</span><Icon name="flight" size={16} color="#7d5d27" /></div>
+        ))}
+        <div className="row" style={{ gap: 10 }}><PAvatar id="omar" size={28} /><span className="small grow" style={{ color: '#1e352d' }}>{mineBooked ? `You’re on ${s.trip.flight.code}, ${s.trip.flight.date || 'Tue 9 Mar'}` : 'You haven’t booked yet'}</span>{mineBooked && <Icon name="check" size={16} color="#2f7a4b" width={2.4} />}</div>
+        {!mineBooked && <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { prefill: trip.same || group.name })}>Book the same flights</button>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- tools ---------- */
+
+const VOTE_KINDS = [['dates', 'Dates'], ['places', 'Places'], ['any', 'Anything']];
+function VoteSheet({ dest, onClose, onPost }) {
+  const [q, setQ] = useState('');
+  const [kind, setKind] = useState('dates');
+  const [opts, setOpts] = useState(['', '']);
+  const [tried, setTried] = useState(false);
+  const ideas = kind === 'dates' ? ['Wed 10 Mar', 'Thu 11 Mar', 'Fri 12 Mar', 'Sat 13 Mar'] : kind === 'places' ? (PLACES[dest]?.spots || ['Georgia', 'Baku', 'AlUla', 'Istanbul']) : ['Yes', 'No', 'Maybe'];
+  const clean = opts.map((o) => o.trim()).filter(Boolean);
+  const dup = new Set(clean.map((o) => o.toLowerCase())).size !== clean.length;
+  const ok = q.trim().length >= 3 && clean.length >= 2 && !dup;
+  const fill = (v) => {
+    if (opts.some((o) => o.trim().toLowerCase() === v.toLowerCase())) return;
+    const i = opts.findIndex((o) => !o.trim());
+    if (i >= 0) setOpts(opts.map((o, j) => (j === i ? v : o)));
+    else if (opts.length < 4) setOpts([...opts, v]);
+    buzz(HAPTIC.select);
+  };
+  return (
+    <Sheet label="Start a vote" onClose={onClose}>
+      <h2 className="h2">Start a vote</h2>
+      <div className="field">
+        <label htmlFor="vote-q">Question</label>
+        <input id="vote-q" className="input" maxLength={60} value={q} onChange={(e) => setQ(e.target.value)} placeholder={kind === 'places' ? 'Where should we go?' : kind === 'dates' ? 'Which evening for dinner?' : 'Shall we book the van?'} />
+      </div>
+      <div className="chips" role="radiogroup" aria-label="Kind of vote">
+        {VOTE_KINDS.map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={kind === id ? 'true' : 'false'} className={'chip' + (kind === id ? ' on' : '')} onClick={() => { setKind(id); buzz(HAPTIC.select); }}>{label}</button>)}
+      </div>
+      <div className="col" style={{ gap: 8 }}>
+        {opts.map((o, i) => (
+          <div key={i} className="row" style={{ gap: 8 }}>
+            <input id={`vote-o${i + 1}`} className="input" aria-label={`Choice ${i + 1}`} maxLength={30} value={o} placeholder={`Choice ${i + 1}`} onChange={(e) => setOpts(opts.map((x, j) => (j === i ? e.target.value : x)))} />
+            {opts.length > 2 && <button type="button" className="icon-btn" aria-label={`Remove choice ${i + 1}`} style={{ background: 'var(--mist)' }} onClick={() => setOpts(opts.filter((_, j) => j !== i))}><Icon name="close" size={18} /></button>}
+          </div>
+        ))}
+        {opts.length < 4 && <button type="button" className="link" style={{ alignSelf: 'flex-start', padding: '4px 0' }} onClick={() => setOpts([...opts, ''])}>Add a choice</button>}
+      </div>
+      <div className="chips" aria-label="Quick choices">{ideas.map((v) => <button key={v} type="button" className="chip cx-chip-ghost" onClick={() => fill(v)}>{v}</button>)}</div>
+      {tried && !ok && <span className="err" role="alert" style={{ color: '#8a3524', fontSize: 13 }}>{q.trim().length < 3 ? 'Add a question.' : dup ? 'Two choices are the same.' : 'Add at least 2 choices.'}</span>}
+      <button type="button" className="btn primary block" aria-disabled={!ok ? 'true' : 'false'} style={{ opacity: ok ? 1 : 0.45 }} onClick={() => { if (!ok) { setTried(true); return; } onPost({ q: q.trim().replace(/([^?])$/, '$1?'), kind, options: clean }); }}>Post the vote</button>
+    </Sheet>
+  );
+}
+
+function SplitSheet({ group, onClose, onPost }) {
+  const [what, setWhat] = useState('');
+  const [total, setTotal] = useState('');
+  const [paidByPick, setPaidBy] = useState('omar');
+  const [mode, setMode] = useState('equal');
+  const [who, setWho] = useState(group.members);
+  const [custom, setCustom] = useState({});
+  const sum = Number(String(total).replace(/[^\d.]/g, '')) || 0;
+  const paidBy = who.includes(paidByPick) ? paidByPick : who[0];
+  const units = shareUnits(mode === 'custom' ? 'equal' : mode, who);
+  const amounts = mode === 'custom' ? units.map((u) => Number(custom[u.key]) || 0) : equalAmounts(sum, units.length || 1);
+  const assigned = amounts.reduce((a, b) => a + b, 0);
+  const diff = Math.round(sum - assigned);
+  const ok = what.trim().length >= 2 && sum > 0 && who.length >= 2 && who.includes(paidBy) && (mode !== 'custom' || diff === 0);
+  const label = (id) => (id === 'omar' ? 'You' : person(id).short);
+  return (
+    <Sheet label="Split a cost" onClose={onClose}>
+      <h2 className="h2">Split a cost</h2>
+      <div className="field">
+        <label htmlFor="split-what">What for</label>
+        <input id="split-what" className="input" maxLength={40} value={what} onChange={(e) => setWhat(e.target.value)} placeholder="Dinner on the Bosphorus" />
+        <div className="chips">{['Dinner', 'Hotel', 'Airport van', 'Tickets'].map((t) => <button key={t} type="button" className="chip cx-chip-ghost" onClick={() => setWhat(t)}>{t}</button>)}</div>
+      </div>
+      <div className="field">
+        <label htmlFor="split-total">Total</label>
+        <div className="row" style={{ gap: 8 }}><span className="input cx-sar">SAR</span><input id="split-total" className="input num" inputMode="decimal" value={total} onChange={(e) => setTotal(e.target.value.replace(/[^\d]/g, '').slice(0, 7))} placeholder="1,200" /></div>
+      </div>
+      <div className="col" style={{ gap: 8 }}>
+        <span className="eyebrow">Paid by</span>
+        <div className="chips" role="radiogroup" aria-label="Paid by">{who.map((id) => <button key={id} type="button" role="radio" aria-checked={paidBy === id ? 'true' : 'false'} className={'chip' + (paidBy === id ? ' on' : '')} onClick={() => setPaidBy(id)}>{label(id)}</button>)}</div>
+      </div>
+      <div className="col" style={{ gap: 8 }}>
+        <span className="eyebrow">Between</span>
+        <div className="chips" aria-label="Between">{group.members.map((id) => <button key={id} type="button" aria-pressed={who.includes(id) ? 'true' : 'false'} className="chip" onClick={() => { setWho(who.includes(id) ? who.filter((x) => x !== id) : group.members.filter((x) => x === id || who.includes(x))); buzz(HAPTIC.select); }}>{label(id)}</button>)}</div>
+      </div>
+      <div className="cx-seg" role="radiogroup" aria-label="How to split">
+        {[['equal', 'Equally'], ['family', 'By family'], ['custom', 'Custom']].map(([id, l]) => <button key={id} type="button" role="radio" aria-checked={mode === id ? 'true' : 'false'} onClick={() => { setMode(id); buzz(HAPTIC.select); }}>{l}</button>)}
+      </div>
+      <div className="cx-shares well">
+        {units.map((u, i) => (
+          <div key={u.key} className="cx-share">
+            <span className="stack">{u.ids.slice(0, 3).map((id) => <PAvatar key={id} id={id} size={26} ring="#f6f2ec" />)}</span>
+            <span className="grow cx-share-l">{u.label}</span>
+            {mode === 'custom'
+              ? <input className="input num cx-amt-in" inputMode="numeric" aria-label={u.ids.includes('omar') ? 'Your share' : `${u.label}’s share`} value={custom[u.key] || ''} placeholder="0" onChange={(e) => setCustom({ ...custom, [u.key]: e.target.value.replace(/[^\d]/g, '').slice(0, 7) })} />
+              : <span className="num cx-share-a">SAR {fmt(amounts[i] || 0)}</span>}
+          </div>
+        ))}
+      </div>
+      {mode === 'custom' && sum > 0 && (diff === 0
+        ? <span className="tiny cx-ok">Adds up to SAR {fmt(sum)}.</span>
+        : <span className="err" role="alert" style={{ color: '#8a3524', fontSize: 13 }}>{diff > 0 ? `SAR ${fmt(diff)} still to share out.` : `SAR ${fmt(-diff)} more than the total.`}</span>)}
+      {who.length < 2 && <span className="tiny">Pick at least 2 people.</span>}
+      <button type="button" className="btn primary block" disabled={!ok} onClick={() => {
+        const shares = units.map((u, i) => ({ ...u, amount: amounts[i], paid: u.ids.includes(paidBy) }));
+        onPost({ what: what.trim(), total: sum, paidBy, mode, shares, settled: shares.every((x) => x.paid) });
+      }}>{ok ? `Split SAR ${fmt(sum)}` : 'Split it'}</button>
+    </Sheet>
+  );
+}
+
+function ShareSheet({ onClose, onPick }) {
+  const { s } = useStore();
+  const [pin, setPin] = useState(false);
+  const saved = s.savedPosts || [];
+  return (
+    <Sheet label="Share a plan or place" onClose={onClose}>
+      <h2 className="h2">Share a plan or place</h2>
+      <span className="eyebrow">Plans we’ve made</span>
+      {Object.values(PLANS).map((pl) => (
+        <button key={pl.id} type="button" className="city-row" onClick={() => onPick({ kind: 'plan', id: pl.id }, pin)}>
+          <img src={pl.img} alt="" />
+          <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{pl.title}</span><span className="tiny">{pl.days} days · {pl.city}</span></span>
+          <Icon name="up" size={18} />
+        </button>
+      ))}
+      <label className="row small" style={{ gap: 8 }}><input type="checkbox" checked={pin} onChange={(e) => setPin(e.target.checked)} />Pin the plan to the top of the circle</label>
+      <span className="eyebrow">Your saved places</span>
+      {saved.length === 0 ? <span className="small">Nothing saved yet. Bookmark a tip in Discover and you can share it here.</span> : saved.map((p) => (
+        <button key={p.id} type="button" className="city-row" onClick={() => onPick({ kind: 'place', post: { id: p.id, who: p.who, uid: p.uid, initial: p.initial, tone: p.tone, city: p.city, place: p.place, text: p.text, img: p.img, kind: p.kind, saves: p.saves, rel: p.rel } })}>
+          {p.img ? <img src={p.img} alt="" /> : <span className="avatar" style={{ width: 48, height: 48, borderRadius: 12 }}>{p.initial}</span>}
+          <span className="grow col" style={{ gap: 0, minWidth: 0 }}><span className="h3" style={{ fontSize: 15 }}>{p.place}</span><span className="tiny">{p.city} · from {p.who}</span></span>
+          <Icon name="up" size={18} />
+        </button>
+      ))}
+    </Sheet>
   );
 }
 

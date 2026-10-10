@@ -17,21 +17,19 @@ const DEFAULTS = {
   photoAt: null,
   preferred: null,
   preferredAt: null,
-  email: { address: 'k7x2m9q4pz@privaterelay.appleid.com', relay: true, source: 'apple', at: null },
-  phone: { digits: '501234127', source: 'signup', at: null },
+  email: null,
+  phone: { digits: '', source: null, at: null },
   home: 'RUH',
   homeAt: null,
   language: 'en',
   arabicNotify: false,
   currency: 'SAR',
-  methods: { apple: true, google: false, phone: true },
-  prefs: { seat: 'window', together: true, meal: 'halal', assist: [], loyalty: [{ id: 'l1', program: 'alfursan', number: '48213377' }], notes: '' },
+  methods: { apple: false, google: false, phone: false },
+  prefs: { seat: 'any', together: true, meal: 'halal', assist: [], loyalty: [], notes: '' },
   people: {},
   faceId: true,
   devices: [
-    { id: 'this', name: 'This iPhone', sub: 'iPhone 15 Pro · Riyadh · now', current: true },
-    { id: 'ipad', name: 'iPad', sub: 'Riyadh · 2 days ago' },
-    { id: 'web', name: 'madatrips.sa on a Mac', sub: 'Chrome · Jeddah · 3 weeks ago' },
+    { id: 'this', name: 'This iPhone', sub: 'Now', current: true },
   ],
   exportAt: null,
   consents: { marketing: false, analytics: true },
@@ -58,15 +56,14 @@ export function fmtDate(ts, withYear) {
   const sameYear = d.getFullYear() === new Date().getFullYear();
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(withYear || !sameYear ? { year: 'numeric' } : {}) });
 }
-export const prettyPhone = (d) => `+966 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}`;
-const firstName = (s) => s.user?.name || PEOPLE.omar.name;
+export const prettyPhone = (d) => (d ? `+966 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}` : 'Not added');
+/* Names come only from the passport or what the person typed. With neither, we say "you". */
+const firstName = (s) => s.user?.name || (s.user?.full ? s.user.full.split(' ')[0] : '');
 export function passportName(s) {
-  if (s.user?.full) return s.user.full;
-  const n = firstName(s);
-  return n === PEOPLE.omar.name ? PEOPLE.omar.full : n;
+  return s.user?.full || '';
 }
 export function displayName(s) {
-  return (s.account && s.account.preferred) || firstName(s);
+  return (s.account && s.account.preferred) || firstName(s) || '';
 }
 
 /* Date of birth from the passport's second MRZ line (YYMMDD at 13–19). */
@@ -156,11 +153,11 @@ export function Row({ icon, lead, label, value, sub, src, onClick, right, danger
 export function UserAvatar({ size = 40, ring, className = '' }) {
   const { s } = useStore();
   const photo = s.account?.photo;
-  const initial = displayName(s).charAt(0).toUpperCase() || 'O';
+  const initial = displayName(s).charAt(0).toUpperCase();
   const style = { width: size, height: size, fontSize: Math.round(size * 0.4), flexShrink: 0, ...(ring ? { boxShadow: `0 0 0 2px ${ring}` } : null) };
   return photo
     ? <img className={'avatar acc-photo ' + className} src={photo} alt="" aria-hidden="true" style={style} />
-    : <span className={'avatar green ' + className} aria-hidden="true" style={style}>{initial}</span>;
+    : <span className={'avatar green ' + className} aria-hidden="true" style={style}>{initial || <Icon name="user" size={Math.round(size * 0.45)} color="#f6f2ec" />}</span>;
 }
 
 /* ---------- 6-digit code entry (email, phone, linking) ---------- */
@@ -337,19 +334,19 @@ function Account() {
         <p className="small acc-intro">Each detail shows where it came from. Mada uses these on every booking.</p>
 
         <Group label="Name">
-          <Row label="Name on your passport" value={passportName(s)} locked onClick={() => setSheet('name')} src={<Source kind={scanned ? 'passport' : a.methods.apple ? 'apple' : 'typed'} />} />
-          <Row label="What Mada calls you" value={displayName(s)} onClick={() => setSheet('preferred')} src={<Source kind={a.preferred ? 'typed' : scanned ? 'passport' : 'apple'} at={a.preferredAt} />} />
+          <Row label="Name on your passport" value={passportName(s) || 'Not scanned yet'} locked onClick={() => setSheet('name')} src={<Source kind={scanned && passportName(s) ? 'passport' : 'none'} />} />
+          <Row label="What Mada calls you" value={displayName(s) || 'Add a name'} onClick={() => setSheet('preferred')} src={a.preferred ? <Source kind="typed" at={a.preferredAt} /> : scanned && displayName(s) ? <Source kind="passport" /> : <span className="acc-src warn">We’ll use your first name once your passport is in</span>} />
         </Group>
 
         <Group label="Contact">
           <Row label="Email" value={<span className="acc-break">{a.email ? a.email.address : 'Not added'}</span>} onClick={() => setSheet('email')}
             src={a.email ? (a.email.relay ? <Source kind="apple" /> : <Source kind="verified" at={a.email.at} />) : <span className="acc-src warn">Add one to get tickets and receipts</span>} />
-          <Row label="Mobile" value={<span className="num">{prettyPhone(a.phone.digits)}</span>} onClick={() => setSheet('phone')} src={<Source kind={a.phone.at ? 'verified' : 'signup'} at={a.phone.at} />} />
+          <Row label="Mobile" value={<span className="num">{prettyPhone(a.phone.digits)}</span>} onClick={() => setSheet('phone')} src={a.phone.digits ? <Source kind={a.phone.source === 'signup' ? 'signup' : a.phone.at ? 'verified' : 'signup'} at={a.phone.source === 'signup' ? null : a.phone.at} /> : <span className="acc-src warn">Add one for gate changes and Faisal’s messages</span>} />
         </Group>
 
         <Group label="From your passport">
           <Row label="Date of birth" value={scanned && dob ? fmtDate(dob, true) : 'Not scanned yet'} locked onClick={() => setSheet('passportField')} src={<Source kind={scanned ? 'passport' : 'none'} />} />
-          <Row label="Nationality" value={scanned ? 'Saudi Arabia' : 'Not scanned yet'} locked onClick={() => setSheet('passportField')} src={<Source kind={scanned ? 'passport' : 'none'} />} />
+          <Row label="Nationality" value={scanned ? (s.user?.passport?.nationality || 'Saudi Arabia') : 'Not scanned yet'} locked onClick={() => setSheet('passportField')} src={<Source kind={scanned ? 'passport' : 'none'} />} />
         </Group>
 
         <Group label="For bookings">
@@ -479,22 +476,22 @@ function PhoneSheet({ onClose }) {
   if (step === 'confirm') {
     return (
       <Sheet label="Confirm new number" onClose={onClose}>
-        <h2 className="h2">Switch to {prettyPhone(chk.d)}?</h2>
-        <div className="acc-swap">
+        <h2 className="h2">{a.phone.digits ? 'Switch to' : 'Use'} {prettyPhone(chk.d)}?</h2>
+        {a.phone.digits && <div className="acc-swap">
           <span className="col" style={{ gap: 2 }}><span className="tiny">Stops working</span><span className="h3 num" style={{ fontSize: 15, textDecoration: 'line-through', color: '#5f6b65' }}>{prettyPhone(a.phone.digits)}</span></span>
           <Icon name="arrow" size={18} />
           <span className="col" style={{ gap: 2 }}><span className="tiny">From now on</span><span className="h3 num" style={{ fontSize: 15 }}>{prettyPhone(chk.d)}</span></span>
-        </div>
+        </div>}
         <p className="body">Your old number stops working for sign-in straight away. Trip texts and calls from Faisal go to the new one. Airlines on booked trips get it too.</p>
-        <button type="button" className="btn primary block" onClick={() => { save({ phone: { digits: chk.d, source: 'typed', at: Date.now() } }); buzz(HAPTIC.success); toast('Number changed. Use it next time you sign in.'); onClose(); }}>Use the new number</button>
+        <button type="button" className="btn primary block" onClick={() => { save((f) => ({ phone: { digits: chk.d, source: 'typed', at: Date.now() }, ...(f.phone?.digits ? {} : { methods: { ...f.methods, phone: true } }) })); buzz(HAPTIC.success); toast(a.phone.digits ? 'Number changed. Use it next time you sign in.' : 'Added. You can sign in with it too.'); onClose(); }}>Use the new number</button>
         <button type="button" className="btn ghost block" onClick={onClose}>Keep my old number</button>
       </Sheet>
     );
   }
   return (
     <Sheet label="Change mobile number" onClose={onClose}>
-      <h2 className="h2">Change your number</h2>
-      <p className="small">Now {prettyPhone(a.phone.digits)}. We’ll text a code to the new number to check it’s yours.</p>
+      <h2 className="h2">{a.phone.digits ? 'Change your number' : 'Add your number'}</h2>
+      <p className="small">{a.phone.digits ? `Now ${prettyPhone(a.phone.digits)}. ` : ''}We’ll text a code to the new number to check it’s yours.</p>
       <form className="col" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); setTouched(true); if (!chk.ok || s.demo.offline) return; buzz(HAPTIC.tap); setStep('code'); }}>
         <div className="field">
           <label htmlFor="acc-phone">New mobile number</label>
@@ -787,7 +784,7 @@ function Household() {
           {ids.map((id) => {
             const st = passportStatus(s, id);
             const band = ageBand(id);
-            return <Row key={id} lead={<PersonAvatar id={id} />} value={id === 'omar' ? `${displayName(s)} (you)` : PEOPLE[id].name}
+            return <Row key={id} lead={<PersonAvatar id={id} />} value={id === 'omar' ? (displayName(s) ? `${displayName(s)} (you)` : 'You') : PEOPLE[id].name}
               sub={[relationOf(s, id) !== 'You' ? relationOf(s, id) : null, st.key !== 'none' && band ? band.label : null].filter(Boolean).join(' · ') || 'Account holder'}
               onClick={() => push('householdPerson', { id })} right={<span className="row" style={{ gap: 6 }}><StatusPill st={st} /><Icon name="chevron" size={18} color="#8a9590" /></span>} />;
           })}
@@ -837,7 +834,7 @@ function HouseholdPerson({ params }) {
         <div className="row" style={{ gap: 14 }}>
           <PersonAvatar id={id} size={64} />
           <div className="col" style={{ gap: 2 }}>
-            <h1 className="h1" style={{ fontSize: 26 }}>{me ? displayName(s) : p.name}</h1>
+            <h1 className="h1" style={{ fontSize: 26 }}>{me ? displayName(s) || 'You' : p.name}</h1>
             <span className="small">{me ? 'You · account holder' : relationOf(s, id)}{band ? ' · ' + band.label : ''}</span>
           </div>
         </div>
@@ -973,26 +970,43 @@ function Security() {
           <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Cancel</button>
         </Sheet>
       )}
-      {sheet === 'everywhere' && (
-        <Sheet label="Sign out everywhere" onClose={() => setSheet(null)}>
-          <h2 className="h2">Sign out everywhere?</h2>
-          <p className="body">Every device, this phone included. Your trips stay in your account, and documents stay encrypted on this phone until you sign in again.</p>
-          <button type="button" className="btn primary block" onClick={() => { save((f) => ({ devices: f.devices.filter((x) => x.current) })); setSheet(null); signOut(); }}>Sign out everywhere</button>
-          <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Cancel</button>
-        </Sheet>
-      )}
+      {sheet === 'everywhere' && <SignOutSheet everywhere onClose={() => setSheet(null)} />}
     </div>
   );
 }
 
-/* Sign out keeps everything on this phone and returns to the welcome screen.
-   Onboarding can offer "Welcome back" when s.account.signedOut is true (see WelcomeBack below). */
+/* Sign out, two ways. Keep: trips stay on this phone, documents stay locked until sign-in, and Onboarding offers
+   "Welcome back". Remove: nothing of this account is left on the phone. */
 export function useSignOut() {
-  const { set } = useStore();
-  return () => {
+  const { set, hardReset } = useStore();
+  return (mode = 'keep') => {
     buzz(HAPTIC.tap);
+    if (mode === 'remove') { hardReset(); return; }
     set((p) => ({ onboarded: false, guest: false, walletUnlocked: false, stack: [], tab: 'today', account: { ...(p.account || {}), signedOut: true, signedOutAt: Date.now() } }));
   };
+}
+
+export function SignOutSheet({ onClose, everywhere }) {
+  const { s } = useStore();
+  const signOut = useSignOut();
+  const [a, save] = useAccount();
+  const others = s.household.filter((id) => id !== 'omar').length;
+  const go = (mode) => { if (everywhere) save((f) => ({ devices: f.devices.filter((x) => x.current) })); onClose(); signOut(mode); };
+  return (
+    <Sheet label={everywhere ? 'Sign out everywhere' : 'Sign out'} onClose={onClose}>
+      <h2 className="h2">{everywhere ? 'Sign out everywhere?' : 'Sign out?'}</h2>
+      <p className="body" style={{ marginTop: -8 }}>{everywhere ? 'Every device, this phone included. ' : ''}Your trips stay in your account either way. What should stay on this phone?</p>
+      <button type="button" className="card tap well acc-choice" onClick={() => go('keep')}>
+        <span className="row" style={{ gap: 10 }}><span className="acc-ic"><Icon name="lock" size={18} /></span><span className="h3" style={{ fontSize: 15 }}>Keep my trips on this phone</span></span>
+        <span className="small">Faster to sign back in. {others ? `Passports for you and ${others} ${others === 1 ? 'other' : 'others'} stay encrypted and locked` : 'Your passport stays encrypted and locked'} until you sign in.</span>
+      </button>
+      <button type="button" className="card tap well acc-choice" onClick={() => go('remove')}>
+        <span className="row" style={{ gap: 10 }}><span className="acc-ic"><Icon name="close" size={18} color="#8a3524" /></span><span className="h3" style={{ fontSize: 15, color: '#8a3524' }}>Remove everything from this phone</span></span>
+        <span className="small">For a shared or borrowed phone. Trips, passports, cards and photos are wiped from it. Sign in again to get them back.</span>
+      </button>
+      <button type="button" className="btn ghost block" onClick={onClose}>Cancel</button>
+    </Sheet>
+  );
 }
 
 /* "Welcome back, Omar": a fast way back in after signing out. Render from Onboarding's welcome step when s.account?.signedOut. */
@@ -1006,14 +1020,14 @@ export function WelcomeBack({ onSomeoneElse }) {
     <div className="screen" style={{ alignItems: 'center', justifyContent: 'center', padding: '0 28px', gap: 18, textAlign: 'center' }}>
       <Sun width={48} />
       <UserAvatar size={96} />
-      <h1 className="display" style={{ fontSize: 44 }}>Welcome back, {displayName(s)}.</h1>
-      <p className="body">Your trips and family are still here. Documents unlock once you’re in.</p>
+      <h1 className="display" style={{ fontSize: 44 }}>{displayName(s) ? `Welcome back, ${displayName(s)}.` : 'Welcome back.'}</h1>
+      <p className="body">{s.household.length > 1 ? 'Your trips and family are still on this phone.' : 'Your trips are still on this phone.'} Documents stay locked until you’re in.</p>
       <div className="col" style={{ gap: 10, width: '100%', marginTop: 8 }}>
         {via
           ? <button type="button" className="btn primary block" onClick={back}>Continue with {via}</button>
           : <button type="button" className="btn primary block" onClick={() => setSheet('code')}>Text me a code</button>}
         {via && a.methods.phone && <button type="button" className="btn secondary block" onClick={() => setSheet('code')}>Use my phone number</button>}
-        <button type="button" className="btn ghost block" onClick={() => (onSomeoneElse ? onSomeoneElse() : hardReset())}>Not {displayName(s)}? Start fresh</button>
+        <button type="button" className="btn ghost block" onClick={() => (onSomeoneElse ? onSomeoneElse() : hardReset())}>Not {displayName(s) || 'you'}? Start fresh</button>
       </div>
       {sheet === 'code' && <Sheet label="Sign in" onClose={() => setSheet(null)}><CodeStep to={prettyPhone(a.phone.digits)} onDone={back} /></Sheet>}
     </div>

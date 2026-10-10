@@ -43,12 +43,21 @@ export const PLANS = {
   },
 };
 
+/* Plan notes are written for a family of four. Say them for who's actually going. */
+function fitNote(note, n, kids) {
+  let t = note.replace(/\b(for|all) 4\b/g, (m, w) => (n === 1 ? (w === 'all' ? 'you' : 'one') : `${w} ${n}`)).replace('Tickets for all you', 'Your ticket').replace('Tastings for one', 'Tastings for one').replace('Booked for 6', `Booked for ${n}`);
+  if (n <= 2) t = t.replace('Two connecting rooms', n === 1 ? 'A room' : 'A double room');
+  if (!kids) t = t.replace(/ Kids\u2019 menu\.| Kids feed the gulls\.|, family dining| 2 hours is enough with kids\./g, (m) => (m.includes('2 hours') ? ' 2 hours is enough.' : ''));
+  return t;
+}
+
 export default function Plan({ params }) {
   const { s, set, pop, push, toast } = useStore();
   const plan = PLANS[params.id] || PLANS.alula2;
   const [day, setDay] = useState(0);
   const saved = (s.savedPlans || []).includes(plan.id);
   const n = Math.max(1, (s.household.length ? s.household : ['omar']).filter((id) => id !== 'lina').length);
+  const kids = s.household.some((id) => /daughter|son|child/i.test(PEOPLE[id]?.role || ''));
   const total = plan.price.flights * n / 2 + plan.price.stay + plan.price.experiences * n / 4;
   return (
     <div className="screen push">
@@ -76,7 +85,7 @@ export default function Plan({ params }) {
               <div className="t-text" style={{ paddingBottom: 18 }}>
                 <span className="tiny num" style={{ fontWeight: 600, color: '#7d5d27' }}>{st.time}</span>
                 <span className="h3">{st.title}</span>
-                <span className="small">{st.note}</span>
+                <span className="small">{fitNote(st.note, n, kids)}</span>
               </div>
             </div>
           ))}

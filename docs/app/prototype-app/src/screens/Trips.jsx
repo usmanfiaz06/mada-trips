@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
+import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
 import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
-import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney } from './TripManage.jsx';
+import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney, MoveNotice, NoStayChoices } from './TripManage.jsx';
+import { TrackedFlights } from './Today.jsx';
 
 const REQ_STAGES = [
   ['queued', 'Waiting for a connection'],
@@ -48,9 +49,19 @@ export default function Trips() {
   );
 }
 
+/* Where to forward a booking made elsewhere: the traveller's own address, never someone else's. */
+function ForwardLine({ lead = '' }) {
+  const { s } = useStore();
+  const addr = forwardAddress(s);
+  return addr
+    ? <>{lead}Forward the confirmation email to <b style={{ color: '#1e352d' }}>{addr}</b>, or upload the PDF. We'll track it like any Mada trip.</>
+    : <>{lead}Upload the PDF and we'll track it like any Mada trip. Your own forwarding address appears once you've signed in.</>;
+}
+
 function Imports() {
   const { s, set, toast } = useStore();
   const [open, setOpen] = useState(false);
+  const names = s.household.map((id) => PEOPLE[id]?.name).filter((x) => x && x !== 'You');
   return (
     <>
       {(s.imports || []).map((im) => (
@@ -60,12 +71,12 @@ function Imports() {
       ))}
       <div className="card well">
         <span className="h3" style={{ fontSize: 15 }}>Booked somewhere else?</span>
-        <span className="small">Forward the confirmation email to <b style={{ color: '#1e352d' }}>omar@trips.madatrips.sa</b>, or upload the PDF. We'll track it like any Mada trip.</span>
+        <span className="small"><ForwardLine /></span>
         <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setOpen(true)}>Upload a booking</button>
       </div>
       {open && <UploadSheet title="Add a booking" allowScan={false}
-        found={[['Airline', 'Emirates · EK 818'], ['Route', 'Riyadh → Dubai'], ['When', 'Thu 3 Jun · 10:15'], ['Travellers', 'Omar, Hessa']]}
-        onSave={() => { set((p) => ({ imports: [...(p.imports || []), { id: 'im' + Date.now(), title: 'Dubai · Emirates EK 818', sub: 'Thu 3 Jun · 2 travellers' }] })); setOpen(false); buzz(HAPTIC.success); toast('Added. We’ll watch EK 818 for you.'); }}
+        found={[['Airline', 'Emirates · EK 818'], ['Route', 'Riyadh → Dubai'], ['When', 'Thu 3 Jun · 10:15'], ['Travellers', names.slice(0, 2).join(', ') || 'You']]}
+        onSave={() => { set((p) => ({ imports: [...(p.imports || []), { id: 'im' + Date.now(), title: 'Dubai · Emirates EK 818', sub: `Thu 3 Jun · ${Math.max(1, Math.min(2, names.length))} ${Math.min(2, names.length) > 1 ? 'travellers' : 'traveller'}` }] })); setOpen(false); buzz(HAPTIC.success); toast('Added. We’ll watch EK 818 for you.'); }}
         onClose={() => setOpen(false)} />}
     </>
   );
@@ -73,32 +84,36 @@ function Imports() {
 
 function Upcoming() {
   const { s, push } = useStore();
+  const tracked = (s.trackedFlights || []).length > 0;
   if (!s.trip) return (<>
     <div className="card well rise" style={{ alignItems: 'flex-start' }}>
       <span className="h3">No trips yet.</span>
-      <span className="small">Tell us where, or forward a booking to <b style={{ color: '#1e352d' }}>omar@trips.madatrips.sa</b> and it appears here.</span>
+      <span className="small">Tell us where you’d like to go. Faisal books it and stays with you until you’re home.</span>
       <button type="button" className="btn primary small" onClick={() => push('ask', {})}>Plan a trip</button>
     </div>
+    {tracked && <TrackedFlights title="Flights you’re tracking" />}
     <Imports />
   </>);
   const t = s.trip;
   const f = t.flight;
+  const who = t.travellers.map((id) => PEOPLE[id]?.name).filter(Boolean);
   return (<>
     <div className="tm-tripcard rise">
-      <button type="button" className="photo" style={{ height: 210, border: 0, padding: 0, width: '100%', display: 'block' }} onClick={() => push('trip')} aria-label="Istanbul trip">
-        <img src="img/istanbul.jpg" alt="Istanbul" />
+      <button type="button" className="photo" style={{ height: 210, border: 0, padding: 0, width: '100%', display: 'block' }} onClick={() => push('trip')} aria-label={`${t.city} trip`}>
+        <img src={t.img || 'img/istanbul.jpg'} alt={t.city} />
         <span className="shade" />
         <span className="over" style={{ textAlign: 'left' }}>
-          <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>Istanbul</span>
-          <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · {t.travellers.map((id) => PEOPLE[id].name).join(', ')}</span>
+          <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>{t.city}</span>
+          <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · {who.length === 1 && t.travellers[0] === 'omar' ? 'Just you' : who.join(', ')}</span>
         </span>
       </button>
       <div className="tm-tripcard-foot">
-        <span className="tiny grow">{f ? `${f.code} · ${f.date} · ${f.dep}` : t.stay ? `${t.stay.name}` : 'Booked'}</span>
+        <span className="tiny grow">{f ? `${f.code} · ${f.date} · ${f.dep}${f.back ? '' : ' · one way'}` : t.stay ? `${t.stay.name}` : 'Booked'}</span>
         <button type="button" className="btn secondary small" onClick={() => push('itinerary')}><Icon name="trips" size={18} />Itinerary</button>
         <button type="button" className="btn secondary small" onClick={() => push('invoices')}><Icon name="card" size={18} />Payments</button>
       </div>
     </div>
+    {tracked && <TrackedFlights title="Flights you’re tracking" />}
     <Imports />
   </>);
 }
@@ -185,11 +200,14 @@ function quoteText(r) {
 
 function Past() {
   const { s, push } = useStore();
+  if (!(s.pastTrips || []).length) return (
+    <div className="card well rise"><span className="h3">No past trips yet.</span><span className="small">Trips you take with Mada stay here, with every receipt, so the next one is quicker to plan.</span></div>
+  );
   return s.pastTrips.map((t) => (
     <div key={t.id} className="card rise">
       <div className="spread"><span className="h3">{t.city}</span><span className="tiny">{t.dates}</span></div>
       <span className="small">{t.note}</span>
-      <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { prefill: 'Same as last Eid' })}>Same again</button>
+      <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { prefill: `${t.city} again, like ${t.when ? t.when.toLowerCase() : 'last time'}` })}>Same again</button>
     </div>
   ));
 }
@@ -218,27 +236,28 @@ export function TripDetail() {
     const back = stayMoney ? stayMoney.cash : t.stay.price;
     set((p) => ({
       trip: { ...p.trip, stay: { ...p.trip.stay, status: 'cancelled' } },
-      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · ${p.trip.stay.nights} nights`, amount: back, perItem: { stay: stayQ ? stayQ.back : t.stay.price }, stage: 0, card: 'Visa ending 41', items: ['stay'], dest: stayMoney?.count ? 'tabby' : 'card', tabby: stayMoney?.count ? { left: stayMoney.cancelled, count: stayMoney.count } : null, created: Date.now() }],
+      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · ${p.trip.stay.nights} nights`, amount: back, perItem: { stay: stayQ ? stayQ.back : t.stay.price }, stage: 0, card: stayPay?.card || 'your card', items: ['stay'], dest: stayMoney?.count ? 'tabby' : 'card', tabby: stayMoney?.count ? { left: stayMoney.cancelled, count: stayMoney.count } : null, created: Date.now() }],
     }));
-    setSheet(null);
     buzz(HAPTIC.success);
     toast('Cancelled. Your refund is on its way.');
+    /* The driver needs somewhere to take them now. */
+    setSheet(t.flight && t.pickup ? 'nostay' : null);
   };
   const manage = [
     ['itinerary', 'trips', 'Full itinerary', 'Day by day, with times and documents'],
     ['invoices', 'card', 'Payments and invoices', nextDue ? `Next payment SAR ${fmt(nextDue.amount)} on ${nextDue.date}` : 'VAT invoices for every payment'],
     ['changeFlight', 'flight', 'Change flight', tm.within24 ? 'Less than a day to go: Faisal calls you' : 'Date, time, way back, a name spelling'],
-    ['hotelOptions', 'stay', 'Hotel options', 'Room, nights, check-in and checkout'],
+    ['hotelOptions', 'stay', 'Hotel options', stayOf(t) ? 'Room, nights, check-in and checkout' : 'Find a place to stay'],
     ['specialRequests', 'star', 'Special requests', 'Wheelchair, meals, bags, a celebration'],
     ['refund', 'refund', 'Ask for a refund', 'See exactly what comes back first'],
   ];
   return (
     <div className="screen push">
       <div className="photo" style={{ height: 230, borderRadius: 0, flexShrink: 0 }}>
-        <img src="img/istanbul.jpg" alt="Istanbul" />
+        <img src={t.img || 'img/istanbul.jpg'} alt={t.city} />
         <span className="shade" />
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }}><TopBar onBack={pop} dark /></div>
-        <span className="over"><span className="display" style={{ fontSize: 40, color: '#fffdf9' }}>Istanbul</span><span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · booking {t.ref || t.pnr}</span></span>
+        <span className="over"><span className="display" style={{ fontSize: 40, color: '#fffdf9' }}>{t.city}</span><span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · booking {t.ref || t.pnr}</span></span>
       </div>
       <div className="scroll no-dock" style={{ paddingTop: 16 }}>
         {open > 0 && (
@@ -248,31 +267,41 @@ export function TripDetail() {
             <Icon name="chevron" size={18} />
           </button>
         )}
+        <MoveNotice />
         {f && (
           <div className="card">
-            <div className="spread"><span className="row" style={{ gap: 10 }}><AirlineMark flight={f} size={32} /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Going · {f.date}</span><span className="tiny">{f.airline} · {f.code}</span></span></span>
+            <div className="spread"><span className="row" style={{ gap: 10 }}><AirlineMark flight={f} size={32} /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{f.back ? 'Going' : 'One way'} · {f.date}</span><span className="tiny">{f.airline} · {f.code}{f.cabin && f.cabin !== 'Economy' ? ' · ' + f.cabin : ''}{t.infants ? ` · ${t.infants} on a lap` : ''}</span></span></span>
               {flightGone ? <span className="pill">Refunded</span> : <button type="button" className="link" onClick={() => push('changeFlight')}>Change</button>}</div>
             <Route dep={f.dep} arr={f.arr} from={f.from} to={f.to} dur={f.dur} />
-            <div className="divider" />
-            <div className="spread"><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Back · {f.backDate}</span><span className="tiny">{f.airline} · {f.back}</span></span></div>
-            <Route dep={f.backDep} arr={f.backArr} from={f.to} to="RUH" dur="4h 10m" />
+            {f.back ? (<>
+              <div className="divider" />
+              <div className="spread"><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Back · {f.backDate}</span><span className="tiny">{f.airline} · {f.back}</span></span></div>
+              <Route dep={f.backDep} arr={f.backArr} from={f.to} to="RUH" dur="4h 10m" />
+            </>) : <span className="tiny">No flight home booked. Faisal can add one any time.</span>}
           </div>
         )}
         {t.stay && (
           <div className="card">
             <div className="spread">
-              <span className="row"><Icon name="stay" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t.stay.name}</span><span className="tiny">9–{9 + t.stay.nights} Mar · {t.stay.nights} nights</span></span></span>
+              <span className="row"><Icon name="stay" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t.stay.name}</span><span className="tiny">{rangeLabel(t.stay.fromISO, stayEnd(t.stay))} · {t.stay.nights} nights</span></span></span>
               {t.stay.status === 'cancelled' ? <span className="pill">Cancelled</span> : tm.allUsed ? <span className="pill ok">Stayed</span> : <button type="button" className="link" onClick={() => setSheet('cancel')}>Cancel</button>}
             </div>
             {t.stay.status === 'cancelled' && <span className="small">Refund on its way. Track it in Trips → Requests.</span>}
           </div>
         )}
-        {!t.stay && (
+        {!stayOf(t) && f && (
+          <div className="card well tm-nostay">
+            <span className="row"><Icon name="stay" /><span className="h3" style={{ fontSize: 15 }}>{t.noStay?.address ? `Staying with ${t.noStay.label || 'family or friends'}` : 'No hotel booked. Where are you staying?'}</span></span>
+            {t.noStay?.address ? <span className="small">{t.noStay.address}{t.pickup ? `. ${t.pickup.arrive?.driver || 'The driver'} takes you there.` : ''}</span> : <span className="small">{t.pickup ? `${t.pickup.arrive?.driver || 'The driver'} needs an address after the airport.` : 'So Faisal knows where to reach you.'}</span>}
+            <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setSheet('nostay')}>{t.noStay?.address ? 'Change' : 'Tell us'}</button>
+          </div>
+        )}
+        {!t.stay && !f && (
           <button type="button" className="card tap well" onClick={() => push('ask', { intent: 'stay' })} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name="stay" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Add a place to stay</span><span className="small">Connecting rooms near Galata, like last time</span></span><Icon name="chevron" />
+            <Icon name="stay" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Add a place to stay</span><span className="small">Rooms near Galata Tower, for the same dates</span></span><Icon name="chevron" />
           </button>
         )}
-        {t.pickup && <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="car" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Airport pickup both ways</span><span className="tiny">Ahmet in Istanbul · Khalid in Riyadh</span></span>{isRefunded(s, 'pickup') && <span className="pill">Refunded</span>}</div>}
+        {t.pickup && <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="car" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t.pickup.arrivalOnly ? 'Airport pickup on arrival' : t.pickup.oneway ? 'Airport pickups on the way there' : 'Airport pickup both ways'}</span><span className="tiny">{t.pickup.home ? `${t.pickup.home.driver} in Riyadh · ` : ''}{t.pickup.arrive?.driver} in Istanbul{!stayOf(t) && !t.noStay?.address ? ' · needs your address' : ''}</span></span>{isRefunded(s, 'pickup') && <span className="pill">Refunded</span>}</div>}
 
         <span className="eyebrow" style={{ marginTop: 8 }}>Manage</span>
         <div className="card tm-list" style={{ padding: 6, gap: 0 }}>
@@ -287,11 +316,18 @@ export function TripDetail() {
 
         <div className="card">
           <span className="h3">Travellers</span>
-          <div className="row" style={{ flexWrap: 'wrap' }}>{t.travellers.map((id) => <span key={id} className="pill">{PEOPLE[id].name}</span>)}</div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>{t.travellers.map((id) => <span key={id} className="pill">{id === 'omar' ? (PEOPLE.omar.name === 'You' ? 'You' : `${PEOPLE.omar.name} (you)`) : PEOPLE[id]?.name}</span>)}</div>
         </div>
-        <button type="button" className="btn secondary block" onClick={() => push('group')}>Open the trip group</button>
+        {(s.groups || []).some((g) => g.id === 'eid') && <button type="button" className="btn secondary block" onClick={() => push('group', { id: 'eid' })}>Open the trip group</button>}
       </div>
 
+      {sheet === 'nostay' && (
+        <Sheet label="Where are you staying" onClose={() => setSheet(null)}>
+          <h2 className="h2">No hotel booked. Where are you staying?</h2>
+          <p className="small" style={{ marginTop: -8 }}>{t.pickup ? `${t.pickup.arrive?.driver || 'Your driver'} meets you at ${t.flight?.to === 'SAW' ? 'Sabiha Gökçen' : 'Istanbul Airport'} on ${t.flight?.date}. Tell us where to take you.` : 'So Faisal knows where you are.'}</p>
+          <NoStayChoices onDone={() => setSheet(null)} />
+        </Sheet>
+      )}
       {sheet === 'cancel' && (
         <Sheet label="Cancel the stay" onClose={() => setSheet(null)}>
           <h2 className="h2">Cancel the stay?</h2>

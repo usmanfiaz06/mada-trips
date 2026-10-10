@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, fmt } from '../store.jsx';
+import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, fmt, addDays, daysBetween, dayLabel as isoDayLabel, weekday, dayOf, shortDay, fullDay, rangeLabel, toDate, seatText, pickupPlan, stayOf, stayEnd, signName, boardsAt, addMin as addMinS } from '../store.jsx';
 import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTicker, PayMark, saveFile, calendarLink } from '../ui.jsx';
 
 /* Trip management: itinerary, payments and VAT invoices, refunds, flight changes, hotel options and special requests.
@@ -11,10 +11,10 @@ import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTi
 export const TAX_PP = 312; /* airport and government taxes per person, per return ticket: refundable even on a fare that isn't */
 const SERVICE_FEE = 100; /* Mada's service fee inside each flight payment; the only flight part with 15% VAT */
 const SELLER = { name: 'Mada Trips', legal: 'Mada Travel and Tourism Co.', vat: '310245678900003', cr: 'CR 1010654321', address: 'King Fahd Rd, Al Olaya, Riyadh 12214' };
-const WD = { 8: 'Mon', 9: 'Tue', 10: 'Wed', 11: 'Thu', 12: 'Fri', 13: 'Sat', 14: 'Sun', 15: 'Mon', 16: 'Tue', 17: 'Wed' };
-const dayLabel = (d) => `${WD[d] || ''} ${d} Mar`;
-const dayNum = (label) => { const m = /(\d+)\s*Mar/.exec(label || ''); return m ? Number(m[1]) : 9; };
-const addMin = (hhmm, mins) => { const [h, m] = hhmm.split(':').map(Number); const t = (((h * 60 + m + mins) % 1440) + 1440) % 1440; return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
+/* Days are ISO dates (2027-03-09). Labels come from them, so a moved flight moves every line. */
+const dayLabel = (iso) => isoDayLabel(iso);
+const addMin = addMinS;
+const freeUntil = (iso) => shortDay(addDays(iso, -7));
 const PICK_INFO = {
   k1: { title: 'Künefe near Galata Tower', time: '19:00', note: 'Noor’s tip. Go before 8, it sells out.' },
   k2: { title: 'Sunset from the Galata Bridge', time: '18:30', note: 'Ferries and the old city in gold. Free.' },
@@ -125,14 +125,19 @@ function effStay(s) {
   });
   return st;
 }
+/* How the booking was paid: 'full' unless the traveller chose Tabby or Tamara at checkout. */
 function payPlan(s) {
-  const t = s.trip;
-  return t?.payPlan || t?.plan || null; /* set by the pay flow when it records one; the seeded demo trip paid the stay with Tabby */
+  return s.trip?.payPlan || 'full';
 }
+/* Monthly from the day it was booked. */
+const bookedISO = (t) => new Date(t?.bookedAt || Date.now()).toISOString().slice(0, 10);
+const bookedDate = (t) => { const d = new Date(t?.bookedAt || Date.now()); return `${d.getUTCDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+const bookedTime = (t) => { const d = new Date((t?.bookedAt || Date.now()) + 3 * 3600000); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; }; /* Riyadh time */
 function instalments(total, plan, s) {
   const count = plan === 'tamara' ? 3 : 4;
   const each = Math.ceil(total / count);
-  const dates = ['14 Feb', '14 Mar', '14 Apr', '14 May'].slice(0, count);
+  const start = toDate(bookedISO(s.trip));
+  const dates = Array.from({ length: count }, (_, i) => { const d = new Date(start); d.setUTCMonth(d.getUTCMonth() + i); return shortDay(d.toISOString().slice(0, 10)); });
   const paid = s.phase === 'home' ? 2 : 1;
   return dates.map((d, i) => ({ date: d, amount: i === count - 1 ? total - each * (count - 1) : each, paid: i < paid }));
 }
@@ -147,44 +152,62 @@ function refundOf(s, key) {
   return null;
 }
 
-/* Every payment for the trip, newest last. Lines carry their VAT rate so the invoice can show the split. */
+/* Every payment for the trip, newest last, read from what was actually booked and paid.
+   Lines carry their VAT rate so the invoice can show the split. */
 export function tripPayments(s) {
   const t = s.trip;
   if (!t) return [];
   const n = nOf(s);
-  const card = cardLabel(s);
-  const brand = cardBrandOf(s);
+  const card = t.paid?.card && t.paid.card !== 'Mada credit' ? t.paid.card : cardLabel(s);
+  const brand = /apple pay/i.test(card) ? 'applepay' : cardBrandOf(s);
   const plan = payPlan(s);
   const list = [];
   const f = t.flight;
+  const date = bookedDate(t);
+  const time = bookedTime(t);
+  const yy = String(new Date(t.bookedAt || Date.now()).getUTCFullYear()).slice(2);
+  const no = (k) => `MT-${yy}-${String((t.invoiceSeq || 4181) + k).padStart(6, '0')}`;
+  const methodFor = (m) => (['tabby', 'tamara'].includes(m) ? m : brand);
+  const promo = t.paid?.discount ? { text: t.paid.promo ? `Code ${t.paid.promo} · 10% off` : 'Discount', qty: 1, gross: -t.paid.discount, vat: 0, note: 'Taken off the fare' } : null;
   if (f && t.flightPrice) {
+    const ways = f.back ? 'return' : 'one way';
+    const cabin = f.cabin && f.cabin !== 'Economy' ? `${f.cabin}, ` : '';
+    const babies = (t.lines || []).find((l) => l.key === 'infants');
+    const tickets = t.flightPrice - (babies?.price || 0);
+    const amount = t.flightPrice - (promo ? t.paid.discount : 0);
     list.push({
-      id: 'flight', icon: 'flight', title: `Flights · ${f.airline}`, sub: `${f.code} and ${f.back} · ${n} ${n === 1 ? 'traveller' : 'travellers'}`,
-      amount: t.flightPrice, method: plan && plan !== 'full' ? plan : brand, card, date: '14 Feb 2027', time: '10:42', no: 'MT-27-004181',
+      id: 'flight', icon: 'flight', title: `Flights · ${f.airline}`, sub: `${f.back ? `${f.code} and ${f.back}` : `${f.code}, one way`} · ${n} ${n === 1 ? 'traveller' : 'travellers'}${f.cabin && f.cabin !== 'Economy' ? ' · ' + f.cabin : ''}`,
+      amount, method: methodFor(plan), card, date, time, no: no(0),
+      plan: ['tabby', 'tamara'].includes(plan) ? instalments(amount, plan, s) : null,
+      credit: t.paid?.creditUsed || 0,
       lines: [
-        { text: `Air tickets ${f.from}–${f.to} return, ${n} × ${sar(Math.round((t.flightPrice - SERVICE_FEE) / n))}`, qty: 1, gross: t.flightPrice - SERVICE_FEE, vat: 0, note: 'International transport, zero-rated' },
+        { text: `Air tickets ${f.from}–${f.to} ${ways}, ${cabin}${n} × ${sar(Math.round((tickets - SERVICE_FEE) / n))}`, qty: 1, gross: tickets - SERVICE_FEE, vat: 0, note: 'International transport, zero-rated' },
+        ...(babies ? [{ text: babies.text, qty: 1, gross: babies.price, vat: 0, note: 'Lap infant fare, zero-rated' }] : []),
         { text: 'Mada service fee', qty: 1, gross: SERVICE_FEE, vat: 15 },
+        ...(promo ? [promo] : []),
       ],
     });
   }
   if (t.stay) {
     const st = effStay(s);
-    const method = plan || 'tabby';
+    const method = t.stay.plan || plan;
     const price = t.stay.price;
     list.push({
-      id: 'stay', icon: 'stay', title: t.stay.name, sub: `${t.stay.nights} nights · from 9 Mar`, amount: price, method: method === 'full' ? brand : method, card, date: '14 Feb 2027', time: '10:42', no: 'MT-27-004182',
+      id: 'stay', icon: 'stay', title: t.stay.name, sub: `${t.stay.nights} nights · from ${shortDay(t.stay.fromISO)}`, amount: price, method: methodFor(method), card, date, time, no: no(1),
       plan: ['tabby', 'tamara'].includes(method) ? instalments(price, method, s) : null,
-      lines: [{ text: `${n > 2 ? 'Connecting rooms' : 'Room'}, ${t.stay.nights} nights × ${sar(t.stay.night || Math.round(price / t.stay.nights))}`, qty: 1, gross: price, vat: 15 }],
+      lines: [{ text: `${n > 2 ? 'Connecting rooms' : 'Room'}, ${t.stay.nights} nights × ${sar(Math.round(price / t.stay.nights))}`, qty: 1, gross: price, vat: 15 }],
       extended: st.nights !== t.stay.nights,
     });
   }
   if (t.pickup) {
-    list.push({ id: 'pickup', icon: 'car', title: 'Airport pickup both ways', sub: 'Khalid in Riyadh · Ahmet in Istanbul', amount: t.pickup.price, method: plan && plan !== 'full' ? plan : brand, card, date: '14 Feb 2027', time: '10:42', no: 'MT-27-004183', lines: [{ text: 'Private transfers, 4 rides', qty: 1, gross: t.pickup.price, vat: 15 }] });
+    const pk = t.pickup;
+    const rides = pk.arrivalOnly ? 1 : pk.oneway ? 2 : 4;
+    list.push({ id: 'pickup', icon: 'car', title: pk.arrivalOnly ? 'Airport pickup on arrival' : pk.oneway ? 'Airport pickups on the way there' : 'Airport pickup both ways', sub: `${pk.home ? `${pk.home.driver} in Riyadh · ` : ''}${pk.arrive?.driver || 'Ahmet'} in Istanbul`, amount: pk.price, method: methodFor(plan), card, date, time, no: no(2), plan: ['tabby', 'tamara'].includes(plan) ? instalments(pk.price, plan, s) : null, lines: [{ text: `Private transfer${rides === 1 ? '' : 's'}, ${rides} ${rides === 1 ? 'ride' : 'rides'}`, qty: 1, gross: pk.price, vat: 15 }] });
   }
   (s.tripChangeLog || []).forEach((c, i) => {
     const applied = f && Object.keys(c.patch || {}).every((k) => f[k] === c.patch[k]);
     if (!applied || !(c.amount > 0)) return;
-    list.push({ id: c.id, icon: 'flight', title: 'Flight change', sub: c.label, amount: c.amount, method: brand, card, date: 'Today', time: '', no: `MT-27-00${4190 + i}`, lines: [{ text: c.label, qty: 1, gross: c.amount, vat: 0, note: 'Fare difference and change fee' }] });
+    list.push({ id: c.id, icon: 'flight', title: 'Flight change', sub: c.label, amount: c.amount, method: brand, card, date: c.at ? fullDay(new Date(c.at).toISOString().slice(0, 10)) : 'Today', time: '', no: `MT-27-00${4190 + i}`, lines: [{ text: c.label, qty: 1, gross: c.amount, vat: 0, note: 'Fare difference and change fee' }] });
   });
   s.requests.filter((r) => r.quote > 0 && PAID_STATES.includes(r.status) && (r.trip || ['food', 'todo', 'car'].includes(r.kind))).forEach((r, i) => {
     list.push({ id: 'x:' + r.id, icon: r.icon || (r.kind === 'food' ? 'food' : r.kind === 'car' ? 'car' : 'star'), title: r.title.replace(/^Booked: /, ''), sub: r.detail || 'Extra', amount: r.quote, method: brand, card, date: 'Today', time: '', no: `MT-27-00${4200 + i}`, lines: [{ text: r.title, qty: 1, gross: r.quote, vat: r.vat ?? 15 }], extra: true });
@@ -193,7 +216,7 @@ export function tripPayments(s) {
   return list.map((p) => { const r = refundOf(s, p.id); return { ...p, refund: r ? { ...r, credited: r.perItem?.[p.id] ?? r.amount } : null }; });
 }
 const splitVat = (l) => { const net = l.vat ? l.gross / (1 + l.vat / 100) : l.gross; return { net, vat: l.gross - net }; };
-const methodName = (p) => (p.method === 'tabby' ? 'Tabby · 4 payments' : p.method === 'tamara' ? 'Tamara · 3 payments' : p.card);
+const methodName = (p) => (p.method === 'tabby' ? 'Tabby · 4 payments' : p.method === 'tamara' ? 'Tamara · 3 payments' : p.card) + (p.credit ? ` and SAR ${fmt(p.credit)} Mada credit` : '');
 
 /* What comes back if this item is cancelled now, and why. Every number traces to a rule the traveller was shown. */
 export function refundQuote(s, key) {
@@ -204,15 +227,17 @@ export function refundQuote(s, key) {
     const f = t.flight;
     const R = fareRules(f);
     const price = t.flightPrice || f.pp * n;
-    if (tm.allUsed) return { back: 0, paid: price, rule: 'Both flights are flown.', why: 'There’s nothing left on the tickets to refund.' };
-    if (tm.airlineCancelled) return { back: price, paid: price, rule: `${f.airline} cancelled this flight.`, why: 'Under GACA rules, when the airline cancels you get the full price back, fees and all.', law: true };
+    const oneway = !f.back;
+    if (tm.allUsed || (oneway && tm.outUsed)) return { back: 0, paid: price, rule: oneway ? 'The flight is flown.' : 'Both flights are flown.', why: 'There’s nothing left on the tickets to refund.' };
+    if (tm.airlineCancelled) return { back: price, paid: price, rule: `${f.airline} cancelled this flight.`, why: 'Under GACA rules you get the full price back, fees and all.', law: true };
     const part = tm.outUsed ? 0.5 : 1;
-    const legs = tm.outUsed ? 'the way back' : 'both flights';
+    const legs = oneway ? 'the flight' : tm.outUsed ? 'the way back' : 'both flights';
+    const taxPP = oneway ? TAX_PP / 2 : TAX_PP;
     if (R.refundable) {
       const fee = R.refundFee * n * part;
       return { back: Math.round(price * part - fee), paid: price, rule: `${f.airline} fare: refund minus SAR ${R.refundFee} per person${tm.outUsed ? ', for the unused way back' : ''}.`, why: tm.outUsed ? 'You’ve flown the way there. The way back is unused, so that half comes back, minus the fee.' : `Fee for ${n}: ${sar(fee)}. Refunds ${legs}.`, fee };
     }
-    return { back: Math.round(TAX_PP * n * part), paid: price, rule: `This ${f.airline} fare can’t be refunded. Airport taxes can: SAR ${TAX_PP} per person${tm.outUsed ? ' for the return' : ''}.`, why: 'The airline never pays those taxes if you don’t fly, so they come back to you. The fare itself doesn’t.', taxesOnly: true };
+    return { back: Math.round(taxPP * n * part), paid: price, rule: `This ${f.airline} fare can’t be refunded. Airport taxes can: SAR ${taxPP} per person${tm.outUsed ? ' for the return' : ''}.`, why: 'The airline never pays those taxes if you don’t fly, so they come back to you. The fare itself doesn’t.', taxesOnly: true };
   }
   if (key === 'stay' && t.stay) {
     const st = t.stay;
@@ -220,15 +245,16 @@ export function refundQuote(s, key) {
     if (tm.allUsed) return { back: 0, paid: st.price, rule: 'Your stay is over.', why: 'Every night was used.' };
     if (tm.airlineCancelled) return { back: st.price, paid: st.price, rule: 'Free, because the flight was cancelled.', why: 'The hotel waives its rule when the airline cancels. Faisal already told them.' };
     if (tm.outUsed) return { back: Math.max(0, st.price - night * 2), paid: st.price, rule: 'Tonight is used. The hotel keeps one more night as its fee.', why: `${st.nights - 1} unused nights, minus one night (${sar(night)}).` };
-    if (tm.early) return { back: st.price, paid: st.price, rule: 'Free to cancel until 2 Mar.', why: 'Every riyal comes back.' };
-    return { back: st.price - night, paid: st.price, rule: `After 2 Mar the hotel keeps the first night, ${sar(night)}.`, why: 'The other nights come back.' };
+    if (tm.early) return { back: st.price, paid: st.price, rule: `Free to cancel until ${freeUntil(st.fromISO)}.`, why: 'Every riyal comes back.' };
+    return { back: st.price - night, paid: st.price, rule: `After ${freeUntil(st.fromISO)} the hotel keeps the first night, ${sar(night)}.`, why: 'The other nights come back.' };
   }
   if (key === 'pickup' && t.pickup) {
     const p = t.pickup.price;
-    if (tm.allUsed) return { back: 0, paid: p, rule: 'All four rides are done.', why: '' };
+    if (tm.allUsed) return { back: 0, paid: p, rule: t.pickup.oneway ? 'Both rides are done.' : 'All four rides are done.', why: '' };
     if (tm.airlineCancelled) return { back: p, paid: p, rule: 'Free, because the flight was cancelled.', why: '' };
+    if (tm.outUsed && t.pickup.oneway) return { back: 0, paid: p, rule: 'Both rides are done.', why: '' };
     if (tm.outUsed) return { back: Math.round(p / 2), paid: p, rule: 'The rides there are done. The rides home aren’t.', why: 'Half comes back.' };
-    if (tm.within24) return { back: 0, paid: p, rule: 'Inside 24 hours, the driver is paid in full.', why: 'Khalid is booked for the morning. You can still ask Faisal.', askAnyway: true };
+    if (tm.within24) return { back: 0, paid: p, rule: 'Inside 24 hours, the driver is paid in full.', why: `${t.pickup.home?.driver || 'Your driver'} is booked for the morning. You can still ask Faisal.`, askAnyway: true };
     return { back: p, paid: p, rule: 'Free to cancel until 24 hours before.', why: '' };
   }
   if (key.startsWith('x:')) {
@@ -322,92 +348,110 @@ function useItinerary() {
   const trq = (s.tripRequests || []).filter((r) => reqStatus(r) === 'yes' || r.outcome === 'done');
   const tags = (kind) => trq.filter((r) => r.kind === kind).map((r) => r.short || r.title);
   const R = f ? fareRules(f) : null;
-  const seats = Array.from({ length: n }, (_, i) => 'ABCDEF'[i]);
-  const seatTxt = seats.length > 1 ? `14${seats[0]}–14${seats[seats.length - 1]}` : `14${seats[0]}`;
-  const outDay = f ? dayNum(f.date) : 9;
-  const backDay = f ? dayNum(f.backDate) : 15;
-  const inDay = st ? (st.from || 9) : outDay;
-  const outDayStay = st ? inDay + st.nights : backDay;
-  const first = Math.min(outDay, inDay);
-  const last = Math.max(backDay, outDayStay);
+  const outDay = f ? f.dateISO : st?.fromISO;
+  const backDay = f ? f.backDateISO : null;
+  const inDay = st ? st.fromISO || outDay : null;
+  const outDayStay = st ? addDays(inDay, st.nights) : null;
+  const firsts = [outDay, inDay].filter(Boolean).sort();
+  const lasts = [backDay, outDayStay, outDay].filter(Boolean).sort();
+  const first = firsts[0];
+  const last = lasts[lasts.length - 1];
   const days = {};
-  for (let d = first; d <= last; d += 1) days[d] = { d, items: [], docs: [] };
-  const add = (d, it) => { if (days[d]) days[d].items.push(it); };
-  const pickup = t.pickup && !isRefunded(s, 'pickup');
-  const termOut = f ? (f.iata === 'XY' ? 'Terminal 2' : f.iata === 'TK' ? 'Terminal 1' : 'Terminal 3') : '';
+  for (let d = first, i = 0; d <= last && i < 40; d = addDays(d, 1), i += 1) days[d] = { d, items: [], docs: [] };
+  const add = (d, it) => { if (d && days[d]) days[d].items.push(it); };
+  const pickup = t.pickup && !isRefunded(s, 'pickup') ? t.pickup : null;
+  const pk = pickup ? pickupPlan(t) : null;
   const arrAirport = f?.to === 'SAW' ? 'Sabiha Gökçen' : 'Istanbul Airport';
   const tm = timing(s);
+  const where = st ? st.name : t.noStay?.address ? t.noStay.address : null;
 
   if (f) {
-    if (pickup) add(outDay, { id: 'pk-ruh', time: addMin(f.dep, -180), icon: 'car', kind: 'pickup', title: 'Khalid picks you up at home', sub: 'Black GMC Yukon · room for 8 bags', driver: 'Khalid', phone: '+966 55 014 2287', status: tm.outUsed ? 'done' : null });
+    if (pk) add(pk.dateISO, { id: 'pk-ruh', time: pk.time, icon: 'car', kind: 'pickup', title: `${pk.driver} picks you up at home`, sub: `${pk.car} · ${pk.room}`, driver: pk.driver, phone: pk.phone, car: pk.car, status: tm.outUsed ? 'done' : null, warn: pk.dateISO !== f.dateISO ? `Still booked for ${dayLabel(pk.dateISO)}. Your flight is ${f.date}.` : null });
     add(outDay, {
       id: 'fl-out', time: f.dep, icon: 'flight', kind: 'flight', leg: 'out', title: `Riyadh → Istanbul · ${f.code}`,
-      sub: `${f.airline} · RUH ${termOut} · lands ${f.arr} at ${f.to}`, facts: [['Seats', seatTxt], ['Bags', `${R.bags} each`], ['Boarding', addMin(f.dep, -45)]],
+      sub: `${f.airline}${f.cabin && f.cabin !== 'Economy' ? ' · ' + f.cabin : ''} · RUH ${f.terminal} · lands ${f.arr} at ${f.to}`, facts: [['Seats', seatText(f.seats)], ['Bags', `${R.bags} each`], ['Boarding', boardsAt(f)]],
       tags: [...tags('meal'), ...tags('wheelchair'), ...tags('seats'), ...tags('bags'), ...tags('sports')], status: tm.outUsed ? 'done' : tm.airlineCancelled ? 'cancelled' : null,
     });
-    if (pickup) add(outDay, { id: 'pk-ist', time: addMin(f.arr, 45), icon: 'car', kind: 'pickup', title: 'Ahmet meets you at Door 3', sub: `${arrAirport} · sign with your name · 40 min to the hotel`, driver: 'Ahmet', phone: '+90 532 418 6610', status: s.phase === 'landed' || s.phase === 'home' ? 'done' : null });
+    if (pickup) add(outDay, { id: 'pk-ist', time: addMin(f.arr, 45), icon: 'car', kind: 'pickup', title: `${pickup.arrive.driver} meets you at ${pickup.arrive.door}`, sub: where ? `${arrAirport} · sign with your name · ${st?.fromAirport || '45 min'} to ${st ? 'the hotel' : 'where you’re staying'}` : `${arrAirport} · sign with your name · tell us where you’re staying`, driver: pickup.arrive.driver, phone: pickup.arrive.phone, car: `${pickup.arrive.car} · ${pickup.arrive.plate}`, status: s.phase === 'landed' || s.phase === 'home' ? 'done' : null, warn: where ? null : 'No hotel booked. Where are you staying?' });
+    if (!where && t.stay?.status === 'cancelled') add(outDay, { id: 'nostay', time: addMin(f.arr, 90), icon: 'stay', kind: 'nostay', title: 'No hotel booked. Where are you staying?', sub: 'Tell us, so the driver and Faisal know where you are.' });
+    if (!st && t.noStay?.address) add(outDay, { id: 'stay-own', time: addMin(f.arr, 105), icon: 'stay', kind: 'own', title: `Staying at ${t.noStay.label || 'your own place'}`, sub: t.noStay.address });
   }
   if (st) {
     const early = trq.find((r) => r.kind === 'early');
     const late = trq.find((r) => r.kind === 'late');
-    const arriveAt = f ? addMin(f.arr, 105) : '14:00';
-    add(inDay, { id: 'h-in', time: early ? '10:00' : arriveAt < '14:00' ? '14:00' : arriveAt, icon: 'stay', kind: 'hotel', title: `Check in · ${st.name}`, sub: `${st.roomType || (n > 2 ? 'Connecting rooms' : 'A room')} · ${st.nights} nights${early ? ' · early check-in' : ''}`, tags: [...tags('celebration'), ...tags('prayer'), ...tags('room'), ...tags('bed'), ...tags('connecting')] });
-    add(outDayStay, { id: 'h-out', time: late ? late.until || '14:00' : '12:00', icon: 'stay', kind: 'hotel', title: 'Check out', sub: late ? 'Late checkout, confirmed' : 'Leave bags at the desk if you want to walk' });
+    const arriveAt = f && f.dateISO === inDay ? addMin(f.arr, 105) : '14:00';
+    const landsLater = f && f.dateISO > inDay;
+    add(inDay, { id: 'h-in', time: early ? '10:00' : arriveAt < '14:00' ? '14:00' : arriveAt, icon: 'stay', kind: 'hotel', title: `Check in · ${st.name}`, sub: `${st.roomType || (n > 2 ? 'Connecting rooms' : 'A room')} · ${st.nights} nights${early ? ' · early check-in' : ''}`, tags: [...tags('celebration'), ...tags('prayer'), ...tags('room'), ...tags('bed'), ...tags('connecting')], warn: landsLater ? `You land on ${f.date}. This night is paid for but empty.` : null });
+    add(outDayStay, { id: 'h-out', time: late ? late.until || '14:00' : '12:00', icon: 'stay', kind: 'hotel', title: 'Check out', sub: late ? 'Late checkout, confirmed' : 'Leave bags at the desk if you want to walk', warn: backDay && outDayStay < backDay ? `Your flight home is ${f.backDate}. No room for the last ${daysBetween(outDayStay, backDay) === 1 ? 'night' : daysBetween(outDayStay, backDay) + ' nights'}.` : null });
   }
-  if (f) {
-    const ahmetBack = addMin(f.backDep, -210);
-    if (pickup) add(backDay, { id: 'pk-back', time: ahmetBack, icon: 'car', kind: 'pickup', title: 'Ahmet takes you to the airport', sub: `From the hotel · ${f.to === 'SAW' ? 'about an hour' : '45 min'}`, driver: 'Ahmet', phone: '+90 532 418 6610' });
-    add(backDay, { id: 'fl-back', time: f.backDep, icon: 'flight', kind: 'flight', leg: 'back', title: `Istanbul → Riyadh · ${f.back}`, sub: `${f.airline} · lands ${f.backArr} at RUH`, facts: [['Seats', seatTxt.replace(/14/g, '16')], ['Bags', `${R.bags} each`], ['Boarding', addMin(f.backDep, -45)]], tags: [...tags('meal'), ...tags('wheelchair')], status: s.phase === 'home' ? 'done' : null });
-    if (pickup) add(backDay, { id: 'pk-home', time: addMin(f.backArr, 30), icon: 'car', kind: 'pickup', title: 'Khalid drives you home', sub: 'Meets you at arrivals, Door 2', driver: 'Khalid', phone: '+966 55 014 2287' });
+  if (f && f.back) {
+    const back = addMin(f.backDep, -210);
+    if (pickup && !pickup.oneway) add(backDay, { id: 'pk-back', time: back, icon: 'car', kind: 'pickup', title: `${pickup.arrive.driver} takes you to the airport`, sub: `From ${st ? 'the hotel' : 'where you’re staying'} · ${f.to === 'SAW' ? 'about an hour' : '45 min'}`, driver: pickup.arrive.driver, phone: pickup.arrive.phone });
+    add(backDay, { id: 'fl-back', time: f.backDep, icon: 'flight', kind: 'flight', leg: 'back', title: `Istanbul → Riyadh · ${f.back}`, sub: `${f.airline}${f.cabin && f.cabin !== 'Economy' ? ' · ' + f.cabin : ''} · lands ${f.backArr} at RUH`, facts: [['Seats', seatText(f.backSeats)], ['Bags', `${R.bags} each`], ['Boarding', addMin(f.backDep, -45)]], tags: [...tags('meal'), ...tags('wheelchair')], status: s.phase === 'home' ? 'done' : null });
+    if (pickup && !pickup.oneway) add(backDay, { id: 'pk-home', time: addMin(f.backArr, 30), icon: 'car', kind: 'pickup', title: `${pickup.home.driver} drives you home`, sub: 'Meets you at arrivals, Door 2', driver: pickup.home.driver, phone: pickup.home.phone });
     Object.keys(f).filter((k) => k.startsWith('split_')).forEach((k) => {
       const who = PEOPLE[k.slice(6)]?.name || 'One of you';
-      const d = dayNum(f[k]);
-      add(d, { id: 'fl-' + k, time: f.backDep, icon: 'flight', kind: 'flight', leg: 'back', title: `${who} flies home · ${f.back}`, sub: `${f.airline} · ${f[k]} · lands ${f.backArr}`, facts: [['Seat', '16A'], ['Bags', R.bags]] });
+      const d = parseDay(f[k]);
+      add(d, { id: 'fl-' + k, time: f.backDep, icon: 'flight', kind: 'flight', leg: 'back', title: `${who} flies home · ${f.back}`, sub: `${f.airline} · ${f[k]} · lands ${f.backArr}`, facts: [['Seat', (f.backSeats || [])[0] || '16A'], ['Bags', R.bags]] });
     });
   }
   /* Booked extras: in-flight picks, plan items and tables. */
+  const second = addDays(outDay, 1);
+  const third = addDays(outDay, 2);
   (s.inflightPicks || []).forEach((id) => {
     const p = PICK_INFO[id];
     if (p) add(outDay, { id: 'pick-' + id, time: p.time, icon: id === 'k4' ? 'stay' : 'food', kind: 'pick', title: p.title, sub: p.note, status: s.phase === 'landed' || s.phase === 'home' ? 'booked' : 'pending', pendingText: 'Booking when you land' });
   });
   s.requests.filter((r) => ['food', 'todo', 'car'].includes(r.kind) && ['quote', 'paid', 'done'].includes(r.status)).forEach((r) => {
-    const map = { food: [outDay, '19:30', 'food', 'Table for 6 by the window', 'Halal menu, family seating'], todo: [10, '19:30', 'star', 'Bosphorus dinner cruise', 'Dinner included · from Kabataş pier'], car: [11, '09:00', 'car', '7-seat car with a child seat', 'Picked up at the hotel · 3 days'] }[r.kind];
+    const map = { food: [outDay, '19:30', 'food', `Table for ${n} by the window`, n > 2 ? 'Halal menu, family seating' : 'Halal menu'], todo: [second, '19:30', 'star', 'Bosphorus dinner cruise', 'Dinner included · from Kabataş pier'], car: [third, '09:00', 'car', '7-seat car with a child seat', 'Picked up at the hotel · 3 days'] }[r.kind];
     add(map[0], { id: 'rq-' + r.id, time: map[1], icon: map[2], kind: 'booked', title: map[3], sub: map[4], status: r.status === 'quote' ? 'pending' : 'booked', pendingText: 'Held · pay to confirm', reqId: r.id, refundKey: PAID_STATES.includes(r.status) && r.quote > 0 ? 'x:' + r.id : null });
   });
-  if (s.circles?.sharePaid && !s.requests.some((r) => r.kind === 'todo' && ['quote', 'paid', 'done'].includes(r.status))) add(10, { id: 'cruise', time: '19:30', icon: 'star', kind: 'booked', title: 'Bosphorus dinner cruise', sub: 'With Abdullah’s family · from Kabataş pier', status: 'booked', refundKey: 'share' });
-  trq.filter((r) => r.kind === 'celebration' && r.day).forEach((r) => add(r.day, { id: 'cel-' + r.id, time: '20:00', icon: 'star', kind: 'note', title: r.short, sub: 'The hotel knows. Something small in the room.' }));
+  if (s.circles?.sharePaid && !s.requests.some((r) => r.kind === 'todo' && ['quote', 'paid', 'done'].includes(r.status))) add(second, { id: 'cruise', time: '19:30', icon: 'star', kind: 'booked', title: 'Bosphorus dinner cruise', sub: 'With Abdullah’s family · from Kabataş pier', status: 'booked', refundKey: 'share' });
+  trq.filter((r) => r.kind === 'celebration' && r.day).forEach((r) => add(typeof r.day === 'number' ? addDays(outDay, r.day - 9) : r.day, { id: 'cel-' + r.id, time: '20:00', icon: 'star', kind: 'note', title: r.short, sub: 'The hotel knows. Something small in the room.' }));
 
-  /* Free days get gentle ideas, never filler. */
-  const ideas = {
-    10: [['Hagia Sophia and the Blue Mosque', 'Go before 10, the queues are short. 8 min by tram.', 'Tickets for Hagia Sophia on Wed 10 Mar'], ['Ferry from Eminönü to Kadıköy', '20 minutes on the water, about SAR 4 each.', null]],
-    11: [['Basilica Cistern', 'Book a time slot and skip the line. Kids love the fish.', 'Tickets for the Basilica Cistern on Thu 11 Mar'], ['Grand Bazaar', 'Open until 19:00. Closed on Sundays.', null]],
-    12: [['Jumu’ah at Süleymaniye Mosque', 'Khutbah at 13:21. Be there by 12:45 for space inside.', null], ['Miniaturk with the kids', 'All of Türkiye in miniature. 2 hours is plenty.', 'Tickets for Miniaturk on Fri 12 Mar']],
-    13: [['A day on Büyükada', 'The biggest of the Princes’ Islands. No cars, just bikes and walks.', 'Ferry tickets to Büyükada on Sat 13 Mar']],
-    14: [['Spice Bazaar', 'Open today, unlike the Grand Bazaar. Lokum to take home.', null], ['Pack tonight', f ? `Ahmet picks you up at ${addMin(f.backDep, -210)} tomorrow.` : 'Check-out is at 12:00 tomorrow.', null]],
-  };
+  /* Free days get gentle ideas, never filler. Friday is Jumu'ah; Sunday the Grand Bazaar is shut. */
+  const kids = (t.travellers || []).some((id) => /daughter|son/i.test(PEOPLE[id]?.role || ''));
+  const pool = [
+    (d) => ['Hagia Sophia and the Blue Mosque', 'Go before 10, the queues are short. 8 min by tram.', `Tickets for Hagia Sophia on ${dayLabel(d)}`],
+    (d) => ['Basilica Cistern', `Book a time slot and skip the line.${kids ? ' Kids love the fish.' : ''}`, `Tickets for the Basilica Cistern on ${dayLabel(d)}`],
+    (d) => ['A day on Büyükada', 'The biggest of the Princes’ Islands. No cars, just bikes and walks.', `Ferry tickets to Büyükada on ${dayLabel(d)}`],
+    (d) => (kids ? ['Miniaturk with the kids', 'All of Türkiye in miniature. 2 hours is plenty.', `Tickets for Miniaturk on ${dayLabel(d)}`] : ['Ferry from Eminönü to Kadıköy', '20 minutes on the water, about SAR 4 each.', null]),
+  ];
+  let k = 0;
+  const lastFull = backDay ? addDays(backDay, -1) : outDayStay ? addDays(outDayStay, -1) : null;
   Object.values(days).forEach((day) => {
     const booked = day.items.filter((i) => ['flight', 'booked', 'pick'].includes(i.kind)).length;
-    if (!booked && ideas[day.d]) ideas[day.d].forEach(([title, sub, ask], i) => day.items.push({ id: `idea-${day.d}-${i}`, time: null, icon: 'pin', kind: 'idea', title, sub, ask }));
-    day.items.sort((a, b) => (a.time || '99') < (b.time || '99') ? -1 : 1);
+    if (!booked && day.d !== outDay && day.d !== backDay) {
+      const wd = weekday(day.d);
+      const ideas = wd === 'Fri' ? [['Jumu’ah at Süleymaniye Mosque', 'Khutbah at 13:21. Be there by 12:45 for space inside.', null], ['Grand Bazaar', 'Open until 19:00. Closed on Sundays.', null]]
+        : wd === 'Sun' ? [['Spice Bazaar', 'Open today, unlike the Grand Bazaar. Lokum to take home.', null]]
+        : [pool[k++ % pool.length](day.d)];
+      if (day.d === lastFull) ideas.push(['Pack tonight', f && f.back && pickup ? `${pickup.arrive.driver} picks you up at ${addMin(f.backDep, -210)} tomorrow.` : 'Check-out is at 12:00 tomorrow.', null]);
+      ideas.forEach(([title, sub, ask], i) => day.items.push({ id: `idea-${day.d}-${i}`, time: null, icon: 'pin', kind: 'idea', title, sub, ask }));
+    }
+    day.items.sort((a, b) => ((a.time || '99') < (b.time || '99') ? -1 : 1));
     const hasFlight = day.items.some((i) => i.kind === 'flight');
     day.free = !day.items.some((i) => i.kind !== 'idea' && i.kind !== 'note');
-    day.title = day.d === outDay ? 'You fly to Istanbul' : day.d === backDay ? 'Home' : day.free ? 'A free day' : 'In Istanbul';
+    day.title = day.d === outDay && f ? 'You fly to Istanbul' : day.d === backDay ? 'Home' : day.free ? 'A free day' : 'In Istanbul';
     day.docs = hasFlight
       ? [`Passports for ${n === 1 ? 'you' : 'all ' + n}`, 'Boarding passes, in your Wallet', ...(day.d === outDay && st ? ['Hotel booking, shown at check-in'] : [])]
       : ['Passport copies are in your Wallet. Originals stay in the room safe.'];
   });
   return Object.values(days);
 }
+/* Old labels like "Sun 14 Mar" to an ISO day in the trip's year. */
+const parseDay = (label) => { const m = /(\d{1,2})\s+([A-Z][a-z]{2})/.exec(label || ''); return m ? `2027-${String(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(m[2]) + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}` : null; };
 
 /* A real calendar file. Riyadh and Istanbul are both UTC+3 all year, so times convert the same way. */
-function buildIcs(days) {
+function buildIcs(days, s) {
   const pad = (x) => String(x).padStart(2, '0');
-  const stamp = (d, hhmm) => { const [h, m] = hhmm.split(':').map(Number); const dt = new Date(Date.UTC(2027, 2, d, h - 3, m)); return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00Z`; };
+  const stamp = (iso, hhmm) => { const [h, m] = hhmm.split(':').map(Number); const [y, mo, d] = iso.split('-').map(Number); const dt = new Date(Date.UTC(y, mo - 1, d, h - 3, m)); return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}${pad(dt.getUTCMinutes())}00Z`; };
   const esc = (x) => String(x).replace(/[,;\\]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const st = stayOf(s?.trip);
   const evs = [];
   days.forEach((day) => day.items.filter((i) => i.time && i.kind !== 'idea').forEach((i) => {
     const mins = i.kind === 'flight' ? 255 : i.kind === 'pickup' ? 45 : 90;
-    evs.push({ where: i.kind === 'flight' ? (i.leg === 'back' ? 'Istanbul Airport' : 'King Khalid International Airport, Riyadh') : i.kind === 'hotel' ? 'Galip Dede Cd. 12, Beyoğlu, İstanbul' : '', uid: `${i.id}-${day.d}@madatrips.sa`, start: stamp(day.d, i.time), end: stamp(day.d, addMin(i.time, mins)), title: i.title, desc: i.sub || '', day: day.d, time: i.time });
+    evs.push({ where: i.kind === 'flight' ? (i.leg === 'back' ? 'Istanbul Airport' : 'King Khalid International Airport, Riyadh') : i.kind === 'hotel' ? (st?.address || '') : '', uid: `${i.id}-${day.d}@madatrips.sa`, start: stamp(day.d, i.time), end: stamp(day.d, addMin(i.time, mins)), title: i.title, desc: i.sub || '', day: day.d, time: i.time });
   }));
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mada Trips//Itinerary//EN', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Istanbul with Mada'];
   evs.forEach((e) => lines.push('BEGIN:VEVENT', `UID:${e.uid}`, 'DTSTAMP:20270214T074200Z', `DTSTART:${e.start}`, `DTEND:${e.end}`, `SUMMARY:${esc(e.title)}`, `DESCRIPTION:${esc(e.desc)}`, 'END:VEVENT'));
@@ -436,7 +480,7 @@ function Itinerary() {
       <div className="tm-daybar chips scrollx" role="tablist" aria-label="Days">
         {days.map((d, i) => (
           <button key={d.d} type="button" role="tab" aria-selected={dayIdx === i ? 'true' : 'false'} className={'tm-daychip' + (dayIdx === i ? ' on' : '')} onClick={() => jump(i)}>
-            <span>{WD[d.d]}</span><b className="num">{d.d}</b>
+            <span>{weekday(d.d)}</span><b className="num">{dayOf(d.d)}</b>
           </button>
         ))}
       </div>
@@ -450,6 +494,7 @@ function Itinerary() {
         <div className="col rise" style={{ gap: 6 }}>
           <span className="eyebrow">{t.datesLong} · {days.length} days</span>
           <h1 className="display" style={{ fontSize: 40 }}>Istanbul, day by day</h1>
+          {(t.flight && t.pickup && t.pickup.status !== 'cancelled' && t.pickup.dateISO !== t.flight.dateISO) || (t.flight && stayOf(t) && stayOf(t).fromISO !== t.flight.dateISO) ? <MoveNotice /> : null}
           <span className="row tiny"><Icon name="wifiOff" size={14} color="#5f6b65" />Saved on this phone. Works without signal.</span>
         </div>
         <div className="row" style={{ gap: 8 }}>
@@ -459,7 +504,7 @@ function Itinerary() {
         {days.map((day) => (
           <section key={day.d} id={'tm-day-' + day.d} className="tm-day rise" aria-label={dayLabel(day.d)}>
             <header className="tm-day-head">
-              <span className="tm-day-date"><b className="num">{day.d}</b><span>{WD[day.d]}</span></span>
+              <span className="tm-day-date"><b className="num">{dayOf(day.d)}</b><span>{weekday(day.d)}</span></span>
               <span className="col" style={{ gap: 0 }}><span className="h3">{day.title}</span><span className="tiny">{dayLabel(day.d)} · {PRAYER.split(' · ').slice(1, 4).join(' · ')}</span></span>
             </header>
             <div className="tm-tl">
@@ -474,6 +519,7 @@ function Itinerary() {
                     {(it.tags || []).length > 0 && <span className="chips" style={{ gap: 4 }}>{it.tags.map((g) => <span key={g} className="pill ok" style={{ height: 22, fontSize: 11 }}>{g}</span>)}</span>}
                     {it.status === 'pending' && <span className="pill gold" style={{ alignSelf: 'flex-start', height: 22, fontSize: 11 }}>{it.pendingText}</span>}
                     {it.status === 'cancelled' && <span className="pill" style={{ alignSelf: 'flex-start', height: 22, fontSize: 11, color: '#8a3524' }}>Cancelled by the airline</span>}
+                    {it.warn && <span className="tm-warn">{it.warn}</span>}
                   </span>
                 </button>
               ))}
@@ -509,13 +555,15 @@ function ItemSheet({ it, onClose }) {
         </div>
       </>)}
       {it.kind === 'pickup' && (<>
-        <Row icon="user" title={it.driver} sub={it.phone} />
+        <Row icon="user" title={it.driver} sub={[it.car, it.phone].filter(Boolean).join(' · ')} />
+        {it.warn && <span className="tm-warn">{it.warn}</span>}
         <span className="small">{it.driver} tracks your flight. If it’s late, he waits, at no cost.</span>
         <button type="button" className="btn primary block" onClick={() => toast(`In the app this calls ${it.driver}. He speaks Arabic and English.`)}>Call {it.driver}</button>
         <button type="button" className="btn ghost block" onClick={() => to('support', { about: 'Istanbul trip', topic: 'other' })}>Talk to Faisal</button>
       </>)}
       {it.kind === 'hotel' && (<>
-        <Row icon="pin" title="Şahkulu, Galip Dede Cd. 12" sub="Beyoğlu, İstanbul · 3 min walk to Galata Tower" />
+        <Row icon="pin" title={stayOf(s.trip)?.short || 'The hotel'} sub={`${stayOf(s.trip)?.address || ''}${stayOf(s.trip)?.walk ? ' · ' + stayOf(s.trip).walk : ''}`} />
+        {it.warn && <span className="tm-warn">{it.warn}</span>}
         <span className="small">Check-in from 14:00, check-out by 12:00. Your booking is under {PEOPLE[s.trip.travellers[0]]?.full || 'your name'}.</span>
         <button type="button" className="btn primary block" onClick={() => to('hotelOptions', {})}>Hotel options</button>
         <button type="button" className="btn ghost block" onClick={() => toast('The address in Turkish is saved for the driver.')}>Show the address in Turkish</button>
@@ -532,7 +580,117 @@ function ItemSheet({ it, onClose }) {
         <button type="button" className={it.ask ? 'btn ghost block' : 'btn primary block'} onClick={onClose}>Leave the day free</button>
       </>)}
       {it.kind === 'note' && <button type="button" className="btn primary block" onClick={onClose}>Close</button>}
+      {(it.kind === 'nostay' || it.kind === 'own') && <NoStayChoices onDone={onClose} />}
     </Sheet>
+  );
+}
+
+/* After a date change: the hotel and the home pickup are still on the old day until the traveller says. */
+export function moveNeeded(t) {
+  const f = t?.flight;
+  if (!f) return null;
+  const st = stayOf(t);
+  const pk = t.pickup && t.pickup.status !== 'cancelled' ? t.pickup : null;
+  const hotel = st && st.fromISO !== f.dateISO ? st : null;
+  const pickup = pk && pk.dateISO !== f.dateISO ? pk : null;
+  return hotel || pickup ? { hotel, pickup, to: f.dateISO, from: (hotel || pickup).fromISO || (hotel || pickup).dateISO } : null;
+}
+export function MoveNotice() {
+  const { s } = useStore();
+  const [open, setOpen] = useState(false);
+  const m = moveNeeded(s.trip);
+  if (!m) return null;
+  const what = m.hotel && m.pickup ? 'Your hotel and pickup are' : m.hotel ? 'Your hotel is' : 'Your pickup is';
+  return (
+    <div className="notice warn tm-move rise">
+      <Icon name="flight" color="#7d5d27" />
+      <span className="grow col" style={{ gap: 2 }}>
+        <span className="h3" style={{ fontSize: 15 }}>{what} still on {dayLabel(m.from)}.</span>
+        <span className="small">Your flight is now {dayLabel(m.to)}.</span>
+        <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={() => { buzz(HAPTIC.tap); setOpen(true); }}>Move {m.hotel && m.pickup ? 'them' : 'it'} to {weekday(m.to)} {dayOf(m.to)}</button>
+      </span>
+      {open && <MoveSheet onClose={() => setOpen(false)} />}
+    </div>
+  );
+}
+export function MoveSheet({ onClose, onDone }) {
+  const { s, set, toast } = useStore();
+  const askQuote = useAskQuote();
+  const t = s.trip;
+  const m = moveNeeded(t);
+  if (!m) return null;
+  const f = t.flight;
+  const tm = timing(s);
+  const st = m.hotel;
+  const night = st ? Math.round(st.price / st.nights) : 0;
+  const keepsCheckout = st && f.backDateISO && stayEnd(st) === f.backDateISO;
+  const newNights = st ? Math.max(1, keepsCheckout ? daysBetween(m.to, f.backDateISO) : st.nights) : 0;
+  const diffNights = st ? newNights - st.nights : 0;
+  const freeNow = !!st && tm.early; /* before the hotel's free window closes */
+  const diff = diffNights * night;
+  const back = diff < 0 && freeNow ? -diff : 0;
+  const pk = m.pickup ? pickupPlan(t) : null;
+  const title = `Move the ${m.hotel && m.pickup ? 'hotel and pickup' : m.hotel ? 'hotel' : 'pickup'} to ${weekday(m.to)} ${dayOf(m.to)} too?`;
+  const apply = () => {
+    const label = `${m.hotel && m.pickup ? 'Hotel and pickup' : m.hotel ? 'Hotel' : 'Pickup'} moved to ${dayLabel(m.to)}`;
+    set((p) => {
+      const trip = { ...p.trip };
+      if (m.pickup) trip.pickup = { ...trip.pickup, dateISO: m.to };
+      if (st && diff <= 0) trip.stay = { ...trip.stay, fromISO: m.to, nights: newNights, price: trip.stay.price + (diff < 0 && freeNow ? diff : 0) };
+      return {
+        trip,
+        refunds: back ? [...p.refunds, { id: 'rf' + Date.now(), title: `${st.name} · ${-diffNights === 1 ? 'one night' : -diffNights + ' nights'} less`, amount: back, stage: 0, card: cardLabel(p), dest: 'card', items: ['stay-night'], created: Date.now() }] : p.refunds,
+        tripRequests: [...(p.tripRequests || []), { id: 'tr' + Date.now(), kind: 'move', area: 'hotel', title: label, short: 'Moved', detail: back ? `SAR ${fmt(back)} back to your card` : diff > 0 ? 'Extra night with Faisal' : 'No cost', with: m.hotel ? 'hotel' : 'faisal', outcome: 'yes', created: Date.now() }],
+      };
+    });
+    if (st && diff > 0) askQuote({ kind: 'hotel', area: 'hotel', short: 'earlier check-in', title: `Check in on ${dayLabel(m.to)} instead`, detail: `${st.name} · ${diffNights === 1 ? 'one more night' : diffNights + ' more nights'}`, quote: diff, icon: 'stay', stayPatch: { fromISO: m.to, addNights: diffNights, addPrice: diff }, quoteText: `The hotel can take you from ${dayLabel(m.to)}. ${diffNights === 1 ? 'One more night' : diffNights + ' more nights'}, SAR ${fmt(diff)}.` });
+    buzz(HAPTIC.success);
+    toast(back ? `Moved. SAR ${fmt(back)} is on its way back.` : diff > 0 ? 'Pickup moved. The extra night is with Faisal.' : 'Moved. No cost.');
+    (onDone || onClose)();
+  };
+  return (
+    <Sheet label="Move the hotel and pickup" onClose={onClose}>
+      <h2 className="h2">{title}</h2>
+      <p className="small" style={{ marginTop: -8 }}>Your flight is now {f.date} at {f.dep}.</p>
+      <div className="card well tm-move-list">
+        {st && (
+          <div className="spread" style={{ alignItems: 'flex-start' }}>
+            <span className="row" style={{ alignItems: 'flex-start' }}><Icon name="stay" size={20} /><span className="col" style={{ gap: 1 }}><span className="h3" style={{ fontSize: 15 }}>{st.name}</span><span className="tiny">Check in {dayLabel(st.fromISO)} → {dayLabel(m.to)} · {newNights} {newNights === 1 ? 'night' : 'nights'}</span></span></span>
+            <span className="num small" style={{ fontWeight: 600, color: '#1e352d', whiteSpace: 'nowrap' }}>{diff === 0 ? 'No cost' : diff > 0 ? `+SAR ${fmt(diff)}` : back ? `−SAR ${fmt(back)}` : 'Nothing back'}</span>
+          </div>
+        )}
+        {pk && (
+          <div className="spread" style={{ alignItems: 'flex-start' }}>
+            <span className="row" style={{ alignItems: 'flex-start' }}><Icon name="car" size={20} /><span className="col" style={{ gap: 1 }}><span className="h3" style={{ fontSize: 15 }}>{pk.driver} at your door</span><span className="tiny">{dayLabel(m.pickup.dateISO)} → {dayLabel(m.to)} · {pk.time}</span></span></span>
+            <span className="num small" style={{ fontWeight: 600, color: '#1e352d' }}>No cost</span>
+          </div>
+        )}
+      </div>
+      {st && diff < 0 && !back && <span className="small">After {freeUntil(st.fromISO)} the hotel keeps the night you drop.</span>}
+      {st && diff > 0 && <span className="small">The hotel needs to say yes to the extra night. You pay once they do.</span>}
+      <button type="button" className="btn primary block" onClick={apply}>{st && pk ? 'Move both' : 'Move it'}{back ? ` · SAR ${fmt(back)} back` : diff > 0 ? ` · +SAR ${fmt(diff)}` : ''}</button>
+      <button type="button" className="btn ghost block" onClick={onClose}>Keep them as they are</button>
+    </Sheet>
+  );
+}
+
+/* No hotel any more: ask where they're staying, so the driver and Faisal know. */
+export function NoStayChoices({ onDone }) {
+  const { s, set, push, toast } = useStore();
+  const [mode, setMode] = useState(null);
+  const [addr, setAddr] = useState(s.trip?.noStay?.address || '');
+  if (mode === 'own') return (
+    <form className="col" style={{ gap: 10 }} onSubmit={(e) => { e.preventDefault(); if (addr.trim().length < 6) return; set((p) => ({ trip: { ...p.trip, noStay: { label: 'family or friends', address: addr.trim() } } })); buzz(HAPTIC.success); toast('Saved. The driver has the address.'); onDone && onDone(); }}>
+      <div className="field"><label htmlFor="ns-addr">Where are you staying?</label><input id="ns-addr" className="input" value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Street, area, İstanbul" autoComplete="street-address" />{addr && addr.trim().length < 6 && <span className="err">Add the street and the area.</span>}</div>
+      <button type="submit" className="btn primary block" disabled={addr.trim().length < 6}>Save the address</button>
+    </form>
+  );
+  return (
+    <div className="col" style={{ gap: 8 }}>
+      <button type="button" className="card tap well" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => { onDone && onDone(); push('ask', { intent: 'stay' }); }}><Icon name="stay" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Find a hotel</span><span className="tiny">For the same dates</span></span><Icon name="chevron" /></button>
+      <button type="button" className="card tap well" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setMode('own')}><Icon name="user" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>With family or friends</span><span className="tiny">Add the address for the driver</span></span><Icon name="chevron" /></button>
+      <button type="button" className="btn ghost block" onClick={() => onDone && onDone()}>Decide later</button>
+    </div>
   );
 }
 
@@ -558,7 +716,8 @@ function ShareSheet({ onClose }) {
 }
 
 function CalendarSheet({ days, onClose }) {
-  const ics = useMemo(() => buildIcs(days), [days]);
+  const { s } = useStore();
+  const ics = useMemo(() => buildIcs(days, s), [days]);
   const [fileState, setFileState] = useState(null);
   const [added, setAdded] = useState([]);
   /* The moments worth a reminder: flights, pickups and check-in. Each opens in the calendar, one by one. */
@@ -676,27 +835,75 @@ function QrMark({ seed, size = 104 }) {
 }
 
 function invoiceHtml(doc) {
-  const rows = doc.lines.map((l) => `<tr><td>${l.text}</td><td>${l.vatRate}%</td><td>${fmt2(l.net)}</td><td>${fmt2(l.vat)}</td><td>${fmt2(l.gross)}</td></tr>`).join('');
+  const rows = doc.lines.map((l) => `<tr><td>${l.text}</td><td>${l.vatRate}%</td><td>${l.gross < 0 ? '−' : ''}${fmt2(l.net)}</td><td>${fmt2(l.vat)}</td><td>${l.gross < 0 ? '−' : ''}${fmt2(l.gross)}</td></tr>`).join('');
+  const buyer = doc.company ? `Buyer: ${doc.company.name}<br>VAT ${doc.company.vat} · CR ${doc.company.cr}<br>${doc.company.address}` : `Customer: ${doc.buyer}`;
   return `<!doctype html><meta charset="utf-8"><title>${doc.kind} ${doc.no}</title><style>body{font:14px system-ui;margin:40px;color:#1e352d}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}</style>
-<h1>${doc.kind}</h1><p>${SELLER.legal} · VAT ${SELLER.vat} · ${SELLER.cr}<br>${SELLER.address}</p><p>No. ${doc.no} · ${doc.date}<br>Customer: ${doc.buyer}</p>
+<h1>${doc.kind}</h1><p>${SELLER.legal} · VAT ${SELLER.vat} · ${SELLER.cr}<br>${SELLER.address}</p><p>No. ${doc.no} · ${doc.date}<br>${buyer}</p>
 <table><tr><th>Item</th><th>VAT</th><th>Net</th><th>VAT</th><th>Total</th></tr>${rows}</table><p><b>Total ${doc.sign}SAR ${fmt2(doc.total)}</b> (VAT ${doc.sign}SAR ${fmt2(doc.vat)})</p>`;
 }
 const fmt2 = (n) => Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/* Saudi VAT numbers: 15 digits, starting and ending with 3. CR numbers: 10 digits. */
+export function companyErrors(c) {
+  const vat = (c.vat || '').replace(/\D/g, '');
+  const cr = (c.cr || '').replace(/\D/g, '');
+  return {
+    name: (c.name || '').trim().length < 2 ? 'Add the company name as it’s registered.' : null,
+    vat: !vat ? 'Add the company’s VAT number.' : vat.length !== 15 ? `A Saudi VAT number has 15 digits (this has ${vat.length}).` : !/^3\d{13}3$/.test(vat) ? 'It starts and ends with 3, like 300000000000003.' : null,
+    cr: !cr ? 'Add the commercial registration number.' : cr.length !== 10 ? `A CR number has 10 digits (this has ${cr.length}).` : null,
+    address: (c.address || '').trim().length < 10 ? 'Add the street, the district and the city.' : null,
+  };
+}
+
+function CompanySheet({ onClose }) {
+  const { s, set, toast } = useStore();
+  const cur = s.trip?.company || {};
+  const [c, setC] = useState({ name: cur.name || '', vat: cur.vat || '', cr: cur.cr || '', address: cur.address || '' });
+  const [touched, setTouched] = useState({});
+  const errs = companyErrors(c);
+  const ok = !Object.values(errs).some(Boolean);
+  const field = (k, label, props = {}) => (
+    <div className="field">
+      <label htmlFor={'co-' + k}>{label}</label>
+      <input id={'co-' + k} className={'input' + (touched[k] && errs[k] ? ' bad' : '')} value={c[k]} onBlur={() => setTouched({ ...touched, [k]: true })} onChange={(e) => setC({ ...c, [k]: props.digits ? e.target.value.replace(/\D/g, '').slice(0, props.digits) : e.target.value })} {...(props.digits ? { inputMode: 'numeric' } : {})} placeholder={props.ph} autoComplete={props.ac} />
+      {touched[k] && errs[k] && <span className="err" role="alert">{errs[k]}</span>}
+    </div>
+  );
+  return (
+    <Sheet label="Invoice for a company" onClose={onClose}>
+      <h2 className="h2">Invoice for a company</h2>
+      <p className="small" style={{ marginTop: -8 }}>We issue a full tax invoice with your company’s details, for every payment on this trip. Check them before you issue it.</p>
+      <form className="col" style={{ gap: 12 }} onSubmit={(e) => { e.preventDefault(); setTouched({ name: true, vat: true, cr: true, address: true }); if (!ok) return; set((p) => ({ trip: { ...p.trip, company: { ...c, vat: c.vat.replace(/\D/g, ''), cr: c.cr.replace(/\D/g, ''), savedAt: Date.now(), issuedAt: null } } })); buzz(HAPTIC.success); toast('Saved. Check it, then issue the tax invoice.'); onClose(); }}>
+        {field('name', 'Company name', { ph: 'As on the commercial registration', ac: 'organization' })}
+        {field('vat', 'VAT number', { digits: 15, ph: '3XXXXXXXXXXXXX3' })}
+        {field('cr', 'CR number', { digits: 10, ph: '10 digits' })}
+        {field('address', 'Address', { ph: 'Street, district, city', ac: 'street-address' })}
+        <button type="submit" className="btn primary block">Save company details</button>
+      </form>
+    </Sheet>
+  );
+}
+
 function Invoice({ params }) {
-  const { s, toast } = useStore();
+  const { s, set, toast } = useStore();
+  const ask = useAskFaisal();
   const p = tripPayments(s).find((x) => x.id === params.id);
   const [view, setView] = useState(params.credit ? 'credit' : 'invoice');
+  const [sheet, setSheet] = useState(params.company ? 'company' : null);
   if (!s.trip) return <NoTrip />;
   if (!p) return <Screen title="Invoice"><div className="card well"><span className="h3">This payment isn’t on the trip any more.</span><span className="small">Faisal can send you a copy of any invoice.</span></div></Screen>;
-  const buyer = PEOPLE[s.trip.travellers[0]]?.full || 'Omar Alharbi';
+  const lead = PEOPLE[s.trip.travellers[0]];
+  const buyer = lead && lead.full !== 'You' ? lead.full : (s.user?.full || 'The traveller');
+  const co = s.trip.company || null;
+  const issued = !!co?.issuedAt;
   const isCredit = view === 'credit' && p.refund;
   const ratio = isCredit ? p.refund.credited / p.amount : 1;
   const lines = p.lines.map((l) => { const g = l.gross * ratio; const { net, vat } = splitVat({ ...l, gross: g }); return { text: l.text, note: l.note, vatRate: l.vat, gross: g, net, vat }; });
   const total = lines.reduce((a, l) => a + l.gross, 0);
   const vat = lines.reduce((a, l) => a + l.vat, 0);
-  const no = isCredit ? p.no.replace('MT-', 'CN-') : p.no;
-  const doc = { kind: isCredit ? 'Credit note' : 'Simplified tax invoice', no, date: isCredit ? 'Today' : `${p.date} ${p.time}`, buyer, lines, total, vat, sign: isCredit ? '−' : '' };
+  const no = isCredit ? p.no.replace('MT-', 'CN-') : co ? p.no.replace('MT-', 'TI-') : p.no;
+  const kind = isCredit ? 'Credit note' : co ? 'Tax invoice' : 'Simplified tax invoice';
+  const doc = { kind, no, date: isCredit ? 'Today' : `${p.date}${p.time ? ' ' + p.time : ''}`, buyer, company: co, lines, total, vat, sign: isCredit ? '−' : '' };
   /* The file is the main path; printing to PDF is the fallback where files can't be handed over. */
   const share = async () => {
     buzz(HAPTIC.tap);
@@ -704,9 +911,13 @@ function Invoice({ params }) {
     if (r === 'saved') { toast('Saved. Open it and print to PDF to share.'); return; }
     try { window.print(); toast('Choose “Save as PDF” to keep a copy.'); } catch (e) { toast('Couldn’t save here. Use Email it to me.'); }
   };
-  const email = () => { buzz(HAPTIC.success); toast(s.demo.offline ? 'Saved. It sends when you’re back online.' : `Sent to ${s.user?.email || 'your email'}. Usually there within a minute.`); };
+  const email = () => { buzz(HAPTIC.success); toast(s.demo.offline ? 'Saved. It sends when you’re back online.' : `Sent to ${s.account?.email?.address || 'your email'}. Usually there within a minute.`); };
+  const draft = co && !issued && !isCredit;
   return (
-    <Screen title={isCredit ? 'Credit note' : 'VAT invoice'} act={<>
+    <Screen title={isCredit ? 'Credit note' : co ? 'Tax invoice' : 'VAT invoice'} act={draft ? <>
+      <button type="button" className="btn primary block" onClick={() => { set((x) => ({ trip: { ...x.trip, company: { ...x.trip.company, issuedAt: Date.now() } } })); buzz(HAPTIC.success); toast('Issued. The tax invoice is final now.'); }}>Issue the tax invoice</button>
+      <button type="button" className="btn secondary block" onClick={() => setSheet('company')}>Edit company details</button>
+    </> : <>
       <button type="button" className="btn primary block" onClick={share}><Icon name="doc" color="#f6f2ec" size={20} />Share PDF</button>
       <button type="button" className="btn secondary block" onClick={email}>Email it to me</button>
     </>}>
@@ -716,11 +927,12 @@ function Invoice({ params }) {
           <button type="button" role="tab" aria-selected={view === 'credit' ? 'true' : 'false'} className={'chip' + (view === 'credit' ? ' on' : '')} onClick={() => setView('credit')}>Credit note</button>
         </div>
       )}
-      <article className="tm-invoice rise" aria-label={doc.kind}>
+      {draft && <div className="notice tm-draft"><Icon name="doc" size={20} /><span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Draft. Check the company details.</span><span className="small">Once it’s issued it can’t be edited. Only Faisal can reissue it.</span></span></div>}
+      <article className={'tm-invoice rise' + (draft ? ' draft' : '')} aria-label={doc.kind}>
         <header className="spread" style={{ alignItems: 'flex-start' }}>
           <span className="col" style={{ gap: 2 }}>
-            <span className="tm-inv-kind">{doc.kind}</span>
-            <span className="tm-inv-ar" lang="ar" dir="rtl">{isCredit ? 'إشعار دائن' : 'فاتورة ضريبية مبسطة'}</span>
+            <span className="tm-inv-kind">{doc.kind}{draft ? ' · draft' : ''}</span>
+            <span className="tm-inv-ar" lang="ar" dir="rtl">{isCredit ? 'إشعار دائن' : co ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسطة'}</span>
           </span>
           <QrMark seed={no} size={92} />
         </header>
@@ -729,14 +941,18 @@ function Invoice({ params }) {
           <span><i>VAT number</i><b className="num">{SELLER.vat}</b></span>
           <span><i>{isCredit ? 'Credit note' : 'Invoice'} no.</i><b className="num">{no}</b></span>
           <span><i>Date</i>{doc.date}</span>
-          <span><i>Customer</i>{buyer}</span>
+          {co ? (<>
+            <span><i>Buyer</i>{co.name}<br /><span className="tiny">{co.address}</span></span>
+            <span><i>Buyer VAT · CR</i><b className="num">{co.vat}</b><br /><span className="tiny num">CR {co.cr}</span></span>
+            <span><i>Traveller</i>{buyer}</span>
+          </>) : <span><i>Customer</i>{buyer}</span>}
           <span><i>{isCredit ? 'Against invoice' : 'Paid with'}</i>{isCredit ? p.no : methodName(p)}</span>
         </div>
         <div className="tm-inv-lines">
           {lines.map((l) => (
             <div key={l.text} className="tm-inv-line">
               <span className="grow col" style={{ gap: 1 }}><span className="small" style={{ color: '#1e352d' }}>{l.text}</span><span className="tiny">VAT {l.vatRate}%{l.note ? ' · ' + l.note : ''}</span></span>
-              <span className="num small" style={{ color: '#1e352d' }}>{doc.sign}{fmt2(l.gross)}</span>
+              <span className="num small" style={{ color: '#1e352d' }}>{l.gross < 0 ? '−' : doc.sign}{fmt2(l.gross)}</span>
             </div>
           ))}
         </div>
@@ -749,6 +965,19 @@ function Invoice({ params }) {
         {isCredit && <span className="tiny">Refund {p.refund.dest === 'credit' ? 'added to your Mada credit' : `sent to ${p.refund.card || cardLabel(s)}`}.</span>}
       </article>
       {p.refund && view === 'invoice' && <button type="button" className="link" style={{ alignSelf: 'flex-start' }} onClick={() => setView('credit')}>See the credit note for the refund</button>}
+      {!isCredit && !co && (
+        <button type="button" className="card tap well" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setSheet('company')}>
+          <Icon name="card" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Invoice for a company</span><span className="tiny">A full tax invoice with your company’s VAT number</span></span><Icon name="chevron" />
+        </button>
+      )}
+      {issued && !isCredit && (
+        <div className="card well" style={{ gap: 6 }}>
+          <span className="row small" style={{ color: '#1e352d', fontWeight: 600 }}><Icon name="lock" size={16} />Issued to {co.name}, {fullDay(new Date(co.issuedAt).toISOString().slice(0, 10))}</span>
+          <span className="small">A tax invoice can’t be edited once it’s issued. Faisal can cancel it with a credit note and issue a new one.</span>
+          <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => { ask({ kind: 'invoice', title: 'Reissue the tax invoice', short: 'Invoice reissued', detail: co.name, with: 'faisal', outcome: 'yes', yesText: 'New tax invoice in Payments' }); buzz(HAPTIC.success); toast('Sent to Faisal. Tell him what to change in the chat.'); }}>Ask Faisal to reissue</button>
+        </div>
+      )}
+      {sheet === 'company' && <CompanySheet onClose={() => setSheet(null)} />}
     </Screen>
   );
 }
@@ -794,7 +1023,7 @@ function Refund({ params }) {
     if (anyway) {
       rec.stage = -1;
       rec.reject = chosen[0].p.id === 'pickup'
-        ? 'Khalid’s company charges in full inside 24 hours, and he has turned down other work for your morning. I asked twice.'
+        ? `${s.trip.pickup?.home?.driver || 'The driver'}’s company charges in full inside 24 hours, and he has turned down other work for your morning. I asked twice.`
         : 'The place is already holding the booking for you and won’t release it this close. I asked twice.';
       rec.alt = chosen[0].p.id === 'pickup' ? 'I can move the ride to another day in the next 3 months instead, free.' : 'I can move it to another day this trip, free.';
     } else if (rec.dest === 'credit') {
@@ -931,33 +1160,38 @@ export function RefundTracker({ r, onTalk }) {
    ================================================================ */
 
 const CHANGE_KINDS = [
-  ['date', 'Another day', 'Both flights move. Same airline.', 'out'],
-  ['time', 'Another time, same day', 'Earlier or later on Tue 9 Mar.', 'out'],
+  ['date', 'Another day', 'Same airline. Your seats move with you.', 'out'],
+  ['time', 'Another time, same day', (f) => `Earlier or later on ${f.date}.`, 'out'],
   ['return', 'Only the way back', 'Stay longer, or come home sooner.', 'back'],
   ['one', 'Just one traveller', 'One of you flies home on another day.', 'back'],
   ['airline', 'Another airline', 'A new ticket, not a change.', 'out'],
   ['name', 'Fix a name spelling', 'Small fixes, so the ticket matches the passport.', 'any'],
 ];
 
-function changeOptions(kind, f) {
+/* Options around the booked dates, so a June trip gets June days. */
+function changeOptions(kind, f, n) {
+  const out = f.dateISO;
+  const back = f.backDateISO;
+  const code = Number(f.code.replace(/\D/g, ''));
+  const backSub = back ? ` Back on ${dayLabel(back)}.` : ' One way.';
   if (kind === 'date') return [
-    { id: 'd8', title: 'Mon 8 Mar · 09:40', sub: 'A day earlier. Back on Mon 15 Mar.', diffPP: 120, say: 'You fly on Mon 8 Mar', patch: { date: 'Mon 8 Mar' } },
-    { id: 'd10', title: 'Wed 10 Mar · 09:40', sub: 'A day later. Back on Mon 15 Mar.', diffPP: 0, say: 'You fly on Wed 10 Mar', patch: { date: 'Wed 10 Mar' } },
-    { id: 'd11', title: 'Thu 11 Mar · 09:40', sub: 'No 4 seats left on this flight.', soldOut: true },
-  ];
+    { id: 'dm1', title: `${dayLabel(addDays(out, -1))} · ${f.dep}`, sub: `A day earlier.${backSub}`, diffPP: 120, say: `You fly on ${dayLabel(addDays(out, -1))}`, patch: { dateISO: addDays(out, -1) } },
+    { id: 'dp1', title: `${dayLabel(addDays(out, 1))} · ${f.dep}`, sub: `A day later.${backSub}`, diffPP: 0, say: `You fly on ${dayLabel(addDays(out, 1))}`, patch: { dateISO: addDays(out, 1) } },
+    { id: 'dp2', title: `${dayLabel(addDays(out, 2))} · ${f.dep}`, sub: `No ${n} seats left on this flight.`, soldOut: true },
+  ].filter((o) => !back || !o.patch || o.patch.dateISO < back);
   if (kind === 'time') return [
-    { id: 't1', title: `${f.iata}${Number(f.code.replace(/\D/g, '')) - 2} · 06:30 → 10:45`, sub: 'Earliest, and the lowest fare. Lands in time for lunch.', diffPP: -380, say: `You’re on ${f.iata}${Number(f.code.replace(/\D/g, '')) - 2} at 06:30`, patch: { code: `${f.iata}${Number(f.code.replace(/\D/g, '')) - 2}`, dep: '06:30', arr: '10:45' } },
-    { id: 't2', title: `${f.iata}${Number(f.code.replace(/\D/g, '')) + 4} · 18:20 → 22:35`, sub: 'Evening. A slow morning at home.', diffPP: 0, say: `You’re on ${f.iata}${Number(f.code.replace(/\D/g, '')) + 4} at 18:20`, patch: { code: `${f.iata}${Number(f.code.replace(/\D/g, '')) + 4}`, dep: '18:20', arr: '22:35' } },
+    { id: 't1', title: `${f.iata}${code - 2} · 06:30 → 10:45`, sub: 'Earliest, and the lowest fare. Lands in time for lunch.', diffPP: -380, say: `You’re on ${f.iata}${code - 2} at 06:30`, patch: { code: `${f.iata}${code - 2}`, dep: '06:30', arr: '10:45' } },
+    { id: 't2', title: `${f.iata}${code + 4} · 18:20 → 22:35`, sub: 'Evening. A slow morning at home.', diffPP: 0, say: `You’re on ${f.iata}${code + 4} at 18:20`, patch: { code: `${f.iata}${code + 4}`, dep: '18:20', arr: '22:35' } },
   ];
-  if (kind === 'return') return [
-    { id: 'r14', title: 'Sun 14 Mar · 15:10', sub: 'A day sooner. The hotel keeps one night as its fee.', diffPP: -80, say: 'You come home on Sun 14 Mar', patch: { backDate: 'Sun 14 Mar' } },
-    { id: 'r16', title: 'Tue 16 Mar · 15:10', sub: 'A day longer. Add a night at the hotel too.', diffPP: 80, say: 'You come home on Tue 16 Mar', patch: { backDate: 'Tue 16 Mar' } },
-    { id: 'r15', title: `Mon 15 Mar · 21:40 · ${f.iata}${Number(f.back.replace(/\D/g, '')) + 2}`, sub: 'Same day, later. Lands 01:50.', diffPP: 0, say: 'You come home at 21:40 instead', patch: { back: `${f.iata}${Number(f.back.replace(/\D/g, '')) + 2}`, backDep: '21:40', backArr: '01:50' } },
-  ];
-  if (kind === 'one') return [
-    { id: 'o14', title: 'Sun 14 Mar · 15:10', sub: 'A day sooner.', diffPP: -80, day: 'Sun 14 Mar' },
-    { id: 'o13', title: 'Sat 13 Mar · 15:10', sub: 'Two days sooner.', diffPP: 0, day: 'Sat 13 Mar' },
-  ];
+  if (kind === 'return' && back) return [
+    { id: 'rm1', title: `${dayLabel(addDays(back, -1))} · ${f.backDep}`, sub: 'A day sooner. The hotel keeps one night as its fee.', diffPP: -80, say: `You come home on ${dayLabel(addDays(back, -1))}`, patch: { backDateISO: addDays(back, -1) } },
+    { id: 'rp1', title: `${dayLabel(addDays(back, 1))} · ${f.backDep}`, sub: 'A day longer. Add a night at the hotel too.', diffPP: 80, say: `You come home on ${dayLabel(addDays(back, 1))}`, patch: { backDateISO: addDays(back, 1) }, longer: true },
+    { id: 'rl', title: `${dayLabel(back)} · 21:40 · ${f.iata}${Number(f.back.replace(/\D/g, '')) + 2}`, sub: 'Same day, later. Lands 01:50.', diffPP: 0, say: 'You come home at 21:40 instead', patch: { back: `${f.iata}${Number(f.back.replace(/\D/g, '')) + 2}`, backDep: '21:40', backArr: '01:50' } },
+  ].filter((o) => !o.patch.backDateISO || o.patch.backDateISO > out);
+  if (kind === 'one' && back) return [
+    { id: 'o1', title: `${dayLabel(addDays(back, -1))} · ${f.backDep}`, sub: 'A day sooner.', diffPP: -80, day: dayLabel(addDays(back, -1)) },
+    { id: 'o2', title: `${dayLabel(addDays(back, -2))} · ${f.backDep}`, sub: 'Two days sooner.', diffPP: 0, day: dayLabel(addDays(back, -2)) },
+  ].filter((o) => o.day > '');
   return [];
 }
 
@@ -972,16 +1206,17 @@ function ChangeFlight({ params }) {
   const [pick, setPick] = useState(null);
   const [stage, setStage] = useState('choose');
   const [result, setResult] = useState(null);
+  const [moveOpen, setMoveOpen] = useState(false);
   if (!t) return <NoTrip />;
   const f = t.flight;
   if (!f || isRefunded(s, 'flight')) return (
     <Screen title="Change flight"><div className="card well"><span className="h3">No flights on this trip.</span><span className="small">{isRefunded(s, 'flight') ? 'The flights were refunded.' : 'You booked the stay only.'} Mada can add flights any time.</span>
-      <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { prefill: 'Flights to Istanbul, 9–15 Mar' })}>Find flights</button></div></Screen>
+      <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { prefill: `Flights to Istanbul, ${t.dates || ''}`.trim() })}>Find flights</button></div></Screen>
   );
   const R = fareRules(f);
   const n = nOf(s);
   const count = kind === 'one' ? 1 : n;
-  const opts = s.demo.noResults ? [] : changeOptions(kind, f);
+  const opts = s.demo.noResults ? [] : changeOptions(kind, f, count);
   const cur = opts.find((o) => o.id === pick);
   const fee = R.changeFee * count;
   const fareDiff = cur ? cur.diffPP * count : 0;
@@ -1022,6 +1257,7 @@ function ChangeFlight({ params }) {
       });
       setResult({ label, total });
       setStage('done');
+      if (patch.dateISO) setMoveOpen(true);
       buzz(HAPTIC.success);
     }, 2400);
   };
@@ -1039,8 +1275,10 @@ function ChangeFlight({ params }) {
     <Screen title="" act={<button type="button" className="btn primary block" onClick={() => { pop(); }}>Back to the trip</button>}>
       <span className="tm-check rise"><Icon name="check" color="#f6f2ec" size={28} width={2.4} /></span>
       <h1 className="h1 rise d1">Done. {result.label}.</h1>
-      <p className="body rise d2">{result.total < 0 ? `The fare is lower, so SAR ${fmt(-result.total)} is in your Mada credit now.` : 'No cost to you.'} New boarding passes reach your Wallet when check-in opens. Your pickups move too.</p>
-      <Faisal>“Changed with {f.airline}. Same seats together.”</Faisal>
+      <p className="body rise d2">{result.total < 0 ? `The fare is lower, so SAR ${fmt(-result.total)} is in your Mada credit now.` : 'No cost to you.'} New boarding passes reach your Wallet when check-in opens.</p>
+      <MoveNotice />
+      <Faisal>“Changed with {f.airline}. {n > 1 ? 'Same seats together.' : 'Same seat.'}”</Faisal>
+      {moveOpen && moveNeeded(t) && <MoveSheet onClose={() => setMoveOpen(false)} />}
     </Screen>
   );
 
@@ -1056,7 +1294,7 @@ function ChangeFlight({ params }) {
     <Screen title="Change flight" act={act}>
       <div className="card rise" style={{ flexDirection: 'row', alignItems: 'center' }}>
         <AirlineMark flight={f} size={36} />
-        <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{f.code} · {f.date} · {f.dep}</span><span className="tiny">Back {f.back} · {f.backDate} · {f.backDep} · {n} travellers</span></span>
+        <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{f.code} · {f.date} · {f.dep}</span><span className="tiny">{f.back ? `Back ${f.back} · ${f.backDate} · ${f.backDep}` : 'One way'} · {n} {n === 1 ? 'traveller' : 'travellers'}</span></span>
       </div>
       <div className="tm-rules rise d1">
         <span><i>Change fee</i>{R.changeFee ? `SAR ${R.changeFee} pp` : 'Free'}</span>
@@ -1066,9 +1304,9 @@ function ChangeFlight({ params }) {
       {!kind && (<>
         <h1 className="h2">What would you like to change?</h1>
         <div className="card tm-list" style={{ padding: 6, gap: 0 }}>
-          {CHANGE_KINDS.map(([id, title, sub, side]) => (
+          {CHANGE_KINDS.filter(([, , , side]) => f.back || side !== 'back').map(([id, title, sub, side]) => (
             allowed(side)
-              ? <Row key={id} icon={id === 'name' ? 'user' : id === 'airline' ? 'globe' : 'flight'} title={title} sub={sub} onClick={() => { setKind(id); setPick(null); }} label={title} />
+              ? <Row key={id} icon={id === 'name' ? 'user' : id === 'airline' ? 'globe' : 'flight'} title={title} sub={typeof sub === 'function' ? sub(f) : sub} onClick={() => { setKind(id); setPick(null); }} label={title} />
               : <Row key={id} icon="flight" title={title} sub="You’ve flown this one already." tone="muted" />
           ))}
         </div>
@@ -1106,8 +1344,8 @@ function ChangeFlight({ params }) {
             <div className="divider" />
             <div className="spread"><span className="h3">{total > 0 ? 'You pay' : total < 0 ? 'You get back' : 'Total'}</span><span className="num h3">{total === 0 ? 'No cost' : `SAR ${fmt(Math.abs(total))}`}</span></div>
             {total < 0 && <span className="tiny">The fare is lower than the fee, so the difference comes back as Mada credit, straight away.</span>}
-            {kind === 'date' && <span className="tiny">Your hotel dates stay as they are. Change them in Hotel options.</span>}
-            {kind === 'return' && cur.patch?.backDate === 'Tue 16 Mar' && <span className="tiny">You’ll need a 7th night. Add it in Hotel options.</span>}
+            {kind === 'date' && (stayOf(t) || t.pickup) && <span className="tiny">Next, we’ll ask if your {stayOf(t) && t.pickup ? 'hotel and pickup move' : stayOf(t) ? 'hotel moves' : 'pickup moves'} too.</span>}
+            {kind === 'return' && cur.longer && stayOf(t) && <span className="tiny">You’ll need one more night. Add it in Hotel options.</span>}
             <span className="tiny">The new tickets keep the same rules. Faisal confirms with {f.airline}.</span>
           </div>
         )}
@@ -1183,26 +1421,26 @@ function HotelOptions() {
   const st = t.stay && t.stay.status !== 'cancelled' ? effStay(s) : null;
   if (!st) return (
     <Screen title="Hotel options">
-      <div className="card well"><span className="h3">{t.stay ? 'The stay is cancelled.' : 'No hotel on this trip.'}</span><span className="small">Connecting rooms near Galata, like last time?</span>
+      <div className="card well"><span className="h3">{t.stay ? 'The stay is cancelled.' : 'No hotel on this trip.'}</span><span className="small">{t.noStay?.address ? `You’re staying at ${t.noStay.address}.` : 'Rooms near Galata Tower, for the same dates?'}</span>
         <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', { intent: 'stay' })}>Find a place to stay</button></div>
     </Screen>
   );
   const mine = (s.tripRequests || []).filter((r) => r.area === 'hotel');
   const pending = s.requests.filter((r) => r.area === 'hotel');
-  const lastDay = 9 + st.nights;
+  const lastDay = stayEnd(st);
   return (
     <Screen title="Hotel options">
       <div className="card rise">
-        <span className="row"><span className="tm-ic"><Icon name="stay" size={20} /></span><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{st.name}</span><span className="tiny">{st.roomType || 'Connecting rooms'} · 9–{lastDay} Mar · {st.nights} nights</span></span></span>
-        <span className="tiny">Free to cancel or shorten until 2 Mar. After that, the hotel keeps one night.</span>
+        <span className="row"><span className="tm-ic"><Icon name="stay" size={20} /></span><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{st.name}</span><span className="tiny">{st.roomType || (nOf(s) > 2 ? 'Connecting rooms' : 'A room')} · {rangeLabel(st.fromISO, lastDay)} · {st.nights} nights</span></span></span>
+        <span className="tiny">Free to cancel or shorten until {freeUntil(st.fromISO)}. After that, the hotel keeps one night.</span>
       </div>
       <div className="card tm-list rise d1" style={{ padding: 6, gap: 0 }}>
         <Row icon="stay" title="Change the room" sub="Suite, view, or separate rooms" onClick={() => setSheet('room')} />
         <Row icon="plus" title="Add or remove nights" sub={`Now ${st.nights} nights, out on ${dayLabel(lastDay)}`} onClick={() => setSheet('nights')} />
         <Row icon="bell" title="Early check-in or late checkout" sub="If a room is ready. Prices shown first." onClick={() => setSheet('times')} />
         <Row icon="user" title="A cot or an extra bed" sub="Cots are free" onClick={() => setSheet('bed')} />
-        <Row icon="link" title="Connecting rooms" sub={/connecting/i.test(st.note || '') || (st.roomType || 'Connecting').startsWith('Connecting') ? 'In your booking' : 'Ask the hotel'} onClick={() => setSheet('connect')} />
-        <Row icon="globe" title="Switch hotel" sub="See other places for the same dates" onClick={() => push('ask', { prefill: 'A different hotel in Istanbul, 9–15 Mar', intent: 'stay' })} />
+        {nOf(s) > 1 && <Row icon="link" title="Connecting rooms" sub={(st.roomType || (nOf(s) > 2 ? 'Connecting' : '')).startsWith('Connecting') ? 'In your booking' : 'Ask the hotel'} onClick={() => setSheet('connect')} />}
+        <Row icon="globe" title="Switch hotel" sub="See other places for the same dates" onClick={() => push('ask', { prefill: `A different hotel in Istanbul, ${rangeLabel(st.fromISO, lastDay)}`, intent: 'stay' })} />
       </div>
       {(mine.length > 0 || pending.length > 0) && (
         <div className="card rise d2">
@@ -1250,28 +1488,29 @@ function HotelSheet({ kind, st, onClose, onDone }) {
     );
   }
   if (kind === 'nights') {
-    const lastDay = 9 + st.nights;
+    const lastDay = stayEnd(st);
     const shortenBack = tm.early ? night : 0;
+    const free = freeUntil(st.fromISO);
     const opts = [
-      { id: 'add', title: `Stay until ${dayLabel(lastDay + 1)}`, sub: `One more night · SAR ${fmt(night)}`, right: `+${fmt(night)}` },
-      { id: 'cut', title: `Leave on ${dayLabel(lastDay - 1)}`, sub: tm.early ? 'One night less · free to shorten until 2 Mar' : 'After 2 Mar the hotel keeps the night you drop', right: shortenBack ? `−${fmt(shortenBack)}` : 'Nothing back', disabled: st.nights <= 1 || tm.outUsed && st.nights <= 2 },
+      { id: 'add', title: `Stay until ${dayLabel(addDays(lastDay, 1))}`, sub: `One more night · SAR ${fmt(night)}`, right: `+${fmt(night)}` },
+      { id: 'cut', title: `Leave on ${dayLabel(addDays(lastDay, -1))}`, sub: tm.early ? `One night less · free to shorten until ${free}` : `After ${free} the hotel keeps the night you drop`, right: shortenBack ? `−${fmt(shortenBack)}` : 'Nothing back', disabled: st.nights <= 1 || tm.outUsed && st.nights <= 2 },
     ];
-    const flightBack = f ? dayNum(f.backDate) : null;
+    const flightBack = f ? f.backDateISO : null;
     return (
       <Sheet label="Add or remove nights" onClose={onClose}>
         <h2 className="h2">Add or remove nights</h2>
         {opts.map((o) => <Pick radio key={o.id} on={pick === o.id} disabled={o.disabled} onClick={() => setPick(o.id)} title={o.title} sub={o.sub} right={o.right} />)}
-        {pick === 'add' && f && flightBack <= lastDay && <div className="notice warn"><span className="grow"><span className="small">Your flight home is still {f.backDate}. Move it too in Change flight, or the extra night goes unused.</span></span></div>}
-        {pick === 'cut' && f && flightBack >= lastDay && <div className="notice warn"><span className="grow"><span className="small">Your flight home is {f.backDate}, so you’d need somewhere for the last night.</span></span></div>}
+        {pick === 'add' && f && flightBack && flightBack <= lastDay && <div className="notice warn"><span className="grow"><span className="small">Your flight home is still {f.backDate}. Move it too in Change flight, or the extra night goes unused.</span></span></div>}
+        {pick === 'cut' && f && flightBack && flightBack >= lastDay && <div className="notice warn"><span className="grow"><span className="small">Your flight home is {f.backDate}, so you’d need somewhere for the last night.</span></span></div>}
         <button type="button" className="btn primary block" disabled={!pick} onClick={() => {
           if (pick === 'add') {
-            askQuote({ kind: 'hotel', area: 'hotel', short: 'extra night', title: `One more night, until ${dayLabel(lastDay + 1)}`, detail: st.name, quote: night, icon: 'stay', stayPatch: { addNights: 1, addPrice: night }, quoteText: `The hotel can keep your rooms one more night, until ${dayLabel(lastDay + 1)}. Same rooms, SAR ${fmt(night)}.` });
+            askQuote({ kind: 'hotel', area: 'hotel', short: 'extra night', title: `One more night, until ${dayLabel(addDays(lastDay, 1))}`, detail: st.name, quote: night, icon: 'stay', stayPatch: { addNights: 1, addPrice: night }, quoteText: `The hotel can keep your rooms one more night, until ${dayLabel(addDays(lastDay, 1))}. Same rooms, SAR ${fmt(night)}.` });
             onDone(sent);
           } else {
             set((p) => ({
               trip: { ...p.trip, stay: { ...p.trip.stay, nights: p.trip.stay.nights - 1, price: p.trip.stay.price - night } },
               refunds: shortenBack ? [...p.refunds, { id: 'rf' + Date.now(), title: `${st.name} · one night less`, amount: shortenBack, stage: 0, card: cardLabel(p), dest: 'card', items: ['stay-night'], created: Date.now() }] : p.refunds,
-              tripRequests: [...(p.tripRequests || []), { id: 'tr' + Date.now(), kind: 'nights', area: 'hotel', title: `Leave on ${dayLabel(lastDay - 1)}`, short: 'One night less', detail: shortenBack ? `SAR ${fmt(shortenBack)} back to your card` : 'The hotel keeps the night', with: 'hotel', outcome: 'yes', created: Date.now() }],
+              tripRequests: [...(p.tripRequests || []), { id: 'tr' + Date.now(), kind: 'nights', area: 'hotel', title: `Leave on ${dayLabel(addDays(lastDay, -1))}`, short: 'One night less', detail: shortenBack ? `SAR ${fmt(shortenBack)} back to your card` : 'The hotel keeps the night', with: 'hotel', outcome: 'yes', created: Date.now() }],
             }));
             onDone(shortenBack ? `Shortened. SAR ${fmt(shortenBack)} is on its way back.` : 'Shortened. The hotel keeps that night, as per the rule.');
           }
@@ -1293,7 +1532,7 @@ function HotelSheet({ kind, st, onClose, onDone }) {
     return (
       <Sheet label="Check-in and checkout" onClose={onClose}>
         <h2 className="h2">Check-in and checkout</h2>
-        {f && <span className="small" style={{ marginTop: -6 }}>You land at {f.arr} and reach the hotel about {reach}. Check-in is from 14:00{reach >= '14:00' ? ', so you may not need it' : ''}. Ahmet collects you at {leave} on your last day; checkout is 12:00.</span>}
+        {f && <span className="small" style={{ marginTop: -6 }}>You land at {f.arr} and reach the hotel about {reach}. Check-in is from 14:00{reach >= '14:00' ? ', so you may not need it' : ''}.{f.back && s.trip.pickup ? ` ${s.trip.pickup.arrive?.driver || 'Your driver'} collects you at ${leave} on your last day; checkout is 12:00.` : ' Checkout is 12:00.'}</span>}
         {opts.map((o) => <Pick radio key={o.id} on={pick === o.id} onClick={() => setPick(o.id)} title={o.title} sub={o.sub} right={o.right} />)}
         <span className="tiny">Subject to the hotel having rooms. You only pay if they say yes.</span>
         <button type="button" className="btn primary block" disabled={!cur} onClick={() => {
@@ -1321,12 +1560,12 @@ function HotelSheet({ kind, st, onClose, onDone }) {
     );
   }
   /* connecting rooms */
-  const has = (st.roomType || 'Connecting').startsWith('Connecting');
+  const has = (st.roomType || (n > 2 ? 'Connecting' : '')).startsWith('Connecting');
   return (
     <Sheet label="Connecting rooms" onClose={onClose}>
       <h2 className="h2">Connecting rooms</h2>
       {has
-        ? <p className="body" style={{ marginTop: -8 }}>Already in your booking. The hotel confirmed two connecting rooms on the 4th floor, like you asked for last Eid.</p>
+        ? <p className="body" style={{ marginTop: -8 }}>Already in your booking. The hotel confirmed two connecting rooms on the 4th floor.</p>
         : <p className="body" style={{ marginTop: -8 }}>Your rooms aren’t connecting now. The hotel can try; it depends on who checks out before you.</p>}
       {has ? <button type="button" className="btn primary block" onClick={onClose}>Good</button>
         : <button type="button" className="btn primary block" onClick={() => { ask({ kind: 'connecting', area: 'hotel', title: 'Connecting rooms', short: 'Connecting rooms', detail: st.name, with: 'hotel', outcome: 'yes' }); onDone(sent); }}>Ask the hotel</button>}
@@ -1408,7 +1647,9 @@ function SpecialSheet({ id, forWho, onClose }) {
   const [opt, setOpt] = useState(null);
   const [count, setCount] = useState(1);
   const [note, setNote] = useState('');
-  const [day, setDay] = useState(11);
+  const tripDays = (() => { const a = stayOf(t)?.fromISO || f?.dateISO; const b = f?.backDateISO || stayEnd(stayOf(t)); const out = []; for (let d = a, i = 0; a && b && d <= b && i < 30; d = addDays(d, 1), i += 1) out.push(d); return out; })();
+  const [day, setDay] = useState(tripDays[2] || tripDays[0] || null);
+  const legs = f && f.back ? 'Both flights' : 'The flight';
   const meta = SPECIALS.find((x) => x.id === id);
   const done = (r) => { ask({ area: 'special', ...r }); buzz(HAPTIC.success); toast('Sent to Faisal. Track it in Trips → Requests.'); onClose(); };
   const needsFlight = ['wheelchair', 'meal', 'bassinet', 'seats', 'bags', 'sports'].includes(id);
@@ -1419,7 +1660,7 @@ function SpecialSheet({ id, forWho, onClose }) {
     <Pick radio on={opt === 'gate'} onClick={() => setOpt('gate')} title="To the gate" sub="Can manage the aircraft steps and walk to the seat" />
     <Pick radio on={opt === 'seat'} onClick={() => setOpt('seat')} title="All the way to the seat" sub="Can’t manage steps. Carried on with an aisle chair." />
     <Pick radio on={opt === 'own'} onClick={() => setOpt('own')} title="Bringing our own wheelchair" sub="Goes in the hold free, taken at the aircraft door" />
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : '(own chair)'}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: 'Both flights', with: 'airline', withName: airline, outcome: 'yes' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : '(own chair)'}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' })}>Send to Faisal</button>
   </>);
   else if (id === 'meal') {
     const kids = whoIds.filter((x) => Number(PEOPLE[x]?.born) >= 2014);
@@ -1429,40 +1670,41 @@ function SpecialSheet({ id, forWho, onClose }) {
         <Pick radio key={k} on={opt === k} disabled={!!dis} onClick={() => setOpt(k)} title={title} sub={dis ? 'Only for children under 12' : sub} />
       ))}
       <span className="tiny">Free. Needs 24 hours before the flight.</span>
-      <button type="button" className="btn primary block" disabled={!opt} onClick={() => { const label = { child: 'Child meal', veg: 'Vegetarian meal', diabetic: 'Diabetic meal', gluten: 'Gluten-free meal' }[opt]; done({ kind: 'meal', title: `${label} · ${opt === 'child' && forWho === 'all' ? joinNames(names(kids)) || whoTxt : whoTxt}`, short: `${label}`, detail: 'Both flights', with: 'airline', withName: airline, outcome: 'yes' }); }}>Send to Faisal</button>
+      <button type="button" className="btn primary block" disabled={!opt} onClick={() => { const label = { child: 'Child meal', veg: 'Vegetarian meal', diabetic: 'Diabetic meal', gluten: 'Gluten-free meal' }[opt]; done({ kind: 'meal', title: `${label} · ${opt === 'child' && forWho === 'all' ? joinNames(names(kids)) || whoTxt : whoTxt}`, short: `${label}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' }); }}>Send to Faisal</button>
     </>);
   } else if (id === 'bassinet') {
     const baby = t.travellers.some((x) => Number(PEOPLE[x]?.born) >= 2024);
     body = baby ? (<>
       <span className="small">A bassinet clips to the wall in front of the first row. For babies under 11 kg. Free, but there are only a few on each plane.</span>
-      <button type="button" className="btn primary block" onClick={() => done({ kind: 'bassinet', title: 'Bassinet seat', short: 'Bassinet', detail: 'Both flights', with: 'airline', withName: airline, outcome: 'no', alt: 'The bassinet row is taken on the way there. Faisal moved you to row 14 with a spare seat beside you instead.' })}>Send to Faisal</button>
+      <button type="button" className="btn primary block" onClick={() => done({ kind: 'bassinet', title: 'Bassinet seat', short: 'Bassinet', detail: legs, with: 'airline', withName: airline, outcome: 'no', alt: 'The bassinet row is taken on the way there. Faisal moved you to row 14 with a spare seat beside you instead.' })}>Send to Faisal</button>
     </>) : (<>
       <p className="body">Bassinets are for babies under 2 and under 11 kg. No one on this trip is that young.</p>
       <span className="small">Travelling with a baby after all? Add them in the Wallet first, then come back.</span>
       <button type="button" className="btn primary block" onClick={onClose}>Close</button>
     </>);
   } else if (id === 'seats') body = (<>
-    <span className="small">You’re in 14{t.travellers.length > 1 ? 'A–14' + 'ABCDEF'[t.travellers.length - 1] : 'A'} going and 16{t.travellers.length > 1 ? 'A–16' + 'ABCDEF'[t.travellers.length - 1] : 'A'} coming back, side by side.</span>
+    <span className="small">You’re in {seatText(f.seats)} going{f.back ? ` and ${seatText(f.backSeats)} coming back` : ''}{t.travellers.length > 1 ? ', side by side' : ''}.</span>
     <Pick radio on={opt === 'keep'} onClick={() => setOpt('keep')} title="Keep us together, whatever changes" sub="If the plane changes, Faisal re-seats you together first" />
     <Pick radio on={opt === 'kids'} onClick={() => setOpt('kids')} title="Children next to a parent" sub="Never across the aisle" />
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'seats', title: opt === 'keep' ? 'Seats together, both ways' : 'Children beside a parent', short: 'Seats together', detail: 'Both flights', with: 'airline', withName: airline, outcome: f.iata === 'XY' ? 'no' : 'yes', alt: 'flynas only guarantees seats together with paid seat selection, SAR 35 each. Faisal can add it.' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'seats', title: opt === 'keep' ? `Seats together${f.back ? ', both ways' : ''}` : 'Children beside a parent', short: 'Seats together', detail: legs, with: 'airline', withName: airline, outcome: f.iata === 'XY' ? 'no' : 'yes', alt: 'flynas only guarantees seats together with paid seat selection, SAR 35 each. Faisal can add it.' })}>Send to Faisal</button>
   </>);
   else if (id === 'celebration') body = (<>
     <span className="small">The hotel will do something small in the room. What exactly is up to them.</span>
     <div className="chips">{['Birthday', 'Anniversary', 'Something else'].map((k) => <button key={k} type="button" className={'chip' + (opt === k ? ' on' : '')} aria-pressed={opt === k ? 'true' : 'false'} onClick={() => setOpt(k)}>{k}</button>)}</div>
-    <div className="chips">{[10, 11, 12, 13, 14].map((d) => <button key={d} type="button" className={'chip' + (day === d ? ' on' : '')} aria-pressed={day === d ? 'true' : 'false'} onClick={() => setDay(d)}>{WD[d]} {d}</button>)}</div>
-    <div className="field"><label htmlFor="cel-note">A note for the hotel (optional)</label><input id="cel-note" className="input" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} placeholder={forWho === 'all' ? 'Hessa turns 39' : `${whoTxt} turns …`} /></div>
+    <div className="chips">{tripDays.map((d) => <button key={d} type="button" className={'chip' + (day === d ? ' on' : '')} aria-pressed={day === d ? 'true' : 'false'} onClick={() => setDay(d)}>{weekday(d)} {dayOf(d)}</button>)}</div>
+    <div className="field"><label htmlFor="cel-note">A note for the hotel (optional)</label><input id="cel-note" className="input" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} placeholder={forWho === 'all' ? 'Who, and what for' : `${whoTxt} turns …`} /></div>
     <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'celebration', title: `${opt} · ${dayLabel(day)}`, short: `${opt}${forWho !== 'all' ? ' · ' + whoTxt : ''}`, detail: note || 'A note to the hotel', day, with: 'hotel', outcome: 'yes' })}>Send to Faisal</button>
   </>);
   else if (id === 'prayer') body = (<>
-    <span className="small">Istanbul on 9 Mar: {PRAYER}. The times for each day are in your itinerary.</span>
+    <span className="small">Istanbul on {shortDay(f?.dateISO || stayOf(t)?.fromISO)}: {PRAYER}. The times for each day are in your itinerary.</span>
     <Pick on={opt === 'mat'} onClick={() => setOpt(opt === 'mat' ? null : 'mat')} title="Prayer mats and the qibla direction in the room" sub="Qibla from Galata is south-east, about 152°" />
     <span className="tiny">Mosques near the hotel: Arap Camii (6 min walk), Kılıç Ali Paşa (10 min).</span>
     <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'prayer', title: 'Prayer mats and qibla in the room', short: 'Prayer mats', detail: t.stay?.name || 'Hotel', with: 'hotel', outcome: 'yes' })}>Send to Faisal</button>
   </>);
   else if (id === 'bags') {
     const people = forWho === 'all' ? t.travellers.length : 1;
-    const price = R.bagFee * count * 2;
+    const legsN = f.back ? 2 : 1;
+    const price = R.bagFee * count * legsN;
     body = (<>
       <span className="small">{R.bags} each is included on {airline}. An extra {R.bagKg} kg bag is SAR {R.bagFee} each way now, about double at the airport.</span>
       <div className="spread card well" style={{ flexDirection: 'row' }}>
@@ -1473,13 +1715,13 @@ function SpecialSheet({ id, forWho, onClose }) {
           <button type="button" className="icon-btn" aria-label="One more bag" disabled={count >= people * 2} onClick={() => setCount(Math.min(people * 2, count + 1))}><Icon name="plus" size={18} /></button>
         </span>
       </div>
-      <div className="spread"><span className="small">{count} × SAR {R.bagFee} × 2 flights</span><span className="num h3">SAR {fmt(price)}</span></div>
-      <button type="button" className="btn primary block" onClick={() => { askQuote({ kind: 'bags', area: 'special', short: 'extra bags', title: `${count} extra ${count === 1 ? 'bag' : 'bags'}, both ways`, detail: `${airline} · ${R.bagKg} kg each`, quote: price, vat: 0, icon: 'bag', quoteText: `${airline} has added ${count} extra ${count === 1 ? 'bag' : 'bags'} of ${R.bagKg} kg, both ways. SAR ${fmt(price)}.` }); buzz(HAPTIC.success); toast('Sent to Faisal. You pay once it’s added.'); onClose(); }}>Ask for SAR {fmt(price)}</button>
+      <div className="spread"><span className="small">{count} × SAR {R.bagFee}{legsN === 2 ? ' × 2 flights' : ''}</span><span className="num h3">SAR {fmt(price)}</span></div>
+      <button type="button" className="btn primary block" onClick={() => { askQuote({ kind: 'bags', area: 'special', short: 'extra bags', title: `${count} extra ${count === 1 ? 'bag' : 'bags'}${legsN === 2 ? ', both ways' : ''}`, detail: `${airline} · ${R.bagKg} kg each`, quote: price, vat: 0, icon: 'bag', quoteText: `${airline} has added ${count} extra ${count === 1 ? 'bag' : 'bags'} of ${R.bagKg} kg${legsN === 2 ? ', both ways' : ''}. SAR ${fmt(price)}.` }); buzz(HAPTIC.success); toast('Sent to Faisal. You pay once it’s added.'); onClose(); }}>Ask for SAR {fmt(price)}</button>
     </>);
   } else if (id === 'sports') body = (<>
     <span className="small">Packed and under {R.bagKg} kg, it counts as one of your bags. Heavier or longer than 2 m costs SAR 300 each way.</span>
     {[['golf', 'Golf clubs', 'Usually 15–20 kg'], ['bike', 'A bike in a box', 'Usually 25–32 kg'], ['ski', 'Skis or a snowboard', 'Usually 8–12 kg']].map(([k, title, sub]) => <Pick radio key={k} on={opt === k} onClick={() => setOpt(k)} title={title} sub={sub} />)}
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: 'Both flights', with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: legs, with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Faisal</button>
   </>);
   else body = (<>
     <p className="body">Pets can’t fly with you to Istanbul on {airline}, in the cabin or the hold, and Mada can’t book pet travel.</p>

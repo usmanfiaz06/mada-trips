@@ -114,3 +114,15 @@ a.btn { text-decoration: none; box-sizing: border-box; }
 }
 .tm-add { height: 34px; padding: 0 14px; font-size: 13px; background: var(--green); color: var(--mist); flex-shrink: 0; gap: 4px; }
 .tm-add.on { background: rgba(47, 122, 75, .12); color: var(--ok); }
+
+/* One source of truth: a fact that no longer lines up (hotel still on the old day, no hotel at all) */
+.tm-warn { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 10px; background: #f3e6c9; color: var(--gold-ink); font-size: 12px; font-weight: 600; line-height: 1.35; }
+.tm-move { align-items: flex-start; }
+.tm-move .h3 { color: var(--green); }
+.tm-move-list { gap: 14px; }
+.tm-move-list .tiny { color: var(--ink-2); }
+.tm-nostay { gap: 8px; border: 1.5px dashed rgba(125, 93, 39, .35); background: #fbf5ea; }
+/* Tax invoice for a company: a draft looks like paper still on the desk */
+.tm-draft { background: #f3e6c9; }
+.tm-invoice.draft { outline: 2px dashed rgba(125, 93, 39, .45); outline-offset: -8px; }
+.tm-invoice.draft .tm-inv-kind { color: var(--gold-ink); }

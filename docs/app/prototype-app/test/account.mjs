@@ -343,13 +343,30 @@ try {
   await phone.locator('.scroll').last().evaluate((el) => el.scrollTo(0, 380));
   await shot('profile-applepay');
 
-  step('sign out keeps data');
+  step('sign out: keep my trips on this phone');
   await phone.locator('.scroll').last().evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await click('Sign out');
-  await click('Sign out');
+  await expectText('What should stay on this phone?');
+  await shot('signout-choice');
+  await phone.getByRole('button', { name: /^Keep my trips on this phone/ }).click();
+  await page.waitForTimeout(400);
   const after = await state();
   if (after.onboarded || !after.account?.signedOut || !after.account.photo || !after.household.length) throw new Error('sign out lost data or did not sign out');
+  await expectText('Documents stay locked until you’re in.');
   await shot('signed-out');
+
+  step('sign out: remove everything from this phone');
+  await demo('Skip sign-up');
+  await phone.getByRole('button', { name: 'Profile and settings' }).click();
+  await page.waitForTimeout(400);
+  await phone.locator('.scroll').last().evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await click('Sign out');
+  await phone.getByRole('button', { name: /^Remove everything from this phone/ }).click();
+  await page.waitForTimeout(500);
+  const wiped = await state();
+  if (wiped.onboarded || wiped.household.length || wiped.cards.length || wiped.account || (wiped.docs || []).length || wiped.user) throw new Error('remove everything left data on the phone');
+  await expectText('Start');
+  await shot('signed-out-removed');
 } catch (e) {
   errors.push('flow: ' + e.message.split('\n')[0]); console.log('FIRST ERROR:', e.message.slice(0, 600));
   await shot('FAILED');

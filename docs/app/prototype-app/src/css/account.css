@@ -60,3 +60,10 @@ button.acc-row:active { background: rgba(30, 53, 45, .05); }
 .acc-faq { display: flex; flex-direction: column; }
 .acc-answer { margin: -4px 0 0; padding: 0 16px 16px; animation: in .3s var(--ease) both; }
 .acc-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Sign out: two clear choices, the destructive one in red */
+.acc-choice { align-items: flex-start; text-align: left; gap: 6px; width: 100%; }
+.acc-choice .small { color: var(--ink-2); padding-left: 46px; }
+/* Empty states for a new account */
+.wl-empty { border: 1.5px dashed rgba(30, 53, 45, .18); background: transparent; }
+.ob-empty { align-items: flex-start; gap: 10px; }

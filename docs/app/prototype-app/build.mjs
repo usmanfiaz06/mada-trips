@@ -15,7 +15,8 @@ const result = await build({
 const js = result.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
 // Shared styles first, then one file per area from src/css/.
 const css = [readFileSync('src/styles.css', 'utf8'), ...(existsSync('src/css') ? readdirSync('src/css').filter((f) => f.endsWith('.css')).sort().map((f) => readFileSync('src/css/' + f, 'utf8')) : [])].join('\n');
-const html = `<title>Mada Trips app</title>
+const html = `<meta charset="utf-8">
+<title>Mada Trips app</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>${css}</style>

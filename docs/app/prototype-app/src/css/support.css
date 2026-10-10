@@ -10,3 +10,16 @@
 .inbox-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--mist); display: grid; place-items: center; flex-shrink: 0; }
 .inbox-dot { position: absolute; top: 18px; right: 14px; width: 8px; height: 8px; border-radius: 9px; background: #b98f4a; }
 .inbox-row.unread .tiny { margin-right: 14px; }
+.support-scroll { gap: 10px; padding-bottom: 120px; }
+.support.is-offline .topbar { padding-top: 64px; }
+.support-act { left: 0; right: 0; bottom: 0; padding: 24px 20px 24px; background: linear-gradient(to bottom, rgba(233,226,216,0), var(--sand) 22px); }
+.support-composer { height: 52px; border-radius: 999px; background: #fffdf9; border: 1px solid var(--line); padding: 0 6px 0 8px; }
+.support-composer input { flex: 1 1 auto; min-width: 0; border: 0; outline: none; background: transparent; font-size: 16px; }
+.sp-refund { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 14px; background: var(--mist); }
+.sp-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.sp-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 16px; background: var(--mist); }
+.sp-form .input { height: 46px; font-size: 16px; }
+.sp-form .chip { height: 34px; font-size: 13px; background: var(--paper); }
+.sp-form .chip[aria-pressed="true"] { background: var(--green); }
+.sp-form .btn:disabled { opacity: .45; }
+.sp-offline { gap: 8px; }

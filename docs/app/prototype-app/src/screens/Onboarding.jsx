@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WelcomeBack } from './Account.jsx';
 import { InvitePreview } from './Social.jsx';
-import { useStore, buzz, HAPTIC, PEOPLE, MRZ } from '../store.jsx';
+import { useStore, buzz, HAPTIC, PEOPLE, MRZ, withDemo } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
 import { checkFile, readPassport } from '../ocr.js';
 
 const OTP = '123456';
+/* The sample page drawn on the passport step and behind the camera. Not anyone's account. */
+const SAMPLE_MRZ = ['P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', 'A08•••41<6SAU8403117M3106228<<<<<<<<<<<<<<02'];
 const DEMO_FIELDS = { given: 'OMAR', surname: 'ALHARBI', number: 'A08493141', nationality: 'Saudi Arabia', dob: '11/03/1984', expiry: '22/06/2031' };
 const BLANK_FIELDS = { given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' };
 const hidden = { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' };
@@ -97,20 +99,33 @@ export default function Onboarding() {
       });
   };
 
+  /* The new account is exactly what they gave us: the passport (or nothing yet), the phone, the sign-in. */
   const finish = () => {
+    const cap = (w) => w.split(' ').map((x) => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
+    const saved = !passportLater && (fields.given || fields.surname);
+    const full = saved ? [fields.given, fields.surname].filter(Boolean).map(cap).join(' ') : '';
+    const name = saved && fields.given ? cap(fields.given.split(' ')[0]) : '';
+    const iso = (dmy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+    const expISO = iso(fields.expiry);
+    const num = (fields.number || '').toUpperCase();
+    const masked = num.length > 5 ? `${num.slice(0, 3)}•••${num.slice(-2)}` : num;
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const tracked = (s.trackedFlights || []).length;
     set({
       onboarded: true,
       guest: false,
-      user: { full: [fields.given, fields.surname].filter(Boolean).map((w) => w.split(' ').map((x) => x.charAt(0) + x.slice(1).toLowerCase()).join(' ')).join(' ') || undefined, name: fields.given ? fields.given.split(' ')[0].charAt(0) + fields.given.split(' ')[0].slice(1).toLowerCase() : 'Omar' },
+      demoSeed: false,
+      user: saved ? { name, full, mrz: [('P<SAU' + `${fields.surname}<<${fields.given}`.toUpperCase().replace(/[^A-Z<]+/g, '<')).padEnd(44, '<').slice(0, 44), `${num.replace(/[^A-Z0-9\u2022]/g, '').padEnd(9, '<').slice(0, 9)}0SAU${(iso(fields.dob) || '0000-00-00').slice(2).replace(/-/g, '')}0<${(expISO || '0000-00-00').slice(2).replace(/-/g, '')}0<<<<<<<<<<<<<<00`], passport: { born: iso(fields.dob)?.slice(0, 4) || '', number: masked, expires: expISO ? `${MON[Number(expISO.slice(5, 7)) - 1]} ${expISO.slice(0, 4)}` : '', expiresISO: expISO, nationality: fields.nationality, dob: iso(fields.dob) } } : { name: '', full: '' },
       household: ['omar', ...household],
-      passportSaved: !passportLater,
-      account: { ...(s.account || {}), signedOut: false, ...(phoneOk ? { phone: { digits, at: Date.now() } } : {}), ...(social ? { methods: { ...(s.account?.methods || {}), [social]: true, phone: phoneOk } } : {}) },
+      passportSaved: !!saved,
+      account: { ...(s.account || {}), signedOut: false, ...(phoneOk ? { phone: { digits, source: 'signup', at: Date.now() } } : {}), methods: { apple: social === 'apple', google: social === 'google', phone: phoneOk }, ...(social === 'apple' ? { email: hideEmail ? { address: `${Array.from({ length: 10 }, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 31)]).join('')}@privaterelay.appleid.com`, relay: true, source: 'apple', at: null } : null } : {}) },
       /* Back to what they were doing before signing in, if anything. */
       tab: s.signinFrom?.tab || 'today',
       stack: s.signinFrom?.name ? [{ name: s.signinFrom.name, params: s.signinFrom.params || {}, key: Date.now() }] : [],
       signinFrom: null,
     });
     buzz(HAPTIC.success);
+    if (tracked) setTimeout(() => toast(tracked === 1 ? 'Your tracked flight is in Trips now.' : `Your ${tracked} tracked flights are in Trips now.`), 600);
   };
 
   /* ---------- phone validation ---------- */
@@ -195,14 +210,14 @@ export default function Onboarding() {
               <p className="body">Signing in needs a connection. Your phone number works the same way once you’re back online.</p>
               <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Okay</button>
             </>) : (<>
-              <h2 className="h2">Continue as Omar?</h2>
+              <h2 className="h2">Continue with {sheet === 'apple' ? 'Apple' : 'Google'}?</h2>
               {sheet === 'apple' ? (
                 <div className="col" style={{ gap: 8 }} role="radiogroup" aria-label="Email">
-                  {[[false, 'Share my email', 'omar.alharbi@icloud.com'], [true, 'Hide my email', 'A private address that forwards to you']].map(([v, t, sub]) => (
+                  {[[false, 'Share my email', 'The email on your Apple ID'], [true, 'Hide my email', 'A private address that forwards to you']].map(([v, t, sub]) => (
                     <button key={t} type="button" role="radio" aria-checked={hideEmail === v ? 'true' : 'false'} className={'card tap well' + (hideEmail === v ? ' selected' : '')} onClick={() => setHideEmail(v)}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></button>
                   ))}
                 </div>
-              ) : <p className="body">Google shares your name and email address, omar.alharbi@gmail.com.</p>}
+              ) : <p className="body">Google shares your name and email address. Nothing else.</p>}
               <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
               <button type="button" className="btn ghost block" onClick={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>Cancel</button>
             </>)}
@@ -223,7 +238,7 @@ export default function Onboarding() {
           <span className="tiny rise d3">New phone? For your safety, the Wallet asks for Face ID the first time you open it.</span>
         </div>
         <div className="act">
-          <button type="button" className="btn primary block" onClick={() => { set({ onboarded: true, guest: false, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, tab: s.signinFrom?.tab || 'today', stack: s.signinFrom?.name ? [{ name: s.signinFrom.name, params: s.signinFrom.params || {}, key: Date.now() }] : [], signinFrom: null }); buzz(HAPTIC.success); }}>Open Mada</button>
+          <button type="button" className="btn primary block" onClick={() => { set((p) => ({ ...withDemo(p), tab: p.signinFrom?.tab || 'today', stack: p.signinFrom?.name ? [{ name: p.signinFrom.name, params: p.signinFrom.params || {}, key: Date.now() }] : [], signinFrom: null })); buzz(HAPTIC.success); }}>Open Mada</button>
           <button type="button" className="btn ghost block" onClick={() => goto('phone')}>That’s not me</button>
         </div>
       </div>
@@ -292,7 +307,7 @@ export default function Onboarding() {
                   <span className="pp-two"><span><i>No.</i>A08•••41</span><span><i>Expires</i>22 JUN 2031</span></span>
                 </div>
               </div>
-              <div className="pp-mrz">{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>
+              <div className="pp-mrz">{SAMPLE_MRZ[0]}{'\n'}{SAMPLE_MRZ[1]}</div>
               <div className="pp-beam" />
             </div>
             <div className="pp-form">
@@ -340,7 +355,7 @@ export default function Onboarding() {
           <div className="viewfinder" style={{ flexShrink: 0 }}>
             {photo && scanState === 'reading' && <img src={photo} alt="Your passport photo" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 85%', opacity: 0.9 }} />}
             {(scanState === 'demo' || scanState === 'reading') && <span className="scanline" />}
-            {scanState !== 'reading' && <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(233,226,216,.35)', whiteSpace: 'pre', overflow: 'hidden' }}>{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>}
+            {scanState !== 'reading' && <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(233,226,216,.35)', whiteSpace: 'pre', overflow: 'hidden' }}>{SAMPLE_MRZ[0]}{'\n'}{SAMPLE_MRZ[1]}</div>}
           </div>
           {scanState === 'choose' && (
             <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -440,25 +455,22 @@ export default function Onboarding() {
       <div className="screen">
         <TopBar onBack={back} right={<button type="button" className="link" onClick={() => goto('alerts')}>Skip</button>} />
         <div className="scroll no-dock">
-          <h1 className="h1">Who do you travel with?</h1>
-          <p className="body">Add them once. We'll fill in their details on every trip and watch their documents.</p>
-          {['hessa', 'sara', 'ahmed', 'lina'].map((id) => {
-            const p = PEOPLE[id];
-            const on = household.includes(id);
-            return (
-              <button key={id} type="button" className={'card tap' + (on ? ' selected' : '')} aria-pressed={on ? 'true' : 'false'}
-                onClick={() => { buzz(HAPTIC.select); setHousehold(on ? household.filter((x) => x !== id) : [...household, id]); }}>
-                <div className="row">
-                  <span className={'avatar' + (on ? ' green' : '')}>{p.initial}</span>
-                  <div className="grow col"><span className="h3">{p.name}</span><span className="small">{p.role}</span></div>
-                  <span className="pill" style={on ? { background: '#1e352d', color: '#f6f2ec' } : null}>{on ? 'Added' : 'Add'}</span>
-                </div>
-                {on && id === 'lina' && <span className="small">Before any trip, we'll ask for Lina's iqama expiry and exit and re-entry visa dates.</span>}
-              </button>
-            );
-          })}
-          <button type="button" className="btn secondary block" onClick={() => setSheet('addPerson')}><Icon name="plus" />Someone else</button>
-          {household.filter((id) => !['hessa', 'sara', 'ahmed', 'lina'].includes(id)).map((id) => <div key={id} className="card selected" style={{ flexDirection: 'row', alignItems: 'center' }}><span className="avatar green">{PEOPLE[id].initial}</span><span className="grow col" style={{ gap: 0 }}><span className="h3">{PEOPLE[id].name}</span><span className="small">{PEOPLE[id].role}</span></span><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec' }}>Added</span></div>)}
+          <h1 className="h1">Add your family.</h1>
+          <p className="body">Anyone you book for. Add them once and we’ll fill in their details on every trip and watch their passports. You can do it later too.</p>
+          {household.map((id) => PEOPLE[id]).filter(Boolean).map((p) => (
+            <div key={p.id} className="card selected rise" style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <span className="avatar green">{p.initial}</span>
+              <span className="grow col" style={{ gap: 0 }}><span className="h3">{p.name}</span><span className="small">{p.full} · {p.role}</span></span>
+              <button type="button" className="link" style={{ fontSize: 13 }} aria-label={`Remove ${p.name}`} onClick={() => { buzz(HAPTIC.tap); setHousehold(household.filter((x) => x !== p.id)); set((st) => ({ household: st.household.filter((x) => x !== p.id) })); }}>Remove</button>
+            </div>
+          ))}
+          {!household.length && (
+            <div className="card well ob-empty">
+              <span className="row" style={{ gap: 6 }}>{['#efe3c9', '#e7ecef', '#f6f2ec'].map((c) => <span key={c} className="avatar" style={{ background: c }}><Icon name="user" size={18} /></span>)}</span>
+              <span className="small">A spouse, children, parents or a helper. Names exactly as on their passports.</span>
+            </div>
+          )}
+          <button type="button" className="btn secondary block" onClick={() => setSheet('addPerson')}><Icon name="plus" />Add someone</button>
           {sheet === 'addPerson' && <AddPersonSheet onClose={() => setSheet(null)} onAdded={(p) => { setHousehold((h) => [...h, p.id]); setSheet(null); }} />}
         </div>
         <div className="act">
