@@ -11,7 +11,7 @@ const exe = process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/c
 const browser = await chromium.launch({ executablePath: exe });
 const page = await browser.newPage({ viewport: { width: 1200, height: 920 } });
 const errors = [];
-page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+page.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); console.log('PAGEERROR', e.message); });
 page.on('console', (m) => { if (m.type() === 'error' && !/fonts\.g/.test(m.text())) errors.push('console: ' + m.text()); });
 await page.goto(pathToFileURL(resolve('dist/index.html')).href);
 
@@ -41,7 +41,9 @@ try {
   await page.waitForTimeout(2600);
   await shot('passport-intro');
   await click('Scan passport');
-  await click('Allow', { exact: true, wait: 2800 });
+  await click('Allow', { exact: true });
+  await shot('passport-camera');
+  await click('Use the demo passport', { wait: 2800 });
   await shot('passport-confirm');
   await click('Yes, save it');
   for (const who of ['Hessa', 'Sara', 'Ahmed']) await phone.getByRole('button', { name: new RegExp(who + ' ') }).click();
@@ -188,6 +190,13 @@ try {
   await phone.getByRole('button', { name: 'Circles' }).click();
   await page.waitForTimeout(500);
   await shot('discover');
+  await phone.locator('article.story .glass-btn[aria-pressed]').first().click();
+  await page.waitForTimeout(300);
+  await phone.getByRole('button', { name: "Reem's profile" }).evaluate((el) => el.click());
+  await page.waitForTimeout(400);
+  await click('Follow');
+  await shot('reem-profile');
+  await click('Back', { wait: 400 });
   await phone.locator('.story', { hasText: 'Two days in AlUla' }).first().click();
   await page.waitForTimeout(600);
   await shot('plan');
@@ -199,6 +208,43 @@ try {
   await page.waitForTimeout(400);
   await click('Circles', { role: 'tab' });
   await shot('circles');
+  await phone.getByRole('button', { name: /^Istanbul\. Choose a city|city/ }).count();
+
+  step('circles: new circle, settings, people, friend');
+  await click('New circle', { wait: 500 });
+  await phone.locator('#nc-name').fill('Cousins in Baku');
+  await phone.locator('.person-row', { hasText: 'Abdullah' }).click();
+  await phone.locator('.person-row', { hasText: 'Noor' }).click();
+  await shot('new-circle');
+  await click('Make Cousins in Baku', { wait: 600 });
+  await phone.locator('#msg').fill('Who is in for June?');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2800);
+  await shot('circle-chat');
+  await phone.getByRole('button', { name: /settings and people$/ }).click();
+  await page.waitForTimeout(400);
+  await shot('circle-settings');
+  await click('Leave the circle');
+  await click('Leave', { wait: 600 });
+  await shot('circles-after-leave');
+  await phone.getByRole('button', { name: /^Your people/ }).click();
+  await page.waitForTimeout(400);
+  await phone.getByRole('tab', { name: /^Requests/ }).click(); await page.waitForTimeout(300);
+  await shot('people-requests');
+  await click('Accept');
+  await phone.getByRole('tab', { name: /^Invited/ }).click(); await page.waitForTimeout(300);
+  await click('Remind');
+  await shot('people-invited');
+  await phone.getByRole('tab', { name: /^Friends/ }).click(); await page.waitForTimeout(300);
+  await phone.locator('.person-row', { hasText: 'Noor' }).click();
+  await page.waitForTimeout(400);
+  await shot('friend');
+  await click('Back', { wait: 400 });
+  await click('Circles', { wait: 400 });
+  await phone.getByRole('button', { name: 'See all' }).first().click();
+  await page.waitForTimeout(400);
+  await shot('saved');
+  await click('Circles', { wait: 400 });
 
   step('offline');
   await demo('Offline');
@@ -212,7 +258,7 @@ try {
   await page.waitForTimeout(500);
   await shot('profile');
 } catch (e) {
-  errors.push('flow: ' + e.message.split('\n')[0]);
+  errors.push('flow: ' + e.message.split('\n')[0]); console.log('FIRST ERROR:', e.message.slice(0, 600));
   await shot('FAILED');
 }
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue } from '../store.jsx';
 import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark } from '../ui.jsx';
 
@@ -469,6 +470,7 @@ function Flashcards() {
 }
 
 function InAir() {
+  const { s } = useStore();
   const [sheet, setSheet] = useState(false);
   const start = useRef(Date.now());
   useTicker(1000);
@@ -511,25 +513,21 @@ function InAir() {
 
       <div className="card" style={{ marginTop: 6 }}>
         <span className="h3">When you land</span>
-        {[['visa', 'Passport control, then bags'], ['bag', 'The carousel shows here as you land'], ['car', 'Ahmet meets you at Door 3 with your name']].map(([ic, t2]) => (
+        {[['visa', 'Passport control, then bags'], ['bag', 'The carousel shows here as you land'], ['car', s.trip?.pickup ? 'Ahmet meets you at Door 3 with your name' : 'No car booked yet. Your options are below.']].map(([ic, t2]) => (
           <div key={t2} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t2}</div>
         ))}
-        <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>Hotel address for the driver</button>
+        <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>{s.trip?.pickup ? 'Hotel address for the driver' : 'Getting to the hotel'}</button>
       </div>
-      {sheet && (
-        <Sheet label="Hotel address" onClose={() => setSheet(false)}>
-          <span className="eyebrow">Show this to the driver</span>
-          <span className="display" style={{ fontSize: 34 }}>Bereketzade, Galata Kulesi Sk., Beyoğlu, İstanbul</span>
-          <span className="small">Rooms near Galata Tower · check-in from 14:00</span>
-          <button type="button" className="btn primary block" onClick={() => setSheet(false)}>Done</button>
-        </Sheet>
-      )}
+      {sheet && <AddressSheet onClose={() => setSheet(false)} />}
     </>
   );
 }
 
 function Landed() {
-  const { s } = useStore();
+  const { s, set, toast } = useStore();
+  const [sheet, setSheet] = useState(null);
+  const [ref, setRef] = useState('');
+  const bag = s.bagReport;
   return (
     <>
       <h1 className="display rise" style={{ fontSize: 46 }}>Welcome to Istanbul.</h1>
@@ -537,10 +535,27 @@ function Landed() {
         <div className="notice rise"><span className="spinner" style={{ marginTop: 3 }} /><span className="grow"><span className="h3">Booking {(s.inflightPicks || []).length === 1 ? "your pick" : `your ${(s.inflightPicks || []).length} picks`} for tonight</span><span className="small">The ones you chose in the air. Confirmation in a few minutes.</span></span></div>
       )}
       <div className="card focal rise d1">
-        {[['bag', 'Bags on carousel 7'], ['car', 'Ahmet is at Door 3 with your name on a sign'], ['globe', 'Your eSIM is on. 10 GB for each of you.'], ['stay', 'Rooms ready at 14:00. Early check-in requested.']].map(([ic, t]) => (
+        {[['bag', bag ? `Missing bag reported · ${bag}` : 'Bags on carousel 7'], ['car', s.trip?.pickup ? 'Ahmet is at Door 3 with your name on a sign' : 'No car booked. Tap below for the best way in.'], ['globe', 'Your eSIM is on. 10 GB for each of you.'], ['stay', 'Rooms ready at 14:00. Early check-in requested.']].map(([ic, t]) => (
           <div key={t} className="row" style={{ fontSize: 15 }}><Icon name={ic} color="#d9b77a" size={20} />{t}</div>
         ))}
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <button type="button" className="btn gold small" onClick={() => setSheet('address')}>{s.trip?.pickup ? 'Hotel address' : 'Getting to the hotel'}</button>
+          {!bag && <button type="button" className="btn on-dark small" onClick={() => setSheet('bag')}>A bag didn’t arrive</button>}
+        </div>
       </div>
+      {sheet === 'address' && <AddressSheet onClose={() => setSheet(null)} />}
+      {sheet === 'bag' && (
+        <Sheet label="Missing bag" onClose={() => setSheet(null)}>
+          <h2 className="h2">Before you leave the baggage hall</h2>
+          {['Go to the Saudia baggage desk next to carousel 7.', 'Show your bag tag (it’s on your boarding pass in the Wallet).', 'They give you a reference that looks like ISTSV12345. Type it below.'].map((t, i) => (
+            <div key={t} className="row" style={{ alignItems: 'flex-start' }}><span className="avatar sm" style={{ flexShrink: 0 }}>{i + 1}</span><span className="body">{t}</span></div>
+          ))}
+          <div className="field"><label htmlFor="pir">Reference from the desk</label><input id="pir" className="input" value={ref} onChange={(e) => setRef(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))} placeholder="ISTSV12345" />
+            {ref.length > 0 && !/^[A-Z]{5}\d{5}$/.test(ref) && <span className="err">It’s 5 letters then 5 numbers, like ISTSV12345.</span>}</div>
+          <button type="button" className="btn primary block" disabled={!/^[A-Z]{5}\d{5}$/.test(ref)} onClick={() => { set({ bagReport: ref }); setSheet(null); buzz(HAPTIC.success); toast('Faisal is chasing it with Saudia. Keep receipts for essentials, up to SAR 375 a day.'); }}>Let Mada chase it</button>
+          <span className="tiny">Bags usually reach the hotel within 48 hours. Saudia pays for essentials while you wait.</span>
+        </Sheet>
+      )}
     </>
   );
 }
@@ -596,5 +611,62 @@ export default function Today() {
         {body}
       </div>
     </div>
+  );
+}
+
+const ADDRESS = { local: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', name: 'Rooms near Galata Tower', phone: '+90 212 000 0000' };
+
+/* The hotel address, maps, and a way there whether or not a car is booked. Saved on the phone, so it works without signal. */
+export function AddressSheet({ onClose }) {
+  const { s, set, toast } = useStore();
+  const [big, setBig] = useState(false);
+  const [ride, setRide] = useState(null);
+  const q = encodeURIComponent(ADDRESS.local);
+  const pickup = s.trip?.pickup;
+  if (big) return createPortal(
+    <div className="address-big" role="dialog" aria-label="Address for the driver" onClick={() => setBig(false)}>
+      <span className="eyebrow" style={{ color: '#7d5d27' }}>Lütfen bu adrese gidin · Please take me here</span>
+      <span className="display" style={{ fontSize: 44, lineHeight: 1.05 }}>{ADDRESS.local}</span>
+      <span className="small">Tap anywhere to close</span>
+    </div>, document.querySelector('.phone') || document.body
+  );
+  return (
+    <Sheet label="Hotel address" onClose={onClose}>
+      <span className="eyebrow">{ADDRESS.name} · check-in from 14:00</span>
+      <button type="button" className="address-card" onClick={() => setBig(true)} aria-label="Show the address full screen">
+        <span className="display" style={{ fontSize: 26, lineHeight: 1.1 }}>{ADDRESS.local}</span>
+        <span className="tiny">Tap to show it full screen to the driver</span>
+      </button>
+      <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <a className="btn secondary small" href={`https://www.google.com/maps/search/?api=1&query=${q}`} target="_blank" rel="noreferrer"><Icon name="pin" size={18} />Google Maps</a>
+        <a className="btn secondary small" href={`https://maps.apple.com/?q=${q}`} target="_blank" rel="noreferrer"><Icon name="pin" size={18} />Apple Maps</a>
+        <button type="button" className="btn secondary small" onClick={async () => { try { await navigator.clipboard.writeText(ADDRESS.local); toast('Address copied.'); } catch (e) { toast('Press and hold the address to copy it.'); } }}>Copy</button>
+        <a className="btn secondary small" href={`tel:${ADDRESS.phone.replace(/\s/g, '')}`}>Call the hotel</a>
+      </div>
+      {pickup ? (
+        <div className="card well" style={{ gap: 6 }}>
+          <span className="h3" style={{ fontSize: 15 }}>Ahmet is meeting you</span>
+          <span className="small">Door 3, arrivals hall, with a sign saying ALHARBI. Grey Mercedes Vito · 34 MDA 21. He waits 60 minutes after you land, at no cost.</span>
+          <div className="row"><a className="btn primary small" href="tel:+905000000000">Call Ahmet</a><button type="button" className="btn secondary small" onClick={() => toast('Message sent. Ahmet replies in English or Turkish.')}>Message</button></div>
+        </div>
+      ) : (
+        <div className="col" style={{ gap: 8 }}>
+          <span className="eyebrow">No car booked. Three ways there</span>
+          {[
+            ['car', 'A Mada pickup', 'SAR 220 for the family · driver waits 60 min · paid now', 'pickup'],
+            ['car', 'Taxi from the rank', 'About TRY 1,100 (SAR 125) · 45–60 min · yellow rank at Door 14. Ask for the meter: “taksimetre”.', 'taxi'],
+            ['flight', 'Metro', 'M11 to Gayrettepe, then M2 to Şişhane · about 70 min · TRY 60 each · hard with big bags', 'metro'],
+          ].map(([ic, t, sub, id]) => (
+            <button key={id} type="button" className={'card tap well' + (ride === id ? ' selected' : '')} style={{ flexDirection: 'row', alignItems: 'flex-start' }} onClick={() => setRide(id)}>
+              <Icon name={ic} /><span className="grow col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></span>
+            </button>
+          ))}
+          {ride === 'pickup' && <button type="button" className="btn primary block" onClick={() => { set((p) => ({ trip: p.trip ? { ...p.trip, pickup: { price: 220, status: 'booked' } } : p.trip })); buzz(HAPTIC.success); toast('Pickup booked. Ahmet will meet you at Door 3.'); }}>Book the pickup · SAR 220</button>}
+          {ride === 'taxi' && <span className="small">Only take taxis from the rank. If a driver won’t use the meter, take the next one. Show them the address above.</span>}
+          {ride === 'metro' && <a className="btn secondary block" href={`https://www.google.com/maps/dir/?api=1&origin=Istanbul+Airport&destination=${q}&travelmode=transit`} target="_blank" rel="noreferrer">Directions in Google Maps</a>}
+        </div>
+      )}
+      <span className="tiny">Saved on this phone. Works without signal.</span>
+    </Sheet>
   );
 }

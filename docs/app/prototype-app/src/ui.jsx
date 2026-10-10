@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { buzz, HAPTIC, useStore, registerPerson } from './store.jsx';
 
@@ -88,7 +89,7 @@ export function TopBar({ title, onBack, backLabel = 'Back', right, dark }) {
 
 export function Sheet({ onClose, children, label }) {
   useEffect(() => { buzz(HAPTIC.tap); }, []);
-  return (
+  const node = (
     <>
       <div className="backdrop" onClick={onClose} aria-hidden="true" />
       <div className="sheet" role="dialog" aria-modal="true" aria-label={label}>
@@ -97,6 +98,9 @@ export function Sheet({ onClose, children, label }) {
       </div>
     </>
   );
+  /* Pinned to the phone, so a sheet opened from deep in a scrolled page never scrolls away. */
+  const host = typeof document !== 'undefined' && document.querySelector('.phone');
+  return host ? createPortal(node, host) : node;
 }
 
 export function Toggle({ checked, onChange, label, onDark }) {
@@ -181,7 +185,12 @@ export function Dock() {
           <Sun width={32} />
         </button>
       ) : (
-        <button key={t.id} type="button" className={s.tab === t.id ? 'on' : ''} aria-label={t.label} aria-current={s.tab === t.id ? 'page' : undefined} onClick={() => { buzz(HAPTIC.tap); go(t.id); }}>
+        <button key={t.id} type="button" className={s.tab === t.id ? 'on' : ''} aria-label={t.label} aria-current={s.tab === t.id ? 'page' : undefined} onClick={() => {
+          buzz(HAPTIC.tap);
+          /* Tapping the tab you're on takes you back to its top, like iOS. */
+          if (s.tab === t.id) document.querySelectorAll('.phone .scroll').forEach((el) => el.scrollTo({ top: 0, behavior: 'smooth' }));
+          go(t.id);
+        }}>
           <Icon name={t.icon} />{s.tab === t.id ? t.label : null}
         </button>
       ))}

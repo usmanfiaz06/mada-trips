@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
 import { Icon, Sun, Sheet, AirlineMark } from '../ui.jsx';
+import { checkFile, readPassport } from '../ocr.js';
 
 export default function Wallet() {
   const { s, set } = useStore();
@@ -184,7 +185,8 @@ function Unlocked() {
       )}
       {sheet === 'upload' && <UploadSheet title={`Add ${docType === 'Something else' ? 'a document' : docType.toLowerCase()} for ${p.name}`}
         found={docType === 'Visa' ? [['Type', 'Schengen, multiple entry'], ['Valid', '12 Jun 2026 – 11 Jun 2028'], ['Name', p.full]] : docType === 'Travel insurance' ? [['Insurer', 'Family travel cover'], ['Covers', 'Türkiye, 9–15 Mar'], ['Policy', 'TI-48211']] : docType === 'Passport' ? [['Name', p.full], ['Number', p.number], ['Expires', p.expires]] : [['Document', docType], ['Name', p.full]]}
-        onSave={() => { set((prev) => ({ docs: [...(prev.docs || []), { id: 'd' + Date.now(), person: who, type: docType, sub: docType === 'Visa' ? 'Schengen · multiple entry until Jun 2028' : docType === 'Travel insurance' ? 'Covers Türkiye, 9–15 Mar' : 'Added just now' }] })); setSheet(null); buzz(HAPTIC.success); toast('Saved to the Wallet.'); }}
+        readPassport={docType === 'Passport'}
+        onSave={(read) => { set((prev) => ({ docs: [...(prev.docs || []), { id: 'd' + Date.now(), person: who, type: docType, sub: read ? `${read.number} · expires ${read.expiry}` : docType === 'Visa' ? 'Schengen · multiple entry until Jun 2028' : docType === 'Travel insurance' ? 'Covers Türkiye, 9–15 Mar' : 'Added just now' }] })); setSheet(null); buzz(HAPTIC.success); toast('Saved to the Wallet.'); }}
         onClose={() => setSheet(null)} />}
       {sheet === 'scan' && <ScanSheet onDone={() => { setSheet(null); if (missing) set({ passportSaved: true }); toast('Saved to the Wallet.'); }} onClose={() => setSheet(null)} />}
       {sheet === 'pass' && (
@@ -220,41 +222,124 @@ export function ScanSheet({ onDone, onClose }) {
   );
 }
 
-/* Upload a photo or PDF: real file picker; reading is simulated. */
-export function UploadSheet({ title, found, onSave, onClose, allowScan = true }) {
+const hidden = { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' };
+const isExpired = (ddmmyyyy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(ddmmyyyy || ''); return !!m && new Date(+m[3], +m[2] - 1, +m[1]) < new Date(); };
+
+/* Upload a photo or PDF: real file picker. Passports are read from the photo for real (ocr.js); other documents are simulated. */
+export function UploadSheet({ title, found, onSave, onClose, allowScan = true, readPassport: realRead = false }) {
   const { s } = useStore();
   const [st, setSt] = useState('choose');
   const [file, setFile] = useState(null);
   const [err, setErr] = useState(null);
-  const read = (f) => {
+  const [photo, setPhoto] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [read, setRead] = useState(null); // what the passport reader found
+  const run = useRef(0);
+  useEffect(() => () => { run.current += 1; }, []);
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
+
+  const simulate = (ms) => setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else { setSt('found'); buzz(HAPTIC.success); } }, ms);
+
+  const readPhoto = (f) => {
+    const bad = checkFile(f);
+    if (bad) { setErr(bad); return; }
+    const mine = ++run.current;
+    setFile(f); setRead(null); setProgress(0); setPhoto(URL.createObjectURL(f)); setSt('reading');
+    readPassport(f, (n) => { if (run.current === mine) setProgress(n); })
+      .then((r) => {
+        if (run.current !== mine) return;
+        if (!r.fields) { setSt('failed'); buzz(HAPTIC.soft); return; }
+        setRead(r); setSt('found'); buzz(r.doubtful.length ? HAPTIC.soft : HAPTIC.success);
+      })
+      .catch((e) => {
+        if (run.current !== mine) return;
+        setErr(/photo|open/i.test(e.message) ? e.message : 'The passport reader didn’t load. Check your connection and try again.');
+        setSt('choose'); buzz(HAPTIC.soft);
+      });
+  };
+
+  const pick = (f) => {
     setErr(null);
     if (!f) return;
+    if (realRead && f.type === 'application/pdf') { setErr('We read passports from a photo, not a PDF. Take a photo of the photo page instead.'); return; }
+    if (realRead) { readPhoto(f); return; }
     if (!/^image\/|application\/pdf/.test(f.type)) { setErr('That file type won’t work. Use a photo or a PDF.'); return; }
     if (f.size > 10 * 1024 * 1024) { setErr('That file is over 10 MB. Try a photo of the page instead.'); return; }
     setFile(f); setSt('reading');
-    setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else { setSt('found'); buzz(HAPTIC.success); } }, 1600);
+    simulate(1600);
   };
+
+  const rows = read ? [
+    ['Surname', read.fields.surname, 'surname'],
+    ['Given names', read.fields.given, 'given'],
+    ['Number', read.fields.number, 'number'],
+    ['Nationality', read.fields.nationality, 'nationality'],
+    ['Born', read.fields.dob, 'dob'],
+    ['Expires', read.fields.expiry, 'expiry'],
+  ] : found.map(([k, v]) => [k, v, null]);
+
   return (
     <Sheet label={title} onClose={onClose}>
       <h2 className="h2">{title}</h2>
       {st === 'choose' && (
         <>
-          {allowScan && <button type="button" className="card tap well" onClick={() => { setSt('reading'); setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else { setSt('found'); buzz(HAPTIC.success); } }, 1800); }} style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="scan" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Scan with the camera</span><span className="tiny">Best for passports and printed visas</span></span></button>}
-          <label className="card tap well" style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer' }}>
-            <Icon name="doc" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Upload a photo or PDF</span><span className="tiny">From your files or photos · up to 10 MB</span></span>
-            <input type="file" accept="image/*,application/pdf" onChange={(e) => read(e.target.files && e.target.files[0])} style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }} />
+          {allowScan && (realRead ? (
+            <label className="card tap well" style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
+              <Icon name="scan" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Take a photo of the photo page</span><span className="tiny">We read the two lines at the bottom</span></span>
+              <input type="file" accept="image/*" capture="environment" onChange={(e) => { pick(e.target.files && e.target.files[0]); e.target.value = ''; }} style={hidden} />
+            </label>
+          ) : (
+            <button type="button" className="card tap well" onClick={() => { setSt('reading'); simulate(1800); }} style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="scan" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Scan with the camera</span><span className="tiny">Best for passports and printed visas</span></span></button>
+          ))}
+          <label className="card tap well" style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
+            <Icon name="doc" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{realRead ? 'Choose a photo' : 'Upload a photo or PDF'}</span><span className="tiny">{realRead ? 'From your photos · up to 10 MB' : 'From your files or photos · up to 10 MB'}</span></span>
+            <input type="file" accept={realRead ? 'image/*' : 'image/*,application/pdf'} onChange={(e) => { pick(e.target.files && e.target.files[0]); e.target.value = ''; }} style={hidden} />
           </label>
           {err && <span className="err" role="alert" style={{ fontSize: 13, color: '#8a3524' }}>{err}</span>}
         </>
       )}
-      {st === 'reading' && <div className="row small"><span className="spinner" />Reading {file ? file.name : 'the page'}…</div>}
-      {st === 'failed' && <><span className="h3">We couldn't read it.</span><span className="small">Try a sharper photo, flat and without glare, or a PDF straight from the issuer.</span><button type="button" className="btn primary block" onClick={() => setSt('choose')}>Try again</button></>}
+      {st === 'reading' && (realRead && photo ? (
+        <>
+          <div className="viewfinder" style={{ margin: 0, height: 180, background: '#0b100d' }}>
+            <img src={photo} alt="Your passport photo" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 85%', opacity: 0.9 }} />
+            <span className="scanline" />
+          </div>
+          <div className="col" style={{ gap: 8 }} aria-live="polite">
+            <span className="h3" style={{ fontSize: 15 }}>Reading your passport…</span>
+            <div role="progressbar" aria-label="Reading your passport" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} style={{ height: 6, borderRadius: 999, background: '#efe9e0', overflow: 'hidden' }}>
+              <span style={{ display: 'block', height: '100%', width: `${progress}%`, background: '#1e352d', borderRadius: 999, transition: 'width .3s var(--ease)' }} />
+            </div>
+            <span className="tiny num">{progress < 30 ? 'Getting ready. The first scan takes a few seconds longer.' : 'Looking for the two lines at the bottom.'} {progress}%</span>
+          </div>
+        </>
+      ) : <div className="row small"><span className="spinner" />Reading {file ? file.name : 'the page'}…</div>)}
+      {st === 'failed' && (
+        <>
+          <span className="h3">We couldn't read it.</span>
+          <span className="small">{realRead ? 'Lay it flat on a table, away from glare, with the whole photo page in the shot, including the two lines at the bottom.' : 'Try a sharper photo, flat and without glare, or a PDF straight from the issuer.'}</span>
+          <button type="button" className="btn primary block" onClick={() => setSt('choose')}>Try again</button>
+        </>
+      )}
       {st === 'found' && (
         <>
-          <span className="small">We found this. Check it before saving.</span>
-          <div className="card well" style={{ gap: 6 }}>{found.map(([k, v]) => <div key={k} className="spread small"><span>{k}</span><span style={{ color: '#1e352d', fontWeight: 600 }}>{v}</span></div>)}</div>
-          <button type="button" className="btn primary block" onClick={onSave}>Save</button>
-          <button type="button" className="btn ghost block" onClick={() => setSt('choose')}>Something's wrong</button>
+          <span className="small">{read ? 'Read from your photo. Check every letter before saving.' : 'We found this. Check it before saving.'}</span>
+          <div className="card well" style={{ gap: 6 }}>
+            {rows.map(([k, v, key]) => {
+              const unsure = read && read.doubtful.includes(key);
+              return (
+                <div key={k} className="spread small">
+                  <span>{k}</span>
+                  <span className="row" style={{ gap: 6 }}>
+                    {unsure && <span className="pill" style={{ background: '#f3e6c9', color: '#7d5d27', height: 22, padding: '0 8px', fontSize: 11 }}>Check this</span>}
+                    <span style={{ color: '#1e352d', fontWeight: 600, borderBottom: unsure ? '2px solid #d9b77a' : 'none' }}>{v || '—'}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {read && isExpired(read.fields.expiry) && <span className="small" role="alert" style={{ color: '#7d5d27' }}>This passport has expired. We'll save it, but it can't be used to travel. Mada can help you renew it.</span>}
+          <button type="button" className="btn primary block" onClick={() => onSave(read ? read.fields : undefined)}>Save</button>
+          <button type="button" className="btn ghost block" onClick={() => { setRead(null); setSt('choose'); }}>Something's wrong</button>
         </>
       )}
     </Sheet>

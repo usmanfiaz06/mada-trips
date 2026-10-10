@@ -4,11 +4,14 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node test/flows.mjs"
+    "test": "node test/flows.mjs",
+    "test:mrz": "node test/mrz.test.mjs",
+    "test:ocr": "node test/ocr.e2e.mjs"
   },
   "dependencies": {
     "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react-dom": "18.3.1",
+    "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "esbuild": "0.24.0",

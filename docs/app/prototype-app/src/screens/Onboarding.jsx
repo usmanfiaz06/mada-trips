@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
+import { checkFile, readPassport } from '../ocr.js';
 
 const OTP = '123456';
+const DEMO_FIELDS = { given: 'OMAR', surname: 'ALHARBI', number: 'A08493141', nationality: 'Saudi Arabia', dob: '11/03/1984', expiry: '22/06/2031' };
+const BLANK_FIELDS = { given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' };
+const hidden = { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' };
 
 export default function Onboarding() {
   const { s, set, toast } = useStore();
@@ -14,9 +18,16 @@ export default function Onboarding() {
   const [tries, setTries] = useState(0);
   const [resendIn, setResendIn] = useState(30);
   const [sheet, setSheet] = useState(null);
-  const [scanState, setScanState] = useState('scanning');
-  const [fields, setFields] = useState({ given: 'OMAR', surname: 'ALHARBI', number: 'A08493141', nationality: 'Saudi Arabia', dob: '11/03/1984', expiry: '22/06/2031' });
+  const [scanState, setScanState] = useState('choose'); // choose | demo | reading | failed
+  const [fields, setFields] = useState(DEMO_FIELDS);
   const [manual, setManual] = useState(false);
+  const [fromPhoto, setFromPhoto] = useState(false);
+  const [doubt, setDoubt] = useState([]);
+  const [photo, setPhoto] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [fileErr, setFileErr] = useState(null);
+  const [failWhy, setFailWhy] = useState(null);
+  const run = useRef(0);
   const [household, setHousehold] = useState([]);
   const [passportLater, setPassportLater] = useState(false);
 
@@ -30,21 +41,60 @@ export default function Onboarding() {
     return () => clearInterval(t);
   }, [step]);
 
+  // Arriving on the camera step: wait for a photo, or the demo passport.
   useEffect(() => {
-    if (step !== 'camera') return undefined;
-    setScanState('scanning');
+    if (step !== 'camera') { run.current += 1; return; }
+    setScanState('choose'); setFileErr(null);
+  }, [step]);
+
+  // The demo passport: a simulated scan of Omar's page.
+  useEffect(() => {
+    if (step !== 'camera' || scanState !== 'demo') return undefined;
     const t = setTimeout(() => {
-      if (s.demo.scanFails) { setScanState('failed'); buzz(HAPTIC.soft); }
-      else { buzz(HAPTIC.success); setManual(false); goto('confirm'); }
+      if (s.demo.scanFails) { setFailWhy(null); setScanState('failed'); buzz(HAPTIC.soft); }
+      else { buzz(HAPTIC.success); setManual(false); setFromPhoto(false); setDoubt([]); setFields(DEMO_FIELDS); goto('confirm'); }
     }, 2200);
     return () => clearTimeout(t);
-  }, [step, s.demo.scanFails]);
+  }, [step, scanState, s.demo.scanFails]);
+
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
+
+  const byHand = () => { setManual(true); setFromPhoto(false); setDoubt([]); setFields(BLANK_FIELDS); };
+
+  // A real photo: read the two lines at the bottom of the page.
+  const readPhoto = (file) => {
+    setFileErr(null);
+    const bad = checkFile(file);
+    if (bad) { setFileErr(bad); buzz(HAPTIC.soft); return; }
+    const mine = ++run.current;
+    setPhoto(URL.createObjectURL(file));
+    setProgress(0);
+    setScanState('reading');
+    readPassport(file, (n) => { if (run.current === mine) setProgress(n); })
+      .then((r) => {
+        if (run.current !== mine) return;
+        if (!r.fields) { setFailWhy(null); setScanState('failed'); buzz(HAPTIC.soft); return; }
+        const f = r.fields;
+        setFields({ given: f.given, surname: f.surname, number: f.number, nationality: f.nationality, dob: f.dob, expiry: f.expiry });
+        setDoubt(r.doubtful);
+        setManual(false);
+        setFromPhoto(true);
+        buzz(r.doubtful.length ? HAPTIC.soft : HAPTIC.success);
+        goto('confirm');
+      })
+      .catch((e) => {
+        if (run.current !== mine) return;
+        setFailWhy(/photo|open/i.test(e.message) ? e.message : 'The passport reader didn’t load. Check your connection and try again.');
+        setScanState('failed');
+        buzz(HAPTIC.soft);
+      });
+  };
 
   const finish = () => {
     set({
       onboarded: true,
       guest: false,
-      user: { name: fields.given ? fields.given.charAt(0) + fields.given.slice(1).toLowerCase() : 'Omar' },
+      user: { name: fields.given ? fields.given.split(' ')[0].charAt(0) + fields.given.split(' ')[0].slice(1).toLowerCase() : 'Omar' },
       household: ['omar', ...household],
       passportSaved: !passportLater,
       tab: 'today',
@@ -216,7 +266,7 @@ export default function Onboarding() {
         </div>
         <div className="act">
           <button type="button" className="btn primary block" onClick={() => setSheet('camera')}><Icon name="scan" color="#d9b77a" />Scan passport</button>
-          <button type="button" className="btn ghost block" onClick={() => { setManual(true); setFields({ given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' }); goto('confirm'); }}>Enter it by hand</button>
+          <button type="button" className="btn ghost block" onClick={() => { byHand(); goto('confirm'); }}>Enter it by hand</button>
         </div>
         {sheet === 'camera' && (
           <Sheet label="Camera access" onClose={() => setSheet(null)}>
@@ -230,7 +280,7 @@ export default function Onboarding() {
           <Sheet label="No camera" onClose={() => setSheet(null)}>
             <h2 className="h2">No camera, no problem.</h2>
             <p className="body">Enter the details by hand now. You can allow the camera later in Settings.</p>
-            <button type="button" className="btn primary block" onClick={() => { setSheet(null); setManual(true); setFields({ given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' }); goto('confirm'); }}>Enter it by hand</button>
+            <button type="button" className="btn primary block" onClick={() => { setSheet(null); byHand(); goto('confirm'); }}>Enter it by hand</button>
             <button type="button" className="btn ghost block" onClick={() => { setSheet(null); setPassportLater(true); goto('household'); }}>Do it later</button>
           </Sheet>
         )}
@@ -240,22 +290,60 @@ export default function Onboarding() {
     camera: (
       <div className="camera">
         <TopBar onBack={back} backLabel="Cancel" dark />
-        <div style={{ padding: '30px 0 0', display: 'flex', flexDirection: 'column', gap: 24 }}>
-          <div className="viewfinder">
-            {scanState === 'scanning' && <span className="scanline" />}
-            <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(233,226,216,.35)', whiteSpace: 'pre', overflow: 'hidden' }}>{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>
+        <div className="scroll no-dock" style={{ padding: '30px 0 32px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div className="viewfinder" style={{ flexShrink: 0 }}>
+            {photo && scanState === 'reading' && <img src={photo} alt="Your passport photo" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 85%', opacity: 0.9 }} />}
+            {(scanState === 'demo' || scanState === 'reading') && <span className="scanline" />}
+            {scanState !== 'reading' && <div style={{ position: 'absolute', left: 16, right: 16, bottom: 16, fontFamily: 'var(--f-mono)', fontSize: 10, color: 'rgba(233,226,216,.35)', whiteSpace: 'pre', overflow: 'hidden' }}>{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>}
           </div>
-          {scanState === 'scanning' ? (
+          {scanState === 'choose' && (
+            <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 4px' }}>
+                <span className="h3" style={{ color: '#f6f2ec' }}>Photograph the photo page</span>
+                <span className="small" style={{ color: '#b8b0a3' }}>Flat on a table, no glare, with the two lines at the bottom in the shot.</span>
+              </div>
+              <label className="btn gold block" style={{ position: 'relative', cursor: 'pointer', boxSizing: 'border-box' }}>
+                <Icon name="scan" color="#1e352d" />Take a photo
+                <input type="file" accept="image/*" capture="environment" style={hidden} onChange={(e) => { readPhoto(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+              </label>
+              <label className="btn on-dark block" style={{ position: 'relative', cursor: 'pointer', boxSizing: 'border-box' }}>
+                Choose a photo
+                <input type="file" accept="image/*" style={hidden} onChange={(e) => { readPhoto(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+              </label>
+              {fileErr && <span className="small" role="alert" style={{ color: '#e6c88f', textAlign: 'center' }}>{fileErr}</span>}
+              <button type="button" className="btn ghost block" style={{ color: '#d6cfc3' }} onClick={() => { setFileErr(null); setScanState('demo'); }}>Use the demo passport</button>
+              <span className="tiny" style={{ color: '#8f887c', textAlign: 'center' }}>Read on this phone. The photo isn't uploaded or kept.</span>
+            </div>
+          )}
+          {scanState === 'demo' && (
             <div style={{ padding: '0 28px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <span className="h3" style={{ color: '#f6f2ec' }}>Hold the photo page in the frame</span>
               <span className="small" style={{ color: '#b8b0a3' }}>Reading the two lines at the bottom…</span>
             </div>
-          ) : (
+          )}
+          {scanState === 'reading' && (
+            <div style={{ padding: '0 28px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 10 }} aria-live="polite">
+              <span className="h3" style={{ color: '#f6f2ec' }}>Reading your passport…</span>
+              <div role="progressbar" aria-label="Reading your passport" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} style={{ height: 6, borderRadius: 999, background: 'rgba(233,226,216,.14)', overflow: 'hidden' }}>
+                <span style={{ display: 'block', height: '100%', width: `${progress}%`, background: '#d9b77a', borderRadius: 999, transition: 'width .3s var(--ease)' }} />
+              </div>
+              <span className="small num" style={{ color: '#b8b0a3' }}>{progress < 30 ? 'Getting ready. The first scan takes a few seconds longer.' : 'Looking for the two lines at the bottom.'} {progress}%</span>
+            </div>
+          )}
+          {scanState === 'failed' && (
             <div style={{ padding: '0 24px', display: 'flex', flexDirection: 'column', gap: 12 }} role="alert">
               <span className="h2" style={{ color: '#f6f2ec' }}>We couldn't read it.</span>
-              <span className="body" style={{ color: '#d6cfc3' }}>Lay the passport flat, away from bright light, with the two lines at the bottom fully in the frame.</span>
-              <button type="button" className="btn gold block" onClick={() => { setScanState('scanning'); setStep('confirm'); setTimeout(() => setStep('camera'), 0); }}>Try again</button>
-              <button type="button" className="btn on-dark block" onClick={() => { setManual(true); setFields({ given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' }); setStep('confirm'); }}>Enter it by hand</button>
+              {failWhy
+                ? <span className="body" style={{ color: '#d6cfc3' }}>{failWhy}</span>
+                : (
+                  <ul className="body" style={{ color: '#d6cfc3', margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <li>Lay the passport flat on a table.</li>
+                    <li>No glare. Turn away from lamps and windows.</li>
+                    <li>Get the whole photo page in, including the two lines at the bottom.</li>
+                  </ul>
+                )}
+              <button type="button" className="btn gold block" onClick={() => { setFailWhy(null); setScanState('choose'); }}>Try again</button>
+              <button type="button" className="btn on-dark block" onClick={() => { byHand(); setStep('confirm'); }}>Enter it by hand</button>
             </div>
           )}
         </div>
@@ -268,13 +356,25 @@ export default function Onboarding() {
         <div className="scroll no-dock">
           <h1 className="h1">{manual ? 'Exactly as on the photo page.' : 'Is this right?'}</h1>
           <p className="body">Airlines need names to match the passport letter for letter, including every given name.</p>
-          {[['given', 'Given names'], ['surname', 'Surname'], ['number', 'Passport number'], ['nationality', 'Nationality'], ['dob', 'Date of birth (DD/MM/YYYY)'], ['expiry', 'Expiry date (DD/MM/YYYY)']].map(([k, lbl]) => (
-            <div className="field" key={k}>
-              <label htmlFor={'pp-' + k}>{lbl}</label>
-              <input id={'pp-' + k} className="input" value={fields[k]} onChange={(e) => setFields({ ...fields, [k]: e.target.value })} autoCapitalize="characters" />
-              {k === 'expiry' && badDate && <span className="err">Use the format DD/MM/YYYY, for example 22/06/2031.</span>}
+          {fromPhoto && (
+            <div className="notice" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '12px 14px', borderRadius: 16, background: '#f6f2ec' }}>
+              <Icon name="scan" size={18} color="#1e352d" />
+              <span className="small" style={{ color: '#1e352d' }}>Read from your photo. Check every letter.{doubt.length ? ` ${doubt.length === 1 ? 'One detail' : `${doubt.length} details`} may not have read right.` : ''}</span>
             </div>
-          ))}
+          )}
+          {[['given', 'Given names'], ['surname', 'Surname'], ['number', 'Passport number'], ['nationality', 'Nationality'], ['dob', 'Date of birth (DD/MM/YYYY)'], ['expiry', 'Expiry date (DD/MM/YYYY)']].map(([k, lbl]) => {
+            const unsure = fromPhoto && doubt.includes(k);
+            return (
+              <div className="field" key={k}>
+                <label htmlFor={'pp-' + k}>{lbl}</label>
+                <input id={'pp-' + k} className="input" value={fields[k]} aria-describedby={unsure ? 'pp-' + k + '-check' : undefined}
+                  style={unsure ? { borderColor: '#d9b77a', boxShadow: '0 0 0 3px rgba(217,183,122,.28)' } : undefined}
+                  onChange={(e) => { setFields({ ...fields, [k]: e.target.value }); if (unsure) setDoubt(doubt.filter((x) => x !== k)); }} autoCapitalize="characters" />
+                {unsure && <span id={'pp-' + k + '-check'} style={{ fontSize: 13, color: '#7d5d27', fontWeight: 600 }}>Check this. It may not have read right.</span>}
+                {k === 'expiry' && badDate && <span className="err">Use the format DD/MM/YYYY, for example 22/06/2031.</span>}
+              </div>
+            );
+          })}
           {expired && (
             <div className="notice warn" role="alert">
               <Icon name="visa" color="#7d5d27" />

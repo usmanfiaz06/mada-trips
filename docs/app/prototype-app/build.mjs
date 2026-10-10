@@ -24,4 +24,15 @@ const html = `<title>Mada Trips app</title>
 mkdirSync('dist/img', { recursive: true });
 writeFileSync('dist/index.html', html);
 cpSync('img', 'dist/img', { recursive: true });
+
+// Passport reader, loaded only when someone scans: dist/ocr/ (same origin as the page).
+// Engine and worker come from node_modules (pinned in package-lock); the English model is committed in ocr-assets/.
+mkdirSync('dist/ocr', { recursive: true });
+for (const [from, to] of [
+  ['node_modules/tesseract.js/dist/tesseract.min.js', 'tesseract.min.js'],
+  ['node_modules/tesseract.js/dist/worker.min.js', 'worker.min.js'],
+  ['node_modules/tesseract.js-core/tesseract-core-simd-lstm.js', 'tesseract-core-simd-lstm.js'],
+  ['node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm', 'tesseract-core-simd-lstm.wasm'],
+  ['ocr-assets/eng.traineddata.gz', 'eng.traineddata.gz'],
+]) cpSync(from, 'dist/ocr/' + to);
 console.log('built dist/index.html', Math.round(html.length / 1024) + ' KB');

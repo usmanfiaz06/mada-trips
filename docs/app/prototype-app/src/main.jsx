@@ -1,3 +1,4 @@
+import { People, NewCircle, Friend, Saved } from './screens/Social.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, PEOPLE, seedTrip, buzz, HAPTIC } from './store.jsx';
@@ -14,7 +15,7 @@ import Profile from './screens/Profile.jsx';
 import Plan from './screens/Plan.jsx';
 
 const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
-const STACK = { ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan };
+const STACK = { saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan };
 
 /* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
 function useBackgroundProgress() {
