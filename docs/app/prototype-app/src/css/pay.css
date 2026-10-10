@@ -1,0 +1,6 @@
+/* ---------- payments ---------- */
+.faceid { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; color: #1e352d; background: var(--mist); animation: breathe 1.4s ease-in-out infinite; }
+.faceid.ok { animation: pop .4s cubic-bezier(.2,.9,.25,1.2) both; background: #e3f0e7; }
+.faceid.bad { animation: none; color: #8a3524; background: #f6e3de; }
+.chip svg { margin-right: 6px; vertical-align: -3px; }
+.credit-card { border: 0; text-align: left; border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 6px; color: #f6f2ec; background: radial-gradient(120% 120% at 100% 0%, #2c4a40 0%, #1e352d 55%, #142720 100%); box-shadow: 0 22px 40px -26px rgba(15,26,22,.8); }

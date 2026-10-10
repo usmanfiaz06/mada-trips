@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
-import { Icon, Sun, Sheet, AirlineMark } from '../ui.jsx';
+import { Icon, Sun, Sheet, AirlineMark, PayMark } from '../ui.jsx';
+import { CardsSheet } from './Pay.jsx';
 import { checkFile, readPassport } from '../ocr.js';
 
 export default function Wallet() {
@@ -47,6 +48,8 @@ function Unlocked() {
   const [who, setWho] = useState(people[0]?.id || 'omar');
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, sh: 100, live: false });
   const [sheet, setSheet] = useState(null);
+  const [money, setMoney] = useState(null);
+  const [docOpen, setDocOpen] = useState(null);
   const [docType, setDocType] = useState('Passport');
   const p = PEOPLE[who];
   const missing = who === 'omar' && !s.passportSaved;
@@ -157,10 +160,10 @@ function Unlocked() {
         {(p.helper
           ? [['doc', 'Iqama', 'Valid until 4 Feb 2027'], ['doc', 'Exit and re-entry visa', 'Needed before each trip abroad']]
           : [['doc', p.id === 'omar' || p.id === 'hessa' ? 'National ID' : 'Family card entry', 'Valid'], ['visa', 'Schengen visa', p.id === 'sara' || p.id === 'ahmed' ? 'Not added' : 'Multi-entry until Jun 2028']]
-        ).concat((s.docs || []).filter((d) => d.person === who).map((d) => ['doc', d.type, d.sub])).map(([ic, t, sub]) => (
-          <div key={t} className="card" style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Icon name={ic} /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></span>
-          </div>
+        ).concat((s.docs || []).filter((d) => d.person === who).map((d) => ['doc', d.type, d.sub, d.id])).map(([ic, t, sub, id]) => (
+          <button key={t + (id || '')} type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setDocOpen({ ic, t, sub, id })}>
+            <Icon name={ic} /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></span><Icon name="chevron" />
+          </button>
         ))}
 
         <span className="eyebrow">For this trip</span>
@@ -173,7 +176,42 @@ function Unlocked() {
         ) : (
           <div className="card well"><span className="h3" style={{ fontSize: 15 }}>{s.trip ? 'Boarding passes' : 'Nothing booked yet'}</span><span className="tiny">{s.trip ? 'They open at check-in, 24 hours before you fly.' : 'Tickets and vouchers land here as soon as they’re confirmed.'}</span></div>
         )}
+
+        <span className="eyebrow">Money</span>
+        <button type="button" className="credit-card" onClick={() => setMoney('credit')}>
+          <span className="spread"><span className="eyebrow" style={{ color: '#d9b77a' }}>Mada credit</span><PayMark brand="credit" size={22} /></span>
+          <span className="num" style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-.03em' }}>SAR {(s.credit?.balance || 0).toLocaleString('en-US')}</span>
+          <span className="tiny" style={{ color: '#c9c1b4' }}>{s.credit?.balance ? 'Used first at checkout. Never expires.' : 'Refunds can land here instantly instead of waiting for the bank.'}</span>
+        </button>
+        <button type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setMoney('cards')}>
+          <span className="stack" style={{ display: 'flex' }}>{s.cards.slice(0, 3).map((c) => <span key={c.id} style={{ marginRight: -8 }}><PayMark brand={c.brand} size={24} /></span>)}</span>
+          <span className="grow col" style={{ gap: 0, marginLeft: 8 }}><span className="h3" style={{ fontSize: 15 }}>Cards and Apple Pay</span><span className="tiny">{s.cards.length} saved · default {(s.cards.find((c) => c.id === s.defaultCard) || {}).label || 'Apple Pay'}</span></span>
+          <Icon name="chevron" />
+        </button>
       </div>
+
+      {money === 'cards' && <CardsSheet current={s.defaultCard} onPick={(id) => { set({ defaultCard: id }); setMoney(null); toast(id === 'applepay' ? 'Apple Pay is your default.' : 'Default card updated.'); }} onClose={() => setMoney(null)} />}
+      {money === 'credit' && (
+        <Sheet label="Mada credit" onClose={() => setMoney(null)}>
+          <h2 className="h2">Mada credit · SAR {(s.credit?.balance || 0).toLocaleString('en-US')}</h2>
+          <p className="small">Money Mada holds for you. It comes from refunds you chose to take as credit, and it’s used first whenever you pay. It never expires, and you can move it to your card at any time.</p>
+          {(s.credit?.history || []).length === 0 ? <span className="small">No movements yet.</span> : s.credit.history.map((h) => (
+            <div key={h.id} className="spread" style={{ fontSize: 15 }}><span className="col" style={{ gap: 0 }}><span>{h.text}</span><span className="tiny">{new Date(h.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span></span><span className="num" style={{ color: h.amount > 0 ? '#2f7a4b' : '#1e352d', fontWeight: 600 }}>{h.amount > 0 ? '+' : '−'}SAR {Math.abs(h.amount).toLocaleString('en-US')}</span></div>
+          ))}
+          {(s.credit?.balance || 0) > 0 && <button type="button" className="btn secondary block" onClick={() => { const amt = s.credit.balance; set((p) => ({ credit: { balance: 0, history: [{ id: 'cr' + Date.now(), text: 'Moved to Visa ending 41', amount: -amt, at: Date.now() }, ...p.credit.history] } })); setMoney(null); toast(`SAR ${amt.toLocaleString('en-US')} is on its way to your card. 5 to 10 working days.`); }}>Move it to my card</button>}
+        </Sheet>
+      )}
+      {docOpen && (
+        <Sheet label={docOpen.t} onClose={() => setDocOpen(null)}>
+          <div className="row"><Icon name={docOpen.ic} /><span className="col" style={{ gap: 0 }}><span className="h2">{docOpen.t}</span><span className="tiny">{docOpen.sub}</span></span></div>
+          {docOpen.sub === 'Not added' ? <button type="button" className="btn primary block" onClick={() => { setDocOpen(null); setSheet('add'); }}>Add it</button> : (<>
+            <button type="button" className="card tap well" onClick={() => { setDocOpen(null); setSheet('add'); }}><span className="h3" style={{ fontSize: 15 }}>Replace with a newer one</span><span className="tiny">Scan or upload it. The old one is removed once the new one is saved.</span></button>
+            <button type="button" className="card tap well" onClick={() => { setDocOpen(null); toast('Shared with Faisal for this trip only. He can’t download it.'); }}><span className="h3" style={{ fontSize: 15 }}>Share with Faisal</span><span className="tiny">For a visa or a booking. Access ends when the trip does.</span></button>
+            {docOpen.id ? <button type="button" className="btn ghost block" style={{ color: '#8a3524' }} onClick={() => { set((p) => ({ docs: (p.docs || []).filter((d) => d.id !== docOpen.id) })); setDocOpen(null); toast('Deleted from this phone and from Mada.'); }}>Delete</button>
+              : <span className="tiny">Added when you set up Mada. To remove it, message Faisal.</span>}
+          </>)}
+        </Sheet>
+      )}
 
       {sheet === 'add' && (
         <Sheet label="Add a document" onClose={() => setSheet(null)}>

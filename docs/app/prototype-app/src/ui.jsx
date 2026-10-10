@@ -321,3 +321,41 @@ export function InviteSheet({ onClose, what = 'this trip' }) {
     </Sheet>
   );
 }
+
+/* Payment marks, drawn as small cards so every method reads at a glance. */
+export function PayMark({ brand, size = 28 }) {
+  const w = Math.round(size * 1.5);
+  const b = String(brand || '').toLowerCase();
+  const box = (bg, children, border) => (
+    <svg width={w} height={size} viewBox="0 0 48 32" aria-hidden="true" style={{ flexShrink: 0, borderRadius: 6, boxShadow: border ? 'inset 0 0 0 1px rgba(30,53,45,.14)' : 'none' }}>
+      <rect width="48" height="32" rx="6" fill={bg} />{children}
+    </svg>
+  );
+  if (b === 'visa') return box('#fffdf9', <text x="24" y="21" textAnchor="middle" fontFamily="Inter Tight, Arial, sans-serif" fontWeight="800" fontStyle="italic" fontSize="15" fill="#1a1f71" letterSpacing="-.5">VISA</text>, true);
+  if (b === 'mastercard') return box('#1e1e1e', <><circle cx="19.5" cy="16" r="8.5" fill="#eb001b" /><circle cx="28.5" cy="16" r="8.5" fill="#f79e1b" /><path d="M24 8.8a8.5 8.5 0 0 1 0 14.4 8.5 8.5 0 0 1 0-14.4z" fill="#ff5f00" /></>);
+  if (b === 'mada') return box('#fffdf9', <><rect x="7" y="10" width="13" height="5" rx="1" fill="#84b740" /><rect x="7" y="17" width="13" height="5" rx="1" fill="#259bd6" /><text x="33" y="20.5" textAnchor="middle" fontFamily="Inter Tight, Arial, sans-serif" fontWeight="700" fontSize="11" fill="#1e1e1e">mada</text></>, true);
+  if (b === 'applepay') return box('#000', <><path d="M14.6 11.3c.5-.6.8-1.4.7-2.2-.7 0-1.6.5-2.1 1.1-.5.5-.9 1.4-.8 2.2.8.1 1.6-.4 2.2-1.1zm.7 1.2c-1.2-.1-2.2.7-2.8.7s-1.4-.6-2.4-.6c-1.2 0-2.3.7-2.9 1.8-1.3 2.2-.3 5.4.9 7.2.6.9 1.3 1.8 2.2 1.8.9 0 1.2-.6 2.3-.6s1.4.6 2.3.6c1 0 1.6-.9 2.2-1.8.7-1 1-2 1-2-.1 0-1.9-.7-1.9-2.8 0-1.7 1.4-2.6 1.5-2.6-.8-1.2-2.1-1.4-2.4-1.4z" fill="#fff" /><text x="31" y="21" textAnchor="middle" fontFamily="Inter Tight, Arial, sans-serif" fontWeight="600" fontSize="12" fill="#fff">Pay</text></>);
+  if (b === 'tabby') return box('#3effc2', <text x="24" y="20.5" textAnchor="middle" fontFamily="Inter Tight, Arial, sans-serif" fontWeight="800" fontSize="12.5" fill="#1e1e1e">tabby</text>);
+  if (b === 'tamara') return box('#fdebd7', <text x="24" y="20.5" textAnchor="middle" fontFamily="Inter Tight, Arial, sans-serif" fontWeight="800" fontSize="11.5" fill="#1e1e1e">tamara</text>);
+  if (b === 'credit') return box('#1e352d', <g transform="translate(24 16)" stroke="#d9b77a" strokeWidth="2.2" strokeLinecap="round">{Array.from({ length: 8 }, (_, i) => { const a = (i * Math.PI) / 4; return <line key={i} x1={Math.cos(a) * 3.5} y1={Math.sin(a) * 3.5} x2={Math.cos(a) * 8} y2={Math.sin(a) * 8} />; })}</g>);
+  return box('#f6f2ec', <rect x="8" y="12" width="32" height="4" rx="1" fill="#1e352d" />, true);
+}
+
+/* Card helpers: brand from the number, and the Luhn check every card number must pass. */
+const MADA_BINS = ['440647', '440795', '446404', '457865', '588845', '588846', '588848', '588850', '604906', '968201', '968202', '968203', '968204', '968205', '968206', '968207', '968208', '968209', '968210', '968211'];
+export function cardBrand(digits) {
+  if (MADA_BINS.some((b) => digits.startsWith(b))) return 'mada';
+  if (/^4/.test(digits)) return 'visa';
+  if (/^(5[1-5]|2[2-7])/.test(digits)) return 'mastercard';
+  return null;
+}
+export function luhn(digits) {
+  let sum = 0;
+  for (let i = 0; i < digits.length; i += 1) {
+    let d = Number(digits[digits.length - 1 - i]);
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+    sum += d;
+  }
+  return digits.length >= 13 && sum % 10 === 0;
+}
+export const BRAND_NAME = { visa: 'Visa', mastercard: 'Mastercard', mada: 'mada', applepay: 'Apple Pay', tabby: 'Tabby', tamara: 'Tamara', credit: 'Mada credit' };

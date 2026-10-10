@@ -6,7 +6,7 @@ import { Dock, Icon, Sun } from './ui.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Today from './screens/Today.jsx';
 import Ask from './screens/Ask.jsx';
-import Pay, { Waiting } from './screens/Pay.jsx';
+import Pay, { Waiting, commitBooking } from './screens/Pay.jsx';
 import Trips, { TripDetail } from './screens/Trips.jsx';
 import Disruption from './screens/Disruption.jsx';
 import Wallet from './screens/Wallet.jsx';
@@ -39,17 +39,24 @@ function useBackgroundProgress() {
         const requests = p.requests.map((r) => {
           const age = now - (r.created || now);
           if (r.status === 'sent' && age > 4000) { changed = true; return { ...r, status: 'reviewing' }; }
-          if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Mada replied', body: `Your ${r.short}: tap Trips to see it.`, haptic: HAPTIC.knock }), 0); return { ...r, status: 'quote' }; }
+          if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Mada replied', body: `Your ${r.short}: tap to see it.`, haptic: HAPTIC.knock, to: { tab: 'trips' }, kind: 'reply' }), 0); return { ...r, status: 'quote' }; }
           if (r.status === 'paid' && age > 15000) { changed = true; return { ...r, status: 'done' }; }
           return r;
         });
         const refunds = p.refunds.map((r) => {
           if (r.stage < 2 && !r.t) { changed = true; return { ...r, t: now }; }
           if (r.stage === 0 && now - r.t > 5000) { changed = true; return { ...r, stage: 1 }; }
-          if (r.stage === 1 && now - r.t > 11000) { changed = true; setTimeout(() => banner({ title: 'Refund sent', body: `SAR ${Math.round(r.amount).toLocaleString('en-US')} is on its way to your card.`, haptic: HAPTIC.soft }), 0); return { ...r, stage: 2 }; }
+          if (r.stage === 1 && now - r.t > 11000) { changed = true; setTimeout(() => banner({ title: 'Refund sent', body: `SAR ${Math.round(r.amount).toLocaleString('en-US')} is on its way to your card.`, haptic: HAPTIC.soft, to: { tab: 'trips' }, kind: 'money' }), 0); return { ...r, stage: 2 }; }
           return r;
         });
-        return changed ? { requests, refunds } : {};
+        let pendingBooking = p.pendingBooking;
+        if (pendingBooking && now - pendingBooking.at > 6000) {
+          changed = true;
+          const pb = pendingBooking;
+          pendingBooking = null;
+          setTimeout(() => { commitBooking(set, pb); banner({ title: 'Confirmed by Faisal', body: `${pb.kind === 'stay' ? 'Your rooms are booked' : pb.kind === 'change' ? 'Your flight is changed' : 'You’re going'}. Booking ${pb.ref}.`, haptic: HAPTIC.success, to: { tab: 'trips' }, kind: 'booking' }); }, 0);
+        }
+        return changed ? { requests, refunds, pendingBooking } : {};
       });
     }, 1000);
     return () => clearInterval(t);
@@ -58,7 +65,8 @@ function useBackgroundProgress() {
 
 function Phone() {
   const store = useStore();
-  const { s, bannerMsg, toastMsg, dismissBanner, set } = store;
+  const { s, bannerMsg, toastMsg, dismissBanner, openBanner, set } = store;
+  useEffect(() => { window.__madaPush = (name, params) => store.push(name, params || {}); });
   useBackgroundProgress();
   useEffect(() => { if (s.tab !== 'wallet' && s.walletUnlocked) set({ walletUnlocked: false }); }, [s.tab]);
   const top = s.stack[s.stack.length - 1];
@@ -86,7 +94,7 @@ function Phone() {
           </div>
         )}
         {bannerMsg && (
-          <button type="button" className="banner" key={bannerMsg.id} onClick={dismissBanner} aria-live="polite">
+          <button type="button" className="banner" key={bannerMsg.id} onClick={() => (bannerMsg.to ? openBanner(bannerMsg) : dismissBanner())} aria-live="polite">
             <span className="app-ic"><Sun width={24} /></span>
             <span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>{bannerMsg.title}</span><span className="small" style={{ color: '#3f4f48' }}>{bannerMsg.body}</span></span>
           </button>
@@ -110,8 +118,8 @@ function Demo() {
       if (phase === 'travelday' || phase === 'delayed' || phase === 'cancelled') { delete trip.rebooked; trip.flight = seedTrip({ ...p, household }).flight; }
       return { ...base, trip, phase };
     });
-    if (phase === 'delayed') setTimeout(() => banner({ title: 'SV263 may leave late', body: 'The plane coming from Cairo is late. We have a plan ready.' }), 600);
-    if (phase === 'cancelled') setTimeout(() => banner({ title: 'Saudia cancelled SV263', body: 'We’re holding seats on two other flights. Tap to choose.' }), 600);
+    if (phase === 'delayed') setTimeout(() => banner({ title: 'SV263 may leave late', body: 'The plane coming from Cairo is late. We have a plan ready.', to: { push: ['disruption', { kind: 'delay' }] } }), 600);
+    if (phase === 'cancelled') setTimeout(() => banner({ title: 'Saudia cancelled SV263', body: 'We’re holding seats on two other flights. Tap to choose.', to: { push: ['disruption', { kind: 'cancel' }] } }), 600);
     if (phase === 'landed') setTimeout(() => banner({ title: 'Ahmet is at Door 3', body: 'He has a sign with your name. Bags on carousel 7.', haptic: HAPTIC.soft }), 600);
     setOpen(false);
   };

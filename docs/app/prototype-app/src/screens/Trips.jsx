@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
-import { Icon, TopBar, Route, Sheet, SlideToConfirm, Tracker, AirlineMark } from '../ui.jsx';
+import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
+import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments } from './TripManage.jsx';
 
 const REQ_STAGES = [
   ['queued', 'Waiting for a connection'],
@@ -14,10 +15,19 @@ const REQ_STAGES = [
 
 function stageIndex(status) { return REQ_STAGES.findIndex(([k]) => k === status); }
 
+export function openCount(s) {
+  const now = Date.now();
+  return s.requests.filter((r) => r.status !== 'done').length
+    + (s.tripRequests || []).filter((r) => !['yes', 'no', 'done'].includes(reqStatus(r, now))).length;
+}
+
 export default function Trips() {
-  const { s, push } = useStore();
-  const [tab, setTab] = useState(s.requests.length && !s.trip ? 'requests' : 'upcoming');
-  const openReq = s.requests.filter((r) => r.status !== 'done').length;
+  const { s, set, push } = useStore();
+  const [tab, setTab] = useState(s.tripsTab || (s.requests.length && !s.trip ? 'requests' : 'upcoming'));
+  useEffect(() => { if (s.tripsTab) { setTab(s.tripsTab); set({ tripsTab: null }); } }, [s.tripsTab]);
+  useTicker(2000);
+  useUnqueue();
+  const openReq = openCount(s);
   return (
     <div className="screen">
       <div className="scroll">
@@ -72,38 +82,73 @@ function Upcoming() {
     <Imports />
   </>);
   const t = s.trip;
+  const f = t.flight;
   return (<>
-    <button type="button" className="photo rise" style={{ height: 210, border: 0, padding: 0 }} onClick={() => push('trip')}>
-      <img src="img/istanbul.jpg" alt="Istanbul" />
-      <span className="shade" />
-      <span className="over" style={{ textAlign: 'left' }}>
-        <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>Istanbul</span>
-        <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · {t.travellers.map((id) => PEOPLE[id].name).join(', ')}</span>
-      </span>
-    </button>
+    <div className="tm-tripcard rise">
+      <button type="button" className="photo" style={{ height: 210, border: 0, padding: 0, width: '100%', display: 'block' }} onClick={() => push('trip')} aria-label="Istanbul trip">
+        <img src="img/istanbul.jpg" alt="Istanbul" />
+        <span className="shade" />
+        <span className="over" style={{ textAlign: 'left' }}>
+          <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>Istanbul</span>
+          <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · {t.travellers.map((id) => PEOPLE[id].name).join(', ')}</span>
+        </span>
+      </button>
+      <div className="tm-tripcard-foot">
+        <span className="tiny grow">{f ? `${f.code} · ${f.date} · ${f.dep}` : t.stay ? `${t.stay.name}` : 'Booked'}</span>
+        <button type="button" className="btn secondary small" onClick={() => push('itinerary')}><Icon name="trips" size={18} />Itinerary</button>
+        <button type="button" className="btn secondary small" onClick={() => push('invoices')}><Icon name="card" size={18} />Payments</button>
+      </div>
+    </div>
     <Imports />
   </>);
 }
 
 function Requests() {
   const { s, push } = useStore();
-  if (!s.requests.length && !s.refunds.length) return (
-    <div className="card well rise"><span className="h3">Nothing waiting.</span><span className="small">Visas, Umrah, cars and tables you ask for show up here while Mada works on them.</span></div>
+  const now = Date.now();
+  const mine = (s.tripRequests || []);
+  if (!s.requests.length && !s.refunds.length && !mine.length) return (
+    <div className="card well rise"><span className="h3">Nothing waiting.</span><span className="small">Changes, refunds, visas, tables and anything else you ask for show up here while Mada works on them.</span></div>
   );
+  const talk = (topic) => push('support', { about: 'Istanbul trip', topic });
+  const items = [
+    ...s.refunds.map((r) => ({ type: 'refund', r, at: r.created || r.t || 0 })),
+    ...s.requests.map((r) => ({ type: 'req', r, at: r.created || 0 })),
+    ...mine.map((r) => ({ type: 'trip', r, at: r.created || now })),
+  ].sort((a, b) => b.at - a.at);
   return (
     <>
-      {s.refunds.map((r) => (
-        <div key={r.id} className="card rise">
-          <div className="spread"><span className="h3">Refund · SAR {fmt(r.amount)}</span><span className={'pill' + (r.stage === 2 ? ' ok' : '')}>{r.stage === 2 ? 'Sent' : 'On its way'}</span></div>
-          <span className="small">{r.title}</span>
-          <Tracker items={[
-            { title: 'Requested', sub: 'Today', state: 'done' },
-            { title: r.airline ? `Approved by ${r.airline}` : 'Approved', sub: r.stage >= 1 ? 'Today' : 'Usually 1–3 days', state: r.stage >= 1 ? 'done' : 'now' },
-            { title: `Sent to your ${r.card || 'card'}`, sub: r.stage >= 2 ? 'Arrives in 5–10 days, in riyals' : 'Usually 7–14 days', state: r.stage >= 2 ? 'done' : r.stage === 1 ? 'now' : '' },
-          ]} />
-        </div>
-      ))}
-      {s.requests.slice().reverse().map((r) => {
+      {items.map(({ type, r }) => {
+        if (type === 'refund') {
+          const rejected = r.stage === -1 && now - (r.created || now) > 7000;
+          const credit = r.dest === 'credit';
+          const pill = rejected ? 'Not approved' : r.stage === -1 ? 'With Faisal' : credit ? 'In your credit' : r.stage === 2 ? 'Sent' : 'On its way';
+          return (
+            <div key={r.id} className="card rise">
+              <div className="spread"><span className="h3">Refund · SAR {fmt(r.amount)}</span><span className={'pill' + (rejected ? ' warn' : r.stage === 2 ? ' ok' : '')}>{pill}</span></div>
+              <span className="small">{r.title}</span>
+              <RefundTracker r={r} onTalk={() => talk('refund')} />
+            </div>
+          );
+        }
+        if (type === 'trip') {
+          const st = reqStatus(r, now);
+          return (
+            <div key={r.id} className="card rise">
+              <div className="spread" style={{ alignItems: 'flex-start' }}><span className="h3">{r.title}</span><span className={'pill' + (st === 'yes' || st === 'done' ? ' ok' : st === 'no' ? ' warn' : '')} style={{ flexShrink: 0 }}>{reqLabel(r, now)}</span></div>
+              {r.detail && <span className="small">{r.detail}</span>}
+              <ReqTracker r={r} now={now} />
+              {st === 'no' && (
+                <div className="card well" style={{ gap: 8 }}>
+                  <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
+                  <span className="small" style={{ color: '#1e352d' }}>{r.alt || 'They can’t do it this time. Let’s find another way.'}</span>
+                  <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => talk('other')}>Talk to Faisal</button>
+                </div>
+              )}
+              {st === 'queued' && <span className="tiny">Saved on this phone. Sends when you're back online.</span>}
+            </div>
+          );
+        }
         const idx = stageIndex(r.status);
         return (
           <div key={r.id} className="card rise">
@@ -127,6 +172,7 @@ function Requests() {
 }
 
 function quoteText(r) {
+  if (r.quoteText) return r.quoteText;
   if (r.kind === 'visa' && /renewal/i.test(r.title)) return 'Absher has a passport appointment on Sunday at 10:20. I can book it and prepare the forms. SAR 150 service fee.';
   if (r.kind === 'visa') return 'The earliest appointment is Tue 14 Jan, 10:20 at VFS Riyadh. I’ll book it and prepare every form. Service fee SAR 450, plus the embassy fee paid on the day.';
   if (r.kind === 'umrah') return 'Flights to Madinah, 3 nights steps from the Haram, the Haramain train and transfers for all of you: SAR 6,900. Nusuk permits are yours to get; I’ll remind you.';
@@ -152,32 +198,57 @@ function Past() {
 export function TripDetail() {
   const { s, set, pop, push, toast } = useStore();
   const [sheet, setSheet] = useState(null);
+  useTicker(2000);
+  useUnqueue();
   const t = s.trip;
   if (!t) return (
     <div className="screen push"><TopBar onBack={pop} /><div className="scroll no-dock"><span className="h2">This trip has ended.</span></div></div>
   );
   const f = t.flight;
+  const flightGone = isRefunded(s, 'flight');
+  const tm = timing(s);
+  const stayQ = t.stay ? refundQuote(s, 'stay') : null;
+  const open = openCount(s);
+  const payments = tripPayments(s);
+  const nextDue = payments.flatMap((p) => (p.plan && !p.refund ? p.plan.filter((i) => !i.paid) : []))[0];
   const cancelStay = () => {
+    const back = stayQ ? stayQ.back : t.stay.price;
     set((p) => ({
       trip: { ...p.trip, stay: { ...p.trip.stay, status: 'cancelled' } },
-      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · 6 nights`, amount: p.trip.stay.price, stage: 0, card: 'Visa ending 41' }],
+      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · ${p.trip.stay.nights} nights`, amount: back, stage: 0, card: 'Visa ending 41', items: ['stay'], dest: 'card', created: Date.now() }],
     }));
     setSheet(null);
     buzz(HAPTIC.success);
     toast('Cancelled. Your refund is on its way.');
   };
+  const manage = [
+    ['itinerary', 'trips', 'Full itinerary', 'Day by day, with times and documents'],
+    ['invoices', 'card', 'Payments and invoices', nextDue ? `Next payment SAR ${fmt(nextDue.amount)} on ${nextDue.date}` : 'VAT invoices for every payment'],
+    ['changeFlight', 'flight', 'Change flight', tm.within24 ? 'Less than a day to go: Faisal calls you' : 'Date, time, way back, a name spelling'],
+    ['hotelOptions', 'stay', 'Hotel options', 'Room, nights, check-in and checkout'],
+    ['specialRequests', 'star', 'Special requests', 'Wheelchair, meals, bags, a celebration'],
+    ['refund', 'refund', 'Ask for a refund', 'See exactly what comes back first'],
+  ];
   return (
     <div className="screen push">
       <div className="photo" style={{ height: 230, borderRadius: 0, flexShrink: 0 }}>
         <img src="img/istanbul.jpg" alt="Istanbul" />
         <span className="shade" />
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }}><TopBar onBack={pop} dark /></div>
-        <span className="over"><span className="display" style={{ fontSize: 40, color: '#fffdf9' }}>Istanbul</span><span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · booking {t.pnr}</span></span>
+        <span className="over"><span className="display" style={{ fontSize: 40, color: '#fffdf9' }}>Istanbul</span><span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · booking {t.ref || t.pnr}</span></span>
       </div>
       <div className="scroll no-dock" style={{ paddingTop: 16 }}>
+        {open > 0 && (
+          <button type="button" className="tm-strip rise" onClick={() => set({ tab: 'trips', stack: [], tripsTab: 'requests' })}>
+            <span className="avatar sm green">F</span>
+            <span className="grow small" style={{ color: '#1e352d' }}><b>{open} {open === 1 ? 'request' : 'requests'} with Faisal.</b> See where each one is.</span>
+            <Icon name="chevron" size={18} />
+          </button>
+        )}
         {f && (
           <div className="card">
-            <div className="spread"><span className="row" style={{ gap: 10 }}><AirlineMark flight={f} size={32} /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Going · {f.date}</span><span className="tiny">{f.airline} · {f.code}</span></span></span><button type="button" className="link" onClick={() => setSheet('change')}>Change</button></div>
+            <div className="spread"><span className="row" style={{ gap: 10 }}><AirlineMark flight={f} size={32} /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Going · {f.date}</span><span className="tiny">{f.airline} · {f.code}</span></span></span>
+              {flightGone ? <span className="pill">Refunded</span> : <button type="button" className="link" onClick={() => push('changeFlight')}>Change</button>}</div>
             <Route dep={f.dep} arr={f.arr} from={f.from} to={f.to} dur={f.dur} />
             <div className="divider" />
             <div className="spread"><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Back · {f.backDate}</span><span className="tiny">{f.airline} · {f.back}</span></span></div>
@@ -187,10 +258,10 @@ export function TripDetail() {
         {t.stay && (
           <div className="card">
             <div className="spread">
-              <span className="row"><Icon name="stay" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t.stay.name}</span><span className="tiny">9–15 Mar · 6 nights</span></span></span>
-              {t.stay.status === 'cancelled' ? <span className="pill">Cancelled</span> : <button type="button" className="link" onClick={() => setSheet('cancel')}>Cancel</button>}
+              <span className="row"><Icon name="stay" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{t.stay.name}</span><span className="tiny">9–{9 + t.stay.nights} Mar · {t.stay.nights} nights</span></span></span>
+              {t.stay.status === 'cancelled' ? <span className="pill">Cancelled</span> : tm.allUsed ? <span className="pill ok">Stayed</span> : <button type="button" className="link" onClick={() => setSheet('cancel')}>Cancel</button>}
             </div>
-            {t.stay.status === 'cancelled' && <span className="small">Refund of SAR {fmt(t.stay.price)} on its way. Track it in Trips → Requests.</span>}
+            {t.stay.status === 'cancelled' && <span className="small">Refund on its way. Track it in Trips → Requests.</span>}
           </div>
         )}
         {!t.stay && (
@@ -198,7 +269,19 @@ export function TripDetail() {
             <Icon name="stay" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Add a place to stay</span><span className="small">Connecting rooms near Galata, like last time</span></span><Icon name="chevron" />
           </button>
         )}
-        {t.pickup && <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="car" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Airport pickup both ways</span><span className="tiny">Ahmet in Istanbul · Khalid in Riyadh</span></span></div>}
+        {t.pickup && <div className="card" style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="car" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Airport pickup both ways</span><span className="tiny">Ahmet in Istanbul · Khalid in Riyadh</span></span>{isRefunded(s, 'pickup') && <span className="pill">Refunded</span>}</div>}
+
+        <span className="eyebrow" style={{ marginTop: 8 }}>Manage</span>
+        <div className="card tm-list" style={{ padding: 6, gap: 0 }}>
+          {manage.map(([name, icon, title, sub], i) => (
+            <button key={name} type="button" className={'tm-row' + (i === 0 ? ' lead' : '')} onClick={() => { buzz(HAPTIC.tap); push(name); }}>
+              <span className={'tm-ic' + (i === 0 ? ' gold' : '')}><Icon name={icon} size={20} /></span>
+              <span className="grow col" style={{ gap: 1 }}><span className="tm-row-title">{title}</span><span className="tiny">{sub}</span></span>
+              <Icon name="chevron" size={18} color="#5f6b65" />
+            </button>
+          ))}
+        </div>
+
         <div className="card">
           <span className="h3">Travellers</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>{t.travellers.map((id) => <span key={id} className="pill">{PEOPLE[id].name}</span>)}</div>
@@ -209,40 +292,12 @@ export function TripDetail() {
       {sheet === 'cancel' && (
         <Sheet label="Cancel the stay" onClose={() => setSheet(null)}>
           <h2 className="h2">Cancel the stay?</h2>
-          <p className="body">You'll get <b style={{ color: '#1e352d' }}>SAR {fmt(t.stay.price)}</b> back. It's free to cancel until 2 Mar. Your flights stay as they are.</p>
+          <p className="body">You'll get <b style={{ color: '#1e352d' }}>SAR {fmt(stayQ ? stayQ.back : t.stay.price)}</b> back. {stayQ?.rule} Your flights stay as they are.</p>
+          {stayQ && stayQ.back < t.stay.price && <span className="small">You paid SAR {fmt(t.stay.price)}. {stayQ.why}</span>}
           <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={cancelStay}>Cancel the stay</button>
           <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Keep it</button>
         </Sheet>
       )}
-      {sheet === 'change' && <ChangeSheet onClose={() => setSheet(null)} />}
     </div>
-  );
-}
-
-function ChangeSheet({ onClose }) {
-  const { s, push } = useStore();
-  const opts = [
-    { id: 'later', label: 'Leave a day later · Wed 10 Mar, 09:40', amount: 480, patch: { date: 'Wed 10 Mar' } },
-    { id: 'back', label: 'Come back a day later · Tue 16 Mar, 15:10', amount: 320, patch: { backDate: 'Tue 16 Mar' } },
-    { id: 'early', label: 'Earlier the same day · flynas 06:15', amount: 0, patch: null, note: 'Different airline, so we rebook it as a new ticket.' },
-  ];
-  const [pick, setPick] = useState(null);
-  const cur = opts.find((o) => o.id === pick);
-  return (
-    <Sheet label="Change flight" onClose={onClose}>
-      <h2 className="h2">What would you like to change?</h2>
-      {opts.map((o) => (
-        <button key={o.id} type="button" className={'card tap well' + (pick === o.id ? ' selected' : '')} onClick={() => { setPick(o.id); buzz(HAPTIC.select); }}>
-          <span className="spread"><span className="h3" style={{ fontSize: 15 }}>{o.label}</span><span className="num small" style={{ color: '#1e352d', fontWeight: 600 }}>{o.amount ? '+SAR ' + fmt(o.amount) : 'Ask Mada'}</span></span>
-          {o.note && <span className="tiny">{o.note}</span>}
-        </button>
-      ))}
-      <span className="small">Prices include the change fee and the fare difference for everyone.</span>
-      <button type="button" className="btn primary block" disabled={!cur} onClick={() => {
-        if (cur.patch) push('pay', { kind: 'change', label: cur.label, amount: cur.amount, patch: cur.patch });
-        else push('ask', { prefill: 'Move us to the flynas 06:15 on 9 Mar' });
-        onClose();
-      }}>{cur ? (cur.patch ? `Review · SAR ${fmt(cur.amount)}` : 'Ask Mada') : 'Pick one'}</button>
-    </Sheet>
   );
 }

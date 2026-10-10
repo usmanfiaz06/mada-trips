@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, PICKUP, fmt, seedTrip } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, useTicker, AddPersonSheet, InviteSheet } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, Toggle, useTicker, AddPersonSheet, InviteSheet, PayMark, cardBrand, luhn, BRAND_NAME } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 
 /* Builds the lines, total and rules for anything the traveller can pay for. */
@@ -11,12 +11,17 @@ function useOrder(params, travellers) {
     const f = FLIGHTS.find((x) => x.id === params.flightId);
     const hotelFactor = n > 2 ? 1 : 0.55;
     const stay = HOTELS[0].night * STAY_NIGHTS * hotelFactor;
-    const lines = [{ icon: 'flight', text: `${n} ${n === 1 ? 'traveller' : 'travellers'} · ${f.airline}, direct`, price: f.pp * n }];
+    const sr = params.search || {};
+    const x = (sr.cabin === 'Business' ? 3.2 : sr.cabin === 'Premium' ? 1.7 : 1) * (sr.type === 'oneway' ? 0.55 : 1);
+    const pp = Math.round(f.pp * x);
+    const lines = [{ icon: 'flight', text: `${n} ${n === 1 ? 'traveller' : 'travellers'} · ${f.airline}, direct${sr.cabin && sr.cabin !== 'Economy' ? ' · ' + sr.cabin : ''}${sr.type === 'oneway' ? ' · one way' : ''}`, price: pp * n }];
+    if (sr.infants) lines.push({ icon: 'flight', text: `${sr.infants} ${sr.infants === 1 ? 'baby' : 'babies'} on a lap`, price: Math.round(pp * 0.1) * sr.infants });
     if (params.bundle) {
       lines.push({ icon: 'stay', text: `${n > 2 ? 'Connecting rooms' : 'A room'} near Galata Tower · 6 nights`, price: stay });
       lines.push({ icon: 'car', text: 'Airport pickup both ways', price: PICKUP });
     }
-    return { title: `Istanbul · ${params.flex ? '10–15' : '9–15'} Mar`, lines, rule: f.refund === 'Not refundable' ? 'Flights can’t be refunded. Changes cost ' + f.change + '.' : 'Free to cancel until 2 Mar. After that, SAR 400 per person.', agent: true, people: true };
+    const dates = sr.month ? (sr.type === 'oneway' ? `${sr.dep} ${sr.month}` : `${params.flex && sr.dep === 9 ? 10 : sr.dep}–${sr.ret} ${sr.month}`) : `${params.flex ? '10–15' : '9–15'} Mar`;
+    return { title: `Istanbul · ${dates}`, lines, rule: f.refund === 'Not refundable' ? 'Flights can’t be refunded. Changes cost ' + f.change + '.' : 'Free to cancel until 2 Mar. After that, SAR 400 per person.', agent: true, people: true };
   }
   if (params.kind === 'stay') {
     const h = HOTELS.find((x) => x.id === params.hotelId);
@@ -47,7 +52,24 @@ export default function Pay({ params }) {
   const order = useOrder(params, travellers);
   const base = order.lines.reduce((a, l) => a + l.price, 0);
   const [bump, setBump] = useState(0);
-  const total = base + bump;
+  const [promo, setPromo] = useState(null);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [codeErr, setCodeErr] = useState(null);
+  const discount = promo ? Math.min(300, Math.round((base + bump) * 0.1)) : 0;
+  const balance = s.credit?.balance || 0;
+  const [useCredit, setUseCredit] = useState(balance > 0);
+  const creditUsed = useCredit ? Math.min(balance, base + bump - discount) : 0;
+  const total = base + bump - discount - creditUsed;
+  const [otp, setOtp] = useState('');
+  const [otpTries, setOtpTries] = useState(0);
+  const tryCode = () => {
+    const c = code.trim().toUpperCase();
+    if (c === 'EID10') { setPromo(c); setCodeErr(null); setPromoOpen(false); buzz(HAPTIC.success); }
+    else if (c === 'RAMADAN') setCodeErr('That code ended on 30 March.');
+    else if (!c) setCodeErr(null);
+    else setCodeErr('We don’t know that code. Check the spelling. (Demo: EID10)');
+  };
   const [card, setCard] = useState(s.defaultCard);
   const [plan, setPlan] = useState('full');
   const [sheet, setSheet] = useState(null);
@@ -58,10 +80,10 @@ export default function Pay({ params }) {
   useTicker(1000);
   const left = Math.max(0, holdEnds.current - Date.now() - holdSkip);
   const expired = left === 0;
-  const cardObj = s.cards.find((c) => c.id === card) || s.cards[0];
+  const cardObj = card === 'applepay' ? { id: 'applepay', label: 'Apple Pay', brand: 'applepay' } : (s.cards.find((c) => c.id === card) || s.cards[0]);
   const tabby = Math.ceil(total / 4);
   const tamara = Math.ceil(total / 3);
-  const slideLabel = plan === 'tabby' ? `Slide to book · 4 × SAR ${fmt(tabby)}` : plan === 'tamara' ? `Slide to book · 3 × SAR ${fmt(tamara)}` : `Slide to book · SAR ${fmt(total)}`;
+  const slideLabel = total === 0 ? 'Slide to book · paid with credit' : plan === 'tabby' ? `Slide to book · 4 × SAR ${fmt(tabby)}` : plan === 'tamara' ? `Slide to book · 3 × SAR ${fmt(tamara)}` : `Slide to book · SAR ${fmt(total)}`;
 
   const confirm = () => {
     setBusy(true);
@@ -70,13 +92,17 @@ export default function Pay({ params }) {
       if (s.demo.offline) { setSheet('offline'); buzz(HAPTIC.soft); return; }
       if (s.demo.decline && card === s.cards[0].id && plan === 'full') { setSheet('declined'); buzz(HAPTIC.soft); return; }
       if (s.demo.priceUp && !priceSeen && order.agent) { setSheet('price'); buzz(HAPTIC.soft); return; }
+      if (total === 0) { done(); return; }
+      if (card === 'applepay') { setSheet('applepay'); return; }
+      if (s.demo.needs3ds || cardObj.fresh) { setOtp(''); setOtpTries(0); setSheet('3ds'); buzz(HAPTIC.knock); return; }
       done();
     }, 1300);
   };
 
   const done = () => {
+    if (creditUsed > 0) set((p) => ({ credit: { balance: p.credit.balance - creditUsed, history: [{ id: 'cr' + Date.now(), text: order.title, amount: -creditUsed, at: Date.now() }, ...p.credit.history] } }));
     if (order.agent) {
-      replace('waiting', { ...params, travellers, total, card: cardObj.label, plan });
+      replace('waiting', { ...params, travellers, total, card: total === 0 ? 'Mada credit' : cardObj.label, plan, creditUsed, discount });
       return;
     }
     buzz(HAPTIC.success);
@@ -108,10 +134,23 @@ export default function Pay({ params }) {
           ))}
           {order.people && (
             <div className="spread card well" style={{ padding: '12px 14px', flexDirection: 'row' }}>
-              <span className="small">{travellers.map((id) => PEOPLE[id].name).join(', ')} · window seats · halal meals</span>
+              <span className="small">{travellers.map((id) => PEOPLE[id].name).join(', ')}{params.kind === 'trip' || params.kind === 'package' ? ` · ${s.account?.prefs?.seat === 'aisle' ? 'aisle seats' : 'seats together'} · ${s.account?.prefs?.meal || 'halal'} meals` : ''}</span>
               <button type="button" className="link" onClick={() => setSheet('people')}>Edit</button>
             </div>
           )}
+          {discount > 0 && <div className="spread" style={{ fontSize: 15 }}><span className="row"><Icon name="star" size={20} />Code {promo} · 10% off <button type="button" className="link" style={{ fontSize: 13 }} onClick={() => { setPromo(null); setCode(''); }}>Remove</button></span><span className="num small" style={{ color: '#2f7a4b' }}>−{fmt(discount)}</span></div>}
+          {balance > 0 && (
+            <div className="spread" style={{ fontSize: 15 }}>
+              <span className="row"><PayMark brand="credit" size={20} />Mada credit · SAR {fmt(balance)}</span>
+              <span className="row" style={{ gap: 10 }}>{creditUsed > 0 && <span className="num small" style={{ color: '#2f7a4b' }}>−{fmt(creditUsed)}</span>}<Toggle checked={useCredit} label="Use Mada credit" onChange={setUseCredit} /></span>
+            </div>
+          )}
+          {!promo && (promoOpen ? (
+            <div className="field">
+              <div className="row"><input className="input grow" aria-label="Promo code" placeholder="Promo code" value={code} onChange={(e) => { setCode(e.target.value); setCodeErr(null); }} autoCapitalize="characters" /><button type="button" className="btn secondary small" onClick={tryCode}>Apply</button></div>
+              {codeErr && <span className="err" role="alert">{codeErr}</span>}
+            </div>
+          ) : <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 14 }} onClick={() => setPromoOpen(true)}>Have a promo code?</button>)}
           <div className="divider" />
           <div className="col" style={{ gap: 2 }}>
             <span className="num" style={{ fontSize: 40, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.05 }}>SAR {fmt(total)}</span>
@@ -119,13 +158,13 @@ export default function Pay({ params }) {
             <span className="small">{order.rule}</span>
           </div>
           <div className="spread">
-            <span className="row" style={{ fontSize: 15, fontWeight: 500 }}><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec', fontSize: 10 }}>{cardObj.brand}</span>{cardObj.label}</span>
+            <span className="row" style={{ fontSize: 15, fontWeight: 500 }}>{total === 0 ? <><PayMark brand="credit" />Paid with Mada credit</> : <><PayMark brand={cardObj.brand} />{cardObj.label}</>}</span>
             <button type="button" className="link" onClick={() => setSheet('cards')}>Change</button>
           </div>
-          {total >= 1000 && (
+          {total >= 1000 && card !== 'applepay' && (
             <div className="chips" role="radiogroup" aria-label="How to pay">
               {[['full', 'Pay in full'], ['tabby', `Tabby · 4 × ${fmt(tabby)}`], ['tamara', `Tamara · 3 × ${fmt(tamara)}`]].map(([id, label]) => (
-                <button key={id} type="button" role="radio" aria-checked={plan === id ? 'true' : 'false'} className={'chip' + (plan === id ? ' on' : '')} onClick={() => { setPlan(id); buzz(HAPTIC.select); }}>{label}</button>
+                <button key={id} type="button" role="radio" aria-checked={plan === id ? 'true' : 'false'} className={'chip' + (plan === id ? ' on' : '')} onClick={() => { setPlan(id); buzz(HAPTIC.select); }}>{id !== 'full' && <PayMark brand={id} size={16} />}{label}</button>
               ))}
             </div>
           )}
@@ -175,6 +214,23 @@ export default function Pay({ params }) {
           <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Try again</button>
         </Sheet>
       )}
+      {sheet === '3ds' && (
+        <Sheet label="Bank check" onClose={() => { setSheet(null); toast('Cancelled. Nothing was charged.'); }}>
+          <div className="row"><PayMark brand={cardObj.brand} size={32} /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Your bank wants to check it’s you</span><span className="tiny">{cardObj.label} · SAR {fmt(plan === 'tabby' ? tabby : plan === 'tamara' ? tamara : total)}</span></span></div>
+          <p className="body">They sent a code to the number your bank has. It isn’t from Mada.</p>
+          <div className="field">
+            <label htmlFor="otp3ds">Code from your bank</label>
+            <input id="otp3ds" className={'input otp' + (otpTries ? ' bad' : '')} inputMode="numeric" maxLength={6} value={otp} disabled={otpTries >= 3} onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '').slice(0, 6); setOtp(v);
+              if (v.length === 6) { if (v === '123456') { setSheet(null); buzz(HAPTIC.success); done(); } else { setOtpTries(otpTries + 1); setOtp(''); buzz(HAPTIC.warn); } }
+            }} />
+            {otpTries > 0 && otpTries < 3 && <span className="err" role="alert">That code doesn’t match. {3 - otpTries} {3 - otpTries === 1 ? 'try' : 'tries'} left.</span>}
+            {otpTries >= 3 && <span className="err" role="alert">Your bank stopped this payment. Nothing was charged. Use another card or call your bank.</span>}
+          </div>
+          {otpTries >= 3 ? <button type="button" className="btn primary block" onClick={() => setSheet('cards')}>Use another card</button> : <span className="tiny">Demo code: 123456</span>}
+        </Sheet>
+      )}
+      {sheet === 'applepay' && <ApplePaySheet amount={plan === 'full' ? total : total} label={order.title} fail={s.demo.faceIdFails} onDone={() => { setSheet(null); done(); }} onClose={() => { setSheet(null); toast('Cancelled. Nothing was charged.'); }} />}
       {sheet === 'price' && (
         <Sheet label="Price changed" onClose={() => setSheet(null)}>
           <h2 className="h2">The price went up SAR 140 while we checked.</h2>
@@ -191,42 +247,122 @@ export function CardsSheet({ current, onPick, onClose }) {
   const { s, set } = useStore();
   const [adding, setAdding] = useState(false);
   const [num, setNum] = useState('');
+  const [exp, setExp] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [name, setName] = useState('');
+  const [save, setSave] = useState(true);
+  const [touched, setTouched] = useState({});
   const digits = num.replace(/\D/g, '');
-  const ok = digits.length >= 15 && digits.length <= 16;
+  const brand = cardBrand(digits);
+  const amex = /^3[47]/.test(digits);
+  const numOk = !!brand && digits.length === 16 && luhn(digits);
+  const [mm, yy] = exp.split('/').map((x) => Number(x));
+  const now = new Date(); const cy = now.getFullYear() % 100; const cm = now.getMonth() + 1;
+  const expOk = /^\d{2}\/\d{2}$/.test(exp) && mm >= 1 && mm <= 12 && (yy > cy || (yy === cy && mm >= cm));
+  const cvvOk = /^\d{3}$/.test(cvv);
+  const nameOk = name.trim().length >= 3;
+  const ok = numOk && expOk && cvvOk && nameOk;
+  const numErr = amex ? 'We can’t take American Express yet. Use Visa, Mastercard or mada.' : digits.length >= 16 && !luhn(digits) ? 'That number doesn’t look right. Check each digit.' : digits.length > 0 && digits.length < 16 && touched.num ? 'Card numbers have 16 digits.' : digits.length >= 6 && !brand ? 'We take Visa, Mastercard and mada.' : null;
+  const expErr = touched.exp && exp && !expOk ? (/^\d{2}\/\d{2}$/.test(exp) ? 'This card has expired.' : 'Use MM/YY, like 08/28.') : null;
   return (
     <Sheet label="Payment method" onClose={onClose}>
       <h2 className="h2">Pay with</h2>
+      {(s.credit?.balance || 0) > 0 && <div className="row small" style={{ color: '#1e352d' }}><PayMark brand="credit" size={22} />You have SAR {fmt(s.credit.balance)} Mada credit. It’s used first.</div>}
       {s.cards.map((c) => (
         <button key={c.id} type="button" className={'card tap well' + (c.id === current ? ' selected' : '')} onClick={() => { buzz(HAPTIC.select); onPick(c.id); }} style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <span className="pill" style={{ background: '#1e352d', color: '#f6f2ec', fontSize: 10 }}>{c.brand}</span>
-          <span className="grow h3" style={{ fontSize: 15 }}>{c.label}</span>
+          <PayMark brand={c.brand} size={30} />
+          <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{c.label}</span>{c.exp && <span className="tiny">Expires {c.exp}</span>}</span>
           {c.id === current && <Icon name="check" color="#2f7a4b" width={2.4} />}
         </button>
       ))}
-      <button type="button" className="card tap well" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => { buzz(HAPTIC.select); onPick('applepay'); }}>
-        <span className="pill" style={{ background: '#0f1a16', color: '#fff', fontSize: 10 }}>Pay</span><span className="grow h3" style={{ fontSize: 15 }}>Apple Pay</span>
+      <button type="button" className={'card tap well' + (current === 'applepay' ? ' selected' : '')} style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => { buzz(HAPTIC.select); onPick('applepay'); }}>
+        <PayMark brand="applepay" size={30} /><span className="grow h3" style={{ fontSize: 15 }}>Apple Pay</span>{current === 'applepay' && <Icon name="check" color="#2f7a4b" width={2.4} />}
       </button>
       {adding ? (
-        <form className="col" style={{ gap: 10 }} onSubmit={(e) => {
+        <form className="col" style={{ gap: 12 }} onSubmit={(e) => {
           e.preventDefault(); if (!ok) return;
           const id = 'card' + Date.now();
-          const label = (digits.startsWith('4') ? 'Visa' : digits.startsWith('5') ? 'Mastercard' : 'mada') + ' ending ' + digits.slice(-2);
-          set((p) => ({ cards: [...p.cards, { id, label, brand: label.split(' ')[0].toUpperCase() }] }));
+          const label = BRAND_NAME[brand] + ' ending ' + digits.slice(-2);
+          set((p) => ({ cards: [...p.cards, { id, label, brand, exp, fresh: true, temp: !save }] }));
           onPick(id);
         }}>
           <div className="field">
             <label htmlFor="cardnum">Card number</label>
-            <input id="cardnum" className="input num" inputMode="numeric" value={num} onChange={(e) => setNum(e.target.value)} placeholder="4000 0000 0000 0000" autoComplete="cc-number" />
-            {num && !ok && <span className="err">Card numbers have 15 or 16 digits.</span>}
+            <div style={{ position: 'relative' }}>
+              <input id="cardnum" className={'input num' + (numErr ? ' bad' : '')} inputMode="numeric" value={num} onBlur={() => setTouched({ ...touched, num: true })} onChange={(e) => setNum(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 '))} placeholder="4000 0000 0000 0000" autoComplete="cc-number" style={{ paddingRight: 70 }} />
+              {brand && <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}><PayMark brand={brand} size={24} /></span>}
+            </div>
+            {numErr && <span className="err">{numErr}</span>}
           </div>
-          <button type="submit" className="btn primary block" disabled={!ok}>Add card</button>
+          <div className="row" style={{ gap: 10 }}>
+            <div className="field grow"><label htmlFor="cardexp">Expiry</label><input id="cardexp" className={'input num' + (expErr ? ' bad' : '')} inputMode="numeric" placeholder="MM/YY" value={exp} onBlur={() => setTouched({ ...touched, exp: true })} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); setExp(v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v); }} autoComplete="cc-exp" />{expErr && <span className="err">{expErr}</span>}</div>
+            <div className="field grow"><label htmlFor="cardcvv">Security code</label><input id="cardcvv" className="input num" inputMode="numeric" placeholder="3 digits" value={cvv} onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').slice(0, 3))} autoComplete="cc-csc" /></div>
+          </div>
+          <div className="field"><label htmlFor="cardname">Name on the card</label><input id="cardname" className="input" value={name} onChange={(e) => setName(e.target.value)} autoComplete="cc-name" placeholder="OMAR ALHARBI" /></div>
+          <label className="row small" style={{ color: '#1e352d' }}><input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />Save this card for next time</label>
+          <span className="tiny">Card details go straight to the payment provider. Mada never sees the full number. Test card: 4242 4242 4242 4242.</span>
+          <button type="submit" className="btn primary block" disabled={!ok}>Use this card</button>
         </form>
       ) : <button type="button" className="btn secondary block" onClick={() => setAdding(true)}><Icon name="plus" />Add a card</button>}
     </Sheet>
   );
 }
 
+/* Apple Pay, the way the system sheet behaves: double-click, Face ID, done. */
+function ApplePaySheet({ amount, label, fail, onDone, onClose }) {
+  const [stage, setStage] = useState('wait');
+  useEffect(() => {
+    if (stage !== 'wait') return undefined;
+    const t = setTimeout(() => { if (fail) { setStage('failed'); buzz(HAPTIC.warn); } else { setStage('ok'); buzz(HAPTIC.success); setTimeout(onDone, 700); } }, 1600);
+    return () => clearTimeout(t);
+  }, [stage]);
+  return (
+    <Sheet label="Apple Pay" onClose={onClose}>
+      <div className="spread"><PayMark brand="applepay" size={30} /><button type="button" className="link" onClick={onClose}>Cancel</button></div>
+      <div className="spread small" style={{ color: '#1e352d' }}><span>Visa ending 41 · in Wallet</span><span className="num">SAR {fmt(amount)}</span></div>
+      <span className="tiny">Pay Mada Trips for {label}</span>
+      <div className="col" style={{ alignItems: 'center', gap: 10, padding: '14px 0' }}>
+        <span className={'faceid' + (stage === 'ok' ? ' ok' : stage === 'failed' ? ' bad' : '')} aria-hidden="true">
+          {stage === 'ok' ? <Icon name="check" size={34} color="#2f7a4b" width={2.4} /> : <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9v1M15 9v1M12 9v4h-1M9 16c1.6 1.2 4.4 1.2 6 0" /></svg>}
+        </span>
+        <span className="h3" style={{ fontSize: 15 }}>{stage === 'ok' ? 'Done' : stage === 'failed' ? 'Face not recognised' : 'Double-click to pay'}</span>
+      </div>
+      {stage === 'failed' && <div className="row"><button type="button" className="btn primary small" onClick={() => setStage('wait')}>Try again</button><button type="button" className="btn secondary small" onClick={() => { setStage('ok'); buzz(HAPTIC.success); setTimeout(onDone, 500); }}>Pay with passcode</button></div>}
+    </Sheet>
+  );
+}
+
 /* ---------- with Faisal, then confirmed ---------- */
+
+/* Writes a confirmed booking into the traveller's state. Used by Waiting, and in the background if they close it. */
+export function commitBooking(set, params) {
+  if (params.kind === 'trip') {
+    set((p) => {
+      const t = seedTrip({ ...p, household: params.travellers });
+      const f = FLIGHTS.find((x) => x.id === params.flightId);
+      t.travellers = params.travellers;
+      t.flightId = f.id;
+      t.flight = { ...f, date: params.flex ? 'Wed 10 Mar' : 'Tue 9 Mar', backDep: '15:10', backArr: '19:20', backDate: 'Mon 15 Mar' };
+      t.flightPrice = f.pp * params.travellers.length;
+      if (!params.bundle) { t.stay = null; t.pickup = null; }
+      return { trip: { ...t, ref: params.ref }, phase: 'booked' };
+    });
+  } else if (params.kind === 'stay') {
+    set((p) => {
+      const h = HOTELS.find((x) => x.id === params.hotelId);
+      const stay = { ...h, nights: STAY_NIGHTS, price: params.total, status: 'booked' };
+      if (p.trip) return { trip: { ...p.trip, stay } };
+      const t = seedTrip({ ...p, household: params.travellers });
+      return { trip: { ...t, travellers: params.travellers, flight: null, flightPrice: 0, stay, pickup: null }, phase: 'booked' };
+    });
+  } else if (params.kind === 'package') {
+    const pl = PLANS[params.planId];
+    set((p) => ({ requests: [...p.requests, { id: 'pk' + Date.now(), kind: 'package', short: pl.title, title: `Booked: ${pl.title}`, detail: `${params.travellers.length} travellers · confirmed by Mada`, status: 'done', created: Date.now(), quote: 0 }] }));
+  } else if (params.kind === 'change') {
+    set((p) => ({ trip: { ...p.trip, flight: { ...p.trip.flight, ...params.patch } } }));
+  }
+};
+
 
 const elapsedLabel = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
@@ -237,6 +373,11 @@ export function Waiting({ params }) {
   const [answered, setAnswered] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const asked = useRef(false);
+  const [problem, setProblem] = useState(null); // 'fare' | 'ticketing' | null
+  const [extra, setExtra] = useState(0);
+  const [calling, setCalling] = useState(false);
+  const failed = useRef({});
+  const ref = useRef(params.ref || Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''));
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => { if (confirmed) return undefined; const t = setInterval(() => setElapsed((e) => e + 1), 1000); return () => clearInterval(t); }, [confirmed]);
   const labels = params.kind === 'package' ? ['Seats held', 'Rooms held', 'Booking tours and tables'] : params.kind === 'change' ? ['Seats held', 'Fare checked', 'Changing tickets'] : ['Seats held', 'Price checked', params.kind === 'stay' ? 'Confirming rooms' : 'Issuing tickets'];
@@ -246,40 +387,22 @@ export function Waiting({ params }) {
     if (confirmed) return undefined;
     if (step === 1 && s.demo.agentQuestion && !asked.current) { asked.current = true; setQuestion(true); buzz(HAPTIC.knock); return undefined; }
     if (question && !answered) return undefined;
+    if (problem || calling) return undefined;
+    if (step === 0 && s.demo.fareGone && !failed.current.fare && params.kind === 'trip') { failed.current.fare = true; const t0 = setTimeout(() => { setProblem('fare'); buzz(HAPTIC.warn); }, 1100); return () => clearTimeout(t0); }
+    if (step === 2 && s.demo.ticketingFails && !failed.current.ticketing) { failed.current.ticketing = true; const t0 = setTimeout(() => { setProblem('ticketing'); buzz(HAPTIC.warn); }, 1100); return () => clearTimeout(t0); }
     const t = setTimeout(() => {
       if (step < 3) setStep(step + 1);
       else { setConfirmed(true); buzz(HAPTIC.success); commit(); }
-    }, 1200);
+    }, s.demo.slowAgent ? 4200 : 1200);
     return () => clearTimeout(t);
-  }, [step, question, answered, confirmed]);
+  }, [step, question, answered, confirmed, problem, calling]);
+  const slow = elapsed >= 8 && !confirmed && !problem;
+  const n = params.travellers?.length || 1;
+  /* Close and carry on: the booking finishes in the background and a banner says so. */
+  const hide = () => { set({ pendingBooking: { ...params, ref: ref.current, total: (params.total || 0) + extra, at: Date.now() } }); reset('today'); };
+  const cancelAll = () => { reset('today'); };
 
-  const commit = () => {
-    if (params.kind === 'trip') {
-      set((p) => {
-        const t = seedTrip({ ...p, household: params.travellers });
-        const f = FLIGHTS.find((x) => x.id === params.flightId);
-        t.travellers = params.travellers;
-        t.flightId = f.id;
-        t.flight = { ...f, date: params.flex ? 'Wed 10 Mar' : 'Tue 9 Mar', backDep: '15:10', backArr: '19:20', backDate: 'Mon 15 Mar' };
-        t.flightPrice = f.pp * params.travellers.length;
-        if (!params.bundle) { t.stay = null; t.pickup = null; }
-        return { trip: t, phase: 'booked' };
-      });
-    } else if (params.kind === 'stay') {
-      set((p) => {
-        const h = HOTELS.find((x) => x.id === params.hotelId);
-        const stay = { ...h, nights: STAY_NIGHTS, price: params.total, status: 'booked' };
-        if (p.trip) return { trip: { ...p.trip, stay } };
-        const t = seedTrip({ ...p, household: params.travellers });
-        return { trip: { ...t, travellers: params.travellers, flight: null, flightPrice: 0, stay, pickup: null }, phase: 'booked' };
-      });
-    } else if (params.kind === 'package') {
-      const pl = PLANS[params.planId];
-      set((p) => ({ requests: [...p.requests, { id: 'pk' + Date.now(), kind: 'package', short: pl.title, title: `Booked: ${pl.title}`, detail: `${params.travellers.length} travellers · confirmed by Mada`, status: 'done', created: Date.now(), quote: 0 }] }));
-    } else if (params.kind === 'change') {
-      set((p) => ({ trip: { ...p.trip, flight: { ...p.trip.flight, ...params.patch } } }));
-    }
-  };
+  const commit = () => commitBooking(set, { ...params, ref: ref.current, total: (params.total || 0) + extra });
 
   const steps = labels.map((text, i) => ({ text, state: i < step ? 'done' : i === step ? 'now' : 'todo' }));
   const city = params.kind === 'package' ? `You're going to ${PLANS[params.planId].city}.` : params.kind === 'stay' ? 'Your rooms are booked.' : params.kind === 'change' ? 'Your flight is changed.' : "You're going to Istanbul.";
@@ -323,7 +446,10 @@ export function Waiting({ params }) {
               <span key={live} className="wait-live">{live}<span className="dots" aria-hidden="true"><i /><i /><i /></span></span>
             </span>
           </span>
-          <span className="wait-clock num" aria-label="Time so far">{elapsedLabel(elapsed)}</span>
+          <span className="row" style={{ gap: 8 }}>
+            <span className="wait-clock num" aria-label="Time so far">{elapsedLabel(elapsed)}</span>
+            <button type="button" className="wait-clock" style={{ border: 0, color: '#fffdf9', fontWeight: 600 }} onClick={hide}>Close</button>
+          </span>
         </div>
         <div className="wait-hero">
           <span className="eyebrow" style={{ color: '#d9b77a' }}>{params.kind === 'change' ? 'Changing your flight' : 'Booking now'}</span>
@@ -343,14 +469,37 @@ export function Waiting({ params }) {
               </div>
             );
           })}
+          {problem === 'fare' && (
+            <div className="wait-q rise">
+              <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>Faisal says</span>
+              <span className="body" style={{ color: '#fffdf9' }}>Saudia sold the last seats at that price a minute ago. The same flight is now SAR 120 more each, SAR {fmt(120 * n)} in all. Nothing has been charged.</span>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <button type="button" className="btn small" style={{ background: '#d9b77a', color: '#1e352d' }} onClick={() => { setExtra(120 * n); setProblem(null); buzz(HAPTIC.tap); }}>Book at SAR {fmt((params.total || 0) + 120 * n)}</button>
+                <button type="button" className="glass-btn" onClick={() => replace('ask', { prefill: 'Flights to Istanbul for Eid' })}>See other flights</button>
+                <button type="button" className="glass-btn" onClick={cancelAll}>Stop</button>
+              </div>
+            </div>
+          )}
+          {problem === 'ticketing' && (
+            <div className="wait-q rise">
+              <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>The airline didn’t issue the tickets</span>
+              <span className="body" style={{ color: '#fffdf9' }}>Saudia’s system timed out. Nothing was charged and the hold on your card is released. Your seats are still held for 2 hours.</span>
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <button type="button" className="btn small" style={{ background: '#d9b77a', color: '#1e352d' }} onClick={() => { setProblem(null); buzz(HAPTIC.tap); }}>Faisal tries by phone</button>
+                <button type="button" className="glass-btn" onClick={cancelAll}>Cancel the booking</button>
+              </div>
+              <span className="tiny" style={{ color: 'rgba(255,253,249,.6)' }}>By phone usually takes 15 minutes. You can close the app.</span>
+            </div>
+          )}
+          {slow && !question && <span className="small rise" style={{ color: '#e6c88f' }}>Taking longer than usual. Saudia’s system is slow today. You can close the app; we’ll tell you the moment it’s done.</span>}
           {question && (
             <div className="wait-q rise">
               <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>Faisal asks</span>
               <span className="body" style={{ color: '#fffdf9' }}>Sara's passport shows her given names as “SARA OMAR”. Should her ticket say exactly that?</span>
-              {answered ? <span className="small" style={{ color: '#9fd3b0', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
+              {calling ? <span className="small" style={{ color: '#e6c88f', fontWeight: 600 }}>Faisal is calling +966 5• ••• 4127 now…</span> : answered ? <span className="small" style={{ color: '#9fd3b0', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
                 <div className="row">
                   <button type="button" className="btn small" style={{ background: '#d9b77a', color: '#1e352d' }} onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Yes, as on the passport</button>
-                  <button type="button" className="glass-btn" onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Call me</button>
+                  <button type="button" className="glass-btn" onClick={() => { setCalling(true); buzz(HAPTIC.tap); setTimeout(() => { setCalling(false); setAnswered(true); }, 3000); }}>Call me</button>
                 </div>
               )}
             </div>
@@ -373,16 +522,18 @@ export function Waiting({ params }) {
       </div>
       <div style={{ padding: '0 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h1 className="display rise d1" style={{ fontSize: 46 }}>{city}</h1>
-        <div className="row rise d2"><span className="avatar sm green">F</span><span className="small num">Confirmed by Faisal at Mada{params.kind === 'trip' ? ' · ' + (FLIGHTS.find((f) => f.id === params.flightId)?.code || '') : ''} · <b style={{ color: '#1e352d', letterSpacing: '.04em' }}>X7K2QD</b></span></div>
+        <div className="row rise d2"><span className="avatar sm green">F</span><span className="small num">Confirmed by Faisal at Mada{params.kind === 'trip' ? ' · ' + (FLIGHTS.find((f) => f.id === params.flightId)?.code || '') : ''} · <b style={{ color: '#1e352d', letterSpacing: '.04em' }}>{ref.current}</b></span></div>
         <div className="chips rise d3">
           {params.kind !== 'stay' && <span className="pill" style={{ background: '#fffdf9' }}>Tickets in your Wallet</span>}
           {(params.bundle || params.kind === 'stay') && <span className="pill" style={{ background: '#fffdf9' }}>Rooms booked</span>}
           <span className="pill" style={{ background: '#fffdf9' }}>{params.plan === 'tabby' ? 'Tabby: first of 4 paid' : params.plan === 'tamara' ? 'Tamara: first of 3 paid' : `Paid with ${params.card}`}</span>
+          {params.creditUsed > 0 && <span className="pill" style={{ background: '#fffdf9' }}>SAR {fmt(params.creditUsed)} from credit</span>}
+          <span className="pill" style={{ background: '#fffdf9' }}>VAT invoice in Trips</span>
           {params.kind !== 'stay' && <span className="pill" style={{ background: '#fffdf9' }}>We're watching the flight</span>}
         </div>
       </div>
       <div className="act">
-        <button type="button" className="btn primary block" onClick={() => { reset('today'); }}>See the trip</button>
+        <button type="button" className="btn primary block" onClick={() => { if (params.kind === 'trip' || params.kind === 'stay') { set({ tab: 'trips', stack: [{ name: 'trip', params: {}, key: Date.now() }] }); } else reset(params.kind === 'package' ? 'trips' : 'today'); }}>{params.kind === 'trip' || params.kind === 'stay' ? 'See the trip' : 'Done'}</button>
       </div>
     </div>
   );

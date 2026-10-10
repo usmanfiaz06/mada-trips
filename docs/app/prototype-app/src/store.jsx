@@ -56,6 +56,10 @@ export const DEMO_SWITCHES = [
   { id: 'passportProblem', label: 'Passport problem' },
   { id: 'scanFails', label: 'Scan fails' },
   { id: 'faceIdFails', label: 'Face ID fails' },
+  { id: 'needs3ds', label: 'Bank asks for a code' },
+  { id: 'fareGone', label: 'Fare sold out while booking' },
+  { id: 'ticketingFails', label: 'Tickets fail to issue' },
+  { id: 'slowAgent', label: 'Airline is slow' },
 ];
 
 export const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -75,9 +79,11 @@ export const fresh = () => ({
   notifications: null,
   location: null,
   cards: [
-    { id: 'visa41', label: 'Visa ending 41', brand: 'VISA' },
-    { id: 'mada07', label: 'mada ending 07', brand: 'mada' },
+    { id: 'visa41', label: 'Visa ending 41', brand: 'visa', exp: '08/28' },
+    { id: 'mada07', label: 'mada ending 07', brand: 'mada', exp: '02/27' },
   ],
+  credit: { balance: 0, history: [] },
+  inbox: [],
   defaultCard: 'visa41',
   trip: null,
   pastTrips: [{ id: 'baku', city: 'Baku', dates: '30 Mar – 4 Apr 2026', note: 'Eid with the four of you' }],
@@ -99,7 +105,7 @@ export const fresh = () => ({
     { id: 'i1', name: 'Maha', via: 'WhatsApp', when: '2 days ago', status: 'pending' },
     { id: 'i2', name: 'Yousef', via: 'Link', when: 'Last week', status: 'joined' },
   ],
-  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, passportProblem: false, scanFails: false, faceIdFails: false },
+  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, fareGone: false, ticketingFails: false, slowAgent: false, needs3ds: false, passportProblem: false, scanFails: false, faceIdFails: false },
   tab: 'today',
   stack: [],
   walletUnlocked: false,
@@ -141,13 +147,22 @@ export function StoreProvider({ children }) {
       setToast({ text, id: Date.now() });
       toastTimer.current = setTimeout(() => setToast(null), 3200);
     },
+    /* Every banner is also kept in the inbox, so a missed one isn't lost. `to` is where a tap goes: { tab } or { push: [name, params] }. */
     banner: (b) => {
       clearTimeout(bannerTimer.current);
-      setBanner({ ...b, id: Date.now() });
+      const id = Date.now();
+      setBanner({ ...b, id });
+      set((p) => ({ inbox: [{ id: 'n' + id, title: b.title, body: b.body, to: b.to || null, at: id, read: false, kind: b.kind || 'trip' }, ...(p.inbox || [])].slice(0, 50) }));
       buzz(b.haptic || HAPTIC.warn);
       bannerTimer.current = setTimeout(() => setBanner(null), 5200);
     },
     dismissBanner: () => setBanner(null),
+    openBanner: (b) => {
+      setBanner(null);
+      set((p) => ({ inbox: (p.inbox || []).map((n) => (n.at === b.id ? { ...n, read: true } : n)) }));
+      if (b.to?.push) set((p) => ({ stack: [...p.stack, { name: b.to.push[0], params: b.to.push[1] || {}, key: Date.now() + Math.random() }] }));
+      else if (b.to?.tab) set({ tab: b.to.tab, stack: [] });
+    },
     toastMsg,
     bannerMsg,
     people: () => s.household.map((id) => PEOPLE[id]).filter(Boolean),

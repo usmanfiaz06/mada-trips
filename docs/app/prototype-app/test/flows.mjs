@@ -86,6 +86,10 @@ try {
   await page.waitForTimeout(1900);
   await shot('confirmed');
   await click('See the trip', { wait: 600 });
+  await shot('trip-after-booking');
+  await click('Back', { wait: 500 });
+  await phone.getByRole('button', { name: 'Today' }).click();
+  await page.waitForTimeout(400);
   await shot('today-booked');
 
   step('trips: detail, cancel stay, refund tracker');

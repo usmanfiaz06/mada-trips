@@ -1,0 +1,62 @@
+/* ---------- account management ---------- */
+.acc-group { background: var(--paper); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; }
+.acc-group.well { background: var(--mist); flex-shrink: 0; }
+.acc-group > * + *, .acc-group > .acc-faq + .acc-faq { border-top: 1px solid var(--line); }
+.acc-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 56px; box-sizing: border-box; width: 100%; border: 0; background: transparent; text-align: left; color: var(--green); font: inherit; transition: background .15s ease; }
+button.acc-row:active { background: rgba(30, 53, 45, .05); }
+.acc-row.col { align-items: stretch; }
+.acc-k { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: .01em; }
+.acc-v { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--green); }
+.acc-break { word-break: break-all; }
+.acc-ic { width: 36px; height: 36px; border-radius: 12px; background: var(--mist); display: grid; place-items: center; flex-shrink: 0; }
+.acc-ic.on { background: var(--green); }
+.acc-ic.big { width: 52px; height: 52px; border-radius: 18px; background: #f3e6c9; }
+.acc-src { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; line-height: 1.3; color: var(--ink-3); margin-top: 2px; }
+.acc-src.ok { color: var(--ok); }
+.acc-src.warn { color: var(--gold-ink); }
+.acc-intro { padding: 0 4px; text-align: center; }
+.acc-warn { color: var(--gold-ink); }
+.acc-err { text-align: center; color: #8a3524; font-size: 13px; }
+
+/* profile header and photo */
+.acc-head { gap: 16px; padding-top: 4px; }
+.acc-avatar-wrap { position: relative; border: 0; background: none; padding: 0; display: inline-flex; flex-shrink: 0; border-radius: 999px; }
+.acc-avatar-wrap .avatar { box-shadow: 0 14px 28px -16px rgba(15, 26, 22, .7); }
+.acc-cam { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; border-radius: 999px; background: var(--gold); display: grid; place-items: center; border: 3px solid var(--sand); }
+.acc-photo { object-fit: cover; padding: 0; display: block; }
+.acc-namebtn { border: 0; background: none; padding: 0; text-align: left; color: var(--green); gap: 2px; align-items: flex-start; }
+.acc-link { display: inline-flex; align-items: center; gap: 2px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--gold-ink); }
+.acc-hero { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0 0; align-self: center; }
+.acc-hero .acc-cam { width: 30px; height: 30px; }
+.acc-file { position: relative; cursor: pointer; box-sizing: border-box; overflow: hidden; }
+
+/* crop */
+.acc-crop { position: relative; align-self: center; border-radius: 28px; overflow: hidden; background: #0f1a16; touch-action: none; cursor: grab; flex-shrink: 0; }
+.acc-crop:active { cursor: grabbing; }
+.acc-crop img { position: absolute; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.acc-crop-ring { position: absolute; inset: 0; border-radius: 999px; box-shadow: 0 0 0 200px rgba(15, 26, 22, .5), inset 0 0 0 2px rgba(255, 253, 249, .85); pointer-events: none; }
+.acc-range { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 999px; background: #e3dcd1; outline: none; }
+.acc-range::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; border-radius: 999px; background: var(--green); border: 3px solid var(--paper); box-shadow: 0 2px 8px rgba(15, 26, 22, .3); cursor: pointer; }
+.acc-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 999px; background: var(--green); border: 3px solid var(--paper); }
+
+/* status pills */
+.acc-pill.ok { background: rgba(47, 122, 75, .12); color: var(--ok); }
+.acc-pill.gold { background: #f3e6c9; color: var(--gold-ink); }
+.acc-pill.warn { background: #f4ddd5; color: #8a3524; }
+.acc-pill.muted { background: var(--mist); color: var(--ink-2); }
+.acc-pp { gap: 8px; }
+.acc-pp.gold, .acc-pp.warn { box-shadow: inset 0 0 0 1.5px #e6cf9f; }
+
+/* phone swap */
+.acc-swap { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-radius: 20px; background: var(--mist); }
+
+/* small inline buttons inside rows */
+.btn.small.acc-mini { height: 34px; padding: 0 12px; font-size: 13px; background: var(--mist); color: #8a3524; flex-shrink: 0; }
+
+/* notes */
+.acc-notes { height: 96px; padding: 12px 14px; font-size: 15px; line-height: 1.4; resize: none; }
+
+/* faq */
+.acc-faq { display: flex; flex-direction: column; }
+.acc-answer { margin: -4px 0 0; padding: 0 16px 16px; animation: in .3s var(--ease) both; }
+.acc-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }

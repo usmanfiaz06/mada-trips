@@ -1,0 +1,12 @@
+/* ---------- support and inbox ---------- */
+.support-head { display: flex; align-items: center; gap: 12px; padding: 0 24px 8px; }
+.support-about { margin: 0 24px 6px; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #7d5d27; background: #f3ead8; padding: 6px 12px; border-radius: 999px; }
+.support-msg { max-width: 82%; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px; font-size: 15px; line-height: 1.45; }
+.support-msg.them { align-self: flex-start; background: #fffdf9; color: #1e352d; border-radius: 6px 22px 22px 22px; }
+.support-msg.me { align-self: flex-end; background: #1e352d; color: #f6f2ec; border-radius: 22px 6px 22px 22px; }
+.support-time { font-size: 11px; opacity: .6; }
+.inbox-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px; border: 0; border-radius: 20px; background: transparent; text-align: left; color: #1e352d; position: relative; }
+.inbox-row.unread { background: #fffdf9; }
+.inbox-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--mist); display: grid; place-items: center; flex-shrink: 0; }
+.inbox-dot { position: absolute; top: 18px; right: 14px; width: 8px; height: 8px; border-radius: 9px; background: #b98f4a; }
+.inbox-row.unread .tiny { margin-right: 14px; }

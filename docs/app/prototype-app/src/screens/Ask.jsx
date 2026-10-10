@@ -195,6 +195,13 @@ function FlightFlow({ query, setCta }) {
   const [open, setOpen] = useState(null);
   const [bundle, setBundle] = useState(false);
   const [renewalAsked, setRenewalAsked] = useState(false);
+  const [trip, setTrip] = useState({ type: 'return', dep: 9, ret: 15, month: 'Mar', cabin: 'Economy', infants: 0, flex: false });
+  const [sort, setSort] = useState('best');
+  const [editing, setEditing] = useState(false);
+  const cabinX = trip.cabin === 'Business' ? 3.2 : trip.cabin === 'Premium' ? 1.7 : 1;
+  const legX = trip.type === 'oneway' ? 0.55 : 1;
+  const fare = (f) => Math.round(f.pp * cabinX * legX);
+  const dateLabel = trip.type === 'oneway' ? `${trip.month} ${trip.dep}, one way` : `${trip.dep}–${trip.ret} ${trip.month}`;
 
   if (where && where !== 'Istanbul') {
     const city = where.charAt(0).toUpperCase() + where.slice(1);
@@ -204,7 +211,12 @@ function FlightFlow({ query, setCta }) {
     <Ask1 q="Where to?" options={[['Istanbul', 'Istanbul'], ['Somewhere else', 'other']]} onPick={(v) => setWhere(v === 'other' ? 'other-city' : v)} />
   );
   if (where === 'other-city') return <RequestFlow kind="general" query="Flights somewhere new" />;
-  if (!when) return <Ask1 q="When?" options={[['Eid al-Fitr · 9–15 Mar', 'eid'], ['Mid-year school break', 'eid'], ['I’ll pick dates', 'eid']]} onPick={setWhen} />;
+  if (!when) return (
+    <>
+      <Ask1 q="When?" options={[['Eid al-Fitr · 9–15 Mar', 'eid'], ['Mid-year school break · 20–27 Jun', 'june'], ['I’ll pick dates', 'pick']]} onPick={(v) => { if (v === 'pick') setEditing(true); else { if (v === 'june') setTrip({ ...trip, month: 'Jun', dep: 20, ret: 27 }); setWhen(v); } }} />
+      {editing && <SearchSheet value={trip} onClose={() => setEditing(false)} onDone={(t) => { setTrip(t); setWhen('custom'); setEditing(false); }} />}
+    </>
+  );
   if (!whoDone) return (
     <div className="col rise" style={{ gap: 12 }}>
       <span className="h2">Who's going?</span>
@@ -238,18 +250,33 @@ function FlightFlow({ query, setCta }) {
     </div>
   );
 
-  const options = FLIGHTS.filter((f) => !(s.demo.supplierDown && mode === 'others' && f.id === 'best'));
+  const durMin = (f) => { const m = f.dur.match(/(\d+)h (\d+)m/); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
+  const options = FLIGHTS.filter((f) => !(s.demo.supplierDown && mode === 'others' && f.id === 'best'))
+    .slice().sort((a, b) => (sort === 'cheapest' ? a.pp - b.pp : sort === 'fastest' ? durMin(a) - durMin(b) : sort === 'earliest' ? a.dep.localeCompare(b.dep) : 0));
   const current = options.find((f) => f.id === pick) || options[0];
   const blocking = who.map((id) => ({ p: PEOPLE[id], issue: passportIssue(s, id) })).filter((x) => x.issue?.blocking);
   const hotelTotal = HOTELS[0].night * STAY_NIGHTS * (who.length > 2 ? 1 : 0.55) + PICKUP;
-  const total = current.pp * who.length + (bundle ? hotelTotal : 0);
+  const infantFare = (f) => Math.round(fare(f) * 0.1);
+  const total = fare(current) * who.length + infantFare(current) * trip.infants + (bundle ? hotelTotal : 0);
 
   return (
     <div className="col" style={{ gap: 12 }}>
       <div className="row tiny rise"><Icon name="check" color="#2f7a4b" size={16} width={2.4} />Checked 14 flights · holding seats for {who.length}</div>
       <div className="col rise d1" style={{ gap: 2 }}>
         <h2 className="h2" style={{ fontSize: 24 }}>Three ways to get there.</h2>
-        <span className="small">{mode === 'flex' ? 'Wed 10 – Mon 15 Mar' : 'Tue 9 – Mon 15 Mar'} · {who.length} {who.length === 1 ? 'traveller' : 'travellers'} · return</span>
+      </div>
+      <button type="button" className="search-summary rise d1" onClick={() => setEditing(true)} aria-label="Edit search">
+        <span className="col" style={{ gap: 1 }}>
+          <span className="h3" style={{ fontSize: 15 }}>Riyadh → Istanbul · {mode === 'flex' && trip.month === 'Mar' && trip.dep === 9 ? '10–15 Mar' : dateLabel}</span>
+          <span className="tiny">{who.length} {who.length === 1 ? 'adult' : 'people'}{trip.infants ? ` + ${trip.infants} on a lap` : ''} · {trip.cabin}{trip.flex ? ' · ±2 days' : ''}</span>
+        </span>
+        <span className="link" style={{ fontSize: 14 }}>Edit</span>
+      </button>
+      <div className="row" style={{ gap: 16 }} role="group" aria-label="Sort flights">
+        {[['best', 'Best'], ['cheapest', 'Cheapest'], ['fastest', 'Fastest'], ['earliest', 'Earliest']].map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={sort === id ? 'true' : 'false'} onClick={() => { setSort(id); buzz(HAPTIC.select); }}
+            style={{ border: 0, background: 'none', padding: '4px 0', fontSize: 14, fontWeight: 600, color: sort === id ? '#1e352d' : '#7a857f', borderBottom: sort === id ? '2px solid #d9b77a' : '2px solid transparent' }}>{label}</button>
+        ))}
       </div>
       {options.map((f, i) => {
         const on = current.id === f.id;
@@ -265,7 +292,7 @@ function FlightFlow({ query, setCta }) {
                     <span className="pill" style={{ height: 22, alignSelf: 'flex-start', ...(on ? { background: '#d9b77a' } : {}) }}>{f.label}</span>
                   </span>
                 </span>
-                <span className="num" style={{ fontSize: 17, fontWeight: 600 }}>SAR {fmt(f.pp * who.length)}</span>
+                <span className="num" style={{ fontSize: 17, fontWeight: 600 }}>SAR {fmt(fare(f) * who.length + infantFare(f) * trip.infants)}</span>
               </span>
               <Route dep={f.dep} arr={f.arr} from={f.from} to={f.to} dur={f.dur} />
               <span className="small">{f.reason}</span>
@@ -273,7 +300,7 @@ function FlightFlow({ query, setCta }) {
             {on && open === f.id && (
               <div className="col rise" style={{ padding: '0 16px 14px', gap: 8 }}>
                 <div className="divider" />
-                {[['Bags', f.bags], ['Change', f.change], ['Cancel', f.refund], ['Return', `${f.back} · Mon 15 Mar`]].map(([k, v]) => (
+                {[['Bags', f.bags], ['Change', f.change], ['Cancel', f.refund], ...(trip.type === 'oneway' ? [] : [['Return', `${f.back} · ${trip.month} ${trip.ret}`]]), ...(trip.infants ? [['Lap infant', `SAR ${fmt(infantFare(f))} each · bassinet on request`]] : [])].map(([k, v]) => (
                   <div key={k} className="spread small"><span>{k}</span><span style={{ color: '#1e352d', fontWeight: 600 }}>{v}</span></div>
                 ))}
               </div>
@@ -317,9 +344,62 @@ function FlightFlow({ query, setCta }) {
       <PublishCta setCta={setCta} cta={{
         label: blocking.length ? `Sort out ${blocking[0].p.name}'s passport first` : `Review · SAR ${fmt(total)}`,
         disabled: blocking.length > 0,
-        onClick: () => push('pay', { kind: 'trip', flightId: current.id, travellers: who, bundle, flex: mode === 'flex' }),
-      }} deps={[blocking.length, total, current.id, who.join(), bundle, mode]} />
+        onClick: () => push('pay', { kind: 'trip', flightId: current.id, travellers: who, bundle, flex: mode === 'flex', search: trip }),
+      }} deps={[blocking.length, total, current.id, who.join(), bundle, mode, JSON.stringify(trip)]} />
+      {editing && <SearchSheet value={trip} onClose={() => setEditing(false)} onDone={(t) => { setTrip(t); setEditing(false); setRunKey((k) => k + 1); }} />}
     </div>
+  );
+}
+
+/* Edit a search in one place: trip type, dates, cabin, infants. */
+function SearchSheet({ value, onClose, onDone }) {
+  const [t, setT] = useState(value);
+  const [pickRet, setPickRet] = useState(false);
+  const days = t.month === 'Jun' ? 30 : 31;
+  const first = t.month === 'Jun' ? 2 : 1; // Mon=0: 1 Mar 2027 is a Monday, 1 Jun 2027 a Tuesday
+  const today = t.month === 'Mar' ? 0 : 0;
+  const pickDay = (d) => {
+    buzz(HAPTIC.select);
+    if (t.type === 'oneway' || !pickRet) { setT({ ...t, dep: d, ret: Math.max(d + 1, t.ret) }); if (t.type !== 'oneway') setPickRet(true); }
+    else if (d <= t.dep) setT({ ...t, dep: d });
+    else { setT({ ...t, ret: d }); setPickRet(false); }
+  };
+  return (
+    <Sheet label="Edit search" onClose={onClose}>
+      <h2 className="h2">Your search</h2>
+      <div className="seg" role="radiogroup" aria-label="Trip type">
+        {[['return', 'Return'], ['oneway', 'One way']].map(([id, label]) => <button key={id} type="button" role="radio" aria-checked={t.type === id ? 'true' : 'false'} onClick={() => setT({ ...t, type: id })}>{label}</button>)}
+      </div>
+      <div className="spread">
+        <span className="h3" style={{ fontSize: 15 }}>{t.type === 'oneway' ? `Leaving ${t.month} ${t.dep}` : pickRet ? `Leaving ${t.month} ${t.dep} · now pick the return` : `${t.month} ${t.dep} → ${t.month} ${t.ret} · ${t.ret - t.dep} nights`}</span>
+        <span className="row" style={{ gap: 4 }}>
+          {['Mar', 'Jun'].map((m) => <button key={m} type="button" className={'chip' + (t.month === m ? ' on' : '')} style={{ height: 30 }} onClick={() => setT({ ...t, month: m, dep: m === 'Jun' ? 20 : 9, ret: m === 'Jun' ? 27 : 15 })}>{m}</button>)}
+        </span>
+      </div>
+      <div className="cal" role="grid" aria-label={`${t.month} 2027`}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="cal-h">{d}</span>)}
+        {Array.from({ length: first - 1 + today }, (_, i) => <span key={'b' + i} />)}
+        {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+          const inRange = t.type === 'return' && d > t.dep && d < t.ret;
+          const end = d === t.dep || (t.type === 'return' && d === t.ret);
+          return <button key={d} type="button" className={'cal-d' + (end ? ' end' : inRange ? ' in' : '')} aria-pressed={end ? 'true' : 'false'} onClick={() => pickDay(d)}>{d}</button>;
+        })}
+      </div>
+      <label className="spread small" style={{ color: '#1e352d' }}><span>Flexible by 2 days either side</span><input type="checkbox" checked={t.flex} onChange={(e) => setT({ ...t, flex: e.target.checked })} /></label>
+      <span className="eyebrow">Cabin</span>
+      <div className="seg" role="radiogroup" aria-label="Cabin">
+        {['Economy', 'Premium', 'Business'].map((c) => <button key={c} type="button" role="radio" aria-checked={t.cabin === c ? 'true' : 'false'} onClick={() => setT({ ...t, cabin: c })}>{c}</button>)}
+      </div>
+      <div className="spread">
+        <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Babies on a lap</span><span className="tiny">Under 2 on the day you fly back. One per adult.</span></span>
+        <span className="row" style={{ gap: 10 }}>
+          <button type="button" className="icon-btn" aria-label="One fewer baby" disabled={!t.infants} onClick={() => setT({ ...t, infants: t.infants - 1 })}>−</button>
+          <span className="num h3" aria-live="polite">{t.infants}</span>
+          <button type="button" className="icon-btn" aria-label="One more baby" disabled={t.infants >= 2} onClick={() => setT({ ...t, infants: t.infants + 1 })}>+</button>
+        </span>
+      </div>
+      <button type="button" className="btn primary block" disabled={pickRet && t.type === 'return'} onClick={() => onDone(t)}>{pickRet && t.type === 'return' ? 'Pick a return date' : 'Search'}</button>
+    </Sheet>
   );
 }
 

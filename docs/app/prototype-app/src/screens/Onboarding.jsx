@@ -18,6 +18,8 @@ export default function Onboarding() {
   const [tries, setTries] = useState(0);
   const [resendIn, setResendIn] = useState(30);
   const [sheet, setSheet] = useState(null);
+  const [social, setSocial] = useState(null); // 'apple' | 'google' once they've signed in that way
+  const [hideEmail, setHideEmail] = useState(true);
   const [scanState, setScanState] = useState('choose'); // choose | demo | reading | failed
   const [fields, setFields] = useState(DEMO_FIELDS);
   const [manual, setManual] = useState(false);
@@ -116,7 +118,12 @@ export default function Onboarding() {
   const locked = tries >= 3;
   const submitCode = (value) => {
     if (value.length !== 6 || locked) return;
-    if (value === OTP) { buzz(HAPTIC.success); goto('passport'); return; }
+    if (value === OTP) {
+      buzz(HAPTIC.success);
+      /* 50 000 4127 is the demo account that already exists: bring everything back instead of starting over. */
+      if (digits.endsWith('4127') && !social) { goto('welcomeBack'); return; }
+      goto('passport'); return;
+    }
     buzz(HAPTIC.soft);
     setTries((n) => n + 1);
     setCode('');
@@ -173,14 +180,44 @@ export default function Onboarding() {
           <button type="button" className="btn ghost block" onClick={() => goto('phone')}>Use my phone number</button>
           <p className="act-note">Bookings stay private. We never sell your data.</p>
         </div>
-        {sheet && (
-          <Sheet label="Sign in" onClose={() => setSheet(null)}>
-            <h2 className="h2">Continue as Omar?</h2>
-            <p className="body">{sheet === 'apple' ? 'Apple shares your name and a private email that forwards to you.' : 'Google shares your name and email address.'}</p>
-            <button type="button" className="btn primary block" onClick={() => { setSheet(null); goto('passport'); }}>Continue</button>
-            <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Cancel</button>
+        {(sheet === 'apple' || sheet === 'google') && (
+          <Sheet label="Sign in" onClose={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>
+            {s.demo.offline ? (<>
+              <h2 className="h2">You’re offline.</h2>
+              <p className="body">Signing in needs a connection. Your phone number works the same way once you’re back online.</p>
+              <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Okay</button>
+            </>) : (<>
+              <h2 className="h2">Continue as Omar?</h2>
+              {sheet === 'apple' ? (
+                <div className="col" style={{ gap: 8 }} role="radiogroup" aria-label="Email">
+                  {[[false, 'Share my email', 'omar.alharbi@icloud.com'], [true, 'Hide my email', 'A private address that forwards to you']].map(([v, t, sub]) => (
+                    <button key={t} type="button" role="radio" aria-checked={hideEmail === v ? 'true' : 'false'} className={'card tap well' + (hideEmail === v ? ' selected' : '')} onClick={() => setHideEmail(v)}><span className="h3" style={{ fontSize: 15 }}>{t}</span><span className="tiny">{sub}</span></button>
+                  ))}
+                </div>
+              ) : <p className="body">Google shares your name and email address, omar.alharbi@gmail.com.</p>}
+              <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
+              <button type="button" className="btn ghost block" onClick={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>Cancel</button>
+            </>)}
           </Sheet>
         )}
+      </div>
+    ),
+
+    welcomeBack: (
+      <div className="screen">
+        <div style={{ padding: '110px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <span className="avatar green rise" style={{ width: 72, height: 72, fontSize: 28 }}>O</span>
+          <h1 className="display rise d1" style={{ fontSize: 44 }}>Welcome back, Omar.</h1>
+          <p className="body rise d2">Your trips, your family’s passports and your saved places are all here. Nothing to set up again.</p>
+          <div className="card rise d3" style={{ gap: 8 }}>
+            {[['circles', 'Omar, Hessa, Sara and Ahmed'], ['visa', '4 passports, checked and encrypted'], ['trips', '1 past trip · Baku']].map(([ic, t]) => <div key={t} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t}</div>)}
+          </div>
+          <span className="tiny rise d3">New phone? For your safety, the Wallet asks for Face ID the first time you open it.</span>
+        </div>
+        <div className="act">
+          <button type="button" className="btn primary block" onClick={() => { set({ onboarded: true, guest: false, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, tab: 'today', stack: [] }); buzz(HAPTIC.success); }}>Open Mada</button>
+          <button type="button" className="btn ghost block" onClick={() => goto('phone')}>That’s not me</button>
+        </div>
       </div>
     ),
 
@@ -188,8 +225,8 @@ export default function Onboarding() {
       <div className="screen">
         <TopBar onBack={back} />
         <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); if (phoneOk && !s.demo.offline) goto('otp'); }}>
-          <h1 className="h1">Your mobile number</h1>
-          <p className="body">We'll text a 6-digit code. Used for sign-in and urgent trip updates only.</p>
+          <h1 className="h1">{social ? 'One more thing: your mobile' : 'Your mobile number'}</h1>
+          <p className="body">{social ? `You’re signed in with ${social === 'apple' ? 'Apple' : 'Google'}. Gate changes and Faisal’s messages come by SMS and WhatsApp, so we need a number that’s with you.` : 'We\'ll text a 6-digit code. Used for sign-in and urgent trip updates only.'}</p>
           <div className="field">
             <label htmlFor="phone">Mobile number</label>
             <div className="row">
@@ -199,6 +236,7 @@ export default function Onboarding() {
             </div>
             {phoneTouched && phoneErr && <span className="err" role="alert">{phoneErr}</span>}
             {s.demo.offline && <span className="err" role="alert">You're offline. We'll be able to send the code once you're connected.</span>}
+            {!social && <span className="tiny">Demo: 50 000 4127 already has an account.</span>}
           </div>
           <div className="act">
             <button type="submit" className="btn primary block" disabled={!phoneOk || s.demo.offline}>Text me a code</button>
