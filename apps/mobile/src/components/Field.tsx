@@ -4,6 +4,8 @@ import { colors, font, radii, sizes, ff } from '@/theme';
 import { T } from './Text';
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
+/** A web input has an intrinsic width from its font (wider in Arabic) that can push a bubble or card wider than the screen. */
+const webFill = Platform.OS === 'web' ? { width: '100%' as const } : null;
 
 /** A labelled input. Problems show under it in calm words, never red alarms (COPY.md §5.6). */
 export const Field = forwardRef<TextInput, TextInputProps & { label: string; error?: string | null; hint?: ReactNode; bad?: boolean; prefix?: string; big?: boolean }>(
@@ -14,7 +16,7 @@ export const Field = forwardRef<TextInput, TextInputProps & { label: string; err
         placeholderTextColor={colors.muted}
         accessibilityLabel={label}
         {...input}
-        style={[styles.input, font('body', colors.green), { fontSize: 17 }, big ? styles.otp : null, (bad || error) ? styles.bad : null, webNoOutline, prefix ? { flex: 1, minWidth: 0 } : null, style]}
+        style={[styles.input, font('body', colors.green), { fontSize: 17 }, big ? styles.otp : null, (bad || error) ? styles.bad : null, webNoOutline, webFill, prefix ? { flex: 1, minWidth: 0, width: Platform.OS === 'web' ? 0 : undefined } : null, style]}
       />
     );
     return (

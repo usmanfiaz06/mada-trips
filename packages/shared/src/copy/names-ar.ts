@@ -79,6 +79,8 @@ const PATTERNS_AR: readonly [RegExp, (m: RegExpExecArray) => string][] = [
   [/^[Dd]oor (\d+)$/, (m) => `البوابة ${m[1]}`],
   [/^carousel (\d+)$/i, (m) => `السير ${m[1]}`],
   [/^Terminal (\d+)$/, (m) => `الصالة ${m[1]}`],
+  [/^(\d+) min$/, (m) => `${m[1]} د`],
+  [/^(\d+)[–-](\d+) min$/, (m) => `${m[1]}–${m[2]} د`],
   [/^(Visa|Mastercard|mada|Card) ending (\d{2,4})$/, (m) => `${m[1] === 'mada' ? 'مدى' : m[1] === 'Card' ? 'البطاقة' : m[1]} المنتهية بـ \u2066${m[2]}\u2069`],
 ];
 

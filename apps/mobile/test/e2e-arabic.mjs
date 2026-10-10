@@ -70,7 +70,7 @@ function kit(page) {
     const a = await page.evaluate(() => {
       const vw = window.innerWidth;
       const out = { dir: document.documentElement.dir, overflow: [], english: [] };
-      const scroller = (el) => { for (let x = el.parentElement; x; x = x.parentElement) { const s = getComputedStyle(x); if (/(auto|scroll|hidden)/.test(s.overflowX) && x.scrollWidth > x.clientWidth + 2) return true; } return false; };
+      const scroller = (el) => { for (let x = el.parentElement; x; x = x.parentElement) { const s = getComputedStyle(x); if (/(auto|scroll)/.test(s.overflowX) && x.scrollWidth > x.clientWidth + 2) return true; } return false; };
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       for (let t = walker.nextNode(); t; t = walker.nextNode()) {
         const text = t.textContent.replace(/[⁦-⁩]/g, '').trim();

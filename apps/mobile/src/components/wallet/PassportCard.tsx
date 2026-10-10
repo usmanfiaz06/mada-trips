@@ -63,7 +63,7 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
   return (
     <View style={isRTL() ? { minHeight: 214 } : { height: 214 }}>
     <GestureDetector gesture={tilt}>
-      <Animated.View style={[styles.passport, isRTL() ? { height: undefined, minHeight: 214 } : null, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
+      <Animated.View style={[styles.passport, isRTL() ? { height: 'auto', minHeight: 214 } : null, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
             <LinearGradient id={`ppg${gid}`} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
