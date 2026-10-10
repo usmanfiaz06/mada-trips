@@ -49,7 +49,7 @@ export default function Security() {
   const dev = sheet && typeof sheet === 'object' ? sheet : null;
 
   return (
-    <AccountScreen title={t('security.title')} testID="security">
+    <AccountScreen title={t('security.title')} testID="security" query={devices}>
       <Group label={t('security.wallet')}>
         <Row icon="lock" value={t('security.faceId')} sub={checking ? t('security.checking') : on ? t('security.on') : t('security.off')}
           right={checking ? <Spinner /> : <Toggle label={t('security.faceId')} value={on} onChange={(v) => (v ? turnOn() : setSheet('faceoff'))} testID="faceid-toggle" />} />

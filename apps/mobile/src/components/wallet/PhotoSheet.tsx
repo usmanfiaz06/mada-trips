@@ -11,6 +11,7 @@ import { useAccount, walletApi, walletKeys, type PickedFile } from '@/lib/wallet
 import { fmtDate } from '@/lib/wallet-model';
 import { colors } from '@/theme';
 import { Button } from '../Button';
+import { PermissionDenied } from '../states';
 import { Icon } from '../Icon';
 import { Sheet } from '../Sheet';
 import { T } from '../Text';
@@ -25,12 +26,14 @@ export function PhotoSheet({ visible, onClose, initial }: { visible: boolean; on
   const account = useAccount();
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [denied, setDenied] = useState(false);
   const photo = account.data?.photo;
 
   const use = async (fromCamera: boolean) => {
     setProblem(null);
+    setDenied(false);
     const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.86 };
-    if (fromCamera && Platform.OS !== 'web') { const p = await ImagePicker.requestCameraPermissionsAsync().catch(() => ({ granted: true })); if (!p.granted) { setProblem(t('passport.camera.deniedBody')); return; } }
+    if (fromCamera && Platform.OS !== 'web') { const p = await ImagePicker.requestCameraPermissionsAsync().catch(() => ({ granted: true })); if (!p.granted) { setDenied(true); return; } }
     const r = fromCamera ? await ImagePicker.launchCameraAsync({ ...opts, cameraType: ImagePicker.CameraType.front }) : await ImagePicker.launchImageLibraryAsync(opts);
     const a = r.canceled ? null : r.assets[0];
     if (!a) return;
@@ -61,6 +64,7 @@ export function PhotoSheet({ visible, onClose, initial }: { visible: boolean; on
       <Button label={t('account.photo.take')} icon={<Icon name="scan" color={colors.gold} />} busy={busy} onPress={() => use(true)} testID="photo-take" />
       <Button variant="secondary" style={{ backgroundColor: colors.mist }} label={t('account.photo.choose')} onPress={() => use(false)} testID="photo-choose" />
       {problem ? <T v="small" color={colors.badInk} style={{ textAlign: 'center' }} accessibilityRole="alert">{problem}</T> : null}
+      {denied ? <PermissionDenied kind="camera" onSkip={() => use(false)} skipLabel={t('account.photo.choose')} /> : null}
       {photo ? <Button variant="ghost" color={colors.badInk} label={t('account.photo.remove')} onPress={remove} testID="photo-remove" /> : null}
       <T v="tiny" style={{ textAlign: 'center' }}>{t('account.photo.rules')}</T>
     </Sheet>

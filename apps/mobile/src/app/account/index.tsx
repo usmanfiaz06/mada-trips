@@ -35,7 +35,7 @@ export default function YourDetails() {
   const scan = () => router.push('/passport');
 
   return (
-    <AccountScreen title={t('account.title')} testID="account-details">
+    <AccountScreen title={t('account.title')} testID="account-details" query={account}>
       <Pressable accessibilityRole="button" accessibilityLabel={a?.photo ? t('profile.photoChange') : t('profile.photoAdd')} onPress={() => { buzz('tap'); setSheet('photo'); }} style={styles.hero} testID="details-photo">
         <View>
           <UserAvatar size={84} initial={display.charAt(0)} hasPhoto={!!a?.photo} photoKey={a?.photo?.updatedAt} />

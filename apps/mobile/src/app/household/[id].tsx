@@ -40,16 +40,8 @@ export default function HouseholdPerson() {
   const d = detail.data?.details;
   useOnChange(d?.exitVisa.until ?? null, (u) => setUntil(u ? isoToDmy(u) : ''));
 
-  if (detail.isError) {
-    return (
-      <AccountScreen>
-        <T v="h1">{t('household.gone')}</T>
-        <Button variant="secondary" block={false} label={t('common.back')} onPress={() => router.back()} />
-      </AccountScreen>
-    );
-  }
   const p = detail.data?.person;
-  if (!p || !d) return <AccountScreen backLabel={t('household.title')}><View /></AccountScreen>;
+  if (!p || !d) return <AccountScreen backLabel={t('household.title')} query={detail}><View /></AccountScreen>;
   const me = p.isSelf;
   const trip = nextTrip(trips.data);
   const st = passportStatus(p, trip);

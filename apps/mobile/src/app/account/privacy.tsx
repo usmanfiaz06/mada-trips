@@ -55,7 +55,7 @@ export default function Privacy() {
   };
 
   return (
-    <AccountScreen title={t('privacy.title')} testID="privacy">
+    <AccountScreen title={t('privacy.title')} testID="privacy" query={account}>
       <DeletionBanner />
       <Group label={t('privacy.yours')}>
         <Row icon="doc" value={pending ? t('privacy.exportPending') : t('privacy.export')} testID="privacy-export"

@@ -12,18 +12,25 @@ import { useSession } from '@/lib/session';
 import { fmtDate } from '@/lib/wallet-model';
 import { colors } from '@/theme';
 import { Button } from '../Button';
+import { QueryState, SkeletonList } from '../states';
+import type { ApiQueryResult } from '@/lib/net/hooks';
 import { Notice } from './ui';
 
 /** A pushed account screen: back on the start side, a title, the scrolling list, and an optional Act zone. */
-export function AccountScreen({ title, backLabel, children, act, testID }: { title?: string; backLabel?: string; children: ReactNode; act?: ReactNode; testID?: string }) {
+/**
+ * An Account page. Pass `query` (the screen's main read) and the page waits for it with a skeleton, says why when it
+ * can't load, and marks the saved copy when offline (components/states QueryState).
+ */
+export function AccountScreen({ title, backLabel, children, act, testID, query }: { title?: string; backLabel?: string; children: ReactNode; act?: ReactNode; testID?: string; query?: ApiQueryResult<unknown> }) {
   const router = useRouter();
+  const body = query ? <QueryState query={query} skeleton={<SkeletonList />} badge>{() => children}</QueryState> : children;
   return (
     <Screen>
       <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/profile'))} backLabel={backLabel} title={title} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ flex: 1 }} testID={testID}>
-          <Scroll top={8} bottomPad={act ? 160 : 60}>{children}</Scroll>
-          {act ? <Act>{act}</Act> : null}
+          <Scroll top={8} bottomPad={act ? 160 : 60}>{body}</Scroll>
+          {act && (!query || query.data !== undefined) ? <Act>{act}</Act> : null}
         </View>
       </KeyboardAvoidingView>
     </Screen>

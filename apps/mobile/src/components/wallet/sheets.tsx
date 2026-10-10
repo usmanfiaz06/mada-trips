@@ -14,6 +14,7 @@ import { demo } from '@/lib/wallet-demo';
 import { fmtDate, fullDay, fullNameOf, useOnOpen } from '@/lib/wallet-model';
 import { colors, ff, radii } from '@/theme';
 import { Button } from '../Button';
+import { PermissionDenied } from '../states';
 import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
 import { Field } from '../Field';
@@ -70,15 +71,17 @@ export function UploadSheet({ visible, kind, person, replaces, onClose, onSaved 
   const [until, setUntil] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useOnOpen(visible, () => { setStage('choose'); setFile(null); setProblem(null); setUntil(''); });
+  const [denied, setDenied] = useState(false);
+  useOnOpen(visible, () => { setStage('choose'); setFile(null); setProblem(null); setUntil(''); setDenied(false); });
 
   const what = kind === 'other' ? t('docs.upload.aDocument') : t(ADD.find(([k]) => k === kind)![1]).toLowerCase();
   const title = t('docs.upload.for', { what, name: person.firstName || t('household.youPlain') });
 
   const read = (f: PickedFile | null | 'denied') => {
     setProblem(null);
+    setDenied(false);
     if (!f) return;
-    if (f === 'denied') { setProblem(t('passport.camera.deniedBody')); return; }
+    if (f === 'denied') { setDenied(true); return; }
     const bad = checkUpload(f);
     if (bad) { setProblem(t(bad)); buzz('soft'); return; }
     setFile(f);
@@ -118,6 +121,7 @@ export function UploadSheet({ visible, kind, person, replaces, onClose, onSaved 
           <WellRow icon="scan" title={t('docs.upload.scan')} sub={t('docs.upload.scanSub')} onPress={async () => read(await takePhoto())} testID="upload-scan" />
           <WellRow icon="doc" title={t('docs.upload.file')} sub={t('docs.upload.fileSub')} onPress={async () => read(await chooseFile())} testID="upload-file" />
           {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert" testID="upload-problem">{problem}</T> : null}
+          {denied ? <PermissionDenied kind="camera" onSkip={async () => read(await chooseFile())} /> : null}
         </>
       ) : null}
       {stage === 'reading' ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner /><T v="small">{file ? t('docs.upload.reading', { name: file.name }) : t('docs.upload.readingPage')}</T></View> : null}

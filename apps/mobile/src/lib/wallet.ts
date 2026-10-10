@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useApiQuery } from '@/lib/net/hooks';
 import { z } from 'zod';
 import {
   API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse,
@@ -144,18 +145,18 @@ export const walletKeys = {
 
 const useOn = () => useSession((s) => s.status) === 'signedIn';
 
-export const useDocuments = () => useQuery({ queryKey: walletKeys.documents, enabled: useOn(), queryFn: async () => (await walletApi.documents()).documents });
-export const usePersonDetail = (id: string | undefined) => useQuery({ queryKey: walletKeys.person(id ?? ''), enabled: useOn() && !!id, queryFn: () => walletApi.person(id!) });
-export const useAccount = () => useQuery({ queryKey: walletKeys.account, enabled: useOn(), queryFn: async () => (await walletApi.account()).account });
-export const useDevices = () => useQuery({ queryKey: walletKeys.devices, enabled: useOn(), queryFn: async () => (await walletApi.devices()).devices });
-export const useConsents = () => useQuery({ queryKey: walletKeys.consents, enabled: useOn(), queryFn: () => walletApi.consents() });
-export const useExport = () => useQuery({ queryKey: walletKeys.export, enabled: useOn(), queryFn: async () => (await walletApi.exportStatus()).export });
-export const useCards = () => useQuery({ queryKey: walletKeys.cards, enabled: useOn(), queryFn: () => walletApi.cards() });
-export const useCredit = () => useQuery({ queryKey: walletKeys.credit, enabled: useOn(), queryFn: async () => (await walletApi.credit()).credit });
-export const useUnread = () => useQuery({ queryKey: walletKeys.unread, enabled: useOn(), refetchInterval: 60_000, queryFn: async () => (await walletApi.unread()).unread });
-export const useInbox = () => useQuery({ queryKey: walletKeys.notifications, enabled: useOn(), refetchOnMount: 'always', queryFn: () => walletApi.notifications() });
-export const useTrips = () => useQuery({ queryKey: walletKeys.trips, enabled: useOn(), staleTime: 60_000, queryFn: () => walletApi.trips() });
-export const usePresence = (threadId?: string) => useQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
+export const useDocuments = () => useApiQuery({ queryKey: walletKeys.documents, enabled: useOn(), queryFn: async () => (await walletApi.documents()).documents });
+export const usePersonDetail = (id: string | undefined) => useApiQuery({ queryKey: walletKeys.person(id ?? ''), enabled: useOn() && !!id, queryFn: () => walletApi.person(id!) });
+export const useAccount = () => useApiQuery({ queryKey: walletKeys.account, enabled: useOn(), queryFn: async () => (await walletApi.account()).account });
+export const useDevices = () => useApiQuery({ queryKey: walletKeys.devices, enabled: useOn(), queryFn: async () => (await walletApi.devices()).devices });
+export const useConsents = () => useApiQuery({ queryKey: walletKeys.consents, enabled: useOn(), queryFn: () => walletApi.consents() });
+export const useExport = () => useApiQuery({ queryKey: walletKeys.export, enabled: useOn(), queryFn: async () => (await walletApi.exportStatus()).export });
+export const useCards = () => useApiQuery({ queryKey: walletKeys.cards, enabled: useOn(), queryFn: () => walletApi.cards() });
+export const useCredit = () => useApiQuery({ queryKey: walletKeys.credit, enabled: useOn(), queryFn: async () => (await walletApi.credit()).credit });
+export const useUnread = () => useApiQuery({ queryKey: walletKeys.unread, enabled: useOn(), refetchInterval: 60_000, queryFn: async () => (await walletApi.unread()).unread });
+export const useInbox = () => useApiQuery({ queryKey: walletKeys.notifications, enabled: useOn(), refetchOnMount: 'always', queryFn: () => walletApi.notifications() });
+export const useTrips = () => useApiQuery({ queryKey: walletKeys.trips, enabled: useOn(), staleTime: 60_000, queryFn: () => walletApi.trips() });
+export const usePresence = (threadId?: string) => useApiQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
 
 /** Patch the account and keep the cache in step. */
 export function useUpdateAccount() {

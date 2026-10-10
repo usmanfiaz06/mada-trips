@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
 import { DESK_PHONE, DESK_SMS, DESK_TEL, DESK_WHATSAPP, SUPPORT_TOPICS, checkUpload, formatSar, type SupportMessage, type SupportTopic } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -10,16 +9,18 @@ import { Field } from '@/components/Field';
 import { Icon, type IconName } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
+import { InlineError } from '@/components/states';
 import { ArtChat } from '@/components/wallet/Arts';
 import { TypingDots } from '@/components/wallet/ui';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
+import { useApiQuery } from '@/lib/net/hooks';
 import { useNet } from '@/lib/net/state';
 import { discardItem, retryItem, useOutbox } from '@/lib/net/outbox';
 import { chooseFile } from '@/lib/pick';
 import { useSession } from '@/lib/session';
-import { SUPPORT_KIND, deliver, newClientId, sendToMada, useChat } from '@/lib/support-chat';
+import { SUPPORT_KIND, deliver, newClientId, useChat, useSendToMada } from '@/lib/support-chat';
 import { toast } from '@/lib/toast';
 import { usePresence, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
@@ -41,12 +42,13 @@ export default function Support() {
   const trip = nextTrip(trips.data);
   const tripId = tripParam ?? undefined;
   const key = threadParam ?? (tripId ? `trip:${tripId}` : 'account');
-  const q = useQuery({ queryKey: walletKeys.thread(key), refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
+  const q = useApiQuery({ queryKey: walletKeys.thread(key), refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
   const th = q.data?.thread;
   const presence = usePresence(th?.id && q.data?.messages.some((m) => m.author.kind === 'user') ? th.id : undefined);
   const typing = useChat((s) => (th ? !!s.typing[th.id] : false));
   const offline = useNet((s) => s.online === false) || demo('offline');
   const pending = useOutbox(SUPPORT_KIND, (i) => i.meta?.threadId === th?.id);
+  const { send: post, sending } = useSendToMada(key, th?.id, t('action.send'));
   const [draft, setDraft] = useState('');
   const scroll = useRef<ScrollView>(null);
   const bottom = useBottomInset();
@@ -59,12 +61,12 @@ export default function Support() {
   const send = (body: string, extra: { topic?: SupportTopic } = {}) => {
     if (!th || (!body.trim() && !extra.topic)) return;
     buzz('tap');
-    sendToMada(key, th.id, { body: body.trim(), ...extra }, t('action.send'));
+    post({ body: body.trim(), ...extra });
   };
   const reply = (m: SupportMessage, choice: string) => {
     if (!th) return;
     buzz('tap');
-    sendToMada(key, th.id, { body: '', reply: { messageId: m.id, choice } }, t('action.send'));
+    post({ body: '', reply: { messageId: m.id, choice } });
   };
   // A topic passed in (Help → a topic): start with it once.
   useEffect(() => {
@@ -135,8 +137,15 @@ export default function Support() {
               </View>
             </View>
           ) : null}
-          {messages.map((m) => <Message key={m.id} m={m} hasTrip={!!th?.tripId} onReply={reply} onBag={(b) => th && sendToMada(key, th.id, { body: '', bag: b, bagFor: m.id }, t('action.send'))}
-            onNoRef={() => th && sendToMada(key, th.id, { body: '', bag: { messageId: m.id, none: true } }, t('action.send'))} onAction={(to) => router.push(to as '/trips')} />)}
+          {messages.map((m) => <Message key={m.id} m={m} hasTrip={!!th?.tripId} onReply={reply} onBag={(b) => post({ body: '', bag: b, bagFor: m.id })}
+            onNoRef={() => post({ body: '', bag: { messageId: m.id, none: true } })} onAction={(to) => router.push(to as '/trips')} />)}
+          {!q.data && (q.view === 'error' || q.view === 'slow') ? <InlineError problem={q.problem} onRetry={() => q.retry()} testID="support-load-error" /> : null}
+          {sending && sending.threadId === th?.id && sending.req.body ? (
+            <View style={{ alignSelf: 'flex-end', maxWidth: '82%', gap: 4 }}>
+              <Bubble><T v="body" color={colors.mist} style={{ fontSize: 15 }}>{sending.req.body}</T></Bubble>
+              <T v="tiny" style={{ alignSelf: 'flex-end' }}>{t('support.sending')}</T>
+            </View>
+          ) : null}
           {pending.map((i) => (
             <View key={i.id} style={{ alignSelf: 'flex-end', maxWidth: '82%', gap: 4 }}>
               <Bubble><T v="body" color={colors.mist} style={{ fontSize: 15 }}>{i.meta?.text || t('support.sending')}</T></Bubble>
@@ -164,8 +173,8 @@ export default function Support() {
             <View style={styles.well} testID="support-rate">
               <T v="h3" style={{ fontSize: 15 }}>{t('support.rate.title')}</T>
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Button variant="secondary" size="small" block={false} label={t('support.rate.yes')} onPress={() => th && sendToMada(key, th.id, { body: '', rating: 'yes' }, t('action.send'))} />
-                <Button variant="secondary" size="small" block={false} label={t('support.rate.no')} onPress={() => th && sendToMada(key, th.id, { body: '', rating: 'not_yet' }, t('action.send'))} />
+                <Button variant="secondary" size="small" block={false} label={t('support.rate.yes')} onPress={() => post({ body: '', rating: 'yes' })} />
+                <Button variant="secondary" size="small" block={false} label={t('support.rate.no')} onPress={() => post({ body: '', rating: 'not_yet' })} />
               </View>
             </View>
           ) : null}

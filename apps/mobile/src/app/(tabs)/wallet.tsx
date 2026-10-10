@@ -8,6 +8,7 @@ import { Button, LinkButton } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
 import { EmptyState } from '@/components/EmptyState';
+import { QueryState, SkeletonCard } from '@/components/states';
 import { Icon } from '@/components/Icon';
 import { Scroll, Screen, useTopInset } from '@/components/Layout';
 import { PayMark } from '@/components/PayMark';
@@ -123,7 +124,7 @@ function Unlocked() {
         {who?.passport ? <ValidityCard v={v} who={who} name={name(who)} trip={trip} onRenew={renew} /> : null}
 
         <T v="eyebrow">{who?.isSelf ? t('wallet.docs.eyebrow') : t('wallet.docs.eyebrowOther', { name: name(who) })}</T>
-        {myDocs.length || asks.length ? (
+        <QueryState query={docs} section badge skeleton={<SkeletonCard />}>{() => myDocs.length || asks.length ? (
           <>
             {myDocs.map((d) => (
               <Card key={d.id} onPress={() => setDocOpen(d)} accessibilityLabel={d.title} style={styles.rowCard}>
@@ -143,7 +144,7 @@ function Unlocked() {
             <EmptyState compact art={<ArtCardSlot kind="doc" width={100} height={75} />} onPress={() => setSheet('add')}
               title={t('wallet.docs.emptyTitle')} body={who?.isSelf ? t('wallet.docs.emptyBody') : t('wallet.docs.emptyBodyOther', { name: name(who) })} />
           </View>
-        )}
+        )}</QueryState>
 
         <T v="eyebrow">{t('wallet.passes.eyebrow')}</T>
         {trip && outSeg && passesOpen ? (

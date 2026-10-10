@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Notification } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
+import { QueryState, SkeletonList } from '@/components/states';
 import { Icon, type IconName } from '@/components/Icon';
 import { Scroll, Screen, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -50,7 +51,7 @@ export default function Inbox() {
             </Pressable>
           ))}
         </View>
-        {items.length === 0 ? (
+        <QueryState query={inbox} skeleton={<SkeletonList />} badge>{() => items.length === 0 ? (
           <EmptyState art={<QuietRadar />} stageHeight={170} title={t('inbox.empty.title')}
             body={filter === 'money' ? t('inbox.empty.money') : filter === 'circles' ? t('inbox.empty.circles') : trip ? t('inbox.empty.watching') : t('inbox.empty.body')}
             action={!trip && (filter === 'all' || filter === 'trips') ? <Button block={false} label={t('inbox.empty.plan')} onPress={() => router.push('/ask')} /> : undefined} />
@@ -66,7 +67,7 @@ export default function Inbox() {
             </View>
             {!n.readAt ? <View style={styles.dot} accessibilityLabel={t('inbox.unread')} /> : null}
           </Pressable>
-        ))}
+        ))}</QueryState>
       </Scroll>
     </Screen>
   );

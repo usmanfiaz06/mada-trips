@@ -1,6 +1,9 @@
+import { useCallback } from 'react';
 import { create } from 'zustand';
 import { SendSupportMessageResponse, walletPath, type SendSupportMessageRequest, type SupportMessage, type SupportThreadResponse } from '@mada/shared';
-import { enqueue, registerOutboxKind, type OutboxItem } from './net/outbox';
+import { request } from './api';
+import { useApiMutation } from './net/hooks';
+import { enqueue, registerOutboxKind, type EnqueueInput, type OutboxItem } from './net/outbox';
 import { queryClient } from './queries';
 import { walletKeys } from './wallet';
 
@@ -51,8 +54,38 @@ registerOutboxKind(SUPPORT_KIND, {
 let n = 0;
 export const newClientId = () => `c${Date.now().toString(36)}${(n++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-/** Queue a message (sent at once when online). `key` is the cache key the screen reads the thread from. */
+type Send = { key: string; threadId: string; req: SendSupportMessageRequest & { clientId: string }; label: string };
+
+const outboxInput = ({ key, threadId, req, label }: Send): EnqueueInput => ({
+  kind: SUPPORT_KIND, label, method: 'POST', path: walletPath('supportMessages', { id: threadId }), body: req,
+  meta: { threadId, key, clientId: req.clientId, text: req.body },
+});
+
+/** Put a message straight in the outbox: it shows under the thread as waiting, sending or "Not sent". */
 export function sendToMada(key: string, threadId: string, req: SendSupportMessageRequest, label: string): OutboxItem {
-  const clientId = req.clientId ?? newClientId();
-  return enqueue({ kind: SUPPORT_KIND, label, method: 'POST', path: walletPath('supportMessages', { id: threadId }), body: { ...req, clientId }, meta: { threadId, key, clientId, text: req.body } });
+  return enqueue(outboxInput({ key, threadId, req: { ...req, clientId: req.clientId ?? newClientId() }, label }));
+}
+
+/**
+ * Talk to Mada: sent at once when online (useApiMutation, with a key so a retry is done once), queued in the outbox
+ * when there's no connection (queueWhenOffline). A message typed while the previous one is still going goes through
+ * the outbox too, so a quick second message is never dropped; one that fails is kept there with Send again.
+ */
+export function useSendToMada(key: string, threadId: string | undefined, label: string) {
+  const m = useApiMutation<{ messages: SupportMessage[] }, Send>({
+    quiet: true,
+    mutationFn: (v, { idempotencyKey }) => request({ method: 'POST', path: walletPath('supportMessages', { id: v.threadId }), body: v.req, idempotencyKey }, SendSupportMessageResponse),
+    queueWhenOffline: outboxInput,
+    onSuccess: (r, v) => { if (r) deliver(v.key, v.threadId, r.messages); },
+    onError: (e, v) => { if (v) enqueue(outboxInput(v)); },
+  });
+  const send = useCallback((req: SendSupportMessageRequest) => {
+    if (!threadId) return;
+    const v: Send = { key, threadId, req: { ...req, clientId: req.clientId ?? newClientId() }, label };
+    if (m.isPending) enqueue(outboxInput(v));
+    else m.mutate(v);
+  }, [key, threadId, label, m]);
+  /** What's on its way right now (shown as a "Sending…" bubble until it lands). */
+  const sending = m.isPending ? m.variables : undefined;
+  return { send, sending };
 }

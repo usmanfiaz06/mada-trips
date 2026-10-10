@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { checkUpload, fontFamilies, type MrzResult } from '@mada/shared';
 import { Button } from '@/components/Button';
+import { PermissionDenied } from '@/components/states';
 import { Icon } from '@/components/Icon';
 import { TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -32,6 +33,7 @@ export default function PassportCamera() {
   const [progress, setProgress] = useState(0);
   const [fileErr, setFileErr] = useState<string | null>(null);
   const [failWhy, setFailWhy] = useState<string | null>(null);
+  const [denied, setDenied] = useState(false);
   const [ready, setReady] = useState(false);
   const cam = useRef<CameraView>(null);
   const run = useRef(0);
@@ -83,7 +85,8 @@ export default function PassportCamera() {
       try { const p = await cam.current.takePictureAsync({ quality: 0.9, skipProcessing: false }); if (p?.uri) { read(p.uri); return; } } catch { /* fall back to the system camera */ }
     }
     const f = await takePhoto();
-    if (f && f !== 'denied') read(f.uri, f);
+    if (f === 'denied') { buzz('soft'); setDenied(true); return; }
+    if (f) read(f.uri, f);
   };
   const choose = async () => { const f = await choosePhoto(); if (f) read(f.uri, f); };
   const byHand = () => { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK }); router.replace('/passport/confirm'); };
@@ -107,6 +110,7 @@ export default function PassportCamera() {
             </View>
             <Button variant="gold" icon={<Icon name="scan" color={colors.green} />} label={t('passport.camera.take')} onPress={shoot} testID="camera-take" />
             <Button variant="onDark" label={t('passport.camera.choose')} onPress={choose} testID="camera-choose" />
+            {denied ? <PermissionDenied kind="camera" onSkip={() => { setDenied(false); choose(); }} skipLabel={t('passport.camera.choose')} /> : null}
             {fileErr ? <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert" testID="camera-file-problem">{fileErr}</T> : null}
             <Button variant="ghost" color="#d6cfc3" label={t('passport.camera.useDemo')} onPress={() => { setFileErr(null); setStage('demo'); }} testID="camera-demo" />
             <T v="tiny" color="#8f887c" style={{ textAlign: 'center' }}>{t('passport.camera.private')}</T>

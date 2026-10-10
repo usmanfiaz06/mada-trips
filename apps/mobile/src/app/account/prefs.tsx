@@ -30,7 +30,7 @@ export default function Prefs() {
   const [notes, setNotes] = useState(p?.notes ?? '');
   const [edit, setEdit] = useState<{ item: Loyalty | null } | null>(null);
   useOnChange(p?.notes ?? '', setNotes);
-  if (!p) return <AccountScreen title={t('prefs.title')}><View /></AccountScreen>;
+  if (!p) return <AccountScreen title={t('prefs.title')} query={account}><View /></AccountScreen>;
   const setP = (patch: Partial<TravelPrefs>, done?: string) => update.mutate({ prefs: { ...p, ...patch } }, { onSuccess: () => { if (done) toast(done); }, onError: () => toast(t('error.internal')) });
   const toggleAssist = (id: (typeof ASSIST)[number], on: boolean) => {
     let next = on ? [...p.assist, id] : p.assist.filter((x) => x !== id);

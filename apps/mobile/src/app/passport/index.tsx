@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCameraPermissions } from 'expo-camera';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
@@ -8,6 +8,7 @@ import { fontFamilies } from '@mada/shared';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Act, Scroll, Screen, TopBar } from '@/components/Layout';
+import { PermissionDenied } from '@/components/states';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { t } from '@/lib/i18n';
@@ -28,7 +29,7 @@ export default function PassportIntro() {
   const people = usePeople();
   const start = usePassportScan((s) => s.start);
   const set = usePassportScan((s) => s.set);
-  const [sheet, setSheet] = useState<null | 'camera' | 'denied'>(null);
+  const [sheet, setSheet] = useState<null | 'camera' | 'declined' | 'denied'>(null);
   const [perm, ask] = useCameraPermissions();
   const who = person ? people.data?.find((p) => p.id === person) : null;
   useEffect(() => { start(person ?? null); }, [person, start]);
@@ -38,6 +39,7 @@ export default function PassportIntro() {
   const toCamera = async () => {
     warmUp();
     if (perm?.granted) { router.push('/passport/camera'); return; }
+    if (perm && !perm.canAskAgain && Platform.OS !== 'web') { setSheet('denied'); return; }
     setSheet('camera');
   };
   const allow = async () => {
@@ -68,14 +70,17 @@ export default function PassportIntro() {
         <T v="h2">{t('passport.camera.title')}</T>
         <T v="body">{t('passport.camera.body')}</T>
         <Button label={t('passport.camera.allow')} onPress={allow} testID="camera-allow" />
-        <Button variant="ghost" label={t('passport.camera.deny')} onPress={() => setSheet('denied')} testID="camera-deny" />
+        <Button variant="ghost" label={t('passport.camera.deny')} onPress={() => setSheet('declined')} testID="camera-deny" />
       </Sheet>
-      <Sheet visible={sheet === 'denied'} onClose={() => setSheet(null)} label={t('passport.camera.deniedTitle')}>
+      <Sheet visible={sheet === 'declined'} onClose={() => setSheet(null)} label={t('passport.camera.deniedTitle')}>
         <T v="h2">{t('passport.camera.deniedTitle')}</T>
         <T v="body">{t('passport.camera.deniedBody')}</T>
         <Button label={t('passport.byHand')} onPress={() => { setSheet(null); byHand(); }} testID="denied-by-hand" />
-        {perm && !perm.canAskAgain ? <Button variant="secondary" label={t('passport.camera.settings')} onPress={() => Linking.openSettings().catch(() => {})} /> : null}
         <Button variant="ghost" label={t('passport.camera.doLater')} onPress={() => { setSheet(null); later(); }} />
+      </Sheet>
+      {/* The phone said no to the camera: what it's for, Open Settings, and a way on without it. */}
+      <Sheet visible={sheet === 'denied'} onClose={() => setSheet(null)} label={t('perm.camera.title')}>
+        <PermissionDenied kind="camera" onSkip={() => { setSheet(null); byHand(); }} skipLabel={t('passport.byHand')} />
       </Sheet>
     </Screen>
   );

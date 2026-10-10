@@ -15,6 +15,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { chromium } from 'playwright-core';
+import { Buffer } from 'node:buffer';
 
 const DIST = resolve(process.env.DIST ?? 'dist');
 const OUT = resolve(process.argv[2] ?? process.env.SHOTS ?? 'test/shots-wallet');
