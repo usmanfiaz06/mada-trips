@@ -182,21 +182,41 @@ export default function Onboarding() {
 
     passport: (
       <div className="screen">
-        <TopBar onBack={back} />
-        <div style={{ padding: '16px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="passport" style={{ height: 200 }}>
-            <div className="inner">
-              <div className="spread"><span className="eyebrow" style={{ color: '#d9b77a' }}>Passport</span><Icon name="scan" color="#d9b77a" /></div>
-              <div className="mrz">{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>
+        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => { setPassportLater(true); goto('household'); }}>Later</button>} />
+        <div className="scroll" style={{ padding: '8px 24px 0', gap: 16 }}>
+          <div className="pp-stage" aria-hidden="true">
+            <div className="pp-page">
+              <div className="pp-guilloche" />
+              <div className="pp-head"><span>Kingdom of Saudi Arabia</span><span>Passport · P</span></div>
+              <div className="pp-main">
+                <div className="pp-photo"><svg viewBox="0 0 60 76" width="100%" height="100%"><circle cx="30" cy="30" r="13" fill="#b9ad98" /><path d="M6 76c2-17 12-25 24-25s22 8 24 25z" fill="#b9ad98" /></svg></div>
+                <div className="pp-fields">
+                  <span><i>Surname</i>ALHARBI</span>
+                  <span><i>Given names</i>OMAR</span>
+                  <span className="pp-two"><span><i>No.</i>A08•••41</span><span><i>Expires</i>22 JUN 2031</span></span>
+                </div>
+              </div>
+              <div className="pp-mrz">{MRZ.omar[0]}{'\n'}{MRZ.omar[1]}</div>
+              <div className="pp-beam" />
+            </div>
+            <div className="pp-form">
+              <div className="pp-form-head"><img src="img/airlines/SV.svg" alt="" style={{ height: 14 }} /><span>Saudia · Passenger 1</span><span className="pp-auto">Filled by your scan</span></div>
+              {[['Name on ticket', 'OMAR ALHARBI', '.9s'], ['Passport', 'A08•••41 · Saudi', '1.5s'], ['Valid for this trip', 'Until June 2031', '2.1s']].map(([k, v, d]) => (
+                <div key={k} className="pp-row" style={{ animationDelay: d }}>
+                  <span className="pp-k">{k}</span>
+                  <span className="pp-v">{v}</span>
+                  <span className="pp-tick"><Icon name="check" size={12} color="#1e352d" width={2.6} /></span>
+                </div>
+              ))}
             </div>
           </div>
-          <h1 className="h1">Start with your passport.</h1>
-          <p className="body">One scan fills in every trip from now on. Encrypted, and only opened to book for you.</p>
+          <h1 className="h1">Scan it once. Never type it again.</h1>
+          <p className="body">Every flight, hotel and visa fills itself in from now on, for you and everyone you travel with.</p>
+          <div className="row small" style={{ gap: 8, color: '#3f4f48' }}><Icon name="lock" size={16} /><span>Encrypted on this phone. Opened only when Mada books for you.</span></div>
         </div>
         <div className="act">
-          <button type="button" className="btn primary block" onClick={() => setSheet('camera')}>Scan passport</button>
-          <button type="button" className="btn secondary block" onClick={() => { setManual(true); setFields({ given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' }); goto('confirm'); }}>Enter it by hand</button>
-          <button type="button" className="btn ghost block" onClick={() => { setPassportLater(true); goto('household'); }}>Later</button>
+          <button type="button" className="btn primary block" onClick={() => setSheet('camera')}><Icon name="scan" color="#d9b77a" />Scan passport</button>
+          <button type="button" className="btn ghost block" onClick={() => { setManual(true); setFields({ given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' }); goto('confirm'); }}>Enter it by hand</button>
         </div>
         {sheet === 'camera' && (
           <Sheet label="Camera access" onClose={() => setSheet(null)}>

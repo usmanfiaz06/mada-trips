@@ -38,6 +38,8 @@ try {
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(500);
   step('onboarding: passport scan');
+  await page.waitForTimeout(2600);
+  await shot('passport-intro');
   await click('Scan passport');
   await click('Allow', { exact: true, wait: 2800 });
   await shot('passport-confirm');
