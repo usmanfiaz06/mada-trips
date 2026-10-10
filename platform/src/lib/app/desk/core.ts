@@ -13,7 +13,8 @@ export type DeskActor = { id: string; name: string; permissions: Set<string> | R
 
 /** A refusal meant for the person on the desk; server actions show the message as it is. */
 export class DeskError extends Error {
-  constructor(message: string, readonly code: "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION" = "VALIDATION") {
+  // "kind", not "code": Ops treats errors carrying a code as database errors and hides their message.
+  constructor(message: string, readonly kind: "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "VALIDATION" = "VALIDATION") {
     super(message);
   }
 }

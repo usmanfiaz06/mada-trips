@@ -230,7 +230,7 @@ export async function pickWinner(circleId: string, userId: string, messageId: st
 /* ───────────── splits, in halalas ───────────── */
 
 /** Families for "split by family": people tagged as family travel as one. The unit is keyed by its first member. */
-async function familyOfFn(members: string[]) {
+export async function familyOfFn(members: string[]) {
   const parent = new Map(members.map((m) => [m, m]));
   const find = (x: string): string => (parent.get(x) === x ? x : find(parent.get(x)!));
   for (const m of members) {

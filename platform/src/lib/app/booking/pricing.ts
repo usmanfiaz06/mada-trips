@@ -5,7 +5,8 @@ import {
   type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appCreditLedger, appQuotes, appRequests } from "@/db/app-schema";
+import { appQuotes, appRequests } from "@/db/app-schema";
+import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, today, travellersOf } from "./common";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
@@ -24,10 +25,7 @@ export type Priced = {
   place: string;
 };
 
-export async function creditBalance(userId: string): Promise<number> {
-  const [r] = await db.select({ s: sql<string>`COALESCE(SUM(${appCreditLedger.amount}), 0)` }).from(appCreditLedger).where(eq(appCreditLedger.userId, userId));
-  return Number(r?.s ?? 0);
-}
+export const creditBalance = (userId: string) => getBalance(userId);
 
 const line = (key: string, icon: OrderLine["icon"], text: string, amount: number): OrderLine => ({ key, icon, text, amount });
 

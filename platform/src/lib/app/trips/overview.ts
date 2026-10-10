@@ -37,7 +37,7 @@ export async function overview(ownerId: string, demo: TripPhase | null): Promise
   }
   // The trip Today is about: the first one still in play. A demo override applies to that trip only.
   const live = details.filter((d) => d.status !== "cancelled" && d.clock.phase !== "none");
-  let current = live[0] ?? null;
+  let current: TripDetail | null = live[0] ?? null;
   if (demo) {
     const candidate = current ?? details.find((d) => d.status !== "cancelled" && d.status !== "completed" && (d.endDate ?? d.startDate) >= todayIn()) ?? null;
     current = candidate && demo !== "none" ? withClock(await loadBase(rows.find((r) => r.id === candidate.id)!), demo) : null;

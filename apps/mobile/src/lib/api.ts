@@ -26,7 +26,7 @@ export class ApiError extends Error {
   ) { super(message); }
 }
 
-export type Wire = { method: 'GET' | 'POST' | 'PATCH' | 'DELETE'; path: string; body?: unknown; token?: string | null };
+export type Wire = { method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'; path: string; body?: unknown; token?: string | null };
 export type WireResponse = { status: number; json: unknown };
 
 async function httpTransport(w: Wire): Promise<WireResponse> {
@@ -127,3 +127,6 @@ export const api = {
     }
   },
 };
+
+/** For area clients (lib/<area>.ts): the same checked, refreshing request. */
+export { request, transport };

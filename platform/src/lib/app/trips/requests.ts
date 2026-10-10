@@ -112,6 +112,6 @@ export async function createAsk(ownerId: string, trip: TripDetail, input: Create
     return { request: toRequestView(r) as unknown as Record<string, unknown> };
   });
   const view = request as unknown as TripRequestView;
-  if (view.quote) await notify(ownerId, { kind: "agent_reply", level: "active", copy: "notify.price", vars: { what: view.short ?? view.title, amount: formatSar(view.quote.amount) }, href: "/trips?tab=requests" });
+  if (view.quote) await notify(ownerId, { kind: "agent_reply", level: "active", copy: "notify.trip.price", vars: { what: view.short ?? view.title, amount: formatSar(view.quote.amount) }, href: "/trips?tab=requests" });
   return view;
 }

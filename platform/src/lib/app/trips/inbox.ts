@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import type { Notification } from "@mada/shared";
 import { db } from "@/db";
 import { appDevices, appNotifications } from "@/db/app-schema";
@@ -19,9 +19,8 @@ export async function listNotifications(userId: string, before: string | null, l
   const where = before ? and(eq(appNotifications.userId, userId), lt(appNotifications.createdAt, new Date(before))) : eq(appNotifications.userId, userId);
   const rows = await db.select().from(appNotifications).where(where).orderBy(desc(appNotifications.createdAt)).limit(limit + 1);
   const items = rows.slice(0, limit).map(toView);
-  const [unread] = await db.select({ id: appNotifications.id }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt))).limit(200);
-  const unreadCount = unread ? (await db.select({ id: appNotifications.id }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt))).limit(200)).length : 0;
-  return { items, next: rows.length > limit ? items[items.length - 1]!.createdAt : null, unread: unreadCount };
+  const [unread] = await db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt)));
+  return { items, next: rows.length > limit ? items[items.length - 1]!.createdAt : null, unread: unread?.n ?? 0 };
 }
 
 /** Marks some (or all) of the user's notifications read. Ids that aren't theirs are ignored. */
@@ -46,7 +45,7 @@ export async function registerDevice(userId: string, sessionId: string, input: {
   if (!isExpoToken(input.pushToken)) throw new AppError("VALIDATION", { fields: { pushToken: "Expected an Expo push token" } });
   const values = { userId, sessionId, platform: input.platform, name: input.name ?? null, pushToken: input.pushToken, lastSeenAt: new Date(), disabledAt: null };
   return db.transaction(async (tx) => {
-    const [d] = await tx.insert(appDevices).values(values).onConflictDoUpdate({ target: appDevices.pushToken, targetWhere: undefined, set: values }).returning({ id: appDevices.id });
+    const [d] = await tx.insert(appDevices).values(values).onConflictDoUpdate({ target: appDevices.pushToken, targetWhere: sql`push_token IS NOT NULL`, set: values }).returning({ id: appDevices.id });
     await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "device.registered", entityType: "app_device", entityId: d!.id, summary: `Registered a ${input.platform} device for alerts`, ipHash });
     return d!.id;
   });

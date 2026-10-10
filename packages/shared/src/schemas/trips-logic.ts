@@ -911,6 +911,8 @@ export type AskSpec = {
 export type AskInput = { area: 'special' | 'hotel' | 'other'; kind: string; option?: string; travellerIds?: readonly string[]; count?: number; day?: string; note?: string };
 
 export const ESIM_PRICE: Halalas = 39 * SAR;
+/** A Mada pickup booked on landing: the airport ride only. */
+export const ARRIVAL_PICKUP_PRICE: Halalas = 220 * SAR;
 export const ROOM_OPTIONS = [
   { id: 'family', perNight: 220 * SAR }, { id: 'view', perNight: 380 * SAR }, { id: 'two', perNight: -120 * SAR },
 ] as const;
@@ -1011,6 +1013,10 @@ export function askSpec(trip: TripDetail, a: AskInput): AskSpec | { problem: str
       const count = Math.max(1, Math.min(a.count ?? trip.travellers.length, 12));
       const price = ESIM_PRICE * count;
       return { ...base, title: tk('td.esim.title', { country: destinationOf(trip).country }), short: tk('td.esim.short', { count }), detail: tk('td.esim.detail'), withWhom: 'faisal', quote: price, quoteText: tk('td.esim.quote', { count, price: sar(price) }) };
+    }
+    case 'pickup': {
+      const price = ARRIVAL_PICKUP_PRICE;
+      return { ...base, title: tk('as.pickupTitle'), short: tk('as.pickupShort'), detail: tk('as.pickupDetail', { airport: AIRPORT_NAME[out?.to ?? ''] ?? trip.city }), withWhom: 'faisal', quote: price, quoteText: tk('as.pickupQuote', { price: sar(price) }) };
     }
     case 'call':
       return { ...base, title: tk('cf.callTitle'), short: tk('cf.callShort'), detail: out ? tk('cf.callDetail', { code: out.flightNumber }) : null, withWhom: 'faisal', yesText: tk('cf.callYes') };

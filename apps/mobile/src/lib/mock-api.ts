@@ -4,6 +4,15 @@ import {
   UpdateMeRequest, PassportInput,
 } from '@mada/shared';
 import type { Wire, WireResponse } from './api';
+import { walletMock } from './mock/wallet';
+import { bookingMock } from './mock/booking';
+import { circlesMock } from './mock/circles';
+import { tripsMock } from './mock/trips';
+
+/** Extra endpoints per area: each returns null for paths it doesn't own. `user` is the signed-in mock user (mutable). */
+export type MockUser = User & { people: Person[] };
+export type AreaMock = (w: Wire, ctx: { user: MockUser | null; byPhone: Map<string, string> }) => Promise<WireResponse | null>;
+const AREA_MOCKS: AreaMock[] = [tripsMock, walletMock, circlesMock, bookingMock];
 
 /*
  * EXPO_PUBLIC_API_MODE=mock: the Core API's rules, in memory, for design work and screenshots without a server.
@@ -11,7 +20,6 @@ import type { Wire, WireResponse } from './api';
  * 30 s before a new code, and the demo account +966 50 000 4127 ("Omar") that already exists.
  */
 
-type MockUser = User & { people: Person[] };
 const users = new Map<string, MockUser>();
 const byPhone = new Map<string, string>();
 const access = new Map<string, { userId: string; exp: number }>();
@@ -155,7 +163,13 @@ export async function mockTransport(w: Wire): Promise<WireResponse> {
       r.user.people.push(person);
       return ok({ person }, 201);
     }
-    default:
+    default: {
+      // Area mocks (src/lib/mock/<area>.ts) answer their own paths.
+      for (const area of AREA_MOCKS) {
+        const r = await area(w, { user: w.token ? users.get(access.get(w.token)?.userId ?? '') ?? null : null, byPhone });
+        if (r) return r;
+      }
       return err('NOT_FOUND');
+    }
   }
 }

@@ -5,6 +5,7 @@ import { PassportInput, Person, Sex } from './people';
 import { MessageAuthor } from './social';
 
 export * from '../mrz';
+export * from '../support';
 
 /*
  * The Wallet and the account around it (M1): documents, the household's details, passports from a scan,
@@ -390,7 +391,7 @@ export const SendSupportMessageRequest = z.object({
   bagFor: Id.optional(),
   /** "Did that sort it?" */
   rating: z.enum(['yes', 'not_yet']).optional(),
-}).refine((m) => m.body.length > 0 || !!m.reply || !!m.bag || !!m.rating, { message: 'Write a message', path: ['body'] });
+}).refine((m) => m.body.length > 0 || !!m.topic || !!m.reply || !!m.bag || !!m.rating, { message: 'Write a message', path: ['body'] });
 export type SendSupportMessageRequest = z.input<typeof SendSupportMessageRequest>;
 export const SendSupportMessageResponse = z.object({ messages: z.array(SupportMessage) });
 export const SupportUnreadResponse = z.object({ unread: z.number().int().nonnegative() });

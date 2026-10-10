@@ -28,7 +28,8 @@ export function demoAllowed(): boolean {
 /** The phase the caller asked to see (mock mode only), or null. */
 export function demoPhase(req: Request | null): Phase | null {
   if (!req || !demoAllowed()) return null;
-  const raw = req.headers.get(DEMO_PHASE_HEADER);
+  // The header, or ?demoPhase= for clients that can't set headers (the app's plain fetch transport).
+  const raw = req.headers.get(DEMO_PHASE_HEADER) ?? new URL(req.url).searchParams.get("demoPhase");
   const p = TripPhase.safeParse(raw);
   return p.success ? p.data : null;
 }

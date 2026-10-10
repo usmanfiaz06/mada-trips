@@ -42,10 +42,15 @@ export async function details(circleId: string, tx: Db = db) {
 
 /* ───────────── messages: writing and reading ───────────── */
 
+/** Message times in whole milliseconds, strictly increasing in this process, so a chat's order is its insert order
+ *  and a cursor (which carries milliseconds) never skips or repeats a message. */
+let lastAt = 0;
+const nextAt = () => { lastAt = Math.max(Date.now(), lastAt + 1); return new Date(lastAt); };
+
 export async function addMessage(tx: Db, circleId: string, m: { author: "user" | "mada" | "agent"; userId?: string | null; agentName?: string | null; body: string; card?: Card | null; at?: Date }) {
   const [row] = await tx.insert(appMessages).values({
     threadKind: "circle", threadId: circleId, authorKind: m.author, authorUserId: m.userId ?? null, authorName: m.agentName ?? null,
-    body: m.body.slice(0, 4000), card: m.card ?? null, ...(m.at ? { createdAt: m.at } : {}),
+    body: m.body.slice(0, 4000), card: m.card ?? null, createdAt: m.at ?? nextAt(),
   }).returning();
   await tx.update(appCircles).set({ updatedAt: new Date() }).where(eq(appCircles.id, circleId));
   return row!;
@@ -115,7 +120,7 @@ export async function listCircles(userId: string): Promise<{ circles: CircleSumm
       .where(and(inArray(appCircleInvites.circleId, ids), eq(appCircleInvites.status, "pending"), eq(appCircleInvites.channel, "app"), sql`${appCircleInvites.expiresAt} > now()`)).groupBy(appCircleInvites.circleId),
     db.execute<{ id: string }>(sql`SELECT DISTINCT ON (thread_id) id FROM app_messages WHERE thread_kind = 'circle' AND thread_id IN ${ids} AND NOT (card->>'t' = 'mada' AND card->>'kind' = 'welcome') ORDER BY thread_id, created_at DESC, id DESC`),
     db.execute<{ thread_id: string; n: number }>(sql`SELECT m.thread_id, count(*)::int AS n FROM app_messages m JOIN app_circle_members cm ON cm.circle_id = m.thread_id AND cm.user_id = ${userId}
-      WHERE m.thread_kind = 'circle' AND m.thread_id IN ${ids} AND m.created_at > coalesce(cm.last_read_at, cm.joined_at) AND m.author_user_id IS DISTINCT FROM ${userId} GROUP BY m.thread_id`),
+      WHERE m.thread_kind = 'circle' AND m.thread_id IN ${ids} AND m.created_at > coalesce(cm.last_read_at, cm.joined_at) AND m.author_user_id IS DISTINCT FROM ${userId} AND coalesce(m.card->>'t', '') <> 'sys' AND coalesce(m.card->>'kind', '') <> 'welcome' GROUP BY m.thread_id`),
   ]);
   const lastRows = lasts.length ? await db.select().from(appMessages).where(inArray(appMessages.id, lasts.map((l) => l.id))) : [];
   const lastMsgs = await toMessages(lastRows);
@@ -169,9 +174,11 @@ export async function circleDetail(circleId: string, userId: string): Promise<Ci
   const people = await peopleByIds([...members.map((m) => m.userId), ...invites.map((i) => i.inviteeUserId!).filter(Boolean)]);
   const g = await graphOf(userId);
   const d = await details(circleId);
+  const { familyOfFn } = await import("./messages");
+  const fam = await familyOfFn(members.map((m) => m.userId));
   return {
     circle,
-    members: members.map((m) => ({ ...people.get(m.userId)!, role: m.role === "admin" ? "admin" : "member", relation: relationOf(g, userId, m.userId), joinedAt: m.joinedAt.toISOString() })),
+    members: members.map((m) => ({ ...people.get(m.userId)!, role: m.role === "admin" ? "admin" : "member", relation: relationOf(g, userId, m.userId), joinedAt: m.joinedAt.toISOString(), family: fam(m.userId) })),
     invited: invites.filter((i) => i.inviteeUserId).map((i) => ({ inviteId: i.id, person: people.get(i.inviteeUserId!)!, sentAt: i.createdAt.toISOString(), remindedAt: i.remindedAt?.toISOString() ?? null })),
     pinned: d.pinnedPlan && planById(d.pinnedPlan) ? { kind: "plan", id: d.pinnedPlan, by: d.pinnedBy } : null,
     reads: members.filter((m) => m.lastReadAt).map((m) => ({ userId: m.userId, at: m.lastReadAt!.toISOString() })),

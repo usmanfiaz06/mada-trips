@@ -67,6 +67,18 @@ export const bookingCopy = {
   'ask.q.addSomeone': 'Add someone',
   'ask.q.helper': '{name} (helper)',
 
+  'person.add.body': 'Names exactly as on their passport. You can scan it later from the Wallet.',
+  'person.add.given': 'Given names',
+  'person.add.surname': 'Surname',
+  'person.add.helperNote': "We'll ask for their iqama and exit and re-entry visa before any trip abroad.",
+  'person.add.button': 'Add {name}',
+  'person.add.them': 'them',
+  'person.added': '{name} added. Scan their passport from the Wallet when you can.',
+  'person.rel.family': 'Family',
+  'person.rel.friend': 'Friend',
+  'person.rel.helper': 'Helper',
+  'person.rel.colleague': 'Colleague',
+
   // ───────────── search ─────────────
   'search.working.checking': 'Checking flights to {city}',
   'search.working.holding': 'Holding seats at this price',
@@ -463,6 +475,8 @@ export const bookingCopy = {
   'wait.ticket.cancel': 'Cancel the booking',
   'wait.ticket.note': 'By phone usually takes 15 minutes. You can close the app.',
   'wait.slow': 'Taking longer than usual. {airline}’s system is slow today. You can close the app; we’ll tell you the moment it’s done.',
+  'wait.question.names': '{name}’s passport has more than one given name: “{given}”. Should the ticket say exactly that?',
+  'wait.question.namesYours': 'Your passport has more than one given name: “{given}”. Should the ticket say exactly that?',
   'wait.question.yes': 'Yes, as on the passport',
   'wait.question.call': 'Call me',
   'wait.question.calling': '{agent} is calling you now',
@@ -471,6 +485,9 @@ export const bookingCopy = {
   'wait.cancelled': 'Cancelled. Nothing was charged.',
   'wait.background': 'We’re finishing it. We’ll tell you the moment it’s confirmed.',
   'wait.confirmedToast': 'Confirmed by {agent} at Mada. Booking {ref}.',
+
+  'notify.replied.title': 'Mada replied',
+  'notify.replied.body': '{agent}: your {what} is ready. Tap to see it.',
 
   // ───────────── confirmed ─────────────
   'done.going': "You're going to {city}.",

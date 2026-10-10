@@ -323,7 +323,7 @@ export type TripRequestView = z.infer<typeof TripRequestView>;
 
 export const SpecialKind = z.enum(['wheelchair', 'meal', 'bassinet', 'seats', 'celebration', 'prayer', 'bags', 'sports', 'pet']);
 export const HotelKind = z.enum(['room', 'nights', 'times', 'bed', 'connecting']);
-export const OtherAskKind = z.enum(['esim', 'call', 'wider', 'reissue']);
+export const OtherAskKind = z.enum(['esim', 'call', 'wider', 'reissue', 'pickup']);
 
 /** One body for every ask from the trip. The server decides the words and any price. */
 export const CreateTripAskRequest = z.object({
@@ -383,15 +383,6 @@ export const ChangeFlightRequest = z.discriminatedUnion('kind', [
 ]);
 export type ChangeFlightRequest = z.infer<typeof ChangeFlightRequest>;
 
-export const ChangeFlightResponse = z.object({
-  /** done: changed now. quoted: a price to pay first. sent: with Faisal. */
-  result: z.enum(['done', 'quoted', 'sent']),
-  say: z.string(),
-  total: HalalasAmount,
-  request: TripRequestView,
-  trip: TripDetail,
-});
-
 /** After a date change, the hotel and the home pickup stay on the old day until the traveller says. */
 export const MoveNeeded = z.object({
   from: IsoDay,
@@ -400,6 +391,16 @@ export const MoveNeeded = z.object({
   pickup: z.object({ pickupId: Id, driver: z.string(), fromDay: IsoDay, time: z.string() }).nullable(),
 });
 export type MoveNeeded = z.infer<typeof MoveNeeded>;
+export const ChangeFlightResponse = z.object({
+  /** done: changed now. quoted: a price to pay first. sent: with Faisal. */
+  result: z.enum(['done', 'quoted', 'sent']),
+  say: z.string(),
+  total: HalalasAmount,
+  request: TripRequestView,
+  trip: TripDetail,
+  move: MoveNeeded.nullable(),
+});
+
 export const MoveRequest = z.object({ hotel: z.boolean(), pickup: z.boolean() }).refine((v) => v.hotel || v.pickup, { message: 'Pick what to move' });
 
 /* ───────── money: payments, invoices, refunds ───────── */
@@ -660,7 +661,9 @@ export type TripsResponse = z.infer<typeof TripsResponse>;
 export const TripResponse = z.object({ trip: TripDetail, move: MoveNeeded.nullable() });
 export type TripResponse = z.infer<typeof TripResponse>;
 
-export const TripAskResponse = z.object({ request: TripRequestView, trip: TripDetail });
+export const TripAskResponse = z.object({ request: TripRequestView.nullable(), say: z.string().nullable(), trip: TripDetail });
+export const MoveResponse = z.object({ say: z.string(), back: HalalasAmount, quoted: TripRequestView.nullable(), trip: TripDetail, move: MoveNeeded.nullable() });
+export type MoveResponse = z.infer<typeof MoveResponse>;
 
 /** Flight status refresh: what changed since the trip was last read. */
 export const TripRefreshResponse = z.object({
@@ -702,3 +705,15 @@ export const TRIP_ROUTES = {
 /** The demo override header: in mock mode the trip clock can be told which moment to show. */
 export const DEMO_PHASE_HEADER = 'x-mada-demo-phase';
 export * from './trips-logic';
+
+export type FlightStatusResponse = z.infer<typeof FlightStatusResponse>;
+export type RefundResponse = z.infer<typeof RefundResponse>;
+export type TrackedResponse = z.infer<typeof TrackedResponse>;
+export type PaymentsResponse = z.infer<typeof PaymentsResponse>;
+export type RefundQuoteResponse = z.infer<typeof RefundQuoteResponse>;
+export type ChangeOptionsResponse = z.infer<typeof ChangeOptionsResponse>;
+export type ChangeFlightResponse = z.infer<typeof ChangeFlightResponse>;
+export type DisruptionChoiceResponse = z.infer<typeof DisruptionChoiceResponse>;
+export type TripAskResponse = z.infer<typeof TripAskResponse>;
+export type TripRefreshResponse = z.infer<typeof TripRefreshResponse>;
+export type InvoiceResponse = z.infer<typeof InvoiceResponse>;

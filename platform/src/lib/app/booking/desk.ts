@@ -5,10 +5,11 @@ import {
   type FlightOption, type OrderLine, type StayOption,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
-import { appCreditLedger, appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
+import { appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
 import { appOrderEvents, appOrders, appTripBookings } from "@/db/app-schema-booking";
 import { appTripCharges, appTripFacts } from "@/db/app-schema-trips";
 import { appAuditLog } from "../audit";
+import { addCredit } from "../credit";
 import { AppError } from "../http";
 import { AIRPORT_TZ } from "../suppliers/mock/data";
 import { bookingSuppliers, newRef } from "./common";
@@ -106,10 +107,16 @@ export async function failTicketing(orderId: string, agent: DeskAgent, reason = 
 export async function cancelOrder(orderId: string, actor: { kind: "user" | "agent"; name: string }): Promise<OrderRow> {
   return move(orderId, ["requires_action", "pending_agent", "held", "price_locked", "needs_answer", "fare_changed", "ticketing_failed"], async (tx, o) => {
     await voidPayment(tx, o);
+    await returnCredit(tx, o);
     await orderEvent(tx, o.id, "cancelled", actor);
     await appAuditLog(tx, { actorKind: actor.kind, actorId: actor.kind === "user" ? o.ownerId : actor.name, action: "order.cancelled", entityType: "app_order", entityId: o.id, summary: "Booking cancelled before it was confirmed; nothing was charged" });
     return { status: "cancelled" };
   });
+}
+
+/** Credit held for a booking that won't happen goes back to the traveller. */
+export async function returnCredit(tx: Tx, o: OrderRow) {
+  if (o.creditUsed > 0) await addCredit(tx, { userId: o.ownerId, amount: o.creditUsed, kind: "adjustment", note: "Booking not made: credit back", actor: { kind: "system", id: null } });
 }
 
 async function voidPayment(tx: Tx, o: OrderRow) {
@@ -136,9 +143,6 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
     if (!captured) return { o, failed: true };
     const ref = o.ref ?? newRef();
     const now = new Date();
-    if (o.creditUsed > 0) {
-      await tx.insert(appCreditLedger).values({ userId: o.ownerId, amount: -o.creditUsed, kind: "spend", note: `Booking ${ref}`, paymentId: o.paymentId });
-    }
     let tripId = o.tripId;
     if (o.kind === "trip" || o.kind === "stay") tripId = await writeTrip(tx, { ...o, ref }, agent, now);
     if (o.kind === "package") {

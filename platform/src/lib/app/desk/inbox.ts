@@ -145,3 +145,14 @@ export async function escalate(actor: DeskActor, kind: string, id: string, note:
       summary: on ? `Escalated this ${kind}: ${text}` : `Cleared the escalation on this ${kind}` });
   });
 }
+
+/** Who has one item now, and whether it's escalated: for the side card on a detail page. */
+export async function itemRoute(kind: string, id: string, userId: string | null) {
+  const rota = await loadRota();
+  const [[o], primary] = await Promise.all([
+    db.select().from(appDeskItems).where(and(eq(appDeskItems.itemKind, kind), eq(appDeskItems.itemId, id))),
+    primaryAgents(userId ? [userId] : []),
+  ]);
+  const route = routeFor(userId ? primary.get(userId) ?? null : null, rota.agents, rota.shifts, rota.now, o?.assignedAgentId);
+  return { route, agents: rota.agents.filter((a) => a.active), escalated: !!o?.escalatedAt, escalationNote: o?.escalationNote ?? null, primaryId: userId ? primary.get(userId) ?? null : null };
+}

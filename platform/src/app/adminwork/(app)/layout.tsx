@@ -9,11 +9,12 @@ import { CommandPalette, CommandTrigger } from "@/components/shell/command";
 import { CloseClock, LocaleSwitch, ThemeToggle } from "@/components/client";
 import { NotificationBell, DueToasts } from "@/components/notify";
 import { logout } from "../login/actions";
+import { deskBadge } from "@/lib/app/desk/inbox";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await requireUser();
   const t = await getT();
-  const [counts, issuer, s, alerts] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u)]);
+  const [counts, issuer, s, alerts, desk] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u), can(u, "desk.view") ? deskBadge(u.id).catch(() => 0) : Promise.resolve(0)]);
 
   const sections: NavSection[] = [
     { label: t("Workspace"), items: [
@@ -22,6 +23,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: "/adminwork/tasks", label: t("Tasks"), icon: "ListChecks" as const, count: counts.tasks },
       { href: "/adminwork/approvals", label: t("Approvals"), icon: "Stamp" as const, count: counts.approvals },
     ] },
+    ...(can(u, "desk.view") ? [{ label: t("App desk"), items: [
+      { href: "/adminwork/desk", label: t("Desk inbox"), icon: "Headset" as const, count: desk },
+    ] }] : []),
     { label: t("Operations"), items: [
       { href: "/adminwork/sales", label: t("Sales & bookings"), icon: "ReceiptText" as const },
       ...(issuer ? [{ href: "/adminwork/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
