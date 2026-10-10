@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RequestThread, QuoteBreakdown } from './Ask.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
-import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane } from '../ui.jsx';
+import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane, EmptyState } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
 import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney, MoveNotice, NoStayChoices } from './TripManage.jsx';
 import { TrackedFlights } from './Today.jsx';
@@ -131,12 +131,10 @@ function Requests() {
   const now = Date.now();
   const mine = (s.tripRequests || []);
   if (!s.requests.length && !s.refunds.length && !mine.length) return (
-    <div className="empty-hero rise">
-      <PaperPlane />
-      <h2 className="display">Nothing waiting on Faisal.</h2>
-      <span className="small">Send him anything. Visas, a table tonight, a car for the day. It lands here and you watch it move.</span>
-      <div className="chips">{['A Schengen visa', 'A table for tonight', 'A car with a driver', 'Umrah in Ramadan'].map((q) => <button key={q} type="button" className="chip" onClick={() => push('ask', { prefill: q })}>{q}</button>)}</div>
-    </div>
+    <EmptyState art={<PaperPlane />} title="Nothing waiting on Faisal."
+      body="Send him anything: a visa, a table tonight, a car for the day. It lands here and you watch it move."
+      action={<button type="button" className="btn primary block" onClick={() => push('ask', {})}>Send Faisal a request</button>}
+      ideas={['A Schengen visa', 'A table for tonight', 'A car with a driver', 'Umrah in Ramadan'].map((q) => [q, () => push('ask', { prefill: q })])} />
   );
   const talk = (topic) => push('support', { about: 'Istanbul trip', topic });
   const items = [

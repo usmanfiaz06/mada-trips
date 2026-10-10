@@ -38,7 +38,7 @@ export default function Profile() {
       <TopBar onBack={pop} />
       <div className="scroll no-dock">
         <div className="row acc-head">
-          <button type="button" className="acc-avatar-wrap" aria-label={a.photo ? 'Change photo' : 'Add a photo'} onClick={() => { buzz(HAPTIC.tap); setSheet('photo'); }}>
+          <button type="button" className={'acc-avatar-wrap' + (a.photo ? '' : ' empty')} aria-label={a.photo ? 'Change photo' : 'Add a photo'} onClick={() => { buzz(HAPTIC.tap); setSheet('photo'); }}>
             <UserAvatar size={68} />
             <span className="acc-cam"><Icon name="plus" size={14} color="#1e352d" width={2.6} /></span>
           </button>

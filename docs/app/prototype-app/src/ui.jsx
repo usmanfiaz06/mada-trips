@@ -450,3 +450,292 @@ export function QuietRadar() {
     </div>
   );
 }
+
+/* ---------- the empty-state family ----------
+   One wrapper and a set of small drawings that share a hand: 2-unit strokes on a 160×120 board, paper fills,
+   green ink, gold for the one thing that is alive. Each drawing moves for a reason (a route draws, a tag swings,
+   a page turns) and settles into a still picture when Reduce Motion is on. */
+
+const useArtId = () => 'a' + String(React.useId()).replace(/[^a-zA-Z0-9]/g, '');
+
+function Art({ children, className = '', label }) {
+  return (
+    <svg className={'es-svg ' + className} viewBox="0 0 160 120" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'} focusable="false">
+      {children}
+    </svg>
+  );
+}
+
+/* A folded map: a dotted route draws itself to a pin that bobs. Nothing planned, somewhere to go. */
+export function ArtMap() {
+  const id = useArtId();
+  return (
+    <Art className="es-map">
+      <defs><mask id={id}><path className="es-draw" d="M44 84 C 56 64, 70 82, 82 62 S 106 40, 118 46" fill="none" stroke="#fff" strokeWidth="6" strokeLinecap="round" pathLength="100" /></mask></defs>
+      <path d="M30 32 L64 24 L64 94 L30 102 Z" fill="#fffdf9" stroke="#e3d6bf" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M64 24 L98 32 L98 102 L64 94 Z" fill="#f4ecdd" stroke="#e3d6bf" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M98 32 L132 24 L132 94 L98 102 Z" fill="#fffdf9" stroke="#e3d6bf" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M36 50 h14 M36 58 h20 M104 74 h18 M104 82 h12" stroke="#e9dcc4" strokeWidth="2" strokeLinecap="round" />
+      <path d="M44 84 C 56 64, 70 82, 82 62 S 106 40, 118 46" fill="none" stroke="#b98f4a" strokeWidth="2.2" strokeDasharray="0.1 6" strokeLinecap="round" mask={`url(#${id})`} />
+      <circle cx="44" cy="84" r="4" fill="#1e352d" />
+      <g className="es-bob"><path d="M118 47 c-6-7-9-11-9-15 a9 9 0 0 1 18 0 c0 4-3 8-9 15z" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" strokeLinejoin="round" /><circle cx="118" cy="32" r="3" fill="#fffdf9" /></g>
+      <ellipse className="es-shadow" cx="118" cy="50" rx="5" ry="1.6" fill="#1e352d" opacity=".15" />
+    </Art>
+  );
+}
+
+/* A packed case with a luggage tag that swings: requests, stays, loyalty. */
+export function ArtSuitcase({ tag = '' }) {
+  return (
+    <Art className="es-case">
+      <path d="M68 40 v-8 a5 5 0 0 1 5-5 h14 a5 5 0 0 1 5 5 v8" fill="none" stroke="#1e352d" strokeWidth="2.4" strokeLinejoin="round" />
+      <rect x="46" y="40" width="68" height="56" rx="11" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.4" />
+      <path d="M62 40 v56 M98 40 v56" stroke="#d9b77a" strokeWidth="5" />
+      <path d="M46 62 h68" stroke="#e3d6bf" strokeWidth="1.5" />
+      <circle cx="58" cy="100" r="3.2" fill="#1e352d" /><circle cx="102" cy="100" r="3.2" fill="#1e352d" />
+      <g className="es-swing">
+        <path d="M88 34 C 96 40, 104 44, 110 50" fill="none" stroke="#7d5d27" strokeWidth="1.5" />
+        <g transform="rotate(14 116 60)"><rect x="106" y="50" width="20" height="30" rx="4" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" /><circle cx="116" cy="56" r="2" fill="#fffdf9" /><path d="M110 66 h12 M110 72 h8" stroke="#7d5d27" strokeWidth="1.5" strokeLinecap="round" /></g>
+        {tag ? <text x="116" y="90" textAnchor="middle" fontSize="7" fill="#7d5d27">{tag}</text> : null}
+      </g>
+    </Art>
+  );
+}
+
+/* A wallet pocket with a card that rises and catches the light: documents, cards, refunds. */
+export function ArtCardSlot({ kind = 'card' }) {
+  const id = useArtId();
+  return (
+    <Art className="es-slot">
+      <defs><clipPath id={id}><rect x="44" y="18" width="72" height="70" rx="0" /></clipPath><linearGradient id={id + 'g'} x1="0" x2="1"><stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset=".5" stopColor="#fff" stopOpacity=".75" /><stop offset="1" stopColor="#fff" stopOpacity="0" /></linearGradient></defs>
+      <g clipPath={`url(#${id})`}>
+        <g className="es-rise-card">
+          {kind === 'doc' ? (<>
+            <path d="M56 26 h34 l14 14 v52 h-48 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M90 26 v14 h14" fill="none" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M64 50 h22 M64 58 h30 M64 66 h26" stroke="#d9b77a" strokeWidth="2.4" strokeLinecap="round" />
+          </>) : (<>
+            <rect x="50" y="30" width="60" height="40" rx="7" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" />
+            <rect x="58" y="40" width="12" height="9" rx="2" fill="#f4e2bd" stroke="#7d5d27" strokeWidth="1" />
+            <path d="M58 60 h26" stroke="#7d5d27" strokeWidth="2" strokeLinecap="round" opacity=".6" />
+          </>)}
+          <rect className="es-shine" x="20" y="20" width="22" height="80" fill={`url(#${id}g)`} transform="skewX(-18)" />
+        </g>
+      </g>
+      <path d="M36 66 h88 v26 a10 10 0 0 1 -10 10 h-68 a10 10 0 0 1 -10 -10 z" fill="#1e352d" />
+      <path d="M42 72 h76" stroke="#d9b77a" strokeWidth="1.2" strokeDasharray="3 4" opacity=".7" />
+      <circle cx="80" cy="88" r="4" fill="none" stroke="#d9b77a" strokeWidth="1.5" />
+    </Art>
+  );
+}
+
+/* A boarding pass with its stub, a small plane crossing the fold: passes and tracked flights. */
+export function ArtPass() {
+  return (
+    <Art className="es-pass">
+      <path d="M26 36 h82 a6 6 0 0 0 12 0 h14 a6 6 0 0 1 6 6 v36 a6 6 0 0 1 -6 6 h-14 a6 6 0 0 0 -12 0 h-82 a6 6 0 0 1 -6 -6 v-36 a6 6 0 0 1 6 -6 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M114 44 v32" stroke="#e3d6bf" strokeWidth="1.5" strokeDasharray="3 4" />
+      <path d="M32 50 h16 M32 70 h30 M124 52 h10 M124 60 h6" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+      <text x="32" y="64" fontSize="10" fontWeight="700" fill="#1e352d" fontFamily="Inter Tight, sans-serif">RUH</text>
+      <text x="80" y="64" fontSize="10" fontWeight="700" fill="#b98f4a" fontFamily="Inter Tight, sans-serif">???</text>
+      <path d="M58 60 h18" stroke="#b98f4a" strokeWidth="1.5" strokeDasharray="1 3" strokeLinecap="round" />
+      <g className="es-glide"><path d="M-5 -3 L5 0 L-5 3 L-2.5 0 Z" fill="#1e352d" transform="translate(64 60)" /></g>
+    </Art>
+  );
+}
+
+/* Dots that find each other: people, friends, circles, household. The gold one is you. */
+export function ArtFriends() {
+  const pts = [[80, 60], [44, 38], [120, 34], [126, 82], [40, 86]];
+  return (
+    <Art className="es-friends">
+      {pts.slice(1).map(([x, y], i) => (
+        <line key={i} className="es-draw" style={{ animationDelay: `${0.25 + i * 0.22}s` }} x1="80" y1="60" x2={x} y2={y} stroke={i === 3 ? '#d9b77a' : '#d6c9b1'} strokeWidth="1.6" strokeDasharray={i === 3 ? '2 4' : undefined} pathLength="100" />
+      ))}
+      <path className="es-draw" style={{ animationDelay: '1.1s' }} d="M44 38 Q 82 20 120 34" fill="none" stroke="#e3d6bf" strokeWidth="1.4" pathLength="100" />
+      {pts.slice(1, 4).map(([x, y], i) => <circle key={i} className="es-pop" style={{ animationDelay: `${0.5 + i * 0.22}s` }} cx={x} cy={y} r={i === 1 ? 9 : 7.5} fill={i === 1 ? '#1e352d' : '#fffdf9'} stroke="#1e352d" strokeWidth="2" />)}
+      <circle className="es-ring" cx="40" cy="86" r="9" fill="none" stroke="#b98f4a" strokeWidth="1.6" strokeDasharray="3 3.5" />
+      <path d="M40 82 v8 M36 86 h8" stroke="#b98f4a" strokeWidth="1.8" strokeLinecap="round" />
+      <circle className="es-pulse" cx="80" cy="60" r="16" fill="#d9b77a" opacity=".25" />
+      <circle cx="80" cy="60" r="11" fill="#d9b77a" stroke="#7d5d27" strokeWidth="2" />
+    </Art>
+  );
+}
+
+/* An open book with a ribbon that falls into the fold: saved places. */
+export function ArtBookmark() {
+  return (
+    <Art className="es-book">
+      <path d="M80 44 C 66 36, 46 34, 30 38 v52 c16-4 36-2 50 6 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M80 44 C 94 36, 114 34, 130 38 v52 c-16-4-36-2-50 6 z" fill="#f7f0e4" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M40 52 c10-2 22-1 32 3 M40 62 c10-2 22-1 32 3 M40 72 c8-1 16 0 22 2" fill="none" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" />
+      <path d="M90 55 c10-4 22-5 30-3 M90 65 c10-4 22-5 30-3" fill="none" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" />
+      <g className="es-drop"><path d="M98 14 h14 v46 l-7 -6 l-7 6 z" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" strokeLinejoin="round" /></g>
+    </Art>
+  );
+}
+
+/* A day-to-a-page calendar whose top page lifts away: dates, days, the itinerary. */
+export function ArtCalendar({ day = '9' }) {
+  return (
+    <Art className="es-cal">
+      <rect x="48" y="30" width="64" height="66" rx="10" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
+      <path d="M48 48 h64" stroke="#1e352d" strokeWidth="2" />
+      <text x="80" y="82" textAnchor="middle" fontSize="28" fill="#1e352d" fontFamily="Instrument Serif, Georgia, serif">{Number(day) + 1}</text>
+      <g className="es-page">
+        <rect x="49" y="49" width="62" height="46" rx="0" fill="#fffdf9" />
+        <path d="M49 49 h62 v37 a9 9 0 0 1 -9 9 h-44 a9 9 0 0 1 -9 -9 z" fill="#fffdf9" stroke="#e3d6bf" strokeWidth="1" />
+        <circle cx="80" cy="72" r="15" fill="#f4e9d3" />
+        <text x="80" y="82" textAnchor="middle" fontSize="28" fill="#7d5d27" fontFamily="Instrument Serif, Georgia, serif">{day}</text>
+      </g>
+      <rect x="48" y="30" width="64" height="18" rx="10" fill="#1e352d" />
+      <rect x="48" y="40" width="64" height="8" fill="#1e352d" />
+      <path d="M62 24 v12 M98 24 v12" stroke="#d9b77a" strokeWidth="3" strokeLinecap="round" />
+    </Art>
+  );
+}
+
+/* A receipt that prints out of a slot: payments and invoices. With `stamp`, the trip is settled. */
+export function ArtReceipt({ stamp }) {
+  const id = useArtId();
+  return (
+    <Art className="es-receipt">
+      <defs><clipPath id={id}><rect x="40" y="34" width="80" height="80" /></clipPath></defs>
+      <g clipPath={`url(#${id})`}>
+        <g className={stamp ? '' : 'es-print'}>
+          <path d="M54 30 h52 v66 l-6.5 5 l-6.5 -5 l-6.5 5 l-6.5 -5 l-6.5 5 l-6.5 -5 l-6.5 5 l-6.5 -5 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M62 48 h26 M62 56 h36 M62 64 h20" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M62 80 h18" stroke="#1e352d" strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M90 80 h8" stroke="#b98f4a" strokeWidth="2.4" strokeLinecap="round" />
+          {stamp && <g className="es-stamp" transform="rotate(-12 96 64)"><circle cx="96" cy="64" r="14" fill="none" stroke="#b98f4a" strokeWidth="2" /><circle cx="96" cy="64" r="10.5" fill="none" stroke="#b98f4a" strokeWidth="1" strokeDasharray="2 2" /><path d="M90 64 l4 4 l8 -8" fill="none" stroke="#b98f4a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></g>}
+        </g>
+      </g>
+      <rect x="34" y="24" width="92" height="14" rx="7" fill="#1e352d" />
+      <path d="M44 31 h72" stroke="#0f1a16" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="116" cy="31" r="2" fill="#d9b77a" className="es-blink" />
+    </Art>
+  );
+}
+
+/* Two bubbles, one breathing: a chat that hasn't started. */
+export function ArtChat() {
+  return (
+    <Art className="es-chat">
+      <g className="es-breathe">
+        <path d="M30 34 h64 a12 12 0 0 1 12 12 v18 a12 12 0 0 1 -12 12 h-46 l-12 10 v-10 h-6 a12 12 0 0 1 -12 -12 v-18 a12 12 0 0 1 12 -12 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" transform="translate(12 0)" />
+        <circle className="es-dot d1" cx="62" cy="55" r="3.6" fill="#1e352d" /><circle className="es-dot d2" cx="74" cy="55" r="3.6" fill="#1e352d" /><circle className="es-dot d3" cx="86" cy="55" r="3.6" fill="#1e352d" />
+      </g>
+      <g className="es-float">
+        <path d="M100 74 h28 a10 10 0 0 1 10 10 v4 a10 10 0 0 1 -10 10 h-2 v8 l-10 -8 h-16 a10 10 0 0 1 -10 -10 v-4 a10 10 0 0 1 10 -10 z" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M100 86 h18" stroke="#7d5d27" strokeWidth="2" strokeLinecap="round" opacity=".55" />
+      </g>
+    </Art>
+  );
+}
+
+/* A compass whose needle swings and settles: no match yet, we'll find the way. */
+export function ArtCompass() {
+  return (
+    <Art className="es-compass">
+      <circle cx="80" cy="60" r="38" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
+      <circle cx="80" cy="60" r="30" fill="none" stroke="#e3d6bf" strokeWidth="1.2" />
+      {Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 6; const r1 = i % 3 ? 33 : 30; return <line key={i} x1={80 + Math.sin(a) * r1} y1={60 - Math.cos(a) * r1} x2={80 + Math.sin(a) * 36} y2={60 - Math.cos(a) * 36} stroke={i % 3 ? '#d6c9b1' : '#1e352d'} strokeWidth={i % 3 ? 1.2 : 2} strokeLinecap="round" />; })}
+      <text x="80" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill="#7d5d27" fontFamily="Inter Tight, sans-serif" transform="translate(0 -3)">N</text>
+      <g className="es-needle"><path d="M80 34 L86 60 L80 86 L74 60 Z" fill="#fffdf9" stroke="#1e352d" strokeWidth="1.6" strokeLinejoin="round" /><path d="M80 34 L86 60 L74 60 Z" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.4" strokeLinejoin="round" /></g>
+      <circle cx="80" cy="60" r="3.4" fill="#1e352d" />
+    </Art>
+  );
+}
+
+/* A lantern left on, swaying a little: quiet, but someone is watching for you. */
+export function ArtLantern() {
+  const id = useArtId();
+  return (
+    <Art className="es-lantern">
+      <defs><radialGradient id={id}><stop offset="0" stopColor="#f3d79c" stopOpacity=".95" /><stop offset="1" stopColor="#f3d79c" stopOpacity="0" /></radialGradient></defs>
+      <path d="M40 16 h80" stroke="#d6c9b1" strokeWidth="1.5" strokeLinecap="round" />
+      <g className="es-swing-l">
+        <path d="M80 16 v14" stroke="#7d5d27" strokeWidth="1.5" />
+        <circle className="es-glow" cx="80" cy="66" r="34" fill={`url(#${id})`} />
+        <path d="M70 34 h20 l4 8 h-28 z" fill="#1e352d" />
+        <path d="M66 42 h28 c2 14 2 30 0 44 h-28 c-2-14-2-30 0-44 z" fill="#fff7e6" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M74 42 c-1 14-1 30 0 44 M86 42 c1 14 1 30 0 44" stroke="#e3c58d" strokeWidth="1.2" fill="none" />
+        <path className="es-flame" d="M80 54 c5 6 6 11 0 16 c-6-5-5-10 0-16z" fill="#d9b77a" stroke="#b98f4a" strokeWidth="1" />
+        <path d="M68 86 h24 l-3 6 h-18 z" fill="#1e352d" />
+      </g>
+    </Art>
+  );
+}
+
+/* An envelope with a letter that lifts out: invites and email. */
+export function ArtEnvelope() {
+  return (
+    <Art className="es-env">
+      <g className="es-lift">
+        <rect x="56" y="32" width="48" height="44" rx="4" fill="#fffdf9" stroke="#1e352d" strokeWidth="1.8" />
+        <path d="M64 44 h24 M64 52 h32 M64 60 h18" stroke="#d9b77a" strokeWidth="2.2" strokeLinecap="round" />
+      </g>
+      <path d="M40 58 l40 28 l40 -28 v38 a6 6 0 0 1 -6 6 h-68 a6 6 0 0 1 -6 -6 z" fill="#f4ecdd" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M40 102 l30 -24 M120 102 l-30 -24" stroke="#1e352d" strokeWidth="1.5" strokeLinecap="round" opacity=".5" />
+      <circle cx="80" cy="84" r="5.5" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.2" />
+    </Art>
+  );
+}
+
+/* One phone, one quiet check: signed in only here. */
+export function ArtPhone() {
+  return (
+    <Art className="es-phone">
+      <circle className="es-pulse" cx="80" cy="60" r="34" fill="#d9b77a" opacity=".18" />
+      <rect x="62" y="22" width="36" height="76" rx="9" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" />
+      <path d="M74 28 h12" stroke="#1e352d" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="80" cy="60" r="11" fill="#1e352d" />
+      <path d="M75 60 l3.5 3.5 l6.5 -7" fill="none" stroke="#d9b77a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M40 46 h10 M38 60 h12 M40 74 h10 M110 46 h10 M110 60 h12 M110 74 h10" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 4" />
+    </Art>
+  );
+}
+
+/* The wrapper every empty state uses: a drawing on a soft stage, one line of what lands here and why,
+   one next step, and at most a few quiet ideas in a single row. `compact` is the inline version for lists. */
+export function EmptyState({ art, title, body, action, ideas, compact, center, onClick, label, className = '', children, plain }) {
+  if (compact) {
+    const inner = (<>
+      <span className="es-tile" aria-hidden="true">{art}</span>
+      <span className="grow col" style={{ gap: 2, minWidth: 0 }}>
+        <span className="h3" style={{ fontSize: 15 }}>{title}</span>
+        {body && <span className="tiny es-row-body">{body}</span>}
+        {action && <span className="es-row-act">{action}</span>}
+      </span>
+      {onClick && <Icon name="chevron" size={18} />}
+    </>);
+    return onClick
+      ? <button type="button" className={'es-row tap ' + (plain ? 'plain ' : '') + className} onClick={onClick} aria-label={label}>{inner}</button>
+      : <div className={'es-row ' + (plain ? 'plain ' : '') + className}>{inner}</div>;
+  }
+  return (
+    <section className={'es rise ' + (center ? 'center ' : '') + (plain ? 'plain ' : '') + className} aria-label={label || (typeof title === 'string' ? title : undefined)}>
+      {art && <div className="es-stage" aria-hidden="true">{art}</div>}
+      <h2 className="display es-title">{title}</h2>
+      {body && <p className="small es-body">{body}</p>}
+      {children}
+      {action}
+      {ideas && ideas.length > 0 && (
+        <div className="es-ideas" role="group" aria-label="Ideas">
+          {ideas.map(([t, fn]) => <button key={t} type="button" className="chip" onClick={() => { buzz(HAPTIC.tap); fn(); }}>{t}</button>)}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* Three rings that drift until they overlap: a circle of people, planning together. */
+export function ArtCircles() {
+  return (
+    <Art className="es-rings">
+      <g className="es-ring-a"><circle cx="58" cy="66" r="28" fill="rgba(30,53,45,.05)" stroke="#1e352d" strokeWidth="2" /><circle cx="58" cy="66" r="5" fill="#1e352d" /></g>
+      <g className="es-ring-b"><circle cx="102" cy="66" r="28" fill="rgba(217,183,122,.12)" stroke="#b98f4a" strokeWidth="2" /><circle cx="102" cy="66" r="5" fill="#b98f4a" /></g>
+      <g className="es-ring-c"><circle cx="80" cy="42" r="22" fill="none" stroke="#d9b77a" strokeWidth="2" strokeDasharray="4 5" /><circle cx="80" cy="42" r="5" fill="#d9b77a" /></g>
+    </Art>
+  );
+}

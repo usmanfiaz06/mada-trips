@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE } from '../store.jsx';
-import { Icon, TopBar, Sheet, Toggle, InviteSheet } from '../ui.jsx';
+import { Icon, TopBar, Sheet, Toggle, InviteSheet, EmptyState, ArtFriends, ArtCompass, ArtEnvelope, ArtLantern, ArtBookmark } from '../ui.jsx';
 
 /* People on Mada who aren't in the household. */
 export const FRIENDS = {
@@ -243,75 +243,96 @@ export function useCircleClock() {
 
 export function NewCircle({ params = {} }) {
   const { s, set, pop, replace, toast } = useStore();
+  const [stage, setStage] = useState('name');
   const [name, setName] = useState(params.name || '');
-  const [cover, setCover] = useState(s.trip ? 'img/istanbul.jpg' : null);
+  const [cover, setCover] = useState(s.trip ? 'img/istanbul.jpg' : 'img/alula.jpg');
   const [picked, setPicked] = useState(params.with ? [params.with] : []);
   const [q, setQ] = useState('');
-  const [trip, setTrip] = useState(params.with ? 'new' : 'none');
-  const [where, setWhere] = useState('');
   const [invite, setInvite] = useState(false);
-  const pool = [...s.household.filter((id) => id !== 'omar'), ...s.friends];
-  const term = q.trim().toLowerCase();
-  const shown = pool.filter((id) => !term || person(id).name.toLowerCase().includes(term));
   const dupe = s.groups.some((g) => g.name.trim().toLowerCase() === name.trim().toLowerCase());
   const ok = name.trim().length >= 2 && !dupe;
   const toggle = (id) => { setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]); buzz(HAPTIC.select); };
+  const family = s.household.filter((id) => id !== 'omar');
+  const friends = s.friends || [];
+  /* Search reaches everyone on Mada, not only friends: by name, or by mobile number. */
+  const term = q.trim().toLowerCase();
+  const digits = q.replace(/\D/g, '');
+  const byPhone = /^5\d{8}$/.test(digits) ? (digits.endsWith('7') ? ['khalid'] : []) : null;
+  const everyone = [...new Set([...family, ...friends, ...Object.keys(FRIENDS)])].filter((id) => !(s.circles?.blocked || []).includes(id));
+  const results = byPhone || everyone.filter((id) => person(id).name.toLowerCase().includes(term));
+  const tag = (id) => (family.includes(id) ? 'Family' : friends.includes(id) ? 'Friend' : `On Mada · ${FRIENDS[id]?.mutual || 0} friends in common`);
   const create = () => {
     const id = 'g' + Date.now();
-    const dest = where.trim() ? where.trim().replace(/\b\w/g, (c) => c.toUpperCase()) : null;
     /* People are invited, not added: they're in once they say yes. */
-    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: trip === 'trip' ? `${s.trip?.city || 'Istanbul'} · ${s.trip?.dates || ''}` : trip === 'new' ? (dest || 'Somewhere new') : null, dest, muted: false, fresh: true };
+    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: null, dest: null, muted: false, fresh: true };
     set((p) => ({ groups: [g, ...p.groups] }));
     buzz(HAPTIC.success);
     toast(picked.length ? `Circle made. Invite sent to ${names(picked)}.` : 'Circle made. Share the link to bring people in.');
     replace('group', { id });
   };
-  return (
+  const Row = (id) => (
+    <PersonRow key={id} id={id} sub={tag(id)} on={picked.includes(id)} onClick={() => toggle(id)} right={<Tick on={picked.includes(id)} />} />
+  );
+
+  if (stage === 'name') return (
     <div className="screen push">
-      <TopBar onBack={pop} backLabel="Cancel" />
-      <div className="scroll no-dock" style={{ gap: 18, paddingBottom: 120 }}>
-        <h1 className="h1">A new circle</h1>
+      <TopBar onBack={pop} backLabel="Cancel" right={<span className="tiny" style={{ paddingRight: 8 }}>1 of 2</span>} />
+      <div className="scroll no-dock nc-scroll">
+        <div className="nc-preview" style={cover ? { backgroundImage: `url(${cover})` } : null} aria-hidden="true">
+          <span className="nc-veil" />
+          <span className="nc-preview-name">{name.trim() || 'Your circle'}</span>
+          <span className="nc-preview-sub">{picked.length ? `You and ${picked.length} more` : 'Just you, for now'}</span>
+        </div>
+        <div className="row nc-covers" role="radiogroup" aria-label="Cover">
+          {COVERS.map((c) => (
+            <button key={c || 'plain'} type="button" role="radio" aria-checked={cover === c ? 'true' : 'false'} aria-label={c ? c.split('/')[1].split('.')[0] : 'Plain green'} onClick={() => { setCover(c); buzz(HAPTIC.select); }}
+              className={'cover-dot' + (cover === c ? ' on' : '')} style={c ? { backgroundImage: `url(${c})` } : { background: '#1e352d' }} />
+          ))}
+        </div>
         <div className="field">
           <label htmlFor="nc-name">Name it</label>
-          <input id="nc-name" className={'input' + (dupe ? ' bad' : '')} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer in Baku" />
+          <input id="nc-name" className={'input' + (dupe ? ' bad' : '')} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer in Baku" autoFocus />
           {dupe ? <span className="err" role="alert">You already have a circle called {name.trim()}.</span>
-            : <div className="chips">{['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t) => <button key={t} type="button" className={'chip' + (name === t ? ' on' : '')} onClick={() => setName(t)}>{t}</button>)}</div>}
-        </div>
-
-        <div className="col" style={{ gap: 8 }}>
-          <span className="eyebrow">Cover</span>
-          <div className="row" style={{ gap: 10 }} role="radiogroup" aria-label="Cover">
-            {COVERS.map((c) => (
-              <button key={c || 'plain'} type="button" role="radio" aria-checked={cover === c ? 'true' : 'false'} aria-label={c ? c.split('/')[1].split('.')[0] : 'Plain green'} onClick={() => { setCover(c); buzz(HAPTIC.select); }}
-                className={'cover-pick' + (cover === c ? ' on' : '')} style={c ? { backgroundImage: `url(${c})` } : { background: '#1e352d' }} />
-            ))}
-          </div>
-        </div>
-
-        <div className="col" style={{ gap: 8 }}>
-          <div className="spread"><span className="eyebrow">Who’s in</span><span className="tiny">{picked.length ? `${picked.length} to invite` : 'Optional'}</span></div>
-          {pool.length > 5 && <input className="input" placeholder="Search friends and family" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search friends and family" />}
-          {shown.map((id) => (
-            <PersonRow key={id} id={id} sub={person(id).household ? 'Family' : 'Friend'} on={picked.includes(id)} onClick={() => toggle(id)} right={<Tick on={picked.includes(id)} />} />
-          ))}
-          {pool.length === 0 && <div className="card well" style={{ gap: 4 }}><span className="h3" style={{ fontSize: 15 }}>Start it on your own.</span><span className="small">Make the circle, then send the link. People join when they open it.</span></div>}
-          {pool.length > 0 && shown.length === 0 && <span className="small">Nobody called “{q.trim()}” yet. Invite them with a link.</span>}
-          {picked.length > 0 && <span className="tiny">They get an invite and join when they say yes.</span>}
-          <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setInvite(true)}><Icon name="link" size={18} />Invite someone not on Mada</button>
-        </div>
-
-        <div className="col" style={{ gap: 8 }}>
-          <span className="eyebrow">Planning a trip together?</span>
-          <div className="chips" role="radiogroup" aria-label="Trip">
-            {[['none', 'Not yet'], ...(s.trip ? [['trip', 'Our Istanbul trip']] : []), ['new', 'Somewhere new']].map(([id, label]) => (
-              <button key={id} type="button" role="radio" aria-checked={trip === id ? 'true' : 'false'} className={'chip' + (trip === id ? ' on' : '')} onClick={() => setTrip(id)}>{label}</button>
-            ))}
-          </div>
-          {trip === 'new' && <input className="input" aria-label="Where to" placeholder="Where to? Georgia, Baku… (optional)" value={where} maxLength={30} onChange={(e) => setWhere(e.target.value)} />}
-          {trip !== 'none' && <span className="tiny">Mada joins the circle to answer questions. Faisal confirms anything you book.</span>}
+            : <span className="nc-ideas">{['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t, i) => <React.Fragment key={t}>{i > 0 && <span aria-hidden="true"> · </span>}<button type="button" className="link" onClick={() => setName(t)}>{t}</button></React.Fragment>)}</span>}
         </div>
       </div>
-      <div className="act"><button type="button" className="btn primary block" disabled={!ok} onClick={create}>{ok ? `Make ${name.trim()}` : 'Make the circle'}</button></div>
+      <div className="act nc-act"><button type="button" className="btn primary block" disabled={!ok} onClick={() => { buzz(HAPTIC.tap); setStage('people'); }}>Next</button></div>
+    </div>
+  );
+
+  return (
+    <div className="screen push">
+      <TopBar onBack={() => setStage('name')} right={<span className="tiny" style={{ paddingRight: 8 }}>2 of 2</span>} />
+      <div className="scroll no-dock nc-scroll">
+        <div className="col" style={{ gap: 4 }}>
+          <h1 className="h1">Who’s in {name.trim()}?</h1>
+          <span className="small">They get an invite and join when they say yes.</span>
+        </div>
+        {picked.length > 0 && (
+          <div className="nc-picked" aria-label="Invited so far">
+            {picked.map((id) => (
+              <button key={id} type="button" className="nc-chosen" onClick={() => toggle(id)} aria-label={`Remove ${person(id).short}`}>
+                <Avatar id={id} size={48} /><span className="tiny" style={{ fontWeight: 600, color: '#1e352d' }}>{person(id).short}</span><i aria-hidden="true">×</i>
+              </button>
+            ))}
+          </div>
+        )}
+        <input className="input" placeholder="Search anyone on Mada, by name or number" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search people on Mada" />
+        {term ? (
+          results.length ? <div className="col" style={{ gap: 6 }}>{results.map(Row)}</div> : (
+            <div className="card well" style={{ gap: 8 }}>
+              <span className="h3" style={{ fontSize: 15 }}>{byPhone ? 'That number isn’t on Mada yet.' : `Nobody called “${q.trim()}” on Mada yet.`}</span>
+              <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => setInvite(true)}><Icon name="link" size={18} />Send them an invite link</button>
+            </div>
+          )
+        ) : (<>
+          {family.length > 0 && <><span className="eyebrow">Family</span><div className="col" style={{ gap: 6 }}>{family.map(Row)}</div></>}
+          {friends.length > 0 && <><span className="eyebrow">Friends</span><div className="col" style={{ gap: 6 }}>{friends.map(Row)}</div></>}
+          {!family.length && !friends.length && <span className="small">Search for anyone already on Mada above, or send a link to people who aren’t.</span>}
+        </>)}
+        <button type="button" className="link nc-link" onClick={() => setInvite(true)}><Icon name="link" size={16} />Invite someone not on Mada</button>
+      </div>
+      <div className="act nc-act"><button type="button" className="btn primary block" onClick={create}>{picked.length ? `Make ${name.trim()}` : `Make ${name.trim()}, invite later`}</button></div>
       {invite && <InviteSheet what={name.trim() || 'your circle'} onClose={() => setInvite(false)} />}
     </div>
   );
@@ -462,17 +483,14 @@ export function People({ params = {} }) {
         {tab === 'friends' && (s.friends.length ? s.friends.map((id) => (
           <PersonRow key={id} id={id} sub={FRIENDS[id].going ? `Going to ${FRIENDS[id].going}` : `${FRIENDS[id].places} places explored`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
         )) : (
-          <div className="cx-empty">
-            <EmptyArt kind="friends" />
-            <span className="h3">No friends here yet.</span>
-            <span className="small">Add the people you travel with. Only they see your trips, tips and plans.</span>
-            <button type="button" className="btn primary small" onClick={() => setSheet('add')}>Add friends</button>
-          </div>
+          <EmptyState art={<ArtFriends />} title="No friends here yet." body="Add the people you travel with. Only they see your trips, tips and plans."
+            action={<button type="button" className="btn primary block" onClick={() => setSheet('add')}>Add friends</button>} />
         ))}
 
         {tab === 'following' && ((s.following || []).length ? s.following.map((id) => (
           <PersonRow key={id} id={id} sub={`${FRIENDS[id].places} trips · public tips`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
-        )) : <div className="card well"><span className="h3">You don’t follow anyone yet.</span><span className="small">Tap a name on any tip in Discover to see their profile and follow them.</span></div>)}
+        )) : <EmptyState art={<ArtCompass />} title="You don’t follow anyone yet." body="Follow people whose taste you trust. Their public tips show up first in Discover."
+          action={<button type="button" className="btn secondary block" onClick={() => { pop(); set({ tab: 'circles' }); }}>Find people in Discover</button>} />)}
 
         {tab === 'invited' && (invites.length ? invites.map((iv) => (
           <div key={iv.id} className="person-row" style={{ alignItems: 'flex-start' }}>
@@ -489,7 +507,8 @@ export function People({ params = {} }) {
               {iv.status === 'joined' && <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 13 }} onClick={() => push('friend', { id: 'yousef' })}>See {iv.name}</button>}
             </span>
           </div>
-        )) : <div className="card well"><span className="h3">Nobody invited yet.</span><span className="small">Invite links last 14 days. You’ll see here when someone joins.</span></div>)}
+        )) : <EmptyState art={<ArtEnvelope />} title="Nobody invited yet." body="Send your link on WhatsApp. It lasts 14 days, and you’ll see here the moment someone joins."
+          action={<button type="button" className="btn primary block" onClick={() => setSheet('link')}>Share your invite link</button>} />)}
 
         {tab === 'requests' && (requests.length ? requests.map((id) => (
           <div key={id} className="person-row" style={{ alignItems: 'flex-start' }}>
@@ -503,7 +522,7 @@ export function People({ params = {} }) {
               </span>
             </span>
           </div>
-        )) : <div className="card well"><span className="h3">No requests.</span><span className="small">When someone asks to be your friend, it shows here.</span></div>)}
+        )) : <EmptyState art={<ArtLantern />} title="No requests." body="When someone asks to be your friend, it shows here. You decide, and they aren’t told if you say no." />)}
       </div>
 
       {sheet === 'add' && (
@@ -707,12 +726,8 @@ export function Saved({ params = {} }) {
       <div className="scroll no-dock" style={{ gap: 16 }}>
         <h1 className="h1">{params.city ? `Saved in ${params.city}` : 'Saved'}</h1>
         {posts.length === 0 && (s.savedPlans || []).length === 0 && (
-          <div className="cx-empty">
-            <EmptyArt kind="saved" />
-            <span className="h3">Nothing saved yet.</span>
-            <span className="small">Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share with a circle.</span>
-            <button type="button" className="btn primary small" onClick={() => { pop(); set({ tab: 'circles' }); }}>Look around Discover</button>
-          </div>
+          <EmptyState art={<ArtBookmark />} title="Nothing saved yet." body="Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share with a circle."
+            action={<button type="button" className="btn primary block" onClick={() => { pop(); set({ tab: 'circles' }); }}>Look around Discover</button>} />
         )}
         {list.map((city) => {
           const items = posts.filter((p) => p.city === city);

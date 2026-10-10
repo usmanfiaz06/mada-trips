@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue, shortDay, seatText } from '../store.jsx';
-import { Icon, Sun, Sheet, AirlineMark, PayMark } from '../ui.jsx';
+import { Icon, Sun, Sheet, AirlineMark, PayMark, EmptyState, ArtCardSlot, ArtPass, ArtReceipt } from '../ui.jsx';
 import { CardsSheet } from './Pay.jsx';
 import { checkFile, readPassport } from '../ocr.js';
 
@@ -59,8 +59,8 @@ function Unlocked() {
 
   if (!people.length) return (
     <div className="screen"><div className="scroll"><div style={{ paddingTop: 54 }}><h1 className="h1">Wallet</h1></div>
-      <div className="card well"><span className="h3">Add a passport and we'll keep an eye on it.</span><span className="small">Expiry dates, visas and entry rules for every trip.</span>
-        <button type="button" className="btn primary small" onClick={() => set({ onboarded: false, guest: false, signinFrom: { tab: 'wallet' } })}>Sign in to add one</button></div></div></div>
+      <EmptyState art={<ArtCardSlot kind="doc" />} title="Add a passport and we’ll keep an eye on it." body="Expiry dates, visas and entry rules, checked against every trip."
+        action={<button type="button" className="btn primary block" onClick={() => set({ onboarded: false, guest: false, signinFrom: { tab: 'wallet' } })}>Sign in to add one</button>} /></div></div>
   );
 
   const chip = missing ? { t: 'Not added yet', bg: 'rgba(233,226,216,.14)', fg: '#e9e2d8' }
@@ -89,7 +89,7 @@ function Unlocked() {
         </div>
 
         <div style={{ perspective: 1000 }}>
-          <div className="passport" key={who}
+          <div className={'passport' + (missing ? ' waiting' : '')} key={who}
             onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width; const y = (e.clientY - r.top) / r.height; setTilt({ ry: (x - 0.5) * 14, rx: -(y - 0.5) * 10, sh: 100 - x * 100, live: true }); }}
             onPointerLeave={() => setTilt({ rx: 0, ry: 0, sh: 100, live: false })}
             style={{ transform: `rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg)`, transition: tilt.live ? 'transform .08s linear' : 'transform .6s var(--ease)', animation: 'rise .45s var(--ease) both' }}>
@@ -101,8 +101,15 @@ function Unlocked() {
                 <span className="pill" style={{ background: chip.bg, color: chip.fg }}><span className="dot" style={{ width: 6, height: 6, background: chip.fg }} />{chip.t}</span>
               </div>
               {missing ? (
-                <div className="col" style={{ gap: 10 }}>
-                  <span className="display" style={{ fontSize: 26, color: '#f6f2ec' }}>{who === 'omar' ? 'Your passport isn’t here yet.' : `${p.name}’s passport isn’t here yet.`}</span>
+                <div className="col" style={{ gap: 12 }}>
+                  <div className="pp-wait">
+                    <span className="pp-wait-photo" aria-hidden="true"><Icon name="user" size={26} color="rgba(217,183,122,.55)" /></span>
+                    <span className="col" style={{ gap: 6 }}>
+                      <span className="display" style={{ fontSize: 26, lineHeight: 1.05, color: '#f6f2ec' }}>{who === 'omar' ? 'Your passport isn’t here yet.' : `${p.name}’s passport isn’t here yet.`}</span>
+                      <span className="tiny" style={{ color: '#c9c1b4' }}>One scan, on this phone. We check it against every trip.</span>
+                    </span>
+                  </div>
+                  <span className="pp-wait-mrz" aria-hidden="true">P&lt;SAU&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</span>
                   <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={() => setSheet('scan')}>Scan it now</button>
                 </div>
               ) : (
@@ -164,9 +171,8 @@ function Unlocked() {
           const asks = p.helper ? [['doc', 'Iqama', 'Not added'], ['doc', 'Exit and re-entry visa', 'Needed before each trip abroad']].filter(([, t]) => !docs.some((d) => d[1] === t)) : [];
           const rows = [...docs, ...asks];
           if (!rows.length) return (
-            <button type="button" className="card tap well wl-empty" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setSheet('add')}>
-              <Icon name="plus" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Nothing else yet</span><span className="tiny">Add a visa, a national ID or travel insurance. We’ll watch the dates.</span></span><Icon name="chevron" />
-            </button>
+            <EmptyState compact className="wl-empty" art={<ArtCardSlot kind="doc" />} onClick={() => setSheet('add')} label={who === 'omar' ? 'Add a document' : `Add a document for ${p.name}`}
+              title="No other documents yet" body={`A visa, a national ID or travel insurance${who === 'omar' ? '' : ` for ${p.name}`}. We’ll watch the dates.`} />
           );
           return rows.map(([ic, t, sub, id, seeded]) => (
             <button key={t + (id || '')} type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setDocOpen({ ic, t, sub, id, seeded })}>
@@ -182,6 +188,9 @@ function Unlocked() {
             <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{s.trip.flight.code} · {s.trip.travellers.length} boarding {s.trip.travellers.length === 1 ? 'pass' : 'passes'}</span><span className="tiny">{s.trip.flight.date} · {s.trip.flight.terminal} · {s.trip.travellers.length > 1 ? 'seats' : 'seat'} {seatText(s.trip.flight.seats)}</span></span>
             <Icon name="chevron" />
           </button>
+        ) : !s.trip ? (
+          <EmptyState compact art={<ArtPass />} title="No boarding passes yet" body="Tickets and vouchers land here the moment Faisal confirms a trip. They work offline."
+            action={<button type="button" className="link" onClick={() => push('ask', {})}>Plan a trip</button>} />
         ) : (
           <div className="card well"><span className="h3" style={{ fontSize: 15 }}>{s.trip ? 'Boarding passes' : 'Nothing booked yet'}</span><span className="tiny">{s.trip?.flight ? `For ${s.trip.flight.code} on ${s.trip.flight.date}${s.trip.flight.back ? ` and ${s.trip.flight.back} on ${s.trip.flight.backDate}` : ''}. They open at check-in, 24 hours before you fly.` : s.trip ? 'No flights on this trip.' : 'Tickets and vouchers land here as soon as they’re confirmed.'}</span></div>
         )}
@@ -198,14 +207,14 @@ function Unlocked() {
         </>)}
 
         <span className="eyebrow">Money</span>
-        <button type="button" className="credit-card" onClick={() => setMoney('credit')}>
+        <button type="button" className={'credit-card' + (s.credit?.balance ? '' : ' zero')} onClick={() => setMoney('credit')}>
           <span className="spread"><span className="eyebrow" style={{ color: '#d9b77a' }}>Mada credit</span><PayMark brand="credit" size={22} /></span>
           <span className="num" style={{ fontSize: 34, fontWeight: 600, letterSpacing: '-.03em' }}>SAR {(s.credit?.balance || 0).toLocaleString('en-US')}</span>
           <span className="tiny" style={{ color: '#c9c1b4' }}>{s.credit?.balance ? 'Used first at checkout. Never expires.' : 'Refunds can land here instantly instead of waiting for the bank.'}</span>
         </button>
         <button type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'center' }} onClick={() => setMoney('cards')}>
-          <span className="stack" style={{ display: 'flex' }}>{s.cards.slice(0, 3).map((c) => <span key={c.id} style={{ marginRight: -8 }}><PayMark brand={c.brand} size={24} /></span>)}</span>
-          <span className="grow col" style={{ gap: 0, marginLeft: 8 }}><span className="h3" style={{ fontSize: 15 }}>Cards and Apple Pay</span><span className="tiny">{s.cards.length} saved · default {(s.cards.find((c) => c.id === s.defaultCard) || {}).label || 'Apple Pay'}</span></span>
+          <span className="stack" style={{ display: 'flex' }}>{(s.cards.length ? s.cards.slice(0, 3) : [{ id: 'applepay', brand: 'applepay' }]).map((c) => <span key={c.id} style={{ marginRight: -8 }}><PayMark brand={c.brand} size={24} /></span>)}</span>
+          <span className="grow col" style={{ gap: 0, marginLeft: 8 }}><span className="h3" style={{ fontSize: 15 }}>Cards and Apple Pay</span><span className="tiny">{s.cards.length ? `${s.cards.length} saved · default ${(s.cards.find((c) => c.id === s.defaultCard) || {}).label || 'Apple Pay'}` : 'No cards yet · Apple Pay is ready on this phone'}</span></span>
           <Icon name="chevron" />
         </button>
       </div>
@@ -215,7 +224,7 @@ function Unlocked() {
         <Sheet label="Mada credit" onClose={() => setMoney(null)}>
           <h2 className="h2">Mada credit · SAR {(s.credit?.balance || 0).toLocaleString('en-US')}</h2>
           <p className="small">Money Mada holds for you. It comes from refunds you chose to take as credit, and it’s used first whenever you pay. It never expires, and you can move it to your card at any time.</p>
-          {(s.credit?.history || []).length === 0 ? <span className="small">No movements yet.</span> : s.credit.history.map((h) => (
+          {(s.credit?.history || []).length === 0 ? <EmptyState compact plain art={<ArtReceipt />} title="Nothing has moved yet." body="Refunds you take as credit show here, with the date. They come off your next booking first." /> : s.credit.history.map((h) => (
             <div key={h.id} className="spread" style={{ fontSize: 15 }}><span className="col" style={{ gap: 0 }}><span>{h.text}</span><span className="tiny">{new Date(h.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span></span><span className="num" style={{ color: h.amount > 0 ? '#2f7a4b' : '#1e352d', fontWeight: 600 }}>{h.amount > 0 ? '+' : '−'}SAR {Math.abs(h.amount).toLocaleString('en-US')}</span></div>
           ))}
           {(s.credit?.balance || 0) > 0 && s.cards.length > 0 && <button type="button" className="btn secondary block" onClick={() => { const amt = s.credit.balance; const c = s.cards.find((x) => x.id === s.defaultCard) || s.cards[0]; set((p) => ({ credit: { balance: 0, history: [{ id: 'cr' + Date.now(), text: `Moved to ${c.label}`, amount: -amt, at: Date.now() }, ...p.credit.history] } })); setMoney(null); toast(`SAR ${amt.toLocaleString('en-US')} is on its way to your ${c.label}. 5 to 10 working days.`); }}>Move it to my card</button>}

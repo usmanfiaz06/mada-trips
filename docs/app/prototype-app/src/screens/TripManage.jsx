@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, fmt, addDays, daysBetween, dayLabel as isoDayLabel, weekday, dayOf, shortDay, fullDay, rangeLabel, toDate, seatText, pickupPlan, stayOf, stayEnd, signName, boardsAt, addMin as addMinS } from '../store.jsx';
-import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTicker, PayMark, saveFile, calendarLink } from '../ui.jsx';
+import { Icon, TopBar, Sheet, SlideToConfirm, Tracker, AirlineMark, Steps, useTicker, PayMark, saveFile, calendarLink, EmptyState, ArtCalendar, ArtReceipt, ArtCardSlot, ArtSuitcase, ArtMap } from '../ui.jsx';
 
 /* Trip management: itinerary, payments and VAT invoices, refunds, flight changes, hotel options and special requests.
    State this area owns: tripRequests (requests to Faisal with a live status), tripChangeLog (flight changes sent to pay).
@@ -289,12 +289,21 @@ function Screen({ title, children, act, onBack }) {
     </div>
   );
 }
-function NoTrip() {
+/* Each trip screen, before there is a trip: what will live here, and the one way to get it. */
+const NO_TRIP = {
+  itinerary: { title: 'Itinerary', art: <ArtCalendar />, h: 'No days to plan yet.', body: 'Book a trip and every flight, pickup and night fills in here, day by day, with prayer times.', ideas: ['A weekend in AlUla', 'Three days in Istanbul'] },
+  invoices: { title: 'Payments', art: <ArtReceipt />, h: 'Nothing paid yet.', body: 'Every payment for a trip lands here with its VAT invoice, ready to download or send to work.' },
+  refund: { title: 'Refund', art: <ArtCardSlot />, h: 'Nothing to refund.', body: 'Once you’ve booked, you pick what to refund here and see exactly what comes back before anything happens.' },
+  specialRequests: { title: 'Special requests', art: <ArtSuitcase />, h: 'No requests yet.', body: 'Wheelchairs, baby cots, a quiet room, a birthday cake. Faisal asks the airline and hotel once you’ve booked.' },
+};
+function NoTrip({ kind }) {
   const { push } = useStore();
+  const k = NO_TRIP[kind] || { title: '', art: <ArtMap />, h: 'No trip booked.', body: 'Once Faisal confirms a trip, everything about it lives here: tickets, rooms, pickups and receipts.' };
   return (
-    <Screen title="">
-      <div className="card well"><span className="h3">No trip booked.</span><span className="small">Once Faisal confirms a trip, everything about it lives here.</span>
-        <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('ask', {})}>Plan a trip</button></div>
+    <Screen title={k.title}>
+      <EmptyState art={k.art} title={k.h} body={k.body}
+        action={<button type="button" className="btn primary block" onClick={() => push('ask', {})}>Plan a trip</button>}
+        ideas={(k.ideas || []).map((q) => [q, () => push('ask', { prefill: q })])} />
     </Screen>
   );
 }
@@ -465,7 +474,7 @@ function Itinerary() {
   const [sheet, setSheet] = useState(null);
   const [item, setItem] = useState(null);
   const [dayIdx, setDayIdx] = useState(0);
-  if (!s.trip) return <NoTrip />;
+  if (!s.trip) return <NoTrip kind="itinerary" />;
   const t = s.trip;
   const jump = (i) => {
     setDayIdx(i);
@@ -756,7 +765,7 @@ function CalendarSheet({ days, onClose }) {
 function Payments() {
   const { s, push } = useStore();
   const list = tripPayments(s);
-  if (!s.trip) return <NoTrip />;
+  if (!s.trip) return <NoTrip kind="invoices" />;
   const paid = list.reduce((a, p) => a + p.amount, 0);
   const refunded = list.reduce((a, p) => a + (p.refund ? p.refund.credited : 0), 0);
   const upcoming = list.flatMap((p) => (p.plan && !p.refund ? p.plan.filter((i) => !i.paid).map((i) => ({ ...i, what: p.title, method: p.method })) : []));
@@ -997,7 +1006,7 @@ function Refund({ params }) {
   const [dest, setDest] = useState('card');
   const [sent, setSent] = useState(null);
   useTicker(1000);
-  if (!s.trip) return <NoTrip />;
+  if (!s.trip) return <NoTrip kind="refund" />;
   const items = payments.map((p) => ({ p, q: refundQuote(s, p.id) })).filter((x) => x.q);
   const chosen = items.filter((x) => keys.includes(x.p.id));
   /* With instalments, what comes back is what was paid so far, less what the rule keeps; the payments left are cancelled. */
@@ -1057,9 +1066,9 @@ function Refund({ params }) {
   if (tm.allUsed && !items.some((x) => x.q.back > 0 || x.q.askAnyway)) {
     return (
       <Screen title="Refund">
-        <h1 className="h1">Your trip is done.</h1>
-        <p className="body">Every flight and night was used, so nothing is left to refund. If something went wrong on the trip, tell Faisal. He’ll take it up with the airline or hotel.</p>
-        <button type="button" className="btn primary block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'refund' })}>Talk to Faisal</button>
+        <EmptyState art={<ArtReceipt stamp />} title="Your trip is done."
+          body="Every flight and night was used, so nothing is left to refund. If something went wrong on the trip, tell Faisal. He’ll take it up with the airline or hotel."
+          action={<button type="button" className="btn primary block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'refund' })}>Talk to Faisal</button>} />
       </Screen>
     );
   }
@@ -1595,7 +1604,7 @@ function SpecialRequests() {
   const [open, setOpen] = useState(null);
   useTicker(1000);
   const t = s.trip;
-  if (!t) return <NoTrip />;
+  if (!t) return <NoTrip kind="specialRequests" />;
   const mine = (s.tripRequests || []).filter((r) => r.area === 'special');
   const priced = s.requests.filter((r) => r.area === 'special');
   return (

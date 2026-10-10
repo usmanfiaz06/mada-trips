@@ -136,7 +136,7 @@ try {
   await page.waitForTimeout(1200);
   await phone.getByText('Your passport isn’t here yet.').first().waitFor();
   await none(/National ID|Schengen|Omar/, 'wallet');
-  await phone.getByText('Nothing else yet').first().waitFor();
+  await phone.getByText('No other documents yet').first().waitFor();
   await shot('new-wallet');
   await tab('Trips');
   await none(/omar@/, 'trips');

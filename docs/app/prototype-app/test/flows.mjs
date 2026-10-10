@@ -240,6 +240,7 @@ try {
   step('circles: new circle, settings, people, friend');
   await click('New circle', { wait: 500 });
   await phone.locator('#nc-name').fill('Cousins in Baku');
+  await click('Next', { wait: 400 });
   await phone.locator('.person-row', { hasText: 'Abdullah' }).click();
   await phone.locator('.person-row', { hasText: 'Noor' }).click();
   await shot('new-circle');

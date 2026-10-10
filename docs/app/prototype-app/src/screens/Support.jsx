@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
-import { Icon, Sun, TopBar, QuietRadar } from '../ui.jsx';
+import { Icon, Sun, TopBar, QuietRadar, EmptyState, ArtChat } from '../ui.jsx';
 
 /* One conversation with Faisal and the 24/7 desk. Every message gets a real answer for what it is about,
    and urgent things get a phone call. "Did that sort it?" only follows something that was actually done.
@@ -18,6 +18,7 @@ const TOPICS = [
   ['airport', 'Help at the airport'],
   ['other', 'Something else'],
 ];
+const TOPIC_ICON = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more' };
 
 /* What a message is about. Order matters: someone hurt beats a lost bag. */
 export function supportIntent(text) {
@@ -160,10 +161,11 @@ export function Support({ params = {} }) {
       <div className="scroll no-dock support-scroll">
         <p className="tiny" style={{ textAlign: 'center', margin: '0 12px' }}>Instant answers from Mada. Faisal and the team confirm anything you book.</p>
         {thread.length === 0 && (
-          <div className="col" style={{ gap: 10 }}>
+          <div className="col" style={{ gap: 12 }}>
+            <div className="es-chat-hero rise" aria-hidden="true"><div className="es-stage"><ArtChat /></div></div>
             <div className="support-msg them rise"><span>{s.user?.name ? `Hi ${s.user.name}.` : 'Hi.'} I have your {tripName || 'account'} open. What can I do?</span></div>
-            <div className="chips" style={{ paddingLeft: 4 }}>
-              {TOPICS.map(([k, label]) => <button key={k} type="button" className="chip" onClick={() => send(label, k)}>{label}</button>)}
+            <div className="sp-topics rise d1" role="group" aria-label="Topics">
+              {TOPICS.map(([k, label]) => <button key={k} type="button" onClick={() => send(label, k)}><Icon name={TOPIC_ICON[k] || 'chevron'} size={18} />{label}</button>)}
             </div>
           </div>
         )}
@@ -259,7 +261,7 @@ function BagForm({ onSend, onNone }) {
 const KIND_ICON = { trip: 'flight', reply: 'doc', money: 'refund', booking: 'check', circle: 'circles' };
 
 export function Inbox() {
-  const { s, set, pop, openBanner } = useStore();
+  const { s, set, pop, push, openBanner } = useStore();
   const [filter, setFilter] = useState('all');
   const items = (s.inbox || []).filter((n) => filter === 'all' || (filter === 'trips' ? ['trip', 'booking', 'reply'].includes(n.kind) : n.kind === filter));
   const unread = (s.inbox || []).filter((n) => !n.read).length;
@@ -276,11 +278,12 @@ export function Inbox() {
           ))}
         </div>
         {items.length === 0 && (
-          <div className="empty-hero rise" style={{ alignItems: 'center', textAlign: 'center' }}>
-            <QuietRadar />
-            <h2 className="display">All quiet.</h2>
-            <span className="small">{s.trip || (s.trackedFlights || []).length ? 'We’re watching your flights. The moment a gate, a time or a reply changes, it lands here.' : 'Gate changes, replies from Faisal, refunds and circle news land here, so nothing gets lost.'}</span>
-          </div>
+          <EmptyState center art={<QuietRadar />} title="All quiet."
+            body={filter === 'money' ? 'Payments, refunds and Mada credit land here the moment they move.'
+              : filter === 'circle' ? 'Votes, splits and new people in your circles land here.'
+                : s.trip || (s.trackedFlights || []).length ? 'We’re watching your flights. The moment a gate, a time or a reply changes, it lands here.'
+                  : 'Gate changes, replies from Faisal, refunds and circle news land here, so nothing gets lost.'}
+            action={!s.trip && filter !== 'circle' && filter !== 'money' ? <button type="button" className="btn secondary small" onClick={() => { pop(); push('ask', {}); }}>Plan a trip</button> : null} />
         )}
         {items.map((n) => (
           <button key={n.id} type="button" className={'inbox-row' + (n.read ? '' : ' unread')} onClick={() => { set((p) => ({ inbox: p.inbox.map((x) => (x.id === n.id ? { ...x, read: true } : x)) })); if (n.to) openBanner({ id: n.at, to: n.to }); }}>

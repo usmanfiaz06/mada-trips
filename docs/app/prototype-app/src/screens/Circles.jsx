@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, fmt } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, Toggle } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, Toggle, EmptyState, ArtCircles, ArtFriends, ArtLantern, ArtBookmark, ArtCompass, ArtMap, ArtChat } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useSave, EmptyArt, useCircleClock, setOpenCircle, getThread, fold, opAdd, opMsg, opThread, opGroup, opQueue, sys, names, newId, familyOf, familyLabel, markPaid } from './Social.jsx';
 
@@ -51,11 +51,8 @@ function CitySheet({ current, onPick, onClose }) {
       <input className="input" placeholder="Search a city" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search a city" />
       {hits ? (
         hits.length ? <div className="col" style={{ gap: 8 }}>{hits.map((c) => Row([c, CITY_INFO[c].country]))}</div> : (
-          <div className="card well" style={{ gap: 8 }}>
-            <span className="h3" style={{ fontSize: 15 }}>We don’t cover {q.trim()} yet.</span>
-            <span className="small">Faisal can still plan it with you, and we’ll tell you when Discover reaches it.</span>
-            <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => { toast(`We’ll tell you when ${q.trim()} is on Discover.`); onClose(); }}>Tell me when it’s here</button>
-          </div>
+          <EmptyState compact className="well" art={<ArtCompass />} title={`We don’t cover ${q.trim()} yet.`} body="Faisal can still plan it with you, and we’ll tell you when Discover reaches it."
+            action={<button type="button" className="btn secondary small" onClick={() => { toast(`We’ll tell you when ${q.trim()} is on Discover.`); onClose(); }}>Tell me when it’s here</button>} />
         )
       ) : groups.map(([title, rows]) => (
         <div key={title} className="col" style={{ gap: 8 }}>
@@ -252,7 +249,7 @@ export default function Circles() {
                 <button type="button" className="icon-btn dark" aria-label="New circle" onClick={() => push('newCircle')}><Icon name="plus" color="#f6f2ec" /></button>
               </span>}
         </div>
-        {view === 'discover' ? <Discover posts={posts} setPosts={setPosts} /> : (<>
+        {view === 'discover' ? <Discover posts={posts} setPosts={setPosts} onPost={() => setSheet('post')} /> : (<>
 
         {friends.length > 0 && (
         <div className="card focal rise" style={{ padding: 18, gap: 14 }}>
@@ -284,15 +281,10 @@ export default function Circles() {
 
         <div className="spread"><h2 className="h2">Your circles</h2>{circles.length > 0 && <span className="tiny">{circles.length}</span>}</div>
         {circles.length === 0 ? (
-          <div className="cx-empty cx-empty-hero rise">
-            <EmptyArt kind="circles" />
-            <span className="display" style={{ fontSize: 30 }}>Your people, in one place.</span>
-            <span className="small">Make a circle for the people you travel with. Plan together, vote on dates and split the costs.</span>
-            <div className="chips" style={{ justifyContent: 'center' }}>
-              {['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t) => <button key={t} type="button" className="chip" onClick={() => push('newCircle', { name: t })}>{t}</button>)}
-            </div>
-            <button type="button" className="btn primary small" onClick={() => push('newCircle')}>Make your first circle</button>
-          </div>
+          <EmptyState art={<ArtCircles />} title="Your people, in one place."
+            body="Make a circle for the people you travel with. Plan together, vote on dates and split the costs."
+            action={<button type="button" className="btn primary block" onClick={() => push('newCircle')}>Make your first circle</button>}
+            ideas={['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t) => [t, () => push('newCircle', { name: t })])} />
         ) : (
         <div className="chips scrollx" style={{ gap: 10 }}>
           {circles.map((g) => {
@@ -320,17 +312,11 @@ export default function Circles() {
 
         <div className="spread"><h2 className="h2">Friends</h2>{friends.length > 0 && <button type="button" className="link" onClick={() => push('people')}>{(s.friendRequests || []).length ? `${s.friendRequests.length} request · See all` : 'See all'}</button>}</div>
         {friends.length === 0 ? (
-          <div className="cx-empty row-empty">
-            <EmptyArt kind="friends" />
-            <span className="col" style={{ gap: 4, alignItems: 'flex-start', textAlign: 'left' }}>
-              <span className="h3">Bring your people.</span>
-              <span className="small">Add the friends you travel with. Only they see your trips and tips.</span>
-              <span className="row" style={{ gap: 8, marginTop: 6 }}>
-                <button type="button" className="btn primary small" onClick={() => push('people', { add: true })}>Add friends</button>
-                {(s.friendRequests || []).length > 0 && <button type="button" className="btn secondary small" onClick={() => push('people', { tab: 'requests' })}>{s.friendRequests.length} request</button>}
-              </span>
-            </span>
-          </div>
+          <EmptyState compact art={<ArtFriends />} title="Bring your people." body="Add the friends you travel with. Only they see your trips and tips."
+            action={<>
+              <button type="button" className="btn primary small" onClick={() => push('people', { add: true })}>Add friends</button>
+              {(s.friendRequests || []).length > 0 && <button type="button" className="btn secondary small" onClick={() => push('people', { tab: 'requests' })}>{s.friendRequests.length} request</button>}
+            </>} />
         ) : (
         <div className="chips scrollx" style={{ gap: 14 }}>
           {friends.map((id) => (
@@ -348,7 +334,7 @@ export default function Circles() {
 
         {(friends.length > 0 || known.length > 0) && (<>
           <div className="spread"><h2 className="h2">From people you know</h2><span className="tiny">Newest first</span></div>
-          {known.length === 0 && <div className="card well"><span className="h3">Nothing from friends yet.</span><span className="small">When friends post tips, they show here first.</span></div>}
+          {known.length === 0 && <EmptyState compact art={<ArtLantern />} title="Nothing from friends yet." body="When a friend posts a tip, it shows here first, before anyone else’s." action={<button type="button" className="link" onClick={() => { setView('discover'); buzz(HAPTIC.select); }}>See what’s on in Discover</button>} />}
           {known.map((p) => (
             <button key={p.id} type="button" className="card tap" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }} onClick={() => setOpenPost(p.id)}>
               {p.img ? <img src={p.img} alt="" style={{ width: 64, height: 64, borderRadius: 14, objectFit: 'cover', flexShrink: 0 }} /> : <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: 64, height: 64, borderRadius: 14, fontSize: 24 }}>{p.initial}</span>}
@@ -363,14 +349,8 @@ export default function Circles() {
 
         <div className="spread"><h2 className="h2">Saved</h2>{savedCount > 0 && <button type="button" className="link" onClick={() => push('saved')}>See all</button>}</div>
         {savedCount === 0 ? (
-          <div className="cx-empty row-empty">
-            <EmptyArt kind="saved" />
-            <span className="col" style={{ gap: 4, alignItems: 'flex-start', textAlign: 'left' }}>
-              <span className="h3">Nothing saved yet.</span>
-              <span className="small">Tap the bookmark on any tip or plan in Discover. It lands here, sorted by city.</span>
-              <button type="button" className="link" style={{ padding: '6px 0' }} onClick={() => { setView('discover'); buzz(HAPTIC.select); }}>Look around Discover</button>
-            </span>
-          </div>
+          <EmptyState compact art={<ArtBookmark />} title="Nothing saved yet." body="Tap the bookmark on any tip or plan in Discover. It lands here, sorted by city."
+            action={<button type="button" className="link" onClick={() => { setView('discover'); buzz(HAPTIC.select); }}>Look around Discover</button>} />
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
             {[...new Set((s.savedPosts || []).map((p) => p.city))].map((cty) => {
@@ -399,7 +379,7 @@ export default function Circles() {
             <div className="cx-stamp-row">
               {s.trip ? (
                 <span className="cx-stamp soon" style={{ transform: 'rotate(-7deg)' }}><span><b>{s.trip.city || 'Istanbul'}</b><i>SOON</i></span></span>
-              ) : <span className="cx-stamp ghost" style={{ transform: 'rotate(-7deg)' }} />}
+              ) : <span className="cx-stamp ghost first" style={{ transform: 'rotate(-7deg)' }} />}
               <span className="cx-stamp ghost" style={{ transform: 'rotate(5deg)' }} />
               <span className="cx-stamp ghost" style={{ transform: 'rotate(-3deg)' }} />
             </div>
@@ -522,12 +502,9 @@ export function Group({ params = {} }) {
           <h1 className="h1">This circle is gone.</h1>
           <p className="body">You left it, or the admin deleted it. Bookings you made are still in Trips.</p>
         </>) : (
-          <div className="cx-empty cx-empty-hero">
-            <EmptyArt kind="circles" />
-            <span className="display" style={{ fontSize: 30 }}>No trip circle yet.</span>
-            <span className="small">Make one for the people going with you. Plan, vote and split costs together.</span>
-            <button type="button" className="btn primary small" onClick={() => replace('newCircle', { name: 'Eid trip' })}>Make a circle</button>
-          </div>
+          <EmptyState art={<ArtCircles />} title="No trip circle yet."
+            body="Make one for the people going with you. Plan, vote and split costs together."
+            action={<button type="button" className="btn primary block" onClick={() => replace('newCircle', { name: 'Eid trip' })}>Make a circle</button>} />
         )}
       </div>
     </div>
@@ -668,6 +645,18 @@ export function Group({ params = {} }) {
         </button>
       )}
       <div className="scroll no-dock cx-thread" ref={scroller}>
+        {!thread.trip && !thread.msgs.some((m) => ['text', 'vote', 'split', 'card', 'faisal'].includes(m.t)) && (
+          <div className="es-chat-hero rise">
+            <div className="es-stage" aria-hidden="true"><ArtChat /></div>
+            <h2 className="display">{group.dm ? `Say salam to ${group.name}.` : `${group.name} starts here.`}</h2>
+            <p className="small">{group.dm ? 'Just you two. A hello, a place you saved, a plan for the weekend.' : 'Every vote, plan and split you make together lives here, in order.'}</p>
+            {group.dm && (
+              <div className="es-ideas" role="group" aria-label="Ideas">
+                {['Salam', 'Free this weekend?', 'Where to next?'].map((t) => <button key={t} type="button" className="chip" onClick={() => { setDraft(t); buzz(HAPTIC.tap); setTimeout(() => input.current && input.current.focus(), 30); }}>{t}</button>)}
+              </div>
+            )}
+          </div>
+        )}
         {thread.trip && <TripCard trip={thread.trip} group={group} />}
         {thread.msgs.map((m, i) => {
           const prev = thread.msgs[i - 1];
@@ -1079,7 +1068,7 @@ function ShareSheet({ onClose, onPick }) {
   );
 }
 
-function Discover({ posts, setPosts }) {
+function Discover({ posts, setPosts, onPost }) {
   const { s, push, toast } = useStore();
   const cities = s.trip ? ['Istanbul', 'Riyadh'] : ['Riyadh', 'Istanbul'];
   const [city, setCity] = useState(cities[0]);
@@ -1137,7 +1126,12 @@ function Discover({ posts, setPosts }) {
           ))}
         </div>
       </div>
-      {feed.length === 0 && <div className="card well"><span className="h3">No tips here yet.</span><span className="small">Be the first. Tap + to post one.</span></div>}
+      {feed.length === 0 && (
+        <EmptyState art={<ArtMap />} title={filter === 'Food' ? `No food tips in ${city} yet.` : filter === 'Things to do' ? `No tips on things to do in ${city} yet.` : `No tips from ${city} yet.`}
+          body="People who went share the places they loved. Been there? Yours would be the first."
+          action={<button type="button" className="btn primary block" onClick={onPost}>Post a tip</button>}
+          ideas={filter !== 'All' ? [['All tips', () => setFilter('All')]] : null} />
+      )}
       {feed.map((p, i) => {
         const on = isSaved(p.id);
         return (

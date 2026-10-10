@@ -661,14 +661,10 @@ function FlightFlow({ query, setCta }) {
   if (mode === 'byhand') return <RequestFlow kind="flight" query={`Saudia flights to Istanbul · ${dateLabel}`} note="Faisal will search Saudia by hand and send you the options here within 20 minutes." autoSend />;
 
   if (s.demo.noResults && mode === 'normal') return (
-    <div className="col rise" style={{ gap: 12 }}>
-      <span className="h2">Nothing direct on those dates.</span>
-      <p className="body">Seats to {dest.name} are gone on {dayLabel(trip.dep)}. There's room a day either side, or with one short stop.</p>
-      <div className="chips">
-        <button type="button" className="chip" onClick={() => { setMode('flex'); setRunKey((k) => k + 1); }}>Try a day either side</button>
-        <button type="button" className="chip" onClick={() => { setMode('flex'); setRunKey((k) => k + 1); }}>Allow one stop</button>
-      </div>
-    </div>
+    <EmptyState art={<ArtCalendar day={String(fromIso(trip.dep).getDate())} />} title="Nothing direct on those dates."
+      body={`Seats to ${dest.name} are gone on ${dayLabel(trip.dep)}. There’s room a day either side, or with one short stop.`}
+      action={<button type="button" className="btn primary block" onClick={() => { setMode('flex'); setRunKey((k) => k + 1); }}>Try a day either side</button>}
+      ideas={[['Allow one stop', () => { setMode('flex'); setRunKey((k) => k + 1); }]]} />
   );
 
   const durMin = (f) => { const m = f.dur.match(/(\d+)h (\d+)m/); return m ? Number(m[1]) * 60 + Number(m[2]) : 0; };
@@ -798,7 +794,7 @@ function FaisalSearch({ what, dest, trip, who }) {
   useEffect(() => {
     const names = who.map((id) => PEOPLE[id].name).join(', ');
     const dates = trip.dep ? (trip.type === 'oneway' ? `${rangeLabel(trip.dep)}, one way` : rangeLabel(trip.dep, trip.ret)) : 'Dates to agree';
-    const pp = Math.round(dest.byHand.pp * (trip.cabin === 'Business' ? 3.2 : trip.cabin === 'Premium' ? 1.7 : 1) * (trip.type === 'oneway' ? 0.55 : 1));
+    const pp = Math.round((dest.byHand?.pp || 0) * (trip.cabin === 'Business' ? 3.2 : trip.cabin === 'Premium' ? 1.7 : 1) * (trip.type === 'oneway' ? 0.55 : 1));
     const r = newRequest(s, what === 'stay'
       ? { kind: 'stay', short: `rooms in ${dest.name}`, title: `A place to stay in ${dest.name}`, detail: `${dates} · ${names}`, quote: 0 }
       : { kind: 'flight', short: `flights to ${dest.name}`, title: `Flights to ${dest.name} · ${dates}`, detail: `From ${AIRPORT[trip.from] || trip.from} · ${names} · ${trip.cabin}`, quote: pp * who.length,
@@ -810,6 +806,7 @@ function FaisalSearch({ what, dest, trip, who }) {
   if (!sent) return null;
   return (
     <div className="col rise" style={{ gap: 14 }}>
+      <div className="es-stage" aria-hidden="true"><ArtMap /></div>
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <span className="avatar green">F</span>
         <div className="col" style={{ gap: 2 }}>
@@ -923,11 +920,18 @@ function StayFlow({ query, setCta }) {
   const [who, setWho] = useTravellers(d.ids);
   const run = useSequence(2, 700, 'go');
   const [pick, setPick] = useState('galata');
+  const [byHand, setByHand] = useState(false);
   const otherCity = d.city && d.city !== 'istanbul' ? (d.city === 'other' ? { name: d.cityName, byHand: {} } : DEST[d.city]) : null;
   if (otherCity) return <FaisalSearch what="stay" dest={otherCity} trip={{ type: 'return', dep: d.dep, ret: d.ret, cabin: 'Economy', from: 'RUH' }} who={who} />;
   const n = who.length;
   const rooms = n > 2 ? '2 connecting rooms' : n === 2 ? '1 room for 2' : '1 room';
   if (run < 2) return <Working lines={['Checking 120 places near your plans', n > 2 ? 'Keeping rooms side by side' : 'Picking the quiet rooms']} step={run} />;
+  if (byHand) return <FaisalSearch what="stay" dest={{ name: 'Istanbul', byHand: {} }} trip={{ type: 'return', dep: '2027-03-09', ret: '2027-03-15', cabin: 'Economy', from: 'RUH' }} who={who} />;
+  if (s.demo.noResults) return (
+    <EmptyState art={<ArtSuitcase />} title="No rooms free on those dates."
+      body={`Everything near Galata is taken for ${rooms}. Faisal knows places that never show online, and can look by hand.`}
+      action={<button type="button" className="btn primary block" onClick={() => { setByHand(true); buzz(HAPTIC.tap); }}>Ask Faisal to find rooms</button>} />
+  );
   const lastEid = n > 2 && (s.pastTrips || []).some((t) => /eid/i.test(t.note || ''));
   const cur = HOTELS.find((h) => h.id === pick);
   const factor = n > 2 ? 1 : 0.55;

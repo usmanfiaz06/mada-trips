@@ -2,7 +2,7 @@
    household, security and devices, privacy and data, help and legal. Registered in main.jsx's STACK by name. */
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
-import { Icon, TopBar, Sheet, Toggle, AddPersonSheet, Sun } from '../ui.jsx';
+import { Icon, TopBar, Sheet, Toggle, AddPersonSheet, Sun, EmptyState, ArtEnvelope, ArtSuitcase, ArtFriends, ArtPhone } from '../ui.jsx';
 import * as Support from './Support.jsx';
 
 export const DEMO_CODE = '123456';
@@ -327,7 +327,7 @@ function Account() {
       <TopBar onBack={pop} title="Your details" />
       <div className="scroll no-dock">
         <button type="button" className="acc-hero" onClick={() => setSheet('photo')} aria-label="Change photo">
-          <span className="acc-avatar-wrap"><UserAvatar size={84} /><span className="acc-cam"><Icon name="plus" size={16} color="#1e352d" width={2.4} /></span></span>
+          <span className={'acc-avatar-wrap' + (a.photo ? '' : ' empty')}><UserAvatar size={84} /><span className="acc-cam"><Icon name="plus" size={16} color="#1e352d" width={2.4} /></span></span>
           <span className="small" style={{ fontWeight: 600, color: '#1e352d' }}>{a.photo ? 'Change photo' : 'Add a photo'}</span>
         </button>
 
@@ -341,6 +341,7 @@ function Account() {
         <Group label="Contact">
           <Row label="Email" value={<span className="acc-break">{a.email ? a.email.address : 'Not added'}</span>} onClick={() => setSheet('email')}
             src={a.email ? (a.email.relay ? <Source kind="apple" /> : <Source kind="verified" at={a.email.at} />) : <span className="acc-src warn">Add one to get tickets and receipts</span>} />
+          {!a.email && <EmptyState compact plain art={<ArtEnvelope />} title="No email yet" body="Tickets, receipts and VAT invoices go to your inbox too, so they’re never only on this phone." action={<button type="button" className="link" onClick={() => setSheet('email')}>Add an email</button>} />}
           <Row label="Mobile" value={<span className="num">{prettyPhone(a.phone.digits)}</span>} onClick={() => setSheet('phone')} src={a.phone.digits ? <Source kind={a.phone.source === 'signup' ? 'signup' : a.phone.at ? 'verified' : 'signup'} at={a.phone.source === 'signup' ? null : a.phone.at} /> : <span className="acc-src warn">Add one for gate changes and Faisal’s messages</span>} />
         </Group>
 
@@ -692,6 +693,7 @@ function Prefs() {
             const prog = PROGRAMS.find((x) => x.id === l.program);
             return <Row key={l.id} lead={<span className="acc-ic"><Icon name={prog?.kind === 'Hotel' ? 'stay' : 'flight'} size={18} /></span>} value={prog?.name || l.program} sub={<span className="num">{l.number}</span>} onClick={() => setSheet({ edit: l })} ariaLabel={`Edit ${prog?.name}`} />;
           })}
+          {!p.loyalty.length && <EmptyState compact plain art={<ArtSuitcase />} title="No loyalty numbers yet" body="Add Alfursan, or a hotel programme, and every booking we make earns you points." />}
           <Row lead={<span className="acc-ic"><Icon name="plus" size={18} /></span>} value="Add a loyalty number" onClick={() => setSheet({ edit: null })} />
         </Group>
 
@@ -789,6 +791,7 @@ function Household() {
               onClick={() => push('householdPerson', { id })} right={<span className="row" style={{ gap: 6 }}><StatusPill st={st} /><Icon name="chevron" size={18} color="#8a9590" /></span>} />;
           })}
         </Group>
+        {ids.length <= 1 && <EmptyState plain center className="es-under" art={<ArtFriends />} title="Just you so far." body="Add the people you book for. Their names and passports fill in every trip, so nobody types them twice." />}
         <span className="tiny" style={{ padding: '0 4px' }}>Passports are scanned in the Wallet and stay encrypted on this phone.</span>
       </div>
       <div className="act"><button type="button" className="btn primary block" onClick={() => setAdding(true)}><Icon name="plus" color="#f6f2ec" />Add someone</button></div>
@@ -946,7 +949,7 @@ function Security() {
             <Row key={x.id} icon={x.id === 'web' ? 'globe' : 'user'} value={x.name} sub={x.sub}
               right={x.current ? <span className="pill ok">This phone</span> : <button type="button" className="btn secondary small acc-mini" onClick={() => setSheet({ device: x })}>Sign out</button>} />
           ))}
-          {!others.length && <div className="acc-row"><span className="small">No other devices. Only this phone is signed in.</span></div>}
+          {!others.length && <EmptyState compact plain className="acc-es" art={<ArtPhone />} title="Only this phone is signed in." body="If you sign in on an iPad or the web, it shows here, and you can sign it out from this phone." />}
         </Group>
         <span className="tiny" style={{ padding: '0 4px' }}>Don’t recognise a device? Sign it out, then tell Mada.</span>
 
