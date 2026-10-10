@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StaleBadge } from '@/components/states/StaleBadge';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { dayLabel, formatSar, liveStay, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
@@ -109,6 +110,7 @@ export default function TripDetail() {
               <Grow gap={0}><H3 size={15}>{home && arrive ? t('tm.detail.pickBoth') : home ? t('tm.detail.pickThere') : t('tm.detail.pickArrival')}</H3><Tiny>{[home ? t('tm.detail.inCity', { driver: home.driverName ?? '', city: home.city ?? '' }) : null, arrive ? t('tm.detail.inCity', { driver: arrive.driverName ?? '', city: arrive.city ?? trip.city }) : null].filter(Boolean).join(' · ')}{!stLive && !trip.noStay ? ` · ${t('tm.detail.needsAddr')}` : ''}</Tiny></Grow>
             </Box>
           ) : null}
+          {q.isError ? <StaleBadge testID="trip-fresh" updatedAt={q.dataUpdatedAt || null} stale /> : null}
           <Eyebrow style={{ marginTop: 8 }}>{t('tm.detail.manage')}</Eyebrow>
           <Box padding={6} gap={0}>
             {manage.map(([href, icon, title, sub], i) => <ListRow key={href} testID={`manage-${i}`} first={i === 0} icon={icon} tone={i === 0 ? 'gold' : undefined} title={title} sub={sub} onPress={() => router.push(href as Href)} />)}

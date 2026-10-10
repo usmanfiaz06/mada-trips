@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StaleBadge } from '@/components/states/StaleBadge';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -34,7 +35,8 @@ export default function Trips() {
   const router = useRouter();
   const top = useTopInset();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const { data } = useTrips();
+  const list = useTrips();
+  const { data } = list;
   const queued = useTripOutbox();
   const [tab, setTab] = useState<Tab>(params.tab === 'requests' || params.tab === 'past' ? params.tab : 'upcoming');
   const [seenParam, setSeenParam] = useState(params.tab);
@@ -56,6 +58,7 @@ export default function Trips() {
             </Pressable>
           ))}
         </View>
+        {list.isError && data ? <StaleBadge testID="trips-fresh" updatedAt={list.dataUpdatedAt || null} stale /> : null}
         {tab === 'upcoming' && <Upcoming trips={data?.upcoming ?? []} tracked={data?.tracked ?? []} ask={ask} />}
         {tab === 'requests' && <Requests requests={data?.requests ?? []} refunds={data?.refunds ?? []} ask={ask} />}
         {tab === 'past' && <Past trips={data?.past ?? []} ask={ask} />}

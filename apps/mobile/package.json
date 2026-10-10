@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "export:web": "node scripts/copy-ocr.mjs && expo export --platform web --output-dir dist --clear",
-    "e2e:web": "node test/e2e-web.mjs"
+    "e2e:web": "node test/e2e-web.mjs",
+    "test": "vitest run",
+    "e2e:resilience": "node test/e2e-resilience.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/instrument-serif": "0.4.1",
@@ -61,6 +63,7 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "playwright-core": "1.56.1",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "4.1.11"
   }
 }

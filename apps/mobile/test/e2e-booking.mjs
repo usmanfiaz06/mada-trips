@@ -97,6 +97,12 @@ async function signIn(page) {
 
 async function openAsk(page) {
   const { byTest, see } = kit(page);
+  // Already in Ask (or a screen over it): close back to the tabs first.
+  for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-ask"]').filter({ visible: true }).count()); i++) {
+    const close = page.getByRole('button', { name: /^(Close|Back)$/ }).filter({ visible: true }).last();
+    if (!(await close.count())) break;
+    await close.click(); await page.waitForTimeout(600);
+  }
   await byTest('dock-ask').click();
   await see('Where to?', 'ask start');
 }
@@ -399,8 +405,6 @@ async function requests() {
   await page.locator('[data-testid="request-pay"]').filter({ visible: true }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => errors.push('quote paid: Pay button still there'));
   await k.shot('quote-paid', 200);
   step('requests: a visa for the helper (add someone)');
-  await k.tap('Close');
-  await page.waitForTimeout(600);
   await openAsk(page);
   await k.ask('A Schengen visa');
   await k.see('For who?', 'visa who');

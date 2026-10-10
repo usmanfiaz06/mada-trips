@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { buildIcs, calendarLink, dayLabel, dayOfMonth, liveStay, weekdayOf, type CalendarEvent, type ItineraryDay, type ItineraryItem, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
+import { StaleBadge } from '@/components/states/StaleBadge';
 import { Icon, type IconName } from '@/components/Icon';
 import { Screen, TopBar } from '@/components/Layout';
 import { Sheet } from '@/components/Sheet';
@@ -14,7 +15,7 @@ import { Box, Cells, Display, Eyebrow, Grow, H3, ListRow, Rise, Row, SmallButton
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { lastUpdated, tk, useDemo, useItinerary, useTrip } from '@/lib/trips';
+import { useItinerary, useTrip } from '@/lib/trips';
 import { colors, radii } from '@/theme';
 
 type Picked = ItineraryItem & { day: string };
@@ -24,7 +25,6 @@ const dl = (d: string) => dayLabel(d, { today: d });
 export default function Itinerary() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const phase = useDemo((s) => s.phase);
   const q = useItinerary(id);
   const trip = useTrip(id).data?.trip;
   const scroll = useRef<ScrollView>(null);
@@ -44,8 +44,6 @@ export default function Itinerary() {
     );
   }
   const days = data.days;
-  const updated = lastUpdated(tk.itinerary(id, phase));
-  const stale = q.isError && updated;
   const jump = (i: number) => {
     setDayIdx(i);
     buzz('select');
@@ -75,7 +73,7 @@ export default function Itinerary() {
           <Eyebrow>{t('itin.eyebrow', { dates: data.datesLong, n: days.length })}</Eyebrow>
           <Display size={40}>{data.title}</Display>
           {data.move ? <MoveNotice trip={trip} /> : null}
-          <Row gap={6}><Icon name="wifiOff" size={14} color={colors.ink3} /><Tiny>{stale ? t('itin.lastUpdated', { time: new Date(updated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }) : t('itin.saved')}</Tiny></Row>
+          <Row gap={8} style={{ flexWrap: 'wrap' }}><Row gap={6}><Icon name="wifiOff" size={14} color={colors.ink3} /><Tiny>{t('itin.saved')}</Tiny></Row><StaleBadge testID="itin-fresh" updatedAt={q.dataUpdatedAt || null} stale={q.isError} /></Row>
         </Rise>
         <Row gap={8}>
           <SmallButton testID="itin-cal" icon="bell" label={t('itin.addCal')} onPress={() => setSheet('cal')} />
