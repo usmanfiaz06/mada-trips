@@ -116,3 +116,29 @@ export interface FlightPositionsSupplier {
   byCallsign(callsign: string): Promise<import("@mada/shared").FlightPosition | null>;
   byHex(hex: string): Promise<import("@mada/shared").FlightPosition | null>;
 }
+
+/** What Supabase Auth has proven about the person behind an access token (docs/app/AUTH.md). */
+export type SupabaseIdentity = {
+  /** The Supabase user id (auth.users.id). */
+  sub: string;
+  /** E.164 with the plus, only when Supabase confirmed it with a code. */
+  phone: string | null;
+  phoneVerified: boolean;
+  email: string | null;
+  emailVerified: boolean;
+  /** Apple's private relay address. */
+  isPrivateEmail: boolean;
+  /** Ways in Supabase knows: phone | email | apple | google. */
+  providers: ("phone" | "email" | "apple" | "google")[];
+  /** A name the provider shared, if any. */
+  name: string | null;
+};
+
+/**
+ * Verifies a Supabase Auth access token. Live: the project's JWKS (jose). Mock: the app's unsigned `mocksb.` tokens.
+ * Throws AppError TOKEN_EXPIRED for an expired token and UNAUTHORIZED for anything else it can't trust.
+ */
+export interface SupabaseAuthSupplier {
+  readonly name: string;
+  verify(accessToken: string): Promise<SupabaseIdentity>;
+}

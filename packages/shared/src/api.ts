@@ -9,6 +9,10 @@ export const ROUTES = {
   logout: '/auth/logout',
   apple: '/auth/apple',
   google: '/auth/google',
+  /** Supabase access token in, Core API session out (docs/app/AUTH.md). */
+  session: '/auth/session',
+  /** Signed in: pick up a phone, email or provider just added in Supabase. */
+  sessionSync: '/auth/session/sync',
   me: '/me',
   people: '/people',
   /** GET, with the flight number in place of :flightNo (e.g. /flights/SV263/position). */

@@ -5,7 +5,7 @@ import {
   type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appPayments, appRequests } from "@/db/app-schema";
+import { appPayments, appRequests, appUsers } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
@@ -62,6 +62,9 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   const body = CreateOrderBody.parse(input);
   const prior = await db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.idempotencyKey, body.idempotencyKey)));
   if (prior[0]) return outcomeOf(prior[0]);
+  // Saudi travel needs a reachable number: accounts that began with Apple, Google or email verify one first (AUTH.md).
+  const [owner] = await db.select({ phone: appUsers.phone }).from(appUsers).where(eq(appUsers.id, ownerId));
+  if (!owner?.phone) throw new AppError("PHONE_REQUIRED");
 
   // The fare moved at the airline while the traveller looked (demo: once, SAR 140).
   const bump = demo.has("priceUp") && body.draft.kind === "trip" ? 14_000 : 0;

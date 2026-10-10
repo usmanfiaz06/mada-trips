@@ -8,11 +8,25 @@
  * Display follows COPY.md §4: "Thu 14 Mar", "14–20 Mar", "3h 40m", relative within 2 hours then a clock time.
  */
 
+import { localeOr, localizeDigits, getDisplayPrefs, type Lang } from './locale';
+
 export const TZ = 'Asia/Riyadh';
 
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 export const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** Gregorian month names as Saudi readers know them (يناير…), and the weekdays. Arabic has no short weekday form. */
+export const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] as const;
+export const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] as const;
+
+/** A month's short name (0-based), in the display locale. */
+export const monthName = (month0: number, locale?: Lang): string =>
+  (localeOr(locale) === 'ar' ? MONTHS_AR : MONTHS)[((month0 % 12) + 12) % 12]!;
+/** A weekday's name (0 = Sunday), short in English, in the display locale. */
+export const weekdayName = (dow: number, opts: { locale?: Lang; long?: boolean } = {}): string =>
+  (localeOr(opts.locale) === 'ar' ? WEEKDAYS_AR : opts.long ? WEEKDAYS_LONG : WEEKDAYS)[((dow % 7) + 7) % 7]!;
+const num = (n: number, locale?: Lang) => localizeDigits(String(n), locale);
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -45,8 +59,8 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((day(b).getTime() - day(a).getTime()) / 86_400_000);
 }
 
-export const weekdayOf = (iso: string) => WEEKDAYS[day(iso).getUTCDay()]!;
-export const monthOf = (iso: string) => MONTHS[day(iso).getUTCMonth()]!;
+export const weekdayOf = (iso: string, locale?: Lang) => weekdayName(day(iso).getUTCDay(), { locale });
+export const monthOf = (iso: string, locale?: Lang) => monthName(day(iso).getUTCMonth(), locale);
 export const dayOfMonth = (iso: string) => day(iso).getUTCDate();
 export const yearOf = (iso: string) => day(iso).getUTCFullYear();
 
@@ -71,29 +85,80 @@ export function clockIn(at: Date | string | number, tz: string = TZ): string {
   return `${String(p.hour).padStart(2, '0')}:${String(p.minute).padStart(2, '0')}`;
 }
 
-/** "Thu 14 Mar", with the year only when it isn't this year (COPY.md §4). */
-export function dayLabel(iso: string, opts: { today?: string } = {}): string {
+/**
+ * A clock time for display: "18:30", or "6:30 pm" / "6:30 م" on a 12-hour phone. Arabic-Indic digits when chosen.
+ * Accepts an "HH:MM" string or an instant (shown in `tz`, Riyadh by default).
+ */
+export function timeLabel(at: Date | string | number, opts: { tz?: string; locale?: Lang; hour12?: boolean } = {}): string {
+  const hhmm = typeof at === 'string' && /^\d{1,2}:\d{2}$/.test(at) ? at : clockIn(at, opts.tz ?? TZ);
+  const l = localeOr(opts.locale);
+  const [hs = '0', ms = '00'] = hhmm.split(':');
+  const h = Number(hs);
+  if (!(opts.hour12 ?? getDisplayPrefs().hour12)) return localizeDigits(`${String(h).padStart(2, '0')}:${ms}`, l);
+  const h12 = h % 12 || 12;
+  const mark = l === 'ar' ? (h < 12 ? 'ص' : 'م') : h < 12 ? 'am' : 'pm';
+  return localizeDigits(`${h12}:${ms} ${mark}`, l);
+}
+
+/**
+ * The Hijri (Umm al-Qura) date for a calendar day: "15 Ramadan 1448" / "15 رمضان 1448". Null where the
+ * runtime's Intl has no islamic-umalqura calendar.
+ */
+export function hijriDay(iso: string, opts: { locale?: Lang; year?: boolean } = {}): string | null {
+  const l = localeOr(opts.locale);
+  try {
+    const f = new Intl.DateTimeFormat(`${l === 'ar' ? 'ar-SA' : 'en'}-u-ca-islamic-umalqura-nu-latn`, {
+      timeZone: 'UTC', day: 'numeric', month: 'long', ...(opts.year === false ? {} : { year: 'numeric' }),
+    });
+    const parts = f.formatToParts(day(iso));
+    const get = (t: string) => parts.find((p) => p.type === t)?.value;
+    const month = get('month');
+    const d = get('day');
+    const y = get('year');
+    if (!month || !d || /^\d+$/.test(month)) return null;
+    const dd = String(Number(d.replace(/[٠-٩]/g, (x) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(x)))));
+    const yy = y ? String(Number(y.replace(/[^0-9٠-٩]/g, '').replace(/[٠-٩]/g, (x) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(x))))) : '';
+    return localizeDigits(`${dd} ${month}${yy && opts.year !== false ? ` ${yy}` : ''}`, l);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * "Thu 14 Mar" / "الخميس 14 مارس", with the year only when it isn't this year (COPY.md §4). With the Hijri setting on
+ * (or `hijri: true`), the Hijri date follows after a middle dot.
+ */
+export function dayLabel(iso: string, opts: { today?: string; locale?: Lang; hijri?: boolean } = {}): string {
+  const l = localeOr(opts.locale);
   const today = opts.today ?? todayIn();
-  const base = `${weekdayOf(iso)} ${dayOfMonth(iso)} ${monthOf(iso)}`;
-  return yearOf(iso) === Number(today.slice(0, 4)) ? base : `${base} ${yearOf(iso)}`;
+  const base = `${weekdayOf(iso, l)} ${num(dayOfMonth(iso), l)} ${monthOf(iso, l)}`;
+  const g = yearOf(iso) === Number(today.slice(0, 4)) ? base : `${base} ${num(yearOf(iso), l)}`;
+  const withHijri = opts.hijri ?? (opts.locale === undefined && getDisplayPrefs().hijri);
+  const h = withHijri ? hijriDay(iso, { locale: l, year: false }) : null;
+  return h ? `${g} · ${h}` : g;
 }
 
-/** "14 Mar" */
-export const shortDay = (iso: string) => `${dayOfMonth(iso)} ${monthOf(iso)}`;
+/** "14 Mar" / "14 مارس" */
+export const shortDay = (iso: string, locale?: Lang) => `${num(dayOfMonth(iso), locale)} ${monthOf(iso, locale)}`;
 
-/** "14–20 Mar", "28 Feb – 3 Mar" (en dash for ranges, COPY.md §4). */
-export function rangeLabel(a: string, b?: string | null): string {
-  if (!b || b === a) return shortDay(a);
-  if (monthOf(a) === monthOf(b) && yearOf(a) === yearOf(b)) return `${dayOfMonth(a)}–${dayOfMonth(b)} ${monthOf(b)}`;
-  return `${shortDay(a)} – ${shortDay(b)}`;
+/** "14–20 Mar", "28 Feb – 3 Mar" (en dash for ranges, COPY.md §4); "14–20 مارس" in Arabic. */
+export function rangeLabel(a: string, b?: string | null, locale?: Lang): string {
+  if (!b || b === a) return shortDay(a, locale);
+  if (monthOf(a) === monthOf(b) && yearOf(a) === yearOf(b)) return `${num(dayOfMonth(a), locale)}–${num(dayOfMonth(b), locale)} ${monthOf(b, locale)}`;
+  return `${shortDay(a, locale)} – ${shortDay(b, locale)}`;
 }
 
-/** "3h 40m", "45m", "2h" (COPY.md §4: hours and minutes, no spaces inside). */
-export function durationLabel(minutes: number): string {
+/** "3h 40m", "45m", "2h" (COPY.md §4: hours and minutes, no spaces inside); Arabic "3 س 40 د". */
+export function durationLabel(minutes: number, locale?: Lang): string {
   if (!Number.isFinite(minutes) || minutes < 0) throw new RangeError('Duration must be a positive number of minutes');
   const m = Math.round(minutes);
   const h = Math.floor(m / 60);
   const r = m % 60;
+  if (localeOr(locale) === 'ar') {
+    const n = (x: number) => num(x, 'ar');
+    if (!h) return `${n(r)} د`;
+    return r ? `${n(h)} س ${n(r)} د` : `${n(h)} س`;
+  }
   if (!h) return `${r}m`;
   return r ? `${h}h ${r}m` : `${h}h`;
 }
@@ -135,16 +200,17 @@ export function zonedToInstant(localIso: string, tz: string): Date {
 }
 
 /** The Today header: "Saturday 10 Oct". */
-export function headerDay(now: Date = new Date(), tz: string = TZ): string {
+export function headerDay(now: Date = new Date(), tz: string = TZ, locale?: Lang): string {
   const iso = todayIn(tz, now);
-  return `${WEEKDAYS_LONG[day(iso).getUTCDay()]} ${dayOfMonth(iso)} ${monthOf(iso)}`;
+  return `${weekdayName(day(iso).getUTCDay(), { locale, long: true })} ${num(dayOfMonth(iso), locale)} ${monthOf(iso, locale)}`;
 }
 
 /**
  * The Hijri (Umm al-Qura) day and month, e.g. "Rabiʿ II 29". Falls back to null where the runtime's Intl
  * has no islamic-umalqura calendar, so callers can simply leave it out.
  */
-export function hijriLabel(now: Date = new Date(), tz: string = TZ): string | null {
+export function hijriLabel(now: Date = new Date(), tz: string = TZ, locale?: Lang): string | null {
+  if (localeOr(locale) === 'ar') return hijriDay(todayIn(tz, now), { locale: 'ar', year: false });
   try {
     const f = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', { timeZone: tz, day: 'numeric', month: 'long' });
     const parts = f.formatToParts(now);

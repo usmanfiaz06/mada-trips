@@ -14,7 +14,13 @@ export function toUser(u: UserRow): User {
     locale: u.locale === "ar" ? "ar" : "en",
     alerts: u.alerts === "everything" ? "everything" : "quiet",
     notifications: u.notifications === "allowed" || u.notifications === "declined" ? u.notifications : "unknown",
-    methods: { apple: !!u.appleSub, google: !!u.googleSub, phone: !!u.phone },
+    methods: {
+      apple: !!u.appleSub || u.authProviders.includes("apple"),
+      google: !!u.googleSub || u.authProviders.includes("google"),
+      phone: !!u.phone,
+      email: u.authProviders.includes("email"),
+    },
+    emailVerified: u.emailVerified,
     onboardedAt: u.onboardedAt?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
   };
@@ -41,7 +47,7 @@ export async function createUser(tx: Tx, values: Partial<typeof appUsers.$inferI
 export async function findOrCreateByPhone(tx: Tx, phone: string, ipHash: string | null): Promise<{ user: UserRow; isNew: boolean }> {
   const [existing] = await tx.select().from(appUsers).where(and(eq(appUsers.phone, phone), isNull(appUsers.deletedAt)));
   if (existing) return { user: existing, isNew: false };
-  const user = await createUser(tx, { phone });
+  const user = await createUser(tx, { phone, phoneVerified: true, authProviders: ["phone"] });
   await appAuditLog(tx, { actorKind: "user", actorId: user.id, action: "account.created", entityType: "app_user", entityId: user.id, summary: "Account created with a phone number", ipHash });
   return { user, isNew: true };
 }
@@ -50,7 +56,7 @@ export async function findOrCreateByPhone(tx: Tx, phone: string, ipHash: string 
 export async function attachPhone(tx: Tx, userId: string, phone: string, ipHash: string | null): Promise<UserRow> {
   const [owner] = await tx.select({ id: appUsers.id }).from(appUsers).where(and(eq(appUsers.phone, phone), isNull(appUsers.deletedAt)));
   if (owner && owner.id !== userId) throw new AppError("PHONE_TAKEN");
-  const [u] = await tx.update(appUsers).set({ phone, updatedAt: new Date() }).where(eq(appUsers.id, userId)).returning();
+  const [u] = await tx.update(appUsers).set({ phone, phoneVerified: true, updatedAt: new Date() }).where(eq(appUsers.id, userId)).returning();
   await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "account.phone_verified", entityType: "app_user", entityId: userId, summary: "Mobile number verified", ipHash });
   return u!;
 }

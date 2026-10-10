@@ -1,6 +1,7 @@
 import { OtpVerifyRequest } from "@mada/shared";
 import { requestContext } from "@/lib/app/context";
-import { body, json, route } from "@/lib/app/http";
+import { AppError, body, json, route } from "@/lib/app/http";
+import { legacyAuthEnabled } from "@/lib/app/config";
 import { signInWithPhone } from "@/lib/app/signin";
 import { authenticateOptional } from "@/lib/app/tokens";
 
@@ -9,6 +10,8 @@ import { authenticateOptional } from "@/lib/app/tokens";
 export const dynamic = "force-dynamic";
 
 export const POST = route(async (req) => {
+  // Replaced by Supabase Auth + /auth/session (docs/app/AUTH.md); kept for tests and tools, off in production.
+  if (!legacyAuthEnabled()) throw new AppError("NOT_FOUND");
   const input = await body(req, OtpVerifyRequest);
   const current = await authenticateOptional(req);
   return json(await signInWithPhone(input.phone, input.code, { ...requestContext(req), device: input.device }, current));

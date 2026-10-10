@@ -11,6 +11,10 @@ import { createHash } from "node:crypto";
  *   APP_OTP_PEPPER       keys the hashes of sign-in codes and IPs (defaults to a value derived from APP_JWT_SECRET).
  *   SUPPLIER_MODE        mock | live for every supplier; SUPPLIER_MODE_<NAME> overrides one (e.g. SUPPLIER_MODE_SMS=live).
  *   APP_ALLOW_MOCKS      "yes" to allow mock suppliers on a production deployment (never for the real launch).
+ *   SUPABASE_URL         the Supabase project whose access tokens /auth/session accepts (SUPPLIER_MODE_SUPABASE=live).
+ *   SUPABASE_SMS_HOOK_SECRET  "v1,whsec_…" from Supabase's Send SMS hook; signs the calls to /auth/sms-hook.
+ *   APP_LEGACY_AUTH      "yes" keeps the direct /auth/otp, /auth/apple and /auth/google routes on a production
+ *                        deployment ("no" turns them off anywhere). Supabase Auth replaces them (docs/app/AUTH.md).
  */
 
 const DEV_JWT_SECRET = "dev-only-mada-core-jwt-secret-do-not-use-in-production";
@@ -31,7 +35,7 @@ export function pepper(): string {
 }
 
 export type SupplierName = (typeof SUPPLIERS)[number];
-export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity"] as const;
+export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase"] as const;
 
 /** Free, keyless open data: live by default everywhere. Only SUPPLIER_MODE_FLIGHT_POSITIONS switches it (not SUPPLIER_MODE). */
 const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions"]);
@@ -58,4 +62,12 @@ export function supplierModes(): Record<string, SupplierMode> {
     try { out[s] = supplierMode(s); } catch { out[s] = "mock"; }
   }
   return out;
+}
+
+/** The pre-Supabase sign-in routes: on outside production (tests, local tools), off in production unless asked for. */
+export function legacyAuthEnabled(): boolean {
+  const v = process.env.APP_LEGACY_AUTH?.toLowerCase();
+  if (v === "yes") return true;
+  if (v === "no") return false;
+  return !isProductionDeploy();
 }

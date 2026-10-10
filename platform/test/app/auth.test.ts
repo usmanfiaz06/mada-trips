@@ -216,7 +216,7 @@ describe("Sign in with Apple (mock) then a mobile number", () => {
     expect(v.status).toBe(200);
     const after = SignInResponse.parse(v.json);
     expect(after.user.id).toBe(s.user.id);
-    expect(after.user.methods).toEqual({ apple: true, google: false, phone: true });
+    expect(after.user.methods).toMatchObject({ apple: true, google: false, phone: true });
 
     // Same Apple account again: same user.
     const again = SignInResponse.parse((await call(apple, { body: { idToken: "mock:apple-user-1:k7x2m9q4pz@privaterelay.appleid.com" } })).json);

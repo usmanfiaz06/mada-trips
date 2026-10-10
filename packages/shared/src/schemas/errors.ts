@@ -23,6 +23,10 @@ export const ERROR_CODES = {
   NOT_CONFIGURED: { status: 501, copy: 'error.notConfigured' },
   SUPPLIER_UNAVAILABLE: { status: 503, copy: 'error.notConfigured' },
   INTERNAL: { status: 500, copy: 'error.internal' },
+  /** Signed in with Apple, Google or email and no verified mobile yet: booking needs one (docs/app/AUTH.md). */
+  PHONE_REQUIRED: { status: 403, copy: 'auth.error.phoneRequired' },
+  /** The Supabase identity belongs to a different Mada account than the one signed in. */
+  IDENTITY_TAKEN: { status: 409, copy: 'auth.error.identityTaken' },
   // Resilience (FLOWS.md §12; status.ts has the client-side codes and what the app does with each).
   /** A supplier's circuit is open or it didn't answer in time; `details.supplier` names it. Fails fast, never hangs. */
   SUPPLIER_DOWN: { status: 503, copy: 'error.supplierDown' },

@@ -1,6 +1,7 @@
 import { SocialSignInRequest } from "@mada/shared";
 import { requestContext } from "@/lib/app/context";
-import { body, json, route } from "@/lib/app/http";
+import { AppError, body, json, route } from "@/lib/app/http";
+import { legacyAuthEnabled } from "@/lib/app/config";
 import { signInWithProvider } from "@/lib/app/signin";
 
 // POST /api/app/v1/auth/google  { idToken, nonce?, givenName?, familyName?, device? }  → { tokens, user, isNew }.
@@ -9,6 +10,8 @@ import { signInWithProvider } from "@/lib/app/signin";
 export const dynamic = "force-dynamic";
 
 export const POST = route(async (req) => {
+  // Replaced by Supabase Auth + /auth/session (docs/app/AUTH.md); kept for tests and tools, off in production.
+  if (!legacyAuthEnabled()) throw new AppError("NOT_FOUND");
   const input = await body(req, SocialSignInRequest);
   return json(await signInWithProvider("google", input, { ...requestContext(req), device: input.device }));
 });

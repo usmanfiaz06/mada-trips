@@ -1,27 +1,66 @@
 import { en, type CopyKey } from './en';
+import { authCopyAr } from './auth.ar';
+import { arSections } from './ar';
+import { isLatinRun, localeOr, localizeDigits, LRI, PDI, pluralKeys, type Lang } from '../locale';
 
 export { en, type CopyKey };
 
-export type CopyLocale = 'en' | 'ar';
+export type CopyLocale = Lang;
 export type Vars = Record<string, string | number>;
 
-/** Arabic is transcreated by a native Saudi writer (COPY.md §7.4). Until then, Arabic falls back to English. */
-const catalogues: Record<CopyLocale, Partial<Record<CopyKey, string>>> = { en, ar: {} };
+/**
+ * Arabic (COPY.md §7.4): every English key (test/copy.test.ts holds it to that), plus Arabic's extra plural forms
+ * (`.two`, `.few`, `.many`, `.zero`). Sections live in ./ar; sign-in keeps its own file (auth.ar.ts).
+ * A key Arabic lacks falls back to English rather than showing nothing.
+ */
+export const ar: Readonly<Record<string, string>> = { ...arSections, ...authCopyAr };
+const catalogues: Record<CopyLocale, Readonly<Record<string, string>>> = { en, ar };
+
+/** The whole catalogue for a locale. */
+export const catalogueFor = (locale: CopyLocale): Readonly<Record<string, string>> => catalogues[locale];
 
 /** A string that was never written looks obviously unfinished (COPY.md §9), so it can't ship by accident. */
 export const placeholderFor = (key: string) => `⟦${key}⟧`;
 
-/** Look up a string and fill its `{placeholders}`. */
-export function t(key: CopyKey, vars?: Vars, locale: CopyLocale = 'en'): string {
-  const raw = catalogues[locale][key] ?? en[key] ?? placeholderFor(key);
-  if (!vars) return raw;
-  return raw.replace(/\{(\w+)\}/g, (m, name: string) => (name in vars ? String(vars[name]) : m));
+/**
+ * Fill `{placeholders}`. In Arabic, a value that is a Latin run (a flight number, PNR, IATA code, a hotel's Latin
+ * name) is wrapped in a left-to-right isolate so it never scrambles the sentence around it, and digits follow the
+ * Arabic-Indic setting everywhere except inside those codes.
+ */
+function fill(raw: string, vars: Vars | undefined, locale: CopyLocale): string {
+  const text = locale === 'ar' ? localizeDigits(raw, 'ar') : raw;
+  if (!vars) return text;
+  return text.replace(/\{(\w+)\}/g, (m, name: string) => {
+    if (!(name in vars)) return m;
+    const v = vars[name] ?? '';
+    if (locale !== 'ar') return String(v);
+    if (typeof v === 'number') return localizeDigits(String(v), 'ar');
+    if (/[\u2066-\u2069]/.test(v)) return v;
+    if (/[A-Za-z]/.test(v) && isLatinRun(v)) return `${LRI}${v}${PDI}`;
+    return localizeDigits(v, 'ar');
+  });
 }
 
-/** Plurals: `key.one` for 1, `key.other` with `{count}` otherwise. */
-export function tn(base: string, count: number, vars: Vars = {}, locale: CopyLocale = 'en'): string {
-  const key = `${base}.${count === 1 ? 'one' : 'other'}` as CopyKey;
-  return t(key, { count, ...vars }, locale);
+/** Look up a string and fill its `{placeholders}`. The locale defaults to the display locale (setDisplayPrefs). */
+export function t(key: CopyKey, vars?: Vars, locale?: CopyLocale): string {
+  const l = localeOr(locale);
+  const own = catalogues[l][key];
+  return own !== undefined ? fill(own, vars, l) : fill(en[key] ?? placeholderFor(key), vars, 'en');
+}
+
+/**
+ * Plurals. English has `key.one` and `key.other`. Arabic has six forms (Intl.PluralRules): writers give `.one`,
+ * `.two`, `.few` (3–10) and `.other` (the singular-noun form that "many", 11–99, shares), and `.zero` where it
+ * reads better. `{count}` is filled with the number.
+ */
+export function tn(base: string, count: number, vars: Vars = {}, locale?: CopyLocale): string {
+  const l = localeOr(locale);
+  const all = { count, ...vars };
+  for (const k of pluralKeys(base, count, l)) {
+    const raw = catalogues[l][k];
+    if (raw !== undefined) return fill(raw, all, l);
+  }
+  return t(`${base}.${count === 1 ? 'one' : 'other'}` as CopyKey, all, 'en');
 }
 
 export function hasKey(key: string): key is CopyKey {
@@ -73,6 +112,7 @@ export function bannedIn(text: string, allow: readonly string[] = []): string[] 
 }
 
 export type CopyProblem = { key: string; problem: string };
+export { lintArabic, missingArabic, AR_BANNED } from './lint-ar';
 
 /** Every rule CI enforces on the catalogue (COPY.md §4, §9). */
 export function lintCatalogue(cat: Record<string, string> = en): CopyProblem[] {

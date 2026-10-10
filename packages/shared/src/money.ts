@@ -5,6 +5,8 @@
  * Display follows COPY.md §4: "SAR 8,640" in English (no ".00"), the riyal sign or "ر.س" in Arabic.
  */
 
+import { localeOr, localizeDigits, LRI, PDI, type Lang } from './locale';
+
 export type Halalas = number;
 export const CURRENCY = 'SAR' as const;
 
@@ -74,8 +76,11 @@ export type FormatSarOptions = {
   decimals?: 'auto' | 'always' | 'never';
   /** Show "+" for positive amounts (credits, refunds). */
   sign?: boolean;
-  /** 'en' (default): "SAR 8,640". 'ar': "8,640 ر.س" (Western digits, as Saudi banks and airlines show). */
-  locale?: 'en' | 'ar';
+  /**
+   * 'en': "SAR 8,640". 'ar': "8,640 ر.س" (Western digits, as Saudi banks and airlines show, unless Arabic-Indic
+   * digits are chosen). Defaults to the display locale (setDisplayPrefs); the server always passes it.
+   */
+  locale?: Lang;
   /** Leave the currency off: "8,640". */
   bare?: boolean;
 };
@@ -83,7 +88,8 @@ export type FormatSarOptions = {
 /** "SAR 8,640" — COPY.md §4: SAR before the amount, thousands separator, no ".00". */
 export function formatSar(h: Halalas, opts: FormatSarOptions = {}): string {
   assertHalalas(h);
-  const { decimals = 'auto', sign = false, locale = 'en', bare = false } = opts;
+  const { decimals = 'auto', sign = false, bare = false } = opts;
+  const locale = localeOr(opts.locale);
   const neg = h < 0;
   const abs = Math.abs(h);
   let whole = Math.floor(abs / 100);
@@ -96,8 +102,12 @@ export function formatSar(h: Halalas, opts: FormatSarOptions = {}): string {
   const showFrac = decimals === 'always' || (decimals === 'auto' && frac !== 0);
   const body = group(String(whole)) + (showFrac ? '.' + String(frac).padStart(2, '0') : '');
   const s = neg ? '−' : sign && h > 0 ? '+' : '';
-  if (bare) return `${s}${body}`;
-  return locale === 'ar' ? `${s}${body} ر.س` : `${s}SAR ${body}`;
+  if (locale !== 'ar') return bare ? `${s}${body}` : `${s}SAR ${body}`;
+  // Arabic: the amount, then the riyal abbreviation. A signed amount is isolated left-to-right so "−" stays
+  // in front of the digits inside a right-to-left line.
+  const n = localizeDigits(body, 'ar');
+  const amount = s ? `${LRI}${s}${n}${PDI}` : n;
+  return bare ? amount : `${amount} ر.س`;
 }
 
 export function sum(values: readonly Halalas[]): Halalas {

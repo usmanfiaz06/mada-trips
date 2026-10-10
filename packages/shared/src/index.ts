@@ -1,5 +1,6 @@
 export * from './money';
 export * from './dates';
+export * from './locale';
 export * from './phone';
 export * from './tokens';
 export * from './api';

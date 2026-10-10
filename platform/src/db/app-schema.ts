@@ -28,6 +28,12 @@ export const appUsers = pgTable("app_users", {
   emailRelay: boolean("email_relay").notNull().default(false),
   appleSub: text("apple_sub"),
   googleSub: text("google_sub"),
+  // Identity lives in Supabase Auth (docs/app/AUTH.md): its user id, and what it has proven. Passports and bookings stay here.
+  supabaseUserId: text("supabase_user_id"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
+  // Ways in Supabase knows for this person: phone | email | apple | google.
+  authProviders: text("auth_providers").array().notNull().default(sql`'{}'::text[]`),
   locale: text("locale").notNull().default("en"),
   alerts: text("alerts").notNull().default("quiet"), // quiet | everything
   notifications: text("notifications").notNull().default("unknown"), // allowed | declined | unknown
@@ -41,6 +47,8 @@ export const appUsers = pgTable("app_users", {
   uniqueIndex("app_users_phone_key").on(t.phone).where(sql`${t.phone} IS NOT NULL`),
   uniqueIndex("app_users_apple_key").on(t.appleSub).where(sql`${t.appleSub} IS NOT NULL`),
   uniqueIndex("app_users_google_key").on(t.googleSub).where(sql`${t.googleSub} IS NOT NULL`),
+  uniqueIndex("app_users_supabase_key").on(t.supabaseUserId).where(sql`${t.supabaseUserId} IS NOT NULL`),
+  index("app_users_email_idx").on(sql`lower(${t.email})`),
 ]);
 
 /** One row per signed-in device. The refresh token is stored only as a hash and rotates on every use. */

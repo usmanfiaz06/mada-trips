@@ -66,7 +66,7 @@ export async function anonymiseAccount(userId: string, actor: { kind: "user" | "
     await tx.delete(appTrips).where(eq(appTrips.ownerId, userId));
     await tx.update(appSessions).set({ revokedAt: new Date(), revokedReason: "account_deleted", ip: null, userAgent: null, deviceName: null }).where(eq(appSessions.userId, userId));
     await tx.update(appAccounts).set({ preferredName: null, prefs: {}, photoFileId: null, photoAt: null, deleteAt: null, updatedAt: new Date() }).where(eq(appAccounts.userId, userId));
-    await tx.update(appUsers).set({ phone: null, email: null, emailRelay: false, name: "", appleSub: null, googleSub: null, deletedAt: sql`COALESCE(${appUsers.deletedAt}, now())`, updatedAt: new Date() }).where(eq(appUsers.id, userId));
+    await tx.update(appUsers).set({ phone: null, email: null, emailRelay: false, name: "", appleSub: null, googleSub: null, supabaseUserId: null, authProviders: [], emailVerified: false, phoneVerified: false, deletedAt: sql`COALESCE(${appUsers.deletedAt}, now())`, updatedAt: new Date() }).where(eq(appUsers.id, userId));
     await appAuditLog(tx, { actorKind: actor.kind, actorId: actor.id, action: "account.anonymised", entityType: "app_user", entityId: userId, summary: "Account deleted: personal details and files removed, receipts and ledger kept anonymous" });
   });
   for (const f of files) await deleteFile(db, f);

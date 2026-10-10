@@ -18,7 +18,10 @@ export const User = z.object({
   locale: Locale,
   alerts: AlertsLevel,
   notifications: NotificationsChoice,
-  methods: z.object({ apple: z.boolean(), google: z.boolean(), phone: z.boolean() }),
+  /** Ways in. `email` (a code by email, through Supabase Auth) is absent from older servers. */
+  methods: z.object({ apple: z.boolean(), google: z.boolean(), phone: z.boolean(), email: z.boolean().optional() }),
+  /** The email was proven (a code, or Apple/Google said so). Absent from older servers. */
+  emailVerified: z.boolean().optional(),
   /** Set once the traveller has finished onboarding (name and alerts asked). */
   onboardedAt: IsoDateTime.nullable(),
   createdAt: IsoDateTime,
