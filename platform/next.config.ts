@@ -20,6 +20,8 @@ const zodDir = dirname(require.resolve("zod/package.json"));
 
 const config: NextConfig = {
   experimental: { serverActions: { bodySizeLimit: "8mb", allowedOrigins }, externalDir: true },
+  // The repo root also has a lockfile (the app workspace); trace from there so files in packages/shared are included.
+  outputFileTracingRoot: resolve(here, ".."),
   webpack(cfg) {
     cfg.resolve ??= {};
     cfg.resolve.alias = { ...(cfg.resolve.alias as Record<string, string>), zod$: zodDir, "@mada/shared$": resolve(here, "../packages/shared/src/index.ts") };

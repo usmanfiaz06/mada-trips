@@ -3,7 +3,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { colors, space } from '@/theme';
+import { colors, space, ff } from '@/theme';
 import { Icon } from './Icon';
 import { T } from './Text';
 
@@ -30,7 +30,7 @@ export function TopBar({ onBack, backLabel, title, right, dark }: { onBack?: () 
       {onBack ? (
         <Pressable accessibilityRole="button" accessibilityLabel={backLabel ?? t('common.back')} onPress={() => { buzz('tap'); onBack(); }} style={styles.back} hitSlop={8}>
           <Icon name="back" color={fg} />
-          <T v="callout" color={fg} style={{ fontFamily: 'InterTight_500Medium', fontSize: 15 }}>{backLabel ?? t('common.back')}</T>
+          <T v="callout" color={fg} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{backLabel ?? t('common.back')}</T>
         </Pressable>
       ) : <View style={{ width: 44 }} />}
       {title ? <T v="h3" color={fg} style={{ fontSize: 17 }}>{title}</T> : null}

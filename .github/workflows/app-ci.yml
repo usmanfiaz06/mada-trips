@@ -1,0 +1,59 @@
+name: app-ci
+
+# The Mada Trips app (apps/mobile, packages/shared) and the platform that serves its Core API (platform/).
+on:
+  push:
+    paths: ['apps/**', 'packages/**', 'platform/**', 'package.json', 'package-lock.json', 'eslint.config.mjs', '.github/workflows/app-ci.yml']
+  pull_request:
+    paths: ['apps/**', 'packages/**', 'platform/**', 'package.json', 'package-lock.json', 'eslint.config.mjs', '.github/workflows/app-ci.yml']
+
+concurrency:
+  group: app-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Shared + mobile (typecheck, tests, lint, web export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: package-lock.json }
+      - run: npm ci
+      - name: Typecheck (shared, mobile)
+        run: npm run typecheck --workspaces --if-present
+      - name: Unit tests (money, dates, phone, schemas, copy rules)
+        run: npm test -w @mada/shared
+      - name: Lint (ESLint + the COPY.md string rules)
+        run: npm run lint
+      - name: Expo web export
+        run: npm run export:web -w @mada/mobile
+        env: { CI: '1' }
+
+  platform:
+    name: Platform (typecheck, Core API tests on Postgres 16, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run: { working-directory: platform }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: platform/package-lock.json }
+      # Only platform/ is installed, as on Vercel: packages/shared must build from here alone.
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Core API integration tests
+        run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      - name: Next build (Ops + Core API)
+        run: npm run build

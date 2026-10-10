@@ -94,3 +94,19 @@ drizzle/           SQL migrations
 ```
 
 Design tokens are in `src/app/globals.css`. The interface is sans-serif only (Geist, with IBM Plex Sans Arabic for Arabic).
+
+## Mada Trips app: Core API
+
+The same deployment also serves the Mada Trips mobile app's API at `/api/app/v1/*` (plain JSON, versioned): phone sign-in
+with codes, Sign in with Apple/Google, refresh-token rotation, `/me`, the household (`/people`, passport numbers
+encrypted), live aircraft positions and `/health`. Its tables are all prefixed `app_` (`src/db/app-schema.ts`) and never
+change the Ops tables. Server logic is in `src/lib/app/`, suppliers (mock or live per supplier) in
+`src/lib/app/suppliers/` ([README](src/lib/app/suppliers/README.md)). Types, schemas and strings come from
+`../packages/shared` (TypeScript source, imported through the `@mada/shared` path alias; this package's own `zod`
+serves it, so the Vercel build still installs only `platform/`).
+
+```bash
+npm test          # vitest: Core API integration tests against a throwaway Postgres (local initdb, or TEST_DATABASE_URL)
+```
+
+The full guide (env vars, running the app against this server) is in [docs/app/PRODUCTION.md](../docs/app/PRODUCTION.md).

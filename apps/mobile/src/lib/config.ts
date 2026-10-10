@@ -11,3 +11,8 @@ export const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL ?? fallbackOrigin).re
 export const API_MODE: 'live' | 'mock' = process.env.EXPO_PUBLIC_API_MODE === 'mock' ? 'mock' : 'live';
 /** Development builds show the demo hints the prototype shows ("Demo code: 123456"). */
 export const SHOW_DEMO_HINTS = __DEV__ || API_MODE === 'mock' || process.env.EXPO_PUBLIC_DEMO_HINTS === 'yes';
+/**
+ * Focus the field when a screen opens on native only. On the web, focusing during the slide-in transition scrolls the
+ * sliding container sideways and leaves the screen offset.
+ */
+export const AUTO_FOCUS = Platform.OS !== 'web';

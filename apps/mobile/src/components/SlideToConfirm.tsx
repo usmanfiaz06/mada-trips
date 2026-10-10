@@ -26,20 +26,20 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
 
   const pan = Gesture.Pan()
     .enabled(!disabled && !busy && width > 0)
-    .onBegin(() => { ticks.value = 0; })
+    .onBegin(() => { ticks.set(0); })
     .onChange((e) => {
-      x.value = Math.min(max, Math.max(0, x.value + e.changeX));
-      const p = x.value / max;
-      while (ticks.value < 3 && p >= [0.25, 0.5, 0.75][ticks.value]!) { scheduleOnRN(tick, ticks.value as 0 | 1 | 2); ticks.value += 1; }
+      x.set(Math.min(max, Math.max(0, x.get() + e.changeX)));
+      const p = x.get() / max;
+      while (ticks.get() < 3 && p >= [0.25, 0.5, 0.75][ticks.get()]!) { scheduleOnRN(tick, ticks.get() as 0 | 1 | 2); ticks.set(ticks.get() + 1); }
     })
     .onEnd(() => {
-      if (x.value / max > 0.9) { x.value = withTiming(max, { duration: 120 }); scheduleOnRN(confirm); }
-      else x.value = withTiming(0, { duration: 450, easing: SPRING });
+      if (x.get() / max > 0.9) { x.set(withTiming(max, { duration: 120 })); scheduleOnRN(confirm); }
+      else x.set(withTiming(0, { duration: 450, easing: SPRING }));
     });
 
-  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: busy ? max : x.value }] }));
-  const fill = useAnimatedStyle(() => ({ width: (busy ? max : x.value) + KNOB + PAD * 2 }));
-  const text = useAnimatedStyle(() => ({ opacity: busy ? 1 : interpolate(x.value, [0, max / 1.7], [1, 0], 'clamp') }));
+  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: busy ? max : x.get() }] }));
+  const fill = useAnimatedStyle(() => ({ width: (busy ? max : x.get()) + KNOB + PAD * 2 }));
+  const text = useAnimatedStyle(() => ({ opacity: busy ? 1 : interpolate(x.get(), [0, max / 1.7], [1, 0], 'clamp') }));
 
   return (
     <View
@@ -68,6 +68,6 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
 const styles = StyleSheet.create({
   track: { height: sizes.slider, borderRadius: 999, backgroundColor: colors.green, overflow: 'hidden', justifyContent: 'center', alignSelf: 'stretch' },
   fill: { position: 'absolute', start: 0, top: 0, bottom: 0, borderRadius: 999, backgroundColor: colors.gold },
-  labelWrap: { ...StyleSheet.absoluteFillObject, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  labelWrap: { position: 'absolute', top: 0, bottom: 0, start: 0, end: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   knob: { position: 'absolute', start: PAD, top: PAD, width: KNOB, height: KNOB, borderRadius: 999, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' },
 });

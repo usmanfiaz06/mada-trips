@@ -19,7 +19,7 @@ export function ArtStage({ children, height = 132 }: { children: ReactNode; heig
         <Rect width="100%" height="100%" fill="url(#esbg)" />
         <Rect x="12%" y="8%" width="76%" height="84%" fill="url(#esdots)" opacity={0.8} />
       </Svg>
-      {children}
+      <View style={{ zIndex: 1 }}>{children}</View>
     </View>
   );
 }

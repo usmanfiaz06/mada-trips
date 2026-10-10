@@ -1,6 +1,6 @@
 import { forwardRef, type ReactNode } from 'react';
 import { Platform, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
-import { colors, font, radii, sizes } from '@/theme';
+import { colors, font, radii, sizes, ff } from '@/theme';
 import { T } from './Text';
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
@@ -14,12 +14,12 @@ export const Field = forwardRef<TextInput, TextInputProps & { label: string; err
         placeholderTextColor={colors.muted}
         accessibilityLabel={label}
         {...input}
-        style={[styles.input, font('body', colors.green), { fontSize: 17 }, big ? styles.otp : null, (bad || error) ? styles.bad : null, webNoOutline, prefix ? { flex: 1 } : null, style]}
+        style={[styles.input, font('body', colors.green), { fontSize: 17 }, big ? styles.otp : null, (bad || error) ? styles.bad : null, webNoOutline, prefix ? { flex: 1, minWidth: 0 } : null, style]}
       />
     );
     return (
       <View style={styles.field}>
-        <T v="small" style={{ fontFamily: 'InterTight_600SemiBold' }}>{label}</T>
+        <T v="small" style={{ fontFamily: ff.ui600 }}>{label}</T>
         {prefix ? (
           <View style={styles.row}>
             <View style={[styles.input, styles.prefix]}><T v="body" color={colors.green} style={{ fontSize: 17 }}>{prefix}</T></View>
@@ -38,6 +38,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
   input: { height: sizes.input, borderRadius: radii.input, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, paddingHorizontal: 16 },
   prefix: { width: 92, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 0 },
-  otp: { height: sizes.otp, textAlign: 'center', fontSize: 26, letterSpacing: 13, fontFamily: 'InterTight_600SemiBold', fontVariant: ['tabular-nums'] },
+  otp: { height: sizes.otp, textAlign: 'center', fontSize: 26, letterSpacing: 13, fontFamily: ff.ui600, fontVariant: ['tabular-nums'] },
   bad: { borderColor: colors.bad },
 });

@@ -22,30 +22,30 @@ export function Sheet({ visible, onClose, children, label }: { visible: boolean;
   useEffect(() => {
     if (visible) {
       buzz('tap');
-      y.value = height;
-      y.value = withTiming(0, { duration: 450, easing: EASE });
-      shade.value = withTiming(1, { duration: 250 });
+      y.set(height);
+      y.set(withTiming(0, { duration: 450, easing: EASE }));
+      shade.set(withTiming(1, { duration: 250 }));
     }
   }, [visible, height, y, shade]);
 
   const close = useCallback(() => {
-    shade.value = withTiming(0, { duration: 200 });
-    y.value = withTiming(height, { duration: 260, easing: EASE }, (done) => { if (done) scheduleOnRN(onClose); });
+    shade.set(withTiming(0, { duration: 200 }));
+    y.set(withTiming(height, { duration: 260, easing: EASE }, (done) => { if (done) scheduleOnRN(onClose); }));
   }, [height, onClose, shade, y]);
 
   const pan = Gesture.Pan()
-    .onChange((e) => { y.value = Math.max(0, y.value + e.changeY); })
+    .onChange((e) => { y.set(Math.max(0, y.get() + e.changeY)); })
     .onEnd((e) => {
-      if (y.value > 80 || e.velocityY > 800) {
-        shade.value = withTiming(0, { duration: 200 });
-        y.value = withTiming(height, { duration: 220 }, (done) => { if (done) scheduleOnRN(onClose); });
+      if (y.get() > 80 || e.velocityY > 800) {
+        shade.set(withTiming(0, { duration: 200 }));
+        y.set(withTiming(height, { duration: 220 }, (done) => { if (done) scheduleOnRN(onClose); }));
       } else {
-        y.value = withTiming(0, { duration: 250, easing: EASE });
+        y.set(withTiming(0, { duration: 250, easing: EASE }));
       }
     });
 
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
-  const shadeStyle = useAnimatedStyle(() => ({ opacity: shade.value }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
+  const shadeStyle = useAnimatedStyle(() => ({ opacity: shade.get() }));
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>

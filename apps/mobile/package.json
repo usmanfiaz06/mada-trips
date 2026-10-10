@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "export:web": "expo export --platform web --output-dir dist",
+    "export:web": "expo export --platform web --output-dir dist --clear",
     "e2e:web": "node test/e2e-web.mjs"
   },
   "dependencies": {

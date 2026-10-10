@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ApiErrorBody, CreatePersonRequest, FlightOffer, OtpVerifyRequest, PassportInput, UpdateMeRequest, maskPassportNumber, firstNameOf,
+  ApiErrorBody, CreatePersonRequest, FlightOffer, icaoCallsign, OtpVerifyRequest, PassportInput, UpdateMeRequest, maskPassportNumber, firstNameOf,
 } from '../src/schemas';
 
 describe('schemas', () => {
@@ -45,7 +45,6 @@ describe('schemas', () => {
   });
 });
 
-import { icaoCallsign } from '../src/schemas';
 describe('ADS-B callsigns', () => {
   it('maps IATA flight numbers to ICAO callsigns', () => {
     expect(icaoCallsign('SV263')).toBe('SVA263');

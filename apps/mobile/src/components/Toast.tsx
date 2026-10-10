@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useToast } from '@/lib/toast';
-import { colors, shadow } from '@/theme';
+import { colors, shadow, ff } from '@/theme';
 import { useBottomInset } from './Layout';
 import { T } from './Text';
 
@@ -14,7 +14,7 @@ export function ToastHost() {
   if (!text) return null;
   return (
     <Animated.View key={id} entering={FadeInDown.duration(300)} exiting={FadeOutDown.duration(200)} style={[styles.toast, shadow('focal'), { bottom: 104 + bottom }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
-      <T v="callout" color={colors.mist} style={{ fontFamily: 'InterTight_500Medium' }}>{text}</T>
+      <T v="callout" color={colors.mist} style={{ fontFamily: ff.ui500 }}>{text}</T>
     </Animated.View>
   );
 }

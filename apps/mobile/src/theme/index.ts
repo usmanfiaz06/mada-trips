@@ -26,3 +26,4 @@ export function shadow(name: keyof typeof shadows): ViewStyle {
 }
 
 export const fontsToLoad = fontFamilies;
+export { fontFamilies as ff } from '@mada/shared';
