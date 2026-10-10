@@ -12,6 +12,8 @@ import { GET as health } from "@/app/api/app/v1/health/route";
 import { POST as otpStart } from "@/app/api/app/v1/auth/otp/start/route";
 import { POST as otpVerify } from "@/app/api/app/v1/auth/otp/verify/route";
 import { GET as peopleGet, POST as peoplePost } from "@/app/api/app/v1/people/route";
+import { GET as circleGet, PATCH as circlePatch } from "@/app/api/app/v1/circles/[id]/route";
+import { GET as positionGet } from "@/app/api/app/v1/flights/[flightNo]/position/route";
 import { call, freshIp, newPhone } from "./helpers";
 
 type H = (req: Request) => Promise<Response>;
@@ -326,5 +328,33 @@ describe("GET /status and health", () => {
     await setRuntimeConfig({ maintenance: { on: true } });
     const s = StatusResponse.parse((await send(statusGet as H, { method: "GET", path: "/api/app/v1/status" })).json);
     expect(s).toMatchObject({ status: "down", maintenance: { on: true } });
+  });
+});
+
+describe("routes with path params", () => {
+  const withParams = <P,>(h: (req: Request, ctx: { params: Promise<P> }) => Promise<Response>, params: P): H => (req) => h(req, { params: Promise.resolve(params) });
+  const missing = "00000000-0000-4000-8000-000000000000";
+
+  it("circles routes carry the request id and server time, and the error envelope", async () => {
+    const t = await token();
+    const r = await send(withParams(circleGet, { id: missing }), { method: "GET", path: `/api/app/v1/circles/${missing}`, token: t });
+    expect(r.status).toBe(404);
+    expect(r.headers.get("x-request-id")).toBeTruthy();
+    expect(Number(r.headers.get("x-server-time"))).toBeGreaterThan(0);
+    expect(r.json.error.requestId).toBe(r.headers.get("x-request-id"));
+  });
+
+  it("circles changes wait out maintenance and old apps are asked to update", async () => {
+    const t = await token();
+    await setRuntimeConfig({ maintenance: { on: true, until: new Date(Date.now() + 600_000).toISOString() } });
+    clearRuntimeCache();
+    const m = await send(withParams(circlePatch, { id: missing }), { method: "PATCH", path: `/api/app/v1/circles/${missing}`, body: { name: "Trip" }, token: t });
+    expect(m.status).toBe(503);
+    expect(m.json.error.code).toBe("MAINTENANCE");
+    await setRuntimeConfig({ minVersion: "9.0.0" });
+    clearRuntimeCache();
+    const u = await send(withParams(positionGet, { flightNo: "SV263" }), { method: "GET", path: "/api/app/v1/flights/SV263/position", token: t, headers: { "x-app-version": "1.0.0" } });
+    expect(u.status).toBe(426);
+    expect(u.json.error.code).toBe("UPGRADE_REQUIRED");
   });
 });

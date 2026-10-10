@@ -5,22 +5,19 @@ import { addDays, monthOf, personRef, rangeLabel, t, todayIn, type CopyKey, type
 import { db, type Tx } from "@/db";
 import { appNotifications, appPeople, appTrips, appUsers } from "@/db/app-schema";
 import { appBlocks, appFollows, appFriendships } from "@/db/app-schema-circles";
-import { AppError, errorResponse } from "../http";
+import { AppError, resilient } from "../http";
 
 /* Helpers every circles module shares: people as others see them, who knows whom, blocks, limits, and routes. */
 
 export type Db = Tx | typeof db;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A route handler with dynamic params, wrapped like route(): the error envelope, no caching. */
+/**
+ * A route handler with dynamic params, wrapped like route(): request id, version and maintenance gates,
+ * Idempotency-Key on mutations, the error envelope, no caching.
+ */
 export function routeP<P extends Record<string, string>>(fn: (req: Request, params: P) => Promise<Response>) {
-  return async (req: Request, ctx: { params: Promise<P> }): Promise<Response> => {
-    try {
-      return await fn(req, await ctx.params);
-    } catch (e) {
-      return errorResponse(e);
-    }
-  };
+  return (req: Request, ctx: { params: Promise<P> }): Promise<Response> => resilient(req, async () => fn(req, await ctx.params));
 }
 
 /** A path id must be a uuid; anything else is simply not found. */
