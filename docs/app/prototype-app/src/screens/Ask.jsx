@@ -330,7 +330,7 @@ function EntryChecks({ checks, who, setWho, destKey, dep, ret }) {
             <Icon name="visa" />
             <div className="grow">
               <span className="small" style={{ color: '#1e352d' }}>{c.text}</span>
-              <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={() => ask(c.ansKey, { kind: 'visa', short: 'UK ETA', title: 'UK ETA for everyone', detail: `${who.map((id) => PEOPLE[id].name).join(', ')} · for ${range}`, quote: 60 * who.length })}>Ask Faisal to apply</button>
+              <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={() => ask(c.ansKey, { kind: 'visa', short: 'UK ETA', title: 'UK ETA for everyone', detail: `${who.map((id) => PEOPLE[id].name).join(', ')} · for ${range}`, quote: 60 * who.length })}>Ask Mada to apply</button>
             </div>
           </div>
         );
@@ -341,8 +341,8 @@ function EntryChecks({ checks, who, setWho, destKey, dep, ret }) {
               <span className="h3">{c.title}</span>
               <span className="small">{c.text}</span>
               <div className="row" style={{ marginTop: 6, flexWrap: 'wrap', gap: 8 }}>
-                {c.key === 'visa' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: c.need, title: `${c.need} for ${c.p.name}`, detail: `For ${dest.name}, ${range} · ${NAT[natOf(c.id, s)] || ''} passport`, quote: 350 })}>Ask Faisal to get it</button>}
-                {c.key === 'reentry' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: 'exit and re-entry visa', title: `Exit and re-entry visa for ${c.p.name}`, detail: `Single, valid 90 days · covers ${range}`, quote: 200 })}>Ask Faisal to arrange the exit and re-entry visa</button>}
+                {c.key === 'visa' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: c.need, title: `${c.need} for ${c.p.name}`, detail: `For ${dest.name}, ${range} · ${NAT[natOf(c.id, s)] || ''} passport`, quote: 350 })}>Ask Mada to get it</button>}
+                {c.key === 'reentry' && <button type="button" className="btn primary small" onClick={() => ask(c.ansKey, { kind: 'visa', short: 'exit and re-entry visa', title: `Exit and re-entry visa for ${c.p.name}`, detail: `Single, valid 90 days · covers ${range}`, quote: 200 })}>Ask Mada to arrange the exit and re-entry visa</button>}
                 {c.key === 'reentry' && <button type="button" className="btn secondary small" onClick={() => answer(c.ansKey, 'has')}>{c.p.name} already has one</button>}
                 {c.key === 'iqama' && <button type="button" className="btn secondary small" onClick={() => answer(`${c.id}:iqama`, iso(addDays(fromIso(ret || dep), 365)))}>It’s been renewed</button>}
                 {c.key === 'passport' && <RenewButton p={c.p} />}
@@ -930,7 +930,7 @@ function StayFlow({ query, setCta }) {
   if (s.demo.noResults) return (
     <EmptyState art={<ArtSuitcase />} title="No rooms free on those dates."
       body={`Everything near Galata is taken for ${rooms}. Faisal knows places that never show online, and can look by hand.`}
-      action={<button type="button" className="btn primary block" onClick={() => { setByHand(true); buzz(HAPTIC.tap); }}>Ask Faisal to find rooms</button>} />
+      action={<button type="button" className="btn primary block" onClick={() => { setByHand(true); buzz(HAPTIC.tap); }}>Ask Mada to find rooms</button>} />
   );
   const lastEid = n > 2 && (s.pastTrips || []).some((t) => /eid/i.test(t.note || ''));
   const cur = HOTELS.find((h) => h.id === pick);

@@ -150,10 +150,15 @@ export function Support({ params = {} }) {
         </span>
       } />
       <div className="support-head">
-        <span style={{ position: 'relative' }}><span className="avatar green" style={{ width: 52, height: 52, fontSize: 20 }}>F</span><i className="wait-dot" style={{ borderColor: '#e9e2d8' }} /></span>
-        <span className="col" style={{ gap: 1 }}>
-          <span className="h2" style={{ fontSize: 22 }}>Faisal at Mada</span>
-          <span className="tiny">Replies in about 2 minutes · the 24/7 desk covers him at night</span>
+        <span style={{ position: 'relative' }}><span className="avatar green" style={{ width: 52, height: 52 }}><Sun width={30} /></span></span>
+        <span className="col" style={{ gap: 2 }}>
+          <span className="h2" style={{ fontSize: 22 }}>Mada</span>
+          {(() => {
+            /* Mada vs Faisal: Mada is who you talk to; the person on duty shows as presence. */
+            const h = new Date().getHours();
+            const night = h >= 22 || h < 8;
+            return <span className="tiny row" style={{ gap: 6 }}><i className="presence-dot" aria-hidden="true" />{night ? 'Noura is covering for Faisal tonight · replies in about 5 min' : 'Faisal is online · usually replies in 2 min'}</span>;
+          })()}
         </span>
       </div>
       <div className="support-about"><Icon name="trips" size={16} />About: {about}</div>
@@ -223,8 +228,8 @@ export function Support({ params = {} }) {
               const r = new FileReader(); r.onload = () => { add({ from: 'me', img: r.result, queued: !!s.demo.offline }); reply(); }; r.readAsDataURL(f);
             }} />
           </label>
-          <label htmlFor="support-msg" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Message Faisal</label>
-          <input id="support-msg" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Message Faisal" autoComplete="off" />
+          <label htmlFor="support-msg" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Message Mada</label>
+          <input id="support-msg" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Message Mada" autoComplete="off" />
           <button type="submit" className="icon-btn dark" aria-label="Send" style={{ width: 40, height: 40 }} disabled={!draft.trim()}><Icon name="up" color="#f6f2ec" size={18} /></button>
         </div>
       </form>
@@ -251,7 +256,7 @@ function BagForm({ onSend, onNone }) {
       <div className="chips">{['Black suitcase', 'Coloured suitcase', 'A bag or box'].map((k) => <button key={k} type="button" className="chip" aria-pressed={kind === k ? 'true' : 'false'} onClick={() => setKind(k)}>{k}</button>)}</div>
       <span className="tiny">Deliver it to</span>
       <div className="chips">{['Our hotel', 'Home'].map((k) => <button key={k} type="button" className="chip" aria-pressed={to === k ? 'true' : 'false'} onClick={() => setTo(k)}>{k}</button>)}</div>
-      <button type="submit" className="btn primary small" disabled={ref.trim().length < 5}>Send to Faisal</button>
+      <button type="submit" className="btn primary small" disabled={ref.trim().length < 5}>Send to Mada</button>
       <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 13, padding: 0 }} onClick={onNone}>I don’t have a reference yet</button>
     </form>
   );

@@ -86,7 +86,7 @@ function FaisalLine({ note = 'Faisal is with you today.', dark }) {
   return (
     <button type="button" className={'td-faisal rise' + (dark ? ' dark' : '')} onClick={() => { buzz(HAPTIC.tap); push('support', { about: 'Istanbul trip' }); }}>
       <span className="td-face">F<i /></span>
-      <span className="grow col" style={{ gap: 0 }}><span className="td-faisal-note">{note}</span><span className="td-faisal-cta">Talk to Faisal</span></span>
+      <span className="grow col" style={{ gap: 0 }}><span className="td-faisal-note">{note}</span><span className="td-faisal-cta">Talk to Mada</span></span>
       <Icon name="chevron" size={18} />
     </button>
   );
@@ -1234,7 +1234,7 @@ function RateTrip() {
           <label htmlFor="td-note" className="sr">A note for Faisal</label>
           <textarea id="td-note" className="input td-note" rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional. The kids loved the ferry…" />
           <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn primary small" onClick={() => { buzz(HAPTIC.success); set((p) => ({ todayRating: { ...(p.todayRating || {}), note: note.trim(), sent: true } })); toast('Sent to Faisal.'); }}>Send to Faisal</button>
+            <button type="button" className="btn primary small" onClick={() => { buzz(HAPTIC.success); set((p) => ({ todayRating: { ...(p.todayRating || {}), note: note.trim(), sent: true } })); toast('Sent to Faisal.'); }}>Send to Mada</button>
             <button type="button" className="btn secondary small td-soft" onClick={() => { buzz(HAPTIC.tap); set((p) => ({ todayRating: { ...(p.todayRating || {}), [RATE_Q[RATE_Q.length - 1].id]: undefined } })); }}>Back</button>
           </div>
         </div>

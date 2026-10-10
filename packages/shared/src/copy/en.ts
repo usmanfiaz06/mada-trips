@@ -18,6 +18,21 @@ export const en = {
   'common.tryAgain': 'Try again',
   'common.offline.banner': "You're offline. Everything for your trips is on this phone.",
   'common.agentName': 'Faisal',
+  /* Mada vs Faisal (COPY.md §1): actions say Mada; the person appears as presence or as the one who acted. */
+  'action.talk': 'Talk to Mada',
+  'action.ask': 'Ask Mada',
+  'action.send': 'Send to Mada',
+  'action.call': 'Call Mada',
+  'presence.title': 'Mada',
+  'presence.online': '{agent} is online',
+  'presence.typing': '{agent} is typing…',
+  'presence.replies': 'Usually replies in {minutes} min',
+  'presence.covering': '{agent} is covering for {usual} tonight. {pronoun} has your whole trip.',
+  'presence.away': 'Replies within 10 minutes, any hour',
+  'actor.confirmed': 'Confirmed by {agent} at Mada',
+  'actor.replied': '{agent} replied',
+  'actor.intro': '{agent}, your Mada agent',
+  'notify.sender': 'Mada',
 
   // ───────────── tabs ─────────────
   'tabs.today': 'Today',
@@ -151,7 +166,7 @@ export const en = {
   'trips.past.first': 'Your first',
   'trips.requests.empty.title': 'Nothing waiting on Faisal.',
   'trips.requests.empty.body': 'Send him anything: a visa, a table tonight, a car for the day. It lands here and you watch it move.',
-  'trips.requests.empty.action': 'Send Faisal a request',
+  'trips.requests.empty.action': 'Send Mada a request',
   'trips.past.empty.title': 'Every trip leaves a stamp.',
   'trips.past.empty.body': 'Your first one goes right there. Trips stay here with every receipt, so the next one takes a minute.',
   'trips.past.empty.action': 'Earn the first stamp',
@@ -193,11 +208,11 @@ export const en = {
   // ───────────── ask ─────────────
   'ask.placeholder': 'Where to?',
   'ask.placeholderTrip': 'Anything for {city}?',
-  'ask.disclosure': 'Instant answers from Mada. Faisal and the team confirm anything you book.',
-  'ask.soon': 'Ask opens in the next build. Faisal can still help with anything.',
+  'ask.disclosure': 'Instant answers from Mada. A person at Mada confirms anything you book.',
+  'ask.soon': 'Ask opens in the next build. Talk to Mada for anything in the meantime.',
 
   // ───────────── problems the server reports (COPY.md §5.6: calm, what happened, what we do) ─────────────
-  'error.internal': 'That didn’t work, and it’s on us. Try once more, or ask Faisal.',
+  'error.internal': 'That didn’t work, and it’s on us. Try once more, or talk to Mada.',
   'error.validation': 'A detail needs another look.',
   'error.unauthorized': 'Sign in to carry on.',
   'error.sessionExpired': 'Sign in again to carry on.',
@@ -208,7 +223,7 @@ export const en = {
   'error.otpCooldown': 'A code is on its way. You can ask for a new one in {seconds} seconds.',
   'error.phoneInvalid': 'That doesn’t look like a Saudi mobile number. It needs 9 digits after +966, starting with 5.',
   'error.phoneTaken': 'That number is on another account.',
-  'error.notConfigured': 'This isn’t switched on yet. Faisal can do it by hand.',
+  'error.notConfigured': 'This isn’t switched on yet. Talk to Mada and we’ll do it by hand.',
   'error.offline': 'You’re offline.',
 
   // ───────────── messages that leave the app ─────────────

@@ -19,7 +19,10 @@
     },
     "android": {
       "package": "sa.madatrips.app",
-      "adaptiveIcon": { "backgroundColor": "#1e352d", "foregroundImage": "./assets/images/icon-foreground.png" },
+      "adaptiveIcon": {
+        "backgroundColor": "#1e352d",
+        "foregroundImage": "./assets/images/icon-foreground.png"
+      },
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -31,11 +34,32 @@
       "expo-router",
       "expo-secure-store",
       "expo-video",
-      ["expo-camera", { "cameraPermission": "To read your passport. Nothing is uploaded until you check the details." }],
-      ["expo-local-authentication", { "faceIDPermission": "To open your Wallet." }],
-      ["expo-splash-screen", { "backgroundColor": "#1e352d", "image": "./assets/images/splash.png", "imageWidth": 120 }],
-      "expo-font"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "To read your passport. Nothing is uploaded until you check the details."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "To open your Wallet."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1e352d",
+          "image": "./assets/images/splash.png",
+          "imageWidth": 120
+        }
+      ],
+      "expo-font",
+      "expo-sharing"
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": false }
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": false
+    }
   }
 }

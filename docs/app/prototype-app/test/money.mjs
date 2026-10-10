@@ -214,7 +214,7 @@ try {
   await see(/300123456700003/, 'buyer VAT on the invoice');
   await shot('company-draft');
   await click('Issue the tax invoice', { wait: 500 });
-  await see(/Ask Faisal to reissue/, 'locked after issue');
+  await see(/Ask Mada to reissue/, 'locked after issue');
   if (await phone.getByRole('button', { name: 'Edit company details' }).count()) throw new Error('issued invoice still editable');
   await shot('company-issued');
 } catch (e) {

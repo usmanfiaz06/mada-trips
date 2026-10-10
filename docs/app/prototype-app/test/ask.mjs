@@ -197,8 +197,8 @@ try {
   check(await cta().isDisabled(), 'Review must be blocked for Lina');
   check((await cta().innerText()).startsWith('Sort out Lina’s'), 'Button should say what to sort out');
   await shot('helper-blocked');
-  await click('Ask Faisal to get it');
-  await click('Ask Faisal to arrange the exit and re-entry visa');
+  await click('Ask Mada to get it');
+  await click('Ask Mada to arrange the exit and re-entry visa');
   check(await cta().isDisabled(), 'Still blocked by the iqama');
   await click('It’s been renewed');
   await see('Faisal is arranging Lina’s exit and re-entry visa');
@@ -224,7 +224,7 @@ try {
   await see('bag tag number');
   await notSee('Did that sort it?');
   await phone.locator('#bag-ref').fill('SV 482913');
-  await click('Send to Faisal', { wait: 2400 });
+  await click('Send to Mada', { wait: 2400 });
   await see('filed it with the airline under SV 482913');
   await see('Did that sort it?');
   await shot('support-bag');

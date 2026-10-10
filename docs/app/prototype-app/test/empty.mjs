@@ -191,7 +191,7 @@ try {
   await push('ask', { prefill: 'A hotel in Istanbul' }, 1800);
   await see('No rooms free on those dates.', 'stays none');
   await shot('ask-stays-none');
-  await click('Ask Faisal to find rooms', { wait: 600 });
+  await click('Ask Mada to find rooms', { wait: 600 });
   await see('Faisal is finding rooms in Istanbul', 'stays by hand');
   await shot('ask-stays-by-hand');
   await demo('No flights found');

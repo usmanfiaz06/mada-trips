@@ -133,7 +133,7 @@ function Requests() {
   if (!s.requests.length && !s.refunds.length && !mine.length) return (
     <EmptyState art={<PaperPlane />} title="Nothing waiting on Faisal."
       body="Send him anything: a visa, a table tonight, a car for the day. It lands here and you watch it move."
-      action={<button type="button" className="btn primary block" onClick={() => push('ask', {})}>Send Faisal a request</button>}
+      action={<button type="button" className="btn primary block" onClick={() => push('ask', {})}>Send Mada a request</button>}
       ideas={['A Schengen visa', 'A table for tonight', 'A car with a driver', 'Umrah in Ramadan'].map((q) => [q, () => push('ask', { prefill: q })])} />
   );
   const talk = (topic) => push('support', { about: 'Istanbul trip', topic });
@@ -169,7 +169,7 @@ function Requests() {
                 <div className="card well" style={{ gap: 8 }}>
                   <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
                   <span className="small" style={{ color: '#1e352d' }}>{r.alt || 'They can’t do it this time. Let’s find another way.'}</span>
-                  <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => talk('other')}>Talk to Faisal</button>
+                  <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => talk('other')}>Talk to Mada</button>
                 </div>
               )}
               {st === 'queued' && <span className="tiny">Saved on this phone. Sends when you're back online.</span>}

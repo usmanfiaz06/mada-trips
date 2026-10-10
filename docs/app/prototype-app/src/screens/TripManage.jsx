@@ -568,7 +568,7 @@ function ItemSheet({ it, onClose }) {
         {it.warn && <span className="tm-warn">{it.warn}</span>}
         <span className="small">{it.driver} tracks your flight. If it’s late, he waits, at no cost.</span>
         <button type="button" className="btn primary block" onClick={() => toast(`In the app this calls ${it.driver}. He speaks Arabic and English.`)}>Call {it.driver}</button>
-        <button type="button" className="btn ghost block" onClick={() => to('support', { about: 'Istanbul trip', topic: 'other' })}>Talk to Faisal</button>
+        <button type="button" className="btn ghost block" onClick={() => to('support', { about: 'Istanbul trip', topic: 'other' })}>Talk to Mada</button>
       </>)}
       {it.kind === 'hotel' && (<>
         <Row icon="pin" title={stayOf(s.trip)?.short || 'The hotel'} sub={`${stayOf(s.trip)?.address || ''}${stayOf(s.trip)?.walk ? ' · ' + stayOf(s.trip).walk : ''}`} />
@@ -581,7 +581,7 @@ function ItemSheet({ it, onClose }) {
         <span className="small">{it.status === 'pending' ? it.pendingText + '. Faisal holds it until then.' : 'Booked. Your confirmation is in your Wallet.'}</span>
         {it.status === 'pending' && it.reqId ? <button type="button" className="btn primary block" onClick={() => to('pay', { kind: 'quote', requestId: it.reqId })}>Pay to confirm</button> : null}
         {it.refundKey && <button type="button" className="btn secondary block" onClick={() => to('refund', { keys: [it.refundKey] })}>Ask for a refund</button>}
-        <button type="button" className="btn ghost block" onClick={() => to('support', { about: 'Istanbul trip', topic: 'change' })}>Talk to Faisal</button>
+        <button type="button" className="btn ghost block" onClick={() => to('support', { about: 'Istanbul trip', topic: 'change' })}>Talk to Mada</button>
       </>)}
       {it.kind === 'idea' && (<>
         <span className="small">Just an idea. Nothing is booked.</span>
@@ -983,7 +983,7 @@ function Invoice({ params }) {
         <div className="card well" style={{ gap: 6 }}>
           <span className="row small" style={{ color: '#1e352d', fontWeight: 600 }}><Icon name="lock" size={16} />Issued to {co.name}, {fullDay(new Date(co.issuedAt).toISOString().slice(0, 10))}</span>
           <span className="small">A tax invoice can’t be edited once it’s issued. Faisal can cancel it with a credit note and issue a new one.</span>
-          <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => { ask({ kind: 'invoice', title: 'Reissue the tax invoice', short: 'Invoice reissued', detail: co.name, with: 'faisal', outcome: 'yes', yesText: 'New tax invoice in Payments' }); buzz(HAPTIC.success); toast('Sent to Faisal. Tell him what to change in the chat.'); }}>Ask Faisal to reissue</button>
+          <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start' }} onClick={() => { ask({ kind: 'invoice', title: 'Reissue the tax invoice', short: 'Invoice reissued', detail: co.name, with: 'faisal', outcome: 'yes', yesText: 'New tax invoice in Payments' }); buzz(HAPTIC.success); toast('Sent to Faisal. Tell him what to change in the chat.'); }}>Ask Mada to reissue</button>
         </div>
       )}
       {sheet === 'company' && <CompanySheet onClose={() => setSheet(null)} />}
@@ -1068,7 +1068,7 @@ function Refund({ params }) {
       <Screen title="Refund">
         <EmptyState tall middle art={<ArtReceipt stamp />} title="Your trip is done."
           body="Every flight and night was used, so nothing is left to refund. If something went wrong on the trip, tell Faisal. He’ll take it up with the airline or hotel."
-          action={<button type="button" className="btn primary block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'refund' })}>Talk to Faisal</button>} />
+          action={<button type="button" className="btn primary block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'refund' })}>Talk to Mada</button>} />
       </Screen>
     );
   }
@@ -1144,7 +1144,7 @@ export function RefundTracker({ r, onTalk }) {
           <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
           <span className="small" style={{ color: '#1e352d' }}>“{r.reject}”</span>
           {r.alt && <span className="small" style={{ color: '#1e352d' }}>“{r.alt}”</span>}
-          {onTalk && <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={onTalk}>Talk to Faisal</button>}
+          {onTalk && <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={onTalk}>Talk to Mada</button>}
         </div>}
       </div>
     );
@@ -1241,7 +1241,7 @@ function ChangeFlight({ params }) {
   );
   if (tm.allUsed) return <Screen title="Change flight"><h1 className="h1">Both flights are flown.</h1><p className="body">Welcome home. Nothing left to change.</p></Screen>;
   if (tm.within24) return (
-    <Screen title="Change flight" act={<button type="button" className="btn primary block" onClick={() => { ask({ kind: 'call', title: 'Call me about a flight change', short: 'Call about a change', detail: `${f.code} · less than a day to go`, with: 'faisal', outcome: 'done' }); push('support', { about: 'Istanbul trip', topic: 'change' }); }}>Ask Faisal to call me</button>}>
+    <Screen title="Change flight" act={<button type="button" className="btn primary block" onClick={() => { ask({ kind: 'call', title: 'Call me about a flight change', short: 'Call about a change', detail: `${f.code} · less than a day to go`, with: 'faisal', outcome: 'done' }); push('support', { about: 'Istanbul trip', topic: 'change' }); }}>Ask Mada to call me</button>}>
       <span className="eyebrow">{f.code} · {f.date} · {f.dep}</span>
       <h1 className="h1 rise">Less than a day to go.</h1>
       <p className="body rise d1">Inside 24 hours, {f.airline} only changes tickets by phone. Faisal calls you, then calls them, and stays on until it’s done.</p>
@@ -1335,7 +1335,7 @@ function ChangeFlight({ params }) {
           <div className="card well">
             <span className="h3">No seats for {count === 1 ? 'one' : `all ${count}`} on those flights.</span>
             <span className="small">Faisal can look wider: other airports, or a waitlist on the day you want.</span>
-            <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => { ask({ kind: 'change', title: 'Find another flight', short: 'Wider search', detail: `${f.code} · any day near ${f.date}`, with: 'faisal', outcome: 'yes', yesText: 'Two options sent to your chat' }); toast('Sent to Faisal. Track it in Trips → Requests.'); pop(); }}>Ask Faisal to look wider</button>
+            <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => { ask({ kind: 'change', title: 'Find another flight', short: 'Wider search', detail: `${f.code} · any day near ${f.date}`, with: 'faisal', outcome: 'yes', yesText: 'Two options sent to your chat' }); toast('Sent to Faisal. Track it in Trips → Requests.'); pop(); }}>Ask Mada to look wider</button>
           </div>
         ) : opts.map((o) => {
           const d = o.diffPP * count;
@@ -1379,7 +1379,7 @@ function SwitchAirline({ f, n, R, onSend }) {
       return <Pick radio key={o.id} on={pick === o.id} onClick={() => setPick(o.id)} title={`${o.airline} · ${o.code} · ${o.dep}`} sub={`${o.from} → ${o.to} · ${o.bags} · ${o.refund}`} right={net > 0 ? `+${fmt(net)}` : `−${fmt(-net)}`} />;
     })}
     <span className="tiny">Price after your refund, for all {n}. Faisal checks seats before you pay anything.</span>
-    <button type="button" className="btn primary block" disabled={!pick} onClick={() => { const o = others.find((x) => x.id === pick); onSend(o, o.pp * n - back); }}>Ask Faisal to swap it</button>
+    <button type="button" className="btn primary block" disabled={!pick} onClick={() => { const o = others.find((x) => x.id === pick); onSend(o, o.pp * n - back); }}>Ask Mada to swap it</button>
   </>);
 }
 
@@ -1407,8 +1407,8 @@ function NameFix({ f, onSend }) {
     {state === 'same' && <span className="small">Type it exactly as on the passport. Airlines allow small fixes only: up to 3 letters.</span>}
     {state === 'ok' && <span className="small" style={{ color: '#2f7a4b', fontWeight: 600 }}>A small fix ({d} {d === 1 ? 'letter' : 'letters'}). {f.airline} does this free. Faisal sends it with a photo of the passport page.</span>}
     {state === 'too' && <div className="field"><span className="err">That’s more than a spelling fix. Airlines allow up to 3 letters changed. A different name means a new ticket, so the fare rules apply.</span></div>}
-    <button type="button" className="btn primary block" disabled={state !== 'ok'} onClick={() => onSend({ kind: 'name', title: `Name fix for ${p.name}`, short: 'Name fixed', detail: `${before} → ${after}`, with: 'airline', withName: f.airline, outcome: 'yes', yesText: 'New ticket number in your Wallet' })}>Send to Faisal</button>
-    {state === 'too' && <button type="button" className="btn ghost block" onClick={() => onSend({ kind: 'name', title: `Name change for ${p.name}`, short: 'Name change', detail: `${before} → ${after} · needs a new ticket`, with: 'faisal', outcome: 'no', alt: 'Faisal will call you with the price of a new ticket.' })}>Ask Faisal what it would cost</button>}
+    <button type="button" className="btn primary block" disabled={state !== 'ok'} onClick={() => onSend({ kind: 'name', title: `Name fix for ${p.name}`, short: 'Name fixed', detail: `${before} → ${after}`, with: 'airline', withName: f.airline, outcome: 'yes', yesText: 'New ticket number in your Wallet' })}>Send to Mada</button>
+    {state === 'too' && <button type="button" className="btn ghost block" onClick={() => onSend({ kind: 'name', title: `Name change for ${p.name}`, short: 'Name change', detail: `${before} → ${after} · needs a new ticket`, with: 'faisal', outcome: 'no', alt: 'Faisal will call you with the price of a new ticket.' })}>Ask Mada what it would cost</button>}
   </>);
 }
 
@@ -1456,7 +1456,7 @@ function HotelOptions() {
           <span className="h3">Asked so far</span>
           {pending.map((r) => <div key={r.id} className="spread"><span className="small" style={{ color: '#1e352d' }}>{r.title}</span><span className={'pill' + (r.status === 'quote' ? ' gold' : PAID_STATES.includes(r.status) ? ' ok' : '')}>{r.status === 'quote' ? 'Price ready' : PAID_STATES.includes(r.status) ? 'Booked' : 'With Faisal'}</span></div>)}
           {mine.map((r) => <div key={r.id} className="spread"><span className="small" style={{ color: '#1e352d' }}>{r.title}</span><StatusPill r={r} /></div>)}
-          <button type="button" className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => push('support', { about: 'Istanbul hotel', topic: 'change' })}>Talk to Faisal</button>
+          <button type="button" className="link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => push('support', { about: 'Istanbul hotel', topic: 'change' })}>Talk to Mada</button>
         </div>
       )}
       {sheet && <HotelSheet kind={sheet} st={st} onClose={() => setSheet(null)} onDone={(msg) => { setSheet(null); buzz(HAPTIC.success); toast(msg); }} />}
@@ -1637,7 +1637,7 @@ function SpecialRequests() {
           ))}
         </div>
       )}
-      <button type="button" className="btn ghost block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'other' })}>Something else? Talk to Faisal</button>
+      <button type="button" className="btn ghost block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'other' })}>Something else? Talk to Mada</button>
       {open && <SpecialSheet id={open} forWho={forWho} onClose={() => setOpen(null)} />}
     </Screen>
   );
@@ -1669,7 +1669,7 @@ function SpecialSheet({ id, forWho, onClose }) {
     <Pick radio on={opt === 'gate'} onClick={() => setOpt('gate')} title="To the gate" sub="Can manage the aircraft steps and walk to the seat" />
     <Pick radio on={opt === 'seat'} onClick={() => setOpt('seat')} title="All the way to the seat" sub="Can’t manage steps. Carried on with an aisle chair." />
     <Pick radio on={opt === 'own'} onClick={() => setOpt('own')} title="Bringing our own wheelchair" sub="Goes in the hold free, taken at the aircraft door" />
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : '(own chair)'}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : '(own chair)'}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' })}>Send to Mada</button>
   </>);
   else if (id === 'meal') {
     const kids = whoIds.filter((x) => Number(PEOPLE[x]?.born) >= 2014);
@@ -1679,13 +1679,13 @@ function SpecialSheet({ id, forWho, onClose }) {
         <Pick radio key={k} on={opt === k} disabled={!!dis} onClick={() => setOpt(k)} title={title} sub={dis ? 'Only for children under 12' : sub} />
       ))}
       <span className="tiny">Free. Needs 24 hours before the flight.</span>
-      <button type="button" className="btn primary block" disabled={!opt} onClick={() => { const label = { child: 'Child meal', veg: 'Vegetarian meal', diabetic: 'Diabetic meal', gluten: 'Gluten-free meal' }[opt]; done({ kind: 'meal', title: `${label} · ${opt === 'child' && forWho === 'all' ? joinNames(names(kids)) || whoTxt : whoTxt}`, short: `${label}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' }); }}>Send to Faisal</button>
+      <button type="button" className="btn primary block" disabled={!opt} onClick={() => { const label = { child: 'Child meal', veg: 'Vegetarian meal', diabetic: 'Diabetic meal', gluten: 'Gluten-free meal' }[opt]; done({ kind: 'meal', title: `${label} · ${opt === 'child' && forWho === 'all' ? joinNames(names(kids)) || whoTxt : whoTxt}`, short: `${label}`, detail: legs, with: 'airline', withName: airline, outcome: 'yes' }); }}>Send to Mada</button>
     </>);
   } else if (id === 'bassinet') {
     const baby = t.travellers.some((x) => Number(PEOPLE[x]?.born) >= 2024);
     body = baby ? (<>
       <span className="small">A bassinet clips to the wall in front of the first row. For babies under 11 kg. Free, but there are only a few on each plane.</span>
-      <button type="button" className="btn primary block" onClick={() => done({ kind: 'bassinet', title: 'Bassinet seat', short: 'Bassinet', detail: legs, with: 'airline', withName: airline, outcome: 'no', alt: 'The bassinet row is taken on the way there. Faisal moved you to row 14 with a spare seat beside you instead.' })}>Send to Faisal</button>
+      <button type="button" className="btn primary block" onClick={() => done({ kind: 'bassinet', title: 'Bassinet seat', short: 'Bassinet', detail: legs, with: 'airline', withName: airline, outcome: 'no', alt: 'The bassinet row is taken on the way there. Faisal moved you to row 14 with a spare seat beside you instead.' })}>Send to Mada</button>
     </>) : (<>
       <p className="body">Bassinets are for babies under 2 and under 11 kg. No one on this trip is that young.</p>
       <span className="small">Travelling with a baby after all? Add them in the Wallet first, then come back.</span>
@@ -1695,20 +1695,20 @@ function SpecialSheet({ id, forWho, onClose }) {
     <span className="small">You’re in {seatText(f.seats)} going{f.back ? ` and ${seatText(f.backSeats)} coming back` : ''}{t.travellers.length > 1 ? ', side by side' : ''}.</span>
     <Pick radio on={opt === 'keep'} onClick={() => setOpt('keep')} title="Keep us together, whatever changes" sub="If the plane changes, Faisal re-seats you together first" />
     <Pick radio on={opt === 'kids'} onClick={() => setOpt('kids')} title="Children next to a parent" sub="Never across the aisle" />
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'seats', title: opt === 'keep' ? `Seats together${f.back ? ', both ways' : ''}` : 'Children beside a parent', short: 'Seats together', detail: legs, with: 'airline', withName: airline, outcome: f.iata === 'XY' ? 'no' : 'yes', alt: 'flynas only guarantees seats together with paid seat selection, SAR 35 each. Faisal can add it.' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'seats', title: opt === 'keep' ? `Seats together${f.back ? ', both ways' : ''}` : 'Children beside a parent', short: 'Seats together', detail: legs, with: 'airline', withName: airline, outcome: f.iata === 'XY' ? 'no' : 'yes', alt: 'flynas only guarantees seats together with paid seat selection, SAR 35 each. Faisal can add it.' })}>Send to Mada</button>
   </>);
   else if (id === 'celebration') body = (<>
     <span className="small">The hotel will do something small in the room. What exactly is up to them.</span>
     <div className="chips">{['Birthday', 'Anniversary', 'Something else'].map((k) => <button key={k} type="button" className={'chip' + (opt === k ? ' on' : '')} aria-pressed={opt === k ? 'true' : 'false'} onClick={() => setOpt(k)}>{k}</button>)}</div>
     <div className="chips">{tripDays.map((d) => <button key={d} type="button" className={'chip' + (day === d ? ' on' : '')} aria-pressed={day === d ? 'true' : 'false'} onClick={() => setDay(d)}>{weekday(d)} {dayOf(d)}</button>)}</div>
     <div className="field"><label htmlFor="cel-note">A note for the hotel (optional)</label><input id="cel-note" className="input" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} placeholder={forWho === 'all' ? 'Who, and what for' : `${whoTxt} turns …`} /></div>
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'celebration', title: `${opt} · ${dayLabel(day)}`, short: `${opt}${forWho !== 'all' ? ' · ' + whoTxt : ''}`, detail: note || 'A note to the hotel', day, with: 'hotel', outcome: 'yes' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'celebration', title: `${opt} · ${dayLabel(day)}`, short: `${opt}${forWho !== 'all' ? ' · ' + whoTxt : ''}`, detail: note || 'A note to the hotel', day, with: 'hotel', outcome: 'yes' })}>Send to Mada</button>
   </>);
   else if (id === 'prayer') body = (<>
     <span className="small">Istanbul on {shortDay(f?.dateISO || stayOf(t)?.fromISO)}: {PRAYER}. The times for each day are in your itinerary.</span>
     <Pick on={opt === 'mat'} onClick={() => setOpt(opt === 'mat' ? null : 'mat')} title="Prayer mats and the qibla direction in the room" sub="Qibla from Galata is south-east, about 152°" />
     <span className="tiny">Mosques near the hotel: Arap Camii (6 min walk), Kılıç Ali Paşa (10 min).</span>
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'prayer', title: 'Prayer mats and qibla in the room', short: 'Prayer mats', detail: t.stay?.name || 'Hotel', with: 'hotel', outcome: 'yes' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'prayer', title: 'Prayer mats and qibla in the room', short: 'Prayer mats', detail: t.stay?.name || 'Hotel', with: 'hotel', outcome: 'yes' })}>Send to Mada</button>
   </>);
   else if (id === 'bags') {
     const people = forWho === 'all' ? t.travellers.length : 1;
@@ -1730,12 +1730,12 @@ function SpecialSheet({ id, forWho, onClose }) {
   } else if (id === 'sports') body = (<>
     <span className="small">Packed and under {R.bagKg} kg, it counts as one of your bags. Heavier or longer than 2 m costs SAR 300 each way.</span>
     {[['golf', 'Golf clubs', 'Usually 15–20 kg'], ['bike', 'A bike in a box', 'Usually 25–32 kg'], ['ski', 'Skis or a snowboard', 'Usually 8–12 kg']].map(([k, title, sub]) => <Pick radio key={k} on={opt === k} onClick={() => setOpt(k)} title={title} sub={sub} />)}
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: legs, with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: legs, with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Mada</button>
   </>);
   else body = (<>
     <p className="body">Pets can’t fly with you to Istanbul on {airline}, in the cabin or the hold, and Mada can’t book pet travel.</p>
     <span className="small">Guide and assistance dogs are the exception. They fly free in the cabin with the right papers. Tell Faisal and he’ll arrange it.</span>
-    <button type="button" className="btn primary block" onClick={() => { onClose(); push('support', { about: 'Istanbul trip', topic: 'other' }); }}>Talk to Faisal</button>
+    <button type="button" className="btn primary block" onClick={() => { onClose(); push('support', { about: 'Istanbul trip', topic: 'other' }); }}>Talk to Mada</button>
   </>);
   return (
     <Sheet label={meta.title} onClose={onClose}>

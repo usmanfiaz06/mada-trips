@@ -161,7 +161,7 @@ try {
   await expectText(/more than a spelling fix/, 'too many letters');
   await shot('name-fix-too-much');
   await phone.locator('#nf-given').fill('SARAH');
-  await click('Send to Faisal', { wait: 500 });
+  await click('Send to Mada', { wait: 500 });
 
   step('change flight: no availability');
   await demo('No flights found');
@@ -211,11 +211,11 @@ try {
   await click(/^Wheelchair/, { exact: false });
   await phone.getByRole('radio', { name: /To the gate/ }).click();
   await shot('special-wheelchair');
-  await click('Send to Faisal', { wait: 400 });
+  await click('Send to Mada', { wait: 400 });
   await click('Ahmed', { role: 'radio' });
   await click(/^Meals/, { exact: false });
   await phone.getByRole('radio', { name: /Child meal/ }).click();
-  await click('Send to Faisal', { wait: 400 });
+  await click('Send to Mada', { wait: 400 });
   await click(/^Bassinet/, { exact: false });
   await shot('special-bassinet');
   await closeSheet();
@@ -226,7 +226,7 @@ try {
   await click(/^Ask for SAR 1,000/, { exact: false, wait: 400 });
   await click(/^Sports equipment/, { exact: false });
   await phone.getByRole('radio', { name: /A bike in a box/ }).click();
-  await click('Send to Faisal', { wait: 400 });
+  await click('Send to Mada', { wait: 400 });
   await click(/^Travelling with a pet/, { exact: false });
   await shot('special-pet');
   await closeSheet();
@@ -234,7 +234,7 @@ try {
   await click('Birthday');
   await phone.locator('#cel-note').fill('Hessa turns 39');
   await shot('special-celebration');
-  await click('Send to Faisal', { wait: 400 });
+  await click('Send to Mada', { wait: 400 });
   await scrollDown(800);
   await shot('special-asked');
 
@@ -242,7 +242,7 @@ try {
   await demo('Offline');
   await click(/^Prayer/, { exact: false });
   await phone.getByRole('checkbox', { name: /Prayer mats/ }).click();
-  await click('Send to Faisal', { wait: 400 });
+  await click('Send to Mada', { wait: 400 });
   await expectText(/Waiting for a connection/, 'queued offline');
   await shot('special-offline');
   await demo('Offline');

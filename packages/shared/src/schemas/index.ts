@@ -10,3 +10,4 @@ export * from './notifications';
 export * from './offers';
 export * from './health';
 export * from './positions';
+export * from './wallet';

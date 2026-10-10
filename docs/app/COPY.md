@@ -21,6 +21,24 @@ The app has exactly two voices, and the traveller must always know which one is 
 - **The app never calls itself an assistant, a bot, AI, smart or magic.** It is simply Mada.
 - **A person's name appears only when that person actually acted.** "Confirmed by Faisal" is only ever shown when Faisal confirmed it. If we fake this once, the whole promise is gone.
 
+### Mada and Faisal: one rule everywhere
+
+**Mada is who you talk to. Faisal is the person on duty for you right now.** People must never wonder whether they are dealing with "Mada" or "Faisal".
+
+| Where | Use | Never |
+|---|---|---|
+| **Buttons and actions** | Always **Mada**: "Talk to Mada", "Ask Mada", "Send to Mada", "Book with Mada", "Call Mada" | "Ask Faisal", "Send to Faisal", "Message Faisal" |
+| **Presence** (who is there) | The person, small, under Mada: "**Faisal is online**", "Faisal is typing…", "Usually replies in 2 min" | A big "Faisal" title |
+| **Someone acted** | The person, with Mada: "**Confirmed by Faisal at Mada**", "Faisal replied", "Faisal changed your seats" | "Mada confirmed" when a person did it |
+| **Introducing him** | Once, warmly: "**Faisal, your Mada agent**" | "Your agent Faisal" without Mada |
+| **Chat header** | Title **Mada**; line under it: green dot + "Faisal is online · usually replies in 2 min" | Title "Faisal at Mada" |
+| **Someone else covering** | "**Noura is covering for Faisal tonight.** She has your whole trip." | Silently swapping the name |
+| **Nobody online** (never at launch: 24/7) | "Mada · replies within 10 minutes, any hour" | — |
+| **Notifications** | Sender **Mada**; body names the person if a person acted: "Faisal: Your seats are 3A–3D." | Sender "Faisal" |
+| **Software decides** (search results, alerts) | "We" (Mada): "We're watching your flight." | A person's name |
+
+The shared copy catalogue (`packages/shared/src/copy/en.ts`) holds these patterns as `presence.*` and `actor.*` strings; screens must use them instead of writing their own.
+
 ---
 
 ## 2. Six rules of writing

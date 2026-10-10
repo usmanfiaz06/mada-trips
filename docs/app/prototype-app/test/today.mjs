@@ -160,7 +160,7 @@ try {
   await click('Great');
   await phone.locator('#td-note').fill('The kids loved the ferry.');
   await shot('home-note');
-  await click('Send to Faisal', { wait: 500 });
+  await click('Send to Mada', { wait: 500 });
   await expect(has('Faisal reads every one'), 'rating sent');
   await phone.locator('[data-testid="td-photos"]').setInputFiles(['test/fixtures/anna-photo.jpg', 'test/fixtures/noura-photo.jpg', 'test/fixtures/noura-tilt8.jpg']);
   await page.waitForTimeout(1200);
