@@ -2,6 +2,14 @@ import { People, NewCircle, Friend, Saved, Join } from './screens/Social.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, FLIGHTS, seedTrip, withDemo, buzz, HAPTIC } from './store.jsx';
+
+/* What a phone sign-up with no passport and no name leaves: signed in, and nothing else. */
+const emptyAccount = () => ({
+  onboarded: true, guest: false, demoSeed: false,
+  user: { name: '', full: '' }, household: ['omar'], passportSaved: false, notifications: false,
+  account: { signedOut: false, phone: { digits: '512345678', source: 'signup', at: Date.now() }, methods: { apple: false, google: false, phone: true } },
+  tab: 'today', stack: [],
+});
 import { Dock, Icon, Sun } from './ui.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Today from './screens/Today.jsx';
@@ -155,6 +163,7 @@ function Demo() {
           <div className="demo-grid">
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setOpen(false); }}>Fresh install</button>
             <button type="button" className="demo-btn" onClick={() => jump('none', true)}>Skip sign-up</button>
+            <button type="button" className="demo-btn" onClick={() => { const keep = s.demo; hardReset(); setTimeout(() => set({ ...emptyAccount(), demo: keep }), 0); setOpen(false); }}>Empty account</button>
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setTimeout(() => set({ pendingInvite: 'ist-8k2' }), 0); setOpen(false); }}>Invite link, new to Mada</button>
             <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'ist-8k2' }), 50); setOpen(false); }}>Invite link, signed in</button>
             <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('join', { code: 'old-4q1' }), 50); setOpen(false); }}>Expired invite link</button>
