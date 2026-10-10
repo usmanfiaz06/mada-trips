@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
-import { Icon, Sun, TopBar } from '../ui.jsx';
+import { Icon, Sun, TopBar, QuietRadar } from '../ui.jsx';
 
 /* One conversation with Faisal and the 24/7 desk. Every message gets a real answer for what it is about,
    and urgent things get a phone call. "Did that sort it?" only follows something that was actually done.
@@ -276,10 +276,10 @@ export function Inbox() {
           ))}
         </div>
         {items.length === 0 && (
-          <div className="card well" style={{ alignItems: 'flex-start' }}>
-            <Sun width={36} color="#b98f4a" />
-            <span className="h3">Nothing here yet.</span>
-            <span className="small">Gate changes, replies from Faisal, refunds and circle news land here, so nothing gets lost.</span>
+          <div className="empty-hero rise" style={{ alignItems: 'center', textAlign: 'center' }}>
+            <QuietRadar />
+            <h2 className="display">All quiet.</h2>
+            <span className="small">{s.trip || (s.trackedFlights || []).length ? 'We’re watching your flights. The moment a gate, a time or a reply changes, it lands here.' : 'Gate changes, replies from Faisal, refunds and circle news land here, so nothing gets lost.'}</span>
           </div>
         )}
         {items.map((n) => (

@@ -379,3 +379,74 @@ export async function saveFile(filename, data) {
 /* Google Calendar link for one event: works everywhere, no file needed. Times are 'YYYYMMDDTHHMMSSZ'. */
 export const calendarLink = ({ title, start, end, details = '', location = '' }) =>
   `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
+
+/* ---------- empty states with a little life in them ---------- */
+
+const BOARD = [
+  ['ISTANBUL', 'IST', '4H 15M'], ['ALULA', 'ULH', '1H 20M'], ['BAKU', 'GYD', '3H 05M'], ['DUBAI', 'DXB', '1H 55M'],
+  ['LONDON', 'LHR', '6H 50M'], ['TBILISI', 'TBS', '3H 30M'], ['ABHA', 'AHB', '1H 35M'], ['CAIRO', 'CAI', '2H 25M'],
+];
+
+/* A split-flap departures board that keeps flipping through places: the empty Upcoming tab. */
+export function DepartureBoard({ from = 'Riyadh', onPick }) {
+  const [i, setI] = useState(0);
+  useEffect(() => { const t = setInterval(() => setI((n) => n + 1), 2200); return () => clearInterval(t); }, []);
+  const rows = [0, 1, 2].map((k) => BOARD[(i + k * 3) % BOARD.length]);
+  return (
+    <div className="board" role="img" aria-label={`Departures from ${from}`}>
+      <div className="board-head"><span>Departures · {from}</span><span className="board-dot" /></div>
+      {rows.map(([city, code, dur], k) => (
+        <button type="button" key={k} className="board-row" onClick={() => onPick && onPick(city)} aria-label={`Plan ${city.toLowerCase()}`}>
+          <span className="board-flaps" key={city}>{city.padEnd(9, ' ').split('').map((ch, j) => <i key={j} style={{ animationDelay: `${j * 45 + k * 120}ms` }}>{ch === ' ' ? ' ' : ch}</i>)}</span>
+          <span className="board-code">{code}</span>
+          <span className="board-dur">{dur}</span>
+        </button>
+      ))}
+      <div className="board-row board-you"><span className="board-flaps">{'YOUR TRIP'.split('').map((ch, j) => <i key={j} className="blink" style={{ animationDelay: `${j * 60}ms` }}>{ch === ' ' ? ' ' : ch}</i>)}</span><span className="board-code">???</span><span className="board-dur">SOON</span></div>
+    </div>
+  );
+}
+
+/* An empty passport page, stamps waiting: the empty Past tab. */
+export function EmptyPassport() {
+  const [hit, setHit] = useState(null);
+  const spots = [[18, 22, -12], [62, 16, 8], [28, 60, 6], [70, 58, -6]];
+  return (
+    <div className="pp-empty" role="img" aria-label="An empty passport page">
+      <span className="pp-empty-title">VISAS · STAMPS</span>
+      {spots.map(([x, y, r], k) => (
+        <button type="button" key={k} className={'pp-slot' + (k === 0 ? ' first' : '') + (hit === k ? ' hit' : '')} style={{ left: `${x}%`, top: `${y}%`, transform: `rotate(${r}deg)` }}
+          onClick={() => { setHit(k); buzz([0, 10, 40, 10]); setTimeout(() => setHit(null), 500); }} aria-label={k === 0 ? 'Your first stamp goes here' : 'Empty stamp'}>
+          {k === 0 ? <span>YOUR<br />FIRST</span> : null}
+        </button>
+      ))}
+      <span className="pp-empty-no">P · 01</span>
+    </div>
+  );
+}
+
+/* A paper plane looping on a dotted line: nothing waiting on Faisal. */
+export function PaperPlane() {
+  return (
+    <svg className="plane-loop" viewBox="0 0 300 120" width="100%" height="120" aria-hidden="true">
+      <path id="loop" d="M10 90 C 70 90, 90 20, 150 30 S 250 110, 290 40" fill="none" stroke="#c9b48a" strokeWidth="2" strokeDasharray="2 8" strokeLinecap="round" />
+      <g>
+        <path d="M-12 -7 L12 0 L-12 7 L-6 0 Z" fill="#1e352d" />
+        <path d="M-6 0 L12 0 L-9 4 Z" fill="#d9b77a" />
+        <animateMotion dur="5.5s" repeatCount="indefinite" rotate="auto"><mpath href="#loop" /></animateMotion>
+      </g>
+    </svg>
+  );
+}
+
+/* A calm radar: all quiet, still watching. */
+export function QuietRadar() {
+  return (
+    <div className="radar" aria-hidden="true">
+      <span className="radar-ring r1" /><span className="radar-ring r2" /><span className="radar-ring r3" />
+      <span className="radar-sweep" />
+      <span className="radar-blip" />
+      <Sun width={30} color="#b98f4a" />
+    </div>
+  );
+}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RequestThread, QuoteBreakdown } from './Ask.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
-import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker } from '../ui.jsx';
+import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
 import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney, MoveNotice, NoStayChoices } from './TripManage.jsx';
 import { TrackedFlights } from './Today.jsx';
@@ -87,10 +87,17 @@ function Upcoming() {
   const { s, push } = useStore();
   const tracked = (s.trackedFlights || []).length > 0;
   if (!s.trip) return (<>
-    <div className="card well rise" style={{ alignItems: 'flex-start' }}>
-      <span className="h3">No trips yet.</span>
-      <span className="small">Tell us where you’d like to go. Faisal books it and stays with you until you’re home.</span>
-      <button type="button" className="btn primary small" onClick={() => push('ask', {})}>Plan a trip</button>
+    <div className="empty-hero rise">
+      <DepartureBoard from={({ RUH: 'Riyadh', JED: 'Jeddah', DMM: 'Dammam' })[s.account?.home || 'RUH'] || 'Riyadh'} onPick={(city) => push('ask', { prefill: `Flights to ${city.charAt(0) + city.slice(1).toLowerCase()}` })} />
+      <h2 className="display">Your name’s not on the board yet.</h2>
+      <span className="small">Tap a city to see it, or tell us where. Faisal books it and stays with you until you’re home.</span>
+      <button type="button" className="btn primary block" onClick={() => push('ask', {})}>Where to?</button>
+    </div>
+    <span className="eyebrow rise d1">Easy from here this winter</span>
+    <div className="idea-row rise d1">
+      {[['img/istanbul.jpg', 'Istanbul', '4h · cool and cosy', 'Flights to Istanbul'], ['img/alula.jpg', 'AlUla', '1h 20 · stars and rock', 'A weekend in AlUla'], ['img/riyadh.jpg', 'Riyadh Season', 'No flight needed', 'Things to do in Riyadh this weekend']].map(([img, t, sub, q]) => (
+        <button key={t} type="button" className="idea" onClick={() => push('ask', { prefill: q })}><img src={img} alt="" /><span>{t}<small>{sub}</small></span></button>
+      ))}
     </div>
     {tracked && <TrackedFlights title="Flights you’re tracking" />}
     <Imports />
@@ -124,7 +131,12 @@ function Requests() {
   const now = Date.now();
   const mine = (s.tripRequests || []);
   if (!s.requests.length && !s.refunds.length && !mine.length) return (
-    <div className="card well rise"><span className="h3">Nothing waiting.</span><span className="small">Changes, refunds, visas, tables and anything else you ask for show up here while Mada works on them.</span></div>
+    <div className="empty-hero rise">
+      <PaperPlane />
+      <h2 className="display">Nothing waiting on Faisal.</h2>
+      <span className="small">Send him anything. Visas, a table tonight, a car for the day. It lands here and you watch it move.</span>
+      <div className="chips">{['A Schengen visa', 'A table for tonight', 'A car with a driver', 'Umrah in Ramadan'].map((q) => <button key={q} type="button" className="chip" onClick={() => push('ask', { prefill: q })}>{q}</button>)}</div>
+    </div>
   );
   const talk = (topic) => push('support', { about: 'Istanbul trip', topic });
   const items = [
@@ -205,7 +217,12 @@ function quoteText(r) {
 function Past() {
   const { s, push } = useStore();
   if (!(s.pastTrips || []).length) return (
-    <div className="card well rise"><span className="h3">No past trips yet.</span><span className="small">Trips you take with Mada stay here, with every receipt, so the next one is quicker to plan.</span></div>
+    <div className="empty-hero rise">
+      <EmptyPassport />
+      <h2 className="display">Every trip leaves a stamp.</h2>
+      <span className="small">Your first one goes right there. Trips stay here with every receipt, so the next one takes a minute.</span>
+      <button type="button" className="btn primary block" onClick={() => push('ask', {})}>Earn the first stamp</button>
+    </div>
   );
   return s.pastTrips.map((t) => (
     <div key={t.id} className="card rise">
