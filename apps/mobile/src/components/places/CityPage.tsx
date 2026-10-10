@@ -224,8 +224,8 @@ export function CityPage({ id }: { id: string }) {
 const s = StyleSheet.create({
   hero: { height: 320, overflow: 'hidden', justifyContent: 'flex-end' },
   heroText: { padding: 20, gap: 4 },
-  code: { position: 'absolute', right: -6, bottom: 70, fontFamily: ff.mono, fontSize: 104, lineHeight: 110, color: 'rgba(217,183,122,0.13)' },
-  rose: { position: 'absolute', right: 6, opacity: 0.92 },
+  code: { position: 'absolute', end: -6, bottom: 70, fontFamily: ff.mono, fontSize: 104, lineHeight: 110, color: 'rgba(217,183,122,0.13)' },
+  rose: { position: 'absolute', end: 6, opacity: 0.92 },
   credit: { paddingHorizontal: 20, paddingTop: 6 },
   body: { paddingHorizontal: 20, paddingTop: 16, gap: 12 },
   facts: { flexDirection: 'row', gap: 10 },

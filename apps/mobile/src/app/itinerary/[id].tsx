@@ -16,7 +16,7 @@ import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useItinerary, useTrip } from '@/lib/trips';
-import { colors, radii } from '@/theme';
+import { colors, radii, textEnd } from '@/theme';
 
 type Picked = ItineraryItem & { day: string };
 const dl = (d: string) => dayLabel(d, { today: d });
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   date: { width: 46, alignItems: 'center' },
   tl: { gap: 2 },
   ev: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 8 },
-  time: { width: 44, textAlign: 'right', fontVariant: ['tabular-nums'], paddingTop: 6, color: colors.ink2 },
+  time: { width: 44, textAlign: textEnd(), fontVariant: ['tabular-nums'], paddingTop: 6, color: colors.ink2 },
   dot: { width: 28, height: 28, borderRadius: 14, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   dotIdea: { borderStyle: 'dashed', backgroundColor: colors.paper },
   docs: { backgroundColor: colors.mist, borderRadius: radii.sm, padding: 10 },

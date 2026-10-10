@@ -198,7 +198,7 @@ function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) 
       <View style={styles.ppEmpty}>
         <T style={styles.ppTitle}>{t('trips.past.page')}</T>
         {([[18, 22, -12], [62, 16, 8], [28, 60, 6], [70, 58, -6]] as const).map(([x, y, r], k) => (
-          <View key={k} style={[styles.slot, { left: `${x}%`, top: `${y}%`, transform: [{ rotate: `${r}deg` }] }, k === 0 ? styles.slotFirst : null]}>
+          <View key={k} style={[styles.slot, { start: `${x}%`, top: `${y}%`, transform: [{ rotate: `${r}deg` }] }, k === 0 ? styles.slotFirst : null]}>
             {k === 0 ? <T style={[font('display', colors.goldInk), { fontSize: 14, lineHeight: 14, textAlign: 'center', textTransform: 'uppercase', width: 52 }]}>{t('trips.past.first')}</T> : null}
           </View>
         ))}

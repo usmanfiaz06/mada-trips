@@ -7,7 +7,7 @@ import {
 } from '@mada/shared';
 import { API_MODE, API_ORIGIN } from './config';
 import { useSession } from './session';
-import { t } from './i18n';
+import { getLocale, t } from './i18n';
 import { noteServerTime } from './net/clock';
 import { getAppVersion, noteBusy, noteMaintenance, noteSessionExpired, noteUpgradeRequired, setAppVersion, useGates } from './net/gates';
 import { breadcrumb } from './net/report';
@@ -83,6 +83,7 @@ async function httpTransport(w: Wire): Promise<WireResponse> {
       signal: ctrl.signal,
       headers: {
         Accept: 'application/json',
+        'Accept-Language': getLocale(),
         [HEADERS.appVersion]: getAppVersion(),
         ...(w.body !== undefined ? { 'Content-Type': 'application/json' } : null),
         ...(w.token ? { Authorization: `Bearer ${w.token}` } : null),

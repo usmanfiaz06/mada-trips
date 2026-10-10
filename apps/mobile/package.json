@@ -16,9 +16,11 @@
     "e2e:resilience": "node test/e2e-resilience.mjs"
   },
   "dependencies": {
+    "@expo-google-fonts/ibm-plex-sans-arabic": "0.4.2",
     "@expo-google-fonts/instrument-serif": "0.4.1",
     "@expo-google-fonts/inter-tight": "0.4.2",
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
+    "@expo-google-fonts/reem-kufi": "0.4.2",
     "@mada/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "12.0.1",
@@ -42,6 +44,7 @@
     "expo-image-picker": "~57.0.20",
     "expo-linking": "~57.0.12",
     "expo-local-authentication": "~57.0.3",
+    "expo-localization": "~57.0.2",
     "expo-notifications": "~57.0.22",
     "expo-print": "~57.0.2",
     "expo-router": "~57.0.25",
@@ -50,6 +53,7 @@
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
+    "expo-updates": "~57.0.25",
     "expo-video": "~57.0.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",

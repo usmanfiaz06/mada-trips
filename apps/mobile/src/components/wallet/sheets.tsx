@@ -12,7 +12,7 @@ import { toast } from '@/lib/toast';
 import { useCards, useCredit, walletApi, walletKeys, type PickedFile } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { fmtDate, fullDay, fullNameOf, useOnOpen } from '@/lib/wallet-model';
-import { colors, ff, radii } from '@/theme';
+import { colors, ff, radii, textEnd } from '@/theme';
 import { Button } from '../Button';
 import { PermissionDenied } from '../states';
 import { Card } from '../Card';
@@ -137,7 +137,7 @@ export function UploadSheet({ visible, kind, person, replaces, onClose, onSaved 
           <T v="small">{t('docs.upload.found')}</T>
           <Card variant="well" style={{ gap: 6 }}>
             {rows.map(([k, v]) => (
-              <View key={k} style={styles.spread}><T v="small">{k}</T><T v="small" color={colors.green} style={{ fontFamily: ff.ui600, flexShrink: 1, textAlign: 'right' }}>{v}</T></View>
+              <View key={k} style={styles.spread}><T v="small">{k}</T><T v="small" color={colors.green} style={{ fontFamily: ff.ui600, flexShrink: 1, textAlign: textEnd() }}>{v}</T></View>
             ))}
           </Card>
           <Field label={t('docs.field.validUntil')} value={until} onChangeText={setUntil} placeholder="11/06/2028" keyboardType="numbers-and-punctuation" error={badUntil ? t('passport.field.badDate') : null}

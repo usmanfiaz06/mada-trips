@@ -10,7 +10,7 @@ import { T } from '@/components/Text';
 import { MoveNotice } from '@/components/trips/MoveNotice';
 import { Box, Grow, H3, Photo, Ring, Rise, Row, Small, SmallButton, Spread, Tag, Tiny, Veil } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { dirSign, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, useTrips, useTripMutation, useOffline } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
@@ -88,7 +88,7 @@ function Readiness({ trip }: { trip: TripDetail }) {
       <Pressable testID="ready-done" accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => { buzz('tap'); setOpen(!open); }} style={styles.doneToggle}>
         <View style={{ flexDirection: 'row' }}>{done.map((it, i) => <View key={it.id} style={[styles.tick, i ? { marginStart: -6 } : null]}><Icon name="check" size={11} color={colors.paper} width={3} /></View>)}</View>
         <T numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 17, color: colors.ink2, fontFamily: ff.ui500 }}>{t('td.ready.doneList', { n: done.length, list: done.map((i) => i.k.toLowerCase()).join(', ') })}</T>
-        <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}><Icon name="chevron" size={16} /></View>
+        <View style={{ transform: [{ rotate: open ? `${90 * dirSign()}deg` : '0deg' }] }}><Icon name="chevron" size={16} /></View>
       </Pressable>
       {open ? (
         <View style={{ gap: 10, paddingHorizontal: 4 }}>

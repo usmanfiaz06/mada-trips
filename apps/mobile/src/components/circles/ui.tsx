@@ -8,6 +8,7 @@ import { VGradient } from '@/components/Gradient';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { buzz } from '@/lib/haptics';
+import { dirSign } from '@/lib/i18n';
 import { colors, ff, font, radii, sizes } from '@/theme';
 
 /* Small pieces every Circles screen shares, drawn after the prototype's classes (person-row, tickbox, toggle, tabs-text). */
@@ -56,7 +57,8 @@ export function Tick({ on }: { on: boolean }) {
 
 /** The prototype's toggle: 52×32, gold when on. */
 export function Toggle({ value, onChange, label, onDark }: { value: boolean; onChange: (v: boolean) => void; label: string; onDark?: boolean }) {
-  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(value ? 20 : 0, { duration: 260 }) }] }));
+  const dir = dirSign();
+  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: withTiming(value ? 20 * dir : 0, { duration: 260 }) }] }));
   return (
     <Pressable accessibilityRole="switch" accessibilityLabel={label} accessibilityState={{ checked: value }} onPress={() => { buzz('select'); onChange(!value); }} hitSlop={6}
       style={[styles.toggle, { backgroundColor: value ? colors.gold : onDark ? 'rgba(233,226,216,0.24)' : 'rgba(30,53,45,0.2)' }]}>

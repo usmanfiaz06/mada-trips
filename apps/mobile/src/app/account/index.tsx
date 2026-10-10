@@ -65,7 +65,7 @@ export default function YourDetails() {
 
       <Group label={t('account.forBookings')}>
         <Row label={t('account.home')} value={`${home[1]} · ${home[0]}`} onPress={() => setSheet('home')} src={<Source kind={a?.homeAt ? 'typed' : 'default'} at={a?.homeAt} />} testID="details-home" />
-        <Row label={t('account.language')} value="English" onPress={() => setSheet('language')} src={<Source kind="default" />} />
+        <Row label={t('account.language')} value={t('lang.current')} onPress={() => setSheet('language')} src={<Source kind="default" />} />
         <Row label={t('account.currency')} value={`${a?.currency ?? 'SAR'} · ${currencyName(a?.currency ?? 'SAR')}`} onPress={() => setSheet('currency')} src={<Source kind={a?.currency && a.currency !== 'SAR' ? 'typed' : 'default'} />} testID="details-currency" />
       </Group>
 

@@ -177,7 +177,7 @@ export const arTrips: ArSection<typeof enTrips> = {
   'cf.widerDetail': '{code} · أي يوم قريب من {day}',
   'cf.widerYes': 'أرسلنا خيارين إلى محادثتك',
   'itin.pickupHome': '{driver} يستقبلك من البيت',
-  'itin.flight': '{from} → {to} · {code}',
+  'itin.flight': '{from} ← {to} · {code}',
   'itin.flightSub': '{airline} · {from} {terminal} · تهبط {arr} في {to}',
   'itin.flightBackSub': '{airline} · تهبط {arr} في {to}',
   'itin.fact.seats': 'المقاعد',

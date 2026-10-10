@@ -12,7 +12,7 @@ import { Box, Display, Dot, Grow, H3, Num, Photo, Rise, Row, Small, SmallButton,
 import { AddressSheet } from '@/components/trips/AddressSheet';
 import { request } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { dirSign, t } from '@/lib/i18n';
 import { tripsApi, useOffline } from '@/lib/trips';
 import { colors, ff, radii, shadow } from '@/theme';
 import { useTripLocal } from './local';
@@ -100,19 +100,21 @@ function SwipeDeck({ trip }: { trip: TripDetail }) {
     const next = yes ? [...picks, card.id] : picks;
     setPicks(next);
     if (yes) void tripsApi.patch(trip.id, { picks: next }).catch(() => {});
-    x.set(withTiming(yes ? 420 : -420, { duration: 260 }, () => { scheduleOnRN(setI, i + 1); x.set(0); }));
+    x.set(withTiming((yes ? 420 : -420) * dirSign(), { duration: 260 }, () => { scheduleOnRN(setI, i + 1); x.set(0); }));
   };
+  // Yes is a swipe towards the end of the line: right in English, left in Arabic.
+  const dir = dirSign();
   const pan = Gesture.Pan()
     .onChange((e) => { x.set(x.get() + e.changeX); })
     .onEnd(() => {
-      const v = x.get();
+      const v = x.get() * dir;
       if (v > 90) scheduleOnRN(decide, true);
       else if (v < -90) scheduleOnRN(decide, false);
       else x.set(withTiming(0, { duration: 300 }));
     });
   const cardStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }, { rotate: `${x.get() / 18}deg` }] }));
-  const yesStyle = useAnimatedStyle(() => ({ opacity: x.get() > 30 ? 1 : 0 }));
-  const noStyle = useAnimatedStyle(() => ({ opacity: x.get() < -30 ? 1 : 0 }));
+  const yesStyle = useAnimatedStyle(() => ({ opacity: x.get() * dir > 30 ? 1 : 0 }));
+  const noStyle = useAnimatedStyle(() => ({ opacity: x.get() * dir < -30 ? 1 : 0 }));
   void local;
   if (i >= cards.length) {
     const chosen = cards.filter((c) => picks.includes(c.id));

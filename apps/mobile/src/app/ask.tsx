@@ -160,7 +160,7 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
 
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, gap: 16, paddingTop: 4 },
-  bubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.green, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, borderBottomRightRadius: 6 },
+  bubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.green, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, borderBottomEndRadius: 6 },
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 28, paddingHorizontal: 20, gap: 6, backgroundColor: 'rgba(233,226,216,0.96)' },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },

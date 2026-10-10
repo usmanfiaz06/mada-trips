@@ -1,5 +1,6 @@
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { colors } from '@/theme';
+import { isRTL } from '@/lib/i18n';
 
 /* The prototype's icon set (docs/app/prototype-app/src/ui.jsx): rounded 1.8-unit line icons on a 24-unit grid. Same glyphs. */
 type Shape = { d: string } | { rect: [number, number, number, number, number] } | { circle: [number, number, number] };
@@ -43,9 +44,14 @@ const GLYPHS = {
 
 export type IconName = keyof typeof GLYPHS;
 
-export function Icon({ name, size = 22, color = colors.green, width = 1.8 }: { name: IconName; size?: number; color?: string; width?: number }) {
+/** Glyphs that point along the reading direction, so they mirror in Arabic. Clocks, planes and logos never do. */
+const DIRECTIONAL: ReadonlySet<string> = new Set(['back', 'chevron', 'arrow']);
+
+/** `fixed`: keep the glyph as drawn even in right-to-left (an arrow that points at something physical). */
+export function Icon({ name, size = 22, color = colors.green, width = 1.8, fixed }: { name: IconName; size?: number; color?: string; width?: number; fixed?: boolean }) {
+  const mirror = !fixed && DIRECTIONAL.has(name) && isRTL();
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={mirror ? { transform: [{ scaleX: -1 }] } : undefined}>
       {(GLYPHS[name] as Shape[]).map((s, i) =>
         'd' in s ? <Path key={i} d={s.d} />
           : 'rect' in s ? <Rect key={i} x={s.rect[0]} y={s.rect[1]} width={s.rect[2]} height={s.rect[3]} rx={s.rect[4]} />

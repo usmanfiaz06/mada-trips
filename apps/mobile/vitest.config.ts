@@ -16,6 +16,8 @@ export default defineConfig({
       { find: /^expo-secure-store$/, replacement: stub('secure-store.ts') },
       { find: /^@react-native-async-storage\/async-storage$/, replacement: stub('async-storage.ts') },
       { find: /^@react-native-community\/netinfo$/, replacement: stub('netinfo.ts') },
+      { find: /^expo-localization$/, replacement: stub('expo-localization.ts') },
+      { find: /^expo-updates$/, replacement: stub('expo-updates.ts') },
       { find: /^\.\/mock-api$/, replacement: stub('mock-api.ts') },
     ],
   },

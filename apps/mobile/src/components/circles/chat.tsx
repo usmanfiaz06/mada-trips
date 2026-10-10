@@ -12,7 +12,7 @@ import { T } from '@/components/Text';
 import { COVERS, money, photoSource } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
-import { colors, ff, font } from '@/theme';
+import { colors, ff, font, textEnd } from '@/theme';
 import { Face, Faces, Row, TextLink } from './ui';
 
 /* The pieces of a circle's chat (prototype Circles.jsx Group): bubbles, votes, splits, shared plans and places. */
@@ -30,7 +30,7 @@ export function Bubble({ who, cont, wide, label, children, testID }: { who: Who;
       {!mine ? <View style={st.face}>{cont ? null : face}</View> : null}
       <View style={[st.bubble, cont ? { borderRadius: 22 } : null, mine ? st.mine : null, who.kind === 'mada' ? st.mada : null, wide ? st.bare : null]}>
         {!cont && !mine && !wide ? <T style={st.name}>{name}</T> : null}
-        {wide && label ? <T style={[st.name, mine ? { textAlign: 'right' } : null]}>{label}</T> : null}
+        {wide && label ? <T style={[st.name, mine ? { textAlign: textEnd() } : null]}>{label}</T> : null}
         {children}
       </View>
     </View>
@@ -67,7 +67,7 @@ export function VoteCard({ m, me, total, canClose, people, onVote, onClose }: { 
               <Row gap={8} style={{ flexShrink: 1 }}>{won ? <Icon name="check" size={16} width={2.6} /> : null}<T style={{ fontFamily: ff.ui600, fontSize: 14, color: colors.green }} numberOfLines={1}>{o.label}</T></Row>
               <Row gap={8}>
                 <Faces people={o.votes.slice(0, 3).map((id) => people.get(id) ?? { id, initial: '?', tone: 'default' as const })} size={20} overlap={7} ring={colors.paper} />
-                <T style={{ fontFamily: ff.ui600, fontSize: 14, color: colors.green, minWidth: 14, textAlign: 'right', fontVariant: ['tabular-nums'] }}>{o.votes.length}</T>
+                <T style={{ fontFamily: ff.ui600, fontSize: 14, color: colors.green, minWidth: 14, textAlign: textEnd(), fontVariant: ['tabular-nums'] }}>{o.votes.length}</T>
               </Row>
             </View>
           </Pressable>

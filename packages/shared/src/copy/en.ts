@@ -13,6 +13,7 @@ import { deskCopy } from './desk';
 import { enTrips } from './en-trips';
 import { resilienceCopy } from './resilience';
 import { placesCopy } from './places';
+import { languageCopy } from './language';
 import { authCopy } from './auth';
 
 export const en = {
@@ -30,6 +31,8 @@ export const en = {
   ...resilienceCopy,
   // Places: worldwide city search, city pages, Plan it with Mada: packages/shared/src/copy/places.ts
   ...placesCopy,
+  // Language and display settings (Profile › Language): packages/shared/src/copy/language.ts
+  ...languageCopy,
   // Sign-in through Supabase Auth, Verify your phone, sign-in methods: packages/shared/src/copy/auth.ts
   ...authCopy,
   // ───────────── common ─────────────

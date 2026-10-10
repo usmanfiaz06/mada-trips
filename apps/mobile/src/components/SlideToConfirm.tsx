@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { buzz, tick } from '@/lib/haptics';
+import { dirSign } from '@/lib/i18n';
 import { colors, font, shadow, sizes } from '@/theme';
 import { Sun } from './Sun';
 import { T } from './Text';
@@ -21,6 +22,8 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
   const x = useSharedValue(0);
   const ticks = useSharedValue(0);
   const max = Math.max(1, width - KNOB - PAD * 2);
+  // Right-to-left: the sun starts at the right and slides left.
+  const dir = dirSign();
 
   const confirm = () => { buzz('thunk'); onConfirm(); };
 
@@ -28,7 +31,7 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
     .enabled(!disabled && !busy && width > 0)
     .onBegin(() => { ticks.set(0); })
     .onChange((e) => {
-      x.set(Math.min(max, Math.max(0, x.get() + e.changeX)));
+      x.set(Math.min(max, Math.max(0, x.get() + e.changeX * dir)));
       const p = x.get() / max;
       while (ticks.get() < 3 && p >= [0.25, 0.5, 0.75][ticks.get()]!) { scheduleOnRN(tick, ticks.get() as 0 | 1 | 2); ticks.set(ticks.get() + 1); }
     })
@@ -37,7 +40,7 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
       else x.set(withTiming(0, { duration: 450, easing: SPRING }));
     });
 
-  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: busy ? max : x.get() }] }));
+  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: (busy ? max : x.get()) * dir }] }));
   const fill = useAnimatedStyle(() => ({ width: (busy ? max : x.get()) + KNOB + PAD * 2 }));
   const text = useAnimatedStyle(() => ({ opacity: busy ? 1 : interpolate(x.get(), [0, max / 1.7], [1, 0], 'clamp') }));
 

@@ -39,6 +39,7 @@ describe('the catalogue sections', () => {
       tripsUi2: (await import('../src/copy/en-trips-ui2')).enTripsUi2,
       resilience: (await import('../src/copy/resilience')).resilienceCopy,
       places: (await import('../src/copy/places')).placesCopy,
+      language: (await import('../src/copy/language')).languageCopy,
       auth: (await import('../src/copy/auth')).authCopy,
     };
     const seen = new Map<string, string>();

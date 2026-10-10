@@ -144,7 +144,7 @@ function SignedIn() {
       </Group>
 
       <Group label={t('profile.app')}>
-        <Row icon="globe" value={t('profile.language')} sub={a?.arabicNotify ? t('profile.languageSubNotify') : t('profile.languageSub')} onPress={() => setSheet('language')} testID="profile-language" />
+        <Row icon="globe" value={t('profile.language')} sub={t('lang.current')} onPress={() => setSheet('language')} testID="profile-language" />
         <Row icon="lock" value={t('profile.security')} sub={tn('profile.securitySub', devices.data?.length ?? 1, { face: a?.faceId === false ? t('profile.faceOff') : t('profile.faceOn') })} onPress={() => router.push('/account/security')} testID="profile-security" />
         <Row icon="doc" value={t('profile.privacy')} sub={exportPending ? t('profile.privacySubPending') : t('profile.privacySub')} onPress={() => router.push('/account/privacy')} testID="profile-privacy" />
         <Row icon="bell" value={t('profile.help')} sub={t('profile.helpSub')} onPress={() => router.push('/account/help')} testID="profile-help" />

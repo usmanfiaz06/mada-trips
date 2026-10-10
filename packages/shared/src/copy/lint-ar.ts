@@ -50,7 +50,7 @@ export const AR_LATIN_OK: readonly RegExp[] = [
   /^[\w.+-]+@[\w-]+\.[\w.]+$/, // example e-mail
   /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/, // web address
   /^[A-Z0-9 ·→\-–/:+]+$/, // codes in capitals
-  /^(Mada|Mada Trips|Mada Ops|Tabby|Tamara|Apple Pay|Google Pay|mada|Visa|Mastercard|Face ID|Touch ID|Apple|Google|WhatsApp|eSIM|Saudia|flynas|flyadeal|Instagram|Snapchat|X)$/,
+  /^(Mada|Mada Trips|Mada Ops|Tabby|Tamara|Apple Pay|Google Pay|mada|Visa|Mastercard|Face ID|Touch ID|Apple|Google|English|WhatsApp|eSIM|Saudia|flynas|flyadeal|Instagram|Snapchat|X)$/,
 ];
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();

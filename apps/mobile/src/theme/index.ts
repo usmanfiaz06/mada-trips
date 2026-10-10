@@ -1,5 +1,6 @@
-import type { TextStyle, ViewStyle } from 'react-native';
-import { colors, fontFamilies, radii, shadows, sizes, space, typography, type TypeName } from '@mada/shared';
+import { Platform, type TextStyle, type ViewStyle } from 'react-native';
+import { isRTL } from '@/lib/i18n';
+import { colors, fontFamilies, getDisplayPrefs, radii, shadows, sizes, space, typography, type TypeName } from '@mada/shared';
 
 export { colors, radii, sizes, space, typography };
 export type { TypeName };
@@ -7,15 +8,31 @@ export type { TypeName };
 /** A text style from the shared type scale. Weight comes from the font family (one family per weight on native). */
 export function font(name: TypeName, color?: string): TextStyle {
   const t = typography[name];
+  const m = getDisplayPrefs().locale === 'ar' ? arabicMetrics(t.family, t.size, t.lineHeight) : { size: t.size, lineHeight: t.lineHeight, tracking: t.tracking };
   return {
     fontFamily: fontFamilies[t.family],
-    fontSize: t.size,
-    lineHeight: t.lineHeight,
-    letterSpacing: t.tracking,
+    fontSize: m.size,
+    lineHeight: m.lineHeight,
+    letterSpacing: m.tracking,
     color: color ?? ('color' in t && t.color ? colors[t.color] : colors.green),
     ...('uppercase' in t && t.uppercase ? { textTransform: 'uppercase' as const } : null),
     ...('tabular' in t && t.tabular ? { fontVariant: ['tabular-nums' as const] } : null),
   };
+}
+
+/**
+ * Arabic type (COPY.md §7.4): about 2 pt larger with lines about 15% taller, body never below 16, and no letter
+ * spacing (tracking breaks the joins between Arabic letters). Reem Kufi sets much larger than Instrument Serif at the
+ * same size, so display styles come down instead. The hero number stays: it is digits.
+ */
+export function arabicMetrics(family: string, size: number, lineHeight: number) {
+  if (family === 'display') {
+    const s = Math.round(size * 0.78);
+    return { size: s, lineHeight: Math.round(s * 1.45), tracking: 0 };
+  }
+  if (size >= 60) return { size, lineHeight, tracking: 0 };
+  const s = size >= 16 ? size + 1 : size + 1;
+  return { size: s, lineHeight: Math.max(Math.round(lineHeight * 1.18), Math.round(s * 1.5)), tracking: 0 };
 }
 
 /** Shadows as CSS box-shadow, which React Native supports on iOS, Android (new architecture) and web. */
@@ -27,3 +44,9 @@ export function shadow(name: keyof typeof shadows): ViewStyle {
 
 export const fontsToLoad = fontFamilies;
 export { fontFamilies as ff } from '@mada/shared';
+
+/**
+ * Text aligned to the end of the line (right in English, left in Arabic). Native swaps 'right' itself in
+ * right-to-left; the web build doesn't, so it gets the mirrored value.
+ */
+export const textEnd = (): 'left' | 'right' => (Platform.OS === 'web' && isRTL() ? 'left' : 'right');

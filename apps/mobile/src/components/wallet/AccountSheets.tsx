@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { checkSaudiMobile } from '@mada/shared';
+import { checkSaudiMobile, type CopyLocale } from '@mada/shared';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
-import { keys as coreKeys } from '@/lib/queries';
+import { getLocale, switchLanguage, t, useDisplay } from '@/lib/i18n';
+import { keys as coreKeys, useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useAccount, useUpdateAccount, walletApi, walletKeys } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { prettyPhone, useOnOpen } from '@/lib/wallet-model';
-import { colors, ff } from '@/theme';
+import { colors } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
 import { Chip } from '../Chip';
@@ -25,22 +25,55 @@ import { CodeStep, Group, Notice, Row, Source, Toggle } from './ui';
 
 const well = { backgroundColor: colors.mist };
 
+/**
+ * Profile › Language: English or العربية. A switch restarts Mada, because the layout direction is set once per
+ * launch; the sheet says so first. Digits and the Hijri date apply straight away.
+ */
 export function LanguageSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const account = useAccount();
-  const update = useUpdateAccount();
-  const on = !!account.data?.arabicNotify;
+  const current = getLocale();
+  const [pending, setPending] = useState<CopyLocale | null>(null);
+  const [manual, setManual] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const display = useDisplay();
+  const updateMe = useUpdateMe();
+  const signedIn = useSession((s) => s.status) === 'signedIn';
+  useOnOpen(visible, () => { setPending(null); setManual(false); setBusy(false); });
+  const shown = pending ?? current;
+  const choose = (l: CopyLocale) => { buzz('select'); setManual(false); setPending(l === current ? null : l); };
+  const restart = async () => {
+    if (!pending) return;
+    setBusy(true);
+    // The server sends notifications, texts and emails in the traveller's language too.
+    if (signedIn) { try { await updateMe.mutateAsync({ locale: pending }); } catch { /* saved on the phone; the next sign-in sends it */ } }
+    const ok = await switchLanguage(pending);
+    if (!ok) { setBusy(false); setManual(true); }
+  };
+  const mark = (l: CopyLocale) => (shown === l ? <Icon name="check" color={colors.ok} width={2.4} /> : <View style={{ width: 22 }} />);
   return (
-    <Sheet visible={visible} onClose={onClose} label={t('account.language.title')}>
-      <T v="h2">{t('account.language.title')}</T>
+    <Sheet visible={visible} onClose={onClose} label={t('lang.title')}>
+      <T v="h2">{t('lang.title')}</T>
       <Group well>
-        <Row value="English" right={<Icon name="check" color={colors.ok} width={2.4} />} />
-        <Row value="العربية" sub={t('account.language.arabicSub')} right={<View style={{ height: 26, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.paper, justifyContent: 'center' }}><T v="caption" style={{ fontFamily: ff.ui600 }}>{t('account.language.next')}</T></View>} />
+        <Row value={t('lang.english')} onPress={() => choose('en')} right={mark('en')} testID="lang-en" />
+        <Row value={t('lang.arabic')} onPress={() => choose('ar')} right={mark('ar')} testID="lang-ar" />
       </Group>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{t('account.language.notify')}</T><T v="tiny">{t('account.language.notifySub')}</T></View>
-        <Toggle label={t('account.language.notify')} value={on} testID="arabic-notify" onChange={(v) => update.mutate({ arabicNotify: v }, { onSuccess: () => { if (v) toast(t('account.language.notifyOn')); } })} />
-      </View>
-      <Button label={t('account.language.done')} onPress={onClose} />
+      {pending ? (
+        <>
+          <Notice icon="globe" title={pending === 'ar' ? t('lang.restart.toArabic') : t('lang.restart.toEnglish')} body={manual ? t('lang.restart.manual') : t('lang.restart.body')} testID="lang-restart" />
+          <Button label={t('lang.restart.go')} onPress={() => void restart()} busy={busy} haptic="success" testID="lang-restart-go" />
+          <Button label={t('lang.restart.keep')} variant="ghost" onPress={() => setPending(null)} />
+        </>
+      ) : (
+        <>
+          <T v="tiny">{t('lang.followsPhone')}</T>
+          <Group label={t('lang.display')}>
+            {current === 'ar' ? (
+              <Row value={t('lang.digits')} sub={t('lang.digitsSub')} right={<Toggle label={t('lang.digits')} value={display.digits === 'arab'} testID="lang-digits" onChange={(v) => { display.set({ digits: v ? 'arab' : 'latn' }); toast(t('lang.saved')); }} />} />
+            ) : null}
+            <Row value={t('lang.hijri')} sub={t('lang.hijriSub')} right={<Toggle label={t('lang.hijri')} value={display.hijri} testID="lang-hijri" onChange={(v) => { display.set({ hijri: v }); toast(t('lang.saved')); }} />} />
+          </Group>
+          <Button label={t('lang.done')} onPress={onClose} />
+        </>
+      )}
     </Sheet>
   );
 }

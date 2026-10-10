@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import Svg, { Circle, Defs, Path, Text as SvgText, TextPath } from 'react-native-svg';
-import { backSegment, daysBetween, dayOfMonth, destinationOf, formatSar, liveStay, monthOf, outSegment, type RefundView, type TripDetail, type TripRating } from '@mada/shared';
+import { backSegment, daysBetween, dayOfMonth, destinationOf, formatNumber, formatSar, localizeDigits, liveStay, monthOf, outSegment, type RefundView, type TripDetail, type TripRating } from '@mada/shared';
 import { Icon } from '@/components/Icon';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
@@ -171,7 +171,7 @@ export function Home({ trip }: { trip: TripDetail }) {
               <T style={{ color: 'rgba(255,253,249,0.88)', fontSize: 14, lineHeight: 19 }}>{t('td.home.newStamp', { country: dest.country })} {stamps ? t('td.home.countries', { n: stamps + 1 }) : t('td.home.first')}</T>
             </View>
             <View style={styles.stats}>
-              {[[km.toLocaleString('en-US'), t('td.home.km')], [String(nights), nights === 1 ? t('td.home.nightWord') : t('td.home.nightsWord')], [String(n), n === 1 ? t('td.home.traveller') : t('td.home.ofYou')]].map(([v, k]) => (
+              {[[formatNumber(km), t('td.home.km')], [localizeDigits(String(nights)), nights === 1 ? t('td.home.nightWord') : t('td.home.nightsWord')], [localizeDigits(String(n)), n === 1 ? t('td.home.traveller') : t('td.home.ofYou')]].map(([v, k]) => (
                 <View key={k} style={styles.stat}><Num size={20} color={colors.paper}>{v}</Num><T style={{ fontSize: 12, color: 'rgba(255,253,249,0.8)' }}>{k}</T></View>
               ))}
             </View>

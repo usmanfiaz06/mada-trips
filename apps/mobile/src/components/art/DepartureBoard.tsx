@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { fontFamilies } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { colors } from '@/theme';
+import { colors, textEnd } from '@/theme';
 import { T } from '../Text';
 
 const BOARD: [string, string, string][] = [
@@ -60,5 +60,5 @@ const styles = StyleSheet.create({
   flap: { width: 17, height: 24, borderRadius: 3, backgroundColor: '#1c2723', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   flapTop: { position: 'absolute', top: 0, start: 0, end: 0, height: 12, backgroundColor: '#24312c' },
   flapText: { color: '#f4ead6', fontFamily: fontFamilies.mono, fontSize: 13, lineHeight: 16 },
-  code: { flex: 1, textAlign: 'right', fontFamily: fontFamilies.mono, fontSize: 11, lineHeight: 14, color: '#9bb0a6', letterSpacing: 0.66 },
+  code: { flex: 1, textAlign: textEnd(), fontFamily: fontFamilies.mono, fontSize: 11, lineHeight: 14, color: '#9bb0a6', letterSpacing: 0.66 },
 });

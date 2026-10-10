@@ -1,6 +1,6 @@
 import {
   CreateDocumentMeta, DESK_PHONE, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
-  UpdatePersonRequest, checkSaudiMobile, firstNameOf, maskPassportNumber, supportIntent, supportReplies, t, tn,
+  UpdatePersonRequest, checkSaudiMobile, firstNameOf, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
 } from '@mada/shared';
@@ -109,7 +109,6 @@ const cardsJson = (s: State) => ({ cards: s.cards, defaultId: s.cards.some((c) =
 const creditJson = (s: State) => ({ balance: { amount: balance(s), currency: 'SAR' }, entries: [...s.credit].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 const threadJson = ({ messages: _m, readAt: _r, ...th }: Thread) => th;
 const unreadOf = (th: Thread) => th.messages.filter((m) => m.author.kind !== 'user' && Date.parse(m.createdAt) > th.readAt).length;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const UPLOAD_OK = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'application/pdf'];
 const TITLE: Record<WalletDocument['kind'], CopyKey> = { passport: 'docs.title.passport', visa: 'docs.title.visa', national_id: 'docs.title.national_id', iqama: 'docs.title.iqama', exit_reentry: 'docs.title.exit_reentry', insurance: 'docs.title.insurance', other: 'docs.title.other' };
 const TOPIC_INTENT: Record<SupportTopic, SupportIntent> = { change: 'change', refund: 'refund', bag: 'bag', docs: 'docs', airport: 'airport', other: 'other' };
@@ -170,7 +169,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (fileId && up.__file) s.files.set(fileId, up.__file.uri);
     const doc: WalletDocument = {
       id: uuid(), personId: meta.personId, kind: meta.kind, title: meta.title ?? t(TITLE[meta.kind]),
-      detail: meta.detail ?? (meta.validUntil ? t('wallet.docs.validUntil', { date: `${MONTHS[Number(meta.validUntil.slice(5, 7)) - 1]} ${meta.validUntil.slice(0, 4)}` }) : t('wallet.docs.added')),
+      detail: meta.detail ?? (meta.validUntil ? t('wallet.docs.validUntil', { date: `${monthName(Number(meta.validUntil.slice(5, 7)) - 1)} ${meta.validUntil.slice(0, 4)}` }) : t('wallet.docs.added')),
       validUntil: meta.validUntil ?? null, fields: meta.fields ?? {}, file: fileId && up.__file ? { id: fileId, name: up.__file.name, mime: up.__file.type, size: up.__file.size } : null,
       source: meta.source, removable: true, sharedUntil: null, createdAt: now(), updatedAt: now(),
     };

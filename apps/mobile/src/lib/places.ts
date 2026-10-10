@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ImageSourcePropType } from 'react-native';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { create } from 'zustand';
-import { PlaceResponse, PlaceSearchResponse, PlanPlaceResponse, PopularPlacesResponse, type PlaceHit, type PlanPlaceRequest } from '@mada/shared';
+import { localizeDigits, PlaceResponse, PlaceSearchResponse, PlanPlaceResponse, PopularPlacesResponse, type PlaceHit, type PlanPlaceRequest } from '@mada/shared';
 import { request } from './api';
 import { kvGet, kvSet } from './trips';
 
@@ -86,7 +86,7 @@ export const placePhoto = (key: string | null | undefined) => (key ? PLACE_PHOTO
 /* ───────── time there ───────── */
 
 export function localTime(tz: string, at = new Date()): string | null {
-  try { return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }).format(at); } catch { return null; }
+  try { return localizeDigits(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit' }).format(at)); } catch { return null; }
 }
 
 function offsetMinutes(tz: string | undefined, at: Date): number {

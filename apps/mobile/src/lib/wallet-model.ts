@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { firstNameOf, type Person, type PersonDetails, type TripDetail as Trip } from '@mada/shared';
+import { firstNameOf, localizeDigits, monthName, type Person, type PersonDetails, type TripDetail as Trip } from '@mada/shared';
 import { t } from './i18n';
 
 /*
@@ -9,22 +9,23 @@ import { t } from './i18n';
  */
 
 const DAY = 86_400_000;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const M = (i: number) => monthName(i);
+const N = (n: number | string) => localizeDigits(String(n));
 export const toUtc = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`);
 export const daysBetween = (a: string, b: string) => Math.round((toUtc(b) - toUtc(a)) / DAY);
 export const addDays = (iso: string, n: number) => new Date(toUtc(iso) + n * DAY).toISOString().slice(0, 10);
 export const todayIso = () => new Date().toISOString().slice(0, 10);
 /** "22 Jun 2031" */
-export const fullDay = (iso: string) => `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+export const fullDay = (iso: string) => `${N(Number(iso.slice(8, 10)))} ${M(Number(iso.slice(5, 7)) - 1)} ${N(iso.slice(0, 4))}`;
 /** "9 Mar" */
-export const shortDay = (iso: string) => `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
+export const shortDay = (iso: string) => `${N(Number(iso.slice(8, 10)))} ${M(Number(iso.slice(5, 7)) - 1)}`;
 /** "Jun 2031" */
-export const monthYear = (iso: string) => `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+export const monthYear = (iso: string) => `${M(Number(iso.slice(5, 7)) - 1)} ${N(iso.slice(0, 4))}`;
 /** "12 Oct", with the year when it isn't this year. */
 export function fmtDate(isoOrMs: string | number, withYear = false) {
   const d = new Date(isoOrMs);
   const same = d.getFullYear() === new Date().getFullYear();
-  return `${d.getDate()} ${MONTHS[d.getMonth()]}${withYear || !same ? ` ${d.getFullYear()}` : ''}`;
+  return `${N(d.getDate())} ${M(d.getMonth())}${withYear || !same ? ` ${N(d.getFullYear())}` : ''}`;
 }
 export const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 /** "+966 50 000 4127" */

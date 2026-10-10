@@ -11,7 +11,7 @@ import { T } from '@/components/Text';
 import { AccountScreen, VERSION } from '@/components/wallet/AccountScreen';
 import { Group, Row } from '@/components/wallet/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { dirSign, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useTrips } from '@/lib/wallet';
 import { nextTrip } from '@/lib/wallet-model';
@@ -44,7 +44,7 @@ export default function Help() {
           <View key={i}>
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: open === i }} onPress={() => { buzz('tap'); setOpen(open === i ? null : i); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, minHeight: 56 }}>
               <T v="h3" style={{ flex: 1, fontSize: 15 }}>{t(`help.q${i}`)}</T>
-              <View style={{ transform: [{ rotate: open === i ? '90deg' : '0deg' }] }}><Icon name="chevron" size={18} color={colors.muted} /></View>
+              <View style={{ transform: [{ rotate: open === i ? `${90 * dirSign()}deg` : '0deg' }] }}><Icon name="chevron" size={18} color={colors.muted} /></View>
             </Pressable>
             {open === i ? <T v="small" style={{ paddingHorizontal: 16, paddingBottom: 16, marginTop: -4 }}>{t(`help.a${i}`)}</T> : null}
           </View>

@@ -11,7 +11,7 @@ import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { tripsApi, useTripMutation } from '@/lib/trips';
-import { colors, ff, radii, shadow } from '@/theme';
+import { colors, ff, radii, shadow, textEnd } from '@/theme';
 import { TripHero } from './common';
 import { useTripLocal } from './local';
 
@@ -166,7 +166,7 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
               <Fragment key={p.k}>
                 {i === 3 ? <T style={styles.daymark}>{t('td.plan.tomorrow', { day: dayLabel(out.departLocal.slice(0, 10), { today: out.departLocal.slice(0, 10) }) })}</T> : null}
                 <View style={styles.tl}>
-                  <Num size={14} color={p.state ? colors.green : colors.ink2} style={{ width: 54, textAlign: 'right', paddingTop: 1 }}>{p.time}</Num>
+                  <Num size={14} color={p.state ? colors.green : colors.ink2} style={{ width: 54, textAlign: textEnd(), paddingTop: 1 }}>{p.time}</Num>
                   <View style={styles.rail}>
                     <View style={[styles.railLine, i === 0 ? { top: 8 } : null, i === plan.length - 1 ? { bottom: undefined, height: 8 } : null]} />
                     <View style={[styles.railDot, p.state === 'now' ? { backgroundColor: colors.gold, borderColor: colors.gold } : p.state === 'done' ? { backgroundColor: colors.ok, borderColor: colors.ok } : null]} />

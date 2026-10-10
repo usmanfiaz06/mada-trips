@@ -8,12 +8,6 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { InstrumentSerif_400Regular } from '@expo-google-fonts/instrument-serif/400Regular';
-import { InterTight_400Regular } from '@expo-google-fonts/inter-tight/400Regular';
-import { InterTight_500Medium } from '@expo-google-fonts/inter-tight/500Medium';
-import { InterTight_600SemiBold } from '@expo-google-fonts/inter-tight/600SemiBold';
-import { InterTight_700Bold } from '@expo-google-fonts/inter-tight/700Bold';
-import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono/400Regular';
 import { ToastHost } from '@/components/Toast';
 import { ErrorBoundary as AppErrorBoundary } from '@/components/states/ErrorBoundary';
 import { CrashState } from '@/components/states/ErrorState';
@@ -27,6 +21,8 @@ import { startNet } from '@/lib/net/state';
 import { queryClient } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { colors } from '@/theme';
+import { fontsFor } from '@/theme/fonts';
+import { bootLocale, getLocale, isRTL } from '@/lib/i18n';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 // When things go wrong (FLOWS.md §12): crash reports (Sentry, only with a DSN), the connection, the offline copy.
@@ -40,9 +36,11 @@ export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<vo
 }
 
 export default function RootLayout() {
-  const [fontsLoaded, fontError] = useFonts({
-    InstrumentSerif_400Regular, InterTight_400Regular, InterTight_500Medium, InterTight_600SemiBold, InterTight_700Bold, JetBrainsMono_400Regular,
-  });
+  // Arabic loads IBM Plex Sans Arabic and Reem Kufi under the same family names (theme/fonts.ts).
+  const [fontsLoaded, fontError] = useFonts(fontsFor(getLocale()));
+  // The language for this launch is confirmed before the first screen (a mismatch restarts once, behind the splash).
+  const [localeReady, setLocaleReady] = useState(false);
+  useEffect(() => { void bootLocale().then((ok) => { if (ok) setLocaleReady(true); }).catch(() => setLocaleReady(true)); }, []);
   const status = useSession((s) => s.status);
   const boot = useSession((s) => s.boot);
   useEffect(() => { boot(); }, [boot]);
@@ -58,18 +56,19 @@ export default function RootLayout() {
   useRemoteConfig();
   useOutboxPump();
 
-  const ready = (fontsLoaded || !!fontError) && status !== 'loading' && restored;
+  const ready = (fontsLoaded || !!fontError) && status !== 'loading' && restored && localeReady;
   useEffect(() => { if (ready) SplashScreen.hideAsync().catch(() => {}); }, [ready]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.green }} />;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.sand }}>
+    // dir: react-native-web resolves start/end and mirrors from the nearest dir (native reads I18nManager).
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.sand }} {...({ dir: isRTL() ? 'rtl' : 'ltr' } as object)}>
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <StatusBar style="dark" />
           <AppErrorBoundary onRestart={() => queryClient.resetQueries()}>
             <NetChrome>
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.sand }, animation: 'slide_from_right' }}>
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.sand }, animation: isRTL() ? 'slide_from_left' : 'slide_from_right' }}>
                 <Stack.Screen name="index" options={{ animation: 'none' }} />
                 <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
                 <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />

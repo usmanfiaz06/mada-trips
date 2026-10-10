@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type Vi
 import { Image } from 'expo-image';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { dirSign, t, tn } from '@/lib/i18n';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { fmtDate } from '@/lib/wallet-model';
 import { fileSource } from '@/lib/wallet';
@@ -19,7 +19,8 @@ import { T } from '../Text';
 export function Toggle({ value, onChange, label, disabled, onDark, testID }: { value: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean; onDark?: boolean; testID?: string }) {
   const x = useSharedValue(value ? 1 : 0);
   useEffect(() => { x.set(withSpring(value ? 1 : 0, { damping: 18, stiffness: 260 })); }, [value, x]);
-  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() * 20 }] }));
+  const dir = dirSign();
+  const knob = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() * 20 * dir }] }));
   return (
     <Pressable testID={testID} accessibilityRole="switch" accessibilityLabel={label} accessibilityState={{ checked: value, disabled: !!disabled }} disabled={disabled}
       onPress={() => { buzz('select'); onChange(!value); }} hitSlop={6}

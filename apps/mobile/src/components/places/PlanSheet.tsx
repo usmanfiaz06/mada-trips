@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { planMessage, type CityGuide } from '@mada/shared';
+import { monthName, planMessage, type CityGuide } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Sheet } from '@/components/Sheet';
@@ -10,7 +10,6 @@ import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { colors, ff, font } from '@/theme';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** The next eight months as "2027-05", starting next month. */
 function nextMonths(now = new Date()) {
@@ -48,7 +47,7 @@ export function PlanSheet({ place, visible, onClose, onSend, busy, error, note }
         </View>
         <T v="eyebrow">{t('places.plan.when')}</T>
         <View style={s.chips}>
-          {nextMonths().map((m) => <Chip key={m} label={MONTHS[Number(m.slice(5)) - 1]!} on={month === m} onPress={() => { setMonth(m); setText(null); }} />)}
+          {nextMonths().map((m) => <Chip key={m} label={monthName(Number(m.slice(5)) - 1)} on={month === m} onPress={() => { setMonth(m); setText(null); }} />)}
           <Chip label={t('places.plan.undecided')} on={month === null} onPress={() => { setMonth(null); setText(null); }} />
         </View>
         <View style={{ gap: 6 }}>

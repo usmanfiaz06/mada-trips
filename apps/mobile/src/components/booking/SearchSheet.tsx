@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { AIRPORT_NAMES, MONTHS, addDays, calendarMonths, daysBetween, quickDates, type Cabin } from '@mada/shared';
+import { AIRPORT_NAMES, monthName, localizeDigits, addDays, calendarMonths, daysBetween, quickDates, type Cabin } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { colors, font, ff } from '@/theme';
@@ -61,7 +61,7 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
         <ScrollView ref={strip} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} accessibilityLabel={t('cal.months')}>
           {months.map((m, i) => (
             <Pressable key={m.first} accessibilityRole="button" accessibilityState={{ selected: page === i }} onPress={() => setPage(i)} style={[styles.month, page === i ? { backgroundColor: colors.green } : null]}>
-              <T style={[font('h3', page === i ? colors.mist : colors.ink2), { fontSize: 13 }]}>{MONTHS[m.month0]}{m.month0 === 0 || i === 0 ? ` ${m.year}` : ''}</T>
+              <T style={[font('h3', page === i ? colors.mist : colors.ink2), { fontSize: 13 }]}>{monthName(m.month0)}{m.month0 === 0 || i === 0 ? ` ${localizeDigits(String(m.year))}` : ''}</T>
             </Pressable>
           ))}
         </ScrollView>

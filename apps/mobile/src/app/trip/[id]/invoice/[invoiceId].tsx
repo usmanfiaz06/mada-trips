@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Platform, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Svg, { Rect } from 'react-native-svg';
-import { Company, type InvoiceDoc } from '@mada/shared';
+import { Company, localizeDigits, type InvoiceDoc } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -16,7 +16,7 @@ import { toast } from '@/lib/toast';
 import { newKey, tripsApi, useInvoice, useTrip, useTripMutation } from '@/lib/trips';
 import { colors, ff } from '@/theme';
 
-const fmt2 = (h: number) => (Math.abs(h) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt2 = (h: number) => localizeDigits((Math.abs(h) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 
 /** A stand-in drawing of the ZATCA QR, stable per invoice (the payload itself is on the document). */
 function Finder({ x, y }: { x: number; y: number }) {

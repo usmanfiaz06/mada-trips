@@ -15,7 +15,7 @@ import { T } from '@/components/Text';
 import { COVERS, money, photoSource, useSaved } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { colors, ff } from '@/theme';
+import { colors, ff, textEnd } from '@/theme';
 import { VoteIcon } from './chat';
 import { Faces, GhostChip, Input, Row, Segmented, SheetScroll, TextLink } from './ui';
 
@@ -193,7 +193,7 @@ const st = StyleSheet.create({
   remove: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
   well: { backgroundColor: colors.mist, borderRadius: 18, paddingVertical: 6, paddingHorizontal: 12 },
   share: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: colors.line },
-  amtIn: { width: 96, height: 40, borderRadius: 12, textAlign: 'right', fontSize: 15, paddingHorizontal: 10 },
+  amtIn: { width: 96, height: 40, borderRadius: 12, textAlign: textEnd(), fontSize: 15, paddingHorizontal: 10 },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingStart: 8, paddingEnd: 12, borderRadius: 18, backgroundColor: colors.mist },
   thumb: { width: 48, height: 48, borderRadius: 12 },
   box: { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#c9c1b4', alignItems: 'center', justifyContent: 'center' },
