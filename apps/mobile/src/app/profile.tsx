@@ -62,7 +62,7 @@ function SignedIn() {
   const trip = nextTrip(trips.data);
   const list = people.data ?? [];
   const needs = list.filter((p) => ['none', 'soon', 'problem', 'expired'].includes(passportStatus(p, trip).key)).length;
-  const methods = [user?.methods.apple && t('signinMethods.apple'), user?.methods.google && t('signinMethods.google'), user?.methods.phone && t('signinMethods.phone').split(' ')[0]].filter(Boolean).join(' · ');
+  const methods = [user?.methods.apple && t('signinMethods.apple'), user?.methods.google && t('signinMethods.google'), user?.methods.email && t('auth.methods.email'), user?.methods.phone && t('signinMethods.phone').split(' ')[0]].filter(Boolean).join(' · ');
   const prefs = a?.prefs;
   const seat = prefs ? t(prefs.seat === 'any' ? 'prefs.seat.anyShort' : prefs.seat === 'window' ? 'prefs.seat.window' : 'prefs.seat.aisle') : '';
   const meal = prefs ? t(`prefs.meal.${prefs.meal}` as 'prefs.meal.halal') : '';
@@ -107,6 +107,7 @@ function SignedIn() {
 
       <Group label={t('profile.account')}>
         <Row icon="user" value={t('profile.details')} sub={t('profile.detailsSub')} onPress={() => router.push('/account')} testID="profile-details" />
+        {user && !user.phone ? <Row icon="bell" value={t('auth.verifyPhone.row')} sub={t('auth.verifyPhone.rowSub')} onPress={() => router.push('/verify-phone?then=back')} testID="profile-verify-phone" /> : null}
         <Row icon="lock" value={t('profile.signin')} sub={methods || t('profile.signinNone')} onPress={() => router.push('/account/signin')} testID="profile-signin" />
         <Row icon="flight" value={t('profile.prefs')} sub={`${seat} · ${meal} · ${loyalty}`} onPress={() => router.push('/account/prefs')} testID="profile-prefs" />
         <Row icon="bell" value={t('profile.inbox')} sub={unread ? tn('profile.inboxSub', unread) : t('profile.inboxSub.zero')} onPress={() => router.push('/inbox')} testID="profile-inbox" />

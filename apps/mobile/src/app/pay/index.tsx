@@ -161,7 +161,9 @@ export default function Pay() {
       if (method?.kind === 'new_card') await place({ method: 'new_card', token: method.token, brand: method.brand, last4: method.last4 });
       else if (method?.kind === 'card') await place({ method: 'card', cardId: method.id });
     } catch (e) {
-      if (e instanceof ApiError && e.code === 'OFFLINE') { setSheet('offline'); buzz('soft'); } else toast(e instanceof Error ? e.message : t('error.internal'));
+      if (e instanceof ApiError && e.code === 'OFFLINE') { setSheet('offline'); buzz('soft'); }
+      else if (e instanceof ApiError && e.code === 'PHONE_REQUIRED') { toast(e.message); router.push('/verify-phone?then=back'); }
+      else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setBusy(false); setAttempt((a) => a + 1); }
   };
 

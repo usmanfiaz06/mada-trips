@@ -111,7 +111,7 @@ async function run({ page, phone, returning }) {
   const otp = byTest('otp-input');
   if (!returning) {
     await otp.fill('000000');
-    await see("That code doesn't match. 2 tries left.", 'wrong code');
+    await see('That code doesn’t match. Check the latest one we sent.', 'wrong code');
     await shot('otp-wrong');
   }
   await otp.fill('123456');
@@ -179,8 +179,8 @@ try {
   await run({ page: first.page, phone });
   await first.context.close();
   if (!SKIP_RETURN) {
-    // Same number on a fresh phone: the account exists, so it's "Welcome back". The server makes you wait 30 s for a new code.
-    if (API) { step('waiting out the 30-second resend window'); await new Promise((r) => setTimeout(r, 31_000)); }
+    // Same number on a fresh phone: the account exists, so it's "Welcome back". Codes come from Supabase Auth's
+    // stand-in on each phone (lib/auth/mock.ts), so a fresh page has no wait between codes.
     const second = await newPage();
     await run({ page: second.page, phone: API ? phone : '500004127', returning: true });
     await second.context.close();

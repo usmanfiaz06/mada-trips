@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { ROUTES, SignInResponse, prettyPhone } from '@mada/shared';
-import { ApiError, api, deviceInfo, request } from '@/lib/api';
+import { prettyPhone } from '@mada/shared';
+import { AuthError, auth, authApi } from '@/lib/auth';
+import { sayAuthError } from '../auth/say';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { t } from '@/lib/i18n';
 import { clearSessionExpired, useGates } from '@/lib/net/gates';
@@ -35,10 +36,11 @@ export function SessionExpired() {
   const send = async () => {
     if (!phone) { clearSessionExpired(); await useSession.getState().clear(); router.replace('/signin' as Href); return; }
     setBusy(true); setProblem(null);
-    try { await api.startOtp(phone); setStep('code'); }
+    try { await auth().sendPhoneCode(phone); setStep('code'); }
     catch (e) {
-      if (e instanceof ApiError && e.code === 'OTP_COOLDOWN') { setStep('code'); setProblem(e.message); }
-      else setProblem(e instanceof ApiError ? (e.kind === 'offline' ? t('phone.offline') : e.message) : t('error.internal'));
+      // A code went out less than a minute ago: that one still works.
+      if (e instanceof AuthError && e.code === 'wait') { setStep('code'); setProblem(e.message); }
+      else setProblem(e instanceof AuthError && e.code === 'offline' ? t('phone.offline') : sayAuthError(e, 'phone'));
     } finally { setBusy(false); }
   };
 
@@ -47,8 +49,9 @@ export function SessionExpired() {
     setBusy(true); setProblem(null);
     const before = user?.id;
     try {
-      // A fresh sign-in, not a refresh: the dead tokens aren't sent.
-      const r = await request({ method: 'POST', path: ROUTES.otpVerify, body: { phone, code: value, device: deviceInfo() }, auth: false }, SignInResponse);
+      // A fresh sign-in through Supabase Auth, not a refresh: the dead tokens aren't sent.
+      const id = await auth().verifyPhoneCode(phone!, value);
+      const r = await authApi.session(id.accessToken);
       await useSession.getState().signIn(r.tokens, r.user);
       setStep('ask'); setCode('');
       clearSessionExpired();
@@ -61,7 +64,7 @@ export function SessionExpired() {
       }
     } catch (e) {
       setCode('');
-      setProblem(e instanceof ApiError ? e.message : t('error.internal'));
+      setProblem(sayAuthError(e, 'phone'));
     } finally { setBusy(false); }
   };
 

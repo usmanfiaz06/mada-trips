@@ -26,7 +26,7 @@ export const authCopyAr: Record<keyof typeof authCopy, string> = {
   'auth.code.expired': 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا لتكمل.',
   'auth.code.wait': 'تقدر تطلب رمزًا جديدًا بعد {seconds} ثانية.',
   'auth.code.tooMany': 'طلبت رموزًا كثيرة. حاول بعد ساعة، أو تواصل مع مادا.',
-  'auth.code.resendIn': 'رمز جديد بعد 0:{seconds}',
+  'auth.code.resendIn': 'رمز جديد بعد {time}',
 
   'auth.verifyPhone.title': 'وثّق رقم جوالك',
   'auth.verifyPhone.body': 'دخلت بحساب {provider}. قبل أول حجز نحتاج رقم جوال معك، لتغييرات البوابة ورسائل فيصل.',

@@ -28,7 +28,7 @@ export const authCopy = {
   'auth.code.expired': 'That code has expired. Get a new one to carry on.',
   'auth.code.wait': 'You can ask for a new code in {seconds} seconds.',
   'auth.code.tooMany': 'Too many codes for now. Try again in an hour, or talk to Mada.',
-  'auth.code.resendIn': 'New code in 0:{seconds}',
+  'auth.code.resendIn': 'New code in {time}',
 
   // ───────────── verify your phone ─────────────
   'auth.verifyPhone.title': 'Verify your phone',

@@ -439,6 +439,8 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const b = p.data;
     const prior = [...orders.values()].find((o) => o.owner === user.id && o.key === b.idempotencyKey);
     if (prior) return ok({ outcome: prior.status === 'requires_action' ? 'requires_action' : 'created', order: viewOf(prior) }, 201);
+    // Accounts that began with Apple, Google or email verify a phone before their first booking (AUTH.md).
+    if (!user.phone) return err('PHONE_REQUIRED');
     await new Promise((res) => setTimeout(res, 600));
     const priced = await price(w, user, ctx, b, demo.has('priceUp') && b.draft.kind === 'trip' ? 14_000 : 0);
     if ('status' in priced) return priced;

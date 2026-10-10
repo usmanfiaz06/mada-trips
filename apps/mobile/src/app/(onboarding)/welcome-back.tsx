@@ -45,7 +45,7 @@ export default function WelcomeBack() {
       </View>
       <Act>
         <Button label={t('welcomeBack.open')} onPress={() => { buzz('success'); router.replace('/today'); }} testID="welcome-back-open" haptic={null} />
-        <Button variant="ghost" label={t('welcomeBack.notMe')} onPress={async () => { await api.logout(); router.replace('/phone'); }} />
+        <Button variant="ghost" label={t('welcomeBack.notMe')} onPress={async () => { await api.logout(); router.replace('/signin'); }} />
       </Act>
     </Screen>
   );

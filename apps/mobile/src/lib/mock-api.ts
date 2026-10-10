@@ -1,6 +1,6 @@
 import {
   ACCESS_TOKEN_TTL_SECONDS, OTP_MAX_TRIES, OTP_RESEND_SECONDS, OTP_TTL_SECONDS, REFRESH_TOKEN_TTL_DAYS, ROUTES, checkSaudiMobile,
-  firstNameOf, maskPassportNumber, t, tn, type AuthTokens, type ErrorCode, type Person, type User, ERROR_CODES, CreatePersonRequest,
+  firstNameOf, maskPassportNumber, t, tn, decodeMockSupabaseToken, type AuthTokens, type ErrorCode, type Person, type User, ERROR_CODES, CreatePersonRequest,
   UpdateMeRequest, PassportInput,
 } from '@mada/shared';
 import type { Wire, WireResponse } from './api';
@@ -27,6 +27,9 @@ const byPhone = new Map<string, string>();
 const access = new Map<string, { userId: string; exp: number }>();
 const refresh = new Map<string, string>();
 const otp = new Map<string, { sentAt: number; attempts: number; used: boolean }>();
+/** Supabase user id ↔ Mada user id, for POST /auth/session. */
+const bySub = new Map<string, string>();
+const subOf = new Map<string, string>();
 
 const now = () => Date.now();
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -45,7 +48,7 @@ function self(): Person {
 function newUser(phone: string | null, extra: Partial<User> = {}): MockUser {
   const u: MockUser = {
     id: uuid(), name: '', phone, email: null, emailRelay: false, locale: 'en', alerts: 'quiet', notifications: 'unknown',
-    methods: { apple: false, google: false, phone: !!phone }, onboardedAt: null, createdAt: iso(now()), people: [self()], ...extra,
+    methods: { apple: false, google: false, phone: !!phone, email: false }, emailVerified: false, onboardedAt: null, createdAt: iso(now()), people: [self()], ...extra,
   };
   users.set(u.id, u);
   if (phone) byPhone.set(phone, u.id);
@@ -120,6 +123,40 @@ export async function mockTransport(w: Wire): Promise<WireResponse> {
         name: String(body.givenName ?? ''), email: provider === 'apple' ? `${rid()}@privaterelay.appleid.com` : 'you@gmail.com', emailRelay: provider === 'apple',
         methods: { apple: provider === 'apple', google: provider === 'google', phone: false },
       }), { sub });
+      return ok({ tokens: issue(user.id), user: pub(user), isNew: !user.onboardedAt });
+    }
+    case `POST ${ROUTES.session}`:
+    case `POST ${ROUTES.sessionSync}`: {
+      // Supabase Auth's stand-in (lib/auth/mock.ts) signed in; same rules as platform/src/lib/app/supabase-session.ts.
+      const c = decodeMockSupabaseToken(String(body.accessToken ?? ''));
+      if (!c) return err('UNAUTHORIZED');
+      if (c.exp * 1000 <= now()) return err('TOKEN_EXPIRED');
+      const phone = c.phone ? `+${c.phone.replace(/^\+/, '')}` : null;
+      const email = c.email ? c.email.toLowerCase() : null;
+      const sync = w.path === ROUTES.sessionSync;
+      let user: MockUser | undefined;
+      if (sync) {
+        const r = userOf(w.token);
+        if (r.error) return r.error;
+        user = r.user;
+        const linked = bySub.get(c.sub);
+        if ((linked && linked !== user.id) || (subOf.get(user.id) && subOf.get(user.id) !== c.sub)) return err('IDENTITY_TAKEN');
+        if (phone && byPhone.get(phone) && byPhone.get(phone) !== user.id) return err('PHONE_TAKEN');
+      } else {
+        const id = bySub.get(c.sub) ?? (phone ? byPhone.get(phone) : undefined) ?? (email ? [...users.values()].find((u) => u.email === email)?.id : undefined);
+        user = id ? users.get(id) : undefined;
+        user ??= newUser(null, { name: (String(body.givenName ?? '') || c.name || '').trim().split(/\s+/)[0] ?? '' });
+      }
+      if (!subOf.get(user.id)) { bySub.set(c.sub, user.id); subOf.set(user.id, c.sub); }
+      if (phone && phone !== user.phone && (!byPhone.get(phone) || byPhone.get(phone) === user.id)) {
+        if (user.phone) byPhone.delete(user.phone);
+        user.phone = phone; byPhone.set(phone, user.id);
+      }
+      if (email && !user.email) { user.email = email; user.emailRelay = email.endsWith('@privaterelay.appleid.com'); }
+      if (email && user.email === email) user.emailVerified = true;
+      user.methods = { apple: c.providers.includes('apple'), google: c.providers.includes('google'), phone: !!user.phone, email: c.providers.includes('email') };
+      if (!user.name && body.givenName) user.name = String(body.givenName).trim().split(/\s+/)[0]!.slice(0, 30);
+      if (sync) return ok({ user: pub(user) });
       return ok({ tokens: issue(user.id), user: pub(user), isNew: !user.onboardedAt });
     }
     case `POST ${ROUTES.refresh}`: {

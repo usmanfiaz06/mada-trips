@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { z } from 'zod';
 import {
-  API_PREFIX, ApiErrorBody, ERROR_CODES, HEADERS, MeResponse, OtpStartResponse, PeopleResponse, PersonResponse, RefreshResponse, ROUTES, SignInResponse, TIMEOUTS, errorKind,
+  API_PREFIX, ApiErrorBody, ERROR_CODES, HEADERS, MeResponse, PeopleResponse, PersonResponse, RefreshResponse, ROUTES, TIMEOUTS, errorKind,
   type ClientOnlyErrorCode, type CreatePersonRequest, type DeviceInfo, type ErrorCode, type ErrorKind, type UpdateMeRequest,
 } from '@mada/shared';
 import { API_MODE, API_ORIGIN } from './config';
@@ -294,11 +294,6 @@ export function deviceInfo(): DeviceInfo {
 }
 
 export const api = {
-  startOtp: (phone: string) => request({ method: 'POST', path: ROUTES.otpStart, body: { phone }, auth: false }, OtpStartResponse),
-  /** Sends the access token when there is one: a phone added after Apple/Google sign-in joins that account. */
-  verifyOtp: (phone: string, code: string) => request({ method: 'POST', path: ROUTES.otpVerify, body: { phone, code, device: deviceInfo() }, auth: !!useSession.getState().tokens }, SignInResponse),
-  signInWith: (provider: 'apple' | 'google', idToken: string, givenName?: string) =>
-    request({ method: 'POST', path: provider === 'apple' ? ROUTES.apple : ROUTES.google, body: { idToken, givenName, device: deviceInfo() }, auth: false }, SignInResponse),
   me: () => request({ method: 'GET', path: ROUTES.me }, MeResponse),
   updateMe: (patch: UpdateMeRequest) => request({ method: 'PATCH', path: ROUTES.me, body: patch }, MeResponse),
   people: () => request({ method: 'GET', path: ROUTES.people }, PeopleResponse),
@@ -309,6 +304,8 @@ export const api = {
       if (s.tokens) await transport({ method: 'POST', path: ROUTES.logout, body: { refreshToken: s.tokens.refreshToken }, token: s.tokens.accessToken });
     } catch { /* offline: the server forgets the session when it expires */ } finally {
       await s.clear();
+      // And the Supabase identity session on this phone (lib/auth).
+      await import('./auth').then((m) => m.signOutIdentity()).catch(() => {});
     }
   },
 };
