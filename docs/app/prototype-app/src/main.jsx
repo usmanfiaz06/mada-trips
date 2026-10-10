@@ -1,4 +1,4 @@
-import { People, NewCircle, Friend, Saved } from './screens/Social.jsx';
+import { People, NewCircle, Friend, Saved, Join } from './screens/Social.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, PEOPLE, seedTrip, buzz, HAPTIC } from './store.jsx';
@@ -18,7 +18,7 @@ import { SCREENS as TRIP_SCREENS } from './screens/TripManage.jsx';
 import { SCREENS as SUPPORT_SCREENS } from './screens/Support.jsx';
 
 const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
-const STACK = { saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
+const STACK = { join: Join, saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
 
 /* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
 function useBackgroundProgress() {
@@ -67,6 +67,12 @@ function Phone() {
   const store = useStore();
   const { s, bannerMsg, toastMsg, dismissBanner, openBanner, set } = store;
   useEffect(() => { window.__madaPush = (name, params) => store.push(name, params || {}); });
+  /* An invite link (…#join/ist-8k2) opens the invite, for new and signed-in people alike. */
+  useEffect(() => {
+    const m = /#join\/([\w-]+)/.exec(window.location.hash || '');
+    if (!m) return;
+    if (s.onboarded) store.push('join', { code: m[1] }); else set({ pendingInvite: m[1] });
+  }, []);
   useBackgroundProgress();
   useEffect(() => { if (s.tab !== 'wallet' && s.walletUnlocked) set({ walletUnlocked: false }); }, [s.tab]);
   const top = s.stack[s.stack.length - 1];
@@ -136,6 +142,9 @@ function Demo() {
           <div className="demo-grid">
             <button type="button" className="demo-btn" onClick={() => { hardReset(); setOpen(false); }}>Fresh install</button>
             <button type="button" className="demo-btn" onClick={() => jump('none')}>Skip sign-up</button>
+            <button type="button" className="demo-btn" onClick={() => { hardReset(); setTimeout(() => set({ pendingInvite: 'ist-8k2' }), 0); setOpen(false); }}>Invite link, new to Mada</button>
+            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none'); setTimeout(() => window.__madaPush('join', { code: 'ist-8k2' }), 50); setOpen(false); }}>Invite link, signed in</button>
+            <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none'); setTimeout(() => window.__madaPush('join', { code: 'old-4q1' }), 50); setOpen(false); }}>Expired invite link</button>
           </div>
         </div>
         <div className="col" style={{ gap: 8 }}>

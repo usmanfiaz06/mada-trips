@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WelcomeBack } from './Account.jsx';
+import { InvitePreview } from './Social.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
 import { checkFile, readPassport } from '../ocr.js';
@@ -530,6 +531,7 @@ export default function Onboarding() {
     ),
   };
 
+  if (s.pendingInvite && step === 'welcome') return <InvitePreview code={s.pendingInvite} onJoin={() => { set({ signinFrom: { name: 'join', params: { code: s.pendingInvite } }, pendingInvite: null }); goto('signin'); }} onDecline={() => set({ pendingInvite: null })} />;
   if (s.account?.signedOut && step === 'welcome') return <WelcomeBack onSomeoneElse={() => { set((p) => ({ account: { ...(p.account || {}), signedOut: false } })); }} />;
   return <div key={step} className="push" style={{ position: 'absolute', inset: 0 }}>{screens[step]}</div>;
 }

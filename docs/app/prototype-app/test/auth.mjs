@@ -77,6 +77,25 @@ try {
   await page.waitForTimeout(600);
   await click('Open Mada', { wait: 700 });
   await shot('back-in-ask');
+
+  step('invite link: new to Mada, then signed in, then expired');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload(); await page.waitForTimeout(400);
+  await page.locator('.demo').getByRole('button', { name: 'Invite link, new to Mada' }).click();
+  await page.waitForTimeout(500);
+  await shot('invite-new-user');
+  await click('Join with Mada', { wait: 400 });
+  await click('Use my phone number');
+  await phone.locator('#phone').fill('512345678');
+  await click('Text me a code');
+  await phone.locator('#otp').fill('123456');
+  await page.waitForTimeout(600);
+  await click('Later', { wait: 400 });
+  await click('Skip', { wait: 400 }).catch(() => {});
+  await shot('invite-after-signup-step');
+  await page.evaluate(() => window.__madaPush('join', { code: 'old-4q1' }));
+  await page.waitForTimeout(400);
+  await shot('invite-expired');
 } catch (e) {
   errors.push('flow: ' + e.message.split('\n')[0]);
   console.log('FIRST ERROR:', e.message.slice(0, 500));

@@ -851,7 +851,7 @@ function Refund({ params }) {
           return (
             <Pick key={p.id} on={on} disabled={done || (q.back === 0 && !q.askAnyway)} onClick={() => toggle(p.id)}
               title={p.title} sub={done ? 'Already refunded' : q.rule}
-              right={done ? 'Refunded' : q.back > 0 ? `+${fmt(money({ p, q }).cash)}` : 'Nothing back'}
+              right={done ? 'Refunded' : money({ p, q }).cash > 0 ? `+${fmt(money({ p, q }).cash)}` : q.back > 0 ? 'Payments stop' : 'Nothing back'}
               note={on ? <>{q.why}{q.back > 0 && q.back < q.paid ? ` You paid ${sar(q.paid)}.` : ''}{money({ p, q }).count ? ` You’ve paid ${sar(p.amount - money({ p, q }).cancelled)} so far, and that comes back. The ${money({ p, q }).count} ${p.method === 'tabby' ? 'Tabby' : 'Tamara'} payments left (${sar(money({ p, q }).cancelled)}) are cancelled.` : ''}{money({ p, q }).owe ? ` ${p.method === 'tabby' ? 'Tabby' : 'Tamara'} still takes ${sar(money({ p, q }).owe)} for the hotel’s fee.` : ''}</> : null} />
           );
         })}

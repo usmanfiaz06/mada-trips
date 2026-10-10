@@ -36,7 +36,7 @@ const COVERS = [null, 'img/istanbul.jpg', 'img/alula.jpg', 'img/riyadh.jpg'];
 export function Avatar({ id, size = 40, ring }) {
   if (id === 'omar') return <UserAvatar size={size} ring={ring} />;
   const p = person(id);
-  return <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: size, height: size, fontSize: size * 0.4, flexShrink: 0, ...(ring ? { borderColor: ring } : null) }}>{p.initial}</span>;
+  return <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: size, height: size, fontSize: size * 0.4, flexShrink: 0, ...(p.tone ? null : { color: '#1e352d', background: '#f6f2ec' }), ...(ring ? { borderColor: ring } : null) }}>{p.initial}</span>;
 }
 
 function PersonRow({ id, sub, right, onClick, on }) {
@@ -538,4 +538,61 @@ export function Saved({ params = {} }) {
       {share && <InviteSheet what={`your ${share} list`} onClose={() => setShare(null)} />}
     </div>
   );
+}
+
+/* ---------- opening an invite link ---------- */
+
+export const INVITES = {
+  'ist-8k2': { code: 'ist-8k2', from: 'abdullah', circle: 'Istanbul for Eid', img: 'img/istanbul.jpg', members: ['abdullah', 'noor', 'khalid'], trip: 'Istanbul · 9–15 Mar' },
+  'old-4q1': { code: 'old-4q1', from: 'abdullah', expired: true, circle: 'Summer in Baku' },
+};
+
+/* What the invited person sees, signed in or not. */
+export function InvitePreview({ code, signedIn, onJoin, onDecline }) {
+  const inv = INVITES[code] || { expired: true, from: 'abdullah', circle: 'a circle' };
+  const from = FRIENDS[inv.from]?.short || 'A friend';
+  if (inv.expired) return (
+    <div className="screen" style={{ padding: '120px 28px 0', gap: 16 }}>
+      <Icon name="link" size={36} />
+      <h1 className="h1">This invite has expired.</h1>
+      <p className="body">Invite links last 14 days. Ask {from} to send a new one. It takes them two taps.</p>
+      <div className="act">
+        <a className="btn primary block" href="https://wa.me/" target="_blank" rel="noreferrer">Ask {from} on WhatsApp</a>
+        <button type="button" className="btn ghost block" onClick={onDecline}>{signedIn ? 'Back to Mada' : 'Look around Mada'}</button>
+      </div>
+    </div>
+  );
+  return (
+    <div className="screen" style={{ background: '#0f1a16', color: '#fffdf9' }}>
+      <img src={inv.img} alt="" className="wait-bg" />
+      <div className="wait-veil" />
+      <div style={{ position: 'relative', marginTop: 'auto', padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <span className="stack">{inv.members.map((m) => <Avatar key={m} id={m} size={40} ring="#0f1a16" />)}</span>
+        <span className="eyebrow" style={{ color: '#d9b77a' }}>{from} invited you</span>
+        <h1 className="display" style={{ fontSize: 46, color: '#fffdf9', lineHeight: 1 }}>{inv.circle}</h1>
+        <span className="small" style={{ color: 'rgba(255,253,249,.85)' }}>{inv.trip} · {inv.members.map((m) => FRIENDS[m]?.short).join(', ')} are in</span>
+        <div className="card" style={{ background: 'rgba(255,253,249,.08)', color: '#fffdf9', gap: 6, border: '1px solid rgba(255,253,249,.12)' }}>
+          <span className="small" style={{ color: '#fffdf9', fontWeight: 600 }}>If you join, they see</span>
+          <span className="small" style={{ color: 'rgba(255,253,249,.8)' }}>Your name, photo and what you post in the circle. Never your passport, payments or where you are.</span>
+        </div>
+        <button type="button" className="btn gold block" onClick={onJoin}>{signedIn ? 'Join the circle' : 'Join with Mada'}</button>
+        <button type="button" className="btn on-dark block" onClick={onDecline}>Not now</button>
+        {!signedIn && <span className="tiny" style={{ color: 'rgba(255,253,249,.6)', textAlign: 'center' }}>Takes a minute. Your passport can wait.</span>}
+      </div>
+    </div>
+  );
+}
+
+export function Join({ params }) {
+  const { s, set, pop, replace, toast } = useStore();
+  const inv = INVITES[params.code];
+  const join = () => {
+    const gid = 'inv-' + params.code;
+    if (s.groups.some((g) => g.id === gid)) { replace('group', { id: gid }); toast('You’re already in this circle.'); return; }
+    set((p) => ({ groups: [{ id: gid, name: inv.circle, img: inv.img, members: [...inv.members, 'omar'], admin: inv.from, unread: 0, sub: 'you just joined', trip: inv.trip, muted: false }, ...p.groups], friends: [...new Set([...p.friends, inv.from])] }));
+    buzz(HAPTIC.success);
+    toast(`You’re in. ${FRIENDS[inv.from].short} can see you joined.`);
+    replace('group', { id: gid });
+  };
+  return <div className="screen push"><InvitePreview code={params.code} signedIn onJoin={join} onDecline={pop} /></div>;
 }
