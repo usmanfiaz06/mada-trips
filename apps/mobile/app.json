@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Mada Trips",
+    "slug": "mada-trips",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "madatrips",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#e9e2d8",
+    "icon": "./assets/images/icon.png",
+    "ios": {
+      "bundleIdentifier": "sa.madatrips.app",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "To read your passport. Nothing is uploaded until you check the details.",
+        "NSFaceIDUsageDescription": "To open your Wallet."
+      }
+    },
+    "android": {
+      "package": "sa.madatrips.app",
+      "adaptiveIcon": { "backgroundColor": "#1e352d", "foregroundImage": "./assets/images/icon-foreground.png" },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#e9e2d8"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-video",
+      ["expo-camera", { "cameraPermission": "To read your passport. Nothing is uploaded until you check the details." }],
+      ["expo-local-authentication", { "faceIDPermission": "To open your Wallet." }],
+      ["expo-splash-screen", { "backgroundColor": "#1e352d", "image": "./assets/images/splash.png", "imageWidth": 120 }],
+      "expo-font"
+    ],
+    "experiments": { "typedRoutes": true, "reactCompiler": false }
+  }
+}

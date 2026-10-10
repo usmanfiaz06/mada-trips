@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // One Vercel project serves both the public website and Mada Ops:
 //   /            the website: its files are copied into public/ at build time by scripts/copy-site.mjs
@@ -8,8 +11,21 @@ import type { NextConfig } from "next";
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "madatrips.sa,www.madatrips.sa,mada-trips.vercel.app")
   .split(",").map((s) => s.trim()).filter(Boolean);
 
+// The Mada Trips app's Core API (src/app/api/app/v1) imports TypeScript straight from packages/shared, outside this
+// folder. externalDir lets Next compile it; tsconfig paths map "@mada/shared". Its one dependency, zod, always resolves
+// to this package's copy, so the Vercel build (which installs only platform/) needs nothing from the repo root.
+const here = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const zodDir = dirname(require.resolve("zod/package.json"));
+
 const config: NextConfig = {
-  experimental: { serverActions: { bodySizeLimit: "8mb", allowedOrigins } },
+  experimental: { serverActions: { bodySizeLimit: "8mb", allowedOrigins }, externalDir: true },
+  webpack(cfg) {
+    cfg.resolve ??= {};
+    cfg.resolve.alias = { ...(cfg.resolve.alias as Record<string, string>), zod$: zodDir, "@mada/shared$": resolve(here, "../packages/shared/src/index.ts") };
+    cfg.resolve.modules = [...(cfg.resolve.modules ?? ["node_modules"]), resolve(here, "node_modules")];
+    return cfg;
+  },
   poweredByHeader: false,
   devIndicators: false,
   async redirects() {

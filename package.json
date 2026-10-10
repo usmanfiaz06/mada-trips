@@ -21,5 +21,8 @@
   "devDependencies": {
     "eslint": "9.39.5",
     "eslint-config-expo": "57.0.2"
+  },
+  "overrides": {
+    "vite": "7.3.6"
   }
 }

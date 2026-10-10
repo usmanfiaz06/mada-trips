@@ -14,13 +14,14 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint:copy": "node --experimental-strip-types scripts/lint-copy.ts"
+    "lint:copy": "vitest run test/copy.test.ts"
   },
   "dependencies": {
     "zod": "4.6.5"
   },
   "devDependencies": {
     "typescript": "~6.0.3",
-    "vitest": "4.1.11"
+    "vitest": "4.1.11",
+    "vite": "7.3.6"
   }
 }

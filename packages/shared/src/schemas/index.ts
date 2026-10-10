@@ -9,3 +9,4 @@ export * from './social';
 export * from './notifications';
 export * from './offers';
 export * from './health';
+export * from './positions';

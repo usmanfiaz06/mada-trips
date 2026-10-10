@@ -11,7 +11,11 @@ export const ROUTES = {
   google: '/auth/google',
   me: '/me',
   people: '/people',
+  /** GET, with the flight number in place of :flightNo (e.g. /flights/SV263/position). */
+  flightPosition: '/flights/:flightNo/position',
 } as const;
+
+export const flightPositionPath = (flightNo: string) => ROUTES.flightPosition.replace(':flightNo', encodeURIComponent(flightNo.replace(/\s+/g, '').toUpperCase()));
 
 export type RouteName = keyof typeof ROUTES;
 

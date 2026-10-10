@@ -1,0 +1,5 @@
+dist/
+.expo/
+expo-env.d.ts.bak
+ios/
+android/
