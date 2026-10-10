@@ -64,6 +64,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 | Need | Recommended | Alternative | Cost model |
 |---|---|---|---|
 | Flight status, gate, delays, inbound aircraft | **FlightAware AeroAPI** (alerts and webhooks, never polling) | AeroDataBox (cheaper, less reliable) | **The one fixed cost worth paying:** about $100 a month minimum, plus per query. Early warnings are the core promise, so data quality matters here more than anywhere else. |
+| Live aircraft position (the plane on the map, the inbound aircraft, in-air progress) | **adsb.lol** open ADS-B data (no key, ODbL licence: commercial use with attribution) | OpenSky Network (free for non-commercial use; commercial needs an agreement) | Free. Position, altitude and speed only. Gates, delays and schedules still come from FlightAware. Cached 30–60 s per flight. |
 | Trip import from email | **Amazon SES inbound** | — | About $0.10 per 1,000 emails. Each user gets an address like `name@trips.madatrips.sa`, and Claude reads the email. |
 | Weather | **Apple WeatherKit** | Open-Meteo (free, open data) | Included with the Apple developer account (500k calls a month). |
 | Maps | **Apple MapKit** on iOS, **Google Maps SDK** on Android | — | Free on iOS. Google's mobile map display is free **[confirm]**. |
