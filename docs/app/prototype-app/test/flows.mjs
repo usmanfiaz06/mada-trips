@@ -41,6 +41,8 @@ try {
   await shot('name-step');
   await phone.locator('#nick').fill('Omar');
   await click('Let’s go, Omar', { wait: 600 });
+  await shot('alerts-step');
+  await click('Allow alerts', { wait: 600 });
   await shot('today-first-open');
 
   step('later: passport from Today');

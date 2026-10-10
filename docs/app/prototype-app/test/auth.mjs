@@ -94,6 +94,7 @@ try {
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(600);
   await click('Skip', { wait: 600 });
+  await click('Not now', { wait: 600 });
   await shot('invite-after-signup-step');
   await page.evaluate(() => window.__madaPush('join', { code: 'old-4q1' }));
   await page.waitForTimeout(400);
@@ -113,6 +114,7 @@ try {
   await page.waitForTimeout(700);
   await phone.locator('#nick').fill('Nadia');
   await click('Let\u2019s go, Nadia', { wait: 700 });
+  await click('Not now', { wait: 700 });
   await none(/Hessa|Sara|Ahmed|Lina/, 'first Today');
   await shot('new-household');
   await none(/Baku|four of you|Abdullah|places saved/, 'today');
@@ -185,7 +187,8 @@ try {
   await click('Text me a code');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(700);
-  await click('Skip', { wait: 900 });
+  await click('Skip', { wait: 600 });
+  await click('Allow alerts', { wait: 900 });
   await phone.getByText('EK818', { exact: false }).first().waitFor();
   await shot('tracked-after-signup');
   await tab('Trips');

@@ -248,17 +248,13 @@ export default function Onboarding({ params = {} }) {
 
     name: (
       <div className="screen">
-        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => finish({ noPassport: true })}>Skip</button>} />
-        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); finish({ noPassport: true }); }}>
+        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => goto('alerts')}>Skip</button>} />
+        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); goto('alerts'); }}>
           <h1 className="h1">What should we call you?</h1>
-          <p className="body">Just a first name. Faisal uses it when he messages you. Names on tickets come from passports, later, when you book.</p>
+          <p className="body">Just a first name. Faisal uses it when he messages you.</p>
           <div className="field">
             <label htmlFor="nick">First name</label>
             <input id="nick" className="input" autoComplete="given-name" autoCapitalize="words" maxLength={30} value={nick} onChange={(e) => setNick(e.target.value)} placeholder={social ? 'Omar' : ''} autoFocus />
-          </div>
-          <div className="card well" style={{ gap: 8 }}>
-            <span className="h3" style={{ fontSize: 15 }}>That’s all for now.</span>
-            {[['visa', 'Your passport, when you first book'], ['circles', 'Your family, whenever you like'], ['bell', 'Alerts, once you have a flight to watch']].map(([ic, t]) => <span key={t} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t}</span>)}
           </div>
           <div className="act">
             <button type="submit" className="btn primary block">{nick.trim() ? `Let’s go, ${nick.trim().split(' ')[0]}` : 'Let’s go'}</button>
@@ -541,8 +537,8 @@ export default function Onboarding({ params = {} }) {
           <p className="body">Gate changes. Delays. The moment your driver arrives. Never offers.</p>
         </div>
         <div className="act">
-          <button type="button" className="btn primary block" onClick={() => { set({ notifications: true }); goto('location'); }}>Allow alerts</button>
-          <button type="button" className="btn ghost block" onClick={() => { set({ notifications: false }); goto('location'); }}>Not now</button>
+          <button type="button" className="btn primary block" onClick={() => { set({ notifications: true }); finish({ noPassport: true }); }}>Allow alerts</button>
+          <button type="button" className="btn ghost block" onClick={() => { set({ notifications: false }); finish({ noPassport: true }); }}>Not now</button>
         </div>
       </div>
     ),

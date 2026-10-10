@@ -13,7 +13,7 @@ The flows the clickable prototype implements end to end, including every edge ca
 
 ## 1. First open and onboarding
 
-People get into the app first. The passport, the family and permissions are asked for later, at the moment they're needed.
+People get into the app first. Only alerts are asked during sign-up; the passport, the family and location come later, at the moment they're needed.
 
 | Step | Happy path | Edge cases |
 |---|---|---|
@@ -21,7 +21,8 @@ People get into the app first. The passport, the family and permissions are aske
 | Sign in | Apple, Google, or phone number | **Apple:** share or hide the email. **Cancelled:** nothing shared. **Apple or Google:** a mobile number is still needed for alerts. |
 | Phone number | +966 and 9 digits starting with 5 | A short, long or wrong-prefix number gets an inline explanation. **Offline:** the code is not sent. **Existing account** (demo: 50 000 4127): "Welcome back", everything restored. |
 | Code | 6 digits (demo code `123456`) | **Wrong code:** "2 tries left". **After 3 wrong codes:** locked. **Resend** after 30 s. |
-| Name | "What should we call you?" → straight into Today | **Skip:** fine, no name. Apple and Google prefill it. |
+| Name | "What should we call you?" | **Skip:** fine, no name. Apple and Google prefill it. |
+| Alerts | Pre-prompt, then allow → straight into Today | **Not now:** the app works fully; we ask again after the first booking. |
 
 **Asked later, in context**
 
@@ -29,7 +30,7 @@ People get into the app first. The passport, the family and permissions are aske
 |---|---|---|
 | Passport | Today shows "Add your passport". At payment, missing passports show a gentle note: book now, add them within 48 hours. | The same scan screen (photo reading, demo passport, by hand, expired warning). |
 | Family | Today's "Add your family", or "Someone else" when choosing who's going. | Account → Household. |
-| Alerts | After the first booking ("Want gate changes on this phone?") or when tracking a flight. | — |
+| Alerts (if declined) | After the first booking ("Want gate changes on this phone?") or when tracking a flight. | — |
 | Location | On the first travel day, for leave times. | — |
 
 ## 2. Booking a flight (and the whole trip)
