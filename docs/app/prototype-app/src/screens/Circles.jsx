@@ -47,16 +47,15 @@ export default function Circles() {
   return (
     <div className="screen">
       <div className="scroll">
-        <div className="spread" style={{ paddingTop: 54 }}>
-          <div className="col" style={{ gap: 2 }}><h1 className="h1">{view === 'discover' ? 'Discover' : 'Circles'}</h1><span className="tiny">{view === 'discover' ? 'What’s on, and tips from people who went' : 'Private. Only people you choose.'}</span></div>
+        <div className="spread" style={{ paddingTop: 58 }}>
+          <div className="tabs-text" role="tablist" aria-label="Circles views">
+            {[['discover', 'Discover'], ['circles', 'Circles']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={view === id ? 'true' : 'false'} onClick={() => { setView(id); buzz(HAPTIC.select); }}>{label}</button>
+            ))}
+          </div>
           {view === 'discover'
-            ? <button type="button" className="btn primary small" onClick={() => setSheet('post')}><Icon name="plus" color="#f6f2ec" size={18} />Post a tip</button>
+            ? <button type="button" className="icon-btn dark" aria-label="Post a tip" onClick={() => setSheet('post')}><Icon name="plus" color="#f6f2ec" /></button>
             : <button type="button" className="btn primary small" onClick={() => setSheet('invite')}>Invite</button>}
-        </div>
-        <div className="chips" role="tablist">
-          {[['discover', 'Discover'], ['circles', 'Your circles']].map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={view === id ? 'true' : 'false'} className={'chip' + (view === id ? ' on' : '')} onClick={() => { setView(id); buzz(HAPTIC.select); }}>{label}</button>
-          ))}
         </div>
         {view === 'discover' ? <Discover posts={posts} setPosts={setPosts} /> : (<>
 
@@ -194,7 +193,7 @@ export function Group() {
       <TopBar onBack={pop} backLabel="Circles" right={<span className="stack"><span className="avatar sm">O</span><span className="avatar sm gold">H</span><span className="avatar sm green">A</span><span className="avatar sm" style={{ fontSize: 10 }}>+3</span></span>} />
       <div style={{ padding: '0 24px 8px' }}>
         <h1 className="display" style={{ fontSize: 34 }}>Istanbul for Eid</h1>
-        <span className="tiny">9–15 Mar · 2 families · 6 people · Instant answers from Mada. Faisal and the team confirm anything you book.</span>
+        <span className="tiny">9–15 Mar · 2 families · 6 people · Instant answers from Mada. A Mada agent confirms anything you book.</span>
       </div>
       <div className="scroll no-dock" style={{ paddingBottom: 100 }}>
         <Bubble who="mada">
@@ -215,9 +214,9 @@ export function Group() {
           ))}
           <span className="tiny">{vote ? `You voted. ${total - 1} others have too.` : 'Hessa asked · 4 of 6 voted'}</span>
         </div>
-        <Bubble who="F" name="Faisal · Mada" tone="green">
+        <Bubble who="F" name="Faisal · your Mada agent" tone="green">
           <span>I'm holding 6 seats on the {day} cruise at 19:30 until Monday. SAR 1,140 for everyone.</span>
-          {cruise ? <span className="row tiny" style={{ color: '#2f7a4b', fontWeight: 600 }}><Icon name="check" size={16} color="#2f7a4b" width={2.4} />Confirmed by Faisal</span>
+          {cruise ? <span className="row tiny" style={{ color: '#2f7a4b', fontWeight: 600 }}><Icon name="check" size={16} color="#2f7a4b" width={2.4} />Confirmed by Faisal at Mada</span>
             : <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={() => { setCruise(true); buzz(HAPTIC.success); }}>Book it</button>}
         </Bubble>
         {cruise && (
@@ -263,63 +262,78 @@ function Discover({ posts, setPosts }) {
   const [saved, setSaved] = useState([]);
   const feed = posts.filter((p) => p.city === city && (filter === 'All' || p.kind === filter))
     .sort((a, b) => (a.rel === 'Friend' ? -1 : 0) - (b.rel === 'Friend' ? -1 : 0));
+  const otherCity = cities.find((c) => c !== city);
   return (
     <>
-      <div className="chips">
-        {cities.map((c) => <button key={c} type="button" className={'chip' + (city === c ? ' on' : '')} aria-pressed={city === c ? 'true' : 'false'} onClick={() => { setCity(c); buzz(HAPTIC.select); }}><Icon name="pin" size={16} />{c}{s.trip && c === 'Istanbul' ? ' · your trip' : ''}</button>)}
-      </div>
-
-      <div className="spread"><h2 className="h2">On this week</h2><span className="tiny">Example listings</span></div>
-      <div className="chips scrollx" style={{ gap: 10 }}>
+      <h2 className="h2" style={{ fontSize: 22 }}>
+        On this week in{' '}
+        <button type="button" className="city-switch" onClick={() => { setCity(otherCity); buzz(HAPTIC.select); }} aria-label={`${city}. Switch to ${otherCity}`}>
+          {city}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7d5d27" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
+      </h2>
+      {s.trip && city === 'Istanbul' && <span className="tiny" style={{ marginTop: -8 }}>While you're there, 9–15 Mar</span>}
+      <div className="chips scrollx" style={{ gap: 12 }}>
         {EVENTS[city].map((e, i) => (
-          <div key={e.id} className="photo" style={{ width: 230, height: 190, flexShrink: 0 }}>
-            <img src={e.img} alt="" style={{ objectPosition: ['50% 40%', '30% 70%', '70% 30%'][i] }} />
-            <span className="shade" />
-            <span className="pill" style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(255,253,249,.9)' }}>{e.tag}</span>
-            <span className="over" style={{ gap: 4 }}>
-              <span className="h3" style={{ color: '#fffdf9' }}>{e.title}</span>
-              <span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{e.when} · {e.where}</span>
-              <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start', height: 34, marginTop: 4 }} onClick={() => push('ask', { prefill: `${e.title} in ${city}` })}>Ask Faisal to book</button>
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="spread"><h2 className="h2">Trips we've planned</h2><span className="tiny">Book as is, or change anything</span></div>
-      <div className="chips scrollx" style={{ gap: 10 }}>
-        {Object.values(PLANS).map((pl) => (
-          <button key={pl.id} type="button" className="photo" style={{ width: 250, height: 170, border: 0, padding: 0, flexShrink: 0 }} onClick={() => push('plan', { id: pl.id })}>
-            <img src={pl.img} alt="" /><span className="shade" />
-            <span className="over" style={{ textAlign: 'left', gap: 2 }}>
-              <span className="pill" style={{ alignSelf: 'flex-start', background: 'rgba(255,253,249,.9)' }}>{pl.days} days</span>
-              <span className="h3" style={{ color: '#fffdf9', fontSize: 17 }}>{pl.title}</span>
-              <span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{pl.sub}</span>
+          <button key={e.id} type="button" className="story" style={{ width: 236, minHeight: 300, flexShrink: 0, border: 0, padding: 0, textAlign: 'left' }} onClick={() => push('ask', { prefill: `${e.title} in ${city}` })}>
+            <img className="bg" src={e.img} alt="" style={{ objectPosition: ['50% 40%', '30% 70%', '70% 30%'][i] }} />
+            <span className="veil" />
+            <span className="top"><span className="pill glass">{e.tag}</span></span>
+            <span className="body">
+              <span className="quote" style={{ fontSize: 26 }}>{e.title}</span>
+              <span className="small" style={{ color: 'rgba(255,253,249,.88)' }}>{e.when}<br />{e.where}</span>
+              <span className="glass-btn" style={{ alignSelf: 'flex-start' }}>Book with Mada<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></span>
             </span>
           </button>
         ))}
       </div>
 
-      <div className="spread"><h2 className="h2">Tips from people</h2><span className="tiny">Friends first</span></div>
-      <div className="chips">
-        {['All', 'Food', 'Things to do'].map((f) => <button key={f} type="button" className={'chip' + (filter === f ? ' on' : '')} onClick={() => { setFilter(f); buzz(HAPTIC.select); }}>{f}</button>)}
+      <h2 className="h2" style={{ fontSize: 22, marginTop: 6 }}>Trips we've planned</h2>
+      <div className="chips scrollx" style={{ gap: 12 }}>
+        {Object.values(PLANS).map((pl) => (
+          <button key={pl.id} type="button" className="story" style={{ width: 280, minHeight: 220, flexShrink: 0, border: 0, padding: 0, textAlign: 'left' }} onClick={() => push('plan', { id: pl.id })}>
+            <img className="bg" src={pl.img} alt="" />
+            <span className="veil" />
+            <span className="top"><span className="pill glass">{pl.days} days · planned by Mada</span></span>
+            <span className="body" style={{ gap: 4 }}>
+              <span className="quote" style={{ fontSize: 26 }}>{pl.title}</span>
+              <span className="small" style={{ color: 'rgba(255,253,249,.88)' }}>{pl.sub}</span>
+            </span>
+          </button>
+        ))}
       </div>
-      {feed.length === 0 && <div className="card well"><span className="h3">No tips here yet.</span><span className="small">Be the first. Tap Post a tip.</span></div>}
-      {feed.map((p) => {
+
+      <div className="spread" style={{ marginTop: 6 }}>
+        <h2 className="h2" style={{ fontSize: 22 }}>From people who went</h2>
+        <div className="row" style={{ gap: 12 }} role="group" aria-label="Filter tips">
+          {[['All', 'All'], ['Food', 'Food'], ['Things to do', 'To do']].map(([f, label]) => (
+            <button key={f} type="button" aria-pressed={filter === f ? 'true' : 'false'} onClick={() => { setFilter(f); buzz(HAPTIC.select); }}
+              style={{ border: 0, background: 'none', padding: '6px 0', fontSize: 14, fontWeight: 600, color: filter === f ? '#1e352d' : '#7a857f', borderBottom: filter === f ? '2px solid #d9b77a' : '2px solid transparent' }}>{label}</button>
+          ))}
+        </div>
+      </div>
+      {feed.length === 0 && <div className="card well"><span className="h3">No tips here yet.</span><span className="small">Be the first. Tap + to post one.</span></div>}
+      {feed.map((p, i) => {
         const on = saved.includes(p.id);
         return (
-          <article key={p.id} className="card rise" style={{ padding: 0, overflow: 'hidden', gap: 0 }}>
-            {p.img && <div className="photo" style={{ height: 150, borderRadius: 0 }}><img src={p.img} alt="" style={{ objectPosition: '50% 60%' }} /></div>}
-            <div className="col" style={{ padding: 14, gap: 8 }}>
-              <div className="row">
-                <span className={'avatar sm' + (p.tone ? ' ' + p.tone : '')}>{p.initial}</span>
-                <span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 14 }}>{p.who}</span><span className="tiny">{p.rel}{p.pending ? ' · being checked' : ''}</span></span>
-                <span className="pill">{p.kind}</span>
-              </div>
-              <span className="h3">{p.place}</span>
-              <span className="small" style={{ color: '#3f4f48' }}>{p.text}</span>
-              <div className="row" style={{ flexWrap: 'wrap' }}>
-                <button type="button" className={'btn small ' + (on ? 'primary' : 'secondary')} style={on ? null : { background: '#f6f2ec' }} aria-pressed={on ? 'true' : 'false'} onClick={() => { setSaved(on ? saved.filter((x) => x !== p.id) : [...saved, p.id]); buzz(HAPTIC.select); if (!on) toast('Saved to ' + city + ' collection.'); }}>{on ? 'Saved' : 'Save'} · {p.saves + (on ? 1 : 0)}</button>
-                <button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => push('ask', { prefill: (p.kind === 'Food' ? 'A table at ' : '') + p.place })}>{p.kind === 'Food' ? 'Book a table' : 'Plan it'}</button>
+          <article key={p.id} className={'story rise' + (p.img ? '' : ' plain')} style={{ animationDelay: `${i * 0.05}s` }}>
+            {p.img && <img className="bg" src={p.img} alt="" style={{ objectPosition: '50% 55%' }} />}
+            <span className="veil" />
+            <div className="top">
+              <span className="row" style={{ gap: 8, padding: '4px 12px 4px 4px', borderRadius: 999, background: 'rgba(15,26,22,.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+                <span className={'avatar sm' + (p.tone ? ' ' + p.tone : '')} style={{ width: 28, height: 28 }}>{p.initial}</span>
+                <span className="col" style={{ gap: 0 }}><span style={{ fontSize: 13, fontWeight: 600 }}>{p.who}</span><span style={{ fontSize: 11, color: 'rgba(255,253,249,.8)' }}>{p.rel}{p.pending ? ' · being checked' : ''}</span></span>
+              </span>
+              <span className="pill glass">{p.kind === 'Things to do' ? 'To do' : p.kind}</span>
+            </div>
+            <div className="body">
+              {!p.img && <span aria-hidden="true" style={{ fontFamily: 'var(--f-display)', fontSize: 64, lineHeight: 0.6, color: '#d9b77a', marginTop: 30 }}>“</span>}
+              <p className="quote">{p.text}</p>
+              <span className="row" style={{ gap: 6, fontSize: 14, fontWeight: 600, color: 'rgba(255,253,249,.92)' }}><Icon name="pin" size={16} color="#d9b77a" />{p.place}</span>
+              <div className="row" style={{ marginTop: 4 }}>
+                <button type="button" className={'glass-btn' + (on ? ' on' : '')} aria-pressed={on ? 'true' : 'false'} onClick={() => { setSaved(on ? saved.filter((x) => x !== p.id) : [...saved, p.id]); buzz(HAPTIC.select); if (!on) toast('Saved to your ' + city + ' collection.'); }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill={on ? '#1e352d' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z" /></svg>{p.saves + (on ? 1 : 0)}
+                </button>
+                <button type="button" className="glass-btn" onClick={() => push('ask', { prefill: (p.kind === 'Food' ? 'A table at ' : '') + p.place })}>{p.kind === 'Food' ? 'Book a table' : 'Plan it'}</button>
               </div>
             </div>
           </article>

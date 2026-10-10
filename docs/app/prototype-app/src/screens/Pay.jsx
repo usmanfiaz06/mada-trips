@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, PICKUP, fmt, seedTrip } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, useTicker } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, useTicker, AddPersonSheet, InviteSheet } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 
 /* Builds the lines, total and rules for anything the traveller can pay for. */
@@ -34,7 +34,7 @@ function useOrder(params, travellers) {
   if (params.kind === 'esim') return { title: 'Data in Türkiye', lines: [{ icon: 'globe', text: `10 GB for 7 days × ${params.count}`, price: 39 * params.count }], rule: 'Refundable until it’s installed.', agent: false };
   if (params.kind === 'quote') {
     const r = s.requests.find((x) => x.id === params.requestId);
-    return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Faisal', price: r?.quote || 0 }], rule: 'Refunded in full if Faisal can’t deliver it.', agent: false, requestId: params.requestId };
+    return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Mada', price: r?.quote || 0 }], rule: 'Refunded in full if we can’t deliver it.', agent: false, requestId: params.requestId };
   }
   if (params.kind === 'share') return { title: 'Your share of the cruise', lines: [{ icon: 'star', text: 'Bosphorus dinner cruise · Abdullah’s family', price: params.amount }], rule: 'Free to cancel until 48 hours before.', agent: false };
   if (params.kind === 'change') return { title: 'Change your flight', lines: [{ icon: 'flight', text: params.label, price: params.amount }], rule: 'The new fare follows the same rules.', agent: true };
@@ -83,7 +83,7 @@ export default function Pay({ params }) {
     if (params.kind === 'quote') set((p) => ({ requests: p.requests.map((r) => (r.id === params.requestId ? { ...r, status: 'paid' } : r)) }));
     if (params.kind === 'share') set((p) => ({ circles: { ...p.circles, sharePaid: true } }));
     pop();
-    toast(params.kind === 'esim' ? 'Done. The eSIMs install before you fly.' : params.kind === 'share' ? 'Paid. Abdullah sees it in the group.' : 'Paid. Faisal takes it from here.');
+    toast(params.kind === 'esim' ? 'Done. The eSIMs install before you fly.' : params.kind === 'share' ? 'Paid. Abdullah sees it in the group.' : 'Paid. We’ll take it from here.');
   };
 
   return (
@@ -149,10 +149,16 @@ export default function Pay({ params }) {
               return <button key={id} type="button" className="chip" aria-pressed={on ? 'true' : 'false'} onClick={() => { if (on && travellers.length === 1) return; setTravellers(on ? travellers.filter((x) => x !== id) : [...travellers, id]); buzz(HAPTIC.select); }}>{PEOPLE[id].name}</button>;
             })}
           </div>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => setSheet('addPerson')}><Icon name="plus" size={18} />Add someone</button>
+            <button type="button" className="btn secondary small" style={{ background: '#f6f2ec' }} onClick={() => setSheet('invite')}><Icon name="link" size={18} />Invite with a link</button>
+          </div>
           <span className="small">The price updates as you change it.</span>
           <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Done · SAR {fmt(total)}</button>
         </Sheet>
       )}
+      {sheet === 'addPerson' && <AddPersonSheet onClose={() => setSheet('people')} onAdded={(p) => { setTravellers((t) => [...t, p.id]); setSheet('people'); }} />}
+      {sheet === 'invite' && <InviteSheet what="the Istanbul trip" onClose={() => setSheet('people')} />}
       {sheet === 'cards' && <CardsSheet current={card} onPick={(id) => { setCard(id); setSheet(null); }} onClose={() => setSheet(null)} />}
       {sheet === 'offline' && (
         <Sheet label="Offline" onClose={() => setSheet(null)}>
@@ -222,6 +228,8 @@ export function CardsSheet({ current, onPick, onClose }) {
 
 /* ---------- with Faisal, then confirmed ---------- */
 
+const elapsedLabel = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+
 export function Waiting({ params }) {
   const { s, set, reset, replace, push, go } = useStore();
   const [step, setStep] = useState(0);
@@ -229,6 +237,8 @@ export function Waiting({ params }) {
   const [answered, setAnswered] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const asked = useRef(false);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => { if (confirmed) return undefined; const t = setInterval(() => setElapsed((e) => e + 1), 1000); return () => clearInterval(t); }, [confirmed]);
   const labels = params.kind === 'package' ? ['Seats held', 'Rooms held', 'Booking tours and tables'] : params.kind === 'change' ? ['Seats held', 'Fare checked', 'Changing tickets'] : ['Seats held', 'Price checked', params.kind === 'stay' ? 'Confirming rooms' : 'Issuing tickets'];
 
   useEffect(() => { buzz(HAPTIC.knock); }, []);
@@ -265,7 +275,7 @@ export function Waiting({ params }) {
       });
     } else if (params.kind === 'package') {
       const pl = PLANS[params.planId];
-      set((p) => ({ requests: [...p.requests, { id: 'pk' + Date.now(), kind: 'package', short: pl.title, title: `Booked: ${pl.title}`, detail: `${params.travellers.length} travellers · confirmed by Faisal`, status: 'done', created: Date.now(), quote: 0 }] }));
+      set((p) => ({ requests: [...p.requests, { id: 'pk' + Date.now(), kind: 'package', short: pl.title, title: `Booked: ${pl.title}`, detail: `${params.travellers.length} travellers · confirmed by Mada`, status: 'done', created: Date.now(), quote: 0 }] }));
     } else if (params.kind === 'change') {
       set((p) => ({ trip: { ...p.trip, flight: { ...p.trip.flight, ...params.patch } } }));
     }
@@ -274,33 +284,82 @@ export function Waiting({ params }) {
   const steps = labels.map((text, i) => ({ text, state: i < step ? 'done' : i === step ? 'now' : 'todo' }));
   const city = params.kind === 'package' ? `You're going to ${PLANS[params.planId].city}.` : params.kind === 'stay' ? 'Your rooms are booked.' : params.kind === 'change' ? 'Your flight is changed.' : "You're going to Istanbul.";
 
-  if (!confirmed) return (
-    <div className="screen push">
-      <div style={{ padding: '0 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 28, flex: 1 }}>
-        <div style={{ position: 'relative', width: 96, height: 96 }}>
-          <span className="pulse" style={{ position: 'absolute', inset: -8, borderRadius: 999, border: '2px solid #d9b77a' }} />
-          <span className="avatar green" style={{ width: 96, height: 96, fontSize: 36 }}>F</span>
+  if (!confirmed) {
+    const f = FLIGHTS.find((x) => x.id === params.flightId);
+    const n = params.travellers?.length || 1;
+    const seats = Array.from({ length: n }, (_, i) => '14' + 'ABCDEF'[i]).join(', ');
+    const hero = params.kind === 'package' ? PLANS[params.planId].img : 'img/istanbul.jpg';
+    const place = params.kind === 'package' ? PLANS[params.planId].city : 'Istanbul';
+    const withWhom = params.kind === 'stay' ? 'the hotel' : params.kind === 'package' ? 'the hotel and guides' : (f?.airline || 'the airline');
+    const nWord = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'][n] || String(n);
+    const total = params.total ? `SAR ${fmt(params.total)}` : 'Your price';
+    const rows = params.kind === 'package' ? [
+      ['Holding seats', `${nWord} seats together, ${seats}`],
+      ['Holding rooms', 'Connecting rooms, quiet side'],
+      ['Booking tours and tables', 'Hegra at 4 pm · dinner at 8'],
+    ] : params.kind === 'stay' ? [
+      ['Asking the hotel', 'Connecting rooms, 4th floor'],
+      ['Locking the price', `${total}, it can’t go up now`],
+      ['Confirming rooms', 'Early check-in requested'],
+    ] : params.kind === 'change' ? [
+      ['Holding the new seats', `${nWord} seats together`],
+      ['Checking the fare', 'Same rules as before'],
+      ['Changing tickets', 'Old tickets released'],
+    ] : [
+      [`Holding ${n === 1 ? 'your seat' : nWord.toLowerCase() + ' seats together'}`, `${n === 1 ? 'Seat' : 'Seats'} ${seats}, window side`],
+      ['Locking the price', `${total}, it can’t go up now`],
+      [`Issuing ${n === 1 ? 'your ticket' : n + ' tickets'}`, `${f?.code || ''} · 065 2214 3301${n > 1 ? ' and ' + (n - 1) + ' more' : ''}`],
+    ];
+    const live = question && !answered ? 'Has a question for you' : step >= 3 ? 'Almost done' : `On the line with ${withWhom}`;
+    return (
+      <div className="screen push wait">
+        <img className="wait-bg" src={hero} alt="" />
+        <div className="wait-veil" />
+        <div className="wait-top">
+          <span className="wait-agent">
+            <span className="avatar sm green" style={{ position: 'relative' }}>F<i className="wait-dot" /></span>
+            <span className="col" style={{ gap: 0 }}>
+              <b>Faisal at Mada</b>
+              <span key={live} className="wait-live">{live}<span className="dots" aria-hidden="true"><i /><i /><i /></span></span>
+            </span>
+          </span>
+          <span className="wait-clock num" aria-label="Time so far">{elapsedLabel(elapsed)}</span>
         </div>
-        <div className="col" style={{ gap: 8 }}>
-          <h1 className="h1">With Faisal</h1>
-          <p className="body">Faisal is {params.kind === 'stay' ? 'confirming your rooms with the hotel' : 'confirming your seats with ' + (FLIGHTS.find((f) => f.id === params.flightId)?.airline || 'the airline')}. Usually 4 minutes.</p>
+        <div className="wait-hero">
+          <span className="eyebrow" style={{ color: '#d9b77a' }}>{params.kind === 'change' ? 'Changing your flight' : 'Booking now'}</span>
+          <h1 className="display" style={{ fontSize: 52, color: '#fffdf9', lineHeight: .95 }}>{place}<span style={{ color: '#d9b77a' }}>.</span></h1>
+          <span className="wait-sub">{params.kind === 'package' ? PLANS[params.planId].sub : params.kind === 'stay' ? '9–15 March · 6 nights' : `${params.flex ? 'Wed 10' : 'Tue 9'} March · ${f?.dep || ''} from Riyadh`}</span>
         </div>
-        <Steps items={steps} />
-        {question && (
-          <div className="card rise" style={{ gap: 12 }}>
-            <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 15 }}>Faisal · Mada</span></div>
-            <span className="body" style={{ color: '#1e352d' }}>Sara's passport shows her given names as “SARA OMAR”. Should her ticket say exactly that?</span>
-            {answered ? <span className="small" style={{ color: '#2f7a4b', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
-              <div className="row">
-                <button type="button" className="btn primary small" onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Yes, as on the passport</button>
-                <button type="button" className="btn secondary small" onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Call me</button>
+        <div className="wait-panel" role="status" aria-live="polite">
+          {rows.map(([doing, done], i) => {
+            const state = i < step ? 'done' : i === step ? 'now' : 'todo';
+            return (
+              <div key={i} className={'wait-row ' + state}>
+                <span className="wait-mark" aria-hidden="true">{state === 'done' ? <Icon name="check" size={14} color="#1e352d" /> : state === 'now' ? <i /> : null}</span>
+                <span className="col" style={{ gap: 1 }}>
+                  <span className="wait-doing">{state === 'done' ? doing.replace(/^Holding/, 'Held:').replace(/^Locking the price/, 'Price locked').replace(/^Issuing/, 'Issued:').replace(/^Asking the hotel/, 'Hotel said yes').replace(/^Confirming rooms/, 'Rooms confirmed').replace(/^Booking tours and tables/, 'Tours and tables booked').replace(/^Checking the fare/, 'Fare checked').replace(/^Changing tickets/, 'Tickets changed') : doing}</span>
+                  {state === 'done' && <span className="wait-done rise">{done}</span>}
+                </span>
               </div>
-            )}
-          </div>
-        )}
+            );
+          })}
+          {question && (
+            <div className="wait-q rise">
+              <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>Faisal asks</span>
+              <span className="body" style={{ color: '#fffdf9' }}>Sara's passport shows her given names as “SARA OMAR”. Should her ticket say exactly that?</span>
+              {answered ? <span className="small" style={{ color: '#9fd3b0', fontWeight: 600 }}>Thanks. Carrying on.</span> : (
+                <div className="row">
+                  <button type="button" className="btn small" style={{ background: '#d9b77a', color: '#1e352d' }} onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Yes, as on the passport</button>
+                  <button type="button" className="glass-btn" onClick={() => { setAnswered(true); buzz(HAPTIC.tap); }}>Call me</button>
+                </div>
+              )}
+            </div>
+          )}
+          <span className="wait-note">Nothing leaves your card until it’s confirmed. You can close the app; we’ll tell you the moment it’s done.</span>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return (
     <div className="screen push" style={{ background: 'radial-gradient(120% 70% at 50% 30%, rgba(217,183,122,.38) 0%, rgba(233,226,216,0) 70%), #e9e2d8' }}>
@@ -314,7 +373,7 @@ export function Waiting({ params }) {
       </div>
       <div style={{ padding: '0 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <h1 className="display rise d1" style={{ fontSize: 46 }}>{city}</h1>
-        <div className="row rise d2"><span className="avatar sm green">F</span><span className="small num">Confirmed by Faisal{params.kind === 'trip' ? ' · ' + (FLIGHTS.find((f) => f.id === params.flightId)?.code || '') : ''} · <b style={{ color: '#1e352d', letterSpacing: '.04em' }}>X7K2QD</b></span></div>
+        <div className="row rise d2"><span className="avatar sm green">F</span><span className="small num">Confirmed by Faisal at Mada{params.kind === 'trip' ? ' · ' + (FLIGHTS.find((f) => f.id === params.flightId)?.code || '') : ''} · <b style={{ color: '#1e352d', letterSpacing: '.04em' }}>X7K2QD</b></span></div>
         <div className="chips rise d3">
           {params.kind !== 'stay' && <span className="pill" style={{ background: '#fffdf9' }}>Tickets in your Wallet</span>}
           {(params.bundle || params.kind === 'stay') && <span className="pill" style={{ background: '#fffdf9' }}>Rooms booked</span>}

@@ -5,10 +5,10 @@ import { UploadSheet } from './Wallet.jsx';
 
 const REQ_STAGES = [
   ['queued', 'Waiting for a connection'],
-  ['sent', 'Sent to Faisal'],
-  ['reviewing', 'Faisal is on it'],
+  ['sent', 'Sent to Mada'],
+  ['reviewing', 'Mada is on it'],
   ['quote', 'Answer ready'],
-  ['paid', 'Paid · Faisal is finishing it'],
+  ['paid', 'Paid · we’re finishing it'],
   ['done', 'Done'],
 ];
 
@@ -88,7 +88,7 @@ function Upcoming() {
 function Requests() {
   const { s, push } = useStore();
   if (!s.requests.length && !s.refunds.length) return (
-    <div className="card well rise"><span className="h3">Nothing waiting.</span><span className="small">Visas, Umrah, cars and tables you ask for show up here while Faisal works on them.</span></div>
+    <div className="card well rise"><span className="h3">Nothing waiting.</span><span className="small">Visas, Umrah, cars and tables you ask for show up here while Mada works on them.</span></div>
   );
   return (
     <>
@@ -111,7 +111,7 @@ function Requests() {
             <span className="small">{r.detail}</span>
             {r.status === 'quote' && (
               <div className="card well" style={{ gap: 8 }}>
-                <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal</span></div>
+                <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
                 <span className="small" style={{ color: '#1e352d' }}>{quoteText(r)}</span>
                 {r.quote > 0
                   ? <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('pay', { kind: 'quote', requestId: r.id })}>Pay SAR {fmt(r.quote)}</button>
@@ -224,7 +224,7 @@ function ChangeSheet({ onClose }) {
   const opts = [
     { id: 'later', label: 'Leave a day later · Wed 10 Mar, 09:40', amount: 480, patch: { date: 'Wed 10 Mar' } },
     { id: 'back', label: 'Come back a day later · Tue 16 Mar, 15:10', amount: 320, patch: { backDate: 'Tue 16 Mar' } },
-    { id: 'early', label: 'Earlier the same day · flynas 06:15', amount: 0, patch: null, note: 'Different airline, so Faisal rebooks it as a new ticket.' },
+    { id: 'early', label: 'Earlier the same day · flynas 06:15', amount: 0, patch: null, note: 'Different airline, so we rebook it as a new ticket.' },
   ];
   const [pick, setPick] = useState(null);
   const cur = opts.find((o) => o.id === pick);
@@ -233,7 +233,7 @@ function ChangeSheet({ onClose }) {
       <h2 className="h2">What would you like to change?</h2>
       {opts.map((o) => (
         <button key={o.id} type="button" className={'card tap well' + (pick === o.id ? ' selected' : '')} onClick={() => { setPick(o.id); buzz(HAPTIC.select); }}>
-          <span className="spread"><span className="h3" style={{ fontSize: 15 }}>{o.label}</span><span className="num small" style={{ color: '#1e352d', fontWeight: 600 }}>{o.amount ? '+SAR ' + fmt(o.amount) : 'Ask Faisal'}</span></span>
+          <span className="spread"><span className="h3" style={{ fontSize: 15 }}>{o.label}</span><span className="num small" style={{ color: '#1e352d', fontWeight: 600 }}>{o.amount ? '+SAR ' + fmt(o.amount) : 'Ask Mada'}</span></span>
           {o.note && <span className="tiny">{o.note}</span>}
         </button>
       ))}
@@ -242,7 +242,7 @@ function ChangeSheet({ onClose }) {
         if (cur.patch) push('pay', { kind: 'change', label: cur.label, amount: cur.amount, patch: cur.patch });
         else push('ask', { prefill: 'Move us to the flynas 06:15 on 9 Mar' });
         onClose();
-      }}>{cur ? (cur.patch ? `Review · SAR ${fmt(cur.amount)}` : 'Ask Faisal') : 'Pick one'}</button>
+      }}>{cur ? (cur.patch ? `Review · SAR ${fmt(cur.amount)}` : 'Ask Mada') : 'Pick one'}</button>
     </Sheet>
   );
 }

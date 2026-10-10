@@ -98,7 +98,7 @@ function RequestsCard() {
       <div className="row">
         <span className="avatar green">F</span>
         <div className="grow col">
-          <span className="h3">{r.status === 'quote' ? `Faisal has an answer on your ${r.short}` : `Faisal is working on your ${r.short}`}</span>
+          <span className="h3">{r.status === 'quote' ? `Mada has an answer on your ${r.short}` : `Mada is working on your ${r.short}`}</span>
           <span className="small">{r.status === 'quote' ? 'Tap to see it' : r.status === 'queued' ? 'Sends when you’re back online' : 'Usually within 2 hours'}</span>
         </div>
         <Icon name="chevron" />
@@ -371,27 +371,150 @@ function Cancelled() {
       <span className="eyebrow" style={{ color: '#d9b77a' }}>{s.trip.flight.code} · Tue 9 Mar</span>
       <h1 className="h1" style={{ color: '#f6f2ec' }}>Saudia cancelled your flight.</h1>
       <p className="body" style={{ color: '#d6cfc3' }}>You're owed a full refund. We're already holding seats on the next flight for all {s.trip.travellers.length} of you.</p>
-      <div className="row"><span className="avatar gold">F</span><span className="small" style={{ color: '#e9e2d8' }}>Faisal is on this with you.</span></div>
+      <div className="row"><span className="avatar gold">F</span><span className="small" style={{ color: '#e9e2d8' }}>Faisal at Mada is on this with you.</span></div>
       <button type="button" className="btn gold block" onClick={() => push('disruption', { kind: 'cancel' })}>See your options</button>
+    </div>
+  );
+}
+
+const PICKS = [
+  { id: 'k1', title: 'Künefe near Galata Tower', note: 'Noor’s tip. Go before 8, it sells out.', img: 'img/istanbul.jpg', pos: '50% 70%', tag: 'Dessert · 4 min walk' },
+  { id: 'k2', title: 'Sunset from the Galata Bridge', note: 'Fishermen, ferries and the old city in gold.', img: 'img/istanbul.jpg', pos: '20% 40%', tag: 'Free · 10 min walk' },
+  { id: 'k3', title: 'Dinner with a Bosphorus view', note: 'Halal, family seating, table for 4 at 20:00.', img: 'img/istanbul.jpg', pos: '80% 30%', tag: 'Dinner · 15 min drive' },
+  { id: 'k4', title: 'An early night', note: 'Room service, and a slow start tomorrow.', img: 'img/clouds.jpg', pos: '50% 50%', tag: 'Rest' },
+];
+const WORDS = [
+  ['Hello', 'Merhaba', 'mer-ha-ba'],
+  ['Thank you', 'Teşekkürler', 'teh-shek-kur-ler'],
+  ['Please', 'Lütfen', 'lewt-fen'],
+  ['The bill, please', 'Hesap, lütfen', 'heh-sap lewt-fen'],
+  ['Where is…?', '… nerede?', 'neh-reh-deh'],
+];
+
+function SwipeDeck() {
+  const { s, set, buzz: _b } = useStore();
+  const picks = s.inflightPicks || [];
+  const [i, setI] = useState(0);
+  const [dx, setDx] = useState(0);
+  const [drag, setDrag] = useState(null);
+  const done = i >= PICKS.length;
+  const decide = (yes) => {
+    const card = PICKS[i];
+    buzz(yes ? HAPTIC.select : HAPTIC.tap);
+    if (yes) set((p) => ({ inflightPicks: [...(p.inflightPicks || []), card.id] }));
+    setDx(yes ? 420 : -420);
+    setTimeout(() => { setI((n) => n + 1); setDx(0); }, 260);
+  };
+  if (done) {
+    const chosen = PICKS.filter((p) => picks.includes(p.id));
+    return (
+      <div className="card focal rise" style={{ gap: 8 }}>
+        <span className="h3">{chosen.length ? `Your first evening: ${chosen.length} ${chosen.length === 1 ? 'pick' : 'picks'}.` : 'A free evening it is.'}</span>
+        <span className="small">{chosen.length ? 'Saved on this phone. We’ll book them the moment you land and have signal.' : 'Nothing booked. You can always ask once you’re there.'}</span>
+        {chosen.map((c) => <span key={c.id} className="row small" style={{ color: '#e9e2d8' }}><Icon name="check" size={16} color="#d9b77a" width={2.4} />{c.title}</span>)}
+        <button type="button" className="link" style={{ color: '#d9b77a', alignSelf: 'flex-start', padding: 0 }} onClick={() => { set({ inflightPicks: [] }); setI(0); }}>Start over</button>
+      </div>
+    );
+  }
+  const card = PICKS[i];
+  const next = PICKS[i + 1];
+  const rot = dx / 18;
+  return (
+    <div className="col" style={{ gap: 12 }}>
+      <div style={{ position: 'relative', height: 300 }}>
+        {next && (
+          <div className="story" style={{ position: 'absolute', inset: 0, minHeight: 0, transform: 'scale(.95) translateY(10px)', opacity: 0.7 }}>
+            <img className="bg" src={next.img} alt="" style={{ objectPosition: next.pos }} /><span className="veil" />
+          </div>
+        )}
+        <div className="story" role="group" aria-label={card.title}
+          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDrag(e.clientX); }}
+          onPointerMove={(e) => { if (drag !== null) setDx(e.clientX - drag); }}
+          onPointerUp={() => { if (drag === null) return; setDrag(null); if (dx > 90) decide(true); else if (dx < -90) decide(false); else setDx(0); }}
+          style={{ position: 'absolute', inset: 0, minHeight: 0, touchAction: 'pan-y', cursor: 'grab', transform: `translateX(${dx}px) rotate(${rot}deg)`, transition: drag !== null ? 'none' : 'transform .3s var(--ease)' }}>
+          <img className="bg" src={card.img} alt="" style={{ objectPosition: card.pos }} draggable="false" />
+          <span className="veil" />
+          <span className="top"><span className="pill glass">{card.tag}</span><span className="pill glass">{i + 1} of {PICKS.length}</span></span>
+          {dx > 30 && <span className="pill" style={{ position: 'absolute', top: 60, left: 18, background: '#d9b77a', color: '#1e352d', transform: 'rotate(-8deg)' }}>Yes, book it</span>}
+          {dx < -30 && <span className="pill" style={{ position: 'absolute', top: 60, right: 18, background: 'rgba(255,253,249,.9)', color: '#1e352d', transform: 'rotate(8deg)' }}>Skip</span>}
+          <div className="body"><p className="quote">{card.title}</p><span className="small" style={{ color: 'rgba(255,253,249,.88)' }}>{card.note}</span></div>
+        </div>
+      </div>
+      <div className="row" style={{ justifyContent: 'center', gap: 16 }}>
+        <button type="button" className="icon-btn" aria-label="Skip" style={{ width: 56, height: 56 }} onClick={() => decide(false)}><Icon name="close" /></button>
+        <button type="button" className="icon-btn dark" aria-label="Yes, book it when I land" style={{ width: 56, height: 56 }} onClick={() => decide(true)}><Icon name="check" color="#d9b77a" width={2.4} /></button>
+      </div>
+    </div>
+  );
+}
+
+function Flashcards() {
+  const [i, setI] = useState(0);
+  const [flip, setFlip] = useState(false);
+  const w = WORDS[i];
+  return (
+    <div className="col" style={{ gap: 10 }}>
+      <button type="button" onClick={() => { setFlip(!flip); buzz(HAPTIC.tap); }} aria-label={flip ? `${w[1]}, said ${w[2]}` : `${w[0]}. Tap to see it in Turkish`}
+        style={{ height: 150, border: 0, borderRadius: 24, padding: 18, background: flip ? '#1e352d' : '#fffdf9', color: flip ? '#f6f2ec' : '#1e352d', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'background .3s ease, color .3s ease, transform .4s var(--ease)', transform: flip ? 'rotateX(360deg)' : 'none' }}>
+        <span className="tiny" style={{ color: flip ? '#d9b77a' : undefined }}>{flip ? 'In Turkish' : 'In English'}</span>
+        <span className="display" style={{ fontSize: 34 }}>{flip ? w[1] : w[0]}</span>
+        <span className="small" style={{ color: flip ? '#c9c1b4' : undefined }}>{flip ? `say “${w[2]}”` : 'Tap to flip'}</span>
+      </button>
+      <div className="spread">
+        <span className="row" style={{ gap: 6 }}>{WORDS.map((_, k) => <span key={k} className="dot" style={{ background: k === i ? '#1e352d' : '#d6cec2' }} />)}</span>
+        <button type="button" className="btn secondary small" onClick={() => { setI((i + 1) % WORDS.length); setFlip(false); buzz(HAPTIC.tap); }}>{i === WORDS.length - 1 ? 'Start again' : 'Next word'}</button>
+      </div>
     </div>
   );
 }
 
 function InAir() {
   const [sheet, setSheet] = useState(false);
+  const start = useRef(Date.now());
+  useTicker(1000);
+  const left = Math.max(0, 125 * 60 - Math.floor((Date.now() - start.current) / 1000));
+  const progress = 1 - left / (255 * 60);
+  const h = Math.floor(left / 3600), m = Math.floor((left % 3600) / 60);
+  const t = Math.min(1, Math.max(0, progress));
+  const x = 20 + t * 300, y = 120 - Math.sin(t * Math.PI) * 80;
   return (
     <>
-      <div className="photo rise" style={{ height: 180 }}>
-        <img src="img/clouds.jpg" alt="Clouds from a plane window" />
-        <span className="shade" />
-        <span className="over"><span className="display" style={{ fontSize: 40, color: '#fffdf9' }}>In the air.</span><span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>Lands in Istanbul at 13:55 local time.</span></span>
+      <div className="story rise" style={{ minHeight: 0, height: 290, background: 'linear-gradient(170deg, #0e1c2b 0%, #1e352d 70%)' }}>
+        <img className="bg" src="img/clouds.jpg" alt="" style={{ opacity: 0.45 }} />
+        <span className="veil" />
+        <svg viewBox="0 0 340 150" width="100%" height="150" aria-hidden="true" style={{ position: 'absolute', top: 18, left: 0 }}>
+          <path d="M20 120 Q 170 -40 320 120" fill="none" stroke="rgba(255,253,249,.25)" strokeWidth="2" strokeDasharray="3 7" />
+          <path d={`M20 120 Q 170 -40 320 120`} fill="none" stroke="#d9b77a" strokeWidth="2.5" strokeDasharray={`${t * 360} 999`} />
+          <circle cx="20" cy="120" r="4" fill="#fffdf9" /><circle cx="320" cy="120" r="4" fill="#fffdf9" />
+          <g transform={`translate(${x} ${y}) rotate(${(0.5 - t) * -60})`}><circle r="13" fill="#d9b77a" /><path d="M7 0c0-.4-.3-.7-.7-.7H2.6L.3-4.2h-.9l1.1 3.5H-1.6l-.7-.9h-.7l.5 1.6-.5 1.6h.7l.7-.9H.5l-1.1 3.5h.9l2.3-3.5h3.7c.4 0 .7-.3.7-.7z" fill="#1e352d" transform="scale(1.4)" /></g>
+          <text x="30" y="124" fontFamily="Inter Tight, sans-serif" fontSize="11" fontWeight="600" fill="rgba(255,253,249,.8)">RUH</text>
+          <text x="310" y="124" textAnchor="end" fontFamily="Inter Tight, sans-serif" fontSize="11" fontWeight="600" fill="rgba(255,253,249,.8)">IST</text>
+        </svg>
+        <div className="body" style={{ gap: 6 }}>
+          <span className="small" style={{ color: '#d9b77a', fontWeight: 600 }}>In the air · estimated, no signal needed</span>
+          <span className="num" style={{ fontSize: 44, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1 }}>{h}h {String(m).padStart(2, '0')}m <span style={{ fontSize: 18, fontWeight: 500 }}>to Istanbul</span></span>
+          <span className="small" style={{ color: 'rgba(255,253,249,.88)' }}>Look left in about 40 minutes: the Taurus Mountains.</span>
+        </div>
       </div>
-      <div className="card rise d1">
-        <span className="eyebrow">Saved on this phone · no signal needed</span>
-        {['Passport control first, then bags.', 'Bags: carousel shows on landing.', 'Ahmet meets you at Door 3 with your name.'].map((t) => (
-          <div key={t} className="row small" style={{ color: '#1e352d' }}><Icon name="check" color="#2f7a4b" size={18} />{t}</div>
+
+      <div className="col" style={{ gap: 4, marginTop: 6 }}>
+        <h2 className="h2" style={{ fontSize: 22 }}>Plan your first evening</h2>
+        <span className="small">Swipe right on what sounds good. We'll book it when you land.</span>
+      </div>
+      <SwipeDeck />
+
+      <div className="col" style={{ gap: 4, marginTop: 6 }}>
+        <h2 className="h2" style={{ fontSize: 22 }}>Five words for Istanbul</h2>
+        <span className="small">For the taxi, the café and the kids.</span>
+      </div>
+      <Flashcards />
+
+      <div className="card" style={{ marginTop: 6 }}>
+        <span className="h3">When you land</span>
+        {[['visa', 'Passport control, then bags'], ['bag', 'The carousel shows here as you land'], ['car', 'Ahmet meets you at Door 3 with your name']].map(([ic, t2]) => (
+          <div key={t2} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t2}</div>
         ))}
-        <button type="button" className="btn secondary small" onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>Show the hotel address for the driver</button>
+        <button type="button" className="btn secondary small" style={{ alignSelf: 'flex-start', background: '#f6f2ec' }} onClick={() => { buzz(HAPTIC.tap); setSheet(true); }}>Hotel address for the driver</button>
       </div>
       {sheet && (
         <Sheet label="Hotel address" onClose={() => setSheet(false)}>
@@ -406,9 +529,13 @@ function InAir() {
 }
 
 function Landed() {
+  const { s } = useStore();
   return (
     <>
       <h1 className="display rise" style={{ fontSize: 46 }}>Welcome to Istanbul.</h1>
+      {(s.inflightPicks || []).length > 0 && (
+        <div className="notice rise"><span className="spinner" style={{ marginTop: 3 }} /><span className="grow"><span className="h3">Booking {(s.inflightPicks || []).length === 1 ? "your pick" : `your ${(s.inflightPicks || []).length} picks`} for tonight</span><span className="small">The ones you chose in the air. Confirmation in a few minutes.</span></span></div>
+      )}
       <div className="card focal rise d1">
         {[['bag', 'Bags on carousel 7'], ['car', 'Ahmet is at Door 3 with your name on a sign'], ['globe', 'Your eSIM is on. 10 GB for each of you.'], ['stay', 'Rooms ready at 14:00. Early check-in requested.']].map(([ic, t]) => (
           <div key={t} className="row" style={{ fontSize: 15 }}><Icon name={ic} color="#d9b77a" size={20} />{t}</div>

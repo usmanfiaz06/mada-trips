@@ -142,7 +142,7 @@ function Unlocked() {
               {issue?.blocking || issue
                 ? <button type="button" className="btn primary small" onClick={() => {
                     set((prev) => ({ requests: [...prev.requests, { id: 'r' + Date.now(), kind: 'visa', short: 'passport renewal', title: `Passport renewal for ${p.name}`, detail: 'Before the next trip', status: s.demo.offline ? 'queued' : 'sent', created: Date.now(), quote: 150 }] }));
-                    buzz(HAPTIC.success); toast(`Sent to Faisal. He'll find the earliest renewal slot for ${p.name}.`);
+                    buzz(HAPTIC.success); toast(`Sent to Mada. We'll find the earliest renewal slot for ${p.name}.`);
                   }}>Book a renewal</button>
                 : null}
               <button type="button" className="btn secondary small" onClick={async () => {

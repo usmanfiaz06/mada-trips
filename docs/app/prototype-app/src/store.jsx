@@ -9,6 +9,10 @@ export const PEOPLE = {
   ahmed: { id: 'ahmed', name: 'Ahmed', full: 'Ahmed Alharbi', initial: 'A', role: 'Son, 10', born: '2016', number: 'A23•••97', expires: 'Mar 2030', expiresISO: '2030-03-21', sex: 'M' },
   lina: { id: 'lina', name: 'Lina', full: 'Lina Reyes', initial: 'L', role: 'Helper', born: '1991', number: 'P71•••32', expires: 'Nov 2028', expiresISO: '2028-11-02', sex: 'F', helper: true },
 };
+export function registerPerson(p) {
+  PEOPLE[p.id] = p;
+  if (!MRZ[p.id]) MRZ[p.id] = ['P<SAU' + p.full.toUpperCase().replace(/\s+/g, '<<').padEnd(39, '<').slice(0, 39), 'Not scanned yet'];
+}
 export const MRZ = {
   omar: ['P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', 'A08•••41<6SAU8403117M3106228<<<<<<<<<<<<<<02'],
   hessa: ['P<SAUALHARBI<<HESSA<<<<<<<<<<<<<<<<<<<<<<<<', 'A11•••07<3SAU8807244F2901159<<<<<<<<<<<<<<06'],
@@ -91,7 +95,7 @@ export const fresh = () => ({
 const load = () => {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...fresh(), ...JSON.parse(raw), stack: [] };
+    if (raw) { const st = { ...fresh(), ...JSON.parse(raw), stack: [] }; (st.extraPeople || []).forEach(registerPerson); return st; }
   } catch (e) { /* storage unavailable */ }
   return fresh();
 };

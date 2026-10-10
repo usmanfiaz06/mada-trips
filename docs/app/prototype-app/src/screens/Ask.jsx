@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, PICKUP, fmt, passportIssue } from '../store.jsx';
-import { Icon, Sun, TopBar, Route, Sheet, Steps, AirlineMark } from '../ui.jsx';
+import { Icon, Sun, TopBar, Route, Sheet, Steps, AirlineMark, AddPersonSheet } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 
 const REQUEST_KINDS = {
@@ -63,7 +63,7 @@ export default function Ask({ params }) {
   return (
     <div className="screen push">
       <TopBar onBack={pop} backLabel="Close" />
-      <p className="tiny" style={{ margin: '0 24px 8px' }}>Instant answers from Mada. Faisal and the team confirm anything you book.</p>
+      <p className="tiny" style={{ margin: '0 24px 8px' }}>Instant answers from Mada. A Mada agent confirms anything you book.</p>
       <div className="scroll no-dock" style={{ paddingBottom: 110 }}>
         {query && <div className="rise" style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#1e352d', color: '#f6f2ec', padding: '12px 16px', borderRadius: '22px 22px 6px 22px', fontSize: 16, lineHeight: 1.4 }}>{query}</div>}
         {s.demo.offline && intent && intent !== 'esim' && ['flight', 'stay'].includes(intent) ? <Offline /> : body}
@@ -88,7 +88,7 @@ export default function Ask({ params }) {
       {needsSignIn && (
         <Sheet label="Sign in to book" onClose={() => { setNeedsSignIn(false); pop(); }}>
           <h2 className="h2">Sign in to book</h2>
-          <p className="body">Booking needs an account, so Faisal can confirm with your details and your tickets land in your Wallet.</p>
+          <p className="body">Booking needs an account, so Mada can confirm with your details and your tickets land in your Wallet.</p>
           <button type="button" className="btn primary block" onClick={() => set({ onboarded: false, guest: false, stack: [] })}>Sign in</button>
           <button type="button" className="btn ghost block" onClick={() => { setNeedsSignIn(false); pop(); }}>Not now</button>
         </Sheet>
@@ -117,7 +117,7 @@ function Offline() {
       <Icon name="wifiOff" />
       <div className="grow">
         <span className="h3">You're offline.</span>
-        <span className="small">Searching needs a connection. Everything for your trips is still on this phone, and requests to Faisal send once you're back.</span>
+        <span className="small">Searching needs a connection. Everything for your trips is still on this phone, and requests to Mada send once you're back.</span>
       </div>
     </div>
   );
@@ -153,9 +153,11 @@ function useTravellers() {
 
 function TravellerChips({ value, onChange }) {
   const { s } = useStore();
+  const [adding, setAdding] = useState(false);
   const all = s.household.length ? s.household : ['omar'];
   return (
     <div className="chips">
+      {adding && <AddPersonSheet onClose={() => setAdding(false)} onAdded={(p) => { onChange([...value, p.id]); setAdding(false); }} />}
       {all.map((id) => {
         const p = PEOPLE[id];
         const on = value.includes(id);
@@ -166,6 +168,7 @@ function TravellerChips({ value, onChange }) {
           </button>
         );
       })}
+      <button type="button" className="chip" style={{ background: 'transparent', boxShadow: 'inset 0 0 0 1.5px rgba(30,53,45,.25)' }} onClick={() => setAdding(true)}><Icon name="plus" size={16} />Someone else</button>
     </div>
   );
 }
@@ -195,7 +198,7 @@ function FlightFlow({ query, setCta }) {
 
   if (where && where !== 'Istanbul') {
     const city = where.charAt(0).toUpperCase() + where.slice(1);
-    return <RequestFlow kind="general" query={`Flights to ${city}`} note={`Live results in this prototype are set up for Istanbul. In the app we'd show ${city} here; for now Faisal searches it for you.`} />;
+    return <RequestFlow kind="general" query={`Flights to ${city}`} note={`Live results in this prototype are set up for Istanbul. In the app we'd show ${city} here; for now Mada searches it for you.`} />;
   }
   if (!where) return (
     <Ask1 q="Where to?" options={[['Istanbul', 'Istanbul'], ['Somewhere else', 'other']]} onPick={(v) => setWhere(v === 'other' ? 'other-city' : v)} />
@@ -215,14 +218,14 @@ function FlightFlow({ query, setCta }) {
 
   if (s.demo.supplierDown && mode === 'normal') return (
     <div className="col rise" style={{ gap: 12 }}>
-      <div className="notice warn"><Icon name="flight" color="#7d5d27" /><div className="grow"><span className="h3">Saudia's system isn't answering.</span><span className="small">Flynas and Turkish are fine. Or Faisal can search Saudia by hand and come back within 20 minutes.</span></div></div>
+      <div className="notice warn"><Icon name="flight" color="#7d5d27" /><div className="grow"><span className="h3">Saudia's system isn't answering.</span><span className="small">Flynas and Turkish are fine. Or a Mada agent can search Saudia by hand and come back within 20 minutes.</span></div></div>
       <div className="row">
         <button type="button" className="btn primary small" onClick={() => { setMode('others'); buzz(HAPTIC.tap); }}>Show the others</button>
-        <button type="button" className="btn secondary small" onClick={() => setMode('byhand')}>Ask Faisal</button>
+        <button type="button" className="btn secondary small" onClick={() => setMode('byhand')}>Ask Mada</button>
       </div>
     </div>
   );
-  if (mode === 'byhand') return <RequestFlow kind="general" query="Saudia flights to Istanbul for Eid" note="Faisal will search Saudia by hand and send you the options here." autoSend />;
+  if (mode === 'byhand') return <RequestFlow kind="general" query="Saudia flights to Istanbul for Eid" note="A Mada agent will search Saudia by hand and send you the options here." autoSend />;
 
   if (s.demo.noResults && mode === 'normal') return (
     <div className="col rise" style={{ gap: 12 }}>
@@ -297,7 +300,7 @@ function FlightFlow({ query, setCta }) {
                 setRenewalAsked(true);
                 set((prev) => ({ requests: [...prev.requests, { id: 'r' + Date.now(), kind: 'visa', short: 'passport renewal', title: `Passport renewal for ${p.name}`, detail: 'Before the Istanbul trip on 9 Mar', status: s.demo.offline ? 'queued' : 'sent', created: Date.now(), quote: 150 }] }));
                 buzz(HAPTIC.success);
-              }}>{renewalAsked ? 'Faisal is on it' : 'Renew it first'}</button>
+              }}>{renewalAsked ? 'Mada is on it' : 'Renew it first'}</button>
             </div>
           </div>
         </div>
@@ -382,7 +385,7 @@ function PlanFlow({ query }) {
       <button type="button" className="photo" style={{ height: 220, border: 0, padding: 0 }} onClick={() => push('plan', { id })}>
         <img src={plan.img} alt="" /><span className="shade" />
         <span className="over" style={{ textAlign: 'left', gap: 4 }}>
-          <span className="pill" style={{ alignSelf: 'flex-start', background: 'rgba(255,253,249,.9)' }}>{plan.days} days · {plan.plan.reduce((a, d) => a + d.stops.length, 0)} stops</span>
+          <span className="pill glass" style={{ alignSelf: 'flex-start' }}>{plan.days} days · {plan.plan.reduce((a, d) => a + d.stops.length, 0)} stops</span>
           <span className="display" style={{ fontSize: 30, color: '#fffdf9' }}>{plan.title}</span>
           <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{plan.sub}</span>
         </span>
@@ -464,7 +467,7 @@ function RequestFlow({ kind, query, note, autoSend }) {
 
   if (sent) return (
     <div className="col rise" style={{ gap: 14 }}>
-      <div className="row"><span className="avatar green">F</span><div className="col" style={{ gap: 0 }}><span className="h3">{sent.status === 'queued' ? 'Saved. It sends when you’re back online.' : 'Sent to Faisal.'}</span><span className="small">Usually within 2 hours, any time of day.</span></div></div>
+      <div className="row"><span className="avatar green">F</span><div className="col" style={{ gap: 0 }}><span className="h3">{sent.status === 'queued' ? 'Saved. It sends when you’re back online.' : 'Sent to Mada.'}</span><span className="small">Usually within 2 hours, any time of day.</span></div></div>
       <div className="card well"><span className="h3">{sent.title}</span><span className="small">{sent.detail}</span></div>
       <button type="button" className="btn primary block" onClick={() => go('trips')}>See it in Trips</button>
     </div>
@@ -499,8 +502,8 @@ function RequestFlow({ kind, query, note, autoSend }) {
       ))}
       {done && (
         <div className="col rise" style={{ gap: 10 }}>
-          <div className="row small"><span className="avatar sm green">F</span>Faisal will {kind === 'visa' ? 'find the earliest appointment and prepare the forms' : 'confirm everything'} and reply here.</div>
-          <button type="button" className="btn primary block" onClick={send}>Send to Faisal</button>
+          <div className="row small"><span className="avatar sm green">F</span>Mada will {kind === 'visa' ? 'find the earliest appointment and prepare the forms' : 'confirm everything'} and reply here.</div>
+          <button type="button" className="btn primary block" onClick={send}>Send to Mada</button>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { buzz, HAPTIC, useStore } from './store.jsx';
+import { buzz, HAPTIC, useStore, registerPerson } from './store.jsx';
 
 const PATHS = {
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />,
@@ -266,5 +266,49 @@ export function AirlineMark({ flight, size = 36 }) {
     <span style={{ width: size, height: size, borderRadius: 12, background: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0, boxShadow: 'inset 0 0 0 1px rgba(30,53,45,.08)' }}>
       <img src={`img/airlines/${flight.iata}.svg`} alt={flight.airline} onError={() => setFailed(true)} style={{ width: size * 0.68, height: size * 0.68, objectFit: 'contain' }} />
     </span>
+  );
+}
+
+/* Add a traveller to the household: name exactly as on the passport, and how they relate. */
+export function AddPersonSheet({ onClose, onAdded }) {
+  const { set, toast } = useStore();
+  const [given, setGiven] = useState('');
+  const [surname, setSurname] = useState('');
+  const [rel, setRel] = useState('Family');
+  const ok = given.trim().length > 1 && surname.trim().length > 1;
+  return (
+    <Sheet label="Add someone" onClose={onClose}>
+      <h2 className="h2">Add someone</h2>
+      <p className="small">Names exactly as on their passport. You can scan it later from the Wallet.</p>
+      <div className="row" style={{ gap: 10 }}>
+        <div className="field grow"><label htmlFor="ap-given">Given names</label><input id="ap-given" className="input" value={given} onChange={(e) => setGiven(e.target.value)} autoCapitalize="words" /></div>
+        <div className="field grow"><label htmlFor="ap-sur">Surname</label><input id="ap-sur" className="input" value={surname} onChange={(e) => setSurname(e.target.value)} autoCapitalize="words" /></div>
+      </div>
+      <div className="chips">{['Family', 'Friend', 'Helper', 'Colleague'].map((r) => <button key={r} type="button" className={'chip' + (rel === r ? ' on' : '')} onClick={() => setRel(r)}>{r}</button>)}</div>
+      {rel === 'Helper' && <span className="small">We'll ask for their iqama and exit and re-entry visa before any trip abroad.</span>}
+      <button type="button" className="btn primary block" disabled={!ok} onClick={() => {
+        const first = given.trim().split(/\s+/)[0];
+        const name = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+        const p = { id: 'p' + Date.now(), name, full: `${given.trim()} ${surname.trim()}`.replace(/\b\w/g, (c) => c.toUpperCase()), initial: name.charAt(0), role: rel, born: '—', number: 'Not scanned', expires: 'Not scanned', helper: rel === 'Helper', added: true };
+        registerPerson(p);
+        set((prev) => ({ extraPeople: [...(prev.extraPeople || []), p], household: [...(prev.household.length ? prev.household : ['omar']), p.id] }));
+        buzz(HAPTIC.success); toast(`${name} added. Scan their passport from the Wallet when you can.`);
+        onAdded && onAdded(p);
+      }}>Add {given.trim().split(/\s+/)[0] || 'them'}</button>
+    </Sheet>
+  );
+}
+
+/* Invite someone with a link: they join, add their own passport and can pay their share. */
+export function InviteSheet({ onClose, what = 'this trip' }) {
+  const { toast } = useStore();
+  const link = 'madatrips.sa/join/ist-8k2';
+  return (
+    <Sheet label="Invite with a link" onClose={onClose}>
+      <h2 className="h2">Invite to {what}</h2>
+      <p className="small">They open the link, add their own passport and can pay their own share. Nothing is shared until they join.</p>
+      <input className="input" readOnly value={link} onFocus={(e) => e.target.select()} aria-label="Invite link" />
+      <button type="button" className="btn primary block" onClick={async () => { try { await navigator.clipboard.writeText('https://' + link); toast('Link copied. Paste it in WhatsApp.'); } catch (e) { toast('Select the link above to copy it.'); } }}><Icon name="link" color="#f6f2ec" />Copy invite link</button>
+    </Sheet>
   );
 }

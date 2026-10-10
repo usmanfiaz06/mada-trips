@@ -60,11 +60,26 @@ try {
   await phone.getByRole('button', { name: /^Review · SAR/ }).last().click();
   await page.waitForTimeout(700);
   await shot('pay');
+  await click('Edit');
+  await click('Add someone');
+  await phone.locator('#ap-given').fill('Noura');
+  await phone.locator('#ap-sur').fill('Alharbi');
+  await click('Friend');
+  await shot('add-person');
+  await click('Add Noura', { wait: 500 });
+  await click('Noura');
+  await click('Invite with a link');
+  await shot('invite-link');
+  await phone.locator('.backdrop').last().click({ force: true });
+  await page.waitForTimeout(300);
+  await click(/^Done · SAR/, { exact: false });
   await phone.locator('.slider').focus();
   await page.keyboard.press('Enter');
   await page.waitForTimeout(1800);
   await shot('waiting');
-  await page.waitForTimeout(4500);
+  await page.waitForTimeout(2600);
+  await shot('waiting-progress');
+  await page.waitForTimeout(1900);
   await shot('confirmed');
   await click('See the trip', { wait: 600 });
   await shot('today-booked');
@@ -92,7 +107,7 @@ try {
   await click('Schengen');
   await click('Done');
   await click('This summer');
-  await click('Send to Faisal', { wait: 600 });
+  await click('Send to Mada', { wait: 600 });
   await shot('visa-sent');
 
   step('edge: card declined + price rise');
@@ -130,6 +145,17 @@ try {
   await click('Take the 10:25', { wait: 2600 });
   await shot('disruption-done');
   await click('Back to today', { wait: 500 });
+  await demo('In the air');
+  await page.waitForTimeout(600);
+  await shot('in-air');
+  await click('Yes, book it when I land');
+  await click('Skip');
+  await phone.locator('.scroll').first().evaluate((el) => el.scrollTo(0, 900));
+  await page.waitForTimeout(300);
+  await shot('in-air-lower');
+  await demo('Landed');
+  await page.waitForTimeout(600);
+  await shot('landed');
 
   step('cancelled → refund');
   await demo('Flight cancelled');
@@ -160,7 +186,7 @@ try {
   await phone.getByRole('button', { name: 'Circles' }).click();
   await page.waitForTimeout(500);
   await shot('discover');
-  await phone.locator('.photo', { hasText: 'Two days in AlUla' }).first().click();
+  await phone.locator('.story', { hasText: 'Two days in AlUla' }).first().click();
   await page.waitForTimeout(600);
   await shot('plan');
   await phone.getByRole('button', { name: /^Book it all/ }).click();
@@ -169,7 +195,7 @@ try {
   await phone.getByRole('button', { name: 'Back' }).first().click();
   await phone.getByRole('button', { name: 'Back' }).first().click();
   await page.waitForTimeout(400);
-  await click('Your circles', { role: 'tab' });
+  await click('Circles', { role: 'tab' });
   await shot('circles');
 
   step('offline');

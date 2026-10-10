@@ -35,7 +35,7 @@ function useBackgroundProgress() {
         const requests = p.requests.map((r) => {
           const age = now - (r.created || now);
           if (r.status === 'sent' && age > 4000) { changed = true; return { ...r, status: 'reviewing' }; }
-          if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Faisal replied', body: `Your ${r.short}: tap Trips to see it.`, haptic: HAPTIC.knock }), 0); return { ...r, status: 'quote' }; }
+          if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Mada replied', body: `Your ${r.short}: tap Trips to see it.`, haptic: HAPTIC.knock }), 0); return { ...r, status: 'quote' }; }
           if (r.status === 'paid' && age > 15000) { changed = true; return { ...r, status: 'done' }; }
           return r;
         });

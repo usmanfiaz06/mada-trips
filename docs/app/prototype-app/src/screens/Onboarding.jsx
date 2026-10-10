@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
 
 const OTP = '123456';
 
@@ -83,15 +83,23 @@ export default function Onboarding() {
 
   const screens = {
     welcome: (
-      <div className="screen dark" style={{ justifyContent: 'space-between' }}>
-        <div style={{ padding: '120px 28px 0', display: 'flex', flexDirection: 'column', gap: 28 }}>
-          <Sun width={84} className="breathe" />
-          <h1 className="display rise" style={{ fontSize: 52, color: '#f6f2ec' }}>We'll take it from here.</h1>
-          <p className="body rise d2" style={{ color: '#d6cfc3', fontSize: 18 }}>Tell us where you're going. We'll find it, book it, and stay with you until you're home.</p>
-        </div>
-        <div style={{ padding: '0 24px 40px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button type="button" className="btn gold block" onClick={() => goto('signin')}>Start</button>
-          <button type="button" className="btn on-dark block" onClick={() => { set({ onboarded: true, guest: true, household: [], tab: 'today', stack: [] }); buzz(HAPTIC.tap); }}>Just track a flight</button>
+      <div className="screen dark" style={{ background: '#0f1a16' }}>
+        <video className="welcome-video" src="img/welcome.mp4" poster="img/welcome.jpg" autoPlay muted loop playsInline aria-hidden="true"
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(15,26,22,.45) 0%, rgba(15,26,22,0) 22%, rgba(15,26,22,0) 42%, rgba(30,53,45,.82) 66%, #1e352d 84%)' }} />
+        <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '64px 24px 40px' }}>
+          <Sun width={64} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '0 4px' }}>
+              <h1 className="display rise" style={{ fontSize: 52, color: '#f6f2ec' }}>We'll take it from here.</h1>
+              <p className="body rise d2" style={{ color: '#e1dacd', fontSize: 18 }}>Tell us where you're going. We'll find it, book it, and stay with you until you're home.</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button type="button" className="btn gold block" onClick={() => goto('signin')}>Start</button>
+              <button type="button" className="btn block" style={{ background: 'rgba(255,253,249,.14)', color: '#f6f2ec', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,253,249,.16)' }}
+                onClick={() => { set({ onboarded: true, guest: true, household: [], tab: 'today', stack: [] }); buzz(HAPTIC.tap); }}>Just track a flight</button>
+            </div>
+          </div>
         </div>
       </div>
     ),
@@ -99,6 +107,12 @@ export default function Onboarding() {
     signin: (
       <div className="screen">
         <TopBar onBack={back} />
+        <div aria-hidden="true" style={{ position: 'relative', height: 250, margin: '8px 0 0' }}>
+          {[['img/alula.jpg', -9, -78, '.05s'], ['img/riyadh.jpg', 8, 78, '.15s'], ['img/istanbul.jpg', 0, 0, '.25s']].map(([src, rot, x, d]) => (
+            <img key={src} src={src} alt="" style={{ position: 'absolute', left: '50%', top: 18, width: 168, height: 220, marginLeft: -84 + x, objectFit: 'cover', borderRadius: 24, border: '4px solid #fffdf9', boxShadow: '0 22px 40px -20px rgba(15,26,22,.6)', transform: `rotate(${rot}deg)`, animation: `rise .7s ${d} var(--ease) both` }} />
+          ))}
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: -4, display: 'flex', justifyContent: 'center' }}><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec', height: 32, padding: '0 14px', whiteSpace: 'nowrap', animation: 'rise .6s .5s var(--ease) both' }}><Sun width={18} />Confirmed by Faisal at Mada</span></div>
+        </div>
         <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h1 className="h1">Sign in to book and keep your trips.</h1>
           <p className="body">Your trips, documents and family stay on this phone and in your account.</p>
@@ -244,7 +258,7 @@ export default function Onboarding() {
           {expired && (
             <div className="notice warn" role="alert">
               <Icon name="visa" color="#7d5d27" />
-              <div className="grow"><span className="h3">This passport has expired.</span><span className="small">We'll save it, but it can't be used to travel. Faisal can help you renew it.</span></div>
+              <div className="grow"><span className="h3">This passport has expired.</span><span className="small">We'll save it, but it can't be used to travel. Mada can help you renew it.</span></div>
             </div>
           )}
         </div>
@@ -277,7 +291,9 @@ export default function Onboarding() {
               </button>
             );
           })}
-          <button type="button" className="btn secondary block" onClick={() => toast('In the app you scan their passport here.')}><Icon name="plus" />Someone else</button>
+          <button type="button" className="btn secondary block" onClick={() => setSheet('addPerson')}><Icon name="plus" />Someone else</button>
+          {household.filter((id) => !['hessa', 'sara', 'ahmed', 'lina'].includes(id)).map((id) => <div key={id} className="card selected" style={{ flexDirection: 'row', alignItems: 'center' }}><span className="avatar green">{PEOPLE[id].initial}</span><span className="grow col" style={{ gap: 0 }}><span className="h3">{PEOPLE[id].name}</span><span className="small">{PEOPLE[id].role}</span></span><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec' }}>Added</span></div>)}
+          {sheet === 'addPerson' && <AddPersonSheet onClose={() => setSheet(null)} onAdded={(p) => { setHousehold((h) => [...h, p.id]); setSheet(null); }} />}
         </div>
         <div className="act">
           <button type="button" className="btn primary block" onClick={() => goto('alerts')}>{household.length ? `Continue with ${household.length + 1} people` : 'Just me for now'}</button>
@@ -289,7 +305,19 @@ export default function Onboarding() {
       <div className="screen">
         <TopBar onBack={back} />
         <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <span className="icon-btn dark" style={{ width: 64, height: 64 }}><Icon name="bell" color="#d9b77a" size={28} /></span>
+          <div aria-hidden="true" style={{ position: 'relative', height: 300, borderRadius: 32, overflow: 'hidden', background: 'linear-gradient(160deg, #2a4a40 0%, #1e352d 55%, #142720 100%)', padding: '22px 14px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <img src="img/istanbul.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.28 }} />
+            <div style={{ position: 'relative', textAlign: 'center', color: '#f6f2ec', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, opacity: 0.85 }}>Tuesday 9 March</div>
+              <div className="num" style={{ fontSize: 54, fontWeight: 600, letterSpacing: '-0.04em', lineHeight: 1 }}>07:12</div>
+            </div>
+            {[['Gate changed to C4', 'SV263 now boards from C4. It’s a 6-minute walk.', '.4s'], ['Your driver is here', 'Khalid is at your door in a grey Lexus.', '1.2s'], ['Leave in 15 minutes', 'Traffic to King Khalid is building.', '2s']].map(([t, b, d]) => (
+              <div key={t} style={{ position: 'relative', display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 18, background: 'rgba(255,253,249,.88)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)', animation: `bannerIn .6s ${d} var(--ease) both` }}>
+                <span style={{ width: 28, height: 28, borderRadius: 8, background: '#1e352d', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Sun width={18} /></span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}><span style={{ fontSize: 13, fontWeight: 600, color: '#1e352d' }}>{t}</span><span style={{ fontSize: 12, color: '#3f4f48' }}>{b}</span></span>
+              </div>
+            ))}
+          </div>
           <h1 className="h1">We'll only interrupt you when it matters.</h1>
           <p className="body">Gate changes. Delays. The moment your driver arrives. Never offers.</p>
         </div>
@@ -304,7 +332,28 @@ export default function Onboarding() {
       <div className="screen">
         <TopBar onBack={back} />
         <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <span className="icon-btn dark" style={{ width: 64, height: 64 }}><Icon name="pin" color="#d9b77a" size={28} /></span>
+          <div aria-hidden="true" style={{ position: 'relative', height: 300, borderRadius: 32, overflow: 'hidden', background: '#f3ece2', boxShadow: 'inset 0 0 0 1px rgba(30,53,45,.06)' }}>
+            <svg width="100%" height="100%" viewBox="0 0 340 300" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0 }}>
+              <g stroke="#e3d9ca" strokeWidth="10" fill="none" strokeLinecap="round">
+                <path d="M-10 70 L360 40" /><path d="M-10 190 L360 230" /><path d="M90 -10 L60 320" /><path d="M250 -10 L280 320" /><path d="M-10 130 C 120 120, 220 160, 360 150" />
+              </g>
+              <path id="route" d="M58 236 C 110 230, 120 160, 170 150 S 250 90, 282 62" fill="none" stroke="#1e352d" strokeWidth="4" strokeDasharray="2 9" strokeLinecap="round" />
+              <circle cx="58" cy="236" r="9" fill="#1e352d" /><circle cx="58" cy="236" r="4" fill="#f6f2ec" />
+              <circle cx="282" cy="62" r="16" fill="#1e352d" />
+              <path d="M290 62c0-.5-.4-.9-.9-.9h-3.4l-3.1-4.6h-1.2l1.5 4.6h-2.8l-.9-1.2h-.9l.6 2.1-.6 2.1h.9l.9-1.2h2.8l-1.5 4.6h1.2l3.1-4.6h3.4c.5 0 .9-.4.9-.9z" fill="#d9b77a" transform="translate(-4 0) scale(1.25) translate(-57 -12)" />
+              <g>
+                <circle r="11" fill="#d9b77a" stroke="#fffdf9" strokeWidth="3" />
+                <animateMotion dur="6s" repeatCount="indefinite" rotate="0" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".4 0 .2 1"><mpath href="#route" /></animateMotion>
+              </g>
+              <text x="70" y="262" fontFamily="Inter Tight, sans-serif" fontSize="12" fontWeight="600" fill="#1e352d">Home</text>
+              <text x="236" y="98" fontFamily="Inter Tight, sans-serif" fontSize="12" fontWeight="600" fill="#1e352d">King Khalid</text>
+            </svg>
+            <div style={{ position: 'absolute', left: 14, top: 14, padding: '8px 12px', borderRadius: 16, background: '#1e352d', color: '#f6f2ec', display: 'flex', flexDirection: 'column', gap: 1, boxShadow: '0 10px 24px -14px rgba(15,26,22,.7)' }}>
+              <span style={{ fontSize: 11, color: '#d9b77a', fontWeight: 600 }}>LEAVE AT</span>
+              <span className="num" style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>07:05</span>
+              <span style={{ fontSize: 11, color: '#c9c1b4' }}>31 min · traffic is light</span>
+            </div>
+          </div>
           <h1 className="h1">Know when to leave.</h1>
           <p className="body">On travel days we time your drive to the airport. That's all we use it for.</p>
         </div>

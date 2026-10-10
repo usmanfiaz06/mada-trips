@@ -47,7 +47,7 @@ export default function Disruption({ params }) {
       <TopBar onBack={null} />
       <div style={{ padding: '60px 28px', display: 'flex', flexDirection: 'column', gap: 24 }}>
         <span className="avatar green" style={{ width: 72, height: 72, fontSize: 28 }}>F</span>
-        <h1 className="h1">Faisal is on it.</h1>
+        <h1 className="h1">Mada is on it.</h1>
         <Steps items={[{ text: 'Seats held', state: 'done' }, { text: cur.id === 'refund' ? 'Asking Saudia for the refund' : 'Moving your tickets', state: 'now' }, { text: 'Moving the pickup', state: 'todo' }]} />
       </div>
     </div>
@@ -57,8 +57,8 @@ export default function Disruption({ params }) {
     <div className="screen push">
       <TopBar onBack={() => setStage('choose')} />
       <div style={{ padding: '40px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <h1 className="h1">You're offline, so Faisal will do it.</h1>
-        <p className="body">Your choice reached us before the connection dropped. Faisal is making the change and will text you when it's done.</p>
+        <h1 className="h1">You're offline, so we'll do it for you.</h1>
+        <p className="body">Your choice reached us before the connection dropped. Your Mada agent is making the change and will text you when it's done.</p>
         <button type="button" className="btn primary block" onClick={() => { set({ phase: 'travelday' }); reset('today'); }}>Back to today</button>
       </div>
     </div>
@@ -96,7 +96,7 @@ export default function Disruption({ params }) {
             </button>
           ))}
         </div>
-        <div className="row"><span className="avatar green">F</span><span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Faisal is with you on this.</span><span className="tiny">{cancel ? 'Saudia confirmed the cancellation at 06:12' : 'Predicted from the inbound plane at 08:02'}</span></span></div>
+        <div className="row"><span className="avatar green">F</span><span className="col" style={{ gap: 2 }}><span className="h3" style={{ fontSize: 15 }}>Faisal at Mada is on this with you.</span><span className="tiny">{cancel ? 'Saudia confirmed the cancellation at 06:12' : 'Predicted from the inbound plane at 08:02'}</span></span></div>
       </div>
       <div className="act">
         <button type="button" className="btn primary block" style={{ height: 60, fontSize: 18 }} onClick={confirm}>

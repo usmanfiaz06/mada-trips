@@ -57,7 +57,7 @@ export default function Plan({ params }) {
         <span className="shade" />
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2 }}><TopBar onBack={pop} dark /></div>
         <span className="over" style={{ gap: 4 }}>
-          <span className="pill" style={{ alignSelf: 'flex-start', background: 'rgba(255,253,249,.9)' }}>Planned by Mada · {plan.days} days</span>
+          <span className="pill glass" style={{ alignSelf: 'flex-start' }}>Planned by Mada · {plan.days} days</span>
           <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>{plan.title}</span>
           <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{plan.sub}</span>
         </span>
