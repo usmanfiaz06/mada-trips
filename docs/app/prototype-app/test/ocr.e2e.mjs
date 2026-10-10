@@ -56,6 +56,12 @@ try {
   await click('Text me a code');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(800);
+  // Sign-up goes straight in (name, alerts); the passport is added from Today's "Add your passport".
+  await phone.locator('#nick').fill('Omar');
+  await click('Let\u2019s go, Omar', 700);
+  await click('Not now', 700);
+  await phone.getByRole('button', { name: /Add your passport/ }).first().click();
+  await page.waitForTimeout(500);
   await click('Scan passport');
   await click('Allow');
   await shot('camera');
@@ -98,15 +104,12 @@ try {
     await page.waitForTimeout(400);
   }
 
-  // Wallet: finish onboarding with the last read, then add a passport through the Wallet sheet.
+  // Wallet: save the demo passport (straight back to Today), then add a passport through the Wallet sheet.
   await click('Use the demo passport', 2800);
-  await click('Yes, save it');
-  await click('Just me for now');
-  await click('Not now');
-  await click('Not now', 800);
+  await click('Yes, save it', 800);
   await phone.getByRole('button', { name: 'Wallet' }).click();
   await page.waitForTimeout(1500);
-  await phone.getByRole('button', { name: 'Add a document' }).click();
+  await phone.getByRole('button', { name: 'Add a document', exact: true }).first().click();
   await page.waitForTimeout(300);
   await click('Passport');
   const t0 = Date.now();
