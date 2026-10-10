@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { WelcomeBack } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
 import { checkFile, readPassport } from '../ocr.js';
@@ -10,7 +11,7 @@ const hidden = { position: 'absolute', width: 1, height: 1, opacity: 0, overflow
 
 export default function Onboarding() {
   const { s, set, toast } = useStore();
-  const [step, setStep] = useState('welcome');
+  const [step, setStep] = useState(s.signinFrom ? 'signin' : 'welcome');
   const [history, setHistory] = useState([]);
   const [phone, setPhone] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -34,7 +35,10 @@ export default function Onboarding() {
   const [passportLater, setPassportLater] = useState(false);
 
   const goto = (next) => { setHistory((h) => [...h, step]); setStep(next); buzz(HAPTIC.tap); };
-  const back = () => { setHistory((h) => { const prev = h[h.length - 1]; if (prev) setStep(prev); return h.slice(0, -1); }); };
+  const back = () => {
+    if (!history.length && s.signinFrom) { set({ onboarded: true, guest: true, signinFrom: null }); return; }
+    setHistory((h) => { const prev = h[h.length - 1]; if (prev) setStep(prev); return h.slice(0, -1); });
+  };
 
   useEffect(() => {
     if (step !== 'otp') return undefined;
@@ -96,11 +100,14 @@ export default function Onboarding() {
     set({
       onboarded: true,
       guest: false,
-      user: { name: fields.given ? fields.given.split(' ')[0].charAt(0) + fields.given.split(' ')[0].slice(1).toLowerCase() : 'Omar' },
+      user: { full: [fields.given, fields.surname].filter(Boolean).map((w) => w.split(' ').map((x) => x.charAt(0) + x.slice(1).toLowerCase()).join(' ')).join(' ') || undefined, name: fields.given ? fields.given.split(' ')[0].charAt(0) + fields.given.split(' ')[0].slice(1).toLowerCase() : 'Omar' },
       household: ['omar', ...household],
       passportSaved: !passportLater,
-      tab: 'today',
-      stack: [],
+      account: { ...(s.account || {}), signedOut: false, ...(phoneOk ? { phone: { digits, at: Date.now() } } : {}), ...(social ? { methods: { ...(s.account?.methods || {}), [social]: true, phone: phoneOk } } : {}) },
+      /* Back to what they were doing before signing in, if anything. */
+      tab: s.signinFrom?.tab || 'today',
+      stack: s.signinFrom?.name ? [{ name: s.signinFrom.name, params: s.signinFrom.params || {}, key: Date.now() }] : [],
+      signinFrom: null,
     });
     buzz(HAPTIC.success);
   };
@@ -215,7 +222,7 @@ export default function Onboarding() {
           <span className="tiny rise d3">New phone? For your safety, the Wallet asks for Face ID the first time you open it.</span>
         </div>
         <div className="act">
-          <button type="button" className="btn primary block" onClick={() => { set({ onboarded: true, guest: false, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, tab: 'today', stack: [] }); buzz(HAPTIC.success); }}>Open Mada</button>
+          <button type="button" className="btn primary block" onClick={() => { set({ onboarded: true, guest: false, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, tab: s.signinFrom?.tab || 'today', stack: s.signinFrom?.name ? [{ name: s.signinFrom.name, params: s.signinFrom.params || {}, key: Date.now() }] : [], signinFrom: null }); buzz(HAPTIC.success); }}>Open Mada</button>
           <button type="button" className="btn ghost block" onClick={() => goto('phone')}>That’s not me</button>
         </div>
       </div>
@@ -523,5 +530,6 @@ export default function Onboarding() {
     ),
   };
 
+  if (s.account?.signedOut && step === 'welcome') return <WelcomeBack onSomeoneElse={() => { set((p) => ({ account: { ...(p.account || {}), signedOut: false } })); }} />;
   return <div key={step} className="push" style={{ position: 'absolute', inset: 0 }}>{screens[step]}</div>;
 }

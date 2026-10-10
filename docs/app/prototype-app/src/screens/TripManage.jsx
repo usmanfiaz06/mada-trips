@@ -80,12 +80,12 @@ export function reqLabel(r, now) {
 export function ReqTracker({ r, now }) {
   const st = reqStatus(r, now);
   const who = r.withName || WITH[r.with] || 'Faisal';
-  if (st === 'done') return null;
+  if (st === 'done' || st === 'yes') return null;
   return (
     <Tracker items={[
       { title: st === 'queued' ? 'Saved on this phone' : 'Sent to Faisal', sub: st === 'queued' ? 'Sends when you’re back online' : 'Today', state: st === 'queued' ? 'now' : 'done' },
       { title: `Faisal asks ${who}`, sub: st === 'checking' ? 'Usually within the hour' : st === 'sent' || st === 'queued' ? '' : 'Today', state: st === 'checking' ? 'now' : ['yes', 'no'].includes(st) ? 'done' : '' },
-      { title: st === 'no' ? 'They can’t do it' : r.with === 'faisal' ? 'Done' : `Confirmed by ${who}`, sub: st === 'yes' ? r.yesText || 'Nothing to pay' : st === 'no' ? '' : '', state: st === 'yes' ? 'done' : st === 'no' ? 'done' : '' },
+      { title: st === 'no' ? 'They can’t do it' : r.with === 'faisal' ? 'Done' : `Confirmed by ${who}`, sub: st === 'yes' ? r.yesText || 'Nothing to pay' : st === 'no' ? 'Faisal has another way, below' : '', state: st === 'yes' ? 'done' : st === 'no' ? 'now' : '' },
     ]} />
   );
 }
@@ -190,7 +190,7 @@ export function tripPayments(s) {
     list.push({ id: 'x:' + r.id, icon: r.icon || (r.kind === 'food' ? 'food' : r.kind === 'car' ? 'car' : 'star'), title: r.title.replace(/^Booked: /, ''), sub: r.detail || 'Extra', amount: r.quote, method: brand, card, date: 'Today', time: '', no: `MT-27-00${4200 + i}`, lines: [{ text: r.title, qty: 1, gross: r.quote, vat: r.vat ?? 15 }], extra: true });
   });
   if (s.circles?.sharePaid) list.push({ id: 'share', icon: 'star', title: 'Your share of the cruise', sub: 'Paid to Abdullah’s booking', amount: 380, method: brand, card, date: 'Last week', time: '', no: 'MT-27-004177', lines: [{ text: 'Bosphorus dinner cruise, your share', qty: 1, gross: 380, vat: 15 }], extra: true });
-  return list.map((p) => ({ ...p, refund: refundOf(s, p.id) }));
+  return list.map((p) => { const r = refundOf(s, p.id); return { ...p, refund: r ? { ...r, credited: r.perItem?.[p.id] ?? r.amount } : null }; });
 }
 const splitVat = (l) => { const net = l.vat ? l.gross / (1 + l.vat / 100) : l.gross; return { net, vat: l.gross - net }; };
 const methodName = (p) => (p.method === 'tabby' ? 'Tabby · 4 payments' : p.method === 'tamara' ? 'Tamara · 3 payments' : p.card);
@@ -239,6 +239,16 @@ export function refundQuote(s, key) {
   }
   if (key === 'share') return { back: tm.early ? 380 : 0, paid: 380, rule: tm.early ? 'Free to cancel until 48 hours before.' : 'Inside 48 hours this can’t be refunded.', why: '', askAnyway: !tm.early };
   return null;
+}
+
+/* With instalments, what comes back is what was paid so far, less what the rule keeps; the payments left are cancelled. */
+export function refundMoney(p, q) {
+  if (p && q && ['tabby', 'tamara'].includes(p.method) && p.plan) {
+    const paidSoFar = p.plan.filter((i) => i.paid).reduce((a, i) => a + i.amount, 0);
+    const keep = p.amount - q.back;
+    return { cash: Math.max(0, paidSoFar - keep), cancelled: p.amount - paidSoFar, count: p.plan.filter((i) => !i.paid).length, owe: Math.max(0, keep - paidSoFar) };
+  }
+  return { cash: q ? q.back : 0, cancelled: 0, count: 0, owe: 0 };
 }
 
 /* ---------- shared bits ---------- */
@@ -577,7 +587,7 @@ function Payments() {
   const list = tripPayments(s);
   if (!s.trip) return <NoTrip />;
   const paid = list.reduce((a, p) => a + p.amount, 0);
-  const refunded = list.reduce((a, p) => a + (p.refund ? p.refund.amount : 0), 0);
+  const refunded = list.reduce((a, p) => a + (p.refund ? p.refund.credited : 0), 0);
   const upcoming = list.flatMap((p) => (p.plan && !p.refund ? p.plan.filter((i) => !i.paid).map((i) => ({ ...i, what: p.title, method: p.method })) : []));
   const next = upcoming[0];
   const credit = credit0(s);
@@ -602,7 +612,7 @@ function Payments() {
             <span className="grow col" style={{ gap: 2 }}>
               <span className="tm-row-title">{p.title}</span>
               <span className="tiny">{p.date} · {methodName(p)}</span>
-              {p.refund && <span className="pill ok" style={{ alignSelf: 'flex-start', height: 22, fontSize: 11 }}>Refunded SAR {fmt(p.refund.amount)} · credit note</span>}
+              {p.refund && <span className="pill ok" style={{ alignSelf: 'flex-start', height: 22, fontSize: 11 }}>Credited SAR {fmt(p.refund.credited)} · credit note</span>}
               {p.plan && !p.refund && (
                 <span className="tm-inst" aria-label={`${p.plan.filter((i) => i.paid).length} of ${p.plan.length} paid`}>
                   {p.plan.map((i) => <span key={i.date} className={i.paid ? 'on' : ''} title={`${i.date} · SAR ${fmt(i.amount)}`} />)}
@@ -669,7 +679,7 @@ function Invoice({ params }) {
   if (!p) return <Screen title="Invoice"><div className="card well"><span className="h3">This payment isn’t on the trip any more.</span><span className="small">Faisal can send you a copy of any invoice.</span></div></Screen>;
   const buyer = PEOPLE[s.trip.travellers[0]]?.full || 'Omar Alharbi';
   const isCredit = view === 'credit' && p.refund;
-  const ratio = isCredit ? p.refund.amount / p.amount : 1;
+  const ratio = isCredit ? p.refund.credited / p.amount : 1;
   const lines = p.lines.map((l) => { const g = l.gross * ratio; const { net, vat } = splitVat({ ...l, gross: g }); return { text: l.text, note: l.note, vatRate: l.vat, gross: g, net, vat }; });
   const total = lines.reduce((a, l) => a + l.gross, 0);
   const vat = lines.reduce((a, l) => a + l.vat, 0);
@@ -757,7 +767,11 @@ function Refund({ params }) {
   if (!s.trip) return <NoTrip />;
   const items = payments.map((p) => ({ p, q: refundQuote(s, p.id) })).filter((x) => x.q);
   const chosen = items.filter((x) => keys.includes(x.p.id));
-  const back = chosen.reduce((a, x) => a + x.q.back, 0);
+  /* With instalments, what comes back is what was paid so far, less what the rule keeps; the payments left are cancelled. */
+  const money = (x) => refundMoney(x.p, x.q);
+  const back = chosen.reduce((a, x) => a + money(x).cash, 0);
+  const credited = chosen.reduce((a, x) => a + x.q.back, 0);
+  const cancelledTotal = chosen.reduce((a, x) => a + money(x).cancelled, 0);
   const asking = chosen.reduce((a, x) => a + x.q.paid, 0);
   const anyway = chosen.length > 0 && back === 0;
   const tabbyItems = chosen.filter((x) => ['tabby', 'tamara'].includes(x.p.method));
@@ -767,9 +781,9 @@ function Refund({ params }) {
 
   const confirm = () => {
     const id = 'rf' + Date.now();
-    const tabbyNote = tabbyItems.length ? tabbyItems.map((x) => { const paidSoFar = x.p.plan ? x.p.plan.filter((i) => i.paid).reduce((a, i) => a + i.amount, 0) : x.p.amount; const left = x.p.amount - paidSoFar; return { left, count: x.p.plan ? x.p.plan.filter((i) => !i.paid).length : 0 }; })[0] : null;
+    const tabbyNote = tabbyItems.length ? { left: money(tabbyItems[0]).cancelled, count: money(tabbyItems[0]).count } : null;
     const rec = {
-      id, title: `Istanbul · ${title}`, amount: anyway ? asking : back, items: chosen.map((x) => x.p.id), card, created: Date.now(),
+      id, title: `Istanbul · ${title}`, amount: anyway ? asking : back, perItem: Object.fromEntries(chosen.map((x) => [x.p.id, anyway ? 0 : x.q.back])), items: chosen.map((x) => x.p.id), card, created: Date.now(),
       dest: anyway ? 'card' : tabbyItems.length === chosen.length && tabbyItems.length ? 'tabby' : dest, reason, tabby: tabbyNote,
       law: chosen.some((x) => x.q.law),
     };
@@ -802,7 +816,7 @@ function Refund({ params }) {
         <h1 className="h1 rise d1">{anyway ? 'Sent to Faisal.' : live.dest === 'credit' ? `SAR ${fmt(back)} is in your Mada credit.` : `SAR ${fmt(back)} is on its way back.`}</h1>
         <p className="body rise d2">{anyway ? 'The rule says nothing comes back, but Faisal will ask. You’ll hear within a day.' : live.dest === 'credit' ? 'Ready to use now, on any booking. It doesn’t expire.' : live.dest === 'tabby' ? 'We tell Tabby today. What you paid goes back to your card, and the payments left are cancelled.' : `Back to your ${card}, usually in 5–10 working days.`}</p>
         <div className="card rise d3"><RefundTracker r={live} /></div>
-        <Faisal>“I’ll keep an eye on it until it’s in your account.”</Faisal>
+        <Faisal>{anyway ? '“I’ll ask, and tell you either way.”' : live.dest === 'credit' ? '“Done. It’s there now.”' : '“I’ll keep an eye on it until it’s in your account.”'}</Faisal>
       </Screen>
     );
   }
@@ -837,8 +851,8 @@ function Refund({ params }) {
           return (
             <Pick key={p.id} on={on} disabled={done || (q.back === 0 && !q.askAnyway)} onClick={() => toggle(p.id)}
               title={p.title} sub={done ? 'Already refunded' : q.rule}
-              right={done ? 'Refunded' : q.back > 0 ? `+${fmt(q.back)}` : 'Nothing back'}
-              note={on ? <>{q.why}{q.back > 0 && q.back < q.paid ? ` You paid ${sar(q.paid)}.` : ''}{['tabby', 'tamara'].includes(p.method) && p.plan ? ` ${p.plan.filter((i) => !i.paid).length} ${p.method === 'tabby' ? 'Tabby' : 'Tamara'} payments left are cancelled.` : ''}</> : null} />
+              right={done ? 'Refunded' : q.back > 0 ? `+${fmt(money({ p, q }).cash)}` : 'Nothing back'}
+              note={on ? <>{q.why}{q.back > 0 && q.back < q.paid ? ` You paid ${sar(q.paid)}.` : ''}{money({ p, q }).count ? ` You’ve paid ${sar(p.amount - money({ p, q }).cancelled)} so far, and that comes back. The ${money({ p, q }).count} ${p.method === 'tabby' ? 'Tabby' : 'Tamara'} payments left (${sar(money({ p, q }).cancelled)}) are cancelled.` : ''}{money({ p, q }).owe ? ` ${p.method === 'tabby' ? 'Tabby' : 'Tamara'} still takes ${sar(money({ p, q }).owe)} for the hotel’s fee.` : ''}</> : null} />
           );
         })}
       </div>
@@ -865,6 +879,7 @@ function Refund({ params }) {
         <div className="tm-sum">
           <span className="small">{anyway ? `The rules say nothing comes back. Faisal can ask anyway.` : 'You get back'}</span>
           {!anyway && <span className="num tm-big">SAR {fmt(back)}</span>}
+          {!anyway && cancelledTotal > 0 && <span className="small">and SAR {fmt(cancelledTotal)} of payments you won’t make. SAR {fmt(credited)} in all.</span>}
         </div>
       </>)}
     </Screen>
@@ -1400,7 +1415,7 @@ function SpecialSheet({ id, forWho, onClose }) {
     <Pick radio on={opt === 'gate'} onClick={() => setOpt('gate')} title="To the gate" sub="Can manage the aircraft steps and walk to the seat" />
     <Pick radio on={opt === 'seat'} onClick={() => setOpt('seat')} title="All the way to the seat" sub="Can’t manage steps. Carried on with an aisle chair." />
     <Pick radio on={opt === 'own'} onClick={() => setOpt('own')} title="Bringing our own wheelchair" sub="Goes in the hold free, taken at the aircraft door" />
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : ', own chair'} · ${whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: 'Both flights', with: 'airline', withName: airline, outcome: 'yes' })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'wheelchair', title: `Wheelchair ${opt === 'gate' ? 'to the gate' : opt === 'seat' ? 'to the seat' : '(own chair)'}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: `Wheelchair · ${whoTxt}`, detail: 'Both flights', with: 'airline', withName: airline, outcome: 'yes' })}>Send to Faisal</button>
   </>);
   else if (id === 'meal') {
     const kids = whoIds.filter((x) => Number(PEOPLE[x]?.born) >= 2014);
@@ -1460,7 +1475,7 @@ function SpecialSheet({ id, forWho, onClose }) {
   } else if (id === 'sports') body = (<>
     <span className="small">Packed and under {R.bagKg} kg, it counts as one of your bags. Heavier or longer than 2 m costs SAR 300 each way.</span>
     {[['golf', 'Golf clubs', 'Usually 15–20 kg'], ['bike', 'A bike in a box', 'Usually 25–32 kg'], ['ski', 'Skis or a snowboard', 'Usually 8–12 kg']].map(([k, title, sub]) => <Pick radio key={k} on={opt === k} onClick={() => setOpt(k)} title={title} sub={sub} />)}
-    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]} · ${whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: 'Both flights', with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Faisal</button>
+    <button type="button" className="btn primary block" disabled={!opt} onClick={() => done({ kind: 'sports', title: `${{ golf: 'Golf clubs', bike: 'A bike', ski: 'Skis' }[opt]}${forWho === 'all' ? '' : ' · ' + whoTxt}`, short: { golf: 'Golf clubs', bike: 'Bike box', ski: 'Skis' }[opt], detail: 'Both flights', with: 'airline', withName: airline, outcome: opt === 'bike' ? 'no' : 'yes', alt: `The bike box is too long for ${airline}’s hold on this plane. Faisal can send it by air cargo for SAR 410; it arrives a day before you.` })}>Send to Faisal</button>
   </>);
   else body = (<>
     <p className="body">Pets can’t fly with you to Istanbul on {airline}, in the cabin or the hold, and Mada can’t book pet travel.</p>

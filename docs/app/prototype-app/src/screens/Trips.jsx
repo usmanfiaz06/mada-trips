@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
 import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
-import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments } from './TripManage.jsx';
+import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney } from './TripManage.jsx';
 
 const REQ_STAGES = [
   ['queued', 'Waiting for a connection'],
@@ -138,6 +138,7 @@ function Requests() {
               <div className="spread" style={{ alignItems: 'flex-start' }}><span className="h3">{r.title}</span><span className={'pill' + (st === 'yes' || st === 'done' ? ' ok' : st === 'no' ? ' warn' : '')} style={{ flexShrink: 0 }}>{reqLabel(r, now)}</span></div>
               {r.detail && <span className="small">{r.detail}</span>}
               <ReqTracker r={r} now={now} />
+              {(st === 'yes' || st === 'done') && <span className="row tiny"><Icon name="check" size={14} color="#2f7a4b" width={2.4} />{r.yesText || (st === 'done' ? 'Done by Faisal today' : 'Confirmed today. Nothing to pay.')}</span>}
               {st === 'no' && (
                 <div className="card well" style={{ gap: 8 }}>
                   <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
@@ -211,11 +212,13 @@ export function TripDetail() {
   const open = openCount(s);
   const payments = tripPayments(s);
   const nextDue = payments.flatMap((p) => (p.plan && !p.refund ? p.plan.filter((i) => !i.paid) : []))[0];
+  const stayPay = payments.find((p) => p.id === 'stay');
+  const stayMoney = stayQ ? refundMoney(stayPay, stayQ) : null;
   const cancelStay = () => {
-    const back = stayQ ? stayQ.back : t.stay.price;
+    const back = stayMoney ? stayMoney.cash : t.stay.price;
     set((p) => ({
       trip: { ...p.trip, stay: { ...p.trip.stay, status: 'cancelled' } },
-      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · ${p.trip.stay.nights} nights`, amount: back, stage: 0, card: 'Visa ending 41', items: ['stay'], dest: 'card', created: Date.now() }],
+      refunds: [...p.refunds, { id: 'f' + Date.now(), title: `${p.trip.stay.name} · ${p.trip.stay.nights} nights`, amount: back, perItem: { stay: stayQ ? stayQ.back : t.stay.price }, stage: 0, card: 'Visa ending 41', items: ['stay'], dest: stayMoney?.count ? 'tabby' : 'card', tabby: stayMoney?.count ? { left: stayMoney.cancelled, count: stayMoney.count } : null, created: Date.now() }],
     }));
     setSheet(null);
     buzz(HAPTIC.success);
@@ -292,8 +295,9 @@ export function TripDetail() {
       {sheet === 'cancel' && (
         <Sheet label="Cancel the stay" onClose={() => setSheet(null)}>
           <h2 className="h2">Cancel the stay?</h2>
-          <p className="body">You'll get <b style={{ color: '#1e352d' }}>SAR {fmt(stayQ ? stayQ.back : t.stay.price)}</b> back. {stayQ?.rule} Your flights stay as they are.</p>
-          {stayQ && stayQ.back < t.stay.price && <span className="small">You paid SAR {fmt(t.stay.price)}. {stayQ.why}</span>}
+          <p className="body">You'll get <b style={{ color: '#1e352d' }}>SAR {fmt(stayMoney ? stayMoney.cash : t.stay.price)}</b> back. {stayQ?.rule} Your flights stay as they are.</p>
+          {stayMoney?.count > 0 && <span className="small">That’s what you’ve paid so far with {stayPay.method === 'tabby' ? 'Tabby' : 'Tamara'}{stayQ.back < t.stay.price ? ', less the hotel’s fee' : ''}. The {stayMoney.count} payments left (SAR {fmt(stayMoney.cancelled)}) are cancelled.</span>}
+          {stayQ && !stayMoney?.count && stayQ.back < t.stay.price && <span className="small">You paid SAR {fmt(t.stay.price)}. {stayQ.why}</span>}
           <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={cancelStay}>Cancel the stay</button>
           <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Keep it</button>
         </Sheet>

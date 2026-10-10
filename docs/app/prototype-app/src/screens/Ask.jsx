@@ -89,7 +89,7 @@ export default function Ask({ params }) {
         <Sheet label="Sign in to book" onClose={() => { setNeedsSignIn(false); pop(); }}>
           <h2 className="h2">Sign in to book</h2>
           <p className="body">Booking needs an account, so Mada can confirm with your details and your tickets land in your Wallet.</p>
-          <button type="button" className="btn primary block" onClick={() => set({ onboarded: false, guest: false, stack: [] })}>Sign in</button>
+          <button type="button" className="btn primary block" onClick={() => set({ onboarded: false, guest: false, stack: [], signinFrom: { name: 'ask', params: { prefill: query || params.prefill || '' } } })}>Sign in</button>
           <button type="button" className="btn ghost block" onClick={() => { setNeedsSignIn(false); pop(); }}>Not now</button>
         </Sheet>
       )}
@@ -99,9 +99,13 @@ export default function Ask({ params }) {
 
 function Start({ onPick }) {
   const { s } = useStore();
+  /* Ideas only use what we actually know about this person. */
+  const family = s.household.includes('sara');
   const ideas = s.trip
     ? ['Add a hotel in Istanbul', 'Dinner for 6 on the first night', 'A car for a day trip', 'Data for the trip']
-    : ['Istanbul for Eid, all four of us', 'Same as last Eid', 'A hotel in Istanbul', 'Schengen visa for Sara', 'Umrah in Ramadan'];
+    : family
+      ? ['Istanbul for Eid, all four of us', 'Same as last Eid', 'A hotel in Istanbul', 'Schengen visa for Sara', 'Umrah in Ramadan']
+      : ['Flights to Istanbul', 'A hotel in Istanbul', 'A weekend in AlUla', 'A Schengen visa', 'Umrah in Ramadan'];
   return (
     <div className="col rise" style={{ gap: 14 }}>
       <h1 className="display" style={{ fontSize: 40 }}>Where to?</h1>

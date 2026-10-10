@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE } from '../store.jsx';
 import { Icon, TopBar, Sheet, Toggle, InviteSheet } from '../ui.jsx';
 
@@ -33,6 +34,7 @@ export const SEED_POSTS = [
 const COVERS = [null, 'img/istanbul.jpg', 'img/alula.jpg', 'img/riyadh.jpg'];
 
 export function Avatar({ id, size = 40, ring }) {
+  if (id === 'omar') return <UserAvatar size={size} ring={ring} />;
   const p = person(id);
   return <span className={'avatar' + (p.tone ? ' ' + p.tone : '')} style={{ width: size, height: size, fontSize: size * 0.4, flexShrink: 0, ...(ring ? { borderColor: ring } : null) }}>{p.initial}</span>;
 }

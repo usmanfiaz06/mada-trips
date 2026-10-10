@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue } from '../store.jsx';
 import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark } from '../ui.jsx';
 
@@ -108,8 +109,8 @@ function Header() {
             {(s.inbox || []).some((n) => !n.read) && <i className="td-bell-dot" aria-hidden="true" />}
           </button>
         )}
-        <button type="button" className="avatar" aria-label="Profile and settings" onClick={() => { buzz(HAPTIC.tap); push('profile'); }} style={{ border: 0, background: '#f6f2ec' }}>
-          {s.user?.name?.charAt(0) || <Icon name="user" size={18} />}
+        <button type="button" aria-label="Profile and settings" onClick={() => { buzz(HAPTIC.tap); push('profile'); }} style={{ border: 0, background: 'none', padding: 0, borderRadius: 999 }}>
+          {s.user ? <UserAvatar size={44} /> : <span className="avatar" style={{ background: '#f6f2ec' }}><Icon name="user" size={18} /></span>}
         </button>
       </span>
     </div>
@@ -224,7 +225,7 @@ function Guest() {
       <div className="card well rise d2">
         <span className="h3">Want us to book and look after the whole trip?</span>
         <span className="small">Sign in to book flights, stays and visas with a named agent behind every booking.</span>
-        <button type="button" className="btn secondary" onClick={() => set({ onboarded: false, guest: false })}>Sign in</button>
+        <button type="button" className="btn secondary" onClick={() => set({ onboarded: false, guest: false, signinFrom: { tab: 'today' } })}>Sign in</button>
       </div>
     </>
   );

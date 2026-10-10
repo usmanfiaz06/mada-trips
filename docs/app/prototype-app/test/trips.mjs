@@ -30,7 +30,7 @@ const scrollDown = async (px = 600) => { await phone.locator('.scroll').last().e
 const step = (t) => console.log('·', t);
 const fresh = async (phase = 'Weeks before') => { await demo('Fresh install'); await demo(phase); };
 const toTabs = async () => { for (let i = 0; i < 8 && !(await phone.locator('.dock').count()); i += 1) { await phone.getByRole('button', { name: /^(Back|Close)$/ }).last().click(); await page.waitForTimeout(450); } };
-const openTrip = async () => { await toTabs(); await phone.getByRole('button', { name: 'Trips', exact: true }).click(); await page.waitForTimeout(400); await phone.locator('.photo').first().click(); await page.waitForTimeout(500); };
+const openTrip = async () => { await toTabs(); await phone.getByRole('button', { name: 'Trips', exact: true }).click(); await page.waitForTimeout(400); await phone.getByRole('tab', { name: 'Upcoming' }).click(); await page.waitForTimeout(300); await phone.locator('.photo').first().click(); await page.waitForTimeout(500); };
 const manage = async (label) => { await phone.getByRole('button', { name: new RegExp('^' + label) }).first().click(); await page.waitForTimeout(500); };
 
 try {
@@ -284,6 +284,7 @@ try {
   await phone.getByRole('checkbox', { name: /Rooms near Galata/ }).click();
   await click('Someone is ill');
   await expectText(/Back through Tabby/, 'tabby destination');
+  await expectText(/and SAR 4,410 of payments/, 'tabby payments cancelled');
   await shot('refund-tabby');
   await slide();
   await page.waitForTimeout(400);

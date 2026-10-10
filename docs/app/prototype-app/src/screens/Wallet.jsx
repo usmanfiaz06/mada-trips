@@ -6,7 +6,7 @@ import { checkFile, readPassport } from '../ocr.js';
 
 export default function Wallet() {
   const { s, set } = useStore();
-  if (!s.walletUnlocked) return <Lock />;
+  if (!s.walletUnlocked && s.account?.faceId !== false) return <Lock />;
   return <Unlocked />;
 }
 
@@ -59,7 +59,7 @@ function Unlocked() {
   if (!people.length) return (
     <div className="screen"><div className="scroll"><div style={{ paddingTop: 54 }}><h1 className="h1">Wallet</h1></div>
       <div className="card well"><span className="h3">Add a passport and we'll keep an eye on it.</span><span className="small">Expiry dates, visas and entry rules for every trip.</span>
-        <button type="button" className="btn primary small" onClick={() => set({ onboarded: false, guest: false })}>Sign in to add one</button></div></div></div>
+        <button type="button" className="btn primary small" onClick={() => set({ onboarded: false, guest: false, signinFrom: { tab: 'wallet' } })}>Sign in to add one</button></div></div></div>
   );
 
   const chip = missing ? { t: 'Not added yet', bg: 'rgba(233,226,216,.14)', fg: '#e9e2d8' }
