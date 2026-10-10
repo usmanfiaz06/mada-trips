@@ -97,7 +97,7 @@ function Upcoming() {
     <span className="eyebrow rise d1">Easy from here this winter</span>
     <div className="idea-row rise d1">
       {[['img/istanbul.jpg', 'Istanbul', '4h · cool and cosy', 'Flights to Istanbul'], ['img/alula.jpg', 'AlUla', '1h 20 · stars and rock', 'A weekend in AlUla'], ['img/riyadh.jpg', 'Riyadh Season', 'No flight needed', 'Things to do in Riyadh this weekend']].map(([img, t, sub, q]) => (
-        <button key={t} type="button" className="idea" onClick={() => push('ask', { prefill: q })}><img src={img} alt="" /><span>{t}<small>{sub}</small></span></button>
+        <button key={t} type="button" className="es-idea" onClick={() => push('ask', { prefill: q })}><img src={img} alt="" /><span>{t}<small>{sub}</small></span></button>
       ))}
     </div>
     {tracked && <TrackedFlights title="Flights you’re tracking" />}

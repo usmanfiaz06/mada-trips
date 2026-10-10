@@ -965,8 +965,8 @@ function StayFlow({ query, setCta }) {
           <button key={h.id} type="button" className={'card tap rise d' + (i + 1) + (on ? ' selected' : '')} style={{ padding: 0, overflow: 'hidden', gap: 0 }} aria-pressed={on ? 'true' : 'false'} onClick={() => { setPick(h.id); buzz(HAPTIC.select); }}>
             <span className="photo" style={{ height: 120, borderRadius: 0, display: 'block' }}>
               <img src="img/istanbul.jpg" alt="" style={{ objectPosition: ['30% 60%', '80% 70%', '50% 20%'][i], filter: i === 2 ? 'hue-rotate(-10deg) saturate(1.1)' : undefined }} />
-              <span className="pill" style={{ position: 'absolute', top: 10, left: 10, background: on ? '#d9b77a' : 'rgba(255,253,249,.9)' }}>{h.label}</span>
-              <span className="pill" style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(255,253,249,.9)' }}>{h.rating}</span>
+              <span className="pill" style={{ position: 'absolute', top: 10, insetInlineStart: 10, color: '#1e352d', background: on ? '#d9b77a' : 'rgba(255,253,249,.92)' }}>{h.label}</span>
+              <span className="pill num" style={{ position: 'absolute', top: 10, insetInlineEnd: 10, color: '#1e352d', background: 'rgba(255,253,249,.92)' }}>{h.rating}</span>
             </span>
             <span className="col" style={{ padding: '12px 16px 14px', gap: 4 }}>
               <span className="spread"><span className="h3">{h.name}</span><span className="num" style={{ fontWeight: 600 }}>SAR {fmt(h.night * STAY_NIGHTS * factor)}</span></span>

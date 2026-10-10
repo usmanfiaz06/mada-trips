@@ -41,7 +41,7 @@
 [dir="rtl"] .pl-type .pl-rose { right: auto; left: 14px; }
 
 [dir="rtl"] .card.tap, [dir="rtl"] .address-card, [dir="rtl"] .acc-namebtn, [dir="rtl"] .acc-choice, [dir="rtl"] .flight-opt,
-[dir="rtl"] .cx-empty.row-empty, [dir="rtl"] .credit-card, [dir="rtl"] .sp-topics button, [dir="rtl"] .idea { text-align: right; }
+[dir="rtl"] .cx-empty.row-empty, [dir="rtl"] .credit-card, [dir="rtl"] .sp-topics button, [dir="rtl"] .es-idea { text-align: right; }
 [dir="rtl"] .cx-row.mine .cx-bubble.bare .cx-name, [dir="rtl"] .cx-n, [dir="rtl"] .cx-amt-in { text-align: left; }
 
 [dir="rtl"] .stack .avatar, [dir="rtl"] .cx-faces .stack .avatar, [dir="rtl"] .cx-voters .avatar, [dir="rtl"] .cx-share .stack .avatar { margin-left: 0; margin-right: -10px; }
