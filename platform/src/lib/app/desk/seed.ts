@@ -1,7 +1,7 @@
 /**
  * Demo data for the agent desk, on top of the Ops demo seed (npm run db:seed):
  *   npx tsx --conditions=react-server src/lib/app/desk/seed.ts
- * Needs the desk tables (drizzle/pending/desk.sql) and APP_DATA_KEY (passports are encrypted as in production).
+ * Needs the desk tables (npm run db:migrate) and APP_DATA_KEY (passports are encrypted as in production).
  * Agents for the seeded Ops users, a rota around now (Faisal on, Noura covering for Omar), travellers, orders in every
  * state, requests, chats, refunds, today's flights (one in the air, two disrupted), tips and reports.
  * Runs once: it stops if desk agents already exist. Local databases only.

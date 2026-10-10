@@ -1,11 +1,10 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
 import { appCircles, appMessages, appUsers } from "./app-schema";
 
 /*
  * Circles (M4): the tables beside app_circles, app_circle_members and app_messages (app-schema.ts), which hold the
- * circle, its members and its chat. CREATE TABLE statements: drizzle/pending/circles.sql, folded into one generated
- * migration at integration. Money in halalas, times as timestamptz, enums as text checked by the shared zod schemas.
+ * circle, its members and its chat. Migration: drizzle/0017_app_features.sql. Money in halalas, times as timestamptz, enums as text checked by the shared zod schemas.
  */
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -87,6 +86,7 @@ export const appFriendships = pgTable("app_friendships", {
   createdAt: createdAt(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true }),
 }, (t) => [
+  check("app_friendships_not_self", sql`${t.requesterId} <> ${t.addresseeId}`),
   uniqueIndex("app_friendships_pair_key").on(sql`least(${t.requesterId}, ${t.addresseeId})`, sql`greatest(${t.requesterId}, ${t.addresseeId})`),
   index("app_friendships_addressee_idx").on(t.addresseeId, t.status),
   index("app_friendships_requester_idx").on(t.requesterId, t.status),

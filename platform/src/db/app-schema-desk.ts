@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, integer, bigint, boolean, timestamp, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, integer, bigint, boolean, timestamp, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
 import { users as opsUsers } from "./schema";
 import { appUsers } from "./app-schema";
 
@@ -9,7 +9,7 @@ import { appUsers } from "./app-schema";
  * canned replies, typing, moderation, blocks, disruption plans). Everything else the desk shows lives in the
  * app_ tables it reads (requests, quotes, payments, refunds, messages, trips).
  *
- * The matching SQL is in drizzle/pending/desk.sql until the lead folds it into one generated migration.
+ * Migration: drizzle/0017_app_features.sql.
  */
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -46,7 +46,7 @@ export const appAgentShifts = pgTable("app_agent_shifts", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => opsUsers.id, { onDelete: "set null" }),
   createdAt: createdAt(),
-}, (t) => [index("app_agent_shifts_time_idx").on(t.startsAt, t.endsAt), index("app_agent_shifts_agent_idx").on(t.agentId, t.startsAt)]);
+}, (t) => [check("app_agent_shifts_order", sql`${t.endsAt} > ${t.startsAt}`), index("app_agent_shifts_time_idx").on(t.startsAt, t.endsAt), index("app_agent_shifts_agent_idx").on(t.agentId, t.startsAt)]);
 
 /** Each traveller account has one primary agent ("Faisal, your Mada agent"). */
 export const appAgentAssignments = pgTable("app_agent_assignments", {

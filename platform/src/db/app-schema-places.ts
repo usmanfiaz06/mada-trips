@@ -6,7 +6,7 @@ import { appRequests, appUsers } from "./app-schema";
  * Places: every city of 15,000 people or more (GeoNames, CC BY 4.0), airports with an IATA code (OurAirports, public
  * domain), the names search matches (English, other Latin spellings, Arabic, airport names and codes), and each
  * city's guide as assembled from Wikipedia, Wikivoyage and Wikimedia Commons (CC BY-SA), cached for 30 days.
- * Loaded by scripts/places/ingest.ts. CREATE statements: drizzle/pending/places.sql (needs pg_trgm and unaccent).
+ * Loaded by scripts/places/ingest.ts. Migration: drizzle/0017_app_features.sql (needs pg_trgm and unaccent, created there).
  */
 
 export type NearAirportJson = { iata: string; name: string; km: number; size: "large" | "medium" };
@@ -54,7 +54,11 @@ export const appPlaceNames = pgTable("app_place_names", {
   norm: text("norm").notNull(),
   label: text("label"),
   rank: integer("rank").notNull().default(0),
-}, (t) => [primaryKey({ columns: [t.placeId, t.kind, t.norm] })]);
+}, (t) => [
+  primaryKey({ name: "app_place_names_pk", columns: [t.placeId, t.kind, t.norm] }),
+  index("app_place_names_trgm_idx").using("gin", t.norm.op("gin_trgm_ops")),
+  index("app_place_names_prefix_idx").on(t.norm.op("text_pattern_ops")),
+]);
 
 export const appPlaceAirports = pgTable("app_place_airports", {
   iata: text("iata").primaryKey(),

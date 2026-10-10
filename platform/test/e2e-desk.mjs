@@ -1,6 +1,6 @@
 // The agent desk in Mada Ops, end to end, in headless Chromium against a running platform with demo data.
 //
-//   DATABASE_URL=… npm run db:migrate && psql "$DATABASE_URL" -f drizzle/pending/desk.sql   (and the other pending files)
+//   DATABASE_URL=… npm run db:migrate
 //   DATABASE_URL=… npm run db:seed && DATABASE_URL=… npx tsx --conditions=react-server src/lib/app/desk/seed.ts
 //   DATABASE_URL=… APP_DATA_KEY=… npm run dev
 //   BASE=http://localhost:3100 node test/e2e-desk.mjs [shot-dir]

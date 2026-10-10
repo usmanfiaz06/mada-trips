@@ -8,7 +8,7 @@ import { appInvoices, appPayments, appRefunds, appRequests, appTrackedFlights, a
  * send twice (offline queue). Trips, segments, stays, pickups, requests, payments, refunds, invoices, notifications,
  * devices and tracked flights themselves stay in the M0 tables.
  *
- * The matching SQL is in drizzle/pending/trips.sql until the lead folds it into one generated migration.
+ * Migration: drizzle/0017_app_features.sql.
  */
 
 const money = (name: string) => bigint(name, { mode: "number" });
@@ -131,7 +131,7 @@ export const appTripIdempotency = pgTable("app_trip_idempotency", {
   key: text("key").notNull(),
   result: jsonb("result").$type<Record<string, unknown>>().notNull(),
   createdAt: createdAt(),
-}, (t) => [primaryKey({ columns: [t.ownerId, t.scope, t.key] })]);
+}, (t) => [primaryKey({ name: "app_trip_idempotency_pk", columns: [t.ownerId, t.scope, t.key] })]);
 
 /** What a tracked flight needs beyond the M0 row: whether to alert, and what the schedule said. */
 export const appTrackedExtras = pgTable("app_tracked_extras", {

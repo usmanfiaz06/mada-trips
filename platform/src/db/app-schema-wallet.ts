@@ -5,7 +5,7 @@ import { appPeople, appTrips, appUsers } from "./app-schema";
 /*
  * Wallet and account tables (M1): encrypted files, documents and their time-boxed grants, household details,
  * account settings and consents, email codes, saved cards, data exports and support threads.
- * The SQL lives in drizzle/pending/wallet.sql until the lead folds it into one generated migration.
+ * Migration: drizzle/0017_app_features.sql.
  *
  * Files are never stored in the clear and never get a public URL: each file has its own random key, sealed with
  * APP_DATA_KEY (src/lib/app/crypto.ts) and bound to the file's row.

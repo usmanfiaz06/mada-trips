@@ -7,7 +7,7 @@ import { appPayments, appRequests, appTrips, appUsers } from "./app-schema";
  * payment-provider webhooks. Requests, quotes, payments, messages and trips themselves live in the M0 tables
  * (app_requests, app_quotes, app_payments, app_messages, app_trips, app_segments, app_stays, app_pickups).
  *
- * The matching SQL is in drizzle/pending/booking.sql until the lead folds it into one generated migration.
+ * Migration: drizzle/0017_app_features.sql.
  */
 
 const money = (name: string) => bigint(name, { mode: "number" });

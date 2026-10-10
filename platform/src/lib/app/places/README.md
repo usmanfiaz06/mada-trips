@@ -18,7 +18,7 @@ traveller's chat opens with their message already in it.
 | `scripts/places/ingest.ts` | `npx tsx scripts/places/ingest.ts --download` (also `--dry-run`, `--dir`, `--no-alt-names`) |
 | `scripts/places/export-bundles.ts` | Offline city lists for the prototype (`docs/app/prototype-app/src/data/cities.json`) and the app's mock mode |
 
-Tables (`src/db/app-schema-places.ts`, `drizzle/pending/places.sql`): `app_place_countries`, `app_places`,
+Tables (`src/db/app-schema-places.ts`, `drizzle/0017_app_features.sql`): `app_place_countries`, `app_places`,
 `app_place_names` (one row per searchable name, trigram-indexed), `app_place_airports`, `app_place_guides` (cache),
 `app_place_plans` (which cities people ask us to plan). The SQL enables `pg_trgm` and `unaccent` and defines
 `app_places_norm()`, an IMMUTABLE wrapper over `unaccent` for indexes. Supabase has both extensions; if they live in

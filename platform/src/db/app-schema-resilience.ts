@@ -3,7 +3,7 @@ import { pgTable, text, integer, timestamp, jsonb, index, primaryKey } from "dri
 /*
  * Resilience (FLOWS.md §12): the idempotency store, supplier health as the circuit breakers last saw it, and the
  * runtime switches behind GET /config (versions, maintenance, features).
- * The matching SQL is in drizzle/pending/resilience.sql until the lead folds it into one generated migration.
+ * Migration: drizzle/0017_app_features.sql.
  */
 
 /**

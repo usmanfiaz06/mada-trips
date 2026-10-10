@@ -120,6 +120,13 @@
       "when": 1791622391153,
       "tag": "0016_app_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791646356815,
+      "tag": "0017_app_features",
+      "breakpoints": true
     }
   ]
 }
