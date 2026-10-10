@@ -2,7 +2,7 @@
  * Resilience on the phone (FLOWS.md §12): the connection, the server's clock, the offline copy, the outbox, the
  * remote switches, and the hooks screens use. Components for each state are in components/states.
  */
-export { useNet, isOffline, simulateOffline, startNet } from './state';
+export { useNet, isOffline, simulateOffline, startNet, useDeviceOffline } from './state';
 export { serverNow, useServerNow, clockOffset } from './clock';
 export { freshnessLabel, useFreshness, isStale } from './freshness';
 export { backoffDelay, newIdempotencyKey, sleep } from './retry';

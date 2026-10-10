@@ -53,7 +53,7 @@ export function TodayHeader({ clock, unread }: { clock: TripDetail['clock'] | nu
             {unread > 0 ? <View style={styles.bellDot} /> : null}
           </Pressable>
         ) : null}
-        <Pressable accessibilityRole="button" accessibilityLabel={t('today.a11y.profile')} onPress={() => { buzz('tap'); router.push((guest ? '/welcome' : '/profile') as Href); }}>
+        <Pressable testID="today-avatar" accessibilityRole="button" accessibilityLabel={t('today.a11y.profile')} onPress={() => { buzz('tap'); router.push((guest ? '/welcome' : '/profile') as Href); }}>
           {user?.name ? <Avatar initial={user.name} tone="green" size={44} /> : <View style={[styles.bell, { backgroundColor: colors.mist }]}><Icon name="user" size={18} /></View>}
         </Pressable>
       </Row>

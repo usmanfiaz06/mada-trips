@@ -6,7 +6,6 @@ import {
   type ClientOnlyErrorCode, type CreatePersonRequest, type DeviceInfo, type ErrorCode, type ErrorKind, type UpdateMeRequest,
 } from '@mada/shared';
 import { API_MODE, API_ORIGIN } from './config';
-import { mockTransport } from './mock-api';
 import { useSession } from './session';
 import { t } from './i18n';
 import { noteServerTime } from './net/clock';
@@ -116,6 +115,13 @@ async function httpTransport(w: Wire): Promise<WireResponse> {
   }
   return { status: res.status, json, headers };
 }
+
+/*
+ * The mock loads on first use, in mock mode only: a production build never runs it, and on the web its code and data
+ * (the bundled city list alone is about 240 KB) sit in their own chunk that live mode never fetches.
+ */
+let mockModule: Promise<typeof import('./mock-api')> | null = null;
+const mockTransport = (w: Wire) => (mockModule ??= import('./mock-api')).then((m) => m.mockTransport(w));
 
 /** The in-app mock, with the same timeouts and the same offline rule, so mock mode behaves like the real thing. */
 async function mockWire(w: Wire): Promise<WireResponse> {

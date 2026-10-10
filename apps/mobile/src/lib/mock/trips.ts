@@ -1,11 +1,11 @@
 import {
   ChangeFlightRequest, CompanyInvoiceRequest, CreateRefundRequest, CreateTripAskRequest, DisruptionChoiceRequest, ERROR_CODES, ImportTrackedRequest, MoveRequest,
-  PatchTripRequest, SELLER, FLIGHT_POSITION_ATTRIBUTION, TrackFlightRequest, TripPhase, AIRLINE_INFO, SWITCH_OFFERS,
+  PatchTripRequest, SELLER, FLIGHT_POSITION_ATTRIBUTION, TrackFlightRequest, TripPhase, AIRLINE_INFO, SWITCH_OFFERS, CARRIERS, CATALOGUE_HOTELS, seatsFor,
   addDays, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, derivePhase, deskStatus,
   disruptionOptions, fareRulesFor, formatSar, homePickup, instalments, invoiceHtml, invoiceLinesFor, invoiceNumber, liveStay, moveNeeded, nameDistance, nightPrice,
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
-  type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
+  type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -121,6 +121,108 @@ function seed(user: MockUser, s: State, outDay = '2027-03-09', backDay = '2027-0
   addCharge(s, trip, { item: 'stay', title: 'Rooms near Galata Tower', sub: '6 nights · from 9 Mar', amount: SAR(5880_00), method: 'tabby', label: 'Visa ending 41', paidAt, plan, creditUsed: SAR(0) });
   addCharge(s, trip, { item: 'pickup', title: 'Airport pickup both ways', sub: 'Khalid in Riyadh · Ahmet in Istanbul', amount: SAR(440_00), method: 'card', label: 'Visa ending 41', paidAt, plan: null, creditUsed: SAR(0) });
   s.trips.push({ ...trip, id: uuid(), city: 'Baku', country: 'Azerbaijan', imageUrl: 'baku-old-city', startDate: '2026-03-30', endDate: '2026-04-04', status: 'completed', segments: [], stays: [], pickups: [], bookingRef: 'B4KU26', weather: null });
+}
+
+/* ───────── trips that booking confirms (mock/booking.ts, like the server's desk writeTrip) ───────── */
+
+const AIRPORT_TZ: Record<string, string> = {
+  RUH: 'Asia/Riyadh', JED: 'Asia/Riyadh', DMM: 'Asia/Riyadh', MED: 'Asia/Riyadh', AHB: 'Asia/Riyadh', ULH: 'Asia/Riyadh',
+  DXB: 'Asia/Dubai', AUH: 'Asia/Dubai', DOH: 'Asia/Qatar', IST: 'Europe/Istanbul', SAW: 'Europe/Istanbul',
+  CAI: 'Africa/Cairo', LHR: 'Europe/London', FRA: 'Europe/Berlin', GYD: 'Asia/Baku', TBS: 'Asia/Tbilisi',
+};
+
+export type BookedTrip = {
+  owner: MockUser;
+  ref: string;
+  agentName: string;
+  city: string;
+  country: string | null;
+  photo: string | null;
+  travellers: Person[];
+  flight: FlightOption | null;
+  stay: StayOption | null;
+  bundle: boolean;
+  lines: OrderLine[];
+  /** Halalas: the fare rise the traveller accepted, the promo discount, and the credit used. */
+  extra: number;
+  discount: number;
+  creditUsed: number;
+  paymentLabel: string;
+  plan: 'full' | 'tabby' | 'tamara';
+  bookedAt: string;
+};
+
+/** A confirmed booking becomes a trip in Trips and Today, with its charges and invoices. Returns the trip id. */
+export function recordBookedTrip(b: BookedTrip): string {
+  const s = stateOf(b.owner);
+  const f = b.flight;
+  const n = Math.max(1, b.travellers.length);
+  const amountOf = (keys: string[]) => b.lines.filter((l) => keys.includes(l.key)).reduce((a, l) => a + l.amount, 0) + (keys.includes('flight') ? b.extra : 0);
+  const travellers: TripTraveller[] = b.travellers.map((p) => ({
+    id: p.id, firstName: p.firstName, fullName: `${p.givenNames || p.firstName} ${p.surname}`.trim(), initial: p.firstName.charAt(0).toUpperCase(),
+    relation: p.relation, isSelf: p.isSelf, birthYear: p.dateOfBirth ? Number(p.dateOfBirth.slice(0, 4)) : null, passportExpiry: p.passport?.expiry ?? null,
+  }));
+  const segments: TripDetail['segments'] = [];
+  if (f) {
+    const legs = [{ leg: f.out, dir: 'out' as const, back: false }, ...(f.back ? [{ leg: f.back, dir: 'back' as const, back: true }] : [])];
+    for (const { leg, dir, back } of legs) {
+      const arriveDay = leg.arr < leg.dep ? addDays(leg.date, 1) : leg.date;
+      segments.push({
+        id: uuid(), carrier: f.carrier, carrierName: f.airline, flightNumber: leg.flightNumber, from: leg.from, to: leg.to,
+        departLocal: `${leg.date}T${leg.dep}`, departTz: AIRPORT_TZ[leg.from] ?? 'Asia/Riyadh', arriveLocal: `${arriveDay}T${leg.arr}`, arriveTz: AIRPORT_TZ[leg.to] ?? 'Asia/Riyadh',
+        durationMin: leg.durationMin, cabin: f.cabin, terminal: back ? null : CARRIERS[f.carrier]?.terminal ?? null, gate: null, seats: seatsFor(n, f.cabin, back), baggage: f.bags,
+        status: 'scheduled', statusSource: 'Schedule', pnr: b.ref, direction: dir, bookedGate: null, delayMin: null, predictedDelay: false, statusAt: null, brand: f.brand,
+      });
+    }
+  }
+  const stays: TripDetail['stays'] = [];
+  if (b.stay || (b.bundle && f?.back && b.lines.some((l) => l.key === 'stay'))) {
+    const galata = CATALOGUE_HOTELS.istanbul![0]!;
+    const checkIn = b.stay?.checkIn ?? f!.out.date;
+    const nights = b.stay?.nights ?? Math.max(1, Math.round((Date.parse(`${f!.back!.date}T00:00:00Z`) - Date.parse(`${f!.out.date}T00:00:00Z`)) / 86_400_000));
+    stays.push({
+      id: uuid(), name: b.stay?.name ?? galata.name, area: b.stay?.area ?? galata.area, address: b.stay?.address ?? galata.address, checkIn, nights, rooms: b.stay?.rooms ?? (n > 2 ? 2 : 1),
+      price: SAR(amountOf(['stay'])), cancellation: b.stay?.cancellation ?? t('pay.rule.stay', { date: addDays(checkIn, -7) }), status: 'booked', confirmation: b.ref, phone: '+90 212 000 0000',
+      addressShort: b.stay ? null : 'Galata Kulesi Sk. 12, Beyoğlu', walk: b.stay ? null : '3 min walk to Galata Tower', fromAirport: '45 min', roomType: n > 2 ? 'Connecting rooms' : 'A quiet room', plan: b.plan,
+    });
+  }
+  const pickups: TripDetail['pickups'] = [];
+  if (f && b.lines.some((l) => l.key === 'pickup')) {
+    const price = amountOf(['pickup']);
+    const home = f.back ? Math.round(price / 2) : price;
+    const toAt = new Date(zonedToInstant(`${f.out.date}T${f.out.dep}`, AIRPORT_TZ[f.out.from] ?? 'Asia/Riyadh').getTime() - 155 * 60_000).toISOString();
+    pickups.push({ id: uuid(), direction: 'to_airport', at: toAt, driverName: 'Khalid', car: n > 3 ? 'Black GMC Yukon' : 'Grey Lexus ES', plate: null, meetingPoint: null, phone: '+966 55 014 2287', price: SAR(home), status: 'booked', room: n > 3 ? 'room for 8 bags' : 'room for 4 bags', waits: '10 min', offsetMin: -155, city: 'Riyadh' });
+    if (f.back) {
+      const landAt = zonedToInstant(`${f.out.arr < f.out.dep ? addDays(f.out.date, 1) : f.out.date}T${f.out.arr}`, AIRPORT_TZ[f.out.to] ?? 'Europe/Istanbul').toISOString();
+      pickups.push({ id: uuid(), direction: 'from_airport', at: landAt, driverName: 'Ahmet', car: 'Grey Mercedes Vito', plate: '34 MDA 21', meetingPoint: 'Door 3', phone: '+90 532 418 6610', price: SAR(price - home), status: 'booked', room: null, waits: '60 min', offsetMin: null, city: b.city });
+    }
+  }
+  const startDate = f ? f.out.date : b.stay!.checkIn;
+  const endDate = f ? f.back?.date ?? null : addDays(b.stay!.checkIn, b.stay!.nights);
+  const flights = amountOf(['flight', 'infants']);
+  const stayAmt = amountOf(['stay']);
+  const pickupAmt = amountOf(['pickup']);
+  const trip: Omit<TripDetail, 'clock'> = {
+    id: uuid(), city: b.city, country: b.country, imageUrl: b.photo, startDate, endDate, travellerIds: travellers.map((p) => p.id), segments, stays, pickups,
+    status: 'booked', bookingRef: b.ref, confirmedBy: { id: b.agentName.toLowerCase(), name: b.agentName, photoUrl: null }, imported: false, createdAt: b.bookedAt,
+    travellers, fare: f ? fareRulesFor(f.carrier) : null,
+    prices: { flights: SAR(flights), stays: SAR(stayAmt), pickups: SAR(pickupAmt), discount: SAR(b.discount), total: SAR(flights + stayAmt + pickupAmt - b.discount) },
+    noStay: null, rebooked: false, vouchers: [], bagReport: null, picks: [], rating: null, company: null, weather: null, disruption: null, openRequests: 0,
+    agent: { name: b.agentName, initial: b.agentName.charAt(0), online: true, covering: null }, bookedAt: b.bookedAt,
+  };
+  s.trips.unshift(trip);
+  const paidAt = nowIso();
+  const method = b.plan !== 'full' ? b.plan : /apple pay/i.test(b.paymentLabel) ? 'applepay' : flights + stayAmt + pickupAmt - b.discount - b.creditUsed <= 0 ? 'credit' : 'card';
+  for (const [item, keys] of [['flight', ['flight', 'infants']], ['stay', ['stay']], ['pickup', ['pickup']]] as const) {
+    const amount = amountOf([...keys]);
+    if (!amount) continue;
+    const plan = b.plan === 'full' ? null : instalments(amount, b.plan === 'tabby' ? 4 : 3).map((a, i) => ({ seq: i + 1, dueOn: addDays(paidAt.slice(0, 10), i * 30), amount: SAR(a), paid: i < 1 }));
+    const title = b.lines.find((l) => (keys as readonly string[]).includes(l.key))?.text ?? item;
+    const sub = item === 'flight' ? segments.map((x) => x.flightNumber).join(' and ') : item === 'stay' ? stays.map((x) => `${x.nights} ${x.nights === 1 ? 'night' : 'nights'}`).join('') : pickups.map((x) => x.driverName).join(' and ');
+    addCharge(s, trip, { item, title, sub, amount: SAR(amount), method, label: b.paymentLabel, paidAt, plan, creditUsed: SAR(item === 'flight' ? b.creditUsed : 0), discount: item === 'flight' ? b.discount : 0 });
+  }
+  notify(s, { kind: 'booking_confirmed', level: 'active', copy: 'notify.confirmed', vars: { city: b.city, agent: b.agentName, ref: b.ref }, href: `/trips/${trip.id}` });
+  return trip.id;
 }
 
 /* ───────── the clock ───────── */

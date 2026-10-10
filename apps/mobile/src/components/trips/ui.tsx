@@ -12,6 +12,7 @@ import { VGradient } from '@/components/Gradient';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useAgent as useAgentName } from '@/lib/trips';
+import { useDeviceOffline } from '@/lib/net/state';
 import { rise } from '@/lib/motion';
 import { colors, ff, font, radii, shadow } from '@/theme';
 
@@ -279,10 +280,12 @@ export function Steps({ items, light }: { items: { text: string; state: 'done' |
 
 /** The agent's face, with a green dot when online (.td-face). */
 export function AgentFace({ initial, size = 36, online = true, ring = colors.sand }: { initial: string; size?: number; online?: boolean; ring?: string }) {
+  // Nobody shows as online while this phone itself has no connection.
+  const offline = useDeviceOffline();
   return (
     <View style={{ width: size, height: size, borderRadius: 99, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' }} accessibilityElementsHidden>
       <T style={{ color: colors.gold, fontFamily: ff.ui600, fontSize: size * 0.39, lineHeight: size * 0.5 }}>{initial}</T>
-      {online ? <View style={{ position: 'absolute', end: -1, bottom: -1, width: 10, height: 10, borderRadius: 99, backgroundColor: colors.live, borderWidth: 2, borderColor: ring }} /> : null}
+      {online && !offline ? <View style={{ position: 'absolute', end: -1, bottom: -1, width: 10, height: 10, borderRadius: 99, backgroundColor: colors.live, borderWidth: 2, borderColor: ring }} /> : null}
     </View>
   );
 }

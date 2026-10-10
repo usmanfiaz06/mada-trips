@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApiQuery } from '@/lib/net/hooks';
+import { useDeviceOffline } from '@/lib/net/state';
 import { z } from 'zod';
 import {
   API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse,
@@ -156,7 +158,16 @@ export const useCredit = () => useApiQuery({ queryKey: walletKeys.credit, enable
 export const useUnread = () => useApiQuery({ queryKey: walletKeys.unread, enabled: useOn(), refetchInterval: 60_000, queryFn: async () => (await walletApi.unread()).unread });
 export const useInbox = () => useApiQuery({ queryKey: walletKeys.notifications, enabled: useOn(), refetchOnMount: 'always', queryFn: () => walletApi.notifications() });
 export const useTrips = () => useApiQuery({ queryKey: walletKeys.trips, enabled: useOn(), staleTime: 60_000, queryFn: () => walletApi.trips() });
-export const usePresence = (threadId?: string) => useApiQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
+/**
+ * Who is on the desk. While this phone is offline the last answer can't be trusted to be live, so the agent shows as
+ * away (no green dot, no typing) with a line that says messages wait until the connection is back.
+ */
+export function usePresence(threadId?: string) {
+  const q = useApiQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
+  const offline = useDeviceOffline();
+  const data = useMemo(() => (offline && q.data ? { ...q.data, online: false, typing: false, line: t('presence.offline', { agent: q.data.agent?.name ?? t('common.agentName') }) } : q.data), [offline, q.data]);
+  return offline ? { ...q, data } : q;
+}
 
 /** Patch the account and keep the cache in step. */
 export function useUpdateAccount() {

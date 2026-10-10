@@ -1,6 +1,6 @@
 import {
   AskParseRequest, CARRIERS, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
-  ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
+  ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
   money, parseAskRules, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
@@ -10,6 +10,7 @@ import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { walletMock } from './wallet';
 import { circlesMock } from './circles';
+import { recordBookedTrip } from './trips';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for booking (M2): the Core API's booking endpoints in memory, running the same shared rules
@@ -19,7 +20,7 @@ import { circlesMock } from './circles';
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[] };
+type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -178,11 +179,20 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
 /* ───────────── the scripted desk ───────────── */
 
 const tickMs = (o: Order) => (o.demo.has('slowAgent') ? 4200 : 1200);
-const viewOf = ({ owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, created, travellers: _tr, ...v }: Order): OrderView =>
+const viewOf = ({ owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
   ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000 });
 
 function confirm(o: Order) {
   o.status = 'confirmed'; o.step = 3; o.ref = o.ref ?? newRef(); o.confirmedBy = o.agent; o.confirmedAt = nowIso(); o.nextAt = null;
+  // Like the server's desk: a confirmed flight or stay becomes a trip, so it shows in Trips and on Today.
+  if ((o.kind === 'trip' || o.kind === 'stay') && !o.tripId && (o.snap.flight || o.snap.stay)) {
+    const dest = o.snap.destination ? DESTINATIONS[o.snap.destination] : null;
+    o.tripId = recordBookedTrip({
+      owner: o.user, ref: o.ref, agentName: o.agent?.name ?? agentName(), city: dest?.name ?? o.place, country: dest ? ENTRY_RULES[dest.country]?.name ?? null : null, photo: dest?.photo ?? o.photo,
+      travellers: o.travellers, flight: o.snap.flight, stay: o.snap.stay, bundle: o.bundle, lines: o.lines, extra: o.extra.amount, discount: o.snap.discount, creditUsed: o.creditUsed.amount,
+      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(),
+    });
+  }
   if (o.kind === 'quote' && o.requestId) { const r = requests.get(o.requestId); if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); } }
   if (o.kind === 'package') {
     const id = uuid();
@@ -468,6 +478,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
       owner: user.id, nextAt: requires3ds ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
+      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0 },
     };
     if (demo.has('slowAgent')) o.nextAt = Date.now() + 4200;
     orders.set(o.id, o);

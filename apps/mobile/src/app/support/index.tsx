@@ -16,7 +16,7 @@ import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { useApiQuery } from '@/lib/net/hooks';
-import { useNet } from '@/lib/net/state';
+import { useDeviceOffline, useNet } from '@/lib/net/state';
 import { discardItem, retryItem, useOutbox } from '@/lib/net/outbox';
 import { chooseFile } from '@/lib/pick';
 import { useSession } from '@/lib/session';
@@ -44,6 +44,7 @@ export default function Support() {
   const key = threadParam ?? (tripId ? `trip:${tripId}` : 'account');
   const q = useApiQuery({ queryKey: walletKeys.thread(key), refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
   const th = q.data?.thread;
+  const phoneOffline = useDeviceOffline();
   const presence = usePresence(th?.id && q.data?.messages.some((m) => m.author.kind === 'user') ? th.id : undefined);
   const typing = useChat((s) => (th ? !!s.typing[th.id] : false));
   const offline = useNet((s) => s.online === false) || demo('offline');
@@ -97,7 +98,9 @@ export default function Support() {
   const queued = pending.filter((i) => i.state !== 'failed');
   const smsBody = encodeURIComponent(queued.map((i) => i.meta?.text).filter(Boolean).join('\n') || t('support.offline.smsBody'));
   const who = presence.data?.agent;
-  const line = typing ? t('presence.typing', { agent: who?.name ?? 'Faisal' }) : presence.data?.line ?? `${t('presence.online', { agent: 'Faisal' })} · ${t('presence.replies', { minutes: 2 })}`;
+  const away = phoneOffline || presence.data?.online === false;
+  const line = typing && !away ? t('presence.typing', { agent: who?.name ?? 'Faisal' })
+    : presence.data?.line ?? (phoneOffline ? t('presence.offline', { agent: 'Faisal' }) : `${t('presence.online', { agent: 'Faisal' })} · ${t('presence.replies', { minutes: 2 })}`);
   const what = th?.tripId && trip ? t('support.aboutTrip', { city: trip.city }) : t('support.account');
   const name = user?.name;
 
@@ -112,7 +115,7 @@ export default function Support() {
       <View style={styles.head}>
         <View>
           <View style={[styles.avatar, { backgroundColor: colors.green }]}><T style={{ fontFamily: ff.ui600, fontSize: 20, color: colors.sand }}>{who?.initial ?? 'F'}</T></View>
-          <View style={styles.dot} />
+          {away ? <View style={[styles.dot, styles.dotAway]} testID="support-presence-away" /> : <View style={styles.dot} />}
         </View>
         <View style={{ flex: 1, gap: 1 }}>
           <T v="h2" style={{ fontSize: 22 }} accessibilityRole="header">{t('presence.title')}</T>
@@ -273,6 +276,7 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 24, paddingBottom: 8 },
   avatar: { width: 52, height: 52, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   dot: { position: 'absolute', end: -2, bottom: -2, width: 13, height: 13, borderRadius: 99, backgroundColor: colors.live, borderWidth: 2, borderColor: colors.sand },
+  dotAway: { backgroundColor: colors.ink3 },
   about: { marginHorizontal: 24, marginBottom: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f3ead8', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
   topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   topic: { width: '48.5%', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.paper, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 12 },

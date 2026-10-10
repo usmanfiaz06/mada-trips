@@ -58,7 +58,7 @@ export default function Waiting() {
   const knocked = useRef(false);
   const confirmedBuzz = useRef(false);
   useEffect(() => { if (!knocked.current) { knocked.current = true; buzz('knock'); } }, []);
-  useEffect(() => { if (o?.status === 'confirmed' && !confirmedBuzz.current) { confirmedBuzz.current = true; buzz('success'); stopWatching(o.id); usePayDraft.getState().clear(); } }, [o?.status, o?.id]);
+  useEffect(() => { if (o?.status === 'confirmed' && !confirmedBuzz.current) { confirmedBuzz.current = true; buzz('success'); stopWatching(o.id); usePayDraft.getState().clear(); void qc.invalidateQueries({ queryKey: ['trips'] }); } }, [o?.status, o?.id, qc]);
   useEffect(() => { if (o?.status === 'fare_changed' || o?.status === 'ticketing_failed' || o?.status === 'needs_answer') buzz('warn'); }, [o?.status]);
   useEffect(() => { if (o?.status === 'cancelled') { toast(t('wait.cancelled')); router.replace('/today'); } }, [o?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 

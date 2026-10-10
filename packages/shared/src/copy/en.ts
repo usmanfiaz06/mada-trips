@@ -51,6 +51,7 @@ export const en = {
   'presence.replies': 'Usually replies in {minutes} min',
   'presence.covering': '{agent} is covering for {usual} tonight. {pronoun} has your whole trip.',
   'presence.away': 'Replies within 10 minutes, any hour',
+  'presence.offline': 'You’re offline. {agent} sees your messages when you’re back',
   'actor.confirmed': 'Confirmed by {agent} at Mada',
   'actor.replied': '{agent} replied',
   'actor.intro': '{agent}, your Mada agent',

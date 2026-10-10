@@ -56,6 +56,8 @@ function recompute() {
  * at once instead of waiting for a timeout. Offline-by-strikes still lets requests try, so one can bring us back.
  */
 export const isOffline = () => useNet.getState().simulated || os.connected === false;
+/** The same, as a hook: presence shows the agent as away while this phone has no connection. */
+export const useDeviceOffline = () => useNet((s) => s.deviceOffline);
 
 /* While our requests can't get through but the OS says online, ask the server every few seconds until it answers. */
 let probe: (() => Promise<boolean>) | null = null;

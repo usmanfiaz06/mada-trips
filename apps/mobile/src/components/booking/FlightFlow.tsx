@@ -16,11 +16,12 @@ import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
 import { Icon } from '../Icon';
 import { Pill } from '../Pill';
+import { SupplierDown } from '../states/SupplierDown';
 import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
-import { ArtCalendar, Ask1, Leg, Notice, Working, useSequence, enter } from './parts';
+import { ArtCalendar, Ask1, Leg, Working, useSequence, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
@@ -186,11 +187,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     const airline = s.unavailable[0]?.airline ?? '';
     return (
       <Animated.View entering={enter(0)} style={{ gap: 12 }}>
-        <Notice icon="flight" warn title={t('search.down.title', { airline })}><T v="small">{t('search.down.body', { airline })}</T></Notice>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <SupplierDown supplier={airline} body={t('search.down.body', { airline })} testID="search-supplier-down" actions={<>
           <Button size="small" block={false} label={t('search.down.others')} onPress={() => setMode('others')} />
           <Button size="small" block={false} variant="secondary" label={t('search.down.byHand')} onPress={() => setMode('byhand')} />
-        </View>
+        </>} />
       </Animated.View>
     );
   }

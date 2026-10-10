@@ -144,11 +144,22 @@ async function run({ page, phone, returning }) {
   await see('Add your passport', 'passport nudge');
   await shot('today');
 
+  step('profile from the avatar');
+  await byTest('today-avatar').click();
+  await page.waitForURL(/\/profile/, { timeout: 8000 });
+  await see('Omar', 'profile name');
+  await shot('profile');
+  await page.goBack();
+  await see('Nowhere planned yet.', 'today again');
+
   step('tabs');
   await byTest('dock-trips').click();
   await see('Your name’s not on the board yet.', 'trips');
   await shot('trips');
   await byTest('dock-circles').click();
+  await see('On this week in', 'circles opens on Discover');
+  await shot('circles-discover');
+  await page.getByText('Circles', { exact: true }).filter({ visible: true }).first().click();
   await see('Your people, in one place.', 'circles');
   await shot('circles');
   await byTest('dock-wallet').click();
