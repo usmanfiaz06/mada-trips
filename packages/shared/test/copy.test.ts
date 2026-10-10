@@ -26,3 +26,29 @@ describe('the string catalogue', () => {
     for (const [code, v] of Object.entries(ERROR_CODES)) expect(en[v.copy], code).toBeTruthy();
   });
 });
+
+describe('the catalogue sections', () => {
+  it('never define the same key twice (a later section would silently replace an earlier one)', async () => {
+    const sections: Record<string, Record<string, string>> = {
+      wallet: (await import('../src/copy/wallet')).walletCopy,
+      circles: (await import('../src/copy/en-circles')).enCircles,
+      booking: (await import('../src/copy/booking')).bookingCopy,
+      desk: (await import('../src/copy/desk')).deskCopy,
+      tripsToday: (await import('../src/copy/en-trips-today')).enTripsToday,
+      tripsUi: (await import('../src/copy/en-trips-ui')).enTripsUi,
+      tripsUi2: (await import('../src/copy/en-trips-ui2')).enTripsUi2,
+      resilience: (await import('../src/copy/resilience')).resilienceCopy,
+      places: (await import('../src/copy/places')).placesCopy,
+    };
+    const seen = new Map<string, string>();
+    const clashes: string[] = [];
+    for (const [name, copy] of Object.entries(sections)) {
+      for (const k of Object.keys(copy)) {
+        const prev = seen.get(k);
+        if (prev) clashes.push(`${k} (${prev}, ${name})`);
+        seen.set(k, name);
+      }
+    }
+    expect(clashes).toEqual([]);
+  });
+});

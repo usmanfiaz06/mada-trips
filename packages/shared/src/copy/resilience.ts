@@ -91,11 +91,11 @@ export const resilienceCopy = {
   'maintenance.retry': 'Check again',
 
   // ───────────── money and orders ─────────────
-  'pay.offline.title': 'You’re offline, so we stopped before paying.',
+  'net.pay.offlineTitle': 'You’re offline, so we stopped before paying.',
   'pay.dropped.title': 'The connection dropped while paying.',
-  'pay.held': 'Nothing was charged. Your price is held for {minutes} more minutes.',
+  'net.pay.held': 'Nothing was charged. Your price is held for {minutes} more minutes.',
   'pay.already': 'Already paying. You can only be charged once.',
-  'pay.offline.body': 'Nothing was charged. We’ll pick up right where you left off.',
+  'net.pay.offlineBody': 'Nothing was charged. We’ll pick up right where you left off.',
   'pay.offline.resume': 'Resume',
   'pay.unknown.title': 'We’re checking with your bank.',
   'pay.unknown.body': 'You won’t be charged twice. We’ll show the answer here.',
