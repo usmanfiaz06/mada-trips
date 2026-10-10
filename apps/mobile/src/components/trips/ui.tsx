@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
@@ -336,7 +336,19 @@ export function TripScreen({ title, children, act, right, onBack, scrollRef }: {
   );
 }
 
-export const Rise = ({ step = 0, children, style }: { step?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) => <Animated.View entering={rise(step)} style={style}>{children}</Animated.View>;
+/*
+ * On the web, reanimated's entering animations stall on views that mount inside a hidden tab (they stay "running" and out
+ * of the flow), so the web build rises with a plain CSS animation instead: same 12 points, 500 ms, 60 ms stagger.
+ */
+const webRise = (step: number) => ({
+  animationKeyframes: [{ from: { opacity: 0, transform: 'translateY(12px)' }, to: { opacity: 1, transform: 'translateY(0px)' } }],
+  animationDuration: '500ms', animationDelay: `${step * 60}ms`, animationTimingFunction: 'cubic-bezier(0.2, 0.8, 0.2, 1)', animationFillMode: 'both',
+}) as unknown as ViewStyle;
+/** The entering animation for an Animated.View: reanimated on phones, nothing on the web (use riseStyle there). */
+export const riseOn = (step = 0) => (Platform.OS === 'web' ? undefined : rise(step));
+/** The web's CSS rise, or nothing on phones. */
+export const riseStyle = (step = 0): ViewStyle | null => (Platform.OS === 'web' ? webRise(step) : null);
+export const Rise = ({ step = 0, children, style }: { step?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) => <Animated.View entering={riseOn(step)} style={[riseStyle(step), style]}>{children}</Animated.View>;
 
 /** Re-renders every `ms`, for countdowns and live labels. */
 export function useTicker(ms = 1000) {

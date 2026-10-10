@@ -8,6 +8,7 @@ import { Card } from '@/components/Card';
 import { Icon } from '@/components/Icon';
 import { Screen, TopBar } from '@/components/Layout';
 import { Sheet } from '@/components/Sheet';
+import { ErrorState } from '@/components/states';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
 import { circlesApi, ck, useAct, useAround, useProfile, whenLabel } from '@/lib/circles';
@@ -33,7 +34,7 @@ export default function Friend() {
   const report = useAct((reason: string) => circlesApi.report({ targetKind: 'user', targetId: id, reason: reason as 'other', block: true }), touched);
   const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : t('error.internal'));
 
-  if (q.isError || (q.isSuccess && !q.data)) {
+  if (q.isError && (q.error as ApiError)?.status === 404) {
     return (
       <Screen>
         <TopBar onBack={() => router.back()} />
@@ -41,6 +42,7 @@ export default function Friend() {
       </Screen>
     );
   }
+  if (!q.data && (q.view === 'error' || q.view === 'offline')) return <Screen><TopBar onBack={() => router.back()} /><ErrorState problem={q.problem} onRetry={q.retry} /></Screen>;
   const p = q.data;
   if (!p) return <Screen><TopBar onBack={() => router.back()} /></Screen>;
   const f = p.person;

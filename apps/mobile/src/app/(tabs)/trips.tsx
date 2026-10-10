@@ -15,10 +15,9 @@ import { T } from '@/components/Text';
 import { TrackedFlights } from '@/components/today/Nothing';
 import { RefundTracker } from '@/components/trips/RefundTracker';
 import { RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
-import { AgentIntro, Box, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
+import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
 import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
@@ -70,7 +69,7 @@ export default function Trips() {
 function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Parameters<typeof TrackedFlights>[0]['flights']; ask: (p?: string) => void }) {
   const router = useRouter();
   if (!trips.length) return (<>
-    <Animated.View entering={rise(0)} style={[styles.hero, shadow('card')]}>
+    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero, shadow('card')]}>
       <DepartureBoard onPick={(city) => ask(`Flights to ${city.charAt(0) + city.slice(1).toLowerCase()}`)} />
       <T style={[font('display'), { fontSize: 32, lineHeight: 33 }]}>{t('trips.empty.title')}</T>
       <T v="small">{t('trips.empty.body')}</T>
@@ -94,7 +93,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
   </>);
   return (<>
     {trips.map((c, i) => (
-      <Animated.View key={c.id} entering={rise(i)} style={[styles.card, shadow('card')]}>
+      <Animated.View key={c.id} entering={riseOn(i)} style={[riseStyle(i), styles.card, shadow('card')]}>
         <Pressable testID={`trip-card-${c.city}`} accessibilityRole="button" accessibilityLabel={t('tr.tripA11y', { city: c.city })} onPress={() => { buzz('tap'); router.push(`/trip/${c.id}` as Href); }}>
           <Photo k={c.imageUrl} style={{ height: 210, borderRadius: 0, borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card }}>
             <Shade id={`trip-${c.id}`} />
@@ -149,7 +148,7 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
       </Box>
     ))}
     {items.map((it, i) => it.type === 'refund' ? (
-      <Animated.View key={it.r.id} entering={rise(i)}>
+      <Animated.View key={it.r.id} entering={riseOn(i)} style={riseStyle(i)}>
         <Box testID="refund-card">
           <Spread><H3>{t('tr.refund', { amount: formatSar(it.r.amount.amount) })}</H3><Tag label={refundPill(it.r)} tone={it.r.stage === 'rejected' ? 'warn' : it.r.stage === 'sent' ? 'ok' : 'default'} /></Spread>
           <Small>{it.r.title}</Small>
@@ -157,7 +156,7 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
         </Box>
       </Animated.View>
     ) : (
-      <Animated.View key={it.r.id} entering={rise(i)}>
+      <Animated.View key={it.r.id} entering={riseOn(i)} style={riseStyle(i)}>
         <RequestCard r={it.r} />
       </Animated.View>
     ))}
@@ -195,7 +194,7 @@ function RequestCard({ r }: { r: TripRequestView }) {
 
 function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) {
   if (!trips.length) return (
-    <Animated.View entering={rise(0)} style={[styles.hero, shadow('card')]}>
+    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero, shadow('card')]}>
       <View style={styles.ppEmpty}>
         <T style={styles.ppTitle}>{t('trips.past.page')}</T>
         {([[18, 22, -12], [62, 16, 8], [28, 60, 6], [70, 58, -6]] as const).map(([x, y, r], k) => (

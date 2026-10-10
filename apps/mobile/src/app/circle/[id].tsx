@@ -15,7 +15,10 @@ import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
-import { COVERS, circlesApi, ck, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
+import { COVERS, circlesApi, ck, queueMessage, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
+import { useOutbox } from '@/lib/net/outbox';
+import { ErrorState, GoneState } from '@/components/states';
+import { OutboxStatus } from '@/components/states/OutboxList';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -66,7 +69,8 @@ export default function CircleChat() {
   }, [count, asking, d]);
 
   const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : t('error.internal'));
-  const send = useAct((b: Parameters<typeof circlesApi.send>[1]) => circlesApi.send(id, b), () => []);
+  const send = useAct((b: Parameters<typeof circlesApi.send>[1]) => circlesApi.send(id, b), () => [], (b) => queueMessage(id, 'body' in b ? b.body : t('circles.tools.share'), `/circles/${id}/messages`, b));
+  const queued = useOutbox('circle', (i) => i.meta?.circleId === id);
   const say = (text?: string) => {
     const v = (text ?? draft).trim();
     if (!v) return;
@@ -74,10 +78,10 @@ export default function CircleChat() {
     setDraft('');
     const mada = /@mada\b/i.test(v) || !!items.filter((m) => m.kind !== 'sys').at(-1)?.mada?.askWhere;
     if (mada) setAsking(true);
-    send.mutate({ body: v }, { onSuccess: (r) => merge(r.items), onError: (e) => { setDraft(v); fail(e); }, onSettled: () => setAsking(false) });
+    send.mutate({ body: v }, { onSuccess: (r) => { if (r) merge(r.items); }, onError: (e) => { setDraft(v); fail(e); }, onSettled: () => setAsking(false) });
   };
-  const vote = useAct((b: Parameters<typeof circlesApi.vote>[1]) => circlesApi.vote(id, b), () => []);
-  const cast = useAct((a: { mid: string; o: string }) => circlesApi.cast(id, a.mid, a.o), () => []);
+  const vote = useAct((b: Parameters<typeof circlesApi.vote>[1]) => circlesApi.vote(id, b), () => [], (b) => queueMessage(id, b.q, `/circles/${id}/votes`, b));
+  const cast = useAct((a: { mid: string; o: string }) => circlesApi.cast(id, a.mid, a.o), () => [], (a) => ({ ...queueMessage(id, a.o, `/circles/${id}/votes/${a.mid}`, { option: a.o }), dedupe: `vote:${a.mid}` }));
   const close = useAct((mid: string) => circlesApi.closeVote(id, mid), () => []);
   const pick = useAct((a: { mid: string; o: string }) => circlesApi.pick(id, a.mid, a.o), () => []);
   const split = useAct((b: Parameters<typeof circlesApi.split>[1]) => circlesApi.split(id, b), () => []);
@@ -85,18 +89,13 @@ export default function CircleChat() {
   const remind = useAct((mid: string) => circlesApi.remindSplit(id, mid), () => []);
   const dismiss = useAct((mid: string) => circlesApi.dismiss(id, mid), () => []);
   const pin = useAct((pid: string) => circlesApi.update(id, { pin: { kind: 'plan', id: pid } }), () => [ck.circle(id), ck.messages(id)]);
-  const on = { onSuccess: (r: { items: CircleMessage[] }) => merge(r.items), onError: fail };
+  const on = { onSuccess: (r: { items: CircleMessage[] } | undefined) => { if (r) merge(r.items); }, onError: fail };
 
   if (circle.isError && (circle.error as ApiError)?.status === 404) {
-    return (
-      <Screen>
-        <TopBar onBack={() => router.back()} backLabel={t('circles.back')} />
-        <View style={{ paddingHorizontal: 20, gap: 12 }}>
-          <T v="h1" accessibilityRole="header">{t('circles.chat.gone')}</T>
-          <T v="body">{t('circles.chat.goneBody')}</T>
-        </View>
-      </Screen>
-    );
+    return <Screen><TopBar onBack={() => router.back()} backLabel={t('circles.back')} /><GoneState variant="full" /></Screen>;
+  }
+  if (!circle.data && (circle.view === 'error' || circle.view === 'offline')) {
+    return <Screen><TopBar onBack={() => router.back()} backLabel={t('circles.back')} /><ErrorState problem={circle.problem} onRetry={circle.retry} /></Screen>;
   }
   if (!d) return <Screen><TopBar onBack={() => router.back()} backLabel={t('circles.back')} /></Screen>;
 
@@ -182,7 +181,7 @@ export default function CircleChat() {
             if (m.kind === 'split') return (
               <View key={m.id} onLayout={onLayout}><Bubble who={who} wide label={t('circles.chat.splitCost', { who: whoName(m) })}>
                 <SplitCard m={m} me={me} people={people} onPay={(sh) => payShare(m, sh)}
-                  onRemind={() => remind.mutate(m.id, { ...on, onSuccess: (r) => { merge(r.items); const names = m.split!.shares.filter((s) => !s.paid && !s.ids.includes(me)).map((s) => people.get(s.ids[0]!)?.short ?? ''); toast(t('circles.split.remindToast', { names: joinNames(names) })); } })}
+                  onRemind={() => remind.mutate(m.id, { ...on, onSuccess: (r) => { if (!r) return; merge(r.items); const names = m.split!.shares.filter((s) => !s.paid && !s.ids.includes(me)).map((s) => people.get(s.ids[0]!)?.short ?? ''); toast(t('circles.split.remindToast', { names: joinNames(names) })); } })}
                   onMark={(sh) => paid.mutate({ mid: m.id, key: sh.key }, on)} />
               </Bubble></View>
             );
@@ -231,6 +230,12 @@ export default function CircleChat() {
               </View>
             );
           })}
+          {queued.map((q) => (
+            <View key={q.id} style={{ gap: 4 }} testID="queued-message">
+              <Bubble who={{ kind: 'me' }}><BubbleText mine>{q.label}</BubbleText></Bubble>
+              <View style={{ alignSelf: 'flex-end' }}><OutboxStatus item={q} /></View>
+            </View>
+          ))}
           {asking ? <Typing text={t('circles.chat.madaTyping')} /> : null}
         </ScrollView>
         <View style={[st.composer, { bottom: 22 + bottom }]}>
@@ -243,9 +248,9 @@ export default function CircleChat() {
 
       <ToolsSheet visible={sheet === 'tools'} onClose={() => setSheet(null)} canSplit={others.length > 0} dest={dest}
         onPick={(tool) => { if (tool === 'ask') { setSheet(null); setDraft('@Mada '); setTimeout(() => input.current?.focus(), 80); } else setSheet(tool); }} />
-      <VoteSheet key={`v${opens}`} visible={sheet === 'vote'} onClose={() => setSheet(null)} dest={dest} busy={vote.isPending} onPost={(v) => vote.mutate(v, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
-      <SplitSheet key={`s${opens}`} visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
-      <ShareSheet visible={sheet === 'share'} onClose={() => setSheet(null)} onPick={(card, p) => send.mutate({ card, pin: p }, { onSuccess: (r) => { merge(r.items); setSheet(null); buzz('success'); }, onError: fail })} />
+      <VoteSheet key={`v${opens}`} visible={sheet === 'vote'} onClose={() => setSheet(null)} dest={dest} busy={vote.isPending} onPost={(v) => vote.mutate(v, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); }, onError: fail })} />
+      <SplitSheet key={`s${opens}`} visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); }, onError: fail })} />
+      <ShareSheet visible={sheet === 'share'} onClose={() => setSheet(null)} onPick={(card, p) => send.mutate({ card, pin: p }, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); buzz('success'); }, onError: fail })} />
       <CircleSettings key={`c${opens}`} visible={sheet === 'settings'} onClose={() => setSheet(null)} d={d} onGone={() => { setSheet(null); router.back(); }} />
     </Screen>
   );

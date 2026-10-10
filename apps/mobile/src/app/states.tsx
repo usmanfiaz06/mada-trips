@@ -54,6 +54,7 @@ function Live() {
           </View>
         )}
       </QueryState>
+      <Button variant="ghost" label={t('maintenance.retry')} onPress={() => q.retry()} testID="states-refresh" />
       {offset ? <T v="tiny" testID="states-clock">{`Server clock offset ${offset > 0 ? '+' : ''}${offset} min`}</T> : null}
     </Scroll>
   );

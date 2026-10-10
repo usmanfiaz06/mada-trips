@@ -133,7 +133,8 @@ export async function verifyEmailChange(userId: string, rawEmail: string, code: 
     const [u] = await db.update(appEmailCodes).set({ attempts: sql`${appEmailCodes.attempts} + 1` }).where(and(eq(appEmailCodes.id, row.id), lt(appEmailCodes.attempts, MAX_TRIES))).returning({ attempts: appEmailCodes.attempts });
     const left = MAX_TRIES - (u?.attempts ?? MAX_TRIES);
     if (left <= 0) throw new AppError("OTP_LOCKED", { triesLeft: 0 });
-    throw new AppError("OTP_WRONG", { triesLeft: left, message: tn("account.code.wrong", left) });
+    // A 400, not OTP_WRONG's 401: the traveller is signed in, and a 401 would read as "sign in again".
+    throw new AppError("VALIDATION", { triesLeft: left, message: tn("account.code.wrong", left), fields: { code: "wrong" } });
   }
   return db.transaction(async (tx) => {
     const [used] = await tx.update(appEmailCodes).set({ consumedAt: new Date() }).where(and(eq(appEmailCodes.id, row.id), isNull(appEmailCodes.consumedAt))).returning({ id: appEmailCodes.id });
@@ -159,7 +160,12 @@ export async function startPhoneChange(userId: string, rawPhone: string, ipHash:
 }
 
 export async function verifyPhoneChange(userId: string, rawPhone: string, code: string, ipHash: string | null) {
-  const phone = await verifyOtp(rawPhone, code);
+  let phone: string;
+  try { phone = await verifyOtp(rawPhone, code); } catch (e) {
+    // Signed in already: a wrong code is a 400 with the tries left, not a 401 that reads as "sign in again".
+    if (e instanceof AppError && e.code === "OTP_WRONG") throw new AppError("VALIDATION", { triesLeft: e.extra.triesLeft, message: e.message, fields: { code: "wrong" } });
+    throw e;
+  }
   return db.transaction(async (tx) => {
     const user = await attachPhone(tx, userId, phone, ipHash);
     await accountRow(userId, tx);

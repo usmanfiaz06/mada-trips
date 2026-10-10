@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
 import { Faces } from '@/components/circles/ui';
 import { VGradient } from '@/components/Gradient';
+import { ErrorState, GoneState } from '@/components/states';
 import { Icon } from '@/components/Icon';
 import { Screen, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -31,7 +32,9 @@ export default function Join() {
   const p = q.data;
 
   if (q.isLoading) return <Screen dark background={colors.night}><View /></Screen>;
-  if (q.isError || !p || p.status !== 'open') {
+  if (!p && q.isError && (q.error as ApiError)?.status === 404) return <Screen><GoneState /></Screen>;
+  if (!p && q.isError) return <Screen><ErrorState problem={q.problem} onRetry={q.retry} /></Screen>;
+  if (!p || p.status !== 'open') {
     const from = p?.from.short ?? t('circles.someone');
     const cancelled = p?.status === 'cancelled';
     return (

@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
+import { InlineError } from '@/components/states';
 import { T } from '@/components/Text';
 import { COVERS, photoSource, useDiscover, usePosts } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
@@ -86,6 +87,8 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
         </View>
       </View>
 
+      {d.view === 'error' || d.view === 'offline' ? <InlineError problem={d.problem} onRetry={d.retry} /> : null}
+      {posts.view === 'error' || posts.view === 'offline' ? <InlineError problem={posts.problem} onRetry={posts.retry} /> : null}
       {posts.isSuccess && feed.length === 0 ? (
         <EmptyState art={<ArtMap />} title={filter === 'food' ? t('circles.discover.empty.food', { city }) : filter === 'todo' ? t('circles.discover.empty.todo', { city }) : t('circles.discover.empty.all', { city })}
           body={t('circles.discover.empty.body')} action={<Button label={t('circles.discover.empty.action')} onPress={() => onPost(city)} />}

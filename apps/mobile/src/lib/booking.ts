@@ -38,9 +38,10 @@ function guardOffline() {
   if (demoOn('offline')) throw new ApiError('OFFLINE', t('error.offline'), 0);
 }
 
-async function call<S extends z.ZodType>(method: 'GET' | 'POST', path: string, schema: S, body?: unknown): Promise<z.infer<S>> {
+async function call<S extends z.ZodType>(method: 'GET' | 'POST', path: string, schema: S, body?: unknown, idempotencyKey?: string): Promise<z.infer<S>> {
   guardOffline();
-  return request({ method, path: q(path), body }, schema);
+  // A key of our own (kept across a double tap, a retry or an app restart) makes the POST safe to send again.
+  return request({ method, path: q(path), body, ...(idempotencyKey ? { idempotencyKey } : null) }, schema);
 }
 
 const QuoteOut = z.object({ request: BookingRequestView, messages: z.array(ThreadMessage) });
@@ -56,12 +57,12 @@ export const bookingApi = {
   plan: (id: string) => call('GET', `/plans/${encodeURIComponent(id)}`, PlanResponse),
   requests: () => call('GET', '/requests', RequestsResponse),
   request: (id: string) => call('GET', `/requests/${id}`, RequestResponse),
-  createRequest: (b: CreateRequestBody) => call('POST', '/requests', RequestResponse, b),
+  createRequest: (b: CreateRequestBody) => call('POST', '/requests', RequestResponse, b, b.clientId ? `req-${b.clientId}` : undefined),
   messages: (id: string) => call('GET', `/requests/${id}/messages`, MessagesResponse),
   postMessage: (id: string, text: string) => call('POST', `/requests/${id}/messages`, MessagesResponse, { text }),
   acceptOffer: (quoteId: string, messageId: string) => call('POST', `/quotes/${quoteId}/accept-offer`, QuoteOut, { messageId }),
   preview: (b: PreviewBody) => call('POST', '/orders/preview', PreviewResponse, b),
-  createOrder: (b: CreateOrderBody) => call('POST', '/orders', CreateOrderResponse, b),
+  createOrder: (b: CreateOrderBody) => call('POST', '/orders', CreateOrderResponse, b, b.idempotencyKey),
   order: (id: string) => request({ method: 'GET', path: `/orders/${id}` }, OrderResponse),
   activeOrders: () => request({ method: 'GET', path: '/orders' }, OrdersResponse),
   otp: (id: string, code: string) => call('POST', `/orders/${id}/3ds`, OrderResponse, { code }),

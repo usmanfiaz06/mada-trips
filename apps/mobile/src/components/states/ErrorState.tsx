@@ -11,8 +11,8 @@ import { StateView } from './StateView';
  * words, the drawing and the one action. Offline, timeouts, a busy or broken server, a supplier not answering, a
  * newer server, something removed. "Reference …" is shown for problems on our side, so Faisal can find the request.
  */
-export function ErrorState({ error, problem, onRetry, variant = 'full', supplierName, booking, testID }: {
-  error?: unknown; problem?: Described | null; onRetry?: () => void; variant?: 'full' | 'card'; supplierName?: string; booking?: boolean; testID?: string;
+export function ErrorState({ error, problem, onRetry, variant = 'full', supplierName, booking, gutter, testID }: {
+  gutter?: number; error?: unknown; problem?: Described | null; onRetry?: () => void; variant?: 'full' | 'card'; supplierName?: string; booking?: boolean; testID?: string;
 }) {
   const d = problem ?? describeError(error, { supplierName, booking });
   const art = {
@@ -32,7 +32,7 @@ export function ErrorState({ error, problem, onRetry, variant = 'full', supplier
   else if (d.primary === 'retry' || d.primary === 'wait') { primary = retry; secondary = d.kind === 'server' || d.kind === 'timeout' ? talk : null; }
 
   return (
-    <StateView variant={variant} art={art} title={d.title} body={d.kind === 'offline' ? `${d.body} ${t('net.offline.retryOnline')}` : d.body}
+    <StateView variant={variant} gutter={gutter} art={art} title={d.title} body={d.kind === 'offline' ? `${d.body} ${t('net.offline.retryOnline')}` : d.body}
       primary={primary} secondary={secondary} note={d.reference ? t('problem.ref', { ref: d.reference }) : null} testID={testID ?? `state-${d.kind}`} />
   );
 }

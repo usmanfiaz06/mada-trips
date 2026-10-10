@@ -37,7 +37,7 @@ export function SessionExpired() {
     setBusy(true); setProblem(null);
     try { await api.startOtp(phone); setStep('code'); }
     catch (e) {
-      if (e instanceof ApiError && e.code === 'OTP_COOLDOWN') setStep('code');
+      if (e instanceof ApiError && e.code === 'OTP_COOLDOWN') { setStep('code'); setProblem(e.message); }
       else setProblem(e instanceof ApiError ? (e.kind === 'offline' ? t('phone.offline') : e.message) : t('error.internal'));
     } finally { setBusy(false); }
   };
@@ -83,6 +83,7 @@ export function SessionExpired() {
             onChangeText={(v) => { const d = v.replace(/\D/g, '').slice(0, 6); setCode(d); if (d.length === 6) void verify(d); }}
             error={problem} hint={SHOW_DEMO_HINTS ? <T v="tiny">{t('otp.demo')}</T> : null} testID="reauth-code" />
           <Button label={t('session.expired.action')} busy={busy} disabled={code.length < 6} onPress={() => void verify(code)} testID="reauth-verify" />
+          <Button variant="ghost" label={t('otp.resend')} disabled={busy} onPress={() => { setCode(''); void send(); }} testID="reauth-resend" />
         </>
       )}
     </Sheet>

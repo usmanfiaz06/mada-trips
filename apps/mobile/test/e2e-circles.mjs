@@ -202,6 +202,17 @@ async function demo() {
   await see('Seen by', 'read receipt', 9000);
   await shot('chat-seen');
 
+  step('offline: a message waits in the outbox, then goes');
+  await context.setOffline(true);
+  await page.waitForTimeout(800);
+  await byTest('chat-input').fill('See you at the pier');
+  await byTest('chat-send').click();
+  await see('Sends when you’re online', 'queued message');
+  await shot('chat-offline-queued');
+  await context.setOffline(false);
+  await page.waitForFunction(() => !document.querySelector('[data-testid="queued-message"]'), null, { timeout: 15000 }).catch(() => errors.push('outbox: message did not send after reconnecting'));
+  await see('See you at the pier', 'sent after reconnect');
+
   step('tools: split');
   await byTest('chat-tools').click();
   await see('Add to the circle', 'tools');

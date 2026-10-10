@@ -11,6 +11,7 @@ import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
 import { Sun } from '@/components/Sun';
+import { InlineError } from '@/components/states';
 import { T } from '@/components/Text';
 import {
   COVERS, circlesApi, cityCover, ck, lastLine, photoSource, useAct, useAround, useCircles, useFriends, useKnownPosts, useMeId, useSaved, useStamps, whenLabel,
@@ -74,6 +75,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
         </View>
       ))}
 
+      {circles.view === 'error' || circles.view === 'offline' ? <InlineError problem={circles.problem} onRetry={circles.retry} /> : null}
       <Head title={t('circles.yours')} right={list.length ? String(list.length) : undefined} />
       {circles.isSuccess && list.length === 0 ? (
         <Animated.View entering={rise(1)}>

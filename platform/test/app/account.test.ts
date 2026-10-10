@@ -69,8 +69,8 @@ describe("email and phone", () => {
     expect(s.status).toBe(200);
     expect(outbox[0]).toMatchObject({ channel: "email", to: email });
     const wrong = await call(emailVerify, { token, body: { email, code: "000000" } });
-    expect(wrong.status).toBe(401);
-    expect(wrong.json.error).toMatchObject({ code: "OTP_WRONG", triesLeft: 2, message: "That code doesn't match. 2 tries left." });
+    expect(wrong.status).toBe(400);
+    expect(wrong.json.error).toMatchObject({ code: "VALIDATION", triesLeft: 2, message: "That code doesn't match. 2 tries left." });
     const ok = await call(emailVerify, { token, body: { email, code: "123456" } });
     expect(MeResponse.parse(ok.json).user).toMatchObject({ email, emailRelay: false });
     expect(AccountResponse.parse((await call(accountGet, { method: "GET", token })).json).account.emailVerifiedAt).not.toBeNull();
@@ -90,6 +90,9 @@ describe("email and phone", () => {
     expect((await call(phoneStart, { token: a.token, body: { phone: "50 12" } })).status).toBe(400);
     const next = newPhone();
     expect((await call(phoneStart, { token: a.token, body: { phone: next } })).status).toBe(200);
+    const bad = await call(phoneVerify, { token: a.token, body: { phone: next, code: "000000" } });
+    expect(bad.status).toBe(400);
+    expect(bad.json.error.triesLeft).toBe(2);
     const v = await call(phoneVerify, { token: a.token, body: { phone: next, code: "123456" } });
     expect(v.status, JSON.stringify(v.json)).toBe(200);
     expect(v.json.user.phone).toBe(next);

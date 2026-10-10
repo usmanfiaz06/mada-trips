@@ -287,7 +287,7 @@ export default function Pay() {
         <T v="body">{t('pay.price.body')}</T>
         <Button label={t('pay.price.accept', { price: formatSar(accepted?.total.amount ?? total) })} testID="price-accept" onPress={async () => {
           setSheet(null); setBusy(true);
-          try { await place(method?.kind === 'card' ? { method: 'card', cardId: method.id } : method?.kind === 'new_card' ? { method: 'new_card', token: method.token, brand: method.brand, last4: method.last4 } : { method: 'applepay', token: `applepay_mock_${Date.now()}` }, accepted?.total.amount); }
+          try { await place(method?.kind === 'card' ? { method: 'card', cardId: method.id } : method?.kind === 'new_card' ? { method: 'new_card', token: method.token, brand: method.brand, last4: method.last4 } : { method: 'applepay', token: `applepay_mock_${key.current}` }, accepted?.total.amount); }
           catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); }
         }} />
         <Button variant="ghost" label={t('pay.price.other')} onPress={() => { setSheet(null); router.back(); }} />
@@ -298,7 +298,7 @@ export default function Pay() {
         <Button label={t('common.back')} onPress={() => { setSheet(null); router.back(); }} />
       </Sheet>
       {sheet === 'applepay' ? <ApplePaySheet visible amount={total} what={p?.title ?? pd.title} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }}
-        onDone={async () => { setSheet(null); setBusy(true); try { await place({ method: 'applepay', token: `applepay_mock_${Date.now()}` }); } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); } }} /> : null}
+        onDone={async () => { setSheet(null); setBusy(true); try { await place({ method: 'applepay', token: `applepay_mock_${key.current}` }); } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); } }} /> : null}
       {threeDs && sheet === '3ds' ? (
         <ThreeDsSheet visible label={method?.label ?? ''} brand={method?.brand ?? 'card'} amount={threeDs.amount} triesLeft={threeDs.triesLeft} stopped={threeDs.stopped}
           onCode={otp} onOther={() => setSheet('cards')} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }} />

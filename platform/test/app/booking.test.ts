@@ -373,6 +373,27 @@ describe("orders and the desk", () => {
     expect((await get(orderGet, other.token, { id: out.order.id })).status).toBe(404);
   });
 
+  it("a retry with the same Idempotency-Key header is answered once: one order, one charge", async () => {
+    const f = await family();
+    const cardId = await addCard(f.token);
+    const s = await istanbul(f.token, f.four);
+    const draft: OrderDraft = { kind: "trip", flightOfferId: s.options[0]!.id, bundle: false, travellerIds: f.four };
+    const p = await previewOf(f.token, draft);
+    const body = { draft, useCredit: true, payment: { method: "card", cardId }, plan: "full", expectedTotal: p.total.amount, idempotencyKey: "slide-hdr-abcdefgh" };
+    const send = () => callP(ordersPost, {}, { method: "POST", token: f.token, body, headers: { "idempotency-key": "slide-hdr-abcdefgh" } });
+    const first = await send();
+    expect(first.status, JSON.stringify(first.json)).toBe(201);
+    const second = await send();
+    expect(second.status).toBe(201);
+    expect(second.json.order.id).toBe(first.json.order.id);
+    const owner = await ownOrderOwner(first.json.order.id);
+    const pays = await db.select().from(appPayments).where(eq(appPayments.ownerId, owner));
+    expect(pays.length).toBe(1);
+    // The same key with a different body is refused, not booked.
+    const changed = await callP(ordersPost, {}, { method: "POST", token: f.token, body: { ...body, plan: "tabby" }, headers: { "idempotency-key": "slide-hdr-abcdefgh" } });
+    expect(changed.json.error.code).toBe("IDEMPOTENCY_CONFLICT");
+  });
+
   it("a new card asks the bank for a code: wrong codes count down, 123456 passes", async () => {
     const f = await family();
     const s = await istanbul(f.token, [f.me, f.hessa]);

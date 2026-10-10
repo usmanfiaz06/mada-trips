@@ -301,7 +301,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (body.code !== '123456') {
       c.tries += 1;
       const left = 3 - c.tries;
-      return left <= 0 ? err('OTP_LOCKED', { triesLeft: 0 }) : err('OTP_WRONG', { triesLeft: left, message: tn('account.code.wrong', left) });
+      return left <= 0 ? err('OTP_LOCKED', { triesLeft: 0 }) : err('VALIDATION', { triesLeft: left, message: tn('account.code.wrong', left), fields: { code: 'wrong' } });
     }
     s.emailCode = null;
     user.email = c.email; user.emailRelay = false; s.account.emailVerifiedAt = now();
@@ -323,7 +323,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (body.code !== '123456') {
       c.tries += 1;
       const left = 3 - c.tries;
-      return left <= 0 ? err('OTP_LOCKED', { triesLeft: 0 }) : err('OTP_WRONG', { triesLeft: left, message: tn('otp.wrong', left) });
+      return left <= 0 ? err('OTP_LOCKED', { triesLeft: 0 }) : err('VALIDATION', { triesLeft: left, message: tn('otp.wrong', left), fields: { code: 'wrong' } });
     }
     if (user.phone) byPhone.delete(user.phone);
     user.phone = p.e164; user.methods.phone = true; byPhone.set(p.e164, user.id); s.phoneCode = null; s.account.phoneVerifiedAt = now();

@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { z } from 'zod';
 import {
   AcceptInviteResponse, AroundResponse, BlocksResponse, CircleDetail, CircleResponse, CirclesResponse, ContactsMatchResponse, CreateInviteResponse,
@@ -9,6 +10,8 @@ import {
   type SendCircleMessageRequest, type SharedCard, type UpdateCircleRequest,
 } from '@mada/shared';
 import { request } from './api';
+import { useApiMutation, useApiQuery } from './net/hooks';
+import { registerOutboxKind, type EnqueueInput } from './net/outbox';
 import { API_ORIGIN } from './config';
 import { t } from './i18n';
 import { useSession } from './session';
@@ -120,27 +123,43 @@ export function useMeId(): string {
   return useSession((s) => s.user?.id ?? '');
 }
 
-export const useCircles = () => useQuery({ queryKey: ck.list, queryFn: circlesApi.list, enabled: signedIn(), refetchInterval: 15_000 });
-export const useCircle = (id: string) => useQuery({ queryKey: ck.circle(id), queryFn: () => circlesApi.get(id), enabled: !!id && signedIn(), refetchInterval: 15_000, retry: false });
+export const useCircles = () => useApiQuery({ queryKey: ck.list, queryFn: circlesApi.list, enabled: signedIn(), refetchInterval: 15_000 });
+export const useCircle = (id: string) => useApiQuery({ queryKey: ck.circle(id), queryFn: () => circlesApi.get(id), enabled: !!id && signedIn(), refetchInterval: 15_000, retry: false });
 /** An open chat polls every 5 seconds. */
-export const useMessages = (id: string, poll = true) => useQuery({ queryKey: ck.messages(id), queryFn: () => circlesApi.messages(id), enabled: !!id && signedIn(), refetchInterval: poll ? 5_000 : false, retry: false });
-export const useFriends = () => useQuery({ queryKey: ck.friends, queryFn: circlesApi.friends, enabled: signedIn() });
-export const useProfile = (id: string) => useQuery({ queryKey: ck.profile(id), queryFn: () => circlesApi.profile(id), enabled: !!id && signedIn(), retry: false });
-export const useInvites = () => useQuery({ queryKey: ck.invites, queryFn: circlesApi.invites, enabled: signedIn() });
-export const usePosts = (city: string | null, kind: PostKind | null) => useQuery({ queryKey: ck.posts(city, kind), queryFn: () => circlesApi.posts(city, kind), enabled: !!city && signedIn(), refetchInterval: 20_000 });
-export const useKnownPosts = () => useQuery({ queryKey: ck.known, queryFn: circlesApi.known, enabled: signedIn(), refetchInterval: 20_000 });
-export const useSaved = () => useQuery({ queryKey: ck.saved, queryFn: circlesApi.saved, enabled: signedIn() });
-export const useDiscover = (city: string | null) => useQuery({ queryKey: ck.discover(city), queryFn: () => circlesApi.discover(city), enabled: signedIn(), placeholderData: (p) => p });
-export const useAround = () => useQuery({ queryKey: ck.around, queryFn: circlesApi.around, enabled: signedIn() });
-export const useStamps = () => useQuery({ queryKey: ck.stamps, queryFn: circlesApi.stamps, enabled: signedIn() });
-export const useSearch = (term: string) => useQuery({ queryKey: ck.search(term), queryFn: () => circlesApi.search(term), enabled: term.trim().length > 0 && signedIn(), placeholderData: (p) => p });
-export const usePreview = (code: string) => useQuery({ queryKey: ck.preview(code), queryFn: () => circlesApi.preview(code), retry: false });
+export const useMessages = (id: string, poll = true) => useApiQuery({ queryKey: ck.messages(id), queryFn: () => circlesApi.messages(id), enabled: !!id && signedIn(), refetchInterval: poll ? 5_000 : false, retry: false });
+export const useFriends = () => useApiQuery({ queryKey: ck.friends, queryFn: circlesApi.friends, enabled: signedIn() });
+export const useProfile = (id: string) => useApiQuery({ queryKey: ck.profile(id), queryFn: () => circlesApi.profile(id), enabled: !!id && signedIn(), retry: false });
+export const useInvites = () => useApiQuery({ queryKey: ck.invites, queryFn: circlesApi.invites, enabled: signedIn() });
+export const usePosts = (city: string | null, kind: PostKind | null) => useApiQuery({ queryKey: ck.posts(city, kind), queryFn: () => circlesApi.posts(city, kind), enabled: !!city && signedIn(), refetchInterval: 20_000 });
+export const useKnownPosts = () => useApiQuery({ queryKey: ck.known, queryFn: circlesApi.known, enabled: signedIn(), refetchInterval: 20_000 });
+export const useSaved = () => useApiQuery({ queryKey: ck.saved, queryFn: circlesApi.saved, enabled: signedIn() });
+export const useDiscover = (city: string | null) => useApiQuery({ queryKey: ck.discover(city), queryFn: () => circlesApi.discover(city), enabled: signedIn(), placeholderData: (p) => p });
+export const useAround = () => useApiQuery({ queryKey: ck.around, queryFn: circlesApi.around, enabled: signedIn() });
+export const useStamps = () => useApiQuery({ queryKey: ck.stamps, queryFn: circlesApi.stamps, enabled: signedIn() });
+export const useSearch = (term: string) => useApiQuery({ queryKey: ck.search(term), queryFn: () => circlesApi.search(term), enabled: term.trim().length > 0 && signedIn(), placeholderData: (p) => p });
+export const usePreview = (code: string) => useApiQuery({ queryKey: ck.preview(code), queryFn: () => circlesApi.preview(code), retry: false });
 
-/** A mutation that refreshes what it touched. */
-export function useAct<A, R>(fn: (a: A) => Promise<R>, touched: (a: A, r: R) => QueryKey[] = () => [ck.all]) {
+/** A mutation that refreshes what it touched (double taps ignored, calm problems; see lib/net/hooks.ts). */
+export function useAct<A, R>(fn: (a: A) => Promise<R>, touched: (a: A, r: R) => QueryKey[] = () => [ck.all], queue?: (a: A) => EnqueueInput) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: fn, onSuccess: (r, a) => { for (const k of touched(a, r)) qc.invalidateQueries({ queryKey: k }); } });
+  const m = useApiMutation<R, A>({
+    mutationFn: (a) => fn(a),
+    queueWhenOffline: queue,
+    onSuccess: (r, a) => { if (r === undefined) return; for (const k of touched(a, r)) qc.invalidateQueries({ queryKey: k }); },
+  });
+  const { mutateAsync } = m;
+  /** mutate(vars, { onSuccess, onError, onSettled }). With `queue`, onSuccess gets undefined when it went to the outbox. */
+  const mutate = useCallback((a: A, cb: { onSuccess?: (r: R, a: A) => void; onError?: (e: Error) => void; onSettled?: () => void } = {}) => {
+    mutateAsync(a).then((r) => cb.onSuccess?.(r as R, a)).catch((e: Error) => cb.onError?.(e)).finally(() => cb.onSettled?.());
+  }, [mutateAsync]);
+  return { ...m, mutate };
 }
+
+/* Messages, votes and tips written offline wait in the outbox and go, in order, when the phone is back. */
+export const queueMessage = (circleId: string, label: string, path: string, body: unknown): EnqueueInput =>
+  ({ kind: 'circle', label, method: 'POST', path, body, meta: { circleId } });
+registerOutboxKind('circle', { invalidate: (i) => [ck.messages(i.meta?.circleId ?? ''), ck.list] });
+registerOutboxKind('circle-post', { invalidate: () => [['circles', 'posts']] });
 
 /** Merge messages a write returned into the open chat at once, so nothing waits for the next poll. */
 export function useMergeMessages(circleId: string) {

@@ -109,11 +109,11 @@ try {
   await shot('wallet-cards');
   await page.mouse.click(300, 120); await page.waitForTimeout(400);
 
-  step('Circles: Discover with no tips, a city we don’t cover, no circles, friends, saved, stamps');
+  step('Circles: Discover with no tips, a city search with no match, no circles, friends, saved, stamps');
   await tab('Circles', 700);
   await phone.getByRole('button', { name: /Choose a city/ }).click(); await page.waitForTimeout(500);
-  await phone.getByLabel('Search a city').fill('Tbilisi'); await page.waitForTimeout(400);
-  await see('We don’t cover Tbilisi yet.', 'city search');
+  await phone.getByLabel('Search a city').fill('sd'); await page.waitForTimeout(400);
+  await see('No city called ‘sd’.', 'city search');
   await shot('city-search-none');
   await phone.getByLabel('Search a city').fill(''); await page.waitForTimeout(300);
   await phone.locator('.city-row', { hasText: 'AlUla' }).click(); await page.waitForTimeout(500);

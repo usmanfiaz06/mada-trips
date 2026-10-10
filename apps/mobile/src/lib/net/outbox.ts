@@ -113,10 +113,11 @@ let running: Promise<number> | null = null;
 
 /** Send what's queued, oldest first. Returns how many were sent. Concurrent calls share one run. */
 export function flushOutbox(): Promise<number> {
-  running ??= (async () => {
+  // A run already going may have stopped before this change (offline a moment ago): go again once it settles.
+  if (running) return running.then((n) => flushOutbox().then((m) => n + m));
+  const run = (async () => {
     let sent = 0;
-    try {
-      for (;;) {
+    for (;;) {
         if (useNet.getState().online === false) break;
         const now = Date.now();
         const next = useOutboxStore.getState().items.filter((i) => i.state === 'queued').sort((a, b) => a.createdAt - b.createdAt)[0];
@@ -138,12 +139,12 @@ export function flushOutbox(): Promise<number> {
           setItems((items) => items.map((i) => (i.id === next.id ? { ...i, state: 'failed', tries: i.tries + 1, problem: (e as Error).message } : i)));
         }
       }
-    } finally {
-      running = null;
-    }
     return sent;
   })();
-  return running;
+  // Cleared once the run settles (a run that ends at once must not leave itself behind as "running").
+  const p: Promise<number> = run.finally(() => { if (running === p) running = null; });
+  running = p;
+  return p;
 }
 
 /** The items of one kind (or all), for screens that show "Sends when you're online" under what was queued. */

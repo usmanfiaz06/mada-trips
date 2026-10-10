@@ -41,8 +41,13 @@ async function main() {
     attribution: "Cities: GeoNames (CC BY 4.0, geonames.org). Airports: OurAirports (public domain, ourairports.com).",
     countries, tz, cities,
   };
-  const json = JSON.stringify(out);
-  for (const target of ["docs/app/prototype-app/src/data/cities.json", "apps/mobile/src/lib/mock/places-cities.json"]) {
+  // The app's mock also shows each city's airports with their names and distances (the prototype stays small).
+  const airportName = Object.fromEntries(d.airports.map((a) => [a.iata, a.name]));
+  const near = Object.fromEntries(chosen.map((p) => [p.id, p.airports.map((a) => `${a.iata}:${a.km}:${a.size[0]}`).join("|")]));
+  const used = new Set(chosen.flatMap((p) => p.airports.map((a) => a.iata)));
+  const mobile = { ...out, near, airports: Object.fromEntries([...used].map((c) => [c, airportName[c] ?? c])) };
+  for (const [target, data] of [["docs/app/prototype-app/src/data/cities.json", out], ["apps/mobile/src/lib/mock/places-cities.json", mobile]] as const) {
+    const json = JSON.stringify(data);
     const path = join(ROOT, target);
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, json);

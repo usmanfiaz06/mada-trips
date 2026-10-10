@@ -16,7 +16,7 @@ import { AgentNote, BigCheck, Box, H3, Num, PickCard, Rise, Row, Small, TripScre
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useRefundQuote, useTrip, useTripMutation, useTrips } from '@/lib/trips';
+import { newKey, toTab, tripsApi, useRefundQuote, useTrip, useTripMutation, useTrips } from '@/lib/trips';
 import { colors } from '@/theme';
 
 const REASONS = RefundReason.options;
@@ -44,7 +44,7 @@ export default function Refund() {
     const live = list.data?.refunds.find((r) => r.id === sent.id) ?? sent;
     return (
       <TripScreen title={t('rf.title')} act={<>
-        <Button testID="see-in-trips" label={t('rf.seeTrips')} onPress={() => router.replace('/trips?tab=requests' as Href)} />
+        <Button testID="see-in-trips" label={t('rf.seeTrips')} onPress={() => toTab(router, '/trips?tab=requests')} />
         <Button label={t('rf.done')} variant="ghost" onPress={() => router.back()} />
       </>}>
         <Rise style={{ marginTop: 30 }}><BigCheck /></Rise>

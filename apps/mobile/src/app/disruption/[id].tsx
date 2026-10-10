@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { DESK_PHONE, DisruptionKind, type DisruptionChoiceResponse, type DisruptionOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -10,7 +10,7 @@ import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, Rise, Row, Sm
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { OUTBOX_DISRUPTION, discardQueued, isOfflineError, newKey, queueDisruption, tripsApi, useDisruption, useOffline, useTripMutation, useTripOutbox } from '@/lib/trips';
+import { OUTBOX_DISRUPTION, discardQueued, toTab, isOfflineError, newKey, queueDisruption, tripsApi, useDisruption, useOffline, useTripMutation, useTripOutbox } from '@/lib/trips';
 import { colors, radii } from '@/theme';
 
 const TEL = `tel:${DESK_PHONE.replace(/\s/g, '')}`;
@@ -39,7 +39,7 @@ export default function Disruption() {
   const [result, setResult] = useState<DisruptionChoiceResponse | null>(null);
   const [clientKey] = useState(newKey);
   const choose = useTripMutation((b: { kind: DisruptionKind; optionId: string }) => tripsApi.choose(id, { ...b, clientKey }));
-  const home = () => router.replace('/today' as Href);
+  const home = () => toTab(router, '/today');
   const d = q.data;
   /* The outbox sent the queued choice once the phone reconnected: show it as done. */
   const shown: Stage = stage === 'queued' && !queued ? 'done' : stage;

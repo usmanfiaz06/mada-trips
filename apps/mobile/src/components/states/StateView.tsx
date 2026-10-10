@@ -12,7 +12,9 @@ import { T } from '../Text';
  *   full    fills the screen below the TopBar (a whole screen couldn't load)
  *   card    sits inside a screen (one section couldn't load)
  */
-export function StateView({ art, title, body, note, primary, secondary, variant = 'full', testID }: {
+export function StateView({ art, title, body, note, primary, secondary, variant = 'full', gutter = 20, testID }: {
+  /** Side padding for 'full' (0 when the screen's own scroll already has its gutter). */
+  gutter?: number;
   art?: ReactNode; title: string; body?: string; note?: string | null; primary?: ReactNode; secondary?: ReactNode; variant?: 'full' | 'card'; testID?: string;
 }) {
   const inner = (
@@ -26,14 +28,14 @@ export function StateView({ art, title, body, note, primary, secondary, variant 
   );
   if (variant === 'card') return inner;
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.full} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.full, { paddingHorizontal: gutter }]} showsVerticalScrollIndicator={false}>
       {inner}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  full: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 20, paddingVertical: 24 },
+  full: { flexGrow: 1, justifyContent: 'center', paddingVertical: 24 },
   card: { gap: 12, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 18, borderRadius: radii.hero, backgroundColor: colors.paper },
   inset: { marginHorizontal: 4 },
 });

@@ -85,6 +85,14 @@ function useReconnectToast(inApp: boolean) {
   }, [online, inApp]);
 }
 
+/* The path updates a moment after a push: don't push the same screen twice meanwhile. */
+let lastPush = { to: '', at: 0 };
+function pushOnce(to: string) {
+  if (lastPush.to === to && Date.now() - lastPush.at < 2000) return;
+  lastPush = { to, at: Date.now() };
+  router.push(to as Href);
+}
+
 /** The update and maintenance screens, when the server says so. */
 function useGateRoutes(inApp: boolean) {
   const update = useGates((s) => (s.updateSetAside ? null : s.update));
@@ -92,10 +100,10 @@ function useGateRoutes(inApp: boolean) {
   const setAside = useGates((s) => s.maintenanceDismissed);
   const path = usePathname();
   useEffect(() => {
-    if (update && path !== '/update') router.push('/update' as Href);
+    if (update && path !== '/update') pushOnce('/update');
   }, [update, path]);
   useEffect(() => {
-    if (inApp && maintenance && !setAside && !update && path !== '/maintenance') router.push('/maintenance' as Href);
+    if (inApp && maintenance && !setAside && !update && path !== '/maintenance') pushOnce('/maintenance');
   }, [inApp, maintenance, setAside, update, path]);
 }
 

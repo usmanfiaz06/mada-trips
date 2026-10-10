@@ -1,0 +1,21 @@
+/* Places: worldwide city search rows and the page for any city (src/screens/City.jsx). */
+.city-row .pl-mono { width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; background: var(--green); color: var(--gold); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; letter-spacing: .04em; }
+
+.pl-type { position: relative; height: 300px; flex-shrink: 0; overflow: hidden; color: var(--mist);
+  background: radial-gradient(120% 90% at 85% 10%, #2a4a40 0%, #1e352d 45%, #142720 100%); }
+.pl-type::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgba(217,183,122,.06) 0 1px, transparent 1px 44px), repeating-linear-gradient(0deg, rgba(217,183,122,.05) 0 1px, transparent 1px 44px); pointer-events: none; }
+.pl-type .pl-code { position: absolute; right: -6px; bottom: 54px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 104px; line-height: 1; letter-spacing: -.02em; color: rgba(217,183,122,.13); }
+.pl-type .pl-rose { position: absolute; right: 14px; top: 58px; width: 110px; opacity: .9; animation: plFloat 9s ease-in-out infinite; }
+.pl-type .pl-rose svg { width: 100%; height: auto; }
+.pl-type-over { position: absolute; left: 20px; right: 20px; bottom: 22px; display: flex; flex-direction: column; gap: 4px; z-index: 1; }
+.pl-type .pl-name { font-size: 50px; line-height: 1; color: #fffdf9; overflow-wrap: anywhere; }
+@keyframes plFloat { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-6px) rotate(4deg); } }
+@media (prefers-reduced-motion: reduce) { .pl-type .pl-rose { animation: none; } }
+
+.pl-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pl-fact { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 20px; background: var(--paper); box-shadow: 0 1px 0 rgba(30,53,45,.06); }
+.pl-fact .h3 { font-size: 22px; }
+.pl-byhand .pl-ic { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--mist); flex-shrink: 0; }
+.pl-credit { text-align: center; color: var(--ink-3); padding: 4px 12px; }
+.city-page .act { left: 0; right: 0; bottom: 0; padding: 26px 20px 28px; background: linear-gradient(180deg, rgba(233,226,216,0) 0, var(--sand) 30%); }
+.city-page .pl-weather { flex-direction: row; align-items: center; }

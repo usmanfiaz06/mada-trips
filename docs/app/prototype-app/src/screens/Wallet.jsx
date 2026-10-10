@@ -144,9 +144,9 @@ function Unlocked() {
                     <span style={{ position: 'absolute', left: 0, right: 0, top: 8, height: 6, borderRadius: 999, background: '#efe9e0' }} />
                     <span style={{ position: 'absolute', left: 0, top: 8, height: 6, borderRadius: 999, width: issue?.blocking ? '78%' : '100%', background: issue?.blocking ? '#d9b77a' : issue ? 'linear-gradient(90deg,#3f9a63 80%,#d9b77a)' : '#3f9a63' }} />
                     <span style={{ position: 'absolute', left: issue ? '36%' : '14%', top: 4, width: 2, height: 14, background: '#1e352d' }} />
-                    <span className="tiny" style={{ position: 'absolute', left: issue ? '36%' : '14%', top: 22, transform: 'translateX(-50%)', fontWeight: 600, color: '#1e352d', whiteSpace: 'nowrap' }}>Trip · {shortDay(s.trip.flight?.dateISO || s.trip.stay?.fromISO)}</span>
-                    <span style={{ position: 'absolute', left: issue ? '95%' : '38%', top: 4, width: 2, height: 14, background: '#b98f4a' }} />
-                    <span className="tiny" style={{ position: 'absolute', left: issue ? '95%' : '38%', top: 22, transform: `translateX(${issue ? -88 : -50}%)`, fontWeight: 600, color: '#7d5d27', whiteSpace: 'nowrap' }}>Needed until {shortDay(passportIssue(s, who)?.need || '') || '150 days after'}</span>
+                    <span className="tiny" style={{ position: 'absolute', left: issue ? '36%' : '0%', top: 22, transform: issue ? 'translateX(-50%)' : 'none', fontWeight: 600, color: '#1e352d', whiteSpace: 'nowrap' }}>Trip · {shortDay(s.trip.flight?.dateISO || s.trip.stay?.fromISO)}</span>
+                    <span style={{ position: 'absolute', left: issue ? '95%' : '64%', top: 4, width: 2, height: 14, background: '#b98f4a' }} />
+                    <span className="tiny" style={{ position: 'absolute', left: issue ? '95%' : '64%', top: 22, transform: `translateX(${issue ? -88 : -50}%)`, fontWeight: 600, color: '#7d5d27', whiteSpace: 'nowrap' }}>Needed until {shortDay(passportIssue(s, who)?.need || '') || '150 days after'}</span>
                   </div>
                 )}
               </>

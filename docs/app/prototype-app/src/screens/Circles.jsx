@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, fmt } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, Toggle, EmptyState, ArtCircles, ArtFriends, ArtLantern, ArtBookmark, ArtCompass, ArtMap, ArtChat, ErrorState, ArtDesk, ArtSignal, PermissionDenied } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
+import { CityResults } from './City.jsx';
 import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useSave, EmptyArt, useCircleClock, setOpenCircle, getThread, fold, opAdd, opMsg, opThread, opGroup, opQueue, sys, names, newId, familyOf, familyLabel, markPaid } from './Social.jsx';
 
 const EVENTS = {
@@ -29,7 +30,7 @@ const CITY_INFO = {
 };
 
 function CitySheet({ current, onPick, onClose }) {
-  const { s, toast } = useStore();
+  const { s, push } = useStore();
   const [q, setQ] = useState('');
   const groups = [
     ['Where you are', [['Riyadh', 'Here now']]],
@@ -37,7 +38,8 @@ function CitySheet({ current, onPick, onClose }) {
     ['Worth a look', [['AlUla', 'A trip we’ve planned'], ...(s.trip ? [] : [['Istanbul', 'Popular this month']])]],
   ];
   const term = q.trim().toLowerCase();
-  const hits = term ? Object.keys(CITY_INFO).filter((c) => c.toLowerCase().includes(term)) : null;
+  /* Any city in the world (City.jsx). Ours with a Discover week switch Discover; the rest open their city page. */
+  const openCity = (c) => { if (CITY_INFO[c.name]) onPick(c.name); else { onClose(); push('city', { id: c.id }); } };
   const Row = ([c, note]) => (
     <button key={c + note} type="button" className={'city-row' + (c === current ? ' on' : '')} aria-pressed={c === current ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.select); onPick(c); }}>
       <img src={CITY_INFO[c].img} alt="" />
@@ -48,13 +50,9 @@ function CitySheet({ current, onPick, onClose }) {
   return (
     <Sheet label="Choose a city" onClose={onClose}>
       <h2 className="h2">What’s on where?</h2>
-      <input className="input" placeholder="Search a city" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search a city" />
-      {hits ? (
-        hits.length ? <div className="col" style={{ gap: 8 }}>{hits.map((c) => Row([c, CITY_INFO[c].country]))}</div> : (
-          <EmptyState compact className="well" art={<ArtCompass />} title={`We don’t cover ${q.trim()} yet.`} body="Faisal can still plan it with you, and we’ll tell you when Discover reaches it."
-            action={<button type="button" className="btn secondary small" onClick={() => { toast(`We’ll tell you when ${q.trim()} is on Discover.`); onClose(); }}>Tell me when it’s here</button>} />
-        )
-      ) : groups.map(([title, rows]) => (
+      <input className="input" placeholder="A city or an airport code" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search a city" />
+      {term ? <CityResults q={q} current={current} onPick={openCity} />
+      : groups.map(([title, rows]) => (
         <div key={title} className="col" style={{ gap: 8 }}>
           <span className="eyebrow">{title}</span>
           {rows.map(Row)}
@@ -67,7 +65,7 @@ function CitySheet({ current, onPick, onClose }) {
 
 /* ---------- what Mada knows about places, for answers in a circle ---------- */
 
-const PLACES = {
+export const PLACES = {
   Istanbul: { fly: '4h 15m direct from Riyadh', from: 1745, nightly: 980, plan: 'istanbul3', ideas: ['A Bosphorus dinner cruise from Kabataş, 19:30', 'Topkapı Palace in the morning. Closed Tuesdays', 'The ferry to Kadıköy for the food walk'], spots: ['Bosphorus cruise', 'Topkapı Palace', 'Kadıköy', 'Princes’ Islands'], when: 'April to June is mild, about 18–24°C. Eid in March is cool, so bring jackets.', visa: 'Saudi passports get an e-visa online in about 10 minutes.', stay: 'Galata or Sultanahmet. Both are walkable with kids.' },
   Georgia: { fly: '3h 30m direct to Tbilisi', from: 1290, nightly: 620, ideas: ['Old Tbilisi and the cable car up to Narikala', 'A day in Kazbegi, under the mountains', 'Lake Bazaleti for a quiet afternoon by the water'], spots: ['Tbilisi', 'Kazbegi', 'Batumi', 'Gudauri'], when: 'May to October is green and warm. Gudauri has snow from December to March.', visa: 'Saudi passports need no visa for stays up to a year.', stay: 'Old Tbilisi to walk everywhere, then a mountain lodge in Kazbegi.' },
   Baku: { fly: '3h direct', from: 1150, nightly: 700, ideas: ['The Old City walls at dusk', 'The Flame Towers light show from the Boulevard', 'A day in Gabala: cable cars and lakes'], spots: ['Old City', 'Boulevard', 'Gabala', 'Shahdag'], when: 'April to June, and September to October.', visa: 'Saudi passports get an e-visa in about 3 days.', stay: 'The Old City, or a seafront hotel on the Boulevard.' },

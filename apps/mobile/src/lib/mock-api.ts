@@ -8,12 +8,13 @@ import { walletMock, walletSeed } from './mock/wallet';
 import { bookingMock } from './mock/booking';
 import { circlesMock } from './mock/circles';
 import { tripsMock } from './mock/trips';
+import { placesMock } from './mock/places';
 import { resilienceMock } from './mock/resilience';
 
 /** Extra endpoints per area: each returns null for paths it doesn't own. `user` is the signed-in mock user (mutable). */
 export type MockUser = User & { people: Person[] };
 export type AreaMock = (w: Wire, ctx: { user: MockUser | null; byPhone: Map<string, string> }) => Promise<WireResponse | null>;
-const AREA_MOCKS: AreaMock[] = [tripsMock, walletMock, circlesMock, bookingMock, resilienceMock];
+const AREA_MOCKS: AreaMock[] = [tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock];
 
 /*
  * EXPO_PUBLIC_API_MODE=mock: the Core API's rules, in memory, for design work and screenshots without a server.

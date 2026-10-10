@@ -97,7 +97,7 @@ function ScanStage() {
         <View style={styles.ppHead}><T style={styles.ppHeadText}>{t('passport.demo.head')}</T><T style={styles.ppHeadText}>{t('passport.demo.type')}</T></View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={styles.ppPhoto}><Svg viewBox="0 0 60 76" width="100%" height="100%"><Circle cx={30} cy={30} r={13} fill="#b9ad98" /><Path d="M6 76c2-17 12-25 24-25s22 8 24 25z" fill="#b9ad98" /></Svg></View>
-          <View style={{ gap: 5 }}>
+          <View style={{ gap: 4 }}>
             <Field k={t('passport.demo.surname')} v="ALHARBI" />
             <Field k={t('passport.demo.given')} v="OMAR" />
             <View style={{ flexDirection: 'row', gap: 16 }}><Field k={t('passport.demo.no')} v="A08•••41" /><Field k={t('passport.demo.expires')} v="22 JUN 2031" /></View>
@@ -125,7 +125,7 @@ function ScanStage() {
 }
 
 function Field({ k, v }: { k: string; v: string }) {
-  return <View><T style={{ fontSize: 8.5, letterSpacing: 0.5, textTransform: 'uppercase', color: '#8a8173' }}>{k}</T><T style={{ fontSize: 12, fontFamily: ff.ui600, color: colors.green, letterSpacing: 0.2 }}>{v}</T></View>;
+  return <View><T style={{ fontSize: 8.5, lineHeight: 10, letterSpacing: 0.5, textTransform: 'uppercase', color: '#8a8173' }}>{k}</T><T style={{ fontSize: 12, lineHeight: 15, fontFamily: ff.ui600, color: colors.green, letterSpacing: 0.2 }}>{v}</T></View>;
 }
 
 const styles = StyleSheet.create({

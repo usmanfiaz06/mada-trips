@@ -12,6 +12,8 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
+import { useApiQuery } from '@/lib/net/hooks';
+import { GoneState } from '@/components/states';
 import { circlesApi, ck, cityCover, photoSource, useAct, useMeId, whenLabel } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -116,7 +118,7 @@ export function PostSheet({ visible, onClose, cities, initialCity, onPosted }: {
   const [photo, setPhoto] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const create = useAct(circlesApi.createPost, () => [ck.all]);
+  const create = useAct(circlesApi.createPost, () => [ck.all], (b) => ({ kind: 'circle-post', label: b.place, method: 'POST', path: '/posts', body: b }));
   const ok = place.trim().length > 2 && text.trim().length > 10 && (!photo || consent);
   const pick = async () => {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true, allowsEditing: false });
@@ -168,10 +170,14 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
   const me = useMeId();
   const [mode, setMode] = useState<'view' | 'delete' | 'report'>('view');
   const [thanked, setThanked] = useState(false);
+  const live = useApiQuery({ queryKey: ['circles', 'post', post?.id ?? ''], queryFn: () => circlesApi.post(post!.id), enabled: !!post, retry: false });
   const del = useAct((id: string) => circlesApi.deletePost(id));
   const thank = useAct((id: string) => circlesApi.thank(id), () => []);
   const report = useAct((r: { id: string; reason: string }) => circlesApi.report({ targetKind: 'post', targetId: r.id, reason: r.reason as 'other' }), () => []);
   if (!post) return <Sheet visible={false} onClose={onClose} label=""><View /></Sheet>;
+  if (live.isError && (live.error as ApiError)?.status === 404) return (
+    <Sheet visible onClose={onClose} label={post.place}><GoneState variant="card" /><T v="small" style={{ textAlign: 'center' }}>{t('circles.tipDetail.gone')}</T></Sheet>
+  );
   const mine = post.author.id === me;
   const plan = () => { onClose(); router.push({ pathname: '/ask', params: { prefill: post.kind === 'food' ? t('circles.tableAsk', { place: post.place }) : post.place } }); };
   const rel = relLabel(post);

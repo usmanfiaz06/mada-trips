@@ -304,8 +304,9 @@ export function buildPlaces(input: {
       add(t, "alt");
       if (names.length > before) alts++;
     }
-    // Its own airports, and any of its nearest within 60 km ("SAW" finds Istanbul; "JED" finds Makkah too).
-    const own = [...(servesCity.get(c.id) ?? []).map((a) => ({ iata: a.iata, name: a.name })), ...near.filter((a) => a.km <= 60 || a.iata === cur?.airport)];
+    // Its own airports, and the one it flies from when that belongs to a neighbour ("JED" finds Makkah too). A code
+    // never finds every town around a hub ("LHR" is London, not Luton).
+    const own = [...(servesCity.get(c.id) ?? []).map((a) => ({ iata: a.iata, name: a.name })), ...near.slice(0, 1).filter((a) => a.km <= 60 || a.iata === cur?.airport)];
     for (const a of own) {
       add(a.iata, "iata", `${airportShortName(a.name, c.name)} (${a.iata})`);
       add(a.name, "airport", `${airportShortName(a.name, c.name)} (${a.iata})`);

@@ -12,7 +12,7 @@ import { AgentNote, AirlineMark, BigCheck, Box, Divider, Grow, H3, ListRow, Num,
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useChangeOptions, useTrip, useTripMutation } from '@/lib/trips';
+import { newKey, toTab, tripsApi, useChangeOptions, useTrip, useTripMutation } from '@/lib/trips';
 import { colors, ff } from '@/theme';
 
 const dl = (d: string) => dayLabel(d, { today: d });
@@ -108,7 +108,7 @@ export default function ChangeFlight() {
     change.mutate(body, {
       onSuccess: (r) => {
         if (r.result === 'done') { setResult({ say: r.say, total: r.total, trip: r.trip }); setTimeout(() => { setStage('done'); buzz('success'); if (cur.movesOutDate && r.move) setMoveOpen(true); }, 1200); }
-        else { setStage('choose'); toast(r.result === 'quoted' ? t('cf.quoted') : t('cf.sent')); router.replace('/trips?tab=requests' as Href); }
+        else { setStage('choose'); toast(r.result === 'quoted' ? t('cf.quoted') : t('cf.sent')); toTab(router, '/trips?tab=requests'); }
       },
       onError: (e) => { setStage('choose'); toast(e.message); },
     });
@@ -173,8 +173,8 @@ export default function ChangeFlight() {
           </Box>
         ) : null}
       </>) : null}
-      {kind === 'airline' ? <SwitchAirline trip={trip} onDone={() => router.replace('/trips?tab=requests' as Href)} /> : null}
-      {kind === 'name' ? <NameFix trip={trip} onDone={() => router.replace('/trips?tab=requests' as Href)} /> : null}
+      {kind === 'airline' ? <SwitchAirline trip={trip} onDone={() => toTab(router, '/trips?tab=requests')} /> : null}
+      {kind === 'name' ? <NameFix trip={trip} onDone={() => toTab(router, '/trips?tab=requests')} /> : null}
     </TripScreen>
   );
 }

@@ -9,6 +9,7 @@ import { ArtCompass, ArtEnvelope, ArtLantern } from '@/components/circles/art';
 import { InviteSheet } from '@/components/circles/sheets';
 import { ChoiceCard, Face, PersonRow, Row, SheetScroll, TabsText, TextLink } from '@/components/circles/ui';
 import { EmptyState } from '@/components/EmptyState';
+import { PermissionDenied } from '@/components/states';
 import { Field } from '@/components/Field';
 import { Icon } from '@/components/Icon';
 import { Screen, TopBar } from '@/components/Layout';
@@ -157,9 +158,8 @@ export default function People() {
         <Button variant="ghost" label={t('circles.contacts.deny')} onPress={() => setSheet('denied')} />
       </Sheet>
       <Sheet visible={sheet === 'denied'} onClose={() => setSheet(null)} label={t('circles.contacts.deniedLabel')}>
-        <T v="h2">{t('circles.contacts.deniedTitle')}</T>
-        <T v="body">{t('circles.contacts.deniedBody')}</T>
-        <Button label={t('circles.people.shareLink')} onPress={() => setSheet('link')} />
+        <PermissionDenied kind="contacts" skipLabel={t('circles.people.shareLink')} onSkip={() => setSheet('link')} />
+        <T v="small" style={{ textAlign: 'center' }}>{t('circles.contacts.deniedBody')}</T>
       </Sheet>
       <Sheet visible={sheet === 'found'} onClose={() => setSheet(null)} label={t('circles.contacts.foundLabel')}>
         <SheetScroll>

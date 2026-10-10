@@ -72,7 +72,7 @@ async function newPage(demo = {}) {
 function kit(page) {
   const shot = async (name) => { n += 1; await page.waitForTimeout(650); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-${name}.png`) }); };
   const see = async (text, what, timeout = 8000) => {
-    try { await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout }); return true; }
+    try { await page.getByText(text, { exact: false }).locator('visible=true').first().waitFor({ state: 'visible', timeout }); return true; }
     catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
   };
   const gone = async (text, what) => {
@@ -80,7 +80,7 @@ function kit(page) {
     catch { errors.push(`${what}: "${text}" should be gone`); console.log('STILL THERE', what, '→', text); }
   };
   const tap = async (name, opts = {}) => { await page.getByRole(opts.role ?? 'button', { name, exact: opts.exact ?? true }).first().click(); };
-  const byTest = (id) => page.locator(`[data-testid="${id}"]`);
+  const byTest = (id) => page.locator(`[data-testid="${id}"]`).locator('visible=true').first();
   /** Scroll it to the middle first, so the dock never covers it. */
   const press = async (loc) => {
     // Wheel the screen until it sits above the dock, then tap.
@@ -93,13 +93,14 @@ function kit(page) {
     }
     await loc.first().click();
   };
-  const text = (s, exact = false) => page.getByText(s, { exact }).first();
+  const text = (s, exact = false) => page.getByText(s, { exact }).locator('visible=true').first();
   /** Pick a file for the next file chooser the app opens. */
   const pickFile = async (trigger, file) => {
     const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), trigger()]);
     await chooser.setFiles(join(FIX, file));
   };
-  const closeSheet = async () => { await page.getByRole('button', { name: 'Close' }).last().click(); await page.waitForTimeout(400); };
+  /** Tap the shade above the sheet. */
+  const closeSheet = async () => { await page.mouse.click(195, 60); await page.waitForTimeout(500); };
   return { shot, see, gone, tap, byTest, text, pickFile, closeSheet, press };
 }
 
@@ -426,6 +427,8 @@ async function account() {
   await see("That code doesn't match. 2 tries left.", 'wrong email code');
   await shot('details-email-code');
   await byTest('email-code-input').fill('123456');
+  await page.waitForTimeout(600);
+  await shot('details-email-after');
   await see('Email verified. Tickets and receipts go there now.', 'email verified');
   await press(byTest('details-phone'));
   await byTest('phone-new').fill('500004127');

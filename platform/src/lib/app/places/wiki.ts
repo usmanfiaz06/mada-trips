@@ -82,7 +82,7 @@ const SECTIONS: [GuideSectionKey, string][] = [["understand", "Understand"], ["g
 /** Cut at a sentence end once there is enough to read; never mid-word, never reworded. */
 export function trimExtract(text: string, min = 260, max = 640): { text: string; trimmed: boolean } {
   // Prose only: listings (a map number, a phone, "(updated Oct 2018)") are addresses, not reading.
-  const paras = text.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 40 && !/^[*•]/.test(p) && !/^\d{1,3}\s/.test(p) && !/☏|\(updated [A-Z][a-z]{2} \d{4}\)|\bfax:/.test(p));
+  const paras = text.split(/\n+/).map((p) => p.trim()).filter((p) => p.length > 40 && !/^[*•]/.test(p) && !/^\d{1,3}\s/.test(p) && !/☏|\(updated [A-Z][a-z]{2} \d{4}\)|\bfax:/.test(p) && !/^(see this section|individual listings|for (more|other)|see also)\b/i.test(p));
   let out = "";
   for (const p of paras) {
     if (out.length >= min) break;
