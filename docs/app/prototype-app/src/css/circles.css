@@ -5,7 +5,7 @@
 
 /* list */
 .cx-tile { width: 210px; height: 128px; border: 0; padding: 0; flex-shrink: 0; }
-.cx-tile.plain { width: 176px; padding: 14px 16px; justify-content: space-between; box-sizing: border-box; align-items: flex-start; overflow: hidden; text-align: left; }
+.cx-tile.plain { width: 176px; padding: 14px 16px; justify-content: space-between; box-sizing: border-box; align-items: flex-start; overflow: hidden; text-align: start; }
 .cx-line { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; max-width: 100%; word-break: break-word; }
 .cx-tile.plain .cx-line { -webkit-line-clamp: 2; }
 
@@ -15,7 +15,7 @@
 .cx-empty .btn { margin-top: 6px; }
 .cx-empty-hero { padding: 28px 22px 24px; gap: 10px; background: radial-gradient(120% 90% at 50% 0%, #fbf3e4 0%, var(--paper) 60%); }
 .cx-empty-hero .display { color: var(--green); }
-.cx-empty.row-empty { flex-direction: row; align-items: center; text-align: left; gap: 14px; padding: 16px; }
+.cx-empty.row-empty { flex-direction: row; align-items: center; text-align: start; gap: 14px; padding: 16px; }
 .cx-empty.row-empty .cx-art { flex-shrink: 0; width: 72px; height: auto; }
 .cx-empty.row-empty .btn { margin-top: 0; }
 .cx-art { display: block; }
@@ -56,7 +56,7 @@
 .cx-more { font-size: 12px; font-weight: 600; padding-left: 2px; }
 
 /* the one pinned line */
-.cx-pin { flex-shrink: 0; display: flex; align-items: center; gap: 12px; margin: 10px 16px 2px; padding: 10px 14px; border: 0; border-radius: 18px; background: var(--paper); color: var(--green); text-align: left; box-shadow: 0 10px 24px -20px rgba(15,26,22,.6); }
+.cx-pin { flex-shrink: 0; display: flex; align-items: center; gap: 12px; margin: 10px 16px 2px; padding: 10px 14px; border: 0; border-radius: 18px; background: var(--paper); color: var(--green); text-align: start; box-shadow: 0 10px 24px -20px rgba(15,26,22,.6); }
 .cx-pin-ic { width: 32px; height: 32px; border-radius: 999px; background: #f3ead8; color: #7d5d27; display: grid; place-items: center; flex-shrink: 0; }
 .cx-pin-k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--gold-ink); }
 .cx-pin-t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -92,7 +92,7 @@
 
 /* cards in the thread */
 .cx-card { background: var(--paper); border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 14px 28px -26px rgba(15,26,22,.7); }
-.cx-opt { position: relative; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: var(--mist); overflow: hidden; padding: 0; text-align: left; color: var(--green); }
+.cx-opt { position: relative; height: 46px; border-radius: 14px; border: 1px solid var(--line); background: var(--mist); overflow: hidden; padding: 0; text-align: start; color: var(--green); }
 .cx-opt.on { border: 2px solid var(--green); }
 .cx-opt.won { border: 2px solid #b98f4a; }
 .cx-opt[disabled] { cursor: default; }
@@ -127,7 +127,7 @@
 
 .cx-share-card { padding: 8px 8px 12px; }
 .cx-share-card > .small, .cx-share-card > .cx-actions, .cx-share-card > .col { padding: 0 6px; }
-.cx-share-photo { position: relative; display: block; height: 150px; border-radius: 16px; overflow: hidden; border: 0; padding: 0; width: 100%; color: #fffdf9; text-align: left; }
+.cx-share-photo { position: relative; display: block; height: 150px; border-radius: 16px; overflow: hidden; border: 0; padding: 0; width: 100%; color: #fffdf9; text-align: start; }
 .cx-share-photo.small { height: 112px; }
 .cx-share-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .cx-share-over { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
@@ -147,7 +147,7 @@
 .cx-composer input:first-child, .cx-composer label + input { padding-left: 14px; }
 .cx-plus { width: 40px; height: 40px; border-radius: 999px; border: 0; background: #f3ead8; color: #7d5d27; display: grid; place-items: center; flex-shrink: 0; }
 .cx-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.cx-tool { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 18px; background: var(--mist); text-align: left; color: var(--green); }
+.cx-tool { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: 18px; background: var(--mist); text-align: start; color: var(--green); }
 .cx-tool[disabled] { opacity: .5; }
 .cx-tool-ic { width: 40px; height: 40px; border-radius: 12px; background: var(--paper); display: grid; place-items: center; flex-shrink: 0; color: var(--green); }
 

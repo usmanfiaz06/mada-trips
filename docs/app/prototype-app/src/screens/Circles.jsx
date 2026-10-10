@@ -299,7 +299,7 @@ export default function Circles() {
                 <img src={g.img} alt="" /><span className="cx-veil" />
                 {g.unread > 0 && <span className="pill gold" style={{ position: 'absolute', top: 10, left: 10 }}>{g.unread} new</span>}
                 {g.muted && <span className="pill glass" style={{ position: 'absolute', top: 10, right: 10 }}>Muted</span>}
-                <span className="over" style={{ textAlign: 'left', gap: 2 }}><span className="display" style={{ fontSize: 22, color: '#fffdf9' }}>{g.name}</span><span className="tiny cx-line" style={{ color: 'rgba(255,253,249,.92)' }}>{line}</span></span>
+                <span className="over" style={{ textAlign: 'start', gap: 2 }}><span className="display" style={{ fontSize: 22, color: '#fffdf9' }}>{g.name}</span><span className="tiny cx-line" style={{ color: 'rgba(255,253,249,.92)' }}>{line}</span></span>
               </button>
             ) : (
               <button key={g.id} type="button" className="card tap cx-tile plain" onClick={() => push('group', { id: g.id })}>
@@ -363,14 +363,14 @@ export default function Circles() {
               return (
                 <button key={cty} type="button" className="photo" style={{ height: 112, border: 0, padding: 0 }} onClick={() => push('saved', { city: cty })}>
                   <img src={cty === 'Riyadh' ? 'img/riyadh.jpg' : cty === 'AlUla' ? 'img/alula.jpg' : 'img/istanbul.jpg'} alt="" /><span className="cx-veil" />
-                  <span className="over" style={{ textAlign: 'left', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 15, color: '#fffdf9' }}>{cty}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{n} {n === 1 ? 'place' : 'places'}</span></span>
+                  <span className="over" style={{ textAlign: 'start', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 15, color: '#fffdf9' }}>{cty}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{n} {n === 1 ? 'place' : 'places'}</span></span>
                 </button>
               );
             })}
             {(s.savedPlans || []).filter((id) => PLANS[id]).map((id) => (
               <button key={id} type="button" className="photo" style={{ height: 112, border: 0, padding: 0 }} onClick={() => push('plan', { id })}>
                 <img src={PLANS[id].img} alt="" /><span className="cx-veil" />
-                <span className="over" style={{ textAlign: 'left', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 14, color: '#fffdf9' }}>{PLANS[id].title}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>Plan · {PLANS[id].days} days</span></span>
+                <span className="over" style={{ textAlign: 'start', gap: 0, padding: 12 }}><span className="h3" style={{ fontSize: 14, color: '#fffdf9' }}>{PLANS[id].title}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>Plan · {PLANS[id].days} days</span></span>
               </button>
             ))}
           </div>
@@ -1095,7 +1095,7 @@ function Discover({ posts, setPosts, onPost }) {
       {s.trip && city === 'Istanbul' && <span className="tiny" style={{ marginTop: -8 }}>While you're there, {s.trip.dates}</span>}
       <div className="chips scrollx" style={{ gap: 12 }}>
         {EVENTS[city].map((e, i) => (
-          <button key={e.id} type="button" className="story" style={{ width: 236, minHeight: 300, flexShrink: 0, border: 0, padding: 0, textAlign: 'left' }} onClick={() => push('ask', { prefill: `${e.title} in ${city}` })}>
+          <button key={e.id} type="button" className="story" style={{ width: 236, minHeight: 300, flexShrink: 0, border: 0, padding: 0, textAlign: 'start' }} onClick={() => push('ask', { prefill: `${e.title} in ${city}` })}>
             <img className="bg" src={e.img} alt="" style={{ objectPosition: ['50% 40%', '30% 70%', '70% 30%'][i] }} />
             <span className="veil" />
             <span className="top"><span className="pill glass">{e.tag}</span></span>
@@ -1111,7 +1111,7 @@ function Discover({ posts, setPosts, onPost }) {
       <h2 className="h2" style={{ fontSize: 22, marginTop: 6 }}>Trips we've planned</h2>
       <div className="chips scrollx" style={{ gap: 12 }}>
         {Object.values(PLANS).map((pl) => (
-          <button key={pl.id} type="button" className="story" style={{ width: 280, minHeight: 220, flexShrink: 0, border: 0, padding: 0, textAlign: 'left' }} onClick={() => push('plan', { id: pl.id })}>
+          <button key={pl.id} type="button" className="story" style={{ width: 280, minHeight: 220, flexShrink: 0, border: 0, padding: 0, textAlign: 'start' }} onClick={() => push('plan', { id: pl.id })}>
             <img className="bg" src={pl.img} alt="" />
             <span className="veil" />
             <span className="top"><span className="pill glass">{pl.days} days · planned by Mada</span></span>
@@ -1145,7 +1145,7 @@ function Discover({ posts, setPosts, onPost }) {
             {p.img && <img className="bg" src={p.img} alt="" style={{ objectPosition: '50% 55%' }} />}
             <span className="veil" />
             <div className="top">
-              <button type="button" disabled={!FRIENDS[p.uid]} aria-label={`${p.who}'s profile`} onClick={() => push('friend', { id: p.uid })} className="row" style={{ gap: 8, padding: '4px 12px 4px 4px', borderRadius: 999, border: 0, color: '#fffdf9', textAlign: 'left', background: 'rgba(15,26,22,.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
+              <button type="button" disabled={!FRIENDS[p.uid]} aria-label={`${p.who}'s profile`} onClick={() => push('friend', { id: p.uid })} className="row" style={{ gap: 8, padding: '4px 12px 4px 4px', borderRadius: 999, border: 0, color: '#fffdf9', textAlign: 'start', background: 'rgba(15,26,22,.45)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
                 <span className={'avatar sm' + (p.tone ? ' ' + p.tone : '')} style={{ width: 28, height: 28 }}>{p.initial}</span>
                 <span className="col" style={{ gap: 0 }}><span style={{ fontSize: 13, fontWeight: 600 }}>{p.who}</span><span style={{ fontSize: 11, color: 'rgba(255,253,249,.8)' }}>{p.rel}{p.pending ? ' · being checked' : ''}</span></span>
               </button>

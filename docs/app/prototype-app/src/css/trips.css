@@ -6,14 +6,14 @@
 
 /* rows inside a grouped card */
 .tm-list { overflow: hidden; }
-.tm-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 10px; border: 0; background: transparent; border-radius: 18px; text-align: left; color: var(--green); box-sizing: border-box; font: inherit; }
+.tm-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 10px; border: 0; background: transparent; border-radius: 18px; text-align: start; color: var(--green); box-sizing: border-box; font: inherit; }
 button.tm-row:active { background: var(--mist); }
 .tm-row + .tm-row { box-shadow: 0 -1px 0 var(--line); border-radius: 0 0 18px 18px; }
 .tm-row-title { font-size: 15px; font-weight: 600; line-height: 1.25; }
 .tm-ic { width: 38px; height: 38px; border-radius: 12px; background: var(--mist); display: grid; place-items: center; flex-shrink: 0; color: var(--green); }
 .tm-ic.gold { background: var(--gold); }
 .tm-ic.muted, .tm-row .tm-ic.muted + .grow { opacity: .5; }
-.tm-strip { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border: 0; border-radius: 20px; background: #f3ead8; box-shadow: inset 0 0 0 1px rgba(185, 143, 74, .35); text-align: left; color: var(--green); font: inherit; width: 100%; }
+.tm-strip { display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 10px; border: 0; border-radius: 20px; background: #f3ead8; box-shadow: inset 0 0 0 1px rgba(185, 143, 74, .35); text-align: start; color: var(--green); font: inherit; width: 100%; }
 .tm-faisal { display: flex; align-items: flex-start; gap: 10px; }
 .tm-faisal .small { color: var(--green); padding-top: 6px; }
 .tm-check { width: 60px; height: 60px; border-radius: 999px; background: var(--ok); display: grid; place-items: center; margin-top: 30px; animation: pop .6s var(--spring) both; }
@@ -53,7 +53,7 @@ button.tm-row:active { background: var(--mist); }
 .tm-day-date span { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--gold); }
 .tm-tl { display: flex; flex-direction: column; position: relative; }
 .tm-tl::before { content: ''; position: absolute; left: 62px; top: 14px; bottom: 14px; width: 2px; background: #ece5da; }
-.tm-ev { position: relative; display: grid; grid-template-columns: 44px 30px 1fr; gap: 4px; align-items: start; width: 100%; border: 0; background: transparent; padding: 8px 4px; border-radius: 16px; text-align: left; color: var(--green); font: inherit; }
+.tm-ev { position: relative; display: grid; grid-template-columns: 44px 30px 1fr; gap: 4px; align-items: start; width: 100%; border: 0; background: transparent; padding: 8px 4px; border-radius: 16px; text-align: start; color: var(--green); font: inherit; }
 .tm-ev:active { background: var(--mist); }
 .tm-ev-time { font-size: 13px; font-weight: 600; padding-top: 5px; color: var(--green); }
 .tm-ev-dot { width: 28px; height: 28px; border-radius: 999px; background: var(--mist); display: grid; place-items: center; position: relative; z-index: 1; box-shadow: 0 0 0 3px var(--paper); }
@@ -79,7 +79,7 @@ button.tm-row:active { background: var(--mist); }
 a.btn { text-decoration: none; box-sizing: border-box; }
 
 /* payments */
-.tm-pay { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 12px 10px; border: 0; background: transparent; border-radius: 18px; text-align: left; color: var(--green); font: inherit; }
+.tm-pay { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 12px 10px; border: 0; background: transparent; border-radius: 18px; text-align: start; color: var(--green); font: inherit; }
 .tm-pay:active { background: var(--mist); }
 .tm-pay + .tm-pay { box-shadow: 0 -1px 0 var(--line); border-radius: 0 0 18px 18px; }
 .tm-inst { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
@@ -104,7 +104,7 @@ a.btn { text-decoration: none; box-sizing: border-box; }
 
 /* special requests grid */
 .tm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.tm-tile { border: 0; border-radius: 22px; background: var(--paper); padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; color: var(--green); font: inherit; min-height: 128px; }
+.tm-tile { border: 0; border-radius: 22px; background: var(--paper); padding: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: start; color: var(--green); font: inherit; min-height: 128px; }
 .tm-tile:active { transform: scale(.98); }
 
 @media print {

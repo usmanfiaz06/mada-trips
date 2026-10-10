@@ -5,7 +5,7 @@
 .support-msg.them { align-self: flex-start; background: #fffdf9; color: #1e352d; border-radius: 6px 22px 22px 22px; }
 .support-msg.me { align-self: flex-end; background: #1e352d; color: #f6f2ec; border-radius: 22px 6px 22px 22px; }
 .support-time { font-size: 11px; opacity: .6; }
-.inbox-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px; border: 0; border-radius: 20px; background: transparent; text-align: left; color: #1e352d; position: relative; }
+.inbox-row { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 14px; border: 0; border-radius: 20px; background: transparent; text-align: start; color: #1e352d; position: relative; }
 .inbox-row.unread { background: #fffdf9; }
 .inbox-icon { width: 40px; height: 40px; border-radius: 12px; background: var(--mist); display: grid; place-items: center; flex-shrink: 0; }
 .inbox-dot { position: absolute; top: 18px; right: 14px; width: 8px; height: 8px; border-radius: 9px; background: #b98f4a; }

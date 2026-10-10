@@ -88,7 +88,7 @@ export default function Profile() {
               ))}
             </div>
             <span className="small">{s.settings.alerts === 'quiet' ? 'Only when you need to act: gate changes, delays, leave-now, documents. Everything else waits for the evening digest.' : 'Every update about your trips as it happens. Still never offers.'}</span>
-            {s.demo.permissionsDenied ? <button type="button" className="link alerts-off" style={{ alignSelf: 'flex-start', padding: 0, color: '#7d5d27', textAlign: 'left' }} onClick={() => setSheet('alertsOff')}>Alerts are off for Mada on this phone. Turn them on</button>
+            {s.demo.permissionsDenied ? <button type="button" className="link alerts-off" style={{ alignSelf: 'flex-start', padding: 0, color: '#7d5d27', textAlign: 'start' }} onClick={() => setSheet('alertsOff')}>Alerts are off for Mada on this phone. Turn them on</button>
               : s.notifications === false && <span className="small" style={{ color: '#7d5d27' }}>Alerts are off for Mada on this phone. Turn them on in Settings to get gate changes.</span>}
           </div>
         </Group>

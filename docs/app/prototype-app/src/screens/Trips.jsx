@@ -111,7 +111,7 @@ function Upcoming() {
       <button type="button" className="photo" style={{ height: 210, border: 0, padding: 0, width: '100%', display: 'block' }} onClick={() => push('trip')} aria-label={`${t.city} trip`}>
         <img src={t.img || 'img/istanbul.jpg'} alt={t.city} />
         <span className="shade" />
-        <span className="over" style={{ textAlign: 'left' }}>
+        <span className="over" style={{ textAlign: 'start' }}>
           <span className="display" style={{ fontSize: 36, color: '#fffdf9' }}>{t.city}</span>
           <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{t.datesLong} · {who.length === 1 && t.travellers[0] === 'omar' ? 'Just you' : who.join(', ')}</span>
         </span>

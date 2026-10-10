@@ -1000,7 +1000,7 @@ function PlanFlow({ query }) {
       <span className="h2">We've planned it. Change anything you like.</span>
       <button type="button" className="photo" style={{ height: 220, border: 0, padding: 0 }} onClick={() => push('plan', { id })}>
         <img src={plan.img} alt="" /><span className="shade" />
-        <span className="over" style={{ textAlign: 'left', gap: 4 }}>
+        <span className="over" style={{ textAlign: 'start', gap: 4 }}>
           <span className="pill glass" style={{ alignSelf: 'flex-start' }}>{plan.days} days · {plan.plan.reduce((a, x) => a + x.stops.length, 0)} stops</span>
           <span className="display" style={{ fontSize: 30, color: '#fffdf9' }}>{plan.title}</span>
           <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>{plan.sub}</span>

@@ -2,7 +2,7 @@
 .acc-group { background: var(--paper); border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; }
 .acc-group.well { background: var(--mist); flex-shrink: 0; }
 .acc-group > * + *, .acc-group > .acc-faq + .acc-faq { border-top: 1px solid var(--line); }
-.acc-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 56px; box-sizing: border-box; width: 100%; border: 0; background: transparent; text-align: left; color: var(--green); font: inherit; transition: background .15s ease; }
+.acc-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; min-height: 56px; box-sizing: border-box; width: 100%; border: 0; background: transparent; text-align: start; color: var(--green); font: inherit; transition: background .15s ease; }
 button.acc-row:active { background: rgba(30, 53, 45, .05); }
 .acc-row.col { align-items: stretch; }
 .acc-k { font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: .01em; }
@@ -24,7 +24,7 @@ button.acc-row:active { background: rgba(30, 53, 45, .05); }
 .acc-avatar-wrap .avatar { box-shadow: 0 14px 28px -16px rgba(15, 26, 22, .7); }
 .acc-cam { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; border-radius: 999px; background: var(--gold); display: grid; place-items: center; border: 3px solid var(--sand); }
 .acc-photo { object-fit: cover; padding: 0; display: block; }
-.acc-namebtn { border: 0; background: none; padding: 0; text-align: left; color: var(--green); gap: 2px; align-items: flex-start; }
+.acc-namebtn { border: 0; background: none; padding: 0; text-align: start; color: var(--green); gap: 2px; align-items: flex-start; }
 .acc-link { display: inline-flex; align-items: center; gap: 2px; margin-top: 4px; font-size: 13px; font-weight: 600; color: var(--gold-ink); }
 .acc-hero { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 4px 0 0; align-self: center; }
 .acc-hero .acc-cam { width: 30px; height: 30px; }
@@ -62,7 +62,7 @@ button.acc-row:active { background: rgba(30, 53, 45, .05); }
 .acc-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
 
 /* Sign out: two clear choices, the destructive one in red */
-.acc-choice { align-items: flex-start; text-align: left; gap: 6px; width: 100%; }
+.acc-choice { align-items: flex-start; text-align: start; gap: 6px; width: 100%; }
 .acc-choice .small { color: var(--ink-2); padding-left: 46px; }
 /* Empty states for a new account */
 .wl-empty { border: 1.5px dashed rgba(30, 53, 45, .18); background: transparent; }

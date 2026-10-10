@@ -113,7 +113,7 @@ h1, h2, h3 { text-wrap: balance; }
 .card.focal { background: var(--green); color: var(--mist); box-shadow: 0 22px 40px -26px rgba(15, 26, 22, .8); }
 .card.focal .small:not(.btn), .card.focal .tiny { color: #c9c1b4; }
 .card.well { background: var(--mist); }
-.card.tap { border: 0; text-align: left; transition: transform .12s ease; width: 100%; color: inherit; font: inherit; }
+.card.tap { border: 0; text-align: start; transition: transform .12s ease; width: 100%; color: inherit; font: inherit; }
 .card.tap:active { transform: scale(.985); }
 .card.tap.focal { color: var(--mist); }
 .card.selected { box-shadow: 0 0 0 2px var(--green); }
@@ -162,7 +162,7 @@ h1, h2, h3 { text-wrap: balance; }
 
 /* ---------- toast + banner ---------- */
 .toast { position: absolute; left: 20px; right: 20px; bottom: 104px; z-index: 60; background: var(--green); color: var(--mist); border-radius: 18px; padding: 12px 16px; font-size: 14px; font-weight: 500; line-height: 1.4; display: flex; gap: 10px; align-items: center; animation: toastIn .4s var(--ease) both; box-shadow: 0 16px 30px -18px rgba(15, 26, 22, .7); }
-.banner { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 70; background: rgba(255, 253, 249, .92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 22px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; box-shadow: 0 18px 40px -16px rgba(15, 26, 22, .5); animation: bannerIn .45s var(--ease) both; border: 0; text-align: left; width: calc(100% - 20px); }
+.banner { position: absolute; left: 10px; right: 10px; top: 10px; z-index: 70; background: rgba(255, 253, 249, .92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 22px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; box-shadow: 0 18px 40px -16px rgba(15, 26, 22, .5); animation: bannerIn .45s var(--ease) both; border: 0; text-align: start; width: calc(100% - 20px); }
 .banner .app-ic { width: 36px; height: 36px; border-radius: 9px; background: var(--green); display: grid; place-items: center; flex-shrink: 0; }
 .offline { flex-shrink: 0; background: var(--green); color: var(--mist); font-size: 13px; font-weight: 500; text-align: center; padding: 50px 16px 8px; }
 
@@ -321,12 +321,12 @@ h1, h2, h3 { text-wrap: balance; }
 .pp-k { color: #6b6a63; }
 .pp-v { font-weight: 600; color: #1e352d; letter-spacing: .01em; }
 .pp-tick { width: 18px; height: 18px; border-radius: 99px; background: #d9b77a; display: grid; place-items: center; }
-.city-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; border: 0; border-radius: 18px; background: var(--mist); text-align: left; color: var(--green); }
+.city-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 12px 8px 8px; border: 0; border-radius: 18px; background: var(--mist); text-align: start; color: var(--green); }
 .city-row img { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
 .city-row.on { background: #efe3c9; box-shadow: inset 0 0 0 1.5px #d9b77a; }
-.address-card { border: 0; text-align: left; background: var(--mist); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 8px; color: var(--green); }
+.address-card { border: 0; text-align: start; background: var(--mist); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 8px; color: var(--green); }
 .address-big { position: absolute; inset: 0; z-index: 80; background: #fffdf9; padding: 80px 28px; display: flex; flex-direction: column; gap: 20px; justify-content: center; color: var(--green); animation: fade .2s ease both; }
-.person-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 0; border-radius: 18px; background: var(--paper); text-align: left; color: var(--green); box-sizing: border-box; }
+.person-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border: 0; border-radius: 18px; background: var(--paper); text-align: start; color: var(--green); box-sizing: border-box; }
 .person-row.on { background: #f3ead8; box-shadow: inset 0 0 0 1.5px #d9b77a; }
 .tickbox { width: 24px; height: 24px; border-radius: 99px; border: 1.5px solid #c9c1b4; display: grid; place-items: center; flex-shrink: 0; }
 .tickbox.on { background: var(--green); border-color: var(--green); }

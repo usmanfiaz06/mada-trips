@@ -125,7 +125,7 @@ function Composer({ title = 'Where to next?' }) {
   const { push } = useStore();
   return (
     <div className="card rise" style={{ padding: 18, gap: 14, boxShadow: '0 18px 40px -28px rgba(30,53,45,.5)' }}>
-      <button type="button" className="spread" onClick={() => { buzz(HAPTIC.tap); push('ask', {}); }} style={{ border: 0, background: 'none', padding: 0, textAlign: 'left' }}>
+      <button type="button" className="spread" onClick={() => { buzz(HAPTIC.tap); push('ask', {}); }} style={{ border: 0, background: 'none', padding: 0, textAlign: 'start' }}>
         <span className="col">
           <span className="display" style={{ fontSize: 30 }}>{title}</span>
           <span className="small">A place, a date, who's going. Any way you like.</span>
@@ -188,7 +188,7 @@ function Nothing() {
       <RequestsCard />
       {(s.trackedFlights || []).length > 0 && <TrackedFlights />}
       {!s.passportSaved && (
-        <button type="button" className="notice rise" style={{ border: 0, textAlign: 'left' }} onClick={() => push('passportSetup', { later: true })}>
+        <button type="button" className="notice rise" style={{ border: 0, textAlign: 'start' }} onClick={() => push('passportSetup', { later: true })}>
           <span className="td-pp-mini" aria-hidden="true"><i /></span>
           <span className="grow"><span className="h3">Add your passport</span><span className="small">One scan and we'll fill it in on every booking.</span></span>
           <Icon name="chevron" />
@@ -198,7 +198,7 @@ function Nothing() {
         <button type="button" className="photo" style={{ minHeight: 220, height: '100%', border: 0, padding: 0, gridRow: 'span 2' }} onClick={() => push('plan', { id: 'alula2' })}>
           <img className="drift" src="img/alula.jpg" alt="Sandstone rocks in AlUla" />
           <span className="shade" />
-          <span className="over" style={{ textAlign: 'left' }}>
+          <span className="over" style={{ textAlign: 'start' }}>
             <span className="display" style={{ fontSize: 28, color: '#fffdf9' }}>AlUla</span>
             <span className="small" style={{ color: 'rgba(255,253,249,.9)' }}>Two days, planned for you. 1h 20m from Riyadh.</span>
           </span>
@@ -369,7 +369,7 @@ function TripHero({ height = 230, children }) {
         <span className="pill glass td-when">{tripWhen(s)}</span>
         {f && <span className="pill glass"><span className="code">{f.from}</span> → <span className="code">{f.to}</span></span>}
       </span>
-      <span className="over" style={{ textAlign: 'left' }}>
+      <span className="over" style={{ textAlign: 'start' }}>
         <span className="display" style={{ fontSize: 44, color: '#fffdf9' }}>{t.city}</span>
         <span className="td-hero-sub">{t.datesLong} · {t.travellers.length === 1 ? 'just you' : `${t.travellers.length} travellers`}{f ? ' · ' + f.airline : ''}{f?.cabin && f.cabin !== 'Economy' ? ' ' + f.cabin : ''}</span>
         {children}
@@ -522,7 +522,7 @@ function Booked() {
             <img src={c.img} alt="" style={{ objectPosition: c.pos }} />
             <span className="td-veil" />
             <span className="pill glass" style={{ position: 'absolute', top: 12, left: 12 }}>{c.tag}</span>
-            <span className="over" style={{ textAlign: 'left' }}>
+            <span className="over" style={{ textAlign: 'start' }}>
               <span className="h3" style={{ color: '#fffdf9', fontSize: 17 }}>{c.title}</span>
               <span className="td-hero-sub" style={{ fontSize: 13 }}>{c.note}</span>
             </span>
@@ -1065,7 +1065,7 @@ function Landed() {
           <span className="pill glass"><span className="dot" style={{ background: '#4fbf7a' }} />Landed {addMin(s.trip?.flight?.arr || '13:55', -3)} · {s.trip?.flight?.to || 'IST'}</span>
           <span className="pill glass">Same time as Riyadh</span>
         </span>
-        <span className="over" style={{ textAlign: 'left' }}>
+        <span className="over" style={{ textAlign: 'start' }}>
           <span className="display" style={{ fontSize: 42, color: '#fffdf9' }}>Welcome to Istanbul.</span>
           <span className="td-hero-sub">14° and light rain. Umbrella out.</span>
         </span>
@@ -1346,7 +1346,7 @@ function Home() {
           <button key={c.id} type="button" role="listitem" className="photo td-tile tall" onClick={() => { buzz(HAPTIC.tap); push(c.go[0], c.go[1]); }}>
             <img src={c.img} alt="" style={{ objectPosition: c.pos }} />
             <span className="td-veil" />
-            <span className="over" style={{ textAlign: 'left' }}>
+            <span className="over" style={{ textAlign: 'start' }}>
               <span className="display" style={{ color: '#fffdf9', fontSize: 28 }}>{c.title}</span>
               <span className="td-hero-sub" style={{ fontSize: 13 }}>{c.note}</span>
             </span>

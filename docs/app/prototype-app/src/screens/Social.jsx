@@ -681,7 +681,7 @@ export function PostDetail({ post, saved, onSave, onClose, onDelete }) {
   return (
     <Sheet label={post.place} onClose={onClose}>
       {post.img && <img src={post.img} alt="" style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 20 }} />}
-      <button type="button" className="row" style={{ border: 0, background: 'none', padding: 0, textAlign: 'left' }} disabled={mine || !FRIENDS[post.uid]} onClick={() => { onClose(); push('friend', { id: post.uid }); }}>
+      <button type="button" className="row" style={{ border: 0, background: 'none', padding: 0, textAlign: 'start' }} disabled={mine || !FRIENDS[post.uid]} onClick={() => { onClose(); push('friend', { id: post.uid }); }}>
         <span className={'avatar sm' + (post.tone ? ' ' + post.tone : '')}>{post.initial}</span>
         <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{post.who}</span><span className="tiny">{post.rel} · {post.when || 'Just now'}{post.pending ? ' · being checked' : ''}</span></span>
       </button>
@@ -737,7 +737,7 @@ export function Saved({ params = {} }) {
             <div key={city} className="col" style={{ gap: 10 }}>
               <div className="photo" style={{ height: 120 }}>
                 <img src={CITY_IMG[city] || 'img/istanbul.jpg'} alt="" /><span className="shade" />
-                <span className="over" style={{ textAlign: 'left', gap: 0 }}><span className="display" style={{ fontSize: 28, color: '#fffdf9' }}>{city}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{items.length} {items.length === 1 ? 'place' : 'places'}</span></span>
+                <span className="over" style={{ textAlign: 'start', gap: 0 }}><span className="display" style={{ fontSize: 28, color: '#fffdf9' }}>{city}</span><span className="tiny" style={{ color: 'rgba(255,253,249,.9)' }}>{items.length} {items.length === 1 ? 'place' : 'places'}</span></span>
               </div>
               <div className="row" style={{ flexWrap: 'wrap' }}>
                 <button type="button" className="btn primary small" onClick={() => push('ask', { prefill: `Plan a day in ${city} around ${items.map((i) => i.place).join(', ')}` })}>Plan a day from these</button>

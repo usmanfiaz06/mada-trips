@@ -2,7 +2,7 @@
 .empty-hero { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 28px; background: var(--paper); box-shadow: 0 18px 36px -28px rgba(15,26,22,.5); }
 .empty-hero .display { font-size: 32px; line-height: 1.02; }
 .idea-row { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
-.idea { flex: 0 0 124px; height: 150px; border-radius: 20px; border: 0; padding: 0; position: relative; overflow: hidden; text-align: left; }
+.idea { flex: 0 0 124px; height: 150px; border-radius: 20px; border: 0; padding: 0; position: relative; overflow: hidden; text-align: start; }
 .idea img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease); }
 .idea:active img { transform: scale(1.06); }
 .idea::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(15,26,22,0) 40%, rgba(15,26,22,.85) 100%); }
@@ -12,7 +12,7 @@
 .board { background: #121c18; border-radius: 22px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 20px 34px -24px rgba(0,0,0,.7); }
 .board-head { display: flex; justify-content: space-between; align-items: center; color: #d9b77a; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 0 2px 4px; }
 .board-dot { width: 7px; height: 7px; border-radius: 9px; background: #4fbf7a; animation: glow 1.6s ease-in-out infinite; }
-.board-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; border: 0; background: none; padding: 0; text-align: left; }
+.board-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; border: 0; background: none; padding: 0; text-align: start; }
 .board-flaps { display: flex; gap: 2px; }
 .board-flaps i { font-style: normal; width: 17px; height: 24px; display: grid; place-items: center; background: linear-gradient(180deg, #24312c 0 49%, #1c2723 51% 100%); color: #f4ead6; font-family: var(--f-mono); font-size: 13px; font-weight: 600; border-radius: 3px; animation: flap .5s cubic-bezier(.3,.7,.3,1) both; }
 .board-flaps i.blink { color: #d9b77a; animation: flap .5s both, blinkish 2.4s 1s ease-in-out infinite; }
@@ -59,7 +59,7 @@
 .es.center .es-ideas { justify-content: safe center; }
 
 /* the compact version, for a slot inside a list */
-.es-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 12px; border-radius: 22px; background: var(--paper); border: 0; text-align: left; width: 100%; box-sizing: border-box; color: inherit; font: inherit; }
+.es-row { display: flex; align-items: center; gap: 14px; padding: 12px 14px 12px 12px; border-radius: 22px; background: var(--paper); border: 0; text-align: start; width: 100%; box-sizing: border-box; color: inherit; font: inherit; }
 .es-row.plain { background: transparent; padding: 10px 2px; border-radius: 0; }
 .es-row.tap { cursor: pointer; transition: transform .18s var(--ease); }
 .es-row.tap:active { transform: scale(.985); }
@@ -150,7 +150,7 @@
 
 /* Support on first open: topics as a tidy grid, never a pile of pills */
 .sp-topics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.sp-topics button { border: 0; border-radius: 16px; background: var(--paper); padding: 12px; text-align: left; font-size: 14px; font-weight: 600; color: var(--green); display: flex; align-items: center; gap: 10px; min-height: 48px; }
+.sp-topics button { border: 0; border-radius: 16px; background: var(--paper); padding: 12px; text-align: start; font-size: 14px; font-weight: 600; color: var(--green); display: flex; align-items: center; gap: 10px; min-height: 48px; }
 .sp-topics button svg { flex-shrink: 0; color: var(--gold-deep); }
 
 /* Household and other short lists: the drawing sits under the list */
