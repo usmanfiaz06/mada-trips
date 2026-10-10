@@ -59,7 +59,8 @@ const tab = async (name) => { await page.getByRole('tab', { name, exact: true })
 
 async function phase(p) {
   await tab('Today');
-  for (let i = 0; i < 6; i += 1) { await page.mouse.move(195, 420); await page.mouse.wheel(0, -3000); await page.waitForTimeout(150); }
+  await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
+  await page.waitForTimeout(400);
   await byTest('today-date').first().waitFor({ state: 'visible', timeout: 15000 });
   await byTest('today-date').first().click({ delay: 700 });
   await page.waitForTimeout(400);
