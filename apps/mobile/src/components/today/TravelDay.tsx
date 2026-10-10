@@ -7,7 +7,6 @@ import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { AirlineMark, Box, Cells, Dot, Eyebrow, Grow, H3, IconTile, Num, Photo, Rise, Row, RouteLine, Small, SmallButton, Spread, Tag, TalkLine, Tiny, useTicker } from '@/components/trips/ui';
 import { VGradient } from '@/components/Gradient';
-import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { tripsApi, useDemo } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
@@ -43,7 +42,7 @@ function LeaveCard({ trip, now }: { trip: TripDetail; now: () => number }) {
 /** The flight, live: gate, boarding, seats, and where the status came from. */
 export function FlightCard({ trip, predicted, updatedAt }: { trip: TripDetail; predicted?: boolean; updatedAt: number }) {
   const router = useRouter();
-  const offline = useDemo((s) => s.offline);
+  const offline = useOffline();
   const out = outSegment(trip)!;
   const changed = !!out.bookedGate && !!out.gate && out.gate !== out.bookedGate;
   const late = out.delayMin ?? 0;
@@ -107,7 +106,7 @@ export function StepList({ steps }: { steps: ['done' | 'now' | 'todo', string, s
 export function TravelDay({ trip, predicted, now, updatedAt }: { trip: TripDetail; predicted?: boolean; now: () => number; updatedAt: number }) {
   const router = useRouter();
   const show = useBanner((s) => s.show);
-  const offline = useDemo((s) => s.offline);
+  const offline = useOffline();
   const out = outSegment(trip)!;
   const pk = pickupPlan(trip);
   const told = useRef(false);

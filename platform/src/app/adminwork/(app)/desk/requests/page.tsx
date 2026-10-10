@@ -10,7 +10,7 @@ import { REQUEST_STATUS, StatusBadge } from "@/components/desk/parts";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 
 export const metadata = { title: "Requests · Desk" };
-const KIND: Record<string, string> = { visa: "Visa", umrah: "Umrah", car: "Car", restaurant: "Restaurant", activity: "Things to do", change: "Change", cancel: "Cancel", refund: "Refund", general: "General" };
+const KIND: Record<string, string> = { destination: "Destination", visa: "Visa", umrah: "Umrah", car: "Car", restaurant: "Restaurant", activity: "Things to do", change: "Change", cancel: "Cancel", refund: "Refund", general: "General" };
 const TABS = ["open", "quote", "quoted", "done", "all"] as const;
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ s?: string }> }) {

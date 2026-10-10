@@ -12,6 +12,7 @@ import { bookingCopy } from './booking';
 import { deskCopy } from './desk';
 import { enTrips } from './en-trips';
 import { resilienceCopy } from './resilience';
+import { placesCopy } from './places';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -26,6 +27,8 @@ export const en = {
   ...enTrips,
   // When things go wrong: offline, slow, busy, maintenance, updates, crashes (FLOWS.md §12): packages/shared/src/copy/resilience.ts
   ...resilienceCopy,
+  // Places: worldwide city search, city pages, Plan it with Mada: packages/shared/src/copy/places.ts
+  ...placesCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

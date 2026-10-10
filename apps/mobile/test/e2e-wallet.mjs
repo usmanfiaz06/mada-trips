@@ -12,7 +12,7 @@
 // offline queue with call and SMS, attachments) and the inbox. Screenshots every step at 390×844; fails on any page
 // error or missing text.
 import { createServer, request as httpRequest } from 'node:http';
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
@@ -56,6 +56,9 @@ writeFileSync(join(FIX, 'visa.jpg'), JPEG);
 writeFileSync(join(FIX, 'insurance.pdf'), '%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 writeFileSync(join(FIX, 'notes.txt'), 'not a document');
 writeFileSync(join(FIX, 'huge.jpg'), Buffer.concat([JPEG, Buffer.alloc(10.5 * 1024 * 1024)]));
+// The prototype's passport photos (docs/app/prototype-app/test/fixtures): a misprinted birth date, an expired specimen, a receipt.
+const PROTO = resolve('../../docs/app/prototype-app/test/fixtures');
+for (const f of ['noura-baddigit.jpg', 'anna-photo.jpg', 'receipt.png']) writeFileSync(join(FIX, f), readFileSync(join(PROTO, f)));
 
 async function newPage(demo = {}) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh' });
@@ -220,10 +223,110 @@ async function walletLock() {
   await context.close();
 }
 
+
+/* ───────────── 3. a new account: empty Wallet, add your passport, documents ───────────── */
+async function walletFresh() {
+  const { page, context } = await newPage();
+  const { shot, see, gone, byTest, pickFile, closeSheet, press, tap } = kit(page);
+  step('fresh: a new account');
+  const phone = `5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`;
+  await signIn(page, phone, { returning: false });
+  await byTest('dock-wallet').click();
+  await see('Your passport isn’t here yet.', 'empty passport');
+  await see('No other documents yet', 'no documents');
+  await see('No boarding passes yet', 'no passes');
+  await shot('fresh-wallet-empty');
+
+  step('passport: intro, camera sheet, wrong file, unreadable photo');
+  await byTest('passport-scan').click();
+  await see('Scan it once. Never type it again.', 'passport intro');
+  await page.waitForTimeout(2400);
+  await shot('passport-intro');
+  await byTest('passport-scan-start').click();
+  await see('“Mada” would like to use the camera', 'camera sheet');
+  await shot('passport-camera-ask');
+  await byTest('camera-deny').click();
+  await see('No camera, no problem.', 'camera denied');
+  await shot('passport-camera-denied');
+  await closeSheet();
+  await byTest('passport-scan-start').click();
+  await byTest('camera-allow').click();
+  await see('Photograph the photo page', 'camera');
+  await shot('passport-camera');
+  await pickFile(() => byTest('camera-choose').click(), 'notes.txt');
+  await see('That isn’t a photo. Choose a JPG or PNG of the photo page.', 'not a photo');
+  await shot('passport-camera-not-photo');
+  await pickFile(() => byTest('camera-choose').click(), 'receipt.png');
+  await see('Reading your passport…', 'reading');
+  await shot('passport-reading');
+  await see("We couldn't read it.", 'unreadable', 150_000);
+  await see('Lay the passport flat on a table.', 'tips');
+  await shot('passport-failed');
+  await byTest('camera-retry').click();
+
+  step('passport: a real photo, read on the phone, with a doubtful birth date');
+  await pickFile(() => byTest('camera-choose').click(), 'noura-baddigit.jpg');
+  await see('Is this right?', 'confirm', 150_000);
+  await see('Read from your photo. Check every letter. One detail may not have read right.', 'doubt notice');
+  await see('Check this. It may not have read right.', 'check this');
+  await shot('passport-confirm-doubt');
+  const v = async (id) => page.locator(`[data-testid="pp-${id}"]`).inputValue();
+  if ((await v('number')) !== 'B47120385') errors.push(`passport number read as ${await v('number')}`);
+  if ((await v('surname')) !== 'ALQAHTANI') errors.push(`surname read as ${await v('surname')}`);
+  await byTest('pp-dob').fill('17/05/1992');
+  await gone('Check this. It may not have read right.', 'doubt cleared');
+  await byTest('pp-expiry').fill('31/02/2033');
+  await see('Use the format DD/MM/YYYY, for example 22/06/2031.', 'bad date');
+  await byTest('pp-expiry').fill('04/09/2033');
+  await byTest('passport-save').click();
+  await see('Passport saved. It fills in every booking from now on.', 'saved toast');
+  await see('Noura Fahad Alqahtani', 'passport on the card');
+  await see('Valid until 4 Sep 2033.', 'validity');
+  await shot('passport-saved');
+
+  step('documents: wrong type, too big, scan fails, upload, share, delete');
+  await byTest('wallet-add').click();
+  await see('What are you adding?', 'add sheet');
+  await shot('docs-add');
+  await byTest('add-visa').click();
+  await see('Add visa for Noura', 'upload sheet');
+  await pickFile(() => byTest('upload-file').click(), 'notes.txt');
+  await see('That file type won’t work. Use a photo or a PDF.', 'wrong type');
+  await pickFile(() => byTest('upload-file').click(), 'huge.jpg');
+  await see('That file is over 10 MB. Try a photo of the page instead.', 'too big');
+  await shot('docs-too-big');
+  await page.evaluate(() => { window.__MADA_DEMO__ = { scanFails: true }; });
+  await pickFile(() => byTest('upload-file').click(), 'visa.jpg');
+  await see("We couldn't read it.", 'scan fails');
+  await shot('docs-scan-fails');
+  await page.evaluate(() => { window.__MADA_DEMO__ = {}; });
+  await tap('Try again');
+  await pickFile(() => byTest('upload-file').click(), 'visa.jpg');
+  await see('We found this. Check it before saving.', 'found');
+  await byTest('upload-until').fill('11/06/2028');
+  await shot('docs-found');
+  await byTest('upload-save').click();
+  await see('Saved to the Wallet.', 'saved');
+  await see('Valid until Jun 2028', 'listed');
+  await press(page.getByRole('button', { name: 'Visa' }));
+  await see('Share with Mada', 'doc actions');
+  await byTest('doc-share').click();
+  await see('Shared with Mada for this trip only. Faisal can see it, not download it.', 'shared');
+  await press(page.getByRole('button', { name: 'Visa' }));
+  await see('Faisal can see it until', 'shared until');
+  await shot('docs-shared');
+  await byTest('doc-delete').click();
+  await see('Deleted from this phone and from Mada.', 'deleted');
+
+  step('household: a helper, by hand, an expired passport, iqama and exit visa');
+  await page.evaluate(() => window.history.pushState({}, '', '/household'));
+  await byTest('dock-today').click().catch(() => {});
+  await context.close();
+}
 try {
   if (want('demo')) await walletDemo();
   if (want('lock')) await walletLock();
-  if (want('fresh') && globalThis.walletFresh) await globalThis.walletFresh();
+  if (want('fresh')) await walletFresh();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

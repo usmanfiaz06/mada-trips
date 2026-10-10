@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { householdOf, todayIn, type AskIntent, type AskKind, type CopyKey } from '@mada/shared';
+import { householdOf, parseAskRules, todayIn, type AskIntent, type AskKind, type CopyKey, type Person } from '@mada/shared';
+import { useQuery } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -67,7 +68,9 @@ export default function Ask() {
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') {
         // Offline: requests can still be written and saved; searching waits for a connection.
-        setIntent({ kind: kindHint ?? 'general', destination: null, destinationName: null, from: null, depart: null, return: null, tripType: null, monthOnly: null, cabin: null, cabinNote: null, travellerIds: null, travellerCount: null, infants: 0, needs: {}, needsMentioned: [], answers: {}, ask: null, source: 'rules' });
+        // Offline: the same rules the server runs read it here, so requests can still be written and saved.
+        const r = parseAskRules(v, { today, people: household });
+        setIntent({ kind: kindHint ?? r.kind, destination: r.destination, destinationName: r.destinationName, from: r.from, depart: r.depart, return: r.return, tripType: r.tripType, monthOnly: r.monthOnly, cabin: r.cabin, cabinNote: r.cabinNote, travellerIds: r.ids, travellerCount: r.count, infants: r.infants, needs: r.needs, needsMentioned: r.needsMentioned, answers: r.answers, ask: r.ask, source: 'rules' });
         setRound((r) => r + 1);
       } else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setParsing(false); }
@@ -130,7 +133,11 @@ export default function Ask() {
   );
 }
 
-function Start({ onPick, people, today }: { onPick: (x: string) => void; people: ReturnType<typeof usePeople>['data'] & object; today: string }) {
+function Start({ onPick, people, today }: { onPick: (x: string) => void; people: Person[]; today: string }) {
+  const router = useRouter();
+  // The app was closed (or killed) while Mada was booking: pick it up from the server.
+  const active = useQuery({ queryKey: ['booking', 'active'], queryFn: async () => (await bookingApi.activeOrders()).orders });
+  const busy = active.data?.find((o) => !['confirmed', 'cancelled', 'declined'].includes(o.status));
   const H = householdOf(people, today);
   const n = H.nonHelper.length;
   const kid = H.kids[0]?.firstName;
@@ -142,6 +149,11 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
       <T style={[font('display'), { fontSize: 40, lineHeight: 42 }]} accessibilityRole="header">{t('ask.title')}</T>
       <T v="body">{t('ask.intro')}</T>
       <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>
+      {busy ? (
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/waiting/[id]', params: { id: busy.id } })}>
+          <Notice icon="flight"><T v="small" color={colors.green}>{t('ask.resume', { place: busy.place })}</T></Notice>
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }

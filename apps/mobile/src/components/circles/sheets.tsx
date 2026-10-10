@@ -7,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { CITY_INFO, type InviteLink, type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
-import { EmptyState } from '@/components/EmptyState';
 import { Field } from '@/components/Field';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
@@ -18,7 +17,6 @@ import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors, ff } from '@/theme';
-import { ArtCompass } from './art';
 import { Face, Input, Row, SheetScroll } from './ui';
 
 /* Sheets shared by several Circles screens: invite links, reports, the city picker, posting a tip, one tip opened. */
@@ -65,13 +63,12 @@ export function ReportBody({ onSend, cta = t('circles.report.send') }: { onSend:
 }
 
 /** "What's on where?": where you are, your trips, worth a look; or a search, honest about cities we don't cover. */
-export function CitySheet({ visible, onClose, current, sheet, onPick }: {
-  visible: boolean; onClose: () => void; current: string; sheet: { title: 'here' | 'trips' | 'worth'; rows: { city: string; note: string }[] }[]; onPick: (city: string) => void;
+export function CitySheet({ visible, onClose, current, sheet, onPick, onGuide }: {
+  visible: boolean; onClose: () => void; current: string; sheet: { title: 'here' | 'trips' | 'worth'; rows: { city: string; note: string }[] }[]; onPick: (city: string) => void; onGuide: (city: string) => void;
 }) {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();
   const hits = term ? Object.keys(CITY_INFO).filter((c) => c.toLowerCase().includes(term)) : null;
-  const notify = useAct((city: string) => circlesApi.notifyCity(city), () => []);
   const note = (n: string) => (n === 'here' ? t('circles.city.hereNow') : n === 'planned' ? t('circles.city.planned') : n === 'popular' ? t('circles.city.popular') : n);
   const row = (city: string, sub: string) => (
     <Pressable key={city + sub} accessibilityRole="button" accessibilityState={{ selected: city === current }} accessibilityLabel={city}
@@ -86,12 +83,19 @@ export function CitySheet({ visible, onClose, current, sheet, onPick }: {
       <SheetScroll>
         <T v="h2">{t('circles.city.title')}</T>
         <Input placeholder={t('circles.city.search')} value={q} onChangeText={setQ} accessibilityLabel={t('circles.city.search')} testID="city-search" />
-        {hits ? (hits.length ? <View style={{ gap: 8 }}>{hits.map((c) => row(c, CITY_INFO[c]!.country))}</View> : (
-          <View style={{ backgroundColor: colors.mist, borderRadius: 22 }}>
-            <EmptyState compact art={<ArtCompass width={80} height={60} />} title={t('circles.city.none', { city: q.trim() })} body={t('circles.city.noneBody')}
-              action={<Button size="small" block={false} variant="secondary" label={t('circles.city.tellMe')} onPress={() => { notify.mutate(q.trim()); toast(t('circles.city.told', { city: q.trim() })); setQ(''); onClose(); }} />} />
+        {hits ? (
+          <View style={{ gap: 8 }}>
+            {hits.map((c) => row(c, CITY_INFO[c]!.country))}
+            {/* Anywhere else opens its city guide (the places screens own /city/[id]). */}
+            {!hits.some((c) => c.toLowerCase() === term) ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={q.trim()} onPress={() => { buzz('select'); setQ(''); onClose(); onGuide(q.trim()); }} style={s.cityRow} testID="city-guide">
+                <View style={[s.cityImg, { backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }]}><Icon name="globe" /></View>
+                <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 16 }}>{q.trim()}</T><T v="tiny">{t('circles.city.guide')}</T></View>
+                <Icon name="chevron" />
+              </Pressable>
+            ) : null}
           </View>
-        )) : sheet.map((g) => (
+        ) : sheet.map((g) => (
           <View key={g.title} style={{ gap: 8 }}>
             <T v="eyebrow">{t(`circles.city.${g.title}`)}</T>
             {g.rows.map((r) => row(r.city, note(r.note)))}

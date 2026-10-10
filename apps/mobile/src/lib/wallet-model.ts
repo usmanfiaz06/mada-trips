@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { firstNameOf, type Person, type PersonDetails, type Trip } from '@mada/shared';
 import { t } from './i18n';
 
@@ -111,3 +112,28 @@ export const isHelper = (p: Person, d?: PersonDetails | null) => p.relation === 
 export const nameOf = (p: Person | undefined, selfName = '') => (p?.isSelf ? (selfName || p.firstName || t('household.youPlain')) : p?.firstName || firstNameOf(p?.givenNames ?? ''));
 /** "Omar Alharbi" from the passport names. */
 export const fullNameOf = (p: Person | undefined) => [p?.givenNames, p?.surname].filter(Boolean).join(' ').toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+
+/** Reset state when a sheet opens (React's "adjust state when a prop changes", without an effect). */
+export function useOnOpen(visible: boolean, reset: () => void) {
+  const [was, setWas] = useState(visible);
+  if (visible !== was) {
+    setWas(visible);
+    if (visible) reset();
+  }
+}
+
+/** Re-run when a value changes (same pattern): keeps a field in step with the server's copy. */
+export function useOnChange<V>(value: V, apply: (v: V) => void) {
+  const [prev, setPrev] = useState(value);
+  if (!Object.is(prev, value)) {
+    setPrev(value);
+    apply(value);
+  }
+}
+
+/** Now, as state: stable during render, refreshed every `everyMs`. */
+export function useNow(everyMs = 30_000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), everyMs); return () => clearInterval(id); }, [everyMs]);
+  return now;
+}

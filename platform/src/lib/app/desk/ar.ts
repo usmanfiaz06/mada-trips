@@ -1,5 +1,13 @@
 // Arabic for the agent desk in Mada Ops. The English string is the key, as in src/lib/i18n/ar.ts (merged there).
 export const AR_DESK: Record<string, string> = {
+  "Destination": "وجهة",
+  "City guide": "دليل المدينة",
+  "Nearest airports": "أقرب المطارات",
+  "Plan it with Mada: the team plans and books it by hand.": "خطّطها مع مدى: يخطط الفريق الرحلة ويحجزها يدويًا.",
+  "Order timeline": "مسار الطلب", "Booking": "الحجز", "Order placed": "قُدّم الطلب", "Card authorised": "فُوّضت البطاقة", "Seats held": "حُجزت المقاعد", "PNR recorded": "سُجّل رقم الحجز",
+  "Fare confirmed": "تأكد السعر", "Question sent": "أُرسل سؤال", "Traveller answered": "أجاب المسافر", "New fare sent": "أُرسل سعر جديد", "Issuing": "قيد الإصدار",
+  "Ticket numbers entered": "أُدخلت أرقام التذاكر", "Card captured": "خُصم المبلغ", "Card hold released": "أُلغي الحجز على البطاقة", "Ticketing failed": "تعذّر الإصدار", "Call me": "اتصل بي",
+  "A lower price is good news: confirm at the price they agreed": "السعر الأقل خبر جيد: أكّد بالسعر الذي وافقوا عليه",
   // navigation and headers
   "App desk": "مكتب التطبيق",
   "App desk · 24/7": "مكتب التطبيق · على مدار الساعة",
@@ -204,7 +212,6 @@ export const AR_DESK: Record<string, string> = {
   "Why, for the team (optional)": "السبب، للفريق (اختياري)",
   "The current card hold is released. The traveller takes the new price or picks again.": "يُلغى الحجز الحالي على البطاقة، ويقبل المسافر السعر الجديد أو يختار من جديد.",
   "Send the new price": "أرسل السعر الجديد",
-  "Ticketing failed": "تعذّر الإصدار",
   "What happened, for the team": "ما الذي حدث، للفريق",
   "Releases the card hold and tells the traveller nothing was charged.": "يلغي الحجز على البطاقة ويبلغ المسافر بأنه لم يُخصم شيء.",
   "Release the card hold and close this order?": "إلغاء الحجز على البطاقة وإغلاق هذا الطلب؟",

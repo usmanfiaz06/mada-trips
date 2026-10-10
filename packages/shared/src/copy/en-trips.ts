@@ -5,9 +5,13 @@
  * Spread into the main catalogue in ./en.ts, so the same lint applies.
  */
 import { enTripsToday } from './en-trips-today';
+import { enTripsUi } from './en-trips-ui';
+import { enTripsUi2 } from './en-trips-ui2';
 
 export const enTrips = {
   ...enTripsToday,
+  ...enTripsUi,
+  ...enTripsUi2,
   // ───────────── trip: shared words ─────────────
   'trip.and': 'and',
   'trip.ofYou.one': 'you',

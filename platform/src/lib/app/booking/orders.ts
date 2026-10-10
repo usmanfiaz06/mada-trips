@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
-  CreateOrderBody, entryChecks, money, seatsFor, t,
+  CreateOrderBody, demoPassportTarget, entryChecks, money, seatsFor, t,
   type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -75,7 +75,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   if (body.draft.kind === "trip" || body.draft.kind === "stay") {
     const search = priced.snapshot.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
     const depart = search.depart ?? search.checkIn ?? today();
-    const checks = entryChecks({ destination: search.destination, travellers: priced.travellers, depart, return: search.return ?? null, answers: {}, today: today(), demo: { passportProblem: demo.has("passportProblem") } });
+    const checks = entryChecks({ destination: search.destination, travellers: priced.travellers, depart, return: search.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has("passportProblem") ? demoPassportTarget(await householdOf(ownerId)) : null } });
     const blocked = checks.checks.find((c) => c.key === "passport" && c.blocking);
     if (blocked) return { outcome: "blocked", message: blocked.text };
   }

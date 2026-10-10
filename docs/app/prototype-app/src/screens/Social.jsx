@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE } from '../store.jsx';
-import { Icon, TopBar, Sheet, Toggle, InviteSheet, EmptyState, ArtFriends, ArtCompass, ArtEnvelope, ArtLantern, ArtBookmark } from '../ui.jsx';
+import { Icon, TopBar, Sheet, Toggle, InviteSheet, EmptyState, ArtFriends, ArtCompass, ArtEnvelope, ArtLantern, ArtBookmark, PermissionDenied } from '../ui.jsx';
 
 /* People on Mada who aren't in the household. */
 export const FRIENDS = {
@@ -528,7 +528,7 @@ export function People({ params = {} }) {
       {sheet === 'add' && (
         <Sheet label="Add friends" onClose={() => setSheet(null)}>
           <h2 className="h2">Add friends</h2>
-          <button type="button" className="card tap well" onClick={() => setSheet('contacts')}><span className="row"><Icon name="circles" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>From your contacts</span><span className="tiny">See who’s already on Mada. Your contacts aren’t uploaded.</span></span></span></button>
+          <button type="button" className="card tap well" onClick={() => { if (s.demo.permissionsDenied) setContacts('off'); setSheet('contacts'); }}><span className="row"><Icon name="circles" /><span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>From your contacts</span><span className="tiny">See who’s already on Mada. Your contacts aren’t uploaded.</span></span></span></button>
           <div className="field">
             <label htmlFor="add-phone">By phone number</label>
             <div className="row"><span className="input" style={{ width: 72, display: 'grid', placeItems: 'center', flexShrink: 0 }}>+966</span><input id="add-phone" className="input grow" inputMode="tel" placeholder="5X XXX XXXX" value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
@@ -555,6 +555,7 @@ export function People({ params = {} }) {
           <button type="button" className="btn ghost block" onClick={() => setContacts(false)}>Don’t allow</button>
         </Sheet>
       )}
+      {sheet === 'contacts' && contacts === 'off' && <PermissionDenied kind="contacts" onClose={() => { setSheet(null); setContacts(null); }} onManual={() => { setContacts(null); setSheet('link'); }} />}
       {sheet === 'contacts' && contacts === false && (
         <Sheet label="No contacts" onClose={() => { setSheet(null); setContacts(null); }}>
           <h2 className="h2">That’s fine.</h2>

@@ -70,7 +70,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                       <Avatar name={c.userName} size={36} />
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline justify-between gap-2"><span className="truncate text-[14px] text-ink">{c.userName}</span><span className="shrink-0 text-[11.5px] text-ink-3">{timeAgo(c.lastAt, L)}</span></span>
-                        <span className="block truncate text-[12px] text-ink-3">{c.kind === "request" ? c.summary ?? shortRef(c.id) : t("Support")}</span>
+                        <span className="block truncate text-[12px] text-ink-3">{c.kind === "request" ? c.summary ?? shortRef(c.id) : c.summary ?? t("Support")}</span>
                         <span className={cx("mt-0.5 block truncate text-[13px]", c.waitingSince ? "font-medium text-ink" : "text-ink-3")}>{c.lastAuthor === "agent" ? `${t("You")}: ` : c.lastAuthor === "mada" ? "Mada: " : ""}{c.lastBody || t("Photo")}</span>
                         {sla && <span className="mt-1.5 block"><SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} compact /></span>}
                       </span>

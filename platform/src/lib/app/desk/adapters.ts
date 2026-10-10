@@ -3,12 +3,19 @@ import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { t as copy, type CopyKey, type Vars } from "@mada/shared";
 import { db, schema, type Tx } from "@/db";
 import {
-  appCreditLedger, appMessages, appNotifications, appPayments, appPeople, appQuotes, appRefunds, appRequests, appSegments, appTrips, appUsers,
+  appMessages, appNotifications, appPayments, appPeople, appQuotes, appRefunds, appRequests, appSegments, appTrips, appUsers,
 } from "@/db/app-schema";
 import { appAgents, appDeskBlocks, appDeskModeration, appDeskNotes } from "@/db/app-schema-desk";
+import { appOrderEvents, appOrders } from "@/db/app-schema-booking";
+import * as booking from "@/lib/app/booking/desk";
+import { addCredit } from "@/lib/app/credit";
+import { appSupportThreads } from "@/db/app-schema-wallet";
+import * as supportDesk from "@/lib/app/support/desk";
+import * as circlesModeration from "@/lib/app/circles/moderation";
+import { appPosts, appReports } from "@/db/app-schema-circles";
 import { decryptField, passportAad } from "@/lib/app/crypto";
 import { supplierMode } from "@/lib/app/config";
-import { suppliers } from "@/lib/app/suppliers";
+import { bookingSuppliers } from "@/lib/app/booking/common";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type DeskActor } from "./core";
 
 /*
@@ -42,6 +49,7 @@ export async function actingAgent(tx: Tx | typeof db, actor: DeskActor) {
   return { agentId: a?.id ?? null, name: a?.displayName ?? actor.name.split(" ")[0] ?? actor.name, photoUrl: a?.photoUrl ?? null };
 }
 
+const isUuidLike = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
 async function notify(tx: Tx, userId: string, n: { kind: string; level: "time_sensitive" | "active" | "passive"; title: CopyKey; body: CopyKey; vars?: Vars; href?: string | null; data?: Record<string, unknown> }) {
@@ -81,8 +89,31 @@ async function claim(tx: Tx, r: typeof appRequests.$inferSelect, actor: DeskActo
 
 /* ═════════════ orders ═════════════ */
 
-export type OrderStage = "awaiting" | "held" | "needs_answer" | "price_changed" | "issued" | "not_issued" | "other";
-export function orderStage(r: { status: string; details: unknown }, payStatus?: string | null): OrderStage {
+export type OrderStage = "awaiting" | "held" | "needs_answer" | "price_changed" | "issued" | "failed" | "not_issued" | "other";
+export type BookingOrder = typeof appOrders.$inferSelect;
+
+/** The booking engine's order behind a request (app_orders.request_id), when the app made one. */
+export async function linkedOrder(requestId: string): Promise<BookingOrder | null> {
+  const [o] = await db.select().from(appOrders).where(eq(appOrders.requestId, requestId)).orderBy(desc(appOrders.createdAt)).limit(1);
+  return o ?? null;
+}
+
+/** The booking engine's states, as the desk names them. */
+export function bookingStage(status: string): OrderStage {
+  switch (status) {
+    case "pending_agent": return "awaiting";
+    case "held": case "price_locked": case "issuing": return "held";
+    case "needs_answer": return "needs_answer";
+    case "fare_changed": return "price_changed";
+    case "confirmed": return "issued";
+    case "ticketing_failed": return "failed";
+    case "cancelled": case "declined": return "not_issued";
+    default: return "other";
+  }
+}
+
+export function orderStage(r: { status: string; details: unknown }, payStatus?: string | null, order?: { status: string } | null): OrderStage {
+  if (order) return bookingStage(order.status);
   const d = deskState(r.details);
   if (r.status === "confirmed" || r.status === "done" || d.issuedAt) return "issued";
   if (r.status === "cancelled" && d.failedAt) return "not_issued";
@@ -98,18 +129,24 @@ export async function listOrders(opts: { stage?: OrderStage | "open" | "all"; li
     .where(and(inArray(appRequests.kind, [...ORDER_KINDS]), ne(appRequests.status, "queued")))
     .orderBy(desc(appRequests.createdAt)).limit(opts.limit ?? 300);
   const ids = rows.map((x) => x.r.id);
-  const [pays, quotes] = ids.length ? await Promise.all([
+  const [pays, quotes, orders] = ids.length ? await Promise.all([
     db.select().from(appPayments).where(inArray(appPayments.requestId, ids)).orderBy(desc(appPayments.createdAt)),
     db.select().from(appQuotes).where(inArray(appQuotes.requestId, ids)).orderBy(desc(appQuotes.createdAt)),
-  ]) : [[], []];
+    db.select().from(appOrders).where(inArray(appOrders.requestId, ids)).orderBy(desc(appOrders.createdAt)),
+  ]) : [[], [], []];
+  const orderPays = orders.some((o) => o.paymentId) ? await db.select().from(appPayments).where(inArray(appPayments.id, orders.map((o) => o.paymentId).filter((x): x is string => !!x))) : [];
   const out = rows.map(({ r, userName, phone }) => {
-    const pay = pays.find((p) => p.requestId === r.id) ?? null;
+    const order = orders.find((o) => o.requestId === r.id) ?? null;
+    const pay = (order?.paymentId ? orderPays.find((p) => p.id === order.paymentId) : null) ?? pays.find((p) => p.requestId === r.id) ?? null;
     const quote = quotes.find((q) => q.requestId === r.id && q.status !== "withdrawn") ?? quotes.find((q) => q.requestId === r.id) ?? null;
-    return { ...r, ref: shortRef(r.id, "O"), userName: travellerName(userName), phone, payment: pay, total: pay?.amount ?? quote?.total ?? 0, stage: orderStage(r, pay?.status), desk: deskState(r.details) };
+    const total = order ? order.total + order.extra : pay?.amount ?? quote?.total ?? 0;
+    const desk = deskState(r.details);
+    if (order?.supplierRef && !desk.heldPnr) desk.heldPnr = order.supplierRef;
+    return { ...r, ref: order?.ref ?? shortRef(r.id, "O"), userName: travellerName(userName), phone, payment: pay, total, stage: orderStage(r, pay?.status, order), desk, order };
   });
   const st = opts.stage ?? "all";
   if (st === "all") return out;
-  if (st === "open") return out.filter((o) => ["awaiting", "held", "needs_answer", "price_changed"].includes(o.stage));
+  if (st === "open") return out.filter((o) => ["awaiting", "held", "needs_answer", "price_changed", "failed"].includes(o.stage));
   return out.filter((o) => o.stage === st);
 }
 
@@ -127,7 +164,13 @@ export async function getRequestFull(id: string) {
     db.select({ n: appDeskNotes, name: schema.users.name }).from(appDeskNotes).innerJoin(schema.users, eq(schema.users.id, appDeskNotes.opsUserId))
       .where(and(eq(appDeskNotes.threadKind, "request"), eq(appDeskNotes.threadId, id))).orderBy(asc(appDeskNotes.createdAt)),
   ]);
-  const payment = payments[0] ?? null;
+  const order = isOrderKind(r.kind) ? await linkedOrder(id) : null;
+  const [orderPay, events] = order ? await Promise.all([
+    order.paymentId ? db.select().from(appPayments).where(eq(appPayments.id, order.paymentId)).then((x) => x[0] ?? null) : Promise.resolve(null),
+    db.select().from(appOrderEvents).where(eq(appOrderEvents.orderId, order.id)).orderBy(asc(appOrderEvents.createdAt)),
+  ]) : [null, [] as (typeof appOrderEvents.$inferSelect)[]];
+  if (orderPay && !payments.some((p) => p.id === orderPay.id)) payments.unshift(orderPay);
+  const payment = orderPay ?? payments[0] ?? null;
   // Travellers in the order they were picked; the passport number only ever leaves masked.
   const travellers = r.travellerIds.map((pid) => people.find((p) => p.id === pid)).filter(Boolean).map((p) => ({
     id: p!.id, name: `${p!.givenNames} ${p!.surname}`.trim() || u.name, relation: p!.relation, dateOfBirth: p!.dateOfBirth, nationality: p!.nationality,
@@ -135,7 +178,8 @@ export async function getRequestFull(id: string) {
   }));
   return {
     request: r, ref: shortRef(r.id, isOrderKind(r.kind) ? "O" : "R"), user: u, travellers, quotes, payments, payment, trip, segments,
-    messages, notes, desk: deskState(r.details), stage: orderStage(r, payment?.status), isOrder: isOrderKind(r.kind),
+    messages, notes, desk: { ...deskState(r.details), ...(order?.supplierRef && !deskState(r.details).heldPnr ? { heldPnr: order.supplierRef } : {}) },
+    stage: orderStage(r, payment?.status, order), isOrder: isOrderKind(r.kind), order, events,
   };
 }
 export type RequestFull = NonNullable<Awaited<ReturnType<typeof getRequestFull>>>;
@@ -157,9 +201,36 @@ export async function revealPassport(actor: DeskActor, personId: string, context
   });
 }
 
+/* The booking engine owns app_orders: for an order it made, the desk calls lib/app/booking/desk.ts. */
+async function engine<T>(fn: () => Promise<T>): Promise<T> {
+  try { return await fn(); } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "NOT_FOUND") throw new DeskError("Order not found", "NOT_FOUND");
+    if (code) throw new DeskError("Someone else just changed this order", "CONFLICT");
+    throw e;
+  }
+}
+async function engineAgent(actor: DeskActor) {
+  const me = await actingAgent(db, actor);
+  return { name: me.name, opsUserId: actor.id };
+}
+const opsLog = (actor: DeskActor, o: BookingOrder, requestId: string, action: string, summary: string, data?: Record<string, unknown>) =>
+  db.transaction((tx) => deskAudit(tx, actor, { action, entityType: "request", entityId: requestId, ref: o.ref ?? shortRef(requestId, "O"), summary, data: { orderId: o.id, ...data } }, { app: false }));
+
 /** Confirm the order and hold the seats (a PNR when the GDS gave one). The app's waiting screen moves to "holding". */
 export async function confirmHold(actor: DeskActor, id: string, v: { pnr?: string | null } = {}) {
   assertCap(actor, "desk.act");
+  const o = await linkedOrder(id);
+  if (o) {
+    if (o.status !== "pending_agent") throw new DeskError(o.status === "held" ? "Already held" : "This order isn't waiting for confirmation", "CONFLICT");
+    const pnr = v.pnr?.trim().toUpperCase() || null;
+    if (pnr && !/^[A-Z0-9]{5,8}$/.test(pnr)) throw new DeskError("A PNR is 5 to 8 letters and numbers");
+    const agent = await engineAgent(actor);
+    await engine(() => booking.acceptOrder(o.id, agent));
+    if (pnr) await db.transaction(async (tx) => { await tx.update(appOrders).set({ supplierRef: pnr }).where(eq(appOrders.id, o.id)); await booking.orderEvent(tx, o.id, "pnr", { kind: "agent", name: agent.name }, { pnr }); });
+    await opsLog(actor, o, id, "desk.order.held", `Confirmed and held ${o.ref ?? shortRef(id, "O")}${pnr ? ` · PNR ${pnr}` : ""}`);
+    return;
+  }
   return db.transaction(async (tx) => {
     const r = await lockRequest(tx, id);
     if (!isOrderKind(r.kind)) throw new DeskError("Only orders can be held");
@@ -181,6 +252,13 @@ export async function askTraveller(actor: DeskActor, id: string, v: { question: 
   const choices = v.choices.map((c) => c.trim()).filter(Boolean).slice(0, 4);
   if (question.length < 5 || question.length > 300) throw new DeskError("Write the question in 5 to 300 characters");
   if (choices.some((c) => c.length > 40)) throw new DeskError("Keep each answer under 40 characters");
+  const o = isUuidLike(id) ? await linkedOrder(id) : null;
+  if (o) {
+    // The app answers an order's question with "Yes" or "Call me" (the booking engine's two answers).
+    await engine(() => engineAgent(actor).then((agent) => booking.askQuestion(o.id, agent, question)));
+    await opsLog(actor, o, id, "desk.request.asked", `Asked the traveller: "${clip(question, 120)}"`);
+    return;
+  }
   return db.transaction(async (tx) => {
     const r = await lockRequest(tx, id);
     if (["confirmed", "done", "cancelled"].includes(r.status)) throw new DeskError("This one is already closed", "CONFLICT");
@@ -196,6 +274,16 @@ export async function askTraveller(actor: DeskActor, id: string, v: { question: 
 export async function priceChanged(actor: DeskActor, id: string, v: { total: number; reason?: string | null }) {
   assertCap(actor, "desk.act");
   if (!Number.isInteger(v.total) || v.total <= 0 || v.total > 100_000_000_00) throw new DeskError("Enter the new total");
+  const o = await linkedOrder(id);
+  if (o) {
+    const now = o.total + o.extra;
+    if (v.total === now) throw new DeskError("That's the same price");
+    if (v.total < now) throw new DeskError("A lower price is good news: confirm at the price they agreed");
+    const perPerson = Math.ceil((v.total - now) / Math.max(1, o.travellerIds.length));
+    await engine(() => engineAgent(actor).then((agent) => booking.priceChanged(o.id, agent, perPerson)));
+    await opsLog(actor, o, id, "desk.order.price_changed", `Sent a new price for ${o.ref ?? shortRef(id, "O")}: ${sarText(now)} → ${sarText(v.total)}`, { total: { from: now, to: v.total }, reason: v.reason ?? null });
+    return null;
+  }
   const [cur] = await db.select().from(appRequests).where(eq(appRequests.id, id));
   if (!cur) throw new DeskError("Request not found", "NOT_FOUND");
   if (!isOrderKind(cur.kind)) throw new DeskError("Only orders have a fare to change");
@@ -231,14 +319,14 @@ async function capture(p: typeof appPayments.$inferSelect): Promise<"captured" |
   if (p.method === "credit" || p.provider === "mada_credit") return "captured";
   if (!p.providerRef) return "failed";
   if (supplierMode("payments") === "mock" && SEEDED.test(p.providerRef)) return p.providerRef.includes("fail") ? "failed" : "captured";
-  const res = await suppliers.payments().capture(p.providerRef, p.amount).catch(() => null);
+  const res = await bookingSuppliers.payments().capture(p.providerRef, p.amount).catch(() => null);
   return res?.status === "captured" ? "captured" : "failed";
 }
 async function voidAuth(p: typeof appPayments.$inferSelect): Promise<"voided" | "failed"> {
   if (p.method === "credit" || p.provider === "mada_credit") return "voided";
   if (!p.providerRef) return "failed";
   if (supplierMode("payments") === "mock" && SEEDED.test(p.providerRef)) return "voided";
-  const res = await suppliers.payments().void(p.providerRef).catch(() => null);
+  const res = await bookingSuppliers.payments().void(p.providerRef).catch(() => null);
   return res?.status === "voided" ? "voided" : "failed";
 }
 
@@ -254,6 +342,23 @@ export async function issueTickets(actor: DeskActor, id: string, v: { pnr: strin
   if (!/^[A-Z0-9]{5,8}$/.test(pnr)) throw new DeskError("A PNR is 5 to 8 letters and numbers");
   if (tickets.some((x) => !/^\d{13}$/.test(x))) throw new DeskError("Ticket numbers are 13 digits");
   if (new Set(tickets).size !== tickets.length) throw new DeskError("The same ticket number appears twice");
+  const o = await linkedOrder(id);
+  if (o) {
+    if (!["pending_agent", "held", "price_locked", "issuing"].includes(o.status)) throw new DeskError("This order isn't ready to issue", "CONFLICT");
+    if (o.kind !== "stay" && tickets.length !== Math.max(1, o.travellerIds.length)) throw new DeskError(`Enter one ticket number for each traveller (${Math.max(1, o.travellerIds.length)})`);
+    const agent = await engineAgent(actor);
+    if (o.status === "pending_agent") await engine(() => booking.acceptOrder(o.id, agent));
+    if (o.status === "pending_agent" || o.status === "held") await engine(() => booking.lockPrice(o.id, agent));
+    await db.transaction(async (tx) => { await tx.update(appOrders).set({ supplierRef: pnr }).where(eq(appOrders.id, o.id)); await booking.orderEvent(tx, o.id, "tickets", { kind: "agent", name: agent.name }, { pnr, tickets }); });
+    const done = await engine(() => booking.issueTickets(o.id, agent));
+    const ok = done.status === "confirmed";
+    await db.transaction(async (tx) => {
+      if (ok) await setDesk(tx, id, { issuedAt: new Date().toISOString(), issuedBy: actor.id, pnr, tickets });
+      await deskAudit(tx, actor, { action: ok ? "desk.order.issued" : "desk.order.capture_failed", entityType: "request", entityId: id, ref: done.ref ?? shortRef(id, "O"),
+        summary: ok ? `Issued ${tickets.length || "the"} ticket${tickets.length === 1 ? "" : "s"} for ${done.ref ?? shortRef(id, "O")} · PNR ${pnr}` : `Payment capture didn't go through for ${done.ref ?? shortRef(id, "O")}. Tickets not issued`, data: { orderId: o.id, pnr, tickets } }, { app: false });
+    });
+    return { ok };
+  }
   const full = await getRequestFull(id);
   if (!full) throw new DeskError("Order not found", "NOT_FOUND");
   if (!full.isOrder) throw new DeskError("Only orders have tickets");
@@ -299,6 +404,16 @@ export async function failTicketing(actor: DeskActor, id: string, v: { reason: s
   assertCap(actor, "desk.act");
   const reason = v.reason.trim();
   if (reason.length < 3) throw new DeskError("Say what happened, for the team");
+  const o = await linkedOrder(id);
+  if (o) {
+    const agent = await engineAgent(actor);
+    if (["held", "price_locked", "issuing"].includes(o.status)) await engine(() => booking.failTicketing(o.id, agent, reason));
+    else if (["pending_agent", "needs_answer", "fare_changed", "ticketing_failed", "requires_action"].includes(o.status)) await engine(() => booking.cancelOrder(o.id, { kind: "agent", name: agent.name }));
+    else throw new DeskError("This order is already closed", "CONFLICT");
+    await db.transaction(async (tx) => { await setDesk(tx, id, { failedAt: new Date().toISOString(), failReason: reason }); });
+    await opsLog(actor, o, id, "desk.order.not_issued", `Marked ${o.ref ?? shortRef(id, "O")} not issued and released the card hold: ${clip(reason, 140)}`);
+    return;
+  }
   const pays = await db.select().from(appPayments).where(and(eq(appPayments.requestId, id), inArray(appPayments.status, ["authorized", "failed", "requires_action"])));
   // A failed capture can still leave the hold in place at the provider, so it is released too.
   const voids = await Promise.all(pays.map(async (p) => ({ p, res: p.status === "requires_action" ? "voided" as const : await voidAuth(p) })));
@@ -317,6 +432,24 @@ export async function failTicketing(actor: DeskActor, id: string, v: { reason: s
 }
 
 /* ═════════════ requests and quotes ═════════════ */
+
+/**
+ * A "Plan it with Mada" request for a city we don't sell automatically (kind "destination", created by
+ * POST /places/:id/plan). The team plans and quotes it by hand. Reads the place from the request's details,
+ * tolerating either { place: {…} } or the fields at the top level.
+ */
+export function destinationOf(details: unknown) {
+  const d = (details ?? {}) as Record<string, unknown>;
+  const p = (d.place && typeof d.place === "object" ? d.place : d) as Record<string, unknown>;
+  const name = String(p.name ?? p.city ?? "").trim();
+  if (!name) return null;
+  const country = p.country ? String(p.country) : null;
+  const airports = (Array.isArray(p.airports) ? p.airports : Array.isArray(p.nearestAirports) ? p.nearestAirports : [])
+    .map((a) => (typeof a === "string" ? a : String((a as Record<string, unknown>)?.code ?? (a as Record<string, unknown>)?.iata ?? ""))).filter(Boolean).slice(0, 4);
+  const guide = typeof p.guideUrl === "string" && /^https:\/\//.test(p.guideUrl) ? p.guideUrl
+    : `https://en.wikivoyage.org/wiki/Special:Search?search=${encodeURIComponent(country ? `${name}, ${country}` : name)}`;
+  return { id: p.id ? String(p.id) : p.placeId ? String(p.placeId) : null, name, country, airports, guideUrl: guide, message: typeof d.message === "string" ? d.message : null };
+}
 
 export const QUOTE_LINE_KINDS = ["flight", "stay", "pickup", "visa", "service", "discount", "credit", "other"] as const;
 
@@ -407,13 +540,14 @@ export async function listConversations(limit = 200): Promise<Conversation[]> {
       WHERE author_user_id IS NOT NULL ORDER BY thread_kind, thread_id, created_at
     )
     SELECT l.thread_kind, l.thread_id, l.author_kind, l.body, l.created_at, w.since, a.at AS agent_at,
-      coalesce(r.owner_id, o.author_user_id) AS user_id, u.name AS user_name, r.summary
+      coalesce(r.owner_id, st.user_id, o.author_user_id) AS user_id, u.name AS user_name, coalesce(r.summary, st.about) AS summary
     FROM last l
     LEFT JOIN waiting w ON w.thread_kind = l.thread_kind AND w.thread_id = l.thread_id
     LEFT JOIN agent_last a ON a.thread_kind = l.thread_kind AND a.thread_id = l.thread_id
     LEFT JOIN owner o ON o.thread_kind = l.thread_kind AND o.thread_id = l.thread_id
     LEFT JOIN ${appRequests} r ON l.thread_kind = 'request' AND r.id = l.thread_id
-    LEFT JOIN ${appUsers} u ON u.id = coalesce(r.owner_id, o.author_user_id)
+    LEFT JOIN ${appSupportThreads} st ON l.thread_kind = 'support' AND st.id = l.thread_id
+    LEFT JOIN ${appUsers} u ON u.id = coalesce(r.owner_id, st.user_id, o.author_user_id)
     ORDER BY (w.since IS NULL), l.created_at DESC LIMIT ${limit}`);
   type Row = { thread_kind: "request" | "support"; thread_id: string; author_kind: string; body: string; created_at: string | Date; since: string | Date | null; agent_at: string | Date | null; user_id: string | null; user_name: string | null; summary: string | null };
   const d = (x: string | Date | null) => (x ? new Date(x) : null);
@@ -433,13 +567,18 @@ export async function getThread(kind: "request" | "support", id: string) {
   if (kind === "request") {
     const [r] = await db.select({ o: appRequests.ownerId, s: appRequests.summary }).from(appRequests).where(eq(appRequests.id, id));
     userId = r?.o ?? null; summary = r?.s ?? null;
-  } else userId = messages.find((m) => m.authorUserId)?.authorUserId ?? null;
+  } else {
+    const [th] = await db.select({ u: appSupportThreads.userId, about: appSupportThreads.about }).from(appSupportThreads).where(eq(appSupportThreads.id, id));
+    userId = th?.u ?? messages.find((m) => m.authorUserId)?.authorUserId ?? null; summary = th?.about ?? null;
+  }
   const [user] = userId ? await db.select().from(appUsers).where(eq(appUsers.id, userId)) : [];
   return { kind, id, messages, notes, user: user ?? null, summary };
 }
 
 async function threadOwner(tx: Tx, kind: "request" | "support", id: string) {
   if (kind === "request") return (await tx.select({ o: appRequests.ownerId }).from(appRequests).where(eq(appRequests.id, id)))[0]?.o ?? null;
+  const [th] = await tx.select({ o: appSupportThreads.userId }).from(appSupportThreads).where(eq(appSupportThreads.id, id));
+  if (th) return th.o;
   return (await tx.select({ o: appMessages.authorUserId }).from(appMessages)
     .where(and(eq(appMessages.threadKind, "support"), eq(appMessages.threadId, id), sql`${appMessages.authorUserId} IS NOT NULL`)).limit(1))[0]?.o ?? null;
 }
@@ -450,11 +589,25 @@ export async function sendAgentReply(actor: DeskActor, kind: "request" | "suppor
   const body = v.body.trim();
   if (!body && !v.attachment) throw new DeskError("Write a reply first");
   if (body.length > 4000) throw new DeskError("Keep a reply under 4,000 characters");
+  // A support thread the wallet's support module knows: its agentReply updates the thread and notifies the traveller.
+  if (kind === "support" && body && !v.attachment) {
+    const [th] = await db.select({ id: appSupportThreads.id }).from(appSupportThreads).where(eq(appSupportThreads.id, id));
+    if (th) {
+      const me = await actingAgent(db, actor);
+      const m = await engine(() => supportDesk.agentReply(id, { opsUserId: actor.id, name: me.name }, body));
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`DELETE FROM app_desk_typing WHERE thread_id = ${id} AND agent_id IN (SELECT id FROM app_agents WHERE ops_user_id = ${actor.id})`);
+        await deskAudit(tx, actor, { action: "desk.chat.replied", entityType: "support_thread", entityId: id, ref: shortRef(id, "C"), summary: `Replied as ${me.name}`, data: { messageId: m.id, chars: body.length } }, { app: false });
+      });
+      return m;
+    }
+  }
   return db.transaction(async (tx) => {
     const owner = await threadOwner(tx, kind, id);
     if (!owner) throw new DeskError("Conversation not found", "NOT_FOUND");
     if (kind === "request") { const r = await lockRequest(tx, id); await claim(tx, r, actor); }
     const { message, agent } = await agentMessage(tx, kind, id, actor, body, v.attachment ? { attachment: v.attachment } : null);
+    if (kind === "support") await tx.update(appSupportThreads).set({ lastMessageAt: new Date(), agentReadAt: new Date() }).where(eq(appSupportThreads.id, id));
     await tx.execute(sql`DELETE FROM app_desk_typing WHERE thread_id = ${id} AND agent_id IN (SELECT id FROM app_agents WHERE ops_user_id = ${actor.id})`);
     await notify(tx, owner, { kind: "agent_reply", level: "active", title: "notify.desk.reply.title", body: "notify.desk.reply.body", vars: { agent: agent.name, text: body || v.attachment?.filename || "" }, href: kind === "request" ? `/requests/${id}` : `/support/${id}` });
     await deskAudit(tx, actor, { action: "desk.chat.replied", entityType: kind === "request" ? "request" : "support_thread", entityId: id, ref: kind === "request" ? shortRef(id) : shortRef(id, "C"),
@@ -497,7 +650,7 @@ export async function approveRefund(actor: DeskActor, id: string, v: { destinati
   let providerRef: string | null = null;
   if (v.destination === "original" && pre.p.providerRef && pre.p.method !== "credit") {
     if (!(supplierMode("payments") === "mock" && SEEDED.test(pre.p.providerRef))) {
-      const res = await suppliers.payments().refund(pre.p.providerRef, pre.f.amount, `refund:${id}`).catch(() => null);
+      const res = await bookingSuppliers.payments().refund(pre.p.providerRef, pre.f.amount, `refund:${id}`).catch(() => null);
       if (!res || (res.status !== "refunded" && res.status !== "partially_refunded")) throw new DeskError("The card refund didn't go through. Try again, or refund to Mada credit", "CONFLICT");
       providerRef = res.providerRef;
     } else providerRef = `${pre.p.providerRef}_rf`;
@@ -540,22 +693,49 @@ export async function rejectRefund(actor: DeskActor, id: string, v: { reason: st
 
 /** One line on the traveller's Mada credit ledger (append-only; corrections are new lines). */
 export async function creditEntry(tx: Tx, actor: DeskActor, v: { userId: string; amount: number; kind: "refund" | "goodwill" | "adjustment"; note: string; refundId?: string | null }) {
-  if (!Number.isInteger(v.amount) || v.amount === 0) throw new DeskError("Enter an amount");
-  await tx.insert(appCreditLedger).values({ userId: v.userId, amount: v.amount, kind: v.kind, note: v.note.slice(0, 200), refundId: v.refundId ?? null });
-  await deskAudit(tx, actor, { action: "desk.credit.added", entityType: "app_user", entityId: v.userId, ref: "Mada credit", summary: `${v.amount > 0 ? "Added" : "Took back"} ${sarText(Math.abs(v.amount))} Mada credit (${v.kind})`, data: { amount: v.amount, kind: v.kind } });
+  if (!Number.isInteger(v.amount) || v.amount <= 0) throw new DeskError("Enter an amount");
+  // lib/app/credit.ts keeps the ledger (and writes its own app audit row); the desk adds the Ops log line.
+  await addCredit(tx, { userId: v.userId, amount: v.amount, kind: v.kind, note: v.note.slice(0, 200), refundId: v.refundId ?? null, actor: { kind: "agent", id: actor.id } });
+  await deskAudit(tx, actor, { action: "desk.credit.added", entityType: "app_user", entityId: v.userId, ref: "Mada credit", summary: `Added ${sarText(v.amount)} Mada credit (${v.kind})`, data: { amount: v.amount, kind: v.kind } }, { app: false });
 }
 
 /* ═════════════ moderation ═════════════ */
 
+export type ModerationSource = "desk" | "post" | "report";
+
+/**
+ * The queue: rows the desk holds (app_desk_moderation), tips waiting in Circles (lib/app/circles/moderation.ts
+ * pendingQueue) and open reports (app_reports). Each carries its source so the decision goes back to the right place.
+ */
 export async function listModeration(status: "open" | "closed" = "open") {
-  const rows = await db.select({ m: appDeskModeration, authorName: appUsers.name }).from(appDeskModeration)
-    .leftJoin(appUsers, eq(appUsers.id, appDeskModeration.authorUserId))
-    .where(status === "open" ? eq(appDeskModeration.status, "open") : ne(appDeskModeration.status, "open"))
-    .orderBy(status === "open" ? asc(appDeskModeration.createdAt) : desc(appDeskModeration.decidedAt)).limit(300);
-  const reporterIds = [...new Set(rows.map((r) => r.m.reporterUserId).filter((x): x is string => !!x))];
-  const reporters = reporterIds.length ? await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, reporterIds)) : [];
+  const open = status === "open";
+  const [rows, posts, reports] = await Promise.all([
+    db.select({ m: appDeskModeration, authorName: appUsers.name }).from(appDeskModeration)
+      .leftJoin(appUsers, eq(appUsers.id, appDeskModeration.authorUserId))
+      .where(open ? eq(appDeskModeration.status, "open") : ne(appDeskModeration.status, "open"))
+      .orderBy(open ? asc(appDeskModeration.createdAt) : desc(appDeskModeration.decidedAt)).limit(300),
+    open ? circlesModeration.pendingQueue(100).catch(() => []) : Promise.resolve([]),
+    db.select().from(appReports).where(open ? eq(appReports.status, "open") : ne(appReports.status, "open")).orderBy(open ? asc(appReports.createdAt) : desc(appReports.reviewedAt)).limit(100).catch(() => []),
+  ]);
+  type Item = Omit<typeof appDeskModeration.$inferSelect, never> & { source: ModerationSource; authorName: string; reporterName: string; authorBlocked: boolean };
+  const userIds = [...new Set([...rows.map((r) => r.m.reporterUserId), ...posts.map((p) => p.authorId), ...reports.flatMap((r) => [r.reporterId, r.targetUserId])].filter((x): x is string => !!x))];
+  const names = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
+  const nm = (id: string | null) => travellerName(names.find((n) => n.id === id)?.name);
   const blocks = await activeBlocks();
-  return rows.map(({ m, authorName }) => ({ ...m, authorName: travellerName(authorName), reporterName: travellerName(reporters.find((r) => r.id === m.reporterUserId)?.name), authorBlocked: !!m.authorUserId && blocks.has(m.authorUserId) }));
+  const items: Item[] = [
+    ...rows.map(({ m, authorName }) => ({ ...m, source: "desk" as const, authorName: travellerName(authorName), reporterName: nm(m.reporterUserId), authorBlocked: !!m.authorUserId && blocks.has(m.authorUserId) })),
+    ...posts.map((p) => ({
+      id: p.id, kind: "tip", targetKind: "post", targetId: p.id, authorUserId: p.authorId, reporterUserId: null, reason: null, note: p.flagged ? `Flagged: ${p.flagged}` : null,
+      snapshot: { city: p.city, place: p.place, text: p.body }, status: "open", decidedBy: null, decidedAt: null, decisionReason: null, createdAt: p.createdAt,
+      source: "post" as const, authorName: nm(p.authorId), reporterName: "", authorBlocked: blocks.has(p.authorId),
+    })),
+    ...reports.map((r) => ({
+      id: r.id, kind: "report", targetKind: r.targetKind, targetId: r.targetId, authorUserId: r.targetUserId, reporterUserId: r.reporterId, reason: r.reason, note: r.note,
+      snapshot: {}, status: r.status === "open" ? "open" : r.status === "actioned" ? "removed" : "dismissed", decidedBy: null, decidedAt: r.reviewedAt, decisionReason: null, createdAt: r.createdAt,
+      source: "report" as const, authorName: nm(r.targetUserId), reporterName: nm(r.reporterId), authorBlocked: !!r.targetUserId && blocks.has(r.targetUserId),
+    })),
+  ];
+  return items.sort((a, b) => open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.decidedAt?.getTime() ?? 0) - (a.decidedAt?.getTime() ?? 0));
 }
 
 export async function activeBlocks() {
@@ -563,9 +743,28 @@ export async function activeBlocks() {
   return new Set(rows.map((r) => r.userId));
 }
 
-export async function decideModeration(actor: DeskActor, id: string, v: { decision: "approved" | "rejected" | "removed" | "dismissed"; reason?: string | null }) {
+export async function decideModeration(actor: DeskActor, id: string, v: { decision: "approved" | "rejected" | "removed" | "dismissed"; reason?: string | null }, source: ModerationSource = "desk") {
   assertCap(actor, "desk.moderate");
   if ((v.decision === "rejected" || v.decision === "removed") && (v.reason?.trim().length ?? 0) < 5) throw new DeskError("Say why, so the author understands");
+  const reason = v.reason?.trim() || undefined;
+  if (source === "post") {
+    if (v.decision !== "approved" && v.decision !== "rejected") throw new DeskError("Approve or reject a tip");
+    await engine(() => circlesModeration.decide(id, v.decision === "approved" ? "approve" : "reject", { kind: "agent", id: actor.id }, reason));
+    await db.transaction((tx) => deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: "post", entityId: id, ref: "Tip", summary: `${v.decision === "approved" ? "Approved" : "Rejected"} a tip${reason ? `: ${clip(reason, 100)}` : ""}` }, { app: false }));
+    return;
+  }
+  if (source === "report") {
+    if (v.decision !== "removed" && v.decision !== "dismissed") throw new DeskError("Remove the content or dismiss the report");
+    await db.transaction(async (tx) => {
+      const [r] = await tx.select().from(appReports).where(eq(appReports.id, id)).for("update");
+      if (!r) throw new DeskError("Not found", "NOT_FOUND");
+      if (r.status !== "open") throw new DeskError("Already decided", "CONFLICT");
+      await tx.update(appReports).set({ status: v.decision === "removed" ? "actioned" : "dismissed", reviewedAt: new Date() }).where(eq(appReports.id, id));
+      if (v.decision === "removed" && r.targetKind === "post") await tx.update(appPosts).set({ status: "rejected", moderatedAt: new Date(), moderatedBy: actor.id, moderationNote: reason ?? null }).where(eq(appPosts.id, r.targetId));
+      await deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: r.targetKind, entityId: r.targetId, ref: "Report", summary: `${v.decision === "removed" ? "Removed" : "Dismissed"} a report on a ${r.targetKind}${reason ? `: ${clip(reason, 100)}` : ""}`, data: { reportId: id } });
+    });
+    return;
+  }
   await db.transaction(async (tx) => {
     const [m] = await tx.select().from(appDeskModeration).where(eq(appDeskModeration.id, id)).for("update");
     if (!m) throw new DeskError("Not found", "NOT_FOUND");

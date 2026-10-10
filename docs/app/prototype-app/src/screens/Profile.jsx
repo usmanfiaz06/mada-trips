@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt } from '../store.jsx';
-import { Icon, TopBar, Sheet, PayMark } from '../ui.jsx';
+import { Icon, TopBar, Sheet, PayMark, PermissionDenied } from '../ui.jsx';
 import { CardsSheet } from './Pay.jsx';
 import { UserAvatar, PhotoSheet, LanguageSheet, DeletionBanner, Group, Row, useAccount, SignOutSheet, displayName, passportName, prettyPhone, householdIds, passportStatus, MEALS } from './Account.jsx';
 
@@ -88,7 +88,8 @@ export default function Profile() {
               ))}
             </div>
             <span className="small">{s.settings.alerts === 'quiet' ? 'Only when you need to act: gate changes, delays, leave-now, documents. Everything else waits for the evening digest.' : 'Every update about your trips as it happens. Still never offers.'}</span>
-            {s.notifications === false && <span className="small" style={{ color: '#7d5d27' }}>Alerts are off for Mada on this phone. Turn them on in Settings to get gate changes.</span>}
+            {s.demo.permissionsDenied ? <button type="button" className="link alerts-off" style={{ alignSelf: 'flex-start', padding: 0, color: '#7d5d27', textAlign: 'left' }} onClick={() => setSheet('alertsOff')}>Alerts are off for Mada on this phone. Turn them on</button>
+              : s.notifications === false && <span className="small" style={{ color: '#7d5d27' }}>Alerts are off for Mada on this phone. Turn them on in Settings to get gate changes.</span>}
           </div>
         </Group>
 
@@ -105,6 +106,7 @@ export default function Profile() {
 
       {sheet === 'photo' && <PhotoSheet onClose={() => setSheet(null)} />}
       {sheet === 'language' && <LanguageSheet onClose={() => setSheet(null)} />}
+      {sheet === 'alertsOff' && <PermissionDenied kind="notifications" onClose={() => setSheet(null)} onManual={() => { setSheet(null); toast('Alerts by SMS are on. Gate changes and delays go to your number.'); }} />}
       {sheet === 'cards' && <CardsSheet current={s.defaultCard} onPick={(id) => { const changed = id !== s.defaultCard; set({ defaultCard: id }); setSheet(null); toast(changed ? `${id === 'applepay' ? 'Apple Pay' : (s.cards.find((c) => c.id === id)?.label || 'that card')} is your default now.` : 'That’s already your default.'); }} onClose={() => setSheet(null)} />}
       {removeId && (
         <Sheet label="Remove default card" onClose={() => setRemoveId(null)}>

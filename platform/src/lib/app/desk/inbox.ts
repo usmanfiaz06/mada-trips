@@ -4,7 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { appDeskItems } from "@/db/app-schema-desk";
 import { agentForOps, loadRota, primaryAgents, type Agent } from "./agents";
-import { listConversations, listOrders, listRefunds, listRequests, listModeration, type OrderStage } from "./adapters";
+import { destinationOf, listConversations, listOrders, listRefunds, listRequests, listModeration, type OrderStage } from "./adapters";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
 import { disruptedToday } from "./disruptions";
 import { routeFor, type Route } from "./routing";
@@ -16,7 +16,7 @@ import { compareUrgency, DESK_KINDS, slaFor, type DeskKind, type Sla } from "./s
  */
 
 export type InboxItem = {
-  key: string; kind: DeskKind; id: string; title: string; sub: string; note: string; userId: string | null; userName: string;
+  key: string; kind: DeskKind; id: string; title: string; sub: string; note: string; tag?: string | null; link?: { label: string; href: string } | null; userId: string | null; userName: string;
   href: string; sla: Sla; route: Route; agentName: string | null; escalated: boolean; escalationNote: string | null; amount: number | null;
 };
 export type InboxFilter = "mine" | "team" | "unassigned" | "escalated";
@@ -34,6 +34,9 @@ async function sources(now: Date) {
     if (st === "awaiting") {
       const opened = o.desk.question?.answeredAt ? new Date(o.desk.question.answeredAt) : o.createdAt;
       raw.push({ kind: "order", id: o.id, title: o.summary, note: "Confirm the order", sub: `${o.ref} · ${o.userName}`, userId: o.ownerId, userName: o.userName, href: `/adminwork/desk/orders/${o.id}`, sla: slaFor("order", opened, now), amount: o.total });
+    } else if (st === "failed") {
+      raw.push({ kind: "ticketing", id: o.id, title: o.summary, note: "Ticketing failed", sub: `${o.ref} · ${o.userName}${o.order?.problem ? ` · ${o.order.problem}` : ""}`,
+        userId: o.ownerId, userName: o.userName, href: `/adminwork/desk/orders/${o.id}`, sla: slaFor("ticketing", o.order?.updatedAt ?? o.updatedAt, now), amount: o.total });
     } else if (st === "held") {
       const failed = o.payment?.status === "failed";
       raw.push({ kind: "ticketing", id: o.id, title: o.summary, note: failed ? "Payment capture didn't go through" : "Issue tickets", sub: `${o.ref} · ${o.userName}${o.desk.heldPnr ? ` · PNR ${o.desk.heldPnr}` : ""}`,
@@ -43,7 +46,10 @@ async function sources(now: Date) {
   for (const r of requests) {
     // Cancellations and refunds are decided in the refunds queue, not quoted.
     if ((r.status === "sent" || r.status === "reviewing") && r.kind !== "cancel" && r.kind !== "refund") {
-      raw.push({ kind: "request", id: r.id, title: r.summary, note: "Needs a quote", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.createdAt, now, { due: r.promisedBy }), amount: null });
+      const place = r.kind === "destination" ? destinationOf(r.details) : null;
+      raw.push({ kind: "request", id: r.id, title: place ? `${place.name}${place.country ? `, ${place.country}` : ""}` : r.summary, note: "Needs a quote", sub: `${r.ref} · ${r.userName}${place?.airports.length ? ` · ${place.airports.join(" ")}` : ""}`,
+        userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.createdAt, now, { due: r.promisedBy }), amount: null,
+        tag: place ? "Destination" : null, link: place ? { label: "City guide", href: place.guideUrl } : null });
     } else if (r.status === "with_agent") {
       raw.push({ kind: "request", id: r.id, title: r.summary, note: "Paid, finish it", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.updatedAt, now, { targetMinutes: 24 * 60 }), amount: null });
     }

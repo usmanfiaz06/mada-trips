@@ -29,7 +29,7 @@ export default async function DeskInbox({ searchParams }: { searchParams: Promis
   const href = (f: string, k = kind) => { const p = new URLSearchParams(); p.set("f", f); if (k) p.set("k", k); return `/adminwork/desk?${p}`; };
   const rows: InboxRow[] = shown.map((i) => ({
     key: i.key, kind: i.kind, id: i.id, title: i.title, note: i.note, sub: i.sub, href: i.href, due: i.sla.dueAt.toISOString(), opened: i.sla.openedAt.toISOString(),
-    agentName: i.agentName, reason: i.route.reason, escalated: i.escalated, escalationNote: i.escalationNote, amount: i.amount ? `SAR ${sar(i.amount)}` : null, mine: !!me && i.route.agentId === me.id,
+    agentName: i.agentName, reason: i.route.reason, tag: i.tag ?? null, link: i.link ?? null, escalated: i.escalated, escalationNote: i.escalationNote, amount: i.amount ? `SAR ${sar(i.amount)}` : null, mine: !!me && i.route.agentId === me.id,
   }));
 
   // Who is on now, and who they cover for: the line the night lead reads first.

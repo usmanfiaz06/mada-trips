@@ -15,3 +15,4 @@ export * from './circles';
 export * from './desk';
 export * from './booking';
 export * from './status';
+export * from './places';

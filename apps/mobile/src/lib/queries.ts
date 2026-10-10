@@ -4,14 +4,22 @@ import { ApiError, api } from './api';
 import './circles-join'; // Circles: resume joining from an invite link after sign-up
 import { useSession } from './session';
 
-/** Server state lives in React Query; never retry what the server refused on purpose (4xx). */
+/*
+ * Server state lives in React Query. The API client (api.ts) already retries what can be retried (network trouble and
+ * 5xx on GETs, with backoff) and refreshes tokens, so an ApiError reaching React Query is final: no second layer of
+ * retries. Queries pause while offline (net/state.ts drives onlineManager) and refetch on reconnect; mutations run
+ * regardless and fail fast with OFFLINE, so a button never spins forever. Data is kept a day in memory, and the
+ * offline copy (net/persist.ts) keeps what travel needs for longer.
+ */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: (n, e) => !(e instanceof ApiError && e.status >= 400 && e.status < 500) && n < 2,
+      gcTime: 24 * 60 * 60_000,
+      retry: (n, e) => !(e instanceof ApiError) && n < 2,
+      refetchOnReconnect: true,
     },
-    mutations: { retry: false },
+    mutations: { retry: false, networkMode: 'always' },
   },
 });
 

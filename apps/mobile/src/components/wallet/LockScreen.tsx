@@ -15,10 +15,10 @@ const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object
 
 /** "Wallet is locked" (prototype Wallet Lock): Face ID straight away; if it doesn't match, the passcode. */
 export function LockScreen() {
-  const { phase, wrong, lockedUntil, tryBiometric, tryPasscode, hydrate } = useWalletLock();
+  const { phase, lockedUntil, tryBiometric, tryPasscode, hydrate } = useWalletLock();
   const [code, setCode] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const native = Platform.OS !== 'web';
   useEffect(() => { hydrate().then(() => { if (useWalletLock.getState().lockedUntil <= Date.now()) tryBiometric(); }); }, [hydrate, tryBiometric]);
   useEffect(() => { if (lockedUntil <= Date.now()) return undefined; const i = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(i); }, [lockedUntil]);

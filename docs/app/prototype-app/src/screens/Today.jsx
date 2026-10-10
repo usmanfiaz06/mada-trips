@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue, appDay, toDate, daysBetween, addDays, dayLabel, shortDay, weekday, dayOf, monthOf, seatText, pickupPlan, boardsAt, termShort, stayOf, stayEnd, signName, ofYou, NUM_WORD, lookupFlight, FLIGHT_NO, AIRPORTS, STAY_NIGHTS, makePickup } from '../store.jsx';
 import { MoveNotice } from './TripManage.jsx';
-import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark, EmptyState, ArtFriends, ArtCircles, ArtPass } from '../ui.jsx';
+import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark, EmptyState, ArtFriends, ArtCircles, ArtPass, NetStale } from '../ui.jsx';
 
 const SERVICES = [
   { id: 'flight', label: 'Flights', icon: 'flight' },
@@ -1379,9 +1379,28 @@ export default function Today() {
       <Wash />
       <div className="scroll" style={{ position: 'relative' }}>
         <Header />
+        <NetStale />
+        {s.pendingBooking?.closed && <StillBooking />}
         {body}
       </div>
     </div>
+  );
+}
+
+/* The app was closed (or the phone died) while Faisal was booking. He kept going; this says so and picks it back up. */
+function StillBooking() {
+  const { s, set, push } = useStore();
+  const pb = s.pendingBooking;
+  const place = pb.kind === 'stay' ? 'Istanbul rooms' : 'Istanbul';
+  return (
+    <button type="button" className="resume-card rise" onClick={() => { buzz(HAPTIC.tap); set({ pendingBooking: null }); push('waiting', { ...pb, closed: undefined, resumeStep: pb.resumeStep ?? 1 }); }}>
+      <span className="avatar sm gold" style={{ position: 'relative' }}>F<i className="wait-dot" /></span>
+      <span className="col grow" style={{ gap: 2 }}>
+        <span className="h3" style={{ fontSize: 15 }}>Your {place} booking is still with Faisal.</span>
+        <span className="tiny">The app closed while you were booking. He kept going; there’s nothing you need to do.</span>
+      </span>
+      <span className="pill gold" style={{ flexShrink: 0 }}>Open<Icon name="chevron" size={14} /></span>
+    </button>
   );
 }
 

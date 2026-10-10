@@ -11,7 +11,7 @@ import { chooseFile, takePhoto } from '@/lib/pick';
 import { toast } from '@/lib/toast';
 import { useCards, useCredit, walletApi, walletKeys, type PickedFile } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
-import { fmtDate, fullDay, fullNameOf } from '@/lib/wallet-model';
+import { fmtDate, fullDay, fullNameOf, useOnOpen } from '@/lib/wallet-model';
 import { colors, ff, radii } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
@@ -70,7 +70,7 @@ export function UploadSheet({ visible, kind, person, replaces, onClose, onSaved 
   const [until, setUntil] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
-  useEffect(() => { if (visible) { setStage('choose'); setFile(null); setProblem(null); setUntil(''); } }, [visible]);
+  useOnOpen(visible, () => { setStage('choose'); setFile(null); setProblem(null); setUntil(''); });
 
   const what = kind === 'other' ? t('docs.upload.aDocument') : t(ADD.find(([k]) => k === kind)![1]).toLowerCase();
   const title = t('docs.upload.for', { what, name: person.firstName || t('household.youPlain') });
@@ -299,7 +299,7 @@ export function CardsSheet({ visible, onClose, onPicked }: { visible: boolean; o
   const [name, setName] = useState('');
   const [touched, setTouched] = useState<{ num?: boolean; exp?: boolean }>({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (visible) { setAdding(false); setNum(''); setExp(''); setCvv(''); setName(''); setTouched({}); } }, [visible]);
+  useOnOpen(visible, () => { setAdding(false); setNum(''); setExp(''); setCvv(''); setName(''); setTouched({}); });
   const digits = num.replace(/\D/g, '');
   const brand = cardBrand(digits);
   const amex = /^3[47]/.test(digits);

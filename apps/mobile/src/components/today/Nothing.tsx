@@ -12,7 +12,7 @@ import { VGradient } from '@/components/Gradient';
 import { Icon, type IconName } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { Box, Display, Eyebrow, Grow, H3, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
+import { Box, Display, Eyebrow, H3, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
 import { eidLine } from '@/lib/days';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';

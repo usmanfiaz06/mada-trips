@@ -1,7 +1,7 @@
 import {
   AskParseRequest, CARRIERS, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
   ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
-  addDays, addMinutes, bundleFor, checkPromo, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
+  addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
   money, parseAskRules, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
   type RequestQuote, type StayOption, type ThreadMessage,
@@ -303,7 +303,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (!DESTINATIONS[p.data.destination]) return err('VALIDATION');
     const travellers = p.data.travellerIds.map((id) => people.find((x) => x.id === id)).filter((x): x is Person => !!x);
     if (travellers.length !== p.data.travellerIds.length) return err('NOT_FOUND');
-    return ok(entryChecks({ destination: p.data.destination, travellers, depart: p.data.depart, return: p.data.return, answers: p.data.answers, today: today(), demo: { passportProblem: demo.has('passportProblem') }, iqamaOf: demoIqama }));
+    return ok(entryChecks({ destination: p.data.destination, travellers, depart: p.data.depart, return: p.data.return, answers: p.data.answers, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null }, iqamaOf: demoIqama }));
   }
   let r = m(/^\/offers\/([^/]+)(\/price)?$/);
   if (r) {
@@ -424,7 +424,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (b.expectedTotal !== pv.total.amount) return ok({ outcome: 'price_changed', previousTotal: money(b.expectedTotal), preview: pv, changedBy: money(pv.total.amount - b.expectedTotal) });
     if (b.draft.kind === 'trip' || b.draft.kind === 'stay') {
       const s = priced.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
-      const checks = entryChecks({ destination: s.destination, travellers: priced.travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: {}, today: today(), demo: { passportProblem: demo.has('passportProblem') } });
+      const checks = entryChecks({ destination: s.destination, travellers: priced.travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null } });
       const blocked = checks.checks.find((c) => c.key === 'passport' && c.blocking);
       if (blocked) return ok({ outcome: 'blocked', message: blocked.text });
     }

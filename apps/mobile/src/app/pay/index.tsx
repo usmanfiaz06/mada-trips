@@ -57,6 +57,7 @@ export default function Pay() {
   const [plan, setPlan] = useState<PayPlan>('full');
   const [sheet, setSheet] = useState<SheetName>(null);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0); // remounts the slider so the sun goes home after a try that stays here
   const [holdSkip, setHoldSkip] = useState(0);
   const [acceptedState, setAcceptedState] = useState<{ key: string; preview: OrderPreview } | null>(null);
   const [blocked, setBlocked] = useState('');
@@ -142,7 +143,7 @@ export default function Pay() {
       else if (method?.kind === 'card') await place({ method: 'card', cardId: method.id });
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') { setSheet('offline'); buzz('soft'); } else toast(e instanceof Error ? e.message : t('error.internal'));
-    } finally { setBusy(false); }
+    } finally { setBusy(false); setAttempt((a) => a + 1); }
   };
 
   const recheck = async () => {
@@ -255,7 +256,7 @@ export default function Pay() {
       </Animated.View>
       <View style={[styles.act, { paddingBottom: 18 + bottom }]}>
         {expired ? <Button label={t('pay.recheck')} onPress={recheck} testID="pay-recheck" /> : (
-          <SlideToConfirm label={slideLabel} busy={busy} busyLabel={t('pay.busy')} disabled={!p || previewQ.isFetching && !p} onConfirm={confirm} />
+          <SlideToConfirm key={attempt} label={slideLabel} busy={busy} busyLabel={t('pay.busy')} disabled={!p || previewQ.isFetching && !p} onConfirm={confirm} />
         )}
         <T v="tiny" style={{ textAlign: 'center' }}>
           {p?.agent === false ? t('pay.nowNote') : t('pay.agentNote')}

@@ -1,0 +1,188 @@
+1561314	290557	ar	الامارات العربية المتحدة						
+1977591	290557	ar	الإمارات العربية المتحدة	1					
+2919958	290557	link	https://en.wikipedia.org/wiki/United_Arab_Emirates						
+3057620	290557	link	https://ru.wikipedia.org/wiki/%D0%9E%D0%B1%D1%8A%D0%B5%D0%B4%D0%B8%D0%BD%D1%91%D0%BD%D0%BD%D1%8B%D0%B5_%D0%90%D1%80%D0%B0%D0%B1%D1%81%D0%BA%D0%B8%D0%B5_%D0%AD%D0%BC%D0%B8%D1%80%D0%B0%D1%82%D1%8B						
+11262187	290557	link	http://id.loc.gov/authorities/names/n79086806						
+1599347	292223	ar	دبي						
+7352081	292223	link	https://en.wikipedia.org/wiki/Dubai						
+1900652	292672	ar	إمارة الشارقة						
+2922552	292672	link	https://en.wikipedia.org/wiki/Sharjah						
+5724370	292672	ar	الشارقة						
+16340751	292672	ar	مدينة الشارقة						
+1560351	2077456	ar	استراليا						
+1618442	2077456	ar	أستراليا	1					
+2939742	2077456	link	https://en.wikipedia.org/wiki/Australia						
+3051021	2077456	link	https://ru.wikipedia.org/wiki/%D0%90%D0%B2%D1%81%D1%82%D1%80%D0%B0%D0%BB%D0%B8%D1%8F						
+10724872	2077456	link	http://id.loc.gov/authorities/names/n79021326						
+1597125	2147714	ar	سيدني						
+2920129	2147714	link	https://en.wikipedia.org/wiki/Sydney						
+3051195	2147714	link	https://ru.wikipedia.org/wiki/%D0%A1%D0%B8%D0%B4%D0%BD%D0%B5%D0%B9						
+10782297	2147714	link	http://id.loc.gov/authorities/names/n79021855						
+1593230	587084	ar	باكو						
+2920223	587084	link	https://en.wikipedia.org/wiki/Baku						
+10782214	587084	link	http://id.loc.gov/authorities/names/n79110308						
+1560133	587116	ar	آذربيجان						
+1974626	587116	ar	أذربيجان	1					
+2924385	587116	link	https://en.wikipedia.org/wiki/Azerbaijan						
+10794900	587116	link	http://id.loc.gov/authorities/names/n92000010						
+1981575	3448439	ar	ساو باولو						
+2920734	3448439	link	https://en.wikipedia.org/wiki/S%C3%A3o_Paulo						
+3056399	3448439	link	https://ru.wikipedia.org/wiki/%D0%A1%D0%B0%D0%BD-%D0%9F%D0%B0%D1%83%D0%BB%D1%83						
+10782289	3448439	link	http://id.loc.gov/authorities/names/n79077404						
+7129813	3457358	link	https://en.wikipedia.org/wiki/Medina%2C_Minas_Gerais						
+1559009	3469034	ar	البرازيل	1					
+2919965	3469034	link	https://en.wikipedia.org/wiki/Brazil						
+3056419	3469034	link	https://ru.wikipedia.org/wiki/%D0%91%D1%80%D0%B0%D0%B7%D0%B8%D0%BB%D0%B8%D1%8F						
+10724875	3469034	link	http://id.loc.gov/authorities/names/n79128015						
+3030289	6058560	link	https://en.wikipedia.org/wiki/London%2C_Ontario						
+8203475	6058560	ar	لندن						
+1969542	6251999	ar	كندا	1					
+3075873	6251999	link	https://en.wikipedia.org/wiki/Canada						
+10724860	6251999	link	http://id.loc.gov/authorities/names/n79007233						
+1602685	2657896	ar	زيورخ						
+5708953	2657896	link	https://en.wikipedia.org/wiki/Z%C3%BCrich						
+1558463	2658434	ar	سويسرا	1					
+3075874	2658434	link	https://en.wikipedia.org/wiki/Switzerland						
+1556835	357994	ar	مصر	1					
+2919963	357994	link	https://en.wikipedia.org/wiki/Egypt						
+6968634	357994	ar	جمهورية مصر العربية						
+10782316	357994	link	http://id.loc.gov/authorities/names/n80061791						
+1591246	360630	ar	القاهرة						
+2919892	360630	link	https://en.wikipedia.org/wiki/Cairo						
+10782222	360630	link	http://id.loc.gov/authorities/names/n79055723						
+1592111	2988507	ar	باريس						
+2964086	2988507	link	https://en.wikipedia.org/wiki/Paris						
+3047080	2988507	link	http://www.paris.fr						
+10782272	2988507	link	http://id.loc.gov/authorities/names/n79058874						
+13263649	2988507	link	https://en.wikivoyage.org/wiki/Paris						
+17450838	2988507	link	https://viewer.acdh.oeaw.ac.at/viewer/image/AC03301453/7/				1	1818	
+17450848	2988507	link	https://viewer.acdh.oeaw.ac.at/viewer/image/AC03301453/43/				1	1818	
+1556302	3017382	ar	فرنسا	1					
+2919871	3017382	link	https://en.wikipedia.org/wiki/France						
+3054858	3017382	link	https://ru.wikipedia.org/wiki/%D0%A4%D1%80%D0%B0%D0%BD%D1%86%D0%B8%D1%8F						
+10305461	3017382	link	http://id.loc.gov/authorities/names/n79006404						
+1555679	2635167	ar	المملكة المتحدة	1					
+3051585	2635167	link	https://ru.wikipedia.org/wiki/%D0%92%D0%B5%D0%BB%D0%B8%D0%BA%D0%BE%D0%B1%D1%80%D0%B8%D1%82%D0%B0%D0%BD%D0%B8%D1%8F						
+7297556	2635167	link	https://en.wikipedia.org/wiki/United_Kingdom	1					
+11262177	2635167	link	http://id.loc.gov/authorities/names/n79023147						
+1982257	2643123	ar	مانشستر						
+2919909	2643123	link	https://en.wikipedia.org/wiki/Manchester						
+1591349	2643743	ar	لندن						
+2919903	2643743	link	https://en.wikipedia.org/wiki/London						
+10782258	2643743	link	http://id.loc.gov/authorities/names/n79005665						
+1607235	2653941	ar	كامبريدج						
+2952632	2653941	link	https://en.wikipedia.org/wiki/Cambridge						
+3051740	2653941	link	https://ru.wikipedia.org/wiki/%D0%9A%D0%B5%D0%BC%D0%B1%D1%80%D0%B8%D0%B4%D0%B6						
+13633314	611694	link	https://en.wikipedia.org/wiki/Telavi						
+1895308	611717	ar	تبليسي						
+2919954	611717	link	https://en.wikipedia.org/wiki/Tbilisi						
+3048968	613607	link	https://ru.wikipedia.org/wiki/%D0%9A%D1%83%D1%82%D0%B0%D0%B8%D1%81%D0%B8						
+10147562	613607	link	https://en.wikipedia.org/wiki/Kutaisi						
+1555474	614540	ar	جورجيا	1					
+2919986	614540	link	https://en.wikipedia.org/wiki/Georgia_%28country%29						
+3048973	614540	link	https://ru.wikipedia.org/wiki/%D0%93%D1%80%D1%83%D0%B7%D0%B8%D1%8F						
+10794934	614540	link	http://id.loc.gov/authorities/names/n81055241						
+8205618	615532	ar	باطومي						
+16241349	615532	link	https://en.wikipedia.org/wiki/Batumi						
+1564063	294640	ar	اسرائيل						
+1974996	294640	ar	إسرائيل	1					
+2922651	294640	link	https://en.wikipedia.org/wiki/Israel						
+3047610	294640	link	https://ru.wikipedia.org/wiki/%D0%98%D0%B7%D1%80%D0%B0%D0%B8%D0%BB%D1%8C						
+10232979	294640	ar	دولة إسرائيل						
+10794953	294640	link	http://id.loc.gov/authorities/names/n79003285						
+1628918	295530	ar	بئر السبع	1					
+2922681	295530	link	https://en.wikipedia.org/wiki/Beersheba						
+3047624	295530	link	https://ru.wikipedia.org/wiki/%D0%91%D0%B5%D1%8D%D1%80-%D0%A8%D0%B5%D0%B2%D0%B0						
+16252315	295530	link	https://ar.wikipedia.org/wiki/%D8%A8%D8%A6%D8%B1_%D8%A7%D9%84%D8%B3%D8%A8%D8%B9						
+16252317	295530	ar	بير السبع						
+16252318	295530	ar	بيئر شيبع						
+16252319	295530	ar	بير سبع						
+16252320	295530	ar	بئير شيڤع						
+16252321	295530	ar	بئير شيبع						
+16252322	295530	ar	بئير شيفع						
+16252323	295530	ar	بِئِير شِڤَع						
+1590698	3169070	ar	روما						
+2978426	3169070	link	https://en.wikipedia.org/wiki/Rome						
+3055936	3169070	link	https://ru.wikipedia.org/wiki/%D0%A0%D0%B8%D0%BC						
+1563634	3175395	ar	ايطاليا						
+1972552	3175395	ar	إيطاليا	1					
+2980155	3175395	link	https://en.wikipedia.org/wiki/Italy						
+3056006	3175395	link	https://ru.wikipedia.org/wiki/%D0%98%D1%82%D0%B0%D0%BB%D0%B8%D1%8F						
+11262283	3175395	link	http://id.loc.gov/authorities/names/n79021783						
+1979127	1850147	ar	طوكيو						
+3050815	1850147	link	https://uk.wikipedia.org/wiki/%D0%A2%D0%BE%D0%BA%D1%96%D0%BE						
+7235462	1850147	link	https://en.wikipedia.org/wiki/Tokyo						
+8552514	1850147	link	https://no.wikipedia.org/wiki/Tokyo						
+8552517	1850147	link	https://es.wikipedia.org/wiki/Tokyo						
+8552518	1850147	link	https://de.wikipedia.org/wiki/Tokyo						
+8552519	1850147	link	https://fr.wikipedia.org/wiki/Tokyo						
+8552520	1850147	link	https://ru.wikipedia.org/wiki/Tokyo						
+8552524	1850147	link	https://tr.wikipedia.org/wiki/Tokyo						
+10782303	1850147	link	http://id.loc.gov/authorities/names/n79034998						
+1563178	1861060	ar	اليابان	1					
+2919889	1861060	link	https://en.wikipedia.org/wiki/Japan						
+11262284	1861060	link	http://id.loc.gov/authorities/names/n78089021						
+2934471	1282027	link	https://en.wikipedia.org/wiki/Mal%C3%A9						
+3050195	1282027	link	https://ru.wikipedia.org/wiki/%D0%9C%D0%B0%D0%BB%D0%B5						
+1560921	1282028	ar	مالديف						
+1978448	1282028	ar	جزر المالديف	1					
+2420906	1282028	ar	جزر الملديف	1					
+2920286	1282028	link	https://en.wikipedia.org/wiki/Maldives						
+3050196	1282028	link	https://ru.wikipedia.org/wiki/%D0%9C%D0%B0%D0%BB%D1%8C%D0%B4%D0%B8%D0%B2%D1%8B						
+1556241	102358	ar	العربية السعودية						
+1976172	102358	ar	السعودية						
+2418880	102358	ar	المملكة العربية السعودية	1					
+2921008	102358	link	https://en.wikipedia.org/wiki/Saudi_Arabia						
+3047273	102358	link	https://ru.wikipedia.org/wiki/%D0%A1%D0%B0%D1%83%D0%B4%D0%BE%D0%B2%D1%81%D0%BA%D0%B0%D1%8F_%D0%90%D1%80%D0%B0%D0%B2%D0%B8%D1%8F						
+10782319	102358	link	http://id.loc.gov/authorities/names/n80131611						
+1981273	104515	ar	مكة		1				
+2921015	104515	link	https://en.wikipedia.org/wiki/Mecca						
+9069164	104515	ar	مكة المكرمة	1					
+1597699	105343	ar	جدة						
+3047275	105343	link	https://ru.wikipedia.org/wiki/%D0%94%D0%B6%D0%B8%D0%B4%D0%B4%D0%B0						
+6586084	105343	ar	جدّة						
+7352083	105343	link	https://en.wikipedia.org/wiki/Jeddah						
+1602008	107968	ar	الطائف						
+2921036	107968	link	https://en.wikipedia.org/wiki/Ta%27if						
+3686306	107968	ar	Aţ Ţā’if						
+1591602	108410	ar	الرياض						
+2921038	108410	link	https://en.wikipedia.org/wiki/Riyadh						
+3047278	108410	link	https://ru.wikipedia.org/wiki/%D0%AD%D1%80-%D0%A0%D0%B8%D1%8F%D0%B4						
+8488387	108841	link	https://en.wikipedia.org/wiki/Al-%60Ula						
+12133078	108841	ar	العلا						
+16581547	108841	ar	ددن				1		
+16581548	108841	ar	دادان				1		
+16581549	108841	ar	ديدان				1		
+1620970	109223	ar	المدينة						
+1896687	109223	ar	المدينة المنورة						
+2920356	109223	link	https://en.wikipedia.org/wiki/Medina						
+3047279	109223	link	https://ru.wikipedia.org/wiki/%D0%9C%D0%B5%D0%B4%D0%B8%D0%BD%D0%B0						
+1923948	110690	ar	أبها	1	1				
+2921051	110690	link	https://en.wikipedia.org/wiki/Abha						
+3047282	110690	link	https://ru.wikipedia.org/wiki/%D0%90%D0%B1%D1%85%D0%B0						
+1564800	298795	ar	تركيا	1					
+2922712	298795	link	https://en.wikipedia.org/wiki/Turkey						
+3047632	298795	link	https://ru.wikipedia.org/wiki/%D0%A2%D1%83%D1%80%D1%86%D0%B8%D1%8F						
+11262189	298795	link	http://id.loc.gov/authorities/names/n80070818						
+2919971	745044	link	https://en.wikipedia.org/wiki/Constantinople				1		
+3049631	745044	link	https://ru.wikipedia.org/wiki/%D0%A1%D1%82%D0%B0%D0%BC%D0%B1%D1%83%D0%BB						
+3049632	745044	link	https://uk.wikipedia.org/wiki/%D0%A1%D1%82%D0%B0%D0%BC%D0%B1%D1%83%D0%BB						
+7480887	745044	link	https://no.wikipedia.org/wiki/Istanbul						
+7480888	745044	link	https://en.wikipedia.org/wiki/Istanbul	1					
+8040597	745044	ar	اسطنبول						
+10782245	745044	link	http://id.loc.gov/authorities/names/n79034985						
+3003821	4717560	link	https://en.wikipedia.org/wiki/Paris%2C_Texas						
+8232541	4717560	ar	باريس						
+3016573	5162512	link	https://en.wikipedia.org/wiki/Medina%2C_Ohio						
+9367220	5162512	ar	مدينا						
+1599177	5391811	ar	سان دييغو						
+2920603	5391811	link	https://en.wikipedia.org/wiki/San_Diego						
+3058283	5391811	link	https://ru.wikipedia.org/wiki/%D0%A1%D0%B0%D0%BD-%D0%94%D0%B8%D0%B5%D0%B3%D0%BE_%28%D0%9A%D0%B0%D0%BB%D0%B8%D1%84%D0%BE%D1%80%D0%BD%D0%B8%D1%8F%29						
+10133546	5391811	link	http://id.loc.gov/authorities/names/n79056560						
+1564123	6252001	ar	الاولايات المتحدة الامريكية						
+2422312	6252001	ar	الولايات المتحدة الأمريكية	1					
+3031730	6252001	link	https://en.wikipedia.org/wiki/United_States						
+7297451	6252001	link	http://www.usa.gov/						
+7297452	6252001	link	http://www.whitehouse.gov/						
+8791437	6252001	link	http://id.loc.gov/authorities/names/n78095330						
+20739751	6252001	ar	الولايات المتحدة						

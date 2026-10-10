@@ -19,6 +19,10 @@ import { colors, ff } from '@/theme';
 const fmt2 = (h: number) => (Math.abs(h) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** A stand-in drawing of the ZATCA QR, stable per invoice (the payload itself is on the document). */
+function Finder({ x, y }: { x: number; y: number }) {
+  return <><Rect x={x} y={y} width={7} height={7} fill={colors.green} /><Rect x={x + 1} y={y + 1} width={5} height={5} fill="#fff" /><Rect x={x + 2} y={y + 2} width={3} height={3} fill={colors.green} /></>;
+}
+
 function QrMark({ seed, size = 92 }: { seed: string; size?: number }) {
   const N = 25;
   let h = 2166136261;
@@ -27,11 +31,10 @@ function QrMark({ seed, size = 92 }: { seed: string; size?: number }) {
   const finder = (x: number, y: number) => (x < 7 && y < 7) || (x >= N - 7 && y < 7) || (x < 7 && y >= N - 7);
   const cells: [number, number][] = [];
   for (let y = 0; y < N; y += 1) for (let x = 0; x < N; x += 1) if (!finder(x, y) && rnd() > 0.52) cells.push([x, y]);
-  const F = ({ x, y }: { x: number; y: number }) => <><Rect x={x} y={y} width={7} height={7} fill={colors.green} /><Rect x={x + 1} y={y + 1} width={5} height={5} fill="#fff" /><Rect x={x + 2} y={y + 2} width={3} height={3} fill={colors.green} /></>;
   return (
     <Svg width={size} height={size} viewBox={`-1 -1 ${N + 2} ${N + 2}`} accessibilityLabel={t('inv.qr')} style={{ backgroundColor: '#fff', borderRadius: 8 }}>
       {cells.map(([x, y]) => <Rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={colors.green} />)}
-      <F x={0} y={0} /><F x={N - 7} y={0} /><F x={0} y={N - 7} />
+      <Finder x={0} y={0} /><Finder x={N - 7} y={0} /><Finder x={0} y={N - 7} />
     </Svg>
   );
 }

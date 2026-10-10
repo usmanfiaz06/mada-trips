@@ -65,6 +65,7 @@ export const resilienceCopy = {
   'session.expired.title': 'Sign in again to carry on.',
   'session.expired.body': 'It’s been a while. Everything you typed is kept, and you’ll come back right here.',
   'session.expired.action': 'Sign in',
+  'session.expired.to': 'We’ll text a code to {phone}.',
 
   // ───────────── versions and maintenance ─────────────
   'update.title': 'Time for the new Mada.',
@@ -76,6 +77,7 @@ export const resilienceCopy = {
   'maintenance.title': 'We’re making Mada better.',
   'maintenance.body': 'Booking is paused for a few minutes. Your trips, passes and documents still open on this phone.',
   'maintenance.until': 'Back by {time}.',
+  'maintenance.banner': 'Booking is paused for a few minutes.',
   'maintenance.trips': 'Open my trips',
   'maintenance.retry': 'Check again',
 

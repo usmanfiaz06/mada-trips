@@ -21,7 +21,7 @@ import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useAccount, useCards, useCredit, useDocuments, useRefreshHousehold, useTrips, walletApi } from '@/lib/wallet';
 import { useWalletLock } from '@/lib/wallet-lock';
-import { fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
+import { useNow, fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
 import { colors, ff, shadow } from '@/theme';
 
 /** The Wallet (prototype Wallet.jsx): locked with Face ID, passports for the whole household, documents, passes, money. */
@@ -61,6 +61,7 @@ function Unlocked() {
   const cards = useCards();
   const account = useAccount();
   const refresh = useRefreshHousehold();
+  const now = useNow();
   const list = people.data ?? [];
   const [whoId, setWho] = useState<string | null>(null);
   const who: Person | undefined = list.find((p) => p.id === whoId) ?? list[0];
@@ -87,7 +88,8 @@ function Unlocked() {
   const helper = who ? isHelper(who) : false;
   const asks = helper ? [[t('wallet.docs.iqama'), t('wallet.docs.notAdded')], [t('wallet.docs.exitVisa'), t('wallet.docs.exitNeeded')]].filter(([title]) => !myDocs.some((d) => d.title === title)) : [];
   const outSeg = trip?.trip.segments.find((s) => s.direction === 'out') ?? null;
-  const passesOpen = outSeg ? Date.parse(`${outSeg.departLocal}:00+03:00`) - Date.now() < 24 * 3_600_000 && Date.parse(`${outSeg.departLocal}:00+03:00`) > Date.now() - 6 * 3_600_000 : false;
+  const departs = outSeg ? Date.parse(`${outSeg.departLocal}:00+03:00`) : 0;
+  const passesOpen = outSeg ? departs - now < 24 * 3_600_000 && departs > now - 6 * 3_600_000 : false;
   const travellers = trip ? list.filter((p) => trip.travellerIds.includes(p.id)) : [];
   const bal = credit.data?.balance.amount ?? 0;
   const savedCards = cards.data?.cards ?? [];

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, FLIGHTS, HOTELS, STAY_NIGHTS, PICKUP, fmt, passportIssue } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, Steps, AirlineMark, AddPersonSheet, Plane, EmptyState, ArtCalendar, ArtSuitcase, ArtMap } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, Steps, AirlineMark, AddPersonSheet, Plane, EmptyState, ArtCalendar, ArtSuitcase, ArtMap, ArtCompass, ArtDesk, InlineError } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 
 /* Ask: one composer for flights, stays, plans and anything Faisal does by hand.
@@ -557,6 +557,7 @@ function FlightFlow({ query, setCta }) {
   const [pick, setPick] = useState(null);
   const [open, setOpen] = useState(null);
   const [bundle, setBundle] = useState(false);
+  const [retried, setRetried] = useState(false);
   const [sort, setSort] = useState('best');
   const [heldId, setHeldId] = useState(null);
 
@@ -649,16 +650,30 @@ function FlightFlow({ query, setCta }) {
   if (step < lines.length) return <Working lines={lines} step={step} />;
 
   const istanbul = destKey === 'istanbul';
+  /* Our own search can't be reached: say so in place, keep everything they chose, one Try again. */
+  if (s.demo.serverDown) return (
+    <InlineError art={<ArtDesk />} title="We can’t reach our flight search right now."
+      body="It’s on our side, not your connection. Your dates and travellers are kept, and saved trips still open."
+      onRetry={() => setRunKey((k) => k + 1)} />
+  );
+  /* One airline isn't answering: the same in-place design, with the airlines that are. */
   if (istanbul && s.demo.supplierDown && mode === 'normal') return (
-    <div className="col rise" style={{ gap: 12 }}>
-      <div className="notice warn"><Icon name="flight" color="#7d5d27" /><div className="grow"><span className="h3">Saudia's system isn't answering.</span><span className="small">Flynas and Turkish are fine. Or Faisal can search Saudia by hand and come back within 20 minutes.</span></div></div>
-      <div className="row">
+    <InlineError tone="partial" icon="flight" title="Saudia isn’t answering right now."
+      body="flynas and Turkish Airlines are. Or Faisal can search Saudia by hand and reply here within 20 minutes."
+      secondary={<>
         <button type="button" className="btn primary small" onClick={() => { setMode('others'); buzz(HAPTIC.tap); }}>Show the others</button>
         <button type="button" className="btn secondary small" onClick={() => setMode('byhand')}>Ask Mada</button>
-      </div>
-    </div>
+      </>} />
   );
   if (mode === 'byhand') return <RequestFlow kind="flight" query={`Saudia flights to Istanbul · ${dateLabel}`} note="Faisal will search Saudia by hand and send you the options here within 20 minutes." autoSend />;
+  if (mode === 'askall') return <RequestFlow kind="flight" query={`Flights to ${dest.name} · ${dateLabel}`} note="Faisal will search by hand and send you the options here within 20 minutes." autoSend />;
+  /* The search ran out of time: nothing is lost, try once more or hand it to Mada. */
+  if (s.demo.searchTimeout && !retried && mode === 'normal') return (
+    <InlineError art={<ArtCompass />} title="The search took too long."
+      body={`Airlines were slow to answer for ${dest.name}. Your dates and travellers are kept.`}
+      onRetry={() => { setRetried(true); setRunKey((k) => k + 1); }}
+      secondary={<button type="button" className="btn secondary small" onClick={() => { buzz(HAPTIC.tap); setMode('askall'); }}>Ask Mada to search</button>} />
+  );
 
   if (s.demo.noResults && mode === 'normal') return (
     <EmptyState art={<ArtCalendar day={String(fromIso(trip.dep).getDate())} />} title="Nothing direct on those dates."

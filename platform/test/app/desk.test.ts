@@ -6,15 +6,19 @@ import {
   appCreditLedger, appMessages, appNotifications, appPayments, appPeople, appQuotes, appRefunds, appRequests, appSegments, appTrips, appUsers,
 } from "@/db/app-schema";
 import { appAgentShifts, appAgents, appDeskModeration } from "@/db/app-schema-desk";
+import { appOrders } from "@/db/app-schema-booking";
+import { appSupportThreads } from "@/db/app-schema-wallet";
+import { appPosts, appReports } from "@/db/app-schema-circles";
 import { encryptField, passportAad } from "@/lib/app/crypto";
 import { createSession } from "@/lib/app/tokens";
 import { suppliers } from "@/lib/app/suppliers";
+import { bookingSuppliers } from "@/lib/app/booking/common";
 import { GET as presenceGet } from "@/app/api/app/v1/support/presence/route";
 import type { DeskActor } from "@/lib/app/desk/core";
 import { addShift, assignPrimary, firstReplySamples, pingTyping, presenceFor, saveAgent, setAgentStatus } from "@/lib/app/desk/agents";
 import {
   addNote, approveRefund, askTraveller, blockTraveller, confirmHold, decideModeration, failTicketing, getRequestFull, issueTickets, listConversations,
-  markDone, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
+  destinationOf, listModeration, listOrders, markDone, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
 } from "@/lib/app/desk/adapters";
 import { pushPlan, zonedToUtc } from "@/lib/app/desk/disruptions";
 import { deskInbox, escalate, filterInbox, reassign } from "@/lib/app/desk/inbox";
@@ -47,7 +51,7 @@ async function order(userId: string, personIds: string[], opts: { token?: string
   const [r] = await db.insert(appRequests).values({ ownerId: userId, kind: "flight", status: "with_agent", summary: "Riyadh to Istanbul, 14 Nov", travellerIds: personIds, tripId: trip!.id }).returning();
   const [q] = await db.insert(appQuotes).values({ requestId: r!.id, lines: [{ label: "Flights", amount: 412000, kind: "flight" }], total: 412000, status: "accepted" }).returning();
   const key = `test:${r!.id}`;
-  const auth = await suppliers.payments().authorize({ amount: 412000, currency: "SAR", token: opts.token ?? "tok_visa", idempotencyKey: key, customerRef: userId, description: "test" } as never);
+  const auth = await bookingSuppliers.payments().authorize({ amount: 412000, currency: "SAR", token: opts.token ?? "tok_visa", idempotencyKey: key, customerRef: userId, description: "test" } as never);
   const [p] = await db.insert(appPayments).values({ ownerId: userId, requestId: r!.id, quoteId: q!.id, method: opts.method ?? "card", status: auth.status, amount: 412000, label: "Visa ending 41", provider: "mock", providerRef: auth.providerRef, idempotencyKey: key }).returning();
   return { request: r!, trip: trip!, payment: p! };
 }
@@ -189,7 +193,7 @@ describe("order desk", () => {
 
   it("a failed capture leaves the order unconfirmed; ticketing failed voids the hold and says nothing was charged", async () => {
     const { user, person } = await traveller();
-    const { request, payment } = await order(user.id, [person.id], { token: "tok_fail_capture" });
+    const { request, payment } = await order(user.id, [person.id], { token: "tok_visa_failcapture" });
     const res = await issueTickets(lead, request.id, { pnr: "QWE123", tickets: ["0651234567891"] });
     expect(res.ok).toBe(false);
     let full = await getRequestFull(request.id);
@@ -238,7 +242,7 @@ describe("order desk", () => {
     const { request, payment } = await order(user.id, [person.id]);
     await expect(priceChanged(counter, request.id, { total: 412000 })).rejects.toThrow(/same price/);
     const q = await priceChanged(counter, request.id, { total: 436000, reason: "Fare class sold out" });
-    expect(q.total).toBe(436000);
+    expect(q!.total).toBe(436000);
     const quotes = await db.select().from(appQuotes).where(eq(appQuotes.requestId, request.id));
     expect(quotes.map((x) => x.status).sort()).toEqual(["open", "withdrawn"]);
     const [p] = await db.select().from(appPayments).where(eq(appPayments.id, payment.id));
@@ -261,6 +265,47 @@ describe("order desk", () => {
   });
 });
 
+describe("orders made by the booking engine (app_orders)", () => {
+  async function engineOrder(userId: string, personIds: string[], token = "tok_visa") {
+    const [r] = await db.insert(appRequests).values({ ownerId: userId, kind: "flight", status: "with_agent", summary: "Riyadh to Dubai", travellerIds: personIds, details: { source: "order" } }).returning();
+    const key = `eng:${r!.id}`;
+    const auth = await bookingSuppliers.payments().authorize({ amount: 250000, method: "card", token, idempotencyKey: key, description: "test" });
+    const [p] = await db.insert(appPayments).values({ ownerId: userId, requestId: r!.id, method: "card", status: auth.status, amount: 250000, label: "Visa ending 41", provider: "mock", providerRef: auth.providerRef, idempotencyKey: key }).returning();
+    const [o] = await db.insert(appOrders).values({ ownerId: userId, kind: "quote", status: "pending_agent", idempotencyKey: key, draft: {}, snapshot: {}, lines: [], travellerIds: personIds,
+      subtotal: 250000, total: 250000, paymentLabel: "Visa ending 41", paymentMethod: { method: "card" }, paymentId: p!.id, requestId: r!.id }).returning();
+    return { request: r!, order: o!, payment: p! };
+  }
+  it("hold and issue go through lib/app/booking/desk.ts, signed by the agent, in the Ops log", async () => {
+    const { user, person } = await traveller();
+    const { request, order, payment } = await engineOrder(user.id, [person.id]);
+    expect((await listOrders({ stage: "open" })).find((x) => x.id === request.id)?.stage).toBe("awaiting");
+    await confirmHold(counter, request.id, { pnr: "dxb7aa" });
+    let [o] = await db.select().from(appOrders).where(eq(appOrders.id, order.id));
+    expect(o).toMatchObject({ status: "held", supplierRef: "DXB7AA", agentName: "Faisal" });
+    expect((await getRequestFull(request.id))!.stage).toBe("held");
+    const res = await issueTickets({ ...lead, id: counter.id, name: counter.name }, request.id, { pnr: "DXB7AA", tickets: ["0651234567777"] });
+    expect(res.ok).toBe(true);
+    [o] = await db.select().from(appOrders).where(eq(appOrders.id, order.id));
+    expect(o).toMatchObject({ status: "confirmed", confirmedByName: "Faisal" });
+    const [p] = await db.select().from(appPayments).where(eq(appPayments.id, payment.id));
+    expect(p!.status).toBe("captured");
+    expect((await opsAudits(request.id)).map((a) => a.action)).toEqual(["desk.order.held", "desk.order.issued"]);
+  });
+  it("a question and ticketing failed go through the engine too", async () => {
+    const { user, person } = await traveller();
+    const a = await engineOrder(user.id, [person.id]);
+    await askTraveller(counter, a.request.id, { question: "Is the name on the ticket as on the passport?", choices: [] });
+    expect((await db.select().from(appOrders).where(eq(appOrders.id, a.order.id)))[0]!.status).toBe("needs_answer");
+    const b = await engineOrder(user.id, [person.id]);
+    await confirmHold(counter, b.request.id);
+    await failTicketing(counter, b.request.id, { reason: "The airline refused the fare" });
+    expect((await db.select().from(appOrders).where(eq(appOrders.id, b.order.id)))[0]!.status).toBe("ticketing_failed");
+    expect((await db.select().from(appPayments).where(eq(appPayments.id, b.payment.id)))[0]!.status).toBe("voided");
+    const { items } = await deskInbox(new Date());
+    expect(items.find((i) => i.id === b.request.id)).toMatchObject({ kind: "ticketing", note: "Ticketing failed" });
+  });
+});
+
 /* ───────────── requests, chat, refunds ───────────── */
 
 describe("requests and quotes", () => {
@@ -276,6 +321,19 @@ describe("requests and quotes", () => {
     full = await getRequestFull(r!.id);
     expect(full!.request.status).toBe("done");
     expect((await audits(r!.id)).map((a) => a.action)).toEqual(["desk.quote.sent", "desk.request.done"]);
+  });
+});
+
+describe("destination requests (Plan it with Mada)", () => {
+  it("land in the inbox as a request to quote, with the city and a guide link", async () => {
+    const { user } = await traveller();
+    const [r] = await db.insert(appRequests).values({ ownerId: user.id, kind: "destination", status: "sent", summary: "Plan a trip to Tbilisi",
+      details: { place: { id: "plc_tbilisi", name: "Tbilisi", country: "Georgia", airports: ["TBS", { code: "KUT" }] }, message: "Can you plan Tbilisi for us in May?" } }).returning();
+    expect(destinationOf(r!.details)).toMatchObject({ name: "Tbilisi", country: "Georgia", airports: ["TBS", "KUT"], id: "plc_tbilisi" });
+    expect(destinationOf({})).toBeNull();
+    const item = (await deskInbox(new Date())).items.find((i) => i.id === r!.id)!;
+    expect(item).toMatchObject({ kind: "request", title: "Tbilisi, Georgia", note: "Needs a quote", tag: "Destination" });
+    expect(item.link!.href).toContain("Tbilisi");
   });
 });
 
@@ -299,12 +357,26 @@ describe("chat", () => {
   });
 });
 
+describe("support threads (lib/app/support/desk.ts)", () => {
+  it("replies through the support module, which updates the thread", async () => {
+    const { user } = await traveller("Reem Alshehri");
+    const [th] = await db.insert(appSupportThreads).values({ userId: user.id, about: "Your account", lastMessageAt: new Date() }).returning();
+    await db.insert(appMessages).values({ threadKind: "support", threadId: th!.id, authorKind: "user", authorUserId: user.id, body: "Can I change my email?" });
+    expect((await listConversations()).find((c) => c.id === th!.id)).toMatchObject({ summary: "Your account", userName: "Reem A." });
+    await sendAgentReply(counter, "support", th!.id, { body: "Yes. Open Account, then Email." });
+    const [after] = await db.select().from(appSupportThreads).where(eq(appSupportThreads.id, th!.id));
+    expect(after!.agentReadAt).toBeTruthy();
+    expect(after!.assignedOpsUserId).toBe(counter.id);
+    expect((await listConversations()).find((c) => c.id === th!.id)!.waitingSince).toBeNull();
+  });
+});
+
 describe("refunds", () => {
   async function refund(method = "card") {
     const { user, person } = await traveller();
     const { payment } = await order(user.id, [person.id], { method });
     await db.update(appPayments).set({ status: "captured" }).where(eq(appPayments.id, payment.id));
-    await suppliers.payments().capture(payment.providerRef!, payment.amount);
+    await bookingSuppliers.payments().capture(payment.providerRef!, payment.amount);
     const [f] = await db.insert(appRefunds).values({ paymentId: payment.id, amount: 120000 }).returning();
     return { user, payment, refund: f! };
   }
@@ -418,6 +490,23 @@ describe("moderation", () => {
     await expect(blockTraveller(lead, user.id, "Again please")).rejects.toThrow(/Already blocked/);
     const a = await audits(user.id);
     expect(a.map((x) => x.action)).toEqual(["desk.traveller.blocked"]);
+  });
+});
+
+describe("circles moderation (lib/app/circles/moderation.ts)", () => {
+  it("lists pending tips and open reports, and decides them at the source", async () => {
+    const { user } = await traveller("Tip Writer");
+    const other = await traveller("Reporter Person");
+    const [post] = await db.insert(appPosts).values({ authorId: user.id, city: "Istanbul", place: "Galata", body: "DM me for cheap tours", kind: "todo", audience: "everyone", flagged: "matched dm me" }).returning();
+    const [rep] = await db.insert(appReports).values({ reporterId: other.user.id, targetKind: "post", targetId: post!.id, targetUserId: user.id, reason: "unwanted" }).returning();
+    const q = await listModeration("open");
+    expect(q.find((m) => m.id === post!.id)).toMatchObject({ source: "post", kind: "tip" });
+    expect(q.find((m) => m.id === rep!.id)).toMatchObject({ source: "report", kind: "report" });
+    await decideModeration(lead, post!.id, { decision: "rejected", reason: "Selling tours in tips" }, "post");
+    expect((await db.select().from(appPosts).where(eq(appPosts.id, post!.id)))[0]!.status).toBe("rejected");
+    await decideModeration(lead, rep!.id, { decision: "dismissed" }, "report");
+    expect((await db.select().from(appReports).where(eq(appReports.id, rep!.id)))[0]!.status).toBe("dismissed");
+    await expect(decideModeration(lead, rep!.id, { decision: "dismissed" }, "report")).rejects.toThrow(/Already decided/);
   });
 });
 

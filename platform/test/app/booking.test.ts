@@ -201,10 +201,10 @@ describe("entry checks", () => {
     for (const c of r.checks) expect(bannedIn(`${c.title ?? ""} ${c.text}`)).toEqual([]);
     const answered = EntryCheckResponse.parse((await post(searchEntry, f.token, { ...body, answers: { [visa.answerKey!]: "asked", [`${f.lina}:reentry`]: "has", [`${f.lina}:iqama`]: "2028-03-15" } })).json);
     expect(answered.blocking).toBe(0);
-    // The passport-problem switch: Sara's passport (the first child) ends too soon for Türkiye's 150 days.
+    // The passport-problem switch: Ahmed's passport (the youngest) ends too soon for Türkiye's 150 days.
     const short = EntryCheckResponse.parse((await post(searchEntry, f.token, { ...body, travellerIds: f.four }, "?demo=passportProblem")).json);
     const pp = short.checks.find((c) => c.key === "passport")!;
-    expect(pp).toMatchObject({ name: "Sara", blocking: true, removable: true });
+    expect(pp).toMatchObject({ name: "Ahmed", blocking: true, removable: true });
     expect(pp.text).toContain("2 Jul 2027");
     const uk = EntryCheckResponse.parse((await post(searchEntry, f.token, { destination: "london", travellerIds: [f.me], depart: EID_OUT, return: EID_BACK })).json);
     expect(uk.checks[0]).toMatchObject({ key: "eta", info: true, service: "uk_eta" });

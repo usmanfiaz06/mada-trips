@@ -37,8 +37,9 @@ type Entry = {
  * Every desk action lands in both trails, in the same transaction as the change: the app's audit (what happened to
  * the traveller's records) and the Ops activity log (what the team did), so neither can disagree with the other.
  */
-export async function deskAudit(tx: Tx | typeof db, actor: DeskActor, e: Entry) {
-  await tx.insert(appAudit).values({
+export async function deskAudit(tx: Tx | typeof db, actor: DeskActor, e: Entry, opts: { app?: boolean } = {}) {
+  // { app: false } when the feature's own function already wrote the app audit row for this change.
+  if (opts.app !== false) await tx.insert(appAudit).values({
     actorKind: "agent", actorId: actor.id, action: e.action, entityType: e.entityType,
     entityId: e.entityId ?? null, summary: e.summary, data: e.data ?? null,
   });

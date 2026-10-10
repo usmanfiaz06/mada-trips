@@ -48,7 +48,7 @@ export function TodayHeader({ clock, unread }: { clock: TripDetail['clock'] | nu
       </Pressable>
       <Row gap={8}>
         {!guest ? (
-          <Pressable testID="bell" accessibilityRole="button" accessibilityLabel={t('today.a11y.notifications')} onPress={() => { buzz('tap'); router.push('/trip/inbox' as Href); }} style={styles.bell}>
+          <Pressable testID="bell" accessibilityRole="button" accessibilityLabel={t('today.a11y.notifications')} onPress={() => { buzz('tap'); router.push('/inbox' as Href); }} style={styles.bell}>
             <Icon name="bell" size={19} />
             {unread > 0 ? <View style={styles.bellDot} /> : null}
           </Pressable>
@@ -176,18 +176,6 @@ export function DemoSheet() {
   );
 }
 
-/** The offline line at the top: "You're offline. Everything for your trips is on this phone." */
-export function OfflineBar() {
-  const offline = useDemo((s) => s.offline);
-  useEffect(() => {}, [offline]);
-  if (!offline) return null;
-  return (
-    <View style={styles.offline} accessibilityRole="alert">
-      <Icon name="wifiOff" size={16} color={colors.mist} />
-      <T v="small" color={colors.mist} style={{ fontFamily: ff.ui500, flex: 1 }}>{t('common.offline.banner')}</T>
-    </View>
-  );
-}
 
 export const todayHour = () => Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hourCycle: 'h23', timeZone: 'Asia/Riyadh' }).format(new Date()));
 export const realToday = () => todayIn();

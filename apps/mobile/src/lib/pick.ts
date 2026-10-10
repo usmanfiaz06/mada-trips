@@ -1,5 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 import type { PickedFile } from './wallet';
 
 /*
@@ -16,8 +17,11 @@ function fromImage(a: ImagePicker.ImagePickerAsset): PickedFile {
 
 /** The camera. Asks for permission first; returns 'denied' if the person said no. */
 export async function takePhoto(): Promise<PickedFile | null | 'denied'> {
-  const perm = await ImagePicker.requestCameraPermissionsAsync().catch(() => ({ granted: true }));
-  if (!perm.granted) return 'denied';
+  // The web build opens the file chooser with the camera offered; there's no permission to ask for.
+  if (Platform.OS !== 'web') {
+    const perm = await ImagePicker.requestCameraPermissionsAsync().catch(() => ({ granted: true }));
+    if (!perm.granted) return 'denied';
+  }
   const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85, exif: false });
   return r.canceled || !r.assets[0] ? null : fromImage(r.assets[0]);
 }

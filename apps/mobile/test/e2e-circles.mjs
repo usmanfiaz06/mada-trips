@@ -3,7 +3,7 @@
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
 //   node test/e2e-circles.mjs [shot-dir]          (DIST=… to point at another export; API_TARGET=… for a real server)
 //
-// Walks: Discover (city sheet, a city we don't cover, filters, a tip opened, saved, reported, a tip posted and checked),
+// Walks: Discover (city sheet, a city guide for anywhere else, filters, a tip opened, saved, reported, a tip posted and checked),
 // the Circles view (who's around and its privacy choices, circles, friends, people you know, saved, passport stamps),
 // a circle's chat (votes cast and closed, @Mada, a cost split, settings, rename, invite link), a new circle in two
 // steps (duplicate name, Mada-wide search, nobody found), your people (tabs, contacts, by phone), a friend's page,
@@ -53,16 +53,19 @@ async function newPage() {
 function kit(page) {
   const shot = async (name) => { n += 1; await page.waitForTimeout(600); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-${name}.png`) }); };
   const see = async (text, what, timeout = 8000) => {
-    try { await page.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout }); return true; }
+    try { await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout }); return true; }
     catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
   };
-  const tap = async (name, exact = true) => page.getByRole('button', { name, exact }).first().click();
+  const tap = async (name, exact = true) => page.getByRole('button', { name, exact }).filter({ visible: true }).first().click();
   const byTest = (id) => page.locator(`[data-testid="${id}"]`);
-  const text = (s) => page.getByText(s, { exact: true }).first();
+  const text = (s) => page.getByText(s, { exact: true }).filter({ visible: true }).first();
   // In-app navigation (a reload would start the in-app mock API over).
   const go = async (path) => { await page.evaluate((p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); }, path); await page.waitForTimeout(700); };
   return { shot, see, tap, byTest, text, go };
 }
+/** Scroll the screen under the thumb. */
+async function scroll(page, dy) { await page.mouse.move(195, 420); await page.mouse.wheel(0, dy); await page.waitForTimeout(400); }
+
 async function signIn(page, phone, { returning, name = 'Omar' }) {
   const { see, byTest } = kit(page);
   await page.goto(ORIGIN + '/');
@@ -92,38 +95,36 @@ async function demo() {
   await see('While you’re there, 9–15 Mar', 'trip dates');
   await see('Bosphorus dinner cruise', 'events');
   await shot('discover');
-  await page.mouse.wheel(0, 700);
+  await scroll(page, 700);
   await see('Trips we’ve planned', 'plans');
   await see('Künefe near Galata Tower', 'friend tip first');
   await shot('discover-tips');
 
   step('city sheet');
-  await page.mouse.wheel(0, -2000);
+  await scroll(page, -2000);
   await byTest('city-switch').click();
   await see('What’s on where?', 'city sheet');
   await see('Your trips', 'your trips group');
   await shot('city-sheet');
   await byTest('city-search').fill('Tbilisi');
-  await see('We don’t cover Tbilisi yet.', 'not covered');
-  await shot('city-not-covered');
-  await tap('Tell me when it’s here');
-  await see('We’ll tell you when Tbilisi is on Discover.', 'told toast');
-  await byTest('city-switch').click();
+  await see('City guide', 'anywhere else opens its guide');
+  await shot('city-guide-row');
+  await byTest('city-search').fill('');
   await page.getByRole('button', { name: 'AlUla', exact: true }).first().click();
   await see('Hegra at golden hour', 'alula events');
   await page.getByRole('button', { name: 'Food', exact: true }).first().click();
   await see('No food tips in AlUla yet.', 'empty filter');
-  await page.mouse.wheel(0, 900);
+  await scroll(page, 900);
   await shot('discover-empty-filter');
   await tap('All tips');
   await see('Maraya at night', 'alula tip');
-  await page.mouse.wheel(0, -2000);
+  await scroll(page, -2000);
   await byTest('city-switch').click();
   await page.getByRole('button', { name: 'Riyadh', exact: true }).first().click();
   await see('Boulevard World at night', 'riyadh events');
 
   step('a tip: save, open, report');
-  await page.mouse.wheel(0, 900);
+  await scroll(page, 900);
   await byTest('tip-bookmark').first().click();
   await see('Saved to Riyadh. Find it in Circles → Saved.', 'saved toast');
   await byTest('tip-card').first().click();
@@ -137,7 +138,7 @@ async function demo() {
   await see('Thanks. A person will look at this tip within 24 hours.', 'report toast');
 
   step('post a tip');
-  await page.mouse.wheel(0, -2000);
+  await scroll(page, -2000);
   await byTest('post-tip').click();
   await see('Tips are checked before they show.', 'post sheet');
   await byTest('tip-place').fill('Najdi Village');
@@ -166,16 +167,16 @@ async function demo() {
   await see('Don’t show me Noor here', 'noor sheet');
   await shot('noor-sheet');
   await tap('Cancel');
-  await page.mouse.wheel(0, 700);
+  await scroll(page, 700);
   await see('From people you know', 'known');
   await see('Saved', 'saved');
   await shot('circles-more');
-  await page.mouse.wheel(0, 900);
+  await scroll(page, 900);
   await see('Your passport', 'passport');
   await see('Baku', 'stamps');
   await see('You’re 2nd among friends', 'rank');
   await shot('passport');
-  await page.mouse.wheel(0, -3000);
+  await scroll(page, -3000);
 
   step('a circle: chat, vote, Mada');
   await page.getByRole('button', { name: 'Istanbul for Eid', exact: true }).first().click();
@@ -195,8 +196,10 @@ async function demo() {
   await shot('chat-mada');
   await byTest('chat-input').fill('Who is in for the ferry?');
   await byTest('chat-send').click();
-  await see('Seen by', 'read receipt', 9000);
   await see('I’m in.', 'reply', 9000);
+  await byTest('chat-input').fill('Thanks');
+  await byTest('chat-send').click();
+  await see('Seen by', 'read receipt', 9000);
   await shot('chat-seen');
 
   step('tools: split');
@@ -206,7 +209,7 @@ async function demo() {
   await byTest('tool-split').click();
   await byTest('split-what').fill('Dinner');
   await byTest('split-total').fill('1140');
-  await tap('By family');
+  await page.getByRole('radio', { name: 'By family' }).click();
   await see('Your family', 'family unit');
   await see('Abdullah’s family', 'abdullah family');
   await shot('split-sheet');
@@ -233,7 +236,7 @@ async function demo() {
   await see('Renamed.', 'renamed');
   await byTest('invite-link-btn').click();
   await see('Invite to Eid in Istanbul', 'invite sheet');
-  await see('madatrips.sa/join/', 'link shown');
+  await page.waitForFunction(() => /madatrips\.sa\/join\//.test(document.querySelector('[data-testid="invite-link"]')?.value ?? ''), null, { timeout: 8000 }).catch(() => errors.push('link shown: no invite link'));
   await shot('invite-link');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
@@ -347,7 +350,7 @@ async function fresh() {
   await see('Bring your people.', 'no friends');
   await see('Nothing saved yet.', 'nothing saved');
   await shot('fresh-circles');
-  await page.mouse.wheel(0, 900);
+  await scroll(page, 900);
   await see('Every trip home adds a stamp.', 'empty passport');
   await shot('fresh-passport');
   await context.close();

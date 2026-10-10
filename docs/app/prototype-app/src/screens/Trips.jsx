@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RequestThread, QuoteBreakdown } from './Ask.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
-import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane, EmptyState } from '../ui.jsx';
+import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane, EmptyState, NetStale } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
 import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney, MoveNotice, NoStayChoices } from './TripManage.jsx';
 import { TrackedFlights } from './Today.jsx';
@@ -37,6 +37,7 @@ export default function Trips() {
           <h1 className="h1">Trips</h1>
           <button type="button" className="icon-btn dark" aria-label="Plan a trip" onClick={() => push('ask', {})}><Icon name="plus" color="#f6f2ec" /></button>
         </div>
+        <NetStale />
         <div className="chips" role="tablist">
           {[['upcoming', 'Upcoming'], ['requests', `Requests${openReq ? ' · ' + openReq : ''}`], ['past', 'Past']].map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={tab === id ? 'true' : 'false'} className={'chip' + (tab === id ? ' on' : '')} onClick={() => { setTab(id); buzz(HAPTIC.select); }}>{label}</button>

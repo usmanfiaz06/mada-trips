@@ -164,10 +164,7 @@ export const enCircles = {
   'circles.city.hereNow': 'Here now',
   'circles.city.planned': 'A trip we’ve planned',
   'circles.city.popular': 'Popular this month',
-  'circles.city.none': 'We don’t cover {city} yet.',
-  'circles.city.noneBody': 'We can still plan it with you, and we’ll tell you when Discover reaches it.',
-  'circles.city.tellMe': 'Tell me when it’s here',
-  'circles.city.told': 'We’ll tell you when {city} is on Discover.',
+  'circles.city.guide': 'City guide',
 
   // ───────────── post a tip, and one tip opened ─────────────
   'circles.postTip.title': 'Post a tip',

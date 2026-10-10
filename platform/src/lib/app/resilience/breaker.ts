@@ -78,7 +78,16 @@ export function healthOf(name: string, now = Date.now()): SupplierState {
   return c.failures.filter((t) => now - t < BREAKER.WINDOW_MS).length > 0 ? "degraded" : "up";
 }
 
-async function record(name: string, state: SupplierState, c: Circuit) {
+/** Writes for one supplier happen in order, so "degraded" never lands after "down". */
+const writes = new Map<string, Promise<void>>();
+function record(name: string, state: SupplierState, c: Circuit): Promise<void> {
+  const snapshot = { ...c, failures: [...c.failures] };
+  const next = (writes.get(name) ?? Promise.resolve()).then(() => write(name, state, snapshot));
+  writes.set(name, next);
+  return next;
+}
+
+async function write(name: string, state: SupplierState, c: Circuit) {
   try {
     await db.insert(appSupplierHealth).values({ name, state, failures: c.failures.length, lastProblem: c.lastProblem })
       .onConflictDoUpdate({

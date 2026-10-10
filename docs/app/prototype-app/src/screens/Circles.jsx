@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, fmt } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, Toggle, EmptyState, ArtCircles, ArtFriends, ArtLantern, ArtBookmark, ArtCompass, ArtMap, ArtChat } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, Toggle, EmptyState, ArtCircles, ArtFriends, ArtLantern, ArtBookmark, ArtCompass, ArtMap, ArtChat, ErrorState, ArtDesk, ArtSignal, PermissionDenied } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
 import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useSave, EmptyArt, useCircleClock, setOpenCircle, getThread, fold, opAdd, opMsg, opThread, opGroup, opQueue, sys, names, newId, familyOf, familyLabel, markPaid } from './Social.jsx';
 
@@ -249,7 +249,14 @@ export default function Circles() {
                 <button type="button" className="icon-btn dark" aria-label="New circle" onClick={() => push('newCircle')}><Icon name="plus" color="#f6f2ec" /></button>
               </span>}
         </div>
-        {view === 'discover' ? <Discover posts={posts} setPosts={setPosts} onPost={() => setSheet('post')} /> : (<>
+        {view === 'discover' && (s.demo.offline || s.demo.serverDown) ? (
+          /* Discover is live and nothing of it is saved on the phone, so it says so instead of showing a stale feed. */
+          <ErrorState art={s.demo.offline ? <ArtSignal /> : <ArtDesk />}
+            title={s.demo.offline ? 'Tips need a connection.' : 'Tips can’t load right now.'}
+            body={s.demo.offline ? 'Discover is live, so it isn’t kept on the phone. It’s back the moment you are.' : 'Mada’s servers aren’t answering. It’s on our side, and nothing you posted is lost.'}
+            works={['Your trips', 'Wallet', 'Your circles']}
+            action={s.demo.offline ? null : <button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); toast('Still not answering. We’ll keep trying in the background.'); }}>Try again</button>} />
+        ) : view === 'discover' ? <Discover posts={posts} setPosts={setPosts} onPost={() => setSheet('post')} /> : (<>
 
         {friends.length > 0 && (
         <div className="card focal rise" style={{ padding: 18, gap: 14 }}>
@@ -274,7 +281,7 @@ export default function Circles() {
               <span className="h3" style={{ fontSize: 15 }}>Tell friends you're in {city}</span>
               <span className="tiny">{c.around ? `On for ${who === 'family' ? 'family only' : who === 'close' ? 'close friends' : 'Abdullah, Noor and family'} · city only · ends when you fly home` : 'Off. Only people you choose, city only, and it ends when you fly home.'}</span>
             </div>
-            <Toggle onDark checked={c.around} label={`Tell friends you're in ${city}`} onChange={(v) => { if (v) setSheet('around'); else { setC({ around: false }); toast('Hidden. Nobody can see where you are.'); } }} />
+            <Toggle onDark checked={c.around} label={`Tell friends you're in ${city}`} onChange={(v) => { if (v) setSheet(s.demo.permissionsDenied ? 'locationOff' : 'around'); else { setC({ around: false }); toast('Hidden. Nobody can see where you are.'); } }} />
           </div>
         </div>
         )}
@@ -412,6 +419,7 @@ export default function Circles() {
       </div>
 
       {sheet === 'post' && <PostSheet onClose={() => setSheet(null)} onPost={(post) => { setPosts([post, ...posts]); setSheet(null); setView('discover'); buzz(HAPTIC.success); toast('Posted to ' + (post.audience === 'friends' ? 'your friends' : 'everyone on Mada') + '. It shows once it’s checked, usually within a minute.'); }} />}
+      {sheet === 'locationOff' && <PermissionDenied kind="location" onClose={() => setSheet(null)} onManual={() => { setC({ around: true, aroundWho: who }); setSheet(null); toast(`On, with ${city} as your city. Nothing more precise is shared.`); }} />}
       {sheet === 'around' && (
         <Sheet label="Who can see you" onClose={() => setSheet(null)}>
           <h2 className="h2">Who can see you're in {city}?</h2>

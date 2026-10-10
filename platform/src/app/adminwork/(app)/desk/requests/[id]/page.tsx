@@ -9,9 +9,9 @@ import { getT } from "@/lib/i18n";
 import { fmtDate, timeAgo } from "@/lib/dates";
 import { isUuid } from "@/lib/security";
 import { agentForOps } from "@/lib/app/desk/agents";
-import { CHECKLISTS, getRequestFull } from "@/lib/app/desk/adapters";
+import { CHECKLISTS, destinationOf, getRequestFull } from "@/lib/app/desk/adapters";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Badge, Card, CardHead, Input, Money, Textarea, cx } from "@/components/ui";
+import { Badge, Card, CardHead, Input, Money, Textarea, btn, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
@@ -35,8 +35,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const closed = ["done", "cancelled", "confirmed"].includes(r.status);
   const sla = r.status === "sent" || r.status === "reviewing" ? slaFor("request", r.createdAt, new Date(), { due: r.promisedBy }) : null;
   const checklist = d.checklist ?? (CHECKLISTS[r.kind] ?? []).map((label) => ({ label, done: false }));
-  const asked = Object.entries(r.details).filter(([k]) => k !== "desk" && k !== "offer").slice(0, 12);
+  const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message"].includes(k)).slice(0, 12);
   const quote = x.quotes.find((q) => q.status !== "withdrawn");
+  const place = r.kind === "destination" ? destinationOf(r.details) : null;
 
   return (
     <>
@@ -57,6 +58,17 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-4">
+          {place && (
+            <Card className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
+                <div className="mb-1 flex items-center gap-2"><Badge tone="info">{t("Destination")}</Badge><span className="text-[12.5px] text-ink-3">{t("Plan it with Mada: the team plans and books it by hand.")}</span></div>
+                <div className="text-[22px] font-[400] tracking-[-0.02em]">{place.name}{place.country ? `, ${place.country}` : ""}</div>
+                {place.airports.length > 0 && <div className="mt-1 text-[13px] text-ink-3">{t("Nearest airports")}: <span className="num" dir="ltr">{place.airports.join(" · ")}</span></div>}
+                {place.message && <p className="mt-2 rounded-2xl bg-surface-2 px-3.5 py-2 text-[13.5px] text-ink-2">{place.message}</p>}
+              </div>
+              <a href={place.guideUrl} target="_blank" rel="noopener noreferrer" className={btn("outline", "sm")}>{t("City guide")} ↗</a>
+            </Card>
+          )}
           <Card>
             <CardHead title={t("What they asked for")} />
             {asked.length ? <Facts rows={asked.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13.5px] text-ink-2">{r.summary}</p>}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { CHANGE_KINDS, SWITCH_OFFERS, dayLabel, formatSar, liveStay, moveNeeded, nameDistance, outSegment, backSegment, switchCredit, timing, type ChangeFlightRequest, type ChangeKind, type TripDetail } from '@mada/shared';
@@ -207,7 +207,6 @@ function NameFix({ trip, onDone }: { trip: TripDetail; onDone: () => void }) {
   const split = (full: string) => ({ given: full.split(' ').slice(0, -1).join(' ').toUpperCase(), sur: (full.split(' ').slice(-1)[0] ?? '').toUpperCase() });
   const [given, setGiven] = useState(split(p?.fullName ?? '').given);
   const [sur, setSur] = useState(split(p?.fullName ?? '').sur);
-  useEffect(() => { const s = split(p?.fullName ?? ''); setGiven(s.given); setSur(s.sur); }, [who]); // eslint-disable-line react-hooks/exhaustive-deps
   const change = useTripMutation(() => tripsApi.change(trip.id, { kind: 'name', travellerId: who, givenNames: given, surname: sur, clientKey: newKey() }));
   const before = (p?.fullName ?? '').toUpperCase();
   const after = `${given} ${sur}`.toUpperCase().replace(/\s+/g, ' ').trim();
@@ -216,7 +215,7 @@ function NameFix({ trip, onDone }: { trip: TripDetail; onDone: () => void }) {
   const out = outSegment(trip)!;
   return (<>
     <T v="h2">{t('cf.n.whose')}</T>
-    <Row gap={8} style={{ flexWrap: 'wrap' }}>{trip.travellers.map((x) => <Chip key={x.id} label={x.firstName} on={who === x.id} onPress={() => setWho(x.id)} />)}</Row>
+    <Row gap={8} style={{ flexWrap: 'wrap' }}>{trip.travellers.map((x) => <Chip key={x.id} label={x.firstName} on={who === x.id} onPress={() => { setWho(x.id); const s = split(x.fullName); setGiven(s.given); setSur(s.sur); }} />)}</Row>
     <Box tone="well" gap={4}><Tiny>{t('cf.n.now')}</Tiny><T style={{ fontFamily: ff.ui600, fontSize: 15, letterSpacing: 0.9, color: colors.green }}>{`${split(p?.fullName ?? '').sur}/${split(p?.fullName ?? '').given}`}</T></Box>
     <Row gap={10} align="flex-start">
       <View style={{ flex: 1, gap: 6 }}><T style={styles.label}>{t('cf.n.given')}</T><TextInput testID="nf-given" value={given} onChangeText={(v) => setGiven(v.toUpperCase())} autoCapitalize="characters" style={[styles.input, state === 'too' ? { borderColor: colors.bad } : null]} /></View>

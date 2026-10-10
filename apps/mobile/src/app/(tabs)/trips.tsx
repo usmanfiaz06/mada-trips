@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -14,7 +14,7 @@ import { T } from '@/components/Text';
 import { TrackedFlights } from '@/components/today/Nothing';
 import { RefundTracker } from '@/components/trips/RefundTracker';
 import { RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
-import { AgentFace, AgentIntro, Box, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
+import { AgentIntro, Box, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
@@ -39,7 +39,8 @@ export default function Trips() {
   const { data } = useTrips();
   const queued = useOutbox((s) => s.items);
   const [tab, setTab] = useState<Tab>(params.tab === 'requests' || params.tab === 'past' ? params.tab : 'upcoming');
-  useEffect(() => { if (params.tab === 'requests' || params.tab === 'past' || params.tab === 'upcoming') setTab(params.tab); }, [params.tab]);
+  const [seenParam, setSeenParam] = useState(params.tab);
+  if (seenParam !== params.tab) { setSeenParam(params.tab); if (params.tab === 'requests' || params.tab === 'past' || params.tab === 'upcoming') setTab(params.tab); }
   const open = (data?.requests ?? []).filter((r) => !['done', 'confirmed', 'cancelled'].includes(r.status)).length + queued.length;
   const ask = (prefill?: string) => router.push((prefill ? `/ask?prefill=${encodeURIComponent(prefill)}` : '/ask') as Href);
 

@@ -53,7 +53,7 @@ function kit(page) {
     try { await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout }); return true; }
     catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
   };
-  const byTest = (id) => page.locator(`[data-testid="${id}"]`);
+  const byTest = (id) => page.locator(`[data-testid="${id}"]`).filter({ visible: true }).last();
   const press = async (loc) => { loc = loc.filter({ visible: true }); await loc.first().evaluate((el) => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(200); await loc.first().click(); };
   const tap = async (name, exact = true) => press(page.getByRole('button', { name, exact }));
   const text = (s, exact = false) => page.getByText(s, { exact }).filter({ visible: true }).first();
@@ -106,7 +106,7 @@ async function toPay(page, { bundle = true, shots = false } = {}) {
   const k = kit(page);
   await k.ask('Istanbul for Eid, all of us');
   if (shots) { await k.see('Checking flights to Istanbul', 'working'); await k.shot('ask-working', 300); }
-  await k.see('Three ways to get there.', 'results', 12000);
+  if (!(await k.see('Three ways to get there.', 'results', 12000))) await k.shot('no-results');
   if (bundle) await k.press(k.byTest('bundle-add'));
   await k.press(k.byTest('ask-review'));
   await k.see('Everything included. No fees later.', 'pay sheet', 12000);
@@ -229,7 +229,7 @@ async function edges() {
   await k.shot('calendar');
   await k.tap('Eid al-Fitr · Mar 2027');
   await k.see('Tue 9 Mar 2027 → Mon 15 Mar 2027 · 6 nights', 'eid picked');
-  await k.tap('Business');
+  await k.press(page.getByRole('radio', { name: 'Business', exact: true }));
   await k.tap('One more baby');
   await k.shot('calendar-eid');
   await k.byTest('search-go').click();
@@ -254,11 +254,11 @@ async function edges() {
   step('edges: a passport problem');
   await k.demo('Airline not answering', 'Passport problem');
   await k.ask('Istanbul for Eid, all of us');
-  await k.see('Sara can’t travel on this passport.', 'passport blocks', 12000);
-  await k.see('Sort out Sara’s passport first', 'blocked cta');
-  await k.press(k.text('Sara can’t travel on this passport.'));
+  await k.see('Ahmed can’t travel on this passport.', 'passport blocks', 12000);
+  await k.see('Sort out Ahmed’s passport first', 'blocked cta');
+  await k.press(k.text('Ahmed can’t travel on this passport.'));
   await k.shot('passport-problem');
-  await k.tap('Book without Sara');
+  await k.tap('Book without Ahmed');
   await k.see('Review · SAR', 'unblocked', 8000);
   await k.shot('passport-resolved');
   step('edges: offline');
@@ -268,7 +268,7 @@ async function edges() {
   await k.shot('ask-offline');
   await k.demo('Offline');
   step('edges: a city Mada searches by hand');
-  await k.ask('Flights to Tbilisi on 3 Dec, just me');
+  await k.ask('Flights to Tbilisi 3-10 Dec, just me');
   await k.see('We’re searching Tbilisi for you.', 'by hand', 12000);
   await k.shot('by-hand-tbilisi');
   await context.close();
@@ -290,7 +290,6 @@ async function pay() {
   await k.see('Pay with', 'cards after decline');
   await k.press(k.byTest('card-applepay'));
   step('pay: Apple Pay, Face ID fails, then passcode');
-  await k.byTest('ask-demo').count().catch(() => 0);
   await k.slide();
   await k.see('Double-click to pay', 'apple pay', 10000);
   await k.shot('applepay');
@@ -343,9 +342,17 @@ async function desk() {
   await k.byTest('ticket-retry').click();
   await k.see("You're going to Istanbul.", 'confirmed after phone', 20000);
   await k.shot('confirmed-after-problems', 1200);
+  await context.close();
+  await deskSlow();
+}
+
+async function deskSlow() {
+  const { page, context } = await newPage();
+  const k = kit(page);
   step('desk: slow airline');
+  await signIn(page);
   await openAsk(page);
-  await k.demo('Fare sold out while booking', 'Mada asks a question', 'Tickets fail to issue', 'Airline is slow');
+  await k.demo('Airline is slow');
   await toPay(page, { bundle: false });
   await k.slide();
   await k.see('Taking longer than usual.', 'slow', 20000);

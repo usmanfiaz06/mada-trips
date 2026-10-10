@@ -75,7 +75,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
                 {m.decisionReason && <p className="mt-3 text-[12.5px] text-ink-3">{t("Reason")}: {m.decisionReason}</p>}
                 {m.status === "open" && (mod ? (
                   <ActionForm action={moderateAction} className="mt-4 space-y-2">
-                    <input type="hidden" name="id" value={m.id} /><input type="hidden" name="blockAuthor" value={m.authorUserId ?? ""} />
+                    <input type="hidden" name="id" value={m.id} /><input type="hidden" name="source" value={m.source} /><input type="hidden" name="blockAuthor" value={m.authorUserId ?? ""} />
                     <Input name="reason" maxLength={200} placeholder={m.kind === "tip" ? t("Reason, if you reject it") : t("Reason, if you remove it")} />
                     <div className="flex flex-wrap items-center gap-2">
                       {m.kind === "tip" ? (

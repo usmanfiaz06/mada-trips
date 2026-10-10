@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue, shortDay, seatText } from '../store.jsx';
-import { Icon, Sun, Sheet, AirlineMark, PayMark, EmptyState, ArtCardSlot, ArtPass, ArtReceipt } from '../ui.jsx';
+import { Icon, Sun, Sheet, AirlineMark, PayMark, EmptyState, ArtCardSlot, ArtPass, ArtReceipt, NetStale, PermissionDenied, UploadProgress } from '../ui.jsx';
 import { CardsSheet } from './Pay.jsx';
 import { checkFile, readPassport } from '../ocr.js';
 
@@ -79,6 +79,7 @@ function Unlocked() {
           </div>
           <button type="button" className="icon-btn dark" aria-label="Add a document" onClick={() => setSheet('add')}><Icon name="plus" color="#f6f2ec" /></button>
         </div>
+        <NetStale />
 
         <div className="chips" role="group" aria-label="Whose documents">
           {people.map((x) => (
@@ -303,6 +304,7 @@ export function ScanSheet({ onDone, onClose }) {
     const t = setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else { setSt('ok'); buzz(HAPTIC.success); } }, 1800);
     return () => clearTimeout(t);
   }, [st]);
+  if (s.demo.permissionsDenied) return <PermissionDenied kind="camera" manualLabel="Not now" onManual={onClose} onClose={onClose} />;
   return (
     <Sheet label="Scan" onClose={onClose}>
       <div className="viewfinder" style={{ margin: 0, background: '#0b100d' }}>{st === 'scanning' && <span className="scanline" />}</div>
@@ -329,7 +331,7 @@ export function UploadSheet({ title, found, onSave, onClose, allowScan = true, r
   useEffect(() => () => { run.current += 1; }, []);
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
 
-  const simulate = (ms) => setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else { setSt('found'); buzz(HAPTIC.success); } }, ms);
+  const simulate = (ms) => setTimeout(() => { if (s.demo.scanFails) { setSt('failed'); buzz(HAPTIC.soft); } else if (s.demo.uploadFails) setSt('uploading'); else { setSt('found'); buzz(HAPTIC.success); } }, ms);
 
   const readPhoto = (f) => {
     const bad = checkFile(f);
@@ -380,7 +382,7 @@ export function UploadSheet({ title, found, onSave, onClose, allowScan = true, r
               <input type="file" accept="image/*" capture="environment" onChange={(e) => { pick(e.target.files && e.target.files[0]); e.target.value = ''; }} style={hidden} />
             </label>
           ) : (
-            <button type="button" className="card tap well" onClick={() => { setSt('reading'); simulate(1800); }} style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="scan" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Scan with the camera</span><span className="tiny">Best for passports and printed visas</span></span></button>
+            <button type="button" className="card tap well" onClick={() => { if (s.demo.permissionsDenied) { setSt('denied'); buzz(HAPTIC.soft); return; } setSt('reading'); simulate(1800); }} style={{ flexDirection: 'row', alignItems: 'center' }}><Icon name="scan" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>Scan with the camera</span><span className="tiny">Best for passports and printed visas</span></span></button>
           ))}
           <label className="card tap well" style={{ flexDirection: 'row', alignItems: 'center', cursor: 'pointer', position: 'relative' }}>
             <Icon name="doc" /><span className="grow col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}>{realRead ? 'Choose a photo' : 'Upload a photo or PDF'}</span><span className="tiny">{realRead ? 'From your photos · up to 10 MB' : 'From your files or photos · up to 10 MB'}</span></span>
@@ -404,6 +406,8 @@ export function UploadSheet({ title, found, onSave, onClose, allowScan = true, r
           </div>
         </>
       ) : <div className="row small"><span className="spinner" />Reading {file ? file.name : 'the page'}…</div>)}
+      {st === 'denied' && <PermissionDenied inline kind="camera" onManual={() => setSt('choose')} />}
+      {st === 'uploading' && <UploadProgress name={file ? file.name : 'Scan of the page'} size={2.4} stopAt={62} onDone={() => { setSt('found'); buzz(HAPTIC.success); }} />}
       {st === 'failed' && (
         <>
           <span className="h3">We couldn't read it.</span>

@@ -170,6 +170,8 @@ async function main() {
   const car = await req(nora, "car", "quoted", "A car with driver in London, 3 days", 60 * 5, { agentOpsUserId: counter.id, agentName: "Faisal", details: { city: "London", days: 3 } });
   await db.insert(app.appQuotes).values({ requestId: car.id, lines: [{ label: "Mercedes V-Class with driver · 3 days", amount: H(4200), kind: "service" }], total: H(4200), status: "open", createdByOpsUserId: counter.id, expiresAt: new Date(NOW + 20 * 3600_000) });
   await req(lama, "restaurant", "with_agent", "Dinner for 2 at Nobu Kuala Lumpur", 60 * 8, { agentOpsUserId: bader.id, agentName: "Bader", details: { date: day(46), time: "20:30", guests: 2 } });
+  await req(nora, "destination", "sent", "Plan a trip to Tbilisi", 9, { promisedBy: new Date(NOW + 110 * 60_000),
+    details: { place: { id: "plc_tbilisi", name: "Tbilisi", country: "Georgia", airports: ["TBS", "KUT"] }, dates: "May, 5 nights", travellers: 2, message: "Hi, we'd like Tbilisi in May for 5 nights. Old town, and a day trip to Kazbegi." } });
   await req(sultan, "general", "done", "Extra bag on the Jeddah trip", 60 * 30, { agentOpsUserId: counter.id, agentName: "Faisal" });
 
   /* ── chats ── */

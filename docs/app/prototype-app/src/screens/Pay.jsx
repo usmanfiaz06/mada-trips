@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, fmt, isoDate, addDays, daysBetween, dayLabel, shortDay, rangeLabel, TRIP_YEAR, MONTHS, makeFlight, makePickup, seatsFor, seatText, bundleQuote, stayOf, NUM_WORD } from '../store.jsx';
-import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, Toggle, useTicker, AddPersonSheet, InviteSheet, PayMark, cardBrand, luhn, BRAND_NAME } from '../ui.jsx';
+import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, Toggle, useTicker, AddPersonSheet, InviteSheet, PayMark, cardBrand, luhn, BRAND_NAME, InlineError, ArtPriceHold, ArtDesk } from '../ui.jsx';
 import { passportStatus } from './Account.jsx';
 import { PLANS } from './Plan.jsx';
 import { MEALS, ageBand } from './Account.jsx';
@@ -147,11 +147,24 @@ export default function Pay({ params }) {
   const tamara = Math.ceil(total / 3);
   const slideLabel = total === 0 ? 'Slide to book · paid with credit' : plan === 'tabby' ? `Slide to book · 4 × SAR ${fmt(tabby)}` : plan === 'tamara' ? `Slide to book · 3 × SAR ${fmt(tamara)}` : `Slide to book · SAR ${fmt(total)}`;
 
+  /* One payment per slide, however many times it's tapped: a second tap while we're paying is ignored, and we say so. */
+  const paying = useRef(false);
+  const resumed = useRef(false);
+  const [twice, setTwice] = useState(false);
+  const [payDown, setPayDown] = useState(false);
+  const downRef = useRef(null);
+  useEffect(() => { if (payDown) downRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, [payDown]);
   const confirm = () => {
+    if (paying.current) { setTwice(true); buzz(HAPTIC.soft); return; }
+    paying.current = true;
+    setPayDown(false);
     setBusy(true);
     setTimeout(() => {
+      paying.current = false;
       setBusy(false);
-      if (s.demo.offline) { setSheet('offline'); buzz(HAPTIC.soft); return; }
+      setTwice(false);
+      if (s.demo.offline || (s.demo.payDrops && !resumed.current)) { setSheet('offline'); buzz(HAPTIC.soft); return; }
+      if (s.demo.serverDown) { setPayDown(true); buzz(HAPTIC.soft); return; }
       if (s.demo.decline && s.cards[0] && card === s.cards[0].id && plan === 'full') { setSheet('declined'); buzz(HAPTIC.soft); return; }
       if (s.demo.priceUp && !priceSeen && order.agent) { setSheet('price'); buzz(HAPTIC.soft); return; }
       if (total === 0) { done(); return; }
@@ -247,6 +260,13 @@ export default function Pay({ params }) {
               ))}
             </div>
           )}
+          {payDown && !busy && (
+            <div ref={downRef}>
+              <InlineError art={<ArtDesk />} title="We can’t reach payments right now."
+                body={`Nothing was charged. Your price is held for ${Math.max(1, Math.ceil(left / 60000))} more minutes.`}
+                onRetry={confirm} />
+            </div>
+          )}
         </div>
       </div>
       <div className="act" style={{ zIndex: 6 }}>
@@ -255,7 +275,7 @@ export default function Pay({ params }) {
         ) : (
           <SlideToConfirm label={slideLabel} busy={busy} busyLabel="Checking with your bank" onConfirm={confirm} />
         )}
-        <p className="act-note">{order.agent ? 'You’re only charged once it’s confirmed.' : 'Charged now.'} <button type="button" className="link" style={{ fontSize: 12, padding: 0 }} onClick={() => setHoldSkip(20 * 60000)}>(demo: end the hold)</button></p>
+        <p className="act-note">{busy ? <span className="pay-lock" role="status"><Icon name="lock" size={14} />{twice ? 'Already paying. You can only be charged once.' : 'Locked while we pay. You’re charged once.'}</span> : order.agent ? 'You’re only charged once it’s confirmed.' : 'Charged now.'} {!busy && <button type="button" className="link" style={{ fontSize: 12, padding: 0 }} onClick={() => setHoldSkip(20 * 60000)}>(demo: end the hold)</button>}</p>
       </div>
 
       {sheet === 'people' && (
@@ -279,10 +299,13 @@ export default function Pay({ params }) {
       {sheet === 'invite' && <InviteSheet what="the Istanbul trip" onClose={() => setSheet('people')} />}
       {sheet === 'cards' && <CardsSheet current={card} onPick={(id) => { setCard(id); setSheet(null); }} onClose={() => setSheet(null)} />}
       {sheet === 'offline' && (
-        <Sheet label="Offline" onClose={() => setSheet(null)}>
-          <h2 className="h2">You're offline.</h2>
-          <p className="body">Nothing was charged. Your price stays held while the timer runs. Try again once you're connected.</p>
-          <button type="button" className="btn primary block" onClick={() => setSheet(null)}>Okay</button>
+        <Sheet label="Payment paused" onClose={() => setSheet(null)}>
+          <div className="es-stage" style={{ height: 120 }} aria-hidden="true"><ArtPriceHold /></div>
+          <h2 className="h2">{s.demo.offline ? 'You’re offline, so we stopped before paying.' : 'The connection dropped while paying.'}</h2>
+          <p className="body" style={{ margin: 0 }}>Nothing was charged. Your price is held for {Math.max(1, Math.ceil(left / 60000))} more minutes.</p>
+          {s.demo.offline && <span className="small" style={{ color: '#7d5d27' }}>Resume works once you’re connected. Everything you picked is kept.</span>}
+          <button type="button" className="btn primary block" disabled={s.demo.offline} onClick={() => { resumed.current = true; setSheet(null); buzz(HAPTIC.tap); confirm(); }}>Resume</button>
+          <button type="button" className="btn ghost block" onClick={() => setSheet(null)}>Not now</button>
         </Sheet>
       )}
       {sheet === 'declined' && (
@@ -478,7 +501,7 @@ const elapsedLabel = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padSta
 
 export function Waiting({ params }) {
   const { s, set, reset, replace, push, go } = useStore();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(params.resumeStep || 0);
   const [question, setQuestion] = useState(false);
   const [answered, setAnswered] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
@@ -517,6 +540,13 @@ export function Waiting({ params }) {
   const cancelAll = () => { reset('today'); };
 
   const commit = () => commitBooking(set, { ...params, ref: ref.current, total: params.total || 0, extra });
+  /* While Faisal is booking, the booking is kept on the phone as in flight. If the app is closed or killed now,
+     the next launch finds it (store.jsx load) and Today says it's still with Faisal, then picks it back up. */
+  useEffect(() => () => set({ inflight: null }), []);
+  useEffect(() => {
+    if (confirmed) set({ inflight: null });
+    else set({ inflight: { ...params, ref: ref.current, total: params.total || 0, extra, resumeStep: step } });
+  }, [step, extra, confirmed]);
 
   const steps = labels.map((text, i) => ({ text, state: i < step ? 'done' : i === step ? 'now' : 'todo' }));
   const city = params.kind === 'package' ? `You're going to ${PLANS[params.planId].city}.` : params.kind === 'stay' ? 'Your rooms are booked.' : params.kind === 'change' ? 'Your flight is changed.' : "You're going to Istanbul.";

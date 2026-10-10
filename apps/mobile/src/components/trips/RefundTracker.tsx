@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatSar, type RefundView } from '@mada/shared';
 import { t } from '@/lib/i18n';
 import { useAgent } from '@/lib/trips';
@@ -7,6 +8,7 @@ import { AgentFace, Box, H3, Row, Small, SmallButton, Tracker } from './ui';
 /** Requested → Approved → Sent → In your bank. Credit is instant; instalments go back through Tabby; a no comes with a reason. */
 export function RefundTracker({ r, onTalk }: { r: RefundView; onTalk?: () => void }) {
   const agent = useAgent();
+  const [now] = useState(Date.now);
   if (r.anyway) {
     const decided = r.stage === 'rejected';
     return (
@@ -30,7 +32,7 @@ export function RefundTracker({ r, onTalk }: { r: RefundView; onTalk?: () => voi
     return <Tracker items={[{ title: t('rf.tr.requested'), sub: t('rf.tr.today'), state: 'done' }, { title: t('rf.tr.approvedBy', { agent: agent.name }), sub: t('rf.tr.today'), state: 'done' }, { title: t('rf.tr.inCredit', { amount: formatSar(r.amount.amount) }), sub: t('rf.tr.readyNow'), state: 'done' }]} />;
   }
   const stage = r.stage === 'requested' ? 0 : r.stage === 'approved' ? 1 : 2;
-  const inBank = !!r.sentAt && Date.now() - Date.parse(r.sentAt) > 10 * 86_400_000;
+  const inBank = !!r.sentAt && now - Date.parse(r.sentAt) > 10 * 86_400_000;
   const tabby = r.destination === 'instalments';
   return (
     <Tracker items={[

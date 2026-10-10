@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import {
-  CARRIERS, CATALOGUE_HOTELS, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
+  CARRIERS, CATALOGUE_HOTELS, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
   type StayOption, type StaySearchRequest, type StaySearchResponse, EntryCheckRequest as EntrySchema, FlightSearchRequest as FlightSchema, StaySearchRequest as StaySchema,
 } from "@mada/shared";
@@ -11,7 +11,7 @@ import { supplierMode } from "../config";
 import { AppError } from "../http";
 import type { BookingFlightOffer, BookingHotelOffer } from "../suppliers/booking-types";
 import { SupplierDown } from "../suppliers/mock/flights";
-import { bookingSuppliers, isUuid, today, travellersOf } from "./common";
+import { bookingSuppliers, householdOf, isUuid, today, travellersOf } from "./common";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -200,7 +200,7 @@ export async function checkEntry(ownerId: string, input: EntryCheckRequest, demo
   const mock = supplierMode("flights") === "mock";
   return entryChecks({
     destination: q.destination, travellers, depart: q.depart, return: q.return, answers: q.answers, today: today(),
-    demo: { passportProblem: demo.has("passportProblem") }, iqamaOf: mock ? demoIqama : undefined,
+    demo: { passportProblemFor: demo.has("passportProblem") ? demoPassportTarget(await householdOf(ownerId)) : null }, iqamaOf: mock ? demoIqama : undefined,
   });
 }
 

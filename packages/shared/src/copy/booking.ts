@@ -43,6 +43,7 @@ export const bookingCopy = {
   'ask.signin.title': 'Sign in to book',
   'ask.signin.body': 'Booking needs an account, so Mada can confirm with your details and your tickets land in your Wallet.',
   'ask.signin.go': 'Sign in',
+  'ask.resume': 'We’re booking {place} for you. See where it is.',
   'ask.demo.title': 'Make it go wrong',
   'ask.demo.body': 'Demo switches for the mock suppliers. Nothing here is real.',
   'ask.demo.open': 'Demo',

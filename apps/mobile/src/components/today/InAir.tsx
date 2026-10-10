@@ -41,7 +41,7 @@ function usePosition(flight: string | null, enabled: boolean) {
 /** The arc from home to there, the plane on it, and the time left. Estimated without signal; real when ADS-B sees the plane. */
 function AirMap({ trip, now }: { trip: TripDetail; now: () => number }) {
   useTicker(1000);
-  const offline = useDemo((s) => s.offline);
+  const offline = useOffline();
   const back = trip.clock.phase === 'inair' && backSegment(trip) && Date.parse(trip.clock.now) > departInstant(backSegment(trip)!).getTime();
   const seg = back ? backSegment(trip)! : outSegment(trip)!;
   const dep = departInstant(seg).getTime();

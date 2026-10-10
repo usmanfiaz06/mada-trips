@@ -83,13 +83,16 @@ function useBackgroundProgress() {
 
 /* The app-level things that can go wrong, layered over whatever screen is open. */
 function useAppStates(s, set) {
-  const [outbox, setOutbox] = useState(false);
+  const outbox = !!s.outboxOpen;
+  const setOutbox = (v) => set({ outboxOpen: v });
   const [maintOpen, setMaintOpen] = useState(true);
   const [crashKey, setCrashKey] = useState(0);
   const [flushing, setFlushing] = useState(0);
   const loaded = useRef(new Set());
   const prevOff = useRef(s.demo.offline);
   useEffect(() => { if (s.demo.maintenance) setMaintOpen(true); }, [s.demo.maintenance]);
+  const wasCrashed = useRef(!!s.demo.crashed);
+  useEffect(() => { if (wasCrashed.current && !s.demo.crashed) setCrashKey((k) => k + 1); wasCrashed.current = !!s.demo.crashed; }, [s.demo.crashed]);
   useEffect(() => { if (!s.demo.weak) loaded.current = new Set(); }, [s.demo.weak]);
   /* Reconnecting: the pill says "Sending" for a moment while the Outbox empties. */
   useEffect(() => {
@@ -179,8 +182,11 @@ function Phone() {
 }
 
 function Demo() {
-  const { s, set, hardReset, banner } = useStore();
+  const { s, set, hardReset, banner, push, go, toast, dismissBanner } = useStore();
   const [open, setOpen] = useState(false);
+  const [gal, setGal] = useState(null);
+  const sRef = useRef(s);
+  sRef.current = s;
   /* "Skip sign-up" always starts the demo account (Omar's family). A phase jump keeps whoever is signed in,
      and only brings in the demo account when nobody is. */
   const jump = (phase, demoAccount) => {
@@ -208,10 +214,43 @@ function Demo() {
     if (phase === 'landed') setTimeout(() => banner(arrive?.driver ? { title: `${arrive.driver} is at ${arrive.door || 'Door 3'}`, body: 'He has a sign with your name. Bags on carousel 7.', haptic: HAPTIC.soft } : { title: 'Welcome to Istanbul', body: 'Bags on carousel 7. Your ways to the hotel are in Today.', haptic: HAPTIC.soft }), 600);
     setOpen(false);
   };
+  const toggle = (id) => { buzz(HAPTIC.tap); set((p) => ({ demo: { ...p.demo, [id]: !p.demo[id] } })); };
+  /* The walkthrough: every step starts clean, then sets up one state. */
+  const runStep = async (i) => {
+    setGal(i);
+    setOpen(false);
+    toast(null);
+    dismissBanner();
+    const clear = Object.fromEntries(DEMO_SWITCHES.map((d) => [d.id, false]));
+    const ctx = {
+      get s() { return sRef.current; },
+      set, push, go,
+      jump: (phase, demoAcct) => jump(phase, demoAcct),
+      flags: (on) => set((p) => ({ demo: { ...p.demo, ...clear, ...on } })),
+    };
+    set((p) => ({ demo: { ...p.demo, ...clear }, stack: [], outbox: [], pendingBooking: null, support: (p.support || []).filter((m) => !String(m.id).startsWith('g-')), requests: (p.requests || []).filter((r) => r.id !== 'g-rq'), walletUnlocked: false, outboxOpen: false, tab: 'today' }));
+    await new Promise((r) => setTimeout(r, 120));
+    try { await GALLERY[i].run(ctx); } catch (e) { /* a step that can't reach its screen still leaves the switches set */ }
+  };
+  const endGallery = () => { setGal(null); set((p) => ({ demo: { ...p.demo, ...Object.fromEntries(DEMO_SWITCHES.map((d) => [d.id, false])) }, stack: [], outbox: [], pendingBooking: null })); };
+  const bar = (where) => gal !== null && (
+        <div className={'gallery-bar ' + where} role="region" aria-label="When things go wrong">
+          <span className="gb-count">When things go wrong · {gal + 1} of {GALLERY.length}</span>
+          <span className="gb-title">{GALLERY[gal].title}</span>
+          <span className="gb-note">{GALLERY[gal].note}</span>
+          <div className="gb-row">
+            <button type="button" onClick={() => runStep(gal - 1)} disabled={gal === 0} aria-label="Previous state">Back</button>
+            <button type="button" className="next" onClick={() => (gal === GALLERY.length - 1 ? endGallery() : runStep(gal + 1))}>{gal === GALLERY.length - 1 ? 'Done' : 'Next state'}</button>
+            <button type="button" onClick={endGallery} aria-label="End the walkthrough">End</button>
+          </div>
+        </div>
+  );
   return (
     <>
+      {bar('floating')}
       <button type="button" className="demo-fab" onClick={() => setOpen(!open)}>{open ? 'Close demo' : 'Demo'}</button>
       <aside className="demo" data-open={open ? 'true' : 'false'} aria-label="Demo controls">
+        {bar('in-panel')}
         <div className="col" style={{ gap: 6 }}>
           <h2>Mada Trips · clickable prototype</h2>
           <p>Every screen works. Use these controls to jump through a trip and to trigger the hard cases. Nothing here is real: no bookings, payments or messages leave this page.</p>
@@ -238,12 +277,27 @@ function Demo() {
         </div>
         <div className="col" style={{ gap: 8 }}>
           <h3>Make it go wrong</h3>
+          <button type="button" className="demo-btn demo-gallery" onClick={() => runStep(0)}>When things go wrong · walk through all {GALLERY.length}</button>
           <div className="demo-grid">
-            {DEMO_SWITCHES.map((d) => (
-              <button key={d.id} type="button" className="demo-btn" aria-pressed={s.demo[d.id] ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.tap); set((p) => ({ demo: { ...p.demo, [d.id]: !p.demo[d.id] } })); }}>{d.label}</button>
+            {DEMO_SWITCHES.filter((d) => !d.group).map((d) => (
+              <button key={d.id} type="button" className="demo-btn" aria-pressed={s.demo[d.id] ? 'true' : 'false'} onClick={() => toggle(d.id)}>{d.label}</button>
             ))}
           </div>
         </div>
+        {[['app', 'When the app can’t work'], ['flow', 'Inside a flow']].map(([g, h]) => (
+          <div key={g} className="col" style={{ gap: 8 }}>
+            <h3>{h}</h3>
+            <div className="demo-grid">
+              {DEMO_SWITCHES.filter((d) => d.group === g).map((d) => (
+                <button key={d.id} type="button" className="demo-btn" aria-pressed={s.demo[d.id] ? 'true' : 'false'} onClick={() => toggle(d.id)}>{d.label}</button>
+              ))}
+              {g === 'flow' && <>
+                <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => set((p) => ({ pendingBooking: { kind: 'trip', flightId: 'best', travellers: (p.household || ['omar']).filter((id) => id !== 'lina'), bundle: true, search: { type: 'return', dep: 9, ret: 15, month: 'Mar' }, ref: 'K4TQ9M', total: 21380, extra: 0, at: Date.now() + 40000, closed: true, resumeStep: 2 }, tab: 'today', stack: [] })), 60); setOpen(false); }}>App closed mid-booking</button>
+                <button type="button" className="demo-btn" onClick={() => { if (!s.onboarded) jump('none', true); setTimeout(() => window.__madaPush('notFound', { what: 'trip' }), 60); setOpen(false); }}>Open a deleted link</button>
+              </>}
+            </div>
+          </div>
+        ))}
         <p>Sign-in code: <b>123456</b>. Passcode: any 6 digits. Vibration works on Android browsers; the app uses native haptics.</p>
       </aside>
     </>

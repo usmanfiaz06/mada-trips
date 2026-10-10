@@ -11,7 +11,7 @@ import { useT } from "@/lib/i18n/client";
 
 export type InboxRow = {
   key: string; kind: string; id: string; title: string; note: string; sub: string; href: string; due: string; opened: string;
-  agentName: string | null; reason: string; escalated: boolean; escalationNote: string | null; amount: string | null; mine: boolean;
+  agentName: string | null; reason: string; tag?: string | null; link?: { label: string; href: string } | null; escalated: boolean; escalationNote: string | null; amount: string | null; mine: boolean;
 };
 
 
@@ -63,6 +63,7 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">{t(M.label)}</span>
                   <span className="text-[12.5px] font-medium text-ink-2">· {t(r.note)}</span>
+                  {r.tag && <span className="inline-flex h-5 items-center rounded-full bg-info-soft px-1.5 text-[11px] font-medium text-info">{t(r.tag)}</span>}
                   {r.escalated && <span className="inline-flex h-5 items-center gap-1 rounded-full bg-bad-soft px-1.5 text-[11px] font-medium text-bad" title={r.escalationNote ?? ""}><Flag className="size-3" />{t("Escalated")}</span>}
                 </span>
                 <span dir="auto" className="mt-0.5 block truncate text-start text-[14.5px] text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{r.title}</span>
@@ -89,6 +90,7 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
                 )}
               </div>
               <div className="ms-auto flex items-center gap-1.5 lg:ms-0">
+                {r.link && <a href={r.link.href} target="_blank" rel="noopener noreferrer" className="hidden h-8 items-center rounded-full px-2.5 text-[12.5px] text-ink-3 underline decoration-gold decoration-2 underline-offset-4 hover:text-ink sm:inline-flex">{t(r.link.label)}</a>}
                 {myAgentId && !r.mine && (
                   <form action={take} ref={(el) => { takeRefs.current[r.key] = el; }}>
                     <input type="hidden" name="kind" value={r.kind} /><input type="hidden" name="itemId" value={r.id} /><input type="hidden" name="agentId" value={myAgentId} />

@@ -343,7 +343,7 @@ export function nationalityOf(p: Person): string | null {
  */
 export function entryChecks(input: {
   destination: string; travellers: Person[]; depart: string; return: string | null; answers: Record<string, string>; today: string;
-  demo?: { passportProblem?: boolean }; iqamaOf?: (p: Person) => string | null;
+  demo?: { passportProblemFor?: string | null }; iqamaOf?: (p: Person) => string | null;
 }) {
   const dest = DESTINATIONS[input.destination];
   const c = dest?.country ?? '';
@@ -352,13 +352,12 @@ export function entryChecks(input: {
   const until = input.return ?? input.depart;
   const out: EntryCheckValue[] = [];
   const base = { done: false, info: false, title: null, need: null, answerKey: null, service: null } as const;
-  const firstChild = input.travellers.find((p) => p.relation === 'child') ?? input.travellers.find((p) => !p.isSelf);
   for (const p of input.travellers) {
     const name = personName(p);
     const removable = !p.isSelf;
     const nat = nationalityOf(p);
     // Passport validity after landing (Türkiye: 150 days), or simply valid for the whole trip.
-    const expiry = input.demo?.passportProblem && firstChild?.id === p.id ? DEMO_SHORT_PASSPORT : p.passport?.expiry ?? null;
+    const expiry = input.demo?.passportProblemFor === p.id ? DEMO_SHORT_PASSPORT : p.passport?.expiry ?? null;
     if (dest && !rule.domestic && expiry) {
       const need = rule.passportDays ? addDays(input.depart, rule.passportDays) : until;
       if (expiry < need) {
@@ -405,6 +404,12 @@ export function entryChecks(input: {
     okText: !out.length && !rule.domestic ? rule.SAU?.ok ?? null : null,
     checks: out, blocking: out.filter((x) => x.blocking).length, checkedOn: input.today,
   };
+}
+
+/** Whose passport the passport-problem demo switch shortens: the household's youngest child (Ahmed in the prototype). */
+export function demoPassportTarget(household: Person[]): string | null {
+  const kids = household.filter((p) => !p.isSelf && p.relation === 'child').sort((a, b) => (b.dateOfBirth ?? '').localeCompare(a.dateOfBirth ?? ''));
+  return kids[0]?.id ?? household.filter((p) => !p.isSelf).at(-1)?.id ?? null;
 }
 
 /** The mock-mode iqama: a helper's iqama ends on the prototype's demo date. */

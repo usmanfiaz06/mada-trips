@@ -51,6 +51,7 @@ export const ORDER_STAGE: Record<string, { label: string; tone: Tone }> = {
   needs_answer: { label: "Waiting on traveller", tone: "neutral" },
   price_changed: { label: "New price sent", tone: "warn" },
   issued: { label: "Issued", tone: "ok" },
+  failed: { label: "Ticketing failed", tone: "bad" },
   not_issued: { label: "Not issued", tone: "bad" },
   other: { label: "In progress", tone: "neutral" },
 };

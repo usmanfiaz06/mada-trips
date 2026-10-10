@@ -23,6 +23,10 @@ import { askAction, failAction, holdAction, issueAction, priceAction, replyActio
 export const metadata = { title: "Order · Desk" };
 
 const hm = (local: string) => local.slice(11, 16);
+const EVENT: Record<string, string> = {
+  created: "Order placed", authorised: "Card authorised", held: "Seats held", pnr: "PNR recorded", price_locked: "Fare confirmed", question: "Question sent", answered: "Traveller answered",
+  fare_changed: "New fare sent", issuing: "Issuing", tickets: "Ticket numbers entered", captured: "Card captured", confirmed: "Confirmed", ticketing_failed: "Ticketing failed", voided: "Card hold released", cancelled: "Cancelled",
+};
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
   const u = await requirePerm("desk.view");
@@ -35,7 +39,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!o.isOrder) redirect(`/adminwork/desk/requests/${id}`);
   const r = o.request, d = o.desk, pay = o.payment;
   const act = can(u, "desk.act"), issue = can(u, "desk.issue");
-  const open = ["awaiting", "held", "needs_answer", "price_changed"].includes(o.stage);
+  const open = ["awaiting", "held", "needs_answer", "price_changed", "failed"].includes(o.stage);
+  const ev = o.events ?? [];
+  const question = d.question ?? (o.order?.question ? { text: o.order.question.text, choices: o.order.question.options.map((x) => (x === "yes" ? "Yes" : x === "call" ? "Call me" : x)), askedAt: (ev.filter((e) => e.kind === "question").at(-1)?.createdAt ?? o.order.updatedAt).toISOString() } : null);
   const sla = o.stage === "awaiting" ? slaFor("order", d.question?.answeredAt ? new Date(d.question.answeredAt) : r.createdAt) : o.stage === "held" ? slaFor("ticketing", d.heldAt ? new Date(d.heldAt) : r.updatedAt) : null;
   const quote = o.quotes.find((q) => q.status !== "withdrawn") ?? o.quotes[0] ?? null;
   const total = pay?.amount ?? quote?.total ?? 0;
@@ -127,6 +133,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             {act && <Composer action={replyAction} typing={typingAction} threadKind="request" threadId={r.id} agentName={me?.displayName ?? u.name.split(" ")[0]!} canned={canned.map((c) => ({ id: c.id, title: c.title, en: c.bodyEn, ar: c.bodyAr }))} locale={L} />}
           </Card>
 
+          {ev.length > 0 && (
+            <Card>
+              <CardHead title={t("Order timeline")} hint={o.order?.ref ? `${t("Booking")} ${o.order.ref}` : undefined} />
+              <ol className="space-y-2">
+                {ev.map((e) => (
+                  <li key={e.id} className="flex items-baseline gap-3 text-[13.5px]">
+                    <span className="num w-[52px] shrink-0 text-[12px] text-ink-3" dir="ltr">{fmtDate(e.createdAt, L, true).split(", ").at(-1)}</span>
+                    <span className="text-ink">{t(EVENT[e.kind] ?? e.kind)}</span>
+                    <span className="truncate text-ink-3">{e.actorName ?? t(e.actorKind === "user" ? "Traveller" : "System")}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
+
           <DeskTimeline entityId={r.id} />
         </div>
 
@@ -143,11 +164,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <p className="text-[13.5px] text-ink-2">{d.failReason}</p>
             </Card>
           )}
-          {o.stage === "needs_answer" && d.question && (
+          {o.stage === "needs_answer" && question && (
             <Card>
-              <CardHead title={t("Waiting on the traveller")} hint={t("Asked {ago}", { ago: timeAgo(d.question.askedAt, L) })} />
-              <p className="text-[14px] text-ink">{d.question.text}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">{d.question.choices.map((c) => <Badge key={c}>{c}</Badge>)}</div>
+              <CardHead title={t("Waiting on the traveller")} hint={t("Asked {ago}", { ago: timeAgo(question.askedAt, L) })} />
+              <p className="text-[14px] text-ink">{question.text}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">{question.choices.map((c) => <Badge key={c}>{t(c)}</Badge>)}</div>
             </Card>
           )}
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { Screen, useTopInset } from '@/components/Layout';
-import { BannerHost, DemoSheet, OfflineBar, TodayHeader, Wash, todayHour } from '@/components/today/common';
+import { BannerHost, DemoSheet, TodayHeader, Wash, todayHour } from '@/components/today/common';
 import { Booked } from '@/components/today/Booked';
 import { DayBefore } from '@/components/today/DayBefore';
 import { Home } from '@/components/today/Home';
@@ -56,7 +56,6 @@ export default function Today() {
     <Screen>
       <Wash hour={todayHour()} />
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140, paddingTop: top + 10, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" testID="today-scroll">
-        <OfflineBar />
         <TodayHeader clock={clock} unread={trips.data?.unread ?? 0} />
         {body}
       </ScrollView>

@@ -414,6 +414,8 @@ const load = () => {
       delete st.seed;
       if (saved.seed === 'demo') st.demoSeed = true;
       if (st.trip) st.trip = normalizeTrip(st.trip);
+      /* The app closed while a booking was with Faisal: he carried on, and Today says so on this launch. */
+      if (st.inflight) { st.pendingBooking = { ...st.inflight, at: Date.now(), closed: true }; st.inflight = null; }
       (st.extraPeople || []).forEach(registerPerson);
       return st;
     }
@@ -452,6 +454,7 @@ export function StoreProvider({ children }) {
     reset: (tab = 'today') => set({ tab, stack: [] }),
     toast: (text) => {
       clearTimeout(toastTimer.current);
+      if (!text) { setToast(null); return; }
       setToast({ text, id: Date.now() });
       toastTimer.current = setTimeout(() => setToast(null), 3200);
     },

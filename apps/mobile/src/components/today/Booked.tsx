@@ -103,7 +103,7 @@ function Readiness({ trip }: { trip: TripDetail }) {
 /** Data on landing: pick who needs it. Mada confirms the eSIMs and the price lands in Requests. */
 function EsimSheet({ trip, open, onClose }: { trip: TripDetail; open: boolean; onClose: () => void }) {
   const [who, setWho] = useState(trip.travellers.map((p) => p.id));
-  const offline = useDemo((s) => s.offline);
+  const offline = useOffline();
   const ask = useTripMutation(() => tripsApi.ask(trip.id, { area: 'other', kind: 'esim', count: who.length, travellerIds: who, clientKey: newKey() }));
   const dest = destinationOf(trip);
   return (

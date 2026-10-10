@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { dehydrate, hydrate, onlineManager, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { create } from 'zustand';
 import { z } from 'zod';
 import {
@@ -12,14 +12,17 @@ import {
 import { ApiError, request } from './api';
 import { API_MODE } from './config';
 import { queryClient } from './queries';
+import { discardItem, enqueue, registerOutboxKind, useOutbox, type OutboxItem } from './net/outbox';
+import { persistQueries } from './net/persist';
+import { isOffline, simulateOffline, useNet } from './net/state';
 import { useSession } from './session';
 
 /*
  * The trip companion's client: every call to the Core API for trips, refunds, invoices, tracked flights, the inbox and
  * devices, the React Query hooks the screens use, and three things travel days need:
  *  - the trip clock's demo override (mock mode or demo hints only),
- *  - an offline copy of everything under ['trips'] so travel-day screens open without signal,
- *  - an outbox: a choice made offline is saved on the phone and sent once there's a connection.
+ *  - the offline copy of everything under ['trips'] (lib/net/persist) so travel-day screens open without signal,
+ *  - the outbox (lib/net/outbox): a choice made offline is saved on the phone and sent once there's a connection.
  */
 
 /* ───────── small persistent storage (localStorage on the web, a file in the app's documents on a phone) ───────── */
@@ -73,10 +76,10 @@ export const useDemo = create<DemoState>((set) => ({
   },
   setOffline(offline) {
     set({ offline });
-    onlineManager.setOnline(!offline);
+    simulateOffline(offline);
   },
 }));
-if (useDemo.getState().offline) onlineManager.setOnline(false);
+if (useDemo.getState().offline) simulateOffline(true);
 
 /** Appends the demo phase so the server's trip clock shows that moment (ignored outside mock mode). */
 const withPhase = (path: string) => {
@@ -87,7 +90,7 @@ const withPhase = (path: string) => {
 
 /** In the demo, "Offline" really is offline: nothing leaves the phone. */
 function guard() {
-  if (useDemo.getState().offline) throw new ApiError('OFFLINE', 'You’re offline.', 0);
+  if (isOffline()) throw new ApiError('OFFLINE', 'You’re offline.', 0);
 }
 const get = <S extends z.ZodType>(path: string, schema: S) => { guard(); return request({ method: 'GET', path: withPhase(path) }, schema); };
 const send = <S extends z.ZodType>(method: 'POST' | 'PATCH' | 'DELETE', path: string, body: unknown, schema: S) => { guard(); return request({ method, path: withPhase(path), body }, schema); };
@@ -194,36 +197,15 @@ export function useTripMutation<A, R>(fn: (a: A) => Promise<R>) {
   return useMutation({ mutationFn: fn, onSettled: () => qc.invalidateQueries({ queryKey: tk.all }) });
 }
 
-/* ───────── offline copy of the trip data ───────── */
+/* ───────── offline: the shared resilience layer (lib/net) ───────── */
 
-const CACHE_KEY = 'mada.trips.cache.v1';
-let restored = false;
+const DAY = 86_400_000;
+/* Trips, the itinerary, boarding passes and the hotel address stay on the phone for a month. Prices (refund quotes,
+   change options) and live positions are never kept: a price from yesterday is worse than none. */
+persistQueries('trips', 30 * DAY, ['position', 'quote', 'change']);
 
-/** Restores the last copy of the trip screens once at launch, then keeps writing it (debounced) as data changes. */
-export function useOfflineTrips() {
-  const [ready, setReady] = useState(restored);
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (!restored) {
-      restored = true;
-      void kvGet(CACHE_KEY).then((raw) => {
-        if (raw) {
-          try { hydrate(queryClient, JSON.parse(raw)); } catch { /* an old copy: ignore */ }
-        }
-        setReady(true);
-      });
-    }
-    const unsub = queryClient.getQueryCache().subscribe(() => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const state = dehydrate(queryClient, { shouldDehydrateQuery: (q) => q.queryKey[0] === 'trips' && q.state.status === 'success' });
-        void kvSet(CACHE_KEY, JSON.stringify(state));
-      }, 800);
-    });
-    return () => { clearTimeout(timer); unsub(); };
-  }, []);
-  return ready;
-}
+/** Offline as the whole app sees it (the OS, our own failed requests, or the demo switch). */
+export const useOffline = () => useNet((s) => s.online === false);
 
 /** When a query last succeeded, for "Offline · last update at 06:41". */
 export function lastUpdated(key: QueryKey): number | null {
@@ -232,57 +214,26 @@ export function lastUpdated(key: QueryKey): number | null {
 
 export const isOfflineError = (e: unknown) => e instanceof ApiError && e.code === 'OFFLINE';
 
-/* ───────── the outbox: choices made offline ───────── */
+/* ───────── the outbox: choices made offline go through lib/net's outbox ───────── */
 
-export type Queued =
-  | { id: string; kind: 'disruption'; tripId: string; body: { kind: DisruptionKind; optionId: string; clientKey: string }; at: number }
-  | { id: string; kind: 'ask'; tripId: string; body: CreateTripAskRequest; title: string; at: number };
+export const OUTBOX_DISRUPTION = 'trip.disruption';
+export const OUTBOX_ASK = 'trip.ask';
+registerOutboxKind(OUTBOX_DISRUPTION, { invalidate: () => [tk.all] });
+registerOutboxKind(OUTBOX_ASK, { invalidate: () => [tk.all] });
 
-type OutboxState = { items: Queued[]; add: (q: Queued) => void; remove: (id: string) => void; load: () => Promise<void> };
-const OUTBOX_KEY = 'mada.trips.outbox.v1';
-export const useOutbox = create<OutboxState>((set, getState) => ({
-  items: [],
-  add(q) { const items = [...getState().items, q]; set({ items }); void kvSet(OUTBOX_KEY, JSON.stringify(items)); },
-  remove(id) { const items = getState().items.filter((x) => x.id !== id); set({ items }); void kvSet(OUTBOX_KEY, JSON.stringify(items)); },
-  async load() { const raw = await kvGet(OUTBOX_KEY); if (raw) { try { set({ items: JSON.parse(raw) as Queued[] }); } catch { /* */ } } },
-}));
-
-let flushing = false;
-/** Sends what's waiting. Each item carries its client key, so a retry never does it twice on the server. */
-export async function flushOutbox(): Promise<number> {
-  if (flushing || useDemo.getState().offline) return 0;
-  flushing = true;
-  let sent = 0;
-  try {
-    for (const q of [...useOutbox.getState().items]) {
-      try {
-        if (q.kind === 'disruption') await tripsApi.choose(q.tripId, q.body);
-        else await tripsApi.ask(q.tripId, q.body);
-        useOutbox.getState().remove(q.id);
-        sent += 1;
-      } catch (e) {
-        if (isOfflineError(e)) break;
-        useOutbox.getState().remove(q.id); // the server refused it on purpose: don't retry forever
-      }
-    }
-  } finally { flushing = false; }
-  if (sent) void queryClient.invalidateQueries({ queryKey: tk.all });
-  return sent;
+/** A disruption choice made offline. The latest choice for a trip replaces an earlier one still waiting. */
+export function queueDisruption(tripId: string, body: { kind: DisruptionKind; optionId: string; clientKey: string }, label: string) {
+  return enqueue({ kind: OUTBOX_DISRUPTION, label, method: 'POST', path: withPhase(TRIP_ROUTES.disruption(tripId)), body, dedupe: `dz-${tripId}`, meta: { tripId, optionId: body.optionId } });
 }
-
-/** Keeps the outbox moving: on launch, whenever the connection comes back, and every 15 seconds while items wait. */
-export function useOutboxPump() {
-  const items = useOutbox((s) => s.items.length);
-  const offline = useDemo((s) => s.offline);
-  useEffect(() => { void useOutbox.getState().load(); }, []);
-  useEffect(() => onlineManager.subscribe((online) => { if (online) void flushOutbox(); }), []);
-  useEffect(() => {
-    if (!items || offline) return;
-    void flushOutbox();
-    const t = setInterval(() => void flushOutbox(), 15_000);
-    return () => clearInterval(t);
-  }, [items, offline]);
+/** A request to Mada made offline (special requests, hotel options). */
+export function queueAsk(tripId: string, body: CreateTripAskRequest, label: string) {
+  return enqueue({ kind: OUTBOX_ASK, label, method: 'POST', path: withPhase(TRIP_ROUTES.asks(tripId)), body, meta: { tripId } });
 }
+/** What this trip (or every trip) has waiting on the phone. */
+export function useTripOutbox(tripId?: string, kind?: string): OutboxItem[] {
+  return useOutbox(kind, (i) => (i.kind === OUTBOX_DISRUPTION || i.kind === OUTBOX_ASK) && (!tripId || i.meta?.tripId === tripId));
+}
+export { discardItem as discardQueued };
 
 /* ───────── guest tracked flights, carried over at sign-up ───────── */
 

@@ -1,0 +1,448 @@
+AE.07	Umm Al Quwain	Umm Al Quwain	290595
+AE.05	Ras Al Khaimah	Ras Al Khaimah	291075
+AE.03	Dubai	Dubai	292224
+AE.06	Sharjah	Sharjah	292673
+AE.04	Fujairah	Fujairah	292879
+AE.02	Ajman	Ajman	292933
+AE.01	Abu Dhabi	Abu Dhabi	292969
+AU.08	Western Australia	Western Australia	2058645
+AU.05	South Australia	South Australia	2061327
+AU.03	Northern Territory	Northern Territory	2064513
+AU.07	Victoria	Victoria	2145234
+AU.06	Tasmania	Tasmania	2147291
+AU.04	Queensland	Queensland	2152274
+AU.02	New South Wales	New South Wales	2155400
+AU.01	Australian Capital Territory	Australian Capital Territory	2177478
+AZ.12	Beyləqan	Beylaqan	146879
+AZ.69	Zangilan District	Zangilan District	146900
+AZ.66	Yardimli District	Yardimli District	146962
+AZ.55	Shusha	Shusha	147163
+AZ.49	Salyan District	Salyan District	147269
+AZ.46	Sabirabad District	Sabirabad District	147284
+AZ.45	Saatlı	Saatli	147287
+AZ.13	Bilasuvar District	Bilasuvar District	147310
+AZ.36	Neftçala	Neftcala	147422
+AZ.35	Nakhchivan	Nakhchivan	147435
+AZ.32	Masally	Masally	147551
+AZ.31	Lerik District	Lerik District	147610
+AZ.29	Lənkəran	Lankaran	147613
+AZ.28	Lachin Rayon	Lachin Rayon	147626
+AZ.43	Qubadlı	Qubadli	147694
+AZ.24	İmişli	Imisli	147983
+AZ.18	Fuzuli District	Fuzuli District	148107
+AZ.14	Jabrayil	Jabrayil	148140
+AZ.15	Jalilabad	Jalilabad	148155
+AZ.08	Astara	Astara	148442
+AZ.64	Khojaly	Khojaly	148449
+AZ.02	Ağcabǝdi	Aghjabadi Rayon	148615
+AZ.03	Ağdam	Agdam	148617
+AZ.07	Shirvan	Shirvan	409417
+AZ.30	Lankaran Sahari	Lankaran Sahari	409418
+AZ.56	Shusha City	Shusha City	409419
+AZ.57	Tartar District	Tartar District	409420
+AZ.61	Xankǝndi	Xankandi Sahari	409421
+AZ.65	Khojavend	Khojavend	409423
+AZ.71	Zardab	Zardab	584583
+AZ.70	Zaqatala District	Zaqatala District	584604
+AZ.67	Yevlax	Yevlax	584650
+AZ.37	Oğuz	Oguz	584742
+AZ.59	Ucar	Ucar	584783
+AZ.58	Tovuz District	Tovuz District	584861
+AZ.50	Şamaxı	Samaxi	585030
+AZ.47	Shaki	Shaki	585031
+AZ.51	Şǝmkir	Shamkir Rayon	585059
+AZ.27	Kurdamir District	Kurdamir District	585686
+AZ.38	Qabala District	Qabala District	585738
+AZ.44	Qusar District	Qusar District	585749
+AZ.42	Quba	Quba	585786
+AZ.62	Goygol Rayon	Goygol Rayon	585967
+AZ.60	Xaçmaz	Xacmaz	586001
+AZ.26	Kalbajar	Kalbajar	586047
+AZ.40	Qazax	Qazax	586087
+AZ.21	Goranboy District	Goranboy District	586112
+AZ.39	Qax	Qax	586290
+AZ.25	Ismayilli District	Ismayilli District	586320
+AZ.22	Göyçay	Goeycay	586482
+AZ.17	Shabran	Shabran	586725
+AZ.16	Daşkǝsǝn	Dashkasan Rayon	586771
+AZ.10	Balakan District	Balakan District	587010
+AZ.11	Barda	Barda	587056
+AZ.09	Baki	Baki	587081
+AZ.01	Abşeron	Abseron	587245
+AZ.06	Agsu District	Agsu District	587342
+AZ.04	Ağdaş	Agdas	587376
+AZ.19	Gadabay District	Gadabay District	627535
+AZ.05	Ağstafa	Agstafa	828297
+AZ.20	Gǝncǝ	Ganja City	828298
+AZ.33	Mingacevir City	Mingacevir City	828299
+AZ.34	Naftalan	Naftalan	828300
+AZ.41	Qobustan	Qobustan	828301
+AZ.52	Samux	Samux	828302
+AZ.48	Shaki City	Shaki City	828303
+AZ.53	Siyǝzǝn	Siazan Rayon	828304
+AZ.54	Sumqayit	Sumqayit	828305
+AZ.63	Xızı	Xizi	828306
+AZ.68	Yevlax City	Yevlax City	828307
+AZ.23	Hacıqabul	Haciqabul	828315
+BR.22	Rio Grande do Norte	Rio Grande do Norte	3390290
+BR.20	Piauí	Piaui	3392213
+BR.30	Pernambuco	Pernambuco	3392268
+BR.17	Paraíba	Paraiba	3393098
+BR.16	Pará	Para	3393129
+BR.13	Maranhão	Maranhao	3395443
+BR.06	Ceará	Ceara	3402362
+BR.03	Amapá	Amapa	3407762
+BR.02	Alagoas	Alagoas	3408096
+BR.28	Sergipe	Sergipe	3447799
+BR.27	São Paulo	Sao Paulo	3448433
+BR.26	Santa Catarina	Santa Catarina	3450387
+BR.23	Rio Grande do Sul	Rio Grande do Sul	3451133
+BR.21	Rio de Janeiro	Rio de Janeiro	3451189
+BR.18	Paraná	Parana	3455077
+BR.15	Minas Gerais	Minas Gerais	3457153
+BR.11	Mato Grosso do Sul	Mato Grosso do Sul	3457415
+BR.14	Mato Grosso	Mato Grosso	3457419
+BR.29	Goiás	Goias	3462372
+BR.07	Federal District	Federal District	3463504
+BR.08	Espírito Santo	Espirito Santo	3463930
+BR.05	Bahia	Bahia	3471168
+BR.31	Tocantins	Tocantins	3474575
+BR.25	Roraima	Roraima	3662560
+BR.04	Amazonas	Amazonas	3665361
+BR.01	Acre	Acre	3665474
+BR.24	Rondônia	Rondonia	3924825
+CA.01	Alberta	Alberta	5883102
+CA.02	British Columbia	British Columbia	5909050
+CA.03	Manitoba	Manitoba	6065171
+CA.04	New Brunswick	New Brunswick	6087430
+CA.13	Northwest Territories	Northwest Territories	6091069
+CA.07	Nova Scotia	Nova Scotia	6091530
+CA.14	Nunavut	Nunavut	6091732
+CA.08	Ontario	Ontario	6093943
+CA.09	Prince Edward Island	Prince Edward Island	6113358
+CA.10	Quebec	Quebec	6115047
+CA.11	Saskatchewan	Saskatchewan	6141242
+CA.12	Yukon	Yukon	6185811
+CA.05	Newfoundland and Labrador	Newfoundland and Labrador	6354959
+CH.ZH	Zurich	Zurich	2657895
+CH.ZG	Zug	Zug	2657907
+CH.VD	Vaud	Vaud	2658182
+CH.VS	Valais	Valais	2658205
+CH.UR	Uri	Uri	2658226
+CH.TI	Ticino	Ticino	2658370
+CH.TG	Thurgau	Thurgau	2658372
+CH.SO	Solothurn	Solothurn	2658563
+CH.SZ	Schwyz	Schwyz	2658664
+CH.SH	Schaffhausen	Schaffhausen	2658760
+CH.SG	Saint Gallen	Saint Gallen	2658821
+CH.OW	Obwalden	Obwalden	2659315
+CH.NW	Nidwalden	Nidwalden	2659471
+CH.NE	Neuchâtel	Neuchatel	2659495
+CH.LU	Lucerne	Lucerne	2659810
+CH.JU	Jura	Jura	2660207
+CH.GR	Grisons	Grisons	2660522
+CH.GL	Glarus	Glarus	2660593
+CH.GE	Geneva	Geneva	2660645
+CH.FR	Fribourg	Fribourg	2660717
+CH.BE	Bern	Bern	2661551
+CH.BS	Basel-City	Basel-City	2661602
+CH.BL	Basel-Landschaft	Basel-Landschaft	2661603
+CH.AR	Appenzell Ausserrhoden	Appenzell Ausserrhoden	2661739
+CH.AI	Appenzell Innerrhoden	Appenzell Innerrhoden	2661741
+CH.AG	Aargau	Aargau	2661876
+EG.24	Sohag	Sohag	347794
+EG.27	North Sinai	North Sinai	349401
+EG.23	Qena	Qena	350546
+EG.22	Matruh	Matruh	352603
+EG.21	Kafr el-Sheikh	Kafr el-Sheikh	354500
+EG.26	South Sinai	South Sinai	355182
+EG.20	Damietta	Damietta	358044
+EG.19	Port Said	Port Said	358617
+EG.18	Beni Suweif	Beni Suweif	359171
+EG.17	Asyut	Asyut	359781
+EG.16	Aswan	Aswan	359787
+EG.15	Suez	Suez	359797
+EG.14	Sharqia	Sharqia	360016
+EG.13	New Valley	New Valley	360483
+EG.12	Qalyubia	Qalyubia	360621
+EG.11	Cairo	Cairo	360631
+EG.10	Minya	Minya	360688
+EG.09	Monufia	Monufia	360689
+EG.08	Giza	Giza	360997
+EG.07	Ismailia	Ismailia	361056
+EG.06	Alexandria	Alexandria	361059
+EG.05	Gharbia	Gharbia	361294
+EG.04	Faiyum	Faiyum	361323
+EG.03	Beheira	Beheira	361370
+EG.02	Red Sea	Red Sea	361468
+EG.01	Dakahlia	Dakahlia	361849
+EG.28	Luxor	Luxor	7603259
+FR.93	Provence-Alpes-Côte d'Azur	Provence-Alpes-Cote d'Azur	2985244
+FR.52	Pays de la Loire	Pays de la Loire	2988289
+FR.11	Île-de-France	Ile-de-France	3012874
+FR.94	Corsica	Corsica	3023519
+FR.24	Centre-Val de Loire	Centre-Val de Loire	3027939
+FR.53	Brittany	Brittany	3030293
+FR.27	Bourgogne-Franche-Comté	Bourgogne-Franche-Comte	11071619
+FR.75	New Aquitaine	New Aquitaine	11071620
+FR.28	Normandy	Normandy	11071621
+FR.44	Grand Est	Grand Est	11071622
+FR.76	Occitanie	Occitanie	11071623
+FR.32	Hauts-de-France	Hauts-de-France	11071624
+FR.84	Auvergne-Rhône-Alpes	Auvergne-Rhone-Alpes	11071625
+GB.WLS	Wales	Wales	2634895
+GB.SCT	Scotland	Scotland	2638360
+GB.NIR	Northern Ireland	Northern Ireland	2641364
+GB.ENG	England	England	6269131
+GE.51	Tbilisi	Tbilisi	611716
+GE.04	Adjara	Adjara	615929
+GE.68	Kvemo Kartli	Kvemo Kartli	865536
+GE.67	Kakheti	Kakheti	865537
+GE.65	Guria	Guria	865538
+GE.66	Imereti	Imereti	865539
+GE.73	Shida Kartli	Shida Kartli	865540
+GE.69	Mtskheta-Mtianeti	Mtskheta-Mtianeti	865541
+GE.70	Racha-Lechkhumi and Kvemo Svaneti	Racha-Lechkhumi and Kvemo Svaneti	865542
+GE.71	Samegrelo and Zemo Svaneti	Samegrelo and Zemo Svaneti	865543
+GE.72	Samtskhe-Javakheti	Samtskhe-Javakheti	865544
+GE.02	Abkhazia	Abkhazia	6643410
+IL.06	Jerusalem	Jerusalem	293198
+IL.05	Tel Aviv	Tel Aviv	293396
+IL.04	Haifa	Haifa	294800
+IL.03	Northern District	Northern District	294824
+IL.02	Central District	Central District	294904
+IL.01	Southern District	Southern District	294952
+IL.WE	Judea and Samaria Area	Judea and Samaria Area	11821181
+IT.15	Sicily	Sicily	2523119
+IT.14	Sardinia	Sardinia	2523228
+IT.03	Calabria	Calabria	2525468
+IT.20	Veneto	Veneto	3164604
+IT.19	Aosta Valley	Aosta Valley	3164857
+IT.18	Umbria	Umbria	3165048
+IT.17	Trentino-Alto Adige	Trentino-Alto Adige	3165244
+IT.16	Tuscany	Tuscany	3165361
+IT.13	Apulia	Apulia	3169778
+IT.12	Piedmont	Piedmont	3170831
+IT.11	Molise	Molise	3173222
+IT.10	The Marches	The Marches	3174004
+IT.09	Lombardy	Lombardy	3174618
+IT.08	Liguria	Liguria	3174725
+IT.07	Lazio	Lazio	3174976
+IT.06	Friuli Venezia Giulia	Friuli Venezia Giulia	3176525
+IT.05	Emilia-Romagna	Emilia-Romagna	3177401
+IT.04	Campania	Campania	3181042
+IT.02	Basilicate	Basilicate	3182306
+IT.01	Abruzzo	Abruzzo	3183560
+JP.46	Yamanashi	Yamanashi	1848649
+JP.45	Yamaguchi	Yamaguchi	1848681
+JP.43	Wakayama	Wakayama	1848938
+JP.42	Toyama	Toyama	1849872
+JP.41	Tottori	Tottori	1849890
+JP.40	Tokyo	Tokyo	1850144
+JP.39	Tokushima	Tokushima	1850157
+JP.38	Tochigi	Tochigi	1850310
+JP.37	Shizuoka	Shizuoka	1851715
+JP.36	Shimane	Shimane	1852442
+JP.35	Shiga	Shiga	1852553
+JP.34	Saitama	Saitama	1853226
+JP.33	Saga	Saga	1853299
+JP.32	Osaka	Osaka	1853904
+JP.47	Okinawa	Okinawa	1854345
+JP.31	Okayama	Okayama	1854381
+JP.30	Oita	Oita	1854484
+JP.29	Niigata	Niigata	1855429
+JP.28	Nara	Nara	1855608
+JP.27	Nagasaki	Nagasaki	1856156
+JP.26	Nagano	Nagano	1856210
+JP.25	Miyazaki	Miyazaki	1856710
+JP.23	Mie	Mie	1857352
+JP.22	Kyoto	Kyoto	1857907
+JP.21	Kumamoto	Kumamoto	1858419
+JP.20	Kochi	Kochi	1859133
+JP.19	Kanagawa	Kanagawa	1860291
+JP.18	Kagoshima	Kagoshima	1860825
+JP.17	Kagawa	Kagawa	1860834
+JP.15	Ishikawa	Ishikawa	1861387
+JP.13	Hyōgo	Hyogo	1862047
+JP.11	Hiroshima	Hiroshima	1862413
+JP.10	Gunma	Gunma	1863501
+JP.09	Gifu	Gifu	1863640
+JP.07	Fukuoka	Fukuoka	1863958
+JP.06	Fukui	Fukui	1863983
+JP.05	Ehime	Ehime	1864226
+JP.01	Aichi	Aichi	1865694
+JP.44	Yamagata	Yamagata	2110554
+JP.24	Miyagi	Miyagi	2111888
+JP.16	Iwate	Iwate	2112518
+JP.14	Ibaraki	Ibaraki	2112669
+JP.08	Fukushima	Fukushima	2112922
+JP.04	Chiba	Chiba	2113014
+JP.02	Akita	Akita	2113124
+JP.12	Hokkaido	Hokkaido	2130037
+JP.03	Aomori	Aomori	2130656
+MV.47	Vaavu Atholhu	Vaavu Atholhu	1281843
+MV.46	Thaa Atholhu	Thaa Atholhu	1281881
+MV.45	Shaviyani Atholhu	Shaviyani Atholhu	1281892
+MV.01	Seenu	Seenu	1281893
+MV.44	Raa Atoll	Raa Atoll	1281918
+MV.43	Noonu Atoll	Noonu Atoll	1281937
+MV.42	Gnyaviyani Atoll	Gnyaviyani Atoll	1281945
+MV.41	Meemu Atholhu	Meemu Atholhu	1281985
+MV.39	Faadhippolhu Atoll	Faadhippolhu Atoll	1282096
+MV.05	Laamu	Laamu	1282101
+MV.38	Kaafu Atoll	Kaafu Atoll	1282208
+MV.37	Haa Dhaalu Atholhu	Haa Dhaalu Atholhu	1282293
+MV.36	Haa Alifu Atholhu	Haa Alifu Atholhu	1282294
+MV.35	Gaafu Dhaalu Atoll	Gaafu Dhaalu Atoll	1282328
+MV.34	Gaafu Alif Atoll	Gaafu Alif Atoll	1282329
+MV.33	Faafu Atholhu	Faafu Atholhu	1282393
+MV.32	Dhaalu Atholhu	Dhaalu Atholhu	1282447
+MV.31	Baa Atholhu	Baa Atholhu	1282478
+MV.30	Northern Ari Atoll	Northern Ari Atoll	1282497
+MV.40	Male	Male	1337624
+MV.10346475	Southern Ari Atoll	Southern Ari Atoll	10346475
+SA.19	Tabuk Region	Tabuk Region	101627
+SA.16	Najran Region	Najran Region	103628
+SA.14	Mecca Region	Mecca Region	104514
+SA.17	Jazan Region	Jazan Region	105298
+SA.13	Ha'il Region	Ha'il Region	106280
+SA.11	'Asir Region	'Asir Region	108179
+SA.06	Eastern Province	Eastern Province	108241
+SA.10	Riyadh Region	Riyadh Region	108411
+SA.08	Al-Qassim Region	Al-Qassim Region	108933
+SA.05	Medina Region	Medina Region	109224
+SA.20	Al Jawf Region	Al Jawf Region	109470
+SA.15	Northern Borders Region	Northern Borders Region	109579
+SA.02	Al Bahah Region	Al Bahah Region	109954
+TR.66	Yozgat	Yozgat	296560
+TR.65	Van	Van	298113
+TR.64	Uşak	Usak	298298
+TR.63	Şanlıurfa	Sanliurfa	298332
+TR.62	Tunceli	Tunceli	298845
+TR.58	Sivas	Sivas	300617
+TR.74	Siirt	Siirt	300821
+TR.73	Niğde Province	Nigde Province	303826
+TR.50	Nevşehir Province	Nevsehir Province	303830
+TR.49	Muş	Mus	304041
+TR.48	Muğla	Mugla	304183
+TR.72	Mardin	Mardin	304794
+TR.45	Manisa	Manisa	304825
+TR.44	Malatya	Malatya	304919
+TR.43	Kütahya	Kuetahya	305267
+TR.71	Konya	Konya	306569
+TR.40	Kırşehir	Kirsehir	307513
+TR.38	Kayseri	Kayseri	308463
+TR.46	Kahramanmaraş	Kahramanmaras	310858
+TR.35	İzmir Province	Izmir Province	311044
+TR.33	Isparta	Isparta	311071
+TR.32	Mersin	Mersin	311728
+TR.31	Hatay	Hatay	312394
+TR.70	Hakkâri	Hakkari	312888
+TR.83	Gaziantep	Gaziantep	314829
+TR.26	Eskişehir	Eskisehir	315201
+TR.25	Erzurum	Erzurum	315367
+TR.24	Erzincan	Erzincan	315372
+TR.23	Elazığ	Elazig	315807
+TR.21	Diyarbakır Province	Diyarbakir Province	316540
+TR.20	Denizli	Denizli	317106
+TR.15	Burdur	Burdur	320390
+TR.13	Bitlis	Bitlis	321022
+TR.12	Bingöl	Bingoel	321079
+TR.11	Bilecik	Bilecik	321122
+TR.10	Balıkesir	Balikesir	322164
+TR.09	Aydın	Aydin	322819
+TR.07	Antalya	Antalya	323776
+TR.68	Ankara	Ankara	323784
+TR.04	Ağrı	Agri	325163
+TR.03	Afyonkarahisar Province	Afyonkarahisar Province	325302
+TR.02	Adıyaman Province	Adiyaman Province	325329
+TR.81	Adana	Adana	325361
+TR.91	Osmaniye	Osmaniye	443183
+TR.88	Iğdır	Igdir	443184
+TR.75	Aksaray	Aksaray	443185
+TR.76	Batman	Batman	443186
+TR.78	Karaman	Karaman	443187
+TR.79	Kırıkkale	Kirikkale	443188
+TR.80	Şırnak	Sirnak	443189
+TR.90	Kilis	Kilis	443213
+TR.85	Zonguldak Province	Zonguldak Province	737021
+TR.61	Trabzon	Trabzon	738647
+TR.60	Tokat Province	Tokat Province	738742
+TR.59	Tekirdağ	Tekirdag	738926
+TR.57	Sinop	Sinop	739598
+TR.55	Samsun	Samsun	740263
+TR.54	Sakarya	Sakarya	740352
+TR.53	Rize Province	Rize Province	740481
+TR.52	Ordu	Ordu	741098
+TR.41	Kocaeli	Kocaeli	742865
+TR.39	Kırklareli	Kirklareli	743165
+TR.37	Kastamonu	Kastamonu	743881
+TR.84	Kars Province	Kars Province	743942
+TR.34	Istanbul	Istanbul	745042
+TR.69	Gümüşhane Province	Guemueshane Province	746423
+TR.28	Giresun	Giresun	746878
+TR.22	Edirne	Edirne	747711
+TR.19	Çorum	Corum	748877
+TR.82	Çankırı	Cankiri	749747
+TR.17	Canakkale	Canakkale	749778
+TR.16	Bursa Province	Bursa Province	750268
+TR.14	Bolu	Bolu	750510
+TR.08	Artvin	Artvin	751816
+TR.05	Amasya	Amasya	752014
+TR.87	Bartın	Bartin	862467
+TR.89	Karabük Province	Karabuek Province	862468
+TR.92	Yalova	Yalova	862469
+TR.86	Ardahan	Ardahan	862470
+TR.77	Bayburt Province	Bayburt Province	862471
+TR.93	Düzce	Duzce	865521
+US.AR	Arkansas	Arkansas	4099753
+US.DC	District of Columbia	District of Columbia	4138106
+US.DE	Delaware	Delaware	4142224
+US.FL	Florida	Florida	4155751
+US.GA	Georgia	Georgia	4197000
+US.KS	Kansas	Kansas	4273857
+US.LA	Louisiana	Louisiana	4331987
+US.MD	Maryland	Maryland	4361885
+US.MO	Missouri	Missouri	4398678
+US.MS	Mississippi	Mississippi	4436296
+US.NC	North Carolina	North Carolina	4482348
+US.OK	Oklahoma	Oklahoma	4544379
+US.SC	South Carolina	South Carolina	4597040
+US.TN	Tennessee	Tennessee	4662168
+US.TX	Texas	Texas	4736286
+US.WV	West Virginia	West Virginia	4826850
+US.AL	Alabama	Alabama	4829764
+US.CT	Connecticut	Connecticut	4831725
+US.IA	Iowa	Iowa	4862182
+US.IL	Illinois	Illinois	4896861
+US.IN	Indiana	Indiana	4921868
+US.ME	Maine	Maine	4971068
+US.MI	Michigan	Michigan	5001836
+US.MN	Minnesota	Minnesota	5037779
+US.NE	Nebraska	Nebraska	5073708
+US.NH	New Hampshire	New Hampshire	5090174
+US.NJ	New Jersey	New Jersey	5101760
+US.NY	New York	New York	5128638
+US.OH	Ohio	Ohio	5165418
+US.RI	Rhode Island	Rhode Island	5224323
+US.VT	Vermont	Vermont	5242283
+US.WI	Wisconsin	Wisconsin	5279468
+US.CA	California	California	5332921
+US.CO	Colorado	Colorado	5417618
+US.NM	New Mexico	New Mexico	5481136
+US.NV	Nevada	Nevada	5509151
+US.UT	Utah	Utah	5549030
+US.AZ	Arizona	Arizona	5551752
+US.ID	Idaho	Idaho	5596512
+US.MT	Montana	Montana	5667009
+US.ND	North Dakota	North Dakota	5690763
+US.OR	Oregon	Oregon	5744337
+US.SD	South Dakota	South Dakota	5769223
+US.WA	Washington	Washington	5815135
+US.WY	Wyoming	Wyoming	5843591
+US.HI	Hawaii	Hawaii	5855797
+US.AK	Alaska	Alaska	5879092
+US.KY	Kentucky	Kentucky	6254925
+US.MA	Massachusetts	Massachusetts	6254926
+US.PA	Pennsylvania	Pennsylvania	6254927
+US.VA	Virginia	Virginia	6254928

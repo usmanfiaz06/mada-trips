@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -20,10 +20,12 @@ import { Face, GlassButton, PhotoFill } from './ui';
 const Arrow = () => <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.paper} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><Path d="M5 12h14M13 6l6 6-6 6" /></Svg>;
 const Bookmark = ({ on }: { on: boolean }) => <Svg width={16} height={16} viewBox="0 0 24 24" fill={on ? colors.green : 'none'} stroke={on ? colors.green : colors.paper} strokeWidth={2} strokeLinejoin="round"><Path d="M6 3h12v18l-6-4-6 4z" /></Svg>;
 
+/** A city Discover has no week for yet: its guide, from the places screens. Swap the id here when their search lands. */
+const openCityGuide = (city: string) => router.push(`/city/${encodeURIComponent(city.toLowerCase())}`);
+
 /** Discover (prototype Circles → Discover): what's on this week in a city, trips we've planned, tips from people who went. */
-export function Discover({ onPost, onOpen }: { onPost: (city: string) => void; onOpen: (p: Post) => void }) {
+export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string | null; setPicked: (c: string) => void; onPost: (city: string) => void; onOpen: (p: Post) => void }) {
   const router = useRouter();
-  const [picked, setPicked] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState<PostKind | null>(null);
   const d = useDiscover(picked);
@@ -125,7 +127,7 @@ export function Discover({ onPost, onOpen }: { onPost: (city: string) => void; o
         );
       })}
 
-      <CitySheet visible={picking} onClose={() => setPicking(false)} current={city} sheet={d.data?.sheet ?? []} onPick={(c) => { setPicked(c); setPicking(false); setFilter(null); }} />
+      <CitySheet visible={picking} onClose={() => setPicking(false)} current={city} sheet={d.data?.sheet ?? []} onPick={(c) => { setPicked(c); setPicking(false); setFilter(null); }} onGuide={openCityGuide} />
     </>
   );
 }
@@ -136,7 +138,7 @@ const s = StyleSheet.create({
   rail: { paddingHorizontal: 20, gap: 12 },
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   story: { borderRadius: 28, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: colors.green, boxShadow: '0px 24px 40px -30px rgba(15,26,22,0.8)' },
-  plain: { minHeight: 300 },
+  plain: { minHeight: 300, paddingTop: 64 },
   top: { position: 'absolute', top: 14, start: 14, end: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 2 },
   body: { padding: 18, gap: 10 },
   author: { flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 4, paddingStart: 4, paddingEnd: 12, borderRadius: 999, backgroundColor: 'rgba(15,26,22,0.45)' },

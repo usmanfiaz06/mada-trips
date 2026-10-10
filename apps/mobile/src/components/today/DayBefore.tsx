@@ -1,4 +1,4 @@
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { addMinutes, AIRPORT_NAME, dayLabel, boardsAt, destinationOf, liveStay, outSegment, passportIssue, pickupPlan, PICKUP_OFFSETS, SUGGESTED_OFFSET, seatText, termShort, type TripDetail } from '@mada/shared';
@@ -125,7 +125,7 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
   const router = useRouter();
   const [sheet, setSheet] = useState(false);
   const [local] = useTripLocal(trip.id);
-  const packY = useRef(0);
+  const [packY, setPackY] = useState(0);
   const out = outSegment(trip)!;
   const pk = pickupPlan(trip);
   const n = trip.travellers.length;
@@ -137,7 +137,7 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
   const airport = AIRPORT_NAME[out.from] ?? out.from;
   const sleepHours = Math.round((mins('22:30', '24:00') + mins('00:00', wake)) / 60);
   const plan: { k: string; time: string; t: string; sub: string; state?: 'done' | 'now'; act?: [string, () => void] }[] = [
-    { k: 'tonight', time: t('td.plan.tonight'), t: allPacked ? t('td.plan.packed') : t('td.plan.pack'), sub: allPacked ? t('td.plan.packedSub') : t('td.plan.packSub', { n: packed, total: items }), state: allPacked ? 'done' : 'now', act: allPacked ? undefined : [t('td.plan.seeList'), () => scrollTo?.(packY.current)] },
+    { k: 'tonight', time: t('td.plan.tonight'), t: allPacked ? t('td.plan.packed') : t('td.plan.pack'), sub: allPacked ? t('td.plan.packedSub') : t('td.plan.packSub', { n: packed, total: items }), state: allPacked ? 'done' : 'now', act: allPacked ? undefined : [t('td.plan.seeList'), () => scrollTo?.(packY)] },
     { k: 'sleep', time: '22:30', t: t('td.plan.lights'), sub: t('td.plan.lightsSub', { n: sleepHours }) },
     { k: 'wake', time: wake, t: t('td.plan.wake'), sub: t('td.plan.wakeSub') },
     pk ? { k: 'pickup', time: pk.time, t: t('td.plan.atDoor', { driver: pk.driver }), sub: t('td.plan.atDoorSub', { car: pk.car ?? '', waits: pk.waits }), act: [t('td.plan.changePickup'), () => setSheet(true)] }
@@ -196,7 +196,7 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
           <TextLink light label={n === 1 ? t('td.db.openPass') : t('td.db.openPasses')} onPress={() => router.push('/wallet')} />
         </Pressable>
       </Rise>
-      <View onLayout={(e) => { packY.current = e.nativeEvent.layout.y; }}><PackingList trip={trip} /></View>
+      <View onLayout={(e) => setPackY(e.nativeEvent.layout.y)}><PackingList trip={trip} /></View>
       <TalkLine note={t('td.talk.tonight', { agent: trip.agent.name })} agentInitial={trip.agent.initial} about={trip.city} />
       {pk ? <PickupSheet trip={trip} open={sheet} onClose={() => setSheet(false)} /> : null}
     </>

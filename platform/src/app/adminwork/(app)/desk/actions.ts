@@ -262,7 +262,8 @@ export async function moderateAction(_: ActionState, fd: FormData): Promise<Acti
   try {
     const u = await requirePerm("desk.moderate");
     const decision = z.enum(["approved", "rejected", "removed", "dismissed"]).parse(str(fd, "decision"));
-    await decideModeration(u, uuid(fd, "id"), { decision, reason: str(fd, "reason") || null });
+    const source = str(fd, "source") === "post" ? "post" : str(fd, "source") === "report" ? "report" : "desk";
+    await decideModeration(u, uuid(fd, "id"), { decision, reason: str(fd, "reason") || null }, source);
     const author = str(fd, "blockAuthor");
     if (str(fd, "block") === "yes" && isUuid(author)) await blockTraveller(u, author, str(fd, "reason") || "Blocked from moderation");
     return done(decision === "approved" ? "Tip approved" : decision === "dismissed" ? "Report dismissed" : "Done");

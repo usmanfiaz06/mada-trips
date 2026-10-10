@@ -44,7 +44,7 @@ export default function CircleChat() {
   const reads = msgs.data?.reads ?? [];
   const holdTop = useRef<boolean | null>(null);
 
-  const people = useMemo(() => new Map<string, PersonRef>((d?.members ?? []).map((m) => [m.id, m])), [d]);
+  const people = useMemo(() => new Map<string, PersonRef>([...(d?.invited ?? []).map((i) => [i.person.id, i.person] as const), ...(d?.members ?? []).map((m) => [m.id, m] as const)]), [d]);
   const dest = d ? circleDest({ dest: d.circle.dest, name: d.circle.name, trip: d.circle.trip }) : null;
   const others = (d?.members ?? []).filter((m) => m.id !== me);
   const invited = d?.invited ?? [];
@@ -54,6 +54,8 @@ export default function CircleChat() {
   // Read up to now while the chat is open, and on every new message.
   const read = useAct(() => circlesApi.update(id, { read: true }), () => [ck.list]);
   const count = items.length;
+  const joins = items.filter((m) => m.kind === 'sys' && ['joined', 'joinedByLink', 'left', 'removed', 'admin', 'renamed'].includes(m.sys!.event)).length;
+  useEffect(() => { if (joins) void circle.refetch(); }, [joins]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (d && count) read.mutate(undefined); }, [d?.circle.id, count]); // eslint-disable-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { msgs.refetch(); }, [])); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

@@ -1,0 +1,18 @@
+#ISO	ISO3	ISO-Numeric	fips	Country	Capital	Area(in sq km)	Population	Continent	tld	CurrencyCode	CurrencyName	Phone	Postal Code Format	Postal Code Regex	Languages	geonameid	neighbours	EquivalentFipsCode
+AE	ARE	784	AE	United Arab Emirates	Abu Dhabi	82880	9630959	AS	.ae	AED	Dirham	971	##### #####	^\d{5}-\d{5}$	ar-AE,fa,en,hi,ur	290557	SA,OM	
+AU	AUS	036	AS	Australia	Canberra	7686850	24992369	OC	.au	AUD	Dollar	61	####	^(\d{4})$	en-AU	2077456		
+AZ	AZE	031	AJ	Azerbaijan	Baku	86600	10224900	AS	.az	AZN	Manat	994	AZ ####	^(?:AZ )*(\d{4})$	az,ru,hy	587116	GE,IR,AM,TR,RU	
+BR	BRA	076	BR	Brazil	Brasilia	8511965	209469333	SA	.br	BRL	Real	55	#####-###	^\d{5}-\d{3}$	pt-BR,es,en,fr	3469034	SR,PE,BO,UY,GY,PY,GF,VE,CO,AR	
+CA	CAN	124	CA	Canada	Ottawa	9984670	37058856	NA	.ca	CAD	Dollar	1	@#@ #@#	^([ABCEGHJKLMNPRSTVXY]\d[ABCEGHJKLMNPRSTVWXYZ]) ?(\d[ABCEGHJKLMNPRSTVWXYZ]\d)$ 	en-CA,fr-CA,iu	6251999	US	
+CH	CHE	756	SZ	Switzerland	Bern	41290	8516543	EU	.ch	CHF	Franc	41	####	^(\d{4})$	de-CH,fr-CH,it-CH,rm	2658434	DE,IT,LI,FR,AT	
+EG	EGY	818	EG	Egypt	Cairo	1001450	98423595	AF	.eg	EGP	Pound	20	#####	^(\d{5})$	ar-EG,en,fr	357994	LY,SD,IL,PS	
+FR	FRA	250	FR	France	Paris	547030	66987244	EU	.fr	EUR	Euro	33	#####	^(\d{5})$	fr-FR,frp,br,co,ca,eu,oc	3017382	CH,DE,BE,LU,IT,AD,MC,ES	
+GB	GBR	826	UK	United Kingdom	London	244820	66488991	EU	.uk	GBP	Pound	44	@# #@@|@## #@@|@@# #@@|@@## #@@|@#@ #@@|@@#@ #@@|GIR0AA	^([Gg][Ii][Rr]\s?0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([A-Za-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z]))))\s?[0-9][A-Za-z]{2})$	en-GB,cy-GB,gd	2635167	IE	
+GE	GEO	268	GG	Georgia	Tbilisi	69700	3704500	AS	.ge	GEL	Lari	995	####	^(\d{4})$	ka,ru,hy,az	614540	AM,AZ,TR,RU	
+IL	ISR	376	IS	Israel	Jerusalem	20770	8883800	AS	.il	ILS	Shekel	972	#######	^(\d{7}|\d{5})$	he,ar-IL,en-IL,	294640	SY,JO,LB,EG,PS	
+IT	ITA	380	IT	Italy	Rome	301230	60431283	EU	.it	EUR	Euro	39	#####	^(\d{5})$	it-IT,de-IT,fr-IT,sc,ca,co,sl	3175395	CH,VA,SI,SM,FR,AT	
+JP	JPN	392	JA	Japan	Tokyo	377835	126529100	AS	.jp	JPY	Yen	81	###-####	^\d{3}-\d{4}$	ja	1861060		
+MV	MDV	462	MV	Maldives	Male	300	515696	AS	.mv	MVR	Rufiyaa	960	#####	^(\d{5})$	dv,en	1282028		
+SA	SAU	682	SA	Saudi Arabia	Riyadh	1960582	33699947	AS	.sa	SAR	Rial	966	#####	^(\d{5})$	ar-SA	102358	QA,OM,IQ,YE,JO,AE,KW	
+TR	TUR	792	TU	Turkey	Ankara	780580	82319724	AS	.tr	TRY	Lira	90	#####	^(\d{5})$	tr-TR,ku,diq,az,av	298795	SY,GE,IQ,IR,GR,AM,AZ,BG	
+US	USA	840	US	United States	Washington	9629091	327167434	NA	.us	USD	Dollar	1	#####-####	^\d{5}(-\d{4})?$	en-US,es-US,haw,fr	6252001	CA,MX,CU	

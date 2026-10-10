@@ -39,6 +39,7 @@ const PATHS = {
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
   camera: <><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.5" /></>,
   phone: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z" />,
+  chat: <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H10l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />,
   outbox: <><path d="M4 13v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6M4 13l2.5-6h11l2.5 6M4 13h5l1 2h4l1-2h5" /><path d="M12 4v6M9.5 6.5 12 4l2.5 2.5" /></>,
 };
 
@@ -866,7 +867,11 @@ export function ArtHourglass() {
 
 /* Two gears, the gold one turning back into step: something broke on our side, and it's being put right. */
 export function ArtGears() {
-  const teeth = (cx, cy, r, n) => Array.from({ length: n }, (_, i) => { const a = (i * 2 * Math.PI) / n; return <rect key={i} x={cx - 3.5} y={cy - r - 6} width="7" height="9" rx="2" transform={`rotate(${(a * 180) / Math.PI} ${cx} ${cy})`} />; });
+  /* Teeth as plain shapes (no SVG transforms, so the CSS rotation below has nothing to fight with). */
+  const teeth = (cx, cy, r, n) => Array.from({ length: n }, (_, i) => {
+    const a = (i * 2 * Math.PI) / n; const w = 0.2; const pt = (rr, aa) => `${(cx + Math.sin(aa) * rr).toFixed(1)} ${(cy - Math.cos(aa) * rr).toFixed(1)}`;
+    return <path key={i} d={`M${pt(r - 2, a - w)} L${pt(r + 6, a - w * 0.7)} L${pt(r + 6, a + w * 0.7)} L${pt(r - 2, a + w)} Z`} strokeLinejoin="round" />;
+  });
   return (
     <Art className="es-gears">
       <g className="fs-gear-a" fill="#fffdf9" stroke="#1e352d" strokeWidth="2">{teeth(64, 64, 24, 10)}<circle cx="64" cy="64" r="25" /><circle cx="64" cy="64" r="7" fill="#1e352d" /></g>
@@ -900,7 +905,6 @@ export function ArtSwitch({ icon = 'camera' }) {
     <Art className="es-switch">
       <circle cx="80" cy="36" r="17" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
       <g transform="translate(68 24)"><g transform="scale(1)" fill="none" stroke="#1e352d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{PATHS[icon]}</g></g>
-      <path d="M93 49 l8 8" stroke="#b98f4a" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 4" />
       <rect x="52" y="70" width="56" height="30" rx="15" fill="#e9e2d8" stroke="#1e352d" strokeWidth="2" />
       <rect className="fs-track" x="52" y="70" width="56" height="30" rx="15" fill="#d9b77a" />
       <circle className="fs-knob" cx="67" cy="85" r="11" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
@@ -918,7 +922,7 @@ export function ArtPriceHold() {
       <text x="74" y="80" fontSize="10" fontWeight="700" fill="#1e352d" fontFamily="Inter Tight, sans-serif">SAR</text>
       <circle cx="120" cy="86" r="16" fill="#1e352d" />
       <circle cx="120" cy="86" r="11" fill="none" stroke="rgba(233,226,216,.25)" strokeWidth="3" />
-      <circle className="fs-ring" cx="120" cy="86" r="11" fill="none" stroke="#d9b77a" strokeWidth="3" strokeLinecap="round" pathLength="100" strokeDasharray="100" transform="rotate(-90 120 86)" />
+      <path className="fs-ring" d="M120 75 a11 11 0 1 1 -0.01 0" fill="none" stroke="#d9b77a" strokeWidth="3" strokeLinecap="round" pathLength="100" strokeDasharray="100" />
       <path d="M120 80 v6 l4 2" stroke="#fffdf9" strokeWidth="1.8" strokeLinecap="round" fill="none" />
     </Art>
   );
@@ -1021,6 +1025,7 @@ function Works({ items }) {
   if (!items || !items.length) return null;
   return (
     <div className="fs-works" role="list" aria-label="Still works">
+      <span className="fs-works-label" aria-hidden="true">Still works</span>
       {items.map((t) => <span key={t} className="fs-work" role="listitem"><Icon name="check" size={14} width={2.4} color="#2f7a4b" />{t}</span>)}
     </div>
   );
@@ -1060,7 +1065,7 @@ export function FullScreenState({ art, eyebrow, title, body, works, list, primar
 /* A small pill in the status-bar strip: never over the back button, never over a banner. Tap for the Outbox. */
 export function NetPill({ mode, count, onClick, label }) {
   const text = label || (mode === 'held' ? `${count} didn’t send · open the Outbox` : mode === 'offline' ? (count ? `Offline · ${count} waiting to send` : 'Offline · your trips are on this phone')
-    : mode === 'down' ? (count ? `Can’t reach Mada · ${count} waiting` : 'Can’t reach Mada · showing what’s saved')
+    : mode === 'down' ? (count ? `Can’t reach Mada · ${count} waiting` : 'Can’t reach Mada right now')
     : mode === 'weak' ? 'Weak connection · loading slowly'
     : mode === 'sending' ? `Sending ${count} ${count === 1 ? 'thing' : 'things'}…` : '');
   return (
@@ -1073,7 +1078,7 @@ export function NetPill({ mode, count, onClick, label }) {
 }
 
 const OUTBOX_STATE = { queued: 'Queued', sending: 'Sending', failed: 'Didn’t send' };
-const OUTBOX_ICON = { message: 'mic', request: 'doc', choice: 'flight', upload: 'up' };
+const OUTBOX_ICON = { message: 'chat', request: 'doc', choice: 'flight', upload: 'up' };
 
 /* Everything waiting to reach Mada, one row each: Queued, Sending, or Didn't send with Send again and Discard. */
 export function OutboxSheet({ onClose }) {
@@ -1168,11 +1173,17 @@ export function PermissionDenied({ kind = 'camera', onManual, manualLabel, onClo
 const TONES = [['#1e352d', '#2a4a40'], ['#7d5d27', '#b98f4a'], ['#2a4a40', '#4d5c55'], ['#b98f4a', '#d9b77a'], ['#142720', '#2a4a40']];
 const initialsOf = (label) => String(label || 'Mada').replace(/[^A-Za-zÀ-ž\s-]/g, ' ').trim().split(/[\s_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'M';
 /* A tasteful stand-in: a tone picked from the name, the initials in the display serif, the sun's rays faintly. */
-export function placeholderSrc(label) {
+export function placeholderSrc(label, small) {
   const k = [...String(label || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length;
   const [a, b] = TONES[k];
-  const rays = Array.from({ length: 9 }, (_, i) => { const t = Math.PI + (i * Math.PI) / 8; return `<line x1="${200 + Math.cos(t) * 150}" y1="${300 + Math.sin(t) * 150}" x2="${200 + Math.cos(t) * 230}" y2="${300 + Math.sin(t) * 230}"/>`; }).join('');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><g stroke="#fffdf9" stroke-opacity=".09" stroke-width="10" stroke-linecap="round">${rays}</g><text x="200" y="168" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-size="96" fill="#fffdf9" fill-opacity=".86">${initialsOf(label)}</text></svg>`;
+  const ini = initialsOf(label);
+  /* Large photos usually carry their own words on top, so the initials sit in a small medallion up top and the
+     sun's rays rise from the bottom edge. Thumbnails get the initials large and centred. */
+  const rays = Array.from({ length: 9 }, (_, i) => { const t = Math.PI + (i * Math.PI) / 8; return `<line x1="${200 + Math.cos(t) * 120}" y1="${330 + Math.sin(t) * 120}" x2="${200 + Math.cos(t) * 210}" y2="${330 + Math.sin(t) * 210}"/>`; }).join('');
+  const mark = small
+    ? `<text x="200" y="182" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-size="120" fill="#fffdf9" fill-opacity=".9">${ini}</text>`
+    : `<circle cx="200" cy="92" r="34" fill="none" stroke="#fffdf9" stroke-opacity=".5" stroke-width="2"/><text x="200" y="105" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-size="36" fill="#fffdf9" fill-opacity=".85">${ini}</text>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><g stroke="#fffdf9" stroke-opacity=".08" stroke-width="12" stroke-linecap="round">${small ? '' : rays}</g>${mark}</svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
 const labelFor = (img) => {
@@ -1183,9 +1194,9 @@ const labelFor = (img) => {
 };
 
 /* An <img> that falls back to the placeholder by itself. */
-export function SafeImg({ src, alt = '', label, ...rest }) {
+export function SafeImg({ src, alt = '', label, small, ...rest }) {
   const [bad, setBad] = useState(false);
-  return <img {...rest} src={bad ? placeholderSrc(label || alt) : src} alt={alt} data-fallback={bad ? '1' : undefined} onError={() => setBad(true)} />;
+  return <img {...rest} src={bad ? placeholderSrc(label || alt, small) : src} alt={alt} data-fallback={bad ? '1' : undefined} onError={() => setBad(true)} />;
 }
 
 /* Every photo in the phone gets the same fallback when it can't load. With `off`, photos are made to miss
@@ -1199,7 +1210,7 @@ export function useImageFallback(off) {
       if (!img || img.tagName !== 'IMG' || img.dataset.fallback || /^data:/.test(img.getAttribute('src') || '')) return;
       if (/airlines\//.test(img.dataset.orig || img.getAttribute('src') || '')) return; /* the airline mark has its own fallback */
       img.dataset.fallback = '1';
-      img.src = placeholderSrc(labelFor(img));
+      img.src = placeholderSrc(labelFor(img), (img.clientWidth || img.parentElement?.clientWidth || 0) < 140);
       img.classList.add('img-fallback');
     };
     root.addEventListener('error', onErr, true);
@@ -1258,7 +1269,7 @@ export function NotFound({ params = {} }) {
   return (
     <div className="screen push">
       <TopBar onBack={pop} />
-      <div className="scroll no-dock" style={{ justifyContent: 'center' }}>
+      <div className="scroll no-dock" style={{ paddingTop: 8 }}>
         <ErrorState className="middle" tall art={<ArtTorn />}
           title="This link doesn’t go anywhere now."
           body={`The ${what === 'post' ? 'tip' : what} it pointed to was removed, or it was shared with someone else. Nothing of yours has changed.`}

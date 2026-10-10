@@ -26,8 +26,9 @@ export default function Circles() {
   const startPost = (city: string) => { setOpens((n) => n + 1); setPosting(city); };
   const friends = useFriends();
   const requests = friends.data?.requests.length ?? 0;
-  const d = useDiscover(null);
-  const tripCity = d.data?.tripDates ? d.data.city : null;
+  const [city, setCity] = useState<string | null>(null);
+  const d = useDiscover(city);
+  const tripCity = d.data?.sheet.find((g) => g.title === 'trips')?.rows[0]?.city ?? null;
   const postCities = [...new Set([...(tripCity ? [tripCity] : []), posting ?? HOME_CITY, HOME_CITY, 'Istanbul'])].slice(0, 3);
   const { togglePost } = useSaveToggle();
 
@@ -46,7 +47,7 @@ export default function Circles() {
             )}
         </View>
         {view === 'discover'
-          ? <Discover onPost={startPost} onOpen={setOpen} />
+          ? <Discover picked={city} setPicked={setCity} onPost={startPost} onOpen={setOpen} />
           : <CirclesHome onDiscover={() => setView('discover')} onOpenPost={setOpen} />}
       </Scroll>
       <PostSheet key={`post-${opens}`} visible={!!posting} onClose={() => setPosting(null)} cities={postCities} initialCity={posting ?? HOME_CITY}

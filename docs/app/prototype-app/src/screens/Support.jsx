@@ -95,9 +95,16 @@ export function Support({ params = {} }) {
   const send = (text, key) => {
     if (!text.trim()) return;
     const k = key || supportIntent(text);
-    add({ from: 'me', text: text.trim(), queued: !!s.demo.offline, about, intent: k });
-    buzz(HAPTIC.tap);
-    if (!s.demo.offline) answer(k, text);
+    /* A message that didn't reach Mada stays in the thread, marked, with Send again on it. */
+    const failed = !s.demo.offline && (s.demo.sendFails || s.demo.serverDown);
+    add({ from: 'me', text: text.trim(), queued: !!s.demo.offline, failed, about, intent: k });
+    buzz(failed ? HAPTIC.soft : HAPTIC.tap);
+    if (!s.demo.offline && !failed) answer(k, text);
+  };
+  const sendAgain = (m) => {
+    if (s.demo.serverDown) { buzz(HAPTIC.soft); return; }
+    set((p) => ({ support: p.support.map((x) => (x.id === m.id ? { ...x, failed: false, sending: true } : x)) }));
+    later(() => { set((p) => ({ support: p.support.map((x) => (x.id === m.id ? { ...x, sending: false } : x)) })); answer(m.intent || supportIntent(m.text), m.text || ''); }, 900);
   };
 
   const pick = (m, [label, k]) => {
@@ -190,7 +197,9 @@ export function Support({ params = {} }) {
             {m.form === 'bag' && !m.filed && <BagForm onSend={(f) => fileBag(m, f)} onNone={() => { set((p) => ({ support: p.support.map((x) => (x.id === m.id ? { ...x, filed: true } : x)) })); add({ from: 'me', text: 'I don’t have a reference yet.' }); say({ text: 'That’s fine. Before you leave the airport, go to the baggage desk in arrivals and report it. They’ll give you a reference on a form. Send me a photo of it and I’ll take it from there.' }); }} />}
             {m.action && <button type="button" className="btn gold small" style={{ alignSelf: 'flex-start' }} onClick={() => push(m.action[1], m.action[2] || { from: 'support' })}>{m.action[0]}</button>}
             {m.urgent && <a className="btn primary small" style={{ alignSelf: 'flex-start' }} href={DESK_TEL}>Call the desk now</a>}
-            <span className="support-time">{time(m.at)}{m.from === 'me' ? (m.queued ? ' · sends when you’re online' : ' · read') : ''}</span>
+            {m.failed ? (
+              <span className="support-time msg-failed" role="status">{time(m.at)} · Didn’t send<button type="button" className="msg-again" onClick={() => { buzz(HAPTIC.tap); sendAgain(m); }}>Send again</button></span>
+            ) : <span className="support-time">{time(m.at)}{m.from === 'me' ? (m.sending ? ' · sending…' : m.queued ? ' · sends when you’re online' : ' · read') : ''}</span>}
           </div>
         ))}
         {typing && <div className="support-msg them"><span className="dots" style={{ color: '#7a857f' }} aria-label="Faisal is typing"><i /><i /><i /></span></div>}
