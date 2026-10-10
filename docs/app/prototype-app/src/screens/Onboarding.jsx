@@ -12,9 +12,11 @@ const DEMO_FIELDS = { given: 'OMAR', surname: 'ALHARBI', number: 'A08493141', na
 const BLANK_FIELDS = { given: '', surname: '', number: '', nationality: 'Saudi Arabia', dob: '', expiry: '' };
 const hidden = { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' };
 
-export default function Onboarding() {
-  const { s, set, toast } = useStore();
-  const [step, setStep] = useState(s.signinFrom ? 'signin' : 'welcome');
+/* Also used after sign-up as the "Add your passport" screen (params.later): same scan, then straight back. */
+export default function Onboarding({ params = {} }) {
+  const { s, set, toast, pop } = useStore();
+  const later = !!params.later;
+  const [step, setStep] = useState(later ? 'passport' : s.signinFrom ? 'signin' : 'welcome');
   const [history, setHistory] = useState([]);
   const [phone, setPhone] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -39,6 +41,7 @@ export default function Onboarding() {
 
   const goto = (next) => { setHistory((h) => [...h, step]); setStep(next); buzz(HAPTIC.tap); };
   const back = () => {
+    if (later && !history.length) { pop(); return; }
     if (!history.length && s.signinFrom) { set({ onboarded: true, guest: true, signinFrom: null }); return; }
     setHistory((h) => { const prev = h[h.length - 1]; if (prev) setStep(prev); return h.slice(0, -1); });
   };
@@ -100,9 +103,25 @@ export default function Onboarding() {
   };
 
   /* The new account is exactly what they gave us: the passport (or nothing yet), the phone, the sign-in. */
-  const finish = () => {
+  const [nick, setNick] = useState('');
+  const savePassportLater = () => {
     const cap = (w) => w.split(' ').map((x) => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
-    const saved = !passportLater && (fields.given || fields.surname);
+    const iso = (dmy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
+    const expISO = iso(fields.expiry);
+    const num = (fields.number || '').toUpperCase();
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    set((p) => ({
+      passportSaved: true,
+      user: { ...(p.user || {}), name: p.user?.name || cap((fields.given || '').split(' ')[0] || ''), full: [fields.given, fields.surname].filter(Boolean).map(cap).join(' '), passport: { born: iso(fields.dob)?.slice(0, 4) || '', number: num.length > 5 ? `${num.slice(0, 3)}\u2022\u2022\u2022${num.slice(-2)}` : num, expires: expISO ? `${MON[Number(expISO.slice(5, 7)) - 1]} ${expISO.slice(0, 4)}` : '', expiresISO: expISO, nationality: fields.nationality, dob: iso(fields.dob) } },
+    }));
+    buzz(HAPTIC.success);
+    pop();
+    toast('Passport saved. It fills in every booking from now on.');
+  };
+  const finish = (opts = {}) => {
+    if (later) return savePassportLater();
+    const cap = (w) => w.split(' ').map((x) => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
+    const saved = !opts.noPassport && !passportLater && (fields.given || fields.surname);
     const full = saved ? [fields.given, fields.surname].filter(Boolean).map(cap).join(' ') : '';
     const name = saved && fields.given ? cap(fields.given.split(' ')[0]) : '';
     const iso = (dmy) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dmy || ''); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
@@ -115,7 +134,7 @@ export default function Onboarding() {
       onboarded: true,
       guest: false,
       demoSeed: false,
-      user: saved ? { name, full, mrz: [('P<SAU' + `${fields.surname}<<${fields.given}`.toUpperCase().replace(/[^A-Z<]+/g, '<')).padEnd(44, '<').slice(0, 44), `${num.replace(/[^A-Z0-9\u2022]/g, '').padEnd(9, '<').slice(0, 9)}0SAU${(iso(fields.dob) || '0000-00-00').slice(2).replace(/-/g, '')}0<${(expISO || '0000-00-00').slice(2).replace(/-/g, '')}0<<<<<<<<<<<<<<00`], passport: { born: iso(fields.dob)?.slice(0, 4) || '', number: masked, expires: expISO ? `${MON[Number(expISO.slice(5, 7)) - 1]} ${expISO.slice(0, 4)}` : '', expiresISO: expISO, nationality: fields.nationality, dob: iso(fields.dob) } } : { name: '', full: '' },
+      user: saved ? { name, full, mrz: [('P<SAU' + `${fields.surname}<<${fields.given}`.toUpperCase().replace(/[^A-Z<]+/g, '<')).padEnd(44, '<').slice(0, 44), `${num.replace(/[^A-Z0-9\u2022]/g, '').padEnd(9, '<').slice(0, 9)}0SAU${(iso(fields.dob) || '0000-00-00').slice(2).replace(/-/g, '')}0<${(expISO || '0000-00-00').slice(2).replace(/-/g, '')}0<<<<<<<<<<<<<<00`], passport: { born: iso(fields.dob)?.slice(0, 4) || '', number: masked, expires: expISO ? `${MON[Number(expISO.slice(5, 7)) - 1]} ${expISO.slice(0, 4)}` : '', expiresISO: expISO, nationality: fields.nationality, dob: iso(fields.dob) } } : { name: nick.trim(), full: '' },
       household: ['omar', ...household],
       passportSaved: !!saved,
       account: { ...(s.account || {}), signedOut: false, ...(phoneOk ? { phone: { digits, source: 'signup', at: Date.now() } } : {}), methods: { apple: social === 'apple', google: social === 'google', phone: phoneOk }, ...(social === 'apple' ? { email: hideEmail ? { address: `${Array.from({ length: 10 }, () => 'abcdefghjkmnpqrstuvwxyz23456789'[Math.floor(Math.random() * 31)]).join('')}@privaterelay.appleid.com`, relay: true, source: 'apple', at: null } : null } : {}) },
@@ -145,7 +164,8 @@ export default function Onboarding() {
       buzz(HAPTIC.success);
       /* 50 000 4127 is the demo account that already exists: bring everything back instead of starting over. */
       if (digits.endsWith('4127') && !social) { goto('welcomeBack'); return; }
-      goto('passport'); return;
+      /* Straight in: passport, family and permissions are asked later, when they're needed. */
+      goto('name'); return;
     }
     buzz(HAPTIC.soft);
     setTries((n) => n + 1);
@@ -218,11 +238,32 @@ export default function Onboarding() {
                   ))}
                 </div>
               ) : <p className="body">Google shares your name and email address. Nothing else.</p>}
-              <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
+              <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); setNick('Omar'); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
               <button type="button" className="btn ghost block" onClick={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>Cancel</button>
             </>)}
           </Sheet>
         )}
+      </div>
+    ),
+
+    name: (
+      <div className="screen">
+        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => finish({ noPassport: true })}>Skip</button>} />
+        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); finish({ noPassport: true }); }}>
+          <h1 className="h1">What should we call you?</h1>
+          <p className="body">Just a first name. Faisal uses it when he messages you. Names on tickets come from passports, later, when you book.</p>
+          <div className="field">
+            <label htmlFor="nick">First name</label>
+            <input id="nick" className="input" autoComplete="given-name" autoCapitalize="words" maxLength={30} value={nick} onChange={(e) => setNick(e.target.value)} placeholder={social ? 'Omar' : ''} autoFocus />
+          </div>
+          <div className="card well" style={{ gap: 8 }}>
+            <span className="h3" style={{ fontSize: 15 }}>That’s all for now.</span>
+            {[['visa', 'Your passport, when you first book'], ['circles', 'Your family, whenever you like'], ['bell', 'Alerts, once you have a flight to watch']].map(([ic, t]) => <span key={t} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t}</span>)}
+          </div>
+          <div className="act">
+            <button type="submit" className="btn primary block">{nick.trim() ? `Let’s go, ${nick.trim().split(' ')[0]}` : 'Let’s go'}</button>
+          </div>
+        </form>
       </div>
     ),
 
@@ -293,7 +334,7 @@ export default function Onboarding() {
 
     passport: (
       <div className="screen">
-        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => { setPassportLater(true); goto('household'); }}>Later</button>} />
+        <TopBar onBack={back} right={<button type="button" className="link" style={{ fontSize: 15, fontWeight: 600, padding: '10px 4px' }} onClick={() => { if (later) pop(); else { setPassportLater(true); goto('household'); } }}>Later</button>} />
         <div className="scroll" style={{ padding: '8px 24px 0', gap: 16 }}>
           <div className="pp-stage" aria-hidden="true">
             <div className="pp-page">
@@ -342,7 +383,7 @@ export default function Onboarding() {
             <h2 className="h2">No camera, no problem.</h2>
             <p className="body">Enter the details by hand now. You can allow the camera later in Settings.</p>
             <button type="button" className="btn primary block" onClick={() => { setSheet(null); byHand(); goto('confirm'); }}>Enter it by hand</button>
-            <button type="button" className="btn ghost block" onClick={() => { setSheet(null); setPassportLater(true); goto('household'); }}>Do it later</button>
+            <button type="button" className="btn ghost block" onClick={() => { setSheet(null); if (later) pop(); else { setPassportLater(true); goto('household'); } }}>Do it later</button>
           </Sheet>
         )}
       </div>
@@ -444,7 +485,7 @@ export default function Onboarding() {
           )}
         </div>
         <div className="act">
-          <button type="button" className="btn primary block" disabled={missing.length > 0 || badDate} onClick={() => { buzz(HAPTIC.success); goto('household'); }}>
+          <button type="button" className="btn primary block" disabled={missing.length > 0 || badDate} onClick={() => { buzz(HAPTIC.success); if (later) finish(); else goto('household'); }}>
             {missing.length ? `Fill in ${missing.length} more` : manual ? 'Save passport' : 'Yes, save it'}
           </button>
         </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, PEOPLE, FLIGHTS, HOTELS, STAY_NIGHTS, fmt, isoDate, addDays, daysBetween, dayLabel, shortDay, rangeLabel, TRIP_YEAR, MONTHS, makeFlight, makePickup, seatsFor, seatText, bundleQuote, stayOf, NUM_WORD } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, SlideToConfirm, Steps, Toggle, useTicker, AddPersonSheet, InviteSheet, PayMark, cardBrand, luhn, BRAND_NAME } from '../ui.jsx';
+import { passportStatus } from './Account.jsx';
 import { PLANS } from './Plan.jsx';
 import { MEALS, ageBand } from './Account.jsx';
 
@@ -214,6 +215,21 @@ export default function Pay({ params }) {
               {codeErr && <span className="err" role="alert">{codeErr}</span>}
             </div>
           ) : <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 14 }} onClick={() => setPromoOpen(true)}>Have a promo code?</button>)}
+          {order.people && (params.kind === 'trip' || params.kind === 'package') && (() => {
+            const missing = travellers.filter((id) => passportStatus(s, id).key === 'none');
+            if (!missing.length) return null;
+            const names = missing.map((id) => (id === 'omar' ? 'you' : PEOPLE[id]?.name || 'someone'));
+            return (
+              <div className="notice" style={{ alignItems: 'flex-start' }}>
+                <Icon name="visa" color="#7d5d27" />
+                <span className="grow col" style={{ gap: 4 }}>
+                  <span className="h3" style={{ fontSize: 15 }}>Passports for {names.join(', ').replace(/, ([^,]*)$/, ' and $1')}</span>
+                  <span className="small">Book now and add them after. Faisal holds the seats and issues the tickets once they’re in, any time in the next 48 hours.</span>
+                  <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 14 }} onClick={() => (missing[0] === 'omar' ? push('passportSetup', { later: true }) : push('householdPerson', { id: missing[0] }))}>Scan {missing[0] === 'omar' ? 'yours' : names[0] + '’s'} now</button>
+                </span>
+              </div>
+            );
+          })()}
           <div className="divider" />
           <div className="col" style={{ gap: 2 }}>
             <span className="num" style={{ fontSize: 40, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.05 }}>SAR {fmt(total)}</span>
@@ -630,6 +646,16 @@ export function Waiting({ params }) {
           {params.creditUsed > 0 && <span className="pill" style={{ background: '#fffdf9' }}>SAR {fmt(params.creditUsed)} from credit</span>}
           <span className="pill" style={{ background: '#fffdf9' }}>VAT invoice in Trips</span>
           {params.kind !== 'stay' && <span className="pill" style={{ background: '#fffdf9' }}>We're watching the flight</span>}
+        </div>
+        {s.notifications == null && params.kind !== 'stay' && (
+          <div className="card rise d3" style={{ gap: 10 }}>
+            <span className="h3" style={{ fontSize: 15 }}>Want gate changes on this phone?</span>
+            <span className="small">Only things you need to act on: gate changes, delays, the moment your driver arrives. Never offers.</span>
+            <div className="row"><button type="button" className="btn primary small" onClick={() => { set({ notifications: true }); buzz(HAPTIC.success); }}>Allow alerts</button><button type="button" className="btn ghost small" onClick={() => set({ notifications: false })}>Not now</button></div>
+          </div>
+        )}
+        {s.notifications === true && <span className="small rise" style={{ color: '#2f7a4b', fontWeight: 600 }}>Alerts are on for this trip.</span>}
+        <div style={{ display: 'none' }}>
         </div>
       </div>
       <div className="act">

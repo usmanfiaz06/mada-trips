@@ -13,16 +13,24 @@ The flows the clickable prototype implements end to end, including every edge ca
 
 ## 1. First open and onboarding
 
+People get into the app first. The passport, the family and permissions are asked for later, at the moment they're needed.
+
 | Step | Happy path | Edge cases |
 |---|---|---|
-| Welcome | "We'll take it from here." → **Start** | **Just track a flight** opens a guest mode without an account. The traveller is asked to sign in only when they try to book. |
-| Sign in | Apple, Google, or phone number | — |
-| Phone number | +966 and 9 digits starting with 5 | A short, long or wrong-prefix number gets an inline explanation, and the button stays off until the number is valid. **Offline:** the code is not sent, and the screen says so. |
-| Code | 6 digits (demo code `123456`) | **Wrong code:** "2 tries left". **After 3 wrong codes:** locked, "Get a new code". **Resend:** available after a 30 s countdown. |
-| Passport | **Scan** → check the fields → save | **Camera refused:** offer to enter it by hand, or allow later. **Scan can't read it** (demo switch): tips, then retry or enter by hand. **Wrong field:** every field can be edited before saving. **Expired passport:** a warning, and it is saved but marked as not usable for travel. **Later:** skip, and Today shows a reminder. |
-| Household | Add spouse, children, helper | **Helper** asks about the iqama and the exit/re-entry visa. **Just me for now:** skip. |
-| Alerts | Pre-prompt, then allow | **Not now:** the app works fully and shows a reminder after the first booking. |
-| Location | "Know when to leave" | **Not now:** leave times use the airport only, with no traffic. |
+| Welcome | "We'll take it from here." → **Start** | **Just track a flight** opens a guest mode without an account. The traveller is asked to sign in only when they try to book, and lands back where they were. **Invite link:** the invite preview comes first. |
+| Sign in | Apple, Google, or phone number | **Apple:** share or hide the email. **Cancelled:** nothing shared. **Apple or Google:** a mobile number is still needed for alerts. |
+| Phone number | +966 and 9 digits starting with 5 | A short, long or wrong-prefix number gets an inline explanation. **Offline:** the code is not sent. **Existing account** (demo: 50 000 4127): "Welcome back", everything restored. |
+| Code | 6 digits (demo code `123456`) | **Wrong code:** "2 tries left". **After 3 wrong codes:** locked. **Resend** after 30 s. |
+| Name | "What should we call you?" → straight into Today | **Skip:** fine, no name. Apple and Google prefill it. |
+
+**Asked later, in context**
+
+| What | When | Where |
+|---|---|---|
+| Passport | Today shows "Add your passport". At payment, missing passports show a gentle note: book now, add them within 48 hours. | The same scan screen (photo reading, demo passport, by hand, expired warning). |
+| Family | Today's "Add your family", or "Someone else" when choosing who's going. | Account → Household. |
+| Alerts | After the first booking ("Want gate changes on this phone?") or when tracking a flight. | — |
+| Location | On the first travel day, for leave times. | — |
 
 ## 2. Booking a flight (and the whole trip)
 

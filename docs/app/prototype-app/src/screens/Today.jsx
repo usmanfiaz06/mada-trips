@@ -188,7 +188,7 @@ function Nothing() {
       <RequestsCard />
       {(s.trackedFlights || []).length > 0 && <TrackedFlights />}
       {!s.passportSaved && (
-        <button type="button" className="notice rise" style={{ border: 0, textAlign: 'left' }} onClick={() => go('wallet')}>
+        <button type="button" className="notice rise" style={{ border: 0, textAlign: 'left' }} onClick={() => push('passportSetup', { later: true })}>
           <Icon name="visa" color="#7d5d27" />
           <span className="grow"><span className="h3">Add your passport</span><span className="small">One scan and we'll fill it in on every booking.</span></span>
           <Icon name="chevron" />

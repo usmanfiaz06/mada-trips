@@ -37,17 +37,26 @@ try {
   await shot('otp-wrong');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(500);
-  step('onboarding: passport scan');
-  await page.waitForTimeout(2600);
+  step('onboarding: just a name, then straight in');
+  await shot('name-step');
+  await phone.locator('#nick').fill('Omar');
+  await click('Let’s go, Omar', { wait: 600 });
+  await shot('today-first-open');
+
+  step('later: passport from Today');
+  await click('Add your passport', { exact: false, wait: 2600 });
   await shot('passport-intro');
   await click('Scan passport');
   await click('Allow', { exact: true });
   await shot('passport-camera');
   await click('Use the demo passport', { wait: 2800 });
   await shot('passport-confirm');
-  await click('Yes, save it');
+  await click('Yes, save it', { wait: 600 });
+
+  step('later: family from Today');
+  await click('Add your family', { exact: false, wait: 500 });
   /* A new account never offers someone else's family: they add their own, by name. */
-  if (await phone.getByText(/Hessa|Lina/).count()) throw new Error('household step offers strangers');
+  if (await phone.getByText(/Hessa|Lina/).count()) throw new Error('household offers strangers');
   await shot('household-empty');
   for (const who of ['Hessa', 'Sara', 'Ahmed']) {
     await click('Add someone');
@@ -56,9 +65,7 @@ try {
     await click('Add ' + who, { wait: 450 });
   }
   await shot('household');
-  await click('Continue with 4 people');
-  await click('Allow alerts');
-  await click('Allow', { exact: true, wait: 800 });
+  await click('Back', { wait: 500 });
   await shot('today-nothing');
 
   step('book: flights via the composer');

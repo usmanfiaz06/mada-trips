@@ -93,8 +93,7 @@ try {
   await click('Text me a code');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(600);
-  await click('Later', { wait: 400 });
-  await click('Skip', { wait: 400 }).catch(() => {});
+  await click('Skip', { wait: 600 });
   await shot('invite-after-signup-step');
   await page.evaluate(() => window.__madaPush('join', { code: 'old-4q1' }));
   await page.waitForTimeout(400);
@@ -112,13 +111,10 @@ try {
   await click('Text me a code');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(700);
-  await click('Later', { wait: 500 });
-  await phone.getByText('Add your family.').first().waitFor();
-  await none(/Hessa|Sara|Ahmed|Lina/, 'household step');
+  await phone.locator('#nick').fill('Nadia');
+  await click('Let\u2019s go, Nadia', { wait: 700 });
+  await none(/Hessa|Sara|Ahmed|Lina/, 'first Today');
   await shot('new-household');
-  await click('Just me for now');
-  await click('Allow alerts');
-  await click('Allow', { exact: true, wait: 800 });
   await none(/Baku|four of you|Abdullah|places saved/, 'today');
   await shot('new-today');
   const st0 = await state();
@@ -189,10 +185,7 @@ try {
   await click('Text me a code');
   await phone.locator('#otp').fill('123456');
   await page.waitForTimeout(700);
-  await click('Later', { wait: 500 });
-  await click('Just me for now');
-  await click('Allow alerts');
-  await click('Allow', { exact: true, wait: 900 });
+  await click('Skip', { wait: 900 });
   await phone.getByText('EK818', { exact: false }).first().waitFor();
   await shot('tracked-after-signup');
   await tab('Trips');

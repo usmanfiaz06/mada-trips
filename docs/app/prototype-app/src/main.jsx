@@ -18,7 +18,7 @@ import { SCREENS as TRIP_SCREENS } from './screens/TripManage.jsx';
 import { SCREENS as SUPPORT_SCREENS } from './screens/Support.jsx';
 
 const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
-const STACK = { join: Join, saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
+const STACK = { passportSetup: Onboarding, join: Join, saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
 
 /* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
 function useBackgroundProgress() {
