@@ -51,7 +51,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
                         <span className="relative"><Avatar name={a.displayName} size={40} /><span className={cx("absolute -bottom-0.5 -end-0.5 size-3.5 rounded-full ring-2 ring-surface", !shift ? "bg-ink-4" : a.status === "online" ? "bg-ok" : a.status === "away" ? "bg-warn" : "bg-ink-4")} /></span>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2"><span className="text-[15px] text-ink">{a.displayName}</span>{a.displayNameAr && <span className="text-[13px] text-ink-3">{a.displayNameAr}</span>}{!a.active && <Badge>{t("Inactive")}</Badge>}</div>
-                          <div className="text-[12.5px] text-ink-3">{opsName(a.opsUserId)} · {a.languages.map((l) => l.toUpperCase()).join(" · ")} · {t("{n} travellers", { n: b.travellers.get(a.id) ?? 0 })}</div>
+                          <div className="text-[12.5px] text-ink-3">{opsName(a.opsUserId)} · {a.languages.map((l) => l.toUpperCase()).join(" · ")} · {((b.travellers.get(a.id) ?? 0) === 1 ? t("1 traveller") : t("{n} travellers", { n: b.travellers.get(a.id) ?? 0 }))}</div>
                         </div>
                         <div className="text-end text-[12.5px]">
                           <div className={shift ? "text-ok" : "text-ink-3"}>{shift ? (cover ? t("Covering for {name}", { name: name(cover.coveringForId) }) : t("On shift")) : t("Off shift")}</div>

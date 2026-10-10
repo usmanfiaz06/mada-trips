@@ -38,7 +38,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
   const around = useAround();
   const list = (circles.data?.circles ?? []).filter((c) => !c.dm);
   const incoming = circles.data?.incoming ?? [];
-  const fr = friends.data?.friends ?? [];
+  const fr = useMemo(() => (friends.data?.friends ?? []).filter((f) => f.tag !== 'family'), [friends.data]);
   const requests = friends.data?.requests ?? [];
   const posts = (known.data?.posts ?? []);
   const savedList = saved.data?.saved ?? [];
@@ -58,7 +58,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
       {fr.length > 0 && around.data ? <Around data={around.data} /> : null}
 
       {incoming.map((iv) => (
-        <Animated.View key={iv.inviteId} entering={rise(0)} style={st.incoming}>
+        <View key={iv.inviteId} style={st.incoming}>
           <Row gap={12}>
             <Face p={iv.from} size={44} />
             <View style={{ flex: 1 }}>
@@ -71,7 +71,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
               onPress={() => accept.mutate(iv.inviteId, { onSuccess: (r) => { buzz('success'); router.push(`/circle/${r.circleId}`); } })} />
             <Button size="small" block={false} variant="secondary" label={t('common.notNow')} onPress={() => decline.mutate(iv.inviteId, { onSuccess: () => toast(t('circles.incoming.declined', { name: iv.from.short })) })} />
           </Row>
-        </Animated.View>
+        </View>
       ))}
 
       <Head title={t('circles.yours')} right={list.length ? String(list.length) : undefined} />
@@ -199,7 +199,6 @@ function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: (
 
 /** Who's around: city only, the people you choose, off when you fly home. A friend who shared their city shows on top. */
 function Around({ data }: { data: AroundResponse }) {
-  const router = useRouter();
   const [sheet, setSheet] = useState<null | 'who' | 'person' | 'report'>(null);
   const [who, setWho] = useState<Audience>(data.audience);
   const [target, setTarget] = useState<PersonRef | null>(null);
@@ -215,7 +214,7 @@ function Around({ data }: { data: AroundResponse }) {
     ['family', t('circles.around.family'), data.options.family.length ? names(data.options.family).join(', ') : t('circles.around.nobody')],
   ];
   return (
-    <Animated.View entering={rise(0)} style={[st.focal, shadow('focal')]}>
+    <View style={[st.focal, shadow('focal')]}>
       {data.people.map((p) => (
         <View key={p.person.id} style={{ gap: 14 }}>
           <Row gap={12}>
@@ -262,8 +261,7 @@ function Around({ data }: { data: AroundResponse }) {
           <Button variant="ghost" label={t('circles.cancel')} onPress={() => setSheet(null)} />
         </>) : null}
       </Sheet>
-      {void router}
-    </Animated.View>
+    </View>
   );
 }
 

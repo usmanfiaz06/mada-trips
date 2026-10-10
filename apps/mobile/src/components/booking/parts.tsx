@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path, Rect, Text as SvgText } from 'react-native-svg';
@@ -45,9 +45,15 @@ export function Photo({ name, focal, style }: { name: string; focal?: string; st
 
 export const sar = (amount: number) => formatSar(amount);
 
+/**
+ * The prototype's rise, on native. On the web, Reanimated's entering animations inside a scroll view leave elements
+ * absolutely positioned (they overlap the next ones), so the web export shows them still.
+ */
+export const enter = (step = 0) => (Platform.OS === 'web' ? undefined : rise(step));
+
 /** The ticking clock for holds and waits. */
 export function useNow(ms = 1000) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const id = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(id); }, [ms]);
   return now;
 }
@@ -55,7 +61,7 @@ export function useNow(ms = 1000) {
 /** Mada shows its work: the sun thinks, the steps tick off one by one. */
 export function Working({ lines, step }: { lines: string[]; step: number }) {
   return (
-    <Animated.View entering={rise(0)} style={styles.working}>
+    <Animated.View entering={enter(0)} style={styles.working}>
       <View style={{ marginTop: 2 }}><Sun width={34} color={colors.goldDeep} /></View>
       <View style={{ flex: 1, gap: 14 }}>
         {lines.map((text, i) => (i > step ? null : (
@@ -76,8 +82,8 @@ export function useSequence(n: number, ms: number, run: string | null) {
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (run === null) return undefined;
-    setStep(0);
-    const ts = Array.from({ length: n }, (_, i) => setTimeout(() => setStep(i + 1), ms * (i + 1)));
+    const ts = [setTimeout(() => setStep(0), 0)];
+    ts.push(...Array.from({ length: n }, (_, i) => setTimeout(() => setStep(i + 1), ms * (i + 1))));
     return () => ts.forEach(clearTimeout);
   }, [run, n, ms]);
   return step;
@@ -91,7 +97,7 @@ export function ChipWrap({ children, style }: { children: ReactNode; style?: Sty
 /** One question, answered with a tap (EXPERIENCE.md §5). */
 export function Ask1({ q, options, onPick }: { q: string; options: [string, string][]; onPick: (v: string) => void }) {
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 12 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 12 }}>
       <T v="h2" accessibilityRole="header">{q}</T>
       <ChipWrap>{options.map(([label, v]) => <Chip key={label} label={label} background={colors.paper} onPress={() => onPick(v)} />)}</ChipWrap>
     </Animated.View>

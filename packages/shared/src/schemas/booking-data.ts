@@ -60,10 +60,10 @@ export const CARRIERS: Record<string, { name: string; brand: string; terminal: s
 /* ───────────── the catalogue flight supplier (mock GDS) ───────────── */
 
 /** best / lowest / earliest / bags are the labels the prototype uses on its cards. */
-export type OptionLabel = 'best' | 'lowest' | 'earliest' | 'fastest' | 'bags' | 'quiet' | 'water';
+export type OptionLabelKey = 'best' | 'lowest' | 'earliest' | 'fastest' | 'bags' | 'quiet' | 'water';
 
 export type CatalogueFlight = {
-  key: string; label: OptionLabel; carrier: string; number: string; backNumber: string;
+  key: string; label: OptionLabelKey; carrier: string; number: string; backNumber: string;
   dep: string; arr: string; durationMin: number; ppSar: number; reason: string; bags: string; change: string; refund: string;
   /** Arrival airport when it isn't the destination's main one (flynas to SAW). */
   to?: string;
@@ -122,7 +122,7 @@ export const SEAT_ROW = { economy: 14, premium: 8, business: 3, first: 3 } as co
 /* ───────────── the catalogue hotel supplier (mock RateHawk) ───────────── */
 
 export type CatalogueHotel = {
-  key: string; label: OptionLabel; name: string; area: string; nightSar: number; note: string; rating: number; address: string;
+  key: string; label: OptionLabelKey; name: string; area: string; nightSar: number; note: string; rating: number; address: string;
   /** Photo and focal point for the card. */
   photo: string; focal: string;
   /** What the card says for one or two people (prototype hotelNote). */

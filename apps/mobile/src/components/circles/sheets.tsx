@@ -17,9 +17,9 @@ import { circlesApi, ck, cityCover, photoSource, useAct, useMeId, whenLabel } fr
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { colors, ff, radii } from '@/theme';
+import { colors, ff } from '@/theme';
 import { ArtCompass } from './art';
-import { Face, Input, Row, SheetScroll, webNoOutline } from './ui';
+import { Face, Input, Row, SheetScroll } from './ui';
 
 /* Sheets shared by several Circles screens: invite links, reports, the city picker, posting a tip, one tip opened. */
 
@@ -112,7 +112,6 @@ export function PostSheet({ visible, onClose, cities, initialCity, onPosted }: {
   const [photo, setPhoto] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { if (visible) setCity(initialCity); }, [visible, initialCity]);
   const create = useAct(circlesApi.createPost, () => [ck.all]);
   const ok = place.trim().length > 2 && text.trim().length > 10 && (!photo || consent);
   const pick = async () => {
@@ -165,7 +164,6 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
   const me = useMeId();
   const [mode, setMode] = useState<'view' | 'delete' | 'report'>('view');
   const [thanked, setThanked] = useState(false);
-  useEffect(() => { setMode('view'); setThanked(false); }, [post?.id]);
   const del = useAct((id: string) => circlesApi.deletePost(id));
   const thank = useAct((id: string) => circlesApi.thank(id), () => []);
   const report = useAct((r: { id: string; reason: string }) => circlesApi.report({ targetKind: 'post', targetId: r.id, reason: r.reason as 'other' }), () => []);
@@ -222,4 +220,3 @@ const s = StyleSheet.create({
   box: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#c9c1b4', alignItems: 'center', justifyContent: 'center', marginTop: 1 },
   boxOn: { backgroundColor: colors.green, borderColor: colors.green },
 });
-void radii; void webNoOutline;

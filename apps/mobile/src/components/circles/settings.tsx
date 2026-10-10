@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { CircleDetail, CircleMemberView, PersonRef } from '@mada/shared';
+import type { CircleDetail, CircleMemberView } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
@@ -26,7 +26,6 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
   const [target, setTarget] = useState<CircleMemberView | null>(null);
   const [adding, setAdding] = useState<string[]>([]);
   const [reminded, setReminded] = useState<string[]>([]);
-  useEffect(() => { if (visible) { setMode('main'); setRename(d.circle.name); setAdding([]); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const id = d.circle.id;
   const admin = d.circle.role === 'admin';
   const others = d.members.filter((m) => m.id !== me);
@@ -132,11 +131,9 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
 }
 
 const join = (n: string[]) => (n.length <= 1 ? n[0] ?? '' : `${n.slice(0, -1).join(', ')} ${t('circles.and')} ${n[n.length - 1]}`);
-export type { PersonRef };
 
 const st = StyleSheet.create({
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   invited: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, backgroundColor: colors.mist },
   mini: { height: 32, paddingHorizontal: 12 },
 });
-void Pressable;

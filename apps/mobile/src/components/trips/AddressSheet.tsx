@@ -72,7 +72,7 @@ export function AddressSheet({ trip, open: visible, onClose }: { trip: TripDetai
         ) : (
           <View style={{ gap: 8 }}>
             <Eyebrow>{t('as.noCar')}</Eyebrow>
-            {([['car', t('as.opt.pickup'), t('as.opt.pickupSub', { all: trip.travellers.length > 1 ? t('as.forAll') : '' }), 'pickup'], ['car', t('as.opt.taxi'), dest.taxi ?? t('as.opt.taxiGeneric'), 'taxi'], ['flight', t('as.opt.metro'), dest.metro ?? t('as.opt.metroGeneric'), 'metro']] as [IconName, string, string, 'pickup' | 'taxi' | 'metro'][]).map(([ic, title, sub, id]) => (
+            {([['car', t('as.opt.pickup'), t('as.opt.pickupSub', { all: trip.travellers.length > 1 ? `${t('as.forAll')} ` : '' }), 'pickup'], ['car', t('as.opt.taxi'), dest.taxi ?? t('as.opt.taxiGeneric'), 'taxi'], ['flight', t('as.opt.metro'), dest.metro ?? t('as.opt.metroGeneric'), 'metro']] as [IconName, string, string, 'pickup' | 'taxi' | 'metro'][]).map(([ic, title, sub, id]) => (
               <Box key={id} tone="well" onPress={() => setRide(id)} style={[{ flexDirection: 'row', alignItems: 'flex-start' }, ride === id ? { borderWidth: 2, borderColor: colors.green } : null]} testID={`ride-${id}`}>
                 <Icon name={ic} /><Grow><H3 size={15}>{title}</H3><Tiny>{sub}</Tiny></Grow>
               </Box>

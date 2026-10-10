@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import {
@@ -57,7 +57,6 @@ export function VoteSheet({ visible, onClose, dest, busy, onPost }: { visible: b
   const [kind, setKind] = useState<'dates' | 'places' | 'any'>('dates');
   const [opts, setOpts] = useState(['', '']);
   const [tried, setTried] = useState(false);
-  useEffect(() => { if (!visible) { setQ(''); setOpts(['', '']); setTried(false); setKind('dates'); } }, [visible]);
   const ideas = kind === 'dates' ? nextDays() : kind === 'places' ? (dest && PLACES[dest]?.spots) || ['Georgia', 'Baku', 'AlUla', 'Istanbul'] : [t('circles.voteSheet.yes'), t('circles.voteSheet.no'), t('circles.voteSheet.maybe')];
   const clean = opts.map((o) => o.trim()).filter(Boolean);
   const dup = new Set(clean.map((o) => o.toLowerCase())).size !== clean.length;
@@ -100,7 +99,6 @@ export function SplitSheet({ visible, onClose, me, members, busy, onPost }: { vi
   const [mode, setMode] = useState<SplitMode>('equal');
   const [who, setWho] = useState<string[]>(members.map((m) => m.id));
   const [custom, setCustom] = useState<Record<string, string>>({});
-  useEffect(() => { if (visible) { setWho(members.map((m) => m.id)); setPayer(me); } else { setWhat(''); setTotal(''); setCustom({}); setMode('equal'); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const sum = (Number(total) || 0) * 100;
   const paidBy = who.includes(payer) ? payer : who[0] ?? me;
   const short = (id: string) => (id === me ? t('circles.you') : members.find((m) => m.id === id)?.short ?? '');

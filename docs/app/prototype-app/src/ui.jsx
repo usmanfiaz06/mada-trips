@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import React, { useEffect, useRef, useState } from 'react';
-import { buzz, HAPTIC, useStore, registerPerson } from './store.jsx';
+import { buzz, HAPTIC, useStore, registerPerson, outboxItems, discardOutbox } from './store.jsx';
 
 const PATHS = {
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z" />,
@@ -37,6 +37,9 @@ const PATHS = {
   globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></>,
   refund: <path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2" />,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" /></>,
+  camera: <><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.5" /></>,
+  phone: <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z" />,
+  outbox: <><path d="M4 13v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6M4 13l2.5-6h11l2.5 6M4 13h5l1 2h4l1-2h5" /><path d="M12 4v6M9.5 6.5 12 4l2.5 2.5" /></>,
 };
 
 export function Icon({ name, size = 22, color = 'currentColor', width = 1.8, style }) {
@@ -738,5 +741,626 @@ export function ArtCircles() {
       <g className="es-ring-b"><circle cx="102" cy="66" r="28" fill="rgba(217,183,122,.12)" stroke="#b98f4a" strokeWidth="2" /><circle cx="102" cy="66" r="5" fill="#b98f4a" /></g>
       <g className="es-ring-c"><circle cx="80" cy="42" r="22" fill="none" stroke="#d9b77a" strokeWidth="2" strokeDasharray="4 5" /><circle cx="80" cy="42" r="5" fill="#d9b77a" /></g>
     </Art>
+  );
+}
+
+/* ======================================================================================================
+   When things go wrong: the failure-state family.
+   Same hand as the empty states (2-unit strokes on a 160×120 board, paper fills, green ink, gold for the one
+   thing that's alive), same stage, same motion rules. Every state says three things, in this order:
+   what happened, what still works, and one next step. Nothing is red, nothing shakes, nobody is blamed.
+   ====================================================================================================== */
+
+const DESK_LINE = '+966 11 520 0000';
+const DESK_CALL = 'tel:+966115200000';
+
+/* The connection and server state the whole app reads. `stale` means we're showing what's saved. */
+export function useNet() {
+  const { s } = useStore();
+  const d = s.demo || {};
+  return { offline: !!d.offline, weak: !!d.weak && !d.offline, down: !!d.serverDown && !d.offline, stale: !!d.offline || !!d.serverDown };
+}
+
+/* A phone with its signal arcs. Offline: the arcs rest, dashed, and a letter waits above the phone.
+   Weak: the arcs light one at a time, slowly. */
+export function ArtSignal({ weak }) {
+  return (
+    <Art className={'es-signal' + (weak ? ' weak' : '')}>
+      {[14, 26, 38].map((r, i) => (
+        <path key={r} className={weak ? 'fs-arc a' + i : ''} d={`M${80 - r} ${66 - r * 0.15} A ${r} ${r} 0 0 1 ${80 + r} ${66 - r * 0.15}`} fill="none" stroke={weak ? '#b98f4a' : '#d6c9b1'} strokeWidth="2.4" strokeLinecap="round" strokeDasharray={weak ? undefined : '3 6'} transform="translate(0 -14)" />
+      ))}
+      <rect x="66" y="56" width="28" height="48" rx="7" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" />
+      <path d="M75 61 h10" stroke="#1e352d" strokeWidth="2" strokeLinecap="round" />
+      <circle cx="80" cy="52" r="3.4" fill={weak ? '#d9b77a' : '#1e352d'} />
+      {!weak && (
+        <g className="es-float">
+          <rect x="102" y="24" width="26" height="18" rx="3" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.5" />
+          <path d="M102 26 l13 9 l13 -9" fill="none" stroke="#7d5d27" strokeWidth="1.5" strokeLinejoin="round" />
+        </g>
+      )}
+    </Art>
+  );
+}
+
+/* A desk bell with its ring fading out: we rang, nobody at Mada's end answered yet. */
+export function ArtDesk() {
+  return (
+    <Art className="es-desk">
+      <path className="fs-wave w1" d="M50 50 a34 34 0 0 1 60 0" fill="none" stroke="#d9b77a" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 6" />
+      <path className="fs-wave w2" d="M40 46 a46 46 0 0 1 80 0" fill="none" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 6" />
+      <g className="fs-ding">
+        <path d="M80 54 v-6" stroke="#1e352d" strokeWidth="2.4" strokeLinecap="round" />
+        <circle cx="80" cy="46" r="3.6" fill="#1e352d" />
+        <path d="M52 86 a28 28 0 0 1 56 0 z" fill="#d9b77a" stroke="#7d5d27" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M62 78 a18 18 0 0 1 12 -12" fill="none" stroke="#fffdf9" strokeWidth="2.4" strokeLinecap="round" opacity=".7" />
+      </g>
+      <rect x="42" y="86" width="76" height="9" rx="4.5" fill="#1e352d" />
+      <path d="M36 102 h88" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" />
+    </Art>
+  );
+}
+
+/* A door sign on a nail that swings a little: closed for a planned hour, back at a set time. */
+export function ArtSign({ until = '03:00' }) {
+  return (
+    <Art className="es-sign">
+      <circle cx="80" cy="18" r="3" fill="#1e352d" />
+      <g className="es-swing-l">
+        <path d="M80 18 L56 44 M80 18 L104 44" stroke="#7d5d27" strokeWidth="1.5" fill="none" />
+        <rect x="40" y="42" width="80" height="54" rx="9" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" />
+        <rect x="46" y="48" width="68" height="42" rx="5" fill="none" stroke="#e3d6bf" strokeWidth="1.2" />
+        <text x="80" y="64" textAnchor="middle" fontSize="8.5" fontWeight="700" letterSpacing="1.4" fill="#7d5d27" fontFamily="Inter Tight, Arial, sans-serif">BACK AT</text>
+        <text x="80" y="83" textAnchor="middle" fontSize="17" fill="#1e352d" fontFamily="JetBrains Mono, Menlo, monospace" fontWeight="600">{until}</text>
+      </g>
+    </Art>
+  );
+}
+
+/* A phone with a gold arrow lifting out of it: a new version is ready. */
+export function ArtUpdate() {
+  return (
+    <Art className="es-update">
+      <circle className="es-pulse" cx="80" cy="62" r="34" fill="#d9b77a" opacity=".18" />
+      <rect x="60" y="20" width="40" height="84" rx="10" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" />
+      <path d="M73 26 h14" stroke="#1e352d" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M68 88 h24" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+      <g className="fs-up">
+        <circle cx="80" cy="58" r="13" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.6" />
+        <path d="M80 65 v-14 M74 57 l6 -6 l6 6" fill="none" stroke="#1e352d" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+      <path d="M40 40 h8 M36 52 h10 M112 40 h8 M114 52 h10" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 4" />
+    </Art>
+  );
+}
+
+/* A key that turns in its lock and back: sign in again, nothing else changes. */
+export function ArtKey() {
+  return (
+    <Art className="es-key">
+      <rect x="34" y="34" width="44" height="56" rx="10" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" />
+      <circle cx="56" cy="56" r="6" fill="#1e352d" />
+      <path d="M56 60 l-3 14 h6 z" fill="#1e352d" />
+      <g className="fs-turn">
+        <circle cx="104" cy="62" r="14" fill="#d9b77a" stroke="#7d5d27" strokeWidth="2" />
+        <circle cx="104" cy="62" r="5" fill="#fffdf9" stroke="#7d5d27" strokeWidth="1.5" />
+        <path d="M90 62 h-24 M74 62 v7 M68 62 v5" stroke="#7d5d27" strokeWidth="3" strokeLinecap="round" />
+      </g>
+    </Art>
+  );
+}
+
+/* An hourglass that drains, then turns over: wait a moment, then go again. */
+export function ArtHourglass() {
+  return (
+    <Art className="es-hour">
+      <g className="fs-flip">
+        <path d="M60 22 h40 M60 98 h40" stroke="#1e352d" strokeWidth="3" strokeLinecap="round" />
+        <path d="M64 24 c0 18 12 24 14 36 c-2 12 -14 18 -14 36 h32 c0 -18 -12 -24 -14 -36 c2 -12 14 -18 14 -36 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2.2" strokeLinejoin="round" />
+        <path className="fs-sand-top" d="M70 34 h20 c-2 8 -7 12 -10 18 c-3 -6 -8 -10 -10 -18 z" fill="#d9b77a" />
+        <path className="fs-sand-bot" d="M68 94 c2 -8 8 -12 12 -14 c4 2 10 6 12 14 z" fill="#d9b77a" />
+        <path className="fs-stream" d="M80 60 v20" stroke="#d9b77a" strokeWidth="1.6" strokeDasharray="2 3" />
+      </g>
+    </Art>
+  );
+}
+
+/* Two gears, the gold one turning back into step: something broke on our side, and it's being put right. */
+export function ArtGears() {
+  const teeth = (cx, cy, r, n) => Array.from({ length: n }, (_, i) => { const a = (i * 2 * Math.PI) / n; return <rect key={i} x={cx - 3.5} y={cy - r - 6} width="7" height="9" rx="2" transform={`rotate(${(a * 180) / Math.PI} ${cx} ${cy})`} />; });
+  return (
+    <Art className="es-gears">
+      <g className="fs-gear-a" fill="#fffdf9" stroke="#1e352d" strokeWidth="2">{teeth(64, 64, 24, 10)}<circle cx="64" cy="64" r="25" /><circle cx="64" cy="64" r="7" fill="#1e352d" /></g>
+      <g className="fs-gear-b" fill="#d9b77a" stroke="#7d5d27" strokeWidth="1.8">{teeth(106, 46, 14, 7)}<circle cx="106" cy="46" r="15" /><circle cx="106" cy="46" r="4.5" fill="#fffdf9" /></g>
+      <path d="M96 84 c6 4 14 4 20 0" fill="none" stroke="#e3d6bf" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 5" />
+    </Art>
+  );
+}
+
+/* A ticket torn in two, the halves drifting a little apart: the thing this link pointed to is gone. */
+export function ArtTorn() {
+  return (
+    <Art className="es-torn">
+      <g className="fs-half-l">
+        <path d="M24 38 h52 l-4 6 l5 6 l-5 6 l5 6 l-5 6 l5 6 l-5 6 l4 6 h-52 a6 6 0 0 1 -6 -6 v-36 a6 6 0 0 1 6 -6 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M30 52 h22 M30 70 h30" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+        <text x="30" y="65" fontSize="9" fontWeight="700" fill="#1e352d" fontFamily="Inter Tight, sans-serif">RUH</text>
+      </g>
+      <g className="fs-half-r">
+        <path d="M86 38 h50 a6 6 0 0 1 6 6 v36 a6 6 0 0 1 -6 6 h-50 l4 -6 l-5 -6 l5 -6 l-5 -6 l5 -6 l-5 -6 l5 -6 l-5 -6 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+        <text x="100" y="65" fontSize="9" fontWeight="700" fill="#b98f4a" fontFamily="Inter Tight, sans-serif">???</text>
+        <path d="M100 52 h24 M100 72 h16" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+      </g>
+    </Art>
+  );
+}
+
+/* A settings switch that slides on, rests, and slides back: it's off on this phone, and it's one switch away. */
+export function ArtSwitch({ icon = 'camera' }) {
+  return (
+    <Art className="es-switch">
+      <circle cx="80" cy="36" r="17" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
+      <g transform="translate(68 24)"><g transform="scale(1)" fill="none" stroke="#1e352d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{PATHS[icon]}</g></g>
+      <path d="M93 49 l8 8" stroke="#b98f4a" strokeWidth="2" strokeLinecap="round" strokeDasharray="2 4" />
+      <rect x="52" y="70" width="56" height="30" rx="15" fill="#e9e2d8" stroke="#1e352d" strokeWidth="2" />
+      <rect className="fs-track" x="52" y="70" width="56" height="30" rx="15" fill="#d9b77a" />
+      <circle className="fs-knob" cx="67" cy="85" r="11" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" />
+    </Art>
+  );
+}
+
+/* A price tag with a ring that runs down slowly: nothing was charged, the price is still held. */
+export function ArtPriceHold() {
+  return (
+    <Art className="es-hold">
+      <path d="M40 46 l26 -16 h44 a6 6 0 0 1 6 6 v48 a6 6 0 0 1 -6 6 h-44 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <circle cx="58" cy="60" r="4" fill="none" stroke="#1e352d" strokeWidth="2" />
+      <path d="M74 52 h26 M74 62 h18" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+      <text x="74" y="80" fontSize="10" fontWeight="700" fill="#1e352d" fontFamily="Inter Tight, sans-serif">SAR</text>
+      <circle cx="120" cy="86" r="16" fill="#1e352d" />
+      <circle cx="120" cy="86" r="11" fill="none" stroke="rgba(233,226,216,.25)" strokeWidth="3" />
+      <circle className="fs-ring" cx="120" cy="86" r="11" fill="none" stroke="#d9b77a" strokeWidth="3" strokeLinecap="round" pathLength="100" strokeDasharray="100" transform="rotate(-90 120 86)" />
+      <path d="M120 80 v6 l4 2" stroke="#fffdf9" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+    </Art>
+  );
+}
+
+/* A page going up a line of dots that pauses partway: the part that went is kept. */
+export function ArtUploadStop() {
+  return (
+    <Art className="es-upstop">
+      <path d="M58 30 h30 l14 14 v48 h-44 z" fill="#fffdf9" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M88 30 v14 h14" fill="none" stroke="#1e352d" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M66 54 h22 M66 62 h28 M66 70 h18" stroke="#e3d6bf" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="40" y="100" width="80" height="6" rx="3" fill="#e9e2d8" />
+      <rect className="fs-bar" x="40" y="100" width="50" height="6" rx="3" fill="#d9b77a" />
+      <circle className="es-blink" cx="90" cy="103" r="5" fill="#fffdf9" stroke="#b98f4a" strokeWidth="2" />
+      <path d="M118 52 v-14 M112 44 l6 -6 l6 6" stroke="#b98f4a" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Art>
+  );
+}
+
+/* ---------- loading: skeletons and the slow-connection veil ---------- */
+
+/* Grey shapes where the content will be, with one slow sheen across them. */
+export function Skeleton({ rows = 3, hero = true, className = '' }) {
+  return (
+    <div className={'sk-wrap ' + className} aria-hidden="true">
+      {hero && <div className="sk sk-hero" />}
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="sk-row">
+          <span className="sk sk-tile" />
+          <span className="col grow" style={{ gap: 8 }}><span className="sk sk-line" style={{ width: `${72 - i * 9}%` }} /><span className="sk sk-line short" style={{ width: `${44 + i * 7}%` }} /></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* A weak connection: the screen loads under a skeleton. After 4 seconds we say so, with a way out. */
+export function LoadingVeil({ onCancel, onDone, ms = 7600, stacked }) {
+  const [slow, setSlow] = useState(false);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    const a = setTimeout(() => { setSlow(true); buzz(HAPTIC.tap); }, 4000);
+    const b = setTimeout(() => { setGone(true); onDone && onDone(); }, ms);
+    return () => { clearTimeout(a); clearTimeout(b); };
+  }, []);
+  if (gone) return null;
+  return (
+    <div className={'veil-load' + (stacked ? ' stacked' : '')} role="status" aria-live="polite" aria-label="Loading">
+      <Skeleton rows={4} />
+      {slow && (
+        <div className="slow-note">
+          <span className="slow-dots" aria-hidden="true"><i /><i /><i /></span>
+          <span className="col grow" style={{ gap: 1 }}><span className="h3" style={{ fontSize: 15 }}>Still working… slower than usual</span><span className="tiny">Your connection is weak. Nothing you did is lost.</span></span>
+          <button type="button" className="btn secondary small" onClick={() => { buzz(HAPTIC.tap); setGone(true); onCancel && onCancel(); }}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- small honest markers ---------- */
+
+/* Shown on anything that came from this phone's copy instead of live. */
+export function StaleBadge({ mins = 14, offline }) {
+  return (
+    <span className="stale" role="status"><i aria-hidden="true" />{offline ? `Saved on this phone · updated ${mins} min ago` : `Last updated ${mins} min ago`}</span>
+  );
+}
+/* The badge, only when what's on screen is the saved copy. Drop it under any header that shows cached data. */
+export function NetStale() {
+  const net = useNet();
+  if (!net.stale) return null;
+  return <div className="stale-row rise"><StaleBadge offline={net.offline} /></div>;
+}
+
+/* One step that couldn't finish, said in place: what happened, then Try again. Everything around it still works. */
+export function InlineError({ art, icon = 'refund', title, body, onRetry, retryLabel = 'Try again', secondary, tone, className = '' }) {
+  const [busy, setBusy] = useState(false);
+  const retry = () => { if (busy) return; buzz(HAPTIC.tap); setBusy(true); setTimeout(() => { setBusy(false); onRetry && onRetry(); }, 900); };
+  return (
+    <div className={'ie rise' + (tone === 'partial' ? ' partial' : '') + ' ' + className} role="status">
+      {art ? <span className="es-tile ie-art" aria-hidden="true">{art}</span> : <span className="ie-ic" aria-hidden="true"><Icon name={icon} size={20} color="#7d5d27" /></span>}
+      <span className="col grow" style={{ gap: 4, minWidth: 0 }}>
+        <span className="h3" style={{ fontSize: 15 }}>{title}</span>
+        {body && <span className="small">{body}</span>}
+        {(onRetry || secondary) && (
+          <span className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+            {onRetry && <button type="button" className="btn primary small" onClick={retry} disabled={busy}>{busy ? <><span className="spinner light" />Trying</> : retryLabel}</button>}
+            {secondary}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/* What still works, as quiet chips with a tick. */
+function Works({ items }) {
+  if (!items || !items.length) return null;
+  return (
+    <div className="fs-works" role="list" aria-label="Still works">
+      {items.map((t) => <span key={t} className="fs-work" role="listitem"><Icon name="check" size={14} width={2.4} color="#2f7a4b" />{t}</span>)}
+    </div>
+  );
+}
+
+/* A whole area that has nothing saved to show: the empty-state stage, plus what still works and one next step. */
+export function ErrorState({ art, title, body, works, action, secondary, className = '', tall }) {
+  return (
+    <EmptyState className={'fs-err ' + className} tall={tall} art={art} title={title} body={body}
+      action={<>{works && <Works items={works} />}{action}{secondary}</>} />
+  );
+}
+
+/* The full-screen version, for when the whole app has to wait: maintenance, an update, a crash. */
+export function FullScreenState({ art, eyebrow, title, body, works, list, primary, secondary, note, label, dark }) {
+  return (
+    <div className={'fs-screen' + (dark ? ' dark' : '')} role="alertdialog" aria-modal="true" aria-label={label || (typeof title === 'string' ? title : 'Mada')}>
+      <div className="fs-inner">
+        <div className="es-stage fs-stage" aria-hidden="true">{art}</div>
+        {eyebrow && <span className="eyebrow fs-eyebrow">{eyebrow}</span>}
+        <h1 className="display fs-title">{title}</h1>
+        {body && <p className="body fs-body">{body}</p>}
+        {list && <ul className="fs-list">{list.map(([ic, t]) => <li key={t}><span className="fs-list-ic"><Icon name={ic} size={16} color="#7d5d27" /></span>{t}</li>)}</ul>}
+        <Works items={works} />
+      </div>
+      <div className="fs-act">
+        {primary}
+        {secondary}
+        {note && <span className="act-note">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- the connection pill and the Outbox ---------- */
+
+/* A small pill in the status-bar strip: never over the back button, never over a banner. Tap for the Outbox. */
+export function NetPill({ mode, count, onClick, label }) {
+  const text = label || (mode === 'held' ? `${count} didn’t send · open the Outbox` : mode === 'offline' ? (count ? `Offline · ${count} waiting to send` : 'Offline · your trips are on this phone')
+    : mode === 'down' ? (count ? `Can’t reach Mada · ${count} waiting` : 'Can’t reach Mada · showing what’s saved')
+    : mode === 'weak' ? 'Weak connection · loading slowly'
+    : mode === 'sending' ? `Sending ${count} ${count === 1 ? 'thing' : 'things'}…` : '');
+  return (
+    <button type="button" className={'net-pill ' + mode} onClick={() => { buzz(HAPTIC.tap); onClick && onClick(); }} aria-live="polite" aria-label={text + '. Open the Outbox.'}>
+      {mode === 'sending' ? <span className="spinner light" style={{ width: 12, height: 12 }} /> : <i className="net-dot" aria-hidden="true" />}
+      <span>{text}</span>
+      {mode !== 'weak' && mode !== 'sending' && <Icon name="chevron" size={14} color="currentColor" />}
+    </button>
+  );
+}
+
+const OUTBOX_STATE = { queued: 'Queued', sending: 'Sending', failed: 'Didn’t send' };
+const OUTBOX_ICON = { message: 'mic', request: 'doc', choice: 'flight', upload: 'up' };
+
+/* Everything waiting to reach Mada, one row each: Queued, Sending, or Didn't send with Send again and Discard. */
+export function OutboxSheet({ onClose }) {
+  const { s, set, toast } = useStore();
+  const net = useNet();
+  const items = outboxItems(s);
+  const [busy, setBusy] = useState({});
+  const again = (it) => {
+    buzz(HAPTIC.tap);
+    setBusy((b) => ({ ...b, [it.id]: true }));
+    setTimeout(() => {
+      setBusy((b) => ({ ...b, [it.id]: false }));
+      if (net.offline || s.demo.serverDown) { set((p) => (it.ref.type === 'outbox' ? { outbox: (p.outbox || []).map((o) => (o.id === it.ref.id ? { ...o, state: 'failed', why: net.offline ? 'You’re still offline. It stays here.' : 'Mada isn’t answering yet. It stays here.' } : o)) } : {})); toast(net.offline ? 'Still offline. It stays in the Outbox.' : 'Mada isn’t answering yet. It stays in the Outbox.'); return; }
+      if (it.ref.type === 'support') set((p) => ({ support: (p.support || []).map((m) => (m.id === it.ref.id ? { ...m, failed: false, queued: false } : m)) }));
+      else set((p) => discardOutbox(p, it.ref));
+      buzz(HAPTIC.success); toast('Sent.');
+    }, 1300);
+  };
+  const discard = (it) => { set((p) => discardOutbox(p, it.ref)); buzz(HAPTIC.tap); toast('Discarded. Nothing was sent.'); };
+  return (
+    <Sheet label="Outbox" onClose={onClose}>
+      <div className="row" style={{ gap: 12 }}>
+        <span className="es-tile ob-art" aria-hidden="true"><ArtSignal weak={!net.offline} /></span>
+        <span className="col" style={{ gap: 2 }}>
+          <h2 className="h2">{items.length ? 'Waiting to send' : 'Nothing waiting to send'}</h2>
+          <span className="small">{net.offline ? 'You’re offline. These go the moment you’re back.' : net.down ? 'Mada isn’t answering right now. These go as soon as it does.' : 'Everything you did has reached Mada.'}</span>
+        </span>
+      </div>
+      {items.length > 0 && (
+        <div className="ob-list" role="list">
+          {items.map((it) => {
+            const st = busy[it.id] ? 'sending' : it.state;
+            return (
+              <div key={it.id} className={'ob-row ' + st} role="listitem">
+                <span className="ob-ic" aria-hidden="true"><Icon name={OUTBOX_ICON[it.kind] || 'doc'} size={18} /></span>
+                <span className="col grow" style={{ gap: 2, minWidth: 0 }}>
+                  <span className="ob-title">{it.title}</span>
+                  <span className="tiny">{it.sub}{it.size ? ` · ${it.size}` : ''}</span>
+                  {st === 'sending' && it.progress != null && <span className="ob-bar" aria-hidden="true"><i style={{ width: `${it.progress}%` }} /></span>}
+                  {st === 'failed' && <span className="tiny ob-why">{it.why || 'It didn’t reach Mada. Nothing is lost.'}</span>}
+                  {st === 'failed' && (
+                    <span className="row" style={{ gap: 8, marginTop: 4 }}>
+                      <button type="button" className="btn primary small" onClick={() => again(it)}>Send again</button>
+                      <button type="button" className="btn secondary small" onClick={() => discard(it)}>Discard</button>
+                    </span>
+                  )}
+                </span>
+                <span className={'ob-state ' + st}>{st === 'sending' ? <span className="spinner" style={{ width: 12, height: 12 }} /> : <i />}{OUTBOX_STATE[st]}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="ob-works">
+        <span className="eyebrow">Works without a connection</span>
+        <span className="small">Trips, Wallet, boarding passes, your itinerary and the hotel address in the local language.</span>
+      </div>
+      <a className="btn secondary block" href={DESK_CALL}><Icon name="phone" size={18} />Call Mada · {DESK_LINE}</a>
+    </Sheet>
+  );
+}
+
+/* ---------- permissions: one design for camera, contacts, location and alerts ---------- */
+
+const PERMS = {
+  camera: { icon: 'camera', title: 'The camera is off for Mada.', why: 'We use it to read passports and documents. Nothing is saved until you check it.', manual: 'Upload a photo instead' },
+  contacts: { icon: 'user', title: 'Contacts are off for Mada.', why: 'We match numbers on this phone to show who’s already on Mada. They’re never uploaded.', manual: 'Share your invite link' },
+  location: { icon: 'pin', title: 'Location is off for Mada.', why: 'We use your city, never your street, so friends you chose can see you’re nearby.', manual: 'Choose your city instead' },
+  notifications: { icon: 'bell', title: 'Alerts are off for Mada.', why: 'Gate changes, delays and your driver arriving. Never offers.', manual: 'Get them by SMS instead' },
+};
+
+/* It was turned off in the phone's Settings, so we can't ask again. Say why it helps, how to turn it on, and the way
+   to carry on without it. `inline` drops it into a sheet that's already open. */
+export function PermissionDenied({ kind = 'camera', onManual, manualLabel, onClose, inline }) {
+  const { toast } = useStore();
+  const p = PERMS[kind] || PERMS.camera;
+  const body = (
+    <div className={'perm' + (inline ? ' inline' : '')}>
+      <div className="es-stage perm-stage" aria-hidden="true"><ArtSwitch icon={p.icon} /></div>
+      <h2 className="h2">{p.title}</h2>
+      <p className="small" style={{ margin: 0 }}>{p.why} Turn it on in Settings › Mada, or carry on without it.</p>
+      <button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); toast('Opens the phone’s Settings for Mada.'); }}><Icon name="gear" size={18} color="#f6f2ec" />Open Settings</button>
+      <button type="button" className="btn secondary block" onClick={() => { buzz(HAPTIC.tap); onManual && onManual(); }}>{manualLabel || p.manual}</button>
+    </div>
+  );
+  if (inline) return body;
+  return <Sheet label={p.title} onClose={onClose}>{body}</Sheet>;
+}
+
+/* ---------- images that don't arrive ---------- */
+
+const TONES = [['#1e352d', '#2a4a40'], ['#7d5d27', '#b98f4a'], ['#2a4a40', '#4d5c55'], ['#b98f4a', '#d9b77a'], ['#142720', '#2a4a40']];
+const initialsOf = (label) => String(label || 'Mada').replace(/[^A-Za-zÀ-ž\s-]/g, ' ').trim().split(/[\s_-]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || 'M';
+/* A tasteful stand-in: a tone picked from the name, the initials in the display serif, the sun's rays faintly. */
+export function placeholderSrc(label) {
+  const k = [...String(label || '')].reduce((a, c) => a + c.charCodeAt(0), 0) % TONES.length;
+  const [a, b] = TONES[k];
+  const rays = Array.from({ length: 9 }, (_, i) => { const t = Math.PI + (i * Math.PI) / 8; return `<line x1="${200 + Math.cos(t) * 150}" y1="${300 + Math.sin(t) * 150}" x2="${200 + Math.cos(t) * 230}" y2="${300 + Math.sin(t) * 230}"/>`; }).join('');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="300" fill="url(#g)"/><g stroke="#fffdf9" stroke-opacity=".09" stroke-width="10" stroke-linecap="round">${rays}</g><text x="200" y="168" text-anchor="middle" font-family="Instrument Serif, Georgia, serif" font-size="96" fill="#fffdf9" fill-opacity=".86">${initialsOf(label)}</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+const labelFor = (img) => {
+  if (img.alt) return img.alt;
+  const src = img.dataset.orig || img.getAttribute('src') || '';
+  const file = (src.split('/').pop() || '').replace(/\.[a-z]+$/i, '');
+  return file.replace(/[-_]/g, ' ') || 'Mada';
+};
+
+/* An <img> that falls back to the placeholder by itself. */
+export function SafeImg({ src, alt = '', label, ...rest }) {
+  const [bad, setBad] = useState(false);
+  return <img {...rest} src={bad ? placeholderSrc(label || alt) : src} alt={alt} data-fallback={bad ? '1' : undefined} onError={() => setBad(true)} />;
+}
+
+/* Every photo in the phone gets the same fallback when it can't load. With `off`, photos are made to miss
+   (the "Photos don't load" switch), so the fallback can be seen everywhere at once. */
+export function useImageFallback(off) {
+  useEffect(() => {
+    const root = document.querySelector('.phone');
+    if (!root) return undefined;
+    const onErr = (e) => {
+      const img = e.target;
+      if (!img || img.tagName !== 'IMG' || img.dataset.fallback || /^data:/.test(img.getAttribute('src') || '')) return;
+      if (/airlines\//.test(img.dataset.orig || img.getAttribute('src') || '')) return; /* the airline mark has its own fallback */
+      img.dataset.fallback = '1';
+      img.src = placeholderSrc(labelFor(img));
+      img.classList.add('img-fallback');
+    };
+    root.addEventListener('error', onErr, true);
+    let mo = null;
+    if (off) {
+      const miss = (img) => { const src = img.getAttribute('src') || ''; if (img.dataset.orig || /^(data|blob):/.test(src)) return; img.dataset.orig = src; img.setAttribute('src', 'img/__missing__/' + src.split('/').pop()); };
+      root.querySelectorAll('img').forEach(miss);
+      mo = new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return; if (n.tagName === 'IMG') miss(n); else n.querySelectorAll && n.querySelectorAll('img').forEach(miss); })));
+      mo.observe(root, { childList: true, subtree: true });
+    }
+    return () => {
+      root.removeEventListener('error', onErr, true);
+      if (mo) mo.disconnect();
+      if (off) root.querySelectorAll('img[data-orig]').forEach((img) => { img.setAttribute('src', img.dataset.orig); delete img.dataset.orig; delete img.dataset.fallback; img.classList.remove('img-fallback'); });
+    };
+  }, [off]);
+}
+
+/* ---------- an upload that keeps what it already sent ---------- */
+
+/* Goes up in steps. With `stopAt`, the connection drops there once; Carry on picks up from the same byte. */
+export function UploadProgress({ name = 'scan.jpg', size = 2.4, stopAt, onDone }) {
+  const [pct, setPct] = useState(0);
+  const [stopped, setStopped] = useState(false);
+  const stoppedOnce = useRef(false);
+  useEffect(() => {
+    if (stopped || pct >= 100) return undefined;
+    const t = setTimeout(() => {
+      const next = Math.min(100, pct + 8);
+      if (stopAt && !stoppedOnce.current && next >= stopAt) { stoppedOnce.current = true; setPct(stopAt); setStopped(true); buzz(HAPTIC.soft); return; }
+      setPct(next);
+      if (next >= 100) setTimeout(() => onDone && onDone(), 350);
+    }, 160);
+    return () => clearTimeout(t);
+  }, [pct, stopped]);
+  const sent = ((size * pct) / 100).toFixed(1);
+  return (
+    <div className={'up' + (stopped ? ' stopped' : '')} aria-live="polite">
+      {stopped && <div className="es-stage up-stage" aria-hidden="true"><ArtUploadStop /></div>}
+      <div className="spread"><span className="h3" style={{ fontSize: 15 }}>{stopped ? `Stopped at ${pct}%. The connection dropped.` : `Uploading ${name}`}</span><span className="tiny num">{sent} of {size} MB</span></div>
+      <div className="up-track" role="progressbar" aria-label="Upload" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><i style={{ width: `${pct}%` }} />{stopped && <b style={{ left: `${pct}%` }} />}</div>
+      {stopped && (<>
+        <span className="small">The {sent} MB that went is kept. Carry on and it starts from there, not from the beginning.</span>
+        <button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); setStopped(false); }}>Carry on from {pct}%</button>
+      </>)}
+    </div>
+  );
+}
+
+/* ---------- app-level screens ---------- */
+
+/* A link to something that isn't there any more: say so, and a way back. */
+export function NotFound({ params = {} }) {
+  const { pop, reset } = useStore();
+  const what = params.what || 'trip';
+  return (
+    <div className="screen push">
+      <TopBar onBack={pop} />
+      <div className="scroll no-dock" style={{ justifyContent: 'center' }}>
+        <ErrorState className="middle" tall art={<ArtTorn />}
+          title="This link doesn’t go anywhere now."
+          body={`The ${what === 'post' ? 'tip' : what} it pointed to was removed, or it was shared with someone else. Nothing of yours has changed.`}
+          works={['Your trips', 'Your Wallet', 'Your circles']}
+          action={<button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); reset(what === 'post' ? 'circles' : 'trips'); }}>{what === 'post' ? 'Go to Circles' : 'See your trips'}</button>}
+          secondary={<button type="button" className="btn ghost block" onClick={() => reset('today')}>Go to Today</button>} />
+      </div>
+    </div>
+  );
+}
+
+/* Planned downtime: when it ends, what still works, and a person on the phone. */
+export function MaintenanceScreen({ until = '03:00', onOpenTrips }) {
+  return (
+    <FullScreenState label="Planned maintenance" art={<ArtSign until={until} />} eyebrow="Planned maintenance"
+      title={<>Mada is being updated until {until}.</>}
+      body={`Booking, changes and payments pause until ${until} Riyadh time. It’s planned, and nothing you’ve booked is affected.`}
+      works={['Your trips and Wallet still work offline', 'Boarding passes', 'Hotel address']}
+      primary={<button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); onOpenTrips && onOpenTrips(); }}>Open my trips</button>}
+      secondary={<a className="btn secondary block" href={DESK_CALL}><Icon name="phone" size={18} />Talk to Mada by phone</a>}
+      note={`The desk answers any hour on ${DESK_LINE}.`} />
+  );
+}
+
+/* This version can't book any more. What's new, and one button. */
+export function UpdateScreen({ onUpdate }) {
+  return (
+    <FullScreenState label="Update Mada" art={<ArtUpdate />} eyebrow="Mada 1.1 is ready"
+      title="Update Mada to keep booking."
+      body="This version can’t reach bookings any more. Your trips and documents are safe, and they’re all here after the update."
+      list={[['trips', 'Boarding passes for the whole family in one swipe'], ['bell', 'Gate changes and delays on the lock screen'], ['circles', 'Pay your share in a circle with mada or Apple Pay']]}
+      primary={<button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.success); onUpdate && onUpdate(); }}>Update Mada</button>}
+      note="38 MB from the App Store. Usually under a minute on Wi-Fi." />
+  );
+}
+
+/* The session ran out: sign back in over the screen you were on, so nothing you typed is lost. */
+export function SessionSheet({ onDone }) {
+  const { s } = useStore();
+  const [code, setCode] = useState('');
+  const [bad, setBad] = useState(false);
+  const tail = (s.account?.phone?.digits || '501234127').slice(-4);
+  const check = (v) => { if (v === '123456') { buzz(HAPTIC.success); onDone && onDone(); } else { setBad(true); setCode(''); buzz(HAPTIC.soft); } };
+  return (
+    <Sheet label="Sign back in" onClose={() => {}}>
+      <div className="row" style={{ gap: 12 }}>
+        <span className="es-tile" aria-hidden="true"><ArtKey /></span>
+        <span className="col" style={{ gap: 2 }}><h2 className="h2">Sign back in to carry on.</h2><span className="small">You’ve been signed out to keep your account safe. What you typed is still here.</span></span>
+      </div>
+      <div className="field">
+        <label htmlFor="session-code">Code sent to +966 5• ••• {tail}</label>
+        <input id="session-code" className={'input otp' + (bad ? ' bad' : '')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setCode(v); setBad(false); if (v.length === 6) check(v); }} />
+        {bad && <span className="err" role="alert">That code doesn’t match. Check the latest text from Mada.</span>}
+      </div>
+      <span className="tiny">Demo code: 123456. Your trips and Wallet stayed on this phone the whole time.</span>
+    </Sheet>
+  );
+}
+
+/* Too many tries in a row: a short, friendly pause with a countdown, never a lock-out with no end. */
+export function RateLimitSheet({ seconds = 45, onDone, onClose }) {
+  const [left, setLeft] = useState(seconds);
+  useEffect(() => { if (left <= 0) return undefined; const t = setTimeout(() => setLeft(left - 1), 1000); return () => clearTimeout(t); }, [left]);
+  const r = 26; const c = 2 * Math.PI * r;
+  return (
+    <Sheet label="A short pause" onClose={onClose}>
+      <div className="es-stage rl-stage" aria-hidden="true"><ArtHourglass /></div>
+      <h2 className="h2">Let’s take a short pause.</h2>
+      <p className="small" style={{ margin: 0 }}>There were a lot of tries in a row, so we’ve paused codes for this number for a moment. It keeps your account safe. Nothing is locked.</p>
+      <div className="rl-count" role="timer" aria-live="polite">
+        <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r={r} fill="none" stroke="#efe9e0" strokeWidth="5" /><circle cx="32" cy="32" r={r} fill="none" stroke="#d9b77a" strokeWidth="5" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - left / seconds)} transform="rotate(-90 32 32)" style={{ transition: 'stroke-dashoffset 1s linear' }} /></svg>
+        <span className="col" style={{ gap: 0 }}><span className="tiny">{left > 0 ? 'You can try again in' : 'Ready when you are'}</span><span className="num rl-time">{left > 0 ? `0:${String(left).padStart(2, '0')}` : '0:00'}</span></span>
+      </div>
+      <button type="button" className="btn primary block" disabled={left > 0} onClick={() => { buzz(HAPTIC.tap); onDone && onDone(); }}>Try again</button>
+      <a className="btn ghost block" href={DESK_CALL}>Talk to Mada instead</a>
+    </Sheet>
+  );
+}
+
+/* Catches a crash anywhere in the app and shows a calm screen instead of a blank one. */
+export class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { crashed: false }; }
+  static getDerivedStateFromError() { return { crashed: true }; }
+  componentDidCatch() { /* production sends a report here: screen, version, no personal details */ }
+  render() {
+    if (this.state.crashed) return this.props.fallback(() => this.setState({ crashed: false }));
+    return this.props.children;
+  }
+}
+/* Throws while the "App crashed" switch is on, so the boundary above is the real one, not a mock. */
+export function Crasher() {
+  const { s } = useStore();
+  if (s.demo?.crashed) throw new Error('Demo crash');
+  return null;
+}
+export function CrashScreen({ onRestart, onTalk }) {
+  return (
+    <FullScreenState label="Mada restarted" art={<ArtGears />} eyebrow="Mada stopped"
+      title="Something broke on our side. Your trips are safe."
+      body="Bookings, payments and documents aren’t touched by this. Restart and you’ll be back on Today."
+      primary={<button type="button" className="btn primary block" onClick={() => { buzz(HAPTIC.tap); onRestart && onRestart(); }}>Restart Mada</button>}
+      secondary={<button type="button" className="btn secondary block" onClick={() => { buzz(HAPTIC.tap); onTalk && onTalk(); }}>Talk to Mada</button>}
+      note="A report went to our team. Nothing personal is in it." />
   );
 }

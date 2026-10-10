@@ -22,6 +22,8 @@ export default function Circles() {
   const [view, setView] = useState<'discover' | 'circles'>(params.view === 'circles' ? 'circles' : 'discover');
   const [posting, setPosting] = useState<string | null>(null);
   const [open, setOpen] = useState<Post | null>(null);
+  const [opens, setOpens] = useState(0);
+  const startPost = (city: string) => { setOpens((n) => n + 1); setPosting(city); };
   const friends = useFriends();
   const requests = friends.data?.requests.length ?? 0;
   const d = useDiscover(null);
@@ -35,7 +37,7 @@ export default function Circles() {
         <View style={styles.header}>
           <TabsText label={t('circles.a11y.views')} value={view} onChange={setView} tabs={[['discover', t('circles.tab.discover')], ['circles', t('circles.tab.circles')]]} />
           {view === 'discover'
-            ? <RoundButton dark a11y={t('circles.a11y.postTip')} icon={<Icon name="plus" color={colors.mist} />} onPress={() => setPosting(d.data?.city ?? HOME_CITY)} testID="post-tip" />
+            ? <RoundButton dark a11y={t('circles.a11y.postTip')} icon={<Icon name="plus" color={colors.mist} />} onPress={() => startPost(d.data?.city ?? HOME_CITY)} testID="post-tip" />
             : (
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <RoundButton a11y={requests ? t('circles.a11y.peopleRequests', { count: requests }) : t('circles.a11y.people')} badge={requests > 0} icon={<Icon name="circles" />} onPress={() => router.push('/people')} testID="people" />
@@ -44,12 +46,12 @@ export default function Circles() {
             )}
         </View>
         {view === 'discover'
-          ? <Discover onPost={(c) => setPosting(c)} onOpen={setOpen} />
+          ? <Discover onPost={startPost} onOpen={setOpen} />
           : <CirclesHome onDiscover={() => setView('discover')} onOpenPost={setOpen} />}
       </Scroll>
-      <PostSheet visible={!!posting} onClose={() => setPosting(null)} cities={postCities} initialCity={posting ?? HOME_CITY}
+      <PostSheet key={`post-${opens}`} visible={!!posting} onClose={() => setPosting(null)} cities={postCities} initialCity={posting ?? HOME_CITY}
         onPosted={(audience) => { setPosting(null); setView('discover'); toast(audience === 'friends' ? t('circles.postTip.postedFriends') : t('circles.postTip.postedEveryone')); }} />
-      <PostDetail post={open} onClose={() => setOpen(null)} onSave={(p) => { togglePost(p); setOpen({ ...p, saved: !p.saved }); }} />
+      <PostDetail key={open?.id ?? 'none'} post={open} onClose={() => setOpen(null)} onSave={(p) => { togglePost(p); setOpen({ ...p, saved: !p.saved }); }} />
     </Screen>
   );
 }

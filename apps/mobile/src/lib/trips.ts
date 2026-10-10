@@ -326,3 +326,12 @@ export async function registerForPush(): Promise<void> {
     registered = true;
   } catch { /* no project id in development builds, or no network: try again next launch */ }
 }
+
+/** The agent on duty for the trip Today is about, from the server (COPY.md §1). Faisal until a trip says otherwise. */
+export function useAgent(): { name: string; initial: string; online: boolean } {
+  const list = useTrips();
+  const id = list.data?.currentId ?? list.data?.upcoming[0]?.id ?? null;
+  const trip = useTrip(id);
+  const a = trip.data?.trip.agent;
+  return a ? { name: a.covering?.name ?? a.name, initial: a.covering?.initial ?? a.initial, online: a.online } : { name: 'Faisal', initial: 'F', online: true };
+}

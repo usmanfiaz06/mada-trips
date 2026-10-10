@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated from 'react-native-reanimated';
 import { formatSar, type Person, type WalletDocument } from '@mada/shared';
 import { ArtCardSlot, ArtPass } from '@/components/art/Arts';
 import { Button, LinkButton } from '@/components/Button';
@@ -17,7 +16,6 @@ import { PassportCard } from '@/components/wallet/PassportCard';
 import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, PassSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -106,13 +104,13 @@ function Unlocked() {
           <Pressable accessibilityRole="button" accessibilityLabel={t('wallet.add')} onPress={() => { buzz('tap'); setSheet('add'); }} style={styles.plus} testID="wallet-add"><Icon name="plus" color={colors.mist} /></Pressable>
         </View>
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityLabel={t('wallet.whose')}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }} accessibilityLabel={t('wallet.whose')}>
           {list.map((p) => {
             const pv = validity(p, trip);
             const dot = !p.passport ? DOT.none : pv.kind === 'blocked' || pv.kind === 'expired' || pv.kind === 'spare' ? DOT.warn : DOT.ok;
             return <Chip key={p.id} on={who?.id === p.id} label={name(p)} onPress={() => setWho(p.id)} icon={() => <View style={[styles.dot, { backgroundColor: dot }]} />} />;
           })}
-        </View>
+        </ScrollView>
 
         <PassportCard person={who} validity={v} isSelf={!!who?.isSelf} name={name(who)} onScan={() => scan()} />
 
@@ -162,13 +160,13 @@ function Unlocked() {
         )}
 
         <T v="eyebrow">{t('money.eyebrow')}</T>
-        <Animated.View entering={rise(1)}>
+        <View>
           <Pressable accessibilityRole="button" accessibilityLabel={t('money.credit')} onPress={() => { buzz('tap'); setSheet('credit'); }} style={[styles.credit, shadow('focal')]} testID="wallet-credit">
             <View style={styles.spread}><T v="eyebrow" color={colors.gold}>{t('money.credit')}</T><PayMark brand="credit" size={22} /></View>
             <T style={{ fontFamily: ff.ui600, fontSize: 34, lineHeight: 40, letterSpacing: -1, color: colors.mist, fontVariant: ['tabular-nums'] }}>{formatSar(bal)}</T>
             <T v="tiny" color={colors.onDark2}>{bal ? t('money.credit.used') : t('money.credit.zero')}</T>
           </Pressable>
-        </Animated.View>
+        </View>
         <Card onPress={() => setSheet('cards')} accessibilityLabel={t('money.cards')} style={styles.rowCard}>
           <View style={{ flexDirection: 'row' }}>{(savedCards.length ? savedCards.slice(0, 3) : [{ id: 'applepay', brand: 'applepay' as const }]).map((c, i) => <View key={c.id} style={{ marginStart: i ? -8 : 0 }}><PayMark brand={c.brand} size={24} /></View>)}</View>
           <View style={{ flex: 1, marginStart: 8 }}>
@@ -207,7 +205,7 @@ function ValidityCard({ v, who, name, trip, onRenew }: { v: Validity; who: Perso
     default: break;
   }
   return (
-    <Animated.View entering={rise(1)}>
+    <View>
       <Card style={{ gap: 10 }}>
         <T v="h3" testID="validity-head">{head}</T>
         {body ? <T v="small">{body}</T> : null}
@@ -227,7 +225,7 @@ function ValidityCard({ v, who, name, trip, onRenew }: { v: Validity; who: Perso
           <Button variant="secondary" size="small" block={false} label={t('wallet.copyNumber')} onPress={() => copyMasked(who.passport!.numberMasked)} style={{ backgroundColor: colors.mist }} />
         </View>
       </Card>
-    </Animated.View>
+    </View>
   );
 }
 

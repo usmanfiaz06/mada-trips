@@ -35,7 +35,6 @@ export function CardsSheet({ visible, current, credit, onPick, onClose }: { visi
   const [touched, setTouched] = useState<{ number?: boolean; expiry?: boolean }>({});
   const [busy, setBusy] = useState(false);
   const c = cardProblems({ number: num, expiry: exp, cvv, name }, todayIn(), touched);
-  useEffect(() => { if (!visible) { setAdding(false); setNum(''); setExp(''); setCvv(''); setName(''); setTouched({}); } }, [visible]);
   const use = async () => {
     if (!c.ok || !c.brand) return;
     setBusy(true);
@@ -98,7 +97,6 @@ export function ApplePaySheet({ visible, amount, what, onDone, onClose }: { visi
   const cards = useCards();
   const walletCard = cards.data?.cards[0]?.label ?? t('pay.apple.card');
   const [stage, setStage] = useState<'wait' | 'ok' | 'failed'>('wait');
-  useEffect(() => { if (visible) setStage('wait'); }, [visible]);
   useEffect(() => {
     if (!visible || stage !== 'wait') return undefined;
     const tm = setTimeout(() => { if (fail) { setStage('failed'); buzz('warn'); } else { setStage('ok'); buzz('success'); setTimeout(onDone, 700); } }, 1600);
@@ -135,7 +133,6 @@ export function ThreeDsSheet({ visible, label, brand, amount, triesLeft, stopped
 }) {
   const [otp, setOtp] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (visible) setOtp(''); }, [visible, triesLeft]);
   const wrong = triesLeft < 3 && !stopped;
   return (
     <Sheet visible={visible} onClose={onClose} label={t('pay.3ds.title')}>

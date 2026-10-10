@@ -211,16 +211,16 @@ export function PassSheet({ visible, onClose, seg, people }: { visible: boolean;
       </View>
       {n > 1 ? (
         <View style={styles.spread}>
-          <Button variant="secondary" size="small" block={false} label={t('wallet.pass.previous')} disabled={k === 0} onPress={() => setI(k - 1)} />
+          <Button variant="secondary" style={well} size="small" block={false} label={t('wallet.pass.previous')} disabled={k === 0} onPress={() => setI(k - 1)} />
           <T v="tiny">{t('wallet.pass.of', { n: k + 1, count: n })}</T>
-          <Button variant="secondary" size="small" block={false} label={t('wallet.pass.next')} disabled={k === n - 1} onPress={() => setI(k + 1)} />
+          <Button variant="secondary" style={well} size="small" block={false} label={t('wallet.pass.next')} disabled={k === n - 1} onPress={() => setI(k + 1)} />
         </View>
       ) : null}
       <View style={styles.qr} accessibilityRole="image" accessibilityLabel={t('wallet.pass.code')}>
         {cells.map((on, x) => <View key={x} style={{ width: 200 / 21, height: 200 / 21, backgroundColor: on ? '#0f1a16' : colors.white }} />)}
       </View>
       <T v="small" style={{ textAlign: 'center' }}>{t('wallet.pass.bright')}</T>
-      <Button variant="secondary" label={t('wallet.pass.appleWallet')} onPress={() => toast(t('error.notConfigured'))} />
+      <Button variant="secondary" style={well} label={t('wallet.pass.appleWallet')} onPress={() => toast(t('error.notConfigured'))} />
     </Sheet>
   );
 }
@@ -234,6 +234,8 @@ export function CreditSheet({ visible, onClose }: { visible: boolean; onClose: (
   const credit = useCredit();
   const cards = useCards();
   const [busy, setBusy] = useState(false);
+  const { refetch } = credit;
+  useEffect(() => { if (visible) refetch(); }, [visible, refetch]);
   const bal = credit.data?.balance.amount ?? 0;
   const card = cards.data?.cards.find((c) => c.id === cards.data?.defaultId) ?? cards.data?.cards[0];
   const move = async () => {
@@ -259,7 +261,7 @@ export function CreditSheet({ visible, onClose }: { visible: boolean; onClose: (
           <T style={{ fontFamily: ff.ui600, fontSize: 15, color: e.amount > 0 ? colors.ok : colors.green, fontVariant: ['tabular-nums'] }}>{formatSar(e.amount, { sign: true })}</T>
         </View>
       ))}
-      {bal > 0 && card ? <Button variant="secondary" label={t('money.credit.move')} busy={busy} onPress={move} testID="credit-move" /> : null}
+      {bal > 0 && card ? <Button variant="secondary" style={well} label={t('money.credit.move')} busy={busy} onPress={move} testID="credit-move" /> : null}
     </Sheet>
   );
 }
@@ -360,7 +362,7 @@ export function CardsSheet({ visible, onClose, onPicked }: { visible: boolean; o
           <T v="tiny">{t('cards.note')}{API_MODE === 'mock' ? ` ${t('cards.test')}` : ''}</T>
           <Button label={t('cards.use')} disabled={!ok} busy={busy} onPress={add} testID="card-use" />
         </View>
-      ) : <Button variant="secondary" icon={<Icon name="plus" />} label={t('cards.add')} onPress={() => setAdding(true)} testID="card-add" />}
+      ) : <Button variant="secondary" style={well} icon={<Icon name="plus" />} label={t('cards.add')} onPress={() => setAdding(true)} testID="card-add" />}
     </Sheet>
   );
 }
@@ -370,6 +372,9 @@ export async function copyMasked(masked: string) {
   try { await Clipboard.setStringAsync(masked); } catch { /* the toast still shows it */ }
   toast(t('wallet.copyNumber.masked', { number: masked }));
 }
+
+/** Secondary buttons on a sheet sit on mist, not paper (prototype .sheet .btn.secondary). */
+const well = { backgroundColor: colors.mist };
 
 const styles = StyleSheet.create({
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },

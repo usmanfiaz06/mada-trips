@@ -7,7 +7,6 @@ import { DESTINATIONS, addDays, formatSar, householdOf, quickDates, type AskInte
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
@@ -18,7 +17,7 @@ import { VGradient } from '../Gradient';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import type { Cta } from './FlightFlow';
 import { rangeName } from './format';
-import { ArtSuitcase, Photo, Working, useSequence } from './parts';
+import { ArtSuitcase, Photo, Working, useSequence, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 
@@ -71,14 +70,14 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   }
   return (
     <View style={{ gap: 12 }}>
-      <Animated.View entering={rise(0)} style={{ gap: 2 }}>
+      <Animated.View entering={enter(0)} style={{ gap: 2 }}>
         <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('search.stays.title')}</T>
         <T v="small">{t('search.stays.sub', { dates: rangeName(checkIn, checkOut, today), nights, rooms: cur?.roomsLabel ?? '' })}</T>
       </Animated.View>
       {s.options.map((h, i) => {
         const on = cur?.id === h.id;
         return (
-          <Animated.View key={h.id} entering={rise(i + 1)}>
+          <Animated.View key={h.id} entering={enter(i + 1)}>
             <Card padding={0} selected={on} onPress={() => setPick(h.id)} accessibilityLabel={h.name} style={{ overflow: 'hidden', gap: 0 }}>
               <View style={styles.photo}>
                 <Photo name={h.photo} focal={h.focal} />
@@ -115,7 +114,7 @@ export function PlanFlow({ query, people, today }: { query: string; people: Pers
   if (step < 3 || !plan) return <Working lines={steps} step={Math.min(step, 2)} />;
   const go = () => router.push({ pathname: '/ask/plan/[id]', params: { id } });
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 12 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 12 }}>
       <T v="h2">{t('plan.ready')}</T>
       <Pressable accessibilityRole="button" accessibilityLabel={plan.title} onPress={go} style={styles.planCard}>
         <Photo name={plan.photo} />
@@ -135,7 +134,7 @@ export function EsimFlow() {
   const router = useRouter();
   const n = 1;
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 12 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 12 }}>
       <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('esim.title')}</T>
       <Card>
         <View style={styles.spread}><T v="h3">{t('esim.plan')}</T><T style={styles.price}>{t('esim.each', { price: formatSar(3900) })}</T></View>

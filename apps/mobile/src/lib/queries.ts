@@ -1,6 +1,7 @@
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UpdateMeRequest } from '@mada/shared';
 import { ApiError, api } from './api';
+import './circles-join'; // Circles: resume joining from an invite link after sign-up
 import { useSession } from './session';
 
 /** Server state lives in React Query; never retry what the server refused on purpose (4xx). */

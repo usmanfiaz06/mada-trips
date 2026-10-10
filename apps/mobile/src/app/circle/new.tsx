@@ -28,7 +28,7 @@ export default function NewCircle() {
   const [stage, setStage] = useState<'name' | 'people'>('name');
   const [name, setName] = useState(params.name ?? '');
   const [cover, setCover] = useState<CoverKey | null>('alula');
-  const [picked, setPicked] = useState<PersonRef[]>([]);
+  const [chosen, setPicked] = useState<PersonRef[]>([]);
   const [q, setQ] = useState('');
   const [term, setTerm] = useState('');
   const [invite, setInvite] = useState(false);
@@ -38,16 +38,17 @@ export default function NewCircle() {
   const search = useSearch(term);
   useEffect(() => { const h = setTimeout(() => setTerm(q.trim()), 250); return () => clearTimeout(h); }, [q]);
 
-  const all = friends.data?.friends ?? [];
-  useEffect(() => {
-    if (params.with && !picked.length) { const f = all.find((x) => x.id === params.with); if (f) setPicked([f]); }
-  }, [params.with, all, picked.length]);
+  const all = useMemo(() => friends.data?.friends ?? [], [friends.data]);
+  // "Plan a trip together" arrives with that friend already picked, until they're taken off.
+  const [withOff, setWithOff] = useState(false);
+  const withF = params.with && !withOff ? all.find((x) => x.id === params.with) ?? null : null;
+  const picked = withF && !chosen.some((x) => x.id === withF.id) ? [withF, ...chosen] : chosen;
   const family = all.filter((f) => f.tag === 'family');
   const others = all.filter((f) => f.tag !== 'family');
   const dupe = (circles.data?.circles ?? []).some((c) => !c.dm && c.name.trim().toLowerCase() === name.trim().toLowerCase());
   const ok = name.trim().length >= 2 && !dupe;
   const isOn = (id: string) => picked.some((p) => p.id === id);
-  const toggle = (p: PersonRef) => { buzz('select'); setPicked(isOn(p.id) ? picked.filter((x) => x.id !== p.id) : [...picked, p]); };
+  const toggle = (p: PersonRef) => { buzz('select'); if (withF && p.id === withF.id) { setWithOff(true); return; } setPicked(isOn(p.id) ? chosen.filter((x) => x.id !== p.id) : [...chosen, p]); };
   const tag = useMemo(() => (id: string, rel?: string, mutual?: number) => (family.some((f) => f.id === id) || rel === 'family' ? t('circles.newCircle.tagFamily') : all.some((f) => f.id === id) || rel === 'friend' ? t('circles.newCircle.tagFriend') : t('circles.newCircle.tagMada', { count: mutual ?? 0 })), [family, all]);
   const create = useAct(circlesApi.create, () => [ck.list]);
   const make = () => create.mutate({ name: name.trim(), cover, invite: picked.map((p) => p.id) }, {

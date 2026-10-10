@@ -23,6 +23,19 @@ export const ERROR_CODES = {
   NOT_CONFIGURED: { status: 501, copy: 'error.notConfigured' },
   SUPPLIER_UNAVAILABLE: { status: 503, copy: 'error.notConfigured' },
   INTERNAL: { status: 500, copy: 'error.internal' },
+  // Resilience (FLOWS.md §12; status.ts has the client-side codes and what the app does with each).
+  /** A supplier's circuit is open or it didn't answer in time; `details.supplier` names it. Fails fast, never hangs. */
+  SUPPLIER_DOWN: { status: 503, copy: 'error.supplierDown' },
+  /** Planned maintenance (GET /config `maintenance.on`): the app shows its maintenance screen. */
+  MAINTENANCE: { status: 503, copy: 'error.maintenance' },
+  /** The app is older than GET /config `minVersion`: the app shows its update screen. */
+  UPGRADE_REQUIRED: { status: 426, copy: 'error.upgradeRequired' },
+  /** An Idempotency-Key was reused with a different request. */
+  IDEMPOTENCY_CONFLICT: { status: 422, copy: 'error.idempotencyConflict' },
+  /** The first request with this Idempotency-Key is still running. Retry after `retryAfter`. */
+  IN_PROGRESS: { status: 409, copy: 'error.inProgress' },
+  /** The server gave up waiting on something (a supplier, the database). */
+  TIMEOUT: { status: 504, copy: 'error.timeout' },
 } as const satisfies Record<string, { status: number; copy: CopyKey }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;
@@ -38,6 +51,10 @@ export const ApiErrorBody = z.object({
     triesLeft: z.number().int().optional(),
     /** 429s: seconds until trying again makes sense. */
     retryAfter: z.number().int().optional(),
+    /** Code-specific facts, e.g. SUPPLIER_DOWN { supplier }, MAINTENANCE { until }, UPGRADE_REQUIRED { minVersion }. */
+    details: z.record(z.string(), z.unknown()).optional(),
+    /** The x-request-id of the request, for "Reference …" lines and support. */
+    requestId: z.string().max(80).optional(),
   }),
 });
 export type ApiErrorBody = z.infer<typeof ApiErrorBody>;

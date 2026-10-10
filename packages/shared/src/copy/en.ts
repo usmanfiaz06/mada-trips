@@ -11,6 +11,7 @@ import { enCircles } from './en-circles';
 import { bookingCopy } from './booking';
 import { deskCopy } from './desk';
 import { enTrips } from './en-trips';
+import { resilienceCopy } from './resilience';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -23,6 +24,8 @@ export const en = {
   ...deskCopy,
   // Trip companion (M3)
   ...enTrips,
+  // When things go wrong: offline, slow, busy, maintenance, updates, crashes (FLOWS.md §12): packages/shared/src/copy/resilience.ts
+  ...resilienceCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

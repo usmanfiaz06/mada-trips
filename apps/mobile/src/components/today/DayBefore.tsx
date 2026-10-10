@@ -15,6 +15,7 @@ import { colors, ff, radii, shadow } from '@/theme';
 import { TripHero } from './common';
 import { useTripLocal } from './local';
 
+type PackItem = { id: string; t: string; sub: string; people?: boolean; problem?: { firstName: string; id: string } | null; own?: boolean };
 const mins = (a: string, b: string) => { const [h1, m1] = a.split(':').map(Number); const [h2, m2] = b.split(':').map(Number); return h2! * 60 + m2! - (h1! * 60 + m1!); };
 
 /** What to pack, from the trip: passports checked against the Wallet, the plug, the weather, the kids. */
@@ -34,14 +35,14 @@ function packList(trip: TripDetail) {
     { id: 'mat', t: t('td.pack.mat'), sub: liveStay(trip) ? t('td.pack.matHotel') : t('td.pack.matCity', { city: trip.city }) },
     ...(kids.length ? [{ id: 'snacks', t: t('td.pack.snacks', { names: kids.join(` ${t('trip.and')} `) }), sub: t('td.pack.snacksSub', { dur: out ? `${Math.floor(out.durationMin / 60)}h ${out.durationMin % 60}m` : '' }) }] : []),
     { id: 'meds', t: t('td.pack.meds'), sub: t('td.pack.medsSub') },
-  ] as { id: string; t: string; sub: string; people?: boolean; problem?: { firstName: string; id: string } | null; own?: boolean }[];
+  ] as PackItem[];
 }
 
 function PackingList({ trip }: { trip: TripDetail }) {
   const router = useRouter();
   const [local, update] = useTripLocal(trip.id);
   const [draft, setDraft] = useState('');
-  const items = [...packList(trip), ...local.extra.map((x) => ({ id: x.id, t: x.t, sub: t('td.pack.yours'), own: true }))];
+  const items: PackItem[] = [...packList(trip), ...local.extra.map((x) => ({ id: x.id, t: x.t, sub: t('td.pack.yours'), own: true }))];
   const packed = local.packed.filter((id) => items.some((i) => i.id === id));
   const all = packed.length === items.length;
   const toggle = (id: string) => {
@@ -68,7 +69,7 @@ function PackingList({ trip }: { trip: TripDetail }) {
                   <Tiny color={it.problem ? colors.badInk : undefined}>{it.sub}</Tiny>
                 </Grow>
                 {it.people ? <View style={{ flexDirection: 'row' }}>{trip.travellers.slice(0, 4).map((p, i) => <View key={p.id} style={[styles.mini, i ? { marginStart: -8 } : null, it.problem?.id === p.id ? { backgroundColor: '#f3d9cf' } : null]}><T style={{ fontSize: 10, fontFamily: ff.ui600, color: it.problem?.id === p.id ? colors.badInk : colors.green }}>{p.initial}</T></View>)}</View> : null}
-                {it.own ? <Pressable accessibilityRole="button" accessibilityLabel={t('td.pack.remove', { item: it.t })} onPress={() => update((l) => ({ extra: l.extra.filter((x) => x.id !== it.id), packed: l.packed.filter((x) => x !== it.id) }))} style={styles.x}><Icon name="close" size={14} color={colors.ink2} /></Pressable> : null}
+                {it.own ? <Pressable accessibilityRole="button" accessibilityLabel={t('td.pack.remove', { what: it.t })} onPress={() => update((l) => ({ extra: l.extra.filter((x) => x.id !== it.id), packed: l.packed.filter((x) => x !== it.id) }))} style={styles.x}><Icon name="close" size={14} color={colors.ink2} /></Pressable> : null}
               </Pressable>
               {it.problem ? <View style={{ marginStart: 38, marginBottom: 8 }}><Button label={t('td.ready.fixPp', { name: it.problem.firstName })} variant="gold" size="small" block={false} onPress={() => router.push('/wallet')} /></View> : null}
             </View>

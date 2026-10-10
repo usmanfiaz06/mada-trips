@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,7 +16,7 @@ import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
-import { circlesApi, ck, useAct, useFriends, useInvites, whenLabel } from '@/lib/circles';
+import { circlesApi, ck, useAct, useFriends, useInvites, useSearch, whenLabel } from '@/lib/circles';
 import { API_MODE } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -37,7 +37,6 @@ export default function People() {
   const [phone, setPhone] = useState('');
   const [sent, setSent] = useState<string[]>([]);
   const [found, setFound] = useState<SearchHit[] | null>(null);
-  const [byPhone, setByPhone] = useState<{ digits: string; hit: SearchHit | null } | null>(null);
   const friends = useFriends();
   const invites = useInvites();
   const f = friends.data;
@@ -54,12 +53,8 @@ export default function People() {
 
   const digits = phone.replace(/\D/g, '').replace(/^0/, '');
   const check = checkSaudiMobile(digits);
-  useEffect(() => {
-    if (!check.ok) { setByPhone(null); return; }
-    let live = true;
-    circlesApi.search(check.e164).then((r) => { if (live) setByPhone({ digits, hit: r.people[0] ?? null }); }).catch(() => {});
-    return () => { live = false; };
-  }, [digits]); // eslint-disable-line react-hooks/exhaustive-deps
+  const phoneSearch = useSearch(check.ok ? check.e164 : '');
+  const byPhone = check.ok && phoneSearch.isSuccess && !phoneSearch.isPlaceholderData ? { digits, hit: phoneSearch.data.people[0] ?? null } : null;
 
   const askFriend = (p: { id: string; short: string }) => add.mutate(p.id, { onSuccess: (r) => { buzz('tap'); setSent([...sent, p.id]); toast(r.status === 'friends' ? t('circles.people.friendsNow', { name: p.short }) : t('circles.addFriends.requestSent')); }, onError: fail });
   const contacts = async () => {

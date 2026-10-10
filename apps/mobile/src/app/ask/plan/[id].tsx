@@ -12,12 +12,11 @@ import { Icon } from '@/components/Icon';
 import { Act, Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { Pill } from '@/components/Pill';
 import { T } from '@/components/Text';
-import { ChipWrap, Photo, Toggle } from '@/components/booking/parts';
+import { ChipWrap, Photo, Toggle, enter } from '@/components/booking/parts';
 import { usePayDraft, usePlan } from '@/lib/booking';
 import { circlesApi, ck, useSaved } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { usePeople } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { colors, font, ff } from '@/theme';
@@ -74,7 +73,7 @@ export default function PlanScreen() {
         <ChipWrap>{p.plan.map((d, i) => <Toggle key={d.day} label={d.day} on={day === i} onPress={() => setDay(i)} />)}</ChipWrap>
         <View key={day}>
           {p.plan[day]!.stops.map((st, i, arr) => (
-            <Animated.View key={st.title} entering={rise(i)} style={styles.item}>
+            <Animated.View key={st.title} entering={enter(i)} style={styles.item}>
               <View style={styles.rail}>
                 <View style={styles.dot}><Icon name={st.icon} size={18} /></View>
                 {i < arr.length - 1 ? <View style={styles.bar} /> : null}

@@ -100,6 +100,9 @@ function stateOf(u: MockUser): State {
   return s;
 }
 
+/** mock-api calls this once for the demo account, so the family is there before the first /people. */
+export function walletSeed(u: MockUser) { stateOf(u); }
+
 /* ───────────── helpers ───────────── */
 
 const balance = (s: State) => s.credit.reduce((a, e) => a + e.amount, 0);

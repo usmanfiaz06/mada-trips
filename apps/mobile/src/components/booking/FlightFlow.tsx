@@ -10,7 +10,6 @@ import {
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
@@ -21,7 +20,7 @@ import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
-import { ArtCalendar, Ask1, Leg, Notice, Working, useSequence } from './parts';
+import { ArtCalendar, Ask1, Leg, Notice, Working, useSequence, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
@@ -111,7 +110,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       <View style={{ gap: 12 }}>
         <Ask1 q={t('ask.q.where')} options={[...ASK_CITIES, [t('ask.q.elsewhere'), 'other']]} onPick={(v) => (v === 'other' ? setAskingCity(true) : setWhere({ key: v, other: null }))} />
         {askingCity ? (
-          <Animated.View entering={rise(0)} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+          <Animated.View entering={enter(0)} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
             <View style={{ flex: 1, gap: 6 }}>
               <T v="small" style={{ fontFamily: ff.ui600 }}>{t('ask.q.whichCity')}</T>
               <TextInput value={cityDraft} onChangeText={setCityDraft} placeholder={t('ask.q.cityHint')} placeholderTextColor={colors.muted} autoFocus={Platform.OS !== 'web'} accessibilityLabel={t('ask.q.whichCity')}
@@ -162,7 +161,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   if (!whoDone) {
     const self = people.find((p) => p.id === who[0]);
     return (
-      <Animated.View entering={rise(0)} style={{ gap: 12 }}>
+      <Animated.View entering={enter(0)} style={{ gap: 12 }}>
         <T v="h2">{t('ask.q.who')}</T>
         {intent.travellerCount && intent.travellerCount > who.length ? <T v="small">{t('ask.q.whoSaid', { count: intent.travellerCount })}</T> : null}
         <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} />
@@ -186,7 +185,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   if (s.outcome === 'partial' && mode === 'normal') {
     const airline = s.unavailable[0]?.airline ?? '';
     return (
-      <Animated.View entering={rise(0)} style={{ gap: 12 }}>
+      <Animated.View entering={enter(0)} style={{ gap: 12 }}>
         <Notice icon="flight" warn title={t('search.down.title', { airline })}><T v="small">{t('search.down.body', { airline })}</T></Notice>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Button size="small" block={false} label={t('search.down.others')} onPress={() => setMode('others')} />
@@ -215,9 +214,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const words = [t('search.ways.one'), t('search.ways.two'), t('search.ways.three')];
   return (
     <View style={{ gap: 12 }}>
-      <Animated.View entering={rise(0)} style={styles.rowTiny}><Icon name="check" color={colors.ok} size={16} width={2.4} /><T v="tiny">{t('search.checked', { count: s.checked, people: who.length })}</T></Animated.View>
+      <Animated.View entering={enter(0)} style={styles.rowTiny}><Icon name="check" color={colors.ok} size={16} width={2.4} /><T v="tiny">{t('search.checked', { count: s.checked, people: who.length })}</T></Animated.View>
       {blocking.length ? <T v="small" color={colors.goldInk}>{blocking.length === 1 ? t('search.blocking.one') : t('search.blocking.other', { count: blocking.length })}</T> : null}
-      <Animated.View entering={rise(1)}><T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{words[Math.min(options.length, 3) - 1]}</T></Animated.View>
+      <Animated.View entering={enter(1)}><T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{words[Math.min(options.length, 3) - 1]}</T></Animated.View>
       {intent.cabinNote ? <T v="small">{intent.cabinNote}</T> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={t('search.a11y.edit')} onPress={() => setEditing({})} style={styles.summary} testID="search-edit">
         <View style={{ flex: 1, gap: 1 }}>
@@ -236,7 +235,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       {options.map((f, i) => {
         const on = current?.id === f.id;
         return (
-          <Animated.View key={f.id} entering={rise(i + 2)}>
+          <Animated.View key={f.id} entering={enter(i + 2)}>
             <Card padding={0} selected={on} style={{ gap: 0 }}>
               <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${f.airline}, ${formatSar(f.total.amount)}`}
                 onPress={() => { buzz('select'); if (on) setOpen(open === f.id ? null : f.id); else { setPick(f.id); setOpen(null); } }} style={styles.opt} testID={`flight-${f.out.flightNumber}`}>
@@ -254,7 +253,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
                 <T v="small">{f.reason}</T>
               </Pressable>
               {on && open === f.id ? (
-                <Animated.View entering={rise(0)} style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 8 }}>
+                <Animated.View entering={enter(0)} style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 8 }}>
                   <View style={styles.divider} />
                   {([[t('search.rule.bags'), f.bags], [t('search.rule.change'), f.changeRule], [t('search.rule.cancel'), f.refundRule],
                     ...(f.back ? [[t('search.rule.return'), `${f.back.flightNumber} · ${dayName(f.back.date, today)}`]] : []),

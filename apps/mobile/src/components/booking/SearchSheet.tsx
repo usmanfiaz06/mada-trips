@@ -28,7 +28,6 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
   const initial = value.dep ? idxOf(value.dep) : month ? months.findIndex((m) => m.month0 === month.month - 1 && m.year === month.year) : 0;
   const [page, setPage] = useState(Math.max(0, initial));
   const strip = useRef<ScrollView>(null);
-  useEffect(() => { if (visible) { setS(value); setPickRet(value.type === 'return' && !!value.dep && !value.ret); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { strip.current?.scrollTo({ x: Math.max(0, page * 62 - 120), animated: true }); }, [page]);
   const pm = months[page]!;
   const daysIn = new Date(Date.UTC(pm.year, pm.month0 + 1, 0)).getUTCDate();

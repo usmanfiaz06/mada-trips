@@ -41,7 +41,8 @@ async function sources(now: Date) {
     }
   }
   for (const r of requests) {
-    if (r.status === "sent" || r.status === "reviewing") {
+    // Cancellations and refunds are decided in the refunds queue, not quoted.
+    if ((r.status === "sent" || r.status === "reviewing") && r.kind !== "cancel" && r.kind !== "refund") {
       raw.push({ kind: "request", id: r.id, title: r.summary, note: "Needs a quote", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.createdAt, now, { due: r.promisedBy }), amount: null });
     } else if (r.status === "with_agent") {
       raw.push({ kind: "request", id: r.id, title: r.summary, note: "Paid, finish it", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.updatedAt, now, { targetMinutes: 24 * 60 }), amount: null });

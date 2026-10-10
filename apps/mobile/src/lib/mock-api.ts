@@ -4,7 +4,7 @@ import {
   UpdateMeRequest, PassportInput,
 } from '@mada/shared';
 import type { Wire, WireResponse } from './api';
-import { walletMock } from './mock/wallet';
+import { walletMock, walletSeed } from './mock/wallet';
 import { bookingMock } from './mock/booking';
 import { circlesMock } from './mock/circles';
 import { tripsMock } from './mock/trips';
@@ -51,7 +51,7 @@ function newUser(phone: string | null, extra: Partial<User> = {}): MockUser {
 }
 
 // The demo account the prototype ships with.
-newUser('+966500004127', { name: 'Omar', notifications: 'allowed', onboardedAt: '2026-04-01T09:00:00.000Z' });
+walletSeed(newUser('+966500004127', { name: 'Omar', notifications: 'allowed', onboardedAt: '2026-04-01T09:00:00.000Z' }));
 
 function issue(userId: string): AuthTokens {
   const a = `mock.${rid()}.${rid()}`;

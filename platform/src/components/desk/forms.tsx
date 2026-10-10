@@ -113,9 +113,9 @@ export function QuoteBuilder({ action, requestId, people, defaultKind }: { actio
         {state?.ok && <div role="status" className="rounded-xl bg-ok-soft px-3 py-2 text-[13px] text-ok">{t(state.ok)}</div>}
         <div className="space-y-2">
           {lines.map((l) => (
-            <div key={l.key} className="grid grid-cols-[minmax(0,1fr)_110px_32px] gap-2 sm:grid-cols-[minmax(0,1fr)_120px_130px_32px]">
-              <input name="lineLabel" value={l.label} onChange={(e) => set(l.key, { label: e.target.value })} placeholder={t("What it's for")} className="field" maxLength={80} aria-label={t("Line")} />
-              <select name="lineKind" value={l.kind} onChange={(e) => set(l.key, { kind: e.target.value })} className="field hidden sm:block" aria-label={t("Type")}>
+            <div key={l.key} className="grid grid-cols-[minmax(0,1fr)_120px_32px] gap-2 rounded-2xl bg-surface-2 p-2">
+              <input name="lineLabel" value={l.label} onChange={(e) => set(l.key, { label: e.target.value })} placeholder={t("What it's for")} className="field col-span-3" maxLength={80} aria-label={t("Line")} />
+              <select name="lineKind" value={l.kind} onChange={(e) => set(l.key, { kind: e.target.value })} className="field" aria-label={t("Type")}>
                 {KINDS.map((k) => <option key={k} value={k}>{t(k[0]!.toUpperCase() + k.slice(1))}</option>)}
               </select>
               <input name="lineAmount" value={l.amount} onChange={(e) => set(l.key, { amount: e.target.value })} inputMode="decimal" placeholder="0" className="field num text-end" dir="ltr" aria-label={t("Amount (SAR)")} />

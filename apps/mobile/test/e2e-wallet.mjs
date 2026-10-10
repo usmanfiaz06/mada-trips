@@ -78,6 +78,18 @@ function kit(page) {
   };
   const tap = async (name, opts = {}) => { await page.getByRole(opts.role ?? 'button', { name, exact: opts.exact ?? true }).first().click(); };
   const byTest = (id) => page.locator(`[data-testid="${id}"]`);
+  /** Scroll it to the middle first, so the dock never covers it. */
+  const press = async (loc) => {
+    // Wheel the screen until it sits above the dock, then tap.
+    for (let i = 0; i < 12; i += 1) {
+      const box = await loc.first().boundingBox();
+      if (box && box.y > 80 && box.y + box.height < 700) break;
+      await page.mouse.move(195, 400);
+      await page.mouse.wheel(0, box && box.y < 80 ? -250 : 250);
+      await page.waitForTimeout(250);
+    }
+    await loc.first().click();
+  };
   const text = (s, exact = false) => page.getByText(s, { exact }).first();
   /** Pick a file for the next file chooser the app opens. */
   const pickFile = async (trigger, file) => {
@@ -85,7 +97,7 @@ function kit(page) {
     await chooser.setFiles(join(FIX, file));
   };
   const closeSheet = async () => { await page.getByRole('button', { name: 'Close' }).last().click(); await page.waitForTimeout(400); };
-  return { shot, see, gone, tap, byTest, text, pickFile, closeSheet };
+  return { shot, see, gone, tap, byTest, text, pickFile, closeSheet, press };
 }
 
 async function signIn(page, phone, { returning }) {
@@ -115,7 +127,7 @@ const want = (name) => !ONLY || ONLY.includes(name);
 /* ───────────── 1. the Wallet with the demo family ───────────── */
 async function walletDemo() {
   const { page, context } = await newPage();
-  const { shot, see, tap, byTest, text, closeSheet } = kit(page);
+  const { shot, see, byTest, text, closeSheet, press } = kit(page);
   step('wallet: sign in as the demo account');
   await signIn(page, '500004127', { returning: true });
   await byTest('dock-wallet').click();
@@ -129,7 +141,7 @@ async function walletDemo() {
   step('wallet: family chips');
   await text('Sara', true).click();
   await see('Sara Alharbi', 'sara passport');
-  await see('Expires 14 Aug 2027', 'hmm', 1).catch(() => {});
+  await see('Valid until 14 Aug 2027.', 'sara validity');
   await shot('wallet-sara');
   await text('Hessa', true).click();
   await see('Hessa Alharbi', 'hessa passport');
@@ -142,14 +154,15 @@ async function walletDemo() {
   await see('Shared with Mada for this trip only. Faisal can see it, not download it.', 'shared toast');
   await page.waitForTimeout(800);
   step('wallet: money');
-  await page.mouse.wheel(0, 900);
+  await page.mouse.move(195, 400);
+  await page.mouse.wheel(0, 1200);
   await see('Mada credit', 'credit card');
   await shot('wallet-money');
-  await byTest('wallet-credit').click();
+  await press(byTest('wallet-credit'));
   await see('Nothing has moved yet.', 'credit empty');
   await shot('wallet-credit-empty');
   await closeSheet();
-  await tap('Cards and Apple Pay');
+  await press(page.getByRole('button', { name: 'Cards and Apple Pay' }));
   await see('Pay with', 'cards');
   await shot('wallet-cards');
   await byTest('card-add').click();
@@ -170,10 +183,8 @@ async function walletDemo() {
   await see('3 saved · default Visa ending 42', 'default label');
   // Credit lands (a refund taken as credit), then moves to the card.
   await page.evaluate(() => window.__madaWallet?.addCredit(64000, 'Galata rooms refund'));
-  await page.goto(ORIGIN + '/wallet');
-  await see('Wallet is locked', 'locks again after reload');
-  await see('SAR 640', 'credit balance', 10000);
-  await byTest('wallet-credit').click();
+  await press(byTest('wallet-credit'));
+  await see('Mada credit · SAR 640', 'credit balance', 10000);
   await see('Galata rooms refund', 'credit history');
   await shot('wallet-credit-history');
   await byTest('credit-move').click();

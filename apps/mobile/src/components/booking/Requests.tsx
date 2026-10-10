@@ -10,14 +10,13 @@ import {
 import { bookingApi, bookingKeys, sendRequest, useBookingRequest, usePayDraft, useThread } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { toast } from '@/lib/toast';
 import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { T } from '../Text';
-import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle } from './parts';
+import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter } from './parts';
 import { TravellerChips } from './Travellers';
 
 /* Requests a person at Mada completes: one question at a time, per-person needs, a note, then the quote and the thread. */
@@ -56,7 +55,11 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
       onSent?.(r?.id ?? null);
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); }
   };
-  useEffect(() => { if (autoSend && !sent) void send(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!autoSend || sent) return undefined;
+    const id = setTimeout(() => { void send(); }, 0);
+    return () => clearTimeout(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (sent) return <SentRequest id={sent.id} people={people} selfName={selfName} />;
   if (autoSend) return null;
@@ -66,7 +69,7 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
       {sysNote ? <Notice icon="doc"><T v="small">{sysNote}</T></Notice> : null}
       {kind === 'umrah' ? <Notice icon="umrah" warn><T v="small">{t('request.umrahNusuk')}</T></Notice> : null}
       {form.map((f, i) => (i > (done ? form.length : firstOpen) ? null : (
-        <Animated.View key={f.k} entering={rise(0)} style={{ gap: 10 }}>
+        <Animated.View key={f.k} entering={enter(0)} style={{ gap: 10 }}>
           <T v="h2">{t(f.q as CopyKey)}</T>
           {f.people ? (
             <>
@@ -112,7 +115,7 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
         </Animated.View>
       )))}
       {done ? (
-        <Animated.View entering={rise(0)} style={{ gap: 10 }}>
+        <Animated.View entering={enter(0)} style={{ gap: 10 }}>
           {form.length ? (
             <View style={{ gap: 6 }}>
               <T v="small" style={{ fontFamily: ff.ui600 }}>{t('request.note.label')}</T>
@@ -138,7 +141,7 @@ export function SentRequest({ id }: { id: string | null; people?: Person[]; self
   const r = q.data;
   if (!id) {
     return (
-      <Animated.View entering={rise(0)} style={{ gap: 14 }}>
+      <Animated.View entering={enter(0)} style={{ gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
           <MadaDot size={40} />
           <View style={{ flex: 1 }}><T v="h3">{t('request.queued')}</T><T v="small">{t('request.sentBody')}</T></View>
@@ -151,7 +154,7 @@ export function SentRequest({ id }: { id: string | null; people?: Person[]; self
   const answered = ['quoted', 'paid', 'done'].includes(r.status);
   const agent = r.agent?.name ?? 'Mada';
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 14 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
         <AgentDot name={agent} size={40} />
         <View style={{ flex: 1 }}>
@@ -252,7 +255,7 @@ export function RequestThread({ request }: { request: BookingRequestView }) {
 /** A city we don't sell live: Mada searches it by hand and replies in the request. */
 export function ByHand({ city, stay, queued }: { city: string; stay?: boolean; queued?: boolean }) {
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 14 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
       <View style={styles.stage}><ArtMap /></View>
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
         <MadaDot size={40} />

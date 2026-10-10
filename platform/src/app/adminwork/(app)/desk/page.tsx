@@ -109,13 +109,12 @@ export default async function DeskInbox({ searchParams }: { searchParams: Promis
 
       <Card pad={false} className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-1.5 border-b border-line p-3 sm:px-4">
-          {FILTERS.map((f, i) => {
+          {FILTERS.map((f) => {
             const n = f === "team" ? counts.all : counts[f];
             return (
               <Link key={f} href={href(f)} className={cx("inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13.5px] transition", filter === f ? "bg-ink text-bg" : "text-ink-2 hover:bg-sunken")}>
                 {t(f === "mine" ? "Mine" : f === "team" ? "Whole team" : f === "unassigned" ? "Unassigned" : "Escalations")}
                 <span className={cx("num rounded-full px-1.5 text-[11px]", filter === f ? "bg-gold text-[#1a140a]" : f === "escalated" && n ? "bg-bad-soft text-bad" : "bg-sunken text-ink-3")}>{n}</span>
-                <kbd className="hidden text-[10.5px] opacity-40 lg:inline">{i + 1}</kbd>
               </Link>
             );
           })}

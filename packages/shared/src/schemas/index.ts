@@ -14,3 +14,4 @@ export * from './wallet';
 export * from './circles';
 export * from './desk';
 export * from './booking';
+export * from './status';

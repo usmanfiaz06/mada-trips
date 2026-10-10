@@ -5,13 +5,12 @@ import { addDays, type EntryCheckResponse } from '@mada/shared';
 import { sendRequest } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { toast } from '@/lib/toast';
 import { colors } from '@/theme';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import { T } from '../Text';
-import { Notice } from './parts';
+import { Notice, enter } from './parts';
 
 /* Everything that could stop someone boarding, before anyone pays (FLOWS.md §2). Blocking checks hold the review. */
 
@@ -32,7 +31,7 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
   };
   return (
     <View style={{ gap: 10 }}>
-      <Animated.View entering={rise(0)} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+      <Animated.View entering={enter(0)} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
         <Icon name="check" color={colors.ok} size={14} width={2.4} />
         <T v="tiny" style={{ flex: 1 }}>{t('entry.checked', { what })}{!result.checks.length && result.okText ? ` · ${result.okText}` : ''}</T>
       </Animated.View>
@@ -40,7 +39,7 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
         const k = `${c.personId ?? 'all'}:${c.key}`;
         if (c.done || (c.info && c.key !== 'eta')) {
           return (
-            <Animated.View key={k} entering={rise(0)} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <Animated.View key={k} entering={enter(0)} style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
               <Icon name={c.done ? 'check' : 'doc'} size={16} color={c.done ? colors.ok : colors.goldInk} width={2.2} />
               <T v="small" color={colors.green} style={{ flex: 1 }}>{c.text}</T>
             </Animated.View>
@@ -48,7 +47,7 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
         }
         if (c.key === 'eta') {
           return (
-            <Animated.View key={k} entering={rise(0)}>
+            <Animated.View key={k} entering={enter(0)}>
               <Notice icon="visa">
                 <T v="small" color={colors.green}>{c.text}</T>
                 <Button size="small" block={false} variant="secondary" style={{ alignSelf: 'flex-start', marginTop: 4, backgroundColor: colors.mist }} label={t('entry.eta.ask')} disabled={asked[k]} onPress={() => ask(k, 'uk_eta', null, null, c.answerKey)} />
@@ -57,7 +56,7 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
           );
         }
         return (
-          <Animated.View key={k} entering={rise(0)}>
+          <Animated.View key={k} entering={enter(0)}>
             <Notice icon="visa" warn title={c.title ?? undefined}>
               <T v="small">{c.text}</T>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>

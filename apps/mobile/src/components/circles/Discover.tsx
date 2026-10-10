@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -12,7 +11,6 @@ import { T } from '@/components/Text';
 import { COVERS, photoSource, useDiscover, usePosts } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { colors, ff, font } from '@/theme';
 import { ArtMap } from './art';
 import { useSaveToggle } from './hooks';
@@ -92,11 +90,11 @@ export function Discover({ onPost, onOpen }: { onPost: (city: string) => void; o
           ideas={filter ? [[t('circles.discover.empty.allTips'), () => setFilter(null)]] : undefined} />
       ) : null}
 
-      {feed.map((p, i) => {
+      {feed.map((p) => {
         const on = isSaved('post', p.id);
         const src = photoSource(p);
         return (
-          <Animated.View key={p.id} entering={rise(i)}>
+          <View key={p.id}>
             <Pressable accessibilityRole="button" accessibilityLabel={p.place} onPress={() => onOpen(p)} style={[s.story, src ? { minHeight: 380 } : s.plain]} testID="tip-card">
               {src ? <PhotoFill source={src} veil="story" position="50% 55%" /> : null}
               <View style={s.top}>
@@ -123,7 +121,7 @@ export function Discover({ onPost, onOpen }: { onPost: (city: string) => void; o
                 </View>
               </View>
             </Pressable>
-          </Animated.View>
+          </View>
         );
       })}
 

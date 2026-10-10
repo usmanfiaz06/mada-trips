@@ -55,7 +55,7 @@ export function DeskNav({ items }: { items: { href: string; label: string; count
   const path = usePathname();
   const current = items.filter((i) => (i.href === "/adminwork/desk" ? path === i.href : path === i.href || path.startsWith(i.href + "/"))).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
-    <nav className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label="Desk">
+    <nav className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" aria-label="Desk">
       {items.map((it) => {
         const on = current === it.href;
         return (

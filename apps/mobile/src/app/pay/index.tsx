@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -53,12 +53,12 @@ export default function Pay() {
   const [code, setCode] = useState('');
   const [codeErr, setCodeErr] = useState<string | null>(null);
   const [useCredit, setUseCredit] = useState(true);
-  const [method, setMethod] = useState<PayMethod | null>(null);
+  const [chosen, setMethod] = useState<PayMethod | null>(null);
   const [plan, setPlan] = useState<PayPlan>('full');
   const [sheet, setSheet] = useState<SheetName>(null);
   const [busy, setBusy] = useState(false);
   const [holdSkip, setHoldSkip] = useState(0);
-  const [accepted, setAccepted] = useState<OrderPreview | null>(null);
+  const [acceptedState, setAcceptedState] = useState<{ key: string; preview: OrderPreview } | null>(null);
   const [blocked, setBlocked] = useState('');
   const [threeDs, setThreeDs] = useState<{ orderId: string; triesLeft: number; stopped: boolean; amount: number } | null>(null);
   const key = useRef(newIdempotencyKey());
@@ -75,15 +75,14 @@ export default function Pay() {
     placeholderData: (p) => p,
     queryFn: async () => (await bookingApi.preview({ draft: draft!, promo, useCredit })).preview,
   });
+  // A price the traveller accepted after it moved holds until they change what they're booking.
+  const choiceKey = `${travellers.join()}|${promo}|${useCredit}`;
+  const accepted = acceptedState?.key === choiceKey ? acceptedState.preview : null;
+  const setAccepted = (pv: OrderPreview | null) => setAcceptedState(pv ? { key: choiceKey, preview: pv } : null);
   const p = accepted ?? previewQ.data;
-  useEffect(() => { setAccepted(null); }, [travellers.join(), promo, useCredit]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // The default way to pay: the default card, else Apple Pay.
-  useEffect(() => {
-    if (method || !cards.data) return;
-    const def = cards.data.cards.find((c) => c.id === cards.data!.defaultId);
-    setMethod(def ? { kind: 'card', id: def.id, label: def.label, brand: def.brand } : { kind: 'applepay', label: 'Apple Pay', brand: 'applepay' });
-  }, [cards.data, method]);
+  const def = cards.data?.cards.find((c) => c.id === cards.data!.defaultId);
+  const method: PayMethod | null = chosen ?? (!cards.data ? null : def ? { kind: 'card', id: def.id, label: def.label, brand: def.brand } : { kind: 'applepay', label: 'Apple Pay', brand: 'applepay' });
 
   if (!pd || !draft) {
     return (
@@ -103,7 +102,7 @@ export default function Pay() {
   const household = people.data ?? [];
   const H = householdOf(household, todayIn());
   const selfName = user?.name ?? '';
-  const hasPeople = 'travellerIds' in pd.draft && pd.draft.kind !== 'esim';
+  const hasPeople = 'travellerIds' in pd.draft;
 
   const tryCode = async () => {
     const c = code.trim().toUpperCase();
@@ -270,7 +269,7 @@ export default function Pay() {
         <T v="small">{t('pay.people.note')}</T>
         <Button label={t('pay.people.done', { price: formatSar(total) })} onPress={() => setSheet(null)} />
       </Sheet>
-      <CardsSheet visible={sheet === 'cards'} current={method} credit={p?.credit.balance.amount ?? 0} onPick={(m) => { setMethod(m); setSheet(null); }} onClose={() => setSheet(null)} />
+      {sheet === 'cards' ? <CardsSheet visible current={method} credit={p?.credit.balance.amount ?? 0} onPick={(m) => { setMethod(m); setSheet(null); }} onClose={() => setSheet(null)} /> : null}
       <Sheet visible={sheet === 'offline'} label={t('pay.offline.title')} onClose={() => setSheet(null)}>
         <T v="h2">{t('pay.offline.title')}</T>
         <T v="body">{t('pay.offline.body')}</T>
@@ -297,10 +296,10 @@ export default function Pay() {
         <T v="body">{blocked}</T>
         <Button label={t('common.back')} onPress={() => { setSheet(null); router.back(); }} />
       </Sheet>
-      <ApplePaySheet visible={sheet === 'applepay'} amount={total} what={p?.title ?? pd.title} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }}
-        onDone={async () => { setSheet(null); setBusy(true); try { await place({ method: 'applepay', token: `applepay_mock_${Date.now()}` }); } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); } }} />
-      {threeDs ? (
-        <ThreeDsSheet visible={sheet === '3ds'} label={method?.label ?? ''} brand={method?.brand ?? 'card'} amount={threeDs.amount} triesLeft={threeDs.triesLeft} stopped={threeDs.stopped}
+      {sheet === 'applepay' ? <ApplePaySheet visible amount={total} what={p?.title ?? pd.title} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }}
+        onDone={async () => { setSheet(null); setBusy(true); try { await place({ method: 'applepay', token: `applepay_mock_${Date.now()}` }); } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); } }} /> : null}
+      {threeDs && sheet === '3ds' ? (
+        <ThreeDsSheet visible label={method?.label ?? ''} brand={method?.brand ?? 'card'} amount={threeDs.amount} triesLeft={threeDs.triesLeft} stopped={threeDs.stopped}
           onCode={otp} onOther={() => setSheet('cards')} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }} />
       ) : null}
     </Screen>

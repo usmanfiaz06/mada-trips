@@ -24,9 +24,13 @@ export async function StatusPill({ agent, onShift, action }: { agent: { id: stri
         <Avatar name={agent.name} size={30} />
         <span className={cx("absolute -bottom-0.5 -end-0.5 size-3 rounded-full ring-2 ring-surface", STATUS[agent.status]?.dot ?? "bg-ink-4")} />
       </span>
-      <span className="pe-1 text-[12.5px] leading-tight">
+      <span className="hidden pe-1 text-[12.5px] leading-tight 2xl:block">
         <span className="block text-ink">{t("You're {name} to travellers", { name: agent.name })}</span>
         <span className="block text-ink-3">{onShift ? t("On shift") : t("Not on shift")}</span>
+      </span>
+      <span className="pe-1 text-[12.5px] leading-tight 2xl:hidden" title={t("You're {name} to travellers", { name: agent.name })}>
+        <span className="block text-ink">{agent.name}</span>
+        <span className="block text-[11.5px] text-ink-3">{onShift ? t("On shift") : t("Not on shift")}</span>
       </span>
       <form action={action} className="flex rounded-full bg-sunken p-0.5">
         <input type="hidden" name="agentId" value={agent.id} />
@@ -126,7 +130,7 @@ async function Bubble({ m, traveller }: { m: Msg; traveller: string }) {
     <div className={cx("flex items-end gap-2", mine ? "flex-row-reverse" : "")}>
       {m.authorKind === "mada" ? <span className="grid size-7 shrink-0 place-items-center rounded-full bg-brand"><img src={withBase("/symbol-sand.svg")} alt="" className="h-3 dark:hidden" /><img src={withBase("/symbol-green.svg")} alt="" className="hidden h-3 dark:block" /></span> : <Avatar name={who} size={28} />}
       <div className={cx("max-w-[78%] min-w-0", mine && "text-end")}>
-        <div className="mb-1 text-[11.5px] text-ink-3"><span className="font-medium text-ink-2">{who}</span>{m.authorKind === "agent" && <span> · {t("as {name}", { name: m.authorName ?? "" })}</span>} · <span title={fmtDate(m.createdAt, t.locale, true)}>{timeAgo(m.createdAt, t.locale)}</span></div>
+        <div className="mb-1 text-[11.5px] text-ink-3"><span className="font-medium text-ink-2">{who}</span> · <span title={fmtDate(m.createdAt, t.locale, true)}>{timeAgo(m.createdAt, t.locale)}</span></div>
         <div className={cx("inline-block max-w-full whitespace-pre-wrap break-words rounded-[18px] px-3.5 py-2 text-start text-[14px] leading-relaxed",
           m.authorKind === "user" ? "rounded-es-md bg-surface-2 text-ink ring-1 ring-line" : m.authorKind === "agent" ? "rounded-ee-md bg-ink text-bg" : "rounded-ee-md bg-brand text-brand-ink")}>
           {m.body}

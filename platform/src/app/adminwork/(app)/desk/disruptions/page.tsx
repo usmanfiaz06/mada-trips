@@ -115,7 +115,7 @@ function FlightCard({ f, focus, act, voucher, t, L }: { f: BoardFlight; focus: b
             {f.terminal && <span>{f.terminal}</span>}{f.gate && <span>{t("Gate {gate}", { gate: f.gate })}</span>}{f.source && <span>{f.source}</span>}
           </div>
           <div className="mt-4">
-            <div className="mb-2 text-[12px] font-medium text-ink-3">{t("{n} travellers on board", { n: f.travellerCount })}</div>
+            <div className="mb-2 text-[12px] font-medium text-ink-3">{f.travellerCount === 1 ? t("1 traveller on board") : t("{n} travellers on board", { n: f.travellerCount })}</div>
             <div className="flex flex-wrap gap-1.5">{f.travellers.map((x) => <span key={x.tripId} className="rounded-full bg-surface-2 px-2.5 py-1 text-[12.5px] text-ink-2 ring-1 ring-line">{x.name}{x.count > 1 ? ` +${x.count - 1}` : ""}</span>)}</div>
           </div>
           {f.plans.map((p) => (
@@ -135,12 +135,12 @@ function FlightCard({ f, focus, act, voucher, t, L }: { f: BoardFlight; focus: b
                   {[1, 2].map((i) => <div key={i} className="grid gap-1.5"><Input name="optionLabel" maxLength={60} placeholder={t("Option {n}", { n: i })} /><Input name="optionDetail" maxLength={140} placeholder={t("What it means for them")} /></div>)}
                 </div>
                 {voucher && <Field label={t("Voucher per account, as Mada credit (SAR, optional)")}><Input name="voucher" inputMode="decimal" placeholder="0" className="num w-40" dir="ltr" /></Field>}
-                <SubmitButton variant="gold" className="w-full sm:w-auto"><Send className="size-4 rtl:-scale-x-100" />{t("Send to {n} travellers", { n: f.travellers.length })}</SubmitButton>
+                <SubmitButton variant="gold" className="w-full sm:w-auto"><Send className="size-4 rtl:-scale-x-100" />{f.travellers.length === 1 ? t("Send to 1 account") : t("Send to {n} accounts", { n: f.travellers.length })}</SubmitButton>
               </ActionForm>
             </details>
           )}
         </div>
-        <div className="night relative flex flex-col justify-between p-5">
+        <div className="night relative flex flex-col justify-start gap-2 p-5">
           <RouteMap from={f.from} to={f.to} pos={f.position} />
           <div className="mt-3 grid grid-cols-3 gap-2 text-[11.5px] text-tile-ink-3">
             {f.position ? (

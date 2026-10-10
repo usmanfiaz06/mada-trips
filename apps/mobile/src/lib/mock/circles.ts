@@ -24,7 +24,7 @@ type Member = { circleId: string; userId: string; role: 'admin' | 'member'; mute
 type Invite = { id: string; kind: 'circle' | 'mada'; circleId: string | null; inviterId: string; inviteeId: string | null; phone: string | null; channel: 'app' | 'link' | 'sms' | 'whatsapp'; lookup: string | null; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; acceptedBy: string | null; remindedAt: number | null; expiresAt: number; at: number };
 type Friendship = { a: string; b: string; status: 'pending' | 'accepted'; tagA: string | null; tagB: string | null; at: number; acceptedAt: number | null };
 type PostRow = { id: string; authorId: string; city: string; place: string; body: string; kind: 'food' | 'todo'; audience: 'friends' | 'everyone'; photoKey: string | null; photoUrl: string | null; status: 'pending' | 'approved' | 'rejected'; approveAt: number | null; deleted: boolean; at: number };
-type Person = { id: string; full: string; short: string; phone: string | null; places: number; trips: number; going: string | null };
+type Person = { id: string; full: string; short: string; phone: string | null; places: number; trips: number; going: string | null; tone?: 'green' | 'gold' | 'default' };
 
 const now = () => Date.now();
 const uuid = () => '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
@@ -57,6 +57,8 @@ seedPerson(ID.reem, 'Reem Aldosari', '+966551000003', 14, 14);
 seedPerson(ID.hessa, 'Hessa Alharbi', '+966551000008', 9, 9);
 seedPerson(ID.sara, 'Sara Alharbi', null, 6, 6);
 seedPerson(ID.ahmed, 'Ahmed Alharbi', null, 6, 6);
+// The prototype's colours for its people.
+([[ID.abdullah, 'green'], [ID.noor, 'gold'], [ID.maha, 'gold'], [ID.yousef, 'green'], [ID.khalid, 'default'], [ID.faris, 'default'], [ID.reem, 'default'], [ID.hessa, 'default'], [ID.sara, 'default'], [ID.ahmed, 'default']] as const).forEach(([id, tone]) => { people.get(id)!.tone = tone; });
 
 const circles = new Map<string, CircleRow>();
 let members: Member[] = [];
@@ -120,7 +122,7 @@ function relation(me: string, other: string): SocialRelation {
 }
 function ref(id: string): PersonRef {
   const p = people.get(id);
-  return personRef(id, p?.full || t('circles.someone'));
+  return personRef(id, p?.full || t('circles.someone'), p?.tone);
 }
 const mutual = (me: string, other: string) => friendsOf(other).filter((x) => x !== me && friendsOf(me).includes(x)).length;
 function friendView(me: string, id: string): FriendView {

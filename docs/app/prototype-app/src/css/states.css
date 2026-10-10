@@ -1,0 +1,173 @@
+/* ---------- when things go wrong: the failure-state family ----------
+   Built on the empty-state stage (empty.css): same paper, same dotted board, same motion rules.
+   No red anywhere. The one warm accent is gold; "still works" is the calm green. */
+
+/* the connection pill: lives in the status-bar strip, above the back button and below nothing */
+.net-pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 85; height: 30px; max-width: calc(100% - 120px); padding: 0 12px 0 10px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 12.5px; font-weight: 600; letter-spacing: -.005em; background: var(--green); color: var(--mist); box-shadow: 0 10px 24px -14px rgba(15,26,22,.8); animation: pill-in .45s var(--spring) both; }
+.net-pill span { overflow: hidden; text-overflow: ellipsis; }
+.net-pill .net-dot { width: 7px; height: 7px; border-radius: 9px; background: var(--gold); flex-shrink: 0; animation: blinkish 2.4s ease-in-out infinite; }
+.net-pill.down { background: #3a3324; color: #f6eedd; }
+.net-pill.weak { background: rgba(255,253,249,.92); color: var(--green); box-shadow: 0 10px 24px -16px rgba(15,26,22,.6), inset 0 0 0 1px rgba(30,53,45,.08); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.net-pill.weak .net-dot { background: var(--gold-deep); }
+.net-pill.held { background: #f3e6c9; color: var(--gold-ink); box-shadow: 0 10px 24px -16px rgba(15,26,22,.5); }
+.net-pill.held .net-dot { background: var(--gold-deep); }
+.net-pill.maint { background: #fffdf9; color: var(--green); box-shadow: 0 10px 24px -16px rgba(15,26,22,.6), inset 0 0 0 1px rgba(185,143,74,.35); }
+.net-pill.maint .net-dot { background: var(--gold-deep); animation: none; }
+@keyframes pill-in { from { opacity: 0; transform: translate(-50%, -14px) scale(.9) } to { opacity: 1; transform: translate(-50%, 0) } }
+.app:has(.net-pill) .banner { top: 50px; }
+.toast { pointer-events: none; }
+
+/* the honest "this is the saved copy" marker */
+.stale-row { display: flex; margin: -6px 0 -4px; }
+.stale { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 11px 0 9px; border-radius: 999px; background: rgba(217,183,122,.2); color: var(--gold-ink); font-size: 12px; font-weight: 600; }
+.stale i { width: 6px; height: 6px; border-radius: 9px; background: var(--gold-deep); }
+
+/* skeletons: shapes where things will be, one slow sheen */
+.sk-wrap { display: flex; flex-direction: column; gap: 14px; }
+.sk { display: block; position: relative; overflow: hidden; background: rgba(30,53,45,.07); border-radius: 12px; }
+.sk::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,253,249,.65), transparent); animation: sk-sheen 1.6s ease-in-out infinite; }
+@keyframes sk-sheen { to { transform: translateX(100%) } }
+.sk-hero { height: 190px; border-radius: 24px; }
+.sk-row { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 22px; background: rgba(255,253,249,.55); }
+.sk-tile { flex: 0 0 56px; height: 56px; border-radius: 16px; }
+.sk-line { height: 12px; border-radius: 6px; }
+.sk-line.short { height: 10px; opacity: .7; }
+
+/* the slow-connection veil: covers the content area, never the header or the dock */
+.veil-load { position: absolute; left: 0; right: 0; top: 104px; bottom: 0; z-index: 19; padding: 6px 20px 120px; background: var(--sand); display: flex; flex-direction: column; gap: 14px; animation: fade .25s ease both; overflow: hidden; }
+.veil-load.stacked { top: 100px; }
+.slow-note { position: absolute; left: 16px; right: 16px; bottom: 112px; display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 16px; border-radius: 22px; background: var(--paper); box-shadow: 0 18px 36px -22px rgba(15,26,22,.55); animation: toastIn .45s var(--ease) both; }
+.veil-load.stacked .slow-note { bottom: 34px; }
+.slow-dots { display: inline-flex; gap: 4px; flex-shrink: 0; }
+.slow-dots i { width: 6px; height: 6px; border-radius: 9px; background: var(--gold-deep); animation: dot 1.8s ease-in-out infinite; }
+.slow-dots i:nth-child(2) { animation-delay: .3s } .slow-dots i:nth-child(3) { animation-delay: .6s }
+/* on a weak connection photos arrive the way they really do: blurred first, then sharp */
+.app.net-weak img { animation: img-progress 3.2s ease-out both; }
+@keyframes img-progress { 0% { filter: blur(16px) saturate(.3); opacity: .35 } 55% { filter: blur(6px) saturate(.7); opacity: .8 } 100% { filter: none; opacity: 1 } }
+.img-fallback { animation: fade .4s ease both; }
+
+/* one step that couldn't finish, said in place */
+.ie { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 22px; background: var(--paper); box-shadow: inset 3px 0 0 var(--gold); }
+.ie.partial { background: #f8efdc; }
+.ie-ic { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; background: #f3e6c9; }
+.ie-art { flex: 0 0 72px; width: 72px; height: 58px; }
+.ie-art .es-svg { width: 92px; height: 69px; }
+.ie .btn.small .spinner { width: 14px; height: 14px; }
+
+/* what still works */
+.fs-works { display: flex; flex-wrap: wrap; gap: 6px; }
+.es > .fs-works { margin: 0 4px; }
+.fs-work { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px 0 9px; border-radius: 999px; background: rgba(47,122,75,.09); color: #245f3b; font-size: 13px; font-weight: 600; }
+.es.fs-err .btn { align-self: stretch; }
+
+/* the full-screen version */
+.fs-screen { position: absolute; inset: 0; z-index: 90; background: radial-gradient(120% 60% at 50% 0%, #f4ecdd 0%, var(--sand) 60%); display: flex; flex-direction: column; animation: fade .35s ease both; }
+.fs-inner { flex: 1 1 auto; overflow-y: auto; padding: 72px 24px 16px; display: flex; flex-direction: column; gap: 12px; }
+.fs-stage { height: 196px; flex-shrink: 0; border-radius: 26px; animation: rise .6s var(--ease) both; }
+.fs-stage .es-svg { width: 248px; height: 186px; }
+.fs-eyebrow { color: var(--gold-ink); margin-top: 6px; animation: rise .5s .06s var(--ease) both; }
+.fs-title { font-size: 36px; line-height: 1.02; animation: rise .5s .1s var(--ease) both; }
+.fs-body { margin: 0; animation: rise .5s .14s var(--ease) both; }
+.fs-inner .fs-works { animation: rise .5s .18s var(--ease) both; }
+.fs-list { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; animation: rise .5s .18s var(--ease) both; }
+.fs-list li { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 500; }
+.fs-list-ic { flex: 0 0 34px; height: 34px; border-radius: 12px; background: #f3e6c9; display: grid; place-items: center; }
+.fs-act { flex-shrink: 0; padding: 8px 24px 30px; display: flex; flex-direction: column; gap: 10px; }
+
+/* the Outbox */
+.ob-art { flex: 0 0 72px; width: 72px; height: 60px; }
+.ob-art .es-svg { width: 96px; height: 72px; }
+.ob-list { display: flex; flex-direction: column; border-radius: 20px; background: var(--mist); padding: 4px 14px; }
+.ob-row { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; }
+.ob-row + .ob-row { border-top: 1px solid var(--line); }
+.ob-ic { flex: 0 0 34px; height: 34px; border-radius: 12px; background: var(--paper); display: grid; place-items: center; }
+.ob-title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-why { color: var(--gold-ink); }
+.ob-state { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--paper); color: var(--ink-2); margin-top: 4px; }
+.ob-state i { width: 6px; height: 6px; border-radius: 9px; background: var(--ink-3); }
+.ob-state.sending { color: var(--green); }
+.ob-state.failed { background: #f3e6c9; color: var(--gold-ink); }
+.ob-state.failed i { background: var(--gold-deep); }
+.ob-bar { height: 4px; border-radius: 4px; background: rgba(30,53,45,.1); overflow: hidden; margin-top: 4px; }
+.ob-bar i { display: block; height: 100%; background: var(--green); border-radius: 4px; transition: width .4s var(--ease); }
+.ob-works { display: flex; flex-direction: column; gap: 4px; padding: 2px 2px 0; }
+
+/* permissions */
+.perm { display: flex; flex-direction: column; gap: 12px; }
+.perm-stage { height: 128px; }
+.perm.inline { padding-top: 2px; }
+
+/* uploads */
+.up { display: flex; flex-direction: column; gap: 10px; }
+.up-stage { height: 112px; }
+.up-track { position: relative; height: 8px; border-radius: 999px; background: #efe9e0; }
+.up-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--green); transition: width .2s linear; }
+.up.stopped .up-track i { background: var(--gold); }
+.up-track b { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 99px; background: var(--paper); box-shadow: 0 0 0 2px var(--gold-deep); }
+
+/* the short pause */
+.rl-stage { height: 120px; }
+.rl-count { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 20px; background: var(--mist); }
+.rl-time { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+
+/* chat: a message that didn't go */
+.msg-failed { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.msg-again { border: 0; background: var(--gold); color: var(--green); height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+
+/* the paused-pay lock note */
+.pay-lock { display: inline-flex; align-items: center; gap: 6px; }
+
+/* a booking that carried on while the app was closed */
+.resume-card { display: flex; gap: 14px; align-items: center; padding: 14px; border-radius: 24px; background: var(--green); color: var(--mist); border: 0; text-align: left; width: 100%; box-shadow: 0 22px 40px -26px rgba(15,26,22,.8); }
+.resume-card .tiny { color: #c9c1b4; }
+.resume-card .avatar { position: relative; }
+
+/* the art: each piece moves for its reason, and is still under Reduce Motion (base state = final state) */
+.es-signal .fs-arc { animation: fs-arc 2.4s ease-in-out infinite; }
+.es-signal .fs-arc.a1 { animation-delay: .5s } .es-signal .fs-arc.a2 { animation-delay: 1s }
+@keyframes fs-arc { 0%, 100% { opacity: .2 } 30%, 60% { opacity: 1 } }
+.fs-ding { transform-origin: 50% 100%; animation: fs-ding 4s ease-in-out infinite; }
+@keyframes fs-ding { 0%, 70%, 100% { transform: rotate(0) } 74% { transform: rotate(-4deg) } 80% { transform: rotate(3deg) } 86% { transform: rotate(-1.5deg) } }
+.fs-wave { animation: fs-wave 4s ease-out infinite; }
+.fs-wave.w2 { animation-delay: .25s; }
+@keyframes fs-wave { 0%, 70% { opacity: .15 } 80% { opacity: 1 } 100% { opacity: .15 } }
+.fs-up { animation: es-lift 3.6s ease-in-out infinite; }
+.fs-turn { transform-origin: 104px 62px; transform-box: view-box; animation: fs-turn 4.8s ease-in-out infinite; }
+@keyframes fs-turn { 0%, 30%, 100% { transform: rotate(0) } 45%, 70% { transform: rotate(-80deg) } }
+.fs-flip { transform-origin: 80px 60px; transform-box: view-box; animation: fs-flip 6s ease-in-out infinite; }
+@keyframes fs-flip { 0%, 84% { transform: rotate(0) } 96%, 100% { transform: rotate(180deg) } }
+.fs-sand-top { transform-origin: 50% 0%; animation: fs-drain 6s linear infinite; }
+.fs-sand-bot { transform-origin: 50% 100%; animation: fs-fill 6s linear infinite; }
+@keyframes fs-drain { 0% { transform: scaleY(1) } 84%, 100% { transform: scaleY(.15) } }
+@keyframes fs-fill { 0% { transform: scaleY(.3) } 84%, 100% { transform: scaleY(1) } }
+.fs-stream { animation: es-dot 1s linear infinite; }
+.fs-gear-a { transform-origin: 64px 64px; transform-box: view-box; animation: es-turn 14s linear infinite; }
+.fs-gear-b { transform-origin: 106px 46px; transform-box: view-box; animation: fs-gear-b 7s ease-in-out infinite; }
+@keyframes fs-gear-b { 0%, 20% { transform: rotate(0) } 60%, 100% { transform: rotate(-200deg) } }
+.fs-half-l { animation: fs-half-l 5s ease-in-out infinite; }
+.fs-half-r { animation: fs-half-r 5s ease-in-out infinite; }
+@keyframes fs-half-l { 0%, 100% { transform: translate(0, 0) rotate(0) } 50% { transform: translate(-3px, 2px) rotate(-2deg) } }
+@keyframes fs-half-r { 0%, 100% { transform: translate(0, 0) rotate(0) } 50% { transform: translate(3px, -2px) rotate(2deg) } }
+.fs-track { opacity: 0; animation: fs-track 4.4s ease-in-out infinite; }
+.fs-knob { animation: fs-knob 4.4s var(--spring) infinite; }
+@keyframes fs-track { 0%, 25%, 90%, 100% { opacity: 0 } 40%, 75% { opacity: 1 } }
+@keyframes fs-knob { 0%, 25%, 90%, 100% { transform: translateX(0) } 40%, 75% { transform: translateX(26px) } }
+.fs-ring { stroke-dashoffset: 30; animation: fs-ring 8s linear infinite; }
+@keyframes fs-ring { from { stroke-dashoffset: 0 } to { stroke-dashoffset: 30 } }
+.fs-bar { transform-origin: 0 50%; animation: fs-bar 3s var(--ease) both; }
+@keyframes fs-bar { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+
+/* the demo panel's walkthrough */
+.demo .demo-gallery { background: var(--green); color: var(--mist); }
+.gallery-bar { position: fixed; z-index: 120; left: 16px; bottom: 16px; width: 300px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px; border-radius: 22px; background: var(--green); color: var(--mist); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 24px 50px -24px rgba(15,26,22,.8); animation: toastIn .4s var(--ease) both; }
+.gallery-bar .gb-count { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+.gallery-bar .gb-title { font-size: 16px; font-weight: 600; }
+.gallery-bar .gb-note { font-size: 12.5px; line-height: 1.4; color: #c9c1b4; }
+.gallery-bar .gb-row { display: flex; gap: 6px; }
+.gallery-bar button { border: 0; border-radius: 999px; height: 36px; padding: 0 14px; font-size: 13px; font-weight: 600; background: rgba(233,226,216,.14); color: var(--mist); }
+.gallery-bar button.next { background: var(--gold); color: var(--green); flex: 1 1 auto; }
+.gallery-bar button:disabled { opacity: .4; }
+@media (max-width: 520px) {
+  .gallery-bar { left: 8px; right: 8px; bottom: 8px; width: auto; max-width: none; padding: 10px 12px; gap: 6px; border-radius: 18px; }
+  .gallery-bar .gb-note { display: none; }
+}

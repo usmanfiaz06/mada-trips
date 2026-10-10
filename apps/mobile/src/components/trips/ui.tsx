@@ -11,6 +11,7 @@ import { T } from '@/components/Text';
 import { VGradient } from '@/components/Gradient';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
+import { useAgent as useAgentName } from '@/lib/trips';
 import { rise } from '@/lib/motion';
 import { colors, ff, font, radii, shadow } from '@/theme';
 
@@ -45,7 +46,10 @@ const FOCAL: Record<string, string> = {
   'airport-terminal': '60% 35%', 'family-walking': '50% 60%', 'inflight-wing': '55% 50%',
 };
 export const photoOf = (key: string | null | undefined): ImageSource => PHOTOS[key ?? ''] ?? PHOTOS['istanbul-galata']!;
-export const focalOf = (key: string | null | undefined, override?: string) => (override ?? FOCAL[key ?? ''] ?? '50% 50%') as `${number}% ${number}%`;
+export const focalOf = (key: string | null | undefined, override?: string) => {
+  const [left, top] = (override ?? FOCAL[key ?? ''] ?? '50% 50%').split(' ') as [`${number}%`, `${number}%`];
+  return { left, top };
+};
 
 export function Photo({ k, uri, style, focal, children }: { k?: string | null; uri?: string; style?: StyleProp<ViewStyle>; focal?: string; children?: ReactNode }) {
   return (
@@ -363,3 +367,9 @@ const styles = StyleSheet.create({
   talk: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 14, paddingBottom: 8, paddingHorizontal: 4, borderTopWidth: 1, borderTopColor: colors.line, marginTop: 2 },
   actWrap: { position: 'absolute', start: 0, end: 0, bottom: 0, height: 210 },
 });
+
+/** "F · Faisal, your Mada agent": introducing the person on duty, once (COPY.md §1). */
+export function AgentIntro() {
+  const agent = useAgentName();
+  return <Row><AgentFace initial={agent.initial} size={32} online={false} /><H3 size={14}>{t('actor.intro', { agent: agent.name })}</H3></Row>;
+}

@@ -85,7 +85,50 @@ export const DEMO_SWITCHES = [
   { id: 'fareGone', label: 'Fare sold out while booking' },
   { id: 'ticketingFails', label: 'Tickets fail to issue' },
   { id: 'slowAgent', label: 'Airline is slow' },
+  /* When the app itself can't do its job: the connection, our servers, the app version, the session. */
+  { id: 'weak', label: 'Weak connection', group: 'app' },
+  { id: 'serverDown', label: 'Server down', group: 'app' },
+  { id: 'maintenance', label: 'Maintenance', group: 'app' },
+  { id: 'updateRequired', label: 'Update required', group: 'app' },
+  { id: 'sessionExpired', label: 'Session expired', group: 'app' },
+  { id: 'rateLimited', label: 'Too many tries', group: 'app' },
+  { id: 'crashed', label: 'App crashed', group: 'app' },
+  /* Inside a flow: one step can't finish, everything around it still works. */
+  { id: 'payDrops', label: 'Connection drops while paying', group: 'flow' },
+  { id: 'searchTimeout', label: 'Search times out', group: 'flow' },
+  { id: 'sendFails', label: 'Messages don’t send', group: 'flow' },
+  { id: 'uploadFails', label: 'Upload stops midway', group: 'flow' },
+  { id: 'imagesFail', label: 'Photos don’t load', group: 'flow' },
+  { id: 'permissionsDenied', label: 'Permissions turned off', group: 'flow' },
 ];
+
+/* Everything that's waiting to reach Mada: made offline, still sending, or didn't go. One list, read by the
+   connection pill and the Outbox sheet. Each item says what it is and how to drop it. */
+export function outboxItems(s) {
+  const offline = !!s.demo?.offline;
+  const items = [];
+  (s.support || []).forEach((m) => {
+    if (m.from !== 'me' || !(m.queued || m.failed)) return;
+    items.push({ id: 'sp-' + m.id, kind: 'message', title: m.text ? `“${m.text.length > 42 ? m.text.slice(0, 40) + '…' : m.text}”` : 'A photo', sub: 'Message to Mada', state: m.failed ? 'failed' : 'queued', ref: { type: 'support', id: m.id }, at: m.at });
+  });
+  Object.entries(s.requestThreads || {}).forEach(([rid, th]) => (th || []).forEach((m) => {
+    if (m.queued) items.push({ id: 'rt-' + rid + m.id, kind: 'message', title: `“${String(m.text || '').slice(0, 40)}”`, sub: 'Reply in a request', state: 'queued', ref: { type: 'thread', rid, id: m.id }, at: m.at });
+  }));
+  (s.requests || []).forEach((r) => { if (r.status === 'queued') items.push({ id: 'rq-' + r.id, kind: 'request', title: r.title || r.short || 'A request', sub: 'Request to Mada', state: 'queued', ref: { type: 'request', id: r.id }, at: r.created }); });
+  (s.tripRequests || []).forEach((r) => { if (r.queued) items.push({ id: 'tr-' + r.id, kind: 'request', title: r.title || 'A trip request', sub: 'Request for your trip', state: 'queued', ref: { type: 'tripRequest', id: r.id }, at: r.created }); });
+  if (s.disruptionQueue) items.push({ id: 'dq', kind: 'choice', title: 'Your choice for the new flight', sub: 'For Faisal to confirm with the airline', state: 'queued', ref: { type: 'disruption' }, at: s.disruptionQueue.at });
+  (s.outbox || []).forEach((o) => items.push({ ...o, ref: { type: 'outbox', id: o.id } }));
+  return items.map((x) => (x.state === 'queued' && !offline && x.ref.type !== 'outbox' ? { ...x, state: 'sending' } : x));
+}
+/* Takes one thing out of the Outbox without sending it. */
+export function discardOutbox(p, ref) {
+  if (ref.type === 'support') return { support: (p.support || []).filter((m) => m.id !== ref.id) };
+  if (ref.type === 'thread') return { requestThreads: { ...p.requestThreads, [ref.rid]: (p.requestThreads[ref.rid] || []).filter((m) => m.id !== ref.id) } };
+  if (ref.type === 'request') return { requests: p.requests.filter((r) => r.id !== ref.id) };
+  if (ref.type === 'tripRequest') return { tripRequests: (p.tripRequests || []).filter((r) => r.id !== ref.id) };
+  if (ref.type === 'disruption') return { disruptionQueue: null };
+  return { outbox: (p.outbox || []).filter((o) => o.id !== ref.id) };
+}
 
 export const fmt = (n) => Math.round(n).toLocaleString('en-US');
 export const buzz = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* not supported */ } };
@@ -295,7 +338,8 @@ export const fresh = () => ({
   friendRequests: [],
   invites: [],
   stamps: [],
-  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, fareGone: false, ticketingFails: false, slowAgent: false, needs3ds: false, passportProblem: false, scanFails: false, faceIdFails: false },
+  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, fareGone: false, ticketingFails: false, slowAgent: false, needs3ds: false, passportProblem: false, scanFails: false, faceIdFails: false, weak: false, serverDown: false, maintenance: false, updateRequired: false, sessionExpired: false, rateLimited: false, crashed: false, payDrops: false, searchTimeout: false, sendFails: false, uploadFails: false, imagesFail: false, permissionsDenied: false },
+  outbox: [],
   tab: 'today',
   stack: [],
   walletUnlocked: false,

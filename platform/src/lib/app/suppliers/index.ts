@@ -17,12 +17,14 @@ import { flightAware } from "./live/flight-status";
 import { openAdsbPositions } from "./live/flight-positions";
 import { claudeAi } from "./live/ai";
 import { providerIdentity } from "./live/identity";
+import { guarded } from "../resilience/breaker";
 
 export type * from "./types";
 export { outbox } from "./mock/outbox";
 
 /* One place decides mock or live, per supplier, on every call (so a test or an env change takes effect at once). */
-const pick = <T>(name: SupplierName, mock: T, live: T): T => (supplierMode(name) === "live" ? live : mock);
+// Live adapters go through a timeout and a circuit breaker (resilience/breaker.ts); mocks stay deterministic.
+const pick = <T extends object>(name: SupplierName, mock: T, live: T): T => (supplierMode(name) === "live" ? guarded(name, live) : mock);
 
 export const suppliers = {
   flights: (): FlightSupplier => pick("flights", mockFlights, gdsFlights),

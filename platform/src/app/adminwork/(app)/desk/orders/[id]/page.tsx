@@ -208,7 +208,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </Card>
           )}
 
-          <AssignCard kind={o.stage === "held" ? "ticketing" : "order"} id={r.id} userId={r.ownerId} canAct={act} />
+          {open && <AssignCard kind={o.stage === "held" ? "ticketing" : "order"} id={r.id} userId={r.ownerId} canAct={act} />}
 
           {pay && (
             <Card>

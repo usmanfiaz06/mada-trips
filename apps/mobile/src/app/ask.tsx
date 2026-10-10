@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { householdOf, todayIn, type AskIntent, type AskKind, type CopyKey } from '@mada/shared';
@@ -12,14 +12,13 @@ import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, type Cta } from '@/components/booking/FlightFlow';
 import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
-import { ChipWrap, Notice } from '@/components/booking/parts';
+import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { RequestFlow } from '@/components/booking/Requests';
 import { ApiError } from '@/lib/api';
 import { bookingApi, useDemo } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -75,8 +74,11 @@ export default function Ask() {
   };
 
   useEffect(() => {
-    if (params.prefill) void submit(String(params.prefill));
-    else if (params.intent && PROMPT[params.intent as AskKind]) void submit(t(PROMPT[params.intent as AskKind]!), params.intent as AskKind);
+    const id = setTimeout(() => {
+      if (params.prefill) void submit(String(params.prefill));
+      else if (params.intent && PROMPT[params.intent as AskKind]) void submit(t(PROMPT[params.intent as AskKind]!), params.intent as AskKind);
+    }, 0);
+    return () => clearTimeout(id);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kind = intent?.kind;
@@ -96,10 +98,10 @@ export default function Ask() {
           <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable>
         ) : undefined} />
         <T v="tiny" style={{ marginHorizontal: 24, marginBottom: 8 }}>{t('ask.disclosure')}</T>
-        <Animated.ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {query ? <Animated.View entering={rise(0)} style={styles.bubble}><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{query}</T></Animated.View> : null}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {query ? <Animated.View entering={enter(0)} style={styles.bubble}><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{query}</T></Animated.View> : null}
           {body}
-        </Animated.ScrollView>
+        </ScrollView>
         <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
           {cta && !offline ? (
             <>
@@ -136,7 +138,7 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
     ? [t('ask.idea.familyEid', { count: n }), t('ask.idea.hotel'), kid ? t('ask.idea.visaFor', { name: kid }) : t('ask.idea.visa'), t('ask.idea.umrah')]
     : [t('ask.idea.flights'), t('ask.idea.dubai'), t('ask.idea.hotel'), t('ask.idea.alula'), t('ask.idea.umrah')];
   return (
-    <Animated.View entering={rise(0)} style={{ gap: 14 }}>
+    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
       <T style={[font('display'), { fontSize: 40, lineHeight: 42 }]} accessibilityRole="header">{t('ask.title')}</T>
       <T v="body">{t('ask.intro')}</T>
       <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>

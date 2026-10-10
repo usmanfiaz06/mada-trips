@@ -1,7 +1,7 @@
 import { People, NewCircle, Friend, Saved, Join } from './screens/Social.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, FLIGHTS, seedTrip, withDemo, buzz, HAPTIC } from './store.jsx';
+import { StoreProvider, useStore, PHASES, DEMO_SWITCHES, FLIGHTS, seedTrip, withDemo, buzz, HAPTIC, outboxItems } from './store.jsx';
 
 /* What a phone sign-up with no passport and no name leaves: signed in, and nothing else. */
 const emptyAccount = () => ({
@@ -10,7 +10,8 @@ const emptyAccount = () => ({
   account: { signedOut: false, phone: { digits: '512345678', source: 'signup', at: Date.now() }, methods: { apple: false, google: false, phone: true } },
   tab: 'today', stack: [],
 });
-import { Dock, Icon, Sun } from './ui.jsx';
+import { Dock, Icon, Sun, NetPill, OutboxSheet, LoadingVeil, MaintenanceScreen, UpdateScreen, SessionSheet, RateLimitSheet, ErrorBoundary, Crasher, CrashScreen, NotFound, useImageFallback } from './ui.jsx';
+import { GALLERY } from './gallery.jsx';
 import Onboarding from './screens/Onboarding.jsx';
 import Today from './screens/Today.jsx';
 import Ask from './screens/Ask.jsx';
@@ -26,14 +27,22 @@ import { SCREENS as TRIP_SCREENS } from './screens/TripManage.jsx';
 import { SCREENS as SUPPORT_SCREENS } from './screens/Support.jsx';
 
 const TABS = { today: Today, trips: Trips, circles: Circles, wallet: Wallet };
-const STACK = { passportSetup: Onboarding, join: Join, saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS };
+const STACK = { passportSetup: Onboarding, join: Join, saved: Saved, people: People, newCircle: NewCircle, friend: Friend, ask: Ask, pay: Pay, waiting: Waiting, trip: TripDetail, disruption: Disruption, group: Group, profile: Profile, plan: Plan, ...ACCOUNT_SCREENS, ...TRIP_SCREENS, ...SUPPORT_SCREENS, notFound: NotFound };
 
 /* Moves requests and refunds along over time, the way Faisal's replies and the airlines would. */
 function useBackgroundProgress() {
-  const { s, set, banner } = useStore();
+  const { s, set, banner, toast } = useStore();
   const prevOffline = useRef(s.demo.offline);
   useEffect(() => {
     if (prevOffline.current && !s.demo.offline) {
+      /* Back online: everything in the Outbox goes, and we say how many. */
+      const n = outboxItems(s).filter((x) => x.state !== 'failed' && x.ref.type !== 'outbox').length;
+      if (n) setTimeout(() => toast(`Back online. Sent ${n === 1 ? '1 thing' : n + ' things'} you did offline.`), 900);
+      set((p) => ({
+        support: (p.support || []).map((m) => (m.queued ? { ...m, queued: false } : m)),
+        tripRequests: (p.tripRequests || []).map((r) => (r.queued ? { ...r, queued: false, created: Date.now() } : r)),
+        requestThreads: Object.fromEntries(Object.entries(p.requestThreads || {}).map(([k, th]) => [k, (th || []).map((m) => (m.queued ? { ...m, queued: false } : m))])),
+      }));
       set((p) => ({ requests: p.requests.map((r) => (r.status === 'queued' ? { ...r, status: 'sent', created: Date.now() } : r)) }));
       if (s.disruptionQueue) { applyDisruptionChoice(set, s.disruptionQueue); setTimeout(() => banner({ title: 'Your choice reached Faisal', body: 'Sent now you’re back online. He’s confirming it with the airline.', to: { tab: 'today' } }), 0); }
     }
@@ -72,9 +81,32 @@ function useBackgroundProgress() {
   }, [s.demo.offline]);
 }
 
+/* The app-level things that can go wrong, layered over whatever screen is open. */
+function useAppStates(s, set) {
+  const [outbox, setOutbox] = useState(false);
+  const [maintOpen, setMaintOpen] = useState(true);
+  const [crashKey, setCrashKey] = useState(0);
+  const [flushing, setFlushing] = useState(0);
+  const loaded = useRef(new Set());
+  const prevOff = useRef(s.demo.offline);
+  useEffect(() => { if (s.demo.maintenance) setMaintOpen(true); }, [s.demo.maintenance]);
+  useEffect(() => { if (!s.demo.weak) loaded.current = new Set(); }, [s.demo.weak]);
+  /* Reconnecting: the pill says "Sending" for a moment while the Outbox empties. */
+  useEffect(() => {
+    if (prevOff.current && !s.demo.offline) {
+      const n = outboxItems(s).filter((x) => x.state !== 'failed' && x.ref.type !== 'outbox').length;
+      if (n) { setFlushing(n); setTimeout(() => setFlushing(0), 1400); }
+    }
+    prevOff.current = s.demo.offline;
+  }, [s.demo.offline]);
+  useImageFallback(!!s.demo.imagesFail);
+  return { outbox, setOutbox, maintOpen, setMaintOpen, crashKey, setCrashKey, flushing, loaded };
+}
+
 function Phone() {
   const store = useStore();
   const { s, bannerMsg, toastMsg, dismissBanner, openBanner, set } = store;
+  const app = useAppStates(s, set);
   useEffect(() => { window.__madaPush = (name, params) => store.push(name, params || {}); });
   /* An invite link (…#join/ist-8k2) opens the invite, for new and signed-in people alike. */
   useEffect(() => {
@@ -87,9 +119,16 @@ function Phone() {
   const top = s.stack[s.stack.length - 1];
   const TabScreen = TABS[s.tab] || Today;
   const Top = top ? STACK[top.name] : null;
+  const navKey = `${s.tab}|${top ? top.key : ''}`;
   return (
     <div className="phone" aria-label="Mada Trips app">
-      <div className="app">
+      <div className={'app' + (s.demo.weak && !s.demo.offline ? ' net-weak' : '')}>
+        <ErrorBoundary key={app.crashKey} fallback={() => (
+          <CrashScreen
+            onRestart={() => { set((p) => ({ demo: { ...p.demo, crashed: false }, tab: 'today', stack: [] })); app.setCrashKey((k) => k + 1); }}
+            onTalk={() => { set((p) => ({ demo: { ...p.demo, crashed: false }, stack: [{ name: 'support', params: {}, key: Date.now() }] })); app.setCrashKey((k) => k + 1); }} />
+        )}>
+        <Crasher />
         {!s.onboarded ? <Onboarding /> : (
           <>
             <div style={{ position: 'absolute', inset: 0 }} {...(top ? { inert: '', 'aria-hidden': 'true' } : {})}>
@@ -99,15 +138,34 @@ function Phone() {
             {s.stack.map((st, i) => {
               const C = STACK[st.name];
               const covered = i < s.stack.length - 1;
-              return C ? <div key={st.key} style={{ position: 'absolute', inset: 0, zIndex: 10 + i }} {...(covered ? { inert: '', 'aria-hidden': 'true' } : {})}><C params={st.params} /></div> : null;
+              /* A link to a screen that doesn't exist (an old or deleted link) gets the not-found screen, never a blank. */
+              const Screen = C || NotFound;
+              return <div key={st.key} style={{ position: 'absolute', inset: 0, zIndex: 10 + i }} {...(covered ? { inert: '', 'aria-hidden': 'true' } : {})}><Screen params={C ? st.params : { what: 'page' }} /></div>;
             })}
+            {s.demo.weak && !s.demo.offline && !app.loaded.current.has(navKey) && (
+              <div style={{ position: 'absolute', inset: 0, zIndex: top ? 10 + s.stack.length : 19, pointerEvents: 'none' }}>
+                <div style={{ pointerEvents: 'auto' }}>
+                  <LoadingVeil key={navKey} stacked={!!top}
+                    onDone={() => { app.loaded.current.add(navKey); }}
+                    onCancel={() => { app.loaded.current.add(navKey); if (top) store.pop(); else store.toast('Stopped. Showing what’s saved on this phone.'); }} />
+                </div>
+              </div>
+            )}
           </>
         )}
-        {s.demo.offline && s.onboarded && (
-          <div className="offline" style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 80, paddingTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} role="status">
-            <Icon name="wifiOff" size={16} color="#f6f2ec" />You're offline. Everything for your trips is on this phone.
-          </div>
-        )}
+        </ErrorBoundary>
+        {s.onboarded && !s.demo.crashed && (() => {
+          const items = outboxItems(s);
+          const failed = items.filter((x) => x.state === 'failed').length;
+          const mode = app.flushing ? 'sending' : s.demo.offline ? 'offline' : s.demo.serverDown ? 'down' : s.demo.weak ? 'weak' : s.demo.maintenance && !app.maintOpen ? 'maint' : failed ? 'held' : null;
+          if (!mode) return null;
+          return <NetPill mode={mode} count={app.flushing || (mode === 'held' ? failed : items.length)} label={mode === 'maint' ? 'Maintenance until 03:00 · booking paused' : undefined} onClick={() => (mode === 'maint' ? app.setMaintOpen(true) : app.setOutbox(true))} />;
+        })()}
+        {app.outbox && <OutboxSheet onClose={() => app.setOutbox(false)} />}
+        {s.onboarded && s.demo.maintenance && app.maintOpen && <MaintenanceScreen onOpenTrips={() => { app.setMaintOpen(false); set({ tab: 'trips', stack: [] }); }} />}
+        {s.onboarded && s.demo.updateRequired && <UpdateScreen onUpdate={() => { set((p) => ({ demo: { ...p.demo, updateRequired: false } })); store.toast('Updated. You’re on Mada 1.1, right where you left off.'); }} />}
+        {s.onboarded && s.demo.sessionExpired && <SessionSheet onDone={() => { set((p) => ({ demo: { ...p.demo, sessionExpired: false } })); store.toast('Signed back in. Everything is where you left it.'); }} />}
+        {s.demo.rateLimited && <RateLimitSheet key="rl" onDone={() => set((p) => ({ demo: { ...p.demo, rateLimited: false } }))} onClose={() => set((p) => ({ demo: { ...p.demo, rateLimited: false } }))} />}
         {bannerMsg && (
           <button type="button" className="banner" key={bannerMsg.id} onClick={() => (bannerMsg.to ? openBanner(bannerMsg) : dismissBanner())} aria-live="polite">
             <span className="app-ic"><Sun width={24} /></span>

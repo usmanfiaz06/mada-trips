@@ -4,7 +4,10 @@
  * with the COPY.md §1 rule: buttons say Mada, a person is named only as presence or when they acted ({agent}).
  * Spread into the main catalogue in ./en.ts, so the same lint applies.
  */
+import { enTripsToday } from './en-trips-today';
+
 export const enTrips = {
+  ...enTripsToday,
   // ───────────── trip: shared words ─────────────
   'trip.and': 'and',
   'trip.ofYou.one': 'you',

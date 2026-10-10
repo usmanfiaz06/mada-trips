@@ -1,10 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
 import { circleDest, joinNames, planById, type CircleMessage, type MadaAction, type PersonRef, type SplitShare } from '@mada/shared';
-import { ArtCircles } from '@/components/art/Arts';
 import { Button } from '@/components/Button';
 import { Bubble, BubbleText, ShareCard, SplitCard, SysLine, Typing, VoteCard, VoteIcon, type Who } from '@/components/circles/chat';
 import { ArtChat } from '@/components/circles/art';
@@ -12,10 +10,9 @@ import { useSaveToggle } from '@/components/circles/hooks';
 import { CircleSettings } from '@/components/circles/settings';
 import { ToolsSheet, ShareSheet, SplitSheet, VoteSheet, type Tool } from '@/components/circles/tools';
 import { Faces, Row, webNoOutline } from '@/components/circles/ui';
-import { EmptyState } from '@/components/EmptyState';
 import { VGradient } from '@/components/Gradient';
 import { Icon } from '@/components/Icon';
-import { Screen, TopBar, useBottomInset, useTopInset } from '@/components/Layout';
+import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
@@ -29,13 +26,14 @@ export default function CircleChat() {
   const router = useRouter();
   const { id = '' } = useLocalSearchParams<{ id: string }>();
   const me = useMeId();
-  const top = useTopInset();
   const bottom = useBottomInset();
   const circle = useCircle(id);
   const msgs = useMessages(id);
   const merge = useMergeMessages(id);
   const [draft, setDraft] = useState('');
-  const [sheet, setSheet] = useState<null | 'tools' | Tool | 'settings'>(null);
+  const [sheet, setSheetRaw] = useState<null | 'tools' | Tool | 'settings'>(null);
+  const [opens, setOpens] = useState(0);
+  const setSheet = (s: null | 'tools' | Tool | 'settings') => { if (s) setOpens((n) => n + 1); setSheetRaw(s); };
   const [asking, setAsking] = useState(false);
   const scroller = useRef<ScrollView>(null);
   const input = useRef<TextInput>(null);
@@ -45,7 +43,6 @@ export default function CircleChat() {
   const items = msgs.data?.items ?? [];
   const reads = msgs.data?.reads ?? [];
   const holdTop = useRef<boolean | null>(null);
-  if (holdTop.current === null && d) holdTop.current = d.circle.fresh;
 
   const people = useMemo(() => new Map<string, PersonRef>((d?.members ?? []).map((m) => [m.id, m])), [d]);
   const dest = d ? circleDest({ dest: d.circle.dest, name: d.circle.name, trip: d.circle.trip }) : null;
@@ -60,10 +57,11 @@ export default function CircleChat() {
   useEffect(() => { if (d && count) read.mutate(undefined); }, [d?.circle.id, count]); // eslint-disable-line react-hooks/exhaustive-deps
   useFocusEffect(useCallback(() => { msgs.refetch(); }, [])); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!count) return;
+    if (!count || !d) return;
+    if (holdTop.current === null) holdTop.current = d.circle.fresh;
     if (holdTop.current) { holdTop.current = false; return; }
     setTimeout(() => scroller.current?.scrollToEnd({ animated: true }), 60);
-  }, [count, asking]);
+  }, [count, asking, d]);
 
   const fail = (e: unknown) => toast(e instanceof ApiError ? e.message : t('error.internal'));
   const send = useAct((b: Parameters<typeof circlesApi.send>[1]) => circlesApi.send(id, b), () => []);
@@ -243,11 +241,10 @@ export default function CircleChat() {
 
       <ToolsSheet visible={sheet === 'tools'} onClose={() => setSheet(null)} canSplit={others.length > 0} dest={dest}
         onPick={(tool) => { if (tool === 'ask') { setSheet(null); setDraft('@Mada '); setTimeout(() => input.current?.focus(), 80); } else setSheet(tool); }} />
-      <VoteSheet visible={sheet === 'vote'} onClose={() => setSheet(null)} dest={dest} busy={vote.isPending} onPost={(v) => vote.mutate(v, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
-      <SplitSheet visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
+      <VoteSheet key={`v${opens}`} visible={sheet === 'vote'} onClose={() => setSheet(null)} dest={dest} busy={vote.isPending} onPost={(v) => vote.mutate(v, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
+      <SplitSheet key={`s${opens}`} visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { merge(r.items); setSheet(null); }, onError: fail })} />
       <ShareSheet visible={sheet === 'share'} onClose={() => setSheet(null)} onPick={(card, p) => send.mutate({ card, pin: p }, { onSuccess: (r) => { merge(r.items); setSheet(null); buzz('success'); }, onError: fail })} />
-      <CircleSettings visible={sheet === 'settings'} onClose={() => setSheet(null)} d={d} onGone={() => { setSheet(null); router.back(); }} />
-      {void top}{void ArtCircles}{void EmptyState}
+      <CircleSettings key={`c${opens}`} visible={sheet === 'settings'} onClose={() => setSheet(null)} d={d} onGone={() => { setSheet(null); router.back(); }} />
     </Screen>
   );
 }

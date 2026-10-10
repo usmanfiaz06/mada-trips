@@ -4,7 +4,6 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fontFamilies, makeTd3, type Person } from '@mada/shared';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { fullDay, fullNameOf, monthYear, type Validity } from '@/lib/wallet-model';
 import { colors, font, shadow } from '@/theme';
 import { Button } from '../Button';
@@ -60,8 +59,9 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
   const expires = person?.passport ? (validity.kind === 'blocked' || validity.kind === 'expired' ? fullDay(person.passport.expiry) : monthYear(person.passport.expiry)) : '';
 
   return (
+    <View style={{ height: 214 }}>
     <GestureDetector gesture={tilt}>
-      <Animated.View key={person?.id} entering={rise(0)} style={[styles.passport, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
+      <Animated.View style={[styles.passport, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
             <LinearGradient id="ppg" x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
@@ -120,6 +120,7 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
         </View>
       </Animated.View>
     </GestureDetector>
+    </View>
   );
 }
 

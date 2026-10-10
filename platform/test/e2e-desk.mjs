@@ -50,6 +50,9 @@ async function shot(page, name, full = true) {
 async function go(page, path) {
   const res = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
   if (!res || res.status() >= 400) problems.push(`${path}: HTTP ${res?.status()}`);
+  // Forms post through React: wait until the page is hydrated before anyone clicks.
+  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForTimeout(300);
   const body = await page.innerText('body');
   if (/Application error|Unhandled Runtime Error|Something went wrong/.test(body ?? '')) problems.push(`${path}: error page`);
 }
@@ -115,7 +118,9 @@ if (ONLY !== 'flows') {
 /* ───────────── the flows ───────────── */
 if (ONLY !== 'pages') {
   const { page, ctx } = await session('bader@madatrips.com', { width: 1440, height: 960 });
-  const submitIn = async (formSel, button) => { await page.locator(formSel).getByRole('button', { name: button }).click(); await page.waitForLoadState('networkidle'); await page.waitForTimeout(600); };
+  // Click, then wait until the action has answered (no pending button) and the page has refreshed.
+  const settle = async () => { await page.waitForTimeout(300); await page.waitForFunction(() => !document.querySelector('form button[disabled]'), null, { timeout: 90_000 }); await page.waitForLoadState('networkidle'); await page.waitForTimeout(500); };
+  const submitIn = async (formSel, button) => { await page.locator(formSel).getByRole('button', { name: button }).click(); await settle(); };
 
   // Confirm & hold, look at a passport, issue.
   await go(page, ids.awaiting);
@@ -165,11 +170,11 @@ if (ONLY !== 'pages') {
   const first = page.locator('form:has(input[name=destination])').first();
   await first.locator('text=Mada credit').click();
   await first.getByRole('button', { name: 'Approve refund' }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  await settle();
   const decline = page.locator('form:has(textarea[name=reason])').first();
   await decline.locator('textarea[name=reason]').fill('This was a non-refundable rate, booked inside the free cancellation window.');
   await decline.getByRole('button', { name: 'Decline with reason' }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  await settle();
   await go(page, '/adminwork/desk/refunds?s=sent');
   await shot(page, 'flow-refunds-sent');
 
@@ -181,14 +186,14 @@ if (ONLY !== 'pages') {
   await plan.locator('input[name=optionDetail]').first().fill('21:15, same seats');
   await plan.locator('input[name=voucher]').fill('150');
   await plan.getByRole('button', { name: /Send to/ }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(800);
+  await settle();
   await expectText(page, 'Sent by Bader');
   await shot(page, 'flow-disruption-plan');
 
   // Moderation: approve the good tip.
   await go(page, '/adminwork/desk/moderation');
-  await page.locator('form:has(input[name=blockAuthor])').first().getByRole('button', { name: 'Approve' }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  await page.locator('section', { hasText: 'Karaköy' }).getByRole('button', { name: 'Approve', exact: true }).click();
+  await settle();
   await shot(page, 'flow-moderation');
 
   // Rota: Omar covers for Faisal tomorrow night.
@@ -201,7 +206,7 @@ if (ONLY !== 'pages') {
   await shift.locator('input[name=startsAt]').fill(iso(t0));
   await shift.locator('input[name=endsAt]').fill(iso(new Date(t0.getTime() + 8 * 3600_000)));
   await shift.getByRole('button', { name: 'Add to the rota' }).click();
-  await page.waitForLoadState('networkidle'); await page.waitForTimeout(600);
+  await settle();
   await expectText(page, 'covering for Faisal');
   await shot(page, 'flow-rota');
 
