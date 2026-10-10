@@ -65,3 +65,31 @@ describe('t() and tn() in Arabic', () => {
     expect(t('nope.key' as never)).toBe('⟦nope.key⟧');
   });
 });
+
+describe('place and airline names in Arabic', () => {
+  it('swaps known names that arrive in English, and leaves everything else', async () => {
+    const { nameIn } = await import('../src/copy');
+    expect(t('wallet.chip.ready', { city: 'Istanbul' }, 'ar')).toBe('جاهز لـ إسطنبول');
+    expect(nameIn('Saudia', 'ar')).toBe('السعودية');
+    expect(nameIn('Pera Palace', 'ar')).toBe('Pera Palace');
+    expect(nameIn('Istanbul', 'en')).toBe('Istanbul');
+    expect(stripIsolates(t('search.down.title', { airline: 'Pegasus Express' }, 'ar'))).toBe('نظام Pegasus Express لا يستجيب.');
+  });
+});
+
+describe('number words', () => {
+  it('turn into digits in Arabic', () => {
+    expect(t('trip.ofYou.many', { n: 'four' }, 'ar')).toBe('أنتم الـ 4');
+    expect(t('trip.ofYou.many', { n: 'four' }, 'en')).toBe('the four of you');
+  });
+});
+
+describe('Arabic counts nouns English writes once', () => {
+  it('picks the form from {n} or {count}', () => {
+    expect(t('td.when.inWeeks', { n: 1 }, 'ar')).toBe('بعد أسبوع');
+    expect(t('td.when.inWeeks', { n: 2 }, 'ar')).toBe('بعد أسبوعين');
+    expect(t('td.when.inWeeks', { n: 3 }, 'ar')).toBe('بعد 3 أسابيع');
+    expect(t('td.when.inWeeks', { n: 21 }, 'ar')).toBe('بعد 21 أسبوعًا');
+    expect(t('td.when.inWeeks', { n: 21 }, 'en')).toBe('In 21 weeks');
+  });
+});

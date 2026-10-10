@@ -5,7 +5,7 @@ import Animated from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { durationLabel, formatSar } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { isRTL, t } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
 import { colors, font, radii, ff } from '@/theme';
 import { Chip } from '../Chip';
@@ -147,7 +147,7 @@ export function Leg({ dep, arr, from, to, durationMin, stop, onDark }: { dep: st
     <View style={styles.route}>
       <View><T style={[styles.time, { color: fg }]}>{dep}</T><T style={styles.code}>{from}</T></View>
       <View style={styles.mid}>
-        <View style={styles.line}><View style={styles.dash} /><View style={{ transform: [{ rotate: '45deg' }] }}><Icon name="flight" size={16} color={fg} /></View><View style={styles.dash} /></View>
+        <View style={styles.line}><View style={styles.dash} /><View style={{ transform: isRTL() ? [{ scaleX: -1 }, { rotate: '45deg' }] : [{ rotate: '45deg' }] }}><Icon name="flight" size={16} color={fg} /></View><View style={styles.dash} /></View>
         <T v="tiny">{stop ? t('search.oneStop', { duration: durationLabel(durationMin) }) : t('search.direct', { duration: durationLabel(durationMin) })}</T>
       </View>
       <View style={{ alignItems: 'flex-end' }}><T style={[styles.time, { color: fg }]}>{arr}</T><T style={styles.code}>{to}</T></View>

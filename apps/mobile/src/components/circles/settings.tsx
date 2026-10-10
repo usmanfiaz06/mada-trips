@@ -9,7 +9,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { agoLabel, circlesApi, ck, useAct, useFriends, useMeId } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { joinAnd, t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors } from '@/theme';
 import { InviteSheet } from './sheets';
@@ -130,7 +130,7 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
   );
 }
 
-const join = (n: string[]) => (n.length <= 1 ? n[0] ?? '' : `${n.slice(0, -1).join(', ')} ${t('circles.and')} ${n[n.length - 1]}`);
+const join = (n: string[]) => (n.length <= 1 ? n[0] ?? '' : joinAnd(n));
 
 const st = StyleSheet.create({
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

@@ -12,7 +12,7 @@ import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, useAct, usePreview } from '@/lib/circles';
 import { holdJoin } from '@/lib/circles-join';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { joinAnd, t } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { colors, ff, font } from '@/theme';
@@ -65,7 +65,7 @@ export default function Join() {
   };
   const members = p.circle?.members ?? [p.from];
   const names = members.map((m) => m.short);
-  const areIn = names.length === 1 ? t('circles.join.isIn', { names: names[0]! }) : t('circles.join.areIn', { names: `${names.slice(0, -1).join(', ')} ${t('circles.and')} ${names[names.length - 1]}` });
+  const areIn = names.length === 1 ? t('circles.join.isIn', { names: names[0]! }) : t('circles.join.areIn', { names: joinAnd(names) });
 
   return (
     <Screen background={colors.night}>

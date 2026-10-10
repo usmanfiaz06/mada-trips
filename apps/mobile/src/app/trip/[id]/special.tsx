@@ -12,7 +12,7 @@ import { ArtSuitcase } from '@/components/trips/Arts';
 import { RequestStatusPill } from '@/components/trips/Requests';
 import { Box, H3, IconTile, Num, PickCard, Rise, Row, Small, Spread, Tiny, TripScreen } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { listSep, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { OUTBOX_ASK, newKey, queueAsk, tripsApi, useOffline, useTrip, useTripOutbox, useTripMutation, useTripRequests } from '@/lib/trips';
 import { colors, ff } from '@/theme';
@@ -106,7 +106,7 @@ function SpecialSheet({ trip, sid, forWho, onClose }: { trip: TripDetail; sid: S
     const kids = who.filter((p) => p.birthYear !== null && p.birthYear > year - 12);
     body = (<>
       <Small>{t('sr.m.intro', { airline, who: whoTxt })}</Small>
-      {(['child', 'veg', 'diabetic', 'gluten'] as const).map((o) => <PickCard inSheet radio key={o} testID={`m-${o}`} on={opt === o} disabled={o === 'child' && !kids.length} onPress={() => setOpt(o)} title={t(`sr.meal.${o}`)} sub={o === 'child' ? (kids.length ? t('sr.m.for', { names: kids.map((k) => k.firstName).join(', ') }) : t('sr.meal.childOnly')) : t(`sr.m.${o}Sub`)} />)}
+      {(['child', 'veg', 'diabetic', 'gluten'] as const).map((o) => <PickCard inSheet radio key={o} testID={`m-${o}`} on={opt === o} disabled={o === 'child' && !kids.length} onPress={() => setOpt(o)} title={t(`sr.meal.${o}`)} sub={o === 'child' ? (kids.length ? t('sr.m.for', { names: kids.map((k) => k.firstName).join(listSep()) }) : t('sr.meal.childOnly')) : t(`sr.m.${o}Sub`)} />)}
       <Tiny>{t('sr.m.foot')}</Tiny>
       {sendBtn(t(`sr.meal.${(opt ?? 'veg') as 'veg'}`), { option: opt ?? undefined }, !opt)}
     </>);

@@ -19,7 +19,7 @@ import { ApiError } from '@/lib/api';
 import { bookingApi, demoOn, newIdempotencyKey, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { joinAnd, listSep, t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -213,7 +213,7 @@ export default function Pay() {
           ))}
           {hasPeople ? (
             <View style={styles.well}>
-              <T v="small" style={{ flex: 1 }}>{travellers.length === 1 && travellers[0] === H.me ? t('pay.justYou') : names.join(', ')}</T>
+              <T v="small" style={{ flex: 1 }}>{travellers.length === 1 && travellers[0] === H.me ? t('pay.justYou') : names.join(listSep())}</T>
               <LinkButton label={t('pay.edit')} onPress={() => setSheet('people')} />
             </View>
           ) : null}
@@ -245,7 +245,7 @@ export default function Pay() {
             </View>
           ) : <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('pay.promo.open')} onPress={() => setPromoOpen(true)} /></View>) : null}
           {missing.length ? (
-            <Notice icon="visa" iconColor={colors.goldInk} title={t('pay.passports.title', { names: missing.map((x) => (x!.isSelf ? 'you' : personName(x))).join(', ').replace(/, ([^,]*)$/, ' and $1') })}>
+            <Notice icon="visa" iconColor={colors.goldInk} title={t('pay.passports.title', { names: joinAnd(missing.map((x) => (x!.isSelf ? t('circles.youLower') : personName(x)))) })}>
               <T v="small">{t('pay.passports.body')}</T>
               <View style={{ alignSelf: 'flex-start' }}><LinkButton label={missing[0]!.isSelf ? t('pay.passports.scanYours') : t('pay.passports.scan', { name: personName(missing[0]) })} onPress={() => router.push('/wallet')} /></View>
             </Notice>

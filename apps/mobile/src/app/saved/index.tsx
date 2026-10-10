@@ -15,7 +15,7 @@ import { Icon } from '@/components/Icon';
 import { Screen, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { circlesApi, cityCover, photoSource, useSaved } from '@/lib/circles';
-import { t, tn } from '@/lib/i18n';
+import { listSep, t, tn } from '@/lib/i18n';
 import { colors, font } from '@/theme';
 
 /** Everything you saved, by city (prototype Saved): plan a day from them, share the list, open a map. */
@@ -56,7 +56,7 @@ export default function Saved() {
                 </View>
               </View>
               <Row wrap gap={10}>
-                <Button size="small" block={false} label={t('circles.savedScreen.dayFrom')} onPress={() => ask(t('circles.savedScreen.dayAsk', { city, places: items.map((i) => i.post!.place).join(', ') }))} />
+                <Button size="small" block={false} label={t('circles.savedScreen.dayFrom')} onPress={() => ask(t('circles.savedScreen.dayAsk', { city, places: items.map((i) => i.post!.place).join(listSep()) }))} />
                 <Button size="small" block={false} variant="secondary" icon={<Icon name="link" size={18} />} label={t('circles.savedScreen.share')} onPress={() => setShare(city)} />
               </Row>
               {items.map((s) => {

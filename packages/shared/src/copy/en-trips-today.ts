@@ -300,6 +300,7 @@ export const enTripsToday = {
   'td.air.estimated': 'In the air · estimated, no signal needed',
   'td.air.live': 'In the air · {alt} ft, seen just now',
   'td.air.to': 'to {city}',
+  'td.air.sources': 'Aircraft positions: {sources}',
   'td.air.lookLeft': 'Look left in about 40 minutes: the Taurus Mountains.',
   'td.deck.title': 'Plan your first evening',
   'td.deck.body': 'Swipe right on what sounds good. We’ll book it when you land.',

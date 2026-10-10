@@ -17,7 +17,7 @@ import {
   COVERS, circlesApi, cityCover, ck, lastLine, photoSource, useAct, useAround, useCircles, useFriends, useKnownPosts, useMeId, useSaved, useStamps, whenLabel,
 } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { joinAnd, listSep, t, tn } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
 import { toast } from '@/lib/toast';
 import { colors, ff, font, shadow } from '@/theme';
@@ -208,12 +208,12 @@ function Around({ data }: { data: AroundResponse }) {
   const act = useAct((a: { id: string; action: 'hello' | 'notNow' | 'hide' }) => circlesApi.aroundAction(a.id, a.action), () => [ck.around]);
   const report = useAct(circlesApi.report, () => [ck.around]);
   const names = (ps: PersonRef[]) => ps.map((p) => p.short);
-  const joinN = (ps: PersonRef[]) => { const n = names(ps); return n.length <= 1 ? n[0] ?? '' : `${n.slice(0, -1).join(', ')} ${t('circles.and')} ${n[n.length - 1]}`; };
+  const joinN = (ps: PersonRef[]) => { const n = names(ps); return n.length <= 1 ? n[0] ?? '' : joinAnd(n); };
   const whoLine = data.audience === 'family' ? t('circles.around.whoFamily') : data.audience === 'close' ? t('circles.around.whoClose') : joinN(data.options.picked) || t('circles.around.nobody');
   const opts: [Audience, string, string][] = [
     ['picked', t('circles.around.picked'), joinN(data.options.picked) || t('circles.around.nobody')],
     ['close', t('circles.around.close'), data.options.close.length ? tn('circles.people', data.options.close.length) : t('circles.around.nobody')],
-    ['family', t('circles.around.family'), data.options.family.length ? names(data.options.family).join(', ') : t('circles.around.nobody')],
+    ['family', t('circles.around.family'), data.options.family.length ? names(data.options.family).join(listSep()) : t('circles.around.nobody')],
   ];
   return (
     <View style={[st.focal, shadow('focal')]}>

@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { addMinutes, AIRPORT_NAME, boardsAt, clockIn, formatSar, homePickup, liveStay, outSegment, pickupPlan, seatText, type TripDetail } from '@mada/shared';
+import { addMinutes, AIRPORT_NAME, boardsAt, clockIn, formatSar, homePickup, liveStay, ltr, nameIn, outSegment, pickupPlan, seatText, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { AirlineMark, Box, Cells, Dot, Eyebrow, Grow, H3, IconTile, Num, Photo, Rise, Row, RouteLine, Small, SmallButton, Spread, Tag, TalkLine, Tiny, useTicker } from '@/components/trips/ui';
 import { VGradient } from '@/components/Gradient';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { tripsApi, useOffline } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
 import { useBanner } from './common';
@@ -145,7 +145,7 @@ export function TravelDay({ trip, predicted, now, updatedAt }: { trip: TripDetai
           )}
           {trip.weather ? (
             <Box style={{ flex: 1, height: 96, justifyContent: 'space-between', backgroundColor: '#e7ecef' }}>
-              <H3 size={14}>{trip.city} · {trip.weather.tempC}°</H3>
+              <H3 size={14}>{nameIn(trip.city, getLocale())} · {ltr(`${trip.weather.tempC}°`)}</H3>
               <Tiny color={colors.inkSoft}>{trip.weather.tip}</Tiny>
             </Box>
           ) : null}

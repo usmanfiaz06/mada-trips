@@ -10,7 +10,7 @@ import { T } from '@/components/Text';
 import { MoveNotice } from '@/components/trips/MoveNotice';
 import { Box, Grow, H3, Photo, Ring, Rise, Row, Small, SmallButton, Spread, Tag, Tiny, Veil } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { dirSign, t } from '@/lib/i18n';
+import { dirSign, listSep, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, useTrips, useTripMutation, useOffline } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
@@ -41,7 +41,7 @@ export function readinessItems(trip: TripDetail, esim: TripRequestView | null): 
     problem
       ? { id: 'pass', ok: false, k: t('td.ready.ppOf', { name: problem.p.firstName }), v: problem.issue!.text, fix: t('td.ready.fixPp', { name: problem.p.firstName }), act: 'passport', urgent: true }
       : missing.length
-        ? { id: 'pass', ok: false, k: t(n === 1 ? 'td.ready.passport' : 'td.ready.passports'), v: t('td.ready.ppMissing', { names: missing.map((p) => p.firstName).join(', ') }), fix: t('td.ready.addPp'), act: 'passport' }
+        ? { id: 'pass', ok: false, k: t(n === 1 ? 'td.ready.passport' : 'td.ready.passports'), v: t('td.ready.ppMissing', { names: missing.map((p) => p.firstName).join(listSep()) }), fix: t('td.ready.addPp'), act: 'passport' }
         : { id: 'pass', ok: true, k: t(n === 1 ? 'td.ready.passport' : 'td.ready.passports'), v: n === 1 ? t('td.ready.ppValid', { country: dest.country }) : t('td.ready.ppValidAll', { n, country: dest.country }) },
     { id: 'entry', ok: true, k: t('td.ready.entry'), v: n === 1 ? t('td.ready.entryV') : t('td.ready.entryAll', { n }) },
     esim
@@ -87,7 +87,7 @@ function Readiness({ trip }: { trip: TripDetail }) {
       ))}
       <Pressable testID="ready-done" accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => { buzz('tap'); setOpen(!open); }} style={styles.doneToggle}>
         <View style={{ flexDirection: 'row' }}>{done.map((it, i) => <View key={it.id} style={[styles.tick, i ? { marginStart: -6 } : null]}><Icon name="check" size={11} color={colors.paper} width={3} /></View>)}</View>
-        <T numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 17, color: colors.ink2, fontFamily: ff.ui500 }}>{t('td.ready.doneList', { n: done.length, list: done.map((i) => i.k.toLowerCase()).join(', ') })}</T>
+        <T numberOfLines={1} style={{ flex: 1, fontSize: 13, lineHeight: 17, color: colors.ink2, fontFamily: ff.ui500 }}>{t('td.ready.doneList', { n: done.length, list: done.map((i) => i.k.toLowerCase()).join(listSep()) })}</T>
         <View style={{ transform: [{ rotate: open ? `${90 * dirSign()}deg` : '0deg' }] }}><Icon name="chevron" size={16} /></View>
       </Pressable>
       {open ? (

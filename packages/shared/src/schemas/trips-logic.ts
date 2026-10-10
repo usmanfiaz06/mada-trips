@@ -8,6 +8,7 @@
 import { t, tn, type CopyKey, type Vars } from '../copy';
 import { addDays, addMinutes, dayLabel, dayOfMonth, daysBetween, durationLabel, monthOf, rangeLabel, shortDay, todayIn, weekdayOf, zonedToInstant, TZ } from '../dates';
 import { bps, formatSar, vatInside, type Halalas } from '../money';
+import { getDisplayPrefs } from '../locale';
 import type {
   ChangeKind, ChangeOption, DisruptionKind, DisruptionOption, FareRules, InvoiceLine, ItineraryDay, ItineraryItem, MoveNeeded, PickupDetail,
   RefundQuoteItem, SegmentDetail, StayDetail, TripDetail, TripPayment, TripPhase, TripRequestView, TripTraveller, CalendarEvent,
@@ -92,7 +93,7 @@ const ISTANBUL: Destination = {
   mosques: 'Mosques near the hotel: Arap Camii (6 min walk), Kılıç Ali Paşa (10 min).',
   freeDays: [
     { title: 'Hagia Sophia and the Blue Mosque', sub: 'Go before 10, the queues are short. 8 min by tram.', ask: 'Tickets for Hagia Sophia on {day}' },
-    { title: 'Basilica Cistern', sub: 'Book a time slot and skip the line.', ask: 'Tickets for the Basilica Cistern on {day}' },
+    { title: 'Basilica Cistern', sub: 'Book a time slot and skip the line.', ask: 'تذاكر صهريج البازيليك يوم {day}' },
     { title: 'A day on Büyükada', sub: 'The biggest of the Princes’ Islands. No cars, just bikes and walks.', ask: 'Ferry tickets to Büyükada on {day}' },
     { title: 'Ferry from Eminönü to Kadıköy', sub: '20 minutes on the water, about SAR 4 each.', ask: null },
   ],
@@ -110,8 +111,36 @@ const GENERIC = (city: string, country: string | null): Destination => ({
   stamp: `${city.toUpperCase()} · ENTRY ·`,
 });
 
+/** Istanbul in Arabic: the same facts, written for an Arabic reader (a first draft for the Saudi writer). */
+const ISTANBUL_AR: Destination = {
+  ...ISTANBUL,
+  plug: 'نوع F', language: 'التركية',
+  words: [['مرحبًا', 'Merhaba', 'مِرحَبا'], ['شكرًا', 'Teşekkürler', 'تَشَكّورلَر'], ['لو سمحت', 'Lütfen', 'لوتفَن'], ['الحساب، لو سمحت', 'Hesap, lütfen', 'حِساب لوتفَن'], ['أين…؟', '… nerede?', 'نيرِدِه']],
+  picks: [
+    { id: 'k1', title: 'كنافة قرب برج غلطة', note: 'نصيحة نور. اذهبوا قبل 8، تنفد بسرعة.', tag: 'حلويات · 4 د مشيًا', time: '19:00', photo: 'turkish-breakfast' },
+    { id: 'k2', title: 'الغروب من جسر غلطة', note: 'صيادون وعبّارات والمدينة القديمة بلون الذهب.', tag: 'مجاني · 10 د مشيًا', time: '18:30', photo: 'istanbul-bosphorus' },
+    { id: 'k3', title: 'عشاء بإطلالة على البوسفور', note: 'حلال، جلسات عائلية، طاولة لأربعة الساعة 20:00.', tag: 'عشاء · 15 د بالسيارة', time: '20:00', photo: 'istanbul-galata' },
+    { id: 'k4', title: 'نوم مبكر', note: 'خدمة الغرف، وبداية هادئة غدًا.', tag: 'راحة', time: '21:00', photo: 'hotel-room' },
+  ],
+  prayer: 'الفجر 05:58 · الظهر 13:21 · العصر 16:37 · المغرب 19:13 · العشاء 20:36',
+  qibla: 'القبلة من غلطة باتجاه الجنوب الشرقي، حوالي 152°',
+  mosques: 'مساجد قرب الفندق: جامع العرب (6 د مشيًا)، وجامع قليج علي باشا (10 د).',
+  freeDays: [
+    { title: 'آيا صوفيا والجامع الأزرق', sub: 'اذهبوا قبل 10، الطوابير قصيرة. 8 د بالترام.', ask: 'تذاكر آيا صوفيا يوم {day}' },
+    { title: 'صهريج البازيليك', sub: 'احجز موعدًا وتجاوز الطابور.', ask: 'تذاكر صهريج البازيليك يوم {day}' },
+    { title: 'يوم في بيوك أدا', sub: 'أكبر جزر الأميرات. بلا سيارات، دراجات ومشي فقط.', ask: 'تذاكر عبّارة إلى بيوك أدا يوم {day}' },
+    { title: 'عبّارة من أمين أونو إلى قاضي كوي', sub: '20 دقيقة على الماء، حوالي 4 ر.س للشخص.', ask: null },
+  ],
+  friday: [{ title: 'صلاة الجمعة في جامع السليمانية', sub: 'الخطبة الساعة 13:21. احضروا قبل 12:45 لتجدوا مكانًا في الداخل.' }, { title: 'البازار الكبير', sub: 'مفتوح حتى 19:00. مغلق يوم الأحد.' }],
+  sunday: [{ title: 'سوق التوابل', sub: 'مفتوح اليوم، بخلاف البازار الكبير. خذوا معكم حلقوم تركي.' }],
+  carousel: 'السير 7', atm: 'الصراف الآلي عند البوابة 8 أفضل من مكتب الصرافة',
+  taxi: 'حوالي 1,100 ليرة (125 ر.س) · من 45 إلى 60 د · الموقف الأصفر عند البوابة 14. اطلب العدّاد: «taksimetre».',
+  metro: 'M11 إلى غيرّت تبه، ثم M2 · حوالي 70 د · 60 ليرة للشخص · صعب مع الحقائب الكبيرة',
+};
+
 export function destinationOf(trip: Pick<TripDetail, 'city' | 'country'>): Destination {
-  return /istanbul/i.test(trip.city) ? ISTANBUL : GENERIC(trip.city, trip.country);
+  if (/istanbul/i.test(trip.city)) return getDisplayPrefs().locale === 'ar' ? ISTANBUL_AR : ISTANBUL;
+  return GENERIC(trip.city, trip.country);
 }
 
 /* ═══════════ small helpers ═══════════ */
@@ -636,7 +665,7 @@ export function buildItinerary({ trip, requests, picks }: ItineraryInput): Itine
     if (arr) {
       add(outDay, item({
         id: 'pk-arrive', time: addMinutes(hhmm(out.arriveLocal), 45), icon: 'car', kind: 'pickup', title: tk('itin.meets', { driver: arr.driverName ?? tk('trip.yourDriver'), door: arr.meetingPoint ?? '' }),
-        sub: where ? tk('itin.meetsSub', { airport: arrAirport, drive: st?.fromAirport ?? '45 min', place: tk(st ? 'itin.theHotel' : 'itin.yourPlace') }) : tk('itin.meetsSubNoStay', { airport: arrAirport }),
+        sub: where ? tk('itin.meetsSub', { airport: arrAirport, drive: st?.fromAirport ?? durationLabel(45), place: tk(st ? 'itin.theHotel' : 'itin.yourPlace') }) : tk('itin.meetsSubNoStay', { airport: arrAirport }),
         driver: arr.driverName, phone: arr.phone, car: [arr.car, arr.plate].filter(Boolean).join(' · ') || null, status: landedOrHome ? 'done' : null,
         warn: where ? null : tk('itin.warn.noStay'),
       }));
@@ -663,7 +692,7 @@ export function buildItinerary({ trip, requests, picks }: ItineraryInput): Itine
   if (back && backDay) {
     const leave = addMinutes(hhmm(back.departLocal), -210);
     if (arr && trip.pickups.filter((p) => p.status !== 'cancelled').length > 1) {
-      add(backDay, item({ id: 'pk-back', time: leave, icon: 'car', kind: 'pickup', title: tk('itin.toAirport', { driver: arr.driverName ?? tk('trip.yourDriver') }), sub: tk('itin.toAirportSub', { place: tk(st ? 'itin.theHotel' : 'itin.yourPlace'), drive: back.from === 'SAW' ? tk('itin.aboutHour') : '45 min' }), driver: arr.driverName, phone: arr.phone }));
+      add(backDay, item({ id: 'pk-back', time: leave, icon: 'car', kind: 'pickup', title: tk('itin.toAirport', { driver: arr.driverName ?? tk('trip.yourDriver') }), sub: tk('itin.toAirportSub', { place: tk(st ? 'itin.theHotel' : 'itin.yourPlace'), drive: back.from === 'SAW' ? tk('itin.aboutHour') : durationLabel(45) }), driver: arr.driverName, phone: arr.phone }));
     }
     add(backDay, item({
       id: 'fl-back', time: hhmm(back.departLocal), icon: 'flight', kind: 'flight', leg: 'back',

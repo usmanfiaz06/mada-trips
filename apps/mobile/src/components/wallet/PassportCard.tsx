@@ -4,9 +4,9 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fontFamilies, makeTd3, type Person } from '@mada/shared';
-import { t } from '@/lib/i18n';
+import { t, isRTL } from '@/lib/i18n';
 import { fullDay, fullNameOf, monthYear, type Validity } from '@/lib/wallet-model';
-import { colors, font, shadow } from '@/theme';
+import { colors, font, shadow, textLeft } from '@/theme';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import { Sun } from '../Sun';
@@ -61,9 +61,9 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
   const expires = person?.passport ? (validity.kind === 'blocked' || validity.kind === 'expired' ? fullDay(person.passport.expiry) : monthYear(person.passport.expiry)) : '';
 
   return (
-    <View style={{ height: 214 }}>
+    <View style={isRTL() ? { minHeight: 214 } : { height: 214 }}>
     <GestureDetector gesture={tilt}>
-      <Animated.View style={[styles.passport, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
+      <Animated.View style={[styles.passport, isRTL() ? { height: undefined, minHeight: 214 } : null, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
             <LinearGradient id={`ppg${gid}`} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
@@ -135,6 +135,6 @@ const styles = StyleSheet.create({
   sunMark: { position: 'absolute', end: -18, top: 48 },
   photoSlot: { width: 60, height: 76, borderRadius: 12, backgroundColor: '#ddd3c4', alignItems: 'center', justifyContent: 'center' },
   waitPhoto: { width: 58, height: 72, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(217,183,122,0.55)', alignItems: 'center', justifyContent: 'center' },
-  waitMrz: { fontFamily: fontFamilies.mono, fontSize: 11, letterSpacing: 1.3, color: 'rgba(233,226,216,0.28)' },
-  mrz: { fontFamily: fontFamilies.mono, fontSize: 10.5, lineHeight: 15, color: 'rgba(233,226,216,0.55)' },
+  waitMrz: { writingDirection: 'ltr', textAlign: textLeft(), fontFamily: fontFamilies.mono, fontSize: 11, letterSpacing: 1.3, color: 'rgba(233,226,216,0.28)' },
+  mrz: { writingDirection: 'ltr', textAlign: textLeft(), fontFamily: fontFamilies.mono, fontSize: 10.5, lineHeight: 15, color: 'rgba(233,226,216,0.55)' },
 });

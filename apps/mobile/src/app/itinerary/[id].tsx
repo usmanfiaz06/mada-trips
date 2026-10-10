@@ -13,7 +13,7 @@ import { ArtCalendar } from '@/components/trips/Arts';
 import { MoveNotice, NoStayChoices } from '@/components/trips/MoveNotice';
 import { Box, Cells, Display, Eyebrow, Grow, H3, ListRow, Rise, Row, SmallButton, Small, Spread, Tag, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { listSep, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useItinerary, useTrip } from '@/lib/trips';
 import { colors, radii, textEnd } from '@/theme';
@@ -134,7 +134,7 @@ function ItemSheet({ trip, it, onClose }: { trip: TripDetail; it: Picked; onClos
       {it.sub ? <T v="body" style={{ marginTop: -8 }}>{it.sub}</T> : null}
       {it.facts.length ? <Cells items={it.facts.map(([k, v]) => ({ k, v }))} /> : null}
       {it.kind === 'flight' ? (<>
-        {it.tags.length ? <Small>{t('itin.askedFor', { what: it.tags.join(', ') })}</Small> : null}
+        {it.tags.length ? <Small>{t('itin.askedFor', { what: it.tags.join(listSep()) })}</Small> : null}
         <Small>{t('itin.checkInNote')}</Small>
         <Button testID="item-change" label={t('itin.changeFlight')} onPress={() => to(`/trip/${trip.id}/change${it.leg === 'back' ? '?focus=return' : ''}`)} />
         <Row gap={8}>

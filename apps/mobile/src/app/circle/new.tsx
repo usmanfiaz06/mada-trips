@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, useAct, useCircles, useFriends, useSearch } from '@/lib/circles';
 import { AUTO_FOCUS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { joinAnd, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors, ff, font } from '@/theme';
 import { VGradient } from '@/components/Gradient';
@@ -55,7 +55,7 @@ export default function NewCircle() {
     onSuccess: (d) => {
       buzz('success');
       const names = picked.map((p) => p.short);
-      toast(picked.length ? t('circles.newCircle.made', { names: names.length <= 1 ? names[0]! : `${names.slice(0, -1).join(', ')} ${t('circles.and')} ${names[names.length - 1]}` }) : t('circles.newCircle.madeAlone'));
+      toast(picked.length ? t('circles.newCircle.made', { names: names.length <= 1 ? names[0]! : joinAnd(names) }) : t('circles.newCircle.madeAlone'));
       router.replace(`/circle/${d.circle.id}`);
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : t('error.internal')),

@@ -5,14 +5,14 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { scheduleOnRN } from 'react-native-worklets';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
-import { arrivalPickup, arriveInstant, departInstant, destinationOf, FlightPositionResponse, flightPositionPath, liveStay, outSegment, backSegment, type TripDetail } from '@mada/shared';
+import { arrivalPickup, durationLabel, arriveInstant, departInstant, destinationOf, FlightPositionResponse, flightPositionPath, liveStay, outSegment, backSegment, type TripDetail } from '@mada/shared';
 import { Icon, type IconName } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { Box, Display, Dot, Grow, H3, Num, Photo, Rise, Row, Small, SmallButton, Spread, Tag, TalkLine, TextLink, Tiny, useTicker, Veil } from '@/components/trips/ui';
 import { AddressSheet } from '@/components/trips/AddressSheet';
 import { request } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { dirSign, t } from '@/lib/i18n';
+import { dirSign, isRTL, t } from '@/lib/i18n';
 import { tripsApi, useOffline } from '@/lib/trips';
 import { colors, ff, radii, shadow } from '@/theme';
 import { useTripLocal } from './local';
@@ -76,9 +76,9 @@ function AirMap({ trip, now }: { trip: TripDetail; now: () => number }) {
       </Svg>
       <View style={{ padding: 18, gap: 6 }}>
         <T style={{ color: colors.gold, fontSize: 13, lineHeight: 17, fontFamily: ff.ui600 }}>{live ? t('td.air.live', { alt: Math.round((p!.altitudeFt ?? 0) / 100) * 100 }) : t('td.air.estimated')}</T>
-        <Row align="baseline" gap={8}><Num size={44} color={colors.paper}>{`${h}h ${String(m).padStart(2, '0')}m`}</Num><T style={{ fontSize: 18, lineHeight: 22, fontFamily: ff.ui500, color: colors.paper }}>{t('td.air.to', { city: back ? (trip.segments[0]?.from === 'RUH' ? 'Riyadh' : seg.to) : trip.city })}</T></Row>
+        <Row align="baseline" gap={8}><Num size={44} color={colors.paper}>{isRTL() ? durationLabel(h * 60 + m) : `${h}h ${String(m).padStart(2, '0')}m`}</Num><T style={{ fontSize: 18, lineHeight: 22, fontFamily: ff.ui500, color: colors.paper }}>{t('td.air.to', { city: back ? (trip.segments[0]?.from === 'RUH' ? 'Riyadh' : seg.to) : trip.city })}</T></Row>
         {dest.city === 'Istanbul' && !back ? <T v="small" color="rgba(255,253,249,0.88)">{t('td.air.lookLeft')}</T> : null}
-        {live ? <Tiny color="rgba(255,253,249,0.6)">{pos.data!.attribution}</Tiny> : null}
+        {live ? <Tiny color="rgba(255,253,249,0.6)">{t('td.air.sources', { sources: pos.data!.attribution.replace(/^Aircraft positions:\s*/, '') })}</Tiny> : null}
       </View>
     </View>
   );

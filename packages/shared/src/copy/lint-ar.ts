@@ -53,6 +53,9 @@ export const AR_LATIN_OK: readonly RegExp[] = [
   /^(Mada|Mada Trips|Mada Ops|Tabby|Tamara|Apple Pay|Google Pay|mada|Visa|Mastercard|Face ID|Touch ID|Apple|Google|English|WhatsApp|eSIM|Saudia|flynas|flyadeal|Instagram|Snapchat|X)$/,
 ];
 
+/** Placeholders Arabic may leave out, with the reason: Arabic marks gender in the verb, not with a pronoun. */
+const AR_OPTIONAL: Readonly<Record<string, readonly string[]>> = { 'presence.covering': ['pronoun'] };
+
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
 const PLURAL_SHORT = /\.(one|two|zero)$/;
 const PLURAL_EXTRA = /\.(zero|two|few|many)$/;
@@ -68,7 +71,9 @@ export function lintArabic(ar: Record<string, string>, en: Record<string, string
   const out: ArProblem[] = [];
   for (const [key, value] of Object.entries(ar)) {
     const enKey = PLURAL_EXTRA.test(key) && !(key in en) ? key.replace(PLURAL_EXTRA, '.other') : key;
-    const english = en[enKey];
+    // Forms for a key English writes once with a number: "td.when.inWeeks.few" for "td.when.inWeeks".
+    const base = key.replace(/\.(zero|one|two|few|many|other)$/, '');
+    const english = en[enKey] ?? (base !== key && /\{(count|n)\}/.test(en[base] ?? '') ? en[base] : undefined);
     if (english === undefined) {
       out.push({ key, problem: 'no English key (a typo, or a plural form without an English .other)' });
       continue;
@@ -76,7 +81,8 @@ export function lintArabic(ar: Record<string, string>, en: Record<string, string
     // Placeholders match English. Singular/dual forms may drop the count.
     const want = placeholders(english);
     const got = placeholders(value);
-    const optional = PLURAL_SHORT.test(key) || /\.two$/.test(key) ? new Set(['count', 'n']) : new Set<string>();
+    const optional = new Set<string>(AR_OPTIONAL[key] ?? []);
+    if (PLURAL_SHORT.test(key)) { optional.add('count'); optional.add('n'); }
     const missing = want.filter((p) => !got.includes(p) && !optional.has(p));
     const extra = got.filter((p) => !want.includes(p));
     if (missing.length) out.push({ key, problem: `missing placeholder ${missing.map((p) => `{${p}}`).join(' ')}` });

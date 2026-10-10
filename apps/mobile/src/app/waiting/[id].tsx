@@ -14,7 +14,7 @@ import { T } from '@/components/Text';
 import { Photo, useNow, enter } from '@/components/booking/parts';
 import { bookingApi, bookingKeys, finishInBackground, stopWatching, useOrder, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { listSep, t, tn } from '@/lib/i18n';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -33,7 +33,7 @@ const FROM: Record<string, string> = { RUH: 'Riyadh', JED: 'Jeddah', DMM: 'Damma
 function rowsOf(o: OrderView): [string, string, string][] {
   const n = Math.max(1, o.travellerIds.length);
   const nWord = (NUM[n] ?? String(n)).toLowerCase();
-  const seats = o.seats.join(', ');
+  const seats = o.seats.join(listSep());
   const price = t('wait.row.priceDetail', { price: formatSar(o.total.amount + o.extra.amount) });
   if (o.kind === 'stay') return [[t('wait.row.hotel'), t('wait.row.hotelDone'), t('wait.row.hotelDetail')], [t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.roomsDetail')]];
   if (o.kind === 'package') return [[t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.hotelDetail')], [t('wait.row.tours'), t('wait.row.toursDone'), t('wait.row.toursDetail')]];

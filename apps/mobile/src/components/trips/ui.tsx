@@ -10,7 +10,7 @@ import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { VGradient } from '@/components/Gradient';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { isRTL, t } from '@/lib/i18n';
 import { useAgent as useAgentName } from '@/lib/trips';
 import { useDeviceOffline } from '@/lib/net/state';
 import { rise } from '@/lib/motion';
@@ -190,7 +190,8 @@ export function RouteLine({ dep, arr, from, to, durationMin, big, direct = true,
       <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
         <Row gap={4} style={{ width: '100%' }}>
           <View style={[styles.dash, light ? { borderColor: 'rgba(255,253,249,0.4)' } : null]} />
-          <Svg width={16} height={16} viewBox="0 0 24 24"><Path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill={fg} transform="rotate(90 12 12)" /></Svg>
+          {/* The plane points from where you leave to where you land: leftwards when the row reads right to left. */}
+          <Svg width={16} height={16} viewBox="0 0 24 24" style={isRTL() ? { transform: [{ scaleX: -1 }] } : undefined}><Path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" fill={fg} transform="rotate(90 12 12)" /></Svg>
           <View style={[styles.dash, light ? { borderColor: 'rgba(255,253,249,0.4)' } : null]} />
         </Row>
         {durationMin ? <Tiny color={light ? colors.onDark2 : undefined}>{durationLabel(durationMin)}{direct ? ` · ${t('trip.direct')}` : ''}</Tiny> : null}

@@ -17,7 +17,7 @@ import { RefundTracker } from '@/components/trips/RefundTracker';
 import { RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
 import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { listSep, t } from '@/lib/i18n';
 import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
 import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
@@ -99,7 +99,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
             <Shade id={`trip-${c.id}`} />
             <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
               <Display size={36} color={colors.paper}>{c.city}</Display>
-              <T v="small" color="rgba(255,253,249,0.9)">{rangeLong(c.startDate, c.endDate)} · {c.justYou ? t('tr.justYou') : c.travellerNames.join(', ')}</T>
+              <T v="small" color="rgba(255,253,249,0.9)">{rangeLong(c.startDate, c.endDate)} · {c.justYou ? t('tr.justYou') : c.travellerNames.join(listSep())}</T>
             </View>
           </Photo>
         </Pressable>
@@ -212,7 +212,7 @@ function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) 
     {trips.map((p) => (
       <Box key={p.id} testID={`past-${p.city}`}>
         <Spread><H3>{p.city}</H3><Tiny>{rangeLong(p.startDate, p.endDate)}</Tiny></Spread>
-        {p.note ? <Small>{p.note}</Small> : <Small>{p.justYou ? t('tr.justYou') : p.travellerNames.join(', ')}</Small>}
+        {p.note ? <Small>{p.note}</Small> : <Small>{p.justYou ? t('tr.justYou') : p.travellerNames.join(listSep())}</Small>}
         <SmallButton tone="soft" label={t('tr.sameAgain')} onPress={() => ask(t('tr.sameAgainAsk', { city: p.city, when: (p.when ?? t('td.lastTime')).toLowerCase() }))} />
       </Box>
     ))}

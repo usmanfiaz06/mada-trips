@@ -77,6 +77,11 @@ setDisplayPrefs({ locale, digits: webSaved.digits ?? 'latn', hijri: webSaved.hij
 if (web && typeof document !== 'undefined') {
   document.documentElement.lang = locale;
   document.documentElement.dir = locale === 'ar' ? 'rtl' : 'ltr';
+  // Drawings (route maps, stamps, card marks) are pictures, not reading order: their text anchors stay put, as on
+  // native, instead of following the page's direction.
+  const style = document.createElement('style');
+  style.textContent = 'svg { direction: ltr; }';
+  document.head.appendChild(style);
 }
 
 export const getLocale = (): CopyLocale => locale;
@@ -90,6 +95,15 @@ export const flipX = () => (locale === 'ar' ? [{ scaleX: -1 }] : []);
 export const setLocale = (_l: CopyLocale) => { I18nManager.allowRTL(true); };
 
 export const t = (key: CopyKey, vars?: Vars) => tShared(key, vars, locale);
+
+/** The list separator: ", " in English, the Arabic comma "، " in Arabic. */
+export const listSep = (): string => (locale === 'ar' ? '، ' : ', ');
+/** "Sara, Hessa and Ahmed" / "سارة، حصة وأحمد": in Arabic "و" joins the last name with no space. */
+export function joinAnd(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  const and = tShared('circles.and', undefined, locale);
+  return `${items.slice(0, -1).join(listSep())} ${and}${locale === 'ar' ? '' : ' '}${items[items.length - 1]}`;
+}
 export const tn = (base: string, count: number, vars?: Vars) => tnShared(base, count, vars, locale);
 
 /** Display settings that apply without a restart. Components that show them subscribe here. */

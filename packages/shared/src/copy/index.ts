@@ -1,9 +1,11 @@
 import { en, type CopyKey } from './en';
 import { authCopyAr } from './auth.ar';
 import { arSections } from './ar';
+import { nameIn } from './names-ar';
 import { isLatinRun, localeOr, localizeDigits, LRI, PDI, pluralKeys, type Lang } from '../locale';
 
 export { en, type CopyKey };
+export { NAMES_AR, nameIn } from './names-ar';
 
 export type CopyLocale = Lang;
 export type Vars = Record<string, string | number>;
@@ -22,6 +24,8 @@ export const catalogueFor = (locale: CopyLocale): Readonly<Record<string, string
 /** A string that was never written looks obviously unfinished (COPY.md §9), so it can't ship by accident. */
 export const placeholderFor = (key: string) => `⟦${key}⟧`;
 
+const EN_NUMBER_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+
 /**
  * Fill `{placeholders}`. In Arabic, a value that is a Latin run (a flight number, PNR, IATA code, a hotel's Latin
  * name) is wrapped in a left-to-right isolate so it never scrambles the sentence around it, and digits follow the
@@ -36,6 +40,11 @@ function fill(raw: string, vars: Vars | undefined, locale: CopyLocale): string {
     if (locale !== 'ar') return String(v);
     if (typeof v === 'number') return localizeDigits(String(v), 'ar');
     if (/[\u2066-\u2069]/.test(v)) return v;
+    // English number words ("the four of you") come out as digits in Arabic.
+    const word = EN_NUMBER_WORDS.indexOf(v.toLowerCase());
+    if (word >= 0) return localizeDigits(String(word), 'ar');
+    const named = nameIn(v, 'ar');
+    if (named !== v) return named;
     if (/[A-Za-z]/.test(v) && isLatinRun(v)) return `${LRI}${v}${PDI}`;
     return localizeDigits(v, 'ar');
   });
@@ -44,6 +53,17 @@ function fill(raw: string, vars: Vars | undefined, locale: CopyLocale): string {
 /** Look up a string and fill its `{placeholders}`. The locale defaults to the display locale (setDisplayPrefs). */
 export function t(key: CopyKey, vars?: Vars, locale?: CopyLocale): string {
   const l = localeOr(locale);
+  // Arabic counts nouns where English doesn't need a plural key ("In {n} weeks"): when the Arabic catalogue has
+  // forms for the key (`key.two`, `key.few`, `key.other`…), the number in {count} or {n} picks one.
+  if (l === 'ar' && vars) {
+    const n = typeof vars.count === 'number' ? vars.count : typeof vars.n === 'number' ? vars.n : null;
+    if (n !== null && catalogues.ar[`${key}.other`] !== undefined) {
+      for (const k of pluralKeys(key, n, 'ar')) {
+        const raw = catalogues.ar[k];
+        if (raw !== undefined) return fill(raw, vars, 'ar');
+      }
+    }
+  }
   const own = catalogues[l][key];
   return own !== undefined ? fill(own, vars, l) : fill(en[key] ?? placeholderFor(key), vars, 'en');
 }

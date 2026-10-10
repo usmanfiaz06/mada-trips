@@ -27,12 +27,14 @@ export function font(name: TypeName, color?: string): TextStyle {
  */
 export function arabicMetrics(family: string, size: number, lineHeight: number) {
   if (family === 'display') {
-    const s = Math.round(size * 0.78);
-    return { size: s, lineHeight: Math.round(s * 1.45), tracking: 0 };
+    const s = Math.round(size * 0.86);
+    return { size: s, lineHeight: Math.round(s * 1.4), tracking: 0 };
   }
   if (size >= 60) return { size, lineHeight, tracking: 0 };
-  const s = size >= 16 ? size + 1 : size + 1;
-  return { size: s, lineHeight: Math.max(Math.round(lineHeight * 1.18), Math.round(s * 1.5)), tracking: 0 };
+  // Headlines keep their size (the layouts are tight); text grows a point. Lines open up for the marks.
+  if (size >= 24) return { size, lineHeight: Math.max(Math.round(lineHeight * 1.1), Math.round(size * 1.32)), tracking: 0 };
+  const s = size + 1;
+  return { size: s, lineHeight: Math.max(Math.round(lineHeight * 1.15), Math.round(s * 1.5)), tracking: 0 };
 }
 
 /** Shadows as CSS box-shadow, which React Native supports on iOS, Android (new architecture) and web. */
@@ -50,3 +52,7 @@ export { fontFamilies as ff } from '@mada/shared';
  * right-to-left; the web build doesn't, so it gets the mirrored value.
  */
 export const textEnd = (): 'left' | 'right' => (Platform.OS === 'web' && isRTL() ? 'left' : 'right');
+/** Text pinned to the physical left whatever the language: machine-readable lines, codes drawn as on paper. */
+export const textLeft = (): 'left' | 'right' => (Platform.OS !== 'web' && isRTL() ? 'right' : 'left');
+/** Text pinned to the physical right: the start of a right-to-left line, for a Latin-only line inside Arabic. */
+export const textRight = (): 'left' | 'right' => (Platform.OS !== 'web' && isRTL() ? 'left' : 'right');

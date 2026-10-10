@@ -1,7 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { addMinutes, AIRPORT_NAME, dayLabel, boardsAt, destinationOf, liveStay, outSegment, passportIssue, pickupPlan, PICKUP_OFFSETS, SUGGESTED_OFFSET, seatText, termShort, type TripDetail } from '@mada/shared';
+import { addMinutes, AIRPORT_NAME, dayLabel, durationLabel, boardsAt, destinationOf, liveStay, outSegment, passportIssue, pickupPlan, PICKUP_OFFSETS, SUGGESTED_OFFSET, seatText, termShort, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
@@ -33,7 +33,7 @@ function packList(trip: TripDetail) {
     ...(trip.weather?.rain ? [{ id: 'umbrella', t: t('td.pack.umbrella'), sub: t('td.pack.umbrellaSub') }] : []),
     ...(trip.weather ? [{ id: 'layer', t: n === 1 ? t('td.pack.layer') : t('td.pack.layerEach'), sub: t('td.pack.layerSub', { temp: trip.weather.tempC, city: trip.city }) }] : []),
     { id: 'mat', t: t('td.pack.mat'), sub: liveStay(trip) ? t('td.pack.matHotel') : t('td.pack.matCity', { city: trip.city }) },
-    ...(kids.length ? [{ id: 'snacks', t: t('td.pack.snacks', { names: kids.join(` ${t('trip.and')} `) }), sub: t('td.pack.snacksSub', { dur: out ? `${Math.floor(out.durationMin / 60)}h ${out.durationMin % 60}m` : '' }) }] : []),
+    ...(kids.length ? [{ id: 'snacks', t: t('td.pack.snacks', { names: kids.join(` ${t('trip.and')} `) }), sub: t('td.pack.snacksSub', { dur: out ? durationLabel(out.durationMin) : '' }) }] : []),
     { id: 'meds', t: t('td.pack.meds'), sub: t('td.pack.medsSub') },
   ] as PackItem[];
 }

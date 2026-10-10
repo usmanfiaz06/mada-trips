@@ -16,7 +16,7 @@ import { CardsSheet } from '@/components/wallet/sheets';
 import { LanguageSheet } from '@/components/wallet/AccountSheets';
 import { Group, Row, UserAvatar } from '@/components/wallet/ui';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { listSep, t, tn } from '@/lib/i18n';
 import { usePeople, useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -115,7 +115,7 @@ function SignedIn() {
 
       <Group label={t('profile.household')}>
         <Row lead={<View style={{ flexDirection: 'row' }}>{list.slice(0, 4).map((p, i) => <View key={p.id} style={{ marginStart: i ? -10 : 0 }}>{p.isSelf ? <UserAvatar size={34} ring={colors.paper} initial={display.charAt(0)} hasPhoto={!!a?.photo} photoKey={a?.photo?.updatedAt} /> : <View style={styles.face}><T style={{ fontFamily: ff.ui600, fontSize: 13, color: colors.green }}>{p.firstName.charAt(0)}</T></View>}</View>)}</View>}
-          value={list.length > 1 ? list.map((p) => (p.isSelf ? display || t('household.youPlain') : p.firstName)).join(', ') : t('profile.justYou')}
+          value={list.length > 1 ? list.map((p) => (p.isSelf ? display || t('household.youPlain') : p.firstName)).join(listSep()) : t('profile.justYou')}
           sub={list.length <= 1 ? (needs ? t('profile.household.youNoPassport') : t('profile.household.addFamily')) : needs ? tn('profile.household.needs', needs) : t('profile.household.allGood')}
           onPress={() => router.push('/household')} testID="profile-household" />
       </Group>
