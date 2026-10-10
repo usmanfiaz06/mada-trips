@@ -39,3 +39,23 @@ for (const [from, to] of [
 // The model ships as base64 text: the host serves plain text, not .gz or binary.
 writeFileSync('dist/ocr/eng-traineddata.b64.txt', readFileSync('ocr-assets/eng.traineddata.gz').toString('base64'));
 console.log('built dist/index.html', Math.round(html.length / 1024) + ' KB');
+
+/*
+ * Thmanyah (Arabic). Its licence allows it inside a built product but not re-hosting the files, and this repo is
+ * public, so dist/index.html (committed) keeps IBM Plex Sans Arabic and Reem Kufi. When the woff2 files are in
+ * fonts/thmanyah/ (ignored by git), a second page, dist/index.thm.html (also ignored), carries them inline for
+ * publishing the prototype.
+ */
+const thmDir = 'fonts/thmanyah';
+const thm = existsSync(thmDir) ? readdirSync(thmDir).filter((f) => f.endsWith('.woff2')) : [];
+const face = (family, weight, match) => {
+  const f = thm.find((x) => x.toLowerCase().includes(match));
+  return f ? `@font-face{font-family:'${family}';font-weight:${weight};font-display:swap;src:url(data:font/woff2;base64,${readFileSync(`${thmDir}/${f}`).toString('base64')}) format('woff2')}` : '';
+};
+const faces = [face('Thmanyah Sans', 400, 'sans-regular'), face('Thmanyah Sans', 500, 'sans-medium'), face('Thmanyah Sans', 600, 'sans-bold'), face('Thmanyah Sans', 700, 'sans-bold'), face('Thmanyah Serif Display', 500, 'serifdisplay-medium')];
+if (faces.every(Boolean)) {
+  const rtl = `[dir="rtl"]{--f-ui:'Thmanyah Sans','Inter Tight',system-ui,sans-serif;--f-display:'Thmanyah Serif Display','Thmanyah Sans',Georgia,serif}`;
+  const page = html.replace('<style>', `<style>${faces.join('')}</style>\n<style>`).replace('</style>\n<div id="root">', `\n${rtl}</style>\n<div id="root">`);
+  writeFileSync('dist/index.thm.html', page);
+  console.log('built dist/index.thm.html with Thmanyah', Math.round(page.length / 1024) + ' KB');
+}

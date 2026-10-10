@@ -14,3 +14,5 @@ apps/mobile/web-build/
 # Thmanyah font files: licence forbids re-hosting, and this repo is public (apps/mobile/src/theme/arabic-fonts.ts)
 apps/mobile/assets/fonts/thmanyah/
 apps/mobile/src/theme/arabic-fonts.local.ts
+docs/app/prototype-app/fonts/thmanyah/
+docs/app/prototype-app/dist/index.thm.html
