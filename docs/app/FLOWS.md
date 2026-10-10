@@ -137,6 +137,35 @@ The demo panel can jump to any of these moments.
 - **Toasts and lock-screen-style banners** for events: gate change, driver arrived, refund sent.
 - **Haptics:** vibration on Android browsers only in the prototype. The real app uses native patterns ([EXPERIENCE.md §4.6](EXPERIENCE.md)).
 
+## 12. When things go wrong
+
+How the real app behaves when the network, our server or a supplier lets the traveller down. The prototype's designs are in §13; this is what the app does underneath. Code: `apps/mobile/src/lib/net`, `apps/mobile/src/components/states` (with a README for screens), `platform/src/lib/app/resilience`. Every state is on one page at `/states` in mock builds, and `apps/mobile/test/e2e-resilience.mjs` screenshots each one under Playwright's network emulation.
+
+| Situation | What the app does | What the traveller sees |
+|---|---|---|
+| **No connection** | NetInfo (phones) or `navigator.onLine` (web) says offline: requests fail at once instead of waiting, queries pause and refetch on reconnect. | The pill under the status bar, "Offline · your trips are on this phone" (never over Back, a title or a banner: screens move down under it). Trips, itinerary, Wallet and passes open from the copy saved on the phone, with "Saved on this phone · updated 14 min ago". |
+| **Phone online, our server not answering** | Two requests in a row can't reach us: treated as offline; a probe asks GET /config every few seconds (3 s, doubling to 30 s) until it answers. | "Can't reach Mada right now", the saved copy. |
+| **Weak connection** | 2G/slow 3G, data saver, or our requests averaging over 2.5 s. | "Weak connection · loading slowly"; skeletons; "Still working… slower than usual" after 2.5 s instead of 4 s, with Cancel. |
+| **Slow answer** | Every request has a timeout: 8 s, 20 s for search, payments, orders and refunds. | Skeleton → after 4 s "Still working… slower than usual" with Cancel → "This didn't load." with Try again. |
+| **Our server fails (5xx)** | Reads retry twice with backoff and jitter. Changes never retry unless they carry their own Idempotency-Key. | "That didn't work, and it's on us." with Try again, Talk to Mada and "Reference …" (the request id, which Faisal can look up). |
+| **Busy (429)** | Waits the server's Retry-After (up to 10 s), then tries again by itself. | "We're busy for a moment. Trying again in 3 seconds." |
+| **A supplier not answering** | The server times each supplier call and opens a circuit breaker after 5 failures in a minute: further calls fail at once with SUPPLIER_DOWN for 30 s (doubling to 5 min). GET /status lists them. | "Saudia's system isn't answering." In a booking: "Faisal is booking this by hand. You don't need to do anything." |
+| **Maintenance** | GET /config `maintenance.on`, or a 503 MAINTENANCE on any change. Reads still work. | Full screen "Mada is being updated until 03:00." → Open my trips (the pill stays: "Maintenance until 03:00 · booking paused") or Talk to Mada by phone. |
+| **Version too old** | Below GET /config `minVersion`, every request answers 426. | "Update Mada to keep booking." → Update Mada (store), or open saved trips. |
+| **Session ran out** | 401 TOKEN_EXPIRED refreshes once. If the refresh is refused, the screen stays and a sheet asks for a code; a revoked session signs the phone out. | "Sign back in to carry on." over the current screen; what was typed is still there afterwards. |
+| **Sent while offline** | The outbox keeps messages, requests and disruption choices on the phone with their own Idempotency-Key and sends them in order on reconnect; the latest disruption choice replaces a queued one. | "Offline · 2 waiting to send"; the Outbox (Queued, Sending, Didn't send with Send again and Discard); "Back online. Sent 2 things you did offline." |
+| **Airplane mode mid-payment** | The payment request fails fast with OFFLINE (or TIMEOUT); the order's own Idempotency-Key means a retry can't charge twice. | "You're offline, so we stopped before paying." / "The connection dropped while paying." "Nothing was charged. Your price is held for 18 more minutes." Resume. |
+| **Double tap on Pay** | `useApiMutation` ignores a second tap while the first runs; the server replays the first answer for a repeated key. | "Already paying. You can only be charged once." |
+| **App killed during booking** | The order lives on the server; GET /orders on the next launch finds it. | "Your Istanbul booking is still with Faisal." |
+| **Phone clock wrong** | Every response carries X-Server-Time; countdowns use `serverNow()`. | Countdowns are right. |
+| **Phone full** | A write that fails for space is noticed once. | "Your phone is almost full. We couldn't save your trips for offline use." |
+| **Link to something deleted** | Unknown routes and missing records land on one screen. | "This link doesn't go anywhere now." See your trips · Go to Today. |
+| **Newer or older server** | A response that doesn't match the shared schema is a soft BAD_RESPONSE; unknown fields are ignored; unknown error codes fall back by HTTP status. | "Part of this didn't load." with Try again. Never a crash. |
+| **A crash** | A root error boundary (and expo-router's) catches it and reports to Sentry when a DSN is set. | "Something broke on our side. Your trips are safe." Restart Mada · Talk to Mada. |
+| **A photo that fails or crawls** | `SafeImage` shows a tone from the name with initials until it loads, a thumbnail or blurhash first when there is one. | Never a broken-image icon. |
+
+**Server side.** Every error is `{ error: { code, message, retryAfter?, details?, requestId?, fields? } }` with codes from `packages/shared/src/schemas/errors.ts`. Every response carries `X-Request-Id` (the app's own when it sends a sane one) and `X-Server-Time`, and each request is logged on one line with its id. POST/PATCH/PUT/DELETE with `Idempotency-Key` run once per user and key for 24 hours (`app_idempotency_keys`); a repeat gets the first answer, a different body with the same key gets 422, a repeat while the first runs gets 409 with Retry-After. GET /config and GET /status are public and cached briefly; GET /health also reports open breakers and maintenance.
+
 ## 13. Failure states in the prototype
 
 Every state below can be reached from the demo panel: its own switch, or the **When things go wrong** walkthrough, which steps through all 27 in order. They share one design family (`EmptyState` stage, the same drawing hand and motion; components in `prototype-app/src/ui.jsx`, styles in `src/css/states.css`). Each one says what happened, what still works, and one next step. Nothing is red, nothing shakes, nobody is blamed. Test: `test/states.mjs` (desktop and 390×844).

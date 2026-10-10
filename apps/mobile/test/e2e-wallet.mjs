@@ -145,7 +145,7 @@ async function walletDemo() {
   step('wallet: family chips');
   await text('Sara', true).click();
   await see('Sara Alharbi', 'sara passport');
-  await see('Valid until 14 Aug 2027.', 'sara validity');
+  await see('on the Istanbul trip.', 'sara not on the trip');
   await shot('wallet-sara');
   await text('Hessa', true).click();
   await see('Hessa Alharbi', 'hessa passport');
@@ -214,9 +214,11 @@ async function walletLock() {
   for (let i = 0; i < 4; i += 1) { await byTest('lock-passcode-input').fill('111111'); await byTest('lock-open').click(); await page.waitForTimeout(200); }
   await see('Too many tries. Try again in 5 min, or open it with Face ID.', 'lockout');
   await shot('lock-lockout');
-  await page.evaluate(() => { localStorage.removeItem('mada.wallet.lockout.v1'); });
-  await page.reload();
-  await byTest('dock-wallet').click().catch(() => {});
+  const kept = await page.evaluate(() => { const v = localStorage.getItem('mada.wallet.lockout.v1') || ''; localStorage.clear(); return v; });
+  if (!/"lockedUntil":[1-9]/.test(kept)) errors.push('lockout: not kept on the device');
+  // The mock API lives in memory, so a reload is a fresh start: sign in again, with the lockout cleared.
+  await signIn(page, '500004127', { returning: true });
+  await byTest('dock-wallet').click();
   await see("Face ID didn't match. Use your passcode.", 'face id failed again');
   await byTest('lock-passcode-input').fill('123456');
   await byTest('lock-open').click();

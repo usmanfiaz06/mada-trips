@@ -13,6 +13,7 @@
 // running out (re-sign-in over the screen, typed text kept), a contract mismatch, the outbox (queued, sent on
 // reconnect, a refusal with Send again / Remove), a deep link to nothing, a crash, photos that fail or crawl, and the
 // states gallery. Screenshots every state at 390×844; fails on any page error or missing text.
+import { Buffer } from 'node:buffer';
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
