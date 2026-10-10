@@ -13,7 +13,7 @@ config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules'), p
 /*
  * Thmanyah (theme/arabic-fonts.ts): its files can't live in this public repo, so when assets/fonts/thmanyah/ holds
  * them, write arabic-fonts.local.ts pointing at them and resolve the theme module to it. Files are matched by name:
- * Serif Display Regular for display; Sans Regular, Medium and Bold for the interface (Thmanyah Sans has no SemiBold,
+ * Serif Display Medium (or Regular) for display; Sans Regular, Medium and Bold for the interface (Thmanyah Sans has no SemiBold,
  * so 600 uses Bold).
  */
 const fs = require('node:fs');
@@ -23,7 +23,7 @@ const local = path.join(projectRoot, 'src/theme/arabic-fonts.local.ts');
 const files = fs.existsSync(fontDir) ? fs.readdirSync(fontDir).filter((f) => /\.(otf|ttf)$/i.test(f)) : [];
 const pick = (...words) => files.find((f) => words.every((w) => f.toLowerCase().replace(/[^a-z0-9]/g, '').includes(w)));
 const found = {
-  display: pick('serif', 'display', 'regular') ?? pick('serifdisplay'),
+  display: pick('serif', 'display', 'medium') ?? pick('serif', 'display', 'regular'),
   ui400: pick('sans', 'regular'),
   ui500: pick('sans', 'medium'),
   ui700: pick('sans', 'bold'),

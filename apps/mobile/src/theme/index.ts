@@ -1,6 +1,7 @@
 import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 import { isRTL } from '@/lib/i18n';
 import { colors, fontFamilies, getDisplayPrefs, radii, shadows, sizes, space, typography, type TypeName } from '@mada/shared';
+import { thmanyah } from './arabic-fonts';
 
 export { colors, radii, sizes, space, typography };
 export type { TypeName };
@@ -22,13 +23,14 @@ export function font(name: TypeName, color?: string): TextStyle {
 
 /**
  * Arabic type (COPY.md §7.4): about 2 pt larger with lines about 15% taller, body never below 16, and no letter
- * spacing (tracking breaks the joins between Arabic letters). Reem Kufi sets much larger than Instrument Serif at the
- * same size, so display styles come down instead. The hero number stays: it is digits.
+ * spacing (tracking breaks the joins between Arabic letters). Arabic display (Thmanyah Serif Display, or Reem Kufi as
+ * the fallback) sets larger than Instrument Serif at the same size, so display styles come down a little. The hero number stays: it is digits.
  */
 export function arabicMetrics(family: string, size: number, lineHeight: number) {
   if (family === 'display') {
-    const s = Math.round(size * 0.86);
-    return { size: s, lineHeight: Math.round(s * 1.4), tracking: 0 };
+    // Thmanyah Serif Display sits close to Instrument Serif; Reem Kufi (the fallback) sets much larger.
+    const s = Math.round(size * (thmanyah ? 0.96 : 0.86));
+    return { size: s, lineHeight: Math.round(s * (thmanyah ? 1.32 : 1.4)), tracking: 0 };
   }
   if (size >= 60) return { size, lineHeight, tracking: 0 };
   // Headlines keep their size (the layouts are tight); text grows a point. Lines open up for the marks.
