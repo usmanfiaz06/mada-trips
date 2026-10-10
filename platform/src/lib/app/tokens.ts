@@ -1,4 +1,5 @@
 import "server-only";
+import { setRequestLocale } from "./resilience/request";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { SignJWT, jwtVerify, errors as joseErrors } from "jose";
@@ -102,12 +103,14 @@ export async function authenticate(req: Request): Promise<AppAuth> {
   } catch (e) {
     throw new AppError(e instanceof joseErrors.JWTExpired ? "TOKEN_EXPIRED" : "UNAUTHORIZED");
   }
-  const [row] = await db.select({ revokedAt: appSessions.revokedAt, userId: appSessions.userId, deletedAt: appUsers.deletedAt })
+  const [row] = await db.select({ revokedAt: appSessions.revokedAt, userId: appSessions.userId, deletedAt: appUsers.deletedAt, locale: appUsers.locale })
     .from(appSessions).innerJoin(appUsers, eq(appUsers.id, appSessions.userId))
     .where(eq(appSessions.id, sid)).limit(1);
   if (!row || row.userId !== sub) throw new AppError("UNAUTHORIZED");
   if (row.revokedAt) throw new AppError("SESSION_REVOKED");
   if (row.deletedAt) throw new AppError("UNAUTHORIZED");
+  // From here the request speaks the traveller's saved language (resilience/request.ts).
+  setRequestLocale(row.locale);
   return { userId: sub, sessionId: sid };
 }
 

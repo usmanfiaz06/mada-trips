@@ -5,6 +5,7 @@ import { db, type Tx } from "@/db";
 import { appPeople, appUsers } from "@/db/app-schema";
 import { appAuditLog } from "./audit";
 import { AppError } from "./http";
+import { currentLocale } from "./resilience/request";
 
 type UserRow = typeof appUsers.$inferSelect;
 
@@ -38,7 +39,8 @@ async function createSelf(tx: Tx, userId: string) {
 }
 
 export async function createUser(tx: Tx, values: Partial<typeof appUsers.$inferInsert>): Promise<UserRow> {
-  const [u] = await tx.insert(appUsers).values(values).returning();
+  // A new account starts in the language its phone asked in (Accept-Language); the app keeps it in step after.
+  const [u] = await tx.insert(appUsers).values({ locale: currentLocale(), ...values }).returning();
   await createSelf(tx, u!.id);
   return u!;
 }

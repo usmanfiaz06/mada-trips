@@ -15,6 +15,7 @@ import { decryptField, passportAad } from "@/lib/app/crypto";
 import { supplierMode } from "@/lib/app/config";
 import { bookingSuppliers } from "@/lib/app/booking/common";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type DeskActor } from "./core";
+import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
 
 /*
  * Thin adapters for the desk. They read and write the M0 app_ tables directly, so the desk works today.
@@ -51,8 +52,9 @@ const isUuidLike = (s: string) => /^[0-9a-f-]{36}$/i.test(s);
 export const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
 
 async function notify(tx: Tx, userId: string, n: { kind: string; level: "time_sensitive" | "active" | "passive"; title: CopyKey; body: CopyKey; vars?: Vars; href?: string | null; data?: Record<string, unknown> }) {
+  const locale = await localeOfUser(userId, tx);
   await tx.insert(appNotifications).values({
-    userId, kind: n.kind, level: n.level, title: clip(copy(n.title, n.vars), 32), body: clip(copy(n.body, n.vars), 90), href: n.href ?? null, data: n.data ?? null,
+    userId, kind: n.kind, level: n.level, title: clip(copy(n.title, n.vars, locale), 32), body: clip(copy(n.body, n.vars, locale), 90), href: n.href ?? null, data: n.data ?? null,
   });
 }
 
@@ -216,7 +218,7 @@ const opsLog = (actor: DeskActor, o: BookingOrder, requestId: string, action: st
   db.transaction((tx) => deskAudit(tx, actor, { action, entityType: "request", entityId: requestId, ref: o.ref ?? shortRef(requestId, "O"), summary, data: { orderId: o.id, ...data } }, { app: false }));
 
 /** Confirm the order and hold the seats (a PNR when the GDS gave one). The app's waiting screen moves to "holding". */
-export async function confirmHold(actor: DeskActor, id: string, v: { pnr?: string | null } = {}) {
+async function confirmHoldHere(actor: DeskActor, id: string, v: { pnr?: string | null } = {}) {
   assertCap(actor, "desk.act");
   const o = await linkedOrder(id);
   if (o) {
@@ -244,7 +246,7 @@ export async function confirmHold(actor: DeskActor, id: string, v: { pnr?: strin
 }
 
 /** Ask the traveller something before booking. It shows on the app's waiting screen with one-tap answers. */
-export async function askTraveller(actor: DeskActor, id: string, v: { question: string; choices: string[] }) {
+async function askTravellerHere(actor: DeskActor, id: string, v: { question: string; choices: string[] }) {
   assertCap(actor, "desk.act");
   const question = v.question.trim();
   const choices = v.choices.map((c) => c.trim()).filter(Boolean).slice(0, 4);
@@ -269,7 +271,7 @@ export async function askTraveller(actor: DeskActor, id: string, v: { question: 
 }
 
 /** The fare moved before booking: send the new price. Nothing is captured; the old card hold is released. */
-export async function priceChanged(actor: DeskActor, id: string, v: { total: number; reason?: string | null }) {
+async function priceChangedHere(actor: DeskActor, id: string, v: { total: number; reason?: string | null }) {
   assertCap(actor, "desk.act");
   if (!Number.isInteger(v.total) || v.total <= 0 || v.total > 100_000_000_00) throw new DeskError("Enter the new total");
   const o = await linkedOrder(id);
@@ -333,7 +335,7 @@ async function voidAuth(p: typeof appPayments.$inferSelect): Promise<"voided" | 
  * the traveller it's booked, signed by the person who did it ("Confirmed by Faisal at Mada").
  * If the capture doesn't go through, nothing is confirmed and the order shows under ticketing problems.
  */
-export async function issueTickets(actor: DeskActor, id: string, v: { pnr: string; tickets: string[] }) {
+async function issueTicketsHere(actor: DeskActor, id: string, v: { pnr: string; tickets: string[] }) {
   assertCap(actor, "desk.issue");
   const pnr = v.pnr.trim().toUpperCase();
   const tickets = v.tickets.map((x) => x.replace(/[\s-]/g, "")).filter(Boolean);
@@ -398,7 +400,7 @@ export async function issueTickets(actor: DeskActor, id: string, v: { pnr: strin
 }
 
 /** Ticketing didn't work: release the card hold, close the order, and tell the traveller plainly that nothing was charged. */
-export async function failTicketing(actor: DeskActor, id: string, v: { reason: string }) {
+async function failTicketingHere(actor: DeskActor, id: string, v: { reason: string }) {
   assertCap(actor, "desk.act");
   const reason = v.reason.trim();
   if (reason.length < 3) throw new DeskError("Say what happened, for the team");
@@ -460,7 +462,7 @@ export async function listRequests(opts: { open?: boolean; limit?: number } = {}
 }
 
 /** A price for each person, sent to the traveller as a card they can pay from. */
-export async function sendQuote(actor: DeskActor, id: string, v: { lines: { label: string; amount: number; kind: string }[]; cancellation?: string | null; holdHours?: number | null }) {
+async function sendQuoteHere(actor: DeskActor, id: string, v: { lines: { label: string; amount: number; kind: string }[]; cancellation?: string | null; holdHours?: number | null }) {
   assertCap(actor, "desk.act");
   const lines = v.lines.map((l) => ({ label: l.label.trim(), amount: l.amount, kind: (QUOTE_LINE_KINDS as readonly string[]).includes(l.kind) ? l.kind : "other" })).filter((l) => l.label);
   if (!lines.length) throw new DeskError("Add at least one line");
@@ -502,7 +504,7 @@ export async function saveChecklist(actor: DeskActor, id: string, items: { label
   });
 }
 
-export async function markDone(actor: DeskActor, id: string) {
+async function markDoneHere(actor: DeskActor, id: string) {
   assertCap(actor, "desk.act");
   await db.transaction(async (tx) => {
     const r = await lockRequest(tx, id);
@@ -582,7 +584,7 @@ async function threadOwner(tx: Tx, kind: "request" | "support", id: string) {
 }
 
 /** A reply in the traveller's thread, sent as the agent's own name. */
-export async function sendAgentReply(actor: DeskActor, kind: "request" | "support", id: string, v: { body: string; attachment?: { id: string; filename: string; mime: string; size: number } | null }) {
+async function sendAgentReplyHere(actor: DeskActor, kind: "request" | "support", id: string, v: { body: string; attachment?: { id: string; filename: string; mime: string; size: number } | null }) {
   assertCap(actor, "desk.act");
   const body = v.body.trim();
   if (!body && !v.attachment) throw new DeskError("Write a reply first");
@@ -640,7 +642,7 @@ export async function listRefunds(stage?: string) {
 const instalmentProvider = (m: string) => (m === "tabby" ? "Tabby" : m === "tamara" ? "Tamara" : null);
 
 /** Approve a refund to the card it came from, or to Mada credit (instant). Credit goes in as a ledger entry. */
-export async function approveRefund(actor: DeskActor, id: string, v: { destination: "original" | "credit"; note?: string | null }) {
+async function approveRefundHere(actor: DeskActor, id: string, v: { destination: "original" | "credit"; note?: string | null }) {
   assertCap(actor, "desk.refund");
   const [pre] = await db.select({ f: appRefunds, p: appPayments }).from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).where(eq(appRefunds.id, id));
   if (!pre) throw new DeskError("Refund not found", "NOT_FOUND");
@@ -674,7 +676,7 @@ export async function approveRefund(actor: DeskActor, id: string, v: { destinati
 }
 
 /** Say no, with the reason the traveller will read in the app. */
-export async function rejectRefund(actor: DeskActor, id: string, v: { reason: string }) {
+async function rejectRefundHere(actor: DeskActor, id: string, v: { reason: string }) {
   assertCap(actor, "desk.refund");
   const reason = v.reason.trim();
   if (reason.length < 10 || reason.length > 300) throw new DeskError("Give the traveller a clear reason, 10 to 300 characters");
@@ -722,3 +724,25 @@ export async function unblockTraveller(actor: DeskActor, userId: string) {
     await deskAudit(tx, actor, { action: "desk.traveller.unblocked", entityType: "app_user", entityId: userId, ref: "Block", summary: `Lifted the block on a traveller account` });
   });
 }
+
+/* ───────── the desk writes to a traveller in the traveller's language ─────────
+ * Every message, line and notification these actions create is read by the traveller who owns the request, refund
+ * or thread, so the action runs in that traveller's saved language (lib/app/locale.ts), not the agent's.
+ */
+const forOwner = <V, R>(fn: (actor: DeskActor, id: string, v: V) => Promise<R>) =>
+  (actor: DeskActor, id: string, v: V): Promise<R> => inRequestOwnerLocale(id, () => fn(actor, id, v));
+export const confirmHold = (actor: DeskActor, id: string, v: { pnr?: string | null } = {}) => inRequestOwnerLocale(id, () => confirmHoldHere(actor, id, v));
+export const askTraveller = forOwner(askTravellerHere);
+export const priceChanged = forOwner(priceChangedHere);
+export const issueTickets = forOwner(issueTicketsHere);
+export const failTicketing = forOwner(failTicketingHere);
+export const sendQuote = forOwner(sendQuoteHere);
+export const markDone = (actor: DeskActor, id: string) => inRequestOwnerLocale(id, () => markDoneHere(actor, id));
+export const sendAgentReply: typeof sendAgentReplyHere = async (actor, kind, id, v) =>
+  inUserLocale(await db.transaction((tx) => threadOwner(tx, kind, id)), () => sendAgentReplyHere(actor, kind, id, v));
+async function refundOwner(id: string): Promise<string | null> {
+  const [r] = await db.select({ userId: appPayments.ownerId }).from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).where(eq(appRefunds.id, id)).limit(1);
+  return r?.userId ?? null;
+}
+export const approveRefund: typeof approveRefundHere = async (actor, id, v) => inUserLocale(await refundOwner(id), () => approveRefundHere(actor, id, v));
+export const rejectRefund: typeof rejectRefundHere = async (actor, id, v) => inUserLocale(await refundOwner(id), () => rejectRefundHere(actor, id, v));

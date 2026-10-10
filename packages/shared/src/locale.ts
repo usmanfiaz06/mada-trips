@@ -39,8 +39,20 @@ export const resetDisplayPrefs = () => { prefs = { ...DEFAULTS }; };
 export const isLocale = (s: unknown): s is Lang => s === 'en' || s === 'ar';
 export const isRtlLocale = (l: Lang) => l === 'ar';
 
-/** Resolve the locale to use: an explicit one, else the process preference. */
-export const localeOr = (l?: Lang | null): Lang => (l && isLocale(l) ? l : prefs.locale);
+let resolver: (() => Lang | null | undefined) | null = null;
+
+/**
+ * A server sets this once: the locale of the request being handled (the traveller's saved language, else
+ * Accept-Language), so every t(), formatSar() and dayLabel() inside a request speaks that traveller's language.
+ */
+export function setLocaleResolver(fn: (() => Lang | null | undefined) | null) { resolver = fn; }
+
+/** Resolve the locale to use: an explicit one, else the request's (on a server), else the process preference. */
+export const localeOr = (l?: Lang | null): Lang => {
+  if (l && isLocale(l)) return l;
+  const r = resolver?.();
+  return r && isLocale(r) ? r : prefs.locale;
+};
 
 /**
  * The best supported locale for a list of language tags, an Accept-Language header or a single tag.

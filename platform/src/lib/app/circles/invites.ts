@@ -15,6 +15,7 @@ import { AppError } from "../http";
 import { suppliers } from "../suppliers";
 import { createCircleInvites, details, incomingInvites, memberIds, membership, requireAdmin, assertInvitable, sysMessage } from "./circles";
 import { assertUnder, circleTrip, err, graphOf, isBlocked, peopleByIds, sha256hex, type Db } from "./common";
+import { currentLocale } from "../resilience/request";
 
 /*
  * Invites. A link's code is "<lookup>-<mac>": the lookup finds the row, the mac (HMAC of the lookup with the server
@@ -88,7 +89,7 @@ export async function inviteByPhone(userId: string, input: Extract<CreateInviteR
 
 async function send(channel: string, phone: string, name: string, code: string, key: "sms.circles.invite" | "sms.circles.remind") {
   try {
-    if (channel === "whatsapp") await suppliers.whatsapp().sendTemplate(phone, "mada_invite", [name, inviteUrl(code)]);
+    if (channel === "whatsapp") await suppliers.whatsapp().sendTemplate(phone, "mada_invite", [name, inviteUrl(code)], currentLocale());
     else await suppliers.sms().send(phone, t(key, { name, url: inviteUrl(code) }));
   } catch (e) {
     console.error("[circles] invite message not sent", (e as Error).message);

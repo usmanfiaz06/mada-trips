@@ -8,7 +8,7 @@
 import { t, tn, type CopyKey, type Vars } from '../copy';
 import { addDays, addMinutes, dayLabel, dayOfMonth, daysBetween, durationLabel, monthOf, rangeLabel, shortDay, todayIn, weekdayOf, zonedToInstant, TZ } from '../dates';
 import { bps, formatSar, vatInside, type Halalas } from '../money';
-import { getDisplayPrefs } from '../locale';
+import { localeOr } from '../locale';
 import type {
   ChangeKind, ChangeOption, DisruptionKind, DisruptionOption, FareRules, InvoiceLine, ItineraryDay, ItineraryItem, MoveNeeded, PickupDetail,
   RefundQuoteItem, SegmentDetail, StayDetail, TripDetail, TripPayment, TripPhase, TripRequestView, TripTraveller, CalendarEvent,
@@ -139,7 +139,7 @@ const ISTANBUL_AR: Destination = {
 };
 
 export function destinationOf(trip: Pick<TripDetail, 'city' | 'country'>): Destination {
-  if (/istanbul/i.test(trip.city)) return getDisplayPrefs().locale === 'ar' ? ISTANBUL_AR : ISTANBUL;
+  if (/istanbul/i.test(trip.city)) return localeOr() === 'ar' ? ISTANBUL_AR : ISTANBUL;
   return GENERIC(trip.city, trip.country);
 }
 

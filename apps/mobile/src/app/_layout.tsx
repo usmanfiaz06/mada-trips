@@ -19,6 +19,7 @@ import { useRemoteConfig } from '@/lib/net/remote';
 import { initReporting } from '@/lib/net/report';
 import { startNet } from '@/lib/net/state';
 import { queryClient } from '@/lib/queries';
+import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { colors } from '@/theme';
 import { fontsFor } from '@/theme/fonts';
@@ -55,6 +56,11 @@ export default function RootLayout() {
   }, [status]);
   useRemoteConfig();
   useOutboxPump();
+  // The server writes notifications, texts and emails in the language saved on the account: keep it this launch's.
+  const savedLocale = useSession((s) => s.user?.locale);
+  useEffect(() => {
+    if (status === 'signedIn' && savedLocale && savedLocale !== getLocale()) void api.updateMe({ locale: getLocale() }).catch(() => {});
+  }, [status, savedLocale]);
 
   const ready = (fontsLoaded || !!fontError) && status !== 'loading' && restored && localeReady;
   useEffect(() => { if (ready) SplashScreen.hideAsync().catch(() => {}); }, [ready]);

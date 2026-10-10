@@ -1,4 +1,5 @@
 import "server-only";
+import { localeOfUser } from "@/lib/app/locale";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { icaoCallsign, t as copy, type FlightPosition } from "@mada/shared";
 import { db } from "@/db";
@@ -123,9 +124,10 @@ export async function pushPlan(actor: DeskActor, v: { flightNumber: string; date
     const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
     for (const userId of users) {
       const trip = segs.find((s) => s.ownerId === userId)!.tripId;
+      const locale = await localeOfUser(userId, tx);
       await tx.insert(appNotifications).values({
         userId, kind: v.status === "cancelled" ? "flight_cancelled" : "flight_delayed", level: "time_sensitive",
-        title: clip(copy("notify.desk.plan.title", { flight: v.flightNumber }), 32), body: clip(copy("notify.desk.plan.body", { agent: me.name, plan }), 90), href: `/trips/${trip}/disruption`,
+        title: clip(copy("notify.desk.plan.title", { flight: v.flightNumber }, locale), 32), body: clip(copy("notify.desk.plan.body", { agent: me.name, plan }, locale), 90), href: `/trips/${trip}/disruption`,
         data: { disruptionId: row!.id, options, voucher: v.voucher },
       });
       if (v.voucher > 0) await creditEntry(tx, actor, { userId, amount: v.voucher, kind: "goodwill", note: `For the trouble on ${v.flightNumber}` });
