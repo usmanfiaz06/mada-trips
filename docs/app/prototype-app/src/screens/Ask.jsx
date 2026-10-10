@@ -271,7 +271,7 @@ function FlightFlow({ query, setCta }) {
       </div>
       <button type="button" className="search-summary rise d1" onClick={() => setEditing(true)} aria-label="Edit search">
         <span className="col" style={{ gap: 1 }}>
-          <span className="h3" style={{ fontSize: 15 }}>Riyadh → Istanbul · {mode === 'flex' && trip.month === 'Mar' && trip.dep === 9 ? '10–15 Mar' : dateLabel}</span>
+           <span className="h3" style={{ fontSize: 15 }}>{({ RUH: 'Riyadh', JED: 'Jeddah', DMM: 'Dammam' })[s.account?.home || 'RUH'] || s.account?.home} → Istanbul · {mode === 'flex' && trip.month === 'Mar' && trip.dep === 9 ? '10–15 Mar' : dateLabel}</span>
           <span className="tiny">{who.length} {who.length === 1 ? 'adult' : 'people'}{trip.infants ? ` + ${trip.infants} on a lap` : ''} · {trip.cabin}{trip.flex ? ' · ±2 days' : ''}</span>
         </span>
         <span className="link" style={{ fontSize: 14 }}>Edit</span>

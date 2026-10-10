@@ -359,3 +359,23 @@ export function luhn(digits) {
   return digits.length >= 13 && sum % 10 === 0;
 }
 export const BRAND_NAME = { visa: 'Visa', mastercard: 'Mastercard', mada: 'mada', applepay: 'Apple Pay', tabby: 'Tabby', tamara: 'Tamara', credit: 'Mada credit' };
+
+/* Hands the viewer a file. On claude.ai the page must ask through the downloads capability (the viewer confirms);
+   anywhere else, a plain download link. Resolves 'saved', 'declined' or 'unavailable'. */
+export async function saveFile(filename, data) {
+  try {
+    const dl = window.claude?.use ? await window.claude.use('downloads') : null;
+    if (dl) {
+      try { await dl.save({ filename, data }); return 'saved'; } catch (e) { return e?.code === 'declined' ? 'declined' : 'unavailable'; }
+    }
+    if (window.self !== window.top) return 'unavailable';
+    const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
+    const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return 'saved';
+  } catch (e) { return 'unavailable'; }
+}
+
+/* Google Calendar link for one event: works everywhere, no file needed. Times are 'YYYYMMDDTHHMMSSZ'. */
+export const calendarLink = ({ title, start, end, details = '', location = '' }) =>
+  `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${start}/${end}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}`;
