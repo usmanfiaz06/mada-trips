@@ -502,7 +502,7 @@ export function Group({ params = {} }) {
           <h1 className="h1">This circle is gone.</h1>
           <p className="body">You left it, or the admin deleted it. Bookings you made are still in Trips.</p>
         </>) : (
-          <EmptyState art={<ArtCircles />} title="No trip circle yet."
+          <EmptyState tall middle art={<ArtCircles />} title="No trip circle yet."
             body="Make one for the people going with you. Plan, vote and split costs together."
             action={<button type="button" className="btn primary block" onClick={() => replace('newCircle', { name: 'Eid trip' })}>Make a circle</button>} />
         )}

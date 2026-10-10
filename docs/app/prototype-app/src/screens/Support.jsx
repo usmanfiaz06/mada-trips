@@ -278,12 +278,12 @@ export function Inbox() {
           ))}
         </div>
         {items.length === 0 && (
-          <EmptyState center art={<QuietRadar />} title="All quiet."
+          <EmptyState center tall art={<QuietRadar />} title="All quiet."
             body={filter === 'money' ? 'Payments, refunds and Mada credit land here the moment they move.'
               : filter === 'circle' ? 'Votes, splits and new people in your circles land here.'
                 : s.trip || (s.trackedFlights || []).length ? 'We’re watching your flights. The moment a gate, a time or a reply changes, it lands here.'
                   : 'Gate changes, replies from Faisal, refunds and circle news land here, so nothing gets lost.'}
-            action={!s.trip && filter !== 'circle' && filter !== 'money' ? <button type="button" className="btn secondary small" onClick={() => { pop(); push('ask', {}); }}>Plan a trip</button> : null} />
+            action={!s.trip && filter !== 'circle' && filter !== 'money' ? <button type="button" className="btn primary" onClick={() => { pop(); push('ask', {}); }}>Plan a trip</button> : null} />
         )}
         {items.map((n) => (
           <button key={n.id} type="button" className={'inbox-row' + (n.read ? '' : ' unread')} onClick={() => { set((p) => ({ inbox: p.inbox.map((x) => (x.id === n.id ? { ...x, read: true } : x)) })); if (n.to) openBanner({ id: n.at, to: n.to }); }}>

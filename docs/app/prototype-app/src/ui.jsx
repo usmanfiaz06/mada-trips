@@ -546,18 +546,19 @@ export function ArtPass() {
 
 /* Dots that find each other: people, friends, circles, household. The gold one is you. */
 export function ArtFriends() {
-  const pts = [[80, 60], [44, 38], [120, 34], [126, 82], [40, 86]];
+  const pts = [[80, 62], [34, 34], [124, 28], [132, 88], [32, 92]];
   return (
     <Art className="es-friends">
       {pts.slice(1).map(([x, y], i) => (
-        <line key={i} className="es-draw" style={{ animationDelay: `${0.25 + i * 0.22}s` }} x1="80" y1="60" x2={x} y2={y} stroke={i === 3 ? '#d9b77a' : '#d6c9b1'} strokeWidth="1.6" strokeDasharray={i === 3 ? '2 4' : undefined} pathLength="100" />
+        <line key={i} className="es-draw" style={{ animationDelay: `${0.25 + i * 0.22}s` }} x1="80" y1="62" x2={x} y2={y} stroke={i === 3 ? '#b98f4a' : '#c9b48a'} strokeWidth="2" strokeLinecap="round" strokeDasharray={i === 3 ? '2 5' : undefined} pathLength="100" />
       ))}
-      <path className="es-draw" style={{ animationDelay: '1.1s' }} d="M44 38 Q 82 20 120 34" fill="none" stroke="#e3d6bf" strokeWidth="1.4" pathLength="100" />
-      {pts.slice(1, 4).map(([x, y], i) => <circle key={i} className="es-pop" style={{ animationDelay: `${0.5 + i * 0.22}s` }} cx={x} cy={y} r={i === 1 ? 9 : 7.5} fill={i === 1 ? '#1e352d' : '#fffdf9'} stroke="#1e352d" strokeWidth="2" />)}
-      <circle className="es-ring" cx="40" cy="86" r="9" fill="none" stroke="#b98f4a" strokeWidth="1.6" strokeDasharray="3 3.5" />
-      <path d="M40 82 v8 M36 86 h8" stroke="#b98f4a" strokeWidth="1.8" strokeLinecap="round" />
-      <circle className="es-pulse" cx="80" cy="60" r="16" fill="#d9b77a" opacity=".25" />
-      <circle cx="80" cy="60" r="11" fill="#d9b77a" stroke="#7d5d27" strokeWidth="2" />
+      <path className="es-draw" style={{ animationDelay: '1.1s' }} d="M34 34 Q 80 12 124 28" fill="none" stroke="#e0d1b4" strokeWidth="1.6" strokeLinecap="round" pathLength="100" />
+      <path className="es-draw" style={{ animationDelay: '1.3s' }} d="M124 28 Q 142 58 132 88" fill="none" stroke="#e0d1b4" strokeWidth="1.6" strokeLinecap="round" pathLength="100" />
+      {pts.slice(1, 4).map(([x, y], i) => <circle key={i} className="es-pop" style={{ animationDelay: `${0.5 + i * 0.22}s` }} cx={x} cy={y} r={i === 1 ? 10 : 9} fill={i === 1 ? '#1e352d' : '#fffdf9'} stroke="#1e352d" strokeWidth="2.2" />)}
+      <circle className="es-ring" cx="32" cy="92" r="11" fill="#fffdf9" stroke="#b98f4a" strokeWidth="1.8" strokeDasharray="3.5 3.5" />
+      <path d="M32 87 v10 M27 92 h10" stroke="#b98f4a" strokeWidth="2" strokeLinecap="round" />
+      <circle className="es-pulse" cx="80" cy="62" r="20" fill="#d9b77a" opacity=".25" />
+      <circle cx="80" cy="62" r="13" fill="#d9b77a" stroke="#7d5d27" strokeWidth="2.2" />
     </Art>
   );
 }
@@ -698,7 +699,7 @@ export function ArtPhone() {
 
 /* The wrapper every empty state uses: a drawing on a soft stage, one line of what lands here and why,
    one next step, and at most a few quiet ideas in a single row. `compact` is the inline version for lists. */
-export function EmptyState({ art, title, body, action, ideas, compact, center, onClick, label, className = '', children, plain }) {
+export function EmptyState({ art, title, body, action, ideas, compact, center, tall, middle, onClick, label, className = '', children, plain }) {
   if (compact) {
     const inner = (<>
       <span className="es-tile" aria-hidden="true">{art}</span>
@@ -714,7 +715,7 @@ export function EmptyState({ art, title, body, action, ideas, compact, center, o
       : <div className={'es-row ' + (plain ? 'plain ' : '') + className}>{inner}</div>;
   }
   return (
-    <section className={'es rise ' + (center ? 'center ' : '') + (plain ? 'plain ' : '') + className} aria-label={label || (typeof title === 'string' ? title : undefined)}>
+    <section className={'es rise ' + (center ? 'center ' : '') + (tall ? 'tall ' : '') + (middle ? 'middle ' : '') + (plain ? 'plain ' : '') + className} aria-label={label || (typeof title === 'string' ? title : undefined)}>
       {art && <div className="es-stage" aria-hidden="true">{art}</div>}
       <h2 className="display es-title">{title}</h2>
       {body && <p className="small es-body">{body}</p>}

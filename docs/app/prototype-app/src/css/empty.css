@@ -63,8 +63,8 @@
 .es-row.plain { background: transparent; padding: 10px 2px; border-radius: 0; }
 .es-row.tap { cursor: pointer; transition: transform .18s var(--ease); }
 .es-row.tap:active { transform: scale(.985); }
-.es-tile { flex: 0 0 72px; width: 72px; height: 62px; border-radius: 16px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(120% 90% at 50% 0%, #fbf6ec 0%, #f1e8d8 100%); box-shadow: inset 0 0 0 1px rgba(125,93,39,.1); }
-.es-tile .es-svg { width: 92px; height: 69px; flex-shrink: 0; }
+.es-tile { flex: 0 0 80px; width: 80px; height: 64px; border-radius: 16px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(120% 90% at 50% 0%, #fbf6ec 0%, #f1e8d8 100%); box-shadow: inset 0 0 0 1px rgba(125,93,39,.1); }
+.es-tile .es-svg { width: 100px; height: 75px; flex-shrink: 0; }
 .es-row-body { color: var(--ink-2); }
 .es-row-act { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
 .es-row-act .link { padding: 2px 0; }
@@ -99,7 +99,7 @@
 .es-page { transform-origin: 50% 0%; animation: es-page 6s 1s ease-in-out infinite; }
 @keyframes es-page { 0%, 55% { transform: none; opacity: 1 } 70% { transform: scaleY(.15) skewX(-10deg); opacity: .9 } 72% { opacity: 0 } 92% { opacity: 0; transform: none } 100% { opacity: 1 } }
 .es-print { animation: es-print 6s ease-in-out infinite; }
-@keyframes es-print { 0% { transform: translateY(-62px) } 12% { transform: translateY(-48px) } 24% { transform: translateY(-34px) } 36% { transform: translateY(-20px) } 48%, 88% { transform: translateY(0) } 100% { transform: translateY(0) } }
+@keyframes es-print { 0% { transform: translateY(-40px); opacity: 1 } 7% { transform: translateY(-30px) } 14% { transform: translateY(-20px) } 21% { transform: translateY(-10px) } 28%, 88% { transform: translateY(0); opacity: 1 } 94% { transform: translateY(6px); opacity: 0 } 95% { transform: translateY(-40px); opacity: 0 } 100% { transform: translateY(-40px); opacity: 1 } }
 .es-blink { animation: blinkish 1.2s ease-in-out infinite; }
 .es-stamp { animation: es-stamp .55s .6s var(--spring) both; transform-origin: center; }
 @keyframes es-stamp { from { opacity: 0; transform: rotate(-12deg) scale(1.6) } to { opacity: 1; transform: rotate(-12deg) scale(1) } }
@@ -173,3 +173,13 @@
 .td-pp-mini::before { content: ''; position: absolute; left: 7px; top: 8px; width: 14px; height: 14px; border-radius: 99px; border: 1.5px solid #d9b77a; }
 .td-pp-mini i { position: absolute; left: 3px; right: 3px; height: 1.5px; top: 4px; background: #f3d79c; box-shadow: 0 0 6px 1px rgba(217,183,122,.7); animation: td-pp-scan 2.6s ease-in-out infinite; }
 @keyframes td-pp-scan { 0%, 100% { top: 4px } 50% { top: 30px } }
+
+/* A screen that is only its empty state: a taller stage, centred in the space under the header */
+.es.center .es-stage { align-self: stretch; }
+.es.tall .es-stage { height: 208px; border-radius: 22px; }
+.es.tall .es-stage .es-svg { width: 256px; height: 192px; }
+.es.tall .es-title { font-size: 34px; }
+.es.tall .es-stage .radar { width: 160px; height: 160px; }
+.es.tall .es-stage .radar-ring.r2 { inset: 28px; } .es.tall .es-stage .radar-ring.r3 { inset: 56px; }
+.es.tall .es-stage .plane-loop { height: 170px; }
+.es.middle { margin-top: auto; margin-bottom: auto; }

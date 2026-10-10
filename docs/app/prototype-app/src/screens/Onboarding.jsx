@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { WelcomeBack } from './Account.jsx';
+import { ReturnHero } from './Welcome.jsx';
 import { InvitePreview } from './Social.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, withDemo } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
@@ -264,16 +265,8 @@ export default function Onboarding({ params = {} }) {
     ),
 
     welcomeBack: (
-      <div className="screen">
-        <div style={{ padding: '110px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <span className="avatar green rise" style={{ width: 72, height: 72, fontSize: 28 }}>O</span>
-          <h1 className="display rise d1" style={{ fontSize: 44 }}>Welcome back, Omar.</h1>
-          <p className="body rise d2">Your trips, your family’s passports and your saved places are all here. Nothing to set up again.</p>
-          <div className="card rise d3" style={{ gap: 8 }}>
-            {[['circles', 'Omar, Hessa, Sara and Ahmed'], ['visa', '4 passports, checked and encrypted'], ['trips', '1 past trip · Baku']].map(([ic, t]) => <div key={t} className="row small" style={{ color: '#1e352d' }}><Icon name={ic} size={18} />{t}</div>)}
-          </div>
-          <span className="tiny rise d3">New phone? For your safety, the Wallet asks for Face ID the first time you open it.</span>
-        </div>
+      <div className="screen" style={{ overflow: 'hidden' }}>
+        <ReturnHero />
         <div className="act">
           <button type="button" className="btn primary block" onClick={() => { set((p) => ({ ...withDemo(p), tab: p.signinFrom?.tab || 'today', stack: p.signinFrom?.name ? [{ name: p.signinFrom.name, params: p.signinFrom.params || {}, key: Date.now() }] : [], signinFrom: null })); buzz(HAPTIC.success); }}>Open Mada</button>
           <button type="button" className="btn ghost block" onClick={() => goto('phone')}>That’s not me</button>

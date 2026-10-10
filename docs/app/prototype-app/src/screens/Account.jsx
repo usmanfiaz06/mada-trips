@@ -1,6 +1,7 @@
 /* Account management: your details and where each one came from, sign-in methods, travel preferences,
    household, security and devices, privacy and data, help and legal. Registered in main.jsx's STACK by name. */
 import React, { useEffect, useRef, useState } from 'react';
+import { ReturnHero } from './Welcome.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
 import { Icon, TopBar, Sheet, Toggle, AddPersonSheet, Sun, EmptyState, ArtEnvelope, ArtSuitcase, ArtFriends, ArtPhone } from '../ui.jsx';
 import * as Support from './Support.jsx';
@@ -341,7 +342,6 @@ function Account() {
         <Group label="Contact">
           <Row label="Email" value={<span className="acc-break">{a.email ? a.email.address : 'Not added'}</span>} onClick={() => setSheet('email')}
             src={a.email ? (a.email.relay ? <Source kind="apple" /> : <Source kind="verified" at={a.email.at} />) : <span className="acc-src warn">Add one to get tickets and receipts</span>} />
-          {!a.email && <EmptyState compact plain art={<ArtEnvelope />} title="No email yet" body="Tickets, receipts and VAT invoices go to your inbox too, so they’re never only on this phone." action={<button type="button" className="link" onClick={() => setSheet('email')}>Add an email</button>} />}
           <Row label="Mobile" value={<span className="num">{prettyPhone(a.phone.digits)}</span>} onClick={() => setSheet('phone')} src={a.phone.digits ? <Source kind={a.phone.source === 'signup' ? 'signup' : a.phone.at ? 'verified' : 'signup'} at={a.phone.source === 'signup' ? null : a.phone.at} /> : <span className="acc-src warn">Add one for gate changes and Faisal’s messages</span>} />
         </Group>
 
@@ -1020,12 +1020,12 @@ export function WelcomeBack({ onSomeoneElse }) {
   const via = a.methods.apple ? 'Apple' : a.methods.google ? 'Google' : null;
   const back = () => { set((p) => ({ onboarded: true, guest: false, stack: [], tab: 'today', account: { ...(p.account || {}), signedOut: false } })); buzz(HAPTIC.success); };
   return (
-    <div className="screen" style={{ alignItems: 'center', justifyContent: 'center', padding: '0 28px', gap: 18, textAlign: 'center' }}>
-      <Sun width={48} />
-      <UserAvatar size={96} />
-      <h1 className="display" style={{ fontSize: 44 }}>{displayName(s) ? `Welcome back, ${displayName(s)}.` : 'Welcome back.'}</h1>
-      <p className="body">{s.household.length > 1 ? 'Your trips and family are still on this phone.' : 'Your trips are still on this phone.'} Documents stay locked until you’re in.</p>
-      <div className="col" style={{ gap: 10, width: '100%', marginTop: 8 }}>
+    <div className="screen" style={{ overflow: 'hidden' }}>
+      <ReturnHero name={displayName(s)}
+        people={s.household.slice(0, 5).map((id, i) => [(id === 'omar' ? (displayName(s) || 'Y') : (PEOPLE[id]?.name || '?')).charAt(0).toUpperCase(), ['green', 'gold', '', 'green', 'gold'][i]])}
+        stamp={(s.pastTrips || [])[0] ? [String(s.pastTrips[0].city || '').toUpperCase().slice(0, 8), 'BEEN'] : ['MADA', 'HOME']}
+        line={`${s.household.length > 1 ? 'Your trips and family are still on this phone.' : 'Your trips are still on this phone.'} Documents stay locked until you’re in.`} />
+      <div className="act" style={{ gap: 10 }}>
         {via
           ? <button type="button" className="btn primary block" onClick={back}>Continue with {via}</button>
           : <button type="button" className="btn primary block" onClick={() => setSheet('code')}>Text me a code</button>}

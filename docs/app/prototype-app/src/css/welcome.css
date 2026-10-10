@@ -1,0 +1,16 @@
+/* ---------- welcome back ---------- */
+.wb { position: relative; padding: 70px 24px 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
+.wb-glow { position: absolute; left: -20%; right: -20%; top: -10%; height: 520px; background: radial-gradient(60% 50% at 50% 40%, rgba(217,183,122,.55) 0%, rgba(233,226,216,0) 70%); pointer-events: none; animation: fade 1.2s ease both; }
+.wb-photos { position: relative; width: 100%; height: 250px; }
+.wb-polaroid { position: absolute; left: 50%; top: 10px; width: 150px; height: 196px; margin-left: -75px; padding: 8px 8px 30px; background: #fffdf9; border-radius: 10px; box-shadow: 0 24px 40px -22px rgba(15,26,22,.65); transform: translateX(var(--x)) rotate(var(--r)); animation: wbDrop .8s cubic-bezier(.2,.9,.25,1.1) both; box-sizing: border-box; }
+.wb-polaroid img { width: 100%; height: 100%; object-fit: cover; border-radius: 4px; display: block; }
+@keyframes wbDrop { 0% { opacity: 0; transform: translateX(var(--x)) translateY(-60px) rotate(calc(var(--r) * 2)) scale(1.08); } 100% { opacity: 1; transform: translateX(var(--x)) rotate(var(--r)); } }
+.wb-stamp { position: absolute; left: calc(50% + 30px); top: 150px; width: 96px; height: 96px; border-radius: 999px; border: 3px solid #b98f4a; color: #7d5d27; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,253,249,.35); box-shadow: inset 0 0 0 4px rgba(255,253,249,.4), inset 0 0 0 6px #b98f4a; transform: rotate(-14deg); animation: wbStamp .45s 1.05s cubic-bezier(.2,.9,.25,1.3) both; }
+.wb-stamp b { font-family: var(--f-display); font-weight: 400; font-size: 22px; line-height: 1; letter-spacing: .04em; }
+.wb-stamp i { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .16em; margin-top: 3px; }
+@keyframes wbStamp { 0% { opacity: 0; transform: rotate(-14deg) scale(2.2); } 70% { opacity: 1; transform: rotate(-14deg) scale(.94); } 100% { opacity: 1; transform: rotate(-14deg) scale(1); } }
+.wb-people { display: flex; justify-content: center; margin-top: 4px; }
+.wb-people .avatar { width: 46px; height: 46px; font-size: 17px; margin-left: -10px; border: 3px solid var(--sand); animation: pop .45s cubic-bezier(.2,.9,.25,1.2) both; }
+.wb-people .avatar:first-child { margin-left: 0; }
+.wb-title { font-size: 46px; line-height: .98; margin: 4px 0 0; animation: rise .6s 1.5s var(--ease) both; }
+.wb-line { font-size: 16px; line-height: 1.4; color: #3f4f48; max-width: 300px; margin: 0; animation: rise .6s 1.65s var(--ease) both; }

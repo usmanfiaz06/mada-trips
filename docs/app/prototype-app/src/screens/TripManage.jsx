@@ -301,7 +301,7 @@ function NoTrip({ kind }) {
   const k = NO_TRIP[kind] || { title: '', art: <ArtMap />, h: 'No trip booked.', body: 'Once Faisal confirms a trip, everything about it lives here: tickets, rooms, pickups and receipts.' };
   return (
     <Screen title={k.title}>
-      <EmptyState art={k.art} title={k.h} body={k.body}
+      <EmptyState tall middle art={k.art} title={k.h} body={k.body}
         action={<button type="button" className="btn primary block" onClick={() => push('ask', {})}>Plan a trip</button>}
         ideas={(k.ideas || []).map((q) => [q, () => push('ask', { prefill: q })])} />
     </Screen>
@@ -1066,7 +1066,7 @@ function Refund({ params }) {
   if (tm.allUsed && !items.some((x) => x.q.back > 0 || x.q.askAnyway)) {
     return (
       <Screen title="Refund">
-        <EmptyState art={<ArtReceipt stamp />} title="Your trip is done."
+        <EmptyState tall middle art={<ArtReceipt stamp />} title="Your trip is done."
           body="Every flight and night was used, so nothing is left to refund. If something went wrong on the trip, tell Faisal. He’ll take it up with the airline or hotel."
           action={<button type="button" className="btn primary block" onClick={() => push('support', { about: 'Istanbul trip', topic: 'refund' })}>Talk to Faisal</button>} />
       </Screen>

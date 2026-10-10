@@ -190,10 +190,10 @@ try {
   await shot('ask-flights-none');
   await push('ask', { prefill: 'A hotel in Istanbul' }, 1800);
   await see('No rooms free on those dates.', 'stays none');
+  await shot('ask-stays-none');
   await click('Ask Faisal to find rooms', { wait: 600 });
   await see('Faisal is finding rooms in Istanbul', 'stays by hand');
   await shot('ask-stays-by-hand');
-  await shot('ask-stays-none');
   await demo('No flights found');
   await push('ask', { prefill: 'A hotel in Baku' }, 1200);
   await see('Faisal is finding rooms in Baku', 'other city');
@@ -219,7 +219,6 @@ try {
 
   step('Tracking a flight as a guest, nothing tracked yet');
   await demo('Fresh install');
-  await click('Start');
   await click('Just track a flight', { wait: 800 });
   await see('Nothing tracked yet.', 'guest tracking');
   await shot('guest-track');

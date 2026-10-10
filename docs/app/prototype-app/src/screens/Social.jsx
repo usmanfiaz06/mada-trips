@@ -483,14 +483,14 @@ export function People({ params = {} }) {
         {tab === 'friends' && (s.friends.length ? s.friends.map((id) => (
           <PersonRow key={id} id={id} sub={FRIENDS[id].going ? `Going to ${FRIENDS[id].going}` : `${FRIENDS[id].places} places explored`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
         )) : (
-          <EmptyState art={<ArtFriends />} title="No friends here yet." body="Add the people you travel with. Only they see your trips, tips and plans."
+          <EmptyState tall art={<ArtFriends />} title="No friends here yet." body="Add the people you travel with. Only they see your trips, tips and plans."
             action={<button type="button" className="btn primary block" onClick={() => setSheet('add')}>Add friends</button>} />
         ))}
 
         {tab === 'following' && ((s.following || []).length ? s.following.map((id) => (
           <PersonRow key={id} id={id} sub={`${FRIENDS[id].places} trips · public tips`} onClick={() => push('friend', { id })} right={<Icon name="chevron" />} />
-        )) : <EmptyState art={<ArtCompass />} title="You don’t follow anyone yet." body="Follow people whose taste you trust. Their public tips show up first in Discover."
-          action={<button type="button" className="btn secondary block" onClick={() => { pop(); set({ tab: 'circles' }); }}>Find people in Discover</button>} />)}
+        )) : <EmptyState tall art={<ArtCompass />} title="You don’t follow anyone yet." body="Follow people whose taste you trust. Their public tips show up first in Discover."
+          action={<button type="button" className="btn primary block" onClick={() => { pop(); set({ tab: 'circles' }); }}>Find people in Discover</button>} />)}
 
         {tab === 'invited' && (invites.length ? invites.map((iv) => (
           <div key={iv.id} className="person-row" style={{ alignItems: 'flex-start' }}>
@@ -507,7 +507,7 @@ export function People({ params = {} }) {
               {iv.status === 'joined' && <button type="button" className="link" style={{ alignSelf: 'flex-start', fontSize: 13 }} onClick={() => push('friend', { id: 'yousef' })}>See {iv.name}</button>}
             </span>
           </div>
-        )) : <EmptyState art={<ArtEnvelope />} title="Nobody invited yet." body="Send your link on WhatsApp. It lasts 14 days, and you’ll see here the moment someone joins."
+        )) : <EmptyState tall art={<ArtEnvelope />} title="Nobody invited yet." body="Send your link on WhatsApp. It lasts 14 days, and you’ll see here the moment someone joins."
           action={<button type="button" className="btn primary block" onClick={() => setSheet('link')}>Share your invite link</button>} />)}
 
         {tab === 'requests' && (requests.length ? requests.map((id) => (
@@ -522,7 +522,7 @@ export function People({ params = {} }) {
               </span>
             </span>
           </div>
-        )) : <EmptyState art={<ArtLantern />} title="No requests." body="When someone asks to be your friend, it shows here. You decide, and they aren’t told if you say no." />)}
+        )) : <EmptyState tall art={<ArtLantern />} title="No requests." body="When someone asks to be your friend, it shows here. You decide, and they aren’t told if you say no." />)}
       </div>
 
       {sheet === 'add' && (
@@ -726,7 +726,7 @@ export function Saved({ params = {} }) {
       <div className="scroll no-dock" style={{ gap: 16 }}>
         <h1 className="h1">{params.city ? `Saved in ${params.city}` : 'Saved'}</h1>
         {posts.length === 0 && (s.savedPlans || []).length === 0 && (
-          <EmptyState art={<ArtBookmark />} title="Nothing saved yet." body="Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share with a circle."
+          <EmptyState tall middle art={<ArtBookmark />} title="Nothing saved yet." body="Tap the bookmark on any tip or plan. It lands here, sorted by city, ready to plan or share with a circle."
             action={<button type="button" className="btn primary block" onClick={() => { pop(); set({ tab: 'circles' }); }}>Look around Discover</button>} />
         )}
         {list.map((city) => {
