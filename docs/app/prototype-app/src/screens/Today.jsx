@@ -195,7 +195,7 @@ function Nothing() {
         </button>
       )}
       <div className="rise d2" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
-        <button type="button" className="photo" style={{ height: 220, border: 0, padding: 0, gridRow: 'span 2' }} onClick={() => push('plan', { id: 'alula2' })}>
+        <button type="button" className="photo" style={{ minHeight: 220, height: '100%', border: 0, padding: 0, gridRow: 'span 2' }} onClick={() => push('plan', { id: 'alula2' })}>
           <img className="drift" src="img/alula.jpg" alt="Sandstone rocks in AlUla" />
           <span className="shade" />
           <span className="over" style={{ textAlign: 'left' }}>
@@ -204,25 +204,25 @@ function Nothing() {
           </span>
         </button>
         {saved > 0 ? (
-          <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
+          <button type="button" className="card tap focal" style={{ minHeight: 104, height: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 10 }} onClick={() => go('circles')}>
             <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
             <span className="col" style={{ gap: 0 }}><span className="h3">{saved} {saved === 1 ? 'place' : 'places'} saved</span><span className="tiny" style={{ color: '#c9c1b4' }}>{[...new Set(s.savedPosts.map((x) => x.city).filter(Boolean))].slice(0, 2).join(', ') || 'In Circles'}</span></span>
           </button>
         ) : (
-          <button type="button" className="card tap focal" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => push('ask', { prefill: 'Istanbul' })}>
+          <button type="button" className="card tap focal" style={{ minHeight: 104, height: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 10 }} onClick={() => push('ask', { prefill: 'Istanbul' })}>
             <span className="spread"><img src="img/istanbul.jpg" alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: 'cover', border: '2px solid #d9b77a' }} /><Icon name="chevron" color="#d9b77a" /></span>
             <span className="col" style={{ gap: 0 }}><span className="h3">Istanbul</span><span className="tiny" style={{ color: '#c9c1b4' }}>4h 15m from Riyadh</span></span>
           </button>
         )}
         {known ? (
-          <button type="button" className="card tap" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => go('circles')}>
+          <button type="button" className="card tap" style={{ minHeight: 104, height: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 10 }} onClick={() => go('circles')}>
             <span className="stack"><span className="avatar sm green">A</span><span className="avatar sm gold">N</span></span>
             <span className="col" style={{ gap: 0 }}><span className="h3">Abdullah is back</span><span className="tiny">He saved 3 places for you</span></span>
           </button>
         ) : (
-          <button type="button" className="card tap" style={{ height: 104, justifyContent: 'space-between' }} onClick={() => push(fresh && s.household.length <= 1 ? 'household' : 'newCircle')}>
+          <button type="button" className="card tap" style={{ minHeight: 104, height: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 10 }} onClick={() => push(fresh && s.household.length <= 1 ? 'household' : 'newCircle')}>
             <span className="stack"><span className="avatar sm"><Icon name="plus" size={16} /></span></span>
-            <span className="col" style={{ gap: 0 }}><span className="h3">{s.household.length <= 1 ? 'Add your family' : 'Start a circle'}</span><span className="tiny">{s.household.length <= 1 ? 'Book for everyone in one go' : 'Plan the next trip together'}</span></span>
+            <span className="col" style={{ gap: 0 }}><span className="h3">{s.household.length <= 1 ? 'Add your family' : 'Start a circle'}</span><span className="tiny">{s.household.length <= 1 ? 'Book everyone at once' : 'Plan the next trip together'}</span></span>
           </button>
         )}
       </div>

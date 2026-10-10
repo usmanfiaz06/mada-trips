@@ -56,7 +56,7 @@ h1, h2, h3 { text-wrap: balance; }
 @media (max-width: 520px) {
   .demo { position: fixed; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 70dvh; overflow-y: auto; z-index: 100; }
   .demo[data-open="false"] { display: none; }
-  .demo-fab { display: block; position: fixed; left: 10px; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); z-index: 101; opacity: .9; border: 0; border-radius: 999px; padding: 8px 12px; background: var(--green); color: var(--mist); font-size: 12px; font-weight: 600; }
+  .demo-fab { display: block; position: fixed; right: 0; top: 46%; z-index: 101; border: 0; border-radius: 10px 0 0 10px; padding: 10px 5px; background: rgba(30,53,45,.82); color: var(--mist); font-size: 11px; font-weight: 600; writing-mode: vertical-rl; letter-spacing: .06em; }
 }
 
 /* ---------- layout primitives ---------- */

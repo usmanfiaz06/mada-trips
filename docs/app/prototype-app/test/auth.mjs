@@ -141,7 +141,7 @@ try {
   await phone.getByText('5678@trips.madatrips.sa', { exact: false }).first().waitFor();
   await shot('new-trips');
   await phone.getByRole('tab', { name: 'Past' }).click(); await page.waitForTimeout(300);
-  await phone.getByText('No past trips yet.').first().waitFor();
+  await phone.getByText('Every trip leaves a stamp.').first().waitFor();
   await tab('Circles');
   await shot('new-discover');
   await phone.getByRole('tab', { name: 'Circles' }).click(); await page.waitForTimeout(500);
