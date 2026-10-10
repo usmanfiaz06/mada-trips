@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pay sheet: slide to book</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+button{font-family:inherit}
+@keyframes sheet{from{transform:translateY(60px);opacity:.6}to{transform:none;opacity:1}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes nudge{0%,70%,100%{transform:translateX(0)}80%{transform:translateX(7px)}90%{transform:translateX(0)}}
+@keyframes drift{0%{transform:scale(1.08) translate(0,0)}50%{transform:scale(1.12) translate(-6px,-3px)}100%{transform:scale(1.08) translate(0,0)}}
+.sheet{animation:sheet .55s cubic-bezier(.2,.85,.2,1) both}
+.breathe{animation:breathe 10s ease-in-out infinite;transform-origin:50% 62%}
+.nudge{animation:nudge 3.2s 1.2s ease-in-out infinite}
+.drift{animation:drift 24s ease-in-out infinite}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0f1a16; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+  <img class="drift" src="/_blob/902d065e4dafba4928acbbed2ea06b3a" alt="Galata Tower above the rooftops of Istanbul" style="position: absolute; left: 0; top: 0; width: 390px; height: 300px; object-fit: cover">
+  <div style="position: absolute; left: 0; top: 0; width: 390px; height: 300px; background: linear-gradient(180deg, rgba(15,26,22,.35) 0%, rgba(15,26,22,.1) 45%, rgba(15,26,22,.55) 100%)"></div>
+  <a href="Ask.dc.html" aria-label="Back to Ask" style="position: absolute; top: 54px; left: 16px; width: 44px; height: 44px; border-radius: 999px; background: rgba(255,253,249,.22); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: grid; place-items: center">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fffdf9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+  </a>
+  <div style="position: absolute; left: 24px; top: 150px; color: #fffdf9; font-family: 'Instrument Serif', Georgia, serif; font-size: 52px; line-height: 1">Istanbul</div>
+
+  <div class="sheet" style="position: absolute; left: 0; right: 0; top: 222px; bottom: 0; background: #fffdf9; border-radius: 32px 32px 0 0; padding: 10px 24px 24px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+    <div style="align-self: center; width: 40px; height: 5px; border-radius: 999px; background: #e3dcd1"></div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em">Istanbul · 9–15 Mar</div>
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 13.5 3 11l1.5-1.5 8 1 4-4.5c1-1 2.6-1.3 3.4-.4.8.8.6 2.4-.4 3.4l-4.5 4 1 8L14.5 22.5 12 15z"/></svg>
+        4 travellers · Saudia, direct
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="1.6"></circle></svg>
+        Connecting rooms near Galata Tower · 6 nights
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 15px">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16V11l2-5h10l2 5v5M4 16h16v3H4zM5 11h14"/><circle cx="8" cy="14" r=".6"></circle><circle cx="16" cy="14" r=".6"></circle></svg>
+        Airport pickup both ways
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 18px; background: #e9e2d8">
+        <span style="font-size: 13px; line-height: 1.4; color: #4d5c55">Omar, Hessa, Sara, Ahmed · window seats · halal meals</span>
+        <button type="button" style="border: 0; background: transparent; font-size: 14px; font-weight: 600; color: #1e352d; cursor: pointer; padding: 6px">Edit</button>
+      </div>
+    </div>
+
+    <div style="height: 1px; background: rgba(30,53,45,.08)"></div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 40px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.05">SAR 14,960</div>
+      <div style="font-size: 14px; color: #4d5c55">Everything included. No fees later.</div>
+      <div style="font-size: 14px; color: #4d5c55">Free to cancel until 2 Mar. After that, SAR 400.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; align-items: center; justify-content: space-between">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500">
+          <span style="width: 38px; height: 26px; border-radius: 6px; background: #1e352d; color: #f6f2ec; display: grid; place-items: center; font-size: 10px; font-weight: 700; letter-spacing: .04em">VISA</span>
+          Visa ending 41
+        </div>
+        <button type="button" style="border: 0; background: transparent; font-size: 14px; font-weight: 600; color: #1e352d; cursor: pointer; padding: 6px">Change</button>
+      </div>
+      <div style="font-size: 13px; color: #56655e">Or 4 payments of SAR 3,740 with Tabby.</div>
+    </div>
+
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px">
+      <div style="position: relative; height: 64px">
+        <button type="button" aria-label="Slide to book for SAR 14,960. Press Enter to book." onPointerDown="{{down}}" onPointerMove="{{move}}" onPointerUp="{{up}}" onPointerCancel="{{up}}" onKeyDown="{{key}}" style="position: absolute; inset: 0; width: 100%; height: 64px; border: 0; padding: 0; border-radius: 999px; background: #1e352d; cursor: grab; touch-action: none; overflow: hidden; display: block">
+          <span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{fillW}}%; border-radius: 999px; background: #d9b77a; transition: {{trans}}"></span>
+          <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding-left: 40px; font-size: 17px; font-weight: 600; color: #f6f2ec; opacity: {{labelOpacity}}; letter-spacing: -0.005em">Slide to book</span>
+          <span style="position: absolute; top: 4px; left: {{knobLeft}}%; width: 56px; height: 56px; border-radius: 999px; background: #d9b77a; display: grid; place-items: center; box-shadow: 0 6px 16px -6px rgba(0,0,0,.5); transition: {{trans}}">
+            <span class="{{knobAnim}}" style="display: grid; place-items: center">
+              <svg width="30" height="20" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#1e352d"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+            </span>
+          </span>
+        </button>
+        <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+          <a ref="{{setLink}}" href="Confirmed.dc.html" style="position: absolute; inset: 0; border-radius: 999px; background: #d9b77a; color: #1e352d; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 17px; font-weight: 600">
+            Sent to Faisal
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </sc-if>
+      </div>
+      <div style="text-align: center; font-size: 13px; color: #56655e">You're only charged once it's confirmed.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { p: 0, dragging: false, done: false };
+    this.TRACK = 342;
+    this.KNOB = 56;
+  }
+  componentWillUnmount() {
+    clearTimeout(this.navTimer);
+  }
+  buzz(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+  knobCenterFrac(p) {
+    return (4 + this.KNOB / 2 + p * (this.TRACK - this.KNOB - 8)) / this.TRACK;
+  }
+  complete() {
+    this.buzz([0, 40]);
+    this.setState({ p: 1, dragging: false, done: true });
+    this.navTimer = setTimeout(() => { if (this.link) this.link.click(); }, 900);
+  }
+  renderVals() {
+    const s = this.state;
+    const usable = this.TRACK - this.KNOB - 8;
+    const knobLeftPx = 4 + s.p * usable;
+    return {
+      knobLeft: (knobLeftPx / this.TRACK * 100).toFixed(3),
+      fillW: ((knobLeftPx + this.KNOB + 4) / this.TRACK * 100).toFixed(3),
+      labelOpacity: Math.max(0, 1 - s.p * 1.7).toFixed(3),
+      trans: s.dragging ? 'none' : 'left .45s cubic-bezier(.2,.9,.25,1.15), width .45s cubic-bezier(.2,.9,.25,1.15)',
+      knobAnim: s.p === 0 && !s.dragging ? 'nudge' : '',
+      done: s.done,
+      setLink: (el) => { this.link = el; },
+      down: (e) => {
+        if (s.done) return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const frac = (e.clientX - rect.left) / rect.width;
+        const offset = frac - this.knobCenterFrac(s.p);
+        if (Math.abs(offset) > 0.14) return;
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+        this.rect = rect;
+        this.offset = offset;
+        this.tick = 0;
+        this.buzz(6);
+        this.setState({ dragging: true });
+      },
+      move: (e) => {
+        if (!this.state.dragging || !this.rect) return;
+        const frac = (e.clientX - this.rect.left) / this.rect.width - this.offset;
+        let p = (frac * this.TRACK - 4 - this.KNOB / 2) / usable;
+        p = Math.min(1, Math.max(0, p));
+        const ticks = [0.25, 0.5, 0.75];
+        while (this.tick < ticks.length && p >= ticks[this.tick]) {
+          this.buzz(6 + this.tick * 6);
+          this.tick += 1;
+        }
+        this.setState({ p });
+      },
+      up: () => {
+        if (!this.state.dragging) return;
+        if (this.state.p > 0.9) this.complete();
+        else this.setState({ p: 0, dragging: false });
+      },
+      key: (e) => {
+        if (s.done) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.complete(); }
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

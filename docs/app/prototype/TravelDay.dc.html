@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today, travel day</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes halo{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.6;transform:scale(1.22)}}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(47,122,75,.45)}70%{box-shadow:0 0 0 7px rgba(47,122,75,0)}100%{box-shadow:0 0 0 0 rgba(47,122,75,0)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes out{to{opacity:0;transform:translateY(-14px)}}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes flash{0%{background:#fffdf9}15%{background:#ecd9b0}100%{background:#f6efe2}}
+@keyframes rain{0%{transform:translateY(-14px);opacity:0}20%{opacity:.55}100%{transform:translateY(70px);opacity:0}}
+@keyframes grow{from{max-height:0;opacity:0}to{max-height:90px;opacity:1}}
+.breathe{animation:breathe 10s ease-in-out infinite;transform-origin:50% 62%}
+.halo{animation:halo 10s ease-in-out infinite}
+.ping{animation:ping 2.2s ease-out infinite}
+.rise1{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.rise2{animation:rise .6s .08s cubic-bezier(.2,.8,.2,1) both}
+.rise3{animation:rise .6s .16s cubic-bezier(.2,.8,.2,1) both}
+.rise4{animation:rise .6s .24s cubic-bezier(.2,.8,.2,1) both}
+.out{animation:out .45s cubic-bezier(.4,0,.2,1) both}
+.in{animation:in .5s .12s cubic-bezier(.2,.8,.2,1) both}
+.flash{animation:flash 2.4s ease both}
+.drop{position:absolute;width:1.5px;height:14px;border-radius:2px;background:#6f8fa6;animation:rain 1.4s linear infinite}
+.grow{animation:grow .5s cubic-bezier(.2,.8,.2,1) both;overflow:hidden}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+  <div style="position: absolute; inset: 0 0 auto 0; height: 360px; background: {{wash}}; pointer-events: none"></div>
+
+  <div style="position: relative; padding: 54px 24px 0 24px; display: flex; flex-direction: column; gap: 16px">
+    <div class="rise1" style="display: flex; align-items: center; justify-content: space-between">
+      <div style="height: 40px; padding: 0 14px 0 10px; border-radius: 999px; background: rgba(255,253,249,.75); border: 1px solid rgba(30,53,45,.06); display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500">
+        <svg width="22" height="15" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#b98f4a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+        Today · Riyadh → Istanbul
+      </div>
+      <a href="Wallet.dc.html" aria-label="Your profile" style="width: 40px; height: 40px; border-radius: 999px; background: #f6f2ec; display: grid; place-items: center; font-weight: 600; font-size: 15px">O</a>
+    </div>
+
+    <div class="rise2" style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: {{statusColor}}">
+        <span class="ping" style="width: 8px; height: 8px; border-radius: 999px; background: {{statusColor}}"></span>
+        {{status}}
+      </div>
+      <div style="border-radius: 28px; background: #1e352d; color: #f6f2ec; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 22px 40px -26px rgba(15,26,22,.8)">
+      <div style="display: flex; align-items: center; gap: 18px">
+        <svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true">
+          <circle cx="46" cy="46" r="40" fill="none" stroke="rgba(233,226,216,.16)" stroke-width="7"></circle>
+          <circle cx="46" cy="46" r="40" fill="none" stroke="#d9b77a" stroke-width="7" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="{{ringOffset}}" transform="rotate(-90 46 46)" style="transition: stroke-dashoffset 1s linear"></circle>
+        </svg>
+        <div style="display: flex; flex-direction: column">
+          <span style="font-size: 15px; font-weight: 500; color: #c9c1b4">Leave in</span>
+          <span style="font-size: 60px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums">{{mins}} <span style="font-size: 24px; letter-spacing: -0.01em">min</span></span>
+        </div>
+      </div>
+      <div style="font-size: 15px; color: #d6cfc3">31 min to King Khalid. Traffic is light.</div>
+      </div>
+    </div>
+
+    <div class="rise3" style="border-radius: 28px; background: #fffdf9; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 16px 34px -26px rgba(30,53,45,.5)">
+      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px">
+        <span><span style="font-weight: 600; letter-spacing: .06em">SV263</span> <span style="color: #56655e">· Saudia</span></span>
+        <span style="color: #56655e">Wed 9 Mar</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px">
+        <div style="display: flex; flex-direction: column">
+          <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums">09:40</span>
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #56655e">RUH</span>
+        </div>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+          <div style="width: 100%; display: flex; align-items: center">
+            <span style="flex-grow: 1; border-top: 1.5px dashed rgba(30,53,45,.3)"></span>
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="margin: 0 6px; flex-shrink: 0"><path d="M22 12c0-.8-.7-1.5-1.5-1.5H15L10 3H8l2.5 7.5H6L4.5 8.5H3l1 3.5-1 3.5h1.5L6 13.5h4.5L8 21h2l5-7.5h5.5c.8 0 1.5-.7 1.5-1.5z" fill="#1e352d"/></svg>
+            <span style="flex-grow: 1; border-top: 1.5px dashed rgba(30,53,45,.3)"></span>
+          </div>
+          <span style="font-size: 12px; color: #56655e">4h 15m · direct</span>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end">
+          <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums">13:55</span>
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #56655e">IST</span>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <div class="{{gateFlash}}" style="border-radius: 16px; background: #e9e2d8; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 500; color: #56655e">Gate</span>
+          <span style="position: relative; height: 26px; overflow: hidden; display: block">
+            <span class="{{oldGateAnim}}" style="position: absolute; left: 0; top: 0; font-size: 22px; font-weight: 600; letter-spacing: .02em; font-variant-numeric: tabular-nums">B12</span>
+            <sc-if value="{{gateChanged}}" hint-placeholder-val="{{ false }}">
+              <span class="in" style="position: absolute; left: 0; top: 0; font-size: 22px; font-weight: 600; letter-spacing: .02em; font-variant-numeric: tabular-nums">C4</span>
+            </sc-if>
+          </span>
+        </div>
+        <div style="border-radius: 16px; background: #e9e2d8; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 500; color: #56655e">Boards</span>
+          <span style="font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums">08:55</span>
+        </div>
+        <div style="border-radius: 16px; background: #e9e2d8; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 500; color: #56655e">Seats</span>
+          <span style="font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums">3A–D</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #56655e">
+        <span class="ping" style="width: 6px; height: 6px; border-radius: 999px; background: #2f7a4b"></span>
+        {{sourceLine}}
+      </div>
+      <sc-if value="{{predicted}}" hint-placeholder-val="{{ false }}">
+        <div class="grow" style="border-top: 1px solid rgba(30,53,45,.08); padding-top: 12px; display: flex; align-items: center; gap: 12px">
+          <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 14px; font-weight: 600">The plane coming from Cairo is late.</span>
+            <span style="font-size: 12px; color: #56655e">Mada predicts a delay. Saudia hasn't said yet.</span>
+          </div>
+          <a href="Disruption.dc.html" class="press" style="flex-shrink: 0; height: 40px; padding: 0 14px; border-radius: 999px; background: #d9b77a; color: #1e352d; display: flex; align-items: center; font-size: 14px; font-weight: 600">See the plan</a>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{showTiles}}" hint-placeholder-val="{{ true }}">
+    <div class="rise4" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+      <div style="height: 96px; border-radius: 24px; background: #fffdf9; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <div style="width: 28px; height: 28px; border-radius: 999px; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 12px; font-weight: 600">K</div>
+          <span style="font-size: 14px; font-weight: 600">Khalid · 07:08</span>
+        </div>
+        <span style="font-size: 13px; line-height: 1.35; color: #56655e">Grey Lexus ES. He'll wait at your door.</span>
+      </div>
+      <div style="position: relative; height: 96px; border-radius: 24px; background: #e7ecef; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden">
+        <span class="drop" style="left: 22px; top: 6px; animation-delay: 0s"></span>
+        <span class="drop" style="left: 54px; top: 0; animation-delay: .5s"></span>
+        <span class="drop" style="left: 88px; top: 10px; animation-delay: .9s"></span>
+        <span class="drop" style="left: 118px; top: 2px; animation-delay: .3s"></span>
+        <span class="drop" style="left: 146px; top: 8px; animation-delay: 1.1s"></span>
+        <span style="position: relative; font-size: 14px; font-weight: 600">Istanbul · 14°</span>
+        <span style="position: relative; font-size: 13px; line-height: 1.35; color: #3f4f48">Light rain. Pack the umbrella.</span>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+
+  <a href="Wallet.dc.html" class="press" style="position: absolute; left: 24px; right: 24px; bottom: 100px; height: 56px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 17px; font-weight: 600">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"></rect><path d="M8 8h8M8 12h5M8 17h2M14 17h2"/></svg>
+    Boarding passes
+  </a>
+
+  <nav aria-label="Main" style="position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(255,253,249,.8); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(30,53,45,.08); box-shadow: 0 18px 40px -18px rgba(30,53,45,.35)">
+    <a href="TravelDay.dc.html" style="height: 52px; padding: 0 18px 0 14px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+      Today
+    </a>
+    <a href="TravelDay.dc.html" aria-label="Trips" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>
+    </a>
+    <a href="Ask.dc.html" aria-label="Ask Mada" style="width: 60px; height: 60px; border-radius: 999px; background: #1e352d; display: grid; place-items: center; position: relative">
+            <svg width="32" height="22" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+    </a>
+    <a href="Group.dc.html" aria-label="Circles" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg>
+    </a>
+    <a href="Wallet.dc.html" aria-label="Wallet" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"></rect><path d="M3 10h18M16 15h2M6 6V5a2 2 0 0 1 2-2h9"/></svg>
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { gateChanged: false, predicted: false, changedAt: 0 };
+    this.leaveAt = Date.now() + 42 * 60000;
+    this.total = 42 * 60000;
+  }
+  componentDidMount() {
+    this.tick = setInterval(() => this.forceUpdate(), 1000);
+    this.t1 = setTimeout(() => { this.setState({ gateChanged: true, changedAt: Date.now() }); this.buzz([0, 30, 70, 30]); }, 6000);
+    this.t2 = setTimeout(() => { this.setState({ predicted: true }); this.buzz(14); }, 13000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.tick);
+    clearTimeout(this.t1);
+    clearTimeout(this.t2);
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const now = new Date();
+    const remaining = Math.max(0, this.leaveAt - now.getTime());
+    const h = now.getHours();
+    let wash = 'linear-gradient(180deg, rgba(255,248,236,.9) 0%, rgba(233,226,216,0) 100%)';
+    if (h >= 5 && h < 8) wash = 'linear-gradient(180deg, rgba(240,200,160,.55) 0%, rgba(233,226,216,0) 100%)';
+    else if (h >= 15 && h < 18) wash = 'linear-gradient(180deg, rgba(217,183,122,.45) 0%, rgba(233,226,216,0) 100%)';
+    else if (h >= 18 || h < 5) wash = 'linear-gradient(180deg, rgba(30,53,45,.22) 0%, rgba(233,226,216,0) 100%)';
+    const sourceLine = s.gateChanged ? 'Gate changed to C4 · 6-minute walk · Live from Saudia' : 'Live from Saudia · updated just now';
+    return {
+      wash,
+      mins: Math.ceil(remaining / 60000),
+      ringOffset: (251.3 * (1 - remaining / this.total)).toFixed(2),
+      gateChanged: s.gateChanged,
+      oldGateAnim: s.gateChanged ? 'out' : '',
+      gateFlash: s.gateChanged ? 'flash' : '',
+      sourceLine,
+      predicted: s.predicted,
+      showTiles: !s.predicted,
+      status: s.predicted ? 'One thing to look at.' : 'All set.',
+      statusColor: s.predicted ? '#7d5d27' : '#2f7a4b'
+    };
+  }
+}
+</script>
+</body>
+</html>

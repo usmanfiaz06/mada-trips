@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stress mode: the fix is ready</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+button{font-family:inherit}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes check{from{stroke-dashoffset:30}to{stroke-dashoffset:0}}
+.rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+.d1{animation-delay:.08s}.d2{animation-delay:.16s}.d3{animation-delay:.24s}
+.check{stroke-dasharray:30;animation:check .5s .2s ease both}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+  <a href="TravelDay.dc.html" style="position: absolute; top: 54px; left: 16px; height: 40px; padding: 0 14px 0 6px; display: flex; align-items: center; gap: 2px; font-size: 15px; font-weight: 500">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+    Today
+  </a>
+
+  <sc-if value="{{choosing}}" hint-placeholder-val="{{ true }}">
+    <div style="position: absolute; left: 24px; right: 24px; top: 116px; display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <h1 style="margin: 0; font-size: 34px; font-weight: 600; line-height: 1.08; letter-spacing: -0.025em">SV263 will likely leave 3 hours late.</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.45; color: #3f4f48">The plane coming from Cairo landed late. Saudia hasn't announced it yet. We're holding seats for all 4 of you on an earlier flight.</p>
+      </div>
+
+      <div role="radiogroup" aria-label="Choose a flight" style="display: flex; flex-direction: column; gap: 10px">
+        <sc-for list="{{options}}" as="o" hint-placeholder-count="2">
+          <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" class="press" style="text-align: left; cursor: pointer; border-radius: 24px; background: #fffdf9; border: {{o.border}}; padding: 16px; display: flex; gap: 14px; align-items: flex-start; color: #1e352d">
+            <span style="flex-shrink: 0; margin-top: 2px; width: 22px; height: 22px; border-radius: 999px; border: 2px solid #1e352d; display: grid; place-items: center; box-sizing: border-box">
+              <span style="width: 10px; height: 10px; border-radius: 999px; background: {{o.dot}}"></span>
+            </span>
+            <span style="display: flex; flex-direction: column; gap: 4px">
+              <span style="font-size: 17px; font-weight: 600">{{o.title}}</span>
+              <span style="font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums">{{o.times}}</span>
+              <span style="font-size: 14px; line-height: 1.4; color: #4d5c55">{{o.note}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div style="width: 40px; height: 40px; border-radius: 999px; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 15px; font-weight: 600; flex-shrink: 0">F</div>
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 15px; font-weight: 600">Faisal is with you on this.</span>
+          <span style="font-size: 13px; color: #56655e">Predicted from the inbound plane at 08:02</span>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class="press" onClick="{{confirm}}" style="position: absolute; left: 24px; right: 24px; bottom: 32px; height: 60px; border: 0; border-radius: 999px; background: #1e352d; color: #f6f2ec; font-size: 18px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums">{{cta}}</button>
+  </sc-if>
+
+  <sc-if value="{{done}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 24px; right: 24px; top: 190px; display: flex; flex-direction: column; gap: 20px">
+      <div class="rise" style="width: 64px; height: 64px; border-radius: 999px; background: #2f7a4b; display: grid; place-items: center">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="check" d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+      </div>
+      <h1 class="rise d1" style="margin: 0; font-size: 34px; font-weight: 600; line-height: 1.08; letter-spacing: -0.025em">{{doneTitle}}</h1>
+      <p class="rise d2" style="margin: 0; font-size: 17px; line-height: 1.45; color: #3f4f48">{{doneBody}}</p>
+      <div class="rise d3" style="display: flex; align-items: center; gap: 12px">
+        <div style="width: 40px; height: 40px; border-radius: 999px; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 15px; font-weight: 600; flex-shrink: 0">F</div>
+        <span style="font-size: 15px; line-height: 1.4">“I've moved everything. Have a good flight.”</span>
+      </div>
+    </div>
+    <a href="TravelDay.dc.html" class="press rise d3" style="position: absolute; left: 24px; right: 24px; bottom: 32px; height: 60px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600">Back to today</a>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { pick: 'a', done: false };
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const defs = [
+      { id: 'a', title: 'flynas XY125 · direct', times: 'Leaves 10:25 · lands 15:05 at Sabiha Gökçen', note: 'No extra cost to you. Your pickup moves with you.' },
+      { id: 'b', title: 'Stay on SV263', times: 'Likely leaves 12:40 · lands 16:55', note: 'Same seats, same airport. You land 3 hours later.' }
+    ];
+    const options = defs.map((o) => {
+      const on = s.pick === o.id;
+      return {
+        ...o,
+        checked: on ? 'true' : 'false',
+        border: on ? '2px solid #1e352d' : '1px solid rgba(30,53,45,.12)',
+        dot: on ? '#1e352d' : 'transparent',
+        pick: () => { this.buzz(8); this.setState({ pick: o.id }); }
+      };
+    });
+    const a = s.pick === 'a';
+    return {
+      options,
+      choosing: !s.done,
+      done: s.done,
+      cta: a ? 'Take the 10:25' : 'Stay on SV263',
+      confirm: () => { this.buzz(14); this.setState({ done: true }); },
+      doneTitle: a ? 'Done. All 4 of you are on flynas XY125.' : 'Done. You’re staying on SV263.',
+      doneBody: a
+        ? 'Khalid now takes you to the airport at 07:50. Your Istanbul pickup moves to Sabiha Gökçen. New boarding passes are in your Wallet.'
+        : 'We’ll keep watching the plane. If it gets later, we’ll have another option ready before Saudia announces it.'
+    };
+  }
+}
+</script>
+</body>
+</html>

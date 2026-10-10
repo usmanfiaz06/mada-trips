@@ -50,8 +50,11 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 
 | Need | Recommended | Alternative | Cost model |
 |---|---|---|---|
-| Flight search, pricing, PNR | **Mada's GDS (Enterprise API)** | — | Existing contract. The agent issues the ticket in Ops, exactly as today. |
-| NDC fares and low-cost carriers (flynas, flyadeal and others) | **Duffel** | Direct airline APIs | Pay per order: $3 + 1% + $2 per ancillary. **Duffel also charges for excess searches, so we cache results aggressively and debounce searches.** |
+| Flight search, pricing, PNR (**the core**) | **Mada's GDS through its Enterprise API** (Sabre or Amadeus, whichever the desk already uses) | — | Bookings are held as a PNR or order, and an agent issues them on **Mada's own IATA number** through BSP, exactly as today. GDSs usually **pay the agency incentives per segment** instead of charging fees, so this is the cheapest source as volume grows. Saudia's NDC fares are live on both Sabre and Amadeus, and Riyadh Air has signed with Sabre, Amadeus and Travelport. |
+| flynas and flyadeal | **Travelfusion** | flyadeal is also on Amadeus (since 2025) | Neither is on Duffel. Travelfusion lists both. |
+| Riyadh Air NDC-only offers (optional) | **Verteil** | — | Riyadh Air's launch NDC aggregator. Add it only if its offers are richer than what the GDS shows. |
+| Fast prototyping only | Duffel | — | Fine for building and testing AI search quickly. **Not the core:** it charges $3 per order + 1%, using your own IATA number needs its Enterprise plan, and it doesn't carry flynas, flyadeal, Riyadh Air or Air Arabia. |
+| Search economics | Built in-house | — | AI makes a lot of searches. Cache results for 5–15 minutes, re-price live only when the traveller picks a fare, and stay within the GDS contract's look-to-book limit. |
 | Hotels | **RateHawk** + **WebBeds** | Hotelbeds next; Expedia Rapid later | Net rates with no API fee (RateHawk says so). WebBeds terms come from sales. |
 | Visa rules by nationality | **IATA Timatic** through the GDS | Sherpa | Usually within the GDS contract **[confirm]**. |
 | Visas, cars, activities, restaurants, packages, Umrah | **No API at MVP.** These are requests handled by agents in the Ops inbox. | — | Free. |
@@ -162,7 +165,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 5. Register an **SMS sender ID** with a Saudi provider.
 6. Ask the accountant about **ZATCA e-invoicing** (phase 2).
 7. Book the **legal opinions** in 0.10.
-8. Create free accounts for **Duffel**, **RateHawk**, **FlightAware**, **PostHog**, **Sentry**, **Amazon SES** and the **Anthropic API**.
+8. Ask **Travelfusion** for terms for flynas and flyadeal. Create free accounts for **RateHawk**, **FlightAware**, **PostHog**, **Sentry**, **Amazon SES** and the **Anthropic API**.
 
 ---
 
@@ -174,7 +177,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 |---|---|---|
 | Apple Developer Program | $99 a year | Required to publish on iOS |
 | Google Play Console | $25 once | Required to publish on Android |
-| FlightAware AeroAPI | About $100 a month minimum, plus queries | Early-warning data is the core promise |
+| FlightAware AeroAPI | About $100 a month minimum, plus queries | Early-warning data is the core promise. **It tracks flights only. It sells no seats and shows no fares.** |
 | Supabase + Vercel | Plans already paid for Ops | Hosting |
 
 **Costs that grow only with use**
@@ -182,7 +185,8 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 | Item | Charged per |
 |---|---|
 | Claude API | Conversation and document |
-| Duffel | Booked order |
+| GDS | Usually pays Mada per segment (incentives), not the other way round |
+| Travelfusion | Booked order (terms to confirm) |
 | WhatsApp | Conversation |
 | SMS | Fallback login code |
 | Amazon SES | Email |

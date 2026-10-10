@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wallet: the household</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+button{font-family:inherit}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes halo{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.6;transform:scale(1.22)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.breathe{animation:breathe 10s ease-in-out infinite;transform-origin:50% 62%}
+.halo{animation:halo 10s ease-in-out infinite}
+.rise1{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.rise2{animation:rise .6s .08s cubic-bezier(.2,.8,.2,1) both}
+.rise3{animation:rise .6s .16s cubic-bezier(.2,.8,.2,1) both}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+  <div style="padding: 54px 24px 0 24px; display: flex; flex-direction: column; gap: 16px">
+    <div class="rise1" style="display: flex; align-items: center; justify-content: space-between">
+      <div style="display: flex; flex-direction: column; gap: 2px">
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em">Wallet</h1>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; color: #56655e">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56655e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          Locked with Face ID · works offline
+        </span>
+      </div>
+      <button type="button" aria-label="Scan a passport" class="press" style="width: 44px; height: 44px; border-radius: 999px; border: 0; background: #1e352d; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <div class="rise2" style="height: 196px; perspective: 900px">
+      <div onPointerMove="{{tilt}}" onPointerLeave="{{untilt}}" style="position: relative; height: 196px; border-radius: 22px; background: linear-gradient(145deg, #24423a 0%, #1e352d 55%, #172b24 100%); color: #e9e2d8; padding: 18px 20px; box-sizing: border-box; overflow: hidden; transform: rotateX({{rx}}deg) rotateY({{ry}}deg); transition: {{tiltTrans}}; box-shadow: 0 24px 40px -24px rgba(15,26,22,.7); display: flex; flex-direction: column; justify-content: space-between">
+        <div style="position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0) 30%, rgba(233,210,160,.28) 50%, rgba(255,255,255,0) 70%); background-size: 250% 100%; background-position: {{sheen}}% 0; pointer-events: none"></div>
+        <div style="position: relative; display: flex; justify-content: space-between; align-items: flex-start">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: .14em; color: #d9b77a">PASSPORT</span>
+          <span style="font-size: 12px; font-weight: 500; letter-spacing: .08em; color: #c9c1b4">SAU</span>
+        </div>
+        <div style="position: relative; display: flex; flex-direction: column; gap: 10px">
+          <div style="font-family: 'Instrument Serif', Georgia, serif; font-size: 30px; line-height: 1; color: #f6f2ec">{{card.name}}</div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-variant-numeric: tabular-nums">
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Number</span><span style="font-size: 14px; font-weight: 600; letter-spacing: .04em">{{card.number}}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Born</span><span style="font-size: 14px; font-weight: 600">{{card.born}}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #b8b0a3">Expires</span><span style="font-size: 14px; font-weight: 600; color: {{card.expColor}}">{{card.expires}}</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rise3" style="display: flex; flex-direction: column; gap: 4px">
+      <div style="font-size: 15px; font-weight: 600; margin-bottom: 4px">Everyone is ready for Istanbul.</div>
+      <sc-for list="{{people}}" as="p" hint-placeholder-count="4">
+        <button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" class="press" style="text-align: left; cursor: pointer; border: 0; border-radius: 18px; background: {{p.bg}}; padding: 10px 12px; display: flex; align-items: center; gap: 12px; color: #1e352d; transition: background .2s ease">
+          <span style="width: 36px; height: 36px; border-radius: 999px; background: #f6f2ec; display: grid; place-items: center; font-size: 14px; font-weight: 600; flex-shrink: 0">{{p.initial}}</span>
+          <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px">
+            <span style="font-size: 15px; font-weight: 600">{{p.name}}</span>
+            <span style="font-size: 13px; line-height: 1.35; color: #4d5c55">{{p.note}}</span>
+          </span>
+          <span style="width: 10px; height: 10px; border-radius: 999px; background: {{p.dot}}; flex-shrink: 0"></span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="font-size: 15px; font-weight: 600">For this trip</div>
+      <div style="border-radius: 20px; background: #fffdf9; padding: 12px 14px; display: flex; align-items: center; gap: 12px">
+        <span style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px">
+          <span style="font-size: 15px; font-weight: 600">SV263 · 4 boarding passes</span>
+          <span style="font-size: 13px; color: #4d5c55">Ready at check-in, 24 hours before</span>
+        </span>
+        <button type="button" class="press" style="flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 999px; border: 0; background: #0f1a16; color: #f6f2ec; font-size: 13px; font-weight: 600; cursor: pointer">Add to Wallet</button>
+      </div>
+    </div>
+  </div>
+
+  <nav aria-label="Main" style="position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(255,253,249,.8); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(30,53,45,.08); box-shadow: 0 18px 40px -18px rgba(30,53,45,.35)">
+    <a href="TravelDay.dc.html" aria-label="Today" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a href="TravelDay.dc.html" aria-label="Trips" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="3"></rect><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/></svg>
+    </a>
+    <a href="Ask.dc.html" aria-label="Ask Mada" style="width: 60px; height: 60px; border-radius: 999px; background: #1e352d; display: grid; place-items: center; position: relative">
+            <svg width="32" height="22" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#d9b77a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+    </a>
+    <a href="Group.dc.html" aria-label="Circles" style="width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/></svg>
+    </a>
+    <a href="Wallet.dc.html" style="height: 52px; padding: 0 18px 0 14px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f6f2ec" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="14" rx="3"></rect><path d="M3 10h18M16 15h2M6 6V5a2 2 0 0 1 2-2h9"/></svg>
+      Wallet
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { who: 'sara', rx: 0, ry: 0, sheen: 100, tilting: false };
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const data = [
+      { id: 'omar', initial: 'O', name: 'Omar', note: 'Passport valid until 2031', full: 'Omar Alharbi', number: 'A08•••41', born: '1984', expires: 'Jun 2031', watch: false },
+      { id: 'hessa', initial: 'H', name: 'Hessa', note: 'Passport valid until 2029', full: 'Hessa Alharbi', number: 'A11•••07', born: '1988', expires: 'Jan 2029', watch: false },
+      { id: 'sara', initial: 'S', name: 'Sara', note: 'Fine for Istanbul: Turkey needs 150 days after arrival, Sara has 158. Renew before summer.', full: 'Sara Alharbi', number: 'A23•••96', born: '2013', expires: '14 Aug 2027', watch: true },
+      { id: 'ahmed', initial: 'A', name: 'Ahmed', note: 'Passport valid until 2030', full: 'Ahmed Alharbi', number: 'A23•••97', born: '2016', expires: 'Mar 2030', watch: false }
+    ];
+    const people = data.map((p) => ({
+      ...p,
+      pressed: s.who === p.id ? 'true' : 'false',
+      bg: s.who === p.id ? '#fffdf9' : 'transparent',
+      dot: p.watch ? '#d9b77a' : '#2f7a4b',
+      pick: () => { this.buzz(8); this.setState({ who: p.id }); }
+    }));
+    const c = data.find((p) => p.id === s.who);
+    return {
+      people,
+      card: { name: c.full, number: c.number, born: c.born, expires: c.expires, expColor: c.watch ? '#e6c88f' : '#e9e2d8' },
+      rx: s.rx.toFixed(2),
+      ry: s.ry.toFixed(2),
+      sheen: s.sheen.toFixed(1),
+      tiltTrans: s.tilting ? 'transform .08s linear' : 'transform .6s cubic-bezier(.2,.8,.2,1)',
+      tilt: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        this.setState({ ry: (x - 0.5) * 14, rx: -(y - 0.5) * 10, sheen: 100 - x * 100, tilting: true });
+      },
+      untilt: () => this.setState({ rx: 0, ry: 0, sheen: 100, tilting: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask: three ways to get there</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+button{font-family:inherit}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.think{animation:breathe 1.6s ease-in-out infinite;transform-origin:50% 62%}
+.rest{animation:breathe 10s ease-in-out infinite;transform-origin:50% 62%}
+.rise{animation:rise .5s cubic-bezier(.2,.8,.2,1) both}
+.d1{animation-delay:.06s}.d2{animation-delay:.14s}.d3{animation-delay:.22s}.d4{animation-delay:.3s}
+.spin{animation:spin 1s linear infinite}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+
+  <div style="position: absolute; top: 0; left: 0; right: 0; padding: 54px 16px 8px 16px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(180deg, #e9e2d8 80%, rgba(233,226,216,0)); z-index: 2">
+    <a href="Main.dc.html" style="align-self: flex-start; height: 40px; padding: 0 14px 0 6px; display: flex; align-items: center; gap: 2px; font-size: 15px; font-weight: 500">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+      Today
+    </a>
+    <p style="margin: 0 8px; font-size: 12px; line-height: 1.4; color: #56655e">Instant answers from Mada. Faisal and the team confirm anything you book.</p>
+  </div>
+
+  <div style="position: absolute; top: 128px; left: 0; right: 0; bottom: {{scrollBottom}}px; overflow-y: auto; padding: 0 24px 24px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+    <div class="rise" style="align-self: flex-end; max-width: 78%; background: #1e352d; color: #f6f2ec; padding: 12px 16px; border-radius: 22px 22px 6px 22px; font-size: 16px; line-height: 1.4">Istanbul for Eid, all four of us</div>
+
+    <sc-if value="{{showWork}}" hint-placeholder-val="{{ true }}">
+      <div class="rise" style="display: flex; gap: 12px; align-items: flex-start">
+        <svg class="think" width="34" height="23" viewBox="0 0 132.31 88.61" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><g fill="#b98f4a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+        <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 2px">
+          <sc-for list="{{lines}}" as="line" hint-placeholder-count="3">
+            <div class="rise" style="display: flex; align-items: center; gap: 10px; font-size: 15px; color: {{line.color}}">
+              <sc-if value="{{line.done}}" hint-placeholder-val="{{ true }}">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2f7a4b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+              </sc-if>
+              <sc-if value="{{line.working}}" hint-placeholder-val="{{ false }}">
+                <span class="spin" style="width: 14px; height: 14px; margin: 2px; border-radius: 999px; border: 2px solid #e9e2d8; border-top-color: #1e352d; box-sizing: border-box"></span>
+              </sc-if>
+              <span>{{line.text}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{showQuestion}}" hint-placeholder-val="{{ false }}">
+      <div class="rise" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Flexible by a day or two?</div>
+        <div style="display: flex; gap: 8px">
+          <button type="button" class="press" onClick="{{answerYes}}" style="height: 44px; padding: 0 22px; border-radius: 999px; border: 0; background: #1e352d; color: #f6f2ec; font-size: 15px; font-weight: 600; cursor: pointer">Yes</button>
+          <button type="button" class="press" onClick="{{answerExact}}" style="height: 44px; padding: 0 22px; border-radius: 999px; border: 0; background: #f6f2ec; color: #1e352d; font-size: 15px; font-weight: 600; cursor: pointer">Exact dates</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{showResults}}" hint-placeholder-val="{{ false }}">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <div class="rise" style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #56655e">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2f7a4b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+          Checked 14 flights · holding seats for 4
+        </div>
+        <div class="rise d1" style="display: flex; flex-direction: column; gap: 2px">
+          <h2 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Three ways to get there.</h2>
+          <div style="font-size: 14px; color: #56655e">{{dates}} · 4 travellers · return</div>
+        </div>
+        <sc-for list="{{options}}" as="opt" hint-placeholder-count="3">
+          <button type="button" class="press rise {{opt.delay}}" onClick="{{opt.pick}}" aria-pressed="{{opt.pressed}}" style="text-align: left; cursor: pointer; border-radius: 24px; background: #fffdf9; border: {{opt.border}}; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; color: #1e352d; box-shadow: {{opt.shadow}}; transition: border-color .2s ease, box-shadow .2s ease">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%">
+              <span style="height: 24px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; background: {{opt.tagBg}}; color: #1e352d">{{opt.label}}</span>
+              <span style="font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em">SAR {{opt.priceText}}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; width: 100%">
+              <div style="display: flex; flex-direction: column">
+                <span style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums">{{opt.dep}}</span>
+                <span style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #56655e">{{opt.from}}</span>
+              </div>
+              <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 3px">
+                <div style="width: 100%; display: flex; align-items: center">
+                  <span style="flex-grow: 1; border-top: 1.5px dashed rgba(30,53,45,.3)"></span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" style="margin: 0 6px; flex-shrink: 0"><path d="M22 12c0-.8-.7-1.5-1.5-1.5H15L10 3H8l2.5 7.5H6L4.5 8.5H3l1 3.5-1 3.5h1.5L6 13.5h4.5L8 21h2l5-7.5h5.5c.8 0 1.5-.7 1.5-1.5z" fill="#1e352d"/></svg>
+                  <span style="flex-grow: 1; border-top: 1.5px dashed rgba(30,53,45,.3)"></span>
+                </div>
+                <span style="font-size: 12px; color: #56655e">{{opt.dur}} · direct</span>
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: flex-end">
+                <span style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums">{{opt.arr}}</span>
+                <span style="font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #56655e">{{opt.to}}</span>
+              </div>
+            </div>
+            <div style="font-size: 14px; line-height: 1.4; color: #4d5c55"><span style="font-weight: 600; color: #1e352d">{{opt.airline}}</span> · {{opt.reason}}</div>
+          </button>
+        </sc-for>
+        <div class="rise d4" style="border-radius: 24px; background: #f6f2ec; padding: 14px 16px; display: flex; align-items: center; gap: 12px">
+          <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+            <div style="font-size: 15px; font-weight: 600; line-height: 1.3">Add connecting rooms near Galata Tower and airport pickup?</div>
+            <div style="font-size: 13px; line-height: 1.4; color: #4d5c55">You asked for connecting rooms last Eid. 6 nights · SAR 6,320</div>
+          </div>
+          <button type="button" class="press" onClick="{{toggleBundle}}" aria-pressed="{{bundlePressed}}" style="flex-shrink: 0; height: 40px; min-width: 76px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer; font-size: 14px; font-weight: 600; background: {{bundleBg}}; color: {{bundleFg}}; transition: background .2s ease, color .2s ease">{{bundleLabel}}</button>
+        </div>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="position: absolute; left: 24px; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 12px">
+    <sc-if value="{{showResults}}" hint-placeholder-val="{{ false }}">
+      <a href="Pay.dc.html" class="press rise" style="height: 56px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums">Book · SAR {{totalText}}</a>
+    </sc-if>
+    <div style="height: 52px; border-radius: 999px; background: #fffdf9; border: 1px solid rgba(30,53,45,.1); display: flex; align-items: center; justify-content: space-between; padding: 0 6px 0 20px">
+      <label for="ask" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Ask Mada</label>
+      <input id="ask" type="text" placeholder="Anything else for Istanbul?" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-family: inherit; font-size: 16px; color: #1e352d">
+      <button type="button" aria-label="Hold to talk" style="width: 40px; height: 40px; border-radius: 999px; border: 0; background: #f6f2ec; display: grid; place-items: center; cursor: pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e352d" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 0, results: false, flexible: true, pick: 'best', bundle: false };
+  }
+  componentDidMount() {
+    const at = [450, 1250, 2050, 2650];
+    this.timers = at.map((ms, i) => setTimeout(() => this.setState({ step: i + 1 }), ms));
+  }
+  componentWillUnmount() {
+    (this.timers || []).forEach(clearTimeout);
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const fmt = (n) => n.toLocaleString('en-US');
+    const lineDefs = ['Checking 14 flights', 'Holding seats at this price', 'Matching your family’s seats and meals'];
+    const lines = [];
+    lineDefs.forEach((text, i) => {
+      if (s.step > i) {
+        const done = s.step > i + 1;
+        lines.push({ text, done, working: !done, color: done ? '#1e352d' : '#56655e' });
+      }
+    });
+    const defs = [
+      { id: 'best', label: 'Best for you', airline: 'Saudia', dep: '09:40', arr: '13:55', from: 'RUH', to: 'IST', dur: '4h 15m', reason: 'Lands before check-in. Window seats together.', price: 8640 },
+      { id: 'low', label: 'Lowest price', airline: 'flynas', dep: '06:15', arr: '10:40', from: 'RUH', to: 'SAW', dur: '4h 25m', reason: 'The other airport, about 50 minutes from Galata.', price: 6980 },
+      { id: 'early', label: 'Earliest', airline: 'Turkish Airlines', dep: '02:10', arr: '06:20', from: 'RUH', to: 'IST', dur: '4h 10m', reason: 'A full first day, after a short night.', price: 9310 }
+    ];
+    const options = defs.map((o, i) => {
+      const on = s.pick === o.id;
+      return {
+        ...o,
+        priceText: fmt(o.price),
+        delay: 'd' + (i + 1),
+        pressed: on ? 'true' : 'false',
+        border: on ? '2px solid #1e352d' : '1px solid rgba(30,53,45,.1)',
+        shadow: on ? '0 14px 30px -18px rgba(30,53,45,.45)' : 'none',
+        tagBg: on ? '#d9b77a' : '#efe9e0',
+        pick: () => { this.buzz(8); this.setState({ pick: o.id }); }
+      };
+    });
+    const chosen = defs.find((o) => o.id === s.pick);
+    const total = chosen.price + (s.bundle ? 6320 : 0);
+    return {
+      lines,
+      showWork: !s.results,
+      showQuestion: !s.results && s.step >= 4,
+      showResults: s.results,
+      options,
+      dates: s.flexible ? 'Tue 9 – Mon 15 Mar' : 'Wed 10 – Tue 16 Mar',
+      answerYes: () => { this.buzz(8); this.setState({ results: true, flexible: true }); },
+      answerExact: () => { this.buzz(8); this.setState({ results: true, flexible: false }); },
+      toggleBundle: () => { this.buzz(10); this.setState({ bundle: !s.bundle }); },
+      bundleLabel: s.bundle ? 'Added' : 'Add',
+      bundlePressed: s.bundle ? 'true' : 'false',
+      bundleBg: s.bundle ? '#1e352d' : '#fffdf9',
+      bundleFg: s.bundle ? '#f6f2ec' : '#1e352d',
+      totalText: fmt(total),
+      scrollBottom: s.results ? 156 : 88
+    };
+  }
+}
+</script>
+</body>
+</html>

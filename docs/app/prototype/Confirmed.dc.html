@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>With Faisal, then confirmed</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Inter+Tight:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1e352d;text-decoration:none}a:hover{color:#1e352d}
+@keyframes ring{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.12);opacity:.15}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes burst{0%{transform:scale(.35);opacity:0}25%{opacity:1}100%{transform:scale(1.45);opacity:0}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes warm{from{opacity:0}to{opacity:1}}
+.ring{animation:ring 2.4s ease-in-out infinite}
+.rise{animation:rise .6s cubic-bezier(.2,.8,.2,1) both}
+.d1{animation-delay:.12s}.d2{animation-delay:.24s}.d3{animation-delay:.5s}.d4{animation-delay:.62s}.d5{animation-delay:.74s}.d6{animation-delay:.9s}
+.spin{animation:spin 1s linear infinite}
+.burst{animation:burst .9s cubic-bezier(.15,.7,.2,1) both;transform-origin:50% 50%}
+.pop{animation:pop .7s cubic-bezier(.2,.9,.25,1.2) both}
+.breathe{animation:breathe 10s 1s ease-in-out infinite;transform-origin:50% 62%}
+.warm{animation:warm 1.2s ease both}
+.press{transition:transform .12s ease}.press:active{transform:scale(.98)}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #e9e2d8; font-family: 'Inter Tight', system-ui, sans-serif; color: #1e352d">
+
+  <sc-if value="{{waiting}}" hint-placeholder-val="{{ true }}">
+    <div style="position: absolute; inset: 0; padding: 0 32px; display: flex; flex-direction: column; justify-content: center; gap: 28px">
+      <div class="rise" style="position: relative; width: 96px; height: 96px">
+        <span class="ring" style="position: absolute; inset: -10px; border-radius: 999px; border: 2px solid #d9b77a"></span>
+        <div style="width: 96px; height: 96px; border-radius: 999px; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 36px; font-weight: 600">F</div>
+      </div>
+      <div class="rise d1" style="display: flex; flex-direction: column; gap: 8px">
+        <h1 style="margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.02em">With Faisal</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.45; color: #4d5c55">Faisal is confirming your seats with Saudia. Usually 4 minutes.</p>
+      </div>
+      <div class="rise d2" style="display: flex; flex-direction: column; gap: 14px">
+        <sc-for list="{{steps}}" as="st" hint-placeholder-count="3">
+          <div style="display: flex; align-items: center; gap: 12px; font-size: 16px; color: {{st.color}}; transition: color .3s ease">
+            <span style="width: 24px; height: 24px; display: grid; place-items: center">
+              <sc-if value="{{st.done}}" hint-placeholder-val="{{ false }}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2f7a4b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+              </sc-if>
+              <sc-if value="{{st.working}}" hint-placeholder-val="{{ true }}">
+                <span class="spin" style="width: 16px; height: 16px; border-radius: 999px; border: 2px solid #e3dcd1; border-top-color: #1e352d; box-sizing: border-box"></span>
+              </sc-if>
+              <sc-if value="{{st.todo}}" hint-placeholder-val="{{ false }}">
+                <span style="width: 8px; height: 8px; border-radius: 999px; background: #d6cec2"></span>
+              </sc-if>
+            </span>
+            {{st.text}}
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{confirmed}}" hint-placeholder-val="{{ false }}">
+    <div class="warm" style="position: absolute; inset: 0; background: radial-gradient(120% 70% at 50% 30%, rgba(217,183,122,.38) 0%, rgba(233,226,216,0) 70%)"></div>
+    <div style="position: absolute; left: 0; right: 0; top: 150px; height: 220px; display: grid; place-items: center">
+      <svg class="burst" width="260" height="260" viewBox="-130 -130 260 260" aria-hidden="true" style="position: absolute">
+        <g stroke="#d9b77a" stroke-width="5" stroke-linecap="round">
+          <line x1="0" y1="-62" x2="0" y2="-112"></line>
+          <line x1="31" y1="-54" x2="56" y2="-97"></line>
+          <line x1="54" y1="-31" x2="97" y2="-56"></line>
+          <line x1="62" y1="0" x2="112" y2="0"></line>
+          <line x1="54" y1="31" x2="97" y2="56"></line>
+          <line x1="31" y1="54" x2="56" y2="97"></line>
+          <line x1="0" y1="62" x2="0" y2="112"></line>
+          <line x1="-31" y1="54" x2="-56" y2="97"></line>
+          <line x1="-54" y1="31" x2="-97" y2="56"></line>
+          <line x1="-62" y1="0" x2="-112" y2="0"></line>
+          <line x1="-54" y1="-31" x2="-97" y2="-56"></line>
+          <line x1="-31" y1="-54" x2="-56" y2="-97"></line>
+        </g>
+      </svg>
+      <div class="pop" style="position: relative">
+        <svg class="breathe" width="120" height="80" viewBox="0 0 132.31 88.61" aria-hidden="true"><g fill="#b98f4a"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></g></svg>
+      </div>
+    </div>
+    <div style="position: absolute; left: 32px; right: 32px; top: 400px; display: flex; flex-direction: column; gap: 14px">
+      <h1 class="rise d1" style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 48px; line-height: 1.02; letter-spacing: -0.01em">You're going to Istanbul.</h1>
+      <div class="rise d2" style="display: flex; align-items: center; gap: 10px">
+        <div style="width: 32px; height: 32px; border-radius: 999px; background: #1e352d; color: #e9e2d8; display: grid; place-items: center; font-size: 13px; font-weight: 600; flex-shrink: 0">F</div>
+        <div style="font-size: 14px; line-height: 1.4; color: #4d5c55; font-variant-numeric: tabular-nums">Confirmed by Faisal · Saudia SV263 · <span style="font-weight: 600; color: #1e352d; letter-spacing: .04em">X7K2QD</span></div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px">
+        <span class="rise d3" style="height: 32px; padding: 0 12px; border-radius: 999px; background: #fffdf9; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500">Tickets in your Wallet</span>
+        <span class="rise d4" style="height: 32px; padding: 0 12px; border-radius: 999px; background: #fffdf9; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500">Hotel and pickup booked</span>
+        <span class="rise d5" style="height: 32px; padding: 0 12px; border-radius: 999px; background: #fffdf9; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500">We're watching SV263</span>
+      </div>
+    </div>
+    <a href="TravelDay.dc.html" class="press rise d6" style="position: absolute; left: 24px; right: 24px; bottom: 32px; height: 56px; border-radius: 999px; background: #1e352d; color: #f6f2ec; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600">See the trip</a>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { step: 0, confirmed: false };
+  }
+  componentDidMount() {
+    const knock = setTimeout(() => this.buzz(14), 300);
+    const s1 = setTimeout(() => this.setState({ step: 1 }), 1300);
+    const s2 = setTimeout(() => this.setState({ step: 2 }), 2500);
+    const s3 = setTimeout(() => this.setState({ step: 3 }), 3600);
+    const peak = setTimeout(() => { this.setState({ confirmed: true }); this.buzz([0, 18, 90, 36]); }, 4300);
+    this.timers = [knock, s1, s2, s3, peak];
+  }
+  componentWillUnmount() {
+    (this.timers || []).forEach(clearTimeout);
+  }
+  buzz(p) {
+    try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {}
+  }
+  renderVals() {
+    const s = this.state;
+    const steps = ['Seats held', 'Price checked', 'Issuing tickets'].map((text, i) => {
+      const done = s.step > i;
+      const working = s.step === i;
+      return { text, done, working, todo: !done && !working, color: done || working ? '#1e352d' : '#5b6862' };
+    });
+    return { steps, waiting: !s.confirmed, confirmed: s.confirmed };
+  }
+}
+</script>
+</body>
+</html>
