@@ -185,11 +185,14 @@ try {
   await demo('No flights found');
   await push('ask', { intent: 'flight' });
   await click('Istanbul');
-  await click('Eid al-Fitr · 9–15 Mar', { wait: 900 });
+  await click('Eid al-Fitr · 9–15 Mar', { wait: 3200 });
   await see('Nothing direct on those dates.', 'flights none');
   await shot('ask-flights-none');
   await push('ask', { prefill: 'A hotel in Istanbul' }, 1800);
-  await see('No rooms free', 'stays none');
+  await see('No rooms free on those dates.', 'stays none');
+  await click('Ask Faisal to find rooms', { wait: 600 });
+  await see('Faisal is finding rooms in Istanbul', 'stays by hand');
+  await shot('ask-stays-by-hand');
   await shot('ask-stays-none');
   await demo('No flights found');
   await push('ask', { prefill: 'A hotel in Baku' }, 1200);
@@ -217,8 +220,9 @@ try {
   step('Tracking a flight as a guest, nothing tracked yet');
   await demo('Fresh install');
   await click('Start');
-  const guest = phone.getByRole('button', { name: /Track a flight/ }).first();
-  if (await guest.isVisible().catch(() => false)) { await guest.click(); await page.waitForTimeout(700); await shot('guest-track'); }
+  await click('Just track a flight', { wait: 800 });
+  await see('Nothing tracked yet.', 'guest tracking');
+  await shot('guest-track');
 
   step('phone width: content starts below the viewer bar');
   await demo('Empty account');
