@@ -141,7 +141,7 @@ async function walletDemo() {
   await shot('wallet-lock-checking');
   await see('Locked with Face ID · works offline', 'unlocked');
   await see('Omar Alharbi', 'passport name');
-  await see('Valid until 22 Jun 2031.', 'validity without a trip');
+  await see('Ready for Istanbul.', 'validity for the trip');
   await shot('wallet-omar');
   step('wallet: family chips');
   await text('Sara', true).click();
