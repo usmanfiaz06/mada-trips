@@ -347,7 +347,7 @@ export const AcceptOfferBody = z.object({ messageId: Id });
 /* Cards and credit: the Wallet's /cards and /credit (schemas/wallet.ts). Orders pay with a saved card's id. */
 /* ───────────── orders ───────────── */
 
-export const OrderKind = z.enum(['trip', 'stay', 'package', 'quote', 'esim']);
+export const OrderKind = z.enum(['trip', 'stay', 'package', 'quote', 'esim', 'share']);
 export type OrderKind = z.infer<typeof OrderKind>;
 
 export const OrderDraft = z.discriminatedUnion('kind', [
@@ -356,6 +356,8 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
   z.object({ kind: z.literal('quote'), requestId: Id }),
   z.object({ kind: z.literal('esim'), count: z.number().int().min(1).max(12) }),
+  /** Your share of a split in a circle, paid by card. The amount comes from the circle, never from the app. */
+  z.object({ kind: z.literal('share'), circleId: Id, messageId: Id, shareKey: z.string().min(1).max(64) }),
 ]);
 export type OrderDraft = z.input<typeof OrderDraft>;
 

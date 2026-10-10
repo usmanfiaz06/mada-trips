@@ -605,20 +605,22 @@ async function support() {
   await shot('support-back-online');
 
   step('support: a reply from Faisal, then the inbox');
-  await page.evaluate(() => { window.__madaWallet?.agentReply('Faisal', 'Your Schengen visas are valid until June 2028. Nothing to do.'); window.__madaWallet?.notify({ kind: 'agent_reply', title: 'Mada', body: 'Faisal: Your Schengen visas are valid until June 2028.' }); window.__madaWallet?.notify({ kind: 'refund_moved', title: 'Refund sent', body: 'SAR 640 is on its way to your Visa ending 41.' }); });
+  await page.evaluate(() => { window.__madaWallet?.agentReply('Faisal', 'Your Schengen visas are valid until June 2028. Nothing to do.');
+  });
+  await see('Your Schengen visas are valid until June 2028. Nothing to do.', 'agent reply', 15_000);
+  await see('Faisal', 'agent name');
+  await shot('support-agent-reply');
   await page.goBack();
   await page.goBack();
   await press(byTest('profile-inbox'));
   await see('Updates', 'inbox');
-  await see('Refund sent', 'inbox item');
   await shot('inbox');
   await byTest('inbox-money').click();
-  await see('SAR 640 is on its way to your Visa ending 41.', 'money filter');
+  await see('Payments, refunds and Mada credit land here', 'money filter');
   await byTest('inbox-circles').click();
   await see('Votes, splits and new people in your circles land here.', 'circles empty');
   await shot('inbox-empty-circles');
   await byTest('inbox-all').click();
-  await byTest('inbox-mark-read').click();
   await context.close();
 }
 try {

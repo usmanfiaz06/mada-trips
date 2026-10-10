@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindowDimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatSar, householdOf, personName, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
+import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
@@ -15,7 +16,7 @@ import { ApplePaySheet, CardsSheet, ThreeDsSheet, type PayMethod } from '@/compo
 import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
 import { ApiError } from '@/lib/api';
-import { bookingApi, demoOn, newIdempotencyKey, useDemo, useInvalidateBooking, usePayDraft } from '@/lib/booking';
+import { bookingApi, demoOn, newIdempotencyKey, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -40,7 +41,18 @@ export default function Pay() {
   const invalidate = useInvalidateBooking();
   const { height } = useWindowDimensions();
   const bottom = useBottomInset();
-  const pd = usePayDraft((s) => s.current);
+  const stored = usePayDraft((s) => s.current);
+  // Opened by a link from another screen: a circle share (Circles), or a quote to pay (Trips, the itinerary).
+  const params = useLocalSearchParams<{ kind?: string; circleId?: string; messageId?: string; shareKey?: string; title?: string; requestId?: string }>();
+  const linked = useMemo<PayDraft | null>(() => {
+    if (params.kind === 'share' && params.circleId && params.messageId && params.shareKey) {
+      return { draft: { kind: 'share', circleId: params.circleId, messageId: params.messageId, shareKey: params.shareKey }, title: params.title ?? '' };
+    }
+    if (params.requestId) return { draft: { kind: 'quote', requestId: params.requestId }, title: '' };
+    return null;
+  }, [params.kind, params.circleId, params.messageId, params.shareKey, params.title, params.requestId]);
+  const pd = linked ?? stored;
+  const share = pd?.draft.kind === 'share' ? pd.draft : null;
   const demo = useDemo((s) => s.on);
   const user = useSession((s) => s.user);
   const people = usePeople();
@@ -115,14 +127,21 @@ export default function Pay() {
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); }
   };
 
+  /** The server already marked the share paid; this tells Circles too (a no-op if done) and refreshes the chat. */
+  const settleShare = async (sh: { circleId: string; messageId: string; shareKey: string }) => {
+    try { await circlesApi.paid(sh.circleId, sh.messageId, { key: sh.shareKey, via: 'card' }); } catch { /* the server settled it; the chat catches up on its next read */ }
+    await qc.invalidateQueries({ predicate: (q) => JSON.stringify(q.queryKey).includes(sh.circleId) });
+  };
+
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
     const out = await bookingApi.createOrder({ draft, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current });
     key.current = newIdempotencyKey();
     if (out.outcome === 'created') { buzz('knock'); invalidate(); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
     if (out.outcome === 'paid') {
       buzz('success'); invalidate(); usePayDraft.getState().clear();
+      if (share) await settleShare(share);
       router.back();
-      toast(pd.draft.kind === 'esim' ? t('pay.esimToast') : t('pay.paidToast'));
+      toast(share ? t('pay.shareToast') : pd.draft.kind === 'esim' ? t('pay.esimToast') : t('pay.paidToast'));
       return;
     }
     if (out.outcome === 'requires_action') { setThreeDs({ orderId: out.order.id, triesLeft: out.order.action?.triesLeft ?? 3, stopped: false, amount: charge }); setSheet('3ds'); buzz('knock'); return; }
@@ -161,7 +180,7 @@ export default function Pay() {
     if (!threeDs) return;
     const { order } = await bookingApi.otp(threeDs.orderId, c);
     if (order.status === 'pending_agent') { setSheet(null); buzz('success'); invalidate(); router.replace({ pathname: '/waiting/[id]', params: { id: order.id } }); return; }
-    if (order.status === 'confirmed') { setSheet(null); buzz('success'); invalidate(); router.back(); toast(t('pay.paidToast')); return; }
+    if (order.status === 'confirmed') { setSheet(null); buzz('success'); invalidate(); if (share) await settleShare(share); router.back(); toast(share ? t('pay.shareToast') : t('pay.paidToast')); return; }
     if (order.status === 'declined') { setThreeDs({ ...threeDs, stopped: true, triesLeft: 0 }); buzz('warn'); return; }
     setThreeDs({ ...threeDs, triesLeft: order.action?.triesLeft ?? 0 }); buzz('warn');
   };
@@ -202,7 +221,7 @@ export default function Pay() {
               <T v="small" color={colors.ok}>−{formatSar(p.promo.discount.amount, { bare: true })}</T>
             </View>
           ) : null}
-          {p && p.credit.balance.amount > 0 ? (
+          {p && !share && p.credit.balance.amount > 0 ? (
             <View style={styles.spread}>
               <View style={styles.row}><PayMark brand="credit" size={20} /><T v="callout" color={colors.green} style={{ fontSize: 15 }}>{t('pay.credit', { price: formatSar(p.credit.balance.amount) })}</T></View>
               <View style={styles.row}>
@@ -213,7 +232,7 @@ export default function Pay() {
               </View>
             </View>
           ) : null}
-          {p?.promo?.status !== 'applied' ? (promoOpen ? (
+          {!share && p?.promo?.status !== 'applied' ? (promoOpen ? (
             <View style={{ gap: 6 }}>
               <View style={styles.row}>
                 <TextInput accessibilityLabel={t('pay.promo.label')} placeholder={t('pay.promo.label')} placeholderTextColor={colors.muted} value={code} autoCapitalize="characters" onChangeText={(v) => { setCode(v); setCodeErr(null); }}
@@ -270,7 +289,7 @@ export default function Pay() {
         <T v="small">{t('pay.people.note')}</T>
         <Button label={t('pay.people.done', { price: formatSar(total) })} onPress={() => setSheet(null)} />
       </Sheet>
-      {sheet === 'cards' ? <CardsSheet visible current={method} credit={p?.credit.balance.amount ?? 0} onPick={(m) => { setMethod(m); setSheet(null); }} onClose={() => setSheet(null)} /> : null}
+      {sheet === 'cards' ? <CardsSheet visible current={method} credit={share ? 0 : p?.credit.balance.amount ?? 0} onPick={(m) => { setMethod(m); setSheet(null); }} onClose={() => setSheet(null)} /> : null}
       <Sheet visible={sheet === 'offline'} label={t('pay.offline.title')} onClose={() => setSheet(null)}>
         <T v="h2">{t('pay.offline.title')}</T>
         <T v="body">{t('pay.offline.body')}</T>

@@ -11,6 +11,7 @@ import { InlineError } from '@/components/states';
 import { T } from '@/components/Text';
 import { COVERS, photoSource, useDiscover, usePosts } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
+import { placesApi } from '@/lib/places';
 import { t } from '@/lib/i18n';
 import { colors, ff, font } from '@/theme';
 import { ArtMap } from './art';
@@ -21,8 +22,12 @@ import { Face, GlassButton, PhotoFill } from './ui';
 const Arrow = () => <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.paper} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><Path d="M5 12h14M13 6l6 6-6 6" /></Svg>;
 const Bookmark = ({ on }: { on: boolean }) => <Svg width={16} height={16} viewBox="0 0 24 24" fill={on ? colors.green : 'none'} stroke={on ? colors.green : colors.paper} strokeWidth={2} strokeLinejoin="round"><Path d="M6 3h12v18l-6-4-6 4z" /></Svg>;
 
-/** A city Discover has no week for yet: its guide, from the places screens. Swap the id here when their search lands. */
-const openCityGuide = (city: string) => router.push(`/city/${encodeURIComponent(city.toLowerCase())}`);
+/** A city Discover has no week for yet: its page (places), by the id search finds for what was typed; by name if search can't answer. */
+const openCityGuide = async (city: string) => {
+  let id = city.trim().toLowerCase();
+  try { const top = (await placesApi.search(city.trim())).results[0]; if (top) id = top.id; } catch { /* offline: the page resolves the name itself */ }
+  router.push(`/city/${encodeURIComponent(id)}`);
+};
 
 /** Discover (prototype Circles → Discover): what's on this week in a city, trips we've planned, tips from people who went. */
 export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string | null; setPicked: (c: string) => void; onPost: (city: string) => void; onOpen: (p: Post) => void }) {
@@ -130,7 +135,7 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
         );
       })}
 
-      <CitySheet visible={picking} onClose={() => setPicking(false)} current={city} sheet={d.data?.sheet ?? []} onPick={(c) => { setPicked(c); setPicking(false); setFilter(null); }} onGuide={openCityGuide} />
+      <CitySheet visible={picking} onClose={() => setPicking(false)} current={city} sheet={d.data?.sheet ?? []} onPick={(c) => { setPicked(c); setPicking(false); setFilter(null); }} onGuide={(c) => void openCityGuide(c)} />
     </>
   );
 }

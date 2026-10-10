@@ -17,10 +17,11 @@ import { GET as presenceGet } from "@/app/api/app/v1/support/presence/route";
 import type { DeskActor } from "@/lib/app/desk/core";
 import { addShift, assignPrimary, firstReplySamples, pingTyping, presenceFor, saveAgent, setAgentStatus } from "@/lib/app/desk/agents";
 import {
-  addNote, approveRefund, askTraveller, blockTraveller, confirmHold, decideModeration, failTicketing, getRequestFull, issueTickets, listConversations,
-  destinationOf, listModeration, listOrders, markDone, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
+  addNote, approveRefund, askTraveller, blockTraveller, confirmHold, failTicketing, getRequestFull, issueTickets, listConversations,
+  destinationOf, listOrders, markDone, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
 } from "@/lib/app/desk/adapters";
 import { pushPlan, zonedToUtc } from "@/lib/app/desk/disruptions";
+import { decideModeration, listModeration } from "@/lib/app/desk/moderation";
 import { deskInbox, escalate, filterInbox, reassign } from "@/lib/app/desk/inbox";
 import { routeFor } from "@/lib/app/desk/routing";
 import { compareUrgency, slaFor, typicalReplyMinutes } from "@/lib/app/desk/sla";

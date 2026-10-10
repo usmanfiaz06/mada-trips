@@ -80,6 +80,9 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     if (blocked) return { outcome: "blocked", message: blocked.text };
   }
 
+  // A share between friends is paid in full by card or Apple Pay: no instalments, no Mada credit.
+  if (body.draft.kind === "share" && (body.plan !== "full" || body.payment.method === "credit")) throw new AppError("VALIDATION");
+
   const agentKind = AGENT_KINDS.has(preview.kind);
   const charge = await chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo);
   const agentName = await agentFor(ownerId);

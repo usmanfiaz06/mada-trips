@@ -41,7 +41,7 @@ export default function Support() {
   const trip = nextTrip(trips.data);
   const tripId = tripParam ?? undefined;
   const key = threadParam ?? (tripId ? `trip:${tripId}` : 'account');
-  const q = useQuery({ queryKey: walletKeys.thread(key), queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
+  const q = useQuery({ queryKey: walletKeys.thread(key), refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
   const th = q.data?.thread;
   const presence = usePresence(th?.id && q.data?.messages.some((m) => m.author.kind === 'user') ? th.id : undefined);
   const typing = useChat((s) => (th ? !!s.typing[th.id] : false));

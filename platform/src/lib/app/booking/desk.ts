@@ -14,6 +14,7 @@ import { AppError } from "../http";
 import { AIRPORT_TZ } from "../suppliers/mock/data";
 import { bookingSuppliers, newRef } from "./common";
 import { reauthorize } from "./payments";
+import { markPaid } from "../circles/messages";
 
 /*
  * The agent desk's actions on an order. The desk UI (Mada Ops) calls these; in mock mode the autopilot in orders.ts
@@ -171,7 +172,23 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
     return { o: u!, failed: false };
   });
   if (out.failed) return failTicketing(orderId, agent, "the card capture didn't go through");
+  if (out.o.kind === "share") await settleShare(out.o);
   return out.o;
+}
+
+/**
+ * A circle share paid by card: mark it paid in the circle (Circles' own function, so the line and the audit are
+ * theirs). Done here on the server, so it holds even if the app is closed straight after paying. Idempotent.
+ */
+async function settleShare(o: OrderRow) {
+  const s = (o.snapshot as { share?: { circleId: string; messageId: string; key: string } }).share;
+  if (!s) return;
+  try {
+    await markPaid(s.circleId, o.ownerId, s.messageId, { key: s.key, via: "card", paymentId: o.paymentId ?? undefined }, null);
+  } catch (e) {
+    // Paid, but the circle changed (left, or the split was removed). The payment stands; the order keeps the record.
+    console.warn("[booking] share paid but not marked in the circle", o.id, e instanceof AppError ? e.code : "unexpected");
+  }
 }
 
 async function capture(tx: Tx, o: OrderRow): Promise<boolean> {

@@ -6,7 +6,7 @@ import { appDeskBlocks } from "@/db/app-schema-desk";
 import { can, requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { fmtDate, timeAgo } from "@/lib/dates";
-import { listModeration } from "@/lib/app/desk/adapters";
+import { listModeration } from "@/lib/app/desk/moderation";
 import { travellerName } from "@/lib/app/desk/core";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Avatar, Badge, Card, Empty, Input, PageHeader, Tabs, cx, type Tone } from "@/components/ui";

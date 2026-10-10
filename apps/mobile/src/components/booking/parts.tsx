@@ -17,6 +17,7 @@ import { T } from '../Text';
 
 const PHOTOS: Record<string, ImageSource> = {
   'istanbul-galata': require('../../../assets/photos/istanbul-galata.jpg'),
+  'riyadh-kingdom-centre': require('../../../assets/photos/riyadh-kingdom-centre.jpg'),
   'istanbul-bosphorus': require('../../../assets/photos/istanbul-bosphorus.jpg'),
   'istanbul-sultanahmet': require('../../../assets/photos/istanbul-sultanahmet.jpg'),
   'dubai-skyline': require('../../../assets/photos/dubai-skyline.jpg'),

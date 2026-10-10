@@ -1,7 +1,7 @@
 import {
   CreateDocumentMeta, DESK_PHONE, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
   UpdatePersonRequest, checkSaudiMobile, firstNameOf, maskPassportNumber, supportIntent, supportReplies, t, tn,
-  type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Notification, type Person, type PersonDetails,
+  type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
@@ -26,7 +26,6 @@ type State = {
   consentHistory: { consent: 'marketing' | 'analytics'; granted: boolean; at: string }[];
   exportStatus: ExportStatus | null;
   threads: Thread[];
-  inbox: (Notification & { readAt: string | null })[];
   emailCode: { email: string; tries: number } | null;
   phoneCode: { phone: string; tries: number } | null;
   files: Map<string, string>;
@@ -47,7 +46,7 @@ const blankDetails = (): PersonDetails => ({ relationLabel: null, meal: null, iq
 
 function fresh(): State {
   return {
-    docs: [], details: {}, cards: [], defaultId: 'applepay', credit: [], consentHistory: [], exportStatus: null, threads: [], inbox: [], emailCode: null, phoneCode: null, files: new Map(),
+    docs: [], details: {}, cards: [], defaultId: 'applepay', credit: [], consentHistory: [], exportStatus: null, threads: [], emailCode: null, phoneCode: null, files: new Map(),
     account: { preferredName: null, preferredAt: null, home: 'RUH', homeAt: null, currency: 'SAR', arabicNotify: false, prefs: DEFAULT_PREFS, faceId: true, consents: { marketing: false, analytics: true }, photo: null, emailVerifiedAt: null, phoneVerifiedAt: null, deleteAt: null, exportRequestedAt: null },
     devices: [{ id: uuid(), name: 'This iPhone', platform: 'ios', current: true, lastUsedAt: now(), createdAt: now() }],
   };
@@ -143,7 +142,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
   const [path, query = ''] = w.path.split('?');
   const q = new URLSearchParams(query);
   const m = (re: RegExp) => re.exec(path!);
-  const owned = /^\/(documents|people\/[^/]+(\/passport)?|passport|account|me\/(email|phone|methods)|consents|export|cards|credit|support|notifications)/.test(path!);
+  const owned = /^\/(documents|people\/[^/]+(\/passport)?|passport|account|me\/(email|phone|methods)|consents|export|cards|credit|support)/.test(path!);
   if (!owned) return null;
   // /people (GET, POST) is M0's.
   if (path === '/people') return null;
@@ -488,13 +487,6 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     return ok({ messages: out }, 201);
   }
 
-  /* inbox (the Trips area owns notifications; this answers until its endpoint lands) */
-  if (key === 'GET /notifications') return ok({ notifications: s.inbox });
-  if (key === 'POST /notifications/read') {
-    const ids = (body.ids as string[] | undefined) ?? s.inbox.map((n) => n.id);
-    s.inbox = s.inbox.map((n) => (ids.includes(n.id) ? { ...n, readAt: n.readAt ?? now() } : n));
-    return ok({ ok: true });
-  }
   return null;
 };
 
@@ -503,10 +495,6 @@ export const walletMockTools = {
   /** Mada credit for every signed-in mock account, as a refund taken as credit. */
   addCredit(amount: number, note: string) {
     for (const s of states.values()) s.credit.push({ id: uuid(), amount, kind: 'refund', note, createdAt: now() });
-  },
-  /** A notification in every mock inbox. */
-  notify(n: { kind: Notification['kind']; title: string; body: string }) {
-    for (const s of states.values()) s.inbox.unshift({ id: uuid(), level: 'active', href: null, readAt: null, createdAt: now(), ...n });
   },
   /** A reply from a named person at the desk, in the newest conversation. */
   agentReply(name: string, body: string) {

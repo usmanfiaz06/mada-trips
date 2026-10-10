@@ -165,6 +165,19 @@ function Unlocked() {
             action={<LinkButton label={t('wallet.passes.plan')} onPress={() => router.push('/ask')} />} />
         )}
 
+        {trip?.trip.vouchers.length ? (
+          <>
+            <T v="eyebrow">{t('wallet.vouchers')}</T>
+            {trip.trip.vouchers.map((vo) => (
+              <Card key={vo.id} style={styles.rowCard}>
+                <Icon name={vo.kind === 'hotel' ? 'stay' : 'food'} />
+                <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{vo.title}</T><T v="tiny">{vo.body}</T></View>
+                <T v="tiny" style={{ fontFamily: ff.ui600, color: colors.green, letterSpacing: 0.5, fontVariant: ['tabular-nums'] }}>{vo.code}</T>
+              </Card>
+            ))}
+          </>
+        ) : null}
+
         <T v="eyebrow">{t('money.eyebrow')}</T>
         <View>
           <Pressable accessibilityRole="button" accessibilityLabel={t('money.credit')} onPress={() => { buzz('tap'); setSheet('credit'); }} style={[styles.credit, shadow('focal')]} testID="wallet-credit">

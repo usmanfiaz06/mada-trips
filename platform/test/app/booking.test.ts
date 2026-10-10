@@ -34,6 +34,11 @@ import { POST as webhook } from "@/app/api/app/v1/payments/webhook/route";
 import { GET as peopleGet, POST as peoplePost } from "@/app/api/app/v1/people/route";
 import { POST as cardsPost } from "@/app/api/app/v1/cards/route";
 import { callP, signIn } from "./wallet-helpers";
+import { person } from "./circles-helpers";
+import { POST as circlesPost } from "@/app/api/app/v1/circles/route";
+import { POST as splitPost } from "@/app/api/app/v1/circles/[id]/splits/route";
+import { POST as inviteAccept } from "@/app/api/app/v1/invites/[ref]/accept/route";
+import { appCircleSplitShares } from "@/db/app-schema-circles";
 
 /* Booking (M2), end to end against the Core API on a real Postgres: Ask, search, entry checks, plans, requests and
    quotes, the order sheet, payments (3-D Secure, declines, Tabby), the desk's lifecycle, the trip it writes, webhooks. */
@@ -513,6 +518,44 @@ describe("orders and the desk", () => {
     await expect(confirmOrder(out.order.id, agent)).rejects.toThrow();
     await expect(issueTickets(out.order.id, agent)).rejects.toThrow();
     await expect(failTicketing(out.order.id, agent)).rejects.toThrow();
+  });
+});
+
+describe("a circle share, paid by card", () => {
+  it("prices the share from the circle, charges it, and marks it paid in the circle; only your own unpaid share", async () => {
+    const omar = await person("Omar");
+    const hessa = await person("Hessa");
+    const made = await post(circlesPost, omar.token, { name: `Dinner ${Math.random().toString(36).slice(2, 6)}`, invite: [hessa.id] });
+    expect(made.status, JSON.stringify(made.json)).toBe(201);
+    const circleId = made.json.circle.id as string;
+    const inviteId = (made.json.invited as { inviteId: string; person: { id: string } }[]).find((i) => i.person.id === hessa.id)!.inviteId;
+    expect((await post(inviteAccept, hessa.token, {}, "", { ref: inviteId })).status).toBe(200);
+    const sp = await post(splitPost, omar.token, { what: "Dinner", total: 60_000, paidBy: omar.id, mode: "equal", between: [omar.id, hessa.id] }, "", { id: circleId });
+    expect(sp.status, JSON.stringify(sp.json)).toBe(201);
+    const msg = sp.json.items[0] as { id: string; split: { shares: { key: string; ids: string[] }[] } };
+    const mine = msg.split.shares.find((x) => x.ids.includes(hessa.id))!;
+    const omars = msg.split.shares.find((x) => x.ids.includes(omar.id))!;
+    const draft: OrderDraft = { kind: "share", circleId, messageId: msg.id, shareKey: mine.key };
+
+    // The amount comes from the circle; no promo, no credit, no instalments.
+    const p = await previewOf(hessa.token, draft, { promo: "EID10" });
+    expect(p).toMatchObject({ kind: "share", agent: false, total: { amount: 30_000 }, promo: null, instalments: null });
+    // Not yours, not your circle.
+    expect((await post(previewPost, hessa.token, { draft: { ...draft, shareKey: omars.key } })).status).toBe(404);
+    const stranger = await signIn();
+    expect((await post(previewPost, stranger.token, { draft })).status).toBe(404);
+    // No paying a friend with Mada credit or in instalments.
+    const cardId = await addCard(hessa.token);
+    expect((await post(ordersPost, hessa.token, { draft, payment: { method: "card", cardId }, plan: "tabby", expectedTotal: 30_000, idempotencyKey: "share-tabby-1" })).status).toBe(400);
+
+    const { out } = await book(hessa.token, draft, { method: "card", cardId });
+    expect(out.outcome).toBe("paid");
+    const [row] = await db.select().from(appCircleSplitShares).where(and(eq(appCircleSplitShares.messageId, msg.id), eq(appCircleSplitShares.key, mine.key)));
+    expect(row).toMatchObject({ paidVia: "card", markedBy: hessa.id });
+    const [pay] = await db.select().from(appPayments).where(eq(appPayments.id, row!.paymentId!));
+    expect(pay).toMatchObject({ status: "captured", amount: 30_000 });
+    // Settled: it can't be paid twice.
+    expect((await post(previewPost, hessa.token, { draft })).status).toBe(400);
   });
 });
 

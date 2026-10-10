@@ -9,10 +9,11 @@ import { detectFileType, isUuid } from "@/lib/security";
 import { DeskError } from "@/lib/app/desk/core";
 import { addShift, assignPrimary, pingTyping, removeShift, saveAgent, setAgentStatus } from "@/lib/app/desk/agents";
 import {
-  addNote, approveRefund, askTraveller, blockTraveller, confirmHold, decideModeration, failTicketing, issueTickets, markDone, priceChanged,
+  addNote, approveRefund, askTraveller, blockTraveller, confirmHold, failTicketing, issueTickets, markDone, priceChanged,
   rejectRefund, revealPassport, saveChecklist, sendAgentReply, sendQuote, unblockTraveller,
 } from "@/lib/app/desk/adapters";
 import { pushPlan } from "@/lib/app/desk/disruptions";
+import { decideModeration } from "@/lib/app/desk/moderation";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { deskAudit } from "@/lib/app/desk/core";

@@ -34,7 +34,7 @@ export function QueryState<T>({ query, children, skeleton, section, badge, suppl
     case 'error':
       return section
         ? <InlineError problem={query.problem} onRetry={query.retry} />
-        : <ErrorState problem={query.problem} onRetry={query.retry} supplierName={supplierName} gutter={0} />;
+        : <ErrorState variant="card" problem={query.problem} onRetry={query.retry} supplierName={supplierName} />;
     default:
       return (
         <>

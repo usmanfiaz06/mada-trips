@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import {
   API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse,
-  DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, MoveCreditResponse, Notification, PeopleResponse,
-  PersonDetailResponse, PresenceResponse, SendSupportMessageResponse, SupportThreadResponse, SupportUnreadResponse, Trip, walletPath,
+  DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, MoveCreditResponse, PeopleResponse,
+  PersonDetailResponse, PresenceResponse, SendSupportMessageResponse, SupportThreadResponse, SupportUnreadResponse, walletPath, type TripDetail, type Notification,
   type AddCardRequest, type CreateDocumentMeta, type CreatePersonRequest, type SavePassportRequest, type SendSupportMessageRequest,
   type UpdateAccountRequest, type UpdatePersonRequest,
 } from '@mada/shared';
 import { ApiError, request, transport, refreshSession } from './api';
+import { tripsApi } from './trips';
 import { API_MODE, API_ORIGIN } from './config';
 import { keys as coreKeys } from './queries';
 import { useSession } from './session';
@@ -60,8 +61,6 @@ export function fileSource(path: string): { uri: string; headers: Record<string,
   return { uri: `${API_ORIGIN}${API_PREFIX}${path}`, headers: token ? { Authorization: `Bearer ${token}` } : {} };
 }
 
-const TripsLoose = z.object({ trips: z.array(z.unknown()) });
-
 export const walletApi = {
   documents: (personId?: string) => request({ method: 'GET', path: `${P('documents')}${personId ? `?personId=${personId}` : ''}` }, DocumentsResponse),
   addDocument: (meta: CreateDocumentMeta, file: PickedFile | null) => (file
@@ -107,21 +106,22 @@ export const walletApi = {
   markRead: (id: string) => request({ method: 'POST', path: P('supportRead', { id }) }, Ok),
   unread: () => request({ method: 'GET', path: P('supportUnread') }, SupportUnreadResponse),
   presence: (threadId?: string) => request({ method: 'GET', path: `/support/presence${threadId ? `?threadKind=support&threadId=${threadId}` : ''}` }, PresenceResponse),
-  /** The notifications API belongs to Trips; until it answers, the inbox is simply empty. */
-  async notifications() {
-    try { return (await request({ method: 'GET', path: '/notifications' }, z.object({ notifications: z.array(Notification) }))).notifications; } catch (e) {
-      if (e instanceof ApiError && (e.status === 404 || e.code === 'BAD_RESPONSE')) return [];
+  /** The inbox comes from the Trips area's notifications API. */
+  async notifications(): Promise<Notification[]> {
+    try { const r = await tripsApi.notifications(); return (r as { items?: Notification[] }).items ?? []; } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return [];
       throw e;
     }
   },
   async markNotificationsRead(ids: string[]) {
-    try { await request({ method: 'POST', path: '/notifications/read', body: { ids } }, z.unknown()); } catch { /* the inbox marks them locally */ }
+    try { await tripsApi.markRead({ ids }); } catch { /* the inbox marks them locally */ }
   },
-  /** Trips belong to the Trips area; the Wallet only reads them for validity and passes. */
-  async trips() {
+  /** Trips belong to the Trips area; the Wallet reads the coming ones (with flights, travellers, vouchers). */
+  async trips(): Promise<TripDetail[]> {
     try {
-      const r = await request({ method: 'GET', path: '/trips' }, TripsLoose);
-      return r.trips.map((x) => Trip.safeParse(x)).filter((x) => x.success).map((x) => x.data);
+      const r = await tripsApi.list();
+      const ids = [r.currentId, ...r.upcoming.map((c) => c.id)].filter((x, i, a): x is string => !!x && a.indexOf(x) === i).slice(0, 2);
+      return (await Promise.all(ids.map((id) => tripsApi.trip(id).then((x) => x.trip).catch(() => null)))).filter((x): x is TripDetail => !!x);
     } catch { return []; }
   },
 };
@@ -153,7 +153,7 @@ export const useExport = () => useQuery({ queryKey: walletKeys.export, enabled: 
 export const useCards = () => useQuery({ queryKey: walletKeys.cards, enabled: useOn(), queryFn: () => walletApi.cards() });
 export const useCredit = () => useQuery({ queryKey: walletKeys.credit, enabled: useOn(), queryFn: async () => (await walletApi.credit()).credit });
 export const useUnread = () => useQuery({ queryKey: walletKeys.unread, enabled: useOn(), refetchInterval: 60_000, queryFn: async () => (await walletApi.unread()).unread });
-export const useInbox = () => useQuery({ queryKey: walletKeys.notifications, enabled: useOn(), queryFn: () => walletApi.notifications() });
+export const useInbox = () => useQuery({ queryKey: walletKeys.notifications, enabled: useOn(), refetchOnMount: 'always', queryFn: () => walletApi.notifications() });
 export const useTrips = () => useQuery({ queryKey: walletKeys.trips, enabled: useOn(), staleTime: 60_000, queryFn: () => walletApi.trips() });
 export const usePresence = (threadId?: string) => useQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
 

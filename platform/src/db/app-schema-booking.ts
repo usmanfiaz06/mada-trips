@@ -38,7 +38,7 @@ export const appOffers = pgTable("app_offers", {
 export const appOrders = pgTable("app_orders", {
   id: id(),
   ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "restrict" }),
-  kind: text("kind").notNull(), // trip | stay | package | quote | esim
+  kind: text("kind").notNull(), // trip | stay | package | quote | esim | share
   status: text("status").notNull(),
   step: integer("step").notNull().default(0),
   idempotencyKey: text("idempotency_key").notNull(),

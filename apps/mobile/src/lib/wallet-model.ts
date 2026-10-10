@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { firstNameOf, type Person, type PersonDetails, type Trip } from '@mada/shared';
+import { firstNameOf, type Person, type PersonDetails, type TripDetail as Trip } from '@mada/shared';
 import { t } from './i18n';
 
 /*

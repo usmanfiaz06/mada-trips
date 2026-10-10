@@ -5,7 +5,9 @@ import {
   type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appQuotes, appRequests } from "@/db/app-schema";
+import { appMessages, appQuotes, appRequests } from "@/db/app-schema";
+import { appCircleSplitShares } from "@/db/app-schema-circles";
+import { membership } from "../circles/circles";
 import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, today, travellersOf } from "./common";
@@ -121,6 +123,24 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     place = title;
     hold = q.expiresAt;
     snapshot.quote = { id: q.id, requestId: r.id, total: q.total };
+  } else if (d.kind === "share") {
+    // Your share of a circle's split: you must be in the circle, the share must be yours, and not yet settled.
+    if (!isUuid(d.circleId) || !isUuid(d.messageId)) throw new AppError("NOT_FOUND");
+    const circle = await membership(d.circleId, ownerId);
+    const [m] = await db.select({ card: appMessages.card }).from(appMessages)
+      .where(and(eq(appMessages.id, d.messageId), eq(appMessages.threadKind, "circle"), eq(appMessages.threadId, d.circleId)));
+    const card = m?.card as { t?: string; what?: string } | null | undefined;
+    if (!card || card.t !== "split") throw new AppError("NOT_FOUND");
+    const [share] = await db.select().from(appCircleSplitShares).where(and(eq(appCircleSplitShares.messageId, d.messageId), eq(appCircleSplitShares.key, d.shareKey)));
+    if (!share || !share.userIds.includes(ownerId)) throw new AppError("NOT_FOUND");
+    if (share.paidAt) throw new AppError("VALIDATION", { message: t("pay.shareGone") });
+    lines = [line("share", "doc", t("pay.line.share", { what: card.what ?? "" }), Number(share.amount))];
+    rule = t("pay.rule.share");
+    title = t("pay.title.share", { circle: circle.name });
+    agent = false;
+    photo = "riyadh-kingdom-centre";
+    place = circle.name;
+    snapshot.share = { circleId: d.circleId, messageId: d.messageId, key: d.shareKey, amount: Number(share.amount) };
   } else {
     lines = [line("esim", "globe", t("pay.line.esim", { count: d.count }), sarToHalalas(DESK_PRICES.esimEach * d.count))];
     rule = t("pay.rule.esim");
@@ -131,10 +151,12 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   }
 
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
-  const promo = checkPromo(body.promo, today(), subtotal);
+  // Promo codes and Mada credit are for travel; a share between friends is paid as it is.
+  const travel = d.kind !== "share";
+  const promo = travel ? checkPromo(body.promo, today(), subtotal) : null;
   const discount = promo?.status === "applied" ? promo.discount : 0;
   const balance = await creditBalance(ownerId);
-  const creditUsed = body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
+  const creditUsed = travel && body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
   const total = subtotal - discount - creditUsed;
   const household = travellers.length ? await householdOf(ownerId) : [];
   const missing = travellers.filter((p) => !household.find((h) => h.id === p.id)?.passport).map((p) => p.id);
@@ -143,7 +165,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
     credit: { balance: money(balance), used: money(creditUsed) }, total: money(total), rule, agent,
     holdExpiresAt: hold ? hold.toISOString() : null,
-    instalments: total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
+    instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id),
     missingPassports: d.kind === "trip" || d.kind === "package" ? missing : [],
   };

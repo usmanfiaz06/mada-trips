@@ -9,6 +9,7 @@ import {
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { walletMock } from './wallet';
+import { circlesMock } from './circles';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for booking (M2): the Core API's booking endpoints in memory, running the same shared rules
@@ -143,20 +144,32 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     lines = [L('quote', 'doc', r.view.kind === 'visa' ? t('pay.line.quoteVisa') : t('pay.line.quote'), r.view.quote.total.amount)];
     rule = t('pay.rule.quote'); title = r.view.title; agent = false; photo = r.view.kind === 'umrah' ? 'makkah-clock-tower' : 'istanbul-galata'; place = title;
     travellers = pick(r.view.travellerIds);
+  } else if (d.kind === 'share') {
+    // Read the circle the way the app does (Circles' own mock), so the amount comes from the split, never the link.
+    const r = await circlesMock({ method: 'GET', path: `/circles/${d.circleId}/messages`, token: w.token }, ctx);
+    const page = r && r.status === 200 ? (r.json as { items: { id: string; split: { what: string; shares: { key: string; ids: string[]; amount: number; paid: boolean }[] } | null }[] }) : null;
+    const m = page?.items.find((x) => x.id === d.messageId && x.split);
+    const sh = m?.split?.shares.find((x) => x.key === d.shareKey && x.ids.includes(user.id));
+    if (!m || !sh) return err('NOT_FOUND');
+    if (sh.paid) return err('VALIDATION', t('pay.shareGone'));
+    const name = (await circlesMock({ method: 'GET', path: `/circles/${d.circleId}`, token: w.token }, ctx))?.json as { circle?: { name?: string } } | undefined;
+    lines = [L('share', 'doc', t('pay.line.share', { what: m.split!.what }), sh.amount)];
+    rule = t('pay.rule.share'); title = t('pay.title.share', { circle: name?.circle?.name ?? '' }); agent = false; photo = 'riyadh-kingdom-centre'; place = title;
   } else {
     lines = [L('esim', 'globe', t('pay.line.esim', { count: d.count }), sarToHalalas(DESK_PRICES.esimEach * d.count))];
     rule = t('pay.rule.esim'); title = t('pay.title.esim'); agent = false; place = title;
   }
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
-  const promo = checkPromo(body.promo, today(), subtotal);
+  const travel = d.kind !== 'share'; // promo codes, credit and instalments are for travel
+  const promo = travel ? checkPromo(body.promo, today(), subtotal) : null;
   const discount = promo?.status === 'applied' ? promo.discount : 0;
   const balance = await creditBalance(w, user, ctx);
-  const used = body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
+  const used = travel && body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
   const total = subtotal - discount - used;
   const preview: OrderPreview = {
     kind: d.kind, title, photo, lines, subtotal: money(subtotal), promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
     credit: { balance: money(balance), used: money(used) }, total: money(total), rule, agent, holdExpiresAt: hold ? new Date(hold).toISOString() : null,
-    instalments: total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
+    instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id), missingPassports: d.kind === 'trip' || d.kind === 'package' ? travellers.filter((p) => !p.passport).map((p) => p.id) : [],
   };
   return { preview, place, travellers, ...out };
@@ -429,6 +442,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       if (blocked) return ok({ outcome: 'blocked', message: blocked.text });
     }
     const pay = b.payment;
+    if (b.draft.kind === 'share' && (b.plan !== 'full' || pay.method === 'credit')) return err('VALIDATION');
     let label = t('pay.paidCredit');
     let requires3ds = false;
     if (pv.total.amount > 0 && pay.method !== 'credit') {

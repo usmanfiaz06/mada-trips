@@ -54,6 +54,7 @@ const scroll = async (px = 700) => { await page.mouse.move(195, 420); await page
 const back = async () => { await page.getByRole('button', { name: /^(Back|Close)$/ }).first().click(); await page.waitForTimeout(600); };
 const closeSheet = async () => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); const c = page.getByRole('button', { name: 'Close' }); if (await c.count()) { await c.last().click().catch(() => {}); } await page.waitForTimeout(400); };
 const go = async (path) => { await page.evaluate((p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); }, path); await page.waitForTimeout(900); };
+const toTab = async () => { for (let i = 0; i < 6 && (await page.getByRole('button', { name: /^(Back|Close)$/ }).count()); i += 1) await back(); };
 const tab = async (name) => { await page.getByRole('tab', { name, exact: true }).first().click().catch(async () => { await tapText(name); }); await page.waitForTimeout(700); };
 
 async function phase(p) {
@@ -115,25 +116,6 @@ try {
   await byTest('dz-home').click();
   await page.waitForTimeout(3000);
   await shot('today-after-rebook');
-
-  step('disruption: cancellation, offline');
-  await phase('cancelled');
-  await byTest('see-options').first().click();
-  await page.waitForTimeout(1200);
-  await shot('disruption-cancel');
-  await page.evaluate(() => { window.dispatchEvent(new Event('offline')); });
-  await context.setOffline(true);
-  await page.waitForTimeout(800);
-  await byTest('dz-opt-refund').click().catch(() => {});
-  await byTest('dz-confirm').click();
-  await page.waitForTimeout(800);
-  await see('Saved on your phone', 'queued offline');
-  await shot('disruption-queued');
-  await context.setOffline(false);
-  await page.evaluate(() => { window.dispatchEvent(new Event('online')); });
-  await page.waitForTimeout(6000);
-  await shot('disruption-sent-after-reconnect');
-  await go('/today');
 
   /* ── Trips tab and trip management (booked: everything still changeable) ── */
   await phase('booked');
@@ -232,6 +214,29 @@ try {
   await byTest('sr-bags').click(); await page.waitForTimeout(500);
   await shot('special-bags-sheet');
   await closeSheet();
+
+  /* ── Last, because a refund takes the whole trip away: a cancellation chosen offline, sent on reconnect ── */
+  await toTab();
+  step('disruption: cancellation, offline');
+  await phase('cancelled');
+  await byTest('see-options').first().click();
+  await page.waitForTimeout(1200);
+  await shot('disruption-cancel');
+  await page.evaluate(() => { window.dispatchEvent(new Event('offline')); });
+  await context.setOffline(true);
+  await page.waitForTimeout(800);
+  await byTest('dz-opt-refund').click().catch(() => {});
+  await byTest('dz-confirm').click();
+  await page.waitForTimeout(800);
+  await see('Saved on your phone', 'queued offline');
+  await shot('disruption-queued');
+  await context.setOffline(false);
+  await page.evaluate(() => { window.dispatchEvent(new Event('online')); });
+  await page.waitForTimeout(6000);
+  await shot('disruption-sent-after-reconnect');
+  await page.waitForTimeout(800);
+  await shot('trips-after-refund');
+
 } catch (e) {
   errors.push(`crash: ${e.message}`);
   console.log('CRASH', e.message);
