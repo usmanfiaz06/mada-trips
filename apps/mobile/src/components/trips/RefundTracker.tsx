@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { serverNow } from '@/lib/net/clock';
 import { formatSar, type RefundView } from '@mada/shared';
 import { t } from '@/lib/i18n';
 import { useAgent } from '@/lib/trips';
@@ -8,7 +9,7 @@ import { AgentFace, Box, H3, Row, Small, SmallButton, Tracker } from './ui';
 /** Requested → Approved → Sent → In your bank. Credit is instant; instalments go back through Tabby; a no comes with a reason. */
 export function RefundTracker({ r, onTalk }: { r: RefundView; onTalk?: () => void }) {
   const agent = useAgent();
-  const [now] = useState(Date.now);
+  const [now] = useState(serverNow);
   if (r.anyway) {
     const decided = r.stage === 'rejected';
     return (

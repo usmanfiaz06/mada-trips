@@ -5,7 +5,7 @@ import { defineConfig } from 'eslint/config';
 export default defineConfig([
   expoConfig,
   {
-    ignores: ['**/node_modules/**', '**/dist/**', 'apps/mobile/.expo/**', 'platform/**', 'docs/**', 'js/**', 'assets/**', 'Assets/**', 'tools/**', 'ar/**', 'css/**'],
+    ignores: ['**/node_modules/**', '**/dist/**', 'apps/mobile/.expo/**', 'platform/**', 'docs/**', 'js/**', 'assets/**', 'Assets/**', 'tools/**', 'ar/**', 'css/**', 'apps/mobile/public/ocr/**'],
   },
   {
     files: ['apps/mobile/**/*.{ts,tsx}'],

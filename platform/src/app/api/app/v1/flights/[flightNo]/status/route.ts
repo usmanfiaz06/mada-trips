@@ -1,6 +1,6 @@
 import { AIRLINE_INFO, FlightNumber, isIsoDay, type FlightStatusResponse } from "@mada/shared";
 import { requestContext } from "@/lib/app/context";
-import { AppError, errorResponse, json } from "@/lib/app/http";
+import { AppError, json, resilient } from "@/lib/app/http";
 import { guestLimit, lookupFlight } from "@/lib/app/trips/status";
 import { authenticateOptional } from "@/lib/app/tokens";
 
@@ -9,7 +9,7 @@ import { authenticateOptional } from "@/lib/app/tokens";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request, ctx: { params: Promise<{ flightNo: string }> }) {
-  try {
+  return resilient(req, async () => {
     const auth = await authenticateOptional(req);
     if (!auth) {
       const wait = guestLimit(`status:${requestContext(req).ipHash ?? "unknown"}`);
@@ -26,7 +26,5 @@ export async function GET(req: Request, ctx: { params: Promise<{ flightNo: strin
       status: info.status, gate: info.gate, terminal: info.terminal, source: info.source, updatedAt: new Date().toISOString(), known: true, durationMin: dur, brand: AIRLINE_INFO[raw.slice(0, 2)]?.brand ?? null,
     } : null;
     return json({ flight } satisfies FlightStatusResponse, 200, { "Cache-Control": "private, max-age=60" });
-  } catch (e) {
-    return errorResponse(e);
-  }
+  });
 }

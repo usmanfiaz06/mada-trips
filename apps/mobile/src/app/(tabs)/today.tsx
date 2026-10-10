@@ -10,6 +10,7 @@ import { Landed } from '@/components/today/Landed';
 import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
 import { useSession } from '@/lib/session';
+import { clockOffset, serverNow } from '@/lib/net/clock';
 import { registerForPush, useCarryOverGuestFlights, useTrip, useTrips } from '@/lib/trips';
 import { colors } from '@/theme';
 
@@ -31,7 +32,8 @@ export default function Today() {
   const trip = currentId ? tripQ.data?.trip : null;
   const clock = trip?.clock ?? trips.data?.clock ?? null;
   // Countdowns run on the server's clock: its instant when the trip was read, plus the time since (clock skew safe).
-  const now = () => (trip ? Date.parse(trip.clock.now) + (Date.now() - tripQ.dataUpdatedAt) : Date.now());
+  /* The trip clock's moment (virtual in a demo), moved on by the server's clock since it was read, never the phone's. */
+  const now = () => (trip ? Date.parse(trip.clock.now) + (serverNow() - (tripQ.dataUpdatedAt + clockOffset())) : serverNow());
 
   let body: React.ReactNode;
   if (status === 'guest') body = <Guest />;

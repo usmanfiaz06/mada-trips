@@ -1,27 +1,27 @@
 import "server-only";
 import { z } from "zod";
 import { authenticate, type AppAuth } from "../tokens";
-import { AppError, errorResponse } from "../http";
+import { AppError, resilient, type RouteOptions } from "../http";
 import { requestContext } from "../context";
 
 /*
  * Route helpers for the Wallet and account endpoints: authentication first, path ids checked as UUIDs (anything else
- * is simply "not found"), the same error envelope as every Core API route.
+ * is simply "not found"), and the same request id, version and maintenance gates, Idempotency-Key handling and error envelope as
+ * every Core API route (resilient() from http.ts).
  */
 
 type Ctx<P> = { params: Promise<P> };
 export type Authed = AppAuth & { ipHash: string | null };
 
-export function authed<P extends Record<string, string> = {}>(fn: (req: Request, auth: Authed, params: P) => Promise<Response>) { // eslint-disable-line @typescript-eslint/no-empty-object-type
-  return async (req: Request, ctx: Ctx<P>): Promise<Response> => {
-    try {
-      const auth = await authenticate(req);
-      const params = ((await ctx?.params) ?? {}) as P;
-      return await fn(req, { ...auth, ipHash: requestContext(req).ipHash }, params);
-    } catch (e) {
-      return errorResponse(e);
-    }
-  };
+export function authed<P extends Record<string, string> = {}>( // eslint-disable-line @typescript-eslint/no-empty-object-type
+  fn: (req: Request, auth: Authed, params: P) => Promise<Response>,
+  opts: RouteOptions = {},
+) {
+  return (req: Request, ctx: Ctx<P>): Promise<Response> => resilient(req, async () => {
+    const auth = await authenticate(req);
+    const params = ((await ctx?.params) ?? {}) as P;
+    return fn(req, { ...auth, ipHash: requestContext(req).ipHash }, params);
+  }, opts);
 }
 
 const Uuid = z.uuid();

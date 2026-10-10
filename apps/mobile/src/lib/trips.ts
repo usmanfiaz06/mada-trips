@@ -224,7 +224,7 @@ registerOutboxKind(OUTBOX_ASK, { invalidate: () => [tk.all] });
 
 /** A disruption choice made offline. The latest choice for a trip replaces an earlier one still waiting. */
 export function queueDisruption(tripId: string, body: { kind: DisruptionKind; optionId: string; clientKey: string }, label: string) {
-  return enqueue({ kind: OUTBOX_DISRUPTION, label, method: 'POST', path: withPhase(TRIP_ROUTES.disruption(tripId)), body, dedupe: `dz-${tripId}`, meta: { tripId, optionId: body.optionId } });
+  return enqueue({ kind: OUTBOX_DISRUPTION, label, method: 'POST', path: withPhase(TRIP_ROUTES.disruption(tripId)), body, dedupe: `disruption:${tripId}`, meta: { tripId, optionId: body.optionId } });
 }
 /** A request to Mada made offline (special requests, hotel options). */
 export function queueAsk(tripId: string, body: CreateTripAskRequest, label: string) {
