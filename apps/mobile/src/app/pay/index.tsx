@@ -251,7 +251,7 @@ export default function Pay() {
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>
-            <T v="small">{t('pay.allIn')}</T>
+            {share ? null : <T v="small">{t('pay.allIn')}</T>}
             <T v="small">{p?.rule ?? ''}</T>
           </View>
           <View style={styles.spread}>

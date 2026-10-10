@@ -1,7 +1,6 @@
 import { StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
 import { talkToMada } from '@/lib/net/talk';
 import { colors, ff } from '@/theme';
 import { Avatar } from '../Avatar';
@@ -19,7 +18,7 @@ export function SupplierDown({ supplier, booking, agent, initial, testID }: { su
   const name = supplier ?? t('supplierDown.generic');
   const person = agent ?? t('common.agentName');
   return (
-    <Animated.View entering={rise()} style={styles.card} accessibilityRole="alert" testID={testID ?? 'supplier-down'}>
+    <Animated.View entering={FadeIn.duration(300)} style={styles.card} accessibilityRole="alert" testID={testID ?? 'supplier-down'}>
       <View style={styles.row}>
         <View style={styles.art}><ArtRouteGap width={88} height={66} /></View>
         <View style={{ flex: 1, gap: 4 }}>

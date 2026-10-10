@@ -1,5 +1,6 @@
 /** Call a route handler the way Next does: a standard Request in, a Response out. */
-export type Handler = (req: Request) => Promise<Response>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Handler = (req: Request, ctx?: any) => Promise<Response>;
 
 let ipSeq = Math.floor(Math.random() * 60_000);
 /** Each test gets its own network address unless it asks for one, so per-IP limits don't leak between tests. */
@@ -12,7 +13,7 @@ export async function call(handler: Handler, opts: { method?: string; path?: str
     method: opts.method ?? "POST", headers,
     body: opts.raw ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
   });
-  const res = await handler(req);
+  const res = await handler(req, { params: Promise.resolve({}) });
   const text = await res.text();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { status: res.status, headers: res.headers, json: (text ? JSON.parse(text) : null) as any };

@@ -12,8 +12,8 @@ import { requestContext } from "../context";
 type Ctx<P> = { params: Promise<P> };
 export type Authed = AppAuth & { ipHash: string | null };
 
-export function authed<P extends Record<string, string> = Record<string, never>>(fn: (req: Request, auth: Authed, params: P) => Promise<Response>) {
-  return async (req: Request, ctx?: Ctx<P>): Promise<Response> => {
+export function authed<P extends Record<string, string> = {}>(fn: (req: Request, auth: Authed, params: P) => Promise<Response>) { // eslint-disable-line @typescript-eslint/no-empty-object-type
+  return async (req: Request, ctx: Ctx<P>): Promise<Response> => {
     try {
       const auth = await authenticate(req);
       const params = ((await ctx?.params) ?? {}) as P;

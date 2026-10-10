@@ -261,7 +261,7 @@ export function buildPlaces(input: {
     // Airports within 150 km: the ones linked to this city first, then large before medium, then by distance.
     const linked = new Set((servesCity.get(c.id) ?? []).map((a) => a.iata));
     // Across a border only when it's close (Basel–Mulhouse), never the next country's capital.
-    const score = (x: { item: Airport; km: number }) => (x.item.iata === cur?.airport ? 1000 : 0) + (HUBS.has(x.item.iata) && x.km <= 80 ? 100 : 0) + (linked.has(x.item.iata) ? 10 : 0) + (x.item.size === "large" ? 1 : 0);
+    const score = (x: { item: Airport; km: number }) => (x.item.iata === cur?.airport ? 1000 : 0) + (linked.has(x.item.iata) ? 100 : 0) + (HUBS.has(x.item.iata) && x.km <= 80 ? 10 : 0) + (x.item.size === "large" ? 1 : 0);
     const near = nearAirports(c.lat, c.lon, 150)
       .filter((x) => x.item.countryCode === c.countryCode || x.km <= 80)
       .sort((x, y) => score(y) - score(x) || x.km - y.km)

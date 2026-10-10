@@ -14,5 +14,5 @@ export { StateView } from './StateView';
 export { ErrorBoundary } from './ErrorBoundary';
 export { NetChrome } from './NetChrome';
 export { SessionExpired } from './SessionExpired';
-export { OutboxList } from './OutboxList';
+export { OutboxList, OutboxStatus } from './OutboxList';
 export * from './art';

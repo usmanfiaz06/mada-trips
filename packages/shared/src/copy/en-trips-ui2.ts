@@ -75,7 +75,7 @@ export const enTripsUi2 = {
   'sr.s.bassinet': 'For a baby under 2',
   'sr.s.seats': 'Keep the family side by side',
   'sr.s.celebration': 'Birthday or anniversary, a note to the hotel',
-  'sr.s.prayer': 'In the room when you arrive',
+  'sr.s.prayer': 'With prayer times for the city',
   'sr.s.bags': 'Cheaper now than at the airport',
   'sr.s.sports': 'Golf, bikes, skis',
   'sr.s.pet': 'What’s allowed',
@@ -132,6 +132,7 @@ export const enTripsUi2 = {
 
   /* itinerary */
   'itin.title': 'Itinerary',
+  'itin.heading': '{city}, day by day',
   'itin.offTitle': 'The itinerary isn’t on this phone yet.',
   'itin.offBody': 'Open it once with signal and it stays here for the whole trip.',
   'itin.retry': 'Try again',

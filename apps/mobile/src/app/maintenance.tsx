@@ -1,39 +1,36 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import { router, type Href } from 'expo-router';
+import { DESK_PHONE } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Screen, useTopInset } from '@/components/Layout';
 import { ArtSign } from '@/components/states/art';
 import { StateView } from '@/components/states/StateView';
 import { t } from '@/lib/i18n';
-import { dismissMaintenance, endMaintenance, useGates } from '@/lib/net/gates';
-import { loadConfig } from '@/lib/net/remote';
-import { toast } from '@/lib/toast';
+import { dismissMaintenance, useGates } from '@/lib/net/gates';
+import { callDesk } from '@/lib/net/talk';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * Planned maintenance (a 503 MAINTENANCE, or GET /config). Booking and changes pause; everything saved on the phone
- * still opens. "Open my trips" sets this aside (a gold line stays at the top); "Check again" asks the server.
+ * Planned maintenance (a 503 MAINTENANCE, or GET /config), prototype MaintenanceScreen: when it ends, what still
+ * works, and a person on the phone. "Open my trips" sets it aside; a small pill stays at the top until /config says
+ * it's over.
  */
 export default function MaintenanceScreen() {
   const top = useTopInset();
   const m = useGates((s) => s.maintenance);
-  const [busy, setBusy] = useState(false);
   const until = m?.until ? new Date(m.until) : null;
-  const back = until && Number.isFinite(until.getTime()) ? ` ${t('maintenance.until', { time: `${pad(until.getHours())}:${pad(until.getMinutes())}` })}` : '';
-  const leave = () => { if (router.canGoBack()) router.back(); else router.replace('/today' as Href); };
+  const time = until && Number.isFinite(until.getTime()) ? `${pad(until.getHours())}:${pad(until.getMinutes())}` : null;
   return (
     <Screen>
       <View style={{ flex: 1, paddingTop: top }}>
-        <StateView art={<ArtSign />} title={t('maintenance.title')} body={`${m?.message ?? t('maintenance.body')}${back}`} testID="maintenance-screen"
+        <StateView art={<ArtSign />} testID="maintenance-screen"
+          title={time ? t('maintenance.titleUntil', { time }) : t('maintenance.title')}
+          body={m?.message ?? (time ? t('maintenance.bodyUntil', { time }) : t('maintenance.body'))}
+          works={t('maintenance.works')}
           primary={<Button label={t('maintenance.trips')} onPress={() => { dismissMaintenance(); router.replace('/trips' as Href); }} testID="maintenance-trips" />}
-          secondary={<Button variant="secondary" label={t('maintenance.retry')} busy={busy} testID="maintenance-retry" onPress={async () => {
-            setBusy(true);
-            const c = await loadConfig();
-            setBusy(false);
-            if (c && !c.maintenance.on) { endMaintenance(); toast(t('net.back')); leave(); }
-          }} />} />
+          secondary={<Button variant="ghost" label={t('maintenance.call')} onPress={callDesk} testID="maintenance-call" />}
+          note={t('maintenance.note', { phone: DESK_PHONE })} />
       </View>
     </Screen>
   );

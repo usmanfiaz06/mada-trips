@@ -94,11 +94,11 @@ const scenarios = {
     step('offline bar on Today and Trips');
     await p.shot('today-online');
     await p.context.setOffline(true);
-    await p.see("You're offline. Everything for your trips is on this phone.", 'offline bar');
+    await p.see('Offline · your trips are on this phone', 'offline pill');
     await p.shot('today-offline');
     // The bar never covers the top of a screen: the first thing under it starts below it.
     const bar = await p.byTest('offline-banner').boundingBox();
-    if (!bar || bar.y !== 0) errors.push('offline bar: not at the top');
+    if (!bar || bar.y > 60) errors.push('offline pill: not under the status bar');
     await p.byTest('dock-trips').click();
     await p.shot('trips-offline');
     step('a screen with a back button under the bar');
@@ -128,7 +128,7 @@ const scenarios = {
     await p.page.evaluate(() => document.fonts.ready);
     await p.page.waitForTimeout(2500);
     await p.context.setOffline(true);
-    await p.see("You're offline. Everything for your trips is on this phone.", 'offline bar after reload');
+    await p.see('Offline · your trips are on this phone', 'offline pill after reload');
     await p.page.waitForTimeout(1200);
     await p.shot('reopened-offline');
     await p.page.unroute('**/api/**');
@@ -209,7 +209,7 @@ const scenarios = {
     await p.page.route(`${API}/people`, (route) => route.fulfill({ status: 401, contentType: 'application/json', body: envelope('TOKEN_EXPIRED', 'x') }));
     await p.page.route(`${API}/auth/refresh`, (route) => route.fulfill({ status: 401, contentType: 'application/json', body: envelope('UNAUTHORIZED', 'x') }));
     await p.byTest('states-refresh').click();
-    await p.see('Sign in again to carry on.', 'session sheet', 15_000);
+    await p.see('Sign back in to carry on.', 'session sheet', 15_000);
     await p.shot('session-expired');
     await p.page.unroute(`${API}/people`);
     await p.page.unroute(`${API}/auth/refresh`);
@@ -231,11 +231,11 @@ const scenarios = {
     await p.page.route(`${API}/config`, config({ maintenance: { on: true, message: null, until: null } }));
     await p.page.route(`${API}/people`, (route) => route.fulfill({ status: 503, contentType: 'application/json', headers: { 'Retry-After': '600' }, body: envelope('MAINTENANCE', 'Booking is paused until 03:00 Riyadh time while we make Mada better.', { retryAfter: 600, details: { until: null } }) }));
     await go(p, '/states?view=live');
-    await p.see('We’re making Mada better.', 'maintenance screen', 15_000);
+    await p.see('Mada is being updated', 'maintenance screen', 15_000);
     await p.shot('maintenance');
     await p.page.unroute(`${API}/people`);
     await p.byTest('maintenance-trips').click();
-    await p.see('Booking is paused for a few minutes.', 'maintenance bar');
+    await p.see('booking paused', 'maintenance pill');
     await p.shot('maintenance-bar-trips');
 
     await p.page.unroute(`${API}/config`);
@@ -249,7 +249,7 @@ const scenarios = {
     await p.page.route(`${API}/config`, config({ minVersion: '9.0.0' }));
     await p.page.route(`${API}/people`, (route) => route.fulfill({ status: 426, contentType: 'application/json', body: envelope('UPGRADE_REQUIRED', 'x', { details: { minVersion: '9.0.0' } }) }));
     await go(p, '/states?view=live');
-    await p.see('Time for the new Mada.', 'update screen', 15_000);
+    await p.see('Update Mada to keep booking.', 'update screen', 15_000);
     await p.shot('update-required');
     await p.page.unroute(`${API}/people`);
   },
@@ -262,15 +262,24 @@ const scenarios = {
     await p.see('Sends when you’re online', 'queued');
     await p.byTest('outbox-list').scrollIntoViewIfNeeded();
     await p.shot('outbox-queued');
+    step('the Outbox, from the pill');
+    await p.see('Offline · 1 waiting to send', 'pill with count');
+    await p.byTest('offline-banner').click();
+    await p.see('Works without a connection', 'outbox sheet');
+    await p.shot('outbox-sheet');
+    await p.page.mouse.click(195, 120);
+    await p.page.waitForTimeout(500);
     await p.context.setOffline(false);
-    await p.see('Back online. Sending the 1 thing you wrote offline.', 'reconnect sending toast');
+    await p.see('Back online. Sent 1 thing you did offline.', 'reconnect sent toast');
     await p.shot('outbox-sent');
     step('a refusal: Not sent, Send again, Remove');
     await p.page.route(`${API}/people`, (route) => (route.request().method() === 'POST' ? route.fulfill({ status: 400, contentType: 'application/json', body: envelope('VALIDATION', 'A detail needs another look.') }) : route.fallback()));
     await p.byTest('states-queue').click();
-    await p.see('Not sent.', 'failed item');
+    await p.see('Didn’t send', 'failed item');
     await p.byTest('outbox-list').scrollIntoViewIfNeeded();
     await p.shot('outbox-failed');
+    await p.see('1 didn’t send · open the Outbox', 'held pill');
+    await p.shot('outbox-held-pill');
     await p.byTest('outbox-discard').click();
     await p.page.unroute(`${API}/people`);
   },
@@ -286,7 +295,7 @@ const scenarios = {
     }
     step('a deep link to nothing');
     await go(p, '/trip-that-was-cancelled');
-    await p.see('This isn’t here any more.', 'not found');
+    await p.see('This link doesn’t go anywhere now.', 'not found');
     await p.shot('not-found');
     step('a crash');
     await go(p, '/states');

@@ -60,7 +60,7 @@ export default function Itinerary() {
       <TopBar onBack={back} title={t('itin.title')} right={
         <Pressable testID="itin-share-top" accessibilityRole="button" accessibilityLabel={t('itin.shareTitle')} onPress={() => setSheet('share')} hitSlop={10}><Icon name="link" size={20} /></Pressable>
       } />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daybar} accessibilityRole="tablist" style={{ flexGrow: 0 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daybar} accessibilityRole="tablist" style={{ flexGrow: 0, flexShrink: 0, minHeight: 74 }}>
         {days.map((d, i) => (
           <Pressable key={d.date} testID={`itin-chip-${i}`} accessibilityRole="tab" accessibilityState={{ selected: dayIdx === i }} onPress={() => jump(i)} style={[styles.chip, dayIdx === i && styles.chipOn]}>
             <T v="tiny" color={dayIdx === i ? colors.mist : colors.ink3}>{weekdayOf(d.date)}</T>
@@ -71,7 +71,7 @@ export default function Itinerary() {
       <ScrollView ref={scroll} scrollEventThrottle={64} onScroll={(e) => onScroll(e.nativeEvent.contentOffset.y)} contentContainerStyle={styles.body}>
         <Rise style={{ gap: 6 }}>
           <Eyebrow>{t('itin.eyebrow', { dates: data.datesLong, n: days.length })}</Eyebrow>
-          <Display size={40}>{data.title}</Display>
+          <Display size={40}>{t('itin.heading', { city: trip.city })}</Display>
           {data.move ? <MoveNotice trip={trip} /> : null}
           <Row gap={8} style={{ flexWrap: 'wrap' }}><Row gap={6}><Icon name="wifiOff" size={14} color={colors.ink3} /><Tiny>{t('itin.saved')}</Tiny></Row><StaleBadge testID="itin-fresh" updatedAt={q.dataUpdatedAt || null} stale={q.isError} /></Row>
         </Rise>

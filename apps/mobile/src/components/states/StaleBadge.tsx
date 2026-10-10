@@ -14,7 +14,8 @@ export function StaleBadge({ updatedAt, stale, dark, testID }: { updatedAt: numb
   const offline = useNet((s) => s.online === false);
   if (!label) return null;
   const saved = offline || stale;
-  const text = saved && offline ? t('fresh.offline', { when: label.replace(/^Updated /, '') }) : label;
+  const when = label.replace(/^Updated /, '');
+  const text = offline ? t('fresh.offline', { when }) : stale ? t('fresh.last', { when }) : label;
   return (
     <View style={[styles.pill, dark ? styles.dark : null]} accessibilityLabel={text} testID={testID ?? 'stale-badge'}>
       <View style={[styles.dot, { backgroundColor: saved ? colors.goldDeep : colors.ok }]} />

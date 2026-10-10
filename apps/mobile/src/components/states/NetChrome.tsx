@@ -1,33 +1,37 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, SlideInUp, SlideOutUp } from 'react-native-reanimated';
-import { StatusBar } from 'expo-status-bar';
+import Animated, { FadeIn, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { router, usePathname, type Href } from 'expo-router';
 import { t, tn } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { useGates } from '@/lib/net/gates';
 import { useStorageHealth } from '@/lib/net/kv';
-import { useOutboxStore } from '@/lib/net/outbox';
-import { useNet } from '@/lib/net/state';
+import { flushOutbox, useOutboxStore } from '@/lib/net/outbox';
+import { isOffline, useNet } from '@/lib/net/state';
 import { useSession } from '@/lib/session';
+import { buzz } from '@/lib/haptics';
 import { toast } from '@/lib/toast';
 import { colors, ff } from '@/theme';
 import { Icon } from '../Icon';
 import { T } from '../Text';
+import { OutboxSheet } from './OutboxSheet';
 
 /*
- * The app-wide layer for when things go wrong, around the whole navigator:
- *   - the offline bar (prototype copy: "You're offline. Everything for your trips is on this phone."), green, across the
- *     status bar. It never covers anything: every screen below gets a taller top inset, so TopBars, back buttons and
- *     banners sit just under it, exactly as the prototype moves its top bar down;
- *   - after maintenance was set aside, the same bar in gold: "Booking is paused for a few minutes.";
- *   - a quiet toast on reconnect ("Back online.", or what the outbox is now sending), when the server asks us to wait,
- *     when the phone is too full to keep trips offline, and once when a newer version is ready;
+ * The app-wide layer for when things go wrong, around the whole navigator (prototype ui.jsx NetPill):
+ *   - a small pill under the status bar: "Offline · your trips are on this phone", "Offline · 2 waiting to send",
+ *     "Can't reach Mada right now" (the phone is online, our server isn't answering), "Sending 2 things…",
+ *     "1 didn't send · open the Outbox", "Weak connection · loading slowly", "Maintenance until 03:00 · booking paused".
+ *     Tap it for the Outbox. It never covers anything: while it shows, every screen's top inset grows by its strip, so
+ *     TopBars, back buttons and banners sit just under it;
+ *   - a quiet toast on reconnect ("Back online. Sent 2 things you did offline."), when the server asks us to wait, when
+ *     the phone is too full to keep trips offline, and once when a newer version is ready;
  *   - the update and maintenance screens when the server says so.
  */
 
-const BAR = 38; // one line of 13-point text with its padding
+const STRIP = 40; // the strip under the status bar that holds the pill
+
+type PillMode = 'offline' | 'down' | 'held' | 'sending' | 'weak' | 'maint';
 
 export function NetChrome({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
@@ -35,42 +39,76 @@ export function NetChrome({ children }: { children: ReactNode }) {
   const status = useSession((s) => s.status);
   const inApp = status === 'signedIn' || status === 'guest';
   const online = useNet((s) => s.online);
+  const weak = useNet((s) => s.weak);
+  const osOffline = useNet((s) => s.simulated) || isOffline();
+  const items = useOutboxStore((s) => s.items);
   const maintenance = useGates((s) => s.maintenance);
   const maintenanceSetAside = useGates((s) => s.maintenanceDismissed);
-  const offline = inApp && online === false;
-  const paused = inApp && !offline && !!maintenance && maintenanceSetAside;
-  const show = offline || paused;
-  const [barH, setBarH] = useState(BAR);
+  const [outboxOpen, setOutboxOpen] = useState(false);
 
   useReconnectToast(inApp);
   useGateRoutes(inApp);
   useQuietToasts(inApp);
 
-  // Screens keep using useSafeAreaInsets()/useTopInset(): while the bar shows, "the top" is the bar's bottom edge.
+  const waiting = items.filter((i) => i.state !== 'failed').length;
+  const failed = items.filter((i) => i.state === 'failed').length;
+  const sending = items.filter((i) => i.state === 'sending').length;
+  let mode: PillMode | null = null;
+  if (!inApp) mode = null;
+  else if (online === false) mode = osOffline ? 'offline' : 'down';
+  else if (maintenance && maintenanceSetAside) mode = 'maint';
+  else if (sending) mode = 'sending';
+  else if (failed) mode = 'held';
+  else if (weak) mode = 'weak';
+
+  const until = maintenance?.until ? new Date(maintenance.until) : null;
+  const untilText = until && Number.isFinite(until.getTime()) ? `${String(until.getHours()).padStart(2, '0')}:${String(until.getMinutes()).padStart(2, '0')}` : null;
+  const text = mode === 'offline' ? (waiting ? t('pill.offlineWaiting', { count: waiting }) : t('pill.offline'))
+    : mode === 'down' ? (waiting ? t('pill.downWaiting', { count: waiting }) : t('pill.down'))
+    : mode === 'held' ? t('pill.held', { count: failed })
+    : mode === 'sending' ? tn('pill.sending', sending)
+    : mode === 'weak' ? t('pill.weak')
+    : mode === 'maint' ? (untilText ? t('maintenance.bannerUntil', { time: untilText }) : t('maintenance.banner'))
+    : '';
+
+  // Screens keep using useSafeAreaInsets()/useTopInset(): while the pill shows, "the top" is under its strip, so it
+  // never sits over a back button, a title or a banner.
   const statusTop = Math.max(insets.top, Platform.OS === 'web' ? 44 : 20);
-  const shifted = show ? { ...insets, top: statusTop + barH } : insets;
+  const shifted = mode ? { ...insets, top: statusTop + STRIP } : insets;
+  const tone = PILL[mode ?? 'offline'];
 
   return (
     <View style={{ flex: 1 }}>
       <SafeAreaInsetsContext.Provider value={shifted}>{children}</SafeAreaInsetsContext.Provider>
-      {show ? (
-        <Animated.View
-          entering={still ? FadeIn.duration(150) : SlideInUp.duration(320)} exiting={still ? FadeOut.duration(150) : SlideOutUp.duration(260)}
-          style={[styles.bar, { paddingTop: statusTop + 8, backgroundColor: offline ? colors.green : colors.goldWash }]}
-          onLayout={(e) => setBarH(Math.max(BAR, Math.round(e.nativeEvent.layout.height - statusTop)))}
-          accessibilityRole="alert" accessibilityLiveRegion="polite" testID={offline ? 'offline-banner' : 'maintenance-banner'}>
-          {offline ? <StatusBar style="light" /> : null}
-          <Icon name={offline ? 'wifiOff' : 'lock'} size={16} color={offline ? colors.mist : colors.goldInk} />
-          <T v="small" style={[styles.text, { color: offline ? colors.mist : colors.green }]}>
-            {offline ? t('common.offline.banner') : t('maintenance.banner')}
-          </T>
+      {mode ? (
+        <Animated.View entering={still ? FadeIn.duration(150) : SlideInUp.duration(380)} exiting={still ? FadeOut.duration(150) : FadeOut.duration(200)}
+          style={[styles.strip, { top: statusTop }]} pointerEvents="box-none">
+          <Pressable
+            onPress={() => { buzz('tap'); if (mode === 'maint') { useGates.setState({ maintenanceDismissed: false }); } else if (mode !== 'weak') setOutboxOpen(true); }}
+            accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={t('pill.a11y', { text })}
+            style={({ pressed }) => [styles.pill, { backgroundColor: tone.bg }, mode === 'weak' ? styles.pillWeak : null, pressed ? { transform: [{ scale: 0.97 }] } : null]}
+            testID={mode === 'offline' ? 'offline-banner' : mode === 'maint' ? 'maintenance-banner' : `net-pill-${mode}`}>
+            {mode === 'sending' ? <ActivityIndicator size="small" color={tone.fg} style={{ transform: [{ scale: 0.7 }] }} /> : <View style={[styles.dot, { backgroundColor: tone.dot }]} />}
+            <T v="caption" numberOfLines={1} style={[styles.text, { color: tone.fg }]}>{text}</T>
+            {mode !== 'weak' && mode !== 'sending' ? <Icon name="chevron" size={14} color={tone.fg} /> : null}
+          </Pressable>
         </Animated.View>
       ) : null}
+      <OutboxSheet visible={outboxOpen} onClose={() => setOutboxOpen(false)} />
     </View>
   );
 }
 
-/** "Back online." when the connection returns, or what the outbox is sending now. */
+const PILL: Record<PillMode, { bg: string; fg: string; dot: string }> = {
+  offline: { bg: colors.green, fg: colors.mist, dot: colors.gold },
+  held: { bg: colors.green, fg: colors.mist, dot: colors.gold },
+  sending: { bg: colors.green, fg: colors.mist, dot: colors.gold },
+  down: { bg: '#3a3324', fg: '#f6eedd', dot: colors.gold },
+  weak: { bg: 'rgba(255,253,249,0.94)', fg: colors.green, dot: colors.goldDeep },
+  maint: { bg: colors.goldWash, fg: colors.green, dot: colors.goldDeep },
+};
+
+/** When the connection returns: "Back online.", or once the outbox has gone, "Back online. Sent 2 things you did offline." */
 function useReconnectToast(inApp: boolean) {
   const online = useNet((s) => s.online);
   const wasOffline = useRef(false);
@@ -79,8 +117,9 @@ function useReconnectToast(inApp: boolean) {
     if (online && wasOffline.current) {
       wasOffline.current = false;
       if (!inApp) return;
-      const queued = useOutboxStore.getState().items.filter((i) => i.state === 'queued').length;
-      toast(queued ? tn('net.back.sending', queued) : t('net.back'));
+      const queued = useOutboxStore.getState().items.some((i) => i.state === 'queued');
+      if (!queued) { toast(t('net.back')); return; }
+      void flushOutbox().then((sent) => toast(sent ? tn('net.back.sending', sent) : t('net.back')));
     }
   }, [online, inApp]);
 }
@@ -124,6 +163,9 @@ function useQuietToasts(inApp: boolean) {
 }
 
 const styles = StyleSheet.create({
-  bar: { position: 'absolute', top: 0, start: 0, end: 0, zIndex: 80, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 9 },
-  text: { fontFamily: ff.ui500, textAlign: 'center', flexShrink: 1 },
+  strip: { position: 'absolute', start: 0, end: 0, height: STRIP, zIndex: 80, alignItems: 'center', justifyContent: 'center' },
+  pill: { height: 30, maxWidth: '86%', paddingStart: 10, paddingEnd: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 7, boxShadow: '0px 10px 24px -14px rgba(15,26,22,0.8)' },
+  pillWeak: { borderWidth: 1, borderColor: 'rgba(30,53,45,0.08)' },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  text: { fontFamily: ff.ui600, fontSize: 12.5, flexShrink: 1 },
 });

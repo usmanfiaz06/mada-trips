@@ -19,7 +19,7 @@ export function OutboxStatus({ item }: { item: OutboxItem }) {
   return (
     <View style={styles.row} testID={`outbox-${item.id}`}>
       <Icon name={item.state === 'sending' ? 'up' : 'wifiOff'} size={12} color={colors.ink3} />
-      <T v="tiny">{item.state === 'sending' ? t('outbox.sending') : t('outbox.queued')}</T>
+      <T v="tiny">{item.state === 'sending' ? `${t('outbox.sending')}…` : t('outbox.queuedLine')}</T>
     </View>
   );
 }

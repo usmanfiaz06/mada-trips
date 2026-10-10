@@ -1,5 +1,6 @@
 import { router, type Href } from 'expo-router';
 import { describeError, type Described } from '@/lib/net/describe';
+import { reportingOn } from '@/lib/net/report';
 import { talkToMada } from '@/lib/net/talk';
 import { t } from '@/lib/i18n';
 import { Button } from '../Button';
@@ -21,13 +22,14 @@ export function ErrorState({ error, problem, onRetry, variant = 'full', supplier
   }[d.kind as string] ?? <ArtRouteGap />;
 
   const retry = onRetry ? <Button label={t('common.tryAgain')} onPress={onRetry} testID="state-retry" /> : null;
-  const talk = <Button variant="secondary" label={t('action.talk')} onPress={() => talkToMada()} testID="state-talk" />;
+  const talk = <Button variant="ghost" label={t('action.talk')} onPress={() => talkToMada()} testID="state-talk" />;
+  const talkFirst = <Button label={t('action.talk')} onPress={() => talkToMada()} testID="state-talk" />;
   const home = <Button label={t('gone.home')} onPress={() => router.replace('/today' as Href)} testID="state-home" />;
 
   let primary = null;
   let secondary = null;
   if (d.primary === 'home') { primary = home; secondary = talk; }
-  else if (d.primary === 'talk') { primary = talk; secondary = onRetry ? <Button variant="ghost" label={t('common.tryAgain')} onPress={onRetry} testID="state-retry" /> : null; }
+  else if (d.primary === 'talk') { primary = talkFirst; secondary = onRetry ? <Button variant="ghost" label={t('common.tryAgain')} onPress={onRetry} testID="state-retry" /> : null; }
   else if (d.kind === 'offline') primary = null; // it comes back by itself; the banner says so
   else if (d.primary === 'retry' || d.primary === 'wait') { primary = retry; secondary = d.kind === 'server' || d.kind === 'timeout' ? talk : null; }
 
@@ -47,8 +49,8 @@ export function CrashState({ onRestart, reference }: { onRestart: () => void; re
   return (
     <StateView art={<ArtFrayed />} title={t('crash.title')} body={t('crash.body')}
       primary={<Button label={t('crash.restart')} onPress={onRestart} testID="crash-restart" />}
-      secondary={<Button variant="secondary" label={t('action.talk')} onPress={() => talkToMada()} testID="crash-talk" />}
-      note={reference ? t('problem.ref', { ref: reference }) : null} testID="state-crash" />
+      secondary={<Button variant="ghost" label={t('action.talk')} onPress={() => talkToMada()} testID="crash-talk" />}
+      note={reportingOn() ? `${t('crash.note')}${reference ? ` ${t('problem.ref', { ref: reference })}` : ''}` : null} testID="state-crash" />
   );
 }
 
@@ -56,7 +58,7 @@ export function CrashState({ onRestart, reference }: { onRestart: () => void; re
 export function GoneState({ invite, variant = 'full' }: { invite?: boolean; variant?: 'full' | 'card' }) {
   return (
     <StateView variant={variant} art={<ArtMissing />} title={invite ? t('gone.inviteTitle') : t('gone.title')} body={invite ? t('gone.inviteBody') : t('gone.body')}
-      primary={<Button label={t('gone.home')} onPress={() => router.replace('/today' as Href)} testID="state-home" />}
-      secondary={<Button variant="secondary" label={t('action.talk')} onPress={() => talkToMada()} testID="state-talk" />} testID="state-gone" />
+      primary={<Button label={invite ? t('gone.home') : t('gone.trips')} onPress={() => router.replace((invite ? '/today' : '/trips') as Href)} testID="state-home" />}
+      secondary={invite ? <Button variant="ghost" label={t('action.talk')} onPress={() => talkToMada()} testID="state-talk" /> : <Button variant="ghost" label={t('gone.home')} onPress={() => router.replace('/today' as Href)} testID="state-today" />} testID="state-gone" />
   );
 }

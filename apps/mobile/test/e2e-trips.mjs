@@ -48,22 +48,23 @@ const see = async (text, what, timeout = 8000) => {
   catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
 };
 const byTest = (id) => page.locator(`[data-testid="${id}"]`);
-const tap = async (name, opts = {}) => { await page.getByRole(opts.role ?? 'button', { name, exact: opts.exact ?? true }).first().click(); await page.waitForTimeout(opts.wait ?? 500); };
 const tapText = async (text) => { await page.getByText(text, { exact: false }).first().click(); await page.waitForTimeout(500); };
 const scroll = async (px = 700) => { await page.mouse.move(195, 420); await page.mouse.wheel(0, px); await page.waitForTimeout(500); };
 const back = async () => { await page.getByRole('button', { name: /^(Back|Close)$/ }).first().click(); await page.waitForTimeout(600); };
 const closeSheet = async () => { await page.keyboard.press('Escape'); await page.waitForTimeout(300); const c = page.getByRole('button', { name: 'Close' }); if (await c.count()) { await c.last().click().catch(() => {}); } await page.waitForTimeout(400); };
-const go = async (path) => { await page.evaluate((p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); }, path); await page.waitForTimeout(900); };
 const toTab = async () => { for (let i = 0; i < 6 && (await page.getByRole('button', { name: /^(Back|Close)$/ }).count()); i += 1) await back(); };
 const tab = async (name) => { await page.getByRole('tab', { name, exact: true }).first().click().catch(async () => { await tapText(name); }); await page.waitForTimeout(700); };
 
 async function phase(p) {
   await tab('Today');
-  await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
-  await page.waitForTimeout(400);
-  await byTest('today-date').first().waitFor({ state: 'visible', timeout: 15000 });
-  await byTest('today-date').first().click({ delay: 700 });
-  await page.waitForTimeout(400);
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await page.evaluate(() => { window.scrollTo(0, 0); for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
+    await page.waitForTimeout(400);
+    const date = byTest('today-date').first();
+    await date.waitFor({ state: 'visible', timeout: 15000 });
+    await date.click({ delay: 800 });
+    try { await byTest(`demo-${p}`).waitFor({ state: 'visible', timeout: 3000 }); break; } catch { /* the long press didn't land: again */ }
+  }
   await byTest(`demo-${p}`).click();
   await page.waitForTimeout(1500);
 }
@@ -166,7 +167,7 @@ try {
   await shot('payments');
   await page.locator('[data-testid^="payment-"]').first().click();
   await page.waitForTimeout(1200);
-  await see('VAT', 'invoice');
+  await see('Simplified tax invoice', 'invoice');
   await shot('invoice');
   await tapText('Invoice for a company');
   await page.waitForTimeout(500);

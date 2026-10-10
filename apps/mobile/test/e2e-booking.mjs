@@ -447,12 +447,51 @@ async function requests() {
   await context.close();
 }
 
+/* ───────────── 6. links from Circles: pay my share, a plan at /plan/:id ───────────── */
+async function circles() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  step('circles: a plan at /plan/:id');
+  await k.text('Circles').click(); // the dock opens Discover
+  await k.press(k.byTest('plan-alula2'));
+  await k.see('Riyadh → AlUla', 'plan from a link', 10000);
+  await k.see('Book it all', 'book it all');
+  await k.shot('plan-link');
+  await page.goBack();
+  await k.see('Trips we’ve planned', 'back on Discover', 8000);
+  await page.waitForTimeout(1500);
+  step('circles: pay my share of a split');
+  await page.getByText('Circles', { exact: true }).filter({ visible: true }).first().click(); // the Circles header
+  await k.see('Istanbul for Eid', 'circles');
+  await page.getByRole('button', { name: 'Istanbul for Eid', exact: true }).first().click();
+  await k.see('Which evening for the cruise?', 'circle chat', 10000);
+  await k.byTest('chat-tools').click();
+  await k.byTest('tool-split').click();
+  await k.byTest('split-what').fill('Cruise tickets');
+  await k.byTest('split-total').fill('600');
+  await k.press(page.getByRole('button', { name: 'Hessa', exact: true }));
+  await k.byTest('split-post').click();
+  await k.see('Pay my share', 'pay share button', 10000);
+  await k.press(k.byTest('pay-share'));
+  await k.see('Your share · Istanbul for Eid', 'share sheet', 10000);
+  await k.see('Cruise tickets, your share', 'share line');
+  if (await page.getByText('Have a promo code?').filter({ visible: true }).count()) errors.push('share: promo offered');
+  await k.shot('share-pay');
+  await k.slide();
+  await k.see('Paid. Your circle can see it.', 'share paid toast', 10000);
+  await k.see('You paid your share', 'share paid line in the chat', 10000);
+  await k.shot('share-paid', 200);
+  await context.close();
+}
+
 try {
   if (want('flights')) await flights();
   if (want('edges')) await edges();
   if (want('pay')) await pay();
   if (want('desk')) await desk();
   if (want('requests')) await requests();
+  if (want('circles')) await circles();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

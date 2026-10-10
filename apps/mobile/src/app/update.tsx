@@ -18,9 +18,9 @@ export default function UpdateScreen() {
   return (
     <Screen>
       <View style={{ flex: 1, paddingTop: top }}>
-        <StateView art={<ArtUpdate />} title={t('update.title')} body={t('update.body')} testID="update-screen"
+        <StateView art={<ArtUpdate />} title={t('update.title')} body={t('update.body')} note={t('update.note')} testID="update-screen"
           primary={<Button label={t('update.action')} onPress={() => { void Linking.openURL(store).catch(() => {}); }} testID="update-go" />}
-          secondary={<Button variant="secondary" label={t('update.offline')} onPress={() => { setAsideUpdate(); router.replace('/trips' as Href); }} testID="update-trips" />} />
+          secondary={<Button variant="ghost" label={t('update.offline')} onPress={() => { setAsideUpdate(); router.replace('/trips' as Href); }} testID="update-trips" />} />
       </View>
     </Screen>
   );
