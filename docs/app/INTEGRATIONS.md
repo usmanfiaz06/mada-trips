@@ -37,7 +37,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 | 0.4 | **WhatsApp Business Platform** (Meta Cloud API directly, with no middleman fee) | Business verification plus approval of every message template. Needed day one for the 24/7 agent channel and confirmations. | Mada | Pay per conversation (Meta's rates) |
 | 0.5 | **Payment gateway merchant account: MyFatoorah** (mada, Visa and Mastercard, Apple Pay, Google Pay, STC Pay, tokenised cards) | Merchant onboarding and KYC. Apple Pay on mada needs gateway support plus an Apple merchant ID. | Mada (finance) | A fee per transaction, no monthly fee **[confirm]** |
 | 0.6 | **Tabby and Tamara merchant onboarding** | Each provider must approve selling **airline tickets and travel packages**, and agree how and when money settles. | Mada (finance) | A fee per transaction, paid by the merchant |
-| 0.7 | **SMS sender ID in Saudi Arabia** (Unifonic, Taqnyat or Msegat) | Fallback login codes. The sender ID "MadaTrips" must be registered with CST, the telecoms regulator. | Mada | Pay per message |
+| 0.7 | **SMS sender ID in Saudi Arabia** (Unifonic or Taqnyat; both have live adapters) | Phone sign-in codes, sent for Supabase Auth through our SMS hook ([AUTH.md](AUTH.md)). The sender ID "MadaTrips" must be registered with CST, the telecoms regulator. | Mada | Pay per message |
 | 0.8 | **ZATCA e-invoicing (Fatoora, phase 2)** | App sales are simplified tax invoices, and they must be reported to ZATCA, the tax authority. **Mada Ops records VAT amounts but has no ZATCA integration today**, so this is a gap for the shop as well as the app. | Abdulaziz | Compare building directly on ZATCA's free API with the accounting system's built-in option |
 | 0.9 | **Umrah licence route** | Selling Umrah trips goes through the Ministry of Hajj and Umrah's platforms (Nusuk) under Mada's Umrah licence. Confirm what system access the licence gives. **[Unverified: depends on the licence type]** | Bader | — |
 | 0.10 | **Legal opinions** | (a) Whether rewards points stay outside SAMA's e-money rules. (b) User-generated content and photos under the Anti-Cyber Crime Law. (c) Location as sensitive data under the PDPL (Saudi data protection law). (d) Consent for storing data outside Saudi Arabia while we use the current database. (e) Telling people when they are talking to software (see [COPY.md §6](COPY.md)). | Saudi counsel | One-time fee |
@@ -87,7 +87,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 
 | Need | Recommended | Alternative | Cost model |
 |---|---|---|---|
-| Login | **Sign in with Apple** and **Google Sign-In** first. Phone code by **WhatsApp authentication message**, with **SMS** as the fallback. | Twilio Verify | Apple and Google sign-in are free. Phone codes are paid per message, so they are used only when needed. |
+| Login (identity) | **Supabase Auth** ([AUTH.md](AUTH.md)): **Sign in with Apple** (iOS), **Google Sign-In**, a 6-digit **email code** and a **phone code by SMS**. SMS goes out through Supabase's *Send SMS* hook to our Core API, which sends it with a Saudi sender (**Unifonic** or **Taqnyat**, registered sender ID). The app swaps the Supabase token for its own Core API session; only phone and email live in Supabase. Accounts that start with Apple, Google or email verify a phone before their first booking. WhatsApp authentication messages can be added to the same hook later. | Twilio Verify (poor delivery to Saudi numbers) | Supabase Auth is included in the plan we already pay for (50k monthly active users on Pro). Apple and Google sign-in are free. Phone codes are paid per message. |
 | Chat: concierge thread, human agent, **trip groups** | **Built in-house** on **Supabase Realtime + Postgres**: messages, read state, attachments, polls, report and block | Stream Chat, if the build runs late | Included in the Supabase plan we already pay for. Stream would cost about $400–500 a month above 1k users. |
 | WhatsApp | **WhatsApp Business Platform** (Meta Cloud API) | — | Per conversation. The app's own push notifications come first, so WhatsApp is used where it adds value: confirmations, invites, and agent replies when the traveller isn't in the app. |
 | Push notifications | **APNs + FCM** through **Expo push** | — | Free. Includes Live Activity updates. |
@@ -166,7 +166,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 2. Confirm which **GDS** Mada uses and ask for **Enterprise API** access.
 3. Start **WhatsApp Business** verification on Meta's Cloud API.
 4. Open **MyFatoorah**, **Tabby** and **Tamara** merchant applications. Ask each one whether they cover airline tickets, how settlement works, and their fees.
-5. Register an **SMS sender ID** with a Saudi provider.
+5. Register an **SMS sender ID** with a Saudi provider, and set up **Supabase Auth** with Apple, Google, email codes and the SMS hook ([AUTH.md](AUTH.md)).
 6. Ask the accountant about **ZATCA e-invoicing** (phase 2).
 7. Book the **legal opinions** in 0.10.
 8. Ask **Travelfusion** for terms for flynas and flyadeal. Create free accounts for **RateHawk**, **FlightAware**, **PostHog**, **Sentry**, **Amazon SES** and the **Anthropic API**.
@@ -192,7 +192,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 | GDS | Usually pays Mada per segment (incentives), not the other way round |
 | Travelfusion | Booked order (terms to confirm) |
 | WhatsApp | Conversation |
-| SMS | Fallback login code |
+| SMS | Phone sign-in code (Unifonic or Taqnyat, through the Supabase SMS hook) |
 | Amazon SES | Email |
 | Payment gateway, Tabby and Tamara | Transaction |
 
