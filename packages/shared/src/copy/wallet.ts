@@ -756,7 +756,7 @@ export const walletCopy = {
   'help.callBody': '{phone}. Day and night, in Arabic or English. Have your booking code ready if it’s about a trip.',
   'help.callNow': 'Call now',
   'help.opening': 'Opening WhatsApp: {phone}',
-  'legal.updated': 'Updated 1 Oct 2026',
+  'legal.updated': 'Updated {date}',
   'legal.terms.1h': 'Who we are',
   'legal.terms.1b': 'Mada Trips is run by Mada Travel and Tourism, a licensed travel agency in Riyadh. People at Mada book every trip.',
   'legal.terms.2h': 'Bookings',

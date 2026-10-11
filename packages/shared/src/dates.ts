@@ -141,6 +141,9 @@ export function dayLabel(iso: string, opts: { today?: string; locale?: Lang; hij
 /** "14 Mar" / "14 مارس" */
 export const shortDay = (iso: string, locale?: Lang) => `${num(dayOfMonth(iso), locale)} ${monthOf(iso, locale)}`;
 
+/** "11 Oct 2026" / "11 أكتوبر 2026": a day with its year always shown, for documents and legal dates. */
+export const fullDay = (iso: string, locale?: Lang) => `${shortDay(iso, locale)} ${num(yearOf(iso), locale)}`;
+
 /** "14–20 Mar", "28 Feb – 3 Mar" (en dash for ranges, COPY.md §4); "14–20 مارس" in Arabic. */
 export function rangeLabel(a: string, b?: string | null, locale?: Lang): string {
   if (!b || b === a) return shortDay(a, locale);

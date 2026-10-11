@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { LEGAL_UPDATED, fullDay } from '@mada/shared';
 import { T } from '@/components/Text';
 import { AccountScreen } from '@/components/wallet/AccountScreen';
 import { t } from '@/lib/i18n';
@@ -11,7 +12,7 @@ export default function Legal() {
   return (
     <AccountScreen testID="legal">
       <T v="h1" accessibilityRole="header">{which === 'privacy' ? t('help.privacy') : t('help.terms')}</T>
-      <T v="tiny">{t('legal.updated')}</T>
+      <T v="tiny">{t('legal.updated', { date: fullDay(LEGAL_UPDATED) })}</T>
       {[1, 2, 3, 4, 5].map((i) => (
         <View key={i} style={{ gap: 6 }}>
           <T v="h3">{t(`legal.${which}.${i}h` as 'legal.terms.1h')}</T>

@@ -752,7 +752,7 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'help.callBody': '{phone}. ليلًا ونهارًا، بالعربية أو الإنجليزية. جهّز رمز الحجز إن كان الأمر عن رحلة.',
   'help.callNow': 'اتصل الآن',
   'help.opening': 'نفتح واتساب: {phone}',
-  'legal.updated': 'حُدّثت في 1 أكتوبر 2026',
+  'legal.updated': 'حُدّثت في {date}',
   'legal.terms.1h': 'من نحن',
   'legal.terms.1b': 'تديرها مادا للسفر والسياحة، وكالة سفر مرخّصة في الرياض. كل رحلة يحجزها أشخاص من فريق مادا.',
   'legal.terms.2h': 'الحجوزات',
