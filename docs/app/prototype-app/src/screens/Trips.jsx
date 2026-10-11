@@ -179,10 +179,11 @@ function Requests() {
           );
         }
         const idx = stageIndex(r.status);
+        const priced = r.quote > 0 || !!r.fares;
         return (
           <div key={r.id} className="card rise">
-            <div className="spread"><span className="h3">{r.title}</span><span className={'pill' + (r.status === 'quote' ? ' gold' : r.status === 'done' ? ' ok' : '')}>{REQ_STAGES[idx]?.[1]}</span></div>
-            <span className="small">{r.detail}</span>
+            <div className="spread" style={{ alignItems: 'flex-start' }}><span className="h3">{r.title}</span><span className={'pill' + (r.status === 'quote' ? ' gold' : r.status === 'done' ? ' ok' : '')}>{r.status === 'quote' && !priced ? 'Faisal replied' : REQ_STAGES[idx]?.[1]}</span></div>
+            {r.detail && r.detail !== r.title && <span className="small">{r.detail}</span>}
             {r.fares && ['quote', 'paid', 'done'].includes(r.status) && (
               <div className="card well" style={{ gap: 8 }}>
                 <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
@@ -197,10 +198,10 @@ function Requests() {
                 <QuoteBreakdown r={r} />
                 {r.quote > 0
                   ? <button type="button" className="btn primary small" style={{ alignSelf: 'flex-start' }} onClick={() => push('pay', { kind: 'quote', requestId: r.id })}>Pay SAR {fmt(r.quote)}</button>
-                  : <span className="tiny">No charge from Mada.</span>}
+                  : r.kind === 'food' ? <span className="tiny">Nothing to pay now.</span> : null}
               </div>
             )}
-            {r.note && <span className="small" style={{ color: '#3f4f48' }}>“{r.note}”</span>}
+            {r.note && r.note !== r.title && !(r.detail || '').includes(r.note) && <span className="small" style={{ color: '#3f4f48' }}>“{r.note}”</span>}
             {r.status === 'queued' && <span className="tiny">Saved on this phone. Sends when you're back online.</span>}
             {['quote', 'reviewing', 'paid', 'done'].includes(r.status) && <RequestThread requestId={r.id} />}
           </div>

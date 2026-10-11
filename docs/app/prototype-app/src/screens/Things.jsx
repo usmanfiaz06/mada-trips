@@ -172,7 +172,7 @@ function RideSheet({ x, city, trip, day: initial, onClose }) {
     const id = 'rd' + Date.now();
     const reqTitle = w('things.ride.requestTitle', { name: title });
     set((p) => ({
-      requests: [...p.requests, { id, kind: 'car', short: 'ride', title: reqTitle, detail: `${from} → ${title} · ${dayLabel(day)} ${time} · ${who}`, status: offline ? 'queued' : 'sent', created: Date.now(), quote: 0, quoteText: `A car from ${from} to ${title} on ${dayLabel(day)} at ${time}. I’ll send you the price here first.` }],
+      requests: [...p.requests, { id, kind: 'car', short: 'ride', title: reqTitle, detail: `${from} → ${title} · ${dayLabel(day)} ${time} · ${who}`, status: offline ? 'queued' : 'sent', created: Date.now(), quote: 0, when: dayLabel(day), quoteText: `A car from ${from} to ${title} on ${dayLabel(day)} at ${time}. I’ll send you the price here first.` }],
       support: [...(p.support || []), { id: 'm' + Date.now(), at: Date.now(), from: 'me', text: msg, about: reqTitle, queued: offline, intent: 'free' }],
       tripsTab: 'requests',
     }));
@@ -287,7 +287,7 @@ function BookSheet({ x, city, trip, day: initial, onClose }) {
     const id = 'th' + Date.now();
     const reqTitle = w('things.request.title', { name: title });
     set((p) => ({
-      requests: [...p.requests, { id, kind: 'todo', short: 'plans', title: reqTitle, detail: `${city} · ${who} · ${day ? dayLabel(day) : w('things.request.dayOpen')}`, status: offline ? 'queued' : 'sent', created: Date.now(), quote: 0, quoteText: `I’ll book ${title} for ${who}${day ? ` on ${dayLabel(day)}` : ''} and send you the price here first.` }],
+      requests: [...p.requests, { id, kind: 'todo', short: 'plans', title: reqTitle, detail: `${city} · ${who} · ${day ? dayLabel(day) : w('things.request.dayOpen')}`, status: offline ? 'queued' : 'sent', created: Date.now(), quote: 0, when: day ? dayLabel(day) : undefined, quoteText: `I’ll book ${title} for ${who}${day ? ` on ${dayLabel(day)}` : ''} and send you the price here first.` }],
       support: [...(p.support || []), { id: 'm' + Date.now(), at: Date.now(), from: 'me', text: msg, about: reqTitle, queued: offline, intent: 'free' }],
       tripsTab: 'requests',
     }));

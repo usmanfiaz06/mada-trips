@@ -1211,7 +1211,13 @@ const FORMS = {
   ],
   flight: [],
   stay: [],
-  general: [],
+  /* Anything else ("Boulevard World at night"): when and who, so Faisal can price it and nobody asks about dates
+     that were never set. */
+  general: [
+    { k: 'when', q: 'When would you like to go?', options: ['Today', 'This weekend', 'Next week', 'Any day is fine'],
+      from: [[/tonight|today/, 'Today'], [/weekend/, 'This weekend'], [/next week/, 'Next week']] },
+    { k: 'who', q: 'Who’s going?', people: true },
+  ],
 };
 
 const TODO_PP = { 'Bosphorus dinner cruise': 190, 'Princes’ Islands day trip': 160, 'Topkapı Palace tickets': 85, 'A food walk in Kadıköy': 140 };
@@ -1254,7 +1260,20 @@ function buildQuote(kind, answers, who, needs, note, s) {
     const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, l) => x + l[1], 0), 0);
     return { quote: total, breakdown, quoteText: `${picks.join(', ')} for ${who.length === 1 ? 'you' : `all ${who.length} of you`}: SAR ${fmt(total)}. Children under 12 are half price.${needLines.length ? ' ' + needLines.join(' ').replace(/ on both flights/g, '') : ''}` };
   }
-  return { quote: { car: 980, food: 0, general: 0, flight: 0, stay: 0 }[kind] ?? 0 };
+  if (kind === 'general') {
+    // Tickets, priced per person; children under 12 half. The answer says the day they chose, or offers days.
+    const when = [].concat(answers.when || [])[0];
+    const breakdown = who.map((id) => ({ id, name: name(id), lines: [['Tickets', age(id) < 12 ? 60 : 120]] }));
+    const total = breakdown.reduce((a, b) => a + b.lines[0][1], 0);
+    const day = !when || when === 'Any day is fine' ? '' : ` ${when.toLowerCase()}`;
+    return {
+      quote: total, breakdown,
+      quoteText: day
+        ? `I can get tickets${day} for ${who.length === 1 ? 'you' : `all ${who.length} of you`}: SAR ${fmt(total)}. Pay and I’ll book them.`
+        : `Tickets for ${who.length === 1 ? 'you' : `all ${who.length} of you`} are SAR ${fmt(total)} on most days. Tell me which day suits you and I’ll book it.`,
+    };
+  }
+  return { quote: { car: 980, food: 0, flight: 0, stay: 0 }[kind] ?? 0 };
 }
 
 function RequestFlow({ kind, query, note: sysNote, autoSend }) {
@@ -1280,7 +1299,7 @@ function RequestFlow({ kind, query, note: sysNote, autoSend }) {
     });
     return out;
   });
-  const [note, setNote] = useState(typed);
+  const [note, setNote] = useState(kind === 'general' || kind === 'flight' ? '' : typed);
   const [sentId, setSentId] = useState(null);
   const firstOpen = form.findIndex((f) => !(f.people || f.needs ? answers[f.k] : answers[f.k]?.length));
   const done = firstOpen === -1;
@@ -1293,11 +1312,13 @@ function RequestFlow({ kind, query, note: sysNote, autoSend }) {
     const needSummary = who.filter((id) => (needs[id] || []).length).map((id) => `${PEOPLE[id].name}: ${needs[id].map((k) => NEED_LABEL[k].toLowerCase()).join(', ')}`).join(' · ');
     const summary = form.map((f) => (f.people ? whoNames : f.needs ? needSummary : [].concat(answers[f.k] || []).join(', '))).filter(Boolean).join(' · ');
     const cleanNote = note.trim();
-    const detail = [summary || (kind === 'general' || kind === 'flight' ? '' : query), cleanNote && cleanNote !== query ? `“${cleanNote}”` : cleanNote && form.length ? `“${cleanNote}”` : ''].filter(Boolean).join(' · ') || query;
+    const detail = [summary || (kind === 'general' || kind === 'flight' ? '' : query), cleanNote && cleanNote !== query ? `“${cleanNote}”` : ''].filter(Boolean).join(' · ') || sysNote || '';
+    const when = [].concat(answers.when || [])[0];
     const q = buildQuote(kind, answers, who, needs, cleanNote, s);
     const r = newRequest(s, {
       kind, short: info.short, title: kind === 'general' || kind === 'flight' ? query : `${info.title}${answers.where ? ': ' + [].concat(answers.where)[0] : ''}`,
-      detail, summary: summary || undefined, note: cleanNote || undefined, travellers: who, needs: needSummary || undefined, ...q,
+      detail, summary: summary || undefined, note: cleanNote && cleanNote !== query ? cleanNote : undefined, travellers: who, needs: needSummary || undefined,
+      when: when && when !== 'Any day is fine' ? when : undefined, ...q,
     });
     set((prev) => ({ requests: [...prev.requests, r] }));
     setSentId(r.id);
@@ -1422,6 +1443,17 @@ export function QuoteBreakdown({ r }) {
 }
 
 /* Replies under a request. Mount it under any request card: <RequestThread requestId={r.id} />. */
+/** One-tap replies that fit what was asked: nobody is offered "change the dates" for a request without dates. */
+export function requestSuggestions(r) {
+  if (r.kind === 'umrah') return ['Can we stay closer to the Haram?', 'Can we leave a day later?'];
+  if (r.kind === 'flight') return ['Is there a later flight?', 'Can we pay less?'];
+  if (r.kind === 'visa') return ['Is there an earlier appointment?'];
+  if (r.kind === 'car') return ['Can we have a bigger car?', 'Can we add a child seat?'];
+  if (r.kind === 'food') return ['Can we go a little later?', 'Is there a table with a view?'];
+  const dated = !!r.when;
+  return [dated ? 'Can we go another day?' : 'This weekend works', 'Can you add a car there?'];
+}
+
 export function RequestThread({ requestId }) {
   const { s, set } = useStore();
   const [draft, setDraft] = useState('');
@@ -1442,7 +1474,8 @@ export function RequestThread({ requestId }) {
       setTyping(false);
       if (/closer|nearer|haram|walk/.test(t) && r.kind === 'umrah') add({ from: 'faisal', text: `Yes. A hotel at the King Abdulaziz Gate, 2 minutes’ walk to the Haram. SAR 380 more each, SAR ${fmt(380 * n)} for ${n === 1 ? 'you' : `all ${n}`}. Shall I switch it?`, offer: { add: 380, label: 'Room at the King Abdulaziz Gate' } });
       else if (/cheaper|less|budget|price/.test(t)) add({ from: 'faisal', text: 'I’ll look for a lower price on the same dates and reply here within 20 minutes.' });
-      else if (/date|later|earlier|day|week/.test(t)) add({ from: 'faisal', text: 'I’ll check those dates with the airline and the hotel, and reply here within 20 minutes.' });
+      else if (/date|later|earlier|day|week|weekend|today|tonight|tomorrow/.test(t)) add({ from: 'faisal', text: r.kind === 'flight' || r.kind === 'umrah' ? 'I’ll check those dates with the airline and the hotel, and reply here within 20 minutes.' : 'Sure. I’ll check that day and reply here within 20 minutes.' });
+      else if (/car|ride|driver/.test(t)) add({ from: 'faisal', text: 'I’ll add a car there and back and send you the price here.' });
       else add({ from: 'faisal', text: 'Got it. I’ll check and reply here within 20 minutes.' });
       buzz(HAPTIC.knock);
     }, 1600));
@@ -1483,7 +1516,7 @@ export function RequestThread({ requestId }) {
       buzz(HAPTIC.success);
     }, 1400));
   };
-  const suggestions = r.kind === 'umrah' ? ['Can we stay closer to the Haram?', 'Can we leave a day later?'] : r.kind === 'flight' ? ['Is there a later flight?', 'Can we pay less?'] : ['Can we change the dates?'];
+  const suggestions = requestSuggestions(r);
   return (
     <div className="req-thread" aria-label="Replies to Faisal">
       {thread.map((m) => (
