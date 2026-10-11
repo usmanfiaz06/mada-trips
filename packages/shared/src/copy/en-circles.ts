@@ -801,4 +801,6 @@ export const enCircles = {
   'links.city.body': 'What’s on, where to eat and trips we’ve planned. Open it in the app.',
   'links.desktop': 'Open this link on your phone to join.',
   'links.gone.body': 'The link may be mistyped, or it was turned off. Ask the person who sent it for a new one.',
+  'circles.invite.making': 'Making your invite link…',
+  'circles.invite.makeFailed': 'The invite link didn\'t come through. Nothing was lost.',
 } as const;

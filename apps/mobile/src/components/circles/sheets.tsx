@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -37,7 +37,8 @@ export function InviteSheet({ visible, onClose, what, load }: { visible: boolean
   const [confirmOff, setConfirmOff] = useState(false);
   const [days, setDays] = useState<1 | 7 | 14>(14);
   const [cap, setCap] = useState<number | null>(null);
-  useEffect(() => { if (visible && !link && !off) load().then(setLink).catch(() => toast(t('error.internal'))); }, [visible, link, off, load]);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { if (visible && !link && !off && !failed) load().then(setLink).catch(() => setFailed(true)); }, [visible, link, off, failed, load]);
   const url = link?.url ?? '';
   const web = Platform.OS === 'web';
   const text = t('circles.invite.shareText', { url });
@@ -88,6 +89,21 @@ export function InviteSheet({ visible, onClose, what, load }: { visible: boolean
           <View style={{ gap: 12 }}>
             <T v="small" style={{ fontFamily: ff.ui600 }} testID="invite-off">{t('circles.invite.turnedOff')}</T>
             <Button label={t('circles.invite.makeNew')} busy={busy} onPress={() => remake({ expiresInDays: days, maxUses: cap }, t('circles.invite.made'))} testID="invite-new" />
+          </View>
+        ) : !link ? (
+          // The circle (and its link) may still be on the way: say so, never an empty code and a blank QR.
+          <View style={[s.qrRow, { justifyContent: 'center', minHeight: 132 }]} testID={failed ? 'invite-failed' : 'invite-loading'} accessibilityLiveRegion="polite">
+            {failed ? (
+              <View style={{ flex: 1, gap: 10, alignItems: 'flex-start' }}>
+                <T v="small">{t('circles.invite.makeFailed')}</T>
+                <Button size="small" block={false} label={t('common.tryAgain')} onPress={() => setFailed(false)} testID="invite-retry" />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <ActivityIndicator color={colors.green} />
+                <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.invite.making')}</T>
+              </View>
+            )}
           </View>
         ) : (<>
           <View style={s.qrRow}>

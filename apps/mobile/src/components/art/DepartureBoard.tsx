@@ -44,7 +44,7 @@ export function DepartureBoard({ from = 'Riyadh', onPick }: { from?: string; onP
       ))}
       <View style={styles.row}>
         <Flaps word="YOUR TRIP" gold />
-        <T style={styles.code}>???</T>
+        <T style={styles.code}>· · ·</T>
         <T style={[styles.code, { color: colors.gold }]}>SOON</T>
       </View>
     </View>

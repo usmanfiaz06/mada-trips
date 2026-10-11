@@ -97,8 +97,8 @@ export function GettingThere({ x, ctx, onDirections, onRide }: { x: Thing; ctx: 
         </View>
       ) : null}
       <View style={st.buttons}>
-        {target ? <Button testID="thing-directions" label={t('things.go.directions')} size="small" style={{ flex: 1 }} icon={<Icon name="arrow" size={16} color={colors.mist} />} onPress={onDirections} /> : null}
-        <Button testID="thing-ride" label={t('things.go.withMada')} variant="secondary" size="small" style={{ flex: 1 }} icon={<Icon name="car" size={16} color={colors.green} />} onPress={onRide} />
+        {target ? <Button testID="thing-directions" label={t('things.go.directions')} size="small" style={st.goButton} icon={<Icon name="arrow" size={16} color={colors.mist} />} onPress={onDirections} /> : null}
+        <Button testID="thing-ride" label={t('things.go.withMada')} variant="secondary" size="small" style={st.goButton} icon={<Icon name="car" size={16} color={colors.green} />} onPress={onRide} />
       </View>
     </View>
   );
@@ -164,16 +164,29 @@ export function DirectionsSheet({ x, ctx, onClose, onRide }: { x: Thing | null; 
 }
 
 const TIMES = Array.from({ length: 33 }, (_, i) => { const m = 7 * 60 + i * 30; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const minutesOf = (tm: string) => Number(tm.slice(0, 2)) * 60 + Number(tm.slice(3, 5));
+/** The times still ahead on a day: today's from the next half hour on, every time on a later day. */
+function timesFor(day: string, now: Date): string[] {
+  if (day !== ymd(now)) return TIMES;
+  const next = Math.ceil((now.getHours() * 60 + now.getMinutes() + 1) / 30) * 30;
+  return TIMES.filter((tm) => minutesOf(tm) >= next);
+}
 
 /** Get there with Mada: which day, what time, from where, how many. A desk request, then its chat. */
 export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsContext; onClose: () => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const presence = usePresence();
-  const today = new Date().toISOString().slice(0, 10);
-  const days = ctx.days.length ? ctx.days : Array.from({ length: 7 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() + i); return d.toISOString().slice(0, 10); });
-  const [day, setDay] = useState<string>(ctx.day && days.includes(ctx.day) ? ctx.day : days.find((d) => d >= today) ?? days[0]!);
-  const [time, setTime] = useState('10:00');
+  const [now] = useState(() => new Date());
+  const today = ymd(now);
+  // Days with a time still ahead (late at night, today has none left).
+  const days = (ctx.days.length ? ctx.days : Array.from({ length: 7 }, (_, i) => { const d = new Date(now); d.setDate(d.getDate() + i); return ymd(d); })).filter((d) => d > today || timesFor(d, now).length);
+  const [day, setDayRaw] = useState<string>(ctx.day && days.includes(ctx.day) ? ctx.day : days.find((d) => d >= today) ?? days[0] ?? today);
+  const dayTimes = timesFor(day, now);
+  // The next half hour when it's today, else 10:00; never a time that has already gone.
+  const [time, setTime] = useState(() => (day === today ? dayTimes[0] : undefined) ?? (dayTimes.includes('10:00') ? '10:00' : dayTimes[0] ?? '10:00'));
+  const setDay = (d: string) => { setDayRaw(d); const ts = timesFor(d, now); if (!ts.includes(time)) setTime(ts[0] ?? time); };
   const [pickup, setPickup] = useState<'hotel' | 'other'>(ctx.hotel ? 'hotel' : 'other');
   const [where, setWhere] = useState('');
   const [n, setN] = useState(Math.max(1, Math.min(6, ctx.travellers || 2)));
@@ -198,9 +211,11 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
   });
   if (!x) return null;
   const title = thingTitle(x, isRTL());
-  const from = pickup === 'hotel' ? ctx.hotel ?? t('things.ride.hotel') : where.trim() || '…';
+  const from = pickup === 'hotel' ? ctx.hotel ?? t('things.ride.hotel') : where.trim();
   const who = n === 1 ? t('things.request.whoOne') : t('things.request.who', { n: localizeDigits(String(n)) });
-  const generated = t('things.ride.message', { name: title, day: dayLabel(day, { today }), time: localizeDigits(time), from, who });
+  // No pickup yet: the message leaves it out (the field above asks for it), never "picking us up from ….".
+  const generated = from ? t('things.ride.message', { name: title, day: dayLabel(day, { today }), time: localizeDigits(time), from, who })
+    : t('things.ride.messageNoFrom', { name: title, day: dayLabel(day, { today }), time: localizeDigits(time), who });
   const message = text ?? generated;
   const agent = presence.data?.agent?.name ?? null;
   const missingWhere = pickup === 'other' && !where.trim();
@@ -217,10 +232,10 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
           ref={times} horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }} testID="ride-times"
           // Start with the chosen time in view (10:00 is off the edge otherwise). Right to left, browsers count scrollLeft
           // down from 0; native counts from the left edge of the content.
-          onContentSizeChange={(w) => { if (!scrolled.current) { scrolled.current = true; const x = Math.max(0, (w / TIMES.length) * TIMES.indexOf(time) - 40); times.current?.scrollTo({ x: !isRTL() ? x : Platform.OS === 'web' ? -x : Math.max(0, w - x - viewport.current), animated: false }); } }}
+          onContentSizeChange={(w) => { if (!scrolled.current) { scrolled.current = true; const x = Math.max(0, (w / dayTimes.length) * dayTimes.indexOf(time) - 40); times.current?.scrollTo({ x: !isRTL() ? x : Platform.OS === 'web' ? -x : Math.max(0, w - x - viewport.current), animated: false }); } }}
           onLayout={(e) => { viewport.current = e.nativeEvent.layout.width; }}
         >
-          {TIMES.map((tm) => <Chip key={tm} label={localizeDigits(tm)} on={time === tm} onPress={() => { setTime(tm); reset(); }} />)}
+          {dayTimes.map((tm) => <Chip key={tm} label={localizeDigits(tm)} on={time === tm} onPress={() => { setTime(tm); reset(); }} />)}
         </ScrollView>
         <T v="eyebrow">{t('things.ride.from')}</T>
         <View style={st.chips}>
@@ -228,7 +243,7 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
           <Chip label={t('things.ride.elsewhere')} on={pickup === 'other'} onPress={() => { setPickup('other'); reset(); }} />
         </View>
         {pickup === 'other' ? (
-          <TextInput value={where} onChangeText={(v) => { setWhere(v); reset(); }} placeholder={t('things.ride.where')} placeholderTextColor={colors.muted} maxLength={160} accessibilityLabel={t('things.ride.where')} testID="ride-where" style={[st.input, { minHeight: 0 }, font('body', colors.green)]} />
+          <TextInput value={where} onChangeText={(v) => { setWhere(v); reset(); }} autoFocus={!ctx.hotel && Platform.OS !== 'web'} placeholder={t('things.ride.where')} placeholderTextColor={colors.muted} maxLength={160} accessibilityLabel={t('things.ride.where')} testID="ride-where" style={[st.input, { minHeight: 0 }, font('body', colors.green)]} />
         ) : null}
         <T v="eyebrow">{t('things.ride.people')}</T>
         <View style={st.chips}>{[1, 2, 3, 4, 5, 6].map((k) => <Chip key={k} label={k === 6 ? '6+' : localizeDigits(String(k))} on={n === k} onPress={() => { setN(k); reset(); }} />)}</View>
@@ -249,6 +264,8 @@ const st = StyleSheet.create({
   card: { gap: 10, padding: 14, borderRadius: 18, backgroundColor: colors.mist },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Side by side when both labels fit, one under the other when they don't (never a label running off the edge).
+  goButton: { flexGrow: 1, flexBasis: 150, minWidth: 190, paddingHorizontal: 16 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   app: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 18, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
   appMark: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldWash },

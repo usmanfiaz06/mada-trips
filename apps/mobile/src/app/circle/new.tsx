@@ -71,8 +71,9 @@ export default function NewCircle() {
         <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
           <CoverArt cover={cover} veil style={st.preview} testID="nc-preview">
             <CoverStatus cover={cover} onDark />
-            <View accessibilityElementsHidden style={{ marginTop: 'auto' }}>
-              <T style={[font('display', ink.text), { fontSize: 36, lineHeight: 38 }]} balance={false}>{name.trim() || t('circles.newCircle.yours')}</T>
+            {/* An icon cover's disc sits on the right: a long name wraps before it instead of running under it. */}
+            <View accessibilityElementsHidden style={{ marginTop: 'auto', maxWidth: cover?.kind === 'icon' ? '60%' : undefined }}>
+              <T style={[font('display', ink.text), name.trim().length > 12 ? { fontSize: 30, lineHeight: 32 } : { fontSize: 36, lineHeight: 38 }]} balance={false} numberOfLines={2}>{name.trim() || t('circles.newCircle.yours')}</T>
               <T style={{ fontSize: 13, fontFamily: ff.ui400, color: ink.soft, marginTop: 6 }}>{picked.length ? t('circles.newCircle.andMore', { count: picked.length }) : t('circles.newCircle.justYou')}</T>
             </View>
           </CoverArt>

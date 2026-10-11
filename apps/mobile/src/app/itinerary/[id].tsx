@@ -17,6 +17,8 @@ import { listSep, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useItinerary, useTrip } from '@/lib/trips';
 import { colors, radii, textEnd } from '@/theme';
+import { GoneState } from '@/components/states';
+import { describeError } from '@/lib/net/describe';
 
 type Picked = ItineraryItem & { day: string };
 const dl = (d: string) => dayLabel(d, { today: d });
@@ -39,7 +41,7 @@ export default function Itinerary() {
     return (
       <Screen>
         <TopBar onBack={back} title={t('itin.title')} />
-        {q.isError ? <EmptyState art={<ArtCalendar />} title={t('itin.offTitle')} body={t('itin.offBody')} action={<Button label={t('itin.retry')} onPress={() => void q.refetch()} />} /> : null}
+        {q.isError && describeError(q.error).kind === 'gone' ? <GoneState variant="card" /> : q.isError ? <EmptyState art={<ArtCalendar />} title={t('itin.offTitle')} body={t('itin.offBody')} action={<Button label={t('itin.retry')} onPress={() => void q.refetch()} />} /> : null}
       </Screen>
     );
   }

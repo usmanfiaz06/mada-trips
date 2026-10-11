@@ -17,6 +17,8 @@ import { colors, ff, shadow } from '@/theme';
 import { EventRow, ExperienceCard, PlaceCard, PlaceRow, Rail } from './parts';
 import { DirectionsSheet, RideSheet } from './go';
 import { BookSheet, ThingSheet, type ThingsContext } from './sheets';
+import { GoneState } from '@/components/states';
+import { describeError } from '@/lib/net/describe';
 
 /*
  * Things to do. As a section (a city's page, a trip) it shows today's ideas, the best places, what we can book and
@@ -113,6 +115,7 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
 
   const body = () => {
     if (!data) {
+      if (q.isError && describeError(q.error).kind === 'gone') return <GoneState variant="card" />;
       if (q.isError) return (
         <View style={[st.note, shadow('card')]}>
           <T v="small" color={colors.green}>{t('things.offline')}</T>

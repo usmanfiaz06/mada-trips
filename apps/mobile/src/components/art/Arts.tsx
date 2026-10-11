@@ -76,7 +76,7 @@ export function ArtPass(p: ArtProps) {
       <Path d="M114 44 v32" stroke="#e3d6bf" strokeWidth={1.5} strokeDasharray="3 4" />
       <Path d="M32 50 h16 M32 70 h30 M124 52 h10 M124 60 h6" stroke="#e3d6bf" strokeWidth={2.4} strokeLinecap="round" />
       <SvgText x={32} y={64} fontSize={10} fontWeight="700" fill="#1e352d" fontFamily="InterTight_700Bold">RUH</SvgText>
-      <SvgText x={80} y={64} fontSize={10} fontWeight="700" fill="#b98f4a" fontFamily="InterTight_700Bold">???</SvgText>
+      <SvgText x={80} y={64} fontSize={10} fontWeight="700" fill="#b98f4a" fontFamily="InterTight_700Bold">· · ·</SvgText>
       <Path d="M58 60 h18" stroke="#b98f4a" strokeWidth={1.5} strokeDasharray="1 3" strokeLinecap="round" />
       <Path d="M-5 -3 L5 0 L-5 3 L-2.5 0 Z" fill="#1e352d" transform="translate(64 60)" />
     </Art>

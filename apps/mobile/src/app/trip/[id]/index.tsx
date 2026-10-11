@@ -18,6 +18,8 @@ import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation
 import { colors } from '@/theme';
 import { TripHotelbeds } from '@/components/trips/Hotelbeds';
 import { ThingsView } from '@/components/things/ThingsView';
+import { ErrorState, GoneState } from '@/components/states';
+import { describeError } from '@/lib/net/describe';
 
 const tripDays = (from: string, to: string | null) => { const out: string[] = []; for (let d = from, i = 0; d <= (to ?? from) && i < 30; d = addDays(d, 1), i++) out.push(d); return out; };
 
@@ -35,7 +37,10 @@ export default function TripDetail() {
     return (
       <Screen>
         <TopBar onBack={() => router.back()} />
-        <View style={{ padding: 24 }}>{q.isPending ? <ActivityIndicator color={colors.green} /> : <T v="h2">{t('tm.detail.gone')}</T>}</View>
+        {/* A trip that isn't there is "this link doesn't go anywhere"; one that can't load right now says why, with Try again. */}
+        {q.isPending ? <View style={{ padding: 24 }}><ActivityIndicator color={colors.green} /></View>
+          : q.error && describeError(q.error).kind !== 'gone' ? <ErrorState error={q.error} onRetry={() => void q.refetch()} variant="card" />
+          : q.error ? <GoneState variant="card" /> : <View style={{ padding: 24 }}><T v="h2">{t('tm.detail.gone')}</T></View>}
       </Screen>
     );
   }

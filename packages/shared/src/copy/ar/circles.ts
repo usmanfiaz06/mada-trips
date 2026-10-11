@@ -833,4 +833,6 @@ export const arCircles: ArSection<typeof enCircles> = {
   'links.city.body': 'ما يحدث هناك، وأين تأكل، ورحلات خطّطناها. افتحها في التطبيق.',
   'links.desktop': 'افتح هذا الرابط من جوالك لتنضم.',
   'links.gone.body': 'ربما نقص من الرابط حرف، أو أُوقف. اطلب رابطًا جديدًا ممن أرسله.',
+  'circles.invite.making': 'نجهّز رابط الدعوة…',
+  'circles.invite.makeFailed': 'لم يصل رابط الدعوة. لم يضع شيء.',
 };

@@ -11,7 +11,7 @@ import {
   type ChangeFlightRequest, type ChangeKind, type Company, type CreateRefundRequest, type CreateTripAskRequest, type DisruptionKind, type PatchTripRequest, type TrackFlightRequest,
 } from '@mada/shared';
 import { ApiError, request } from './api';
-import { API_MODE } from './config';
+import { SHOW_DEMO_HINTS } from './config';
 import { queryClient } from './queries';
 import { discardItem, enqueue, registerOutboxKind, useOutbox, type OutboxItem } from './net/outbox';
 import { persistQueries } from './net/persist';
@@ -52,7 +52,8 @@ export async function kvSet(key: string, value: string | null): Promise<void> {
 
 /* ───────── the demo override (EXPERIENCE: the prototype's demo panel) ───────── */
 
-export const DEMO_ALLOWED = API_MODE === 'mock' || __DEV__ || process.env.EXPO_PUBLIC_DEMO_HINTS === 'yes';
+/** The demo controls (trip phase, offline): the same switch as every other demo hint (lib/config.ts). */
+export const DEMO_ALLOWED = SHOW_DEMO_HINTS;
 
 type DemoState = { phase: TripPhase | null; offline: boolean; setPhase: (p: TripPhase | null) => void; setOffline: (o: boolean) => void };
 function initialPhase(): TripPhase | null {
