@@ -216,6 +216,11 @@
     "locales": {
       "en": "./locales/en.json",
       "ar": "./locales/ar.json"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3ac287ed-b9df-4c3f-b626-48840765bc49"
+      }
     }
   }
 }
