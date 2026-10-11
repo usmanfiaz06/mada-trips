@@ -18,11 +18,14 @@ People get into the app first. Only alerts are asked during sign-up; the passpor
 | Step | Happy path | Edge cases |
 |---|---|---|
 | Welcome | "We'll take it from here." → **Start** | **Just track a flight** opens a guest mode without an account. The traveller is asked to sign in only when they try to book, and lands back where they were. **Invite link:** the invite preview comes first. |
-| Sign in | Apple, Google, or phone number | **Apple:** share or hide the email. **Cancelled:** nothing shared. **Apple or Google:** a mobile number is still needed for alerts. |
+| Sign in | Apple, Google, email or phone number. Codes by default; a password is optional (email only). | **Apple:** share or hide the email. **Cancelled:** nothing shared. **Apple or Google:** a mobile number is still needed for alerts. **Back on this phone:** the way used last time goes first ("Continue as o•••@gmail.com" / "+966 5• ••• 4567": one tap sends the code), with **Use another way** under it. |
 | Phone number | +966 and 9 digits starting with 5 | A short, long or wrong-prefix number gets an inline explanation. **Offline:** the code is not sent. **Existing account** (demo: 50 000 4127): "Welcome back", everything restored. |
-| Code | 6 digits (demo code `123456`) | **Wrong code:** "2 tries left". **After 3 wrong codes:** locked. **Resend** after 30 s. |
+| Code | 6 digits (demo code `123456`). Fills itself: iOS offers it above the keyboard, Android reads the SMS, a pasted code (or a whole pasted message) fills it, and the 6th digit checks it. | **Wrong code:** a gentle shake and "2 tries left". **After 3 wrong codes:** a short pause with a countdown ("Let's take a short pause."), then a new code; Call Mada is always there. **New code** after 60 s: the countdown sits under the code, then "Send a new code"; sending says "New code sent to …" and clears the code. **Email:** Open Mail, and the address with **Change**. **Didn't get the code?** (every code screen, sign-in and Profile alike): send a new code (waits for the countdown), for email check spam or junk (from no-reply@madatrips.sa), wrong number or email (back, filled in), **try another way** (the other code, Apple on iOS, Google; sign-in only), and **I can't use this number or email any more** → the recovery request below. |
+| Password (optional) | Email screen → **Use my password instead** → email and password (password managers fill both) → signed in, same as a code | Only for people who set one in Profile. **Wrong:** "That email and password don't match. 4 tries left before a short pause." (never says whether the email has an account), then the same pause. **Forgot password?** → a code by email (never a link) → choose a new one (the rules tick as they're met: 8+ characters, lowercase, uppercase, a number, a symbol) → signed in. A password found in a leak is refused kindly. |
+| Recovery request | Name, the old number or email, a new way to reach them, an optional note → **Send to Mada** → "We have your request." | Works signed out. The answer is the same whether or not an account uses the old contact. A person on the desk checks it's them (passport details on file, the last booking) and moves the account, usually within a day; they hear it on the new contact. **Too many from one phone:** "Try again tomorrow, or call Mada." |
 | Name | "What should we call you?" | **Skip:** fine, no name. Apple and Google prefill it. |
 | Alerts | Pre-prompt, then allow → straight into Today | **Not now:** the app works fully; we ask again after the first booking. |
+| Face ID (phone only) | Once, after sign-in on a phone that has Face ID or a fingerprint: "Open Mada with Face ID?" | **Not now:** never asked again; Profile › Security has the switch. When on, Mada asks again after 5 minutes away. |
 
 **Asked later, in context**
 
@@ -130,6 +133,8 @@ The demo panel can jump to any of these moments.
 | **Your data:** download everything | — |
 | **Delete account** | Confirmed in a sheet. Bookings already made stay with the airline and hotel. Afterwards the app returns to the welcome screen. |
 | **Sign out** | Returns to the welcome screen |
+| **Sign-in methods › Password:** set, change or remove | A code to the account's email first (it checks it's you), then the new password against the live rules. Needs an email on the account. Removing it leaves codes, Apple and Google as they were. |
+| **Security › Open Mada with Face ID** | On this phone only. Turning it on checks Face ID first. |
 
 ## 10. Everywhere
 
