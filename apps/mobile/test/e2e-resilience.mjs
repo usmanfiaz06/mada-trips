@@ -28,9 +28,10 @@ if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No web export in ${D
 
 const PHOTO = resolve('assets/photos/abha-mountains.jpg');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
+let apiCalls = 0;
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
-  if (url.pathname.startsWith('/api/')) { res.writeHead(204, { 'x-mada-mock': 'pass', 'x-server-time': String(Date.now()) }).end(); return; }
+  if (url.pathname.startsWith('/api/')) { apiCalls += 1; res.writeHead(204, { 'x-mada-mock': 'pass', 'x-server-time': String(Date.now()) }).end(); return; }
   if (url.pathname === '/no-such-photo.jpg') { res.writeHead(404).end(); return; }
   if (url.pathname === '/slow-photo.jpg') {
     setTimeout(() => { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); res.end(existsSync(PHOTO) ? readFileSync(PHOTO) : Buffer.alloc(0)); }, 6000);
@@ -105,7 +106,9 @@ const scenarios = {
     step('a screen with a back button under the bar');
     await go(p, '/states?view=live');
     await p.see('Household', 'live probe title');
-    const back = await p.page.getByRole('button', { name: 'Back' }).first().boundingBox();
+    // Opened straight from a link there's no history to go back to, so the top bar's button reads "Home"
+    // (TopBar's goHome); either way it is the same button, and it must sit under the bar.
+    const back = await p.page.locator('[data-testid="topbar-back"], [data-testid="topbar-home"]').filter({ visible: true }).first().boundingBox();
     if (!back || !bar || back.y < bar.y + bar.height - 1) errors.push(`back button under the offline bar (${back?.y} < ${bar?.y + bar?.height})`);
     await p.shot('live-offline-first-load');
     step('reconnect');
@@ -315,6 +318,9 @@ try {
     if (ONLY && !ONLY.includes(name)) continue;
     const p = await newPage();
     await signIn(p);
+    // Without MOCK_WIRE=http the in-app mock answers without a request, so page.route (slow, 500, 429…) and
+    // setOffline never touch the API, and later steps fail far from the reason. Say the reason instead.
+    if (!apiCalls) throw new Error(`${DIST} was exported without EXPO_PUBLIC_MOCK_WIRE=http: no API call reached this server (see the header for the export command)`);
     await run(p);
     await p.context.close();
   }

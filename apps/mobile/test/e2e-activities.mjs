@@ -35,9 +35,13 @@ const browser = await chromium.launch({ executablePath: CHROME });
 const errors = [];
 let n = 0;
 const step = (s) => console.log('·', s);
+const AT = new Date('2026-10-11T08:30:00Z');
 
 async function newPage(locale) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh', reducedMotion: 'reduce' });
+  // Hours, "open now" and today's ideas are read against Riyadh's clock: run at a fixed late morning there (11:30, a
+  // Sunday; the clock then runs on from it) so a hot day has indoor places open whatever the real time.
+  await context.clock.install({ time: AT });
   const page = await context.newPage();
   page.on('pageerror', (e) => { errors.push(`pageerror: ${e.message}`); console.log('PAGEERROR', e.message); });
   return { context, page };
