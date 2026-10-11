@@ -479,8 +479,99 @@ async function inviteToLive(lang) {
   await context.close();
 }
 
+/*
+ * Circle covers, in English and in Arabic: the picker (drawings first, on six colours; photos we ship, with credits;
+ * your own photo, uploaded and "only you see this until it's checked"), the drawn covers on the circles rail and in
+ * the chat's header, and changing a circle's cover from its settings.
+ */
+const COVER_PHOTO = resolve(process.env.COVER_PHOTO ?? '../../docs/app/photos/abha-mountains-sm.jpg');
+async function covers(lang) {
+  const { context, page } = await newPage(lang === 'ar' ? 'ar-SA' : 'en-GB');
+  const { shot, see, byTest, go } = kit(page);
+  const L = (en, ar) => (lang === 'ar' ? ar : en);
+  await page.goto(ORIGIN + '/');
+  await byTest('welcome-start').waitFor({ timeout: 10000 });
+  await page.evaluate(() => document.fonts.ready);
+  await byTest('welcome-start').click();
+  await byTest('signin-phone').click();
+  await byTest('phone-input').fill('500004127');
+  await byTest('phone-send').click();
+  await byTest('otp-input').fill('123456');
+  await byTest('welcome-back-open').click({ timeout: 10000 });
+  await page.waitForTimeout(1200);
+
+  step(`${lang}: covers on the circles rail`);
+  await go('/circles?view=circles');
+  await see(L('Family', 'Family'), 'family circle');
+  await shot(`${lang}-covers-rail`);
+
+  step(`${lang}: the picker`);
+  await go('/circle/new');
+  await byTest('circle-name').fill(L('Desert weekend', 'عطلة البر'));
+  await byTest('cover-icon-plane').waitFor({ timeout: 8000 });
+  await see(L('Icons', 'رسومات'), 'icons tab');
+  await scroll(page, 260);
+  await shot(`${lang}-cover-picker-icons`);
+  await byTest('cover-icon-camel').click();
+  await byTest('cover-color-sand').click();
+  await scroll(page, -600);
+  await shot(`${lang}-cover-icon-camel-sand`);
+  for (const [icon, color] of [['icecream', 'rose'], ['balloon', 'sky'], ['dallah', 'gold'], ['palm', 'sage']]) {
+    await byTest(`cover-color-${color}`).click();
+    await byTest(`cover-icon-${icon}`).click();
+  }
+  await shot(`${lang}-cover-icon-palm-sage`);
+  await byTest('cover-tab-photos').click();
+  await byTest('cover-photo-desert-camp').click();
+  await see('Tommaso Ubezio / Unsplash', 'photo credit');
+  await scroll(page, 300);
+  await shot(`${lang}-cover-picker-photos`);
+  await byTest('cover-tab-upload').click();
+  await see(L('We check it before the rest of the circle sees it.', 'نراجعها قبل أن يراها بقية المجموعة.'), 'upload body');
+  await shot(`${lang}-cover-picker-upload`);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), byTest('cover-upload').click()]);
+  await chooser.setFiles(COVER_PHOTO);
+  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending upload');
+  await scroll(page, -600);
+  await shot(`${lang}-cover-upload-pending`);
+  // Back to a drawing for the circle itself.
+  await byTest('cover-tab-icons').click();
+  await byTest('cover-color-green').click();
+  await byTest('cover-icon-camel').click();
+  await byTest('circle-next').click();
+  await byTest('circle-make').click();
+  await byTest('circle-head').waitFor({ timeout: 8000 });
+  await page.waitForTimeout(800);
+  await shot(`${lang}-cover-chat-header-icon`);
+
+  step(`${lang}: change the cover from settings`);
+  await byTest('circle-settings').click();
+  await byTest('change-cover').click();
+  await byTest('cover-color-rose').click();
+  await byTest('cover-icon-cake').click();
+  await shot(`${lang}-cover-settings`);
+  await byTest('cover-save').click();
+  await see(L('Cover changed', 'تغيّر الغلاف'), 'saved');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  await shot(`${lang}-cover-chat-header-cake`);
+  await byTest('circle-settings').click();
+  await byTest('change-cover').click();
+  await byTest('cover-tab-upload').click();
+  const [chooser2] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), byTest('cover-upload').click()]);
+  await chooser2.setFiles(COVER_PHOTO);
+  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending upload in settings');
+  await byTest('cover-save').click();
+  await see(L('Cover changed', 'تغيّر الغلاف'), 'saved upload');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending in the header');
+  await shot(`${lang}-cover-chat-header-upload-pending`);
+  await context.close();
+}
+
 try {
-  for (const [name, fn] of [['demo', demo], ['fresh', fresh], ['join', joinSignedOut], ['live-en', () => inviteToLive('en')], ['live-ar', () => inviteToLive('ar')]]) {
+  for (const [name, fn] of [['demo', demo], ['fresh', fresh], ['join', joinSignedOut], ['live-en', () => inviteToLive('en')], ['live-ar', () => inviteToLive('ar')], ['covers-en', () => covers('en')], ['covers-ar', () => covers('ar')]]) {
     if (process.env.ONLY && !process.env.ONLY.split(',').includes(name)) continue;
     try { await fn(); } catch (e) { errors.push(`${name}: ${String(e?.message ?? e).split('\n')[0]}`); console.log(e); }
   }

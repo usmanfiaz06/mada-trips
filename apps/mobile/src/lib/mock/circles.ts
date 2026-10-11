@@ -3,7 +3,7 @@ import {
   HOME_CITY, LinkOptions, PLAN_SUMMARIES, REACTIONS, ReactRequest, ReportRequest, SaveRequest, SendCircleMessageRequest, UpdateCircleRequest, bookPrefill, checkSaudiMobile,
   circleDest, inviteUrl, madaReply, maskPhone, personRef, planById, rangeLabel, shareUnits, splitAmounts, t, votePhrase,
   type AroundResponse, type CircleDetail, type CircleMessage, type CircleSummary, type CopyKey, type ErrorCode, type FriendView,
-  type IncomingInvite, type InvitePreview, type MadaAction, type PersonRef, type Post, type SavedItem, type SearchHit, type SentInvite,
+  type CircleCover, type IncomingInvite, type InvitePreview, type MadaAction, type PersonRef, type Post, type SavedItem, type SearchHit, type SentInvite,
   type LiveKind, type SocialRelation, type StampsResponse, type SysEvent,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
@@ -20,7 +20,7 @@ import type { AreaMock, MockUser } from '../mock-api';
 
 type Card = Record<string, unknown> & { t?: string };
 type Msg = { id: string; circleId: string; authorKind: 'user' | 'mada' | 'agent'; userId: string | null; agentName: string | null; body: string; card: Card | null; at: number };
-type CircleRow = { id: string; name: string; createdBy: string; cover: string | null; dest: string | null; dm: boolean; dmKey: string | null; trip: string | null; pinned: string | null; pinnedBy: string | null; createdAt: number; updatedAt: number };
+type CircleRow = { id: string; name: string; createdBy: string; cover: CircleCover | null; coverPrev?: CircleCover | null; coverBy?: string | null; coverAt?: number | null; dest: string | null; dm: boolean; dmKey: string | null; trip: string | null; pinned: string | null; pinnedBy: string | null; createdAt: number; updatedAt: number };
 type Member = { circleId: string; userId: string; role: 'admin' | 'member'; muted: boolean; lastReadAt: number | null; joinedAt: number };
 type Invite = { id: string; kind: 'circle' | 'mada'; circleId: string | null; inviterId: string; inviteeId: string | null; phone: string | null; channel: 'app' | 'link' | 'sms' | 'whatsapp'; lookup: string | null; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; acceptedBy: string | null; remindedAt: number | null; expiresAt: number; at: number; maxUses?: number | null; uses?: number };
 type Friendship = { a: string; b: string; status: 'pending' | 'accepted'; tagA: string | null; tagB: string | null; at: number; acceptedAt: number | null };
@@ -177,7 +177,7 @@ function seedDemo(me: string) {
   presence.set(ID.noor, { city: 'Istanbul', dates: '10–14 Mar', audience: 'picked', ids: [me], endsAt: now() + 200 * DAY });
 
   const eid = uuid();
-  circles.set(eid, { id: eid, name: 'Istanbul for Eid', createdBy: me, cover: 'istanbul', dest: 'Istanbul', dm: false, dmKey: null, trip: 'Istanbul · 9–15 Mar', pinned: null, pinnedBy: null, createdAt: mins(9000), updatedAt: 0 });
+  circles.set(eid, { id: eid, name: 'Istanbul for Eid', createdBy: me, cover: { kind: 'photo', id: 'istanbul' }, dest: 'Istanbul', dm: false, dmKey: null, trip: 'Istanbul · 9–15 Mar', pinned: null, pinnedBy: null, createdAt: mins(9000), updatedAt: 0 });
   [me, ID.hessa, ID.abdullah, ID.noor, ID.sara, ID.ahmed].forEach((u, i) => members.push({ circleId: eid, userId: u, role: i ? 'member' : 'admin', muted: false, lastReadAt: i ? now() : mins(120), joinedAt: mins(9000 - i) }));
   sys(eid, 'created', me, [], { at: mins(9000) });
   add(eid, { authorKind: 'mada', userId: null, body: 'Abdullah and Noor land 40 minutes after you. We’ve put everyone in one van, so it waits for both families.', card: { t: 'mada', kind: 'answer', list: [], foot: null, actions: [], askWhere: false, ref: null, done: false }, at: mins(300) });
@@ -187,14 +187,14 @@ function seedDemo(me: string) {
   add(eid, { authorKind: 'agent', userId: null, agentName: 'Faisal', body: 'I’m holding 6 seats on the Wednesday cruise at 19:30 until Monday. SAR 1,140 for everyone.', card: null, at: mins(40) });
 
   const family = uuid();
-  circles.set(family, { id: family, name: 'Family', createdBy: me, cover: null, dest: null, dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: mins(40000), updatedAt: 0 });
+  circles.set(family, { id: family, name: 'Family', createdBy: me, cover: { kind: 'icon', icon: 'family', color: 'sand' }, dest: null, dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: mins(40000), updatedAt: 0 });
   [me, ID.hessa, ID.sara, ID.ahmed].forEach((u, i) => members.push({ circleId: family, userId: u, role: i ? 'member' : 'admin', muted: false, lastReadAt: now(), joinedAt: mins(40000) }));
   sys(family, 'created', me, [], { at: mins(40000) });
   user(family, ID.hessa, 'Sara’s new passport photo is done. I added it in the Wallet.', mins(1500));
   user(family, me, 'Thank you. I’ll book the appointment.', mins(1490));
 
   const season = uuid();
-  circles.set(season, { id: season, name: 'Riyadh Season', createdBy: ID.abdullah, cover: 'riyadh', dest: 'Riyadh', dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: mins(20000), updatedAt: 0 });
+  circles.set(season, { id: season, name: 'Riyadh Season', createdBy: ID.abdullah, cover: { kind: 'photo', id: 'riyadh' }, dest: 'Riyadh', dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: mins(20000), updatedAt: 0 });
   [ID.abdullah, me, ID.khalid, ID.faris, ID.maha, ID.yousef, ID.noor, ID.reem].forEach((u, i) => members.push({ circleId: season, userId: u, role: i ? 'member' : 'admin', muted: u === me, lastReadAt: now(), joinedAt: mins(20000 - i) }));
   sys(season, 'created', ID.abdullah, [], { at: mins(20000) });
   user(season, ID.abdullah, 'Boulevard World this week. Who’s coming?', mins(700));
@@ -252,6 +252,28 @@ function toMessage(m: Msg): CircleMessage {
   return out;
 }
 
+/* ───────────── covers (the server's lib/app/circles/covers.ts) ───────────── */
+
+/** Photos picked in the picker: file id → where the picture is (a local uri), and who uploaded it. */
+const coverUploads = new Map<string, { uri: string; owner: string }>();
+/** Covers are checked like tips: a clean one is approved after a short wait (the server's auto mode). */
+const COVER_CHECK_MS = 12_000;
+function coverFor(c: CircleRow, viewer: string | null): CircleCover | null {
+  const cv = c.cover;
+  if (cv?.kind !== 'upload') return cv;
+  if (cv.status === 'pending' && c.coverAt && c.coverAt <= now()) { cv.status = 'approved'; }
+  if (cv.status === 'approved' || (viewer && viewer === c.coverBy)) return cv;
+  return c.coverPrev ?? null;
+}
+function coverIn(input: Exclude<CircleCover, { kind: 'upload' }> | { kind: 'upload'; fileId: string } | null, me: string, prev: CircleRow | null): Pick<CircleRow, 'cover' | 'coverPrev' | 'coverBy' | 'coverAt'> {
+  if (!input || input.kind !== 'upload') return { cover: input, coverPrev: null, coverBy: null, coverAt: null };
+  if (prev?.cover?.kind === 'upload' && prev.cover.fileId === input.fileId) return { cover: prev.cover, coverPrev: prev.coverPrev ?? null, coverBy: prev.coverBy ?? null, coverAt: prev.coverAt ?? null };
+  const up = coverUploads.get(input.fileId);
+  if (!up || up.owner !== me) throw no('VALIDATION', undefined, { fields: { cover: 'Unknown upload' } });
+  const before = prev ? coverFor(prev, null) : null;
+  return { cover: { kind: 'upload', fileId: input.fileId, status: 'pending', url: up.uri }, coverPrev: before?.kind === 'upload' ? null : before, coverBy: me, coverAt: now() + COVER_CHECK_MS };
+}
+
 function summary(c: CircleRow, me: string): CircleSummary {
   const ms = membersOf(c.id);
   const mine = ms.find((m) => m.userId === me)!;
@@ -262,7 +284,7 @@ function summary(c: CircleRow, me: string): CircleSummary {
   const other = ms.find((m) => m.userId !== me);
   return {
     id: c.id, name: c.dm && other ? ref(other.userId).short : c.name, imageUrl: null, tripId: null, role: mine.role, memberCount: ms.length, muted: mine.muted, unread,
-    createdAt: new Date(c.createdAt).toISOString(), cover: (c.cover as CircleSummary['cover']) ?? null, dest: c.dest, dm: c.dm, trip: localDates(c.trip),
+    createdAt: new Date(c.createdAt).toISOString(), cover: c.dm ? null : coverFor(c, me), dest: c.dest, dm: c.dm, trip: localDates(c.trip),
     adminId: ms.find((m) => m.role === 'admin')?.userId ?? null, preview: ms.slice(0, 3).map((m) => ref(m.userId)), invitedCount: pendingInvites(c.id).length,
     last: last ? toMessage(last) : null, fresh: !mine.lastReadAt && c.createdBy !== me && !c.dm,
   };
@@ -270,7 +292,7 @@ function summary(c: CircleRow, me: string): CircleSummary {
 
 function incoming(me: string): IncomingInvite[] {
   return invites.filter((i) => i.inviteeId === me && i.status === 'pending' && i.expiresAt > now() && i.circleId && circles.has(i.circleId) && !isBlocked(me, i.inviterId))
-    .map((i) => { const c = circles.get(i.circleId!)!; return { inviteId: i.id, from: ref(i.inviterId), circle: { id: c.id, name: c.name, cover: (c.cover as IncomingInvite['circle']['cover']) ?? null, memberCount: memberIds(c.id).length }, sentAt: new Date(i.at).toISOString() }; });
+    .map((i) => { const c = circles.get(i.circleId!)!; return { inviteId: i.id, from: ref(i.inviterId), circle: { id: c.id, name: c.name, cover: coverFor(c, me), memberCount: memberIds(c.id).length }, sentAt: new Date(i.at).toISOString() }; });
 }
 
 function detail(cid: string, me: string): CircleDetail {
@@ -434,7 +456,7 @@ const SAMPLE = { live: 'ist8k2qa', expired: 'old4q1ba' };
 function sampleInvites() {
   if (invites.some((i) => i.lookup === SAMPLE.live)) return;
   const cid = uuid();
-  circles.set(cid, { id: cid, name: 'Istanbul for Eid', createdBy: ID.abdullah, cover: 'istanbul', dest: 'Istanbul', dm: false, dmKey: null, trip: 'Istanbul · 9–15 Mar', pinned: 'istanbul3', pinnedBy: ID.abdullah, createdAt: mins(4300), updatedAt: 0 });
+  circles.set(cid, { id: cid, name: 'Istanbul for Eid', createdBy: ID.abdullah, cover: { kind: 'photo', id: 'istanbul' }, dest: 'Istanbul', dm: false, dmKey: null, trip: 'Istanbul · 9–15 Mar', pinned: 'istanbul3', pinnedBy: ID.abdullah, createdAt: mins(4300), updatedAt: 0 });
   [ID.abdullah, ID.noor, ID.khalid].forEach((u, i) => members.push({ circleId: cid, userId: u, role: i ? 'member' : 'admin', muted: false, lastReadAt: now(), joinedAt: mins(4300 - i) }));
   sys(cid, 'created', ID.abdullah, [], { at: mins(4300) });
   user(cid, ID.abdullah, 'Booked. We’re on SV263, Tue 9 Mar. Galata rooms for the six of us.', mins(2900));
@@ -457,6 +479,15 @@ const routes: Route[] = [
       .map((e) => ({ id: e.id, circleId: e.circleId, kind: e.kind, ref: e.ref, actor: e.actor }));
     return ok({ events, cursor: Math.min(liveSeq, Math.max(after, events.at(-1)?.id ?? liveSeq)) });
   }],
+  [/^\/circles\/covers$/, 'POST', ({ me, body }) => {
+    const f = (body as { __file?: { name: string; type: string; size: number; uri: string } }).__file;
+    if (!f) throw no('VALIDATION', undefined, { fields: { file: 'missing' } });
+    if (f.size > 10 * 1024 * 1024) throw no('VALIDATION', 'error.documentSize', { fields: { file: 'too_big' } });
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic'].includes(f.type)) throw no('VALIDATION', 'error.documentType', { fields: { file: 'type' } });
+    const fileId = uuid();
+    coverUploads.set(fileId, { uri: f.uri, owner: me });
+    return ok({ fileId, status: 'pending' }, 201);
+  }],
   [/^\/circles$/, 'GET', ({ me }) => ok({ circles: [...circles.values()].filter((c) => memberIds(c.id).includes(me)).map((c) => summary(c, me)).sort((a, b) => (circles.get(b.id)!.updatedAt - circles.get(a.id)!.updatedAt)), incoming: incoming(me), limited: mockBeta().limited })],
   [/^\/circles$/, 'POST', ({ me, body }) => {
     const b = parse(CreateCircleRequest, body);
@@ -464,7 +495,8 @@ const routes: Route[] = [
     const invite = [...new Set(b.invite)];
     if (invite.some((u) => u === me || !people.has(u) || isBlocked(me, u))) throw no('NOT_FOUND');
     const id = uuid();
-    circles.set(id, { id, name: b.name, createdBy: me, cover: b.cover ?? null, dest: b.dest ?? null, dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: now(), updatedAt: now() });
+    const cover = coverIn(b.cover ?? null, me, null);
+    circles.set(id, { id, name: b.name, createdBy: me, ...cover, dest: b.dest ?? null, dm: false, dmKey: null, trip: null, pinned: null, pinnedBy: null, createdAt: now(), updatedAt: now() });
     members.push({ circleId: id, userId: me, role: 'admin', muted: false, lastReadAt: now(), joinedAt: now() });
     sys(id, 'created', me);
     if (invite.length) {
@@ -496,7 +528,7 @@ const routes: Route[] = [
     const c = circles.get(id!)!;
     if ((p.name !== undefined || p.cover !== undefined) && m.role !== 'admin') throw no('FORBIDDEN', 'circles.err.adminOnly');
     if (p.name !== undefined && p.name !== c.name) { c.name = p.name; sys(c.id, 'renamed', me, [], { text: p.name }); }
-    if (p.cover !== undefined) c.cover = p.cover;
+    if (p.cover !== undefined) Object.assign(c, coverIn(p.cover, me, c));
     if (p.dest !== undefined) c.dest = p.dest;
     if (p.pin !== undefined) { if (p.pin && p.pin.id !== c.pinned) sys(c.id, 'pinned', me, [], { text: planById(p.pin.id)?.title ?? '' }); c.pinned = p.pin?.id ?? null; c.pinnedBy = p.pin ? me : null; }
     if (p.muted !== undefined) m.muted = p.muted;
@@ -693,7 +725,7 @@ const routes: Route[] = [
     const c = i.circleId ? circles.get(i.circleId) : null;
     const ids = c ? memberIds(c.id) : [];
     const preview: InvitePreview = { code: code!, status: i.status === 'cancelled' ? 'cancelled' : i.expiresAt < now() ? 'expired' : isFull(i) ? 'full' : 'open', kind: i.kind, from: ref(i.inviterId),
-      circle: c ? { name: c.name, cover: (c.cover as 'istanbul') ?? null, members: ids.slice(0, 4).map(ref), memberCount: ids.length, trip: localDates(c.trip) } : i.kind === 'circle' ? { name: 'Summer in Baku', cover: null, members: [], memberCount: 0, trip: null } : null };
+      circle: c ? { name: c.name, cover: coverFor(c, null), members: ids.slice(0, 4).map(ref), memberCount: ids.length, trip: localDates(c.trip) } : i.kind === 'circle' ? { name: 'Summer in Baku', cover: null, members: [], memberCount: 0, trip: null } : null };
     return ok(preview);
   }],
   [/^\/invites\/([\w-]+)$/, 'DELETE', ({ me }, id) => {

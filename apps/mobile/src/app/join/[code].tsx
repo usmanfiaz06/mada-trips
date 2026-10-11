@@ -1,7 +1,7 @@
 import { Linking, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
+import { CoverArt } from '@/components/circles/Cover';
 import { Faces } from '@/components/circles/ui';
 import { VGradient } from '@/components/Gradient';
 import { ErrorState, GoneState } from '@/components/states';
@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
-import { COVERS, circlesApi, ck, useAct, usePreview } from '@/lib/circles';
+import { circlesApi, ck, useAct, usePreview } from '@/lib/circles';
 import { holdJoin } from '@/lib/circles-join';
 import { buzz } from '@/lib/haptics';
 import { joinAnd, t, tn } from '@/lib/i18n';
@@ -71,7 +71,7 @@ export default function Join() {
 
   return (
     <Screen background={colors.night}>
-      {p.circle?.cover ? <Image source={COVERS[p.circle.cover]} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+      {p.circle?.cover ? <CoverArt cover={p.circle.cover} layout="poster" style={StyleSheet.absoluteFill} /> : null}
       <VGradient id="join-veil" stops={[[0, 'rgba(15,26,22,0.55)'], [0.24, 'rgba(15,26,22,0.05)'], [0.42, 'rgba(15,26,22,0.2)'], [0.66, 'rgba(15,26,22,0.92)'], [1, '#0f1a16']]} />
       {/* Back at the top as on every pushed screen (Home when the link opened the app); "Not now" below does the same. */}
       <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar dark onBack={leave} /></View>

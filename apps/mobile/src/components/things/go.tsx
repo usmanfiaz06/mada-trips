@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -156,7 +156,7 @@ export function DirectionsSheet({ x, ctx, onClose, onRide }: { x: Thing | null; 
         <View style={st.mada}>
           <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('things.go.withMada')}</T>
           <T v="tiny">{t('things.go.withMadaSub')}</T>
-          <Button testID="directions-ride" label={t('things.go.withMada')} variant="secondary" size="small" icon={<Icon name="car" size={16} color={colors.green} />} onPress={() => onRide(x)} />
+          <Button testID="directions-ride" label={t('things.go.askCar')} variant="secondary" size="small" icon={<Icon name="car" size={16} color={colors.green} />} onPress={() => onRide(x)} />
         </View>
       </ScrollView>
     </Sheet>
@@ -178,6 +178,9 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
   const [where, setWhere] = useState('');
   const [n, setN] = useState(Math.max(1, Math.min(6, ctx.travellers || 2)));
   const [text, setText] = useState<string | null>(null);
+  const times = useRef<ScrollView>(null);
+  const scrolled = useRef(false);
+  const viewport = useRef(390);
   const [clientId] = useState(() => `ride-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`);
   const ride = useMutation({
     mutationFn: (message: string) => thingsApi.ride({
@@ -210,7 +213,12 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
         <T v="eyebrow">{t('things.ride.day')}</T>
         <View style={st.chips}>{days.slice(0, 10).map((d) => <Chip key={d} label={dayLabel(d, { today })} on={day === d} onPress={() => { setDay(d); reset(); }} />)}</View>
         <T v="eyebrow">{t('things.ride.time')}</T>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }} testID="ride-times">
+        <ScrollView
+          ref={times} horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }} testID="ride-times"
+          // Start with the chosen time in view (10:00 is off the edge otherwise).
+          onContentSizeChange={(w) => { if (!scrolled.current) { scrolled.current = true; const x = Math.max(0, (w / TIMES.length) * TIMES.indexOf(time) - 40); times.current?.scrollTo({ x: isRTL() && Platform.OS !== 'web' ? Math.max(0, w - x - viewport.current) : x, animated: false }); } }}
+          onLayout={(e) => { viewport.current = e.nativeEvent.layout.width; }}
+        >
           {TIMES.map((tm) => <Chip key={tm} label={localizeDigits(tm)} on={time === tm} onPress={() => { setTime(tm); reset(); }} />)}
         </ScrollView>
         <T v="eyebrow">{t('things.ride.from')}</T>

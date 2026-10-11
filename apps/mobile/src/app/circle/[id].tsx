@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { circleDest, joinNames, planById, type CircleMessage, type MadaAction, type PersonRef, type SplitShare } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -8,6 +7,7 @@ import { Bubble, BubbleText, ReactionBar, Reactions, ShareCard, SplitCard, SysLi
 import { ArtChat } from '@/components/circles/art';
 import { useSaveToggle } from '@/components/circles/hooks';
 import { CircleSettings } from '@/components/circles/settings';
+import { CoverArt, CoverStatus, coverInk } from '@/components/circles/Cover';
 import { ToolsSheet, ShareSheet, SplitSheet, VoteSheet, type Tool } from '@/components/circles/tools';
 import { Faces, Row, webNoOutline } from '@/components/circles/ui';
 import { VGradient } from '@/components/Gradient';
@@ -15,7 +15,7 @@ import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
-import { COVERS, circlesApi, ck, queueMessage, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
+import { circlesApi, ck, queueMessage, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
 import { useOutbox } from '@/lib/net/outbox';
 import { isOffline } from '@/lib/net/state';
 import { useLive, useTyping } from '@/lib/circles-live';
@@ -138,26 +138,32 @@ export default function CircleChat() {
   const jump = (mid: string) => { const y = positions.current.get(mid); if (y !== undefined) scroller.current?.scrollTo({ y: Math.max(0, y - 120), animated: true }); };
   const sub = [dest && d.circle.trip ? d.circle.trip : dest, tn('circles.people', d.members.length), invited.length ? t('circles.chat.invited', { count: invited.length }) : null, d.circle.muted ? t('circles.chat.muted') : null].filter(Boolean).join(' · ');
 
+  // The cover behind the header: words in paper over a photo or the green, in ink on a light drawing.
+  const cover = dm ? null : d.circle.cover;
+  const ink = coverInk(cover);
+  const onPhoto = !!cover && !ink.light;
   const faces = (
     <Pressable accessibilityRole="button" accessibilityLabel={t('circles.chat.settingsA11y', { name: d.circle.name })} onPress={() => { buzz('tap'); setSheet('settings'); }}
-      style={[st.faces, d.circle.cover && !dm ? st.facesPhoto : null]} testID="circle-settings">
-      <Faces people={d.members.slice(0, 3)} size={28} overlap={8} ring={d.circle.cover && !dm ? 'rgba(15,26,22,0.6)' : colors.sand} />
-      {d.members.length > 3 ? <T style={{ fontSize: 12, fontFamily: ff.ui600, color: d.circle.cover && !dm ? colors.paper : colors.green }}>+{d.members.length - 3}</T> : null}
+      style={[st.faces, onPhoto ? st.facesPhoto : cover ? st.facesLight : null]} testID="circle-settings">
+      <Faces people={d.members.slice(0, 3)} size={28} overlap={8} ring={onPhoto ? 'rgba(15,26,22,0.6)' : cover ? colors.paper : colors.sand} />
+      {d.members.length > 3 ? <T style={{ fontSize: 12, fontFamily: ff.ui600, color: onPhoto ? colors.paper : colors.green }}>+{d.members.length - 3}</T> : null}
     </Pressable>
   );
 
   return (
     <Screen>
       {dm ? <TopBar onBack={() => router.back()} backLabel={t('circles.back')} title={d.circle.name} right={faces} /> : (
-        <View style={[st.head, d.circle.cover ? { backgroundColor: colors.night } : null]}>
-          {d.circle.cover ? <>
-            <Image source={COVERS[d.circle.cover]} style={StyleSheet.absoluteFill} contentFit="cover" />
-            <VGradient id="cx-head" stops={[[0, 'rgba(15,26,22,0.55)'], [0.4, 'rgba(15,26,22,0.25)'], [1, 'rgba(15,26,22,0.82)']]} />
-          </> : null}
-          <TopBar onBack={() => router.back()} backLabel={t('circles.back')} dark={!!d.circle.cover} right={faces} />
+        <View style={[st.head, cover ? { backgroundColor: colors.night } : null]} testID="circle-head">
+          {cover ? (
+            <CoverArt cover={cover} style={StyleSheet.absoluteFill}>
+              {onPhoto ? <VGradient id="cx-head" stops={[[0, 'rgba(15,26,22,0.55)'], [0.4, 'rgba(15,26,22,0.25)'], [1, 'rgba(15,26,22,0.82)']]} /> : null}
+            </CoverArt>
+          ) : null}
+          <TopBar onBack={() => router.back()} backLabel={t('circles.back')} dark={onPhoto} right={faces} />
           <View style={{ paddingHorizontal: 24, gap: 4 }}>
-            <T style={[font('display', d.circle.cover ? colors.paper : colors.green), { fontSize: 34, lineHeight: 36 }]} accessibilityRole="header" balance={false}>{d.circle.name}</T>
-            <T style={{ fontSize: 13, fontFamily: ff.ui400, color: d.circle.cover ? 'rgba(255,253,249,0.88)' : colors.ink3 }}>{sub}</T>
+            <T style={[font('display', cover ? ink.text : colors.green), { fontSize: 34, lineHeight: 36 }]} accessibilityRole="header" balance={false}>{d.circle.name}</T>
+            <T style={{ fontSize: 13, fontFamily: ff.ui400, color: cover ? ink.soft : colors.ink3 }}>{sub}</T>
+            <CoverStatus cover={cover} onDark={onPhoto} />
           </View>
         </View>
       )}
@@ -279,6 +285,7 @@ export default function CircleChat() {
 const st = StyleSheet.create({
   head: { paddingBottom: 12 },
   faces: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4, borderRadius: 999 },
+  facesLight: { backgroundColor: 'rgba(255,253,249,0.7)', paddingVertical: 3, paddingStart: 3, paddingEnd: 8 },
   facesPhoto: { backgroundColor: 'rgba(15,26,22,0.42)', borderWidth: 1, borderColor: 'rgba(255,253,249,0.18)', paddingVertical: 3, paddingStart: 3, paddingEnd: 8 },
   pin: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10, marginHorizontal: 16, marginBottom: 2, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18, backgroundColor: colors.paper, boxShadow: '0px 10px 24px -20px rgba(15,26,22,0.6)' },
   pinIc: { width: 32, height: 32, borderRadius: 999, backgroundColor: '#f3ead8', alignItems: 'center', justifyContent: 'center' },

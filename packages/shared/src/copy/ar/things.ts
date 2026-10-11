@@ -145,6 +145,7 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.go.appRide': 'اطلب مشوارًا إلى هناك',
   'things.go.appMaps': 'الاتجاهات من مكانك',
   'things.go.withMada': 'اذهب مع مادا',
+  'things.go.askCar': 'اطلب سيارة',
   'things.go.withMadaSub': 'سيارة مع سائق نحجزها لك. نرسل السعر أولًا.',
   'things.go.minDrive': '{n} د بالسيارة',
   'things.go.minWalk': '{n} د مشيًا',

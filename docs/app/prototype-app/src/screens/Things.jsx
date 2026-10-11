@@ -4,6 +4,7 @@ import { Icon, TopBar, Sheet, EmptyState, ArtCompass } from '../ui.jsx';
 import { en } from '../../../../../packages/shared/src/copy/index.ts';
 import { MOCK_ACTIVITIES, MOCK_EXPERIENCES, mockEvents } from '../../../../../packages/shared/src/schemas/activities-data.ts';
 import { filterActivities, localClock, moodOf, nextPrayer, openState, todayIdeas, utcOffsetMin } from '../../../../../packages/shared/src/schemas/activities-logic.ts';
+import { googleMapsUrl, travelEstimate } from '../../../../../packages/shared/src/schemas/directions.ts';
 
 /* Things to do (the app's components/things): on a city's page and inside the trip. The same sample data and rules as
    the app's mock mode (packages/shared activities-data.ts / activities-logic.ts): real places from open data with
@@ -20,6 +21,15 @@ const KIND_ICON = { attraction: 'star', museum: 'globe', gallery: 'star', viewpo
 const km = (a, b) => { const r = Math.PI / 180; const x = Math.sin(((b.lat - a.lat) * r) / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(((b.lon - a.lon) * r) / 2) ** 2; return Math.round(6371 * 2 * Math.asin(Math.sqrt(x)) * 10) / 10; };
 const dur = (m) => (!m ? '' : m >= 1440 ? w('things.duration.days', { n: Math.round(m / 1440) }) : m < 60 ? w('things.duration.min', { n: m }) : m % 60 ? w('things.duration.hm', { h: Math.floor(m / 60), m: m % 60 }) : w('things.duration.h', { n: m / 60 }));
 const openText = (a) => (a.openNow === true ? (a.closesAt ? w('things.openUntil', { time: a.closesAt }) : w('things.openAllDay')) : a.openNow === false ? w('things.closedNow') : a.hours ? '' : w('things.hoursUnknown'));
+
+/* Getting there (the app's components/things/go.tsx): where Directions goes, the "about" time from the hotel. */
+const targetOf = (x, city) => {
+  if (x._t === 'a') return { name: x.name, lat: x.lat, lon: x.lon, address: x.address || null };
+  if (x._t === 'e') { const m = x.meetingPoint; return m && m.kind !== 'pickup' && (m.lat != null || m.address) ? { name: m.address || x.title, lat: m.lat, lon: m.lon, address: m.address } : null; }
+  return x.venue ? { name: x.venue, lat: null, lon: null, address: `${x.venue}, ${city}` } : null;
+};
+const estimateOf = (t, near) => (t && near && t.lat != null ? travelEstimate(near, { lat: t.lat, lon: t.lon }) : null);
+const minutesOf = (e) => w(e.mode === 'walk' ? 'things.go.minWalk' : 'things.go.minDrive', { n: e.min });
 
 /** Everything for one city (and trip), the way GET /places/:id/things answers. */
 export function thingsFor(cityId, { trip = null, day = null, filters = new Set() } = {}) {
@@ -55,9 +65,9 @@ function Photo({ k, kind, h = 118, r = 0 }) {
     : <span className="th-photo th-none" style={{ height: h, borderRadius: r }} aria-hidden="true"><span><Icon name={KIND_ICON[kind] || 'star'} size={24} color="#7d5d27" /></span></span>;
 }
 
-function MiniMap({ name }) {
+function MiniMap({ name, onOpen }) {
   return (
-    <button type="button" className="th-map" aria-label={w('things.mapA11y', { name })} onClick={() => buzz(HAPTIC.tap)}>
+    <button type="button" className="th-map" aria-label={w('things.mapA11y', { name })} onClick={() => { buzz(HAPTIC.tap); onOpen?.(); }}>
       <svg viewBox="0 0 320 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
         <rect width="320" height="120" fill="#e6eee6" />
         <path d="M-10 86 C 60 70, 110 98, 170 80 S 280 52, 340 66" stroke="#fffdf9" strokeWidth="9" fill="none" />
@@ -71,7 +81,130 @@ function MiniMap({ name }) {
 }
 
 /** A thing's sheet: photo, what it is, hours, the map, Add to my plan (in a trip) and Book with Mada. */
-function ThingSheet({ x, data, trip, onClose, onBook }) {
+function GettingThere({ x, city, near, hotel, onDirections, onRide }) {
+  const target = targetOf(x, city);
+  const est = estimateOf(target, near);
+  const address = x._t === 'a' ? x.address : x._t === 'w' ? x.venue : null;
+  return (
+    <div className="th-facts" data-testid="thing-getting-there">
+      {address && <span className="row small" style={{ color: '#1e352d', alignItems: 'flex-start' }}><Icon name="pin" size={16} color="#7d5d27" /><span className="col" style={{ gap: 0 }}><span className="tiny" style={{ color: '#7d5d27' }}>{w('things.go.address')}</span><span>{address}</span></span></span>}
+      {est && <span className="row small" style={{ color: '#1e352d', alignItems: 'flex-start' }}><Icon name={est.mode === 'walk' ? 'user' : 'car'} size={16} color="#7d5d27" /><span className="col" style={{ gap: 0 }}><b>{w(est.mode === 'walk' ? 'things.go.walk' : 'things.go.drive', { n: est.min })}</b><span className="tiny">{hotel ? w('things.go.fromHotel', { hotel }) : w('things.go.fromHotelPlain')}</span></span></span>}
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        {target && <button type="button" className="btn primary small grow" onClick={onDirections}><Icon name="arrow" size={16} />{w('things.go.directions')}</button>}
+        <button type="button" className="btn secondary small grow" onClick={onRide}><Icon name="car" size={16} />{w('things.go.withMada')}</button>
+      </div>
+    </div>
+  );
+}
+
+function MeetingPoint({ x }) {
+  const m = x.meetingPoint;
+  const known = m && (m.address || m.kind === 'pickup');
+  return (
+    <div className="th-facts" data-testid="thing-meeting">
+      <span className="row small" style={{ color: '#1e352d', alignItems: 'flex-start' }}><Icon name={m?.kind === 'pickup' ? 'car' : 'pin'} size={16} color="#7d5d27" />
+        <span className="col" style={{ gap: 2 }}>
+          <span className="eyebrow" style={{ color: '#7d5d27' }}>{w('things.meet.label')}</span>
+          <b>{known ? (m.kind === 'pickup' && !m.address ? w('things.meet.pickup') : m.address) : w('things.meet.voucher')}</b>
+          {known ? (m.note && <span className="tiny">{m.note}</span>) : <span className="tiny">{w('things.meet.voucherSub')}</span>}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/** The chooser. On the web (and here) that's Google Maps in a new tab; the app also offers Apple Maps, Waze, Uber, Careem. */
+function DirectionsSheet({ x, city, near, hotel, onClose, onRide }) {
+  const target = targetOf(x, city);
+  const est = estimateOf(target, near);
+  const title = x.name || x.title;
+  const open = () => { buzz(HAPTIC.tap); window.open(googleMapsUrl(target, est?.mode || 'drive'), '_blank', 'noopener'); };
+  return (
+    <Sheet label={w('things.go.title', { name: title })} onClose={onClose}>
+      <h2 className="h2">{w('things.go.title', { name: title })}</h2>
+      {target.address && <span className="small">{target.address}</span>}
+      {est && (
+        <div className="th-facts" style={{ gap: 4 }}>
+          <span className="eyebrow" style={{ color: '#7d5d27' }}>{hotel ? w('things.go.fromHotel', { hotel }) : w('things.go.fromHotelPlain')}</span>
+          <span className="row small" style={{ color: '#1e352d' }}><Icon name="user" size={16} color="#7d5d27" />{est.mode === 'walk' ? <b>{w('things.go.walk', { n: est.walkMin })}</b> : w('things.go.walk', { n: est.walkMin })}</span>
+          <span className="row small" style={{ color: '#1e352d' }}><Icon name="car" size={16} color="#7d5d27" />{est.mode === 'drive' ? <b>{w('things.go.drive', { n: est.driveMin })}</b> : w('things.go.drive', { n: est.driveMin })}</span>
+          <span className="tiny">{w('things.go.estimate')}</span>
+        </div>
+      )}
+      <span className="eyebrow">{w('things.go.openIn')}</span>
+      <button type="button" className="th-app" onClick={open}>
+        <span className="th-app-mark"><Icon name="pin" size={18} color="#7d5d27" /></span>
+        <span className="grow col" style={{ gap: 1, minWidth: 0 }}><span className="h3" style={{ fontSize: 16 }}>{w('things.go.app.google')}</span><span className="tiny">{w('things.go.appWeb')}</span></span>
+        <Icon name="chevron" size={18} color="#5f6b65" />
+      </button>
+      <div className="th-mada">
+        <b className="small" style={{ color: '#1e352d' }}>{w('things.go.withMada')}</b>
+        <span className="tiny">{w('things.go.withMadaSub')}</span>
+        <button type="button" className="btn secondary small block" onClick={onRide}><Icon name="car" size={16} />{w('things.go.askCar')}</button>
+      </div>
+    </Sheet>
+  );
+}
+
+const TIMES = Array.from({ length: 33 }, (_, i) => { const m = 7 * 60 + i * 30; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; });
+
+/** Get there with Mada: a car request to Faisal, like an airport pickup; the chat opens with their words. */
+function RideSheet({ x, city, trip, day: initial, onClose }) {
+  const { s, set, push } = useStore();
+  const hotel = trip ? stayOf(trip)?.name || null : null;
+  const today = new Date().toISOString().slice(0, 10);
+  const days = trip ? tripDays(trip) : Array.from({ length: 7 }, (_, i) => addDays(today, i));
+  const [day, setDay] = useState(initial && days.includes(initial) ? initial : days.find((d) => d >= today) || days[0]);
+  const [time, setTime] = useState('10:00');
+  const [pickup, setPickup] = useState(hotel ? 'hotel' : 'other');
+  const [where, setWhere] = useState('');
+  const [n, setN] = useState(trip ? Math.min(6, (trip.travellers || []).length || 2) : 2);
+  const [text, setText] = useState(null);
+  const title = x.name || x.title;
+  const from = pickup === 'hotel' ? hotel : where.trim() || '…';
+  const who = n === 1 ? w('things.request.whoOne') : w('things.request.who', { n });
+  const msg = text ?? w('things.ride.message', { name: title, day: dayLabel(day), time, from, who });
+  const missing = pickup === 'other' && !where.trim();
+  const timesRef = React.useRef(null);
+  React.useEffect(() => { const el = timesRef.current?.querySelector('.chip.on'); if (el) el.scrollIntoView({ block: 'nearest', inline: 'center' }); }, []);
+  const send = () => {
+    const offline = !!s.demo.offline;
+    const id = 'rd' + Date.now();
+    const reqTitle = w('things.ride.requestTitle', { name: title });
+    set((p) => ({
+      requests: [...p.requests, { id, kind: 'car', short: 'ride', title: reqTitle, detail: `${from} → ${title} · ${dayLabel(day)} ${time} · ${who}`, status: offline ? 'queued' : 'sent', created: Date.now(), quote: 0, quoteText: `A car from ${from} to ${title} on ${dayLabel(day)} at ${time}. I’ll send you the price here first.` }],
+      support: [...(p.support || []), { id: 'm' + Date.now(), at: Date.now(), from: 'me', text: msg, about: reqTitle, queued: offline, intent: 'free' }],
+      tripsTab: 'requests',
+    }));
+    buzz(HAPTIC.success);
+    onClose();
+    if (!offline) setTimeout(() => set((p) => ({ support: [...(p.support || []), { id: 'm' + Date.now() + 'f', at: Date.now(), from: 'faisal', text: `On it. I’ll book a car to ${title} and send you the price here, usually within the hour.` }] })), 1600);
+    push('support', { about: reqTitle });
+  };
+  return (
+    <Sheet label={w('things.ride.title', { name: title })} onClose={onClose}>
+      <h2 className="h2">{w('things.ride.title', { name: title })}</h2>
+      <span className="eyebrow">{w('things.ride.day')}</span>
+      <div className="chips">{days.slice(0, 10).map((d) => <button key={d} type="button" className={'chip' + (day === d ? ' on' : '')} onClick={() => { setDay(d); setText(null); }}>{dayLabel(d)}</button>)}</div>
+      <span className="eyebrow">{w('things.ride.time')}</span>
+      <div className="chips scrollx th-rail" ref={timesRef} data-testid="ride-times">{TIMES.map((tm) => <button key={tm} type="button" className={'chip' + (time === tm ? ' on' : '')} onClick={() => { setTime(tm); setText(null); }}>{tm}</button>)}</div>
+      <span className="eyebrow">{w('things.ride.from')}</span>
+      <div className="chips">
+        {hotel && <button type="button" className={'chip' + (pickup === 'hotel' ? ' on' : '')} onClick={() => { setPickup('hotel'); setText(null); }}>{hotel}</button>}
+        <button type="button" className={'chip' + (pickup === 'other' ? ' on' : '')} onClick={() => { setPickup('other'); setText(null); }}>{w('things.ride.elsewhere')}</button>
+      </div>
+      {pickup === 'other' && <input className="input" aria-label={w('things.ride.where')} placeholder={w('things.ride.where')} value={where} maxLength={160} onChange={(e) => { setWhere(e.target.value); setText(null); }} />}
+      <span className="eyebrow">{w('things.ride.people')}</span>
+      <div className="chips">{[1, 2, 3, 4, 5, 6].map((k) => <button key={k} type="button" className={'chip' + (n === k ? ' on' : '')} onClick={() => { setN(k); setText(null); }}>{k === 6 ? '6+' : k}</button>)}</div>
+      <div className="field"><label htmlFor="rd-msg">{w('things.bookSheet.message')}</label><textarea id="rd-msg" className="input" style={{ height: 76, padding: 14, resize: 'none', lineHeight: 1.4 }} value={msg} onChange={(e) => setText(e.target.value)} /></div>
+      <span className="tiny">{w('things.ride.note', { agent: 'Faisal' })}</span>
+      {missing && <span className="small" style={{ color: '#7d5d27' }}>{w('things.ride.whereNeeded')}</span>}
+      <button type="button" className="btn primary block" disabled={!msg.trim() || missing} onClick={send}>{w('things.ride.send')}</button>
+    </Sheet>
+  );
+}
+
+function ThingSheet({ x, data, trip, city, onClose, onBook, onDirections, onRide }) {
   const { s, set } = useStore();
   const [picking, setPicking] = useState(false);
   const planned = (s.plannedIdeas || []).find((i) => i.ref === x.id);
@@ -90,7 +223,8 @@ function ThingSheet({ x, data, trip, onClose, onBook }) {
           {x.distanceKm != null && <span className="row small" style={{ color: '#1e352d' }}><Icon name="pin" size={16} color="#7d5d27" />{w('things.kmFromHotel', { km: x.distanceKm })}</span>}
           {(x.family || x.indoor || x.free) && <span className="row small" style={{ color: '#1e352d' }}><Icon name="star" size={16} color="#7d5d27" />{[x.family && w('things.familyTag'), x.indoor && w('things.indoor'), x.free && w('things.free')].filter(Boolean).join(' · ')}</span>}
         </div>
-        <MiniMap name={x.name} />
+        <MiniMap name={x.name} onOpen={() => onDirections(x)} />
+        <GettingThere x={x} city={city} near={data.near} hotel={trip ? stayOf(trip)?.name : null} onDirections={() => onDirections(x)} onRide={() => onRide(x)} />
         <span className="tiny">© OpenStreetMap contributors, ODbL</span>
       </>)}
       {x._t === 'e' && (
@@ -101,12 +235,16 @@ function ThingSheet({ x, data, trip, onClose, onBook }) {
           {x.freeCancel && <span className="row small" style={{ color: '#1e352d' }}><Icon name="check" size={16} color="#7d5d27" />{w('things.freeCancel')}</span>}
         </div>
       )}
+      {x._t === 'e' && <MeetingPoint x={x} />}
+      {x._t === 'e' && x.meetingPoint?.lat != null && <MiniMap name={x.meetingPoint.address || x.title} onOpen={() => onDirections(x)} />}
+      {x._t === 'e' && <GettingThere x={x} city={city} near={data.near} hotel={trip ? stayOf(trip)?.name : null} onDirections={() => onDirections(x)} onRide={() => onRide(x)} />}
       {x._t === 'w' && (
         <div className="th-facts">
           <span className="row small" style={{ color: '#1e352d' }}><Icon name="bell" size={16} color="#7d5d27" />{x.startsOn === x.endsOn ? dayLabel(x.startsOn) : w('things.event.dates', { from: dayLabel(x.startsOn), to: dayLabel(x.endsOn) })}</span>
           {(x.time || x.venue) && <span className="row small" style={{ color: '#1e352d' }}><Icon name="pin" size={16} color="#7d5d27" />{[x.time, x.venue].filter(Boolean).join(' · ')}</span>}
         </div>
       )}
+      {x._t === 'w' && x.venue && <GettingThere x={x} city={city} near={data.near} hotel={trip ? stayOf(trip)?.name : null} onDirections={() => onDirections(x)} onRide={() => onRide(x)} />}
       {trip && (planned ? (
         <div className="th-planned"><Icon name="check" size={18} color="#2f7a4b" /><span className="grow small" style={{ color: '#1e352d' }}>{planned.day ? w('things.addedPlan', { day: dayLabel(planned.day) }) : w('things.addedPlanAny')}</span>
           <button type="button" className="link tiny" onClick={() => set((p) => ({ plannedIdeas: (p.plannedIdeas || []).filter((i) => i.ref !== x.id) }))}>{w('things.removePlan')}</button></div>
@@ -182,6 +320,9 @@ export function ThingsSection({ cityId, city, trip = null, full = false }) {
   const [day, setDay] = useState(null);
   const [picked, setPicked] = useState(null);
   const [booking, setBooking] = useState(null);
+  const [going, setGoing] = useState(null);
+  const [riding, setRiding] = useState(null);
+  const then = (close, open) => { close(); setTimeout(open, 250); };
   const data = useMemo(() => thingsFor(cityId, { trip, day, filters }), [cityId, trip, day, filters]);
   const toggle = (f) => setFilters((prev) => { const n = new Set(prev); if (n.has(f)) n.delete(f); else { n.add(f); if (['indoor', 'outdoor', 'see'].includes(f)) ['indoor', 'outdoor', 'see'].filter((x) => x !== f).forEach((x) => n.delete(x)); } return n; });
   const ids = data.today?.ids || [];
@@ -210,7 +351,7 @@ export function ThingsSection({ cityId, city, trip = null, full = false }) {
           {list.map((a) => (
             <button key={a.id} type="button" className="th-row" onClick={() => { buzz(HAPTIC.tap); setPicked({ ...a, _t: 'a' }); }}>
               <Photo k={a.photo} kind={a.kind} h={76} r={16} />
-              <span className="grow col" style={{ gap: 2, minWidth: 0 }}><span className="h3" style={{ fontSize: 16 }}>{a.name}</span><span className="tiny">{[w(`things.kind.${a.kind}`), a.distanceKm != null ? w('things.kmFromHotel', { km: a.distanceKm }) : null, a.free ? w('things.free') : null].filter(Boolean).join(' · ')}</span>{openText(a) && <span className={'tiny ' + (a.openNow === false ? 'th-closed' : 'th-open')}>{openText(a)}</span>}</span>
+              <span className="grow col" style={{ gap: 2, minWidth: 0 }}><span className="h3" style={{ fontSize: 16 }}>{a.name}</span><span className="tiny">{[w(`things.kind.${a.kind}`), data.near ? minutesOf(travelEstimate(data.near, a)) : null, a.free ? w('things.free') : null].filter(Boolean).join(' · ')}</span>{openText(a) && <span className={'tiny ' + (a.openNow === false ? 'th-closed' : 'th-open')}>{openText(a)}</span>}</span>
               <Icon name="chevron" size={18} color="#5f6b65" />
             </button>
           ))}
@@ -256,8 +397,11 @@ export function ThingsSection({ cityId, city, trip = null, full = false }) {
         <button type="button" className="link tiny" style={{ alignSelf: 'flex-start' }} onClick={() => push('thingsSources')}>{w('things.sourcesLink')}</button>
         <span className="tiny">© OpenStreetMap contributors, ODbL · Descriptions from Wikidata, CC0 · Places from GeoNames, CC BY 4.0</span>
       </div>}
-      {picked && <ThingSheet x={picked} data={data} trip={trip} onClose={() => setPicked(null)} onBook={(x) => { setPicked(null); setTimeout(() => setBooking(x), 250); }} />}
+      {picked && <ThingSheet x={picked} data={data} trip={trip} city={city} onClose={() => setPicked(null)} onBook={(x) => then(() => setPicked(null), () => setBooking(x))}
+        onDirections={(x) => then(() => setPicked(null), () => setGoing(x))} onRide={(x) => then(() => setPicked(null), () => setRiding(x))} />}
       {booking && <BookSheet x={booking} city={city} trip={trip} day={day} onClose={() => setBooking(null)} />}
+      {going && <DirectionsSheet x={going} city={city} near={data.near} hotel={trip ? stayOf(trip)?.name : null} onClose={() => { const x = going; then(() => setGoing(null), () => setPicked(x)); }} onRide={() => { const x = going; then(() => setGoing(null), () => setRiding(x)); }} />}
+      {riding && <RideSheet x={riding} city={city} trip={trip} day={day} onClose={() => setRiding(null)} />}
     </div>
   );
 }

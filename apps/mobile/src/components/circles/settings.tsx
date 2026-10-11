@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { CircleDetail, CircleMemberView } from '@mada/shared';
+import type { CircleCover, CircleDetail, CircleMemberView } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
@@ -11,11 +11,13 @@ import { agoLabel, circlesApi, ck, useAct, useFriends, useMeId } from '@/lib/cir
 import { buzz } from '@/lib/haptics';
 import { joinAnd, t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { colors } from '@/theme';
+import { colors, font } from '@/theme';
+import { coverInput, sameCover } from '@/lib/circle-covers';
+import { CoverArt, CoverPicker, CoverStatus, coverInk } from './Cover';
 import { InviteSheet } from './sheets';
 import { ChoiceCard, Face, Input, PersonRow, Row, SheetScroll, TextLink, Tick, Toggle } from './ui';
 
-type Mode = 'main' | 'rename' | 'add' | 'invite' | 'member' | 'leave' | 'delete';
+type Mode = 'main' | 'rename' | 'cover' | 'add' | 'invite' | 'member' | 'leave' | 'delete';
 
 /** Circle settings (prototype GroupInfo): members, invited (remind, cancel), admin, rename, mute, leave, delete for everyone. */
 export function CircleSettings({ visible, onClose, d, onGone }: { visible: boolean; onClose: () => void; d: CircleDetail; onGone: () => void }) {
@@ -23,6 +25,8 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
   const me = useMeId();
   const [mode, setMode] = useState<Mode>('main');
   const [rename, setRename] = useState(d.circle.name);
+  const [cover, setCover] = useState<CircleCover | null>(d.circle.cover);
+  const [upload, setUpload] = useState<Extract<CircleCover, { kind: 'upload' }> | null>(d.circle.cover?.kind === 'upload' ? d.circle.cover : null);
   const [target, setTarget] = useState<CircleMemberView | null>(null);
   const [adding, setAdding] = useState<string[]>([]);
   const [reminded, setReminded] = useState<string[]>([]);
@@ -42,7 +46,7 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
   const remove = useAct((uid: string) => circlesApi.removeMember(id, uid), touched);
   const leave = useAct(() => circlesApi.leave(id), () => [ck.list]);
   const del = useAct(() => circlesApi.remove(id), () => [ck.list]);
-  const sheetLabel = mode === 'rename' ? t('circles.settings.rename') : mode === 'add' ? t('circles.settings.addPeople') : t('circles.settings.label');
+  const sheetLabel = mode === 'rename' ? t('circles.settings.rename') : mode === 'cover' ? t('circles.cover.change') : mode === 'add' ? t('circles.settings.addPeople') : t('circles.settings.label');
 
   if (mode === 'invite') return <InviteSheet visible={visible} onClose={() => setMode('main')} what={d.circle.name} load={(o) => circlesApi.circleLink(id, o)} />;
 
@@ -54,6 +58,15 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
           <Input maxLength={40} value={rename} onChangeText={setRename} accessibilityLabel={t('circles.rename.a11y')} testID="rename-input" />
           <T v="tiny">{t('circles.rename.note')}</T>
           <Button label={t('circles.save')} disabled={rename.trim().length < 2 || rename.trim() === d.circle.name} onPress={() => update.mutate({ name: rename.trim() }, { onSuccess: () => { setMode('main'); toast(t('circles.rename.done')); } })} testID="rename-save" />
+        </>) : mode === 'cover' ? (<>
+          <T v="h2">{t('circles.cover.change')}</T>
+          <CoverArt cover={cover} veil style={st.coverPreview}>
+            <T style={[font('display', coverInk(cover).text), { marginTop: 'auto', fontSize: 26, lineHeight: 28 }]} numberOfLines={1}>{d.circle.name}</T>
+          </CoverArt>
+          {cover?.kind === 'upload' ? <CoverStatus cover={cover} /> : null}
+          <CoverPicker value={cover} onChange={setCover} upload={upload} onUpload={setUpload} />
+          <Button label={t('circles.cover.save')} disabled={sameCover(cover, d.circle.cover)} busy={update.isPending} testID="cover-save"
+            onPress={() => update.mutate({ cover: coverInput(cover) }, { onSuccess: () => { buzz('success'); setMode('main'); toast(t('circles.cover.saved')); } })} />
         </>) : mode === 'add' ? (<>
           <T v="h2">{t('circles.add.title')}</T>
           <T v="small">{t('circles.newCircle.whoSub')}</T>
@@ -84,6 +97,7 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
           <View style={st.spread}>
             <T v="h2" style={{ flex: 1 }}>{d.circle.name}</T>
             {admin && !d.circle.dm ? <TextLink label={t('circles.settings.rename')} onPress={() => setMode('rename')} testID="rename" /> : null}
+            {admin && !d.circle.dm ? <TextLink label={t('circles.cover.change')} onPress={() => { setCover(d.circle.cover); setMode('cover'); }} testID="change-cover" /> : null}
           </View>
           <T v="tiny">{[tn('circles.people', d.members.length), invited.length ? t('circles.chat.invited', { count: invited.length }) : null, d.circle.trip, admin ? t('circles.settings.adminYou') : t('circles.settings.admin', { name: adminP?.short ?? '' })].filter(Boolean).join(' · ')}</T>
           <View style={{ gap: 6 }}>
@@ -136,4 +150,5 @@ const st = StyleSheet.create({
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   invited: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, backgroundColor: colors.mist },
   mini: { height: 32, paddingHorizontal: 12 },
+  coverPreview: { height: 132, borderRadius: 22, padding: 14 },
 });

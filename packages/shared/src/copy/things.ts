@@ -150,6 +150,7 @@ export const thingsCopy = {
   'things.go.appRide': 'Book a ride there',
   'things.go.appMaps': 'Directions from where you are',
   'things.go.withMada': 'Get there with Mada',
+  'things.go.askCar': 'Ask for a car',
   'things.go.withMadaSub': 'A car and driver, booked by us. We send the price first.',
   'things.go.minDrive': '{n} min drive',
   'things.go.minWalk': '{n} min walk',

@@ -227,7 +227,7 @@ async function run(lang) {
   await tapTest('place-osm:r1374029');
   await page.waitForTimeout(600);
   await scrollTo('thing-getting-there');
-  await see(W('From Rooms near Galata Tower', 'من Rooms near Galata Tower'), 'from the hotel');
+  await see(W('From Rooms near Galata Tower', 'من غرف قرب برج غلطة'), 'from the hotel');
   await see(W('About', 'نحو'), 'about how long');
   await shot('trip-place-getting-there');
   await byTest('thing-directions').click();
@@ -245,11 +245,11 @@ async function run(lang) {
   await byTest('thing-ride').click();
   await page.waitForTimeout(900);
   await see(W('A car to Hagia Sophia', 'سيارة إلى آيا صوفيا'), 'ride sheet in the trip');
-  await see('Rooms near Galata Tower', 'pickup from the hotel by default');
+  await see(W('Rooms near Galata Tower', 'غرف قرب برج غلطة'), 'pickup from the hotel by default');
   await shot('trip-ride-sheet');
   await byTest('ride-send').click();
   await page.waitForTimeout(1800);
-  await see(W('picking us up from Rooms near Galata Tower', 'تأخذنا من Rooms near Galata Tower'), 'the request asks for a car from the hotel');
+  await see(W('picking us up from Rooms near Galata Tower', 'تأخذنا من غرف قرب برج غلطة'), 'the request asks for a car from the hotel');
   await shot('trip-ride-request');
 
   step(`${lang}: the idea is on the itinerary`);

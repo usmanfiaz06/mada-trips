@@ -22,6 +22,7 @@ import { rise } from '@/lib/motion';
 import { toast } from '@/lib/toast';
 import { colors, ff, font, shadow } from '@/theme';
 import { ArtBookmark, ArtLantern } from './art';
+import { CoverArt, CoverBadge, coverInk } from './Cover';
 import { ReportBody } from './sheets';
 import { ChoiceCard, Face, Faces, Head, Row, TextLink, Toggle } from './ui';
 
@@ -71,7 +72,10 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
       {incoming.map((iv) => (
         <View key={iv.inviteId} style={st.incoming}>
           <Row gap={12}>
-            <Face p={iv.from} size={44} />
+            <View>
+              <CoverBadge cover={iv.circle.cover} size={48} />
+              <View style={{ position: 'absolute', bottom: -4, end: -6 }}><Face p={iv.from} size={24} ring={colors.paper} /></View>
+            </View>
             <View style={{ flex: 1 }}>
               <T v="h3" style={{ fontSize: 15 }}>{t('circles.incoming.title', { name: iv.from.short, circle: iv.circle.name })}</T>
               <T v="tiny">{`${tn('circles.people', iv.circle.memberCount)} · ${t('circles.incoming.sub')}`}</T>
@@ -181,16 +185,20 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
 
 function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: () => void }) {
   if (c.cover) {
+    const ink = coverInk(c.cover);
     return (
       <Pressable accessibilityRole="button" accessibilityLabel={c.name} onPress={() => { buzz('tap'); onPress(); }} style={st.photoTile} testID="circle-tile">
-        <Image source={COVERS[c.cover]} style={StyleSheet.absoluteFill} contentFit="cover" />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,26,22,0.18)' }]} />
-        <View style={[StyleSheet.absoluteFill, { top: '40%', backgroundColor: 'rgba(15,26,22,0.45)' }]} />
+        <CoverArt cover={c.cover} style={StyleSheet.absoluteFill}>
+          {ink.light ? <View style={[StyleSheet.absoluteFill, { top: '52%', backgroundColor: 'rgba(255,253,249,0.55)' }]} /> : <>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,26,22,0.18)' }]} />
+            <View style={[StyleSheet.absoluteFill, { top: '40%', backgroundColor: 'rgba(15,26,22,0.45)' }]} />
+          </>}
+        </CoverArt>
         {c.unread > 0 ? <Pill variant="gold" label={t('circles.unread', { count: c.unread })} style={{ position: 'absolute', top: 10, start: 10 }} /> : null}
         {c.muted ? <Pill variant="glass" label={t('circles.muted')} style={{ position: 'absolute', top: 10, end: 10 }} /> : null}
         <View style={{ padding: 14, gap: 2 }}>
-          <T style={[font('display', colors.paper), { fontSize: 22, lineHeight: 24 }]} numberOfLines={1}>{c.name}</T>
-          <T v="tiny" color="rgba(255,253,249,0.92)" numberOfLines={1}>{line}</T>
+          <T style={[font('display', ink.text), { fontSize: 22, lineHeight: 24 }]} numberOfLines={1}>{c.name}</T>
+          <T v="tiny" color={ink.light ? 'rgba(30,53,45,0.8)' : 'rgba(255,253,249,0.92)'} numberOfLines={1}>{line}</T>
         </View>
       </Pressable>
     );

@@ -1,24 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type CoverKey, type PersonRef } from '@mada/shared';
+import { type CircleCover, type PersonRef } from '@mada/shared';
 import { Button } from '@/components/Button';
+import { CoverArt, CoverPicker, CoverStatus, coverInk } from '@/components/circles/Cover';
 import { InviteSheet } from '@/components/circles/sheets';
 import { Face, Input, PersonRow, Row, TextLink, Tick } from '@/components/circles/ui';
 import { Icon } from '@/components/Icon';
 import { Act, Screen, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
-import { COVERS, circlesApi, ck, useAct, useCircles, useFriends, useSearch } from '@/lib/circles';
+import { circlesApi, ck, useAct, useCircles, useFriends, useSearch } from '@/lib/circles';
+import { coverInput } from '@/lib/circle-covers';
 import { AUTO_FOCUS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { joinAnd, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors, ff, font } from '@/theme';
-import { VGradient } from '@/components/Gradient';
 
-const COVER_KEYS: (CoverKey | null)[] = [null, 'istanbul', 'alula', 'riyadh'];
 const IDEAS = ['family', 'eid', 'weekend', 'cousins'] as const;
 
 /** New circle (prototype NewCircle): two calm steps. A name and a cover with a live preview; then who's in. */
@@ -27,7 +26,9 @@ export default function NewCircle() {
   const params = useLocalSearchParams<{ name?: string; with?: string }>();
   const [stage, setStage] = useState<'name' | 'people'>('name');
   const [name, setName] = useState(params.name ?? '');
-  const [cover, setCover] = useState<CoverKey | null>('alula');
+  // Drawings first: a plane on the green until they pick something else.
+  const [cover, setCover] = useState<CircleCover | null>({ kind: 'icon', icon: 'plane', color: 'green' });
+  const [upload, setUpload] = useState<Extract<CircleCover, { kind: 'upload' }> | null>(null);
   const [chosen, setPicked] = useState<PersonRef[]>([]);
   const [q, setQ] = useState('');
   const [term, setTerm] = useState('');
@@ -51,7 +52,7 @@ export default function NewCircle() {
   const toggle = (p: PersonRef) => { buzz('select'); if (withF && p.id === withF.id) { setWithOff(true); return; } setPicked(isOn(p.id) ? chosen.filter((x) => x.id !== p.id) : [...chosen, p]); };
   const tag = useMemo(() => (id: string, rel?: string, mutual?: number) => (family.some((f) => f.id === id) || rel === 'family' ? t('circles.newCircle.tagFamily') : all.some((f) => f.id === id) || rel === 'friend' ? t('circles.newCircle.tagFriend') : t('circles.newCircle.tagMada', { count: mutual ?? 0 })), [family, all]);
   const create = useAct(circlesApi.create, () => [ck.list]);
-  const make = () => create.mutate({ name: name.trim(), cover, invite: picked.map((p) => p.id) }, {
+  const make = () => create.mutate({ name: name.trim(), cover: coverInput(cover), invite: picked.map((p) => p.id) }, {
     onSuccess: (d) => {
       buzz('success');
       const names = picked.map((p) => p.short);
@@ -60,6 +61,7 @@ export default function NewCircle() {
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : t('error.internal')),
   });
+  const ink = coverInk(cover);
   const row = (p: PersonRef, sub: string) => <PersonRow key={p.id} p={p} sub={sub} on={isOn(p.id)} onPress={() => toggle(p)} right={<Tick on={isOn(p.id)} />} testID="pick-person" />;
 
   if (stage === 'name') {
@@ -67,20 +69,12 @@ export default function NewCircle() {
       <Screen>
         <TopBar onBack={() => router.back()} backLabel={t('common.cancel')} right={<T v="tiny" style={{ paddingEnd: 8 }}>{t('circles.newCircle.step', { n: 1 })}</T>} />
         <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
-          <View style={st.preview} accessibilityElementsHidden>
-            {cover ? <Image source={COVERS[cover]} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-            <VGradient id="nc-veil" stops={[[0, 'rgba(15,26,22,0.05)'], [0.3, 'rgba(15,26,22,0.05)'], [1, 'rgba(15,26,22,0.78)']]} />
-            <T style={[font('display', colors.paper), { fontSize: 36, lineHeight: 38 }]} balance={false}>{name.trim() || t('circles.newCircle.yours')}</T>
-            <T style={{ fontSize: 13, fontFamily: ff.ui400, color: 'rgba(255,253,249,0.82)', marginTop: 6 }}>{picked.length ? t('circles.newCircle.andMore', { count: picked.length }) : t('circles.newCircle.justYou')}</T>
-          </View>
-          <Row gap={12} style={{ justifyContent: 'center' }}>
-            {COVER_KEYS.map((c) => (
-              <Pressable key={c ?? 'plain'} accessibilityRole="radio" accessibilityState={{ checked: cover === c }} accessibilityLabel={c ?? t('circles.newCircle.plain')}
-                onPress={() => { buzz('select'); setCover(c); }} style={[st.dot, cover === c ? st.dotOn : null]}>
-                {c ? <Image source={COVERS[c]} style={StyleSheet.absoluteFill} contentFit="cover" /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.green }]} />}
-              </Pressable>
-            ))}
-          </Row>
+          <CoverArt cover={cover} veil style={st.preview} testID="nc-preview">
+            <View accessibilityElementsHidden style={{ marginTop: 'auto' }}>
+              <T style={[font('display', ink.text), { fontSize: 36, lineHeight: 38 }]} balance={false}>{name.trim() || t('circles.newCircle.yours')}</T>
+              <T style={{ fontSize: 13, fontFamily: ff.ui400, color: ink.soft, marginTop: 6 }}>{picked.length ? t('circles.newCircle.andMore', { count: picked.length }) : t('circles.newCircle.justYou')}</T>
+            </View>
+          </CoverArt>
           <View style={{ gap: 6 }}>
             <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.newCircle.name')}</T>
             <Input value={name} onChangeText={setName} placeholder={t('circles.newCircle.nameHint')} maxLength={40} autoFocus={AUTO_FOCUS} bad={dupe} accessibilityLabel={t('circles.newCircle.name')} testID="circle-name" />
@@ -91,6 +85,11 @@ export default function NewCircle() {
                 ))}
               </Row>
             )}
+          </View>
+          <View style={{ gap: 10 }}>
+            <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.cover.a11y')}</T>
+            {cover?.kind === 'upload' ? <CoverStatus cover={cover} /> : null}
+            <CoverPicker value={cover} onChange={setCover} upload={upload} onUpload={setUpload} />
           </View>
         </ScrollView>
         <Act><Button label={t('circles.newCircle.next')} disabled={!ok} onPress={() => setStage('people')} testID="circle-next" /></Act>
@@ -144,9 +143,7 @@ export default function NewCircle() {
 
 const st = StyleSheet.create({
   scroll: { paddingHorizontal: 20, paddingBottom: 150, gap: 18 },
-  preview: { height: 200, borderRadius: 28, backgroundColor: colors.green, overflow: 'hidden', justifyContent: 'flex-end', padding: 18, boxShadow: '0px 22px 40px -28px rgba(15,26,22,0.8)' },
-  dot: { width: 44, height: 44, borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(30,53,45,0.1)' },
-  dotOn: { borderWidth: 2, borderColor: colors.goldDeep, transform: [{ scale: 1.06 }], boxShadow: `0px 0px 0px 3px ${colors.sand}` },
+  preview: { height: 200, borderRadius: 28, padding: 18, boxShadow: '0px 22px 40px -28px rgba(15,26,22,0.8)' },
   chosen: { width: 56, alignItems: 'center', gap: 4 },
   x: { position: 'absolute', top: -2, end: 2, width: 18, height: 18, borderRadius: 99, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   well: { backgroundColor: colors.mist, borderRadius: 24, padding: 16, gap: 8 },
