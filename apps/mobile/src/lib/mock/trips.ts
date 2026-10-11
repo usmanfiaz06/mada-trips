@@ -9,6 +9,7 @@ import {
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
+import { plannedFor } from './things-store';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for the trip companion: the same endpoints as platform/src/app/api/app/v1/{trips,refunds,
@@ -485,7 +486,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     return ok({ trip, move: moveNeeded(trip) });
   }
   if (sub === 'itinerary') {
-    const days = buildItinerary({ trip, requests: s.requests.filter((r) => r.tripId === trip.id).map(pub), picks: trip.picks });
+    const days = buildItinerary({ trip, requests: s.requests.filter((r) => r.tripId === trip.id).map(pub), picks: trip.picks, planned: plannedFor(trip.id) });
     const out = outSegment(trip);
     return ok({ tripId: trip.id, title: trip.city, datesLong: rangeLong(trip.startDate, trip.endDate), days, events: calendarEvents(trip, days), shareText: shareText(trip, days), move: moveNeeded(trip), sameTimeAsHome: out ? sameTimeAsHome(out) : true });
   }
