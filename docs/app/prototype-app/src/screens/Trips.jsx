@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RequestThread, QuoteBreakdown } from './Ask.jsx';
+import { RequestThread, QuoteBreakdown, FlightFares } from './Ask.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, forwardAddress, rangeLabel, stayEnd, stayOf, dayLabel, shortDay, addDays, ofYou } from '../store.jsx';
 import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, EmptyPassport, PaperPlane, EmptyState, NetStale } from '../ui.jsx';
 import { UploadSheet } from './Wallet.jsx';
@@ -183,7 +183,14 @@ function Requests() {
           <div key={r.id} className="card rise">
             <div className="spread"><span className="h3">{r.title}</span><span className={'pill' + (r.status === 'quote' ? ' gold' : r.status === 'done' ? ' ok' : '')}>{REQ_STAGES[idx]?.[1]}</span></div>
             <span className="small">{r.detail}</span>
-            {r.status === 'quote' && (
+            {r.fares && ['quote', 'paid', 'done'].includes(r.status) && (
+              <div className="card well" style={{ gap: 8 }}>
+                <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
+                <span className="small" style={{ color: '#1e352d' }}>{r.quoteText}</span>
+                <FlightFares r={r} />
+              </div>
+            )}
+            {r.status === 'quote' && !r.fares && (
               <div className="card well" style={{ gap: 8 }}>
                 <div className="row"><span className="avatar sm green">F</span><span className="h3" style={{ fontSize: 14 }}>Faisal · your Mada agent</span></div>
                 <span className="small" style={{ color: '#1e352d' }}>{quoteText(r)}</span>

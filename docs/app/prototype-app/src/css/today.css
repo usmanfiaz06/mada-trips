@@ -165,3 +165,10 @@
 .td-ic.big { width: 52px; height: 52px; border-radius: 18px; background: #f3e6c9; color: var(--gold-ink); }
 .field .label-like { font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .field input[type="date"] { margin-top: 4px; }
+
+/* The wake-up alarm row and its sheets */
+.td-wake-step { display: flex; align-items: center; justify-content: space-between; padding: 12px 10px; border-radius: 22px; background: var(--mist); }
+.td-wake-step button { width: 52px; height: 52px; border-radius: 99px; border: 0; background: var(--paper); font-size: 17px; font-weight: 600; color: var(--green); }
+.td-wake-big { font-size: 40px; font-weight: 600; letter-spacing: -.03em; color: var(--green); }
+.td-wake-how { align-items: flex-start; }
+.td-tl .toggle { margin-top: 2px; }

@@ -61,7 +61,14 @@ function useBackgroundProgress() {
           const age = now - (r.created || now);
           if (r.status === 'sent' && age > 4000) { changed = true; return { ...r, status: 'reviewing' }; }
           if (r.status === 'reviewing' && age > 9000) { changed = true; setTimeout(() => banner({ title: 'Mada replied', body: `Your ${r.short}: tap to see it.`, haptic: HAPTIC.knock, to: { tab: 'trips' }, kind: 'reply' }), 0); return { ...r, status: 'quote' }; }
-          if (r.status === 'paid' && age > 15000) { changed = true; return { ...r, status: 'done' }; }
+          /* A flight request's fare: Faisal records the PNR and a ticket number each, and the trip is booked. */
+          if (r.status === 'paid' && r.fares && now - (r.paidAt || r.created) > 6000) {
+            changed = true;
+            setTimeout(() => banner({ title: 'You’re booked', body: `Faisal issued your tickets. ${r.title.replace(/^Flights to /, '')}.`, haptic: HAPTIC.success, to: { tab: 'trips' }, kind: 'reply' }), 0);
+            const fare = r.fares.find((f) => f.id === r.optionId) || r.fares[0];
+            return { ...r, status: 'done', pnr: 'QX7K2D', tickets: fare.prices.map((p, i) => ({ id: p.id, name: p.name, number: `065 ${2400000000 + i * 1111111}` })) };
+          }
+          if (r.status === 'paid' && age > 15000 && !r.fares) { changed = true; return { ...r, status: 'done' }; }
           return r;
         });
         const refunds = p.refunds.map((r) => {
@@ -118,7 +125,7 @@ function Phone() {
   useEffect(() => {
     const m = /#join\/([\w-]+)/.exec(window.location.hash || '');
     if (!m) return;
-    if (s.onboarded) store.push('join', { code: m[1] }); else set({ pendingInvite: m[1] });
+    if (s.onboarded) store.push('join', { code: m[1], viaLink: true }); else set({ pendingInvite: m[1] });
   }, []);
   useBackgroundProgress();
   useEffect(() => { if (s.tab !== 'wallet' && s.walletUnlocked) set({ walletUnlocked: false }); }, [s.tab]);

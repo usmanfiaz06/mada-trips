@@ -155,10 +155,13 @@ h1, h2, h3 { text-wrap: balance; }
 .otp { letter-spacing: .5em; text-align: center; font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; height: 64px; }
 
 /* ---------- dock ---------- */
-.dock { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 999px; background: rgba(255, 253, 249, .86); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(30, 53, 45, .08); box-shadow: 0 18px 40px -18px rgba(30, 53, 45, .35); z-index: 20; }
-.dock button { border: 0; background: transparent; width: 52px; height: 52px; border-radius: 999px; display: grid; place-items: center; transition: width .3s var(--ease), background .25s ease; color: var(--green); }
-.dock button.on { width: auto; padding: 0 18px 0 14px; display: flex; gap: 8px; background: var(--green); color: var(--mist); font-size: 14px; font-weight: 600; }
-.dock .orb { width: 60px; height: 60px; background: var(--green); }
+.dock { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); width: min(372px, calc(100% - 24px)); box-sizing: border-box; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 34px; background: rgba(255, 253, 249, .92); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); border: 1px solid rgba(30, 53, 45, .08); box-shadow: 0 18px 40px -18px rgba(30, 53, 45, .35); z-index: 20; }
+/* Every tab carries its name under the icon; the one you're on is green. */
+.dock button { flex: 1; min-width: 0; border: 0; background: transparent; height: 60px; border-radius: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; transition: background .25s ease; color: var(--green); }
+.dock button .dock-l { font-size: 11px; line-height: 14px; font-weight: 600; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dock button.on { background: var(--green); color: var(--mist); }
+.dock button.on .dock-l, .dock .orb .dock-l { color: var(--mist); }
+.dock .orb { flex: none; width: 60px; height: 60px; border-radius: 999px; gap: 1px; background: var(--green); }
 .dock .badge { position: absolute; }
 
 /* ---------- sheet ---------- */

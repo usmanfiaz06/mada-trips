@@ -79,12 +79,16 @@ export function Sun({ width = 32, color = '#d9b77a', className, style }) {
   );
 }
 
-export function TopBar({ title, onBack, backLabel = 'Back', right, dark }) {
+/* Back on the start side. A screen opened from a link, with nothing behind it, gets Home (to Today) instead. */
+export function TopBar({ title, onBack, backLabel = 'Back', right, dark, home = true }) {
+  const { s, set } = useStore();
+  const top = s.stack[s.stack.length - 1];
+  const goHome = !!onBack && home && s.stack.length === 1 && !!top?.params?.viaLink;
   return (
     <div className="topbar">
       {onBack ? (
-        <button type="button" className="back" onClick={() => { buzz(HAPTIC.tap); onBack(); }} style={dark ? { color: '#f6f2ec' } : null}>
-          <Icon name="back" />{backLabel}
+        <button type="button" className="back" onClick={() => { buzz(HAPTIC.tap); if (goHome) set({ tab: 'today', stack: [] }); else onBack(); }} style={dark ? { color: '#f6f2ec' } : null}>
+          <Icon name={goHome ? 'home' : 'back'} size={goHome ? 20 : undefined} />{goHome ? 'Home' : backLabel}
         </button>
       ) : <span />}
       {title ? <span className="title">{title}</span> : null}
@@ -191,7 +195,7 @@ export function Dock() {
     <nav className="dock" aria-label="Main">
       {tabs.map((t) => t.id === 'ask' ? (
         <button key="ask" type="button" className="orb" aria-label="Ask Mada" onClick={() => { buzz(HAPTIC.tap); push('ask', {}); }}>
-          <Sun width={32} />
+          <Sun width={26} /><span className="dock-l" aria-hidden="true">Ask</span>
         </button>
       ) : (
         <button key={t.id} type="button" className={s.tab === t.id ? 'on' : ''} aria-label={t.label} aria-current={s.tab === t.id ? 'page' : undefined} onClick={() => {
@@ -200,7 +204,7 @@ export function Dock() {
           if (s.tab === t.id) document.querySelectorAll('.phone .scroll').forEach((el) => el.scrollTo({ top: 0, behavior: 'smooth' }));
           go(t.id);
         }}>
-          <Icon name={t.icon} />{s.tab === t.id ? t.label : null}
+          <Icon name={t.icon} size={22} /><span className="dock-l" aria-hidden="true">{t.label}</span>
         </button>
       ))}
     </nav>

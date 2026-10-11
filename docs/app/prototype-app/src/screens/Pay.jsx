@@ -66,6 +66,16 @@ function useOrder(params, travellers) {
     return { title: pl.title, lines, rule: 'Free to cancel until 7 days before. Tours refunded in full until 48 hours before.', agent: true, people: true, img: pl.img };
   }
   if (params.kind === 'esim') return { title: 'Data in Türkiye', lines: [{ icon: 'globe', text: `10 GB for 7 days × ${params.count}`, price: 39 * params.count }], rule: 'Refundable until it’s installed.', agent: false, img: 'img/istanbul.jpg' };
+  if (params.kind === 'quote' && s.requests.find((x) => x.id === params.requestId)?.fares) {
+    /* The beta: a fare Faisal is holding for a flight request. Authorised now, captured when he issues the tickets. */
+    const r = s.requests.find((x) => x.id === params.requestId);
+    const f = r.fares.find((x) => x.id === params.optionId) || r.fares[0];
+    const paying = f.prices.filter((p) => p.type !== 'Infant');
+    const babies = f.prices.filter((p) => p.type === 'Infant');
+    const lines = [{ icon: 'flight', text: `${paying.length} traveller${paying.length === 1 ? '' : 's'} · ${f.airline}${f.back ? '' : ' · one way'}`, price: paying.reduce((a, p) => a + p.price, 0) }];
+    if (babies.length) lines.push({ icon: 'flight', text: `${babies.length} on a lap`, price: babies.reduce((a, p) => a + p.price, 0) });
+    return { title: r.title.replace(/^Flights to /, ''), lines, rule: /^Refund minus/.test(f.refund) ? `If you cancel, the flights come back minus ${f.refund.replace(/^Refund minus /, '')}.` : `Flights can’t be refunded, only the airport taxes. Changes cost ${f.change}.`, agent: false, requestId: params.requestId, img: 'img/istanbul.jpg' };
+  }
   if (params.kind === 'quote') {
     const r = s.requests.find((x) => x.id === params.requestId);
     return { title: r?.title || 'Request', lines: [{ icon: 'doc', text: r?.kind === 'visa' ? 'Appointment, forms and checklist' : 'As agreed with Mada', price: r?.quote || 0 }], rule: 'Refunded in full if we can’t deliver it.', agent: false, requestId: params.requestId, img: r?.trip || ['food', 'todo', 'car', 'hotel'].includes(r?.kind) ? (s.trip?.img || 'img/istanbul.jpg') : 'img/clouds.jpg' };
@@ -183,7 +193,7 @@ export default function Pay({ params }) {
       return;
     }
     buzz(HAPTIC.success);
-    if (params.kind === 'quote') set((p) => ({ requests: p.requests.map((r) => (r.id === params.requestId ? { ...r, status: 'paid' } : r)) }));
+    if (params.kind === 'quote') set((p) => ({ requests: p.requests.map((r) => (r.id === params.requestId ? { ...r, status: 'paid', paidAt: Date.now(), optionId: params.optionId || r.optionId } : r)) }));
     if (params.kind === 'share') set((p) => ({ circles: { ...p.circles, sharePaid: true }, ...(params.circle ? { circlePay: { ...(p.circlePay || {}), [params.circle]: true } } : {}) }));
     pop();
     toast(params.kind === 'esim' ? 'Done. The eSIMs install before you fly.' : params.kind === 'share' ? `Paid. ${params.payee || 'Abdullah'} sees it in the group.` : 'Paid. We’ll take it from here.');

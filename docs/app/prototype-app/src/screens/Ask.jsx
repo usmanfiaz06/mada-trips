@@ -636,6 +636,8 @@ function FlightFlow({ query, setCta }) {
       </>
     );
   }
+  /* The beta: no live fares. Where, when and who are known; the rest goes to Mada as a request. */
+  if (s.demo.flightsByRequest) return <><FlightRequest dest={dest} destKey={destKey} trip={{ ...trip, from }} who={who} setWho={setWho} setCta={setCta} onEdit={() => setEditing({})} />{sheet}</>;
   if (!whoDone) return (
     <div className="col rise" style={{ gap: 12 }}>
       <span className="h2">Who's going?</span>
@@ -798,6 +800,136 @@ function Leg({ f, to }) {
         <span className="tiny">{f.dur} · {f.stop ? '1 stop, IST' : 'direct'}</span>
       </div>
       <div className="end r"><span className="t">{f.arr}</span><span className="c">{to}</span></div>
+    </div>
+  );
+}
+
+/* ---------- flights by request (the beta) ---------- */
+
+const FR_FLEX = [[0, 'Exact dates'], [1, '1 day either side'], [3, '3 days either side']];
+const FR_BAGS = [['cabin', 'Cabin bag only'], ['one', 'One checked bag'], ['two', 'Two checked bags']];
+const FR_PREFS = [['direct', 'Direct only'], ['morning', 'Morning flights'], ['evening', 'Evening flights'], ['saudia', 'Saudia'], ['together', 'Seats together'], ['aisle', 'Aisle seats']];
+const FR_CATALOGUE = {
+  istanbul: [{ ...SV, code: 'SV263', back: 'SV264', dep: '09:40', arr: '13:55', pp: 2160, bags: '2 × 23 kg', change: 'SAR 300 per person', refund: 'Refund minus SAR 400 per person', note: 'Direct, and you sit together.' },
+    { ...TK, code: 'TK141', back: 'TK140', dep: '02:10', arr: '06:20', pp: 2328, bags: '2 × 23 kg', change: 'Free', refund: 'Refund minus SAR 300 per person', note: 'A full first day, after a short night.' }],
+};
+
+/* The fares Faisal sends back: two options with a price for each person (children 75%, babies 10%). */
+export function protoFares(destKey, dest, trip, who) {
+  const list = FR_CATALOGUE[destKey] || (dest.flights || []).map((f) => ({ ...f, back: f.code.replace(/\d+$/, (n) => String(Number(n) + 1)), note: f.reason })) ;
+  const base = list.length ? list : FR_CATALOGUE.istanbul;
+  const cabinX = trip.cabin === 'Business' ? 3.2 : trip.cabin === 'Premium' ? 1.7 : 1;
+  const legX = trip.type === 'oneway' ? 0.6 : 1;
+  return base.slice(0, 2).map((f, i) => {
+    const pp = Math.round(f.pp * cabinX * legX);
+    const prices = who.map((id) => { const a = PEOPLE[id]?.born ? 2026 - Number(PEOPLE[id].born) : 30; return { id, name: PEOPLE[id]?.name || 'You', type: a < 2 ? 'Infant' : a < 12 ? 'Child' : 'Adult', price: a < 2 ? Math.round(pp * 0.1) : a < 12 ? Math.round(pp * 0.75) : pp }; });
+    return { id: 'opt' + (i + 1), airline: f.airline, iata: f.iata, brand: f.brand, cabin: trip.cabin, out: { code: f.code, dep: f.dep, arr: f.arr, date: trip.dep }, back: trip.type === 'oneway' ? null : { code: f.back, dep: i ? '12:30' : '15:10', date: trip.ret }, prices, total: prices.reduce((a, p) => a + p.price, 0), bags: f.bags, change: f.change, refund: f.refund, note: f.note };
+  });
+}
+
+/* "Tell us where and when": how flexible, cabin, bags, what they'd like, a note. Then Send to Mada. */
+function FlightRequest({ dest, destKey, trip, who, setWho, setCta, onEdit }) {
+  const { s, set, go } = useStore();
+  const [flex, setFlex] = useState(trip.flex ? 3 : 0);
+  const [cabin, setCabin] = useState(trip.cabin);
+  const [bags, setBags] = useState('one');
+  const [prefs, setPrefs] = useState([]);
+  const [note, setNote] = useState('');
+  const [sent, setSent] = useState(null);
+  const dates = trip.type === 'oneway' ? `${rangeLabel(trip.dep)}, one way` : rangeLabel(trip.dep, trip.ret);
+  const send = () => {
+    const t2 = { ...trip, cabin };
+    const fares = protoFares(destKey, dest, t2, who);
+    const summary = [`${AIRPORT[trip.from] || trip.from} to ${dest.name}`, `${who.length} traveller${who.length === 1 ? '' : 's'}`, cabin, flex ? `±${flex} days` : 'Exact dates', FR_BAGS.find(([k]) => k === bags)[1], ...prefs.map((p) => FR_PREFS.find(([k]) => k === p)[1])].join(' · ');
+    const r = newRequest(s, { kind: 'flight', short: 'flights', title: `Flights to ${dest.name} · ${dates}`, detail: summary, note: note.trim() || undefined, fares, quote: Math.min(...fares.map((f) => f.total)),
+      quoteText: `I found ${fares.length === 1 ? 'this fare' : `${fares.length} fares`} and I’m holding ${fares.length === 1 ? 'it' : 'them'} for you.`, holdUntil: Date.now() + 24 * 3600e3, who });
+    set((p) => ({ requests: [...p.requests, r] }));
+    setSent(r);
+    setCta(null);
+    buzz(HAPTIC.success);
+  };
+  useEffect(() => { if (!sent) setCta({ label: 'Send to Mada', onClick: send, disabled: !who.length }); }, [flex, cabin, bags, prefs.join(), note, who.join(), sent]);
+  useEffect(() => () => setCta(null), []);
+  if (sent) return (
+    <div className="col rise" style={{ gap: 14 }}>
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <span className="avatar green">F</span>
+        <div className="col" style={{ gap: 2 }}>
+          <span className="h3">{sent.status === 'queued' ? 'Saved. It goes to Mada when you’re back online.' : `Sent to Faisal. He’s finding fares to ${dest.name}.`}</span>
+          <span className="small">Your options arrive in Trips › Requests, usually within the hour. You don’t need to stay on this screen.</span>
+        </div>
+      </div>
+      <div className="card well"><span className="h3">{sent.title}</span><span className="small">{sent.detail}</span></div>
+      <button type="button" className="btn primary block" onClick={() => go('trips')}>See it in Trips</button>
+    </div>
+  );
+  const chips = (opts, val, onPick) => <div className="chips">{opts.map(([k, l]) => <button key={k} type="button" className={'chip' + (val === k ? ' on' : '')} aria-pressed={val === k ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.select); onPick(k); }}>{l}</button>)}</div>;
+  return (
+    <div className="col rise" style={{ gap: 16 }} data-test="flight-request">
+      <div className="row" style={{ alignItems: 'flex-start' }}>
+        <span className="avatar green">F</span>
+        <div className="col" style={{ gap: 2 }}>
+          <span className="h2">Tell us where and when</span>
+          <span className="small">Someone at Mada finds the fares and holds the best ones for you. Your options arrive here, usually within the hour.</span>
+        </div>
+      </div>
+      <button type="button" className="card well spread" style={{ textAlign: 'start' }} onClick={onEdit}>
+        <span className="col" style={{ gap: 2 }}><span className="h3">{AIRPORT[trip.from] || trip.from} to {dest.name}</span><span className="tiny">{dates}</span></span>
+        <span className="h3" style={{ textDecoration: 'underline', fontSize: 14 }}>Change</span>
+      </button>
+      <span className="h3">{who.length} traveller{who.length === 1 ? '' : 's'}</span>
+      <TravellerChips value={who} onChange={setWho} />
+      <span className="h3">Can you move your dates?</span>
+      {chips(FR_FLEX, flex, setFlex)}
+      <span className="h3">Cabin</span>
+      {chips([['Economy', 'Economy'], ['Premium', 'Premium'], ['Business', 'Business']], cabin, setCabin)}
+      <span className="h3">Bags, each</span>
+      {chips(FR_BAGS, bags, setBags)}
+      <span className="h3">Anything you’d like</span>
+      <div className="chips">{FR_PREFS.map(([k, l]) => { const on = prefs.includes(k); return <button key={k} type="button" className={'chip' + (on ? ' on' : '')} aria-pressed={on ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.select); setPrefs(on ? prefs.filter((x) => x !== k) : [...prefs, k]); }}>{l}</button>; })}</div>
+      <div className="field"><label htmlFor="fr-note">Anything else</label><textarea id="fr-note" className="input" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="A loyalty number, a meal, a time that suits you" /></div>
+      <div style={{ height: 40 }} />
+    </div>
+  );
+}
+
+/* The fares in a request: choose one, see bags, rules and each person's price, pay. Shown in Trips › Requests. */
+export function FlightFares({ r }) {
+  const { push } = useStore();
+  const [pick, setPick] = useState(r.fares[0].id);
+  const now = Date.now();
+  const left = Math.max(0, (r.holdUntil || now) - now);
+  const chosen = r.fares.find((f) => f.id === pick);
+  return (
+    <div className="col" style={{ gap: 10 }} data-test="fares">
+      {r.status === 'quote' && <span className="pill ok" style={{ alignSelf: 'flex-start' }}>{left ? `Held for ${Math.floor(left / 3600e3)}:${pad(Math.floor((left % 3600e3) / 60e3))}` : 'This hold has ended. Ask Faisal to check the fare again.'}</span>}
+      {r.fares.map((f) => {
+        const on = f.id === pick;
+        return (
+          <button key={f.id} type="button" className={'card' + (on ? ' selected' : '')} style={{ textAlign: 'start', gap: 8 }} aria-pressed={on ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.select); setPick(f.id); }}>
+            <div className="spread"><span className="row"><AirlineMark flight={{ iata: f.iata, brand: f.brand, airline: f.airline }} /><span className="col" style={{ gap: 2 }}><span className="h3">{f.airline}</span><span className={'pill' + (on ? ' gold' : '')}>{on ? 'Chosen' : f.cabin}</span></span></span><span className="h3">SAR {fmt(f.total)}</span></div>
+            <span className="tiny">Going · {dayLabel(f.out.date)} · {f.out.code} · {f.out.dep}–{f.out.arr}{f.back ? `  ·  Coming back · ${dayLabel(f.back.date)} · ${f.back.code}` : ''}</span>
+            {f.note && <span className="small">{f.note}</span>}
+            {on && (
+              <div className="col" style={{ gap: 6 }}>
+                {[['Bags', f.bags], ['Changes', f.change], ['Refund', f.refund]].map(([k, v]) => <div key={k} className="spread"><span className="small">{k}</span><span className="small" style={{ color: '#1e352d', fontWeight: 600 }}>{v}</span></div>)}
+                <div className="card well" style={{ gap: 4 }}>
+                  {f.prices.map((p) => <div key={p.id} className="spread"><span className="small">{p.name} · {p.type}</span><span className="small" style={{ fontWeight: 600 }}>SAR {fmt(p.price)}</span></div>)}
+                  <div className="spread"><span className="h3" style={{ fontSize: 14 }}>All in</span><span className="h3" style={{ fontSize: 14 }}>SAR {fmt(f.total)}</span></div>
+                </div>
+              </div>
+            )}
+          </button>
+        );
+      })}
+      {r.status === 'quote' && left > 0 && <button type="button" className="btn primary" onClick={() => push('pay', { kind: 'quote', requestId: r.id, optionId: chosen.id })}>Pay SAR {fmt(chosen.total)}</button>}
+      {r.status === 'paid' && <span className="small" style={{ color: '#1e352d' }}>Paid. Faisal is issuing your tickets.</span>}
+      {r.status === 'done' && r.pnr && (
+        <div className="card well" style={{ gap: 4 }} data-test="tickets">
+          <span className="h3" style={{ fontSize: 14 }}>Ticketed · Airline booking {r.pnr}</span>
+          {(r.tickets || []).map((t) => <div key={t.id} className="spread"><span className="small">{t.name}</span><span className="small mono">Ticket {t.number}</span></div>)}
+        </div>
+      )}
     </div>
   );
 }

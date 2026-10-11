@@ -85,6 +85,8 @@ export const DEMO_SWITCHES = [
   { id: 'fareGone', label: 'Fare sold out while booking' },
   { id: 'ticketingFails', label: 'Tickets fail to issue' },
   { id: 'slowAgent', label: 'Airline is slow' },
+  /* The beta: no live fares yet, flights go to the desk as a request and come back as fares to choose and pay. */
+  { id: 'flightsByRequest', label: 'Flights by request (beta)' },
   /* When the app itself can't do its job: the connection, our servers, the app version, the session. */
   { id: 'weak', label: 'Weak connection', group: 'app' },
   { id: 'serverDown', label: 'Server down', group: 'app' },
@@ -338,7 +340,7 @@ export const fresh = () => ({
   friendRequests: [],
   invites: [],
   stamps: [],
-  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, fareGone: false, ticketingFails: false, slowAgent: false, needs3ds: false, passportProblem: false, scanFails: false, faceIdFails: false, weak: false, serverDown: false, maintenance: false, updateRequired: false, sessionExpired: false, rateLimited: false, crashed: false, payDrops: false, searchTimeout: false, sendFails: false, uploadFails: false, imagesFail: false, permissionsDenied: false },
+  demo: { offline: false, decline: false, priceUp: false, noResults: false, supplierDown: false, agentQuestion: false, fareGone: false, ticketingFails: false, slowAgent: false, needs3ds: false, passportProblem: false, scanFails: false, faceIdFails: false, weak: false, serverDown: false, maintenance: false, updateRequired: false, sessionExpired: false, rateLimited: false, crashed: false, payDrops: false, searchTimeout: false, sendFails: false, uploadFails: false, imagesFail: false, permissionsDenied: false, flightsByRequest: false },
   outbox: [],
   tab: 'today',
   stack: [],

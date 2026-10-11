@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, fmt, tripTravellers, passportIssue, appDay, toDate, daysBetween, addDays, dayLabel, shortDay, weekday, dayOf, monthOf, seatText, pickupPlan, boardsAt, termShort, stayOf, stayEnd, signName, ofYou, NUM_WORD, lookupFlight, FLIGHT_NO, AIRPORTS, STAY_NIGHTS, makePickup } from '../store.jsx';
 import { MoveNotice } from './TripManage.jsx';
-import { Icon, Sun, Route, Sheet, Avatar, useTicker, AirlineMark, EmptyState, ArtFriends, ArtCircles, ArtPass, NetStale } from '../ui.jsx';
+import { Icon, Sun, Route, Sheet, Avatar, Toggle, useTicker, AirlineMark, EmptyState, ArtFriends, ArtCircles, ArtPass, NetStale } from '../ui.jsx';
 
 const SERVICES = [
   { id: 'flight', label: 'Flights', icon: 'flight' },
@@ -644,10 +644,106 @@ function PickupSheet({ onClose }) {
           );
         })}
       </div>
-      <span className="tiny">We’ll wake your phone at {addMin(timeOf(pick), -45)}.</span>
+      {s.wake?.on && !s.wake?.time && <span className="tiny">Your wake-up alarm moves with it, to {addMin(timeOf(pick), -45)}.</span>}
       <button type="button" className="btn primary block" disabled={pick === cur} onClick={() => { set((p) => ({ trip: { ...p.trip, pickup: { ...p.trip.pickup, home: { ...p.trip.pickup.home, offset: pick } } } })); buzz(HAPTIC.success); toast(`We’ve told ${pk.driver}. Pickup at ${timeOf(pick)}.`); onClose(); }}>{pick === cur ? `Pickup stays at ${timeOf(cur)}` : `Move pickup to ${timeOf(pick)}`}</button>
       {spare < 50 && <span className="small td-warn">That’s tight on a weekday morning. Faisal would go earlier.</span>}
     </Sheet>
+  );
+}
+
+/* The wake-up alarm (the app's WakeRow.tsx): off until you turn it on, a time you can move, and what this phone
+   really does. Android puts it in the Clock app; iOS 26+ rings a real alarm through AlarmKit; older iPhones get a
+   notification. The prototype shows an iPhone on iOS 26; "How it works" can preview the others. */
+const WAKE_PLATFORMS = [
+  { id: 'ios-alarmkit', title: 'iPhone with iOS 26 or later', body: 'A real alarm, like one from Clock. It rings on silent and in Focus, once you allow alarms for Mada.' },
+  { id: 'ios-notify', title: 'Older iPhones', body: 'Apps can’t ring an alarm here. We send a notification with sound, and it stays quiet on silent. Set an alarm in Clock too.' },
+  { id: 'android-clock', title: 'Android', body: 'We put the alarm in your Clock app and you save it there. To turn it off, delete it in Clock.' },
+];
+const wakeLine = (m, time, on) => (m === 'android-clock' ? (on ? 'An alarm in your Clock app, named for this flight. Clock opens so you can save it.' : 'Turning it off here doesn’t delete it from Clock. We open Clock so you can.')
+  : m === 'ios-alarmkit' ? 'A real alarm on this iPhone. It rings even on silent.'
+    : `We’ll send a notification at ${time}. For a sound that rings on silent, set an alarm in Clock.`);
+const minsTo = (a, b) => (((minsBetween(a, b)) % 1440) + 1440) % 1440;
+function clampWake(time, leave) {
+  const before = minsTo(time, leave);
+  if (before < 10) return addMin(leave, -10);
+  if (before > 180) return addMin(leave, -180);
+  return time;
+}
+
+function WakeTimeSheet({ suggested, time: cur, leave, who, onSave, onClose }) {
+  const [time, setTime] = useState(cur);
+  const step = (d) => { buzz(HAPTIC.select); setTime((x) => clampWake(addMin(x, d), leave)); };
+  return (
+    <Sheet label="When should we wake you?" onClose={onClose}>
+      <h2 className="h2">When should we wake you?</h2>
+      <p className="small" style={{ marginTop: -8 }}>{who ? `${who} is at the door at ${leave}. 45 minutes is enough for most families.` : `Leave for King Khalid by ${leave}. Most families need 45 minutes.`}</p>
+      <div className="td-wake-step">
+        <button type="button" aria-label="5 minutes earlier" onClick={() => step(-5)}>−5</button>
+        <span className="col" style={{ alignItems: 'center', gap: 2 }}><span className="num td-wake-big">{time}</span><span className="tiny">{time === suggested ? 'Suggested' : `${minsTo(time, leave)} min before you leave`}</span></span>
+        <button type="button" aria-label="5 minutes later" onClick={() => step(5)}>+5</button>
+      </div>
+      {time !== suggested && <button type="button" className="td-link" onClick={() => setTime(suggested)}>Suggested: {suggested}</button>}
+      <button type="button" className="btn primary block" disabled={time === cur} onClick={() => onSave(time === suggested ? null : time)}>{time === cur ? `Keep ${time}` : `Wake me at ${time}`}</button>
+    </Sheet>
+  );
+}
+
+function WakeHowSheet({ method, onPreview, onClose }) {
+  return (
+    <Sheet label="How the wake-up alarm works" onClose={onClose}>
+      <h2 className="h2">How the wake-up alarm works</h2>
+      <p className="small" style={{ marginTop: -8 }}>It’s set on this phone only. If you use Mada on another phone, turn it on there too.</p>
+      <div className="col" style={{ gap: 8 }}>
+        {WAKE_PLATFORMS.map((p) => (
+          <button key={p.id} type="button" className={'td-time td-wake-how' + (method === p.id ? ' on' : '')} aria-pressed={method === p.id ? 'true' : 'false'} onClick={() => { buzz(HAPTIC.select); onPreview(p.id); }}>
+            <span className="grow col" style={{ gap: 4 }}>
+              <span className="row" style={{ gap: 8 }}><span style={{ fontWeight: 600, fontSize: 15 }}>{p.title}</span>{method === p.id && <span className="pill gold">This phone</span>}</span>
+              <span className="tiny">{p.body}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      <button type="button" className="btn secondary block" onClick={onClose}>Okay</button>
+    </Sheet>
+  );
+}
+
+function WakeRow({ suggested, leave, who }) {
+  const { s, set, toast } = useStore();
+  const w = s.wake || { on: false, time: null };
+  const method = s.wakePlatform || 'ios-alarmkit';
+  const time = w.time ? clampWake(w.time, leave) : suggested;
+  const [sheet, setSheet] = useState(null);
+  const [hint, setHint] = useState(false);
+  const turn = (on, at = time) => {
+    buzz(on ? HAPTIC.success : HAPTIC.select);
+    set((p) => ({ wake: { ...(p.wake || {}), on } }));
+    toast(on ? `This phone wakes you at ${at}.` : method === 'android-clock' ? `Off here. Delete the ${at} alarm in Clock too.` : 'Wake-up alarm is off.');
+  };
+  return (
+    <div className={'td-tl ' + (w.on ? 'todo' : 'todo td-wake-off')} data-testid="wake-row">
+      <span className="td-tl-time num" style={w.on ? null : { textDecoration: 'line-through', color: '#8a8f8a' }}>{time}</span>
+      <span className="td-tl-rail" aria-hidden="true"><i /></span>
+      <span className="grow col td-tl-body">
+        <span className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+          <span className="grow col" style={{ gap: 1 }}>
+            <span className="td-tl-t" style={w.on ? null : { color: '#5c6b64' }}>{w.on ? 'Wake-up alarm' : 'Wake-up alarm is off'}</span>
+            <span className="tiny">{w.on ? `${time} · weather and drive time` : `Turn it on and this phone wakes you at ${time}.`}</span>
+          </span>
+          <Toggle checked={!!w.on} label={`Wake-up alarm at ${time}`} onChange={(v) => turn(v)} />
+        </span>
+        <span className="tiny" style={{ marginTop: 4, color: '#3f4f48' }}>{wakeLine(method, time, !!w.on)}</span>
+        {hint && <span className="tiny" style={{ color: '#3f4f48' }}>Open the Clock app, tap Alarms, then + and set {time}.</span>}
+        <span className="row" style={{ gap: 16, flexWrap: 'wrap' }}>
+          <button type="button" className="td-link" onClick={() => { buzz(HAPTIC.tap); setSheet('time'); }}>Change time</button>
+          {w.on && method === 'ios-notify' && <button type="button" className="td-link" onClick={() => { buzz(HAPTIC.tap); setHint(true); }}>Open Clock</button>}
+          <button type="button" className="td-link" onClick={() => { buzz(HAPTIC.tap); setSheet('how'); }}>How it works</button>
+        </span>
+      </span>
+      {sheet === 'time' && <WakeTimeSheet suggested={suggested} time={time} leave={leave} who={who} onClose={() => setSheet(null)}
+        onSave={(t) => { setSheet(null); set((p) => ({ wake: { ...(p.wake || {}), time: t, on: true } })); buzz(HAPTIC.success); toast(`This phone wakes you at ${t || suggested}.`); }} />}
+      {sheet === 'how' && <WakeHowSheet method={method} onPreview={(m) => set({ wakePlatform: m })} onClose={() => setSheet(null)} />}
+    </div>
   );
 }
 
@@ -662,11 +758,13 @@ function DayBefore() {
   const items = packList(s);
   const packed = (s.todayPacked || []).filter((id) => items.some((i) => i.id === id)).length;
   const allPacked = packed === items.length;
-  const wake = pk ? pk.wake : addMin(f?.dep || '09:40', -200);
+  const suggestedWake = pk ? pk.wake : addMin(f?.dep || '09:40', -200);
+  const leave = pk ? pk.time : addMin(f?.dep || '09:40', -155);
+  const wake = s.wake?.time ? clampWake(s.wake.time, leave) : suggestedWake;
   const plan = [
     { k: 'tonight', time: 'Tonight', t: allPacked ? 'Packed' : 'Pack the bags', sub: allPacked ? 'All in. Nothing left for the morning.' : `${packed} of ${items.length} done`, state: allPacked ? 'done' : 'now', act: allPacked ? null : ['See the list', () => packRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })] },
     { k: 'sleep', time: '22:30', t: 'Lights out', sub: `${Math.round(minsBetween('22:30', '24:00') / 60 + minsBetween('00:00', wake) / 60)} hours before the alarm` },
-    { k: 'wake', time: wake, t: 'We wake your phone', sub: 'A soft alarm, with the weather and the drive time' },
+    { k: 'wake', time: wake, t: 'Wake-up alarm', sub: '' },
     pk ? { k: 'pickup', time: pk.time, t: `${pk.driver} at your door`, sub: `${pk.car} · he waits ${pk.waits || '10 min'}`, act: ['Change pickup time', () => setSheet('pickup')] }
       : { k: 'pickup', time: addMin(f.dep, -155), t: 'Leave for the airport', sub: '31 min to King Khalid. No car booked.' },
     { k: 'airport', time: pk ? pk.airportBy : addMin(f.dep, -120), t: `King Khalid, ${f.terminal}`, sub: `Bag drop closes ${addMin(f.dep, -60)}. You’re already checked in.` },
@@ -692,7 +790,8 @@ function DayBefore() {
           {plan.map((p, i) => (
             <React.Fragment key={p.k}>
               {i === 1 && <span className="td-split" aria-hidden="true" />}
-              {i === 3 && <span className="td-daymark">Tomorrow, {f.date}</span>}
+              {i === 2 && <span className="td-daymark">Tomorrow, {f.date}</span>}
+              {p.k === 'wake' ? <WakeRow suggested={suggestedWake} leave={leave} who={pk ? pk.driver : null} /> : (
               <div className={'td-tl ' + (p.state || 'todo')}>
                 <span className="td-tl-time num">{p.time}</span>
                 <span className="td-tl-rail" aria-hidden="true"><i /></span>
@@ -701,7 +800,7 @@ function DayBefore() {
                   <span className="tiny">{p.sub}</span>
                   {p.act && <button type="button" className="td-link" onClick={() => { buzz(HAPTIC.tap); p.act[1](); }}>{p.act[0]}</button>}
                 </span>
-              </div>
+              </div>)}
             </React.Fragment>
           ))}
         </div>
