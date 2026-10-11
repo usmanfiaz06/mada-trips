@@ -14,6 +14,7 @@
  *
  * Zip reading is done here (central directory + zlib inflate) so the hook needs no unzip tool on the build image.
  */
+import { Buffer } from 'node:buffer';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
