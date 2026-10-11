@@ -23,11 +23,11 @@ export function toPerson(p: PersonRow, selfName = ""): Person {
 }
 
 export async function listPeople(ownerId: string): Promise<Person[]> {
-  const [u] = await db.select({ name: appUsers.name }).from(appUsers).where(eq(appUsers.id, ownerId));
-  const rows = await db.select().from(appPeople)
+  // One query: the household with the account holder's name alongside (each query is a round trip).
+  const rows = await db.select({ p: appPeople, name: appUsers.name }).from(appPeople).innerJoin(appUsers, eq(appUsers.id, appPeople.ownerId))
     .where(and(eq(appPeople.ownerId, ownerId), isNull(appPeople.deletedAt)))
     .orderBy(desc(appPeople.isSelf), asc(appPeople.createdAt));
-  return rows.map((r) => toPerson(r, u?.name ?? ""));
+  return rows.map((r) => toPerson(r.p, r.name ?? ""));
 }
 
 export async function createPerson(ownerId: string, input: CreatePersonRequest, ipHash: string | null): Promise<Person> {

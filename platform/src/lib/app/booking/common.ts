@@ -1,9 +1,9 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { DemoFlag, todayIn, type Person } from "@mada/shared";
 import { db, type Tx } from "@/db";
-import { appPeople, appUsers } from "@/db/app-schema";
+import { appUsers } from "@/db/app-schema";
 import { isProductionDeploy, supplierMode } from "../config";
 import { AppError } from "../http";
 import { listPeople } from "../people";
@@ -68,14 +68,15 @@ export async function householdOf(ownerId: string): Promise<Person[]> {
 }
 
 /** These people, all from this household (NOT_FOUND otherwise: another household's people don't exist for you). */
-export async function travellersOf(ownerId: string, ids: string[], tx: Exec = db): Promise<Person[]> {
+export async function travellersOf(ownerId: string, ids: string[], household?: Promise<Person[]>): Promise<Person[]> {
   const unique = [...new Set(ids)];
   if (!unique.length) return [];
   if (unique.some((id) => !/^[0-9a-f-]{36}$/i.test(id))) throw new AppError("NOT_FOUND");
-  const rows = await tx.select({ id: appPeople.id }).from(appPeople).where(and(eq(appPeople.ownerId, ownerId), inArray(appPeople.id, unique), isNull(appPeople.deletedAt)));
-  if (rows.length !== unique.length) throw new AppError("NOT_FOUND");
-  const all = await householdOf(ownerId);
-  return unique.map((id) => all.find((p) => p.id === id)!).filter(Boolean);
+  // The household (this owner's people, not deleted) is the check: one query, shared with the caller when it has it.
+  const all = await (household ?? householdOf(ownerId));
+  const out = unique.map((id) => all.find((p) => p.id === id));
+  if (out.some((p) => !p)) throw new AppError("NOT_FOUND");
+  return out as Person[];
 }
 
 export async function userName(ownerId: string): Promise<string> {

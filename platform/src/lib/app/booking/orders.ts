@@ -67,12 +67,21 @@ const AGENT_KINDS = new Set(["trip", "stay", "package"]);
 
 export async function createOrder(ownerId: string, input: CreateOrderInput, demo: Set<DemoFlag>, ipHash: string | null): Promise<CreateOrderResponse> {
   const body = CreateOrderBody.parse(input);
-  const prior = await db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.idempotencyKey, body.idempotencyKey)));
+  // Independent reads side by side (each is a round trip): a replay, the account's phone, the desk agent and the price.
+  const bump = demo.has("priceUp") && body.draft.kind === "trip" ? 14_000 : 0;
+  // A stay is priced after the checks: pricing a Hotelbeds room asks Hotelbeds (checkrates), never for a replay.
+  const early = body.draft.kind !== "stay" ? priceDraft(ownerId, body, { bump }) : null;
+  const agentP = agentFor(ownerId);
+  early?.catch(() => {});
+  agentP.catch(() => {});
+  const [prior, [owner]] = await Promise.all([
+    db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.idempotencyKey, body.idempotencyKey))),
+    db.select({ phone: appUsers.phone }).from(appUsers).where(eq(appUsers.id, ownerId)),
+  ]);
   if (prior[0]) return outcomeOf(prior[0]);
   // Saudi travel needs a reachable number: accounts that began with Apple, Google or email verify one first (AUTH.md).
   // The beta (APP_BOOKING_REQUIRES_PHONE=no): an account without one gives a number to call instead, kept on the order
   // as not verified; the desk calls it to confirm (switches.ts).
-  const [owner] = await db.select({ phone: appUsers.phone }).from(appUsers).where(eq(appUsers.id, ownerId));
   let contact: { phone: string; verified: false } | null = null;
   if (!owner?.phone) {
     if (bookingRequiresPhone()) throw new AppError("PHONE_REQUIRED");
@@ -81,9 +90,8 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     contact = { phone, verified: false };
   }
 
-  // The fare moved at the airline while the traveller looked (demo: once, SAR 140).
-  const bump = demo.has("priceUp") && body.draft.kind === "trip" ? 14_000 : 0;
-  const priced = await priceDraft(ownerId, body, { bump });
+  // The fare moved at the airline while the traveller looked (demo: once, SAR 140; bump above).
+  const priced = await (early ?? priceDraft(ownerId, body, { bump }));
   const { preview } = priced;
   if (preview.holdExpiresAt && Date.parse(preview.holdExpiresAt) <= Date.now()) return { outcome: "hold_ended", preview };
   if (body.expectedTotal !== preview.total.amount) {
@@ -102,8 +110,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   if (body.draft.kind === "share" && (body.plan !== "full" || body.payment.method === "credit")) throw new AppError("VALIDATION");
 
   const agentKind = AGENT_KINDS.has(preview.kind);
-  const charge = await chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo);
-  const agentName = await agentFor(ownerId);
+  const [charge, agentName] = await Promise.all([chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo), agentP]);
   const requestId = body.draft.kind === "quote" ? body.draft.requestId : null;
   // A fare the desk quoted for a flight request: the request itself goes with the order to the desk (no new row).
   const quoted = priced.snapshot.quote as { id: string; requestId: string; optionId?: string; pnr?: string | null } | undefined;

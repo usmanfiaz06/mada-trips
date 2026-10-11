@@ -36,6 +36,11 @@ const line = (key: string, icon: OrderLine["icon"], text: string, amount: number
 export async function priceDraft(ownerId: string, input: PreviewInput, opts: { bump?: number } = {}): Promise<Priced> {
   const body = PreviewBody.parse(input);
   const d = body.draft;
+  // Read up front, alongside whatever the draft needs (each query is a round trip): the household and the credit.
+  const household = householdOf(ownerId);
+  const balanceP = creditBalance(ownerId);
+  household.catch(() => {});
+  balanceP.catch(() => {});
   let lines: OrderLine[] = [];
   let title = "";
   let photo = "istanbul-galata";
@@ -49,8 +54,8 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   const snapshot: Record<string, unknown> = { draft: d };
 
   if (d.kind === "trip") {
-    travellers = await travellersOf(ownerId, d.travellerIds);
-    let row = await ownOffer(ownerId, d.flightOfferId);
+    let row: OfferRow;
+    [travellers, row] = await Promise.all([travellersOf(ownerId, d.travellerIds, household), ownOffer(ownerId, d.flightOfferId)]);
     if (row.kind !== "flight") throw new AppError("NOT_FOUND");
     const before = row.payload as unknown as FlightOption;
     if (before.adults !== travellers.length) row = (await repriceOffer(ownerId, row.id, travellers.length)).row;
@@ -80,8 +85,8 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     snapshot.search = search;
     snapshot.bundle = bundle;
   } else if (d.kind === "stay") {
-    travellers = await travellersOf(ownerId, d.travellerIds);
-    let row = await ownOffer(ownerId, d.stayOfferId);
+    let row: OfferRow;
+    [travellers, row] = await Promise.all([travellersOf(ownerId, d.travellerIds, household), ownOffer(ownerId, d.stayOfferId)]);
     if (row.kind !== "stay") throw new AppError("NOT_FOUND");
     const before = row.payload as unknown as StayOption;
     // Rooms are priced by party size (one room for two or fewer, connecting rooms for more).
@@ -103,7 +108,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   } else if (d.kind === "package") {
     const plan = PLANS[d.planId];
     if (!plan) throw new AppError("NOT_FOUND");
-    travellers = await travellersOf(ownerId, d.travellerIds);
+    travellers = await travellersOf(ownerId, d.travellerIds, household);
     const n = travellers.length;
     if (plan.price.flights) lines.push(line("flight", "flight", t("pay.line.planFlights", { count: n, city: plan.city }), sarToHalalas((plan.price.flights * n) / 2)));
     if (plan.price.stay) lines.push(line("stay", "stay", tn("pay.line.planStay", Math.max(1, plan.days - 1), { rooms: n > 2 ? t("pay.line.connecting") : t("pay.line.aRoom") }), sarToHalalas(plan.price.stay)));
@@ -126,7 +131,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
       // captured when they do, like any flight booking.
       const o = pickOption(fq, d.optionId);
       if (!o) throw new AppError("NOT_FOUND");
-      travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds) : [];
+      travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds, household) : [];
       const search = det.search ?? { destination: null, destinationName: null, from: null, depart: null, return: null, cabin: null, carrier: null };
       const f = fareToFlightOption(o, (q.expiresAt ?? new Date(Date.now() + 3600_000)).toISOString(), q.id);
       const n = o.prices.filter((p) => p.type !== "infant").length;
@@ -152,7 +157,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     title = det.title ?? r.summary;
     agent = false;
     photo = det.askKind === "umrah" ? "makkah-clock-tower" : det.askKind === "visa" ? "passport-boarding-pass" : "istanbul-galata";
-    travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds) : [];
+    travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds, household) : [];
     place = title;
     hold = q.expiresAt;
     snapshot.quote = { id: q.id, requestId: r.id, total: q.total };
@@ -189,11 +194,11 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   const travel = d.kind !== "share";
   const promo = travel ? checkPromo(body.promo, today(), subtotal) : null;
   const discount = promo?.status === "applied" ? promo.discount : 0;
-  const balance = await creditBalance(ownerId);
+  const balance = await balanceP;
   const creditUsed = travel && body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
   const total = subtotal - discount - creditUsed;
-  const household = travellers.length ? await householdOf(ownerId) : [];
-  const missing = travellers.filter((p) => !household.find((h) => h.id === p.id)?.passport).map((p) => p.id);
+  const people = travellers.length ? await household : [];
+  const missing = travellers.filter((p) => !people.find((h) => h.id === p.id)?.passport).map((p) => p.id);
   const preview: OrderPreview = {
     kind, title, photo, lines, subtotal: money(subtotal),
     promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
