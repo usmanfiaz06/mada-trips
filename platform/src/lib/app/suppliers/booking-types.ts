@@ -1,4 +1,4 @@
-import type { FlightOffer, HotelOffer, Person, StayFacts } from "@mada/shared";
+import type { FlightOffer, HotelOffer, Person, StayFacts, StayFit } from "@mada/shared";
 import type { FlightSupplier, HotelSupplier, PaymentResult, PaymentSupplier } from "./types";
 
 /*
@@ -20,7 +20,7 @@ export type BookingHotelOffer = HotelOffer & { meta?: {
   // Hotelbeds rooms (suppliers/hotelbeds/hotels.ts).
   hotelCode?: number; imageUrl?: string | null; category?: string | null; rateCommentsId?: string | null; rateComments?: string | null; room?: string | null; board?: string | null;
   /** Structured facts (the app writes the card from them), the fit score and at most one badge each per list. */
-  facts?: StayFacts | null; score?: number; badge?: "best" | "lowest" | null;
+  facts?: StayFacts | null; score?: number; badge?: "best" | "lowest" | null; fit?: StayFit | null;
 } };
 export interface BookingHotelSupplier extends HotelSupplier {
   search(q: Parameters<HotelSupplier["search"]>[0]): Promise<BookingHotelOffer[]>;

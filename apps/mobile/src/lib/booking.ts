@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import {
-  AskParseResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OfferResponse, OrderResponse, OrdersResponse,
+  AskParseResponse, GeocodeResponse, StayRoomsResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OfferResponse, OrderResponse, OrdersResponse,
   PlanResponse, PlansResponse, PreviewResponse, RequestResponse, RequestsResponse, StaySearchResponse, BookingRequestView, ThreadMessage,
   type CreateOrderBody, type CreateRequestBody, type DemoFlag, type EntryCheckRequest, type FlightSearchRequest, type OrderDraft, type PreviewBody, type StaySearchRequest,
+  type DistanceAnchor,
 } from '@mada/shared';
 import { z } from 'zod';
 import { ApiError, request } from './api';
@@ -54,6 +55,8 @@ export const bookingApi = {
   entry: (b: EntryCheckRequest) => call('POST', '/search/entry', EntryCheckResponse, b),
   offer: (id: string) => call('GET', `/offers/${id}`, OfferResponse),
   reprice: (id: string) => call('POST', `/offers/${id}/price`, OfferResponse, {}),
+  rooms: (id: string) => call('GET', `/offers/${id}/rooms`, StayRoomsResponse),
+  geocode: (q: string, city: string) => call('GET', `/geocode?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`, GeocodeResponse),
   plans: () => call('GET', '/plans', PlansResponse),
   plan: (id: string) => call('GET', `/plans/${encodeURIComponent(id)}`, PlanResponse),
   requests: () => call('GET', '/requests', RequestsResponse),
@@ -192,3 +195,7 @@ export async function tokenizeCard(card: { number: string; expiry: string; cvv: 
 
 /** One per slide: a retried request never books twice. */
 export const newIdempotencyKey = () => `slide-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** Where a city's stays measure distance from (a landmark, the centre, the traveller, a typed place), kept per city. */
+type AnchorState = { byCity: Record<string, DistanceAnchor | null>; set: (city: string, a: DistanceAnchor | null) => void };
+export const useStayAnchor = create<AnchorState>((set) => ({ byCity: {}, set: (city, a) => set((s) => ({ byCity: { ...s.byCity, [city]: a } })) }));

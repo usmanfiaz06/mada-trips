@@ -1,3 +1,4 @@
+import { StayFit } from './stay-fit';
 import { z } from 'zod';
 import { ContactPhone, FlightQuote, FlightRequestExtras, ThreadAttachment } from './flight-quote';
 import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay, Money } from './common';
@@ -214,6 +215,8 @@ export const StayOption = z.object({
   /** How well it fits, 0–100 (stars, price, where it is): the "Recommended" order. */
   score: z.number().optional(),
   facts: StayFacts.nullable().optional(),
+  /** Why it ranks where it does: the trip's shape, the score and the facts behind it (stay-fit.ts). */
+  fit: StayFit.nullable().optional(),
 });
 export type StayOption = z.infer<typeof StayOption>;
 
@@ -223,6 +226,8 @@ export const StaySearchResponse = z.object({
   destinationName: z.string(),
   options: z.array(StayOption),
   cachedUntil: IsoDateTime,
+  /** Who the list was ranked for ("family: 2 children under 12"), so the app can say so. */
+  shape: z.object({ shape: z.string(), because: z.string(), travellers: z.number().int(), under12: z.number().int() }).nullable().optional(),
 });
 export type StaySearchResponse = z.infer<typeof StaySearchResponse>;
 

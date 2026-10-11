@@ -183,10 +183,15 @@ describe("search", () => {
     const f = await family();
     const r = await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 6, travellerIds: f.four });
     const s = StaySearchResponse.parse(r.json);
-    expect(s.options.map((o) => o.name)).toEqual(["Rooms near Galata Tower", "Garden hotel in Sultanahmet", "Bosphorus view rooms"]);
-    expect(s.options[0]).toMatchObject({ total: { amount: 588_000 }, roomsLabel: "2 connecting rooms", rating: "9.1" });
+    expect(s.options.map((o) => o.name).sort()).toEqual(["Bosphorus view rooms", "Garden hotel in Sultanahmet", "Rooms near Galata Tower"]);
+    // Ranked for a family of four with children (docs/app/RANKING.md): one best, one lowest, reasons from the facts.
+    expect(s.shape).toMatchObject({ shape: "family" });
+    expect(s.options.filter((o) => o.badge === "best")).toHaveLength(1);
+    expect(s.options.filter((o) => o.badge === "lowest")).toHaveLength(1);
+    expect(s.options[0]!.fit!.reasons.length).toBeGreaterThan(0);
+    expect(s.options.find((o) => o.name === "Rooms near Galata Tower")).toMatchObject({ total: { amount: 588_000 }, roomsLabel: "2 connecting rooms", rating: "9.1" });
     const two = StaySearchResponse.parse((await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 6, travellerIds: [f.me, f.hessa] })).json);
-    expect(two.options[0]!.total.amount).toBe(Math.round(980 * 6 * 0.55) * 100);
+    expect(two.options.find((o) => o.name === "Rooms near Galata Tower")!.total.amount).toBe(Math.round(980 * 6 * 0.55) * 100);
     expect((await post(searchStays, f.token, { destination: "baku", checkIn: EID_OUT, nights: 3, travellerIds: [f.me] })).json.outcome).toBe("by_hand");
     expect((await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 3, travellerIds: [f.me] }, "?demo=noResults")).json.outcome).toBe("none");
   });

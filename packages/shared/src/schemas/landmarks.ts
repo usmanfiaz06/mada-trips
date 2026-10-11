@@ -1,3 +1,4 @@
+import { z } from 'zod';
 /*
  * Landmarks and areas people ask to stay near, for the cities Mada sells, with coordinates (to about 100 m). Each has
  * the words people type for it in English and in Arabic (Arabic as normalizeArabic writes it: ا for أ/إ/آ, ي for ى,
@@ -84,3 +85,7 @@ export type DistanceAnchor = { id: string; kind: 'landmark' | 'centre' | 'me' | 
 
 export const anchorOfLandmark = (l: Landmark): DistanceAnchor => ({ id: l.id, kind: 'landmark', name: l.name, nameAr: l.nameAr, lat: l.lat, lng: l.lng });
 export const landmarkById = (id: string) => LANDMARKS.find((l) => l.id === id) ?? null;
+
+/** GET /geocode?q=&city=: a place or address the traveller typed, as a point (OpenStreetMap Nominatim, cached). */
+export const GeocodeResponse = z.object({ point: z.object({ lat: z.number(), lng: z.number(), name: z.string() }).nullable() });
+export type GeocodeResponse = z.infer<typeof GeocodeResponse>;

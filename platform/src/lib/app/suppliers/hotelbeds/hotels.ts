@@ -1,4 +1,4 @@
-import { CITY_CENTRES, DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, kmApart, roomsFor, shortDay, t, type HotelSearch, type StayAmenity, type StayFacts, type StayView } from "@mada/shared";
+import { DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, rankStays, roomsFor, shortDay, t, type HotelSearch, type StayAmenity, type StayFacts, type StayView, type TripShape } from "@mada/shared";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 import { HotelbedsClient, HotelbedsError, type HotelbedsClientOptions } from "./client";
 import { costHalalas, feeHalalas, pricingRules, sellHalalas, type PricingRules } from "./money";
@@ -324,53 +324,28 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
   };
 }
 
-/**
- * How well a stay fits, 0–100: its stars (a 1-star room is rarely what a Mada traveller wants), its price against the
- * others (value), where it is (from the city centre), and a little for free cancellation and breakfast.
- */
-export function fitScore(x: { stars: number; total: number; km: number | null; refundable: boolean; breakfast: boolean }, prices: { min: number; median: number }, radiusKm: number): number {
-  const star = x.stars ? Math.min(1, Math.max(0, (x.stars - 1) / 4)) : 0.35;
-  const spread = Math.max(1, prices.median * 1.6 - prices.min);
-  const price = Math.min(1, Math.max(0, 1 - (x.total - prices.min) / spread));
-  const where = x.km == null ? 0.4 : Math.max(0, 1 - x.km / Math.max(2, radiusKm));
-  return Math.round(100 * (0.4 * star + 0.33 * price + 0.2 * where + (x.refundable ? 0.04 : 0) + (x.breakfast ? 0.03 : 0)));
-}
-
 /** How many hotels the app lists (HOTELBEDS_MAX_RESULTS; a certification staging shows them all, e.g. 200). */
 export const maxResults = () => { const n = Number(process.env.HOTELBEDS_MAX_RESULTS ?? 8); return Number.isInteger(n) && n > 0 ? Math.min(n, 500) : 8; };
 
 /**
- * The offers the app shows: one rate per hotel, in the order that fits best (fitScore), with exactly one "Best for
+ * The offers the app shows: one rate per hotel, in the order that fits best (stayFit, by trip shape), with exactly one "Best for
  * you" (the best fit at 3 stars and up) and one "Lowest price" (the cheapest); the rest carry no badge.
  */
-export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number; city?: string | null }): BookingHotelOffer[] {
+export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number; city?: string | null; shape?: TripShape }): BookingHotelOffer[] {
   const picked: BookingHotelOffer[] = [];
   for (const h of res.hotels?.hotels ?? []) {
     const b = bestRate(h, o.rooms);
     if (!b) continue;
     try { picked.push(offerOf(h, b.room, b.rate, o)); } catch { /* a currency we can't price: skip that hotel rather than guess */ }
   }
-  if (!picked.length) return [];
-  // The cheapest (by total) are kept when there are more than we show, then ranked by fit.
+  // The cheapest are kept when there are more than we show, then ranked by fit (shared stay-fit.ts, the same rules
+  // the search service runs for the traveller's own trip shape).
   picked.sort((a, b) => a.total.amount - b.total.amount);
   const list = picked.slice(0, o.limit ?? maxResults());
-  const totals = list.map((x) => x.total.amount);
-  const prices = { min: totals[0]!, median: totals[Math.floor(totals.length / 2)]! };
-  const centre = o.city ? CITY_CENTRES[o.city] : undefined;
-  const place = o.city ? HB_PLACES[o.city] : undefined;
-  const scored = list.map((x) => {
-    const f = x.meta!.facts!;
-    const km = centre && f.lat != null && f.lng != null ? kmApart(centre, { lat: f.lat, lng: f.lng }) : null;
-    return { x, score: fitScore({ stars: f.stars ?? 0, total: x.total.amount, km, refundable: f.refundable, breakfast: ["BB", "HB", "FB", "AI"].includes(f.board ?? "") }, prices, place?.radiusKm ?? 8) };
-  });
-  scored.sort((a, b) => b.score - a.score || a.x.total.amount - b.x.total.amount);
-  const lowest = scored.reduce((m, y) => (y.x.total.amount < m.x.total.amount ? y : m));
-  const best = scored.find((y) => (y.x.meta!.facts!.stars ?? 0) >= 3 && y !== lowest) ?? scored.find((y) => y !== lowest) ?? null;
-  return scored.map((y) => {
-    const badge = y === best ? "best" : y === lowest ? "lowest" : null;
-    // label stays for apps from before badges: the cheapest says so, everything else as before.
-    const label = y === lowest ? "lowest" : "best";
-    return { ...y.x, label, meta: { ...y.x.meta!, label, score: y.score, badge } };
+  const ranked = rankStays(list.map((x) => ({ x, name: x.name, total: x.total, facts: x.meta!.facts ?? null })), { shape: o.shape ?? "couple", city: o.city ?? null, radiusKm: (o.city ? HB_PLACES[o.city]?.radiusKm : undefined) ?? 8 });
+  return ranked.map((r) => {
+    const label = r.badge === "lowest" ? "lowest" : "best";
+    return { ...r.x, label, meta: { ...r.x.meta!, label, score: r.score, badge: r.badge, fit: r.fit } };
   });
 }
 

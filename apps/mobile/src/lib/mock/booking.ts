@@ -1,5 +1,5 @@
 import {
-  AskParseRequest, CARRIERS, catalogueFacts, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
+  AskParseRequest, CARRIERS, catalogueFacts, rankStays, tripShape, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
   ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskFirstReply, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
   formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestText, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
@@ -314,7 +314,7 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
 
 export const bookingMock: AreaMock = async (w, ctx) => {
   const [path, query = ''] = w.path.split('?');
-  const owned = /^\/(ask\/parse|search\/|offers\/|plans|requests|quotes\/|orders)/.test(path!);
+  const owned = /^\/(ask\/parse|search\/|offers\/|plans|requests|quotes\/|orders|geocode)/.test(path!);
   if (!owned) return null;
   const user = ctx.user;
   if (!user) return err('UNAUTHORIZED');
@@ -369,9 +369,12 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const base = { destination: dest.key, destinationName: dest.name, cachedUntil: new Date(Date.now() + 600_000).toISOString() };
     if (!CATALOGUE_HOTELS[dest.key]) return ok({ ...base, outcome: 'by_hand', options: [] });
     if (demo.has('noResults')) return ok({ ...base, outcome: 'none', options: [] });
-    const opts = stayOptions(dest.key, p.data.checkIn, p.data.nights, p.data.travellerIds.length);
+    // Ranked for who is going, as the server does (stay-fit.ts).
+    const shape = tripShape(people.filter((x) => p.data.travellerIds.includes(x.id)), p.data.checkIn);
+    const opts: StayOption[] = rankStays(stayOptions(dest.key, p.data.checkIn, p.data.nights, p.data.travellerIds.length), { shape: shape.shape, city: dest.key, radiusKm: 8 })
+      .map((o) => ({ ...o, label: o.badge === 'lowest' ? 'lowest' as const : o.label }));
     for (const o of opts) offers.set(o.id, { id: o.id, owner: user.id, kind: 'stay', option: o, search: { destination: dest.key, checkIn: p.data.checkIn, nights: p.data.nights, travellerIds: p.data.travellerIds }, expiresAt: Date.now() + HOLD });
-    return ok({ ...base, outcome: 'ok', options: opts });
+    return ok({ ...base, outcome: 'ok', options: opts, shape: { shape: shape.shape, because: shape.because, travellers: shape.travellers, under12: shape.under12 } });
   }
   if (key === 'POST /search/entry') {
     const p = EntryCheckRequest.safeParse(body);
@@ -380,6 +383,23 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const travellers = p.data.travellerIds.map((id) => people.find((x) => x.id === id)).filter((x): x is Person => !!x);
     if (travellers.length !== p.data.travellerIds.length) return err('NOT_FOUND');
     return ok(entryChecks({ destination: p.data.destination, travellers, depart: p.data.depart, return: p.data.return, answers: p.data.answers, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null }, iqamaOf: demoIqama }));
+  }
+  if (key === 'GET /geocode') return ok({ point: null });
+  const rooms = m(/^\/offers\/([^/]+)\/rooms$/);
+  if (rooms) {
+    // The hotel's other rooms for the same stay: a bigger room, and the same room cheaper without free cancellation.
+    const o = offers.get(rooms[1]!);
+    if (!o || o.owner !== user.id || o.kind !== 'stay') return err('NOT_FOUND');
+    const s0 = o.option as StayOption;
+    const f = s0.facts;
+    const variant = (k: string, factor: number, room: string, refundable: boolean): StayOption => {
+      const id = uuid();
+      const v: StayOption = { ...s0, id, badge: null, total: money(Math.round((s0.total.amount * factor) / 100) * 100), freeCancelUntil: refundable ? s0.freeCancelUntil : null,
+        cancellation: refundable ? s0.cancellation : t('hb.cancel.none'), facts: f ? { ...f, room, refundable } : f };
+      offers.set(id, { ...o, id, option: v });
+      return v;
+    };
+    return ok({ options: [s0, variant('nrf', 0.9, f?.room ?? 'Double room', false), variant('big', 1.3, 'Superior family suite', true)] });
   }
   let r = m(/^\/offers\/([^/]+)(\/price)?$/);
   if (r) {

@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
-  CARRIERS, CATALOGUE_HOTELS, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
+  CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
   type StayOption, type StaySearchRequest, type StaySearchResponse, EntryCheckRequest as EntrySchema, FlightSearchRequest as FlightSchema, StaySearchRequest as StaySchema,
 } from "@mada/shared";
@@ -134,17 +134,21 @@ export async function searchStays(ownerId: string, input: StaySearchRequest, dem
   const base = { destination: dest.key, destinationName: dest.name, cachedUntil: new Date(Date.now() + CACHE_MS).toISOString() };
   if (!CATALOGUE_HOTELS[dest.key] && supplierMode("hotels") === "mock") return { ...base, outcome: "by_hand", options: [] };
   if (demo.has("noResults")) return { ...base, outcome: "none", options: [] };
-  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n]);
+  // Who is going decides what fits (docs/app/RANKING.md): a family, a couple, someone alone, a group.
+  const shape = tripShape(people, q.checkIn);
+  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape]);
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
   const { value: offers } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]));
   const expiresAt = holdEnds();
   const search = { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
-  const options: StayOption[] = offers.map((h) => ({ ...stayOptionOf(h, randomUUID(), n, q.checkIn), expiresAt: expiresAt.toISOString() }));
-  await storeOffers(offers.map((h, i) => ({
+  // Ranked for this trip, with one "Best for you" and one "Lowest price"; the reasons are stored with each offer.
+  const ranked = rankStays(offers.map((h) => ({ h, name: h.name, total: h.total, facts: h.meta?.facts ?? null })), { shape: shape.shape, city: dest.key, radiusKm: 8 });
+  const options: StayOption[] = ranked.map((r) => ({ ...stayOptionOf(r.h, randomUUID(), n, q.checkIn), label: r.badge === "lowest" ? "lowest" as const : "best" as const, badge: r.badge, score: r.score, fit: r.fit, expiresAt: expiresAt.toISOString() }));
+  await storeOffers(ranked.map(({ h }, i) => ({
     id: options[i]!.id, ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search, payload: options[i] as unknown as Record<string, unknown>, total: h.total.amount, expiresAt,
   })));
-  return { ...base, outcome: options.length ? "ok" : "none", options };
+  return { ...base, outcome: options.length ? "ok" : "none", options, shape: { shape: shape.shape, because: shape.because, travellers: shape.travellers, under12: shape.under12 } };
 }
 
 export type OfferRow = typeof appOffers.$inferSelect;
