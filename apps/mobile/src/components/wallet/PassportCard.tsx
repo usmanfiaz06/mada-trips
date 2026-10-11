@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fontFamilies, makeTd3, type Person } from '@mada/shared';
-import { t, isRTL } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import { fullDay, fullNameOf, monthYear, type Validity } from '@/lib/wallet-model';
 import { colors, font, shadow, textLeft } from '@/theme';
 import { Button } from '../Button';
@@ -61,9 +61,9 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
   const expires = person?.passport ? (validity.kind === 'blocked' || validity.kind === 'expired' ? fullDay(person.passport.expiry) : monthYear(person.passport.expiry)) : '';
 
   return (
-    <View style={isRTL() ? { minHeight: 214 } : { height: 214 }}>
+    <View style={{ minHeight: 214 }}>
     <GestureDetector gesture={tilt}>
-      <Animated.View style={[styles.passport, isRTL() ? { height: 'auto', minHeight: 214 } : null, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
+      <Animated.View style={[styles.passport, shadow('focal'), card]} onPointerLeave={Platform.OS === 'web' ? reset : undefined} testID="passport-card">
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
           <Defs>
             <LinearGradient id={`ppg${gid}`} x1="0" y1="0" x2="1" y2="1"><Stop offset="0" stopColor={colors.green2} /><Stop offset="0.5" stopColor={colors.green} /><Stop offset="1" stopColor={colors.green3} /></LinearGradient>
@@ -127,7 +127,8 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
 }
 
 const styles = StyleSheet.create({
-  passport: { height: 214, borderRadius: 22, overflow: 'hidden' },
+  // Grows with its words: a long name, Arabic, or the empty state on a narrow phone never cuts the button off.
+  passport: { minHeight: 214, borderRadius: 22, overflow: 'hidden' },
   inner: { flex: 1, paddingTop: 16, paddingHorizontal: 18, paddingBottom: 12, justifyContent: 'space-between' },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   chip: { height: 26, paddingHorizontal: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
