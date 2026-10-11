@@ -20,7 +20,9 @@ describe('mock Supabase tokens', () => {
 
 describe('sign-in copy', () => {
   it('has Arabic for every English key, and Arabic is served for ar', () => {
-    expect(Object.keys(authCopyAr).sort()).toEqual(Object.keys(authCopy).sort());
+    // Arabic adds its own plural forms (.two, .few, .many, .zero) to counted strings.
+    const own = Object.keys(authCopyAr).filter((k) => !/\.(two|few|many|zero)$/.test(k) || !(k.replace(/\.\w+$/, '.other') in authCopy));
+    expect(own.sort()).toEqual(Object.keys(authCopy).sort());
     expect(t('auth.signin.email', undefined, 'ar')).toBe(authCopyAr['auth.signin.email']);
   });
   it('writes the brand as مادا in Arabic and passes the punctuation rules', () => {
