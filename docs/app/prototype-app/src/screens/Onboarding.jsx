@@ -5,8 +5,8 @@ import { InvitePreview } from './Social.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, withDemo } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, AddPersonSheet } from '../ui.jsx';
 import { checkFile, readPassport } from '../ocr.js';
+import { AuthPause, CodeInput, PasswordInput, PasswordRules, RecoverScreen, maskContact, passwordMeetsRules } from './AuthHelp.jsx';
 
-const OTP = '123456';
 /* The sample page drawn on the passport step and behind the camera. Not anyone's account. */
 const SAMPLE_MRZ = ['P<SAUALHARBI<<OMAR<<<<<<<<<<<<<<<<<<<<<<<<<', 'A08•••41<6SAU8403117M3106228<<<<<<<<<<<<<<02'];
 const DEMO_FIELDS = { given: 'OMAR', surname: 'ALHARBI', number: 'A08493141', nationality: 'Saudi Arabia', dob: '11/03/1984', expiry: '22/06/2031' };
@@ -21,9 +21,6 @@ export default function Onboarding({ params = {} }) {
   const [history, setHistory] = useState([]);
   const [phone, setPhone] = useState('');
   const [phoneTouched, setPhoneTouched] = useState(false);
-  const [code, setCode] = useState('');
-  const [tries, setTries] = useState(0);
-  const [resendIn, setResendIn] = useState(30);
   const [sheet, setSheet] = useState(null);
   const [social, setSocial] = useState(null); // 'apple' | 'google' once they've signed in that way
   const [hideEmail, setHideEmail] = useState(true);
@@ -38,6 +35,15 @@ export default function Onboarding({ params = {} }) {
   const [failWhy, setFailWhy] = useState(null);
   const run = useRef(0);
   const [household, setHousehold] = useState([]);
+  /* Email sign-in, the optional password, recovery (screens/AuthHelp.jsx). */
+  const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
+  const [password, setPassword] = useState('');
+  const [pwTries, setPwTries] = useState(0);
+  const [pwPause, setPwPause] = useState(null);
+  const [newPw, setNewPw] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [recoverPrefill, setRecoverPrefill] = useState({});
   const [passportLater, setPassportLater] = useState(false);
 
   const goto = (next) => { setHistory((h) => [...h, step]); setStep(next); buzz(HAPTIC.tap); };
@@ -47,12 +53,6 @@ export default function Onboarding({ params = {} }) {
     setHistory((h) => { const prev = h[h.length - 1]; if (prev) setStep(prev); return h.slice(0, -1); });
   };
 
-  useEffect(() => {
-    if (step !== 'otp') return undefined;
-    setResendIn(30);
-    const t = setInterval(() => setResendIn((n) => (n > 0 ? n - 1 : 0)), 1000);
-    return () => clearInterval(t);
-  }, [step]);
 
   // Arriving on the camera step: wait for a photo, or the demo passport.
   useEffect(() => {
@@ -158,19 +158,28 @@ export default function Onboarding({ params = {} }) {
   const pretty = phoneOk ? `+966 ${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}` : '';
 
   /* ---------- otp ---------- */
-  const locked = tries >= 3;
-  const submitCode = (value) => {
-    if (value.length !== 6 || locked) return;
-    if (value === OTP) {
-      buzz(HAPTIC.success);
-      /* 50 000 4127 is the demo account that already exists: bring everything back instead of starting over. */
-      if (digits.endsWith('4127') && !social) { goto('welcomeBack'); return; }
-      /* Straight in: passport, family and permissions are asked later, when they're needed. */
-      goto('name'); return;
-    }
-    buzz(HAPTIC.soft);
-    setTries((n) => n + 1);
-    setCode('');
+  const codeOk = () => {
+    /* The way in this phone used, first on the sign-in screen next time. */
+    if (!social) set({ lastSignIn: { via: 'phone', contact: digits } });
+    /* 50 000 4127 is the demo account that already exists: bring everything back instead of starting over. */
+    if (digits.endsWith('4127') && !social) { goto('welcomeBack'); return; }
+    /* Straight in: passport, family and permissions are asked later, when they're needed. */
+    goto('name');
+  };
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+  const emailNorm = email.trim().toLowerCase();
+  /* Demo: the password set in Profile, or this one for the demo account. */
+  const demoPassword = s.account?.password?.value || 'Istanbul 2027!';
+  const otherWays = {
+    onApple: () => { goto('signin'); setSheet('apple'); },
+    onGoogle: () => { goto('signin'); setSheet('google'); },
+  };
+  const last = s.lastSignIn;
+  const showLast = !!last && !showAll;
+  const continueLast = () => {
+    if (last.via === 'apple' || last.via === 'google') { setSheet(last.via); return; }
+    if (last.via === 'email') { setEmail(last.contact || ''); goto(last.contact ? 'emailCode' : 'email'); return; }
+    setPhone(last.contact || ''); goto(last.contact ? 'otp' : 'phone');
   };
 
   /* ---------- passport ---------- */
@@ -219,10 +228,18 @@ export default function Onboarding({ params = {} }) {
           <p className="body">Your trips, documents and family stay on this phone and in your account.</p>
         </div>
         <div className="act">
+          {showLast && (<>
+            <button type="button" className="btn primary block" onClick={continueLast}>{last.contact && last.via !== 'apple' ? `Continue as ${maskContact(last.via, last.contact)}` : last.via === 'apple' ? 'Continue with Apple' : last.via === 'google' ? 'Continue with Google' : last.via === 'email' ? 'Continue with email' : 'Continue with phone number'}</button>
+            <p className="act-note" style={{ margin: 0 }}>You used this last time on this phone.</p>
+            <button type="button" className="btn ghost block" onClick={() => setShowAll(true)}>Use another way</button>
+          </>)}
+          {!showLast && (<>
           <button type="button" className="btn primary block" onClick={() => setSheet('apple')}><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.72-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.75.73 1.050 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.41 1.2-2.47-.03-.01-2.3-.88-2.32-3.52zM14.2 6.13c.6-.73 1.010-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.68-.92 2.67.97.08 1.96-.49 2.56-1.22z" /></svg>Continue with Apple</button>
           <button type="button" className="btn secondary block" onClick={() => setSheet('google')}><svg width="19" height="19" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z" /><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" /><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" /><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.5z" /></svg>Continue with Google</button>
+          <button type="button" className="btn secondary block" onClick={() => goto('email')}>Continue with email</button>
           <button type="button" className="btn ghost block" onClick={() => goto('phone')}>Use my phone number</button>
           <p className="act-note">Bookings stay private. We never sell your data.</p>
+          </>)}
         </div>
         {(sheet === 'apple' || sheet === 'google') && (
           <Sheet label="Sign in" onClose={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>
@@ -239,7 +256,7 @@ export default function Onboarding({ params = {} }) {
                   ))}
                 </div>
               ) : <p className="body">Google shares your name and email address. Nothing else.</p>}
-              <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); setNick('Omar'); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
+              <button type="button" className="btn primary block" onClick={() => { setSocial(sheet); set({ lastSignIn: { via: sheet, contact: null } }); setNick('Omar'); setSheet(null); buzz(HAPTIC.success); goto('phone'); }}>Continue</button>
               <button type="button" className="btn ghost block" onClick={() => { setSheet(null); toast('Sign-in cancelled. Nothing was shared.'); }}>Cancel</button>
             </>)}
           </Sheet>
@@ -279,7 +296,7 @@ export default function Onboarding({ params = {} }) {
         <TopBar onBack={back} />
         <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); if (phoneOk && !s.demo.offline) goto('otp'); }}>
           <h1 className="h1">{social ? 'One more thing: your mobile' : 'Your mobile number'}</h1>
-          <p className="body">{social ? `You’re signed in with ${social === 'apple' ? 'Apple' : 'Google'}. Gate changes and Faisal’s messages come by SMS and WhatsApp, so we need a number that’s with you.` : 'We\'ll text a 6-digit code. Used for sign-in and urgent trip updates only.'}</p>
+          <p className="body">{social ? `You’re signed in with ${social === 'apple' ? 'Apple' : social === 'google' ? 'Google' : 'your email'}. Gate changes and Faisal’s messages come by SMS and WhatsApp, so we need a number that’s with you.` : 'We\'ll text a 6-digit code. Used for sign-in and urgent trip updates only.'}</p>
           <div className="field">
             <label htmlFor="phone">Mobile number</label>
             <div className="row">
@@ -301,25 +318,130 @@ export default function Onboarding({ params = {} }) {
     otp: (
       <div className="screen">
         <TopBar onBack={back} />
-        <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="scroll no-dock" style={{ padding: '24px 24px 0', gap: 16 }}>
           <h1 className="h1">Enter the code</h1>
           <p className="body">Sent to {pretty || 'your phone'}. <button type="button" className="link" onClick={back}>Change number</button></p>
-          <div className="field">
-            <label htmlFor="otp">6-digit code</label>
-            <input id="otp" className={'input otp' + (tries && !locked ? ' bad' : '')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} disabled={locked}
-              onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setCode(v); if (v.length === 6) submitCode(v); }} />
-            {tries > 0 && !locked && <span className="err" role="alert">That code doesn't match. {3 - tries} {3 - tries === 1 ? 'try' : 'tries'} left.</span>}
-            {locked && <span className="err" role="alert">Too many tries. Get a new code to carry on.</span>}
-          </div>
-          <div className="row">
-            {resendIn > 0 && !locked
-              ? <span className="small num">New code in 0:{String(resendIn).padStart(2, '0')}</span>
-              : <button type="button" className="btn secondary small" onClick={() => { setTries(0); setCode(''); setResendIn(30); toast('New code sent.'); buzz(HAPTIC.tap); }}>Send a new code</button>}
-          </div>
-          <p className="tiny">Demo code: 123456</p>
+          <CodeInput id="otp" about="phone" contact={digits} flow={social ? 'add' : 'signin'} onDone={codeOk} onChange={back}
+            onOther={() => goto('email')} {...otherWays} onLost={() => { setRecoverPrefill({ kind: 'phone', value: digits }); goto('recover'); }} />
         </div>
       </div>
     ),
+
+    email: (
+      <div className="screen">
+        <TopBar onBack={back} />
+        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); setEmailTouched(true); if (emailOk && !s.demo.offline) goto('emailCode'); }}>
+          <h1 className="h1">Your email</h1>
+          <p className="body">We’ll email a 6-digit code. No password to remember.</p>
+          <div className="field">
+            <label htmlFor="email">Email address</label>
+            <input id="email" className={'input' + (emailTouched && email && !emailOk ? ' bad' : '')} inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="you@example.com" value={email}
+              onChange={(e) => setEmail(e.target.value)} onBlur={() => setEmailTouched(true)} />
+            {emailTouched && email && !emailOk && <span className="err" role="alert">That address looks incomplete. It needs an @ and a domain.</span>}
+          </div>
+          <div className="row"><button type="button" className="link" style={{ color: '#5f6b65' }} onClick={() => goto('password')}>Use my password instead</button></div>
+          <div className="act">
+            <button type="submit" className="btn primary block" disabled={!emailOk || s.demo.offline}>Email me a code</button>
+          </div>
+        </form>
+      </div>
+    ),
+
+    emailCode: (
+      <div className="screen">
+        <TopBar onBack={back} />
+        <div className="scroll no-dock" style={{ padding: '24px 24px 0', gap: 16 }}>
+          <h1 className="h1">Check your email</h1>
+          <p className="body">Sent to {emailNorm}. <button type="button" className="link" onClick={back}>Change email</button></p>
+          <CodeInput id="email-code" about="email" contact={emailNorm} flow="signin"
+            onDone={() => { set({ lastSignIn: { via: 'email', contact: emailNorm } }); setSocial('email'); goto('phone'); }} onChange={back}
+            onOther={() => goto('phone')} {...otherWays} onLost={() => { setRecoverPrefill({ kind: 'email', value: emailNorm }); goto('recover'); }} />
+        </div>
+      </div>
+    ),
+
+    password: (
+      <div className="screen">
+        <TopBar onBack={back} />
+        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => {
+          e.preventDefault();
+          if (!emailOk || !password) return;
+          if (pwPause && pwPause.until > Date.now()) { setPwPause({ ...pwPause, open: true }); return; }
+          if (password === demoPassword) { buzz(HAPTIC.success); set({ lastSignIn: { via: 'email', contact: emailNorm } }); setPwTries(0); goto('welcomeBack'); return; }
+          buzz(HAPTIC.soft); setPassword('');
+          const used = pwTries + 1;
+          if (used >= 5) { setPwTries(0); setPwPause({ until: Date.now() + 45000, open: true }); } else setPwTries(used);
+        }}>
+          <h1 className="h1">Your password</h1>
+          <p className="body">Only if you set one in Profile. Codes always work too.</p>
+          <div className="field">
+            <label htmlFor="pw-email">Email address</label>
+            <input id="pw-email" className="input" inputMode="email" autoComplete="username" autoCapitalize="none" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <PasswordInput id="password" value={password} onChange={(v) => { setPassword(v); }}
+            error={pwTries > 0 ? (5 - pwTries === 1 ? 'That email and password don’t match. 1 try left before a short pause.' : `That email and password don’t match. ${5 - pwTries} tries left before a short pause.`) : null} />
+          <div className="row" style={{ gap: 18, flexWrap: 'wrap' }}>
+            <button type="button" className="link" onClick={() => goto('forgot')}>Forgot password?</button>
+            <button type="button" className="link" style={{ color: '#5f6b65' }} onClick={back}>Email me a code instead</button>
+          </div>
+          <span className="tiny">Demo password: {demoPassword}</span>
+          <div className="act">
+            <button type="submit" className="btn primary block" disabled={!emailOk || !password}>Sign in</button>
+          </div>
+        </form>
+        {pwPause?.open && <AuthPause until={pwPause.until} doneLabel="Sign in" onClose={() => setPwPause({ ...pwPause, open: false })} onDone={() => setPwPause(null)} />}
+      </div>
+    ),
+
+    forgot: (
+      <div className="screen">
+        <TopBar onBack={back} />
+        <form style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 16 }} onSubmit={(e) => { e.preventDefault(); if (emailOk) goto('forgotCode'); }}>
+          <h1 className="h1">Choose a new password</h1>
+          <p className="body">{`We’ll email a 6-digit code to ${emailOk ? emailNorm : 'your email'}. Then you choose a new password.`}</p>
+          <div className="field">
+            <label htmlFor="forgot-email">Email address</label>
+            <input id="forgot-email" className="input" inputMode="email" autoComplete="username" autoCapitalize="none" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="act">
+            <button type="submit" className="btn primary block" disabled={!emailOk}>Email me a code</button>
+          </div>
+        </form>
+      </div>
+    ),
+
+    forgotCode: (
+      <div className="screen">
+        <TopBar onBack={back} />
+        <div className="scroll no-dock" style={{ padding: '24px 24px 0', gap: 16 }}>
+          <h1 className="h1">Check your email</h1>
+          <p className="body">Sent to {emailNorm}. <button type="button" className="link" onClick={back}>Change email</button></p>
+          <CodeInput id="reset-code" about="email" contact={emailNorm} flow="signin" onDone={() => { setNewPw(''); goto('newPassword'); }} onChange={back}
+            onOther={() => goto('phone')} {...otherWays} onLost={() => { setRecoverPrefill({ kind: 'email', value: emailNorm }); goto('recover'); }} />
+        </div>
+      </div>
+    ),
+
+    newPassword: (
+      <div className="screen">
+        <TopBar />
+        <form className="scroll no-dock" style={{ padding: '24px 24px 0', gap: 16 }} onSubmit={(e) => {
+          e.preventDefault();
+          if (!passwordMeetsRules(newPw)) return;
+          set((p) => ({ account: { ...(p.account || {}), password: { set: true, value: newPw, at: Date.now() } }, lastSignIn: { via: 'email', contact: emailNorm } }));
+          buzz(HAPTIC.success); toast('Password saved. You can sign in with it or with a code.'); goto('welcomeBack');
+        }}>
+          <h1 className="h1">Choose a new password</h1>
+          <p className="body">A short sentence with a number and a symbol is easy to remember and hard to guess.</p>
+          <input type="email" autoComplete="username" value={emailNorm} readOnly hidden />
+          <PasswordInput id="new-password" label="New password" fresh value={newPw} onChange={setNewPw} />
+          <PasswordRules value={newPw} />
+          <button type="submit" className="btn primary block" disabled={!passwordMeetsRules(newPw)}>Save and sign in</button>
+        </form>
+      </div>
+    ),
+
+    recover: <RecoverScreen prefill={recoverPrefill} onBack={back} onDone={() => { setHistory([]); setStep('signin'); }} />,
 
     passport: (
       <div className="screen">

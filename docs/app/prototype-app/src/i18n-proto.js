@@ -9,6 +9,8 @@ export const PROTO_AR = {
   Start: 'ابدأ',
   'Sent to': 'أرسلناه إلى',
   'your phone': 'جوالك',
+  // Sign-in help (screens/AuthHelp.jsx); everything else there is the catalogue's own words.
+  'Demo password: {password}': 'كلمة مرور التجربة: {password}',
   // Today
   'Last Eid, the four of you went to Baku.': 'في العيد الماضي سافرتم أنتم الأربعة إلى باكو.',
   '{name} is back': 'عاد {name}',

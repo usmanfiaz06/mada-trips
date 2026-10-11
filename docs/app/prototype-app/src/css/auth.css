@@ -1,0 +1,13 @@
+/* Sign-in help (screens/AuthHelp.jsx): Didn't get the code?, the password rules, the gentle shake on a wrong code. */
+.auth-help-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border: 0; border-radius: 24px; background: var(--mist); color: var(--green); font: inherit; text-align: start; }
+.auth-help-row:disabled { opacity: .7; }
+.auth-help-row:not(:disabled):active { transform: scale(.99); }
+.auth-help-ic { width: 34px; height: 34px; flex-shrink: 0; border-radius: 12px; background: var(--paper); display: flex; align-items: center; justify-content: center; }
+[dir="rtl"] .auth-help-row > svg:last-child { transform: scaleX(-1); }
+.auth-rule { display: flex; align-items: center; gap: 8px; color: #5f6b65; }
+.auth-rule.ok { color: var(--green); }
+.auth-rule-dot { width: 20px; height: 20px; border-radius: 10px; border: 1.5px solid #ddd5c9; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.auth-rule.ok .auth-rule-dot { background: var(--green); border-color: var(--green); }
+.shake { animation: auth-shake .32s ease; }
+@keyframes auth-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 45% { transform: translateX(8px); } 70% { transform: translateX(-5px); } 85% { transform: translateX(3px); } }
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }

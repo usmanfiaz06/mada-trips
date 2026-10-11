@@ -5,6 +5,7 @@ import { ReturnHero } from './Welcome.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE, MRZ, passportIssue } from '../store.jsx';
 import { Icon, TopBar, Sheet, Toggle, AddPersonSheet, Sun, EmptyState, ArtEnvelope, ArtSuitcase, ArtFriends, ArtPhone } from '../ui.jsx';
 import * as Support from './Support.jsx';
+import { CodeInput, PasswordInput, PasswordRules, passwordMeetsRules } from './AuthHelp.jsx';
 import { setLang, useLang } from '../lang.jsx';
 
 export const DEMO_CODE = '123456';
@@ -165,33 +166,12 @@ export function UserAvatar({ size = 40, ring, className = '' }) {
 /* ---------- 6-digit code entry (email, phone, linking) ---------- */
 
 function CodeStep({ to, onDone, onBack, backLabel = 'Change' }) {
-  const { s, toast } = useStore();
-  const [code, setCode] = useState('');
-  const [tries, setTries] = useState(0);
-  const [left, setLeft] = useState(30);
-  useEffect(() => { const t = setInterval(() => setLeft((n) => (n > 0 ? n - 1 : 0)), 1000); return () => clearInterval(t); }, []);
-  const locked = tries >= 3;
-  const check = (v) => {
-    if (v === DEMO_CODE) { buzz(HAPTIC.success); onDone(); return; }
-    buzz(HAPTIC.soft); setTries((n) => n + 1); setCode('');
-  };
+  const email = to.includes('@');
   return (
     <>
       <h2 className="h2">Enter the code</h2>
       <p className="body">Sent to {to}. {onBack && <button type="button" className="link" onClick={onBack}>{backLabel}</button>}</p>
-      <div className="field">
-        <label htmlFor="acc-code">6-digit code</label>
-        <input id="acc-code" className={'input otp' + (tries && !locked ? ' bad' : '')} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} disabled={locked}
-          onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setCode(v); if (v.length === 6) check(v); }} />
-        {tries > 0 && !locked && <span className="err" role="alert">That code doesn't match. {3 - tries} {3 - tries === 1 ? 'try' : 'tries'} left.</span>}
-        {locked && <span className="err" role="alert">Too many tries. Get a new code to carry on.</span>}
-      </div>
-      <div className="spread">
-        {left > 0 && !locked
-          ? <span className="small num">New code in 0:{String(left).padStart(2, '0')}</span>
-          : <button type="button" className="btn secondary small" onClick={() => { if (s.demo.offline) { toast('You’re offline. We’ll send it once you’re connected.'); return; } setTries(0); setCode(''); setLeft(30); toast('New code sent.'); }}>Send a new code</button>}
-        <span className="tiny">Demo code: 123456</span>
-      </div>
+      <CodeInput id="acc-code" about={email ? 'email' : 'phone'} contact={to} shownAs={to} flow="add" onDone={onDone} onChange={onBack || (() => {})} />
     </>
   );
 }
@@ -567,6 +547,10 @@ function SignIn() {
   const [sheet, setSheet] = useState(null);
   const count = METHODS.filter((m) => a.methods[m.id]).length;
   const m = sheet && METHODS.find((x) => x.id === sheet.id);
+  /* Password: what they chose, a code to the email to check it's them, then the new one against the rules. */
+  const [pw, setPw] = useState(null);
+  const savePw = () => { save({ password: { set: true, value: pw.value, at: Date.now() } }); buzz(HAPTIC.success); toast('Password saved. You can sign in with it or with a code.'); setPw(null); };
+  const removePw = () => { save({ password: null }); buzz(HAPTIC.tap); toast('Password removed. Codes work as before.'); setPw(null); };
   const link = (id) => { save((f) => ({ methods: { ...f.methods, [id]: true } })); buzz(HAPTIC.success); toast(`${METHODS.find((x) => x.id === id).name} added. You can sign in with it now.`); setSheet(null); };
   return (
     <div className="screen push">
@@ -580,6 +564,11 @@ function SignIn() {
               right={<span className={'pill' + (a.methods[x.id] ? ' ok' : '')}>{a.methods[x.id] ? 'Linked' : 'Add'}</span>}
               onClick={() => setSheet({ id: x.id, mode: a.methods[x.id] ? 'manage' : 'link' })} />
           ))}
+        </Group>
+        <Group>
+          <Row lead={<span className={'acc-ic' + (a.password?.set ? ' on' : '')}><Icon name="lock" size={18} color={a.password?.set ? '#f6f2ec' : '#1e352d'} /></span>}
+            value="Password" sub="Optional, with your email" right={<span className={'pill' + (a.password?.set ? ' ok' : '')}>{a.password?.set ? 'Set' : 'Add'}</span>}
+            onClick={() => { setPw({ step: 'menu', action: 'set', value: '' }); }} />
         </Group>
         {count === 1 && <div className="notice warn"><Icon name="lock" color="#7d5d27" style={{ flexShrink: 0 }} /><div className="grow"><span className="h3" style={{ fontSize: 15 }}>Only one way in.</span><span className="small">Add another method so you can still sign in if you lose this one.</span></div></div>}
         {a.methods.apple && (
@@ -601,6 +590,35 @@ function SignIn() {
       {sheet && sheet.mode === 'link' && sheet.id === 'phone' && (
         <Sheet label="Add phone sign-in" onClose={() => setSheet(null)}>
           <CodeStep to={prettyPhone(a.phone.digits)} onDone={() => link('phone')} />
+        </Sheet>
+      )}
+      {pw && (
+        <Sheet label="Password" onClose={() => setPw(null)}>
+          {!a.email?.address ? (<>
+            <h2 className="h2">Password</h2>
+            <p className="body">Add your email first. A password goes with it.</p>
+          </>) : pw.step === 'menu' ? (<>
+            <h2 className="h2">Password</h2>
+            <p className="body">Codes always work. A password is an extra way in with your email.</p>
+            {a.password?.set ? (<>
+              <button type="button" className="btn primary block" onClick={() => setPw({ ...pw, action: 'set', step: 'code' })}>Change password</button>
+              <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={() => setPw({ ...pw, action: 'remove', step: 'code' })}>Remove password</button>
+            </>) : <button type="button" className="btn primary block" onClick={() => setPw({ ...pw, action: 'set', step: 'code' })}>Set a password</button>}
+          </>) : pw.step === 'code' ? (<>
+            <p className="small" style={{ margin: 0 }}>First, a code to check it’s you.</p>
+            <CodeStep to={a.email.address} onDone={() => setPw({ ...pw, step: pw.action === 'remove' ? 'confirm' : 'new' })} />
+          </>) : pw.step === 'confirm' ? (<>
+            <h2 className="h2">Remove password</h2>
+            <p className="body">You’ll sign in with a code, Apple or Google, as before.</p>
+            <button type="button" className="btn secondary block" style={{ color: '#8a3524' }} onClick={removePw}>Remove password</button>
+          </>) : (<>
+            <h2 className="h2">{a.password?.set ? 'Change password' : 'Set a password'}</h2>
+            <input type="email" autoComplete="username" value={a.email.address} readOnly hidden />
+            <PasswordInput id="acc-new-password" label="New password" fresh value={pw.value} onChange={(v) => setPw({ ...pw, value: v })} />
+            <PasswordRules value={pw.value} />
+            <button type="button" className="btn primary block" disabled={!passwordMeetsRules(pw.value)} onClick={savePw}>Save password</button>
+          </>)}
+          <button type="button" className="btn ghost block" onClick={() => setPw(null)}>Cancel</button>
         </Sheet>
       )}
       {sheet && sheet.mode === 'manage' && (
