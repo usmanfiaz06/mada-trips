@@ -17,7 +17,7 @@ import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, type LastSignI
 import { maskContact } from '@/lib/auth/recovery';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
+import { rise, riseStyle } from '@/lib/motion';
 import { useOnboarding } from '@/lib/onboarding';
 import { toast } from '@/lib/toast';
 import { colors, radii, shadow } from '@/theme';
@@ -103,13 +103,13 @@ export default function SignIn() {
       <TopBar onBack={() => router.back()} />
       <View style={styles.photos} accessible={false}>
         {PHOTOS.map((p, i) => (
-          <Animated.View key={i} entering={rise(i)} style={[styles.photo, shadow('focal'), { transform: [{ translateX: p.x }] }]}>
+          <Animated.View key={i} entering={rise(i)} style={[riseStyle(i, true), styles.photo, shadow('focal'), { transform: [{ translateX: p.x }] }]}>
             <Image source={p.src} style={StyleSheet.absoluteFill} contentFit="cover" />
           </Animated.View>
         ))}
         <View style={styles.badge}>
-          <Animated.View entering={rise(6)}>
-            <Pill variant="dark" height={32} label={t('signin.badge')} icon={<Sun width={18} />} style={{ paddingHorizontal: 14 }} />
+          <Animated.View entering={rise(6)} style={riseStyle(6)}>
+            <Pill variant="dark" height={32} label={t('auth.signin.badge')} icon={<Sun width={18} />} style={{ paddingHorizontal: 14 }} />
           </Animated.View>
         </View>
       </View>

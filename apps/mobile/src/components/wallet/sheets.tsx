@@ -24,6 +24,7 @@ import { Sheet } from '../Sheet';
 import { T } from '../Text';
 import { ArtReceipt } from './Arts';
 import { Spinner } from './ui';
+import { HAS_APPLE_PAY } from '@/lib/device';
 
 /* The Wallet's sheets (prototype Wallet.jsx): add a document, upload it, a document's actions, a boarding pass,
    Mada credit, and cards. */
@@ -350,9 +351,9 @@ export function CardsSheet({ visible, onClose, onPicked }: { visible: boolean; o
           {c.id === current ? <Icon name="check" color={colors.ok} width={2.4} /> : null}
         </Card>
       ))}
-      <Card variant="well" selected={current === 'applepay'} onPress={() => pick('applepay')} accessibilityLabel={t('cards.applePay')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      {HAS_APPLE_PAY ? <Card variant="well" selected={current === 'applepay'} onPress={() => pick('applepay')} accessibilityLabel={t('cards.applePay')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <PayMark brand="applepay" size={30} /><T v="h3" style={{ fontSize: 15, flex: 1 }}>{t('cards.applePay')}</T>{current === 'applepay' ? <Icon name="check" color={colors.ok} width={2.4} /> : null}
-      </Card>
+      </Card> : null}
       {adding ? (
         <View style={{ gap: 12 }}>
           <Field label={t('cards.number')} value={num} keyboardType="number-pad" autoComplete="cc-number" placeholder="4000 0000 0000 0000" error={numErr} onBlur={() => setTouched({ ...touched, num: true })}

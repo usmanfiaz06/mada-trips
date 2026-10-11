@@ -23,6 +23,7 @@ import { toast } from '@/lib/toast';
 import { useAccount, useCards, useCredit, useDevices, useExport, useInbox, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { fullNameOf, nameOf, nextTrip, passportStatus, prettyPhone, useNow } from '@/lib/wallet-model';
 import { colors, ff } from '@/theme';
+import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
 
 /** Profile (prototype Profile.jsx): you, your account, household, paying, alerts, the app, sign out. */
 export default function Profile() {
@@ -78,7 +79,7 @@ function SignedIn() {
       const r = await walletApi.removeCard(id, newDefault);
       qc.setQueryData(walletKeys.cards, r);
       buzz('tap');
-      toast(r.defaultId === 'applepay' && def === id ? t('cards.removedApplePay') : t('cards.removed'));
+      toast(HAS_APPLE_PAY && r.defaultId === 'applepay' && def === id ? t('cards.removedApplePay') : t('cards.removed'));
     } catch { toast(t('error.internal')); }
     setSheet(null);
   };
@@ -116,19 +117,19 @@ function SignedIn() {
       <Group label={t('profile.household')}>
         <Row lead={<View style={{ flexDirection: 'row' }}>{list.slice(0, 4).map((p, i) => <View key={p.id} style={{ marginStart: i ? -10 : 0 }}>{p.isSelf ? <UserAvatar size={34} ring={colors.paper} initial={display.charAt(0)} hasPhoto={!!a?.photo} photoKey={a?.photo?.updatedAt} /> : <View style={styles.face}><T style={{ fontFamily: ff.ui600, fontSize: 13, color: colors.green }}>{p.firstName.charAt(0)}</T></View>}</View>)}</View>}
           value={list.length > 1 ? list.map((p) => (p.isSelf ? display || t('household.youPlain') : p.firstName)).join(listSep()) : t('profile.justYou')}
-          sub={list.length <= 1 ? (needs ? t('profile.household.youNoPassport') : t('profile.household.addFamily')) : needs ? tn('profile.household.needs', needs) : t('profile.household.allGood')}
+          sub={list.length <= 1 ? (!self?.passport ? t('profile.household.youNoPassport') : needs ? tn('profile.household.needs', needs) : t('profile.household.addFamily')) : needs ? tn('profile.household.needs', needs) : t('profile.household.allGood')}
           onPress={() => router.push('/household')} testID="profile-household" />
       </Group>
 
       <Group label={t('profile.paying')}>
-        {def === 'applepay' ? <Row lead={<PayMark brand="applepay" size={26} />} value={t('cards.applePay')} right={<Pill text={t('cards.default')} />} /> : null}
+        {HAS_APPLE_PAY && def === 'applepay' ? <Row lead={<PayMark brand="applepay" size={26} />} value={t('cards.applePay')} right={<Pill text={t('cards.default')} />} /> : null}
         {saved.map((c) => (
           <Row key={c.id} lead={<PayMark brand={c.brand} size={26} />} value={c.label} sub={t('cards.expires', { exp: c.exp })}
             right={<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>{c.id === def ? <Pill text={t('cards.default')} /> : null}
               <Pressable accessibilityRole="button" accessibilityLabel={t('cards.removeLabel', { label: c.label })} onPress={() => askRemove(c.id)} hitSlop={8}><T v="caption" color={colors.badInk} style={{ fontFamily: ff.ui600, fontSize: 13, textDecorationLine: 'underline' }}>{t('cards.remove')}</T></Pressable></View>} />
         ))}
-        {!saved.length && def !== 'applepay' ? <Row icon="card" value={t('profile.noCards')} sub={t('profile.noCardsSub')} /> : null}
-        {!saved.length && def === 'applepay' ? <View style={{ padding: 16 }}><T v="tiny">{t('profile.noCardsApplePay')}</T></View> : null}
+        {!saved.length && (def !== 'applepay' || !HAS_APPLE_PAY) ? <Row icon="card" value={t('profile.noCards')} sub={t('profile.noCardsSub')} /> : null}
+        {!saved.length && def === 'applepay' && HAS_APPLE_PAY ? <View style={{ padding: 16 }}><T v="tiny">{dt('profile.noCardsApplePay')}</T></View> : null}
         {bal > 0 ? <Row lead={<PayMark brand="credit" size={26} />} value={t('profile.credit', { amount: formatSar(bal) })} sub={t('profile.creditSub')} /> : null}
         <Row icon="card" value={saved.length ? t('profile.changeCard') : t('profile.addCard')} onPress={() => setSheet('cards')} testID="profile-cards" />
       </Group>
@@ -145,7 +146,7 @@ function SignedIn() {
 
       <Group label={t('profile.app')}>
         <Row icon="globe" value={t('profile.language')} sub={t('lang.current')} onPress={() => setSheet('language')} testID="profile-language" />
-        <Row icon="lock" value={t('profile.security')} sub={tn('profile.securitySub', devices.data?.length ?? 1, { face: a?.faceId === false ? t('profile.faceOff') : t('profile.faceOn') })} onPress={() => router.push('/account/security')} testID="profile-security" />
+        <Row icon="lock" value={t('profile.security')} sub={HAS_BIOMETRICS ? tn('profile.securitySub', devices.data?.length ?? 1, { face: a?.faceId === false ? dt('profile.faceOff') : dt('profile.faceOn') }) : tn('profile.securityDevices', devices.data?.length ?? 1)} onPress={() => router.push('/account/security')} testID="profile-security" />
         <Row icon="doc" value={t('profile.privacy')} sub={exportPending ? t('profile.privacySubPending') : t('profile.privacySub')} onPress={() => router.push('/account/privacy')} testID="profile-privacy" />
         <Row icon="bell" value={t('profile.help')} sub={t('profile.helpSub')} onPress={() => router.push('/account/help')} testID="profile-help" />
       </Group>
@@ -167,7 +168,7 @@ function SignedIn() {
       </Sheet>
       <Sheet visible={sheet === 'lastcard'} onClose={() => setSheet(null)} label={t('cards.removeLast.title')}>
         <T v="h2">{t('cards.removeLast.title')}</T>
-        <T v="body">{t('cards.removeLast.body')}</T>
+        <T v="body">{dt('cards.removeLast.body')}</T>
         <Button variant="secondary" style={{ backgroundColor: colors.mist }} color={colors.badInk} label={t('cards.removeLast.confirm')} onPress={() => removeCard(def)} testID="remove-last" />
         <Button label={t('cards.keep')} onPress={() => setSheet(null)} />
       </Sheet>

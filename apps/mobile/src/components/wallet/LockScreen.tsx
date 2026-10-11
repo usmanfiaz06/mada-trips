@@ -10,6 +10,7 @@ import { Icon } from '../Icon';
 import { Screen } from '../Layout';
 import { T } from '../Text';
 import { Spinner } from './ui';
+import { dt } from '@/lib/device';
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 
@@ -41,13 +42,13 @@ export function LockScreen() {
         <T v="h1" color="#f6f2ec" style={{ textAlign: 'center' }} accessibilityRole="header">{t('wallet.lock.title')}</T>
         <T v="body" color={colors.onDark2} style={{ textAlign: 'center' }}>{t('wallet.lock.body')}</T>
         {phase === 'checking' ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner light /><T v="small" color="#e9e2d8">{t('wallet.lock.checking')}</T></View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Spinner light /><T v="small" color="#e9e2d8">{dt('wallet.lock.checking')}</T></View>
         ) : null}
         {phase === 'failed' || locked ? (
           <View style={{ gap: 10, alignSelf: 'stretch' }}>
             {locked
-              ? <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert">{t('wallet.lock.lockedOut', { minutes })}</T>
-              : <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert">{problem ?? t('wallet.lock.failed')}</T>}
+              ? <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert">{dt('wallet.lock.lockedOut', { minutes })}</T>
+              : <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert">{problem ?? dt('wallet.lock.failed')}</T>}
             {native ? (
               <Button variant="gold" label={t('wallet.lock.usePasscode')} disabled={locked} onPress={() => submit('')} testID="lock-passcode" />
             ) : (
@@ -59,10 +60,10 @@ export function LockScreen() {
                 {SHOW_DEMO_HINTS ? <T v="tiny" color={colors.onDark3} style={{ textAlign: 'center' }}>{t('wallet.lock.demo')}</T> : null}
               </>
             )}
-            {locked ? <Button variant="ghost" color={colors.onDark2} label={t('wallet.lock.open')} onPress={() => tryBiometric()} /> : null}
+            {locked ? <Button variant="ghost" color={colors.onDark2} label={dt('wallet.lock.open')} onPress={() => tryBiometric()} /> : null}
           </View>
         ) : null}
-        {phase === 'idle' && !locked ? <Button variant="gold" block={false} label={t('wallet.lock.open')} onPress={() => tryBiometric()} testID="lock-faceid" /> : null}
+        {phase === 'idle' && !locked ? <Button variant="gold" block={false} label={dt('wallet.lock.open')} onPress={() => tryBiometric()} testID="lock-faceid" /> : null}
       </View>
     </Screen>
   );

@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { getSecret, setSecret } from './storage';
 import { demo } from './wallet-demo';
 import { t } from './i18n';
+import { HAS_BIOMETRICS } from './device';
 
 /*
  * Open Mada with Face ID (or fingerprint): opt-in, offered once after sign-in on a phone that has it, and switched in
@@ -29,7 +30,8 @@ type AppLock = Saved & {
 };
 
 export async function biometricsAvailable(): Promise<boolean> {
-  if (!native) return true;
+  // The mock web build is the iPhone prototype; the live web has no Face ID to offer.
+  if (!native) return HAS_BIOMETRICS;
   try { return (await LocalAuthentication.hasHardwareAsync()) && (await LocalAuthentication.isEnrolledAsync()); } catch { return false; }
 }
 

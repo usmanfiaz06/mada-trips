@@ -208,4 +208,11 @@ export const authCopy = {
   'auth.error.phoneRequired': 'Verify your phone number to book. It takes a minute.',
   'auth.error.identityTaken': 'That sign-in is already on another account.',
   'auth.error.signInAgain': 'Please sign in again to carry on.',
+  'auth.bio.title.android': 'Open Mada with your fingerprint?',
+  'auth.bio.allow.android': 'Use fingerprint',
+  'auth.bio.row.android': 'Open Mada with your fingerprint',
+  'auth.bio.on.android': 'Mada opens with your fingerprint on this phone.',
+  'auth.bio.off.android': 'Mada opens without a fingerprint.',
+  'auth.bio.unlock.android': 'Open with fingerprint',
+  'auth.signin.badge': 'A real person checks every booking',
 } as const;

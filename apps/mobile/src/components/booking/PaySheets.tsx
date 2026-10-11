@@ -17,6 +17,7 @@ import { PayMark, type PayBrand } from '../PayMark';
 import { Sheet } from '../Sheet';
 import { T } from '../Text';
 import { sar } from './parts';
+import { HAS_APPLE_PAY } from '@/lib/device';
 
 /* The order sheet's own sheets: how to pay (saved cards, Apple Pay, a new card), Apple Pay, the bank's code. */
 
@@ -64,9 +65,11 @@ export function CardsSheet({ visible, current, credit, onPick, onClose }: { visi
             {selected(card.id) ? <Icon name="check" color={colors.ok} width={2.4} /> : null}
           </Pressable>
         ))}
-        <Pressable accessibilityRole="button" accessibilityState={{ selected: selected('applepay') }} onPress={() => { buzz('select'); onPick({ kind: 'applepay', label: 'Apple Pay', brand: 'applepay' }); }} style={[styles.card, selected('applepay') ? styles.sel : null]} testID="card-applepay">
-          <PayMark brand="applepay" size={30} /><T v="h3" style={{ fontSize: 15, flex: 1 }}>Apple Pay</T>{selected('applepay') ? <Icon name="check" color={colors.ok} width={2.4} /> : null}
-        </Pressable>
+        {HAS_APPLE_PAY ? (
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: selected('applepay') }} onPress={() => { buzz('select'); onPick({ kind: 'applepay', label: 'Apple Pay', brand: 'applepay' }); }} style={[styles.card, selected('applepay') ? styles.sel : null]} testID="card-applepay">
+            <PayMark brand="applepay" size={30} /><T v="h3" style={{ fontSize: 15, flex: 1 }}>Apple Pay</T>{selected('applepay') ? <Icon name="check" color={colors.ok} width={2.4} /> : null}
+          </Pressable>
+        ) : null}
         {adding ? (
           <View style={{ gap: 12 }}>
             <Field label={t('pay.card.number')} value={num} keyboardType="number-pad" placeholder="4000 0000 0000 0000" autoComplete="cc-number" testID="card-number"

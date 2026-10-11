@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_MODE } from '@/lib/config';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { formatSar, type Person, type WalletDocument } from '@mada/shared';
 import { ArtCardSlot, ArtPass } from '@/components/art/Arts';
 import { Button, LinkButton } from '@/components/Button';
@@ -25,6 +25,7 @@ import { useAccount, useCards, useCredit, useDocuments, useRefreshHousehold, use
 import { useWalletLock } from '@/lib/wallet-lock';
 import { useNow, fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
 import { colors, ff, shadow } from '@/theme';
+import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
 
 /** The Wallet (prototype Wallet.jsx): locked with Face ID, passports for the whole household, documents, passes, money. */
 export default function Wallet() {
@@ -35,7 +36,7 @@ export default function Wallet() {
   const account = useAccount();
   const unlocked = useWalletLock((s) => s.unlocked);
   if (status !== 'signedIn') return <SignedOut />;
-  if (account.data?.faceId !== false && !unlocked) return <LockScreen />;
+  if (HAS_BIOMETRICS && account.data?.faceId !== false && !unlocked) return <LockScreen />;
   return <Unlocked />;
 }
 
@@ -79,6 +80,13 @@ function Unlocked() {
   const name = (p?: Person) => (p?.isSelf ? (me?.name || p.firstName || t('household.youPlain')) : p?.firstName ?? '');
 
   const scan = (p = who) => router.push({ pathname: '/passport', params: p && !p.isSelf ? { person: p.id } : {} });
+  // Trips › "Upload a booking" opens straight on the upload, for the account holder.
+  const params = useLocalSearchParams<{ upload?: string }>();
+  const self = list.find((p) => p.isSelf);
+  const [opened, setOpened] = useState(false);
+  if (params.upload === 'booking' && self && !opened) { setOpened(true); setWho(self.id); setUpload({ kind: 'other' }); }
+  else if (!params.upload && opened) setOpened(false);
+  useEffect(() => { if (opened && params.upload) router.setParams({ upload: undefined }); }, [opened, params.upload, router]);
   const pickKind = (k: AddKind) => { setSheet(null); if (k === 'passport') scan(); else setUpload({ kind: k }); };
   const renew = async () => {
     try {
@@ -98,7 +106,7 @@ function Unlocked() {
   const travellers = trip ? list.filter((p) => trip.travellerIds.includes(p.id)) : [];
   const bal = credit.data?.balance.amount ?? 0;
   const savedCards = cards.data?.cards ?? [];
-  const defaultLabel = cards.data?.defaultId === 'applepay' ? t('cards.applePay') : savedCards.find((c) => c.id === cards.data?.defaultId)?.label ?? t('cards.applePay');
+  const defaultLabel = HAS_APPLE_PAY && cards.data?.defaultId === 'applepay' ? t('cards.applePay') : savedCards.find((c) => c.id === cards.data?.defaultId)?.label ?? (HAS_APPLE_PAY ? t('cards.applePay') : savedCards[0]?.label ?? '');
 
   return (
     <Screen>
@@ -106,7 +114,7 @@ function Unlocked() {
         <View style={styles.header}>
           <View style={{ gap: 2 }}>
             <T v="h1" style={{ fontSize: 34, lineHeight: 38 }} accessibilityRole="header">{t('wallet.title')}</T>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="lock" size={14} color={colors.ink3} /><T v="tiny">{account.data?.faceId === false ? t('wallet.lock.notLocked') : t('wallet.lock.lockedWith')}</T></View>
+            {HAS_BIOMETRICS ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="lock" size={14} color={colors.ink3} /><T v="tiny">{account.data?.faceId === false ? dt('wallet.lock.notLocked') : dt('wallet.lock.lockedWith')}</T></View> : null}
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={t('wallet.add')} onPress={() => { buzz('tap'); setSheet('add'); }} style={styles.plus} testID="wallet-add"><Icon name="plus" color={colors.mist} /></Pressable>
         </View>
@@ -187,11 +195,11 @@ function Unlocked() {
             <T v="tiny" color={colors.onDark2}>{bal ? t('money.credit.used') : t('money.credit.zero')}</T>
           </Pressable>
         </View>
-        <Card onPress={() => setSheet('cards')} accessibilityLabel={t('money.cards')} style={styles.rowCard}>
+        <Card onPress={() => setSheet('cards')} accessibilityLabel={dt('money.cards')} style={styles.rowCard}>
           <View style={{ flexDirection: 'row' }}>{(savedCards.length ? savedCards.slice(0, 3) : [{ id: 'applepay', brand: 'applepay' as const }]).map((c, i) => <View key={c.id} style={{ marginStart: i ? -8 : 0 }}><PayMark brand={c.brand} size={24} /></View>)}</View>
           <View style={{ flex: 1, marginStart: 8 }}>
-            <T v="h3" style={{ fontSize: 15 }}>{t('money.cards')}</T>
-            <T v="tiny">{savedCards.length ? t(savedCards.length === 1 ? 'money.cards.subOne' : 'money.cards.sub', { count: savedCards.length, label: defaultLabel }) : t('money.cards.none')}</T>
+            <T v="h3" style={{ fontSize: 15 }}>{dt('money.cards')}</T>
+            <T v="tiny">{savedCards.length ? t(savedCards.length === 1 ? 'money.cards.subOne' : 'money.cards.sub', { count: savedCards.length, label: defaultLabel }) : dt('money.cards.none')}</T>
           </View>
           <Icon name="chevron" />
         </Card>

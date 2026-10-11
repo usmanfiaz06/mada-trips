@@ -12,6 +12,7 @@ import { t } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { colors } from '@/theme';
+import { dt } from '@/lib/device';
 
 /**
  * Over the whole app: the lock while it's locked (signed in only; signing out is always there), and the one-time offer
@@ -39,15 +40,15 @@ export function AppLock() {
           <T v="h1" color={colors.onDark} style={{ textAlign: 'center' }} accessibilityRole="header">{t('auth.bio.locked')}</T>
           <T v="body" color={colors.onDark} style={{ textAlign: 'center', opacity: 0.85 }}>{t('auth.bio.lockedBody')}</T>
           <View style={{ alignSelf: 'stretch', gap: 10, marginTop: 12 }}>
-            <Button variant="gold" label={t('auth.bio.unlock')} busy={busy} onPress={open} testID="app-unlock" />
+            <Button variant="gold" label={dt('auth.bio.unlock')} busy={busy} onPress={open} testID="app-unlock" />
             <Button variant="onDark" label={t('auth.bio.signOut')} onPress={async () => { useAppLock.setState({ locked: false }); await api.logout().catch(() => {}); router.replace('/welcome'); }} />
           </View>
         </View>
       ) : null}
-      <Sheet visible={offer && signedIn} onClose={() => void answerOffer(false)} label={t('auth.bio.title')}>
-        <T v="h2">{t('auth.bio.title')}</T>
+      <Sheet visible={offer && signedIn} onClose={() => void answerOffer(false)} label={dt('auth.bio.title')}>
+        <T v="h2">{dt('auth.bio.title')}</T>
         <T v="body">{t('auth.bio.body')}</T>
-        <Button label={t('auth.bio.allow')} onPress={async () => { await answerOffer(true); if (useAppLock.getState().on) toast(t('auth.bio.on')); }} testID="bio-allow" />
+        <Button label={dt('auth.bio.allow')} onPress={async () => { await answerOffer(true); if (useAppLock.getState().on) toast(dt('auth.bio.on')); }} testID="bio-allow" />
         <Button variant="ghost" label={t('auth.bio.later')} onPress={() => void answerOffer(false)} />
       </Sheet>
     </>

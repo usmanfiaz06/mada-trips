@@ -19,10 +19,19 @@ import { demo } from '@/lib/wallet-demo';
 import { fmtDate } from '@/lib/wallet-model';
 import { colors } from '@/theme';
 import type { Device } from '@mada/shared';
+import { DEVICE, dt, HAS_BIOMETRICS } from '@/lib/device';
 
 const ago = (iso: string) => { const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? t('security.device.now') : fmtDate(iso); };
 
 /** Security (Account.jsx Security): Face ID for the Wallet, signed-in devices, sign out everywhere. */
+const PLATFORM = { ios: 'iOS', android: 'Android', web: 'Web' } as const;
+/** This device is what it says it is here (an old sign-in may have been recorded without one); the others as the server knows them. */
+const platformOf = (d: Device): keyof typeof PLATFORM => (d.current ? DEVICE : d.platform === 'android' || d.platform === 'web' ? d.platform : 'ios');
+const deviceName = (d: Device) => {
+  if (!d.current || (d.name !== 'A phone' && d.name !== t('security.device.unknown'))) return d.name;
+  return DEVICE === 'web' ? t('security.device.web') : DEVICE === 'android' ? t('security.device.android') : t('security.device.iphone');
+};
+
 export default function Security() {
   const qc = useQueryClient();
   const account = useAccount();
@@ -43,8 +52,8 @@ export default function Security() {
     if (Platform.OS !== 'web') ok = (await LocalAuthentication.authenticateAsync({ promptMessage: t('wallet.lock.prompt') }).catch(() => ({ success: false }))).success;
     else { await new Promise((r) => setTimeout(r, 900)); ok = !demo('faceIdFails'); }
     setChecking(false);
-    if (!ok) { setFaceErr(t('security.faceFailed')); buzz('soft'); return; }
-    update.mutate({ faceId: true }, { onSuccess: () => { buzz('success'); toast(t('security.faceOnToast')); } });
+    if (!ok) { setFaceErr(dt('security.faceFailed')); buzz('soft'); return; }
+    update.mutate({ faceId: true }, { onSuccess: () => { buzz('success'); toast(dt('security.faceOnToast')); } });
   };
   const signOutDevice = async (d: Device) => {
     try { await walletApi.signOutDevice(d.id); await qc.invalidateQueries({ queryKey: walletKeys.devices }); buzz('tap'); toast(t('security.device.done', { name: d.name })); setSheet(null); } catch { toast(t('error.internal')); }
@@ -53,19 +62,22 @@ export default function Security() {
 
   return (
     <AccountScreen title={t('security.title')} testID="security" query={devices}>
+      {/* The web has no Face ID or fingerprint to lock with: these rows are for phones. */}
+      {HAS_BIOMETRICS ? (<>
       <Group label={t('security.wallet')}>
-        <Row icon="lock" value={t('security.faceId')} sub={checking ? t('security.checking') : on ? t('security.on') : t('security.off')}
-          right={checking ? <Spinner /> : <Toggle label={t('security.faceId')} value={on} onChange={(v) => (v ? turnOn() : setSheet('faceoff'))} testID="faceid-toggle" />} />
+        <Row icon="lock" value={dt('security.faceId')} sub={checking ? dt('security.checking') : on ? dt('security.on') : t('security.off')}
+          right={checking ? <Spinner /> : <Toggle label={dt('security.faceId')} value={on} onChange={(v) => (v ? turnOn() : setSheet('faceoff'))} testID="faceid-toggle" />} />
         {faceErr ? <T v="small" color={colors.badInk} style={{ padding: 16 }} accessibilityRole="alert">{faceErr}</T> : null}
       </Group>
       <Group>
-        <Row icon="lock" value={t('auth.bio.row')} sub={t('auth.bio.rowSub')}
-          right={<Toggle label={t('auth.bio.row')} value={appLock.on} testID="applock-toggle"
-            onChange={async (v) => { const ok = await appLock.setOn(v); if (ok) { buzz(v ? 'success' : 'tap'); toast(v ? t('auth.bio.on') : t('auth.bio.off')); } else { buzz('soft'); setFaceErr(t('security.faceFailed')); } }} />} />
+        <Row icon="lock" value={dt('auth.bio.row')} sub={t('auth.bio.rowSub')}
+          right={<Toggle label={dt('auth.bio.row')} value={appLock.on} testID="applock-toggle"
+            onChange={async (v) => { const ok = await appLock.setOn(v); if (ok) { buzz(v ? 'success' : 'tap'); toast(v ? dt('auth.bio.on') : dt('auth.bio.off')); } else { buzz('soft'); setFaceErr(dt('security.faceFailed')); } }} />} />
       </Group>
+      </>) : null}
       <Group label={t('security.signedInOn')}>
         {list.map((d) => (
-          <Row key={d.id} icon={d.platform === 'web' ? 'globe' : 'user'} value={d.name} sub={t('security.device.sub', { platform: d.platform === 'web' ? 'Web' : d.platform === 'android' ? 'Android' : 'iOS', when: ago(d.lastUsedAt) })}
+          <Row key={d.id} icon={platformOf(d) === 'web' ? 'globe' : 'user'} value={deviceName(d)} sub={t('security.device.sub', { platform: PLATFORM[platformOf(d)], when: ago(d.lastUsedAt) })}
             right={d.current ? <StatusPill label={t('security.thisPhone')} tone="ok" /> : <Button variant="secondary" size="small" block={false} color={colors.badInk} style={{ backgroundColor: colors.mist, height: 34 }} label={t('security.signOut')} onPress={() => setSheet(d)} />} />
         ))}
         {!others.length ? <EmptyState compact art={<ArtPhone width={100} height={75} />} title={t('security.onlyThis')} body={t('security.onlyThisBody')} /> : null}
@@ -73,12 +85,12 @@ export default function Security() {
       <T v="tiny" style={{ paddingHorizontal: 4 }}>{t('security.unknown')}</T>
       <Button variant="secondary" color={colors.badInk} label={t('security.everywhere')} onPress={() => setSheet('everywhere')} testID="signout-everywhere" />
 
-      <Sheet visible={sheet === 'faceoff'} onClose={() => setSheet(null)} label={t('security.faceOff.title')}>
-        <T v="h2">{t('security.faceOff.title')}</T>
+      <Sheet visible={sheet === 'faceoff'} onClose={() => setSheet(null)} label={dt('security.faceOff.title')}>
+        <T v="h2">{dt('security.faceOff.title')}</T>
         <T v="body">{t('security.faceOff.body')}</T>
         <Button variant="secondary" style={{ backgroundColor: colors.mist }} color={colors.badInk} label={t('security.faceOff.confirm')} testID="faceoff-confirm"
-          onPress={() => update.mutate({ faceId: false }, { onSuccess: () => { toast(t('security.faceOff.done')); setSheet(null); } })} />
-        <Button label={t('security.faceOff.keep')} onPress={() => setSheet(null)} />
+          onPress={() => update.mutate({ faceId: false }, { onSuccess: () => { toast(dt('security.faceOff.done')); setSheet(null); } })} />
+        <Button label={dt('security.faceOff.keep')} onPress={() => setSheet(null)} />
       </Sheet>
       <Sheet visible={!!dev} onClose={() => setSheet(null)} label={dev ? t('security.device.title', { name: dev.name }) : ''}>
         <T v="h2">{dev ? t('security.device.title', { name: dev.name }) : ''}</T>

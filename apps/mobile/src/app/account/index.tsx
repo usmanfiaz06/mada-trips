@@ -28,6 +28,8 @@ export default function YourDetails() {
   const a = account.data;
   const self = people.data?.find((p) => p.isSelf);
   const scanned = !!self?.passport;
+  // "From your passport scan" only when it was a scan; a passport typed by hand says so.
+  const ppSrc = self?.passport?.source === 'scan' ? 'passport' : 'typed';
   const passportName = scanned ? fullNameOf(self) : '';
   const display = a?.preferredName || user?.name || self?.firstName || '';
   const home = AIRPORTS.find((x) => x[0] === (a?.home ?? 'RUH')) ?? AIRPORTS[0]!;
@@ -46,9 +48,9 @@ export default function YourDetails() {
       <T v="small" style={{ textAlign: 'center', paddingHorizontal: 4 }}>{t('account.intro')}</T>
 
       <Group label={t('account.name')}>
-        <Row label={t('account.passportName')} value={passportName || t('account.notScanned')} locked onPress={() => setSheet('name')} src={<Source kind={scanned ? 'passport' : 'none'} />} testID="details-passport-name" />
+        <Row label={t('account.passportName')} value={passportName || t('account.notScanned')} locked onPress={() => setSheet('name')} src={<Source kind={scanned ? ppSrc : 'none'} />} testID="details-passport-name" />
         <Row label={t('account.calledYou')} value={display || t('account.addName')} onPress={() => setSheet('preferred')} testID="details-preferred"
-          src={a?.preferredName ? <Source kind="typed" at={a.preferredAt} /> : scanned && display ? <Source kind="passport" /> : display ? <Source kind="typed" /> : <Source warn={t('account.nameWait')} />} />
+          src={a?.preferredName ? <Source kind="typed" at={a.preferredAt} /> : !user?.name && scanned && display ? <Source kind={ppSrc} /> : display ? <Source kind="typed" /> : <Source warn={t('account.nameWait')} />} />
       </Group>
 
       <Group label={t('account.contact')}>
@@ -59,8 +61,8 @@ export default function YourDetails() {
       </Group>
 
       <Group label={t('account.fromPassport')}>
-        <Row label={t('account.dob')} value={scanned && self?.dateOfBirth ? fullDay(self.dateOfBirth) : t('account.notScanned')} locked onPress={() => setSheet('field')} src={<Source kind={scanned ? 'passport' : 'none'} />} />
-        <Row label={t('account.nationality')} value={scanned && self?.nationality ? COUNTRIES[self.nationality] ?? self.nationality : t('account.notScanned')} locked onPress={() => setSheet('field')} src={<Source kind={scanned ? 'passport' : 'none'} />} />
+        <Row label={t('account.dob')} value={scanned && self?.dateOfBirth ? fullDay(self.dateOfBirth) : t('account.notScanned')} locked onPress={() => setSheet('field')} src={<Source kind={scanned ? ppSrc : 'none'} />} />
+        <Row label={t('account.nationality')} value={scanned && self?.nationality ? COUNTRIES[self.nationality] ?? self.nationality : t('account.notScanned')} locked onPress={() => setSheet('field')} src={<Source kind={scanned ? ppSrc : 'none'} />} />
       </Group>
 
       <Group label={t('account.forBookings')}>
