@@ -133,6 +133,8 @@ export const arWords: ArSection<typeof wordsCopy> = {
   'qd.eid': 'عيد الفطر',
   'qd.school': 'إجازة المدارس',
 
+  'places.city.wikiAr': 'من ويكيبيديا العربية، برخصة CC BY-SA 4.0',
+
   'currency.SAR': 'ريال سعودي',
   'currency.AED': 'درهم إماراتي',
   'currency.USD': 'دولار أمريكي',

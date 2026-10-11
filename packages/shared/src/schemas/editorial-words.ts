@@ -5,7 +5,7 @@
  */
 import { hasKey, t, tn, type CopyKey } from '../copy';
 import { formatSar } from '../money';
-import type { Lang } from '../locale';
+import { localeOr, type Lang } from '../locale';
 import type { DiscoverEvent, PlanSummary } from './circles';
 import type { CuratedPlan, PlanStop } from './booking-data';
 
@@ -45,3 +45,21 @@ export function planStopWords(planId: string, day: number, i: number, stop: Plan
   else if (hasKey(`${base}.note`)) note = t(`${base}.note` as CopyKey, undefined, locale);
   return { title, note };
 }
+
+/** A name the runtime's Intl knows in the reader's language ("SA" → "السعودية"), or the fallback as it came. */
+function displayName(type: 'region' | 'currency', code: string, fallback: string, locale?: Lang): string {
+  const l = localeOr(locale);
+  if (l === 'en') return fallback;
+  try {
+    const DN = (Intl as unknown as { DisplayNames?: new (l: string[], o: { type: string }) => { of: (c: string) => string | undefined } }).DisplayNames;
+    const name = DN ? new DN([l], { type }).of(code) : undefined;
+    return name && name !== code ? name : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** A country's name from its two-letter code, in the display language. */
+export const countryNameIn = (code2: string, fallback: string, locale?: Lang) => displayName('region', code2.toUpperCase(), fallback, locale);
+/** A currency's name from its code ("SAR" → "ريال سعودي"), in the display language. */
+export const currencyNameIn = (code: string, fallback: string, locale?: Lang) => displayName('currency', code.toUpperCase(), fallback, locale);

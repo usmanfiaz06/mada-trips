@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Svg, { Line, Rect } from 'react-native-svg';
-import { type CityGuide, type GuideSectionKey } from '@mada/shared';
+import { countryNameIn, currencyNameIn, type CityGuide, type GuideSectionKey } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { VGradient } from '@/components/Gradient';
@@ -15,8 +15,8 @@ import { T } from '@/components/Text';
 import { ArtCompass } from '@/components/circles/art';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
-import { localTime, minutesAhead, placePhoto, placesApi, useNow, usePlace } from '@/lib/places';
+import { isRTL, t, tn } from '@/lib/i18n';
+import { localTime, minutesAhead, placePhoto, placesApi, useArabicSummary, useNow, usePlace } from '@/lib/places';
 import { usePresence } from '@/lib/wallet';
 import { colors, ff, font, shadow } from '@/theme';
 import { PlanSheet, type PlanChoice } from './PlanSheet';
@@ -39,6 +39,9 @@ function diffLabel(min: number) {
 
 const open = (url: string) => { buzz('tap'); void Linking.openURL(url); };
 
+/** "Riyadh Region, Saudi Arabia"; in Arabic the country alone, by its Arabic name (regions come only in English). */
+const whereLine = (g: CityGuide) => (isRTL() ? countryNameIn(g.countryCode, g.country) : g.region && g.region !== g.name ? `${g.region}, ${g.country}` : g.country);
+
 /** No photo of our own and none from Commons: the city's name, set large, on the green with a faint chart grid. */
 function TypeHero({ g, time }: { g: CityGuide; time: string | null }) {
   const top = useTopInset();
@@ -52,7 +55,7 @@ function TypeHero({ g, time }: { g: CityGuide; time: string | null }) {
       {g.airports[0] ? <T style={s.code} accessibilityElementsHidden>{g.airports[0].iata}</T> : null}
       <View style={[s.rose, { top: top + 34 }]}><ArtCompass width={132} height={99} /></View>
       <View style={s.heroText}>
-        <T v="eyebrow" color={colors.gold}>{g.country}</T>
+        <T v="eyebrow" color={colors.gold}>{countryNameIn(g.countryCode, g.country)}</T>
         <T style={[font('display', colors.paper), { fontSize: 50, lineHeight: 54 }]} numberOfLines={2} adjustsFontSizeToFit>{g.name}</T>
         {time ? <T v="small" color={colors.onDark2}>{t('places.city.timeThere', { time })}</T> : null}
       </View>
@@ -71,7 +74,7 @@ function PhotoHero({ g, failed, onFail }: { g: CityGuide; failed: boolean; onFai
       <View style={s.heroText}>
         {g.curation === 'curated' ? <Pill variant="glass" label={g.served ? t('circles.discover.book') : t('places.city.plan')} style={{ alignSelf: 'flex-start' }} /> : null}
         <T style={[font('display', colors.paper), { fontSize: 46, lineHeight: 50 }]} numberOfLines={2} adjustsFontSizeToFit>{g.name}</T>
-        <T v="small" color="rgba(255,253,249,0.9)">{g.region && g.region !== g.name ? `${g.region}, ${g.country}` : g.country}</T>
+        <T v="small" color="rgba(255,253,249,0.9)">{whereLine(g)}</T>
       </View>
     </View>
   );
@@ -109,6 +112,10 @@ export function CityPage({ id }: { id: string }) {
   const byHand = agent ? t('places.city.planByHand', { agent }) : t('places.city.planByHandAway');
 
   const g = q.data;
+  // Arabic reads Arabic Wikipedia's lead, or no lead at all; never the English one (the guide's sections are English only).
+  const ar = isRTL();
+  const arSummary = useArabicSummary(g?.summary?.url, ar);
+  const summary = ar ? arSummary.data ?? null : g?.summary ?? null;
   const time = g ? localTime(g.timezone, now) : null;
   const ahead = useMemo(() => (g ? minutesAhead(g.timezone, now) : 0), [g, now]);
 
@@ -163,15 +170,15 @@ export function CityPage({ id }: { id: string }) {
             <Icon name="rain" size={20} color={colors.goldInk} />
             <T v="small" color={colors.green} style={{ flex: 1 }}>{t('places.city.weather')}</T>
           </View>
-          {g.summary ? (
+          {summary ? (
             <View style={[s.card, shadow('card')]}>
-              <T v="body" color={colors.green}>{g.summary.text}</T>
-              {wiki ? <Pressable onPress={() => open(g.summary!.url)} accessibilityRole="link"><T v="tiny" style={s.link}>{wiki.text} · {t('places.city.wikipedia')}</T></Pressable> : null}
+              <T v="body" color={colors.green}>{summary.text}</T>
+              {wiki ? <Pressable onPress={() => open(summary.url)} accessibilityRole="link"><T v="tiny" style={s.link}>{ar ? t('places.city.wikiAr') : wiki.text} · {t('places.city.wikipedia')}</T></Pressable> : null}
             </View>
           ) : null}
           <ThingsView mode="section" placeId={g.id} city={g.name} />
-          {g.sections.length ? <T v="h2" style={{ fontSize: 22, marginTop: 6 }}>{t('places.city.guide')}</T> : null}
-          {g.sections.map((sec) => (
+          {g.sections.length && !ar ? <T v="h2" style={{ fontSize: 22, marginTop: 6 }}>{t('places.city.guide')}</T> : null}
+          {(ar ? [] : g.sections).map((sec) => (
             <View key={sec.key} style={[s.card, shadow('card')]} testID={`guide-${sec.key}`}>
               <View style={s.secHead}>
                 <View style={s.ic}><Icon name={SECTION_ICON[sec.key]} size={16} /></View>
@@ -197,7 +204,7 @@ export function CityPage({ id }: { id: string }) {
           {g.currency ? (
             <View style={[s.card, shadow('card'), { flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
               <View style={s.ic}><Icon name="card" size={16} /></View>
-              <View style={{ flex: 1 }}><T v="tiny">{t('places.city.money')}</T><T v="h3" style={{ fontSize: 16 }}>{g.currency.name} ({g.currency.code})</T></View>
+              <View style={{ flex: 1 }}><T v="tiny">{t('places.city.money')}</T><T v="h3" style={{ fontSize: 16 }}>{currencyNameIn(g.currency.code, g.currency.name)} ({g.currency.code})</T></View>
             </View>
           ) : null}
           <View style={{ gap: 4, paddingHorizontal: 4 }}>

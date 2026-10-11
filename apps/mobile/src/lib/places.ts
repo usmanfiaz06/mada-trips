@@ -107,3 +107,39 @@ export function useNow(ms = 30_000) {
   useEffect(() => { const h = setInterval(() => setNow(new Date()), ms); return () => clearInterval(h); }, [ms]);
   return now;
 }
+
+/** Cut an Arabic extract at a sentence end once there is enough to read; never reworded. */
+function trimAr(text: string, max = 640): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('.\n'), cut.lastIndexOf('؟ '));
+  return end > max / 3 ? cut.slice(0, end + 1) : `${cut.slice(0, cut.lastIndexOf(' '))}…`;
+}
+
+/**
+ * Arabic Wikipedia's lead for the page the guide's English summary comes from, through Wikipedia's own language
+ * links. Null when there is no Arabic article or it can't be reached; the city page then shows no summary in Arabic
+ * rather than an English one.
+ */
+export function useArabicSummary(enUrl: string | null | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['places', 'wiki-ar', enUrl],
+    enabled: enabled && !!enUrl,
+    staleTime: 7 * 24 * 3_600_000,
+    retry: false,
+    queryFn: async (): Promise<{ text: string; url: string } | null> => {
+      const m = /\/wiki\/([^?#]+)/.exec(enUrl ?? '');
+      if (!m) return null;
+      const get = async (url: string) => {
+        const res = await fetch(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(5000) });
+        return res.ok ? ((await res.json()) as unknown) : null;
+      };
+      const links = await get(`https://en.wikipedia.org/w/api.php?action=query&format=json&formatversion=2&prop=langlinks&lllang=ar&redirects=1&origin=*&titles=${m[1]}`) as { query?: { pages?: { langlinks?: { title?: string }[] }[] } } | null;
+      const arTitle = links?.query?.pages?.[0]?.langlinks?.[0]?.title;
+      if (!arTitle) return null;
+      const sum = await get(`https://ar.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(arTitle.replace(/ /g, '_'))}`) as { type?: string; extract?: string; content_urls?: { desktop?: { page?: string } } } | null;
+      if (!sum?.extract || sum.type === 'disambiguation') return null;
+      return { text: trimAr(sum.extract.trim()), url: sum.content_urls?.desktop?.page ?? `https://ar.wikipedia.org/wiki/${encodeURIComponent(arTitle)}` };
+    },
+  });
+}

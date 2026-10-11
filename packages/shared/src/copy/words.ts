@@ -139,6 +139,9 @@ export const wordsCopy = {
   'qd.eid': 'Eid al-Fitr',
   'qd.school': 'School break',
 
+  // ───────────── city pages ─────────────
+  'places.city.wikiAr': 'From Arabic Wikipedia, CC BY-SA 4.0',
+
   // ───────────── currencies (Account › Currency) ─────────────
   'currency.SAR': 'Saudi riyal',
   'currency.AED': 'UAE dirham',

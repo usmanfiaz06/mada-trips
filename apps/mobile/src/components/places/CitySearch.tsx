@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
-import type { PlaceHit } from '@mada/shared';
+import { countryNameIn, type PlaceHit } from '@mada/shared';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
@@ -9,7 +9,7 @@ import { T } from '@/components/Text';
 import { ArtCompass } from '@/components/circles/art';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { isRTL, t } from '@/lib/i18n';
 import { placePhoto, usePlaceSearch, usePopular, useRecentPlaces } from '@/lib/places';
 import { colors, ff, font } from '@/theme';
 
@@ -21,8 +21,10 @@ import { colors, ff, font } from '@/theme';
 
 /** "Georgia · TBS", or what matched ("Heathrow (LHR) · United Kingdom"). Region only when it tells two apart. */
 function sub(p: PlaceHit, showRegion: boolean) {
-  if (p.matched && (p.matched.kind === 'code' || p.matched.kind === 'airport')) return `${p.matched.label} · ${p.country}`;
-  const where = showRegion && p.region && p.region !== p.name ? `${p.region}, ${p.country}` : p.country;
+  // Regions come in English only: Arabic shows the country, by its Arabic name.
+  const country = countryNameIn(p.countryCode, p.country);
+  if (p.matched && (p.matched.kind === 'code' || p.matched.kind === 'airport')) return `${p.matched.label} · ${country}`;
+  const where = showRegion && !isRTL() && p.region && p.region !== p.name ? `${p.region}, ${p.country}` : country;
   const also = p.matched && p.matched.kind === 'alt' ? ` · ${t('places.hit.alsoCalled', { name: p.matched.label })}` : p.matched?.kind === 'arabic' ? ` · ${p.matched.label}` : '';
   return `${where}${p.iata ? ` · ${p.iata}` : ''}${also}`;
 }
