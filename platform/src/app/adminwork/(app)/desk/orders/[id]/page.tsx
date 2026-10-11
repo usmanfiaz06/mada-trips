@@ -18,7 +18,9 @@ import { AssignCard } from "@/components/desk/assign";
 import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
 import { DeskTimeline, Facts, ORDER_STAGE, PAY_STATUS, StatusBadge, Thread } from "@/components/desk/parts";
-import { askAction, failAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
+import { askAction, confirmCallAction, failAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
+import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts";
+import { FareOption } from "@mada/shared";
 
 export const metadata = { title: "Order · Desk" };
 
@@ -48,6 +50,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const tripEnd = o.trip?.endDate ?? o.trip?.startDate ?? null;
   const ticketNames = r.kind === "stay" ? [] : o.travellers.map((p) => p.name);
   const offer = (r.details as Record<string, unknown>).offer as Record<string, unknown> | undefined;
+  // Flights by request: the fare the traveller chose from the desk's quote.
+  const quotedParse = FareOption.safeParse((o.order?.snapshot as { quotedFlight?: unknown } | undefined)?.quotedFlight);
+  const quoted = quotedParse.success ? quotedParse.data : null;
 
   return (
     <>
@@ -65,6 +70,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <span className="text-ink">{o.user.name || t("Traveller")}</span>
           {o.user.phone && <a href={`tel:${o.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{o.user.phone}</a>}
           {r.agentName && <span>{t("Named agent: {name}", { name: r.agentName })}</span>}
+          {o.contact && <ContactBadge contact={o.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
       </header>
 
@@ -85,6 +91,11 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   </li>
                 ))}
               </ol>
+            ) : quoted ? (
+              <div className="space-y-2">
+                <FlightQuoteSummary quote={{ options: [quoted] }} locale={L} />
+                <p className="text-[12.5px] text-ink-3">{t("The fare they paid for. Book or confirm it in Mada's system, then issue: the trip is written with the PNR and ticket numbers you enter.")}</p>
+              </div>
             ) : offer ? <Facts rows={Object.entries(offer).slice(0, 8).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13px] text-ink-3">{t("No flight details on this order")}</p>}
           </Card>
 

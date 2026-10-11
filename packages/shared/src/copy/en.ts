@@ -18,6 +18,7 @@ import { authCopy } from './auth';
 import { transfersCopy } from './transfers';
 import { betaCopy } from './beta';
 import { storeCopy } from './store';
+import { thingsCopy } from './things';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -44,6 +45,8 @@ export const en = {
   ...betaCopy,
   // Help › About Mada Trips: the full policies on madatrips.sa: packages/shared/src/copy/store.ts
   ...storeCopy,
+  // Things to do: open-data places, Book with Mada, what's on, today's ideas: packages/shared/src/copy/things.ts
+  ...thingsCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

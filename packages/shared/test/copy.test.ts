@@ -42,6 +42,7 @@ describe('the catalogue sections', () => {
       language: (await import('../src/copy/language')).languageCopy,
       auth: (await import('../src/copy/auth')).authCopy,
       beta: (await import('../src/copy/beta')).betaCopy,
+      things: (await import('../src/copy/things')).thingsCopy,
     };
     const seen = new Map<string, string>();
     const clashes: string[] = [];

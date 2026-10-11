@@ -17,7 +17,10 @@ import { AssignCard } from "@/components/desk/assign";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
 import { DeskTimeline, Facts, REQUEST_STATUS, StatusBadge, Thread } from "@/components/desk/parts";
-import { askAction, checklistAction, doneAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
+import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
+import { flightQuoteOf } from "@/lib/app/booking/flight-requests";
 import { ActivityCard } from "@/components/desk/activity";
 
 export const metadata = { title: "Request · Desk" };
@@ -39,6 +42,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message", "activity"].includes(k)).slice(0, 12);
   const quote = x.quotes.find((q) => q.status !== "withdrawn");
   const place = r.kind === "destination" ? destinationOf(r.details) : null;
+  // Flights by request: the form's answers as facts, fares with the quote builder (components/desk/flight-quote.tsx).
+  const fr = x.flightAsk ? flightFacts(r.details, x.travellers, L) : null;
+  const flightQuote = quote ? flightQuoteOf(quote.offerSnapshot) : null;
 
   return (
     <>
@@ -48,6 +54,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           <span className="num">{x.ref}</span><StatusBadge map={REQUEST_STATUS} value={r.status} />
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
           <span>· {timeAgo(r.createdAt, L)}</span>
+          {x.contact && <ContactBadge contact={x.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
         <h1 className="mt-2 text-[32px] font-[380] leading-tight tracking-[-0.03em]">{r.summary}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 text-[13.5px] text-ink-3">
@@ -71,11 +78,25 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             </Card>
           )}
           {r.kind === "activity" && <ActivityCard id={r.id} details={r.details} act={act} t={t} />}
+          {fr ? (
+            <Card>
+              <CardHead title={t("What they asked for")} hint={t("Book it in Mada's system, then send the fares from here.")} />
+              <Facts rows={fr.rows} />
+              {fr.note && <p className="mt-3 rounded-2xl bg-surface-2 px-3.5 py-2 text-[13.5px] text-ink-2">“{fr.note}”</p>}
+            </Card>
+          ) : (
           <Card>
             <CardHead title={t("What they asked for")} />
             {asked.length ? <Facts rows={asked.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13.5px] text-ink-2">{r.summary}</p>}
             {r.kind === "umrah" && <p className="mt-3 rounded-2xl bg-info-soft px-3.5 py-2.5 text-[13px] text-info">{t("Every traveller needs their own Nusuk permit.")}</p>}
           </Card>
+          )}
+          {fr && act && !closed && (
+            <Card>
+              <CardHead title={quote ? t("Send new fares") : t("Send the fares")} hint={t("A price for each traveller, bags and rules for each fare. The traveller picks one and pays in the app.")} />
+              <FlightQuoteBuilder action={flightQuoteAction} requestId={r.id} travellers={fr.travellers} seed={fr.seed} />
+            </Card>
+          )}
 
           <Card>
             <CardHead title={t("Conversation")} hint={t("Replies go out in your agent name. Notes stay with the team.")} />
@@ -89,12 +110,13 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           {quote && (
             <Card>
               <CardHead title={t("Quote sent")} hint={`${fmtDate(quote.createdAt, L, true)}${quote.expiresAt ? ` · ${t("held until {time}", { time: fmtDate(quote.expiresAt, L, true) })}` : ""}`} action={<Badge tone={quote.status === "accepted" ? "ok" : "info"}>{t(quote.status === "accepted" ? "Accepted" : quote.status === "expired" ? "Expired" : "Open")}</Badge>} />
-              <dl className="divide-y divide-line">{quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-3 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}</dl>
-              <div className="mt-2 flex justify-between border-t border-line-strong pt-2.5"><span className="text-[13px] text-ink-3">{t("Total")}</span><Money v={quote.total} className="text-[18px]" /></div>
+              {flightQuote ? <FlightQuoteSummary quote={flightQuote} locale={L} /> : null}
+              {!flightQuote && <dl className="divide-y divide-line">{quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-3 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}</dl>}
+              <div className="mt-2 flex justify-between border-t border-line-strong pt-2.5"><span className="text-[13px] text-ink-3">{t(flightQuote ? "From" : "Total")}</span><Money v={quote.total} className="text-[18px]" /></div>
               {quote.cancellation && <p className="mt-2 text-[12.5px] text-ink-3">{quote.cancellation}</p>}
             </Card>
           )}
-          {act && !closed && (
+          {act && !closed && !fr && (
             <Card>
               <CardHead title={quote ? t("Send a new quote") : t("Build the quote")} hint={t("A line for each person, so everyone sees their share.")} />
               <QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} />
