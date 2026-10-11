@@ -10,3 +10,15 @@ Email can't run a copy button (mail apps block scripts). Instead: the code is on
 | Magic link or OTP | `magic-link.html` | `{{ .Token }} is your Mada Trips code · رمزك في مادا` |
 | Change email address | `change-email.html` | `{{ .Token }} confirms your new email · أكّد بريدك الجديد` |
 | Reset password | `reset-password.html` | `{{ .Token }} resets your Mada Trips password · إعادة تعيين كلمة المرور` |
+
+## Security notices (Authentication → Emails → Security)
+
+Turn these five on; leave MFA added/removed off (the app has no MFA). No codes, no links except support email.
+
+| Notice | File | Subject |
+|---|---|---|
+| Password changed | `notice-password-changed.html` | Your Mada Trips password was changed · تم تغيير كلمة المرور |
+| Email address changed | `notice-email-changed.html` | Your Mada Trips email was changed · تم تغيير بريدك |
+| Phone number changed | `notice-phone-changed.html` | Your Mada Trips phone number was changed · تم تغيير رقم جوالك |
+| Sign-in method linked | `notice-method-linked.html` | New sign-in method on Mada Trips · طريقة دخول جديدة |
+| Sign-in method removed | `notice-method-removed.html` | Sign-in method removed on Mada Trips · أُزيلت طريقة دخول |
