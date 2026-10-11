@@ -12,7 +12,7 @@
  app                         Supabase Auth                    Core API (platform/)
  ───                         ─────────────                    ────────────────────
  phone code    ───────────▶  signInWithOtp(phone) ──hook──▶   POST /auth/sms-hook ─▶ Unifonic / Taqnyat ─▶ SMS
- email code    ───────────▶  signInWithOtp(email)  ─────────▶ (Supabase's SMTP: Amazon SES)
+ email code    ───────────▶  signInWithOtp(email)  ─────────▶ (Supabase's SMTP: ZeptoMail)
  Apple (iOS)   ── native ─▶  signInWithIdToken(apple, nonce)
  Google        ── native ─▶  signInWithIdToken(google)   (web: OAuth redirect to /auth-callback)
                              ◀── Supabase access token
@@ -62,8 +62,8 @@ Use the Supabase project Mada already pays for (or a dedicated one). In the dash
    - **Apple**: on. *Client IDs*: `sa.madatrips.app` (the iOS bundle id) and the Services ID from §3 (web). *Secret key (for OAuth)*: the client secret generated from the Apple key in §3. It expires after 6 months: put the renewal in the calendar.
    - **Google**: on. *Client IDs*: the **web**, **iOS** and **Android** client ids from §4, comma-separated, web first. *Client secret*: the web client's secret. *Skip nonce checks*: **on** (the native Google Sign-In SDK on iOS doesn't let us pass a nonce; Apple keeps its nonce check).
 2. **Authentication › Settings**: *Allow manual linking* **on** (Profile › Sign-in methods uses `linkIdentity`). Leave anonymous sign-ins off.
-3. **Authentication › Emails › Templates**: in *Magic link*, *Confirm signup*, *Change email address*, *Reset password* and *Reauthentication*, replace the link with the code, for example `{{ .Token }} is your Mada Trips code. It expires in 10 minutes. Never share it.` The app enters codes; it never opens links.
-   **SMTP Settings**: use **Amazon SES** (sender `no-reply@madatrips.sa`). Supabase's built-in mailer allows only a few emails an hour.
+3. **Authentication › Emails › Templates**: in *Magic link*, *Confirm signup*, *Change email address*, *Reset password* and *Reauthentication*, replace the link with the code, for example `{{ .Token }} is your Mada Trips code. It expires in 10 minutes. Never share it.` The app enters codes; it never opens links. **Confirm signup is not optional:** an address that has never entered a code is unconfirmed, and `signInWithOtp` sends it *Confirm signup* (not *Magic link*) every time until a code from it is entered. With the default template that email carries only a link, so a new traveller can never sign in.
+   **SMTP Settings**: **ZeptoMail** (Zoho's transactional mail), sender `no-reply@madatrips.sa`, name *Mada Trips*. Supabase's built-in mailer allows only a few emails an hour.
 4. **Authentication › Hooks › Send SMS hook**: type **HTTPS**, URL `https://<ops domain>/api/app/v1/auth/sms-hook` (for example `https://ops.madatrips.sa/api/app/v1/auth/sms-hook`). *Generate secret* and copy the whole `v1,whsec_…` value into the platform's `SUPABASE_SMS_HOOK_SECRET`.
 5. **Authentication › URL Configuration**: *Site URL* `https://madatrips.sa`. *Redirect URLs*: `https://madatrips.sa/auth-callback`, `madatrips://auth-callback`, and for development `http://localhost:8081/auth-callback`.
 6. **Authentication › Rate limits**: keep 60 seconds between codes to one number or address (the app's countdown matches). Raise *SMS sent per hour* to fit the launch.
@@ -153,7 +153,7 @@ No Supabase project is needed to develop, test or take screenshots.
 ## 8. Open items
 
 - **Recovery requests** carry the old and new contact in plain text for the desk; purge decided ones after 90 days with the data-retention job.
-- **Account deletion** clears the Supabase link on our side (`supabase_user_id`, providers). Deleting the Supabase user too needs the service-role key on the platform (`auth.admin.deleteUser`); add it with the deletion job.
+- **Account deletion** clears the Supabase link on our side (`supabase_user_id`, providers). Deleting the Supabase user too needs the service-role key on the platform (`auth.admin.deleteUser`); add it with the deletion job. **Nothing calls `purgeDueAccounts` (or `processPendingExports`) yet:** the 30-day purge needs a scheduled job before the beta.
 - Supabase has no Saudi region. Only phone numbers and email addresses are stored there; confirm with counsel that this fits PDPL (INTEGRATIONS.md 0.10).
 
 ---
@@ -164,15 +164,17 @@ Mada already runs a Supabase project, so sign-in goes into that one: no new proj
 
 **Pass 1: email codes (the beta can start on this alone)**
 1. *Authentication › Sign In / Providers › Email*: on, *Confirm email* on, *Secure email change* off, code length 6, expiry 600 s.
-2. *Authentication › Emails › SMTP Settings*: **custom SMTP is required**. Supabase's built-in mailer only sends to the project's own team members and a handful an hour, so travellers would never get a code. Use the mailbox provider behind `madatrips.sa` (Google Workspace, Microsoft 365 or Zoho all give SMTP details) or Amazon SES. Sender `no-reply@madatrips.sa`, name *Mada Trips*.
-3. DNS for `madatrips.sa`: SPF and DKIM for that sender, and a DMARC record (`p=none` to start). Without them codes land in junk.
-4. *Emails › Templates* (Magic link, Confirm signup, Change email address): replace the link with the code, in English and Arabic:
+2. *Authentication › Emails › SMTP Settings*: **custom SMTP is required**. Supabase's built-in mailer only sends to the project's own team members and a handful an hour, so travellers would never get a code. Live: **ZeptoMail** (Zoho), sender `no-reply@madatrips.sa`, name *Mada Trips*. ZeptoMail signs with its own DKIM selector and uses the bounce domain `bounce-zem.madatrips.sa` for SPF; both come from the ZeptoMail domain page.
+3. DNS for `madatrips.sa`: SPF and DKIM for that sender, and a DMARC record (`p=none` to start). Without them codes land in junk. Live: the DKIM key and the bounce domain's SPF resolve, and a code email passes SPF, DKIM and DMARC.
+4. *Emails › Templates* (Magic link, **Confirm signup**, Change email address, Reset password, Reauthentication): replace the link with the code, in English and Arabic. *Confirm signup* is the one every new address gets (§2.3); it must carry `{{ .Token }}` too:
    `{{ .Token }} is your Mada Trips code. It expires in 10 minutes. Never share it.`
    `رمزك في مادا: {{ .Token }}. صالح لعشر دقائق. لا تشاركه مع أحد.`
 5. *URL Configuration*, *Rate limits*, *JWT Keys*: as §2.5 to §2.7.
 6. Keys into the environment settings (never in chat or git): platform `SUPABASE_URL`, plus `SUPABASE_JWT_SECRET` only if the project is on legacy keys; app `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`. For removing a deleted account from Supabase, `SUPABASE_SERVICE_ROLE_KEY` on the platform only.
 
 *Check:* a code reaches a Gmail, an Outlook and a madatrips.sa inbox within a minute and not in junk; the code signs in on a test build; a wrong code shows the friendly error; a sixth try is slowed down; the Core API's `/auth/session` creates the account once, and signing in again finds the same one.
+
+*Live check, 11 October 2026* (ZeptoMail, a throwaway inbox, the Core API on a local Postgres): every email arrived within 2 seconds, signed by `madatrips.sa` (DKIM), from the ZeptoMail bounce domain (SPF) and passing DMARC. The code for an existing address, the *Reset password* code and the *Reauthentication* code signed in, set a password, signed in with it, refused a wrong one, recovered a forgotten one and signed in with the new one; `/auth/session` created the account once and found it on every later sign-in; `/account/deletion` plus the purge left a tombstone with no email or Supabase id. **Failed:** the *Confirm signup* email still carried Supabase's default link, so a brand-new address got no code (fix the template, §2.3); and the link pointed at `http://localhost:3000`, so the *Site URL* is still the default (§2.5).
 
 **Pass 2: phone codes**
 1. Register the sender "MadaTrips" with CST through Unifonic or Taqnyat (§5); their OTP template in both languages.
