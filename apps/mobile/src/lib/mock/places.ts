@@ -33,6 +33,8 @@ const ALL: City[] = DATA.cities.map(([id, name, cc, iata, tz, popK, photo, alts]
   };
 });
 const byId = new Map(ALL.map((c) => [c.hit.id, c]));
+/** One city by GeoNames id (Things to do's mock). */
+export const mockPlaceHit = (id: string) => byId.get(id)?.hit ?? null;
 
 const grams = (s: string) => { const x = `  ${s} `; const g = new Set<string>(); for (let i = 0; i < x.length - 2; i++) g.add(x.slice(i, i + 3)); return g; };
 const similarity = (a: string, b: string) => { const A = grams(a); const B = grams(b); let n = 0; A.forEach((x) => { if (B.has(x)) n++; }); return n / (A.size + B.size - n); };

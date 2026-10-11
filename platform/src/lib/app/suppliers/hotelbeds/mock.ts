@@ -191,10 +191,14 @@ export function fixtureFetch(opts: { fail?: (method: string, path: string) => { 
 
 const MOCK_CREDS = { apiKey: "mock-key", secret: "mock-secret" };
 
+/** Tests only: answer the mock adapters with this fetch instead of the fixtures (a supplier that is down, slow…). */
+export function setHotelbedsTestFetch(f: FetchLike | null) { (globalThis as { __madaHbTestFetch?: FetchLike | null }).__madaHbTestFetch = f; }
+const testFetch = () => (globalThis as { __madaHbTestFetch?: FetchLike | null }).__madaHbTestFetch ?? null;
+
 /** The fixture-backed adapters (no network). */
-export function mockHotelbedsHotels(facts?: FactsLookup, fetchImpl: FetchLike = fixtureFetch()) {
+export function mockHotelbedsHotels(facts?: FactsLookup, fetchImpl: FetchLike = testFetch() ?? fixtureFetch()) {
   return new HotelbedsHotels(new HotelbedsClient({ product: "hotels", credentials: MOCK_CREDS, env: "test", fetch: fetchImpl, retries: 0, log: () => {} }), facts);
 }
-export function mockHotelbedsTransfers(fetchImpl: FetchLike = fixtureFetch()) {
+export function mockHotelbedsTransfers(fetchImpl: FetchLike = testFetch() ?? fixtureFetch()) {
   return new HotelbedsTransfers(new HotelbedsClient({ product: "transfers", credentials: MOCK_CREDS, env: "test", fetch: fetchImpl, retries: 0, log: () => {} }));
 }

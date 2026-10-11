@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  AIRPORT_NAMES, DESTINATIONS, FlightQuote, rangeLabel, t, tn,
+  FlightQuote, flightRequestCity, flightRequestSummary, flightRequestTitle,
   type BagsWanted, type FareOption, type FlightPref, type FlightQuote as FlightQuoteT,
 } from "@mada/shared";
 
@@ -27,26 +27,11 @@ export const isFlightAsk = (d: unknown): boolean => {
 /** Made while flights went by request (or with the request form's answers): the desk sends fare options. */
 export const isFlightRequest = (d: unknown): boolean => isFlightAsk(d) && !!(d as Details).flightRequest;
 
-export const cityOf = (s: Pick<FlightSearch, "destination" | "destinationName">) => (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || "";
-
-/** "Flights to Istanbul · 10–14 Mar", in the language of whoever is reading. */
-export function flightTitle(s: FlightSearch): string {
-  const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
-  const city = cityOf(s);
-  return s.carrier ? t("request.title.airlineByHand", { airline: s.carrier === "SV" ? "Saudia" : s.carrier, city, dates }) : t("request.title.flightsTo", { city, dates });
-}
-
+export const cityOf = flightRequestCity;
+/** "Flights to Istanbul · 10–14 Mar", in the language of whoever is reading (shared with the mock API). */
+export const flightTitle = (s: FlightSearch) => flightRequestTitle(s);
 /** "Riyadh to Istanbul · Economy · ±3 days · One checked bag · Direct only". */
-export function flightSummary(s: FlightSearch, travellers: number): string {
-  const to = (s.destination && DESTINATIONS[s.destination]?.code) || s.destinationName || "";
-  const parts = [t("beta.fr.route", { from: AIRPORT_NAMES[s.from ?? "RUH"] ?? s.from ?? "RUH", to: cityOf(s) || to })];
-  if (travellers) parts.push(tn("beta.fr.travellers", travellers));
-  if (s.cabin) parts.push(t(`cal.cabin.${s.cabin}` as never));
-  if (s.flexDays !== undefined) parts.push(s.flexDays ? t("beta.fr.sum.flex", { count: s.flexDays }) : t("beta.fr.sum.exact"));
-  if (s.bags) parts.push(t(`beta.fr.bags.${s.bags}` as never));
-  for (const p of s.prefs ?? []) parts.push(t(`beta.fr.pref.${p}` as never));
-  return parts.join(" · ");
-}
+export const flightSummary = (s: FlightSearch, travellers: number) => flightRequestSummary(s, travellers);
 
 /** The fare options in a quote's snapshot, checked against the shared schema (null for any other quote). */
 export function flightQuoteOf(snapshot: unknown): FlightQuoteT | null {

@@ -73,7 +73,7 @@ export function hotelVendor(): "hotelbeds" | "hotelbeds-mock" | "catalogue" | "r
 const BREAKER_NAME: Record<HotelbedsProduct, string> = { hotels: "hotels", transfers: "transfers", activities: "activities" };
 
 /** Every Hotelbeds call goes through the app's circuit breaker; an outage counts, an answer doesn't. */
-const guardFor = (product: HotelbedsProduct) => <T>(fn: () => Promise<T>) =>
+export const guardFor = (product: HotelbedsProduct) => <T>(fn: () => Promise<T>) =>
   callSupplier(BREAKER_NAME[product], async () => {
     try { return await fn(); } catch (e) {
       if (e instanceof HotelbedsError && e.transport) throw new AppError("SUPPLIER_UNAVAILABLE", { details: { supplier: BREAKER_NAME[product], reason: e.code } });

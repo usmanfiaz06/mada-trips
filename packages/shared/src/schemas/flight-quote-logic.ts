@@ -1,6 +1,7 @@
-import { addDays } from '../dates';
+import { addDays, rangeLabel } from '../dates';
+import { t, tn, type CopyKey } from '../copy';
 import { sarToHalalas } from '../money';
-import { CATALOGUE_FLIGHTS, CARRIERS, DESTINATIONS } from './booking-data';
+import { AIRPORT_NAMES, CATALOGUE_FLIGHTS, CARRIERS, DESTINATIONS } from './booking-data';
 import { ageOn, personName } from './booking-logic';
 import type { FlightOption } from './booking';
 import type { FareLeg, FareOption, FarePrice } from './flight-quote';
@@ -104,3 +105,30 @@ export function mockFareOptions(input: MockFareInput): FareOption[] {
 
 /** Stops on one way of a fare: the legs that way, less one. */
 export const fareStops = (o: Pick<FareOption, 'legs'>, direction: 'out' | 'back') => Math.max(0, o.legs.filter((l) => l.direction === direction).length - 1);
+
+/* ───────────── a flight request's own words (server and mock alike, in the reader's language) ───────────── */
+
+export type FlightRequestSearch = {
+  destination: string | null; destinationName: string | null; from: string | null; depart: string | null; return: string | null;
+  cabin: Cabin | null; carrier: string | null; flexDays?: number; bags?: 'cabin' | 'one' | 'two'; prefs?: string[];
+};
+
+export const flightRequestCity = (s: Pick<FlightRequestSearch, 'destination' | 'destinationName'>) => (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || '';
+
+/** "Flights to Istanbul · 10–14 Mar", or "· 9 Mar, one way". */
+export function flightRequestTitle(s: FlightRequestSearch): string {
+  const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t('beta.fr.oneWay', { date: rangeLabel(s.depart) })) : t('request.datesLater');
+  const city = flightRequestCity(s);
+  return s.carrier ? t('request.title.airlineByHand', { airline: s.carrier === 'SV' ? 'Saudia' : s.carrier, city, dates }) : t('request.title.flightsTo', { city, dates });
+}
+
+/** "Riyadh to Istanbul · 3 travellers · Economy · ±3 days · One checked bag · Direct only". */
+export function flightRequestSummary(s: FlightRequestSearch, travellers: number): string {
+  const parts = [t('beta.fr.route', { from: AIRPORT_NAMES[s.from ?? 'RUH'] ?? s.from ?? 'RUH', to: flightRequestCity(s) || s.destination || '' })];
+  if (travellers) parts.push(tn('beta.fr.travellers', travellers));
+  if (s.cabin) parts.push(t(`cal.cabin.${s.cabin}` as CopyKey));
+  if (s.flexDays !== undefined) parts.push(s.flexDays ? t('beta.fr.sum.flex', { count: s.flexDays }) : t('beta.fr.sum.exact'));
+  if (s.bags) parts.push(t(`beta.fr.bags.${s.bags}` as CopyKey));
+  for (const p of s.prefs ?? []) parts.push(t(`beta.fr.pref.${p}` as CopyKey));
+  return parts.join(' · ');
+}
