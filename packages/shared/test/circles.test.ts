@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { resetDisplayPrefs, setDisplayPrefs } from '../src/locale';
 import { circleDest, contactHash, CONTACT_SALT, equalAmounts, findPlace, joinNames, madaReply, sha256Hex, shareUnits, splitAmounts, votePhrase } from '../src/schemas/circles';
 
 describe('circles logic', () => {
@@ -24,5 +25,25 @@ describe('circles logic', () => {
     expect(madaReply({ members: 2, dest: null, text: 'Abha', prevAskedWhere: true }).dest).toBe('Abha');
     expect(votePhrase('Wed 10 Mar')).toBe('Wednesday');
     expect(joinNames(['Hessa', 'Abdullah', 'Noor', 'Sara'])).toBe('Hessa, Abdullah and 2 others');
+  });
+  it('answers @Mada in Arabic when asked in Arabic: place facts, keywords and places typed in Arabic', () => {
+    setDisplayPrefs({ locale: 'ar', digits: 'latn' });
+    try {
+      expect(findPlace('@Mada وش نسوي بإسطنبول')).toBe('Istanbul');
+      const ideas = madaReply({ members: 4, dest: null, text: '@Mada أفكار للعلا', prevAskedWhere: false });
+      expect(ideas.dest).toBe('AlUla');
+      expect(ideas.list).toEqual(['الحِجر وقت الغروب', 'أزقة البلدة القديمة بعد الساعة 16:00', 'سهرة تحت النجوم في غراميل']);
+      expect(madaReply({ members: 4, dest: 'Istanbul', text: '@Mada نحتاج تأشيرة؟', prevAskedWhere: false }).text).toContain('الجواز السعودي ياخذ تأشيرة إلكترونية');
+      expect(madaReply({ members: 4, dest: 'Georgia', text: '@Mada متى أحلى وقت؟', prevAskedWhere: false }).text).toContain('من مايو إلى أكتوبر');
+      expect(madaReply({ members: 4, dest: 'Dubai', text: '@Mada وين نسكن', prevAskedWhere: false }).text).toContain('وسط دبي عشان النوافير');
+      expect(madaReply({ members: 4, dest: null, text: '@Mada', prevAskedWhere: false }).actions.map((a) => a.label)).toEqual(['جورجيا', 'باكو', 'العُلا']);
+      // Nothing English left in an answer.
+      for (const dest of ['Istanbul', 'Georgia', 'Baku', 'AlUla', 'London', 'Dubai', 'Riyadh', 'Abha']) {
+        for (const q of ['@Mada', '@Mada طيران', '@Mada فندق', '@Mada الجو', '@Mada تأشيرة']) {
+          const r = madaReply({ members: 3, dest, text: q, prevAskedWhere: false });
+          for (const line of [r.text, ...r.list, r.foot ?? '']) expect(line, `${dest} ${q}`).not.toMatch(/[A-Za-z]{3,}/);
+        }
+      }
+    } finally { resetDisplayPrefs(); }
   });
 });

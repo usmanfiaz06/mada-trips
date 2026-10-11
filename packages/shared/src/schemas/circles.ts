@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { t } from '../copy';
+import { nameIn, t, type CopyKey } from '../copy';
+import { localeOr, type Lang } from '../locale';
+import { formatSar } from '../money';
 import { HalalasAmount, Id, IsoDateTime, PhoneE164 } from './common';
 import { Circle, Message } from './social';
 import { COVER_COLORS, COVER_ICONS, COVER_PHOTO_IDS } from '../cover-art';
@@ -621,21 +623,40 @@ export const planById = (id: string) => { const p = PLAN_SUMMARIES.find((x) => x
 /* ───────────── what Mada knows about places, for "@Mada" in a circle ───────────── */
 
 type PlaceFacts = { fly: string | null; from: number; nightly: number; plan?: string; ideas: string[]; spots: string[]; when: string; visa: string; stay: string };
-export const PLACES: Record<string, PlaceFacts> = {
-  Istanbul: { fly: '4h 15m direct from Riyadh', from: 1745, nightly: 980, plan: 'istanbul3', ideas: ['A Bosphorus dinner cruise from Kabataş, 19:30', 'Topkapı Palace in the morning. Closed Tuesdays', 'The ferry to Kadıköy for the food walk'], spots: ['Bosphorus cruise', 'Topkapı Palace', 'Kadıköy', 'Princes’ Islands'], when: 'April to June is mild, about 18–24°C. Eid in March is cool, so bring jackets.', visa: 'Saudi passports get an e-visa online in about 10 minutes.', stay: 'Galata or Sultanahmet. Both are walkable with kids.' },
-  Georgia: { fly: '3h 30m direct to Tbilisi', from: 1290, nightly: 620, ideas: ['Old Tbilisi and the cable car up to Narikala', 'A day in Kazbegi, under the mountains', 'Lake Bazaleti for a quiet afternoon by the water'], spots: ['Tbilisi', 'Kazbegi', 'Batumi', 'Gudauri'], when: 'May to October is green and warm. Gudauri has snow from December to March.', visa: 'Saudi passports need no visa for stays up to a year.', stay: 'Old Tbilisi to walk everywhere, then a mountain lodge in Kazbegi.' },
-  Baku: { fly: '3h direct', from: 1150, nightly: 700, ideas: ['The Old City walls at dusk', 'The Flame Towers light show from the Boulevard', 'A day in Gabala: cable cars and lakes'], spots: ['Old City', 'Boulevard', 'Gabala', 'Shahdag'], when: 'April to June, and September to October.', visa: 'Saudi passports get an e-visa in about 3 days.', stay: 'The Old City, or a seafront hotel on the Boulevard.' },
-  AlUla: { fly: '1h 20m direct', from: 690, nightly: 1650, plan: 'alula2', ideas: ['Hegra at golden hour', 'Old Town lanes after 16:00', 'Stargazing at Gharameel'], spots: ['Hegra', 'Old Town', 'Elephant Rock', 'Maraya'], when: 'October to March. Warm days, cool nights.', visa: 'No visa needed.', stay: 'A desert resort with family villas.' },
-  London: { fly: '6h 50m direct', from: 3150, nightly: 1900, ideas: ['Hyde Park and the Diana playground', 'The Natural History Museum. Free, book a slot', 'A Thames boat down to Greenwich'], spots: ['Hyde Park', 'Natural History Museum', 'Greenwich', 'Harrods'], when: 'June to September. Long days, about 20°C.', visa: 'Saudi passports need an electronic travel authorisation. About 3 days.', stay: 'Kensington or Marylebone, near the parks.' },
-  Dubai: { fly: '2h direct', from: 820, nightly: 1100, ideas: ['Dubai Frame and Zabeel Park', 'A day at Aquaventure', 'A desert dinner at sunset'], spots: ['Downtown', 'The Palm', 'Dubai Frame', 'Desert camp'], when: 'November to March.', visa: 'No visa needed.', stay: 'Downtown for the fountains, or the Palm for the beach.' },
-  Riyadh: { fly: null, from: 0, nightly: 800, ideas: ['Boulevard World in the evening', 'Sunset at Bujairi Terrace, Diriyah', 'A desert camp in Thumamah'], spots: ['Boulevard World', 'Diriyah', 'Thumamah', 'Kingdom Centre'], when: 'October to March. Evenings are best.', visa: 'No visa needed.', stay: 'Close to the Boulevard if you’re staying over.' },
-  Abha: { fly: '1h 35m direct', from: 540, nightly: 650, ideas: ['The Al Soudah cable car', 'Rijal Almaa, the stone village', 'Evenings at 20°C in August'], spots: ['Al Soudah', 'Rijal Almaa', 'Abha Dam', 'Art Street'], when: 'June to September, when Riyadh is hot.', visa: 'No visa needed.', stay: 'Al Soudah, up in the clouds.' },
+type PlaceSlug = 'istanbul' | 'georgia' | 'baku' | 'alula' | 'london' | 'dubai' | 'riyadh' | 'abha';
+/** The numbers per place; the words (flight time, ideas, spots, season, visa, where to stay) are copy keys
+ *  `circles.place.<slug>.*` in en-circles.ts and ar/circles.ts, read in the asker's language. */
+const PLACE_DATA: Record<string, { slug: PlaceSlug; flies: boolean; from: number; nightly: number; plan?: string }> = {
+  Istanbul: { slug: 'istanbul', flies: true, from: 1745, nightly: 980, plan: 'istanbul3' },
+  Georgia: { slug: 'georgia', flies: true, from: 1290, nightly: 620 },
+  Baku: { slug: 'baku', flies: true, from: 1150, nightly: 700 },
+  AlUla: { slug: 'alula', flies: true, from: 690, nightly: 1650, plan: 'alula2' },
+  London: { slug: 'london', flies: true, from: 3150, nightly: 1900 },
+  Dubai: { slug: 'dubai', flies: true, from: 820, nightly: 1100 },
+  Riyadh: { slug: 'riyadh', flies: false, from: 0, nightly: 800 },
+  Abha: { slug: 'abha', flies: true, from: 540, nightly: 650 },
 };
-const ALIASES: [string, string][] = [['tbilisi', 'Georgia'], ['georgia', 'Georgia'], ['batumi', 'Georgia'], ['istanbul', 'Istanbul'], ['türkiye', 'Istanbul'], ['turkiye', 'Istanbul'], ['turkey', 'Istanbul'], ['baku', 'Baku'], ['azerbaijan', 'Baku'], ['alula', 'AlUla'], ['al ula', 'AlUla'], ['london', 'London'], ['dubai', 'Dubai'], ['riyadh', 'Riyadh'], ['abha', 'Abha']];
+/** What Mada knows about a place, in the display language (or `locale`); null for a place it has nothing on. */
+export function placeFacts(dest: string | null | undefined, locale?: Lang): PlaceFacts | null {
+  const d = dest ? PLACE_DATA[dest] : undefined;
+  if (!d) return null;
+  const w = (f: string) => t(`circles.place.${d.slug}.${f}` as CopyKey, undefined, locale);
+  return {
+    fly: d.flies ? w('fly') : null, from: d.from, nightly: d.nightly, ...(d.plan ? { plan: d.plan } : {}),
+    ideas: [w('idea1'), w('idea2'), w('idea3')], spots: [w('spot1'), w('spot2'), w('spot3'), w('spot4')],
+    when: w('when'), visa: w('visa'), stay: w('stay'),
+  };
+}
+const ALIASES: [string, string][] = [['tbilisi', 'Georgia'], ['georgia', 'Georgia'], ['batumi', 'Georgia'], ['istanbul', 'Istanbul'], ['türkiye', 'Istanbul'], ['turkiye', 'Istanbul'], ['turkey', 'Istanbul'], ['baku', 'Baku'], ['azerbaijan', 'Baku'], ['alula', 'AlUla'], ['al ula', 'AlUla'], ['london', 'London'], ['dubai', 'Dubai'], ['riyadh', 'Riyadh'], ['abha', 'Abha'],
+  // Typed in Arabic (with or without hamza and the dammah); a prefix like "بـ" or "لـ" still matches.
+  ['إسطنبول', 'Istanbul'], ['اسطنبول', 'Istanbul'], ['تركيا', 'Istanbul'], ['جورجيا', 'Georgia'], ['تبليسي', 'Georgia'], ['باتومي', 'Georgia'],
+  ['باكو', 'Baku'], ['أذربيجان', 'Baku'], ['اذربيجان', 'Baku'], ['العُلا', 'AlUla'], ['العلا', 'AlUla'], ['لندن', 'London'], ['دبي', 'Dubai'],
+  ['الرياض', 'Riyadh'], ['أبها', 'Abha'], ['ابها', 'Abha']];
 
 export function findPlace(text = ''): string | null {
   const s = ` ${String(text).toLowerCase()} `;
-  const hit = ALIASES.find(([k]) => new RegExp(`[^a-z]${k}[^a-z]`).test(s));
+  // Arabic "لـ" + "ال" drops the alif (للعلا, للرياض), so the alif of an Arabic "ال" is optional.
+  const hit = ALIASES.find(([k]) => new RegExp(`[^a-z]${k.startsWith('ال') ? `ا?${k.slice(1)}` : k}[^a-z]`).test(s));
   return hit ? hit[1] : null;
 }
 
@@ -646,7 +667,7 @@ export function circleDest(c: { dest: string | null; name: string; trip?: string
   return findPlace(trip) ?? findPlace(c.name) ?? (trip || null);
 }
 
-const sar = (n: number) => `SAR ${Math.round(n).toLocaleString('en-US')}`;
+const sar = (n: number) => formatSar(Math.round(n) * 100, { decimals: 'never' });
 const roundTo = (n: number, step: number) => Math.round(n / step) * step;
 
 export type MadaReply = { text: string; list: string[]; foot: string | null; actions: MadaAction[]; askWhere: boolean; dest: string | null };
@@ -663,21 +684,23 @@ export function madaReply(input: { members: number; dest: string | null; text: s
   if (!dest && input.prevAskedWhere && q && q.split(/\s+/).length <= 3 && !/[\d@?!.,;:]/.test(q)) dest = q.replace(/\b\w/g, (c) => c.toUpperCase());
   const base = { list: [] as string[], foot: null as string | null, askWhere: false };
   if (!dest) {
-    return { ...base, dest: null, askWhere: true, text: t(n === 1 ? 'circles.mada.where.one' : 'circles.mada.where', { n }), actions: ['Georgia', 'Baku', 'AlUla'].map((p) => ({ label: p, say: p })) };
+    const offer = ['Georgia', 'Baku', 'AlUla'].map((p) => nameIn(p, localeOr()));
+    return { ...base, dest: null, askWhere: true, text: t(n === 1 ? 'circles.mada.where.one' : 'circles.mada.where', { n }), actions: offer.map((p) => ({ label: p, say: p })) };
   }
-  const P = PLACES[dest];
+  const P = placeFacts(dest);
   const who = n === 1 ? t('circles.mada.you') : t('circles.mada.all', { n });
   const planIt: MadaAction = { label: t('circles.mada.planIt'), ask: t('circles.mada.planAsk', { dest, n }) };
   if (!P) return { ...base, dest, text: t('circles.mada.unknown', { dest, who }), actions: [planIt] };
-  if (/visa|passport/.test(lower)) return { ...base, dest, text: `${P.visa} ${t('circles.mada.visaCheck')}`, actions: [planIt] };
-  if (/flight|fly|plane|ticket/.test(lower)) {
+  // What they asked about, in English or Arabic.
+  if (/visa|passport|تأشير|فيز|جواز/.test(lower)) return { ...base, dest, text: `${P.visa} ${t('circles.mada.visaCheck')}`, actions: [planIt] };
+  if (/flight|fly|plane|ticket|طيران|طياره|طائرة|تذكر|تذاكر/.test(lower)) {
     return P.fly
       ? { ...base, dest, text: t('circles.mada.flights', { dest, fly: P.fly, from: sar(P.from), who }), actions: [{ label: t('circles.mada.findFlights'), ask: t('circles.mada.flightsAsk', { dest, n }) }] }
       : { ...base, dest, text: t('circles.mada.home', { dest }), actions: [planIt] };
   }
-  if (/hotel|stay|room|villa|sleep/.test(lower)) return { ...base, dest, text: t('circles.mada.stay', { dest, stay: P.stay }), actions: [{ label: t('circles.mada.seeStays'), ask: t('circles.mada.staysAsk', { dest, n }) }] };
-  if (/when|weather|season|best time|cold|hot|warm/.test(lower)) return { ...base, dest, text: t('circles.mada.when', { dest, when: P.when }), actions: [planIt] };
-  if (/cost|price|budget|how much|expensive|cheap/.test(lower)) {
+  if (/hotel|stay|room|villa|sleep|فندق|فنادق|سكن|غرف|فلة|فيلا|شاليه|نوم/.test(lower)) return { ...base, dest, text: t('circles.mada.stay', { dest, stay: P.stay }), actions: [{ label: t('circles.mada.seeStays'), ask: t('circles.mada.staysAsk', { dest, n }) }] };
+  if (/when|weather|season|best time|cold|hot|warm|متى|طقس|الجو|موسم|برد|بارد|حار|حرارة|دافي/.test(lower)) return { ...base, dest, text: t('circles.mada.when', { dest, when: P.when }), actions: [planIt] };
+  if (/cost|price|budget|how much|expensive|cheap|بكم|كم تكلف|كم السعر|سعر|أسعار|اسعار|تكلف|ميزاني|غالي|رخيص/.test(lower)) {
     const lo = Math.max(500, roundTo(P.from * n + P.nightly * 4 * Math.ceil(n / 4), 500));
     const people = n === 1 ? t('circles.mada.onePerson') : t('circles.mada.people', { n });
     return { ...base, dest, text: t('circles.mada.cost', { people, dest, lo: sar(lo), hi: Math.round(roundTo(lo * 1.25, 500)).toLocaleString('en-US') }), actions: [planIt] };

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import {
-  PLACES, PLAN_SUMMARIES, planWords, addDays, dayOfMonth, monthOf, splitAmounts, todayIn, weekdayOf,
+  PLAN_SUMMARIES, localeOr, nameIn, placeFacts, planWords, addDays, dayOfMonth, monthOf, splitAmounts, todayIn, weekdayOf,
   type CircleMemberView, type CreateSplitRequest, type CreateVoteRequest, type SharedCard, type SplitMode,
 } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -57,7 +57,7 @@ export function VoteSheet({ visible, onClose, dest, busy, onPost }: { visible: b
   const [kind, setKind] = useState<'dates' | 'places' | 'any'>('dates');
   const [opts, setOpts] = useState(['', '']);
   const [tried, setTried] = useState(false);
-  const ideas = kind === 'dates' ? nextDays() : kind === 'places' ? (dest && PLACES[dest]?.spots) || ['Georgia', 'Baku', 'AlUla', 'Istanbul'] : [t('circles.voteSheet.yes'), t('circles.voteSheet.no'), t('circles.voteSheet.maybe')];
+  const ideas = kind === 'dates' ? nextDays() : kind === 'places' ? placeFacts(dest)?.spots ?? ['Georgia', 'Baku', 'AlUla', 'Istanbul'].map((p) => nameIn(p, localeOr())) : [t('circles.voteSheet.yes'), t('circles.voteSheet.no'), t('circles.voteSheet.maybe')];
   const clean = opts.map((o) => o.trim()).filter(Boolean);
   const dup = new Set(clean.map((o) => o.toLowerCase())).size !== clean.length;
   const ok = q.trim().length >= 3 && clean.length >= 2 && !dup;
