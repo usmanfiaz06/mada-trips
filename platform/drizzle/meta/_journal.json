@@ -162,6 +162,13 @@
       "when": 1791722264365,
       "tag": "0022_things_to_do",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791722624424,
+      "tag": "0023_activities_per_city",
+      "breakpoints": true
     }
   ]
 }

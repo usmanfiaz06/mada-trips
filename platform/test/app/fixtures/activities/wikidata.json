@@ -1,0 +1,10 @@
+{
+  "entities": {
+    "Q900001": { "type": "item", "id": "Q900001", "labels": { "en": { "language": "en", "value": "Hegra" }, "ar": { "language": "ar", "value": "الحجر" } }, "descriptions": { "en": { "language": "en", "value": "archaeological site in Saudi Arabia" }, "ar": { "language": "ar", "value": "موقع أثري في السعودية" } }, "sitelinks": { "enwiki": { "site": "enwiki", "title": "Hegra (Mada'in Salih)" }, "arwiki": { "site": "arwiki", "title": "الحجر" }, "frwiki": { "site": "frwiki", "title": "Hégra" }, "dewiki": { "site": "dewiki", "title": "Hegra" }, "commonswiki": { "site": "commonswiki", "title": "Category:Hegra" } }, "claims": { "P18": [ { "mainsnak": { "snaktype": "value", "property": "P18", "datavalue": { "value": "Hegra tomb example.jpg", "type": "string" } } } ] } },
+    "Q900002": { "type": "item", "id": "Q900002", "labels": { "en": { "language": "en", "value": "Elephant Rock" } }, "descriptions": { "en": { "language": "en", "value": "rock formation in AlUla, Saudi Arabia" } }, "sitelinks": { "enwiki": { "site": "enwiki", "title": "Elephant Rock (AlUla)" }, "arwiki": { "site": "arwiki", "title": "جبل الفيل" } }, "claims": {} },
+    "Q900003": { "type": "item", "id": "Q900003", "labels": { "en": { "language": "en", "value": "Maraya" }, "ar": { "language": "ar", "value": "مرايا" } }, "descriptions": { "en": { "language": "en", "value": "mirrored concert hall in AlUla" } }, "sitelinks": { "enwiki": { "site": "enwiki", "title": "Maraya (building)" } }, "claims": {} },
+    "Q900004": { "type": "item", "id": "Q900004", "labels": { "en": { "language": "en", "value": "AlUla Old Town" } }, "descriptions": { "en": { "language": "en", "value": "old mud-brick town in AlUla" } }, "sitelinks": {}, "claims": {} },
+    "Q900005": { "type": "item", "id": "Q900005", "labels": { "en": { "language": "en", "value": "Al Ula Mosque" } }, "descriptions": {}, "sitelinks": { "arwiki": { "site": "arwiki", "title": "جامع العلا" } }, "claims": {} }
+  },
+  "success": 1
+}

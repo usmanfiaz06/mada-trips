@@ -1,0 +1,7 @@
+{ "auditData": { "token": "d4e5f6" }, "activity": { "code": "E-E10-ULHHEGRA", "currency": "EUR", "modalities": [
+  { "code": "MORNING", "name": "Morning", "rates": [ { "rateCode": "GENERIC", "rateDetails": [
+    { "rateKey": "rk-morning-1", "operationDates": [ { "from": "2026-10-20", "to": "2026-10-20", "cancellationPolicies": [ { "dateFrom": "2026-10-18T00:00:00", "amount": 95.0 } ] } ],
+      "paxAmounts": [ { "paxType": "ADULT", "ageFrom": 13, "ageTo": 999, "amount": 95.0 }, { "paxType": "CHILD", "ageFrom": 5, "ageTo": 12, "amount": 60.0 } ], "totalAmount": { "amount": 250.0, "boxOfficeAmount": 280.0 } } ] } ] },
+  { "code": "SUNSET", "name": "Sunset", "rates": [ { "rateCode": "GENERIC", "rateDetails": [
+    { "rateKey": "rk-sunset-1", "operationDates": [ { "from": "2026-10-20", "to": "2026-10-20", "cancellationPolicies": [] } ], "totalAmount": { "amount": 290.0 } } ] } ] }
+] } }

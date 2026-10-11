@@ -1,0 +1,15 @@
+{ "operationId": "test", "auditData": { "processTime": 812, "token": "a1b2c3", "environment": "[int]" },
+  "pagination": { "itemsPerPage": 20, "page": 1, "totalItems": 3 },
+  "activities": [
+    { "code": "E-E10-ULHHEGRA", "type": "TICKET", "name": "Hegra tour", "currency": "EUR",
+      "amountsFrom": [ { "paxType": "ADULT", "ageFrom": 13, "ageTo": 99, "amount": 95.0 }, { "paxType": "CHILD", "ageFrom": 5, "ageTo": 12, "amount": 60.0 } ],
+      "content": { "name": "Hegra: the tombs by vintage Land Rover", "description": "<p>Saudi Arabia&#39;s first <b>UNESCO</b> site with a Rawi storyteller.</p>",
+        "media": { "images": [ { "visualizationOrder": 1, "urls": [ { "sizeType": "SMALL", "resource": "https://media.activitiesbank.com/12345/ENG/S/hegra.jpg" }, { "sizeType": "LARGE2", "resource": "https://media.activitiesbank.com/12345/ENG/L/hegra.jpg" } ] } ] } },
+      "modalities": [
+        { "code": "SUNSET", "name": "Sunset", "duration": { "value": 3, "metric": "HOURS" }, "minChildrenAge": 5, "amountsFrom": [ { "paxType": "ADULT", "amount": 110.0 } ] },
+        { "code": "MORNING", "name": "Morning", "duration": { "value": 180, "metric": "MINUTES" }, "minChildrenAge": 5, "amountsFrom": [ { "paxType": "ADULT", "amount": 95.0 } ] }
+      ] },
+    { "code": "E-E10-ULHBALLOON", "name": "Balloon", "currency": "EUR", "content": { "name": "Hot-air balloon over AlUla" },
+      "modalities": [ { "code": "STD", "name": "Standard", "duration": { "value": 1, "metric": "DAYS" }, "minChildrenAge": 12, "amountsFrom": [ { "paxType": "ADULT", "amount": 420.0 } ] } ] },
+    { "code": "E-E10-NOPRICE", "currency": "EUR", "content": { "name": "No price yet" }, "modalities": [] }
+  ] }

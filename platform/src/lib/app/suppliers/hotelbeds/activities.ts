@@ -64,7 +64,7 @@ function photo(a: HbActivity): Experience["image"] {
   return null;
 }
 
-const strip = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+const strip = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, s.lastIndexOf(" ", n) > n / 2 ? s.lastIndexOf(" ", n) : n)}…` : s);
 
 /** Availability answer → what the app lists. Unpriced or unnamed activities are left out. */

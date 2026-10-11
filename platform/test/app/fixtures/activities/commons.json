@@ -1,0 +1,6 @@
+{ "batchcomplete": true, "query": { "pages": [ { "ns": 6, "title": "File:Hegra tomb example.jpg", "imagerepository": "local", "imageinfo": [ {
+  "thumburl": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Hegra_tomb_example.jpg/1280px-Hegra_tomb_example.jpg", "thumbwidth": 1280, "thumbheight": 853,
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Hegra_tomb_example.jpg", "width": 4000, "height": 2667,
+  "descriptionurl": "https://commons.wikimedia.org/wiki/File:Hegra_tomb_example.jpg",
+  "extmetadata": { "LicenseShortName": { "value": "CC BY-SA 4.0" }, "LicenseUrl": { "value": "https://creativecommons.org/licenses/by-sa/4.0" }, "Artist": { "value": "<a href=\"//commons.wikimedia.org/wiki/User:Example\">A. Photographer</a>" } }
+} ] } ] } }

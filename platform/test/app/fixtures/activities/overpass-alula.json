@@ -1,16 +1,18 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html><head>
-<title>500 Internal Server Error</title>
-</head><body>
-<h1>Internal Server Error</h1>
-<p>The server encountered an internal error or
-misconfiguration and was unable to complete
-your request.</p>
-<p>Please contact the server administrator at 
- webmaster@localhost to inform them of the time this error occurred,
- and the actions you performed just before this error.</p>
-<p>More information about this error may be available
-in the server error log.</p>
-<hr>
-<address>Apache/2.4.66 (Debian) Server at overpass Port 80</address>
-</body></html>
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "osm3s": { "timestamp_osm_base": "2026-10-11T10:00:00Z", "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL." },
+  "elements": [
+    { "type": "relation", "id": 900101, "center": { "lat": 26.7915, "lon": 37.9531 }, "tags": { "name": "Hegra", "name:ar": "الحِجر", "historic": "archaeological_site", "tourism": "attraction", "wikidata": "Q900001", "wikipedia": "en:Hegra (Mada'in Salih)", "opening_hours": "Mo-Su 08:00-17:00", "website": "https://www.experiencealula.com/" } },
+    { "type": "node", "id": 900102, "lat": 26.7920, "lon": 37.9540, "tags": { "name": "Hegra", "tourism": "attraction", "wikidata": "Q900001" } },
+    { "type": "node", "id": 900103, "lat": 26.6893, "lon": 37.9888, "tags": { "name": "Elephant Rock", "name:ar": "جبل الفيل", "tourism": "attraction", "natural": "rock", "wikidata": "Q900002", "opening_hours": "Mo-Su 16:00-24:00", "fee": "no" } },
+    { "type": "way", "id": 900104, "center": { "lat": 26.6510, "lon": 37.8428 }, "tags": { "name": "مرايا", "tourism": "gallery", "building": "yes", "wikidata": "Q900003" } },
+    { "type": "way", "id": 900105, "center": { "lat": 26.6200, "lon": 37.9150 }, "tags": { "name": "AlUla Old Town", "historic": "district", "tourism": "attraction", "wikidata": "Q900004", "opening_hours": "Mo-Su 09:00-24:00" } },
+    { "type": "node", "id": 900106, "lat": 26.5940, "lon": 37.8480, "tags": { "name": "Harrat Viewpoint", "tourism": "viewpoint" } },
+    { "type": "node", "id": 900107, "lat": 26.6100, "lon": 37.9200, "tags": { "name": "Bench with a view", "tourism": "attraction" } },
+    { "type": "node", "id": 900108, "lat": 26.6110, "lon": 37.9210, "tags": { "name": "Founders' plaque", "historic": "memorial", "wikidata": "Q900009" } },
+    { "type": "way", "id": 900109, "center": { "lat": 26.6150, "lon": 37.9180 }, "tags": { "name": "Al Ula Mosque", "name:ar": "جامع العلا", "amenity": "place_of_worship", "religion": "muslim", "wikidata": "Q900005" } },
+    { "type": "way", "id": 900110, "center": { "lat": 26.6300, "lon": 37.9300 }, "tags": { "name": "AlUla Children's Discovery Museum", "tourism": "museum", "opening_hours": "Tu-Su 10:00-18:00; Mo off", "website": "http://example.org/museum" } },
+    { "type": "node", "id": 900111, "lat": 26.6000, "lon": 37.9000, "tags": { "tourism": "viewpoint" } }
+  ]
+}

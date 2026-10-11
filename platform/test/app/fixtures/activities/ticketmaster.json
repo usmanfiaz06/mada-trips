@@ -1,0 +1,11 @@
+{ "_embedded": { "events": [
+  { "name": "Coldplay: Music of the Spheres", "type": "event", "id": "vvG1HZ9pXs1Ab", "url": "https://www.ticketmaster.co.uk/coldplay-tickets/artist/806431",
+    "images": [ { "ratio": "3_2", "url": "https://s1.ticketm.net/dam/a/1d1/small.jpg", "width": 305 }, { "ratio": "16_9", "url": "https://s1.ticketm.net/dam/a/1d1/large.jpg", "width": 1024 } ],
+    "dates": { "start": { "localDate": "2026-10-14", "localTime": "19:30:00" } }, "classifications": [ { "primary": true, "segment": { "name": "Music" }, "genre": { "name": "Rock" }, "family": false } ],
+    "_embedded": { "venues": [ { "name": "Wembley Stadium" } ] } },
+  { "name": "Coldplay: Music of the Spheres", "type": "event", "id": "vvG1HZ9pXs1Ac", "url": "https://www.ticketmaster.co.uk/coldplay-tickets/artist/806431", "dates": { "start": { "localDate": "2026-10-15", "localTime": "19:30:00" } } },
+  { "name": "Frozen the Musical", "type": "event", "id": "G5vYZ9fKz1ArK", "url": "https://www.ticketmaster.co.uk/frozen", "images": [],
+    "dates": { "start": { "localDate": "2026-10-12", "localTime": "14:30:00" }, "end": { "localDate": "2026-12-30" } }, "classifications": [ { "segment": { "name": "Arts & Theatre" }, "genre": { "name": "Children's Theatre" }, "family": true } ],
+    "_embedded": { "venues": [ { "name": "Theatre Royal Drury Lane" } ] } },
+  { "name": "No date", "type": "event", "id": "bad1", "dates": { "start": {} } }
+] }, "page": { "size": 20, "totalElements": 4, "totalPages": 1, "number": 0 } }

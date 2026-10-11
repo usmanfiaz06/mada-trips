@@ -1,4 +1,4 @@
-import { pgTable, integer, text, boolean, doublePrecision, timestamp, jsonb, index, uuid, date, real, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, integer, text, boolean, doublePrecision, timestamp, jsonb, index, uuid, date, real, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
 import { appTrips, appUsers } from "./app-schema";
 import { appPlaces } from "./app-schema-places";
 
@@ -14,7 +14,7 @@ import { appPlaces } from "./app-schema-places";
  */
 
 export const appActivities = pgTable("app_activities", {
-  id: text("id").primaryKey(), // osm:n123
+  id: text("id").notNull(), // osm:n123 (one OSM object can sit in two nearby cities: Riyadh and Diriyah)
   placeId: integer("place_id").notNull().references(() => appPlaces.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(),
   name: text("name").notNull(),
@@ -37,7 +37,7 @@ export const appActivities = pgTable("app_activities", {
   score: real("score").notNull().default(0),
   popularity: integer("popularity").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("app_activities_place_idx").on(t.placeId, t.popularity)]);
+}, (t) => [primaryKey({ name: "app_activities_pk", columns: [t.placeId, t.id] }), index("app_activities_place_idx").on(t.placeId, t.popularity)]);
 
 export const appActivityCities = pgTable("app_activity_cities", {
   placeId: integer("place_id").primaryKey().references(() => appPlaces.id, { onDelete: "cascade" }),
