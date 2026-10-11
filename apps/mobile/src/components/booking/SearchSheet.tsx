@@ -17,8 +17,9 @@ export type TripSearch = { from: 'RUH' | 'JED' | 'DMM'; type: 'return' | 'oneway
 
 const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-export function SearchSheet({ visible, value, today, month, adults, onClose, onDone }: {
-  visible: boolean; value: TripSearch; today: string; month?: { month: number; year: number } | null; adults: number; onClose: () => void; onDone: (v: TripSearch) => void;
+/** `stay`: the same calendar for a hotel: check-in and check-out only (no airport, cabin, babies or one way). */
+export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay }: {
+  visible: boolean; value: TripSearch; today: string; month?: { month: number; year: number } | null; adults: number; onClose: () => void; onDone: (v: TripSearch) => void; stay?: boolean;
 }) {
   const { height } = useWindowDimensions();
   const [s, setS] = useState(value);
@@ -40,18 +41,19 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
     setS({ ...s, ret: x }); setPickRet(false);
   };
   const n = s.dep && s.ret ? daysBetween(s.dep, s.ret) : 0;
-  const status = !s.dep ? (s.type === 'oneway' ? t('cal.pickOut') : t('cal.pickBoth'))
+  const status = stay ? (!s.dep ? t('ask.stay.cal.pickBoth') : !s.ret ? t('ask.stay.cal.pickOut', { day: dayName(s.dep, today) }) : tn('ask.stay.cal.range', n, { from: dayName(s.dep, today), to: dayName(s.ret, today) }))
+    : !s.dep ? (s.type === 'oneway' ? t('cal.pickOut') : t('cal.pickBoth'))
     : s.type === 'oneway' ? t('cal.leaving', { day: dayName(s.dep, today) })
       : !s.ret ? t('cal.pickReturn', { day: dayName(s.dep, today) })
         : tn('cal.range', n, { from: dayName(s.dep, today), to: dayName(s.ret, today) });
   const canSearch = !!s.dep && (s.type === 'oneway' || !!s.ret);
 
   return (
-    <Sheet visible={visible} onClose={onClose} label={t('cal.title')}>
+    <Sheet visible={visible} onClose={onClose} label={stay ? t('ask.stay.cal.title') : t('cal.title')}>
       <ScrollView style={{ maxHeight: height * 0.78 }} contentContainerStyle={{ gap: 12, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
-        <T v="h2">{t('cal.title')}</T>
-        <Seg label={t('cal.from')} value={s.from} options={(['RUH', 'JED', 'DMM'] as const).map((c) => [c, AIRPORT_NAMES[c]!])} onChange={(from) => setS({ ...s, from })} />
-        <Seg label={t('cal.type')} value={s.type} options={[['return', t('cal.return')], ['oneway', t('cal.oneway')]]} onChange={(type) => { setS({ ...s, type, ret: type === 'oneway' ? null : s.ret }); setPickRet(type === 'return' && !!s.dep && !s.ret); }} />
+        <T v="h2">{stay ? t('ask.stay.cal.title') : t('cal.title')}</T>
+        {stay ? null : <Seg label={t('cal.from')} value={s.from} options={(['RUH', 'JED', 'DMM'] as const).map((c) => [c, AIRPORT_NAMES[c]!])} onChange={(from) => setS({ ...s, from })} />}
+        {stay ? null : <Seg label={t('cal.type')} value={s.type} options={[['return', t('cal.return')], ['oneway', t('cal.oneway')]]} onChange={(type) => { setS({ ...s, type, ret: type === 'oneway' ? null : s.ret }); setPickRet(type === 'return' && !!s.dep && !s.ret); }} />}
         <ChipWrap>
           {quickDates(today).map((q) => (
             <Toggle key={q.id} small label={q.label} on={s.dep === q.dates[0] && s.ret === q.dates[1]} onPress={() => { setS({ ...s, type: 'return', dep: q.dates[0], ret: q.dates[1] }); setPickRet(false); setPage(Math.max(0, idxOf(q.dates[0]))); }} />
@@ -89,6 +91,7 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
             );
           })}
         </View>
+        {stay ? null : (<>
         <Pressable accessibilityRole="switch" accessibilityState={{ checked: s.flex }} onPress={() => { buzz('select'); setS({ ...s, flex: !s.flex }); }} style={styles.rowBetween}>
           <T v="small" color={colors.green}>{t('cal.flexible')}</T>
           <View style={[styles.check, s.flex ? { backgroundColor: colors.green } : null]}>{s.flex ? <Icon name="check" size={14} color={colors.mist} width={2.4} /> : null}</View>
@@ -103,7 +106,8 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
             <Pressable accessibilityRole="button" accessibilityLabel={t('cal.more')} disabled={s.infants >= Math.max(1, adults)} onPress={() => setS({ ...s, infants: s.infants + 1 })} style={[styles.nav, s.infants >= Math.max(1, adults) ? { opacity: 0.35 } : null]}><T v="h3">+</T></Pressable>
           </View>
         </View>
-        <Button label={canSearch ? t('cal.search') : !s.dep ? t('cal.pickDate') : t('cal.pickReturnDate')} disabled={!canSearch} onPress={() => onDone(s)} testID="search-go" />
+        </>)}
+        <Button label={stay ? (canSearch ? t('ask.stay.cal.done') : !s.dep ? t('ask.stay.cal.pickIn') : t('ask.stay.cal.pickOutButton')) : canSearch ? t('cal.search') : !s.dep ? t('cal.pickDate') : t('cal.pickReturnDate')} disabled={!canSearch} onPress={() => onDone(s)} testID="search-go" />
       </ScrollView>
     </Sheet>
   );

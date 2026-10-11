@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { personName, type Person } from '@mada/shared';
+import { ageOn, localizeDigits, personName, type Person } from '@mada/shared';
 import { api, ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { keys } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { colors, font } from '@/theme';
@@ -19,14 +19,17 @@ import { ChipWrap, Toggle } from './parts';
 
 export const nameOf = (p: Person | undefined, selfName = '') => personName(p, selfName);
 
-export function TravellerChips({ people, value, onChange, selfName = '' }: { people: Person[]; value: string[]; onChange: (ids: string[]) => void; selfName?: string }) {
+/** `agesOn`: show children's ages on that day (a stay prices children by age), from the household's birthdays. */
+export function TravellerChips({ people, value, onChange, selfName = '', agesOn }: { people: Person[]; value: string[]; onChange: (ids: string[]) => void; selfName?: string; agesOn?: string }) {
   const [adding, setAdding] = useState(false);
   return (
     <>
       <ChipWrap>
         {people.map((p) => {
           const on = value.includes(p.id);
-          const label = p.relation === 'helper' ? t('ask.q.helper', { name: nameOf(p, selfName) }) : nameOf(p, selfName);
+          const age = agesOn ? ageOn(p, agesOn) : null;
+          const base = p.relation === 'helper' ? t('ask.q.helper', { name: nameOf(p, selfName) }) : nameOf(p, selfName);
+          const label = age !== null && age < 18 ? t('ask.flow.childAge', { name: base, age: localizeDigits(String(age), getLocale()) }) : base;
           return <Toggle key={p.id} label={label} on={on} onPress={() => { if (on && value.length === 1) return; onChange(on ? value.filter((x) => x !== p.id) : [...value, p.id]); }} />;
         })}
         <Pressable accessibilityRole="button" accessibilityLabel={t('ask.q.addSomeone')} onPress={() => { buzz('tap'); setAdding(true); }}
