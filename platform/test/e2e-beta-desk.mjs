@@ -31,7 +31,7 @@ const api = async (method, path, token, body) => {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
-  return { status: res.status, json: text ? JSON.parse(text) : null };
+  try { return { status: res.status, json: text ? JSON.parse(text) : null }; } catch { throw new Error(`${method} ${path} answered ${res.status}: ${text.slice(0, 160)}`); }
 };
 async function traveller() {
   const phone = `+9665${String(10_000_000 + Math.floor(Math.random() * 89_999_999))}`;
