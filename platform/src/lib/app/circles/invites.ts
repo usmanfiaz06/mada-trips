@@ -1,4 +1,5 @@
 import "server-only";
+import { publicCover, settleCovers } from "./covers";
 import { assertNotLimited } from "../limits";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
@@ -176,8 +177,9 @@ export async function preview(code: string, viewerId: string | null, ipHash: str
     const [c] = await db.select().from(appCircles).where(eq(appCircles.id, r.circleId));
     const ids = await memberIds(r.circleId);
     const people = await peopleByIds(ids.slice(0, 4));
+    await settleCovers();
     const d = await details(r.circleId);
-    circle = { name: c!.name, cover: (d.cover as "istanbul" | "alula" | "riyadh" | null) ?? null, members: ids.slice(0, 4).map((i) => people.get(i)!), memberCount: ids.length, trip: await circleTrip(c!.tripId) };
+    circle = { name: c!.name, cover: publicCover(d, codeFor(lookup)), members: ids.slice(0, 4).map((i) => people.get(i)!), memberCount: ids.length, trip: await circleTrip(c!.tripId) };
   }
   return { code: codeFor(lookup), status, kind: r.circleId ? "circle" : "mada", from, circle };
 }

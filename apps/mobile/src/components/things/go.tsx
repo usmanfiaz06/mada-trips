@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { dayLabel, localizeDigits, travelEstimate, type GoApp, type GoTarget, type TravelEstimate } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -110,15 +110,15 @@ const APP_ICON: Record<GoApp, IconName> = { apple: 'pin', google: 'pin', waze: '
 export function DirectionsSheet({ x, ctx, onClose, onRide }: { x: Thing | null; ctx: ThingsContext; onClose: () => void; onRide: (x: Thing) => void }) {
   const target = x ? targetOf(x, ctx.city) : null;
   const est = estimateFor(target, ctx);
-  const [apps, setApps] = useState<Offered[] | null>(null);
-  const key = target ? `${target.lat},${target.lon},${target.address ?? target.name}` : '';
-  useEffect(() => {
-    let live = true;
-    setApps(null);
-    if (target) void appsFor(target, est?.mode ?? 'drive').then((a) => { if (live) setApps(a); });
-    return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  const mode = est?.mode ?? 'drive';
+  // Which apps this phone has: asked each time the chooser opens for a place (someone may have just installed one).
+  const apps = useQuery({
+    queryKey: ['directions', target ? `${target.lat},${target.lon},${target.address ?? target.name}` : '', mode],
+    queryFn: () => appsFor(target!, mode),
+    enabled: !!target,
+    staleTime: 0,
+    gcTime: 60_000,
+  }).data;
   if (!x || !target) return null;
   const title = thingTitle(x, isRTL());
   const go = (l: Offered) => {

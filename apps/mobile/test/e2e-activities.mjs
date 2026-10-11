@@ -7,6 +7,8 @@
 // places with their hours, Book with Mada, What's on), a place's sheet (photo, hours, the drawn map), the full list
 // with filters, an experience booked with Mada (sheet → request → its chat), an event, the sources page, a city with
 // no list yet (Tbilisi), and inside the Istanbul trip: from the hotel, by day, Add to my plan → on the itinerary.
+// Getting there: the address, Directions (the chooser; Google Maps on the web), Get there with Mada (a car request,
+// from where they say outside a trip, from the hotel inside one), "12 min drive" on the rows, meeting points.
 // Screenshots every screen at 390×844.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -99,7 +101,37 @@ async function run(lang) {
   await see(W('Open in Maps', 'افتح في الخرائط'), 'map');
   await see(W('From OpenStreetMap', 'من OpenStreetMap'), 'hours source');
   await shot('place-sheet');
-  await closeSheet();
+
+  step(`${lang}: getting there: address, Directions (Google Maps on the web), Get there with Mada`);
+  await scrollTo('thing-getting-there');
+  await see('King Saud Rd', 'address');
+  await see(W('Directions', 'الاتجاهات'), 'directions button');
+  await see(W('Get there with Mada', 'اذهب مع مادا'), 'ride button');
+  await shot('place-getting-there');
+  await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
+  await byTest('thing-directions').click();
+  await page.waitForTimeout(900);
+  await see(W('Getting to National Museum', 'الطريق إلى المتحف الوطني'), 'chooser title');
+  await see(W('Google Maps', 'خرائط Google'), 'Google Maps on the web');
+  await see(W('Opens in your browser', 'يفتح في المتصفح'), 'web note');
+  await shot('directions-chooser');
+  await byTest('go-app-google').click();
+  await page.waitForTimeout(400);
+  const opened = await page.evaluate(() => window.__opened);
+  if (!opened?.[0]?.startsWith('https://www.google.com/maps/dir/?api=1&destination=24.64755,46.71038')) errors.push(`${lang}: Google Maps link was ${JSON.stringify(opened)}`);
+  await byTest('directions-ride').click();
+  await page.waitForTimeout(900);
+  await see(W('A car to National Museum', 'سيارة إلى المتحف الوطني'), 'ride sheet');
+  await see(W('Tell us where to pick you up.', 'أخبرنا أين نأخذك.'), 'no hotel outside a trip: say where');
+  await byTest('ride-where').fill('Kingdom Centre');
+  await page.waitForTimeout(300);
+  await shot('ride-sheet');
+  await byTest('ride-send').click();
+  await page.waitForTimeout(1800);
+  await see('Kingdom Centre', 'the car request thread opens with the message');
+  await shot('ride-request');
+  await go('/city/108410');
+  await scrollTo('things-section');
 
   step(`${lang}: the full list and filters`);
   await tapTest('things-see-all');
@@ -118,11 +150,29 @@ async function run(lang) {
   await page.getByRole('button', { name: W('Indoors', 'في الداخل'), exact: true }).filter({ visible: true }).first().click();
   await page.waitForTimeout(600);
 
+  step(`${lang}: experiences: no meeting point yet → the voucher`);
+  await scrollTo('things-book');
+  await tapTest('exp-hotelbeds:E-E10-RUH-CAMP');
+  await scrollTo('thing-meeting');
+  await see(W('Meeting point is in your voucher', 'نقطة اللقاء مذكورة في القسيمة'), 'meeting point on the voucher');
+  await shot('experience-voucher');
+  await closeSheet();
+
   step(`${lang}: book an experience with Mada`);
   await scrollTo('things-book');
   await tapTest('exp-hotelbeds:E-E10-RUH-DIRIYAH');
   await see(W('Book with Mada', 'احجز مع مادا'), 'book button');
   await shot('experience-sheet');
+  await scrollTo('thing-meeting');
+  await see(W('Meeting point', 'نقطة اللقاء'), 'meeting point label');
+  await see('At-Turaif Visitor Centre', 'meeting point address');
+  await shot('experience-meeting-point');
+  await byTest('thing-directions').click();
+  await page.waitForTimeout(900);
+  await see(W('Getting to', 'الطريق إلى'), 'chooser for the meeting point');
+  await shot('experience-directions');
+  await closeSheet();
+  await page.waitForTimeout(500);
   await byTest('thing-book').click();
   await page.waitForTimeout(900);
   await see(W('Book Diriyah at sunset', 'احجز'), 'book sheet');
@@ -166,22 +216,43 @@ async function run(lang) {
   await see(W('Near the hotel', 'قرب الفندق'), 'near the hotel filter');
   await page.getByRole('button', { name: W('Near the hotel', 'قرب الفندق'), exact: true }).filter({ visible: true }).first().click();
   await page.waitForTimeout(800);
-  await see(W('from the hotel', 'من الفندق'), 'distance from the hotel');
+  await see(W('min drive', 'د بالسيارة'), 'minutes from the hotel on the rows');
+  await see(W('min walk', 'د مشيًا'), 'a short walk from the hotel');
   await shot('trip-things-near');
+  const tripId = await page.evaluate(() => new URL(location.href).searchParams.get('trip'));
   // A day of the trip: no "open now", what's on that day.
   await page.locator('[data-testid="things-days"] [role="button"]').nth(2).click();
   await page.waitForTimeout(900);
   await shot('trip-things-day');
   await tapTest('place-osm:r1374029');
   await page.waitForTimeout(600);
+  await scrollTo('thing-getting-there');
+  await see(W('From Rooms near Galata Tower', 'من Rooms near Galata Tower'), 'from the hotel');
+  await see(W('About', 'نحو'), 'about how long');
+  await shot('trip-place-getting-there');
+  await byTest('thing-directions').click();
+  await page.waitForTimeout(900);
+  await see(W('A straight-line guess', 'تقدير بخط مستقيم'), 'the estimate is labelled a guess');
+  await shot('trip-directions');
+  await closeSheet();
+  await page.waitForTimeout(700);
   await byTest('thing-add-plan').click();
   await page.waitForTimeout(1000);
   await see(W('On your plan for', 'في خطتك يوم'), 'added to the plan');
   await shot('trip-added-plan');
-  await closeSheet();
+
+  step(`${lang}: a car from the hotel`);
+  await byTest('thing-ride').click();
+  await page.waitForTimeout(900);
+  await see(W('A car to Hagia Sophia', 'سيارة إلى آيا صوفيا'), 'ride sheet in the trip');
+  await see('Rooms near Galata Tower', 'pickup from the hotel by default');
+  await shot('trip-ride-sheet');
+  await byTest('ride-send').click();
+  await page.waitForTimeout(1800);
+  await see(W('picking us up from Rooms near Galata Tower', 'تأخذنا من Rooms near Galata Tower'), 'the request asks for a car from the hotel');
+  await shot('trip-ride-request');
 
   step(`${lang}: the idea is on the itinerary`);
-  const tripId = await page.evaluate(() => new URL(location.href).searchParams.get('trip'));
   await go(`/itinerary/${tripId}`);
   await page.waitForTimeout(1200);
   const planned = page.locator('[data-testid^="itin-item-plan-"]').first();

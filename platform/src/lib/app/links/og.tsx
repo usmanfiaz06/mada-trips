@@ -2,7 +2,8 @@
 /** @jsxImportSource react */
 import "server-only";
 import { ImageResponse } from "next/og";
-import { PLANS, hasArabic, joinNames, planById, t, tn, type CoverKey, type InvitePreview, type Lang, type PersonRef } from "@mada/shared";
+import { PLANS, coverArtSvg, coverTextTone, hasArabic, joinNames, planById, t, tn, type CircleCover, type CoverKey, type InvitePreview, type Lang, type PersonRef } from "@mada/shared";
+import { approvedUploadDataUri } from "../circles/covers";
 import { inLocale } from "../resilience/request";
 import { asset } from "./assets";
 
@@ -54,7 +55,7 @@ function Faces({ people }: { people: PersonRef[] }) {
   );
 }
 
-type Frame = { locale: Lang; cover: CoverKey | null; eyebrow: string; title: string; sub: string; people: PersonRef[] };
+type Frame = { locale: Lang; cover: CoverKey | CircleCover | null; eyebrow: string; title: string; sub: string; people: PersonRef[] };
 const HEADERS = { "Content-Type": "image/png", "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=3600", "X-Content-Type-Options": "nosniff" };
 
 /**
@@ -72,7 +73,16 @@ async function frame(o: Frame): Promise<Response> {
 
 async function draw(o: Frame) {
   const rtl = o.locale === "ar";
-  const cover = o.cover ? await dataUri(`${o.cover}.jpg`, "image/jpeg") : null;
+  const c = o.cover;
+  // A photo we ship, an approved upload (JPEG or PNG), or one of Mada's drawings drawn to the frame's size.
+  const cover = !c ? null : typeof c === "string" ? await dataUri(`${c}.jpg`, "image/jpeg") : c.kind === "photo" ? await dataUri(`${c.id}.jpg`, "image/jpeg")
+    : c.kind === "upload" ? await approvedUploadDataUri(c.fileId)
+      : `data:image/svg+xml;base64,${Buffer.from(coverArtSvg(c, { width: W, height: H, side: rtl ? "left" : "right" })).toString("base64")}`;
+  // Words on a light drawing are ink, with the veil in the drawing's own colour; everything else is paper on night.
+  const drawn = !!c && typeof c !== "string" && c.kind === "icon";
+  const light = drawn && coverTextTone((c as Extract<CircleCover, { kind: "icon" }>).color) === "ink";
+  const veil = light ? "rgba(255,253,249," : "rgba(15,26,22,";
+  const ink = light ? "#1e352d" : PAPER;
   const mark = await dataUri("symbol-gold.svg", "image/svg+xml");
   const word = await dataUri("wordmark-sand.svg", "image/svg+xml");
   const arTitle = hasArabic(o.title);
@@ -85,8 +95,8 @@ async function draw(o: Frame) {
           ? <img src={cover} width={W} height={H} style={{ position: "absolute", top: 0, left: 0, width: W, height: H, objectFit: "cover" }} alt="" />
           : <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex", background: "radial-gradient(circle at 78% 30%, #2a4a40 0%, #1e352d 40%, #0f1a16 100%)" }} />}
         <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex", background: rtl
-          ? "linear-gradient(270deg, rgba(15,26,22,0.94) 0%, rgba(15,26,22,0.78) 42%, rgba(15,26,22,0.15) 100%)"
-          : "linear-gradient(90deg, rgba(15,26,22,0.94) 0%, rgba(15,26,22,0.78) 42%, rgba(15,26,22,0.15) 100%)" }} />
+          ? `linear-gradient(270deg, ${veil}${light ? 0.86 : 0.94}) 0%, ${veil}${light ? 0.55 : 0.78}) 42%, ${veil}${drawn ? 0 : 0.15}) ${drawn ? 75 : 100}%)`
+          : `linear-gradient(90deg, ${veil}${light ? 0.86 : 0.94}) 0%, ${veil}${light ? 0.55 : 0.78}) 42%, ${veil}${drawn ? 0 : 0.15}) ${drawn ? 75 : 100}%)` }} />
         {!cover ? <img src={mark} width={330} height={221} style={{ position: "absolute", top: 150, [rtl ? "left" : "right"]: 90, opacity: 0.9 }} alt="" /> : null}
         <div style={{ position: "absolute", top: 0, left: 0, width: W, height: H, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "56px 72px", alignItems: align }}>
           <div style={{ display: "flex", alignItems: "center", gap: 18, flexDirection: rtl ? "row-reverse" : "row" }}>
@@ -95,9 +105,9 @@ async function draw(o: Frame) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: align, maxWidth: 820 }}>
             {o.people.length ? <Faces people={o.people} /> : null}
-            {o.eyebrow ? <Line text={o.eyebrow} style={{ color: GOLD, fontSize: rtl ? 30 : 24, fontWeight: 600, letterSpacing: rtl ? 0 : 3, textTransform: rtl ? "none" : "uppercase" }} /> : null}
-            {o.title ? <Line text={o.title} style={{ color: PAPER, fontFamily: arTitle ? "Plex" : "Serif", fontWeight: arTitle ? 600 : 400, fontSize: arTitle ? Math.round(size * 0.82) : size, lineHeight: arTitle ? 1.25 : 1.02, letterSpacing: arTitle ? 0 : -1 }} /> : null}
-            {o.sub ? <Line text={o.sub} style={{ color: "rgba(255,253,249,0.86)", fontSize: 28 }} /> : null}
+            {o.eyebrow ? <Line text={o.eyebrow} style={{ color: light ? "#7d5d27" : GOLD, fontSize: rtl ? 30 : 24, fontWeight: 600, letterSpacing: rtl ? 0 : 3, textTransform: rtl ? "none" : "uppercase" }} /> : null}
+            {o.title ? <Line text={o.title} style={{ color: ink, fontFamily: arTitle ? "Plex" : "Serif", fontWeight: arTitle ? 600 : 400, fontSize: arTitle ? Math.round(size * 0.82) : size, lineHeight: arTitle ? 1.25 : 1.02, letterSpacing: arTitle ? 0 : -1 }} /> : null}
+            {o.sub ? <Line text={o.sub} style={{ color: light ? "rgba(30,53,45,0.8)" : "rgba(255,253,249,0.86)", fontSize: 28 }} /> : null}
           </div>
         </div>
       </div>

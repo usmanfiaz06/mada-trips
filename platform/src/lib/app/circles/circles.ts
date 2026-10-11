@@ -2,7 +2,7 @@ import "server-only";
 import { assertNotLimited } from "../limits";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
-  CreateCircleRequest, CoverKey, REACTIONS, SharedCard, planById, t,
+  CreateCircleRequest, REACTIONS, SharedCard, planById, t,
   type CircleDetail, type CircleMessage, type CircleSummary, type IncomingInvite, type MessageAuthor, type SysEvent, type UpdateCircleRequest,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -10,6 +10,7 @@ import { appCircleMembers, appCircles, appMessages } from "@/db/app-schema";
 import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitShares, appCircleVotes } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
+import { coverColumns, coverFor, dropReplacedUpload, settleCovers } from "./covers";
 import { circleTrip, err, graphOf, isBlocked, liveUser, notify, peopleByIds, relationOf, type Db } from "./common";
 
 /*
@@ -38,7 +39,7 @@ export async function memberIds(circleId: string, tx: Db = db): Promise<string[]
 }
 export async function details(circleId: string, tx: Db = db) {
   const [d] = await tx.select().from(appCircleDetails).where(eq(appCircleDetails.circleId, circleId));
-  return d ?? { circleId, cover: null, dest: null, dm: false, dmKey: null, pinnedPlan: null, pinnedBy: null, createdAt: new Date() };
+  return d ?? { circleId, cover: null, coverKind: null, coverIcon: null, coverColor: null, coverFileId: null, coverStatus: null, coverBy: null, coverAutoApproveAt: null, coverCheckedAt: null, coverCheckedBy: null, coverNote: null, dest: null, dm: false, dmKey: null, pinnedPlan: null, pinnedBy: null, createdAt: new Date() };
 }
 
 /* ───────────── messages: writing and reading ───────────── */
@@ -118,6 +119,7 @@ export async function listCircles(userId: string): Promise<{ circles: CircleSumm
   const mine = await db.select({ id: appCircles.id, name: appCircles.name, tripId: appCircles.tripId, createdBy: appCircles.createdBy, createdAt: appCircles.createdAt, updatedAt: appCircles.updatedAt, role: appCircleMembers.role, muted: appCircleMembers.muted, lastReadAt: appCircleMembers.lastReadAt })
     .from(appCircleMembers).innerJoin(appCircles, eq(appCircles.id, appCircleMembers.circleId))
     .where(eq(appCircleMembers.userId, userId)).orderBy(desc(appCircles.updatedAt));
+  await settleCovers();
   const incoming = await incomingInvites(userId);
   if (!mine.length) return { circles: [], incoming };
   const ids = mine.map((c) => c.id);
@@ -143,7 +145,7 @@ export async function listCircles(userId: string): Promise<{ circles: CircleSumm
     return {
       id: c.id, name: dm ? (people.get(others[0]?.userId ?? "")?.short ?? c.name) : c.name, imageUrl: null, tripId: c.tripId, role: c.role === "admin" ? "admin" : "member",
       memberCount: ms.length, muted: c.muted, unread: unread.find((u) => u.thread_id === c.id)?.n ?? 0, createdAt: c.createdAt.toISOString(),
-      cover: CoverKey.safeParse(d?.cover).success ? (d!.cover as CircleSummary["cover"]) : null, dest: d?.dest ?? null, dm, trip: trips.get(c.id) ?? null,
+      cover: dm ? null : coverFor(c.id, d, userId), dest: d?.dest ?? null, dm, trip: trips.get(c.id) ?? null,
       adminId: ms.find((m) => m.role === "admin")?.userId ?? null,
       preview: ms.slice(0, 3).map((m) => people.get(m.userId)!), invitedCount: invited.find((i) => i.circleId === c.id)?.n ?? 0,
       last, fresh: !c.lastReadAt && c.createdBy !== userId && !dm,
@@ -165,7 +167,7 @@ export async function incomingInvites(userId: string): Promise<IncomingInvite[]>
   for (const r of visible) {
     const d = await details(r.circleId!);
     const count = (await memberIds(r.circleId!)).length;
-    out.push({ inviteId: r.id, from: people.get(r.inviterId)!, circle: { id: r.circleId!, name: r.name, cover: (d.cover as IncomingInvite["circle"]["cover"]) ?? null, memberCount: count }, sentAt: r.createdAt.toISOString() });
+    out.push({ inviteId: r.id, from: people.get(r.inviterId)!, circle: { id: r.circleId!, name: r.name, cover: coverFor(r.circleId!, d, userId), memberCount: count }, sentAt: r.createdAt.toISOString() });
   }
   return out;
 }
@@ -224,7 +226,7 @@ export async function createCircle(userId: string, raw: unknown, ipHash: string 
       .where(and(eq(appCircleMembers.userId, userId), sql`lower(${appCircles.name}) = lower(${input.name})`, sql`coalesce(${appCircleDetails.dm}, false) = false`)).limit(1);
     if (dupe.length) throw err("VALIDATION", "circles.err.dupeName", { name: t("circles.err.dupeName") });
     const [c] = await tx.insert(appCircles).values({ name: input.name, createdBy: userId }).returning({ id: appCircles.id });
-    await tx.insert(appCircleDetails).values({ circleId: c!.id, cover: input.cover ?? null, dest: input.dest ?? null });
+    await tx.insert(appCircleDetails).values({ circleId: c!.id, ...(await coverColumns(input.cover ?? null, userId, null, tx)), dest: input.dest ?? null });
     await tx.insert(appCircleMembers).values({ circleId: c!.id, userId, role: "admin", lastReadAt: new Date() });
     await sysMessage(tx, c!.id, "created", userId);
     if (invite.length) {
@@ -248,7 +250,7 @@ export async function updateCircle(circleId: string, userId: string, patch: Upda
       await sysMessage(tx, circleId, "renamed", userId, [], { text: patch.name });
     }
     const det: Partial<typeof appCircleDetails.$inferInsert> = {};
-    if (patch.cover !== undefined) det.cover = patch.cover;
+    if (patch.cover !== undefined) Object.assign(det, await coverColumns(patch.cover, userId, d, tx));
     if (patch.dest !== undefined) det.dest = patch.dest;
     if (patch.pin !== undefined) {
       if (patch.pin && !planById(patch.pin.id)) throw new AppError("VALIDATION", { fields: { pin: "Unknown plan" } });
@@ -257,6 +259,7 @@ export async function updateCircle(circleId: string, userId: string, patch: Upda
       if (patch.pin && patch.pin.id !== d.pinnedPlan) await sysMessage(tx, circleId, "pinned", userId, [], { text: planById(patch.pin.id)!.title });
     }
     if (Object.keys(det).length) await tx.insert(appCircleDetails).values({ circleId, ...det }).onConflictDoUpdate({ target: appCircleDetails.circleId, set: det });
+    if (patch.cover !== undefined) await dropReplacedUpload(tx, d, det);
     const mem: Partial<typeof appCircleMembers.$inferInsert> = {};
     if (patch.muted !== undefined) mem.muted = patch.muted;
     if (patch.read) mem.lastReadAt = new Date();

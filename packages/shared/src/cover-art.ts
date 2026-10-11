@@ -392,12 +392,15 @@ export type CoverArtOptions = {
   width: number;
   height: number;
   /** banner: a wide cover with the drawing to one side (headers, previews, tiles, the invite page).
-   *  badge: a small square with the drawing in the middle (list rows, avatars, the picker). */
-  layout?: 'banner' | 'badge';
+   *  badge: a small square with the drawing in the middle (list rows, avatars, the picker).
+   *  poster: a tall screen with the drawing in the upper part (the invite page). */
+  layout?: 'banner' | 'badge' | 'poster';
   /** Which side the drawing sits on in a banner: the end of the line (right in English, left in Arabic). */
   side?: 'left' | 'right';
   /** Draw the dotted pattern (on by default). */
   pattern?: boolean;
+  /** Fill whatever box holds it (width and height 100%, cropped to cover) instead of a fixed size. */
+  fill?: boolean;
 };
 
 /**
@@ -415,6 +418,9 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
     disc = Math.min(H * 0.34, W * 0.24);
     cx = o.side === 'left' ? disc * 1.25 + W * 0.04 : W - disc * 1.25 - W * 0.04;
     cy = H * 0.42;
+  } else if (layout === 'poster') {
+    disc = Math.min(W * 0.3, H * 0.2);
+    cx = W / 2; cy = H * 0.3;
   } else {
     disc = Math.min(W, H) * 0.42;
     cx = W / 2; cy = H / 2;
@@ -423,14 +429,15 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
     const gap = Math.max(12, Math.round(Math.min(W, H) / 9));
     parts.push(`<path d="${dots(W, H, gap, Math.max(1, r2(gap / 11)))}" fill="${c.dot}"/>`);
   }
-  if (layout === 'banner' || Math.min(W, H) >= 80) {
+  if (layout !== 'badge' || Math.min(W, H) >= 80) {
     parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc * 1.42))}" fill="none" stroke="${c.ring}" stroke-width="${r2(Math.max(1, disc * 0.08))}"/>`);
     parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc * 1.9))}" fill="none" stroke="${c.ring}" stroke-width="${r2(Math.max(1, disc * 0.05))}"/>`);
   }
   parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc))}" fill="${PAPER}"${cover.color === 'green' ? '' : ` stroke="rgba(30,53,45,0.10)" stroke-width="${r2(Math.max(0.6, disc * 0.03))}"`}/>`);
   const s = (disc * 1.72) / 64;
   parts.push(`<g transform="translate(${r2(cx - 32 * s)} ${r2(cy - 32 * s)}) scale(${r2(s * 1000) / 1000})">${coverIconMarks(cover.icon)}</g>`);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`;
+  const fit = o.fill ? ` preserveAspectRatio="${layout === 'poster' ? 'xMidYMin' : 'xMidYMid'} slice"` : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" ${o.fill ? 'width="100%" height="100%"' : `width="${W}" height="${H}"`} viewBox="0 0 ${W} ${H}"${fit}>${parts.join('')}</svg>`;
 }
 
 /** Whether words laid on this cover read best in paper (light) or ink (dark). */

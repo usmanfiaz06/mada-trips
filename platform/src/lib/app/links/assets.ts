@@ -10,7 +10,12 @@ import { join } from "node:path";
 
 const DIR = join(process.cwd(), "src/lib/app/links/assets");
 export const ASSETS = {
-  cover: { "istanbul.jpg": "image/jpeg", "istanbul-tall.jpg": "image/jpeg", "alula.jpg": "image/jpeg", "riyadh.jpg": "image/jpeg" },
+  cover: {
+    "istanbul.jpg": "image/jpeg", "istanbul-tall.jpg": "image/jpeg", "alula.jpg": "image/jpeg", "riyadh.jpg": "image/jpeg",
+    // Circle covers from the photo library (docs/app/photos, Unsplash Licence; credits in @mada/shared COVER_PHOTOS).
+    "dubai-skyline.jpg": "image/jpeg", "desert-camp.jpg": "image/jpeg", "maldives-overwater.jpg": "image/jpeg",
+    "jeddah-al-balad.jpg": "image/jpeg", "abha-mountains.jpg": "image/jpeg", "baku-old-city.jpg": "image/jpeg",
+  },
   font: {
     "instrument-serif.ttf": "font/ttf", "plex-arabic-400.woff2": "font/woff2", "plex-arabic-600.woff2": "font/woff2",
     "plex-latin-400.woff2": "font/woff2", "plex-latin-600.woff2": "font/woff2",

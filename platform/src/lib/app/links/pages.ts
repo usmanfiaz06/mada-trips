@@ -2,8 +2,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { eq, or } from "drizzle-orm";
 import {
-  CITY_INFO, INVITE_CODE, PLANS, hasArabic, isLocale, joinNames, pickLocale, planById, t, tn,
-  type CopyKey, type CoverKey, type InvitePreview, type Lang, type PersonRef, type Vars,
+  CITY_INFO, INVITE_CODE, PLANS, coverArtSvg, hasArabic, isLocale, joinNames, pickLocale, planById, t, tn,
+  type CircleCover, type CopyKey, type CoverKey, type InvitePreview, type Lang, type PersonRef, type Vars,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appPlaces } from "@/db/app-schema-places";
@@ -52,7 +52,23 @@ export function localeFor(req: Request): Lang {
 }
 
 /** A cover for a tall screen: the landscape Istanbul photo crops to sky, so the page uses a mosque crop. */
-const coverFile = (c: CoverKey) => (c === "istanbul" ? "istanbul-tall" : c);
+const coverFile = (c: string) => (c === "istanbul" ? "istanbul-tall" : c);
+type PageCover = CoverKey | CircleCover | null;
+/** Where the page's cover picture comes from (a photo we ship, or an approved upload), or null for a drawing or green. */
+function coverSrc(c: PageCover): string | null {
+  if (!c) return null;
+  if (typeof c === "string") return `/links/cover/${coverFile(c)}.jpg`;
+  if (c.kind === "photo") return `/links/cover/${coverFile(c.id)}.jpg`;
+  if (c.kind === "upload") return c.status === "approved" && c.url ? c.url : null;
+  return null;
+}
+/** The cover behind the page: a photo, a drawing (inline SVG, nothing to fetch), or plain green. */
+function coverLayer(c: PageCover): string {
+  const src = coverSrc(c);
+  if (src) return `<img class="bg" src="${esc(src)}" alt="" fetchpriority="high">`;
+  if (c && typeof c !== "string" && c.kind === "icon") return `<div class="bg art" aria-hidden="true">${coverArtSvg(c, { width: 420, height: 880, layout: "poster", fill: true })}</div>`;
+  return `<div class="plain"></div>`;
+}
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const tt = (key: CopyKey, vars?: Vars) => esc(t(key, vars));
 
@@ -80,6 +96,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Plex Arabic',sans-se
 .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;animation:drift 18s ease-in-out infinite}
 @keyframes drift{0%,100%{transform:scale(1.04)}50%{transform:scale(1.1) translate(-1%,-1%)}}
 @media (prefers-reduced-motion:reduce){.bg{animation:none}}
+.art{display:block}.art svg{display:block;width:100%;height:100%}
 .plain{position:absolute;inset:0;background:radial-gradient(120% 70% at 50% 18%,#2a4a40 0%,#1e352d 45%,#0f1a16 100%)}
 .veil{position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,26,22,.55) 0%,rgba(15,26,22,.05) 24%,rgba(15,26,22,.2) 42%,rgba(15,26,22,.92) 66%,#0f1a16 100%)}
 .top{position:relative;display:flex;align-items:center;justify-content:center;padding:calc(22px + env(safe-area-inset-top)) 24px 0}
@@ -123,7 +140,7 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--gold);outline-offse
 type Shell = {
   locale: Lang; title: string; desc: string; url: string; image: string | null; imageAlt: string; status?: number; index?: boolean;
   /** Path the app opens (join/abc…), for the madatrips:// and Android intent links. */
-  appPath: string; stores: Stores; code: string | null; cover: CoverKey | null; body: string;
+  appPath: string; stores: Stores; code: string | null; cover: PageCover; body: string;
 };
 
 function storeButtons(s: Stores, code: string | null): string {
@@ -176,12 +193,12 @@ ${meta.join("\n")}
 <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="${esc(s.url)}">
 <link rel="preload" href="/links/font/${rtl ? "plex-arabic-600.woff2" : "instrument-serif.ttf"}" as="font" crossorigin>
-${s.cover ? `<link rel="preload" href="/links/cover/${coverFile(s.cover)}.jpg" as="image">` : ""}
+${coverSrc(s.cover) ? `<link rel="preload" href="${esc(coverSrc(s.cover)!)}" as="image">` : ""}
 <style>${CSS}</style>
 </head>
 <body data-path="${esc(s.appPath)}" data-pkg="${ANDROID_PACKAGE}" data-fallback="${esc(fallback)}" data-copied="${tt("links.codeCopied")}" data-refused="${tt("links.copyRefused")}">
 <main class="screen">
-${s.cover ? `<img class="bg" src="/links/cover/${coverFile(s.cover)}.jpg" alt="" fetchpriority="high">` : `<div class="plain"></div>`}
+${coverLayer(s.cover)}
 <div class="veil"></div>
 <header class="top"><img src="/links/brand/wordmark-sand.svg" alt="${rtl ? "مادا للرحلات" : "Mada Trips"}" width="58" height="26"></header>
 <section class="main">
