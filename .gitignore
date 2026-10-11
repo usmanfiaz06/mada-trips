@@ -16,3 +16,7 @@ apps/mobile/assets/fonts/thmanyah/
 apps/mobile/src/theme/arabic-fonts.local.ts
 docs/app/prototype-app/fonts/thmanyah/
 docs/app/prototype-app/dist/index.thm.html
+
+# Test screenshots are regenerated on every run
+docs/app/prototype-app/test/shots*/
+apps/mobile/test/shots*/
