@@ -37,5 +37,19 @@ module.exports = ({ config }) => {
     out.plugins.push(['@sentry/react-native/expo', { organization: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT, url: 'https://sentry.io/' }]);
   }
 
+  // Directions from Things to do (src/lib/directions.ts): Android 11+ only lets canOpenURL see apps declared here.
+  out.plugins.push(withRideAppQueries);
+
   return out;
 };
+
+/** <queries> for the maps and ride apps we offer (Waze, Uber, Careem by their URL schemes). */
+function withRideAppQueries(config) {
+  const { withAndroidManifest } = require('expo/config-plugins');
+  return withAndroidManifest(config, (m) => {
+    const manifest = m.modResults.manifest;
+    const intent = (scheme) => ({ action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }], data: [{ $: { 'android:scheme': scheme } }] });
+    manifest.queries = [...(manifest.queries ?? []), { intent: ['waze', 'uber', 'careem'].map(intent) }];
+    return m;
+  });
+}

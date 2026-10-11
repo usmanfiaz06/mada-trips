@@ -1,5 +1,5 @@
 import {
-  AddTripIdeaRequest, BookThingRequest, ERROR_CODES, MOCK_ACTIVITIES, MOCK_EXPERIENCES, THINGS_ATTRIBUTIONS, ThingsQuery, dayLabel, filterActivities, kmBetween, liveStay, localClock,
+  AddTripIdeaRequest, BookThingRequest, RideThingRequest, ERROR_CODES, MOCK_ACTIVITIES, MOCK_EXPERIENCES, THINGS_ATTRIBUTIONS, ThingsQuery, dayLabel, filterActivities, kmBetween, liveStay, localClock,
   mockEvents, moodOf, nextPrayer, openState, t, todayIdeas, utcOffsetMin, type Activity, type ErrorCode, type ThingsResponse, type TodayWeather, type TripDetail, type TripIdea,
 } from '@mada/shared';
 import type { WireResponse } from '../api';
@@ -96,7 +96,8 @@ export const thingsMock: AreaMock = async (w, ctx) => {
   const place = /^\/places\/([^/]+)\/things$/.exec(path);
   const trip = /^\/trips\/([^/]+)\/(things|ideas)(?:\/([^/]+))?$/.exec(path);
   const book = path === '/things/book';
-  if (!place && !trip && !book) return null;
+  const ride = path === '/things/ride';
+  if (!place && !trip && !book && !ride) return null;
   if (!ctx.user) return err('UNAUTHORIZED');
   const raw = Object.fromEntries(new URLSearchParams(query).entries());
 
@@ -156,6 +157,34 @@ export const thingsMock: AreaMock = async (w, ctx) => {
     view.title = t('things.request.title', { name: th.title });
     view.detail = `${th.p.name} · ${who} · ${when}`;
     view.summary = `${who} · ${when}`;
+    await bookingMock({ method: 'POST', path: `/requests/${view.id}/messages`, token: w.token, body: { text: message } }, ctx);
+    return ok({ request: view, message }, 201);
+  }
+  if (ride && w.method === 'POST') {
+    const b = RideThingRequest.safeParse(w.body ?? {});
+    if (!b.success) return err('VALIDATION', Object.fromEntries(b.error.issues.map((i) => [i.path.join('.') || '_', i.message])));
+    let detail: TripDetail | null = null;
+    if (b.data.tripId) {
+      const got = await tripsMock({ method: 'GET', path: `/trips/${b.data.tripId}`, token: w.token }, ctx);
+      if (!got || got.status !== 200) return got ?? err('NOT_FOUND');
+      detail = (got.json as { trip: TripDetail }).trip;
+    }
+    const stay = detail ? liveStay(detail) : null;
+    if (b.data.pickup === 'hotel' && !stay) return err('VALIDATION', { pickupText: t('things.ride.whereNeeded') });
+    if (detail && (b.data.day < detail.startDate || (detail.endDate && b.data.day > detail.endDate))) return err('VALIDATION', { day: 'That day isn’t part of this trip' });
+    const th = findThing(b.data.placeId, b.data.ref);
+    if (!th) return err('NOT_FOUND');
+    const from = b.data.pickup === 'hotel' ? stay!.name : b.data.pickupText!.trim();
+    const n = b.data.travellers ?? Math.max(1, detail?.travellers.length ?? 1);
+    const who = n === 1 ? t('things.request.whoOne') : t('things.request.who', { n });
+    const day = dayLabel(b.data.day, { today: b.data.day });
+    const message = b.data.message ?? t('things.ride.message', { name: th.title, day, time: b.data.time, from, who });
+    const made = await bookingMock({ method: 'POST', path: '/requests', token: w.token, body: { kind: 'car', query: message, answers: {}, needs: {}, note: '', travellerIds: [], clientId: b.data.clientId } }, ctx);
+    if (!made || made.status >= 400) return made ?? err('INTERNAL');
+    const view = (made.json as { request: { id: string; title: string; detail: string; summary: string } }).request;
+    view.title = t('things.ride.requestTitle', { name: th.title });
+    view.detail = [`${from} → ${th.title}`, `${day} ${b.data.time}`, who].join(' · ');
+    view.summary = view.detail;
     await bookingMock({ method: 'POST', path: `/requests/${view.id}/messages`, token: w.token, body: { text: message } }, ctx);
     return ok({ request: view, message }, 201);
   }

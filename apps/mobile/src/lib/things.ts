@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import {
-  BookThingResponse, ThingsResponse, TripIdea, TripIdeasResponse, formatSar, localizeDigits, type Activity, type AddTripIdeaRequest, type BookThingRequest, type Experience,
+  BookThingResponse, RideThingResponse, ThingsResponse, TripIdea, TripIdeasResponse, formatSar, localizeDigits, type Activity, type AddTripIdeaRequest, type BookThingRequest, type Experience, type RideThingRequest,
   type ThingsQuery, type WhatsOn,
 } from '@mada/shared';
 import { z } from 'zod';
@@ -27,6 +27,7 @@ export const thingsApi = {
   forPlace: (id: string, q: ThingsQuery = {}) => request({ method: 'GET', path: `/places/${encodeURIComponent(id)}/things${qs(q)}` }, ThingsResponse),
   forTrip: (tripId: string, q: ThingsQuery = {}) => request({ method: 'GET', path: `/trips/${tripId}/things${qs(q)}` }, ThingsResponse),
   book: (b: BookThingRequest) => request({ method: 'POST', path: '/things/book', body: b }, BookThingResponse),
+  ride: (b: RideThingRequest) => request({ method: 'POST', path: '/things/ride', body: b }, RideThingResponse),
   ideas: (tripId: string) => request({ method: 'GET', path: `/trips/${tripId}/ideas` }, TripIdeasResponse),
   addIdea: (tripId: string, b: AddTripIdeaRequest) => request({ method: 'POST', path: `/trips/${tripId}/ideas`, body: b }, z.object({ idea: TripIdea })),
   removeIdea: (tripId: string, ideaId: string) => request({ method: 'DELETE', path: `/trips/${tripId}/ideas/${ideaId}` }, z.object({ ok: z.boolean() })),

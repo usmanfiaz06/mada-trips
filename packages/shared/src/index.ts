@@ -6,3 +6,4 @@ export * from './tokens';
 export * from './api';
 export * from './copy';
 export * from './schemas';
+export * from './cover-art';

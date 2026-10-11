@@ -22,6 +22,12 @@
         "NSContactsUsageDescription": "To show who’s already on Mada. Numbers are matched on this phone and never stored.",
         "NSAlarmKitUsageDescription": "To wake you before a flight with an alarm that rings even on silent. Only when you turn it on.",
         "CFBundleAllowMixedLocalizations": true,
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps",
+          "waze",
+          "uber",
+          "careem"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "1",

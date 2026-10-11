@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { t } from '../copy';
 import { HalalasAmount, Id, IsoDateTime, PhoneE164 } from './common';
 import { Circle, Message } from './social';
+import { COVER_COLORS, COVER_ICONS, COVER_PHOTO_IDS } from '../cover-art';
 
 /*
  * Circles (M4): circles and their chat, votes and splits, friends and follows, invites, tips and their moderation,
@@ -50,9 +51,48 @@ export type FriendView = z.infer<typeof FriendView>;
 
 /* ───────────── circles ───────────── */
 
-/** Covers are photos we ship; a circle never stores an uploaded picture. null is plain green. */
+/** The photos we ship for tips, plans and Discover. */
 export const CoverKey = z.enum(['istanbul', 'alula', 'riyadh']);
 export type CoverKey = z.infer<typeof CoverKey>;
+
+/*
+ * A circle's cover (cover-art.ts): one of Mada's drawings on a colour, one of the photos we ship, or a photo someone
+ * in the circle uploaded. An upload is checked before the rest of the circle sees it: until then (and if it's turned
+ * down) only the person who added it sees it; everyone else sees the cover it replaced. null is plain green.
+ */
+export const CoverIconKey = z.enum(COVER_ICONS);
+export const CoverColorKey = z.enum(COVER_COLORS);
+export const CoverPhotoKey = z.enum(COVER_PHOTO_IDS);
+export const CoverUploadStatus = z.enum(['pending', 'approved', 'rejected']);
+export type CoverUploadStatus = z.infer<typeof CoverUploadStatus>;
+export const CircleCover = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('icon'), icon: CoverIconKey, color: CoverColorKey }),
+  z.object({ kind: z.literal('photo'), id: CoverPhotoKey }),
+  z.object({
+    kind: z.literal('upload'), fileId: Id, status: CoverUploadStatus,
+    /** The picture: a path on the API server (a member reads it signed in; an invite page through its code). Null when it can't be shown. */
+    url: z.string().nullable().default(null),
+  }),
+]);
+export type CircleCover = z.infer<typeof CircleCover>;
+/** What the app sends: a cover as above (an upload names only its file), or an older app's photo key. */
+export const CircleCoverInput = z.preprocess(
+  (v) => (typeof v === 'string' ? { kind: 'photo', id: v } : v),
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('icon'), icon: CoverIconKey, color: CoverColorKey }),
+    z.object({ kind: z.literal('photo'), id: CoverPhotoKey }),
+    z.object({ kind: z.literal('upload'), fileId: Id }),
+  ]),
+);
+export type CircleCoverInput = z.input<typeof CircleCoverInput>;
+/** A stored cover, read leniently: an old row's bare key ("alula") is a photo; anything unknown is plain green. */
+export function readCover(v: unknown): CircleCover | null {
+  if (v == null) return null;
+  const r = CircleCover.safeParse(typeof v === 'string' ? { kind: 'photo', id: v } : v);
+  return r.success ? r.data : null;
+}
+export const UploadCoverResponse = z.object({ fileId: Id, status: CoverUploadStatus });
+export type UploadCoverResponse = z.infer<typeof UploadCoverResponse>;
 
 export const SysEvent = z.enum([
   'created', 'invited', 'joined', 'joinedByLink', 'left', 'removed', 'renamed', 'admin', 'pinned', 'cancelledInvite',
@@ -134,7 +174,7 @@ export const CircleMessage = Message.omit({ card: true, readAt: true, thread: tr
 export type CircleMessage = z.infer<typeof CircleMessage>;
 
 export const CircleSummary = Circle.extend({
-  cover: CoverKey.nullable(),
+  cover: CircleCover.nullable(),
   /** Where the circle is going, when someone said so. Never a guess. */
   dest: z.string().nullable(),
   /** A conversation between two friends, not a circle. */
@@ -169,7 +209,7 @@ export const CircleDetail = z.object({
 });
 export type CircleDetail = z.infer<typeof CircleDetail>;
 
-export const IncomingInvite = z.object({ inviteId: Id, from: PersonRef, circle: z.object({ id: Id, name: z.string(), cover: CoverKey.nullable(), memberCount: z.number().int() }), sentAt: IsoDateTime });
+export const IncomingInvite = z.object({ inviteId: Id, from: PersonRef, circle: z.object({ id: Id, name: z.string(), cover: CircleCover.nullable(), memberCount: z.number().int() }), sentAt: IsoDateTime });
 export type IncomingInvite = z.infer<typeof IncomingInvite>;
 export const CirclesResponse = z.object({
   circles: z.array(CircleSummary), incoming: z.array(IncomingInvite),
@@ -181,7 +221,7 @@ export const CircleResponse = CircleDetail;
 
 export const CreateCircleRequest = z.object({
   name: z.string().trim().min(2).max(40),
-  cover: CoverKey.nullable().default(null),
+  cover: CircleCoverInput.nullable().default(null),
   dest: z.string().trim().max(40).nullable().optional(),
   invite: z.array(Id).max(30).default([]),
 });
@@ -190,7 +230,7 @@ export type CreateCircleRequest = z.input<typeof CreateCircleRequest>;
 export const UpdateCircleRequest = z.object({
   name: z.string().trim().min(2).max(40),
   muted: z.boolean(),
-  cover: CoverKey.nullable(),
+  cover: CircleCoverInput.nullable(),
   dest: z.string().trim().min(1).max(40),
   pin: z.object({ kind: z.literal('plan'), id: z.string().max(40) }).nullable(),
   /** Mark the chat as read, up to now. */
@@ -290,7 +330,7 @@ export const InvitePreview = z.object({
   status: z.enum(['open', 'expired', 'cancelled', 'full']),
   kind: z.enum(['circle', 'mada']),
   from: PersonRef,
-  circle: z.object({ name: z.string(), cover: CoverKey.nullable(), members: z.array(PersonRef), memberCount: z.number().int(), trip: z.string().nullable() }).nullable(),
+  circle: z.object({ name: z.string(), cover: CircleCover.nullable(), members: z.array(PersonRef), memberCount: z.number().int(), trip: z.string().nullable() }).nullable(),
 });
 export type InvitePreview = z.infer<typeof InvitePreview>;
 export const AcceptInviteResponse = z.object({ circleId: Id.nullable(), friendId: Id.nullable(), already: z.boolean() });
