@@ -13,6 +13,7 @@ import {
   rejectRefund, revealPassport, saveChecklist, sendAgentReply, sendQuote, unblockTraveller,
 } from "@/lib/app/desk/adapters";
 import { pushPlan } from "@/lib/app/desk/disruptions";
+import { confirmContactByCall, sendFlightQuote } from "@/lib/app/desk/flight-quotes";
 import { decideModeration } from "@/lib/app/desk/moderation";
 import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
@@ -168,6 +169,28 @@ export async function quoteAction(_: ActionState, fd: FormData): Promise<ActionS
     await sendQuote(u, uuid(fd, "id"), { lines, cancellation: str(fd, "cancellation") || null, holdHours: Number(str(fd, "holdHours") || 0) });
     return done("Quote sent");
   } catch (e) { return toState(e); }
+}
+
+/** Fares for a flight request from the quote builder (components/desk/flight-quote.tsx): amounts in SAR, the hold in Riyadh time. */
+export async function flightQuoteAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    let raw: { holdUntil?: string; pnr?: string; message?: string; options?: { prices?: { sar?: string; amount?: number }[] }[] };
+    try { raw = JSON.parse(str(fd, "payload") || "{}"); } catch { throw new DeskError("Check the fares"); }
+    const options = (raw.options ?? []).map((o, i) => ({
+      ...o,
+      prices: (o.prices ?? []).map((p) => {
+        try { return { ...p, amount: toHalalas(String(p.sar ?? "")) }; } catch { throw new DeskError(`Fare ${i + 1}: check each traveller's price`); }
+      }),
+    }));
+    await sendFlightQuote(u, uuid(fd, "id"), { options: options as never, holdUntil: riyadh(String(raw.holdUntil ?? "")).toISOString(), pnr: raw.pnr || null, message: raw.message || null });
+    return done(options.length === 1 ? "Fare sent" : "Fares sent");
+  } catch (e) { return toState(e); }
+}
+
+/** The contact number on an order isn't verified: the agent called it and the traveller confirmed. Audited. */
+export async function confirmCallAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try { const u = await requirePerm("desk.act"); await confirmContactByCall(u, uuid(fd, "id")); return done("Marked confirmed by call"); } catch (e) { return toState(e); }
 }
 
 export async function checklistAction(_: ActionState, fd: FormData): Promise<ActionState> {

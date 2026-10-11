@@ -12,6 +12,7 @@ import { AccountScreen, VERSION } from '@/components/wallet/AccountScreen';
 import { Group, Row } from '@/components/wallet/ui';
 import { buzz } from '@/lib/haptics';
 import { dirSign, t } from '@/lib/i18n';
+import { sitePage } from '@/lib/site';
 import { toast } from '@/lib/toast';
 import { useTrips } from '@/lib/wallet';
 import { nextTrip } from '@/lib/wallet-model';
@@ -53,6 +54,12 @@ export default function Help() {
       <Group label={t('help.legal')}>
         <Row value={t('help.terms')} onPress={() => router.push({ pathname: '/account/legal', params: { doc: 'terms' } })} testID="help-terms" />
         <Row value={t('help.privacy')} onPress={() => router.push({ pathname: '/account/legal', params: { doc: 'privacy' } })} />
+      </Group>
+      <Group label={t('about.title')}>
+        {(['privacy', 'terms', 'support', 'delete-account'] as const).map((page) => (
+          <Row key={page} value={t(page === 'privacy' ? 'about.privacy' : page === 'terms' ? 'about.terms' : page === 'support' ? 'about.support' : 'about.delete')} sub={t('about.web')}
+            onPress={() => { Linking.openURL(sitePage(page)).catch(() => {}); }} testID={`about-${page}`} />
+        ))}
       </Group>
       <T v="tiny" style={{ textAlign: 'center' }}>{t('help.version', { version: VERSION })}</T>
       <Sheet visible={call} onClose={() => setCall(false)} label={t('help.callTitle')}>

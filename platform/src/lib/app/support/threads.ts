@@ -1,4 +1,5 @@
 import "server-only";
+import { messageAttachment } from "../file-links";
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
   SupportCard, supportIntent, t, type FileInfo, type SendSupportMessageRequest, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic,
@@ -33,7 +34,9 @@ export function toMessage(m: MessageRow): SupportMessage {
   const author: SupportMessage["author"] = m.authorKind === "user" ? { kind: "user", id: m.authorUserId!, name: m.authorName ?? "" }
     : m.authorKind === "agent" ? { kind: "agent", id: m.authorOpsUserId ?? "desk", name: m.authorName ?? "", photoUrl: null }
       : { kind: "mada" };
-  return { id: m.id, threadId: m.threadId, author, body: m.body, card, attachment: _file ?? null, clientId: _clientId ?? null, createdAt: m.createdAt.toISOString() };
+  // A file the traveller sent (_file) or one an agent attached on the desk, with a short-lived signed link to open it.
+  const file = messageAttachment(m.card);
+  return { id: m.id, threadId: m.threadId, author, body: m.body, card, attachment: file ?? _file ?? null, clientId: _clientId ?? null, createdAt: m.createdAt.toISOString() };
 }
 
 async function unreadFor(threadIds: string[], readAt: Map<string, Date | null>): Promise<Map<string, number>> {

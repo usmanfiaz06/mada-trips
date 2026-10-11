@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import {
-  DESK_PRICES, DESTINATIONS, PLANS, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
+  DESK_PRICES, DESTINATIONS, PLANS, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
   type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -12,6 +12,7 @@ import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, today, travellersOf } from "./common";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
+import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-requests";
 
 /*
  * The order sheet: lines, the all-in total, promo code, Mada credit, instalments and the cancellation rule worked out
@@ -42,6 +43,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   let hold: Date | null = null;
   let travellers: Person[] = [];
   let place = "";
+  let kind: OrderPreview["kind"] = d.kind;
   const offerRows: OfferRow[] = [];
   const snapshot: Record<string, unknown> = { draft: d };
 
@@ -86,7 +88,8 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const s = row.payload as unknown as StayOption;
     const end = new Date(Date.parse(`${s.checkIn}T00:00:00Z`) + s.nights * 86_400_000).toISOString().slice(0, 10);
     lines = [line("stay", "stay", t("pay.line.hotel", { rooms: s.roomsLabel, dates: rangeLabel(s.checkIn, end), count: s.nights }), s.total.amount)];
-    rule = t("pay.rule.stay", { date: freeUntilLabel(s.checkIn) });
+    // A Hotelbeds room carries the hotel's own rule (worked out from its cancellation policies); the catalogue uses ours.
+    rule = row.supplier === "hotelbeds" ? s.cancellation : t("pay.rule.stay", { date: freeUntilLabel(s.checkIn) });
     title = s.name;
     photo = s.photo;
     place = DESTINATIONS[(row.search as { destination: string }).destination]?.name ?? "";
@@ -113,7 +116,34 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     if (!r) throw new AppError("NOT_FOUND");
     const [q] = await db.select().from(appQuotes).where(and(eq(appQuotes.requestId, r.id), eq(appQuotes.status, "open"))).orderBy(sql`${appQuotes.createdAt} DESC`).limit(1);
     if (!q) throw new AppError("NOT_FOUND");
-    const det = r.details as { askKind?: string; title?: string };
+    const det = r.details as { askKind?: string; title?: string; search?: FlightSearch | null };
+    const fq = flightQuoteOf(q.offerSnapshot);
+    if (fq) {
+      // A fare the desk is holding (flights by request): an agent issues the tickets, so it's authorised now and
+      // captured when they do, like any flight booking.
+      const o = pickOption(fq, d.optionId);
+      if (!o) throw new AppError("NOT_FOUND");
+      travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds) : [];
+      const search = det.search ?? { destination: null, destinationName: null, from: null, depart: null, return: null, cabin: null, carrier: null };
+      const f = fareToFlightOption(o, (q.expiresAt ?? new Date(Date.now() + 3600_000)).toISOString(), q.id);
+      const n = o.prices.filter((p) => p.type !== "infant").length;
+      const infants = o.prices.filter((p) => p.type === "infant");
+      const how = f.stop ? t("pay.line.oneStop") : t("pay.line.direct");
+      const suffix = `${o.cabin !== "economy" ? ` · ${t(`cal.cabin.${o.cabin}` as CopyKey)}` : ""}${f.back ? "" : ` · ${t("pay.line.oneWay")}`}`;
+      lines = [line("flight", "flight", `${tn("pay.line.flight", n, { airline: o.airline, how })}${suffix}`, o.prices.filter((p) => p.type !== "infant").reduce((a, p) => a + p.amount.amount, 0))];
+      if (infants.length) lines.push(line("infants", "flight", tn("pay.line.infants", infants.length), infants.reduce((a, p) => a + p.amount.amount, 0)));
+      rule = o.refundable ? t("pay.rule.refund", { fee: o.refundRule.replace(/^Refund minus /, "") }) : t("pay.rule.noRefund", { fee: o.changeRule });
+      const dest = search.destination ? DESTINATIONS[search.destination] ?? null : null;
+      place = cityOf(search) || o.legs[0]!.to;
+      title = `${place} · ${rangeLabel(f.out.date, f.back?.date ?? null)}`;
+      photo = dest?.photo ?? "riyadh-kingdom-centre";
+      hold = q.expiresAt;
+      kind = "trip";
+      snapshot.flight = f;
+      snapshot.quotedFlight = o;
+      snapshot.search = { ...search, destination: search.destination ?? "", depart: f.out.date, return: f.back?.date ?? null };
+      snapshot.quote = { id: q.id, requestId: r.id, optionId: o.id, total: o.total.amount, pnr: (q.offerSnapshot as { pnr?: string | null } | null)?.pnr ?? null };
+    } else {
     lines = [line("quote", "doc", det.askKind === "visa" ? t("pay.line.quoteVisa") : t("pay.line.quote"), q.total)];
     rule = t("pay.rule.quote");
     title = det.title ?? r.summary;
@@ -123,6 +153,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     place = title;
     hold = q.expiresAt;
     snapshot.quote = { id: q.id, requestId: r.id, total: q.total };
+    }
   } else if (d.kind === "share") {
     // Your share of a circle's split: you must be in the circle, the share must be yours, and not yet settled.
     if (!isUuid(d.circleId) || !isUuid(d.messageId)) throw new AppError("NOT_FOUND");
@@ -161,13 +192,13 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   const household = travellers.length ? await householdOf(ownerId) : [];
   const missing = travellers.filter((p) => !household.find((h) => h.id === p.id)?.passport).map((p) => p.id);
   const preview: OrderPreview = {
-    kind: d.kind, title, photo, lines, subtotal: money(subtotal),
+    kind, title, photo, lines, subtotal: money(subtotal),
     promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
     credit: { balance: money(balance), used: money(creditUsed) }, total: money(total), rule, agent,
     holdExpiresAt: hold ? hold.toISOString() : null,
     instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id),
-    missingPassports: d.kind === "trip" || d.kind === "package" ? missing : [],
+    missingPassports: kind === "trip" || kind === "package" ? missing : [],
   };
   return { preview, snapshot, travellers, offerRows, place };
 }

@@ -1,15 +1,16 @@
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  CreateOrderBody, demoPassportTarget, entryChecks, money, seatsFor, t,
+  CreateOrderBody, DESTINATIONS, demoPassportTarget, normalizeContactPhone, entryChecks, money, seatsFor, t,
   type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appPayments, appRequests, appUsers } from "@/db/app-schema";
+import { appPayments, appQuotes, appRequests, appUsers } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
-import { bookingSuppliers, agentFor, autopilotOn, householdOf, isUuid, today } from "./common";
+import { randomInt } from "node:crypto";
+import { bookingSuppliers, agentFor, autopilotOn, householdOf, isUuid, newRef, today } from "./common";
 import {
   DEMO_FARE_RISE_EACH, acceptFare, acceptOrder, answerQuestion, askQuestion, cancelOrder, confirmOrder, failTicketing, issueTickets, lockPrice, orderEvent,
   priceChanged, retryByPhone, returnCredit, startIssuing, type OrderRow,
@@ -17,6 +18,8 @@ import {
 import { authorize, chargeFor } from "./payments";
 import { spendCredit } from "../credit";
 import { priceDraft } from "./pricing";
+import { autoBookStay } from "../suppliers/hotelbeds/bookings";
+import { bookingRequiresPhone } from "../switches";
 
 /*
  * Orders: POST /orders authorises the payment and hands the booking to the desk ('pending_agent'); GET /orders/:id is
@@ -37,7 +40,8 @@ export function orderView(o: OrderRow, now = Date.now()): OrderView {
     id: o.id, kind: o.kind as OrderView["kind"], status: o.status as OrderView["status"], step: Math.min(3, o.step),
     title: snap.title ?? "", place: snap.place ?? "", depart: f?.out.date ?? null, departTime: f?.out.dep ?? null, from: f?.out.from ?? null, oneway: f ? !f.back : false,
     photo: snap.photo ?? "istanbul-galata", carrier: f?.carrier ?? null, airline: f?.airline ?? null, flightNumber: f?.out.flightNumber ?? null, cabin: f?.cabin ?? null,
-    seats: f ? seatsFor(o.travellerIds.length, f.cabin) : [], travellerIds: o.travellerIds,
+    // Quoted fares get their seats from the airline at check-in: none are invented here.
+    seats: f && !(o.snapshot as { quotedFlight?: unknown }).quotedFlight ? seatsFor(o.travellerIds.length, f.cabin) : [], travellerIds: o.travellerIds,
     lines: o.lines as OrderView["lines"], total: money(o.total), extra: money(o.extra), plan: o.plan as OrderView["plan"], paymentLabel: o.paymentLabel, creditUsed: money(o.creditUsed),
     bundle: !!snap.bundle, ref: o.ref, agent: o.agentName ? { name: o.agentName } : null, confirmedBy: o.confirmedByName ? { name: o.confirmedByName } : null,
     question: q && (o.status === "needs_answer" || q.calling) && q.answer !== "yes" ? { text: q.text, options: q.options, calling: !!q.calling } : null,
@@ -63,8 +67,16 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   const prior = await db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.idempotencyKey, body.idempotencyKey)));
   if (prior[0]) return outcomeOf(prior[0]);
   // Saudi travel needs a reachable number: accounts that began with Apple, Google or email verify one first (AUTH.md).
+  // The beta (APP_BOOKING_REQUIRES_PHONE=no): an account without one gives a number to call instead, kept on the order
+  // as not verified; the desk calls it to confirm (switches.ts).
   const [owner] = await db.select({ phone: appUsers.phone }).from(appUsers).where(eq(appUsers.id, ownerId));
-  if (!owner?.phone) throw new AppError("PHONE_REQUIRED");
+  let contact: { phone: string; verified: false } | null = null;
+  if (!owner?.phone) {
+    if (bookingRequiresPhone()) throw new AppError("PHONE_REQUIRED");
+    const phone = body.contactPhone ? normalizeContactPhone(body.contactPhone) : null;
+    if (!phone) throw new AppError("VALIDATION", { copy: "beta.contact.needed", fields: { contactPhone: body.contactPhone ? "invalid" : "missing" } });
+    contact = { phone, verified: false };
+  }
 
   // The fare moved at the airline while the traveller looked (demo: once, SAR 140).
   const bump = demo.has("priceUp") && body.draft.kind === "trip" ? 14_000 : 0;
@@ -75,7 +87,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     return { outcome: "price_changed", previousTotal: money(body.expectedTotal), preview, changedBy: money(preview.total.amount - body.expectedTotal) };
   }
   // A passport that can't make the trip blocks the booking; everything else was answered in Ask.
-  if (body.draft.kind === "trip" || body.draft.kind === "stay") {
+  if ((body.draft.kind === "trip" || body.draft.kind === "stay" || priced.snapshot.quotedFlight) && DESTINATIONS[(priced.snapshot.search as { destination?: string } | undefined)?.destination ?? ""]) {
     const search = priced.snapshot.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
     const depart = search.depart ?? search.checkIn ?? today();
     const checks = entryChecks({ destination: search.destination, travellers: priced.travellers, depart, return: search.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has("passportProblem") ? demoPassportTarget(await householdOf(ownerId)) : null } });
@@ -90,6 +102,9 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   const charge = await chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo);
   const agentName = await agentFor(ownerId);
   const requestId = body.draft.kind === "quote" ? body.draft.requestId : null;
+  // A fare the desk quoted for a flight request: the request itself goes with the order to the desk (no new row).
+  const quoted = priced.snapshot.quote as { id: string; requestId: string; optionId?: string; pnr?: string | null } | undefined;
+  const quotedFlight = !!priced.snapshot.quotedFlight && !!quoted;
   const f = priced.snapshot.flight as FlightOption | undefined;
 
   const res = await db.transaction(async (tx) => {
@@ -98,11 +113,15 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     if (pay?.status === "declined" || pay?.status === "failed") return { outcome: "declined" as const };
     const status = pay?.status === "requires_action" ? "requires_action" : agentKind ? "pending_agent" : "paid_now";
     let deskRequest: string | null = requestId;
-    if (agentKind) {
+    if (agentKind && quotedFlight) {
+      await tx.update(appRequests).set({ status: "with_agent", promisedBy: new Date(Date.now() + 30 * 60_000), updatedAt: new Date(),
+        ...(contact ? { details: sql`${appRequests.details} || ${JSON.stringify({ contactPhone: contact.phone, contactVerified: false })}::jsonb` } : {}) }).where(eq(appRequests.id, quoted!.requestId));
+      await tx.update(appQuotes).set({ status: "accepted" }).where(eq(appQuotes.id, quoted!.id));
+    } else if (agentKind) {
       const [r] = await tx.insert(appRequests).values({
         ownerId, kind: preview.kind === "stay" ? "stay" : preview.kind === "package" ? "trip" : "flight", status: "with_agent", summary: preview.title,
         travellerIds: preview.travellerIds, agentName, promisedBy: new Date(Date.now() + 15 * 60_000),
-        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order" },
+        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
       }).returning({ id: appRequests.id });
       deskRequest = r!.id;
     }
@@ -110,7 +129,8 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     const [o] = await tx.insert(appOrders).values({
       ownerId, kind: preview.kind, status: status === "paid_now" ? "pending_agent" : status, step: 0, idempotencyKey: body.idempotencyKey,
       draft: body.draft as Record<string, unknown>,
-      snapshot: { ...priced.snapshot, flightSupplierId: supplierId ?? null, place: priced.place, photo: preview.photo, title: preview.title, preview },
+      snapshot: { ...priced.snapshot, flightSupplierId: supplierId ?? null, place: priced.place, photo: preview.photo, title: preview.title, preview, ...(contact ? { contact } : {}) },
+      supplierRef: quoted?.pnr ?? null,
       lines: preview.lines, travellerIds: preview.travellerIds, subtotal: preview.subtotal.amount, discount: preview.promo?.status === "applied" ? preview.promo.discount.amount : 0,
       promo: preview.promo?.status === "applied" ? preview.promo.code : null, creditUsed: preview.credit.used.amount, total: preview.total.amount, plan: charge.instalments > 1 ? body.plan : "full",
       paymentLabel: charge.label, paymentMethod: { method: body.payment.method === "new_card" ? "new_card" : body.payment.method, cardId: body.payment.method === "card" ? body.payment.cardId : null, plan: body.plan, provider: charge.provider },
@@ -128,6 +148,8 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     const done = await confirmOrder(res.order.id, { name: agentName });
     return { outcome: "paid", order: orderView(done) };
   }
+  // Stays in live mode (APP_STAYS_MODE=live) are booked on Hotelbeds now; in request mode the desk books them.
+  if (res.order.kind === "stay") await autoBookStay(res.order.id);
   return outcomeOf(res.order);
 }
 
@@ -246,8 +268,15 @@ async function step(o: OrderRow): Promise<OrderRow | null> {
       case "price_locked":
         if (demo.has("ticketingFails") && !doneSet.has("ticketing")) { await mark("ticketing"); return await failTicketing(o.id, agent); }
         return o.kind === "trip" ? await startIssuing(o.id, agent) : await confirmOrder(o.id, agent);
-      case "issuing":
+      case "issuing": {
+        // A quoted fare: the mock desk records a PNR and a ticket number each, as a person would on the desk.
+        const snap = o.snapshot as { quotedFlight?: unknown; tickets?: string[] };
+        if (snap.quotedFlight && !snap.tickets?.length) {
+          const tickets = o.travellerIds.map(() => `065${String(randomInt(1e9, 1e10))}`);
+          await db.update(appOrders).set({ supplierRef: o.supplierRef ?? newRef(), snapshot: { ...(o.snapshot as object), tickets } }).where(eq(appOrders.id, o.id));
+        }
         return await issueTickets(o.id, agent);
+      }
       default:
         return null;
     }

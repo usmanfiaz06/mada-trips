@@ -1,0 +1,58 @@
+/**
+ * Strings for rooms and airport pickups booked through Hotelbeds: the cancellation rule and room notes the server
+ * writes on a stay option (hb.*), and the Airport pickup screen on a trip (pickup.*). Spread into the catalogue in
+ * en.ts, so the copy lint covers every line here.
+ */
+export const transfersCopy = {
+  // ───────────── a room's rule and notes (server) ─────────────
+  'hb.cancel.free': 'Free to cancel until {date}. After that, {fee}.',
+  'hb.cancel.freeAny': 'Free to cancel before check-in.',
+  'hb.cancel.none': 'Not refundable once booked.',
+  'hb.cancel.feeSar': 'SAR {amount}',
+  'hb.cancel.feeAll': 'the full price',
+  'hb.board.RO': 'Room only.',
+  'hb.board.BB': 'Breakfast included.',
+  'hb.board.HB': 'Breakfast and dinner included.',
+  'hb.board.FB': 'All meals included.',
+  'hb.board.AI': 'All inclusive.',
+  'hb.board.other': '{board}.',
+  'hb.note.cityTax': 'Local tax of SAR {amount} is paid at the hotel.',
+  'hb.gone': 'That room just went. Pick another and we hold it for you.',
+  'hb.stars': '{n}-star',
+
+  // ───────────── airport pickup (trip) ─────────────
+  'pickup.entry.title': 'Airport pickup',
+  'pickup.entry.sub': 'A driver meets you at {airport} and takes you to {hotel}.',
+  'pickup.entry.cta': 'See pickups',
+  'pickup.title': 'Airport pickup',
+  'pickup.sub': '{airport} to {hotel} · {day}, {time}',
+  'pickup.people.one': 'For {count} person',
+  'pickup.people.other': 'For {count} people',
+  'pickup.private': 'Private',
+  'pickup.shared': 'Shared',
+  'pickup.privateSub': 'Just your group. The driver follows your flight.',
+  'pickup.sharedSub': 'A shuttle with other travellers, a few stops on the way.',
+  'pickup.upTo': 'Up to {n} people',
+  'pickup.minutes': 'About {n} min',
+  'pickup.total': 'SAR {amount} all in',
+  'pickup.freeCancel': 'Free to cancel until {date}.',
+  'pickup.noCancel': 'Not refundable once booked.',
+  'pickup.choose': 'Choose',
+  'pickup.sendTitle': 'Send this to {agent}?',
+  'pickup.sendBody': '{agent} books it and sends you the price to pay here. Nothing is charged yet.',
+  'pickup.send': 'Send to Mada',
+  'pickup.keep': 'Not now',
+  'pickup.sent': 'Sent. {agent} books it and replies here.',
+  'pickup.withAgent': 'With {agent}',
+  'pickup.withAgentBody': '{agent} is booking your {vehicle}. You see the driver here the day before.',
+  'pickup.seeRequest': 'See the request',
+  'pickup.none': 'No pickups at that hour yet.',
+  'pickup.noneBody': 'Tell us and we arrange one by hand.',
+  'pickup.ask': 'Ask Mada',
+  'pickup.noFlight': 'We need your flight to know when you land.',
+  'pickup.noHotel': 'Tell us where you are staying first.',
+  'pickup.down': 'We can’t see pickups right now. Try again in a minute.',
+  'pickup.retry': 'Try again',
+  'pickup.note': 'Prices include the driver waiting for a late flight.',
+  'request.title.pickup': 'Airport pickup in {city}',
+} as const;

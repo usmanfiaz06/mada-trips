@@ -128,7 +128,9 @@ export async function searchStays(ownerId: string, input: StaySearchRequest, dem
   if (!CATALOGUE_HOTELS[dest.key] && supplierMode("hotels") === "mock") return { ...base, outcome: "by_hand", options: [] };
   if (demo.has("noResults")) return { ...base, outcome: "none", options: [] };
   const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n]);
-  const { value: offers } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n) }));
+  // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
+  const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
+  const { value: offers } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]));
   const options: StayOption[] = [];
   for (const h of offers) {
     const [row] = await db.insert(appOffers).values({

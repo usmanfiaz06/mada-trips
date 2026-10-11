@@ -1,12 +1,12 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
-  CreateCircleRequest, CoverKey, SharedCard, planById, t,
+  CreateCircleRequest, CoverKey, REACTIONS, SharedCard, planById, t,
   type CircleDetail, type CircleMessage, type CircleSummary, type IncomingInvite, type MessageAuthor, type SysEvent, type UpdateCircleRequest,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appCircleMembers, appCircles, appMessages } from "@/db/app-schema";
-import { appCircleDetails, appCircleInvites, appCircleSplitShares, appCircleVotes } from "@/db/app-schema-circles";
+import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitShares, appCircleVotes } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { circleTrip, err, graphOf, isBlocked, liveUser, notify, peopleByIds, relationOf, type Db } from "./common";
@@ -67,6 +67,13 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
   const votes = voteIds.length ? await tx.select().from(appCircleVotes).where(inArray(appCircleVotes.messageId, voteIds)).orderBy(asc(appCircleVotes.createdAt)) : [];
   const shares = splitIds.length ? await tx.select().from(appCircleSplitShares).where(inArray(appCircleSplitShares.messageId, splitIds)) : [];
   const people = await peopleByIds(rows.map((r) => r.authorUserId).filter((x): x is string => !!x), tx);
+  const reacts = await tx.select().from(appCircleReactions).where(inArray(appCircleReactions.messageId, rows.map((r) => r.id))).orderBy(asc(appCircleReactions.createdAt));
+  const order = REACTIONS as readonly string[];
+  const reactionsOf = (mid: string) => {
+    const mine = reacts.filter((x) => x.messageId === mid);
+    return [...new Set(mine.map((x) => x.emoji))].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+      .map((emoji) => ({ emoji, ids: mine.filter((x) => x.emoji === emoji).map((x) => x.userId) }));
+  };
   return rows.map((r) => {
     const c = (r.card ?? {}) as Card;
     const kind = (["sys", "vote", "split", "card", "mada"].includes(String(c.t)) ? c.t : r.authorKind === "mada" ? "mada" : "text") as CircleMessage["kind"];
@@ -75,7 +82,7 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
       : r.authorKind === "agent" ? { kind: "agent", id: r.authorOpsUserId ?? "agent", name: r.authorName ?? "", photoUrl: null } : { kind: "mada" };
     const msg: CircleMessage = {
       id: r.id, circleId: r.threadId, author, body: r.body, createdAt: r.createdAt.toISOString(), kind,
-      sys: null, vote: null, split: null, card: null, mada: null,
+      sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(r.id),
     };
     if (kind === "sys") msg.sys = { event: c.event as SysEvent, actor: (c.actor as string | null) ?? null, users: (c.users as string[]) ?? [], text: (c.text as string | null) ?? null, amount: (c.amount as number | null) ?? null };
     if (kind === "vote") {

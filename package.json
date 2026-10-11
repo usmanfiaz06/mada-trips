@@ -18,7 +18,9 @@
     "e2e:web": "npm run e2e:web -w @mada/mobile",
     "mobile:doctor": "npm run doctor -w @mada/mobile --",
     "store:screenshots": "npm run store:screenshots -w @mada/mobile --",
-    "setup": "npm install && npm --prefix platform ci"
+    "setup": "npm install && npm --prefix platform ci",
+    "app:preflight": "npm --prefix platform run app:preflight",
+    "app:jobs": "npm --prefix platform run app:jobs --"
   },
   "devDependencies": {
     "eslint": "9.39.5",

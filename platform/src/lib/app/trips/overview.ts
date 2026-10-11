@@ -11,6 +11,7 @@ import { loadBase, withClock } from "./core";
 import { listRefunds } from "./money";
 import { isOpen, listRequests } from "./requests";
 import { listTracked } from "./status";
+import { plannedFor } from "../activities/trips";
 
 /* GET /trips: the clock, the trip Today is about, the lists on the Trips tab, and what the bell needs. */
 
@@ -64,8 +65,8 @@ export async function openRequestCount(ownerId: string, tripId: string) {
 }
 
 export async function itinerary(ownerId: string, trip: TripDetail): Promise<ItineraryResponse> {
-  const requests = await listRequests(ownerId, trip.id);
-  const days = buildItinerary({ trip, requests, picks: trip.picks });
+  const [requests, planned] = await Promise.all([listRequests(ownerId, trip.id), plannedFor(ownerId, trip.id)]);
+  const days = buildItinerary({ trip, requests, picks: trip.picks, planned });
   const out = outSegment(trip);
   return {
     tripId: trip.id, title: trip.city, datesLong: rangeLong(trip.startDate, trip.endDate), days, events: calendarEvents(trip, days),

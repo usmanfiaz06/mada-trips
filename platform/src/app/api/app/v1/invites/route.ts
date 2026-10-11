@@ -17,7 +17,10 @@ export const GET = route(async (req) => {
 export const POST = route(async (req) => {
   const { userId } = await authenticate(req);
   const input = await body(req, CreateInviteRequest);
-  if ("link" in input) return json({ invite: null, link: await linkFor(userId, null), onMada: null });
+  if ("link" in input) {
+    const { link: _l, ...opts } = input;
+    return json({ invite: null, link: await linkFor(userId, null, opts), onMada: null });
+  }
   const r = await inviteByPhone(userId, input, requestContext(req).ipHash);
   return json({ ...r, link: null }, r.invite ? 201 : 200);
 });

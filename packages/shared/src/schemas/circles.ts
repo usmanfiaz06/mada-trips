@@ -308,8 +308,8 @@ export type CircleEventsResponse = z.infer<typeof CircleEventsResponse>;
 
 /** The reactions a message can take. A short, warm set; no free-form emoji. */
 export const REACTIONS = ['👍', '❤️', '😂', '😮', '🙏', '🔥'] as const;
-export const ReactRequest = z.object({ emoji: z.enum(REACTIONS) });
-export type ReactRequest = z.infer<typeof ReactRequest>;
+export const ReactRequest = z.object({ emoji: z.enum(REACTIONS), on: z.boolean().default(true) });
+export type ReactRequest = z.input<typeof ReactRequest>;
 
 /* ───────────── tips ───────────── */
 

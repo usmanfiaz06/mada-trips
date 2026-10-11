@@ -15,7 +15,9 @@ import { resilienceCopy } from './resilience';
 import { placesCopy } from './places';
 import { languageCopy } from './language';
 import { authCopy } from './auth';
+import { transfersCopy } from './transfers';
 import { betaCopy } from './beta';
+import { storeCopy } from './store';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -36,8 +38,12 @@ export const en = {
   ...languageCopy,
   // Sign-in through Supabase Auth, Verify your phone, sign-in methods: packages/shared/src/copy/auth.ts
   ...authCopy,
+  // Rooms and airport pickups through Hotelbeds: packages/shared/src/copy/transfers.ts
+  ...transfersCopy,
   // The beta: flights by request, a contact number at payment, files from the desk, a Circles pause: packages/shared/src/copy/beta.ts
   ...betaCopy,
+  // Help › About Mada Trips: the full policies on madatrips.sa: packages/shared/src/copy/store.ts
+  ...storeCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

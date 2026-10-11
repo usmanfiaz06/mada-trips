@@ -774,7 +774,7 @@ export const walletCopy = {
   'legal.privacy.3h': 'Who sees it',
   'legal.privacy.3b': 'People at Mada who work on your trips, and the airlines, hotels and embassies we book with. We never sell it.',
   'legal.privacy.4h': 'Where it’s kept',
-  'legal.privacy.4b': 'Passports are encrypted. Everything is stored in Saudi Arabia, under the PDPL, Saudi Arabia’s privacy law.',
+  'legal.privacy.4b': 'Passports are encrypted. For now our database is hosted in South Korea by Supabase, with the safeguards the PDPL, Saudi Arabia’s privacy law, asks for. We plan to move it to the Kingdom. The full policy is at madatrips.sa/privacy.',
   'legal.privacy.5h': 'Your rights',
   'legal.privacy.5b': 'Download it, correct it or delete it, any time, from Privacy in the app.',
 

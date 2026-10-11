@@ -1,4 +1,5 @@
 import "server-only";
+import { contactOf } from "./flight-quotes";
 import { cache } from "react";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
@@ -35,7 +36,9 @@ async function sources(now: Date) {
     const st: OrderStage = o.stage;
     if (st === "awaiting") {
       const opened = o.desk.question?.answeredAt ? new Date(o.desk.question.answeredAt) : o.createdAt;
-      raw.push({ kind: "order", id: o.id, title: o.summary, note: "Confirm the order", sub: `${o.ref} · ${o.userName}`, userId: o.ownerId, userName: o.userName, href: `/adminwork/desk/orders/${o.id}`, sla: slaFor("order", opened, now), amount: o.total });
+      const call = contactOf(o.details);
+      raw.push({ kind: "order", id: o.id, title: o.summary, note: "Confirm the order", sub: `${o.ref} · ${o.userName}`, userId: o.ownerId, userName: o.userName, href: `/adminwork/desk/orders/${o.id}`, sla: slaFor("order", opened, now), amount: o.total,
+        tag: call && !call.confirmedAt ? "Phone not verified" : null });
     } else if (st === "failed") {
       raw.push({ kind: "ticketing", id: o.id, title: o.summary, note: "Ticketing failed", sub: `${o.ref} · ${o.userName}${o.order?.problem ? ` · ${o.order.problem}` : ""}`,
         userId: o.ownerId, userName: o.userName, href: `/adminwork/desk/orders/${o.id}`, sla: slaFor("ticketing", o.order?.updatedAt ?? o.updatedAt, now), amount: o.total });
@@ -51,7 +54,7 @@ async function sources(now: Date) {
       const place = r.kind === "destination" ? destinationOf(r.details) : null;
       raw.push({ kind: "request", id: r.id, title: place ? `${place.name}${place.country ? `, ${place.country}` : ""}` : r.summary, note: "Needs a quote", sub: `${r.ref} · ${r.userName}${place?.airports.length ? ` · ${place.airports.join(" ")}` : ""}`,
         userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.createdAt, now, { due: r.promisedBy }), amount: null,
-        tag: place ? "Destination" : null, link: place ? { label: "City guide", href: place.guideUrl } : null });
+        tag: place ? "Destination" : r.kind === "flight" ? "Flights" : r.kind === "activity" ? "Activity" : null, link: place ? { label: "City guide", href: place.guideUrl } : null });
     } else if (r.status === "with_agent") {
       raw.push({ kind: "request", id: r.id, title: r.summary, note: "Paid, finish it", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.updatedAt, now, { targetMinutes: 24 * 60 }), amount: null });
     }

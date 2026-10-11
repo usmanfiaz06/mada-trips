@@ -1,0 +1,17 @@
+{
+  "_note": "Shaped on the Booking API booking confirmation (developer.hotelbeds.com). Placeholders filled by mock.ts.",
+  "auditData": { "processTime": "1210", "timestamp": "{{now}}", "token": "8C2D3E4F5A6B7C8D9E0F", "environment": "[awseuwest1]" },
+  "booking": {
+    "reference": "{{reference}}", "clientReference": "{{clientReference}}", "creationDate": "{{today}}", "status": "CONFIRMED",
+    "modificationPolicies": { "cancellation": true, "modification": true },
+    "creationUser": "TESTUSER", "holder": { "name": "{{holderName}}", "surname": "{{holderSurname}}" },
+    "hotel": {
+      "checkOut": "{{checkOut}}", "checkIn": "{{checkIn}}", "code": "{{hotelCode}}", "name": "{{hotelName}}", "categoryCode": "4EST", "categoryName": "4 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 12, "zoneName": "Beyoglu", "latitude": "41.0258", "longitude": "28.9740",
+      "rooms": [ { "status": "CONFIRMED", "id": 1, "code": "DBL.ST", "name": "DOUBLE STANDARD", "paxes": [ { "roomId": 1, "type": "AD", "name": "{{holderName}}", "surname": "{{holderSurname}}" } ],
+        "rates": [ { "rateClass": "NOR", "net": "{{net}}", "rateComments": "Check-in hour 14:00. Car park YES (with additional debit notes).", "paymentType": "AT_WEB", "packaging": false, "boardCode": "BB", "boardName": "BED AND BREAKFAST", "cancellationPolicies": [ { "amount": "{{fee}}", "from": "{{deadline:5}}T23:59:00+03:00" } ], "rooms": 1, "adults": 2, "children": 0 } ] } ],
+      "totalNet": "{{net}}", "currency": "EUR", "supplier": { "name": "HOTELBEDS PROFESSIONAL SERVICES, S.L.U", "vatNumber": "ESB38877676" }
+    },
+    "remark": "{{remark}}", "invoiceCompany": { "code": "E14", "company": "HOTELBEDS PROFESSIONAL SERVICES, S.L.U", "registrationNumber": "ESB38877676" },
+    "totalNet": "{{netNumber}}", "pendingAmount": "{{netNumber}}", "currency": "EUR"
+  }
+}

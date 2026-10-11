@@ -5,7 +5,9 @@ import { addDays, monthOf, personRef, rangeLabel, t, todayIn, type CopyKey, type
 import { db, type Tx } from "@/db";
 import { appNotifications, appPeople, appTrips, appUsers } from "@/db/app-schema";
 import { appBlocks, appFollows, appFriendships } from "@/db/app-schema-circles";
-import { AppError, resilient } from "../http";
+import { AppError, resilient, type RouteOptions } from "../http";
+import { localeOfUser } from "../locale";
+import { pushToUser } from "../push";
 
 /* Helpers every circles module shares: people as others see them, who knows whom, blocks, limits, and routes. */
 
@@ -16,8 +18,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * A route handler with dynamic params, wrapped like route(): request id, version and maintenance gates,
  * Idempotency-Key on mutations, the error envelope, no caching.
  */
-export function routeP<P extends Record<string, string>>(fn: (req: Request, params: P) => Promise<Response>) {
-  return (req: Request, ctx: { params: Promise<P> }): Promise<Response> => resilient(req, async () => fn(req, await ctx.params));
+export function routeP<P extends Record<string, string>>(fn: (req: Request, params: P) => Promise<Response>, opts: RouteOptions = {}) {
+  return (req: Request, ctx: { params: Promise<P> }): Promise<Response> => resilient(req, async () => fn(req, await ctx.params), opts);
 }
 
 /** A path id must be a uuid; anything else is simply not found. */
@@ -155,8 +157,22 @@ export async function pastTrips(userIds: string[], tx: Db = db) {
 
 /* ───────────── notifications ───────────── */
 
-export async function notify(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null = null) {
-  await tx.insert(appNotifications).values({ userId, kind, level: "passive", title: t(title[0], title[1]), body: t(body[0], body[1]), href, data });
+/**
+ * An inbox line for someone, in their own language (whoever's action caused it). With `push`, it also goes to their
+ * phone once the caller's transaction is done (call the returned function after commit; a push is only a nudge).
+ */
+export async function notify(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null = null, opts: { push?: boolean } = {}) {
+  const locale = await localeOfUser(userId, tx);
+  const tt = t(title[0], title[1], locale).slice(0, 64);
+  const bb = t(body[0], body[1], locale);
+  const [row] = await tx.insert(appNotifications).values({ userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data }).returning({ id: appNotifications.id });
+  return async () => {
+    if (!opts.push) return;
+    try {
+      const r = await pushToUser(userId, { title: tt, body: bb, data: { href, id: row!.id } });
+      if (r.sent) await db.update(appNotifications).set({ pushedAt: new Date() }).where(eq(appNotifications.id, row!.id));
+    } catch { /* the inbox has it */ }
+  };
 }
 
 export const sar = (halalas: number) => `SAR ${(halalas / 100).toLocaleString("en-US", { minimumFractionDigits: halalas % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;

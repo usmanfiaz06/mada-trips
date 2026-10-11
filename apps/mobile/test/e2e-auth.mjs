@@ -459,7 +459,7 @@ try {
     await p.see('It comes from Mada Trips, with a Copy code button.', 'copy code');
     if (await p.byTest('help-switch-channel').getAttribute('aria-disabled') !== 'true') errors.push('whatsapp: Send by SMS should wait for the countdown');
     await p.shot('sheet');
-    await p.page.clock.fastForward(61_000);
+    await p.page.clock.runFor(61_000);
     await p.see('Send by SMS instead', 'sms ready');
     await p.byTest('help-switch-channel').click();
     await p.see('New code sent by SMS to', 'resent by sms');

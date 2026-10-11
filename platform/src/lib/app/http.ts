@@ -2,7 +2,7 @@ import "server-only";
 import { createHmac } from "node:crypto";
 import type { z } from "zod";
 import { ERROR_CODES, HEADERS, t, type CopyKey, type ErrorCode, type Vars } from "@mada/shared";
-import { pepper } from "./config";
+import { isProductionDeploy, pepper } from "./config";
 import { idempotencyKeyOf, idempotent } from "./resilience/idempotency";
 import { currentRequest, logRequest, withRequest } from "./resilience/request";
 import { maintenanceRetryAfter, mustUpdate, runtimeConfig } from "./resilience/runtime";
@@ -67,6 +67,11 @@ const MUTATION = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 export async function gate(req: Request): Promise<void> {
   const path = new URL(req.url).pathname;
   if (UNGATED.some((r) => r.test(path))) return;
+  // The launch guard (launch.ts): on production, nothing is served while a blocker stands; GET /status says which.
+  if (isProductionDeploy()) {
+    const { launchStatus } = await import("./launch");
+    if (!launchStatus().ready) throw new AppError("MAINTENANCE", { retryAfter: 300, details: { launch: true } });
+  }
   const cfg = await runtimeConfig();
   if (mustUpdate(req.headers.get(HEADERS.appVersion), cfg)) throw new AppError("UPGRADE_REQUIRED", { details: { minVersion: cfg.minVersion, latestVersion: cfg.latestVersion } });
   if (cfg.maintenance.on && MUTATION.has(req.method) && !path.includes("/auth/")) {

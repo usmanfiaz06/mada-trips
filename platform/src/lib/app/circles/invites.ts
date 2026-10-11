@@ -3,7 +3,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import {
   INVITE_TTL_DAYS, LIMITS, inviteUrl, maskPhone, t,
-  type AcceptInviteResponse, type CreateInviteRequest, type InviteLink, type InvitePreview, type InvitesResponse, type PersonRef, type SentInvite,
+  type AcceptInviteResponse, type CreateInviteRequest, type InviteLink, type InvitePreview, type InvitesResponse, type LinkOptions, type PersonRef, type SentInvite,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appCircleMembers, appCircles, appUsers } from "@/db/app-schema";
@@ -14,14 +14,21 @@ import { decryptField, encryptField, hasDataKey } from "../crypto";
 import { AppError } from "../http";
 import { suppliers } from "../suppliers";
 import { createCircleInvites, details, incomingInvites, memberIds, membership, requireAdmin, assertInvitable, sysMessage } from "./circles";
-import { assertUnder, circleTrip, err, graphOf, isBlocked, peopleByIds, sha256hex, type Db } from "./common";
+import { assertUnder, circleTrip, err, graphOf, isBlocked, notify, peopleByIds, sha256hex, type Db } from "./common";
+import { INVITE_LIMITS, hit, peek } from "./limits";
 import { currentLocale } from "../resilience/request";
 
 /*
  * Invites. A link's code is "<lookup>-<mac>": the lookup finds the row, the mac (HMAC of the lookup with the server
  * pepper) proves the link came from us. Nothing secret is stored, codes can't be guessed, and the same link can be
- * shown again. Links last 14 days. Circle links let anyone with the link in; Mada links make you friends with the
- * person who sent it. Invites to someone already on Mada are addressed to them and wait for a yes.
+ * shown again. Links last 14 days unless made for 1 or 7, and may let in a set number of people. Circle links let
+ * anyone with the link in; Mada links make you friends with the person who sent it. Invites to someone already on
+ * Mada are addressed to them and wait for a yes.
+ *
+ * Abuse: a code is 8 random characters plus a 6-character MAC (about 2^70 together), so codes can't be guessed or
+ * listed; on top of that each network may look up 60 codes a minute and try 20 wrong ones per 10 minutes, a person
+ * may join by link 30 times an hour and make 30 invites an hour. An unknown, forged, cancelled-for-you or blocked
+ * code all answer the same 404.
  */
 
 const ALPHA = "abcdefghjkmnpqrstuvwxyz23456789";
@@ -39,8 +46,11 @@ export function lookupOf(code: string): string | null {
   const b = Buffer.from(m[2]!);
   return a.length === b.length && timingSafeEqual(a, b) ? m[1]! : null;
 }
-const expiry = () => new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
-const link = (lookup: string, expiresAt: Date): InviteLink => ({ code: codeFor(lookup), url: inviteUrl(codeFor(lookup)), expiresAt: expiresAt.toISOString() });
+const expiry = (days: number = INVITE_TTL_DAYS) => new Date(Date.now() + days * 86_400_000);
+type InviteRow = typeof appCircleInvites.$inferSelect;
+const link = (r: Pick<InviteRow, "id" | "lookup" | "expiresAt" | "maxUses" | "uses">): InviteLink =>
+  ({ code: codeFor(r.lookup!), url: inviteUrl(codeFor(r.lookup!)), expiresAt: r.expiresAt.toISOString(), id: r.id, maxUses: r.maxUses ?? null, uses: r.uses ?? 0 });
+const isFull = (r: Pick<InviteRow, "maxUses" | "uses">) => r.maxUses != null && r.uses >= r.maxUses;
 const phoneAad = (inviteId: string) => `app_circle_invites:${inviteId}:phone`;
 export const phoneHash = (e164: string) => sha256hex(`${pepper()}:invite-phone:${e164}`);
 
@@ -50,19 +60,31 @@ async function invitesLastHour(userId: string, tx: Db = db) {
   return r?.n ?? 0;
 }
 
-/** The link to a circle (anyone in it may share it), or to Mada. The same link comes back until it expires. */
-export async function linkFor(userId: string, circleId: string | null): Promise<InviteLink> {
+/**
+ * The link to a circle (anyone in it may share it), or to Mada. The same link comes back until it expires or fills
+ * up. Choosing how long it lasts or how many it lets in, or asking for a fresh one, makes a new link and turns the
+ * old one off.
+ */
+export async function linkFor(userId: string, circleId: string | null, opts: LinkOptions = {}): Promise<InviteLink> {
   if (circleId) await membership(circleId, userId);
-  const [found] = await db.select().from(appCircleInvites)
-    .where(and(eq(appCircleInvites.inviterId, userId), eq(appCircleInvites.channel, "link"), eq(appCircleInvites.status, "pending"), isNotNull(appCircleInvites.lookup),
-      circleId ? eq(appCircleInvites.circleId, circleId) : and(eq(appCircleInvites.kind, "mada"), sql`${appCircleInvites.circleId} IS NULL`),
-      sql`${appCircleInvites.expiresAt} > now() + interval '1 day'`))
-    .orderBy(desc(appCircleInvites.createdAt)).limit(1);
-  if (found) return link(found.lookup!, found.expiresAt);
+  const mine = and(eq(appCircleInvites.inviterId, userId), eq(appCircleInvites.channel, "link"), eq(appCircleInvites.status, "pending"), isNotNull(appCircleInvites.lookup),
+    circleId ? eq(appCircleInvites.circleId, circleId) : and(eq(appCircleInvites.kind, "mada"), sql`${appCircleInvites.circleId} IS NULL`));
+  const replace = !!opts.fresh || opts.expiresInDays !== undefined || opts.maxUses !== undefined;
+  if (!replace) {
+    const [found] = await db.select().from(appCircleInvites)
+      .where(and(mine, sql`${appCircleInvites.expiresAt} > now() + interval '1 day'`, sql`(${appCircleInvites.maxUses} IS NULL OR ${appCircleInvites.uses} < ${appCircleInvites.maxUses})`))
+      .orderBy(desc(appCircleInvites.createdAt)).limit(1);
+    if (found) return link(found);
+  }
   assertUnder(await invitesLastHour(userId), LIMITS.invitesPerHour, 3600);
-  const lookup = rand(8);
-  const [row] = await db.insert(appCircleInvites).values({ kind: circleId ? "circle" : "mada", circleId, inviterId: userId, channel: "link", lookup, expiresAt: expiry() }).returning();
-  return link(lookup, row!.expiresAt);
+  return db.transaction(async (tx) => {
+    if (replace) await tx.update(appCircleInvites).set({ status: "cancelled", respondedAt: new Date() }).where(mine);
+    const [row] = await tx.insert(appCircleInvites).values({
+      kind: circleId ? "circle" : "mada", circleId, inviterId: userId, channel: "link", lookup: rand(8),
+      expiresAt: expiry(opts.expiresInDays ?? INVITE_TTL_DAYS), maxUses: opts.maxUses ?? null,
+    }).returning();
+    return link(row!);
+  });
 }
 
 /** Invite a number to Mada by SMS or WhatsApp. Someone already on Mada comes back as a person to add instead. */
@@ -114,17 +136,39 @@ export async function listInvites(userId: string): Promise<InvitesResponse> {
   const [own] = await db.select().from(appCircleInvites)
     .where(and(eq(appCircleInvites.inviterId, userId), eq(appCircleInvites.kind, "mada"), eq(appCircleInvites.channel, "link"), eq(appCircleInvites.status, "pending"), isNotNull(appCircleInvites.lookup), sql`${appCircleInvites.expiresAt} > now()`))
     .orderBy(desc(appCircleInvites.createdAt)).limit(1);
-  return { sent: rows.map((r) => toSent(r, people)), incoming: await incomingInvites(userId), link: own ? link(own.lookup!, own.expiresAt) : null };
+  return { sent: rows.map((r) => toSent(r, people)), incoming: await incomingInvites(userId), link: own && !isFull(own) ? link(own) : null };
+}
+
+/**
+ * Every lookup of a code counts against the caller's network; a code we never issued counts again, and after 20 of
+ * those in 10 minutes every lookup from that network waits, right or wrong.
+ */
+async function guardLookup(code: string, ipHash: string | null, web = false): Promise<string> {
+  const net = ipHash ?? "unknown";
+  // The web page is also fetched by WhatsApp's and Apple's link previewers, many people behind few addresses.
+  if (web) await hit(`invite:web:${net}`, INVITE_LIMITS.webPreviewsPerMinute, 60);
+  else await hit(`invite:preview:${net}`, INVITE_LIMITS.previewsPerMinute, 60);
+  if ((await peek(`invite:bad:${net}`, 600)) >= INVITE_LIMITS.badCodesPer10Min) await hit(`invite:bad:${net}`, INVITE_LIMITS.badCodesPer10Min, 600);
+  const lookup = lookupOf(code);
+  if (!lookup) {
+    await hit(`invite:bad:${net}`, INVITE_LIMITS.badCodesPer10Min, 600).catch(() => {});
+    throw err("NOT_FOUND", "circles.join.notFound");
+  }
+  return lookup;
+}
+
+/** The invite a code names, for the landing page and the app's preview. null for anything that isn't ours. */
+export async function previewOrNull(code: string, viewerId: string | null, ipHash: string | null, opts: { web?: boolean } = {}): Promise<InvitePreview | null> {
+  try { return await preview(code, viewerId, ipHash, opts); } catch (e) { if (e instanceof AppError && (e.code === "NOT_FOUND" || e.code === "RATE_LIMITED")) return null; throw e; }
 }
 
 /** What anyone with the link sees. Members' first names only; nothing about trips beyond the circle's own line. */
-export async function preview(code: string, viewerId: string | null): Promise<InvitePreview> {
-  const lookup = lookupOf(code);
-  if (!lookup) throw err("NOT_FOUND", "circles.join.notFound");
+export async function preview(code: string, viewerId: string | null, ipHash: string | null = null, opts: { web?: boolean } = {}): Promise<InvitePreview> {
+  const lookup = await guardLookup(code, ipHash, opts.web);
   const [r] = await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookup));
   if (!r || (viewerId && (await isBlocked(viewerId, r.inviterId)))) throw err("NOT_FOUND", "circles.join.notFound");
   const from = (await peopleByIds([r.inviterId])).get(r.inviterId)!;
-  const status = r.status === "cancelled" || r.status === "declined" ? "cancelled" : r.expiresAt.getTime() < Date.now() ? "expired" : "open";
+  const status = r.status === "cancelled" || r.status === "declined" ? "cancelled" : r.expiresAt.getTime() < Date.now() ? "expired" : isFull(r) ? "full" : "open";
   let circle: InvitePreview["circle"] = null;
   if (r.circleId) {
     const [c] = await db.select().from(appCircles).where(eq(appCircles.id, r.circleId));
@@ -150,29 +194,54 @@ async function joinCircle(tx: Db, circleId: string, userId: string, via: { link?
   await sysMessage(tx, circleId, via.link ? "joinedByLink" : "joined", userId, via.link ? [via.link] : []);
 }
 
-/** Accept by link code (anyone signed in) or by invite id (the person it was addressed to). */
-export async function accept(ref: string, userId: string, isId: boolean): Promise<AcceptInviteResponse> {
+/** One more person in through a link with a limit: refused (as full) when the last place has gone. */
+async function takePlace(tx: Db, r: InviteRow) {
+  if (r.channel !== "link") return;
+  const taken = await tx.update(appCircleInvites).set({ uses: sql`${appCircleInvites.uses} + 1` })
+    .where(and(eq(appCircleInvites.id, r.id), sql`(${appCircleInvites.maxUses} IS NULL OR ${appCircleInvites.uses} < ${appCircleInvites.maxUses})`))
+    .returning({ id: appCircleInvites.id });
+  if (!taken.length) throw err("NOT_FOUND", "circles.join.fullTitle");
+}
+
+/**
+ * Accept by link code (anyone signed in) or by invite id (the person it was addressed to). The person who sent it
+ * hears about it: "Noor joined Eid trip", in the inbox and on their phone.
+ */
+export async function accept(ref: string, userId: string, isId: boolean, ipHash: string | null = null): Promise<AcceptInviteResponse> {
+  await hit(`invite:accept:${userId}`, INVITE_LIMITS.acceptsPerHour, 3600);
+  const lookup = isId ? null : await guardLookup(ref, ipHash);
   const [r] = isId
     ? await db.select().from(appCircleInvites).where(and(eq(appCircleInvites.id, ref), eq(appCircleInvites.inviteeUserId, userId)))
-    : await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookupOf(ref) ?? "-"));
+    : await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookup!));
   if (!r || (await isBlocked(userId, r.inviterId))) throw err("NOT_FOUND", "circles.join.notFound");
   if (r.status === "cancelled" || r.status === "declined" || (isId && r.status !== "pending")) throw err("NOT_FOUND", "circles.err.inviteExpired");
   if (r.expiresAt.getTime() < Date.now()) throw err("NOT_FOUND", "circles.err.inviteExpired");
   if (r.inviterId === userId && !r.circleId) throw err("VALIDATION", "circles.err.self");
-  return db.transaction(async (tx) => {
+  const after: (() => Promise<void>)[] = [];
+  const me = (await peopleByIds([userId])).get(userId)!;
+  const out = await db.transaction(async (tx) => {
     if (r.circleId) {
       const ids = await memberIds(r.circleId, tx);
       if (ids.includes(userId)) return { circleId: r.circleId, friendId: null, already: true };
+      await takePlace(tx, r);
       await joinCircle(tx, r.circleId, userId, r.channel === "link" ? { link: r.inviterId } : {});
+      const [c] = await tx.select({ name: appCircles.name }).from(appCircles).where(eq(appCircles.id, r.circleId));
+      if (ids.includes(r.inviterId)) {
+        after.push(await notify(tx, r.inviterId, "circle.joined", ["notify.circles.joined.title", { name: me.short, circle: c?.name ?? "" }], ["notify.circles.joined.body"], `/circle/${r.circleId}`, { circleId: r.circleId, userId }, { push: true }));
+      }
       return { circleId: r.circleId, friendId: null, already: false };
     }
     const g = await graphOf(userId, tx);
     const already = g.friends.has(r.inviterId);
+    if (!already) await takePlace(tx, r);
     await befriend(tx, r.inviterId, userId);
     if (r.channel === "link") await tx.insert(appCircleInvites).values({ kind: "mada", inviterId: r.inviterId, channel: "link", status: "accepted", acceptedBy: userId, respondedAt: new Date(), expiresAt: r.expiresAt });
     else await tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() }).where(eq(appCircleInvites.id, r.id));
+    if (!already) after.push(await notify(tx, r.inviterId, "friend.joined", ["notify.circles.joinedMada.title", { name: me.short }], ["notify.circles.joinedMada.body"], `/friend/${userId}`, { userId }, { push: true }));
     return { circleId: null, friendId: r.inviterId, already };
   });
+  for (const f of after) await f();
+  return out;
 }
 
 /** Say no to a circle invite. The person who sent it isn't told; it just stops showing. */

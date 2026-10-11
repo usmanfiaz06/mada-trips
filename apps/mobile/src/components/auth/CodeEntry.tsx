@@ -120,10 +120,12 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
   return (
     <View style={{ paddingHorizontal: 24, paddingTop: 24, gap: 16 }}>
       <T v="h1" accessibilityRole="header">{title}</T>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 }} testID="code-sent-line">
-        {channel === 'whatsapp' ? <View accessibilityLabel={t('auth.channel.whatsapp')}><WhatsAppMark size={18} /></View> : null}
-        <T v="body">{sentLine}</T>
-        <LinkButton label={about === 'phone' ? t('otp.change') : t('auth.email.change')} onPress={onChange} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }} testID="code-sent-line">
+        {channel === 'whatsapp' ? <View accessibilityLabel={t('auth.channel.whatsapp')} style={{ marginTop: 2 }}><WhatsAppMark size={19} /></View> : null}
+        <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 }}>
+          <T v="body">{sentLine}</T>
+          <LinkButton label={about === 'phone' ? t('otp.change') : t('auth.email.change')} onPress={onChange} />
+        </View>
       </View>
       <Animated.View style={shake}>
         <Field

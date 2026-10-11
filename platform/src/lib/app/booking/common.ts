@@ -13,6 +13,7 @@ import { mockMyFatoorah } from "../suppliers/mock/myfatoorah";
 import { liveMyFatoorah } from "../suppliers/live/myfatoorah";
 import { claudeAsk } from "../suppliers/live/ask-claude";
 import { gdsFlights, rateHawkHotels } from "../suppliers/live/commerce";
+import { bookingHotelbeds, hotelVendor } from "../suppliers/hotelbeds/app";
 import type { AskParser, BookingFlightSupplier, BookingHotelSupplier, BookingPaymentSupplier } from "../suppliers/booking-types";
 
 /*
@@ -27,7 +28,11 @@ const notConfiguredAsk: AskParser = { name: "rules-only", async parse() { return
 /** Picked on every call, so an env change or a test takes effect at once. */
 export const bookingSuppliers = {
   flights: (): BookingFlightSupplier => (supplierMode("flights") === "live" ? (gdsFlights as BookingFlightSupplier) : catalogueFlights),
-  hotels: (): BookingHotelSupplier => (supplierMode("hotels") === "live" ? (rateHawkHotels as BookingHotelSupplier) : catalogueHotels),
+  /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock for its fixtures) or RateHawk (not built). */
+  hotels: (): BookingHotelSupplier => {
+    const v = hotelVendor();
+    return v === "catalogue" ? catalogueHotels : v === "ratehawk" ? (rateHawkHotels as BookingHotelSupplier) : bookingHotelbeds();
+  },
   payments: (): BookingPaymentSupplier => (supplierMode("payments") === "live" ? liveMyFatoorah : mockMyFatoorah),
   /** Live: Claude with a strict tool schema. Mock: none, the deterministic rules answer. */
   ask: (): AskParser => (supplierMode("ai") === "live" ? claudeAsk : notConfiguredAsk),

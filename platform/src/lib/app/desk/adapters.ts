@@ -15,6 +15,8 @@ import { decryptField, passportAad } from "@/lib/app/crypto";
 import { supplierMode } from "@/lib/app/config";
 import { bookingSuppliers } from "@/lib/app/booking/common";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type DeskActor } from "./core";
+import { isFlightAsk } from "@/lib/app/booking/flight-requests";
+import { contactOf } from "./flight-quotes";
 import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
 
 /*
@@ -126,7 +128,7 @@ export function orderStage(r: { status: string; details: unknown }, payStatus?: 
 export async function listOrders(opts: { stage?: OrderStage | "open" | "all"; limit?: number } = {}) {
   const rows = await db.select({ r: appRequests, userName: appUsers.name, phone: appUsers.phone }).from(appRequests)
     .innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId))
-    .where(and(inArray(appRequests.kind, [...ORDER_KINDS]), ne(appRequests.status, "queued")))
+    .where(and(inArray(appRequests.kind, [...ORDER_KINDS]), ne(appRequests.status, "queued"), sql`NOT (${PRE_PAYMENT_FLIGHT_ASK})`))
     .orderBy(desc(appRequests.createdAt)).limit(opts.limit ?? 300);
   const ids = rows.map((x) => x.r.id);
   const [pays, quotes, orders] = ids.length ? await Promise.all([
@@ -165,6 +167,8 @@ export async function getRequestFull(id: string) {
       .where(and(eq(appDeskNotes.threadKind, "request"), eq(appDeskNotes.threadId, id))).orderBy(asc(appDeskNotes.createdAt)),
   ]);
   const order = isOrderKind(r.kind) ? await linkedOrder(id) : null;
+  // A flight request from Ask is quoted on the Requests page until it's paid; then it's an order like any other.
+  const flightAsk = isFlightAsk(r.details);
   const [orderPay, events] = order ? await Promise.all([
     order.paymentId ? db.select().from(appPayments).where(eq(appPayments.id, order.paymentId)).then((x) => x[0] ?? null) : Promise.resolve(null),
     db.select().from(appOrderEvents).where(eq(appOrderEvents.orderId, order.id)).orderBy(asc(appOrderEvents.createdAt)),
@@ -179,7 +183,7 @@ export async function getRequestFull(id: string) {
   return {
     request: r, ref: shortRef(r.id, isOrderKind(r.kind) ? "O" : "R"), user: u, travellers, quotes, payments, payment, trip, segments,
     messages, notes, desk: { ...deskState(r.details), ...(order?.supplierRef && !deskState(r.details).heldPnr ? { heldPnr: order.supplierRef } : {}) },
-    stage: orderStage(r, payment?.status, order), isOrder: isOrderKind(r.kind), order, events,
+    stage: orderStage(r, payment?.status, order), isOrder: isOrderKind(r.kind) && !(flightAsk && !order), order, events, flightAsk, contact: contactOf(r.details),
   };
 }
 export type RequestFull = NonNullable<Awaited<ReturnType<typeof getRequestFull>>>;
@@ -349,7 +353,8 @@ async function issueTicketsHere(actor: DeskActor, id: string, v: { pnr: string; 
     const agent = await engineAgent(actor);
     if (o.status === "pending_agent") await engine(() => booking.acceptOrder(o.id, agent));
     if (o.status === "pending_agent" || o.status === "held") await engine(() => booking.lockPrice(o.id, agent));
-    await db.transaction(async (tx) => { await tx.update(appOrders).set({ supplierRef: pnr }).where(eq(appOrders.id, o.id)); await booking.orderEvent(tx, o.id, "tickets", { kind: "agent", name: agent.name }, { pnr, tickets }); });
+    // The ticket numbers go on the order too, in traveller order, so the trip shows each person theirs.
+    await db.transaction(async (tx) => { await tx.update(appOrders).set({ supplierRef: pnr, snapshot: sql`${appOrders.snapshot} || ${JSON.stringify({ tickets })}::jsonb` }).where(eq(appOrders.id, o.id)); await booking.orderEvent(tx, o.id, "tickets", { kind: "agent", name: agent.name }, { pnr, tickets }); });
     const done = await engine(() => booking.issueTickets(o.id, agent));
     const ok = done.status === "confirmed";
     await db.transaction(async (tx) => {
@@ -451,11 +456,17 @@ export function destinationOf(details: unknown) {
   return { id: p.id ? String(p.id) : p.placeId ? String(p.placeId) : null, name, country, airports, guideUrl: guide, message: typeof d.message === "string" ? d.message : null };
 }
 
+/**
+ * A flight request from Ask that hasn't been paid yet (flights by request): the desk quotes it from Requests. Once the
+ * traveller pays, its order moves it to Orders, where the tickets are issued.
+ */
+const PRE_PAYMENT_FLIGHT_ASK = sql`(${appRequests.kind} = 'flight' AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing','needs_answer','quoted','cancelled'))`;
+
 export const QUOTE_LINE_KINDS = ["flight", "stay", "pickup", "visa", "service", "discount", "credit", "other"] as const;
 
 export async function listRequests(opts: { open?: boolean; limit?: number } = {}) {
   const rows = await db.select({ r: appRequests, userName: appUsers.name }).from(appRequests).innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId))
-    .where(and(sql`${appRequests.kind} NOT IN ('flight','stay','trip')`, ne(appRequests.status, "queued"),
+    .where(and(sql`(${appRequests.kind} NOT IN ('flight','stay','trip') OR ${PRE_PAYMENT_FLIGHT_ASK})`, ne(appRequests.status, "queued"),
       opts.open ? inArray(appRequests.status, ["sent", "reviewing", "needs_answer", "quoted", "awaiting_payment", "with_agent"]) : undefined))
     .orderBy(desc(appRequests.createdAt)).limit(opts.limit ?? 300);
   return rows.map(({ r, userName }) => ({ ...r, ref: shortRef(r.id), userName: travellerName(userName), desk: deskState(r.details) }));

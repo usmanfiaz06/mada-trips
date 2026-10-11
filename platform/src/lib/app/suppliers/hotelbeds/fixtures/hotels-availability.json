@@ -1,0 +1,47 @@
+{
+  "_note": "Shaped on the Booking API examples at developer.hotelbeds.com (workflow and API reference). Dates are {{placeholders}} filled by mock.ts. Replace with a recording from `npm run hotelbeds:smoke -- --record` once the test keys are in.",
+  "auditData": { "processTime": "412", "timestamp": "{{now}}", "requestHost": "10.185.88.193", "serverId": "ip-10-185-88-193.eu-west-1.compute.internal#A+", "environment": "[awseuwest1, awseuwest1b, ip_10_185_88_193]", "release": "4d2b6d2f5a", "token": "6B1F1A2C7D3E4F5A9B8C", "internal": "0|09E3B4FF0C2C47E2A1B7|ES|07|1|1|||||||||||R|1|1|~1~2~0|0|0||0|c0f2a4a5b0f2f0e2c2c6b4d|||" },
+  "hotels": {
+    "hotels": [
+      {
+        "code": 99701, "name": "GALATA TOWER SUITES", "categoryCode": "4EST", "categoryName": "4 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 12, "zoneName": "Beyoglu", "latitude": "41.0258", "longitude": "28.9740",
+        "rooms": [
+          { "code": "DBL.ST", "name": "DOUBLE STANDARD", "rates": [
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99701|DBL.ST|ID_B2B_26|BB||{{occ}}||N@05~~2516a~-1530012497~N~~~NOR~~A1B2C3D4E5F60718AA101|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:612.40}}", "allotment": 4, "paymentType": "AT_WEB", "packaging": false, "boardCode": "BB", "boardName": "BED AND BREAKFAST", "cancellationPolicies": [ { "amount": "{{n:102.07}}", "from": "{{deadline:5}}T23:59:00+03:00" } ], "taxes": { "taxes": [ { "included": false, "amount": "{{n:9.00}}", "currency": "EUR", "clientAmount": "{{n:9.00}}", "clientCurrency": "EUR" } ], "allIncluded": false }, "rooms": 1, "adults": 2, "children": 0 },
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99701|DBL.ST|ID_B2B_26|RO||{{occ}}||N@05~~2516b~-1530012498~N~~~NRF~~A1B2C3D4E5F60718AA102|", "rateClass": "NRF", "rateType": "BOOKABLE", "net": "{{n:540.10}}", "allotment": 2, "paymentType": "AT_WEB", "packaging": false, "boardCode": "RO", "boardName": "ROOM ONLY", "cancellationPolicies": [ { "amount": "{{n:540.10}}", "from": "{{now}}" } ], "rooms": 1, "adults": 2, "children": 0 }
+          ] }
+        ],
+        "minRate": "{{n:540.10}}", "maxRate": "{{n:612.40}}", "currency": "EUR"
+      },
+      {
+        "code": 99702, "name": "SULTANAHMET GARDEN HOTEL", "categoryCode": "3EST", "categoryName": "3 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 3, "zoneName": "Sultanahmet", "latitude": "41.0055", "longitude": "28.9768",
+        "rooms": [
+          { "code": "FAM.ST", "name": "FAMILY ROOM", "rates": [
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99702|FAM.ST|ID_B2B_26|BB||{{occ}}||N@05~~3c11a~-1188820011~N~~~NOR~~B1C2D3E4F5A60718BB201|", "rateClass": "NOR", "rateType": "RECHECK", "net": "{{n:455.75}}", "allotment": 3, "paymentType": "AT_WEB", "packaging": false, "boardCode": "BB", "boardName": "BED AND BREAKFAST", "cancellationPolicies": [ { "amount": "{{n:91.15}}", "from": "{{deadline:3}}T23:59:00+03:00" }, { "amount": "{{n:455.75}}", "from": "{{deadline:1}}T23:59:00+03:00" } ], "rateCommentsId": "256|51200|1", "rooms": 1, "adults": 2, "children": 0 }
+          ] }
+        ],
+        "minRate": "{{n:455.75}}", "maxRate": "{{n:455.75}}", "currency": "EUR"
+      },
+      {
+        "code": 99703, "name": "BOSPHORUS VIEW HOTEL", "categoryCode": "5EST", "categoryName": "5 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 21, "zoneName": "Besiktas", "latitude": "41.0422", "longitude": "29.0083",
+        "rooms": [
+          { "code": "DBL.SV", "name": "DOUBLE SEA VIEW", "rates": [
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99703|DBL.SV|ID_B2B_26|BB||{{occ}}||N@05~~4d22a~-2011020011~N~~~NOR~~C1D2E3F4A5B60718CC301|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:880.00}}", "sellingRate": "{{n:1049.00}}", "hotelMandatory": true, "allotment": 5, "paymentType": "AT_WEB", "packaging": false, "boardCode": "BB", "boardName": "BED AND BREAKFAST", "cancellationPolicies": [ { "amount": "{{n:146.67}}", "from": "{{deadline:7}}T23:59:00+03:00" } ], "rooms": 1, "adults": 2, "children": 0 },
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99703|DBL.SV|ID_B2B_26|BB||{{occ}}||N@05~~4d22b~-2011020012~N~~~NOR~~C1D2E3F4A5B60718CC302|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:820.00}}", "allotment": 5, "paymentType": "AT_HOTEL", "packaging": false, "boardCode": "BB", "boardName": "BED AND BREAKFAST", "rooms": 1, "adults": 2, "children": 0 }
+          ] }
+        ],
+        "minRate": "{{n:820.00}}", "maxRate": "{{n:880.00}}", "currency": "EUR"
+      },
+      {
+        "code": 99704, "name": "TAKSIM CITY ROOMS", "categoryCode": "3EST", "categoryName": "3 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 13, "zoneName": "Taksim", "latitude": "41.0369", "longitude": "28.9850",
+        "rooms": [
+          { "code": "TWN.ST", "name": "TWIN STANDARD", "rates": [
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99704|TWN.ST|ID_B2B_26|RO||{{occ}}||N@05~~5e33a~-1011020011~N~~~NOR~~D1E2F3A4B5C60718DD401|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:398.20}}", "allotment": 9, "paymentType": "AT_WEB", "packaging": false, "boardCode": "RO", "boardName": "ROOM ONLY", "cancellationPolicies": [ { "amount": "{{n:66.37}}", "from": "{{deadline:2}}T23:59:00+03:00" } ], "rooms": 1, "adults": 2, "children": 0 }
+          ] }
+        ],
+        "minRate": "{{n:398.20}}", "maxRate": "{{n:398.20}}", "currency": "EUR"
+      }
+    ],
+    "checkIn": "{{checkIn}}", "total": 4, "checkOut": "{{checkOut}}"
+  }
+}

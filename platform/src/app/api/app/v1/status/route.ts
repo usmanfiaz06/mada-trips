@@ -1,6 +1,7 @@
 import type { StatusResponse } from "@mada/shared";
 import { SUPPLIERS } from "@/lib/app/config";
 import { json, route } from "@/lib/app/http";
+import { launchStatus } from "@/lib/app/launch";
 import { degradedSuppliers } from "@/lib/app/resilience/breaker";
 import { runtimeConfig } from "@/lib/app/resilience/runtime";
 
@@ -13,6 +14,8 @@ export const GET = route(async () => {
   const [degraded, cfg] = await Promise.all([degradedSuppliers(SUPPLIERS), runtimeConfig()]);
   const status: StatusResponse["status"] = cfg.maintenance.on || degraded.some((d) => d.state === "down" && (d.name === "flights" || d.name === "payments"))
     ? "down" : degraded.length ? "degraded" : "ok";
-  const body: StatusResponse = { status, degraded, maintenance: cfg.maintenance, time: new Date().toISOString() };
+  // The launch guard: on production, what keeps app routes closed (launch.ts). Ready and empty elsewhere.
+  const launch = launchStatus();
+  const body: StatusResponse = { status: launch.ready ? status : "down", degraded, maintenance: cfg.maintenance, time: new Date().toISOString(), launch };
   return json(body, 200, { "Cache-Control": "public, max-age=15, s-maxage=15, stale-while-revalidate=60" });
 }, { ungated: true });

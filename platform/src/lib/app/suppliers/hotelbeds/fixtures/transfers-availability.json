@@ -1,0 +1,33 @@
+{
+  "_note": "Shaped on the Transfer Booking API availability response (developer.hotelbeds.com, Availability Simple). Placeholders filled by mock.ts.",
+  "search": { "language": "en", "departure": { "date": "{{date}}", "time": "{{time}}:00" }, "occupancy": { "adults": "{{adults}}", "children": 0, "infants": 0 }, "from": { "code": "{{fromCode}}", "description": "Istanbul, Istanbul Airport", "type": "IATA" }, "to": { "code": "{{toCode}}", "description": "{{toDescription}}", "type": "{{toType}}" } },
+  "services": [
+    { "id": 1, "serviceId": "2380112", "direction": "ARRIVAL", "transferType": "PRIVATE", "vehicle": { "code": "CR", "name": "Car" }, "category": { "code": "STND", "name": "Standard" },
+      "pickupInformation": { "from": { "code": "{{fromCode}}", "description": "Istanbul, Istanbul Airport", "type": "IATA" }, "to": { "code": "{{toCode}}", "description": "{{toDescription}}", "type": "{{toType}}" }, "date": "{{date}}", "time": "{{time}}:00",
+        "pickup": { "address": null, "number": null, "town": null, "zip": null, "description": "The driver waits in the arrivals hall, by meeting point 4, with a sign with your name. If you can't find the driver, call +90 212 000 0000.", "altitude": null, "latitude": 41.2608, "longitude": 28.7418, "checkPickup": { "mustCheckPickupTime": false, "url": null, "hoursBeforeConsulting": null }, "pickupId": null, "stopName": null, "image": null } },
+      "minPaxCapacity": 1, "maxPaxCapacity": 3,
+      "content": { "vehicle": { "code": "CR", "name": "Car" }, "category": { "code": "STND", "name": "Standard" }, "images": [ { "url": "https://media.stage.activitiesbank.com/transfers/CR_STND.png", "type": "EXTRALARGE" } ],
+        "transferDetailInfo": [ { "id": "TRFTIME", "name": "Transfer time", "description": "Approximate duration of the transfer", "type": "GENERAL_INFO", "value": "50" }, { "id": "ER", "name": "Exclusive ride for you", "description": "Exclusive ride for you", "type": "GENERAL_INFO" } ],
+        "customerTransferTimeInfo": [], "supplierTransferTimeInfo": [ { "value": 60, "type": "SUPPLIER_MAX_WAITING_TIME_INTERNATIONAL", "metric": "minutes" } ],
+        "transferRemarks": [ { "type": "CONTRACT", "description": "Please give the driver your flight number.", "mandatory": true } ] },
+      "price": { "totalAmount": "{{n:38.50}}", "netAmount": null, "currencyId": "EUR" }, "rateKey": "ARRIVAL|IATA|{{fromCode}}|{{toType}}|{{toCode}}|{{date}}|{{time}}|{{date}}|{{time}}|{{adults}}~0~0||1|2380112|PRVT|CR|STND|{{n:38.50}}|EUR|ab12cd34",
+      "cancellationPolicies": [ { "amount": "{{n:38.50}}", "from": "{{deadline:1}}T{{time}}:00", "currencyId": "EUR", "isForceMajeure": null } ],
+      "links": [ { "rel": "self", "href": "/availability", "method": "GET" }, { "rel": "confirm", "href": "/booking", "method": "POST" } ], "factsheetId": 41 },
+    { "id": 2, "serviceId": "2380113", "direction": "ARRIVAL", "transferType": "PRIVATE", "vehicle": { "code": "MNV", "name": "Minivan" }, "category": { "code": "STND", "name": "Standard" },
+      "pickupInformation": { "from": { "code": "{{fromCode}}", "description": "Istanbul, Istanbul Airport", "type": "IATA" }, "to": { "code": "{{toCode}}", "description": "{{toDescription}}", "type": "{{toType}}" }, "date": "{{date}}", "time": "{{time}}:00",
+        "pickup": { "description": "The driver waits in the arrivals hall, by meeting point 4, with a sign with your name.", "latitude": 41.2608, "longitude": 28.7418 } },
+      "minPaxCapacity": 1, "maxPaxCapacity": 7,
+      "content": { "vehicle": { "code": "MNV", "name": "Minivan" }, "category": { "code": "STND", "name": "Standard" }, "images": [ { "url": "https://media.stage.activitiesbank.com/transfers/MNV_STND.png", "type": "EXTRALARGE" } ],
+        "transferDetailInfo": [ { "id": "TRFTIME", "name": "Transfer time", "type": "GENERAL_INFO", "value": "50" } ] },
+      "price": { "totalAmount": "{{n:52.00}}", "netAmount": null, "currencyId": "EUR" }, "rateKey": "ARRIVAL|IATA|{{fromCode}}|{{toType}}|{{toCode}}|{{date}}|{{time}}|{{date}}|{{time}}|{{adults}}~0~0||1|2380113|PRVT|MNV|STND|{{n:52.00}}|EUR|ef56gh78",
+      "cancellationPolicies": [ { "amount": "{{n:52.00}}", "from": "{{deadline:1}}T{{time}}:00", "currencyId": "EUR" } ], "factsheetId": 42 },
+    { "id": 3, "serviceId": "2380120", "direction": "ARRIVAL", "transferType": "SHARED", "vehicle": { "code": "SH", "name": "Shuttle" }, "category": { "code": "STND", "name": "Standard" },
+      "pickupInformation": { "from": { "code": "{{fromCode}}", "description": "Istanbul, Istanbul Airport", "type": "IATA" }, "to": { "code": "{{toCode}}", "description": "{{toDescription}}", "type": "{{toType}}" }, "date": "{{date}}", "time": "{{time}}:00",
+        "pickup": { "description": "Go to the Hotelbeds desk in the arrivals hall. Shuttles leave every 45 minutes.", "latitude": 41.2608, "longitude": 28.7418 } },
+      "minPaxCapacity": 1, "maxPaxCapacity": 99,
+      "content": { "vehicle": { "code": "SH", "name": "Shuttle" }, "category": { "code": "STND", "name": "Standard" }, "images": [ { "url": "https://media.stage.activitiesbank.com/transfers/SH_STND.png", "type": "EXTRALARGE" } ],
+        "transferDetailInfo": [ { "id": "TRFTIME", "name": "Transfer time", "type": "GENERAL_INFO", "value": "85" } ] },
+      "price": { "totalAmount": "{{np:11.20}}", "netAmount": null, "currencyId": "EUR" }, "rateKey": "ARRIVAL|IATA|{{fromCode}}|{{toType}}|{{toCode}}|{{date}}|{{time}}|{{date}}|{{time}}|{{adults}}~0~0||1|2380120|SHRD|SH|STND|{{np:11.20}}|EUR|ij90kl12",
+      "cancellationPolicies": [ { "amount": "{{np:11.20}}", "from": "{{deadline:2}}T{{time}}:00", "currencyId": "EUR" } ], "factsheetId": 39 }
+  ]
+}

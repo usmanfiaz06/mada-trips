@@ -35,6 +35,8 @@ export const Activity = z.object({
   summary: z.string().nullable(),
   summaryAr: z.string().nullable(),
   image: PlaceImage.nullable(),
+  /** Our own photo key (apps/mobile/assets/photos), for places we know by hand. Wins over `image`. */
+  photo: z.string().nullable(),
   /** OpenStreetMap's opening_hours, as mapped ("Tu-Su 09:00-17:00"). */
   hours: z.string().nullable(),
   /** Open at the moment we answered, in the city's time. Null when the hours are unknown or too complex to read. */
@@ -71,6 +73,7 @@ export const Experience = z.object({
   title: z.string(),
   summary: z.string().nullable(),
   image: z.object({ url: z.url(), credit: z.string() }).nullable(),
+  photo: z.string().nullable(),
   /** From this, per adult, in SAR (converted by the supplier or the desk's rate table). */
   priceFrom: Money,
   durationMin: z.number().int().positive().nullable(),
@@ -99,6 +102,7 @@ export const WhatsOn = z.object({
   time: z.string().nullable(),
   venue: z.string().nullable(),
   image: z.object({ url: z.url(), credit: z.string().nullable() }).nullable(),
+  photo: z.string().nullable(),
   /** The organiser's page, shown as a source, never as a way to book. */
   link: z.url().nullable(),
   family: z.boolean(),

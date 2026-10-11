@@ -1,14 +1,17 @@
 import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CreateRequestBody, DESTINATIONS, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, REQUEST_FORMS, deskQuote, deskReply, money, personName, rangeLabel, requestTitle, sarToHalalas, t,
+  CreateRequestBody, DESTINATIONS, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, REQUEST_FORMS, deskQuote, deskReply, money, personName, rangeLabel, requestTitle, sarToHalalas, t,
   type BookingRequestView, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestFormKind, type RequestQuote, type ThreadMessage,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appNotifications, appQuotes, appRequests } from "@/db/app-schema";
 import { appAuditLog } from "../audit";
+import { messageAttachment } from "../file-links";
 import { AppError } from "../http";
 import { agentFor, autopilotOn, isUuid, today, travellersOf } from "./common";
+import { flightQuoteOf, flightSummary, flightTitle, isFlightAsk, isFlightRequest, type FlightSearch } from "./flight-requests";
+import { flightsMode } from "../switches";
 
 /*
  * Requests a person at Mada completes (visa, Umrah, car, a table, things to do, flights and rooms searched by hand,
@@ -22,6 +25,7 @@ export type AskDetails = {
   source: "ask"; askKind: string; title: string; detail: string; summaryLine: string; note: string | null; query: string;
   answers: Record<string, string[]>; needs: Record<string, NeedKey[]>; search?: CreateRequestInput["search"] | null;
   service?: string | null; serviceFor?: { personId: string | null; need: string | null; destination: string | null } | null; clientId?: string | null;
+  flightRequest?: boolean;
   // Read by Trips → Requests (lib/app/trips/requests.ts): one line, and the quote once there is one.
   short?: string; quote?: number | null; quoteText?: string | null; withWhom?: "faisal";
 };
@@ -36,13 +40,19 @@ const VIEW_STATUS: Record<string, BookingRequestView["status"]> = {
 function quoteView(q: typeof appQuotes.$inferSelect | undefined): RequestQuote | null {
   if (!q) return null;
   const s = (q.offerSnapshot ?? {}) as { breakdown?: RequestQuote["breakdown"]; text?: string; lead?: string | null; needLines?: string[] };
-  return { id: q.id, total: money(q.total), breakdown: s.breakdown ?? [], text: s.text ?? "", lead: s.lead ?? null, needLines: s.needLines ?? [], expiresAt: q.expiresAt?.toISOString() ?? null, status: q.status as RequestQuote["status"] };
+  const flight = flightQuoteOf(q.offerSnapshot);
+  // A hold that has passed reads as expired at once, before the scheduled job marks it (jobs.ts).
+  const status = q.status === "open" && q.expiresAt && q.expiresAt.getTime() <= Date.now() ? "expired" : q.status;
+  return { id: q.id, total: money(q.total), breakdown: s.breakdown ?? [], text: s.text ?? "", lead: s.lead ?? null, needLines: s.needLines ?? [], expiresAt: q.expiresAt?.toISOString() ?? null, status: status as RequestQuote["status"], flight };
 }
 
 export function requestView(r: RequestRow, q?: typeof appQuotes.$inferSelect): BookingRequestView {
   const d = (r.details ?? {}) as Partial<AskDetails>;
+  // Flight requests are worded when read, so dates and words follow the reader's language (not the sender's).
+  const flight = isFlightAsk(d) && d.search ? d.search as FlightSearch : null;
   return {
-    id: r.id, kind: (d.askKind ?? "general") as BookingRequestView["kind"], status: VIEW_STATUS[r.status] ?? "sent", title: d.title ?? r.summary, summary: d.summaryLine ?? "",
+    id: r.id, kind: (d.askKind ?? "general") as BookingRequestView["kind"], status: VIEW_STATUS[r.status] ?? "sent",
+    title: flight ? flightTitle(flight) : d.title ?? r.summary, summary: flight && d.flightRequest ? flightSummary(flight, r.travellerIds.length) : d.summaryLine ?? "",
     detail: d.detail ?? "", note: d.note ?? null, travellerIds: r.travellerIds, agent: r.agentName ? { name: r.agentName } : null, quote: quoteView(q),
     promisedBy: r.promisedBy?.toISOString() ?? null, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
@@ -85,14 +95,17 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   } else if (b.search) {
     const s = b.search;
     const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || "";
-    const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : `${rangeLabel(s.depart)}, one way`) : t("request.datesLater");
+    const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
     title = b.kind === "stay" ? t("request.title.staysIn", { city }) : s.carrier ? t("request.title.airlineByHand", { airline: s.carrier === "SV" ? "Saudia" : s.carrier, city, dates }) : t("request.title.flightsTo", { city, dates });
     detail = b.kind === "stay" ? `${dates} · ${names(travellers)}` : `From ${s.from ?? "RUH"} · ${names(travellers)}${s.cabin ? ` · ${t(`cal.cabin.${s.cabin}` as never)}` : ""}`;
     promisedMin = 20;
   }
   const agentName = await agentFor(ownerId);
+  // Flights by request (switches.ts): the desk sends fare options, and the request reads as the form's answers.
+  const flightRequest = b.kind === "flight" && !!b.search && (flightsMode() === "request" || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
+  if (flightRequest) promisedMin = 60;
   const details: AskDetails = {
-    source: "ask", askKind: b.kind, title, detail, summaryLine, note: b.note || null, query: b.query, answers: b.answers, needs: b.needs,
+    source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: b.note || null, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
     short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal",
   };
@@ -138,6 +151,10 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
     if (r.status === "sent" && age > 4000) {
       await db.update(appRequests).set({ status: "reviewing", updatedAt: new Date(now) }).where(and(eq(appRequests.id, r.id), eq(appRequests.status, "sent")));
       r.status = "reviewing";
+    }
+    if (r.status === "reviewing" && age > 9000 && isFlightRequest(r.details)) {
+      await mockFlightQuote(r, now);
+      continue;
     }
     if (r.status === "reviewing" && age > 9000) {
       const q = await quoteFor(r);
@@ -187,7 +204,8 @@ function messageView(m: typeof appMessages.$inferSelect): ThreadMessage {
   const card = (m.card ?? null) as { offer?: { label: string; perPerson: number; accepted?: boolean } } | null;
   return {
     id: m.id, from: m.authorKind === "user" ? "me" : m.authorKind === "agent" ? "agent" : "mada", authorName: m.authorName, text: m.body,
-    offer: card?.offer ? { label: card.offer.label, perPerson: money(card.offer.perPerson), accepted: !!card.offer.accepted } : null, createdAt: m.createdAt.toISOString(),
+    offer: card?.offer ? { label: card.offer.label, perPerson: money(card.offer.perPerson), accepted: !!card.offer.accepted } : null,
+    attachment: messageAttachment(m.card), createdAt: m.createdAt.toISOString(),
   };
 }
 
@@ -265,3 +283,28 @@ export async function acceptThreadOffer(ownerId: string, quoteId: string, messag
   return { request: requestView(r, q2), messages: msgs.map(messageView) };
 }
 
+
+/** The mock desk's answer to a flight request: two fares from the catalogue, held for 24 hours (mock mode only). */
+async function mockFlightQuote(r: RequestRow, now: number): Promise<void> {
+  const d = r.details as AskDetails;
+  const s = d.search as FlightSearch;
+  const travellers = r.travellerIds.length ? await travellersOf(r.ownerId, r.travellerIds) : [];
+  const options = mockFareOptions({ destination: s.destination, destinationName: s.destinationName, from: s.from, depart: s.depart ?? today(), return: s.return, cabin: s.cabin, travellers });
+  const total = Math.min(...options.map((o) => o.total.amount));
+  await db.transaction(async (tx) => {
+    const [cur] = await tx.select().from(appRequests).where(eq(appRequests.id, r.id)).for("update");
+    if (!cur || cur.status !== "reviewing") return;
+    const lead = tn("beta.fq.lead", options.length);
+    const [q] = await tx.insert(appQuotes).values({
+      requestId: r.id, total, status: "open", expiresAt: new Date(now + 24 * 3_600_000),
+      lines: options.flatMap((o) => o.prices.map((p) => ({ label: `${o.airline}: ${p.name}`, amount: p.amount.amount, kind: "flight" }))),
+      offerSnapshot: { kind: "flight", source: "mock-desk", options, text: lead, lead, breakdown: [], needLines: [] },
+    }).returning({ id: appQuotes.id });
+    await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date(now), details: { ...d, quote: total, quoteText: lead } }).where(eq(appRequests.id, r.id));
+    await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: lead, card: { quoteId: q!.id, flight: true } });
+    await tx.insert(appNotifications).values({
+      userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),
+      body: t("notify.replied.body", { agent: cur.agentName ?? "Mada", what: d.short ?? "flights" }).slice(0, 90), href: `/ask/request/${r.id}`, data: { requestId: r.id },
+    });
+  });
+}

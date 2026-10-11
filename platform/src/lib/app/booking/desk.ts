@@ -1,8 +1,8 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import {
-  CARRIERS, CATALOGUE_HOTELS, DESTINATIONS, ENTRY_RULES, PICKUP_SAR, addDays, instalments, sarToHalalas, seatsFor, t, zonedToInstant,
-  type FlightOption, type OrderLine, type StayOption,
+  CARRIERS, CATALOGUE_HOTELS, DESTINATIONS, ENTRY_RULES, PICKUP_SAR, addDays, instalments, legMinutes, sarToHalalas, seatsFor, t, zonedToInstant,
+  type FareOption, type FlightOption, type OrderLine, type StayOption,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
@@ -110,9 +110,20 @@ export async function cancelOrder(orderId: string, actor: { kind: "user" | "agen
     await voidPayment(tx, o);
     await returnCredit(tx, o);
     await orderEvent(tx, o.id, "cancelled", actor);
+    await reopenQuote(tx, o);
     await appAuditLog(tx, { actorKind: actor.kind, actorId: actor.kind === "user" ? o.ownerId : actor.name, action: "order.cancelled", entityType: "app_order", entityId: o.id, summary: "Booking cancelled before it was confirmed; nothing was charged" });
     return { status: "cancelled" };
   });
+}
+
+/** A fare the desk quoted goes back on the request when its booking is cancelled before issue (still payable while held). */
+async function reopenQuote(tx: Tx, o: OrderRow) {
+  const q = (o.snapshot as { quote?: { id: string; requestId: string }; quotedFlight?: unknown }).quotedFlight ? (o.snapshot as { quote?: { id: string; requestId: string } }).quote : null;
+  if (!q) return;
+  const [row] = await tx.select({ expiresAt: appQuotes.expiresAt }).from(appQuotes).where(eq(appQuotes.id, q.id));
+  const live = !!row && (!row.expiresAt || row.expiresAt.getTime() > Date.now());
+  await tx.update(appQuotes).set({ status: live ? "open" : "expired" }).where(and(eq(appQuotes.id, q.id), eq(appQuotes.status, "accepted")));
+  await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date() }).where(and(eq(appRequests.id, q.requestId), eq(appRequests.status, "with_agent")));
 }
 
 /** Credit held for a booking that won't happen goes back to the traveller. */
@@ -213,7 +224,8 @@ async function capture(tx: Tx, o: OrderRow): Promise<boolean> {
 const SV_DRIVER = { home: { driver: "Khalid", phone: "+966 55 014 2287", waits: "10 min" }, arrive: { driver: "Ahmet", car: "Grey Mercedes Vito", plate: "34 MDA 21", door: "Door 3", phone: "+90 532 418 6610", waits: "60 min" } };
 
 async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent, now: Date): Promise<string> {
-  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string }; bundle?: boolean; draft?: { tripId?: string | null } };
+  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[] };
+  if (snap.quotedFlight) return writeQuotedTrip(tx, o, snap.quotedFlight, agent, now);
   const n = Math.max(1, o.travellerIds.length);
   const dest = DESTINATIONS[snap.search?.destination ?? ""] ?? null;
   const country = dest ? ENTRY_RULES[dest.country]?.name ?? null : null;
@@ -309,6 +321,61 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     console.warn("[booking] trip facts/charges not written (trips tables not there yet?)", e instanceof Error ? e.message : "");
   }
   return tripId!;
+}
+
+/**
+ * The trip for a fare the desk quoted and ticketed (flights by request): every leg the agent entered, the PNR and a
+ * ticket number per traveller as the desk recorded them, the bags and rules from the quote. No seats or terminals are
+ * invented: the airline gives them at check-in.
+ */
+async function writeQuotedTrip(tx: Tx, o: OrderRow & { ref: string }, fare: FareOption, agent: DeskAgent, now: Date): Promise<string> {
+  const snap = o.snapshot as { search?: { destination?: string }; place?: string; tickets?: string[] };
+  const dest = DESTINATIONS[snap.search?.destination ?? ""] ?? null;
+  const out = fare.legs.filter((l) => l.direction === "out");
+  const back = fare.legs.filter((l) => l.direction === "back");
+  const pnr = o.supplierRef && /^[A-Z0-9]{5,8}$/.test(o.supplierRef) ? o.supplierRef : o.ref;
+  const [trip] = await tx.insert(appTrips).values({
+    ownerId: o.ownerId, city: dest?.name ?? snap.place ?? out[out.length - 1]!.to, country: dest ? ENTRY_RULES[dest.country]?.name ?? null : null, imageUrl: dest?.photo ?? null,
+    startDate: out[0]!.date, endDate: back.length ? back[0]!.date : null, travellerIds: o.travellerIds, status: "booked", bookingRef: pnr,
+    confirmedByName: agent.name, confirmedByOpsUserId: agent.opsUserId ?? null,
+  }).returning({ id: appTrips.id });
+  const tripId = trip!.id;
+  const segmentIds: string[] = [];
+  for (const [i, leg] of [...out, ...back].entries()) {
+    // The first flight each way is "out" or "back"; the flights after it that way are connections.
+    const dir = leg === out[0] ? "out" : leg === back[0] ? "back" : "connection";
+    const [s] = await tx.insert(appSegments).values({
+      tripId, direction: dir, sort: i, carrier: leg.carrier, carrierName: CARRIERS[leg.carrier]?.name ?? fare.airline,
+      flightNumber: leg.flightNumber, fromAirport: leg.from, toAirport: leg.to, departLocal: `${leg.date}T${leg.dep}`, departTz: AIRPORT_TZ[leg.from] ?? "Asia/Riyadh",
+      arriveLocal: `${leg.arrDate ?? (leg.arr < leg.dep ? addDays(leg.date, 1) : leg.date)}T${leg.arr}`, arriveTz: AIRPORT_TZ[leg.to] ?? "Asia/Riyadh",
+      durationMin: legMinutes(leg), cabin: fare.cabin, terminal: null, gate: null, seats: [], baggage: fare.baggage, status: "scheduled", pnr,
+    }).returning({ id: appSegments.id });
+    segmentIds.push(s!.id);
+  }
+  const tickets = Object.fromEntries((snap.tickets ?? []).map((tk, i) => [o.travellerIds[i] ?? `t${i}`, tk]));
+  const lines = o.lines as OrderLine[];
+  const [pay] = o.paymentId ? await tx.select().from(appPayments).where(eq(appPayments.id, o.paymentId)) : [];
+  await tx.insert(appTripBookings).values({
+    tripId, orderId: o.id, ref: o.ref, lines, payPlan: o.plan, bookedAt: o.createdAt,
+    paid: { subtotal: o.subtotal + o.extra, discount: o.discount, promo: o.promo, creditUsed: o.creditUsed, charged: o.total + o.extra, card: o.paymentLabel },
+    details: { segments: segmentIds, fare: { bags: fare.baggage, change: fare.changeRule, refund: fare.refundRule, refundable: fare.refundable }, stays: {}, pickups: {}, tickets, pnr, quoted: true },
+  });
+  try {
+    await tx.transaction(async (sp) => {
+      await sp.insert(appTripFacts).values({ tripId, agentName: agent.name, discount: o.discount, bookedAt: o.createdAt }).onConflictDoUpdate({ target: appTripFacts.tripId, set: { agentName: agent.name } });
+      const amount = lines.reduce((a, l) => a + l.amount, 0) + o.extra;
+      if (amount) {
+        await sp.insert(appTripCharges).values({
+          tripId, ownerId: o.ownerId, paymentId: o.paymentId, item: "flight", title: lines[0]?.text ?? "flight", amount, method: pay?.method ?? "credit", label: o.paymentLabel, plan: o.plan,
+          instalments: o.plan === "full" ? null : instalments(amount, o.plan === "tabby" ? 4 : 3).map((a, i) => ({ seq: i + 1, dueOn: addDays(now.toISOString().slice(0, 10), i * 30), amount: a, paidAt: i === 0 ? now.toISOString() : null })),
+          creditUsed: o.creditUsed, discount: o.discount, paidAt: now,
+        });
+      }
+    });
+  } catch (e) {
+    console.warn("[booking] trip facts/charges not written (trips tables not there yet?)", e instanceof Error ? e.message : "");
+  }
+  return tripId;
 }
 
 /* ───────────── what the traveller does while the desk works ───────────── */

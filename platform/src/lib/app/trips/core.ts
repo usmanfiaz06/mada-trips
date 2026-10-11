@@ -7,6 +7,7 @@ import {
 import { db, type Tx } from "@/db";
 import { appPeople, appPickups, appSegments, appStays, appTrips, appUsers } from "@/db/app-schema";
 import { appTripCharges, appTripFacts } from "@/db/app-schema-trips";
+import { appTripBookings } from "@/db/app-schema-booking";
 import { isProductionDeploy, supplierMode } from "../config";
 import { AppError } from "../http";
 
@@ -101,7 +102,10 @@ export async function loadBase(trip: TripRow, tx: Exec = db): Promise<Omit<TripD
     };
   });
   const byId = new Map(people.map((p) => [p.id, travellerOf(p, owner?.name ?? "")]));
-  const travellers = trip.travellerIds.map((id) => byId.get(id)).filter((x): x is TripTraveller => !!x);
+  // E-ticket numbers the desk recorded when it issued (flights by request), per traveller.
+  const bookings = await tx.select({ details: appTripBookings.details }).from(appTripBookings).where(eq(appTripBookings.tripId, trip.id));
+  const tickets = Object.assign({}, ...bookings.map((b) => ((b.details as { tickets?: Record<string, string> }).tickets ?? {}))) as Record<string, string>;
+  const travellers = trip.travellerIds.map((id) => byId.get(id)).filter((x): x is TripTraveller => !!x).map((p) => (tickets[p.id] ? { ...p, ticketNumber: tickets[p.id]! } : p));
   const sum = (items: string[]) => charges.filter((c) => items.includes(c.item)).reduce((a, c) => a + c.amount, 0);
   const flights = sum(["flight"]);
   const staysSum = sum(["stay"]);

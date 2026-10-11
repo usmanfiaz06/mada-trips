@@ -35,7 +35,7 @@ export function pepper(): string {
 }
 
 export type SupplierName = (typeof SUPPLIERS)[number];
-export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase", "activities", "events", "weather", "openData"] as const;
+export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase", "activities", "events", "weather", "openData", "transfers"] as const;
 
 /** Free, keyless open data: live by default everywhere. Only SUPPLIER_MODE_FLIGHT_POSITIONS switches it (not SUPPLIER_MODE). */
 // Things to do: Open-Meteo, OpenStreetMap/Wikidata and the events list (Ticketmaster only with TICKETMASTER_KEY) are too.
@@ -48,7 +48,8 @@ const envName = (s: SupplierName) => `SUPPLIER_MODE_${s.replace(/[A-Z]/g, (c) =>
 export function supplierMode(name: SupplierName): SupplierMode {
   const global = LIVE_BY_DEFAULT.has(name) ? "live" : process.env.SUPPLIER_MODE;
   const raw = (process.env[envName(name)] ?? global ?? (isProductionDeploy() ? "live" : "mock")).toLowerCase();
-  const mode: SupplierMode = raw === "live" ? "live" : "mock";
+  // A vendor name means live with that vendor (SUPPLIER_MODE_HOTELS=hotelbeds, SUPPLIER_MODE_TRANSFERS=hotelbeds).
+  const mode: SupplierMode = raw === "live" || raw === "hotelbeds" ? "live" : "mock";
   if (mode === "mock" && isProductionDeploy() && process.env.APP_ALLOW_MOCKS !== "yes") {
     throw new Error(`Supplier ${name} is in mock mode on a production deployment. Set ${envName(name)}=live, or APP_ALLOW_MOCKS=yes for a staging copy.`);
   }

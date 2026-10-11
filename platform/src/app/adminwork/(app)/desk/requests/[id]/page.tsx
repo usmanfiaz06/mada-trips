@@ -18,6 +18,7 @@ import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
 import { DeskTimeline, Facts, REQUEST_STATUS, StatusBadge, Thread } from "@/components/desk/parts";
 import { askAction, checklistAction, doneAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { ActivityCard } from "@/components/desk/activity";
 
 export const metadata = { title: "Request · Desk" };
 
@@ -35,7 +36,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const closed = ["done", "cancelled", "confirmed"].includes(r.status);
   const sla = r.status === "sent" || r.status === "reviewing" ? slaFor("request", r.createdAt, new Date(), { due: r.promisedBy }) : null;
   const checklist = d.checklist ?? (CHECKLISTS[r.kind] ?? []).map((label) => ({ label, done: false }));
-  const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message"].includes(k)).slice(0, 12);
+  const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message", "activity"].includes(k)).slice(0, 12);
   const quote = x.quotes.find((q) => q.status !== "withdrawn");
   const place = r.kind === "destination" ? destinationOf(r.details) : null;
 
@@ -69,6 +70,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               <a href={place.guideUrl} target="_blank" rel="noopener noreferrer" className={btn("outline", "sm")}>{t("City guide")} ↗</a>
             </Card>
           )}
+          {r.kind === "activity" && <ActivityCard id={r.id} details={r.details} act={act} t={t} />}
           <Card>
             <CardHead title={t("What they asked for")} />
             {asked.length ? <Facts rows={asked.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13.5px] text-ink-2">{r.summary}</p>}
