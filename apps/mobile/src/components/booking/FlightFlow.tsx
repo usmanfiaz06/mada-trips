@@ -4,12 +4,12 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, quickDates,
+  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, nameIn, quickDates,
   type AskIntent, type FlightOption, type FlightSearchResponse, type Person,
 } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { getLocale, t, tn } from '@/lib/i18n';
 import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
@@ -23,6 +23,8 @@ import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
 import { ArtCalendar, Ask1, Leg, Working, useSequence, enter } from './parts';
 import { ByHand, RequestFlow, SentRequest } from './Requests';
+import { Answered } from './Conversation';
+import { PhoneGate, usePhoneNeeded } from './PhoneSheet';
 import { FlightRequestForm } from './FlightRequest';
 import { useFlightsByRequest } from '@/lib/beta';
 import { SearchSheet, type TripSearch } from './SearchSheet';
@@ -56,13 +58,17 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Flights by request (the beta): no live fares; the form goes to Mada and the fares come back in the request.
   const byRequest = useFlightsByRequest();
+  // Booking needs a verified phone (the server says so): asked here, before the search, not at the payment.
+  const phoneNeeded = usePhoneNeeded();
+  // Questions this flow asked (not ones the words answered): they stay above as the traveller's answers, tap to change.
+  const [asked] = useState(() => ({ where: !intent.destination, when: !intent.depart }));
   const [sentId, setSentId] = useState<string | null | undefined>(undefined);
 
   const dest = where.key ? DESTINATIONS[where.key] ?? null : null;
   const byHand = !!where.other || !!dest?.byHand;
   const needRet = trip.type === 'return' && !!trip.dep && !trip.ret;
   const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && (whoDone || byRequest);
-  const live = ready && !byHand && !!dest && !byRequest;
+  const live = ready && !byHand && !!dest && !byRequest && !phoneNeeded;
   const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), t('search.working.matching', { count: who.length })];
   const step = useSequence(steps.length, 750, live ? `${runKey}` : null);
   const flags = [...demo].sort().join(',');
@@ -138,6 +144,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     buzz('tap');
   }
 
+  const cityName = dest ? nameIn(dest.name, getLocale()) : where.other ?? '';
+  const whereRow = asked.where ? <Answered q={t('ask.q.where')} a={cityName} onChange={() => { setWhere({ key: null, other: null }); setRunKey((k) => k + 1); }} testID="flight-where-answer" /> : null;
+  const whenRow = asked.when && trip.dep ? <Answered q={t('ask.q.when')} a={trip.type === 'oneway' || !trip.ret ? rangeName(trip.dep, null, today) : rangeName(trip.dep, trip.ret, today)} onChange={() => setTrip({ ...trip, dep: null, ret: null })} testID="flight-when-answer" /> : null;
+
   if (!trip.dep) {
     const mo = intent.monthOnly;
     const quick = quickDates(today);
@@ -146,23 +156,25 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       ? [...inMonth.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']]
       : [...quick.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']];
     return (
-      <>
+      <View style={{ gap: 18 }}>
+        {whereRow}
         <Ask1 q={mo ? t('ask.q.whenIn', { month: mo.label ?? MONTH_LONG[mo.month - 1]! }) : t('ask.q.when')} options={opts} onPick={(v) => {
           if (v === 'pick') { setEditing({ month: mo }); return; }
           const q = quick.find((x) => x.id === v)!;
           setTrip({ ...trip, dep: q.dates[0], ret: trip.type === 'oneway' ? null : q.dates[1] });
         }} />
         {sheet}
-      </>
+      </View>
     );
   }
   if (needRet) {
     return (
-      <>
+      <View style={{ gap: 18 }}>
+        {whereRow}
         <Ask1 q={t('ask.q.return', { day: dayName(trip.dep, today) })} options={[[t('ask.q.after3', { day: dayName(addDays(trip.dep, 3), today) }), '3'], [t('ask.q.afterWeek', { day: dayName(addDays(trip.dep, 7), today) }), '7'], [t('ask.q.oneWay'), 'oneway'], [t('ask.q.pickDates'), 'pick']]}
           onPick={(v) => (v === 'pick' ? setEditing({}) : v === 'oneway' ? setTrip({ ...trip, type: 'oneway', ret: null }) : setTrip({ ...trip, ret: addDays(trip.dep!, Number(v)) }))} />
         {sheet}
-      </>
+      </View>
     );
   }
   if (byRequest) {
@@ -179,6 +191,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     const self = people.find((p) => p.id === who[0]);
     return (
       <Animated.View entering={enter(0)} style={{ gap: 12 }}>
+        {whereRow}
+        {whenRow}
         <T v="h2">{t('ask.q.who')}</T>
         {intent.travellerCount && intent.travellerCount > who.length ? <T v="small">{t('ask.q.whoSaid', { count: intent.travellerCount })}</T> : null}
         <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} />
@@ -197,6 +211,15 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     );
   }
 
+  if (phoneNeeded && !byHand) {
+    return (
+      <View style={{ gap: 18 }}>
+        {whereRow}
+        {whenRow}
+        <PhoneGate why={t('ask.phone.beforeFlights', { city: cityName })} />
+      </View>
+    );
+  }
   if (step < steps.length || search.isLoading || !s) return <Working lines={steps} step={Math.min(step, steps.length - 1)} />;
 
   if (s.outcome === 'partial' && mode === 'normal') {

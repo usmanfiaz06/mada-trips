@@ -184,7 +184,7 @@ function RequestCard({ r }: { r: TripRequestView }) {
     <Box testID={`request-${r.kind}`}>
       <Spread align="flex-start">
         {/* Every request opens: a booking's order, the thread for an Ask request, the trip for a trip's own ask. */}
-        <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(requestHref(r) as Href)} testID={r.kind === 'flight' ? 'open-flight-request' : 'open-request'}><H3>{r.title}</H3></Pressable>
+        <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(requestHref(r) as Href)} testID={r.kind === 'flight' ? 'open-flight-request' : `open-request-${r.kind}`}><H3>{r.title}</H3></Pressable>
         <RequestStatusPill r={r} />
       </Spread>
       {r.detail ? <Small>{r.detail}</Small> : null}

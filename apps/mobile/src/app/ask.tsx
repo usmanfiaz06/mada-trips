@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
@@ -14,7 +14,8 @@ import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, type Cta } from '@/components/booking/FlightFlow';
 import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
-import { RequestFlow } from '@/components/booking/Requests';
+import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
+import { MeBubble } from '@/components/booking/Conversation';
 import { ApiError } from '@/lib/api';
 import { bookingApi, useDemo } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
@@ -57,6 +58,11 @@ export default function Ask() {
   const [parsing, setParsing] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
+  // A request sent from here: its thread takes the bottom box (one composer, never two). "Ask something else" gives it back.
+  const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
+  const [askNew, setAskNew] = useState(false);
+  const scroll = useRef<ScrollView>(null);
+  const onReply = useCallback((r: { id: string; agent: string } | null) => { setReplyTo(r); setAskNew(false); }, []);
   const selfName = user?.name ?? '';
   const household = people.data ?? [];
 
@@ -64,7 +70,7 @@ export default function Ask() {
     const v = text.trim();
     if (!v) return;
     buzz('tap');
-    setQuery(v); setCta(null); setDraft('');
+    setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false);
     if (status !== 'signedIn') { setNeedsSignIn(true); return; }
     setParsing(true);
     try {
@@ -107,15 +113,20 @@ export default function Ask() {
           <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable>
         ) : undefined} />
         <T v="tiny" style={{ marginHorizontal: 24, marginBottom: 8 }}>{t('ask.disclosure')}</T>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {query ? <Animated.View entering={enter(0)} style={styles.bubble}><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{query}</T></Animated.View> : null}
-          {body}
+        <ScrollView ref={scroll} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {query ? <MeBubble text={query} testID="ask-query" /> : null}
+          <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
         </ScrollView>
         <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
           {cta && !offline ? (
             <>
               <Button label={cta.label} disabled={cta.disabled} onPress={cta.onPress} testID={cta.testID ?? 'ask-cta'} />
               <View style={{ alignSelf: 'center' }}><LinkButton label={t('ask.somethingElse')} size={13} onPress={() => setCta(null)} /></View>
+            </>
+          ) : replyTo && !askNew ? (
+            <>
+              <ReplyBar requestId={replyTo.id} agent={replyTo.agent} />
+              <View style={{ alignSelf: 'center' }}><LinkButton label={t('ask.somethingElse')} size={13} onPress={() => setAskNew(true)} testID="ask-something-else" /></View>
             </>
           ) : (
             <View style={styles.composer}>
@@ -174,7 +185,6 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
 
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, gap: 16, paddingTop: 4 },
-  bubble: { alignSelf: 'flex-end', maxWidth: '78%', backgroundColor: colors.green, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, borderBottomEndRadius: 6 },
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 28, paddingHorizontal: 20, gap: 6, backgroundColor: 'rgba(233,226,216,0.96)' },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },
