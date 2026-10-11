@@ -101,7 +101,7 @@ export default function NewCircle() {
   const hits = search.data?.people ?? [];
   return (
     <Screen>
-      <TopBar onBack={() => setStage('name')} right={<T v="tiny" style={{ paddingEnd: 8 }}>{t('circles.newCircle.step', { n: 2 })}</T>} />
+      <TopBar home={false} onBack={() => setStage('name')} right={<T v="tiny" style={{ paddingEnd: 8 }}>{t('circles.newCircle.step', { n: 2 })}</T>} />
       <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
         <View style={{ gap: 4 }}>
           <T v="h1" accessibilityRole="header">{t('circles.newCircle.who', { name: name.trim() })}</T>

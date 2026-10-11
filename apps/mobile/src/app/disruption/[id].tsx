@@ -89,7 +89,7 @@ export default function Disruption() {
   if (shown === 'queued') {
     return (
       <Screen>
-        <TopBar onBack={() => { if (queued) discardQueued(queued.id); setStage('choose'); }} backLabel={t('dz.chooseAgain')} right={<CallLink />} />
+        <TopBar home={false} onBack={() => { if (queued) discardQueued(queued.id); setStage('choose'); }} backLabel={t('dz.chooseAgain')} right={<CallLink />} />
         <Scroll top={8} bottomPad={200}>
           <View style={styles.wait}><Icon name="wifiOff" size={28} /></View>
           <T v="h1" accessibilityRole="header">{t('dz.q.title')}</T>

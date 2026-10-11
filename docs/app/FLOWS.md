@@ -50,6 +50,20 @@ People get into the app first. Only alerts are asked during sign-up; the passpor
 | With Faisal | Live steps, then **confirmed** | **Faisal needs an answer** (demo switch): a name-on-ticket question, answered in one tap. |
 | After | The trip appears in Trips and on Today, tickets go to the Wallet, the flight goes on the radar | — |
 
+### 2a. Flights by request (the beta)
+
+While no GDS adapter is connected (`APP_FLIGHTS_MODE=request`, GET /config `features.flightsByRequest`), flights go through the agent desk instead of live fares.
+
+| Step | Happy path | Edge cases |
+|---|---|---|
+| Ask | Where, when and who as in §2, then **Tell us where and when**: how flexible (exact, 1 or 3 days either side), cabin, bags each, what they'd like (direct, morning, evening, Saudia, seats together, aisle) and a note → **Send to Mada** | **Offline:** saved, sent when the connection is back. |
+| Requests | The request in Trips → Requests: sent, then reviewing, with the form's answers in one line | Worded in the reader's language when read (dates too). |
+| The desk | A person books or holds the fares in Mada's own system, then sends up to four from the desk's quote builder: flights (connections too), a price per traveller (adult, child, infant), bags, change and refund rules, the hold | The traveller is told ("Faisal replied"). A new set of fares replaces the old. |
+| Fares | Each fare with its flights, stops, total; tap for bags, rules and the price per person; the hold counts down | **Hold ends:** "This hold has ended. Ask Faisal to check the fare again." (the thread says so too, and nothing can be paid). **Ask for another option** in the thread. |
+| Pay | **Pay SAR …** opens the same pay sheet (instalments, credit, promo codes, 3-D Secure); the card is authorised, captured when the tickets are issued | **No verified phone** while booking allows it: *A number to reach you* on the pay sheet (AUTH.md). **Cancelled before issue:** the fare goes back on the request while it's held. |
+| With Mada | The same waiting screen; the desk enters the PNR and a ticket number per traveller and issues | **Ticketing fails:** the card hold is released (§2). |
+| After | The trip in Trips and on Today with every leg, the PNR and each person's ticket number; the e-tickets the agent attaches open from the request's thread | No seats are shown until the airline gives them. |
+
 ## 3. Hotels only
 
 **Path:** Ask "a hotel in Istanbul" → 3 stays → choose rooms → the same pay sheet and the same confirmation.

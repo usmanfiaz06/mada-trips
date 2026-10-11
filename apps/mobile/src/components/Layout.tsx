@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useSegments } from 'expo-router';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { colors, space, ff } from '@/theme';
@@ -21,16 +22,29 @@ export function Screen({ children, dark, background, style }: { children: ReactN
   return <View style={[styles.screen, { backgroundColor: background ?? (dark ? colors.green : colors.sand) }, style]}>{children}</View>;
 }
 
-/** Back on the start side, an optional title, an optional action on the end side. Back is also a swipe; this is the backup. */
-export function TopBar({ onBack, backLabel, title, right, dark }: { onBack?: () => void; backLabel?: string; title?: string; right?: ReactNode; dark?: boolean }) {
+/** Sign-up and sign-in screens keep their own way out (they lead to Welcome, not Today). */
+const NO_HOME = new Set(['(onboarding)', 'recover', 'verify-phone', 'invite-code', 'auth-callback']);
+
+/**
+ * Back on the start side (top-left, top-right in Arabic), an optional title, an optional action on the end side.
+ * Back is also the iOS swipe; this is the visible way. A screen opened from a link with nothing behind it gets Home
+ * (to Today) instead of a Back that has nowhere to go. `home={false}` for a Back that steps within the screen.
+ */
+export function TopBar({ onBack, backLabel, title, right, dark, home = true }: { onBack?: () => void; backLabel?: string; title?: string; right?: ReactNode; dark?: boolean; home?: boolean }) {
   const top = useTopInset();
+  const router = useRouter();
+  const segments = useSegments() as string[];
   const fg = dark ? colors.onDark : colors.green;
+  let goHome = false;
+  try { goHome = !!onBack && home && !router.canGoBack() && !NO_HOME.has(segments[0] ?? ''); } catch { goHome = false; }
+  const label = goHome ? t('common.home') : backLabel ?? t('common.back');
+  const press = goHome ? () => router.replace('/today') : onBack;
   return (
     <View style={[styles.topbar, { paddingTop: top + 10 }]}>
-      {onBack ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={backLabel ?? t('common.back')} onPress={() => { buzz('tap'); onBack(); }} style={styles.back} hitSlop={8}>
-          <Icon name="back" color={fg} />
-          <T v="callout" color={fg} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{backLabel ?? t('common.back')}</T>
+      {press ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => { buzz('tap'); press(); }} style={styles.back} hitSlop={8} testID={goHome ? 'topbar-home' : 'topbar-back'}>
+          <Icon name={goHome ? 'home' : 'back'} size={goHome ? 20 : undefined} color={fg} />
+          <T v="callout" color={fg} style={{ fontFamily: ff.ui500, fontSize: 15, marginStart: goHome ? 4 : 0 }}>{label}</T>
         </Pressable>
       ) : <View style={{ width: 44 }} />}
       {title ? <T v="h3" color={fg} style={{ fontSize: 17 }}>{title}</T> : null}

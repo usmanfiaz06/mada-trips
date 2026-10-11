@@ -118,6 +118,33 @@ and a replayed old token revokes the session. Every request checks the session i
 immediate. Passport numbers are AES-256-GCM encrypted, bound to their row, returned only masked (`A08•••41`), and never
 written to logs. `app_audit` and `app_credit_ledger` are append-only (database trigger).
 
+### Launching, the guard and the scheduled jobs
+
+```bash
+npm run app:preflight                       # the launch checklist for this shell's environment (✓ ! ✗)
+APP_ENV=production npm run app:preflight    # as a production deployment would see it; exits 1 on a blocker
+npm run app:jobs -- all                     # run the scheduled jobs once against DATABASE_URL
+```
+
+- **The launch guard** (`platform/src/lib/app/launch.ts`). On a production deployment every app route answers
+  `503 MAINTENANCE` (`details.launch: true`, so the app shows its maintenance screen) while any blocker stands: a supplier
+  in mock mode without `APP_ALLOW_MOCKS=yes`, required environment missing or unusable (`DATABASE_URL`, `SUPABASE_URL`,
+  `APP_JWT_SECRET`, `APP_DATA_KEY` for passports and files, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`),
+  `APP_LEGACY_AUTH=yes`, or the mock desk switched on (`APP_DESK_AUTOPILOT=on`). The reason is logged once per instance
+  (`[launch-guard]`) and listed by `GET /status` under `launch.problems`; `GET /config`, `/status`, `/health` and
+  webhooks still answer. Warnings (allowed mocks, `APP_BOOKING_REQUIRES_PHONE=no`, no `APP_BLOB_DIR`) only print.
+- **The beta's switches** (`platform/src/lib/app/switches.ts`): `APP_FLIGHTS_MODE=request|live` (default: live when
+  `GDS_API_URL` is set or on the mock catalogue outside production, request otherwise; FLOWS.md §2a),
+  `APP_BOOKING_REQUIRES_PHONE=yes|no` (AUTH.md), and the mock desk never runs on production unless
+  `APP_DESK_AUTOPILOT=on` (a real agent issues, even on mock payments).
+- **Scheduled jobs** (`platform/src/lib/app/jobs.ts`, `GET /api/cron/{exports|deletions|recovery|quotes|all}` with
+  `Authorization: Bearer $CRON_SECRET`, scheduled in `platform/vercel.json`): copies of everything built, emailed and
+  announced in the app (every 15 minutes); held quotes that ran out marked expired, the traveller told once, bookings
+  stuck at the bank's code for 30 minutes cancelled (every 15 minutes); accounts past their 30 days anonymised and their
+  Supabase Auth user deleted through the admin API (mock when `SUPABASE_SERVICE_ROLE_KEY` is unset; daily); contact
+  details on closed recovery requests wiped 30 days after the desk decided (daily). Every-15-minute crons need Vercel Pro;
+  on Hobby set them daily.
+
 ### Tests
 
 ```bash
