@@ -7,7 +7,10 @@ export const NotificationLevel = z.enum(['time_sensitive', 'active', 'passive'])
 export const NotificationKind = z.enum([
   'gate_change', 'leave_now', 'driver_here', 'booking_confirmed', 'connection_risk', 'flight_cancelled', 'flight_delayed',
   'refund_moved', 'agent_reply', 'agent_needs_answer', 'document_problem', 'digest', 'circle', 'other',
+  // Circles and friends (platform/src/lib/app/circles/*): dotted, as the server writes them.
+  'circle.invite', 'circle.joined', 'circle.share_reminder', 'friend.request', 'friend.joined', 'around.hello', 'post.thanks',
 ]);
+export type NotificationKind = z.infer<typeof NotificationKind>;
 
 export const Notification = z.object({
   id: Id,

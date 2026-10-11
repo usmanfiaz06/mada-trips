@@ -99,7 +99,9 @@ const send = <S extends z.ZodType>(method: 'POST' | 'PATCH' | 'DELETE', path: st
 export const newKey = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
 const Ok = z.object({ ok: z.boolean() }).passthrough();
-const NotificationsResponse = z.object({ items: z.array(Notification), next: z.string().nullable(), unread: z.number().int() });
+// One notification this build can't read (a kind added on the server later) is skipped, not the whole inbox.
+const NotificationList = z.array(z.unknown()).transform((xs) => xs.flatMap((x) => { const r = Notification.safeParse(x); return r.success ? [r.data] : []; }));
+const NotificationsResponse = z.object({ items: NotificationList, next: z.string().nullable(), unread: z.number().int() });
 const RefundsResponse = z.object({ refunds: z.array(RefundResponse.shape.refund) });
 const RequestsResponse = z.object({ requests: z.array(TripAskResponse.shape.request.unwrap()) });
 

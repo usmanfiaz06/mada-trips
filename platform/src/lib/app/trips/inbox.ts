@@ -1,6 +1,6 @@
 import "server-only";
 import { and, count, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
-import type { Notification } from "@mada/shared";
+import { NotificationKind, type Notification } from "@mada/shared";
 import { db } from "@/db";
 import { appDevices, appNotifications } from "@/db/app-schema";
 import { appAuditLog } from "../audit";
@@ -11,7 +11,8 @@ import { isExpoToken } from "../push";
 
 type Row = typeof appNotifications.$inferSelect;
 const toView = (n: Row): Notification => ({
-  id: n.id, kind: n.kind as Notification["kind"], level: n.level as Notification["level"], title: n.title.slice(0, 32), body: n.body.slice(0, 90),
+  // A kind this build doesn't know reads as 'other', so one new kind never breaks an older phone's whole inbox.
+  id: n.id, kind: NotificationKind.safeParse(n.kind).success ? (n.kind as Notification["kind"]) : "other", level: n.level as Notification["level"], title: n.title.slice(0, 32), body: n.body.slice(0, 90),
   href: n.href, readAt: n.readAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString(),
 });
 
