@@ -30,7 +30,7 @@ export function parseViator(data: unknown, limit: number): Experience[] {
     const img = (p.images?.[0]?.variants ?? []).filter((v) => v.url?.startsWith("https://")).sort((a, b) => Math.abs((a.width ?? 0) - 720) - Math.abs((b.width ?? 0) - 720))[0]?.url;
     out.push({
       id: `viator:${p.productCode}`, supplier: "viator", code: p.productCode, modality: null, title: p.title.slice(0, 160), summary: p.description ? p.description.slice(0, 280) : null,
-      image: img ? { url: img, credit: "Viator" } : null, priceFrom: { amount: activitySell(from, p.pricing?.currency ?? "USD"), currency: "SAR" },
+      image: img ? { url: img, credit: "Viator" } : null, photo: null, priceFrom: { amount: activitySell(from, p.pricing?.currency ?? "USD"), currency: "SAR" },
       durationMin: p.duration?.fixedDurationInMinutes ?? p.duration?.variableDurationFromMinutes ?? null,
       rating: typeof p.reviews?.combinedAverageRating === "number" ? Math.min(5, p.reviews.combinedAverageRating) : null, reviews: p.reviews?.totalReviews ?? null,
       family: /family|kids|children/i.test(p.title), minAge: null, freeCancel: p.flags?.includes("FREE_CANCELLATION") ?? null,

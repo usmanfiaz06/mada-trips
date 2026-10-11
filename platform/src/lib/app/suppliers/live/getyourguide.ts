@@ -27,7 +27,7 @@ export function parseGyg(data: unknown, limit: number): Experience[] {
     const img = t.pictures?.[0]?.url?.replace("[format_id]", "21");
     out.push({
       id: `getyourguide:${code}`, supplier: "getyourguide", code, modality: null, title: t.title.slice(0, 160), summary: t.abstract?.slice(0, 280) ?? null,
-      image: img?.startsWith("https://") ? { url: img, credit: "GetYourGuide" } : null, priceFrom: { amount: activitySell(amount, "USD"), currency: "SAR" },
+      image: img?.startsWith("https://") ? { url: img, credit: "GetYourGuide" } : null, photo: null, priceFrom: { amount: activitySell(amount, "USD"), currency: "SAR" },
       durationMin: dur, rating: typeof t.overall_rating === "number" ? Math.min(5, t.overall_rating) : null, reviews: t.number_of_ratings ?? null,
       family: /family|kids|children/i.test(t.title), minAge: null, freeCancel: null,
     });

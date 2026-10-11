@@ -87,7 +87,7 @@ export function parseHotelbedsAvailability(data: unknown, q: Pick<ActivitySearch
     const minAge = (a.modalities ?? []).map((m) => m.minChildrenAge).filter((x): x is number => typeof x === "number").sort((x, y) => x - y)[0] ?? null;
     out.push({
       id: `hotelbeds:${code}`, supplier: "hotelbeds", code, modality: priced?.m.code ?? null, title: title.slice(0, 160),
-      summary: a.content?.description ? clip(strip(a.content.description), 280) : null, image: photo(a), priceFrom: { amount: sell, currency: "SAR" },
+      summary: a.content?.description ? clip(strip(a.content.description), 280) : null, image: photo(a), photo: null, priceFrom: { amount: sell, currency: "SAR" },
       durationMin: minutes(priced?.m.duration ?? a.modalities?.[0]?.duration), rating: null, reviews: null,
       family: minAge !== null ? minAge <= 6 : /family|kids|children|zoo|aquarium|theme park|water ?park/i.test(title), minAge, freeCancel: null,
     });

@@ -45,7 +45,7 @@ export function parseTicketmaster(data: unknown, placeId: string): WhatsOn[] {
       id: `tm:${e.id}`, source: "ticketmaster", placeId, title: e.name.slice(0, 160), body: [seg?.segment?.name, seg?.genre?.name].filter((x) => x && x !== "Undefined").join(" · ") || null,
       startsOn: start, endsOn: e.dates?.end?.localDate && /^\d{4}-\d{2}-\d{2}$/.test(e.dates.end.localDate) ? e.dates.end.localDate : start,
       time: e.dates?.start?.localTime ? e.dates.start.localTime.slice(0, 5) : null, venue: e._embedded?.venues?.[0]?.name ?? null,
-      image: img?.url ? { url: img.url, credit: "Ticketmaster" } : null, link: e.url?.startsWith("https://") ? e.url : null,
+      image: img?.url ? { url: img.url, credit: "Ticketmaster" } : null, photo: null, link: e.url?.startsWith("https://") ? e.url : null,
       family: !!seg?.family || /family|kids|children/i.test(`${seg?.segment?.name ?? ""} ${seg?.genre?.name ?? ""}`),
     });
   }
