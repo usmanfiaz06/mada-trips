@@ -15,9 +15,9 @@ function err(code: ErrorCode, message?: string): WireResponse {
 }
 const uuid = () => '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
 
-type State = { requested: Map<string, { id: string; vehicle: string; status: string }>; options: Map<string, TransferOption & { tripId: string }>; cancelled: Set<string>; clientKeys: Map<string, BookingRequestView> };
+type State = { seen: Map<string, string>; requested: Map<string, { id: string; vehicle: string; status: string }>; options: Map<string, TransferOption & { tripId: string }>; cancelled: Set<string>; clientKeys: Map<string, BookingRequestView> };
 const states = new Map<string, State>();
-const stateOf = (userId: string) => { let s = states.get(userId); if (!s) { s = { requested: new Map(), options: new Map(), cancelled: new Set(), clientKeys: new Map() }; states.set(userId, s); } return s; };
+const stateOf = (userId: string) => { let s = states.get(userId); if (!s) { s = { seen: new Map(), requested: new Map(), options: new Map(), cancelled: new Set(), clientKeys: new Map() }; states.set(userId, s); } return s; };
 
 const HOTELS: Record<number, HotelDetails> = {
   99701: {
@@ -76,22 +76,18 @@ export const transfersMock: AreaMock = async (w, ctx) => {
     return h ? ok({ hotel: h }) : err('NOT_FOUND');
   }
   if (parts[0] === 'vouchers') {
-    // Vouchers belong to a trip: look through this account's trips for it.
-    const list = await tripsMock({ ...w, method: 'GET', path: '/trips', body: undefined }, ctx);
-    const trips = ((list?.json as { trips?: { id: string }[] } | undefined)?.trips ?? []);
-    for (const tr of trips) {
-      const trip = await tripOf(w, ctx, tr.id);
-      const v = trip ? stayVoucher(trip, s) : null;
-      if (v && v.id === parts[1]) {
-        if (parts[2] === 'cancel') {
-          const confirm = !!(w.body as { confirm?: boolean } | undefined)?.confirm;
-          if (v.status === 'cancelled') return err('VALIDATION', 'This booking is already cancelled.');
-          if (confirm) s.cancelled.add(v.id);
-          const after = stayVoucher(trip!, s)!;
-          return ok({ simulated: !confirm, fee: { amount: confirm ? 0 : 0, currency: 'SAR' }, supplierFee: { amount: 0, currency: 'EUR' }, voucher: after }, confirm ? 201 : 200);
-        }
-        return ok({ voucher: v });
+    // A voucher belongs to a trip this account has listed vouchers for.
+    const tripId = s.seen.get(parts[1] ?? '');
+    const trip = tripId ? await tripOf(w, ctx, tripId) : null;
+    const v = trip ? stayVoucher(trip, s) : null;
+    if (trip && v) {
+      if (parts[2] === 'cancel') {
+        const confirm = !!(w.body as { confirm?: boolean } | undefined)?.confirm;
+        if (v.status === 'cancelled') return err('VALIDATION', 'This booking is already cancelled.');
+        if (confirm) s.cancelled.add(v.id);
+        return ok({ simulated: !confirm, fee: { amount: 0, currency: 'SAR' }, supplierFee: { amount: 0, currency: 'EUR' }, voucher: stayVoucher(trip, s) }, confirm ? 201 : 200);
       }
+      return ok({ voucher: v });
     }
     return err('NOT_FOUND');
   }
@@ -100,6 +96,7 @@ export const transfersMock: AreaMock = async (w, ctx) => {
   if (!trip) return err('NOT_FOUND');
   if (parts[2] === 'vouchers') {
     const v = stayVoucher(trip, s);
+    if (v) s.seen.set(v.id, trip.id);
     return ok({ vouchers: v ? [v] : [] });
   }
   const outs = trip.segments.filter((x) => x.direction === 'out');
