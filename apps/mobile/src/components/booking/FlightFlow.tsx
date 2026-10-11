@@ -143,8 +143,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     const quick = quickDates(today);
     const inMonth = mo ? quick.filter((q) => Number(q.dates[0].slice(5, 7)) === mo.month) : [];
     const opts: [string, string][] = mo
-      ? [...inMonth.map((q): [string, string] => [`${q.label.split(' ·')[0]} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']]
-      : [...quick.map((q): [string, string] => [q.id === 'eid' ? `Eid al-Fitr · ${rangeName(q.dates[0], q.dates[1], q.dates[0])}` : `${q.label} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']];
+      ? [...inMonth.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']]
+      : [...quick.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']];
     return (
       <>
         <Ask1 q={mo ? t('ask.q.whenIn', { month: mo.label ?? MONTH_LONG[mo.month - 1]! }) : t('ask.q.when')} options={opts} onPick={(v) => {

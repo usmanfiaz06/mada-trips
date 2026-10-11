@@ -4,7 +4,7 @@
  * entry checks, the desk's per-person quotes, promo codes, cards and seats. Pure functions, no I/O.
  */
 import { t, tn, type CopyKey } from '../copy';
-import type { Lang } from '../locale';
+import { localizeDigits, type Lang } from '../locale';
 import { commaList, wordFor } from './booking-words';
 import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
 import { formatSar, sarToHalalas } from '../money';
@@ -31,14 +31,16 @@ export function weekendDates(today: string, offset = 0): [string, string] {
 }
 
 /** Quick picks in the calendar and the "When?" chips. Fixed season dates drop off once they're past. */
-export function quickDates(today: string): { id: string; label: string; dates: [string, string] }[] {
-  const all: { id: string; label: string; dates: [string, string] }[] = [
-    { id: 'thisWeekend', label: 'This weekend', dates: weekendDates(today, 0) },
-    { id: 'nextWeekend', label: 'Next weekend', dates: weekendDates(today, 1) },
-    { id: 'eid', label: 'Eid al-Fitr · Mar 2027', dates: ['2027-03-09', '2027-03-15'] },
-    { id: 'school', label: 'School break', dates: ['2027-01-07', '2027-01-16'] },
+export function quickDates(today: string): { id: string; name: string; label: string; dates: [string, string] }[] {
+  const all: { id: string; name: CopyKey; month?: boolean; dates: [string, string] }[] = [
+    { id: 'thisWeekend', name: 'qd.thisWeekend', dates: weekendDates(today, 0) },
+    { id: 'nextWeekend', name: 'qd.nextWeekend', dates: weekendDates(today, 1) },
+    { id: 'eid', name: 'qd.eid', month: true, dates: ['2027-03-09', '2027-03-15'] },
+    { id: 'school', name: 'qd.school', dates: ['2027-01-07', '2027-01-16'] },
   ];
-  return all.filter((q) => q.dates[0] >= today);
+  // "Eid al-Fitr · Mar 2027": the month, and the year when it isn't this year (COPY.md §4).
+  const monthYear = (iso: string) => `${monthOf(iso)}${iso.slice(0, 4) !== today.slice(0, 4) ? ` ${localizeDigits(iso.slice(0, 4))}` : ''}`;
+  return all.filter((q) => q.dates[0] >= today).map((q) => ({ id: q.id, name: t(q.name), label: q.month ? `${t(q.name)} · ${monthYear(q.dates[0])}` : t(q.name), dates: q.dates }));
 }
 
 /** The 12 months the calendar offers, starting with this one. */

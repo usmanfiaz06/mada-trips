@@ -128,6 +128,11 @@ export const arWords: ArSection<typeof wordsCopy> = {
   'passport.demo.passportValue': 'A08•••41 · سعودي',
   'passport.demo.validValue': 'حتى يونيو 2031',
 
+  'qd.thisWeekend': 'نهاية هذا الأسبوع',
+  'qd.nextWeekend': 'نهاية الأسبوع القادم',
+  'qd.eid': 'عيد الفطر',
+  'qd.school': 'إجازة المدارس',
+
   'currency.SAR': 'ريال سعودي',
   'currency.AED': 'درهم إماراتي',
   'currency.USD': 'دولار أمريكي',

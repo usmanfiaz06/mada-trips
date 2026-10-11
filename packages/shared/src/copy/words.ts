@@ -133,6 +133,12 @@ export const wordsCopy = {
   'passport.demo.passportValue': 'A08•••41 · Saudi',
   'passport.demo.validValue': 'Until June 2031',
 
+  // ───────────── quick dates (Ask › When?, the calendar) ─────────────
+  'qd.thisWeekend': 'This weekend',
+  'qd.nextWeekend': 'Next weekend',
+  'qd.eid': 'Eid al-Fitr',
+  'qd.school': 'School break',
+
   // ───────────── currencies (Account › Currency) ─────────────
   'currency.SAR': 'Saudi riyal',
   'currency.AED': 'UAE dirham',
