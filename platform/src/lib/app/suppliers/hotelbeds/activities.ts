@@ -33,9 +33,16 @@ const BASE = "/activity-api/3.0";
 type Amount = { paxType?: string; ageFrom?: number; ageTo?: number; amount?: number };
 type RateDetail = { rateKey?: string; totalAmount?: { amount?: number }; operationDates?: { from?: string; to?: string; cancellationPolicies?: { dateFrom?: string; amount?: number }[] }[] };
 type Modality = { code?: string; name?: string; duration?: { value?: number; metric?: string }; amountsFrom?: Amount[]; minChildrenAge?: number; maxChildrenAge?: number; rates?: { rateCode?: string; rateDetails?: RateDetail[] }[] };
+type StartingPoint = {
+  type?: string;
+  meetingPoint?: { type?: string; address?: string; description?: string; zip?: string; city?: string | { name?: string }; geolocation?: { latitude?: number; longitude?: number } };
+};
 type HbActivity = {
   code?: string; name?: string; currency?: string; currencyName?: string; amountsFrom?: Amount[]; type?: string;
-  content?: { name?: string; description?: string; media?: { images?: { visualizationOrder?: number; urls?: { sizeType?: string; resource?: string }[] }[] }; activityFactsheetType?: string };
+  content?: {
+    name?: string; description?: string; media?: { images?: { visualizationOrder?: number; urls?: { sizeType?: string; resource?: string }[] }[] }; activityFactsheetType?: string;
+    location?: { startingPoints?: StartingPoint[] };
+  };
   modalities?: Modality[];
 };
 
@@ -67,6 +74,26 @@ function photo(a: HbActivity): Experience["image"] {
 const strip = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, "\"").replace(/&amp;/g, "&").replace(/\s+/g, " ").replace(/\s+([.,;:!?])/g, "$1").trim();
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, s.lastIndexOf(" ", n) > n / 2 ? s.lastIndexOf(" ", n) : n)}…` : s);
 
+/**
+ * Where it starts: content.location.startingPoints[] (assumed shape, from the /details/full content: a type of
+ * MEETING_POINT or PICKUP, and meetingPoint { address, zip, city, description, geolocation { latitude, longitude } }).
+ * Null when there's nothing usable; the app then says the meeting point is on the voucher.
+ */
+export function meetingPointOf(a: HbActivity): Experience["meetingPoint"] {
+  const sp = a.content?.location?.startingPoints?.[0];
+  const m = sp?.meetingPoint;
+  if (!sp || !m) return null;
+  const pickup = /PICK/i.test(sp.type ?? "") || /PICK/i.test(m.type ?? "");
+  const city = typeof m.city === "string" ? m.city : m.city?.name;
+  const address = [m.address?.trim(), [m.zip, city].filter(Boolean).join(" ").trim()].filter(Boolean).join(", ").slice(0, 200) || null;
+  const lat = m.geolocation?.latitude;
+  const lon = m.geolocation?.longitude;
+  const ok = typeof lat === "number" && typeof lon === "number" && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && !(lat === 0 && lon === 0);
+  const note = m.description ? clip(strip(m.description), 240) : null;
+  if (!address && !ok && !pickup) return null;
+  return { kind: pickup ? "pickup" : "meet", address, note, lat: ok ? lat : null, lon: ok ? lon : null };
+}
+
 /** Availability answer → what the app lists. Unpriced or unnamed activities are left out. */
 export function parseHotelbedsAvailability(data: unknown, q: Pick<ActivitySearch, "ages" | "limit">, rules?: PricingRules): Experience[] {
   const acts = ((data as { activities?: HbActivity[] })?.activities ?? []);
@@ -90,6 +117,7 @@ export function parseHotelbedsAvailability(data: unknown, q: Pick<ActivitySearch
       summary: a.content?.description ? clip(strip(a.content.description), 280) : null, image: photo(a), photo: null, priceFrom: { amount: sell, currency: "SAR" },
       durationMin: minutes(priced?.m.duration ?? a.modalities?.[0]?.duration), rating: null, reviews: null,
       family: minAge !== null ? minAge <= 6 : /family|kids|children|zoo|aquarium|theme park|water ?park/i.test(title), minAge, freeCancel: null,
+      meetingPoint: meetingPointOf(a),
     });
     if (out.length >= q.limit) break;
   }

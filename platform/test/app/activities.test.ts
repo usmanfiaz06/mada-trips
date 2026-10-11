@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { and, eq, sql as q } from "drizzle-orm";
 import {
-  BookThingResponse, ItineraryResponse, MessagesResponse, ThingsResponse, TripIdeasResponse, filterActivities, kindOf, localClock, moodOf, nextPrayer, openState, parseHours,
+  BookThingResponse, ItineraryResponse, RideThingResponse, MessagesResponse, ThingsResponse, TripIdeasResponse, filterActivities, kindOf, localClock, moodOf, nextPrayer, openState, parseHours,
   popularityOf, prayerTimes, todayIdeas, type Activity,
 } from "@mada/shared";
 import { db, schema, sql } from "@/db";
@@ -11,11 +11,11 @@ import { appPeople, appRequests, appStays, appTrips, appUsers } from "@/db/app-s
 import { appActivities, appActivityCities, appGeocodes, appTripIdeas, appWhatsOn } from "@/db/app-schema-activities";
 import { runIngest } from "@/lib/app/places/ingest";
 import { gatherCity, refreshCity, refreshDue, storeCity } from "@/lib/app/activities/ingest";
-import { overpassQuery, pageviewWindow, parseOverpass, parseWikidata, radiusKmFor } from "@/lib/app/activities/opendata";
+import { addressOf, overpassQuery, pageviewWindow, parseOverpass, parseWikidata, radiusKmFor } from "@/lib/app/activities/opendata";
 import { parseOpenMeteo } from "@/lib/app/activities/weather";
 import { parseTicketmaster, ticketmasterUrl } from "@/lib/app/activities/ticketmaster";
 import { pendingThings, thingsFor } from "@/lib/app/activities/things";
-import { activitySell, hotelbedsActivities, parseHotelbedsAvailability, parseHotelbedsDetail } from "@/lib/app/suppliers/hotelbeds/activities";
+import { activitySell, hotelbedsActivities, meetingPointOf, parseHotelbedsAvailability, parseHotelbedsDetail } from "@/lib/app/suppliers/hotelbeds/activities";
 import { parseGyg } from "@/lib/app/suppliers/live/getyourguide";
 import { parseViator } from "@/lib/app/suppliers/live/viator";
 import { pricingRules } from "@/lib/app/suppliers/hotelbeds/money";
@@ -24,6 +24,7 @@ import { bookOnHotelbeds, listWhatsOn, saveWhatsOn, setWhatsOnActive } from "@/l
 import { deskInbox } from "@/lib/app/desk/inbox";
 import { GET as thingsGet } from "@/app/api/app/v1/places/[id]/things/route";
 import { POST as bookPost } from "@/app/api/app/v1/things/book/route";
+import { POST as ridePost } from "@/app/api/app/v1/things/ride/route";
 import { GET as tripThingsGet } from "@/app/api/app/v1/trips/[id]/things/route";
 import { GET as ideasGet, POST as ideasPost } from "@/app/api/app/v1/trips/[id]/ideas/route";
 import { DELETE as ideaDelete } from "@/app/api/app/v1/trips/[id]/ideas/[ideaId]/route";
@@ -473,6 +474,71 @@ describe("inside a trip", () => {
     expect((await callP(ideaDelete, { id: tripId, ideaId }, { token, method: "DELETE" })).status).toBe(200);
     expect((await callP(ideaDelete, { id: tripId, ideaId }, { token, method: "DELETE" })).status).toBe(404);
     expect((await db.select().from(appTripIdeas).where(eq(appTripIdeas.tripId, tripId))).length).toBe(0);
+  });
+});
+
+describe("getting there", () => {
+  const ride = (b: unknown, tok = token) => callP(ridePost, {}, { token: tok, method: "POST", body: b });
+  let tripId = "";
+
+  beforeAll(async () => {
+    const [self] = await db.select().from(appPeople).where(and(eq(appPeople.ownerId, userId), eq(appPeople.isSelf, true)));
+    const [t] = await db.insert(appTrips).values({ ownerId: userId, city: "AlUla", country: "SA", startDate: "2026-10-18", endDate: "2026-10-22", travellerIds: [self!.id], status: "booked" }).returning();
+    tripId = t!.id;
+    await db.insert(appStays).values({ tripId, name: "Shaden Resort", address: "Shaden, AlUla", checkIn: "2026-10-18", nights: 4, rooms: 1, price: 300000, status: "booked" });
+  });
+
+  it("reads street addresses from OSM tags and meeting points from Hotelbeds content", () => {
+    expect(addressOf({ "addr:street": "Great Russell St", "addr:housenumber": "44", "addr:postcode": "WC1B 3DG", "addr:city": "London" })).toBe("Great Russell St 44, WC1B 3DG London");
+    expect(addressOf({ "addr:full": "King Saud Rd, Riyadh" })).toBe("King Saud Rd, Riyadh");
+    expect(addressOf({ "addr:city": "London" })).toBeNull();
+    const meet = meetingPointOf({ content: { location: { startingPoints: [{ type: "MEETING_POINT", meetingPoint: { address: "Kabatas pier", city: "Istanbul", description: "<p>Look for the <b>navy</b> jackets</p>", geolocation: { latitude: 41.03, longitude: 28.99 } } }] } } } as never);
+    expect(meet).toEqual({ kind: "meet", address: "Kabatas pier, Istanbul", note: "Look for the navy jackets", lat: 41.03, lon: 28.99 });
+    expect(meetingPointOf({ content: { location: { startingPoints: [{ type: "PICKUP", meetingPoint: { geolocation: { latitude: 0, longitude: 0 } } }] } } } as never)).toMatchObject({ kind: "pickup", lat: null, address: null });
+    expect(meetingPointOf({ content: {} } as never)).toBeNull();
+    const listed = parseHotelbedsAvailability({ activities: [{ code: "E-1", content: { name: "Cruise", location: { startingPoints: [{ meetingPoint: { address: "Pier 3", geolocation: { latitude: 41, longitude: 29 } } }] } }, currency: "EUR", amountsFrom: [{ paxType: "ADULT", amount: 40 }] }] }, { ages: [], limit: 5 }, pricingRules());
+    expect(listed[0]!.meetingPoint).toMatchObject({ address: "Pier 3", lat: 41 });
+  });
+
+  it("asks the desk for a car from the hotel, with where to and when", async () => {
+    const r = await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2026-10-20", time: "16:30", pickup: "hotel", clientId: "ride-test-0001" });
+    expect(r.status).toBe(201);
+    const v = RideThingResponse.parse(r.json);
+    expect(v.request).toMatchObject({ kind: "car", status: "sent" });
+    expect(v.request.title).toBe("A car to Hegra");
+    expect(v.message).toContain("Shaden Resort");
+    expect(v.message).toContain("16:30");
+    const [row] = await db.select().from(appRequests).where(eq(appRequests.id, v.request.id));
+    expect(row!.tripId).toBe(tripId);
+    expect((row!.details as { ride: Record<string, unknown> }).ride).toMatchObject({ to: "Hegra", pickup: "hotel", from: "Shaden Resort", hotel: "Shaden Resort", day: "2026-10-20", time: "16:30", travellers: 1 });
+    expect(typeof (row!.details as { ride: { lat: unknown } }).ride.lat).toBe("number");
+    const thread = MessagesResponse.parse((await callP(messagesGet, { id: v.request.id }, { token })).json);
+    expect(thread.messages[0]!.text).toBe(v.message);
+    const audit = await db.execute<{ action: string }>(q`SELECT action FROM app_audit WHERE entity_id = ${v.request.id}`);
+    expect(audit.map((x) => x.action)).toContain("request.created");
+    const again = await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2026-10-21", time: "09:00", pickup: "hotel", clientId: "ride-test-0001" });
+    expect(again.json.request.id).toBe(v.request.id);
+  });
+
+  it("picks up from somewhere else without a trip, and refuses what it can't do", async () => {
+    const r = await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), day: "2026-10-20", time: "08:00", pickup: "other", pickupText: "AlUla airport", travellers: 3, clientId: "ride-test-0002" });
+    expect(r.status).toBe(201);
+    expect(r.json.message).toContain("AlUla airport");
+    expect(r.json.message).toContain("3 of us");
+    // From the hotel with no trip, or with nowhere said; a day outside the trip; bad time; unknown place; not signed in; someone else's trip.
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), day: "2026-10-20", time: "08:00", pickup: "hotel", clientId: "ride-test-0003" })).status).toBe(400);
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), day: "2026-10-20", time: "08:00", pickup: "other", clientId: "ride-test-0004" })).status).toBe(400);
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2027-01-01", time: "08:00", pickup: "hotel", clientId: "ride-test-0005" })).status).toBe(400);
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2026-10-20", time: "25:00", pickup: "hotel", clientId: "ride-test-0006" })).status).toBe(400);
+    expect((await ride({ ref: { kind: "activity", id: "osm:n1" }, placeId: String(ALULA), tripId, day: "2026-10-20", time: "08:00", pickup: "hotel", clientId: "ride-test-0007" })).status).toBe(404);
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2026-10-20", time: "08:00", pickup: "hotel", clientId: "ride-test-0008" }, "")).status).toBe(401);
+    expect((await ride({ ref: { kind: "activity", id: "osm:r900101" }, placeId: String(ALULA), tripId, day: "2026-10-20", time: "08:00", pickup: "hotel", clientId: "ride-test-0009" }, other)).status).toBe(404);
+  });
+
+  it("shows in the desk inbox with the request", async () => {
+    const { items } = await deskInbox(new Date());
+    const [row] = await db.select().from(appRequests).where(q`${appRequests.details}->>'clientId' = 'ride-test-0001'`);
+    expect(items.some((i) => i.id === row!.id)).toBe(true);
   });
 });
 
