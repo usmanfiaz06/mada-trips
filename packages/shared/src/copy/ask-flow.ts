@@ -74,7 +74,6 @@ export const askFlowCopy = {
   'ask.req.cancelled': 'Cancelled',
   'ask.req.paidLine': 'Paid. Mada is booking it and sends the details here.',
   'ask.req.replyTo': 'Reply to {agent}',
-  'tr.req.openThread': 'Open the conversation',
 
   // ───────────── replies that fit the request ─────────────
   'ask.suggest.earlierAppt': 'Is there an earlier appointment?',

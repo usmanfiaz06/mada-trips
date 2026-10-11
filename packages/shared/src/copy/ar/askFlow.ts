@@ -76,7 +76,6 @@ export const arAskFlow: ArSection<typeof askFlowCopy> = {
   'ask.req.cancelled': 'ملغي',
   'ask.req.paidLine': 'مدفوع. مادا تحجزه وترسل لك التفاصيل هنا.',
   'ask.req.replyTo': 'رد على {agent}',
-  'tr.req.openThread': 'افتح المحادثة',
 
   'ask.suggest.earlierAppt': 'فيه موعد أبكر؟',
   'ask.suggest.biggerCar': 'نقدر ناخذ سيارة أكبر؟',
