@@ -23,7 +23,8 @@ import { ANDROID_PACKAGE } from "./well-known";
  *
  * Env: APP_STORE_URL, PLAY_STORE_URL (the store pages; without them the buttons say "Not in the stores yet"),
  * APP_STORE_ID (optional, Safari's Smart App Banner). Files in ./assets: the circle covers the app ships, Instrument
- * Serif and IBM Plex Sans Arabic (both SIL OFL 1.1), Mada's symbol and wordmark.
+ * Serif and IBM Plex Sans Arabic (both SIL OFL 1.1), Mada's symbol and wordmark; istanbul-tall.jpg is the prototype's
+ * mosque crop (Paul Bill, Unsplash) because the landscape Istanbul photo crops to sky on a tall screen.
  */
 
 export type Stores = { ios: string | null; android: string | null; iosId: string | null };
