@@ -48,8 +48,13 @@ function page(c, updated, slug) {
   html = html.replace(/(<a[^>]*class="(?:nav__lang|menu__lang|footer__lang)"[^>]*href=")[^"]*(")/g, `$1${other}$2`);
   html = html.replace(/(<a[^>]*href=")[^"]*("[^>]*class="(?:nav__lang|menu__lang|footer__lang)")/g, `$1${other}$2`);
 
+  // Phones stack table cells; each cell carries its column's heading to show above it (legal.css).
+  const labelled = (inner) => inner.replace(/<table class="legal__table">([\s\S]*?)<\/table>/g, (table) => {
+    const heads = [...table.matchAll(/<th>([\s\S]*?)<\/th>/g)].map((m) => m[1].replace(/<[^>]+>/g, ''));
+    return table.replace(/<tr>((?:(?!<\/tr>)[\s\S])*?<td>[\s\S]*?)<\/tr>/g, (row) => { let i = 0; return row.replace(/<td>/g, () => `<td data-label="${esc(heads[i++] ?? '')}">`); });
+  });
   const toc = p.sections.map(([id, h]) => `<li><a href="#${id}">${h}</a></li>`).join('');
-  const body = p.sections.map(([id, h, inner]) => `\n      <section class="legal__section" id="${id}">\n        <h2>${h}</h2>${inner.trimEnd().replace(/\n/g, '\n        ')}\n      </section>`).join('');
+  const body = p.sections.map(([id, h, inner]) => `\n      <section class="legal__section" id="${id}">\n        <h2>${h}</h2>${labelled(inner).trimEnd().replace(/\n/g, '\n        ')}\n      </section>`).join('');
   const main = `<main>
     <section class="legal" data-nav="dark">
       <div class="container legal__wrap">

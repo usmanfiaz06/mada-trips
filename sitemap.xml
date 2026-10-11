@@ -90,4 +90,68 @@
     <priority>0.7</priority>
     <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-contact.jpg</image:loc></image:image>
   </url>
+  <url>
+    <loc>https://www.madatrips.sa/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/privacy"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/ar/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/privacy"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/terms</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/terms"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/terms"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/ar/terms</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/terms"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/terms"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/support</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/support"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/support"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/support"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/ar/support</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/support"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/support"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/support"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/delete-account</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/delete-account"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/delete-account"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/delete-account"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/ar/delete-account</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/delete-account"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/delete-account"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/delete-account"/>
+    <lastmod>2026-10-11</lastmod>
+    <priority>0.3</priority>
+  </url>
 </urlset>

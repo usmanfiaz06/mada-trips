@@ -30,3 +30,6 @@ html[lang="ar"] .legal .eyebrow { letter-spacing: 0; font-family: "IBM Plex Sans
   .legal__table td { border: 0; padding: 3px 0; }
 }
 .legal__draft b { display: inline-block; margin-inline-end: 6px; padding: 1px 8px; border-radius: 6px; background: #5a4317; color: #f7ead0; font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; }
+@media (max-width: 640px) {
+  .legal__table td:not(:first-child)::before { content: attr(data-label); display: block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--muted-d); margin-top: 4px; }
+}
