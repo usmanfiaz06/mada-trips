@@ -4,7 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { formatSar, householdOf, todayIn } from '@mada/shared';
+import { formatSar, householdOf, planDay, planStopWords, planWords, todayIn } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { VGradient } from '@/components/Gradient';
@@ -22,14 +22,6 @@ import { toast } from '@/lib/toast';
 import { colors, font, ff } from '@/theme';
 
 /* A curated plan, day by day (Plan.jsx). Book it all through the same order sheet; change something in Ask. */
-
-/** Plan notes are written for a family of four. Say them for who's actually going. */
-function fitNote(note: string, n: number, kids: boolean) {
-  let s = note.replace(/\b(for|all) 4\b/g, (_m, w: string) => (n === 1 ? (w === 'all' ? 'you' : 'one') : `${w} ${n}`)).replace('Tickets for all you', 'Your ticket').replace('Booked for 6', `Booked for ${n}`);
-  if (n <= 2) s = s.replace('Two connecting rooms', n === 1 ? 'A room' : 'A double room');
-  if (!kids) s = s.replace(/ Kids’ menu\.| Kids feed the gulls\.|, family dining| 2 hours is enough with kids\./g, (m) => (m.includes('2 hours') ? ' 2 hours is enough.' : ''));
-  return s;
-}
 
 export default function PlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -65,14 +57,14 @@ export default function PlanScreen() {
         <View style={{ position: 'absolute', top: 0, start: 0, end: 0 }}><TopBar onBack={() => router.back()} dark /></View>
         <View style={styles.over}>
           <Pill variant="glass" label={t('plan.by', { days: p.days })} />
-          <T style={[font('display', colors.paper), { fontSize: 36, lineHeight: 38 }]} accessibilityRole="header">{p.title}</T>
-          <T v="small" color="rgba(255,253,249,0.9)">{p.sub}</T>
+          <T style={[font('display', colors.paper), { fontSize: 36, lineHeight: 38 }]} accessibilityRole="header">{planWords(p).title}</T>
+          <T v="small" color="rgba(255,253,249,0.9)">{planWords(p).sub}</T>
         </View>
       </View>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 170 + bottom, gap: 16 }} showsVerticalScrollIndicator={false}>
-        <ChipWrap>{p.plan.map((d, i) => <Toggle key={d.day} label={d.day} on={day === i} onPress={() => setDay(i)} />)}</ChipWrap>
+        <ChipWrap>{p.plan.map((d, i) => <Toggle key={d.day} label={planDay(i)} on={day === i} onPress={() => setDay(i)} />)}</ChipWrap>
         <View key={day}>
-          {p.plan[day]!.stops.map((st, i, arr) => (
+          {p.plan[day]!.stops.map((st, i, arr) => { const w = planStopWords(p.id, day, i, st, { n, kids }); return (
             <Animated.View key={st.title} entering={enter(i)} style={styles.item}>
               <View style={styles.rail}>
                 <View style={styles.dot}><Icon name={st.icon} size={18} /></View>
@@ -80,22 +72,22 @@ export default function PlanScreen() {
               </View>
               <View style={{ flex: 1, paddingBottom: 18, gap: 2 }}>
                 <T v="tiny" color={colors.goldInk} style={{ fontFamily: ff.ui600 }}>{st.time}</T>
-                <T v="h3">{st.title}</T>
-                <T v="small">{fitNote(st.note, n, kids)}</T>
+                <T v="h3">{w.title}</T>
+                <T v="small">{w.note}</T>
               </View>
             </Animated.View>
-          ))}
+          ); })}
         </View>
         <Card variant="well" style={{ gap: 8 }}>
           <T v="h3">{t('plan.yours.title')}</T>
           <T v="small">{t('plan.yours.body')}</T>
-          <Button size="small" block={false} variant="secondary" style={{ alignSelf: 'flex-start' }} label={t('plan.change')} onPress={() => router.push({ pathname: '/ask', params: { prefill: t('plan.changePrefill', { title: p.title }) } })} />
+          <Button size="small" block={false} variant="secondary" style={{ alignSelf: 'flex-start' }} label={t('plan.change')} onPress={() => router.push({ pathname: '/ask', params: { prefill: t('plan.changePrefill', { title: planWords(p).title }) } })} />
         </Card>
       </ScrollView>
       <Act>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Button label={t('plan.book', { price: formatSar(p.total.amount) })} testID="plan-book" onPress={() => { usePayDraft.getState().set({ draft: { kind: 'package', planId: p.id, travellerIds: travellers }, title: p.title }); router.push('/pay'); }} />
+            <Button label={t('plan.book', { price: formatSar(p.total.amount) })} testID="plan-book" onPress={() => { usePayDraft.getState().set({ draft: { kind: 'package', planId: p.id, travellerIds: travellers }, title: planWords(p).title }); router.push('/pay'); }} />
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={savedItem ? t('plan.saved') : t('plan.save')} accessibilityState={{ selected: !!savedItem }} onPress={toggleSave} testID="plan-save"
             style={[styles.save, { backgroundColor: savedItem ? colors.green : colors.paper }]}>

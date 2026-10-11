@@ -3,6 +3,7 @@ import { t } from '../copy';
 import { HalalasAmount, Id, IsoDateTime, PhoneE164 } from './common';
 import { Circle, Message } from './social';
 import { COVER_COLORS, COVER_ICONS, COVER_PHOTO_IDS } from '../cover-art';
+import { planWords } from './editorial-words';
 
 /*
  * Circles (M4): circles and their chat, votes and splits, friends and follows, invites, tips and their moderation,
@@ -614,7 +615,8 @@ export const PLAN_SUMMARIES: PlanSummary[] = [
   { id: 'alula2', title: 'Two days in AlUla', sub: 'Old Town, Hegra and a desert sunset', city: 'AlUla', days: 2, photoKey: 'alula' },
   { id: 'istanbul3', title: 'Three easy days in Istanbul with kids', sub: 'Palaces, ferries and the best künefe', city: 'Istanbul', days: 3, photoKey: 'istanbul' },
 ];
-export const planById = (id: string) => PLAN_SUMMARIES.find((p) => p.id === id) ?? null;
+/** A plan by id, its title and line in the display language. */
+export const planById = (id: string) => { const p = PLAN_SUMMARIES.find((x) => x.id === id); return p ? { ...p, ...planWords(p) } : null; };
 
 /* ───────────── what Mada knows about places, for "@Mada" in a circle ───────────── */
 

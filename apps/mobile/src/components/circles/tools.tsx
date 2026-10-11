@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import {
-  PLACES, PLAN_SUMMARIES, addDays, dayOfMonth, monthOf, splitAmounts, todayIn, weekdayOf,
+  PLACES, PLAN_SUMMARIES, planWords, addDays, dayOfMonth, monthOf, splitAmounts, todayIn, weekdayOf,
   type CircleMemberView, type CreateSplitRequest, type CreateVoteRequest, type SharedCard, type SplitMode,
 } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -160,9 +160,9 @@ export function ShareSheet({ visible, onClose, onPick }: { visible: boolean; onC
         <T v="h2">{t('circles.tools.share')}</T>
         <T v="eyebrow">{t('circles.shareSheet.plans')}</T>
         {PLAN_SUMMARIES.map((pl) => (
-          <Pressable key={pl.id} accessibilityRole="button" accessibilityLabel={pl.title} onPress={() => { buzz('tap'); onPick({ kind: 'plan', id: pl.id }, pin); }} style={st.cityRow} testID={`share-${pl.id}`}>
+          <Pressable key={pl.id} accessibilityRole="button" accessibilityLabel={planWords(pl).title} onPress={() => { buzz('tap'); onPick({ kind: 'plan', id: pl.id }, pin); }} style={st.cityRow} testID={`share-${pl.id}`}>
             <Image source={COVERS[pl.photoKey]} style={st.thumb} contentFit="cover" />
-            <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{pl.title}</T><T v="tiny">{t('circles.shareSheet.planSub', { days: pl.days, city: pl.city })}</T></View>
+            <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{planWords(pl).title}</T><T v="tiny">{t('circles.shareSheet.planSub', { days: pl.days, city: pl.city })}</T></View>
             <Icon name="up" size={18} />
           </Pressable>
         ))}

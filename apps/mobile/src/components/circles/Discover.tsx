@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
-import { type Post, type PostKind } from '@mada/shared';
+import { eventWords, planWords, type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
@@ -53,7 +53,7 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
       {d.data?.tripDates ? <T v="tiny" style={{ marginTop: -8 }}>{t('circles.discover.whileThere', { dates: d.data.tripDates })}</T> : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.rail}>
-        {(d.data?.events ?? []).map((e, i) => (
+        {(d.data?.events ?? []).map((ev, i) => { const e = { ...ev, ...eventWords(ev) }; return (
           <Pressable key={e.id} accessibilityRole="button" accessibilityLabel={e.title} onPress={() => { buzz('tap'); ask(t('circles.discover.eventAsk', { title: e.title, city })); }} style={[s.story, { width: 236, minHeight: 300 }]}>
             <PhotoFill source={COVERS[e.photoKey]} veil="story" position={['50% 40%', '30% 70%', '70% 30%'][i % 3]} />
             <View style={s.top}><Pill variant="glass" label={e.tag} /></View>
@@ -63,12 +63,12 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
               <GlassButton label={t('circles.discover.book')} after={<Arrow />} onPress={() => ask(t('circles.discover.eventAsk', { title: e.title, city }))} />
             </View>
           </Pressable>
-        ))}
+        ); })}
       </ScrollView>
 
       <T v="h2" style={{ fontSize: 22, lineHeight: 28, marginTop: 6 }}>{t('circles.discover.plans')}</T>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.rail}>
-        {(d.data?.plans ?? []).map((pl) => (
+        {(d.data?.plans ?? []).map((p0) => { const pl = { ...p0, ...planWords(p0) }; return (
           <Pressable key={pl.id} accessibilityRole="button" accessibilityLabel={pl.title} onPress={() => { buzz('tap'); router.push(`/plan/${pl.id}`); }} style={[s.story, { width: 280, minHeight: 220 }]} testID={`plan-${pl.id}`}>
             <PhotoFill source={COVERS[pl.photoKey]} veil="story" />
             <View style={s.top}><Pill variant="glass" label={t('circles.discover.planPill', { days: pl.days })} /></View>
@@ -77,7 +77,7 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
               <T v="small" color="rgba(255,253,249,0.88)">{pl.sub}</T>
             </View>
           </Pressable>
-        ))}
+        ); })}
       </ScrollView>
 
       <View style={[s.spread, { marginTop: 6 }]}>
