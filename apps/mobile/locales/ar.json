@@ -4,7 +4,8 @@
     "NSCameraUsageDescription": "لقراءة جوازك، ولتصوير مستند أو صورتك الشخصية. لا يُرفع شيء قبل أن تراجعه.",
     "NSPhotoLibraryUsageDescription": "لإضافة صورة مستند أو صورة شخصية تختارها.",
     "NSFaceIDUsageDescription": "لفتح محفظتك والتطبيق ببصمة الوجه.",
-    "NSContactsUsageDescription": "لنريك من معارفك موجود على مادا. نطابق الأرقام على جوالك ولا نحفظها."
+    "NSContactsUsageDescription": "لنريك من معارفك موجود على مادا. نطابق الأرقام على جوالك ولا نحفظها.",
+    "NSAlarmKitUsageDescription": "لنوقظك قبل رحلتك بمنبّه يرنّ حتى في الوضع الصامت. فقط عندما تشغّله."
   },
   "android": {
     "app_name": "مادا"

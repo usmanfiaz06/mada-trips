@@ -20,10 +20,14 @@
         "NSPhotoLibraryUsageDescription": "To add a photo of a document or a profile picture you choose.",
         "NSFaceIDUsageDescription": "To open your Wallet and the app with Face ID.",
         "NSContactsUsageDescription": "To show who’s already on Mada. Numbers are matched on this phone and never stored.",
+        "NSAlarmKitUsageDescription": "To wake you before a flight with an alarm that rings even on silent. Only when you turn it on.",
         "CFBundleAllowMixedLocalizations": true,
         "ITSAppUsesNonExemptEncryption": false
       },
       "buildNumber": "1",
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
+      },
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -106,7 +110,8 @@
         "android.permission.CAMERA",
         "android.permission.READ_CONTACTS",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "com.android.alarm.permission.SET_ALARM"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
