@@ -54,7 +54,7 @@ describe("circles", () => {
     const omar = await person("Omar");
     const hessa = await person("Hessa");
     const c = await makeCircle(omar, "Eid trip", [hessa], { cover: "istanbul" });
-    expect(c.circle).toMatchObject({ name: "Eid trip", role: "admin", memberCount: 1, cover: "istanbul", invitedCount: 1, dm: false });
+    expect(c.circle).toMatchObject({ name: "Eid trip", role: "admin", memberCount: 1, cover: { kind: "photo", id: "istanbul" }, invitedCount: 1, dm: false });
     expect(c.invited.map((i) => i.person.short)).toEqual(["Hessa"]);
     const page = await msgs(omar, c.circle.id);
     expect(page.items.map((m) => m.kind)).toEqual(["sys", "sys", "mada"]);
@@ -326,7 +326,7 @@ describe("invite links", () => {
     expect((await call(withParams(linkPost, { id: c.circle.id }), auth(abdullah))).json.code).toBe(link.code); // same link again
     const pv = await call(withParams(invitePreview, { ref: link.code }), { method: "GET" });
     expect(pv.status).toBe(200);
-    expect(pv.json).toMatchObject({ status: "open", kind: "circle", from: { short: "Abdullah" }, circle: { name: "Istanbul for Eid", memberCount: 2, cover: "istanbul" } });
+    expect(pv.json).toMatchObject({ status: "open", kind: "circle", from: { short: "Abdullah" }, circle: { name: "Istanbul for Eid", memberCount: 2, cover: { kind: "photo", id: "istanbul" } } });
     expect(JSON.stringify(pv.json)).not.toContain(abdullah.phone);
     const omar = await person("Omar");
     const r = await call(withParams(acceptPost, { ref: link.code }), auth(omar));
