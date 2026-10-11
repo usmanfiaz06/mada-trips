@@ -64,7 +64,7 @@ export const PlaceSearchResponse = z.object({
 export type PlaceSearchResponse = z.infer<typeof PlaceSearchResponse>;
 
 export const PlaceAttribution = z.object({
-  source: z.enum(['wikipedia', 'wikivoyage', 'wikimedia', 'geonames', 'ourairports', 'wikidata', 'mada']),
+  source: z.enum(['wikipedia', 'wikivoyage', 'wikimedia', 'geonames', 'ourairports', 'wikidata', 'mada', 'openstreetmap', 'openmeteo', 'ticketmaster']),
   /** "From Wikivoyage, CC BY-SA" */
   text: z.string(),
   url: z.url(),

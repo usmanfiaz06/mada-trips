@@ -35,10 +35,11 @@ export function pepper(): string {
 }
 
 export type SupplierName = (typeof SUPPLIERS)[number];
-export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase"] as const;
+export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase", "activities", "events", "weather", "openData"] as const;
 
 /** Free, keyless open data: live by default everywhere. Only SUPPLIER_MODE_FLIGHT_POSITIONS switches it (not SUPPLIER_MODE). */
-const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions"]);
+// Things to do: Open-Meteo, OpenStreetMap/Wikidata and the events list (Ticketmaster only with TICKETMASTER_KEY) are too.
+const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions", "weather", "openData", "events"]);
 export type SupplierMode = "mock" | "live";
 
 const envName = (s: SupplierName) => `SUPPLIER_MODE_${s.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`;

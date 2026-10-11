@@ -14,6 +14,7 @@ import { arTrips } from './trips';
 import { arResilience } from './resilience';
 import { arPlaces } from './places';
 import { arLanguage } from './language';
+import { arBeta } from './beta';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
@@ -27,5 +28,6 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arResilience,
   ...arPlaces,
   ...arLanguage,
+  ...arBeta,
   ...arCommon,
 } as Record<string, string>;

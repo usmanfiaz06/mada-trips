@@ -11,6 +11,8 @@
 //   3. Email (an incomplete address, a wrong code) → Verify your phone → name
 //   4. Phone → code → name → alerts → Today → Profile › Sign-in methods: add email (code in the sheet), add Google
 //   5. The demo number again on a new phone: Welcome back
+//   … 12. Phone codes on WhatsApp: the WhatsApp line and mark, "Send by SMS instead" after the minute (the clock is
+//      fast-forwarded), the sheet's WhatsApp rows; 13. a number not on WhatsApp gets it by SMS, and says so
 // Fails on any page error or missing text.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -49,8 +51,10 @@ let n = 0;
 const step = (s) => console.log('·', s);
 const randomPhone = () => `5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`;
 
-async function fresh(name, { locale = 'en-GB', last = null } = {}) {
+async function fresh(name, { locale = 'en-GB', last = null, clock = false } = {}) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh' });
+  // A clock the test can move on (the minute between codes), still running by itself.
+  if (clock) await context.clock.install();
   // The way in this phone used last time (lib/auth/last.ts), as if from an earlier visit.
   if (last) await context.addInitScript((v) => { if (!localStorage.getItem('mada.lastSignIn.v1')) localStorage.setItem('mada.lastSignIn.v1', v); }, JSON.stringify(last));
   const page = await context.newPage();
@@ -246,6 +250,8 @@ try {
     await p.byTest('phone-send').click();
     await p.see('Enter the code', 'code screen');
     await p.see('New code in 0:5', 'countdown under the code');
+    await p.see('We sent a code on WhatsApp to', 'whatsapp line');
+    await p.see('Send by SMS in 0:', 'sms waits for the countdown');
     await p.tap('Didn’t get the code?');
     await p.see('Codes can take a minute to arrive.', 'help sheet');
     await p.see('Send a new code in 0:', 'resend waits for the countdown');
@@ -420,9 +426,12 @@ try {
     await p.byTest('phone-input').fill(randomPhone());
     await p.byTest('phone-send').click();
     await p.see('ما وصلك الرمز؟', 'ar link');
+    await p.see('أرسلنا الرمز على واتساب إلى', 'ar whatsapp line');
+    await p.see('برسالة نصية بعد', 'ar sms switch waits');
     await p.shot('code');
     await p.page.getByText('ما وصلك الرمز؟', { exact: true }).first().click();
     await p.see('جرّب طريقة أخرى', 'ar sheet');
+    await p.see('افتح واتساب', 'ar check whatsapp');
     await p.shot('sheet');
     await p.byTest('help-lost').click();
     await p.see('ما عاد عندك رقمك أو بريدك القديم؟', 'ar recovery');
@@ -432,6 +441,47 @@ try {
     await p.byTest('recover-send').click();
     await p.see('وصلنا طلبك.', 'ar sent');
     await p.shot('recover-sent');
+    await p.context.close();
+  }
+
+  {
+    step('12. Phone codes on WhatsApp: the line, the mark, "Send by SMS instead" after the minute');
+    const p = await fresh('whatsapp', { clock: true });
+    await p.byTest('signin-phone').click();
+    await p.byTest('phone-input').fill(randomPhone());
+    await p.byTest('phone-send').click();
+    await p.see('We sent a code on WhatsApp to +966', 'whatsapp line');
+    if (!(await p.byTest('whatsapp-mark').count())) errors.push('whatsapp: no WhatsApp mark beside the line');
+    await p.see('Send by SMS in 0:', 'sms after the countdown');
+    await p.shot('code');
+    await p.tap('Didn’t get the code?');
+    await p.see('Check WhatsApp', 'check whatsapp row');
+    await p.see('It comes from Mada Trips, with a Copy code button.', 'copy code');
+    if (await p.byTest('help-switch-channel').getAttribute('aria-disabled') !== 'true') errors.push('whatsapp: Send by SMS should wait for the countdown');
+    await p.shot('sheet');
+    await p.page.clock.fastForward(61_000);
+    await p.see('Send by SMS instead', 'sms ready');
+    await p.byTest('help-switch-channel').click();
+    await p.see('New code sent by SMS to', 'resent by sms');
+    await p.see('We sent a code by SMS to +966', 'sms line');
+    await p.see('Send on WhatsApp in 0:', 'whatsapp offered back');
+    if (await p.byTest('whatsapp-mark').count()) errors.push('whatsapp: the mark should go with an SMS code');
+    await p.shot('code-sms');
+    await p.byTest('otp-input').fill('123456');
+    await p.see('What should we call you?', 'signed in with the SMS code');
+    await p.context.close();
+  }
+
+  {
+    step('13. A number not on WhatsApp gets the code by SMS, and the screen says so');
+    const p = await fresh('not-whatsapp');
+    await p.byTest('signin-phone').click();
+    await p.byTest('phone-input').fill(`5${String(Math.floor(1000 + Math.random() * 8999))}0000`);
+    await p.byTest('phone-send').click();
+    await p.see('We sent a code by SMS to +966', 'sms line');
+    await p.see('WhatsApp couldn’t reach this number.', 'why sms');
+    await p.see('Send on WhatsApp in 0:', 'whatsapp still offered');
+    await p.shot('code');
     await p.context.close();
   }
 } catch (e) {

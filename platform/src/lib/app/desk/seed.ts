@@ -58,7 +58,7 @@ async function main() {
     { title: "On it", bodyEn: "I'm on it. I'll message you here as soon as it's done.", bodyAr: "أتابع الموضوع الآن، وأكتب لك هنا فور الانتهاء.", sort: 1 },
     { title: "Bag tag photo", bodyEn: "Could you send a photo of the bag tag? It's the sticker the airline gave you at check-in.", bodyAr: "ممكن ترسل صورة ملصق الشنطة؟ هو الملصق اللي أعطوك إياه عند تسجيل الوصول.", sort: 2 },
     { title: "Passport photo", bodyEn: "Please send a clear photo of the passport's photo page, without glare.", bodyAr: "أرسل لو سمحت صورة واضحة لصفحة الصورة في الجواز، بدون انعكاس ضوء.", sort: 3 },
-    { title: "Refund timing", bodyEn: "Card refunds usually take 5 to 10 days to show. Mada credit is instant.", bodyAr: "استرداد البطاقة يظهر عادة خلال 5 إلى 10 أيام. رصيد مدى فوري.", sort: 4 },
+    { title: "Refund timing", bodyEn: "Card refunds usually take 5 to 10 days to show. Mada credit is instant.", bodyAr: "استرداد البطاقة يظهر عادة خلال 5 إلى 10 أيام. رصيد مادا فوري.", sort: 4 },
     { title: "Seats together", bodyEn: "I've asked the airline to seat you together. I'll confirm the seat numbers here.", bodyAr: "طلبت من شركة الطيران أن تكونوا بجانب بعض، وأأكد لك أرقام المقاعد هنا.", sort: 5 },
   ]);
 

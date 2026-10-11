@@ -17,3 +17,6 @@ export * from './booking';
 export * from './status';
 export * from './places';
 export * from './flight-quote';
+export * from './activities';
+export * from './activities-logic';
+export * from './review';

@@ -6,6 +6,9 @@ process.env.APP_JWT_SECRET = "test-secret-for-the-mada-core-api-0123456789";
 process.env.APP_DATA_KEY = Buffer.alloc(32, 7).toString("base64");
 process.env.SUPPLIER_MODE = "mock";
 process.env.SUPPLIER_MODE_FLIGHT_POSITIONS = "mock";
+process.env.SUPPLIER_MODE_WEATHER = "mock";
+process.env.SUPPLIER_MODE_OPEN_DATA = "mock";
+process.env.SUPPLIER_MODE_EVENTS = "mock";
 
 afterAll(async () => {
   const { sql } = await import("@/db");

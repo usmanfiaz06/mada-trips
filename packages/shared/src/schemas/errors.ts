@@ -27,6 +27,8 @@ export const ERROR_CODES = {
   PHONE_REQUIRED: { status: 403, copy: 'auth.error.phoneRequired' },
   /** The Supabase identity belongs to a different Mada account than the one signed in. */
   IDENTITY_TAKEN: { status: 409, copy: 'auth.error.identityTaken' },
+  /** Posting and messages in Circles are paused for this account by the desk (app_desk_blocks). */
+  ACCOUNT_LIMITED: { status: 403, copy: 'error.accountLimited' },
   // Resilience (FLOWS.md §12; status.ts has the client-side codes and what the app does with each).
   /** A supplier's circuit is open or it didn't answer in time; `details.supplier` names it. Fails fast, never hangs. */
   SUPPLIER_DOWN: { status: 503, copy: 'error.supplierDown' },

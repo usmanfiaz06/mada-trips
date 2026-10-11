@@ -15,6 +15,7 @@ import { resilienceCopy } from './resilience';
 import { placesCopy } from './places';
 import { languageCopy } from './language';
 import { authCopy } from './auth';
+import { betaCopy } from './beta';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -35,6 +36,8 @@ export const en = {
   ...languageCopy,
   // Sign-in through Supabase Auth, Verify your phone, sign-in methods: packages/shared/src/copy/auth.ts
   ...authCopy,
+  // The beta: flights by request, a contact number at payment, files from the desk, a Circles pause: packages/shared/src/copy/beta.ts
+  ...betaCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.cancel': 'Cancel',

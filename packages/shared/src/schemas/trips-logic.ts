@@ -611,6 +611,8 @@ export type ItineraryInput = {
   requests: readonly TripRequestView[];
   /** First-evening picks chosen in the air. */
   picks: readonly string[];
+  /** "Add to my plan" from Things to do: ideas on a day (or the first free day), never booked. */
+  planned?: readonly { id: string; day: string | null; title: string; sub: string | null }[];
 };
 
 const item = (o: Partial<ItineraryItem> & Pick<ItineraryItem, 'id' | 'icon' | 'kind' | 'title'>): ItineraryItem => ({
@@ -618,7 +620,7 @@ const item = (o: Partial<ItineraryItem> & Pick<ItineraryItem, 'id' | 'icon' | 'k
 });
 
 /** The trip, day by day: every flight, pickup, night and booked extra, with gentle ideas for free days. */
-export function buildItinerary({ trip, requests, picks }: ItineraryInput): ItineraryDay[] {
+export function buildItinerary({ trip, requests, picks, planned = [] }: ItineraryInput): ItineraryDay[] {
   const phase = trip.clock.phase;
   const tm = timing(phase);
   const dest = destinationOf(trip);
@@ -715,12 +717,17 @@ export function buildItinerary({ trip, requests, picks }: ItineraryInput): Itine
     const day = (r.detail ?? '').match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
     add(day ?? addDays(outDay, 2), item({ id: `cel-${r.id}`, time: '20:00', icon: 'star', kind: 'note', title: r.short ?? r.title, sub: tk('itin.celebrationSub') }));
   }
+  // Things they added to their plan: on their day, or the first free day in the city.
+  for (const p of planned) {
+    const day = p.day && days.has(p.day) ? p.day : [...days.keys()].find((d) => d !== outDay && d !== backDay) ?? null;
+    add(day, item({ id: `plan-${p.id}`, icon: 'star', kind: 'idea', title: p.title, sub: p.sub, tags: ['planned'] }));
+  }
   // Free days get gentle ideas, never filler. Friday is Jumu'ah; on Sunday the Grand Bazaar is shut.
   const kids = trip.travellers.some((p) => p.birthYear !== null && p.birthYear >= new Date(trip.clock.now).getUTCFullYear() - 12);
   let k = 0;
   const lastFull = backDay ? addDays(backDay, -1) : stayOut ? addDays(stayOut, -1) : null;
   for (const day of days.values()) {
-    const bookedCount = day.items.filter((i) => ['flight', 'booked', 'pick'].includes(i.kind)).length;
+    const bookedCount = day.items.filter((i) => ['flight', 'booked', 'pick'].includes(i.kind) || i.tags.includes('planned')).length;
     if (!bookedCount && day.date !== outDay && day.date !== backDay) {
       const wd = weekdayOf(day.date);
       const ideas: { title: string; sub: string; ask: string | null }[] = wd === 'Fri' && dest.friday.length ? dest.friday.map((x) => ({ ...x, ask: null }))

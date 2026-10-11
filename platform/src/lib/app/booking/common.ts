@@ -47,9 +47,11 @@ export function demoFlags(req: Request): Set<DemoFlag> {
   return out;
 }
 
-/** The mock desk moves orders and requests along on its own (polling drives it). Off in live payments mode. */
+/** The mock desk moves orders and requests along on its own (polling drives it). Off in live payments mode and on production. */
 export function autopilotOn(): boolean {
   if (process.env.APP_DESK_AUTOPILOT === "off") return false;
+  // A real desk works production, even on mock payments (the beta): only an explicit "on" lets the mock desk run there.
+  if (isProductionDeploy() && process.env.APP_DESK_AUTOPILOT !== "on") return false;
   try { return supplierMode("payments") === "mock"; } catch { return false; }
 }
 
