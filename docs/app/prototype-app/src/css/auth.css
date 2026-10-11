@@ -1,5 +1,6 @@
 /* Sign-in help (screens/AuthHelp.jsx): Didn't get the code?, the password rules, the gentle shake on a wrong code. */
-.auth-help-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border: 0; border-radius: 24px; background: var(--mist); color: var(--green); font: inherit; text-align: start; }
+.auth-help-row { display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; min-width: 0; padding: 14px; border: 0; border-radius: 24px; background: var(--mist); color: var(--green); font: inherit; text-align: start; }
+.auth-help-row .grow { min-width: 0; overflow-wrap: anywhere; }
 .auth-help-row:disabled { opacity: .7; }
 .auth-help-row:not(:disabled):active { transform: scale(.99); }
 .auth-help-ic { width: 34px; height: 34px; flex-shrink: 0; border-radius: 12px; background: var(--paper); display: flex; align-items: center; justify-content: center; }
