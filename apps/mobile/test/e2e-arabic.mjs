@@ -302,6 +302,34 @@ async function demo() {
   await see('مؤكدة', 'confirmed', 60000);
   await shot('confirmed');
 
+  step('booking: a stay asks where, when and who, right to left');
+  await toTabs();
+  await byTest('dock-ask').click();
+  await see('إلى أين؟', 'ask (stay)');
+  await byTest('ask-input').fill('A place to stay');
+  await byTest('ask-send').click();
+  await see('وين تبي تسكن؟', 'stay where');
+  await shot('stay-where');
+  await page.getByRole('button', { name: 'إسطنبول', exact: true }).first().click();
+  await see('متى بتكون في إسطنبول؟', 'stay when');
+  await shot('stay-when');
+  await page.getByRole('button', { name: /^هالويكند/ }).first().click();
+  await see('مين بيسكن؟', 'stay who');
+  await shot('stay-who');
+
+  step('booking: an outing asked when and who, then its thread');
+  await page.getByRole('button', { name: 'اسأل عن شيء آخر' }).filter({ visible: true }).first().click();
+  await byTest('ask-input').fill('Boulevard World at night in Riyadh');
+  await byTest('ask-send').click();
+  await see('متى تبي تروح؟', 'outing when');
+  await page.getByRole('button', { name: 'هالويكند', exact: true }).first().click();
+  await byTest('request-who-done').click();
+  await byTest('request-send').click();
+  await see('انرسل', 'request progress');
+  await shot('request-sent');
+  await see('جاهز ·', 'request priced', 20000);
+  await shot('request-priced');
+
   step('wallet');
   await toTabs();
   await byTest('dock-wallet').click();

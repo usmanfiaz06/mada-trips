@@ -1,7 +1,7 @@
 // Booking (M2), end to end in headless Chromium against the web export in mock-API mode:
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
-//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,more to pick)
+//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,asks,phone to pick)
 //
 // Signs in as the demo account (50 000 4127, Omar's family) and walks every booking flow and edge case in FLOWS.md §2–4:
 // Ask (typed details, one question at a time, the calendar), search (results, fare rules, sort, the bundle, entry
@@ -388,7 +388,7 @@ async function requests() {
   await k.see('Every traveller needs their own Nusuk permit.', 'nusuk');
   await k.see('Who’s going?', 'who');
   await k.press(page.getByRole('button', { name: 'Hessa', exact: true }));
-  await k.tap('Done');
+  await k.press(k.byTest('request-who-done'));
   await k.see('Anything we should arrange for each person?', 'needs');
   await k.shot('umrah-needs');
   await k.tap('Done');
@@ -431,6 +431,9 @@ async function requests() {
   step('stays: three places, then the order sheet');
   await openAsk(page);
   await k.ask('A hotel in Istanbul');
+  await k.see('When are you in Istanbul?', 'stays when');
+  await k.press(page.getByRole('button', { name: /^This weekend · / }));
+  await k.press(k.byTest('stays-search'));
   await k.see('Three places you\'d like.', 'stays', 12000);
   await k.shot('stays');
   await k.press(k.byTest('ask-review'));
@@ -496,6 +499,182 @@ async function circles() {
   await context.close();
 }
 
+/* ───────────── 7. stays: where, when, who and rooms, one question at a time ───────────── */
+async function stays() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  await openAsk(page);
+  step('stays: nothing said, so Mada asks where');
+  await k.ask('A place to stay');
+  await k.see('Where would you like to stay?', 'stays where');
+  await k.see('Popular', 'popular cities');
+  if (await page.getByText('Checking 120 places').filter({ visible: true }).count()) errors.push('stays: searched before asking where');
+  await k.shot('stay-where');
+  await k.byTest('stay-city').fill('ist');
+  await k.see('Prices right here', 'city match');
+  await k.shot('stay-where-typed');
+  await k.press(k.byTest('city-match-istanbul'));
+  step('stays: when, with quick picks and the calendar');
+  await k.see('When are you in Istanbul?', 'stays when');
+  await k.see('Eid al-Fitr 2027 · 9–15 Mar', 'eid with its year');
+  await k.shot('stay-when');
+  await k.tap('I’ll pick dates');
+  await k.see('Pick the day you check in, then the day you leave', 'stay calendar');
+  if (await page.getByText('Babies on a lap').filter({ visible: true }).count()) errors.push('stay calendar: shows flight-only rows');
+  await k.shot('stay-calendar');
+  await k.tap('Next weekend');
+  await k.see('2 nights', 'stay calendar range');
+  await k.byTest('search-go').click();
+  await k.see('Who’s staying?', 'calendar to who');
+  step('stays: the dates changed from the summary, by a quick pick');
+  await k.press(k.byTest('stay-chip-when'));
+  await k.press(page.getByRole('button', { name: /^Next week · / }));
+  step('stays: who and rooms, from the household');
+  await k.see('Who’s staying?', 'stays who');
+  await k.see('1 guest · 1 room', 'one guest');
+  await k.press(page.getByRole('button', { name: 'Hessa', exact: true }));
+  await k.see('2 guests · 1 room for 2', 'two guests');
+  await k.press(page.getByRole('button', { name: /^Sara, \d+$/ }));
+  await k.see('2 connecting rooms', 'family rooms');
+  await k.see('Children, with their age on the day', 'kids ages');
+  await k.shot('stay-who');
+  await k.press(k.byTest('stays-search'));
+  await k.see("Three places you'd like.", 'stays results', 12000);
+  const photos = await page.locator('[data-testid^="stay-photo-"] img').evaluateAll((els) => els.map((e) => e.getAttribute('src')));
+  if (new Set(photos).size < Math.min(3, photos.length) || !photos.length) errors.push(`stays: hotels share a photo (${photos.join(', ')})`);
+  await k.shot('stay-results');
+  step('stays: change the dates from the summary');
+  await k.press(k.byTest('stay-chip-when'));
+  await k.see('When are you in Istanbul?', 'change dates');
+  await k.press(page.getByRole('button', { name: /^This weekend · / }));
+  await k.see('Who’s staying?', 'back to who');
+  await k.see('3 guests', 'party kept');
+  step('stays: what was typed answers where, when and who');
+  await openAsk(page);
+  await k.ask('A hotel in Dubai next weekend for 4');
+  await k.see('Who’s staying?', 'straight to who', 9000);
+  if (await page.getByText('Where would you like to stay?').filter({ visible: true }).count()) errors.push('stays: asked where after it was said');
+  if (await page.getByText('When are you in').filter({ visible: true }).count()) errors.push('stays: asked when after it was said');
+  await k.see('4 guests · 2 connecting rooms', 'four guests');
+  await k.see('Dubai', 'summary city');
+  await k.shot('stay-typed-dubai');
+  await context.close();
+}
+
+/* ───────────── 8. anything else: only the missing details, words said once, replies that fit ───────────── */
+async function asks() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  await openAsk(page);
+  step('asks: an outing by name is a thing to do, asked when and who');
+  await k.ask('Boulevard World at night in Riyadh');
+  await k.see('When would you like to go?', 'outing when');
+  if (await page.getByText('Pick what you like').filter({ visible: true }).count()) errors.push('outing: asked to pick from Istanbul ideas');
+  await k.tap('This weekend');
+  await k.see('Who’s going?', 'outing who');
+  await k.press(page.getByRole('button', { name: 'Hessa', exact: true }));
+  await k.tap('These 2');
+  await k.shot('outing-asked');
+  await k.byTest('request-send').click();
+  await k.see('Riyadh · This weekend · Omar, Hessa', 'outing summary', 9000);
+  const dup = await page.getByText('“Boulevard World at night in Riyadh”').filter({ visible: true }).count();
+  if (dup) errors.push('outing: the typed words repeated as a note');
+  await k.see('Can we go another day?', 'dated suggestion');
+  if (await page.getByText('Can we change the dates?').filter({ visible: true }).count()) errors.push('outing: offered "change the dates"');
+  const boxes = await page.locator('[data-testid="reply-input"], [data-testid="ask-input"]').filter({ visible: true }).count();
+  if (boxes !== 1) errors.push(`outing: ${boxes} message boxes on screen`);
+  await k.shot('outing-sent');
+  await k.see('Boulevard World at night this weekend for both of you: SAR 240.', 'priced answer', 20000);
+  await k.see('Pay SAR 240', 'pay button');
+  await k.shot('outing-priced');
+  await k.tap('Can we go another day?');
+  await k.see('I’ll check that day', 'reply fits', 9000);
+  await k.shot('outing-thread');
+  step('asks: a table asks where, when, who and what matters');
+  await page.getByRole('button', { name: 'Ask something else' }).filter({ visible: true }).first().click();
+  await k.ask('A table somewhere good');
+  await k.see('Where?', 'table where');
+  await k.tap('Riyadh');
+  await k.see('When?', 'table when');
+  await k.tap('Tonight');
+  await k.see('Who’s coming?', 'table who');
+  await k.press(k.byTest('request-who-done'));
+  await k.see('What matters?', 'table prefs');
+  await k.tap('Halal');
+  await k.press(k.byTest('request-multi-done'));
+  await k.shot('table-asked');
+  await k.byTest('request-send').click();
+  await k.see('Restaurant table: Riyadh', 'table title', 9000);
+  await k.see('Can we go a little later?', 'table suggestion');
+  await k.see('I’m asking for a table for 1 in Riyadh, tonight: halal.', 'table answer', 20000);
+  if (await page.getByText(/airline/).filter({ visible: true }).count()) errors.push('table: the agent talks about airlines');
+  await k.shot('table-answer');
+  step('asks: back to the request from Trips');
+  await page.getByRole('button', { name: /^(Close|Back)$/ }).filter({ visible: true }).last().click();
+  await page.waitForTimeout(800);
+  await k.text('Trips', true).click();
+  await page.waitForTimeout(800);
+  const reqTab = page.getByRole('tab', { name: /Requests/ }).filter({ visible: true });
+  if (await reqTab.count()) await reqTab.first().click();
+  else await k.text('Requests', true).click();
+  await k.press(k.byTest('open-request-food'));
+  await k.see(' at Mada', 'thread screen', 9000);
+  await k.see('I’m asking for a table', 'thread from trips');
+  await k.shot('thread-from-trips');
+  await context.close();
+}
+
+/* ───────────── 9. a verified phone, asked early in a sheet (email account, the server needs one) ───────────── */
+async function phone() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  step('phone: email sign-in, phone later');
+  await page.goto(`${ORIGIN}/?beta=off`);
+  await k.see("We'll take it from here.", 'welcome');
+  await k.byTest('welcome-start').click();
+  await k.byTest('signin-email').click();
+  await k.byTest('email-input').fill(`noor.${Date.now()}@example.com`);
+  await k.byTest('email-send').click();
+  await k.see('Check your email', 'email code');
+  await k.byTest('email-code-input').fill('123456');
+  await k.see('Verify your phone', 'verify phone');
+  await page.getByRole('button', { name: /^(Later|Not now)$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(800);
+  if (await page.locator('[data-testid="name-input"]').count()) { await k.byTest('name-input').fill('Noor'); await page.getByRole('button', { name: /Continue|Let/ }).filter({ visible: true }).first().click(); await page.waitForTimeout(600); }
+  for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-ask"]').filter({ visible: true }).count()); i++) {
+    const b = page.getByRole('button', { name: /^(Not now|Skip|Allow|Continue)$/ }).filter({ visible: true }).first();
+    if (!(await b.count())) break;
+    await b.click(); await page.waitForTimeout(700);
+  }
+  step('phone: asked before the search, not at the payment');
+  await openAsk(page);
+  await k.ask('A hotel in Istanbul next weekend');
+  await k.see('Who’s staying?', 'who (phone)', 9000);
+  await k.see('we’ll ask for your mobile number, once', 'phone said up front');
+  await k.shot('phone-before-search');
+  await k.press(k.byTest('stays-search'));
+  await k.see('Your mobile number', 'phone sheet');
+  await k.byTest('phone-sheet-input').fill('12');
+  await k.byTest('phone-sheet-input').blur();
+  await k.see('start with 5', 'wrong number inline');
+  await k.shot('phone-sheet-wrong');
+  await k.byTest('phone-sheet-input').fill(`5${String(Date.now()).slice(-8)}`);
+  await k.byTest('phone-sheet-send').click();
+  await k.see('Enter the code', 'code in the sheet');
+  await k.byTest('phone-sheet-code').fill('000000');
+  await k.see('doesn', 'wrong code inline');
+  await k.shot('phone-sheet-code-wrong');
+  await k.byTest('phone-sheet-code').fill('123456');
+  await k.see("Three places you'd like.", 'search carries on', 15000);
+  await k.shot('phone-then-results');
+  await k.press(k.byTest('ask-review'));
+  await k.see('Free to cancel until', 'pay without asking again', 10000);
+  if (await page.getByText('Add your mobile number to book').filter({ visible: true }).count()) errors.push('phone: asked again at payment');
+  await context.close();
+}
+
 try {
   if (want('flights')) await flights();
   if (want('edges')) await edges();
@@ -503,6 +682,9 @@ try {
   if (want('desk')) await desk();
   if (want('requests')) await requests();
   if (want('circles')) await circles();
+  if (want('stays')) await stays();
+  if (want('asks')) await asks();
+  if (want('phone')) await phone();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);
