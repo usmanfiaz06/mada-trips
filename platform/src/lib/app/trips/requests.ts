@@ -27,6 +27,17 @@ export type RequestDetails = {
 
 const PENDING = ["sent", "reviewing"];
 
+/**
+ * The order a booking's request follows. Its status is written when the traveller has to answer (needs_answer); at
+ * other times it reads from the request's own state, which every step keeps current (the order may have moved on).
+ */
+function orderOf(status: string, o: RequestDetails["order"]): TripRequestView["order"] {
+  if (!o) return null;
+  if (status === "needs_answer") return o;
+  const now = status === "confirmed" || status === "done" ? "confirmed" : status === "cancelled" ? "cancelled" : "pending_agent";
+  return { id: o.id, status: now, failure: null };
+}
+
 export function toRequestView(r: RequestRow): TripRequestView {
   const d = (r.details ?? {}) as RequestDetails;
   return {
@@ -35,7 +46,7 @@ export function toRequestView(r: RequestRow): TripRequestView {
     status: r.status as TripRequestView["status"], title: isFlightAsk(r.details) ? flightTitle((r.details as { search: FlightSearch }).search) : r.summary, short: d.short ?? null,
     detail: isFlightRequest(r.details) ? flightSummary((r.details as { search: FlightSearch }).search, r.travellerIds.length) : d.detail ?? null,
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
-    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: d.order ?? null,
+    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: orderOf(r.status, d.order),
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }

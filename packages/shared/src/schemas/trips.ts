@@ -324,9 +324,10 @@ export const TripRequestView = z.object({
   /** What Faisal said with the price. */
   quoteText: z.string().nullable(),
   /**
-   * A booking's request: the order it follows. While the traveller has to answer (status 'needs_answer') this says why:
-   * order.status is the order's ('ticketing_failed', 'fare_changed', 'needs_answer') and failure, for tickets that didn't
-   * issue, is 'payment' or 'airline'. The order itself (GET /orders/:id) carries the actions. Optional for older builds.
+   * A booking's request: the order it follows (open it with GET /orders/:id, which carries the actions). While the
+   * traveller has to answer (request status 'needs_answer') order.status is the order's ('ticketing_failed',
+   * 'fare_changed', 'needs_answer') and failure, for tickets that didn't issue, is 'payment' or 'airline'; otherwise
+   * it is 'pending_agent', 'confirmed' or 'cancelled', following the request. Optional for older builds.
    */
   order: z.object({ id: Id, status: z.string(), failure: z.enum(['payment', 'airline']).nullable() }).nullable().optional(),
   createdAt: IsoDateTime,

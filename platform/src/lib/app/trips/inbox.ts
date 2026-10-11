@@ -18,9 +18,12 @@ const toView = (n: Row): Notification => ({
 
 export async function listNotifications(userId: string, before: string | null, limit = 30) {
   const where = before ? and(eq(appNotifications.userId, userId), lt(appNotifications.createdAt, new Date(before))) : eq(appNotifications.userId, userId);
-  const rows = await db.select().from(appNotifications).where(where).orderBy(desc(appNotifications.createdAt)).limit(limit + 1);
+  // The page and the unread count side by side (each query is a round trip).
+  const [rows, [unread]] = await Promise.all([
+    db.select().from(appNotifications).where(where).orderBy(desc(appNotifications.createdAt)).limit(limit + 1),
+    db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt))),
+  ]);
   const items = rows.slice(0, limit).map(toView);
-  const [unread] = await db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt)));
   return { items, next: rows.length > limit ? items[items.length - 1]!.createdAt : null, unread: unread?.n ?? 0 };
 }
 
