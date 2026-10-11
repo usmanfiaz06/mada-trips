@@ -91,7 +91,22 @@ export async function revokeByRefresh(refreshToken: string, reason: string) {
 export type AppAuth = { userId: string; sessionId: string };
 
 /** Verify the Bearer access token, then check the session is still live (so sign-out takes effect at once). */
-export async function authenticate(req: Request): Promise<AppAuth> {
+/** One check per request: a mutation with an Idempotency-Key is authenticated by the wrapper and again by its handler. */
+const checked = new WeakMap<Request, Promise<AppAuth & { locale: string | null }>>();
+
+export function authenticate(req: Request): Promise<AppAuth> {
+  let p = checked.get(req);
+  if (!p) {
+    p = checkBearer(req);
+    checked.set(req, p);
+  }
+  return p.then((a) => {
+    setRequestLocale(a.locale);
+    return { userId: a.userId, sessionId: a.sessionId };
+  });
+}
+
+async function checkBearer(req: Request): Promise<AppAuth & { locale: string | null }> {
   const h = req.headers.get("authorization") ?? "";
   const m = /^Bearer\s+([\w-]+\.[\w-]+\.[\w-]+)$/i.exec(h.trim());
   if (!m) throw new AppError("UNAUTHORIZED");
@@ -109,9 +124,8 @@ export async function authenticate(req: Request): Promise<AppAuth> {
   if (!row || row.userId !== sub) throw new AppError("UNAUTHORIZED");
   if (row.revokedAt) throw new AppError("SESSION_REVOKED");
   if (row.deletedAt) throw new AppError("UNAUTHORIZED");
-  // From here the request speaks the traveller's saved language (resilience/request.ts).
-  setRequestLocale(row.locale);
-  return { userId: sub, sessionId: sid };
+  // From here the request speaks the traveller's saved language (resilience/request.ts; set by authenticate).
+  return { userId: sub, sessionId: sid, locale: row.locale };
 }
 
 /** Like authenticate, but returns null when there is no Authorization header at all. */

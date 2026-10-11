@@ -1,17 +1,18 @@
 import "server-only";
 import { assertNotLimited } from "../limits";
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
-  CreateCircleRequest, REACTIONS, SharedCard, planById, t,
+  CreateCircleRequest, REACTIONS, SharedCard, isLocale, planById, t,
   type CircleDetail, type CircleMessage, type CircleSummary, type IncomingInvite, type MessageAuthor, type SysEvent, type UpdateCircleRequest,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appCircleMembers, appCircles, appMessages } from "@/db/app-schema";
-import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitShares, appCircleVotes } from "@/db/app-schema-circles";
+import { appCircleMembers, appCircles, appMessages, appNotifications, appTrips, appUsers } from "@/db/app-schema";
+import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitShares, appCircleVotes, appBlocks, appFriendships } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { coverColumns, coverFor, dropReplacedUpload, settleCovers } from "./covers";
-import { circleTrip, err, graphOf, isBlocked, liveUser, notify, peopleByIds, relationOf, type Db } from "./common";
+import { err, graphOf, liveUser, peopleByIds, relationOf, tripLine, type Db } from "./common";
 
 /*
  * Circles: who is in one, what it is called, where it's going, and its chat's building blocks. Every read and write
@@ -66,10 +67,13 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
   if (!rows.length) return [];
   const voteIds = rows.filter((r) => (r.card as Card | null)?.t === "vote").map((r) => r.id);
   const splitIds = rows.filter((r) => (r.card as Card | null)?.t === "split").map((r) => r.id);
-  const votes = voteIds.length ? await tx.select().from(appCircleVotes).where(inArray(appCircleVotes.messageId, voteIds)).orderBy(asc(appCircleVotes.createdAt)) : [];
-  const shares = splitIds.length ? await tx.select().from(appCircleSplitShares).where(inArray(appCircleSplitShares.messageId, splitIds)) : [];
-  const people = await peopleByIds(rows.map((r) => r.authorUserId).filter((x): x is string => !!x), tx);
-  const reacts = await tx.select().from(appCircleReactions).where(inArray(appCircleReactions.messageId, rows.map((r) => r.id))).orderBy(asc(appCircleReactions.createdAt));
+  // Independent reads, side by side (each is a round trip to the database).
+  const [votes, shares, people, reacts] = await Promise.all([
+    voteIds.length ? tx.select().from(appCircleVotes).where(inArray(appCircleVotes.messageId, voteIds)).orderBy(asc(appCircleVotes.createdAt)) : Promise.resolve([]),
+    splitIds.length ? tx.select().from(appCircleSplitShares).where(inArray(appCircleSplitShares.messageId, splitIds)) : Promise.resolve([]),
+    peopleByIds(rows.map((r) => r.authorUserId).filter((x): x is string => !!x), tx),
+    tx.select().from(appCircleReactions).where(inArray(appCircleReactions.messageId, rows.map((r) => r.id))).orderBy(asc(appCircleReactions.createdAt)),
+  ]);
   const order = REACTIONS as readonly string[];
   const reactionsOf = (mid: string) => {
     const mine = reacts.filter((x) => x.messageId === mid);
@@ -115,27 +119,40 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
 
 /* ───────────── list and detail ───────────── */
 
-export async function listCircles(userId: string): Promise<{ circles: CircleSummary[]; incoming: IncomingInvite[] }> {
-  const mine = await db.select({ id: appCircles.id, name: appCircles.name, tripId: appCircles.tripId, createdBy: appCircles.createdBy, createdAt: appCircles.createdAt, updatedAt: appCircles.updatedAt, role: appCircleMembers.role, muted: appCircleMembers.muted, lastReadAt: appCircleMembers.lastReadAt })
-    .from(appCircleMembers).innerJoin(appCircles, eq(appCircles.id, appCircleMembers.circleId))
-    .where(eq(appCircleMembers.userId, userId)).orderBy(desc(appCircles.updatedAt));
-  await settleCovers();
-  const incoming = await incomingInvites(userId);
-  if (!mine.length) return { circles: [], incoming };
+export async function listCircles(userId: string, opts: { only?: string } = {}): Promise<{ circles: CircleSummary[]; incoming: IncomingInvite[] }> {
+  return (await circleSummaries(userId, opts)).out;
+}
+
+/**
+ * The circles list, in three rounds of reads run side by side (the database is far from the functions on staging, so
+ * every sequential query costs ~0.45 s). `only`: just that circle, and no incoming invites (the circle screen).
+ */
+async function circleSummaries(userId: string, opts: { only?: string } = {}) {
+  const [mine, , incoming] = await Promise.all([
+    db.select({ id: appCircles.id, name: appCircles.name, tripId: appCircles.tripId, createdBy: appCircles.createdBy, createdAt: appCircles.createdAt, updatedAt: appCircles.updatedAt, role: appCircleMembers.role, muted: appCircleMembers.muted, lastReadAt: appCircleMembers.lastReadAt })
+      .from(appCircleMembers).innerJoin(appCircles, eq(appCircles.id, appCircleMembers.circleId))
+      .where(opts.only ? and(eq(appCircleMembers.userId, userId), eq(appCircleMembers.circleId, opts.only)) : eq(appCircleMembers.userId, userId)).orderBy(desc(appCircles.updatedAt)),
+    settleCovers(),
+    opts.only ? Promise.resolve([] as IncomingInvite[]) : incomingInvites(userId),
+  ]);
+  if (!mine.length) return { out: { circles: [] as CircleSummary[], incoming }, members: [], dets: [] };
   const ids = mine.map((c) => c.id);
-  const [members, dets, invited, lasts, unread] = await Promise.all([
+  const tripIds = [...new Set(mine.map((c) => c.tripId).filter((x): x is string => !!x))];
+  const [members, dets, invited, lastRows, unread, tripRows] = await Promise.all([
     db.select().from(appCircleMembers).where(inArray(appCircleMembers.circleId, ids)).orderBy(asc(appCircleMembers.joinedAt)),
     db.select().from(appCircleDetails).where(inArray(appCircleDetails.circleId, ids)),
     db.select({ circleId: appCircleInvites.circleId, n: sql<number>`count(*)::int` }).from(appCircleInvites)
       .where(and(inArray(appCircleInvites.circleId, ids), eq(appCircleInvites.status, "pending"), eq(appCircleInvites.channel, "app"), sql`${appCircleInvites.expiresAt} > now()`)).groupBy(appCircleInvites.circleId),
-    db.execute<{ id: string }>(sql`SELECT DISTINCT ON (thread_id) id FROM app_messages WHERE thread_kind = 'circle' AND thread_id IN ${ids} AND NOT (card->>'t' = 'mada' AND card->>'kind' = 'welcome') ORDER BY thread_id, created_at DESC, id DESC`),
+    // Each circle's last message (not Mada's welcome), whole rows in one query.
+    db.selectDistinctOn([appMessages.threadId]).from(appMessages)
+      .where(and(eq(appMessages.threadKind, "circle"), inArray(appMessages.threadId, ids), sql`NOT (coalesce(${appMessages.card}->>'t', '') = 'mada' AND coalesce(${appMessages.card}->>'kind', '') = 'welcome')`))
+      .orderBy(appMessages.threadId, desc(appMessages.createdAt), desc(appMessages.id)),
     db.execute<{ thread_id: string; n: number }>(sql`SELECT m.thread_id, count(*)::int AS n FROM app_messages m JOIN app_circle_members cm ON cm.circle_id = m.thread_id AND cm.user_id = ${userId}
       WHERE m.thread_kind = 'circle' AND m.thread_id IN ${ids} AND m.created_at > coalesce(cm.last_read_at, cm.joined_at) AND m.author_user_id IS DISTINCT FROM ${userId} AND coalesce(m.card->>'t', '') <> 'sys' AND coalesce(m.card->>'kind', '') <> 'welcome' GROUP BY m.thread_id`),
+    tripIds.length ? db.select({ id: appTrips.id, city: appTrips.city, startDate: appTrips.startDate, endDate: appTrips.endDate }).from(appTrips).where(inArray(appTrips.id, tripIds)) : Promise.resolve([]),
   ]);
-  const lastRows = lasts.length ? await db.select().from(appMessages).where(inArray(appMessages.id, lasts.map((l) => l.id))) : [];
-  const lastMsgs = await toMessages(lastRows);
-  const people = await peopleByIds(members.map((m) => m.userId));
-  const trips = new Map(await Promise.all(mine.filter((c) => c.tripId).map(async (c) => [c.id, await circleTrip(c.tripId)] as const)));
+  const [lastMsgs, people] = await Promise.all([toMessages(lastRows), peopleByIds(members.map((m) => m.userId))]);
+  const trips = new Map(tripRows.map((x) => [x.id, tripLine(x.city, x.startDate, x.endDate)]));
   const circles = mine.map((c): CircleSummary => {
     const ms = members.filter((m) => m.circleId === c.id);
     const d = dets.find((x) => x.circleId === c.id);
@@ -145,13 +162,13 @@ export async function listCircles(userId: string): Promise<{ circles: CircleSumm
     return {
       id: c.id, name: dm ? (people.get(others[0]?.userId ?? "")?.short ?? c.name) : c.name, imageUrl: null, tripId: c.tripId, role: c.role === "admin" ? "admin" : "member",
       memberCount: ms.length, muted: c.muted, unread: unread.find((u) => u.thread_id === c.id)?.n ?? 0, createdAt: c.createdAt.toISOString(),
-      cover: dm ? null : coverFor(c.id, d, userId), dest: d?.dest ?? null, dm, trip: trips.get(c.id) ?? null,
+      cover: dm ? null : coverFor(c.id, d, userId), dest: d?.dest ?? null, dm, trip: (c.tripId && trips.get(c.tripId)) || null,
       adminId: ms.find((m) => m.role === "admin")?.userId ?? null,
       preview: ms.slice(0, 3).map((m) => people.get(m.userId)!), invitedCount: invited.find((i) => i.circleId === c.id)?.n ?? 0,
       last, fresh: !c.lastReadAt && c.createdBy !== userId && !dm,
     };
   });
-  return { circles, incoming };
+  return { out: { circles, incoming }, members, dets, people };
 }
 
 export async function incomingInvites(userId: string): Promise<IncomingInvite[]> {
@@ -160,82 +177,127 @@ export async function incomingInvites(userId: string): Promise<IncomingInvite[]>
     .where(and(eq(appCircleInvites.inviteeUserId, userId), eq(appCircleInvites.status, "pending"), sql`${appCircleInvites.expiresAt} > now()`))
     .orderBy(desc(appCircleInvites.createdAt));
   if (!rows.length) return [];
-  const g = await graphOf(userId);
-  const visible = rows.filter((r) => !g.blocked.has(r.inviterId));
-  const people = await peopleByIds(visible.map((r) => r.inviterId));
-  const out: IncomingInvite[] = [];
-  for (const r of visible) {
-    const d = await details(r.circleId!);
-    const count = (await memberIds(r.circleId!)).length;
-    out.push({ inviteId: r.id, from: people.get(r.inviterId)!, circle: { id: r.circleId!, name: r.name, cover: coverFor(r.circleId!, d, userId), memberCount: count }, sentAt: r.createdAt.toISOString() });
-  }
-  return out;
+  const circleIds = [...new Set(rows.map((r) => r.circleId!))];
+  const [g, people, dets, counts] = await Promise.all([
+    graphOf(userId),
+    peopleByIds(rows.map((r) => r.inviterId)),
+    db.select().from(appCircleDetails).where(inArray(appCircleDetails.circleId, circleIds)),
+    db.select({ circleId: appCircleMembers.circleId, n: sql<number>`count(*)::int` }).from(appCircleMembers).where(inArray(appCircleMembers.circleId, circleIds)).groupBy(appCircleMembers.circleId),
+  ]);
+  return rows.filter((r) => !g.blocked.has(r.inviterId)).map((r) => ({
+    inviteId: r.id, from: people.get(r.inviterId)!,
+    circle: { id: r.circleId!, name: r.name, cover: coverFor(r.circleId!, dets.find((d) => d.circleId === r.circleId) ?? null, userId), memberCount: counts.find((c) => c.circleId === r.circleId)?.n ?? 0 },
+    sentAt: r.createdAt.toISOString(),
+  }));
 }
 
 export async function circleDetail(circleId: string, userId: string): Promise<CircleDetail> {
-  await membership(circleId, userId);
-  const { circles } = await listCircles(userId);
-  const circle = circles.find((c) => c.id === circleId);
-  if (!circle) throw new AppError("NOT_FOUND");
-  const members = await db.select().from(appCircleMembers).where(eq(appCircleMembers.circleId, circleId)).orderBy(asc(appCircleMembers.joinedAt));
-  const invites = await db.select().from(appCircleInvites)
-    .where(and(eq(appCircleInvites.circleId, circleId), eq(appCircleInvites.status, "pending"), eq(appCircleInvites.channel, "app"), sql`${appCircleInvites.expiresAt} > now()`))
-    .orderBy(asc(appCircleInvites.createdAt));
-  const people = await peopleByIds([...members.map((m) => m.userId), ...invites.map((i) => i.inviteeUserId!).filter(Boolean)]);
-  const g = await graphOf(userId);
-  const d = await details(circleId);
-  const { familyOfFn } = await import("./messages");
-  const fam = await familyOfFn(members.map((m) => m.userId));
+  // Membership is checked by the summary itself (only circles this person is in); the rest is read alongside it.
+  const [sum, invites, g, fam] = await Promise.all([
+    circleSummaries(userId, { only: circleId }),
+    db.select().from(appCircleInvites)
+      .where(and(eq(appCircleInvites.circleId, circleId), eq(appCircleInvites.status, "pending"), eq(appCircleInvites.channel, "app"), sql`${appCircleInvites.expiresAt} > now()`))
+      .orderBy(asc(appCircleInvites.createdAt)),
+    graphOf(userId),
+    familyOfCircle(circleId),
+  ]);
+  const circle = sum.out.circles.find((c) => c.id === circleId);
+  if (!circle) throw err("NOT_FOUND", "circles.err.notMember");
+  const members = sum.members.filter((m) => m.circleId === circleId);
+  const d = sum.dets.find((x) => x.circleId === circleId);
+  const invitees = invites.map((i) => i.inviteeUserId).filter((x): x is string => !!x);
+  const people = new Map(sum.people);
+  const missing = invitees.filter((id) => !people.has(id));
+  if (missing.length) for (const [k, v] of await peopleByIds(missing)) people.set(k, v);
   return {
     circle,
-    members: members.map((m) => ({ ...people.get(m.userId)!, role: m.role === "admin" ? "admin" : "member", relation: relationOf(g, userId, m.userId), joinedAt: m.joinedAt.toISOString(), family: fam(m.userId) })),
+    members: members.map((m) => ({ ...people.get(m.userId)!, role: m.role === "admin" ? "admin" : "member", relation: relationOf(g, userId, m.userId), joinedAt: m.joinedAt.toISOString(), family: fam(m.userId, members.map((x) => x.userId)) })),
     invited: invites.filter((i) => i.inviteeUserId).map((i) => ({ inviteId: i.id, person: people.get(i.inviteeUserId!)!, sentAt: i.createdAt.toISOString(), remindedAt: i.remindedAt?.toISOString() ?? null })),
-    pinned: d.pinnedPlan && planById(d.pinnedPlan) ? { kind: "plan", id: d.pinnedPlan, by: d.pinnedBy } : null,
+    pinned: d?.pinnedPlan && planById(d.pinnedPlan) ? { kind: "plan", id: d.pinnedPlan, by: d.pinnedBy } : null,
     reads: members.filter((m) => m.lastReadAt).map((m) => ({ userId: m.userId, at: m.lastReadAt!.toISOString() })),
+  };
+}
+
+/**
+ * Family groups in a circle, read in one query alongside the rest (members aren't known yet, so the ties are
+ * between any two of its members). Same rule as familyOfFn in messages.ts: the earliest member heads each group.
+ */
+async function familyOfCircle(circleId: string) {
+  const inCircle = sql`(SELECT user_id FROM app_circle_members WHERE circle_id = ${circleId})`;
+  const ties = await db.select({ a: appFriendships.requesterId, b: appFriendships.addresseeId }).from(appFriendships)
+    .where(and(eq(appFriendships.status, "accepted"), sql`${appFriendships.requesterId} IN ${inCircle}`, sql`${appFriendships.addresseeId} IN ${inCircle}`,
+      or(eq(appFriendships.requesterTag, "family"), eq(appFriendships.addresseeTag, "family"))));
+  return (who: string, members: string[]) => {
+    const parent = new Map(members.map((m) => [m, m]));
+    const find = (x: string): string => (parent.get(x) === x ? x : find(parent.get(x)!));
+    for (const m of members) {
+      const family = ties.flatMap((x) => (x.a === m ? [x.b] : x.b === m ? [x.a] : []));
+      for (const o of family) if (parent.has(o)) { const a = find(m); const b = find(o); if (a !== b) parent.set(members.indexOf(a) < members.indexOf(b) ? b : a, members.indexOf(a) < members.indexOf(b) ? a : b); }
+    }
+    return parent.has(who) ? find(who) : who;
   };
 }
 
 /* ───────────── making and changing circles ───────────── */
 
-/** People someone may add to a circle: anyone on Mada who hasn't blocked them, or been blocked. */
+/** People someone may add to a circle: anyone on Mada who hasn't blocked them, or been blocked. Two queries, together. */
 export async function assertInvitable(userId: string, others: string[], tx: Db = db) {
-  for (const o of others) {
-    if (o === userId) throw err("VALIDATION", "circles.err.self");
-    if (!(await liveUser(o, tx)) || (await isBlocked(userId, o, tx))) throw new AppError("NOT_FOUND");
-  }
+  if (!others.length) return;
+  if (others.includes(userId)) throw err("VALIDATION", "circles.err.self");
+  const [live, blocks] = await Promise.all([
+    tx.select({ id: appUsers.id }).from(appUsers).where(and(inArray(appUsers.id, others), isNull(appUsers.deletedAt))),
+    tx.select({ a: appBlocks.blockerId, b: appBlocks.blockedId }).from(appBlocks)
+      .where(or(and(eq(appBlocks.blockerId, userId), inArray(appBlocks.blockedId, others)), and(inArray(appBlocks.blockerId, others), eq(appBlocks.blockedId, userId)))),
+  ]);
+  const ok = new Set(live.map((u) => u.id));
+  for (const b of blocks) ok.delete(b.a === userId ? b.b : b.a);
+  if (others.some((o) => !ok.has(o))) throw new AppError("NOT_FOUND");
 }
 
+/** App invites to a circle and each person's inbox line (in their own language): a few multi-row writes, not one per person. */
 export async function createCircleInvites(tx: Db, circleId: string, circleName: string, inviterId: string, userIds: string[]) {
   if (!userIds.length) return;
   const inviter = (await peopleByIds([inviterId], tx)).get(inviterId)!;
+  const locales = await tx.select({ id: appUsers.id, locale: appUsers.locale }).from(appUsers).where(inArray(appUsers.id, userIds));
   const expiresAt = new Date(Date.now() + 14 * 86_400_000);
-  for (const u of userIds) {
-    await tx.insert(appCircleInvites).values({ kind: "circle", circleId, inviterId, inviteeUserId: u, channel: "app", expiresAt });
-    await notify(tx, u, "circle.invite", ["notify.circles.invite.title", { name: inviter.short }], ["notify.circles.invite.body", { circle: circleName }], "/circles", { circleId });
-  }
+  await tx.insert(appCircleInvites).values(userIds.map((u) => ({ kind: "circle", circleId, inviterId, inviteeUserId: u, channel: "app", expiresAt })));
+  await tx.insert(appNotifications).values(userIds.map((u) => {
+    const l = locales.find((x) => x.id === u)?.locale ?? "en";
+    const locale = isLocale(l) ? l : "en";
+    return {
+      userId: u, kind: "circle.invite", level: "passive", href: "/circles", data: { circleId },
+      title: t("notify.circles.invite.title", { name: inviter.short }, locale).slice(0, 64), body: t("notify.circles.invite.body", { circle: circleName }, locale),
+    };
+  }));
 }
 
 export async function createCircle(userId: string, raw: unknown, ipHash: string | null): Promise<CircleDetail> {
-  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const input = CreateCircleRequest.parse(raw);
   const invite = [...new Set(input.invite)];
-  await assertInvitable(userId, invite);
-  const id = await db.transaction(async (tx) => {
-    const dupe = await tx.select({ id: appCircles.id }).from(appCircles).innerJoin(appCircleMembers, eq(appCircleMembers.circleId, appCircles.id))
+  // The checks don't depend on each other: one round trip for all of them.
+  const [, , dupe, coverCols] = await Promise.all([
+    assertNotLimited(userId), // the desk paused Circles for this account (limits.ts)
+    assertInvitable(userId, invite),
+    db.select({ id: appCircles.id }).from(appCircles).innerJoin(appCircleMembers, eq(appCircleMembers.circleId, appCircles.id))
       .leftJoin(appCircleDetails, eq(appCircleDetails.circleId, appCircles.id))
-      .where(and(eq(appCircleMembers.userId, userId), sql`lower(${appCircles.name}) = lower(${input.name})`, sql`coalesce(${appCircleDetails.dm}, false) = false`)).limit(1);
-    if (dupe.length) throw err("VALIDATION", "circles.err.dupeName", { name: t("circles.err.dupeName") });
-    const [c] = await tx.insert(appCircles).values({ name: input.name, createdBy: userId }).returning({ id: appCircles.id });
-    await tx.insert(appCircleDetails).values({ circleId: c!.id, ...(await coverColumns(input.cover ?? null, userId, null, tx)), dest: input.dest ?? null });
-    await tx.insert(appCircleMembers).values({ circleId: c!.id, userId, role: "admin", lastReadAt: new Date() });
-    await sysMessage(tx, c!.id, "created", userId);
-    if (invite.length) {
-      await createCircleInvites(tx, c!.id, input.name, userId, invite);
-      await sysMessage(tx, c!.id, "invited", userId, invite);
-    }
-    await addMessage(tx, c!.id, { author: "mada", body: "welcome", card: { t: "mada", kind: "welcome" } });
-    await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "circle.created", entityType: "circle", entityId: c!.id, summary: `Made a circle and invited ${invite.length}`, ipHash });
-    return c!.id;
+      .where(and(eq(appCircleMembers.userId, userId), sql`lower(${appCircles.name}) = lower(${input.name})`, sql`coalesce(${appCircleDetails.dm}, false) = false`)).limit(1),
+    coverColumns(input.cover ?? null, userId, null),
+  ]);
+  if (dupe.length) throw err("VALIDATION", "circles.err.dupeName", { name: t("circles.err.dupeName") });
+  const id = randomUUID();
+  await db.transaction(async (tx) => {
+    await tx.insert(appCircles).values({ id, name: input.name, createdBy: userId });
+    await tx.insert(appCircleDetails).values({ circleId: id, ...coverCols, dest: input.dest ?? null });
+    await tx.insert(appCircleMembers).values({ circleId: id, userId, role: "admin", lastReadAt: new Date() });
+    // The opening lines in one insert, in order: made, invited, Mada's welcome (a new circle's updated_at is now already).
+    const sys = (event: SysEvent, users: string[] = []) => ({ threadKind: "circle", threadId: id, authorKind: "mada", body: event, card: { t: "sys", event, actor: userId, users, text: null, amount: null }, createdAt: nextAt() });
+    await tx.insert(appMessages).values([
+      sys("created"),
+      ...(invite.length ? [sys("invited", invite)] : []),
+      { threadKind: "circle", threadId: id, authorKind: "mada", body: "welcome", card: { t: "mada", kind: "welcome" }, createdAt: nextAt() },
+    ]);
+    if (invite.length) await createCircleInvites(tx, id, input.name, userId, invite);
+    await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "circle.created", entityType: "circle", entityId: id, summary: `Made a circle and invited ${invite.length}`, ipHash });
   });
   return circleDetail(id, userId);
 }

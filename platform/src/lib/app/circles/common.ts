@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
-import { addDays, monthOf, personRef, rangeLabel, t, todayIn, type CopyKey, type PersonRef, type SocialRelation, type Vars } from "@mada/shared";
+import { addDays, monthOf, personRef, rangeLabel, t, todayIn, type CopyKey, type Lang, type PersonRef, type SocialRelation, type Vars } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appNotifications, appPeople, appTrips, appUsers } from "@/db/app-schema";
 import { appBlocks, appFollows, appFriendships } from "@/db/app-schema-circles";
@@ -70,10 +70,15 @@ export async function liveUser(id: string, tx: Db = db) {
 
 export type Graph = { friends: Set<string>; family: Set<string>; close: Set<string>; following: Set<string>; blocked: Set<string>; asked: Set<string>; askedMe: Set<string> };
 
-/** Everything about how one person relates to everyone else, in three small queries. */
+/** Everything about how one person relates to everyone else, in three small queries run together. */
 export async function graphOf(userId: string, tx: Db = db): Promise<Graph> {
   const g: Graph = { friends: new Set(), family: new Set(), close: new Set(), following: new Set(), blocked: new Set(), asked: new Set(), askedMe: new Set() };
-  const fr = await tx.select().from(appFriendships).where(or(eq(appFriendships.requesterId, userId), eq(appFriendships.addresseeId, userId)));
+  // Side by side: each is a round trip to the database, and they don't depend on each other.
+  const [fr, fo, bl] = await Promise.all([
+    tx.select().from(appFriendships).where(or(eq(appFriendships.requesterId, userId), eq(appFriendships.addresseeId, userId))),
+    tx.select({ id: appFollows.followeeId }).from(appFollows).where(eq(appFollows.followerId, userId)),
+    tx.select().from(appBlocks).where(or(eq(appBlocks.blockerId, userId), eq(appBlocks.blockedId, userId))),
+  ]);
   for (const f of fr) {
     const mine = f.requesterId === userId;
     const other = mine ? f.addresseeId : f.requesterId;
@@ -86,9 +91,7 @@ export async function graphOf(userId: string, tx: Db = db): Promise<Graph> {
     } else if (mine) g.asked.add(other);
     else g.askedMe.add(other);
   }
-  const fo = await tx.select({ id: appFollows.followeeId }).from(appFollows).where(eq(appFollows.followerId, userId));
   fo.forEach((f) => g.following.add(f.id));
-  const bl = await tx.select().from(appBlocks).where(or(eq(appBlocks.blockerId, userId), eq(appBlocks.blockedId, userId)));
   bl.forEach((b) => g.blocked.add(b.blockerId === userId ? b.blockedId : b.blockerId));
   for (const b of g.blocked) { g.askedMe.delete(b); g.asked.delete(b); }
   return g;
@@ -125,7 +128,7 @@ export async function mutualCounts(me: string, others: string[], tx: Db = db): P
 
 /* ───────────── trips (read only; the booking screens own them) ───────────── */
 
-const tripLine = (city: string, from: string, to: string | null) => `${city} · ${rangeLabel(from, to)}`;
+export const tripLine = (city: string, from: string, to: string | null) => `${city} · ${rangeLabel(from, to)}`;
 export const tripDates = (from: string, to: string | null) => rangeLabel(from, to);
 /** "Mar 27": a stamp's date. */
 export const stampMonth = (iso: string) => `${monthOf(iso).toUpperCase()} ${iso.slice(2, 4)}`;
@@ -161,8 +164,9 @@ export async function pastTrips(userIds: string[], tx: Db = db) {
  * An inbox line for someone, in their own language (whoever's action caused it). With `push`, it also goes to their
  * phone once the caller's transaction is done (call the returned function after commit; a push is only a nudge).
  */
-export async function notify(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null = null, opts: { push?: boolean } = {}) {
-  const locale = await localeOfUser(userId, tx);
+export async function notify(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null = null, opts: { push?: boolean; locale?: Lang } = {}) {
+  // The caller may already know their language (read alongside its other reads): one round trip fewer.
+  const locale = opts.locale ?? (await localeOfUser(userId, tx));
   const tt = t(title[0], title[1], locale).slice(0, 64);
   const bb = t(body[0], body[1], locale);
   const [row] = await tx.insert(appNotifications).values({ userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data }).returning({ id: appNotifications.id });

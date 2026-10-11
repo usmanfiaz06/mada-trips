@@ -4,7 +4,7 @@ import { assertNotLimited } from "../limits";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import {
-  INVITE_TTL_DAYS, LIMITS, inviteUrl, maskPhone, t,
+  INVITE_TTL_DAYS, LIMITS, inviteUrl, isLocale, maskPhone, t, type Lang,
   type AcceptInviteResponse, type CreateInviteRequest, type InviteLink, type InvitePreview, type InvitesResponse, type LinkOptions, type PersonRef, type SentInvite,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -149,9 +149,11 @@ export async function listInvites(userId: string): Promise<InvitesResponse> {
 async function guardLookup(code: string, ipHash: string | null, web = false): Promise<string> {
   const net = ipHash ?? "unknown";
   // The web page is also fetched by WhatsApp's and Apple's link previewers, many people behind few addresses.
-  if (web) await hit(`invite:web:${net}`, INVITE_LIMITS.webPreviewsPerMinute, 60);
-  else await hit(`invite:preview:${net}`, INVITE_LIMITS.previewsPerMinute, 60);
-  if ((await peek(`invite:bad:${net}`, 600)) >= INVITE_LIMITS.badCodesPer10Min) await hit(`invite:bad:${net}`, INVITE_LIMITS.badCodesPer10Min, 600);
+  const [, bad] = await Promise.all([
+    web ? hit(`invite:web:${net}`, INVITE_LIMITS.webPreviewsPerMinute, 60) : hit(`invite:preview:${net}`, INVITE_LIMITS.previewsPerMinute, 60),
+    peek(`invite:bad:${net}`, 600),
+  ]);
+  if (bad >= INVITE_LIMITS.badCodesPer10Min) await hit(`invite:bad:${net}`, INVITE_LIMITS.badCodesPer10Min, 600);
   const lookup = lookupOf(code);
   if (!lookup) {
     await hit(`invite:bad:${net}`, INVITE_LIMITS.badCodesPer10Min, 600).catch(() => {});
@@ -191,13 +193,6 @@ async function befriend(tx: Db, a: string, b: string) {
   await tx.insert(appFriendships).values({ requesterId: a, addresseeId: b, status: "accepted", acceptedAt: new Date() });
 }
 
-async function joinCircle(tx: Db, circleId: string, userId: string, via: { link?: string }) {
-  await tx.insert(appCircleMembers).values({ circleId, userId, role: "member" }).onConflictDoNothing();
-  await tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() })
-    .where(and(eq(appCircleInvites.circleId, circleId), eq(appCircleInvites.inviteeUserId, userId), eq(appCircleInvites.status, "pending")));
-  await sysMessage(tx, circleId, via.link ? "joinedByLink" : "joined", userId, via.link ? [via.link] : []);
-}
-
 /** One more person in through a link with a limit: refused (as full) when the last place has gone. */
 async function takePlace(tx: Db, r: InviteRow) {
   if (r.channel !== "link") return;
@@ -212,26 +207,41 @@ async function takePlace(tx: Db, r: InviteRow) {
  * hears about it: "Noor joined Eid trip", in the inbox and on their phone.
  */
 export async function accept(ref: string, userId: string, isId: boolean, ipHash: string | null = null): Promise<AcceptInviteResponse> {
-  await hit(`invite:accept:${userId}`, INVITE_LIMITS.acceptsPerHour, 3600);
-  const lookup = isId ? null : await guardLookup(ref, ipHash);
+  const [, lookup] = await Promise.all([
+    hit(`invite:accept:${userId}`, INVITE_LIMITS.acceptsPerHour, 3600),
+    isId ? Promise.resolve(null) : guardLookup(ref, ipHash),
+  ]);
   const [r] = isId
     ? await db.select().from(appCircleInvites).where(and(eq(appCircleInvites.id, ref), eq(appCircleInvites.inviteeUserId, userId)))
     : await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookup!));
-  if (!r || (await isBlocked(userId, r.inviterId))) throw err("NOT_FOUND", "circles.join.notFound");
+  if (!r) throw err("NOT_FOUND", "circles.join.notFound");
+  // Everything the join needs to know, read side by side before the transaction (each read is a round trip).
+  const [blocked, people, ids, circleRow, inviter] = await Promise.all([
+    isBlocked(userId, r.inviterId),
+    peopleByIds([userId]),
+    r.circleId ? memberIds(r.circleId) : Promise.resolve([] as string[]),
+    r.circleId ? db.select({ name: appCircles.name }).from(appCircles).where(eq(appCircles.id, r.circleId)) : Promise.resolve([] as { name: string }[]),
+    db.select({ locale: appUsers.locale }).from(appUsers).where(eq(appUsers.id, r.inviterId)),
+  ]);
+  if (blocked) throw err("NOT_FOUND", "circles.join.notFound");
   if (r.status === "cancelled" || r.status === "declined" || (isId && r.status !== "pending")) throw err("NOT_FOUND", "circles.err.inviteExpired");
   if (r.expiresAt.getTime() < Date.now()) throw err("NOT_FOUND", "circles.err.inviteExpired");
   if (r.inviterId === userId && !r.circleId) throw err("VALIDATION", "circles.err.self");
   const after: (() => Promise<void>)[] = [];
-  const me = (await peopleByIds([userId])).get(userId)!;
+  const me = people.get(userId)!;
+  const locale = isLocale(inviter[0]?.locale) ? inviter[0]!.locale as Lang : "en";
+  if (r.circleId && ids.includes(userId)) return { circleId: r.circleId, friendId: null, already: true };
   const out = await db.transaction(async (tx) => {
     if (r.circleId) {
-      const ids = await memberIds(r.circleId, tx);
-      if (ids.includes(userId)) return { circleId: r.circleId, friendId: null, already: true };
-      await takePlace(tx, r);
-      await joinCircle(tx, r.circleId, userId, r.channel === "link" ? { link: r.inviterId } : {});
-      const [c] = await tx.select({ name: appCircles.name }).from(appCircles).where(eq(appCircles.id, r.circleId));
+      // A second tap that raced this one: the member row is already there, nothing more to write.
+      const joined = await tx.insert(appCircleMembers).values({ circleId: r.circleId, userId, role: "member" }).onConflictDoNothing().returning({ id: appCircleMembers.userId });
+      if (!joined.length) return { circleId: r.circleId, friendId: null, already: true };
+      await takePlace(tx, r); // full: throws, and the transaction takes the member row back out
+      await tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() })
+        .where(and(eq(appCircleInvites.circleId, r.circleId), eq(appCircleInvites.inviteeUserId, userId), eq(appCircleInvites.status, "pending")));
+      await sysMessage(tx, r.circleId, r.channel === "link" ? "joinedByLink" : "joined", userId, r.channel === "link" ? [r.inviterId] : []);
       if (ids.includes(r.inviterId)) {
-        after.push(await notify(tx, r.inviterId, "circle.joined", ["notify.circles.joined.title", { name: me.short, circle: c?.name ?? "" }], ["notify.circles.joined.body"], `/circle/${r.circleId}`, { circleId: r.circleId, userId }, { push: true }));
+        after.push(await notify(tx, r.inviterId, "circle.joined", ["notify.circles.joined.title", { name: me.short, circle: circleRow[0]?.name ?? "" }], ["notify.circles.joined.body"], `/circle/${r.circleId}`, { circleId: r.circleId, userId }, { push: true, locale }));
       }
       return { circleId: r.circleId, friendId: null, already: false };
     }
@@ -241,7 +251,7 @@ export async function accept(ref: string, userId: string, isId: boolean, ipHash:
     await befriend(tx, r.inviterId, userId);
     if (r.channel === "link") await tx.insert(appCircleInvites).values({ kind: "mada", inviterId: r.inviterId, channel: "link", status: "accepted", acceptedBy: userId, respondedAt: new Date(), expiresAt: r.expiresAt });
     else await tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() }).where(eq(appCircleInvites.id, r.id));
-    if (!already) after.push(await notify(tx, r.inviterId, "friend.joined", ["notify.circles.joinedMada.title", { name: me.short }], ["notify.circles.joinedMada.body"], `/friend/${userId}`, { userId }, { push: true }));
+    if (!already) after.push(await notify(tx, r.inviterId, "friend.joined", ["notify.circles.joinedMada.title", { name: me.short }], ["notify.circles.joinedMada.body"], `/friend/${userId}`, { userId }, { push: true, locale }));
     return { circleId: null, friendId: r.inviterId, already };
   });
   for (const f of after) await f();

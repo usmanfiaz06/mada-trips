@@ -1,19 +1,19 @@
 import "server-only";
 import { assertNotLimited } from "../limits";
-import { and, asc, desc, eq, gt, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import {
   CreateSplitRequest, CreateVoteRequest, bookPrefill, circleDest, madaReply, planById, shareUnits, splitAmounts, t, todayIn, votePhrase,
   type CircleMessage, type MadaAction, type MarkPaidRequest, type MessagesPage, type SendCircleMessageRequest,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appCircleMembers, appCircles, appMessages } from "@/db/app-schema";
-import { appCircleDetails, appCircleSplitShares, appCircleVotes } from "@/db/app-schema-circles";
+import { appCircleDetails, appCircleSplitShares, appCircleVotes, appFriendships } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { supplierMode } from "../config";
 import { suppliers } from "../suppliers";
 import { addMessage, details, isDm, memberIds, membership, sysMessage, toMessages, type MessageRow } from "./circles";
-import { assertUnder, circleTrip, err, graphOf, isBlocked, notify, peopleByIds, sar, type Db } from "./common";
+import { assertUnder, circleTrip, err, isBlocked, notify, peopleByIds, sar, type Db } from "./common";
 
 /*
  * A circle's chat: pages of messages (newest page first, oldest-first inside a page), sending, Mada's answers to
@@ -233,12 +233,16 @@ export async function pickWinner(circleId: string, userId: string, messageId: st
 /* ───────────── splits, in halalas ───────────── */
 
 /** Families for "split by family": people tagged as family travel as one. The unit is keyed by its first member. */
-export async function familyOfFn(members: string[]) {
+export async function familyOfFn(members: string[], tx: Db = db) {
   const parent = new Map(members.map((m) => [m, m]));
   const find = (x: string): string => (parent.get(x) === x ? x : find(parent.get(x)!));
+  // Family ties between these people (accepted, tagged family by either side), in one query (graphOf's rule).
+  const ties = members.length > 1 ? await tx.select({ a: appFriendships.requesterId, b: appFriendships.addresseeId }).from(appFriendships)
+    .where(and(eq(appFriendships.status, "accepted"), inArray(appFriendships.requesterId, members), inArray(appFriendships.addresseeId, members),
+      or(eq(appFriendships.requesterTag, "family"), eq(appFriendships.addresseeTag, "family")))) : [];
   for (const m of members) {
-    const g = await graphOf(m);
-    for (const o of g.family) if (parent.has(o)) { const a = find(m); const b = find(o); if (a !== b) parent.set(members.indexOf(a) < members.indexOf(b) ? b : a, members.indexOf(a) < members.indexOf(b) ? a : b); }
+    const family = ties.flatMap((x) => (x.a === m ? [x.b] : x.b === m ? [x.a] : []));
+    for (const o of family) if (parent.has(o)) { const a = find(m); const b = find(o); if (a !== b) parent.set(members.indexOf(a) < members.indexOf(b) ? b : a, members.indexOf(a) < members.indexOf(b) ? a : b); }
   }
   return find;
 }
