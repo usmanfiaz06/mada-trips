@@ -39,3 +39,13 @@ async function resume() {
 useSession.subscribe((s, prev) => {
   if (s.status === 'signedIn' && s.user?.onboardedAt && (prev.status !== 'signedIn' || !prev.user?.onboardedAt)) void resume();
 });
+
+/* A first launch after installing from an invite page: pick the invite up (Install Referrer on Android; lib/invite-pickup.ts). */
+let picked = false;
+const pickup = () => {
+  if (picked) return;
+  picked = true;
+  setTimeout(() => { void import('./invite-pickup').then((m) => m.pickupInvite()).catch(() => {}); }, 1200);
+};
+if (useSession.getState().status === 'signedOut') pickup();
+useSession.subscribe((s) => { if (s.status === 'signedOut') pickup(); });

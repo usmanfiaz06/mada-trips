@@ -36,7 +36,7 @@
         "code": 99704, "name": "TAKSIM CITY ROOMS", "categoryCode": "3EST", "categoryName": "3 STARS", "destinationCode": "IST", "destinationName": "Istanbul", "zoneCode": 13, "zoneName": "Taksim", "latitude": "41.0369", "longitude": "28.9850",
         "rooms": [
           { "code": "TWN.ST", "name": "TWIN STANDARD", "rates": [
-            { "rateKey": "{{ci8}}|{{co8}}|W|256|99704|TWN.ST|ID_B2B_26|RO||{{occ}}||N@05~~5e33a~-1011020011~N~~~NOR~~D1E2F3A4B5C60718DD401|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:398.20}}", "allotment": 9, "paymentType": "AT_WEB", "packaging": false, "boardCode": "RO", "boardName": "ROOM ONLY", "cancellationPolicies": [ { "amount": "{{n:66.37}}", "from": "{{deadline:2}}T23:59:00+03:00" } ], "rooms": 1, "adults": 2, "children": 0 }
+            { "rateKey": "{{ci8}}|{{co8}}|W|256|99704|TWN.ST|ID_B2B_26|RO||{{occ}}||N@05~~5e33a~-1011020011~N~~~NOR~~D1E2F3A4B5C60718DD401|", "rateClass": "NOR", "rateType": "BOOKABLE", "net": "{{n:398.20}}", "allotment": 9, "paymentType": "AT_WEB", "packaging": false, "boardCode": "RO", "boardName": "ROOM ONLY", "cancellationPolicies": [ { "amount": "{{n:66.37}}", "from": "{{deadline:2}}T23:59:00+03:00" } ], "rateCommentsId": "256|51204|0", "rooms": 1, "adults": 2, "children": 0 }
           ] }
         ],
         "minRate": "{{n:398.20}}", "maxRate": "{{n:398.20}}", "currency": "EUR"

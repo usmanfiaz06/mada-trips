@@ -16,7 +16,8 @@
     "e2e:resilience": "node test/e2e-resilience.mjs",
     "doctor": "node scripts/doctor.mjs",
     "eas-build-pre-install": "node scripts/eas-fonts.mjs",
-    "store:screenshots": "node test/store-screenshots.mjs"
+    "store:screenshots": "node test/store-screenshots.mjs",
+    "store:listing": "node scripts/store-listing.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-sans-arabic": "0.4.2",
@@ -33,6 +34,7 @@
     "@supabase/supabase-js": "2.117.2",
     "@tanstack/react-query": "5.103.2",
     "expo": "~57.0.27",
+    "expo-application": "~57.0.3",
     "expo-apple-authentication": "~57.0.2",
     "expo-camera": "~57.0.6",
     "expo-clipboard": "~57.0.2",

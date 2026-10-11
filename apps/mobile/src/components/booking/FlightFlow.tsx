@@ -22,7 +22,9 @@ import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
 import { ArtCalendar, Ask1, Leg, Working, useSequence, enter } from './parts';
-import { ByHand, RequestFlow } from './Requests';
+import { ByHand, RequestFlow, SentRequest } from './Requests';
+import { FlightRequestForm } from './FlightRequest';
+import { useFlightsByRequest } from '@/lib/beta';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
 
@@ -52,12 +54,15 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const [bundle, setBundle] = useState(false);
   const [sort, setSort] = useState<'best' | 'cheapest' | 'fastest' | 'earliest'>('best');
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Flights by request (the beta): no live fares; the form goes to Mada and the fares come back in the request.
+  const byRequest = useFlightsByRequest();
+  const [sentId, setSentId] = useState<string | null | undefined>(undefined);
 
   const dest = where.key ? DESTINATIONS[where.key] ?? null : null;
   const byHand = !!where.other || !!dest?.byHand;
   const needRet = trip.type === 'return' && !!trip.dep && !trip.ret;
-  const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && whoDone;
-  const live = ready && !byHand && !!dest;
+  const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && (whoDone || byRequest);
+  const live = ready && !byHand && !!dest && !byRequest;
   const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), t('search.working.matching', { count: who.length })];
   const step = useSequence(steps.length, 750, live ? `${runKey}` : null);
   const flags = [...demo].sort().join(',');
@@ -155,6 +160,16 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       <>
         <Ask1 q={t('ask.q.return', { day: dayName(trip.dep, today) })} options={[[t('ask.q.after3', { day: dayName(addDays(trip.dep, 3), today) }), '3'], [t('ask.q.afterWeek', { day: dayName(addDays(trip.dep, 7), today) }), '7'], [t('ask.q.oneWay'), 'oneway'], [t('ask.q.pickDates'), 'pick']]}
           onPick={(v) => (v === 'pick' ? setEditing({}) : v === 'oneway' ? setTrip({ ...trip, type: 'oneway', ret: null }) : setTrip({ ...trip, ret: addDays(trip.dep!, Number(v)) }))} />
+        {sheet}
+      </>
+    );
+  }
+  if (byRequest) {
+    if (sentId !== undefined) return <SentRequest id={sentId} people={people} selfName={selfName} />;
+    return (
+      <>
+        <FlightRequestForm city={dest?.name ?? where.other ?? ''} destKey={dest?.key ?? null} trip={trip} who={who} setWho={setWho} people={people} selfName={selfName} today={today} query={query}
+          onEdit={() => setEditing({})} setCta={setCta} onSent={(id) => { setCta(null); setSentId(id); }} />
         {sheet}
       </>
     );

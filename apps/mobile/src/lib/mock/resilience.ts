@@ -1,5 +1,6 @@
 import { RESILIENCE_ROUTES, type ConfigResponse, type StatusResponse } from '@mada/shared';
 import type { AreaMock } from '../mock-api';
+import { mockBeta } from './beta';
 
 /*
  * Mock answers for GET /config and GET /status (platform/src/app/api/app/v1/{config,status}). Everything up, no
@@ -11,7 +12,8 @@ export const resilienceMock: AreaMock = async (w) => {
   if (path === RESILIENCE_ROUTES.config) {
     const body: ConfigResponse = {
       minVersion: '0.0.0', latestVersion: '0.1.0', maintenance: { on: false, message: null, until: null },
-      features: { offlineOutbox: true, statusChecks: true, softUpdatePrompt: true }, serverTime: new Date().toISOString(),
+      // The beta's switches (lib/mock/beta.ts, ?beta=flights,nophone,limited).
+      features: { offlineOutbox: true, statusChecks: true, softUpdatePrompt: true, flightsByRequest: mockBeta().flightsByRequest, bookingNeedsPhone: mockBeta().bookingNeedsPhone }, serverTime: new Date().toISOString(),
       storeUrls: { ios: 'https://apps.apple.com/app/mada-trips', android: 'https://play.google.com/store/apps/details?id=sa.madatrips.app' },
       // Phone codes on WhatsApp first, SMS on request (docs/app/AUTH.md).
       phoneChannels: ['whatsapp', 'sms'],

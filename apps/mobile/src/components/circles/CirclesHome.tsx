@@ -56,6 +56,16 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
 
   return (
     <>
+      {circles.data?.limited ? (
+        // The desk paused posting and messages for this account (ACCOUNT_LIMITED): said here, before any tap.
+        <View style={st.limited} testID="circles-limited" accessibilityRole="alert">
+          <Icon name="lock" size={20} color={colors.goldInk} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <T v="h3" style={{ fontSize: 15 }}>{t('beta.limited.title')}</T>
+            <T v="small">{t('beta.limited.body')}</T>
+          </View>
+        </View>
+      ) : null}
       {fr.length > 0 && around.data ? <Around data={around.data} /> : null}
 
       {incoming.map((iv) => (
@@ -325,6 +335,7 @@ function Passport({ stamps }: { stamps: import('@mada/shared').StampsResponse | 
 }
 
 const st = StyleSheet.create({
+  limited: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 18, backgroundColor: colors.goldWash },
   bleed: { marginHorizontal: -20, flexGrow: 0 },
   rail: { paddingHorizontal: 20 },
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },

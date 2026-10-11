@@ -12,7 +12,7 @@ import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, useAct, usePreview } from '@/lib/circles';
 import { holdJoin } from '@/lib/circles-join';
 import { buzz } from '@/lib/haptics';
-import { joinAnd, t } from '@/lib/i18n';
+import { joinAnd, t, tn } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { colors, ff, font } from '@/theme';
@@ -37,12 +37,13 @@ export default function Join() {
   if (!p || p.status !== 'open') {
     const from = p?.from.short ?? t('circles.someone');
     const cancelled = p?.status === 'cancelled';
+    const full = p?.status === 'full';
     return (
       <Screen>
         <View style={{ paddingTop: 120, paddingHorizontal: 28, gap: 16, flex: 1 }}>
           <Icon name="link" size={36} />
-          <T v="h1" accessibilityRole="header">{!p ? t('circles.join.notFound') : cancelled ? t('circles.join.cancelledTitle') : t('circles.join.expiredTitle')}</T>
-          {p ? <T v="body">{cancelled ? t('circles.join.cancelledBody', { name: from }) : t('circles.join.expiredBody', { name: from })}</T> : null}
+          <T v="h1" accessibilityRole="header">{!p ? t('circles.join.notFound') : cancelled ? t('circles.join.cancelledTitle') : full ? t('circles.join.fullTitle') : t('circles.join.expiredTitle')}</T>
+          {p ? <T v="body">{cancelled ? t('circles.join.cancelledBody', { name: from }) : full ? t('circles.join.fullBody', { name: from }) : t('circles.join.expiredBody', { name: from })}</T> : <T v="body">{t('links.gone.body')}</T>}
         </View>
         <View style={{ paddingHorizontal: 20, paddingBottom: 28 + bottom, gap: 10 }}>
           {p ? <Button label={t('circles.join.askOnWhatsApp', { name: from })} onPress={() => Linking.openURL('https://wa.me/')} /> : null}
@@ -53,7 +54,7 @@ export default function Join() {
   }
 
   const join = async () => {
-    if (!signedIn) { await holdJoin(code); router.replace('/welcome'); return; }
+    if (!signedIn) { await holdJoin(code); toast(t('circles.join.signInFirst')); router.replace('/welcome'); return; }
     accept.mutate(undefined, {
       onSuccess: (r) => {
         buzz('success');
@@ -65,7 +66,8 @@ export default function Join() {
   };
   const members = p.circle?.members ?? [p.from];
   const names = members.map((m) => m.short);
-  const areIn = names.length === 1 ? t('circles.join.isIn', { names: names[0]! }) : t('circles.join.areIn', { names: joinAnd(names) });
+  const count = p.circle?.memberCount ?? names.length;
+  const areIn = count > names.length ? tn('circles.join.peopleIn', count) : names.length === 1 ? t('circles.join.isIn', { names: names[0]! }) : t('circles.join.areIn', { names: joinAnd(names) });
 
   return (
     <Screen background={colors.night}>

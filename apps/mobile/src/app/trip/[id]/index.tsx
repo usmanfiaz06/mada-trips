@@ -16,6 +16,10 @@ import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
 import { colors } from '@/theme';
+import { ThingsView } from '@/components/things/ThingsView';
+import { addDays } from '@mada/shared';
+
+const tripDays = (from: string, to: string | null) => { const out: string[] = []; for (let d = from, i = 0; d <= (to ?? from) && i < 30; d = addDays(d, 1), i++) out.push(d); return out; };
 
 /** One trip (prototype TripDetail): flights, stay, pickups, the Manage list and the travellers. */
 export default function TripDetail() {
@@ -115,10 +119,20 @@ export default function TripDetail() {
           <Box padding={6} gap={0}>
             {manage.map(([href, icon, title, sub], i) => <ListRow key={href} testID={`manage-${i}`} first={i === 0} icon={icon} tone={i === 0 ? 'gold' : undefined} title={title} sub={sub} onPress={() => router.push(href as Href)} />)}
           </Box>
+          <ThingsView mode="section" placeId={trip.city} city={trip.city} tripId={trip.id} days={tripDays(trip.startDate, trip.endDate)} />
           <Box>
             <H3>{t('tm.detail.travellers')}</H3>
             <Row style={{ flexWrap: 'wrap' }}>{trip.travellers.map((p) => <Tag key={p.id} label={p.isSelf ? t('tm.detail.you', { name: p.firstName }) : p.firstName} />)}</Row>
           </Box>
+          {trip.travellers.some((p) => p.ticketNumber) ? (
+            <Box testID="tickets-box">
+              <H3>{t('beta.trip.tickets')}</H3>
+              {out?.pnr ? <Tiny>{t('beta.trip.pnr', { ref: out.pnr })}</Tiny> : null}
+              {trip.travellers.filter((p) => p.ticketNumber).map((p) => (
+                <Spread key={p.id}><T v="small">{p.isSelf ? t('tm.detail.you', { name: p.firstName }) : p.firstName}</T><T v="small" color={colors.green} selectable style={{ fontVariant: ['tabular-nums'] }}>{t('beta.trip.ticket', { number: p.ticketNumber! })}</T></Spread>
+              ))}
+            </Box>
+          ) : null}
         </View>
       </Scroll>
       <Sheet visible={sheet === 'cancel'} onClose={() => setSheet(null)} label={t('tm.cancel.title')}>

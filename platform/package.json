@@ -16,7 +16,8 @@
     "db:deploy": "npm run db:migrate && npm run db:bootstrap",
     "test": "vitest run",
     "app:preflight": "tsx --conditions=react-server scripts/app-preflight.ts",
-    "app:jobs": "tsx --conditions=react-server scripts/app-jobs.ts"
+    "app:jobs": "tsx --conditions=react-server scripts/app-jobs.ts",
+    "hotelbeds:smoke": "tsx scripts/hotelbeds-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",

@@ -8,7 +8,8 @@
     "base": {
       "node": "22.20.0",
       "env": {
-        "EXPO_PUBLIC_API_MODE": "live"
+        "EXPO_PUBLIC_API_MODE": "live",
+        "EXPO_PUBLIC_API_URL": "https://madatrips.sa"
       },
       "android": {
         "image": "latest"

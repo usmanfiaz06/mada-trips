@@ -119,3 +119,5 @@ export const HotelDetails = z.object({
 export type HotelDetails = z.infer<typeof HotelDetails>;
 export const HotelDetailsResponse = z.object({ hotel: HotelDetails });
 export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}` } as const;
+
+export { voucherHtml } from './voucher-html';

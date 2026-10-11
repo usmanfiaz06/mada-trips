@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Animated from 'react-native-reanimated';
-import { Button } from '@/components/Button';
+import { Button, LinkButton } from '@/components/Button';
 import { VGradient } from '@/components/Gradient';
 import { useBottomInset, useTopInset } from '@/components/Layout';
 import { Sun } from '@/components/Sun';
@@ -44,6 +44,9 @@ export default function Welcome() {
           <View style={{ gap: 10 }}>
             <Button variant="gold" label={t('welcome.start')} onPress={() => { useOnboarding.getState().reset(); router.push('/signin'); }} testID="welcome-start" />
             <Button variant="glass" label={t('welcome.track')} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} />
+            <View style={{ alignItems: 'center', paddingTop: 2 }}>
+              <LinkButton label={t('circles.code.welcome')} color="#e1dacd" onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
+            </View>
           </View>
         </View>
       </View>

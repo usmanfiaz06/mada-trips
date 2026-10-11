@@ -20,6 +20,7 @@ import { localTime, minutesAhead, placePhoto, placesApi, useNow, usePlace } from
 import { usePresence } from '@/lib/wallet';
 import { colors, ff, font, shadow } from '@/theme';
 import { PlanSheet, type PlanChoice } from './PlanSheet';
+import { ThingsView } from '@/components/things/ThingsView';
 
 /*
  * The page for any city in the world: a photo (ours, or the lead photo from Wikimedia Commons with its credit) or a
@@ -168,6 +169,7 @@ export function CityPage({ id }: { id: string }) {
               {wiki ? <Pressable onPress={() => open(g.summary!.url)} accessibilityRole="link"><T v="tiny" style={s.link}>{wiki.text} · {t('places.city.wikipedia')}</T></Pressable> : null}
             </View>
           ) : null}
+          <ThingsView mode="section" placeId={g.id} city={g.name} />
           {g.sections.length ? <T v="h2" style={{ fontSize: 22, marginTop: 6 }}>{t('places.city.guide')}</T> : null}
           {g.sections.map((sec) => (
             <View key={sec.key} style={[s.card, shadow('card')]} testID={`guide-${sec.key}`}>

@@ -1,0 +1,3 @@
+# Full-size store images (npm run store:screenshots): regenerate rather than commit. The overviews are committed.
+/en/
+/ar/

@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindow
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatSar, householdOf, personName, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
+import { formatSar, householdOf, normalizeContactPhone, personName, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
 import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -16,6 +16,7 @@ import { ApplePaySheet, CardsSheet, ThreeDsSheet, type PayMethod } from '@/compo
 import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
 import { ApiError } from '@/lib/api';
+import { useBookingNeedsPhone } from '@/lib/beta';
 import { bookingApi, demoOn, newIdempotencyKey, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
@@ -75,6 +76,11 @@ export default function Pay() {
   const [blocked, setBlocked] = useState('');
   const [threeDs, setThreeDs] = useState<{ orderId: string; triesLeft: number; stopped: boolean; amount: number } | null>(null);
   const key = useRef(newIdempotencyKey());
+  // The beta: an account without a verified phone gives a number to reach them (GET /config bookingNeedsPhone off).
+  const needsPhone = useBookingNeedsPhone();
+  const askContact = !!user && !user.phone && !needsPhone;
+  const [contact, setContact] = useState('');
+  const [contactErr, setContactErr] = useState<string | null>(null);
 
   const draft = useMemo(() => {
     if (!pd) return null;
@@ -134,7 +140,7 @@ export default function Pay() {
   };
 
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
-    const out = await bookingApi.createOrder({ draft, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current });
+    const out = await bookingApi.createOrder({ draft, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
     key.current = newIdempotencyKey();
     if (out.outcome === 'created') { buzz('knock'); invalidate(); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
     if (out.outcome === 'paid') {
@@ -152,6 +158,10 @@ export default function Pay() {
   };
 
   const confirm = async () => {
+    if (askContact && !normalizeContactPhone(contact)) {
+      setContactErr(contact.trim() ? t('beta.contact.invalid') : t('beta.contact.needed')); buzz('warn'); setAttempt((a) => a + 1);
+      return;
+    }
     setBusy(true);
     try {
       await new Promise((r) => setTimeout(r, 900));
@@ -163,6 +173,7 @@ export default function Pay() {
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') { setSheet('offline'); buzz('soft'); }
       else if (e instanceof ApiError && e.code === 'PHONE_REQUIRED') { toast(e.message); router.push('/verify-phone?then=back'); }
+      else if (e instanceof ApiError && e.code === 'VALIDATION' && askContact) { setContactErr(e.message); buzz('warn'); }
       else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setBusy(false); setAttempt((a) => a + 1); }
   };
@@ -250,6 +261,16 @@ export default function Pay() {
               <View style={{ alignSelf: 'flex-start' }}><LinkButton label={missing[0]!.isSelf ? t('pay.passports.scanYours') : t('pay.passports.scan', { name: personName(missing[0]) })} onPress={() => router.push('/wallet')} /></View>
             </Notice>
           ) : null}
+          {askContact ? (
+            <View style={[styles.well, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]} testID="pay-contact">
+              <T v="h3" style={{ fontSize: 15 }}>{t('beta.contact.title')}</T>
+              <T v="small">{t('beta.contact.body')}</T>
+              <TextInput accessibilityLabel={t('beta.contact.label')} placeholder={t('beta.contact.hint')} placeholderTextColor={colors.muted} value={contact} keyboardType="phone-pad" autoComplete="tel" textContentType="telephoneNumber"
+                onChangeText={(v) => { setContact(v); setContactErr(null); }} onBlur={() => { if (contact.trim() && !normalizeContactPhone(contact)) setContactErr(t('beta.contact.invalid')); }}
+                style={[styles.input, { flex: 0, textAlign: 'left', writingDirection: 'ltr' }, contactErr ? { borderColor: colors.bad } : null, webNoOutline]} testID="pay-contact-input" />
+              {contactErr ? <T v="small" color={colors.badInk} accessibilityRole="alert">{contactErr}</T> : <T v="tiny">{t('beta.contact.note')}</T>}
+            </View>
+          ) : null}
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>
@@ -276,7 +297,7 @@ export default function Pay() {
         </ScrollView>
       </Animated.View>
       <View style={[styles.act, { paddingBottom: 18 + bottom }]}>
-        {expired ? <Button label={t('pay.recheck')} onPress={recheck} testID="pay-recheck" /> : (
+        {expired && pd.draft.kind === 'quote' ? <T v="small" color={colors.goldInk} style={{ textAlign: 'center' }} testID="pay-quote-ended">{t('beta.fq.ended', { agent: 'Mada' })}</T> : expired ? <Button label={t('pay.recheck')} onPress={recheck} testID="pay-recheck" /> : (
           <SlideToConfirm key={attempt} label={slideLabel} busy={busy} busyLabel={t('pay.busy')} disabled={!p || previewQ.isFetching && !p} onConfirm={confirm} />
         )}
         <T v="tiny" style={{ textAlign: 'center' }}>

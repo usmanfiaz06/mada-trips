@@ -18,6 +18,8 @@ import { Icon } from '../Icon';
 import { T } from '../Text';
 import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter } from './parts';
 import { TravellerChips } from './Travellers';
+import { AttachmentChip } from './Attachment';
+import { FlightFares } from './FlightRequest';
 
 /* Requests a person at Mada completes: one question at a time, per-person needs, a note, then the quote and the thread. */
 
@@ -172,8 +174,10 @@ export function SentRequest({ id }: { id: string | null; people?: Person[]; self
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><AgentDot name={agent} size={28} /><T v="h3" style={{ fontSize: 14 }}>{t('actor.intro', { agent })}</T></View>
           <T v="small" color={colors.green}>{r.quote.lead || r.quote.text}</T>
           {r.quote.needLines.length ? <View style={{ gap: 4 }}>{r.quote.needLines.map((x) => <T key={x} v="small">• {x}</T>)}</View> : null}
-          <QuoteBreakdown r={r} />
-          {r.status === 'quoted' && r.quote.status === 'open' && r.quote.total.amount > 0 ? (
+          {r.quote.flight ? <FlightFares r={r} today={todayIn()} /> : <QuoteBreakdown r={r} />}
+          {r.quote.flight && r.status === 'paid' ? <T v="small" color={colors.green} testID="fares-paid">{t('beta.fq.paid', { agent })}</T> : null}
+          {r.quote.flight && r.status === 'done' ? <T v="small" color={colors.ok} testID="fares-ticketed">{t('beta.fq.ticketed')}</T> : null}
+          {!r.quote.flight && r.status === 'quoted' && r.quote.status === 'open' && r.quote.total.amount > 0 ? (
             <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('request.pay', { price: formatSar(r.quote.total.amount) })} testID="request-pay"
               onPress={() => { usePayDraft.getState().set({ draft: { kind: 'quote', requestId: r.id }, title: r.title }); router.push('/pay'); }} />
           ) : null}
@@ -225,14 +229,15 @@ export function RequestThread({ request }: { request: BookingRequestView }) {
       buzz('success');
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); }
   };
-  const suggestions = request.kind === 'umrah' ? [t('request.suggest.closer'), t('request.suggest.later')] : request.kind === 'flight' ? [t('request.suggest.laterFlight'), t('request.suggest.less')] : [t('request.suggest.dates')];
+  const suggestions = request.quote?.flight ? [t('beta.fq.another'), t('beta.fq.checkAgain')] : request.kind === 'umrah' ? [t('request.suggest.closer'), t('request.suggest.later')] : request.kind === 'flight' ? [t('request.suggest.laterFlight'), t('request.suggest.less')] : [t('request.suggest.dates')];
   return (
     <View style={{ gap: 8 }} accessibilityLabel={t('request.a11y.thread')}>
       {msgs.map((m) => (
         <View key={m.id} style={[styles.msg, m.from === 'me' ? styles.me : null]}>
           {m.from !== 'me' ? <AgentDot name={m.authorName ?? agent} size={28} /> : null}
           <View style={[styles.bubble, m.from === 'me' ? styles.bubbleMe : styles.bubbleThem]}>
-            <T style={[font('callout', m.from === 'me' ? colors.mist : colors.green), { lineHeight: 20 }]}>{m.text}</T>
+            {m.text ? <T style={[font('callout', m.from === 'me' ? colors.mist : colors.green), { lineHeight: 20 }]}>{m.text}</T> : null}
+            {m.attachment ? <AttachmentChip file={m.attachment} mine={m.from === 'me'} /> : null}
             {m.offer && !m.offer.accepted ? <Button size="small" block={false} variant="gold" style={{ alignSelf: 'flex-start' }} label={t('request.switch')} onPress={() => accept(m.id)} /> : null}
           </View>
         </View>

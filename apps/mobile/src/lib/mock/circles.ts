@@ -1,10 +1,10 @@
 import {
   CITY_INFO, contactHash, CreateCircleRequest, CreateInviteRequest, CreatePostRequest, CreateSplitRequest, CreateVoteRequest, ERROR_CODES, EVENTS,
-  HOME_CITY, PLAN_SUMMARIES, ReportRequest, SaveRequest, SendCircleMessageRequest, UpdateCircleRequest, bookPrefill, checkSaudiMobile,
+  HOME_CITY, LinkOptions, PLAN_SUMMARIES, REACTIONS, ReactRequest, ReportRequest, SaveRequest, SendCircleMessageRequest, UpdateCircleRequest, bookPrefill, checkSaudiMobile,
   circleDest, inviteUrl, madaReply, maskPhone, personRef, planById, shareUnits, splitAmounts, t, votePhrase,
   type AroundResponse, type CircleDetail, type CircleMessage, type CircleSummary, type CopyKey, type ErrorCode, type FriendView,
   type IncomingInvite, type InvitePreview, type MadaAction, type PersonRef, type Post, type SavedItem, type SearchHit, type SentInvite,
-  type SocialRelation, type StampsResponse, type SysEvent,
+  type LiveKind, type SocialRelation, type StampsResponse, type SysEvent,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -21,7 +21,7 @@ type Card = Record<string, unknown> & { t?: string };
 type Msg = { id: string; circleId: string; authorKind: 'user' | 'mada' | 'agent'; userId: string | null; agentName: string | null; body: string; card: Card | null; at: number };
 type CircleRow = { id: string; name: string; createdBy: string; cover: string | null; dest: string | null; dm: boolean; dmKey: string | null; trip: string | null; pinned: string | null; pinnedBy: string | null; createdAt: number; updatedAt: number };
 type Member = { circleId: string; userId: string; role: 'admin' | 'member'; muted: boolean; lastReadAt: number | null; joinedAt: number };
-type Invite = { id: string; kind: 'circle' | 'mada'; circleId: string | null; inviterId: string; inviteeId: string | null; phone: string | null; channel: 'app' | 'link' | 'sms' | 'whatsapp'; lookup: string | null; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; acceptedBy: string | null; remindedAt: number | null; expiresAt: number; at: number };
+type Invite = { id: string; kind: 'circle' | 'mada'; circleId: string | null; inviterId: string; inviteeId: string | null; phone: string | null; channel: 'app' | 'link' | 'sms' | 'whatsapp'; lookup: string | null; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; acceptedBy: string | null; remindedAt: number | null; expiresAt: number; at: number; maxUses?: number | null; uses?: number };
 type Friendship = { a: string; b: string; status: 'pending' | 'accepted'; tagA: string | null; tagB: string | null; at: number; acceptedAt: number | null };
 type PostRow = { id: string; authorId: string; city: string; place: string; body: string; kind: 'food' | 'todo'; audience: 'friends' | 'everyone'; photoKey: string | null; photoUrl: string | null; status: 'pending' | 'approved' | 'rejected'; approveAt: number | null; deleted: boolean; at: number };
 type Person = { id: string; full: string; short: string; phone: string | null; places: number; trips: number; going: string | null; tone?: 'green' | 'gold' | 'default' };
@@ -68,6 +68,16 @@ let shares: { mid: string; key: string; ids: string[]; amount: number; paidAt: n
 let invites: Invite[] = [];
 let friendships: Friendship[] = [];
 let follows: { from: string; to: string }[] = [];
+let reactions: { mid: string; userId: string; emoji: string; at: number }[] = [];
+
+/* The live feed (the server's app_circle_events): what changed, never the content. The app polls /circles/events. */
+type LiveRow = { id: number; circleId: string; kind: LiveKind; ref: string | null; actor: string | null; userId: string | null };
+let live: LiveRow[] = [];
+let liveSeq = 0;
+function emit(circleId: string, kind: LiveKind, ref: string | null = null, actor: string | null = null, userId: string | null = null) {
+  live.push({ id: (liveSeq += 1), circleId, kind, ref, actor, userId });
+  if (live.length > 2000) live = live.slice(-1000);
+}
 let blocks: { by: string; who: string }[] = [];
 let posts: PostRow[] = [];
 let saved: { id: string; userId: string; kind: 'post' | 'plan'; refId: string; city: string; post: unknown; at: number }[] = [];
@@ -86,6 +96,7 @@ const nextAt = (at?: number) => { lastAt = Math.max(at ?? now(), lastAt + 1); re
 function add(circleId: string, m: Omit<Msg, 'id' | 'circleId' | 'at' | 'agentName'> & { at?: number; agentName?: string | null; id?: string }): Msg {
   const msg: Msg = { id: m.id ?? uuid(), circleId, authorKind: m.authorKind, userId: m.userId, agentName: m.agentName ?? null, body: m.body, card: m.card, at: m.at ?? nextAt() };
   messages.push(msg);
+  emit(circleId, 'message', msg.id, msg.userId);
   const c = circles.get(circleId);
   if (c) c.updatedAt = Math.max(c.updatedAt, msg.at);
   return msg;
@@ -209,11 +220,16 @@ function membership(cid: string, me: string) {
 }
 const pendingInvites = (cid: string) => invites.filter((i) => i.circleId === cid && i.channel === 'app' && i.status === 'pending' && i.expiresAt > now());
 
+function reactionsOf(mid: string) {
+  const mine = reactions.filter((r) => r.mid === mid).sort((a, b) => a.at - b.at);
+  const order = REACTIONS as readonly string[];
+  return [...new Set(mine.map((r) => r.emoji))].sort((a, b) => order.indexOf(a) - order.indexOf(b)).map((emoji) => ({ emoji, ids: mine.filter((r) => r.emoji === emoji).map((r) => r.userId) }));
+}
 function toMessage(m: Msg): CircleMessage {
   const c = (m.card ?? {}) as Card;
   const kind = (['sys', 'vote', 'split', 'card', 'mada'].includes(String(c.t)) ? c.t : m.authorKind === 'mada' ? 'mada' : 'text') as CircleMessage['kind'];
   const author: CircleMessage['author'] = m.authorKind === 'user' && m.userId ? { kind: 'user', id: m.userId, name: ref(m.userId).short } : m.authorKind === 'agent' ? { kind: 'agent', id: 'faisal', name: m.agentName ?? '', photoUrl: null } : { kind: 'mada' };
-  const out: CircleMessage = { id: m.id, circleId: m.circleId, author, body: m.body, createdAt: new Date(m.at).toISOString(), kind, sys: null, vote: null, split: null, card: null, mada: null };
+  const out: CircleMessage = { id: m.id, circleId: m.circleId, author, body: m.body, createdAt: new Date(m.at).toISOString(), kind, sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(m.id) };
   if (kind === 'sys') out.sys = { event: c.event as SysEvent, actor: (c.actor as string) ?? null, users: (c.users as string[]) ?? [], text: (c.text as string) ?? null, amount: (c.amount as number) ?? null };
   if (kind === 'vote') out.vote = { q: String(c.q), kind: c.kind as 'dates', closed: !!c.closed, winner: (c.winner as string) ?? null, options: (c.options as { id: string; label: string }[]).map((o) => ({ ...o, votes: votes.filter((v) => v.mid === m.id && v.option === o.id).sort((a, b) => a.at - b.at).map((v) => v.userId) })) };
   if (kind === 'split') {
@@ -261,6 +277,7 @@ function detail(cid: string, me: string): CircleDetail {
 function join(cid: string, who: string, viaLink: string | null = null) {
   if (!circles.has(cid) || memberIds(cid).includes(who)) return;
   members.push({ circleId: cid, userId: who, role: 'member', muted: false, lastReadAt: null, joinedAt: now() });
+  emit(cid, 'member', who, who, who);
   invites.filter((i) => i.circleId === cid && i.inviteeId === who && i.status === 'pending').forEach((i) => { i.status = 'accepted'; i.acceptedBy = who; });
   sys(cid, viaLink ? 'joinedByLink' : 'joined', who, viaLink ? [viaLink] : []);
 }
@@ -270,20 +287,30 @@ function leave(cid: string, who: string) {
   const others = memberIds(cid).filter((u) => u !== who);
   if (!others.length) { drop(cid); return { deleted: true }; }
   members = members.filter((x) => x !== m);
+  emit(cid, 'member', who, who, who);
   sys(cid, 'left', who);
   if (m.role === 'admin') { members.find((x) => x.circleId === cid && x.userId === others[0])!.role = 'admin'; sys(cid, 'admin', null, [others[0]!]); }
   return { deleted: false };
 }
 function drop(cid: string) {
+  memberIds(cid).forEach((u) => emit(cid, 'member', u, null, u));
   circles.delete(cid);
   members = members.filter((m) => m.circleId !== cid);
   const ids = new Set(messages.filter((m) => m.circleId === cid).map((m) => m.id));
   messages = messages.filter((m) => m.circleId !== cid);
   votes = votes.filter((v) => !ids.has(v.mid));
   shares = shares.filter((s) => !ids.has(s.mid));
+  reactions = reactions.filter((r) => !ids.has(r.mid));
   invites = invites.filter((i) => i.circleId !== cid);
 }
-const readUpTo = (cid: string, who: string) => { const m = members.find((x) => x.circleId === cid && x.userId === who); if (m) m.lastReadAt = now(); };
+/** Reading moves the receipt; the others hear about it when the reader passed someone else's message. */
+function readUpTo(cid: string, who: string) {
+  const m = members.find((x) => x.circleId === cid && x.userId === who);
+  if (!m) return;
+  const since = m.lastReadAt ?? 0;
+  m.lastReadAt = now();
+  if (messages.some((x) => x.circleId === cid && x.at > since && x.userId && x.userId !== who)) emit(cid, 'read', null, who);
+}
 
 /* What other people do next, in the demo world (the prototype's planResponses): read it, answer questions, vote, pay. */
 const SIMULATED = new Set(Object.values(ID));
@@ -319,7 +346,10 @@ function othersReact(c: CircleRow, me: string, text: string, toMada: boolean) {
   else if (GREET.test(plain)) reply = 'Wa alaikum assalam.';
   else if (QUESTION.test(plain)) reply = answerFor(plain, c);
   else if (/\b(booked|paid)\b/i.test(plain)) reply = 'Thank you.';
-  if (reply) later(3000, () => { if (memberIds(c.id).includes(responder)) user(c.id, responder, reply!); });
+  if (reply) {
+    later(1600, () => { if (memberIds(c.id).includes(responder)) emit(c.id, 'typing', null, responder); });
+    later(3000, () => { if (memberIds(c.id).includes(responder)) user(c.id, responder, reply!); });
+  }
   const second = others.find((r) => r !== responder);
   if (reply === 'I’m in.' && !c.dm && second) later(4800, () => { if (memberIds(c.id).includes(second)) user(c.id, second, 'Me too, if it’s after the 10th.'); });
 }
@@ -376,10 +406,16 @@ function sentInvite(i: Invite): SentInvite {
   return { id: i.id, label: i.acceptedBy ? ref(i.acceptedBy).short : i.phone ? (i.phone === '+966551000005' ? 'Maha' : maskPhone(i.phone)) : t('circles.someone'), channel: i.channel === 'whatsapp' ? 'whatsapp' : i.channel === 'sms' ? 'sms' : 'link',
     status: i.status === 'accepted' ? 'joined' : i.expiresAt < now() ? 'expired' : 'pending', sentAt: new Date(i.at).toISOString(), remindedAt: i.remindedAt ? new Date(i.remindedAt).toISOString() : null, joined: i.acceptedBy ? ref(i.acceptedBy) : null };
 }
-function linkFor(me: string, cid: string | null) {
-  let i = invites.find((x) => x.inviterId === me && x.channel === 'link' && x.status === 'pending' && x.lookup && x.circleId === cid && x.expiresAt > now() + DAY);
-  if (!i) { i = { id: uuid(), kind: cid ? 'circle' : 'mada', circleId: cid, inviterId: me, inviteeId: null, phone: null, channel: 'link', lookup: rand(8), status: 'pending', acceptedBy: null, remindedAt: null, expiresAt: now() + 14 * DAY, at: now() }; invites.push(i); }
-  return { code: codeOf(i.lookup!), url: inviteUrl(codeOf(i.lookup!)), expiresAt: new Date(i.expiresAt).toISOString() };
+const isFull = (i: Invite) => i.maxUses != null && (i.uses ?? 0) >= i.maxUses;
+const toLink = (i: Invite) => ({ code: codeOf(i.lookup!), url: inviteUrl(codeOf(i.lookup!)), expiresAt: new Date(i.expiresAt).toISOString(), id: i.id, maxUses: i.maxUses ?? null, uses: i.uses ?? 0 });
+/** The same link until it expires or fills up; any option (or fresh) makes a new one and turns the old one off. */
+function linkFor(me: string, cid: string | null, opts: LinkOptions = {}) {
+  const mine = (x: Invite) => x.inviterId === me && x.channel === 'link' && x.status === 'pending' && !!x.lookup && x.circleId === cid;
+  const replace = !!opts.fresh || opts.expiresInDays !== undefined || opts.maxUses !== undefined;
+  if (replace) invites.filter(mine).forEach((x) => { x.status = 'cancelled'; });
+  let i = replace ? undefined : invites.find((x) => mine(x) && x.expiresAt > now() + DAY && !isFull(x));
+  if (!i) { i = { id: uuid(), kind: cid ? 'circle' : 'mada', circleId: cid, inviterId: me, inviteeId: null, phone: null, channel: 'link', lookup: rand(8), status: 'pending', acceptedBy: null, remindedAt: null, expiresAt: now() + (opts.expiresInDays ?? 14) * DAY, at: now(), maxUses: opts.maxUses ?? null, uses: 0 }; invites.push(i); }
+  return toLink(i);
 }
 
 // The prototype's sample links: one for the Eid circle, one long expired.
@@ -402,6 +438,14 @@ function sampleInvites() {
 export const MOCK_INVITE_CODES = { live: codeOf(SAMPLE.live), expired: codeOf(SAMPLE.expired) };
 
 const routes: Route[] = [
+  [/^\/circles\/events$/, 'GET', ({ me, q }) => {
+    const after = Number(q.get('after') ?? NaN);
+    if (!Number.isFinite(after)) return ok({ events: [], cursor: liveSeq });
+    const mineIds = new Set(members.filter((m) => m.userId === me).map((m) => m.circleId));
+    const events = live.filter((e) => e.id > after && (e.userId === me || mineIds.has(e.circleId))).slice(0, 200)
+      .map((e) => ({ id: e.id, circleId: e.circleId, kind: e.kind, ref: e.ref, actor: e.actor }));
+    return ok({ events, cursor: Math.min(liveSeq, Math.max(after, events.at(-1)?.id ?? liveSeq)) });
+  }],
   [/^\/circles$/, 'GET', ({ me }) => ok({ circles: [...circles.values()].filter((c) => memberIds(c.id).includes(me)).map((c) => summary(c, me)).sort((a, b) => (circles.get(b.id)!.updatedAt - circles.get(a.id)!.updatedAt)), incoming: incoming(me) })],
   [/^\/circles$/, 'POST', ({ me, body }) => {
     const b = parse(CreateCircleRequest, body);
@@ -445,7 +489,8 @@ const routes: Route[] = [
     if (p.dest !== undefined) c.dest = p.dest;
     if (p.pin !== undefined) { if (p.pin && p.pin.id !== c.pinned) sys(c.id, 'pinned', me, [], { text: planById(p.pin.id)?.title ?? '' }); c.pinned = p.pin?.id ?? null; c.pinnedBy = p.pin ? me : null; }
     if (p.muted !== undefined) m.muted = p.muted;
-    if (p.read) m.lastReadAt = now();
+    if (p.read) readUpTo(id!, me);
+    if (p.name !== undefined || p.cover !== undefined || p.dest !== undefined || p.pin !== undefined) emit(id!, 'circle', null, me);
     return ok(detail(id!, me));
   }],
   [/^\/circles\/([\w-]+)$/, 'DELETE', ({ me }, id) => { if (membership(id!, me).role !== 'admin') throw no('FORBIDDEN', 'circles.err.adminOnly'); drop(id!); return ok({ ok: true }); }],
@@ -487,7 +532,7 @@ const routes: Route[] = [
     const m = user(id!, me, q, undefined, { t: 'vote', q, kind: v.kind, options: v.options.map((label, i) => ({ id: `o${i}`, label })), closed: false, winner: null });
     // Others vote over a few seconds, most for the first choice.
     rank(memberIds(id!).filter((u) => u !== me && SIMULATED.has(u))).slice(0, 4).forEach((who, i) => later(1800 + i * 1400, () => {
-      if (!m.card!.closed && !votes.some((x) => x.mid === m.id && x.userId === who)) votes.push({ mid: m.id, userId: who, option: `o${[0, 0, 1, 0][i]! % v.options.length}`, at: now() });
+      if (!m.card!.closed && !votes.some((x) => x.mid === m.id && x.userId === who)) { votes.push({ mid: m.id, userId: who, option: `o${[0, 0, 1, 0][i]! % v.options.length}`, at: now() }); emit(id!, 'vote', m.id, who); }
     }));
     return ok({ items: [toMessage(m)] }, 201);
   }],
@@ -499,6 +544,7 @@ const routes: Route[] = [
     const cur = votes.find((v) => v.mid === m.id && v.userId === me);
     votes = votes.filter((v) => !(v.mid === m.id && v.userId === me));
     if (cur?.option !== option) votes.push({ mid: m.id, userId: me, option, at: now() });
+    emit(id!, 'vote', m.id, me);
     return items(m);
   }],
   [/^\/circles\/([\w-]+)\/votes\/([\w-]+)\/close$/, 'POST', ({ me }, id, mid) => {
@@ -512,6 +558,7 @@ const routes: Route[] = [
     const max = Math.max(...opts.map((o) => count(o.id)));
     const top = opts.filter((o) => count(o.id) === max);
     m.card = { ...m.card, closed: true, winner: top.length === 1 ? top[0]!.id : null };
+    emit(id!, 'vote', m.id, me);
     const follow = top.length === 1 ? resultMsg(id!, m, top[0]!)
       : add(id!, { authorKind: 'mada', userId: null, body: t('circles.mada.tie', { options: top.map((o) => o.label).join(` ${t('circles.and')} `) }), card: { t: 'mada', kind: 'tie', ref: m.id, list: [], foot: null, actions: top.map((o) => ({ label: o.label, pick: o.id })), askWhere: false, done: false } });
     return items(m, follow);
@@ -522,6 +569,7 @@ const routes: Route[] = [
     const w = (m.card!.options as { id: string; label: string }[]).find((o) => o.id === body.option);
     if (!w || !m.card!.closed || m.card!.winner) throw no('VALIDATION');
     m.card = { ...m.card, winner: w.id };
+    emit(id!, 'vote', m.id, me);
     messages.filter((x) => x.circleId === id && x.card?.kind === 'tie' && x.card.ref === m.id).forEach((x) => { x.card = { ...x.card, done: true }; });
     return items(m, resultMsg(id!, m, w));
   }],
@@ -548,6 +596,7 @@ const routes: Route[] = [
     if (!mine && m.card!.paidBy !== me) throw no('FORBIDDEN');
     if (sh.paidAt) return items(m);
     sh.paidAt = now();
+    emit(id!, 'split', m.id, me);
     const line = mine ? sys(id!, body.via === 'card' ? 'paid' : 'markedPaid', me, [me], { amount: sh.amount }) : sys(id!, 'markedPaid', me, sh.ids, { amount: sh.amount });
     return items(m, line);
   }],
@@ -567,6 +616,7 @@ const routes: Route[] = [
     const target = membership(id!, uid!);
     membersOf(id!).forEach((m) => { m.role = 'member'; });
     target.role = 'admin';
+    emit(id!, 'member', uid!, me);
     sys(id!, 'admin', me, [uid!]);
     return ok({ ok: true });
   }],
@@ -574,6 +624,7 @@ const routes: Route[] = [
     if (membership(id!, me).role !== 'admin') throw no('FORBIDDEN', 'circles.err.adminOnly');
     membership(id!, uid!);
     members = members.filter((m) => !(m.circleId === id && m.userId === uid));
+    emit(id!, 'member', uid!, me, uid!);
     sys(id!, 'removed', me, [uid!]);
     return ok({ ok: true });
   }],
@@ -581,21 +632,42 @@ const routes: Route[] = [
     if (membership(id!, me).role !== 'admin') throw no('FORBIDDEN', 'circles.err.adminOnly');
     const ids = [...new Set((body.userIds as string[]) ?? [])].filter((u) => !memberIds(id!).includes(u) && !pendingInvites(id!).some((i) => i.inviteeId === u) && people.has(u) && !isBlocked(me, u));
     if (ids.length) {
-      ids.forEach((u) => invites.push({ id: uuid(), kind: 'circle', circleId: id!, inviterId: me, inviteeId: u, phone: null, channel: 'app', lookup: null, status: 'pending', acceptedBy: null, remindedAt: null, expiresAt: now() + 14 * DAY, at: now() }));
+      ids.forEach((u) => { invites.push({ id: uuid(), kind: 'circle', circleId: id!, inviterId: me, inviteeId: u, phone: null, channel: 'app', lookup: null, status: 'pending', acceptedBy: null, remindedAt: null, expiresAt: now() + 14 * DAY, at: now() }); emit(id!, 'invite', null, me, u); });
       sys(id!, 'invited', me, ids);
       if (SIMULATED.has(ids[0]!)) later(3000, () => { if (pendingInvites(id!).some((i) => i.inviteeId === ids[0])) join(id!, ids[0]!); });
     }
     return ok(detail(id!, me));
   }],
-  [/^\/circles\/([\w-]+)\/link$/, 'POST', ({ me }, id) => { membership(id!, me); return ok(linkFor(me, id!)); }],
+  [/^\/circles\/([\w-]+)\/link$/, 'POST', ({ me, body }, id) => { membership(id!, me); return ok(linkFor(me, id!, parse(LinkOptions, body))); }],
+  [/^\/circles\/([\w-]+)\/typing$/, 'POST', ({ me }, id) => {
+    membership(id!, me);
+    if (!live.some((e) => e.circleId === id && e.kind === 'typing' && e.actor === me && e.id > liveSeq - 5)) emit(id!, 'typing', null, me);
+    return ok({ ok: true });
+  }],
+  [/^\/circles\/([\w-]+)\/messages\/([\w-]+)\/reactions$/, 'POST', ({ me, body }, id, mid) => {
+    membership(id!, me);
+    const r = parse(ReactRequest, body);
+    const m = messages.find((x) => x.id === mid && x.circleId === id);
+    if (!m) throw no('NOT_FOUND');
+    if (m.card?.t === 'sys') throw no('VALIDATION');
+    reactions = reactions.filter((x) => !(x.mid === m.id && x.userId === me && x.emoji === r.emoji));
+    if (r.on) reactions.push({ mid: m.id, userId: me, emoji: r.emoji, at: now() });
+    emit(id!, 'reaction', m.id, me);
+    // Someone in the demo world answers a reaction to their message with one of their own, now and then.
+    const author = m.userId;
+    if (r.on && author && author !== me && SIMULATED.has(author) && !reactions.some((x) => x.mid === m.id && x.userId === author)) {
+      later(2200, () => { if (messages.includes(m)) { reactions.push({ mid: m.id, userId: author, emoji: r.emoji, at: now() }); emit(id!, 'reaction', m.id, author); } });
+    }
+    return items(m);
+  }],
 
   [/^\/invites$/, 'GET', ({ me }) => {
     const own = invites.find((i) => i.inviterId === me && i.kind === 'mada' && i.channel === 'link' && i.status === 'pending' && i.lookup && i.expiresAt > now());
-    return ok({ sent: invites.filter((i) => i.inviterId === me && i.kind === 'mada' && i.status !== 'cancelled' && (i.channel !== 'link' || i.status === 'accepted')).sort((a, b) => b.at - a.at).map(sentInvite), incoming: incoming(me), link: own ? { code: codeOf(own.lookup!), url: inviteUrl(codeOf(own.lookup!)), expiresAt: new Date(own.expiresAt).toISOString() } : null });
+    return ok({ sent: invites.filter((i) => i.inviterId === me && i.kind === 'mada' && i.status !== 'cancelled' && (i.channel !== 'link' || i.status === 'accepted')).sort((a, b) => b.at - a.at).map(sentInvite), incoming: incoming(me), link: own && !isFull(own) ? toLink(own) : null });
   }],
   [/^\/invites$/, 'POST', ({ me, body }) => {
     const b = parse(CreateInviteRequest, body);
-    if ('link' in b) return ok({ invite: null, link: linkFor(me, null), onMada: null });
+    if ('link' in b) { const { link: _l, ...opts } = b; return ok({ invite: null, link: linkFor(me, null, opts), onMada: null }); }
     const found = [...people.values()].find((p) => p.phone === b.phone);
     if (found) { if (found.id === me) throw no('VALIDATION', 'circles.err.self'); return ok({ invite: null, link: null, onMada: isBlocked(me, found.id) ? null : ref(found.id) }); }
     const i: Invite = { id: uuid(), kind: 'mada', circleId: null, inviterId: me, inviteeId: null, phone: b.phone, channel: b.channel ?? 'sms', lookup: rand(8), status: 'pending', acceptedBy: null, remindedAt: null, expiresAt: now() + 14 * DAY, at: now() };
@@ -609,7 +681,7 @@ const routes: Route[] = [
     if (!i || (me && isBlocked(me, i.inviterId))) throw no('NOT_FOUND', 'circles.join.notFound');
     const c = i.circleId ? circles.get(i.circleId) : null;
     const ids = c ? memberIds(c.id) : [];
-    const preview: InvitePreview = { code: code!, status: i.status === 'cancelled' ? 'cancelled' : i.expiresAt < now() ? 'expired' : 'open', kind: i.kind, from: ref(i.inviterId),
+    const preview: InvitePreview = { code: code!, status: i.status === 'cancelled' ? 'cancelled' : i.expiresAt < now() ? 'expired' : isFull(i) ? 'full' : 'open', kind: i.kind, from: ref(i.inviterId),
       circle: c ? { name: c.name, cover: (c.cover as 'istanbul') ?? null, members: ids.slice(0, 4).map(ref), memberCount: ids.length, trip: c.trip } : i.kind === 'circle' ? { name: 'Summer in Baku', cover: null, members: [], memberCount: 0, trip: null } : null };
     return ok(preview);
   }],
@@ -618,6 +690,7 @@ const routes: Route[] = [
     if (!i || (i.inviterId !== me && !(i.circleId && membersOf(i.circleId).some((m) => m.userId === me && m.role === 'admin')))) throw no('NOT_FOUND');
     if (i.status === 'pending' && i.circleId && i.inviteeId) sys(i.circleId, 'cancelledInvite', me, [i.inviteeId]);
     i.status = 'cancelled';
+    if (i.circleId) emit(i.circleId, 'invite', i.id, me, i.inviteeId);
     return ok({ ok: true });
   }],
   [/^\/invites\/([\w-]+)\/accept$/, 'POST', ({ me }, ref0) => {
@@ -627,6 +700,7 @@ const routes: Route[] = [
     if (i.circleId) {
       if (!circles.has(i.circleId)) throw no('NOT_FOUND', 'circles.err.inviteExpired');
       if (memberIds(i.circleId).includes(me)) return ok({ circleId: i.circleId, friendId: null, already: true });
+      if (i.channel === 'link') { if (isFull(i)) throw no('NOT_FOUND', 'circles.join.fullTitle'); i.uses = (i.uses ?? 0) + 1; }
       join(i.circleId, me, i.channel === 'link' ? i.inviterId : null);
       return ok({ circleId: i.circleId, friendId: null, already: false });
     }
@@ -818,6 +892,7 @@ function payShare(cid: string, mid: string, key: string) {
   const sh = shares.find((s) => s.mid === mid && s.key === key);
   if (!sh || sh.paidAt || !circles.has(cid)) return;
   sh.paidAt = now();
+  emit(cid, 'split', mid, sh.ids[0]!);
   sys(cid, 'paid', sh.ids[0]!, sh.ids, { amount: sh.amount });
 }
 function around(me: string): AroundResponse {

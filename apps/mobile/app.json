@@ -73,6 +73,26 @@
               "scheme": "https",
               "host": "madatrips.sa",
               "pathPrefix": "/join/"
+            },
+            {
+              "scheme": "https",
+              "host": "madatrips.sa",
+              "pathPrefix": "/i/"
+            },
+            {
+              "scheme": "https",
+              "host": "madatrips.sa",
+              "pathPrefix": "/trip/"
+            },
+            {
+              "scheme": "https",
+              "host": "madatrips.sa",
+              "pathPrefix": "/plan/"
+            },
+            {
+              "scheme": "https",
+              "host": "madatrips.sa",
+              "pathPrefix": "/city/"
             }
           ],
           "category": [
