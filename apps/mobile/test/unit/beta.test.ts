@@ -117,8 +117,9 @@ describe('booking without a verified phone (mock mode)', () => {
 
 describe('the desk pauses Circles (mock mode)', () => {
   it('says so in GET /circles and refuses posting and messages, and lifts with it', async () => {
-    await call({ method: 'POST', path: ROUTES.otpStart, body: { phone: '0500004127' } });
-    const token = (await call({ method: 'POST', path: ROUTES.otpVerify, body: { phone: '0500004127', code: '123456' } })).tokens.accessToken as string;
+    const phone = `05${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`;
+    await call({ method: 'POST', path: ROUTES.otpStart, body: { phone } });
+    const token = (await call({ method: 'POST', path: ROUTES.otpVerify, body: { phone, code: '123456' } })).tokens.accessToken as string;
     setMockBeta({ limited: true });
     expect((await call({ method: 'GET', path: '/circles', token })).limited).toBe(true);
     const r = await callR({ method: 'POST', path: '/circles', body: { name: 'Eid' }, token });
