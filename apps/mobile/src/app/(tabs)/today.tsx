@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { useScrollToTop } from 'expo-router';
 import { Screen, useTopInset } from '@/components/Layout';
 import { BannerHost, DemoSheet, TodayHeader, Wash, todayHour } from '@/components/today/common';
 import { Booked } from '@/components/today/Booked';
@@ -23,6 +24,8 @@ export default function Today() {
   const top = useTopInset();
   const status = useSession((s) => s.status);
   const scroll = useRef<ScrollView>(null);
+  // Today is home: tapping Today in the dock while here goes back to the top.
+  useScrollToTop(scroll);
   useCarryOverGuestFlights();
   useEffect(() => { void registerForPush(); }, [status]);
   const trips = useTrips();
