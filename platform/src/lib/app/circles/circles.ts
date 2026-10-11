@@ -12,7 +12,7 @@ import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitS
 import { appAuditLog, auditInsert } from "../audit";
 import { atOnce } from "../batch";
 import { AppError } from "../http";
-import { coverColumns, coverFor, dropReplacedUpload, settleCovers } from "./covers";
+import { coverColumns, coverFor, dropReplacedUpload, settleCovers, settled } from "./covers";
 import { err, graphOf, liveUser, peopleByIds, relationOf, tripLine, type Db } from "./common";
 
 /*
@@ -167,7 +167,8 @@ async function circleSummaries(userId: string, opts: { only?: string } = {}) {
     if (!mine.length) return { out: { circles: [] as CircleSummary[], incoming: await incomingP }, members: [], dets: [], people: new Map<string, PersonRef>() };
     [got, incoming] = await Promise.all([rest(mine.map((c) => c.id)), incomingP]);
   }
-  const [members, dets, invited, lastRows, unread, tripRows] = got;
+  const [members, rawDets, invited, lastRows, unread, tripRows] = got;
+  const dets = rawDets.map((d) => settled(d));
   const [lastMsgs, people] = await Promise.all([toMessages(lastRows), peopleByIds(members.map((m) => m.userId))]);
   const trips = new Map(tripRows.map((x) => [x.id, tripLine(x.city, x.startDate, x.endDate)]));
   const circles = mine.map((c): CircleSummary => {

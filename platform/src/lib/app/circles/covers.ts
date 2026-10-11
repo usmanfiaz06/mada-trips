@@ -88,6 +88,16 @@ export async function uploadCover(userId: string, req: Request, ipHash: string |
 }
 
 /** Approve covers whose wait is over (auto mode). Cheap; called before covers are read. */
+/**
+ * A details row as settleCovers leaves it: for reads that run alongside settleCovers (one round trip), an upload whose
+ * wait is over reads approved even if the read saw the row a moment before the update.
+ */
+export function settled<T extends { coverKind?: string | null; coverStatus?: string | null; coverAutoApproveAt?: Date | null } | null | undefined>(d: T, now = new Date()): T {
+  if (!d || moderationMode() !== "auto") return d;
+  if (d.coverKind === "upload" && d.coverStatus === "pending" && d.coverAutoApproveAt && d.coverAutoApproveAt <= now) return { ...d, coverStatus: "approved" };
+  return d;
+}
+
 export async function settleCovers(): Promise<number> {
   if (moderationMode() !== "auto") return 0;
   const done = await db.update(appCircleDetails).set({ coverStatus: "approved", coverCheckedAt: new Date(), coverCheckedBy: "auto" })
