@@ -82,6 +82,11 @@ const FLIGHT_WORDS = /\b(flights?|fly|flying|plane|one[- ]?way|round[- ]?trip|re
 const STAY_WORDS = /\b(hotels?|rooms?|apartment|villa|resort|somewhere to stay|place to stay|a stay)\b/;
 const PLAN_WORDS = /\b(itinerary|plan (a|my|the)|days in|weekend in|day trip|what to do in)\b/;
 
+/** An outing by name: "Boulevard World at night", "Riyadh Season", a concert, a match. A thing to do, priced per person. */
+const EVENT_WORDS = /\bboulevard\b|\bseason\b|festival|concert|\bshow\b|theme park|\bzoo\b|aquarium|\bexpo\b|\bmatch\b|stadium|\bevent\b|wonderland|\bat night\b|safari|\bgame\b|\bopera\b|\bgallery\b/;
+/** A thing to do asked in general words: the list of ideas is the answer, not a named outing. */
+const GENERIC_TODO = /^(?:some )?(?:things?|something|stuff) to do\b|^(?:a |some )?(?:tours?|activit(?:y|ies)|tickets?)\b|^(?:what|ideas)\b/;
+
 export type AskKindValue = 'flight' | 'stay' | 'plan' | 'esim' | 'visa' | 'umrah' | 'car' | 'food' | 'todo' | 'general';
 
 export function parseKind(text: string): AskKindValue {
@@ -94,6 +99,7 @@ export function parseKind(text: string): AskKindValue {
   if (/\bcars?\b|car rental|rent a car|\bdriver\b|\brental\b/.test(s)) return 'car';
   if (/restaurant|dinner|lunch|\btable\b|breakfast/.test(s)) return 'food';
   if (/\btours?\b|things to do|activit|museum|cruise|tickets/.test(s)) return 'todo';
+  if (EVENT_WORDS.test(s)) return 'todo';
   if (PLAN_WORDS.test(s) || (/alula|weekend/.test(s) && !/\bto\b/.test(s))) return 'plan';
   if (/\beid\b|\btrip\b|\breturn\b|\bto\b|same as last/.test(s) || Object.values(DESTINATIONS).some((d) => d.words.test(s))) return 'flight';
   return 'general';
@@ -217,12 +223,54 @@ export function needsByPerson(text: string, people: Person[]): Record<string, Ne
   return out;
 }
 
-/** Form answers already in the text ("Schengen", "In Ramadan"). */
+/** Cities the forms recognise in what was typed, home cities first. */
+const FORM_CITIES: [RegExp, string][] = [
+  [/\briyadh\b/, 'Riyadh'], [/\bjeddah\b|\bjiddah\b/, 'Jeddah'], [/\bmakkah\b|\bmecca\b/, 'Makkah'], [/\bmadinah\b|\bmedina\b/, 'Madinah'], [/\bdammam\b/, 'Dammam'],
+  [/\bkhobar\b/, 'Khobar'], [/\btaif\b/, 'Taif'], [/\bdiriyah\b/, 'Diriyah'],
+  ...Object.values(DESTINATIONS).map((d): [RegExp, string] => [d.words, d.name.replace(/^the /, '')]),
+];
+
+/** The city named in the text ("in Riyadh", "Dubai"), as the forms spell it. */
+export function cityIn(text: string): string | null {
+  const s = text.toLowerCase();
+  return FORM_CITIES.find(([re]) => re.test(s))?.[1] ?? null;
+}
+
+const capitalise = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+
+/**
+ * A named outing in what was typed, without the city, the day or the party: "Boulevard World at night in Riyadh this
+ * weekend for 4" → "Boulevard World at night". Null for general words ("things to do", "tickets").
+ */
+export function eventIn(text: string): string | null {
+  let x = text.trim().replace(/[.!?]+$/, '');
+  x = x.replace(/^(?:i(?:'d| would)? (?:like|want|need)(?: to (?:go to|see|book|do))?|can (?:you|we) (?:book|get)(?: us)?|book(?: us)?|get(?: us)?|tickets? (?:for|to)|let'?s (?:go to|do)|going to|go to)\s+/i, '');
+  x = x.replace(/\s+(?:for (?:\d+|one|two|three|four|five|six|all of us|the family|us|me|my family)(?: (?:people|of us|adults))?|with (?:the kids|my family|the family|my wife|my husband))(?=\s|$)/gi, ' ');
+  x = x.replace(/\s+(?:tonight|today|tomorrow|this weekend|next weekend|next week|this week)(?=\s|$)/gi, ' ');
+  x = x.replace(/\s+in\s+(?:riyadh|jeddah|makkah|madinah|dammam|khobar|diriyah|dubai|istanbul|cairo|london|baku|alula|al ula|abha|tbilisi|paris)\b/gi, ' ');
+  x = x.replace(/\s{2,}/g, ' ').trim();
+  if (x.length < 3 || GENERIC_TODO.test(x.toLowerCase())) return null;
+  return capitalise(x);
+}
+
+/** Form answers already in the text ("Schengen", "In Ramadan", "in Riyadh", "tonight", an outing by name). */
 export function prefillAnswers(kind: string, text: string): Record<string, string[]> {
   const form = REQUEST_FORMS[kind as RequestFormKind] ?? [];
   const s = text.toLowerCase();
   const a: Record<string, string[]> = {};
-  form.forEach((f) => { const hit = (f.from ?? []).find(([re]) => re.test(s)); if (hit) a[f.k] = [hit[1]]; });
+  form.forEach((f) => {
+    const hit = (f.from ?? []).find(([re]) => re.test(s));
+    if (hit) { a[f.k] = [hit[1]]; return; }
+    if (f.city) { const c = cityIn(s); if (c) a[f.k] = [f.options?.find((o) => o.startsWith(c)) ?? c]; return; }
+    if (f.event) {
+      const known = f.options?.filter((o) => s.includes(o.toLowerCase().split(' ').slice(0, 2).join(' ')));
+      if (known?.length) { a[f.k] = known; return; }
+      const ev = eventIn(text);
+      if (ev) a[f.k] = [ev];
+    }
+  });
+  // Where an outing or a request is, when the form doesn't ask it ("Boulevard World at night in Riyadh").
+  if (!a.where && !form.some((f) => f.k === 'where') && (kind === 'todo' || kind === 'general')) { const c = cityIn(s); if (c) a.where = [c]; }
   return a;
 }
 
@@ -494,20 +542,33 @@ export function deskQuote(input: {
     return { totalSar: total, breakdown: who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label: t('dq.visa.label', undefined, l), sar: DESK_PRICES.visaAppointment }] })), lead: null, needLines: [],
       text: tn('dq.visa.text', n, { date: dayLabel(slot, { today, locale: l ?? undefined, hijri: false }), time: timeLabel('10:20', { locale: l }), each: sar(DESK_PRICES.visaAppointment, l), price: sar(total, l) }, l) };
   }
-  if (kind === 'todo') {
-    const picks = answers.pick ?? [];
-    const breakdown = who.map((p) => ({ personId: p.id, name: name(p), lines: picks.map((x) => ({ label: wordFor(x, l), sar: (ageOn(p, today) ?? 30) < 12 ? Math.round((DESK_PRICES.todo[x] ?? 0) / 2) : DESK_PRICES.todo[x] ?? 0 })) }));
+  // The day they chose, said back ("this weekend"), or an offer of days when any day is fine.
+  const w = (answers.when ?? [])[0];
+  const day = !w || /any day|not sure/i.test(w) ? '' : lower(wordFor(w, l));
+  const halfUnder12 = (p: Person, s: number) => ((ageOn(p, today) ?? 30) < 12 ? Math.round(s / 2) : s);
+  if (kind === 'todo' || kind === 'general') {
+    const picks = kind === 'todo' && answers.pick?.length ? answers.pick : null;
+    const tickets = t('dq.outing.tickets', undefined, l);
+    const breakdown = who.map((p) => ({ personId: p.id, name: name(p), lines: (picks ?? ['']).map((x) => ({ label: x ? wordFor(x, l) : tickets, sar: halfUnder12(p, (x && DESK_PRICES.todo[x]) || DESK_PRICES.ticket) })) }));
     const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, li) => x + li.sar, 0), 0);
     const here: string[] = [];
     who.forEach((p) => (needs[p.id] ?? []).forEach((k) => here.push(needLine(k, p, false))));
+    const kids = who.some((p) => (ageOn(p, today) ?? 30) < 12) ? t('dq.outing.kids', undefined, l) : '';
+    const what = picks ? commaList(picks.map((x) => wordFor(x, l)), l) : tickets;
+    const vars = { what, day, price: sar(total, l) };
     return { totalSar: total, breakdown, lead: null, needLines: [],
-      text: [tn('dq.todo.text', n, { picks: commaList(picks.map((x) => wordFor(x, l)), l), price: sar(total, l) }, l), ...here].join(' ') };
+      text: [tn(day ? 'dq.outing.day' : 'dq.outing.anyDay', n, vars, l), kids, t(day ? 'dq.outing.pay' : 'dq.outing.whichDay', undefined, l), ...here].filter(Boolean).join(' ') };
   }
   if (kind === 'car') {
-    const size = (answers.size ?? [])[0];
-    const days = (answers.days ?? ['1 day'])[0] ?? '1 day';
-    return { totalSar: DESK_PRICES.car, breakdown: [], lead: null, needLines: [],
-      text: t('dq.car.text', { size: size ? wordFor(size, l) : t('dq.car.size', undefined, l), days: lower(wordFor(days, l)), price: sar(DESK_PRICES.car, l) }, l) };
+    const size = (answers.size ?? [])[0] ?? 'Standard car';
+    const daysWord = (answers.days ?? ['1 day'])[0] ?? '1 day';
+    const driver = /driver/i.test(size);
+    const days = /week/i.test(daysWord) ? 7 : /whole trip/i.test(daysWord) ? 5 : Number(daysWord.match(/\d+/)?.[0] ?? 1);
+    const total = (driver ? DESK_PRICES.car : /7 seats/.test(size) ? DESK_PRICES.carFamily : DESK_PRICES.carStandard) * days;
+    const from = w && !/trip dates/i.test(w) ? t('dq.car.from', { day: lower(wordFor(w, l)) }, l) : '';
+    const label = `${wordFor(daysWord, l)}${from}`;
+    return { totalSar: total, breakdown: [{ personId: null, name: wordFor(size, l), lines: [{ label, sar: total }] }], lead: null, needLines: [],
+      text: t(driver ? 'dq.car.textDriver' : 'dq.car.text', { size: wordFor(size, l), days: lower(wordFor(daysWord, l)), price: sar(total, l) }, l) };
   }
   return null;
 }
@@ -515,23 +576,83 @@ export function deskQuote(input: {
 /** Lower-case the first letter for the middle of an English sentence ("the whole trip"); Arabic has no case. */
 const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
-/** How the agent answers a reply, until a person types it (the mock desk). Returns an offer when there is one. */
+/** What a reply asks about, so the agent answers that and nothing else (English and Arabic words). */
+const REPLY_ABOUT = {
+  closer: /closer|nearer|haram|walk|أقرب|الحرم/,
+  cheaper: /cheaper|\bless\b|budget|lower price|discount|price|أقل|أرخص|السعر/,
+  dates: /\bdates?\b|later|earlier|another day|\bday\b|\bweek\b|weekend|today|tonight|tomorrow|\btime\b|تاريخ|التواريخ|يوم|أسبوع|متأخر|ويكند|بكرة|الليلة/,
+  car: /\bcar\b|ride|driver|pick ?up|transfer|سيارة|توصل/,
+  bigger: /bigger|larger|more seats|7[- ]seat|\bvan\b|\bsuv\b|أكبر/,
+  childSeat: /child seat|car seat|baby seat|booster|كرسي أطفال/,
+  view: /\bview\b|window|terrace|outside|مطلة|إطلالة/,
+  earlier: /earlier|sooner|first|أبكر/,
+  yes: /^(yes|yeah|ok|okay|sure|please do|book it|go ahead|confirm|نعم|تمام|أكيد|احجز)/,
+} as const;
+
+/** How the agent answers a reply, until a person types it (the mock desk). It fits the kind: no airline talk for a table. */
 export function deskReply(kind: string, text: string, n: number, locale?: Lang): { text: string; offer: { label: string; perPersonSar: number } | null } {
-  const s = text.toLowerCase();
-  if (/closer|nearer|haram|walk|أقرب|الحرم/.test(s) && kind === 'umrah') {
+  const s = text.toLowerCase().trim();
+  const say = (k: CopyKey) => ({ text: t(k, undefined, locale), offer: null });
+  if (REPLY_ABOUT.closer.test(s) && kind === 'umrah') {
     const each = DESK_PRICES.closerToHaram;
     return { text: tn('dq.reply.closer', n, { each: sar(each, locale), price: sar(each * n, locale) }, locale), offer: { label: t('dq.reply.closerLabel', undefined, locale), perPersonSar: each } };
   }
-  if (/cheaper|less|budget|price|أقل|أرخص|السعر/.test(s)) return { text: t('dq.reply.cheaper', undefined, locale), offer: null };
-  if (/date|later|earlier|day|week|تاريخ|التواريخ|يوم|أسبوع/.test(s)) return { text: t(['flight', 'umrah', 'stay'].includes(kind) ? 'dq.reply.dates' : 'dq.reply.datesOther', undefined, locale), offer: null };
-  return { text: t('dq.reply.got', undefined, locale), offer: null };
+  if (REPLY_ABOUT.yes.test(s)) return say(kind === 'food' ? 'dq.reply.tableYes' : 'dq.reply.yes');
+  if (kind === 'food') return say(REPLY_ABOUT.view.test(s) ? 'dq.reply.tableView' : REPLY_ABOUT.dates.test(s) ? 'dq.reply.tableTime' : 'dq.reply.table');
+  if (kind === 'car') return say(REPLY_ABOUT.childSeat.test(s) ? 'dq.reply.childSeat' : REPLY_ABOUT.bigger.test(s) ? 'dq.reply.biggerCar' : REPLY_ABOUT.cheaper.test(s) ? 'dq.reply.cheaper' : REPLY_ABOUT.dates.test(s) ? 'dq.reply.carDays' : 'dq.reply.carDesk');
+  if (kind === 'visa') return say(REPLY_ABOUT.earlier.test(s) ? 'dq.reply.earlierAppt' : 'dq.reply.visaCentre');
+  if (REPLY_ABOUT.cheaper.test(s)) return say('dq.reply.cheaper');
+  if (kind === 'todo' || kind === 'general') return say(REPLY_ABOUT.car.test(s) ? 'dq.reply.addCar' : REPLY_ABOUT.dates.test(s) ? 'dq.reply.thatDay' : 'dq.reply.got');
+  if (REPLY_ABOUT.dates.test(s)) return say(kind === 'stay' ? 'dq.reply.stayDates' : ['flight', 'umrah'].includes(kind) ? 'dq.reply.dates' : 'dq.reply.datesOther');
+  return say('dq.reply.got');
 }
+
+/** The agent's first words when the answer isn't a price (a table to book): what they're doing and when they'll say. */
+export function deskFirstReply(kind: string, answers: Record<string, string[]>, n: number, locale?: Lang): string {
+  if (kind === 'food') {
+    const where = (answers.where ?? [])[0];
+    const when = (answers.when ?? [])[0];
+    const prefs = (answers.pref ?? []).map((x) => lower(wordFor(x, locale)));
+    const details = commaList([where ? t('dq.table.in', { where: wordFor(where.replace(/, near the hotel$/, ''), locale) }, locale) : '', when ? lower(wordFor(when, locale)) : ''].filter(Boolean), locale);
+    return tn('dq.table.asking', n, { details, prefs: prefs.length ? t('dq.table.prefs', { prefs: commaList(prefs, locale) }, locale) : '' }, locale)
+      .replace(/\s+([.:،,])/g, '$1').replace(/\s{2,}/g, ' ');
+  }
+  return t('dq.reply.got', undefined, locale);
+}
+
+/** An outing typed by name is the title itself ("Boulevard World at night"), not "Things to do". */
+const namedOuting = (kind: string, answers: Record<string, string[]>) => {
+  const picks = answers.pick ?? [];
+  return kind === 'todo' && picks.length === 1 && DESK_PRICES.todo[picks[0]!] === undefined ? picks[0]! : null;
+};
 
 /** The request title and one-line summary the desk and Trips show. */
 export function requestTitle(kind: string, answers: Record<string, string[]>, query: string, locale?: Lang): string {
   const titles: Record<string, CopyKey> = { visa: 'dq.title.visa', umrah: 'dq.title.umrah', car: 'dq.title.car', food: 'dq.title.food', todo: 'dq.title.todo', stay: 'dq.title.stay', flight: 'dq.title.flight', general: 'dq.title.general' };
   const title = t(titles[kind] ?? 'dq.title.general', undefined, locale);
-  if (kind === 'general' || kind === 'flight') return query || title;
+  if (kind === 'general' || kind === 'flight') return query ? capitalise(query.trim().replace(/[.!?]+$/, '')) : title;
+  const outing = namedOuting(kind, answers);
+  if (outing) return outing;
   const where = (answers.where ?? [])[0];
   return where ? t('dq.title.where', { title, where: wordFor(where, locale) }, locale) : title;
+}
+
+/**
+ * A request's words, said once each: the title, then a summary of the answers (never the title again), and the
+ * traveller's note only when it adds something. The desk, Trips and the thread all show these.
+ */
+export function requestText(input: { kind: string; answers: Record<string, string[]>; query: string; names: string; needSummary: string; note: string; locale?: Lang }): { title: string; summary: string; detail: string; note: string | null } {
+  const { kind, answers, query, names, needSummary, locale } = input;
+  const form = REQUEST_FORMS[kind as RequestFormKind] ?? [];
+  const title = requestTitle(kind, answers, query, locale);
+  const parts = form.map((f) => (f.people ? names : f.needs ? needSummary : commaList((answers[f.k] ?? []).map((x) => wordFor(x, locale)), locale)));
+  // Where it is, when the form doesn't ask (an outing in Riyadh); never the title's own words again.
+  if (!form.some((f) => f.k === 'where') && answers.where?.length) parts.unshift(commaList(answers.where.map((x) => wordFor(x, locale)), locale));
+  const same = (x: string) => x.trim().toLowerCase() === title.trim().toLowerCase() || x.trim().toLowerCase() === query.trim().toLowerCase();
+  const where = (answers.where ?? [])[0];
+  const summary = parts.filter((x) => !!x && !same(x) && !(where && form.some((f) => f.k === 'where') && x === wordFor(where, locale))).join(' · ');
+  const n = input.note.trim();
+  const note = n && !same(n) ? n : null;
+  const detail = [summary, note ? `“${note}”` : ''].filter(Boolean).join(' · ') || (kind === 'general' || kind === 'flight' || namedOuting(kind, answers) ? '' : query);
+  return { title, summary, detail, note };
 }

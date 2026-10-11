@@ -1,10 +1,10 @@
 import {
   AskParseRequest, CARRIERS, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
-  ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
-  addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
-  formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
+  ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, StaySearchRequest,
+  addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskFirstReply, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
+  formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestText, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
-  type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
+  type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
@@ -305,7 +305,7 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
         id: uuid(), total: money(sarToHalalas(q.totalSar)), text: q.text, lead: q.lead, needLines: q.needLines, status: 'open', expiresAt: new Date(now + 86_400_000).toISOString(),
         breakdown: q.breakdown.map((b) => ({ personId: b.personId, name: b.name, lines: b.lines.map((l) => ({ label: l.label, amount: sarToHalalas(l.sar) })) })),
       };
-    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: t('dq.reply.got'), offer: null, createdAt: nowIso() });
+    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: deskFirstReply(r.view.kind, r.details.answers, Math.max(1, travellers.length)), offer: null, createdAt: nowIso() });
   }
   if (r.view.status === 'paid' && now - Date.parse(r.view.updatedAt) > 15_000) r.view.status = 'done';
 }
@@ -409,11 +409,12 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (!mine(b.travellerIds)) return err('NOT_FOUND');
     const travellers = b.travellerIds.map((id) => people.find((x) => x.id === id)!);
     const names = commaList(travellers.map((x) => personName(x)));
-    const form = REQUEST_FORMS[b.kind as RequestFormKind] ?? [];
     const needSummary = travellers.filter((x) => (b.needs[x.id] ?? []).length).map((x) => `${personName(x)}: ${commaList((b.needs[x.id] ?? []).map((k) => wordFor(NEED_LABELS[k]).toLowerCase()))}`).join(' · ');
-    const summary = form.map((f) => (f.people ? names : f.needs ? needSummary : commaList((b.answers[f.k] ?? []).map((x) => wordFor(x))))).filter(Boolean).join(' · ');
-    let title = requestTitle(b.kind, b.answers, b.query);
-    let detail = [summary || (b.kind === 'general' || b.kind === 'flight' ? '' : b.query), b.note ? `“${b.note}”` : ''].filter(Boolean).join(' · ') || b.query;
+    // Each thing said once: the title, a summary of the answers, the note only when it adds something (requestText).
+    const words = requestText({ kind: b.kind, answers: b.answers, query: b.query, names, needSummary, note: b.note });
+    const summary = words.summary;
+    let title = words.title;
+    let detail = words.detail;
     if (b.service) {
       const who = travellers.find((x) => x.id === b.serviceFor?.personId);
       const name = who ? personName(who) : '';
@@ -434,7 +435,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const req: Req = {
       id, owner: user.id, created: Date.now(), messages: [],
       details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, clientId: b.clientId ?? null, flightRequest: fr },
-      view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: b.note || null, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
+      view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: words.note, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
     };
     requests.set(id, req);
     return ok({ request: req.view }, 201);

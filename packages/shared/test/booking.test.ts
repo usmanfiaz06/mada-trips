@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bannedIn, bundleFor, calendarMonths, cardBrandOf, cardProblems, checkPromo, deskQuote, deskReply, requestTitle, wordFor, entryChecks, fareSar, luhnOk, parseAskRules, quickDates, seatsFor,
+  bannedIn, bundleFor, calendarMonths, cardBrandOf, cardProblems, checkPromo, deskFirstReply, deskQuote, deskReply, requestText, requestTitle, wordFor, entryChecks, eventIn, fareSar, luhnOk, parseAskRules, quickDates, seatsFor,
   weekendDates, type Person,
 } from '../src';
 
@@ -113,5 +113,48 @@ describe("the desk's words", () => {
     expect(deskReply('car', 'Can we change the dates?', 1, 'ar').text).toBe('أتأكد من التواريخ وأرد عليك هنا خلال ساعتين.');
     expect(requestTitle('car', { where: ['Riyadh'] }, '', 'ar')).toBe('تأجير سيارة: الرياض');
     expect(wordFor('Standard car', 'ar')).toBe('سيارة عادية');
+  });
+});
+
+describe('requests ask only what is missing, and say each thing once', () => {
+  const ctx = { today: TODAY, people: FAMILY };
+  it('reads an outing by name as a thing to do, with its city and day', () => {
+    const a = parseAskRules('Boulevard World at night in Riyadh', ctx);
+    expect(a.kind).toBe('todo');
+    expect(a.answers).toEqual({ pick: ['Boulevard World at night'], where: ['Riyadh'] });
+    expect(parseAskRules('Riyadh Season tickets this weekend for 4', ctx)).toMatchObject({ kind: 'todo', answers: { when: ['This weekend'] } });
+    expect(eventIn('Things to do in Istanbul')).toBeNull();
+    expect(eventIn('I want to go to Boulevard World tonight with the kids')).toBe('Boulevard World');
+  });
+  it('fills a car and a table from the words, so those questions are skipped', () => {
+    expect(parseAskRules('Rent a car in Riyadh tomorrow for 3 days', ctx).answers).toEqual({ where: ['Riyadh'], when: ['Tomorrow'], days: ['3 days'] });
+    expect(parseAskRules('A table in Jeddah tonight', ctx).answers).toEqual({ where: ['Jeddah'], when: ['Tonight'] });
+    expect(parseAskRules('A table somewhere good', ctx).answers).toEqual({});
+  });
+  it('never repeats the words as title, summary and note', () => {
+    const ev = requestText({ kind: 'todo', answers: { pick: ['Boulevard World at night'], where: ['Riyadh'], when: ['This weekend'] }, query: 'Boulevard World at night in Riyadh', names: 'Omar, Hessa', needSummary: '', note: 'Boulevard World at night in Riyadh' });
+    expect(ev).toEqual({ title: 'Boulevard World at night', summary: 'Riyadh · This weekend · Omar, Hessa', detail: 'Riyadh · This weekend · Omar, Hessa', note: null });
+    const car = requestText({ kind: 'car', answers: { where: ['Riyadh'], when: ['Tomorrow'], size: ['Standard car'], days: ['1 day'] }, query: 'A car', names: '', needSummary: '', note: '' });
+    expect(car.title).toBe('Car rental: Riyadh');
+    expect(car.summary).toBe('Tomorrow · Standard car · 1 day');
+    const gen = requestText({ kind: 'general', answers: { when: ['Any day is fine'] }, query: 'a desert camp with a chef', names: 'Omar', needSummary: '', note: '' });
+    expect(gen).toMatchObject({ title: 'A desert camp with a chef', summary: 'Any day is fine · Omar', note: null });
+  });
+  it('prices an outing per person, and a self-drive car without a driver', () => {
+    const q = deskQuote({ kind: 'todo', answers: { pick: ['Boulevard World at night'], when: ['This weekend'] }, travellers: [OMAR, AHMED], needs: {}, note: '', today: TODAY })!;
+    expect(q.totalSar).toBe(120 + 60);
+    expect(q.text).toBe('Boulevard World at night this weekend for both of you: SAR 180. Children under 12 are half price. Pay and I’ll book them.');
+    const car = deskQuote({ kind: 'car', answers: { size: ['Standard car'], days: ['3 days'] }, travellers: [OMAR], needs: {}, note: '', today: TODAY })!;
+    expect(car.text).not.toMatch(/driver/);
+    expect(car.totalSar).toBe(260 * 3);
+    expect(deskFirstReply('food', { where: ['Riyadh'], when: ['Tonight'], pref: ['Halal'] }, 4)).toMatch(/^I’m asking for a table for 4 in Riyadh, tonight: halal\./);
+  });
+  it('answers a reply in the words of its kind', () => {
+    expect(deskReply('food', 'Can we go a little later?', 4).text).toMatch(/restaurant/);
+    expect(deskReply('food', 'Can we go a little later?', 4).text).not.toMatch(/airline|hotel/);
+    expect(deskReply('car', 'Can we add a child seat?', 1).text).toMatch(/child seat/);
+    expect(deskReply('todo', 'This weekend works', 2).text).toMatch(/that day/);
+    expect(deskReply('visa', 'Is there an earlier appointment?', 1).text).toMatch(/earlier appointment/);
+    for (const k of ['food', 'car', 'visa', 'todo', 'general', 'stay', 'flight']) expect(bannedIn(deskReply(k, 'anything', 2).text)).toEqual([]);
   });
 });

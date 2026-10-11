@@ -1,8 +1,8 @@
 import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, REQUEST_FORMS, deskQuote, deskReply, money, personName, rangeLabel, requestTitle, sarToHalalas, t,
-  type BookingRequestView, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestFormKind, type RequestQuote, type ThreadMessage,
+  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, sarToHalalas, t,
+  type BookingRequestView, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestQuote, type ThreadMessage,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appNotifications, appQuotes, appRequests } from "@/db/app-schema";
@@ -79,11 +79,12 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     if (seen) return requestView(seen, await latestQuote(seen.id));
   }
   const travellers = await travellersOf(ownerId, b.travellerIds);
-  const form = REQUEST_FORMS[b.kind as RequestFormKind] ?? [];
   const needSummary = travellers.filter((p) => (b.needs[p.id] ?? []).length).map((p) => `${personName(p)}: ${commaList((b.needs[p.id] ?? []).map((k) => wordFor(NEED_LABELS[k]).toLowerCase()))}`).join(" · ");
-  const summaryLine = form.map((f) => (f.people ? names(travellers) : f.needs ? needSummary : commaList((b.answers[f.k] ?? []).map((x) => wordFor(x))))).filter(Boolean).join(" · ");
-  let title = requestTitle(b.kind, b.answers, b.query);
-  let detail = [summaryLine || (b.kind === "general" || b.kind === "flight" ? "" : b.query), b.note ? `“${b.note}”` : ""].filter(Boolean).join(" · ") || b.query;
+  // Each thing said once: the title, a summary of the answers, the note only when it adds something (shared requestText).
+  const words = requestText({ kind: b.kind, answers: b.answers, query: b.query, names: names(travellers), needSummary, note: b.note });
+  const summaryLine = words.summary;
+  let title = words.title;
+  let detail = words.detail;
   // Every price, quote or set of options found by hand: within 2 hours, as the app promises (copy/words.ts).
   const promisedMin = 120;
   if (b.service) {
@@ -104,7 +105,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   // Flights by request (switches.ts): the desk sends fare options, and the request reads as the form's answers.
   const flightRequest = b.kind === "flight" && !!b.search && (flightsMode() === "request" || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
   const details: AskDetails = {
-    source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: b.note || null, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
+    source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: words.note, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
     short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal",
   };
@@ -175,7 +176,7 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
         } else {
           // Nothing to price yet (a table, anything else): the agent answers in the thread.
           await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date(now), details: { ...d, quote: null, quoteText: null } }).where(eq(appRequests.id, r.id));
-          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: t("dq.reply.got") });
+          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: deskFirstReply(d.askKind, d.answers, Math.max(1, cur.travellerIds.length)) });
         }
         await tx.insert(appNotifications).values({
           userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),

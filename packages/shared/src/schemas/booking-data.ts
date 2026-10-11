@@ -239,9 +239,17 @@ export const NEED_WORDS: [NeedKey, RegExp][] = [
 ];
 
 export type RequestFormKind = 'visa' | 'umrah' | 'car' | 'food' | 'todo' | 'flight' | 'stay' | 'general';
-export type FormQuestion = { k: string; q: string; options?: string[]; people?: boolean; needs?: boolean; multi?: boolean; from?: [RegExp, string][] };
+/** `city`: answered by a city named in the text. `event`: answered by a named outing ("Boulevard World at night"). */
+export type FormQuestion = { k: string; q: string; options?: string[]; people?: boolean; needs?: boolean; multi?: boolean; from?: [RegExp, string][]; city?: boolean; event?: boolean };
 
-/** One question at a time, as chips (FLOWS.md §4). Question copy lives in the catalogue under request.q.*. */
+/** Days said in words ("tonight", "this weekend"): the answer is already there, so the question isn't asked. */
+const SOON: [RegExp, string][] = [[/\btonight\b|\btoday\b/, 'Today'], [/\btomorrow\b/, 'Tomorrow'], [/next weekend|this weekend|the weekend|\bweekend\b/, 'This weekend'], [/next week/, 'Next week']];
+
+/**
+ * One question at a time, as chips (FLOWS.md §4). Question copy lives in the catalogue under request.q.*; the chips'
+ * Arabic under request.opt.*. A question whose answer is already in what was typed (`from`, the city, the event) is
+ * skipped. An outing asks when and who; a car asks where, when and for how long; nothing asks about dates never set.
+ */
 export const REQUEST_FORMS: Record<RequestFormKind, FormQuestion[]> = {
   visa: [
     { k: 'where', q: 'request.q.whichVisa', options: ['Schengen', 'UK', 'United States', 'Somewhere else'], from: [[/schengen|france|germany|italy|spain|europe/, 'Schengen'], [/\buk\b|britain|london|england/, 'UK'], [/\bus\b|\busa\b|america|united states/, 'United States']] },
@@ -255,30 +263,40 @@ export const REQUEST_FORMS: Record<RequestFormKind, FormQuestion[]> = {
     { k: 'stay', q: 'request.q.makkahStay', options: ['Steps from the Haram', 'Good value, short ride'], from: [[/haram|close|near|walk/, 'Steps from the Haram']] },
   ],
   car: [
-    { k: 'where', q: 'request.q.where', options: ['Istanbul', 'Riyadh', 'Somewhere else'], from: [[/istanbul/, 'Istanbul'], [/riyadh/, 'Riyadh']] },
-    { k: 'size', q: 'request.q.size', options: ['7 seats for the family', 'Standard car'] },
-    { k: 'days', q: 'request.q.howLong', options: ['1 day', '3 days', 'The whole trip'] },
+    { k: 'where', q: 'request.q.where', options: ['Riyadh', 'Jeddah', 'Istanbul', 'Dubai'], city: true },
+    { k: 'when', q: 'request.q.fromWhen', options: ['Tomorrow', 'This weekend', 'Next week', 'For my trip dates'], from: SOON.filter(([, v]) => v !== 'Today') },
+    { k: 'size', q: 'request.q.size', options: ['Standard car', '7 seats for the family', 'A car with a driver'], from: [[/driver|chauffeur/, 'A car with a driver'], [/7[- ]seat|seven seat|\bvan\b|\bsuv\b|big car|bigger car|family car/, '7 seats for the family']] },
+    { k: 'days', q: 'request.q.howLong', options: ['1 day', '3 days', 'A week'], from: [[/\bweek\b/, 'A week'], [/\b(3|three) days\b/, '3 days'], [/\b(1|one|a) day\b/, '1 day']] },
   ],
   food: [
-    { k: 'where', q: 'request.q.where', options: ['Istanbul, near the hotel', 'Riyadh'] },
-    { k: 'when', q: 'request.q.when', options: ['Tonight', 'Tomorrow', 'First night of the trip'], from: [[/tonight/, 'Tonight'], [/tomorrow/, 'Tomorrow'], [/first night/, 'First night of the trip']] },
+    { k: 'where', q: 'request.q.where', options: ['Riyadh', 'Jeddah', 'Istanbul, near the hotel'], city: true },
+    { k: 'when', q: 'request.q.when', options: ['Tonight', 'Tomorrow', 'This weekend'], from: [[/tonight|today/, 'Tonight'], [/tomorrow/, 'Tomorrow'], [/weekend/, 'This weekend'], [/first night/, 'First night of the trip']] },
+    { k: 'who', q: 'request.q.howMany', people: true },
     { k: 'pref', q: 'request.q.matters', options: ['Halal', 'Family seating', 'A view', 'Quiet'], multi: true },
   ],
   todo: [
-    { k: 'pick', q: 'request.q.pick', options: ['Bosphorus dinner cruise', 'Princes’ Islands day trip', 'Topkapı Palace tickets', 'A food walk in Kadıköy'], multi: true },
+    { k: 'pick', q: 'request.q.pick', options: ['Bosphorus dinner cruise', 'Princes’ Islands day trip', 'Topkapı Palace tickets', 'A food walk in Kadıköy'], multi: true, event: true },
+    { k: 'when', q: 'request.q.whenGo', options: ['Today', 'This weekend', 'Next week', 'Any day is fine'], from: SOON },
     { k: 'who', q: 'request.q.whoGoing', people: true },
-    { k: 'needs', q: 'request.q.needs', needs: true },
   ],
   flight: [],
   stay: [],
-  general: [],
+  /* Anything else ("a desert camp with a chef"): when and who, so Mada can price it, and nobody asks about dates that
+     were never set. */
+  general: [
+    { k: 'when', q: 'request.q.whenGo', options: ['Today', 'This weekend', 'Next week', 'Any day is fine'], from: SOON },
+    { k: 'who', q: 'request.q.whoGoing', people: true },
+  ],
 };
 
 /** The desk's price table for what it quotes by hand (riyals). The mock desk uses it; a real agent types the price in Ops. */
 export const DESK_PRICES = {
   todo: { 'Bosphorus dinner cruise': 190, 'Princes’ Islands day trip': 160, 'Topkapı Palace tickets': 85, 'A food walk in Kadıköy': 140 } as Record<string, number>,
   visaAppointment: 450,
-  car: 980,
+  /** A car per day: self-drive, the 7-seater, and with a driver (fuel and the driver included). */
+  car: 980, carStandard: 260, carFamily: 420,
+  /** Tickets for an outing Mada has no fixed price for, per adult (children under 12 half). */
+  ticket: 120,
   umrahAdult: 2300, umrahChild: 1650, umrahInfant: 350, umrahNearHaram: 450, umrahWheelchair: 300,
   /** Entry-check services. */
   ukEtaEach: 60, eVisa: 350, reentry: 200, passportRenewal: 150,
