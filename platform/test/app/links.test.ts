@@ -87,7 +87,7 @@ describe("/join/<code>: the invite page", () => {
     expect(html).toContain("If you join, they see");
     expect(html).toContain(`href="madatrips://join/${link.code}"`);
     expect(html).toContain(`<code id="code">${link.code}</code>`);
-    expect(html).toContain("/links/cover/istanbul.jpg");
+    expect(html).toContain("/links/cover/istanbul-tall.jpg");
     expect(meta(html, "og:title")).toBe("Abdullah invited you to Istanbul for Eid");
     expect(meta(html, "og:description")).toBe("Plan, vote and pay your share in one place.");
     expect(meta(html, "og:image")).toBe(`https://madatrips.sa/links/og/join/${link.code}?lang=en`);
@@ -230,7 +230,7 @@ describe("other app links", () => {
     expect(trip).toContain('href="madatrips://trip/0b5e0e6c-1111-4111-8111-111111111111"');
     const city = await (await get(cityGet, "/city/istanbul", { id: "istanbul" })).text();
     expect(city).toContain("Istanbul on Mada Trips");
-    expect(city).toContain("/links/cover/istanbul.jpg");
+    expect(city).toContain("/links/cover/istanbul-tall.jpg");
   });
 
   it("serves the covers and fonts by name only, cached for a year", async () => {

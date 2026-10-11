@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 const DIR = join(process.cwd(), "src/lib/app/links/assets");
 export const ASSETS = {
-  cover: { "istanbul.jpg": "image/jpeg", "alula.jpg": "image/jpeg", "riyadh.jpg": "image/jpeg" },
+  cover: { "istanbul.jpg": "image/jpeg", "istanbul-tall.jpg": "image/jpeg", "alula.jpg": "image/jpeg", "riyadh.jpg": "image/jpeg" },
   font: {
     "instrument-serif.ttf": "font/ttf", "plex-arabic-400.woff2": "font/woff2", "plex-arabic-600.woff2": "font/woff2",
     "plex-latin-400.woff2": "font/woff2", "plex-latin-600.woff2": "font/woff2",

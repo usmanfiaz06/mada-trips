@@ -50,6 +50,8 @@ export function localeFor(req: Request): Lang {
   return pickLocale(req.headers.get("accept-language"));
 }
 
+/** A cover for a tall screen: the landscape Istanbul photo crops to sky, so the page uses a mosque crop. */
+const coverFile = (c: CoverKey) => (c === "istanbul" ? "istanbul-tall" : c);
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const tt = (key: CopyKey, vars?: Vars) => esc(t(key, vars));
 
@@ -173,12 +175,12 @@ ${meta.join("\n")}
 <link rel="icon" href="/assets/brand/favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="${esc(s.url)}">
 <link rel="preload" href="/links/font/${rtl ? "plex-arabic-600.woff2" : "instrument-serif.ttf"}" as="font" crossorigin>
-${s.cover ? `<link rel="preload" href="/links/cover/${s.cover}.jpg" as="image">` : ""}
+${s.cover ? `<link rel="preload" href="/links/cover/${coverFile(s.cover)}.jpg" as="image">` : ""}
 <style>${CSS}</style>
 </head>
 <body data-path="${esc(s.appPath)}" data-pkg="${ANDROID_PACKAGE}" data-fallback="${esc(fallback)}" data-copied="${tt("links.codeCopied")}" data-refused="${tt("links.copyRefused")}">
 <main class="screen">
-${s.cover ? `<img class="bg" src="/links/cover/${s.cover}.jpg" alt="" fetchpriority="high">` : `<div class="plain"></div>`}
+${s.cover ? `<img class="bg" src="/links/cover/${coverFile(s.cover)}.jpg" alt="" fetchpriority="high">` : `<div class="plain"></div>`}
 <div class="veil"></div>
 <header class="top"><img src="/links/brand/wordmark-sand.svg" alt="${rtl ? "مادا للرحلات" : "Mada Trips"}" width="58" height="26"></header>
 <section class="main">
