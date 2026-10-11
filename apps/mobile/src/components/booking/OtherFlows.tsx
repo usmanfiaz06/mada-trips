@@ -11,6 +11,7 @@ import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
 import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
+import { ErrorState } from '../states/ErrorState';
 import { Pill } from '../Pill';
 import { T } from '../Text';
 import { VGradient } from '../Gradient';
@@ -22,6 +23,9 @@ import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 
 /* Stays, curated plans and eSIMs in Ask. */
+
+/** Hotels drawn at once; "Show more" adds the next page. */
+const STAYS_PAGE = 10;
 
 export function StayFlow({ intent, query, people, selfName, today, setCta }: { intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void }) {
   const router = useRouter();
@@ -43,7 +47,11 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const step = useSequence(2, 700, 'go');
   const other = intent.destination === 'other' || !!dest.byHand;
   const search = useQuery({ queryKey: ['booking', 'stays', destKey, checkIn, nights, who.join(), flags], enabled: !other && !byHand, staleTime: 600_000, queryFn: () => bookingApi.searchStays({ destination: destKey, checkIn, nights, travellerIds: who }) });
-  const entry = useQuery({ queryKey: ['booking', 'entry', destKey, who.join(), checkIn, checkOut, answers, flags], enabled: !other && !!search.data, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: destKey, travellerIds: who, depart: checkIn, return: checkOut, answers }) });
+  // Entry checks don't depend on the rooms: asked at the same time as the search, not after it.
+  const entry = useQuery({ queryKey: ['booking', 'entry', destKey, who.join(), checkIn, checkOut, answers, flags], enabled: !other && !byHand, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: destKey, travellerIds: who, depart: checkIn, return: checkOut, answers }) });
+  // A city can answer with a couple of hundred hotels: draw a page at a time, cheapest first.
+  const [page, setPage] = useState<{ of: unknown; n: number }>({ of: null, n: STAYS_PAGE });
+  const shown = page.of === search.data ? page.n : STAYS_PAGE;
   const s = search.data;
   const cur = s?.options.find((o) => o.id === pick) ?? s?.options[0];
   const ready = !other && !byHand && step >= 2 && s?.outcome === 'ok' && !!cur;
@@ -64,6 +72,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
       </View>
     );
   }
+  if (!s && search.isError) return <ErrorState variant="card" error={search.error} onRetry={() => { void search.refetch(); }} testID="stays-error" />;
   if (step < 2 || !s) return <Working lines={steps} step={Math.min(step, 1)} />;
   if (s.outcome === 'none') {
     return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? (n > 2 ? t('search.rooms.connecting') : t('search.rooms.one')) })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
@@ -74,10 +83,10 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
         <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('search.stays.title')}</T>
         <T v="small">{t('search.stays.sub', { dates: rangeName(checkIn, checkOut, today), nights, rooms: cur?.roomsLabel ?? '' })}</T>
       </Animated.View>
-      {s.options.map((h, i) => {
+      {s.options.slice(0, shown).map((h, i) => {
         const on = cur?.id === h.id;
         return (
-          <Animated.View key={h.id} entering={enter(i + 1)}>
+          <Animated.View key={h.id} entering={enter(i < STAYS_PAGE ? i + 1 : 0)}>
             <Card padding={0} selected={on} onPress={() => setPick(h.id)} accessibilityLabel={h.name} style={{ overflow: 'hidden', gap: 0 }}>
               <View style={styles.photo}>
                 {h.hotel?.imageUrl ? <Image source={{ uri: h.hotel.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <Photo name={h.photo} focal={h.focal} />}
@@ -96,6 +105,12 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
           </Animated.View>
         );
       })}
+      {s.options.length > shown ? (
+        <View style={{ gap: 8, alignItems: 'center' }}>
+          <T v="tiny">{t('search.stays.shown', { shown, count: s.options.length })}</T>
+          <Button variant="secondary" label={t('search.stays.more', { count: Math.min(STAYS_PAGE, s.options.length - shown) })} onPress={() => setPage({ of: search.data, n: shown + STAYS_PAGE })} testID="stays-more" />
+        </View>
+      ) : null}
       <Card variant="well" style={{ gap: 10 }}>
         <T v="h3">{t('search.staying')}</T>
         <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} />

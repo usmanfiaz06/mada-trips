@@ -156,6 +156,8 @@ export const bookingCopy = {
   'search.stays.none.title': 'No rooms free on those dates.',
   'search.stays.none.body': 'Everything near Galata is taken for {rooms}. Mada knows places that never show online, and can look by hand.',
   'search.stays.byHand': 'Ask Mada to find rooms',
+  'search.stays.more': 'Show {count} more places',
+  'search.stays.shown': 'Showing {shown} of {count} places, cheapest first.',
   'search.byHand.title': 'We’re searching {city} for you.',
   'search.byHand.stayTitle': 'We’re finding rooms in {city} for you.',
   'search.byHand.queued': 'Saved. We start on {city} when you’re back online.',
