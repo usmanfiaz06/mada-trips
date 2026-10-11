@@ -6,9 +6,9 @@ import { Icon, Sun, TopBar, QuietRadar, EmptyState, ArtChat } from '../ui.jsx';
    and urgent things get a phone call. "Did that sort it?" only follows something that was actually done.
    State this file owns: support (the thread). */
 
-export const DESK = '+966 11 520 0000';
-export const DESK_TEL = 'tel:+966115200000';
-const DESK_WA = 'https://wa.me/966115200000';
+export const DESK = '+966 56 668 2662';
+export const DESK_TEL = 'tel:+966566682662';
+const DESK_WA = 'https://wa.me/966566682662';
 
 const TOPICS = [
   ['change', 'Change my booking'],
@@ -209,7 +209,7 @@ export function Support({ params = {} }) {
             <span className="small">{queued.length ? `${queued.length === 1 ? 'Your message sends' : `Your ${queued.length} messages send`} the moment you're back.` : 'Messages you write now send the moment you’re back.'} Need us now? The desk answers any hour.</span>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               <a className="btn primary small" href={DESK_TEL}>Call the desk</a>
-              <a className="btn secondary small" href={`sms:+966115200000?&body=${smsBody}`}>Send an SMS</a>
+              <a className="btn secondary small" href={`sms:+966566682662?&body=${smsBody}`}>Send an SMS</a>
             </div>
           </div>
         )}

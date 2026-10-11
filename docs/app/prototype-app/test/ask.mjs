@@ -247,8 +247,8 @@ try {
   await phone.locator('#support-msg').fill('help');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(900);
-  await see('+966 11 520 0000');
-  check(await phone.locator('a[href="tel:+966115200000"]').count() >= 2, 'Call links use the desk number');
+  await see('+966 56 668 2662');
+  check(await phone.locator('a[href="tel:+966566682662"]').count() >= 2, 'Call links use the desk number');
   await shot('support-intents');
 
   step('support offline: queued, with call and SMS');
@@ -258,7 +258,7 @@ try {
   await page.waitForTimeout(400);
   await see('sends when you’re online');
   await see('Your message sends the moment you\'re back');
-  check(await phone.locator('a[href^="sms:+966115200000"]').count() === 1, 'SMS fallback');
+  check(await phone.locator('a[href^="sms:+966566682662"]').count() === 1, 'SMS fallback');
   await shot('support-offline');
   await demo('Offline');
   await page.waitForTimeout(1900);
@@ -273,7 +273,7 @@ try {
   await click('Take the 13:30', { wait: 500 });
   await see('Saved on your phone. It sends when you\'re back online.');
   await notSee('reached us before');
-  check(await phone.locator('a[href="tel:+966115200000"]').count() >= 1, 'Call the desk');
+  check(await phone.locator('a[href="tel:+966566682662"]').count() >= 1, 'Call the desk');
   await shot('disruption-offline-queued');
   await demo('Offline');
   await page.waitForTimeout(2800);

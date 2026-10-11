@@ -396,9 +396,15 @@ export type SendSupportMessageRequest = z.input<typeof SendSupportMessageRequest
 export const SendSupportMessageResponse = z.object({ messages: z.array(SupportMessage) });
 export const SupportUnreadResponse = z.object({ unread: z.number().int().nonnegative() });
 
-/** The desk: one number, day and night. */
-export const DESK_PHONE = '+966 11 520 0000';
-export const DESK_TEL = 'tel:+966115200000';
-export const DESK_SMS = 'sms:+966115200000';
-export const DESK_WHATSAPP = 'https://wa.me/966115200000';
+/** The desk: one number, day and night. The same number as the website (madatrips.sa) header and contact page. */
+export const DESK_PHONE = '+966 56 668 2662';
+export const DESK_TEL = 'tel:+966566682662';
+export const DESK_SMS = 'sms:+966566682662';
+export const DESK_WHATSAPP = 'https://wa.me/966566682662';
+
+/**
+ * The day the terms and privacy policy last changed. The app's Legal screen shows it, and the website's
+ * /terms and /privacy pages (platform/public, EN and AR) must say the same day: platform/test/legal-date.test.ts checks.
+ */
+export const LEGAL_UPDATED = '2026-10-11';
 

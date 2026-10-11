@@ -1179,7 +1179,7 @@ function Help() {
           <div className="row"><span className="avatar gold" style={{ width: 44, height: 44 }}><Sun width={28} color="#1e352d" /></span><span className="col" style={{ gap: 0 }}><span className="h3" style={{ color: '#f6f2ec' }}>Talk to Mada</span><span className="small">A person answers, day and night. Usually within 5 minutes.</span></span></div>
           <button type="button" className="btn gold block" onClick={chat}>Message Mada</button>
           <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn on-dark small grow" onClick={() => { toast('Opening WhatsApp: +966 11 520 0000'); }}>WhatsApp</button>
+            <button type="button" className="btn on-dark small grow" onClick={() => { toast('Opening WhatsApp: +966 56 668 2662'); }}>WhatsApp</button>
             <button type="button" className="btn on-dark small grow" onClick={() => setCall(true)}>Call</button>
           </div>
         </div>
@@ -1205,8 +1205,8 @@ function Help() {
       {call && (
         <Sheet label="Call Mada" onClose={() => setCall(false)}>
           <h2 className="h2">Call Mada</h2>
-          <p className="body">+966 11 520 0000. Day and night, in Arabic or English. Have your booking code ready if it’s about a trip{s.trip?.pnr ? `: ${s.trip.pnr}` : ''}.</p>
-          <a className="btn primary block" href="tel:+966115200000" onClick={() => setCall(false)}>Call now</a>
+          <p className="body">+966 56 668 2662. Day and night, in Arabic or English. Have your booking code ready if it’s about a trip{s.trip?.pnr ? `: ${s.trip.pnr}` : ''}.</p>
+          <a className="btn primary block" href="tel:+966566682662" onClick={() => setCall(false)}>Call now</a>
           <button type="button" className="btn ghost block" onClick={() => setCall(false)}>Cancel</button>
         </Sheet>
       )}

@@ -15,7 +15,7 @@ export const CODE_SENDER = 'no-reply@madatrips.sa';
 const RESEND_SECONDS = 60;
 const MAX_TRIES = 3;
 const PAUSE_SECONDS = 45;
-const DESK_CALL = 'tel:+966115200000';
+const DESK_CALL = 'tel:+966566682662';
 
 export const mmss = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`;
 export const prettyDigits = (d) => (d && d.length === 9 ? `+966 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5)}` : d ? `+966 ${d}` : '');

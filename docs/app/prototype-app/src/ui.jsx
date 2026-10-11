@@ -761,8 +761,8 @@ export function ArtCircles() {
    what happened, what still works, and one next step. Nothing is red, nothing shakes, nobody is blamed.
    ====================================================================================================== */
 
-const DESK_LINE = '+966 11 520 0000';
-const DESK_CALL = 'tel:+966115200000';
+const DESK_LINE = '+966 56 668 2662';
+const DESK_CALL = 'tel:+966566682662';
 
 /* The connection and server state the whole app reads. `stale` means we're showing what's saved. */
 export function useNet() {

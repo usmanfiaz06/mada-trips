@@ -537,7 +537,7 @@ async function account() {
   await see('A person at Mada, usually Faisal.', 'faq');
   await shot('help');
   await press(byTest('help-call'));
-  await see('+966 11 520 0000. Day and night, in Arabic or English.', 'call sheet');
+  await see('+966 56 668 2662. Day and night, in Arabic or English.', 'call sheet');
   await closeSheet();
   await press(byTest('help-terms'));
   await see('Mada Trips is run by Mada Travel and Tourism', 'terms');
@@ -583,7 +583,7 @@ async function support() {
   step('support: urgent help');
   await byTest('support-input').fill('Help, my son is hurt');
   await byTest('support-send').click();
-  await see('Call the desk now: +966 11 520 0000.', 'urgent');
+  await see('Call the desk now: +966 56 668 2662.', 'urgent');
   await see('Call the desk now', 'urgent button');
   await shot('support-urgent');
 

@@ -60,7 +60,7 @@ describe("talk to Mada", () => {
     const urgent = await send(token, thread.id, { body: "Help, my son is hurt" });
     expect(urgent[0]).toMatchObject({ author: { kind: "user" }, body: "Help, my son is hurt", card: { intent: "urgent" } });
     expect(urgent[1]).toMatchObject({ author: { kind: "mada" }, card: { urgent: true } });
-    expect(urgent[1]!.body).toContain("+966 11 520 0000");
+    expect(urgent[1]!.body).toContain("+966 56 668 2662");
     const bag = await send(token, thread.id, { body: "", topic: "bag" });
     expect(bag[0]!.body).toBe("A missing bag");
     expect(bag[1]!.card).toMatchObject({ form: "bag" });
