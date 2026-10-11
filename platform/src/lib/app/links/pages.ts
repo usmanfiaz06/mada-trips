@@ -94,7 +94,7 @@ h1.long{font-size:36px}
 .sub{font-size:14px;line-height:1.45;color:rgba(255,253,249,.85);margin:0}
 .panel{background:rgba(255,253,249,.08);border:1px solid rgba(255,253,249,.12);border-radius:24px;padding:16px;display:grid;gap:6px;font-size:13px;line-height:1.45;color:rgba(255,253,249,.8);margin:0}
 .panel b{color:var(--paper);font-weight:600}
-.panel ol{margin:0;padding-inline-start:18px;display:grid;gap:4px}
+.panel ol{margin:0;padding:0;list-style:none;display:grid;gap:6px}
 .btn{min-height:56px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;font-weight:600;text-decoration:none;border:0;width:100%;cursor:pointer;font-family:inherit;padding:0 22px;text-align:center}
 .btn.gold{background:var(--gold);color:var(--green)}
 .btn:active{transform:scale(.98)}
