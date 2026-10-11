@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BookThingResponse, ItineraryResponse, ROUTES, ThingsResponse, TripIdeasResponse } from '@mada/shared';
 import type { Wire } from '../../src/lib/api';
 import { mockTransport } from '../../src/lib/mock-api';
@@ -17,7 +17,15 @@ async function signedIn() {
 }
 
 let as: Awaited<ReturnType<typeof signedIn>>;
-beforeAll(async () => { as = await signedIn(); });
+/* Hours and "today" are read against the city's clock, so the suite runs at a fixed late morning in Riyadh (11:30, a
+   Sunday): the Sky Bridge and the museum are open whatever the real time, and a hot day has indoor ideas to offer. */
+const AT = new Date('2026-10-11T08:30:00Z');
+beforeAll(async () => {
+  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+  vi.setSystemTime(AT);
+  as = await signedIn();
+});
+afterAll(() => { vi.useRealTimers(); });
 
 describe('things to do (mock)', () => {
   it('a city: places with hours, weather turning a hot day indoors, experiences, what\'s on', async () => {
