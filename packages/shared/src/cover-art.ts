@@ -394,8 +394,9 @@ export type CoverArtOptions = {
   /** banner: a wide cover with the drawing to one side (headers, previews, tiles, the invite page).
    *  badge: a small square with the drawing in the middle (list rows, avatars, the picker).
    *  poster: a tall screen with the drawing in the upper part (the invite page).
-   *  header: a wide band under a top bar (a circle's chat). */
-  layout?: 'banner' | 'badge' | 'poster' | 'header';
+   *  header: a wide band under a top bar (a circle's chat).
+   *  tile: a small card in a rail; the drawing sits small in the top-end corner, clear of the name below. */
+  layout?: 'banner' | 'badge' | 'poster' | 'header' | 'tile';
   /** Which side the drawing sits on in a banner: the end of the line (right in English, left in Arabic). */
   side?: 'left' | 'right';
   /** Draw the dotted pattern (on by default). */
@@ -419,6 +420,11 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
     disc = Math.min(H * 0.3, W * 0.2);
     cx = o.side === 'left' ? disc * 1.3 + W * 0.04 : W - disc * 1.3 - W * 0.04;
     cy = H * 0.42;
+  } else if (layout === 'tile') {
+    disc = H * 0.21;
+    const inset = H * 0.12;
+    cx = o.side === 'left' ? disc + inset : W - disc - inset;
+    cy = disc + inset;
   } else if (layout === 'header') {
     // Under a top bar whose end holds buttons: the drawing sits lower and a little in from the end.
     disc = Math.min(H * 0.24, W * 0.16);
@@ -435,7 +441,9 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
     const gap = Math.max(12, Math.round(Math.min(W, H) / 9));
     parts.push(`<path d="${dots(W, H, gap, Math.max(1, r2(gap / 11)))}" fill="${c.dot}"/>`);
   }
-  if (layout !== 'badge' || Math.min(W, H) >= 80) {
+  if (layout === 'tile') {
+    parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc * 1.38))}" fill="none" stroke="${c.ring}" stroke-width="${r2(Math.max(1, disc * 0.06))}"/>`);
+  } else if (layout !== 'badge' || Math.min(W, H) >= 80) {
     parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc * 1.42))}" fill="none" stroke="${c.ring}" stroke-width="${r2(Math.max(1, disc * 0.08))}"/>`);
     parts.push(`<path d="${circ(r2(cx), r2(cy), r2(disc * 1.9))}" fill="none" stroke="${c.ring}" stroke-width="${r2(Math.max(1, disc * 0.05))}"/>`);
   }

@@ -73,6 +73,7 @@ h1, h2, h3 { text-wrap: balance; }
 .row { display: flex; align-items: center; gap: 10px; }
 .col { display: flex; flex-direction: column; gap: 4px; }
 .spread { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.spread > .h3, .spread > .grow { min-width: 0; }
 .grow { flex: 1 1 auto; min-width: 0; }
 .act { position: absolute; left: 20px; right: 20px; bottom: 28px; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
 .act.above-dock { bottom: 102px; }
@@ -137,7 +138,7 @@ h1, h2, h3 { text-wrap: balance; }
 .stack .avatar { border: 2px solid var(--sand); margin-left: -10px; }
 .stack .avatar:first-child { margin-left: 0; }
 .dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
-.pill { height: 26px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: var(--mist); }
+.pill { height: 26px; padding: 0 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: var(--mist); white-space: nowrap; flex-shrink: 0; }
 .pill.gold { background: var(--gold); color: var(--green); }
 .pill.glass { background: rgba(15, 26, 22, .5); color: #fffdf9; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 253, 249, .18); }
 .pill.ok { background: rgba(47, 122, 75, .12); color: var(--ok); }

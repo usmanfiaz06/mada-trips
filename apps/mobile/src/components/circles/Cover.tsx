@@ -31,7 +31,7 @@ export function coverInk(c: CircleCover | null | undefined): { text: string; sof
   return light ? { text: colors.green, soft: 'rgba(30,53,45,0.72)', light } : { text: colors.paper, soft: 'rgba(255,253,249,0.86)', light };
 }
 
-const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<CircleCover, { kind: 'icon' }>; w: number; h: number; layout: 'banner' | 'badge' | 'poster' | 'header' }) {
+const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<CircleCover, { kind: 'icon' }>; w: number; h: number; layout: 'banner' | 'badge' | 'poster' | 'header' | 'tile' }) {
   const xml = useMemo(() => coverArtSvg(cover, { width: w, height: h, layout, side: isRTL() ? 'left' : 'right' }), [cover.icon, cover.color, w, h, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   return <SvgXml xml={xml} width={w} height={h} style={StyleSheet.absoluteFill} pointerEvents="none" />;
 });
@@ -41,7 +41,7 @@ const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<
  * .nc-veil); drawings keep their own calm corner, so they get a lighter one in their own colour.
  */
 export function CoverArt({ cover, layout = 'banner', style, veil, children, testID }: {
-  cover: CircleCover | null | undefined; layout?: 'banner' | 'badge' | 'poster' | 'header'; style?: StyleProp<ViewStyle>; veil?: boolean; children?: ReactNode; testID?: string;
+  cover: CircleCover | null | undefined; layout?: 'banner' | 'badge' | 'poster' | 'header' | 'tile'; style?: StyleProp<ViewStyle>; veil?: boolean; children?: ReactNode; testID?: string;
 }) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const onLayout = (e: LayoutChangeEvent) => {

@@ -19,6 +19,6 @@ export function Pill({ label, variant = 'default', icon, style, height = sizes.p
 }
 
 const styles = StyleSheet.create({
-  pill: { paddingHorizontal: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  pill: { paddingHorizontal: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', flexShrink: 0 },
   glass: { borderWidth: 1, borderColor: 'rgba(255,253,249,0.18)' },
 });

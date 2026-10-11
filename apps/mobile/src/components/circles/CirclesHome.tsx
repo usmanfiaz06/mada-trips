@@ -186,16 +186,22 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
 function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: () => void }) {
   if (c.cover) {
     const ink = coverInk(c.cover);
+    const drawing = c.cover.kind === 'icon';
     return (
       <Pressable accessibilityRole="button" accessibilityLabel={c.name} onPress={() => { buzz('tap'); onPress(); }} style={st.photoTile} testID="circle-tile">
-        <CoverArt cover={c.cover} style={StyleSheet.absoluteFill}>
-          {ink.light ? <View style={[StyleSheet.absoluteFill, { top: '52%', backgroundColor: 'rgba(255,253,249,0.55)' }]} /> : <>
+        {/* A drawing is a flat colour with the picture small in the top-end corner: words read on it as they are. */}
+        <CoverArt cover={c.cover} layout={drawing ? 'tile' : 'banner'} style={StyleSheet.absoluteFill}>
+          {drawing ? null : <>
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,26,22,0.18)' }]} />
             <View style={[StyleSheet.absoluteFill, { top: '40%', backgroundColor: 'rgba(15,26,22,0.45)' }]} />
           </>}
         </CoverArt>
-        {c.unread > 0 ? <Pill variant="gold" label={t('circles.unread', { count: c.unread })} style={{ position: 'absolute', top: 10, start: 10 }} /> : null}
-        {c.muted ? <Pill variant="glass" label={t('circles.muted')} style={{ position: 'absolute', top: 10, end: 10 }} /> : null}
+        {c.unread > 0 || c.muted ? (
+          <View style={{ position: 'absolute', top: 10, start: 10, flexDirection: 'row', gap: 6 }}>
+            {c.unread > 0 ? <Pill variant="gold" label={t('circles.unread', { count: c.unread })} /> : null}
+            {c.muted ? <Pill variant={ink.light ? 'default' : 'glass'} label={t('circles.muted')} /> : null}
+          </View>
+        ) : null}
         <View style={{ padding: 14, gap: 2 }}>
           <T style={[font('display', ink.text), { fontSize: 22, lineHeight: 24 }]} numberOfLines={1}>{c.name}</T>
           <T v="tiny" color={ink.light ? 'rgba(30,53,45,0.8)' : 'rgba(255,253,249,0.92)'} numberOfLines={1}>{line}</T>

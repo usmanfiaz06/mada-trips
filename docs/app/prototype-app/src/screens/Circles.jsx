@@ -298,9 +298,12 @@ export default function Circles() {
             const gc = groupCover(g);
             return gc ? (
               <button key={g.id} type="button" className={'photo cx-tile' + (coverLight(gc) ? ' light' : '')} onClick={() => push('group', { id: g.id })}>
-                <CoverBg cover={gc} w={210} h={128} /><span className="cx-veil" />
-                {g.unread > 0 && <span className="pill gold" style={{ position: 'absolute', top: 10, left: 10 }}>{g.unread} new</span>}
-                {g.muted && <span className="pill glass" style={{ position: 'absolute', top: 10, right: 10 }}>Muted</span>}
+                {/* A drawing is a flat colour with the picture small in the top-end corner: no veil needed. */}
+                <CoverBg cover={gc} w={210} h={128} layout={gc.kind === 'icon' ? 'tile' : 'banner'} />{gc.kind !== 'icon' && <span className="cx-veil" />}
+                {(g.unread > 0 || g.muted) && <span className="cx-tile-pills">
+                  {g.unread > 0 && <span className="pill gold">{g.unread} new</span>}
+                  {g.muted && <span className={'pill ' + (coverLight(gc) ? 'cx-pill-light' : 'glass')}>Muted</span>}
+                </span>}
                 <span className="over" style={{ textAlign: 'start', gap: 2 }}><span className="display cx-tile-name" style={{ fontSize: 22 }}>{g.name}</span><span className="tiny cx-line cx-tile-line">{line}</span></span>
               </button>
             ) : (
