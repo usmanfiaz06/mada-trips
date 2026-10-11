@@ -70,7 +70,7 @@ export default function PassportConfirm() {
     <Screen>
       <TopBar onBack={() => router.back()} title={manual ? t('passport.confirm.bar') : undefined} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <Scroll top={8} bottomPad={130}>
+        <Scroll top={8} bottomPad={24}>
           <T v="h1" accessibilityRole="header">{manual ? t('passport.confirm.titleManual') : t('passport.confirm.title')}</T>
           <T v="body">{t('passport.confirm.body')}</T>
           {fromPhoto ? (
@@ -93,7 +93,7 @@ export default function PassportConfirm() {
           {expired ? <Notice icon="visa" warn title={t('passport.expired.title')} body={t('passport.expired.body')} testID="confirm-expired" /> : null}
           {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert">{problem}</T> : null}
         </Scroll>
-        <Act>
+        <Act inline>
           <Button disabled={blocked} busy={busy} onPress={save} testID="passport-save"
             label={missing.length ? tn('passport.fillMore', missing.length) : manual ? t('passport.save') : t('passport.saveScanned')} />
         </Act>

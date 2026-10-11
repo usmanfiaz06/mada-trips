@@ -9,7 +9,7 @@ import { useBottomInset, useTopInset } from '@/components/Layout';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { t } from '@/lib/i18n';
-import { rise, useReduceMotion } from '@/lib/motion';
+import { rise, riseStyle, useReduceMotion } from '@/lib/motion';
 import { useOnboarding } from '@/lib/onboarding';
 import { useSession } from '@/lib/session';
 import { colors, font } from '@/theme';
@@ -34,10 +34,10 @@ export default function Welcome() {
         <Sun width={64} />
         <View style={{ gap: 26 }}>
           <View style={{ gap: 14, paddingHorizontal: 4 }}>
-            <Animated.View entering={rise(0)}>
+            <Animated.View entering={rise(0)} style={riseStyle(0)}>
               <T style={[font('displayXL', colors.mist)]} accessibilityRole="header">{t('welcome.title')}</T>
             </Animated.View>
-            <Animated.View entering={rise(2)}>
+            <Animated.View entering={rise(2)} style={riseStyle(2)}>
               <T v="body" color="#e1dacd" style={{ fontSize: 18, lineHeight: 26 }}>{t('welcome.body')}</T>
             </Animated.View>
           </View>

@@ -54,8 +54,10 @@ export function TopBar({ onBack, backLabel, title, right, dark, home = true }: {
 }
 
 /** The Act zone: the one primary action, at the bottom where the thumb is (EXPERIENCE.md §3.1). */
-export function Act({ children, aboveDock }: { children: ReactNode; aboveDock?: boolean }) {
+export function Act({ children, aboveDock, inline }: { children: ReactNode; aboveDock?: boolean; inline?: boolean }) {
   const bottom = useBottomInset();
+  // `inline`: the buttons sit under the scroll in the normal flow, so the last field or line is never behind them.
+  if (inline) return <View style={[styles.actInline, { paddingBottom: 28 + bottom }]}>{children}</View>;
   return <View style={[styles.act, { bottom: (aboveDock ? 102 : 28) + bottom }]}>{children}</View>;
 }
 
@@ -73,4 +75,5 @@ const styles = StyleSheet.create({
   topbar: { paddingHorizontal: 16, paddingBottom: 8, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   back: { height: 44, flexDirection: 'row', alignItems: 'center', gap: 2, paddingStart: 4, paddingEnd: 12, borderRadius: 999 },
   act: { position: 'absolute', start: 20, end: 20, gap: 10, zIndex: 5 },
+  actInline: { paddingHorizontal: 20, paddingTop: 10, gap: 10 },
 });

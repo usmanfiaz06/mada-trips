@@ -8,7 +8,7 @@ import { T } from '@/components/Text';
 import { api } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
+import { rise, riseStyle } from '@/lib/motion';
 import { useOnboarding } from '@/lib/onboarding';
 import { colors, font, shadow } from '@/theme';
 
@@ -28,7 +28,7 @@ export default function WelcomeBack() {
       <View style={[styles.hero, { paddingTop: top + 26 }]}>
         <View style={styles.photos} accessible={false}>
           {POLAROIDS.map((p, i) => (
-            <Animated.View key={i} entering={rise(i * 2)} style={[styles.polaroid, shadow('focal'), { transform: [{ translateX: p.x }, { rotate: p.rot }] }]}>
+            <Animated.View key={i} entering={rise(i * 2)} style={[riseStyle(i * 2, true), styles.polaroid, shadow('focal'), { transform: [{ translateX: p.x }, { rotate: p.rot }] }]}>
               <Image source={p.src} style={{ flex: 1, borderRadius: 4 }} contentFit="cover" />
             </Animated.View>
           ))}
@@ -36,12 +36,12 @@ export default function WelcomeBack() {
             <T style={[font('display', colors.goldInk), { fontSize: 22, lineHeight: 24, letterSpacing: 0.8 }]}>{'MADA'}</T>
           </Animated.View>
         </View>
-        <Animated.View entering={rise(10)}>
+        <Animated.View entering={rise(10)} style={riseStyle(10)}>
           <T style={[font('displayXL'), { fontSize: 46, lineHeight: 46, textAlign: 'center' }]} accessibilityRole="header">
             {name ? t('welcomeBack.titleNamed', { name }) : t('welcomeBack.title')}
           </T>
         </Animated.View>
-        <Animated.View entering={rise(12)}><T v="body" color={colors.inkSoft} style={{ textAlign: 'center' }}>{t('welcomeBack.line')}</T></Animated.View>
+        <Animated.View entering={rise(12)} style={riseStyle(12)}><T v="body" color={colors.inkSoft} style={{ textAlign: 'center' }}>{t('welcomeBack.line')}</T></Animated.View>
       </View>
       <Act>
         <Button label={t('welcomeBack.open')} onPress={() => { buzz('success'); router.replace('/today'); }} testID="welcome-back-open" haptic={null} />

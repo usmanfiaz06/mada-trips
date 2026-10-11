@@ -18,7 +18,7 @@ import {
 } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { joinAnd, listSep, t, tn } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
+import { rise, riseStyle } from '@/lib/motion';
 import { toast } from '@/lib/toast';
 import { colors, ff, font, shadow } from '@/theme';
 import { ArtBookmark, ArtLantern } from './art';
@@ -92,7 +92,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
       {circles.view === 'error' || circles.view === 'offline' ? <InlineError problem={circles.problem} onRetry={circles.retry} /> : null}
       <Head title={t('circles.yours')} right={list.length ? String(list.length) : undefined} />
       {circles.isSuccess && list.length === 0 ? (
-        <Animated.View entering={rise(1)}>
+        <Animated.View entering={rise(1)} style={riseStyle(1)}>
           <EmptyState art={<ArtCircles />} title={t('circles.empty.title')} body={t('circles.empty.body')}
             action={<Button label={t('circles.empty.action')} onPress={() => router.push('/circle/new')} testID="first-circle" />}
             ideas={(['family', 'eid', 'weekend', 'cousins'] as const).map((k) => [t(`circles.idea.${k}`), () => router.push({ pathname: '/circle/new', params: { name: t(`circles.idea.${k}`) } })] as [string, () => void])} />

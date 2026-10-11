@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path, Rect, Text as SvgText } from 'react-native-svg';
@@ -46,11 +46,8 @@ export function Photo({ name, focal, style }: { name: string; focal?: string; st
 
 export const sar = (amount: number) => formatSar(amount);
 
-/**
- * The prototype's rise, on native. On the web, Reanimated's entering animations inside a scroll view leave elements
- * absolutely positioned (they overlap the next ones), so the web export shows them still.
- */
-export const enter = (step = 0) => (Platform.OS === 'web' ? undefined : rise(step));
+/** The prototype's rise, on native; nothing on the web (lib/motion.ts says why). */
+export const enter = rise;
 
 /** The ticking clock for holds and waits. */
 export function useNow(ms = 1000) {

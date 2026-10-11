@@ -12,7 +12,7 @@ import { PermissionDenied } from '@/components/states';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { t } from '@/lib/i18n';
-import { rise } from '@/lib/motion';
+import { rise, riseStyle } from '@/lib/motion';
 import { usePeople } from '@/lib/queries';
 import { BLANK, SAMPLE_MRZ, usePassportScan } from '@/lib/passport-scan';
 import { warmUp } from '@/lib/ocr';
@@ -55,13 +55,14 @@ export default function PassportIntro() {
   return (
     <Screen>
       <TopBar onBack={later} right={<View style={{ paddingHorizontal: 4 }}><LinkButton label={t('passport.later')} size={15} onPress={later} /></View>} />
-      <Scroll top={8} gutter={24} bottomPad={170}>
+      <Scroll top={8} gutter={24} bottomPad={20}>
         <ScanStage />
         <T v="h1" accessibilityRole="header">{who && !who.isSelf ? t('passport.titleFor', { name: who.firstName }) : t('passport.title')}</T>
         <T v="body">{t('passport.body')}</T>
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Icon name="lock" size={16} color={colors.inkSoft} /><T v="small" color={colors.inkSoft} style={{ flex: 1 }}>{t('passport.lock')}</T></View>
       </Scroll>
-      <Act>
+      <Act inline>
+        {/* Always in sight, right above the button it's about. */}
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 4 }}><Icon name="lock" size={16} color={colors.inkSoft} /><T v="small" color={colors.inkSoft} style={{ flex: 1 }}>{t('passport.lock')}</T></View>
         <Button label={t('passport.scan')} icon={<Icon name="scan" color={colors.gold} />} onPress={toCamera} testID="passport-scan-start" />
         <Button variant="ghost" label={t('passport.byHand')} onPress={byHand} testID="passport-by-hand" />
       </Act>
@@ -98,7 +99,7 @@ function ScanStage() {
         <Defs><RadialGradient id="ppst" cx="20%" cy="0%" rx="120%" ry="80%"><Stop offset="0" stopColor="#2c4a40" /><Stop offset="0.55" stopColor="#1e352d" /><Stop offset="1" stopColor="#132620" /></RadialGradient></Defs>
         <Rect width="100%" height="100%" fill="url(#ppst)" />
       </Svg>
-      <Animated.View entering={rise(0)} style={styles.page}>
+      <Animated.View entering={rise(0)} style={[riseStyle(0), styles.page]}>
         <View style={styles.ppHead}><T style={styles.ppHeadText}>{t('passport.demo.head')}</T><T style={styles.ppHeadText}>{t('passport.demo.type')}</T></View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={styles.ppPhoto}><Svg viewBox="0 0 60 76" width="100%" height="100%"><Circle cx={30} cy={30} r={13} fill="#b9ad98" /><Path d="M6 76c2-17 12-25 24-25s22 8 24 25z" fill="#b9ad98" /></Svg></View>
@@ -111,14 +112,14 @@ function ScanStage() {
         <T style={styles.ppMrz} numberOfLines={2}>{`${SAMPLE_MRZ[0]}\n${SAMPLE_MRZ[1]}`}</T>
         <Animated.View style={[styles.beam, beamStyle]} />
       </Animated.View>
-      <Animated.View entering={rise(4)} style={styles.form}>
+      <Animated.View entering={rise(4)} style={[riseStyle(4), styles.form]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <View style={styles.sv}><T style={{ fontSize: 8, color: colors.mist, fontFamily: ff.ui600 }}>SV</T></View>
           <T style={{ fontSize: 12, fontFamily: ff.ui600, color: colors.green }}>{t('passport.demo.form')}</T>
           <T style={{ marginStart: 'auto', fontSize: 11, fontFamily: ff.ui600, color: colors.goldInk }}>{t('passport.demo.filled')}</T>
         </View>
         {rows.map(([k, v], i) => (
-          <Animated.View key={k} entering={rise(8 + i * 10)} style={styles.row}>
+          <Animated.View key={k} entering={rise(8 + i * 10)} style={[riseStyle(8 + i * 10), styles.row]}>
             <T style={{ fontSize: 12.5, color: '#6b6a63', flex: 1 }}>{k}</T>
             <T style={{ fontSize: 12.5, fontFamily: ff.ui600, color: colors.green }}>{v}</T>
             <View style={styles.tick}><Icon name="check" size={12} color={colors.green} width={2.6} /></View>
