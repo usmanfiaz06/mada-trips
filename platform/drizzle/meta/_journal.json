@@ -176,6 +176,13 @@
       "when": 1791722694179,
       "tag": "0024_hotelbeds",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791725410336,
+      "tag": "0025_flight_status_cache",
+      "breakpoints": true
     }
   ]
 }
