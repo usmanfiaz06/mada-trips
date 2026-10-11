@@ -4,6 +4,7 @@ import { createClient, type Session, type SupabaseClient, type UserIdentity } fr
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { sendViaHook } from './channel';
 import { secureSessionStorage } from './session-storage';
+import { orReviewLogin } from './review';
 import { nativeCredential, nativeSocial, redirectUrl } from './social';
 import { AuthError, fromSupabase, type AuthBackend, type Identity, type SocialProvider } from './types';
 
@@ -67,8 +68,8 @@ export const supabaseAuth: AuthBackend = {
     });
   },
   async verifyPhoneCode(phone, code) {
-    const { session } = await run(supabase().auth.verifyOtp({ phone: bare(phone), token: code, type: 'sms' }));
-    return { accessToken: tokenOf(session) };
+    const verify = run(supabase().auth.verifyOtp({ phone: bare(phone), token: code, type: 'sms' })).then(({ session }) => ({ accessToken: tokenOf(session) }));
+    return orReviewLogin(verify, { kind: 'phone', value: phone }, code);
   },
 
   async sendEmailCode(email) {
@@ -76,8 +77,8 @@ export const supabaseAuth: AuthBackend = {
     await run(supabase().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } }));
   },
   async verifyEmailCode(email, code) {
-    const { session } = await run(supabase().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code, type: 'email' }));
-    return { accessToken: tokenOf(session) };
+    const verify = run(supabase().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code, type: 'email' })).then(({ session }) => ({ accessToken: tokenOf(session) }));
+    return orReviewLogin(verify, { kind: 'email', value: email.trim().toLowerCase() }, code);
   },
 
   async signInWith(provider): Promise<Identity | null> {
