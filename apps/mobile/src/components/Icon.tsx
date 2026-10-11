@@ -39,6 +39,9 @@ const GLYPHS = {
   bag: [{ rect: [5, 7, 14, 13, 2] }, { d: 'M9 7V5h6v2M9 11v5M15 11v5' }],
   globe: [{ circle: [12, 12, 9] }, { d: 'M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18' }],
   refund: [{ d: 'M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2' }],
+  mail: [{ rect: [3, 5, 18, 14, 2.5] }, { d: 'M4 7l8 6 8-6' }],
+  phone: [{ rect: [7, 2.5, 10, 19, 2.5] }, { d: 'M11 18.5h2' }],
+  edit: [{ d: 'M4 20h4L19 9l-4-4L4 16z' }, { d: 'M13.5 6.5l4 4' }],
   user: [{ circle: [12, 8, 4] }, { d: 'M4 21c1-4 4-6 8-6s7 2 8 6' }],
 } satisfies Record<string, Shape[]>;
 

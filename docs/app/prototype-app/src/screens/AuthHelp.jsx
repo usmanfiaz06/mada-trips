@@ -77,11 +77,11 @@ export function CodeHelpSheet({ about, resendIn, onResend, onChange, flow, onOth
       <h2 className="h2">Didn’t get the code?</h2>
       <p className="body">Codes can take a minute to arrive. Here’s what else you can do.</p>
       <HelpRow icon={<Icon name="refund" size={18} />} title={resendIn > 0 ? `Send a new code in ${mmss(resendIn)}` : 'Send a new code'} disabled={resendIn > 0} onClick={go(onResend)} />
-      {about === 'email' && <HelpRow icon={<Icon name="doc" size={18} />} title="Check your spam or junk folder" sub={`It comes from Mada Trips, ${CODE_SENDER}.`} />}
-      <HelpRow icon={<Icon name={about === 'phone' ? 'bell' : 'doc'} size={18} />} title={about === 'phone' ? 'Wrong number? Change it' : 'Wrong email? Change it'} onClick={go(onChange)} />
+      {about === 'email' && <HelpRow icon={<Icon name="mail" size={18} />} title="Check your spam or junk folder" sub={`It comes from Mada Trips, ${CODE_SENDER}.`} />}
+      <HelpRow icon={<Icon name="edit" size={18} />} title={about === 'phone' ? 'Wrong number? Change it' : 'Wrong email? Change it'} onClick={go(onChange)} />
       {flow === 'signin' && (<>
         <span className="small" style={{ fontWeight: 600, marginTop: 4 }}>Try another way</span>
-        <HelpRow icon={<Icon name={about === 'phone' ? 'doc' : 'bell'} size={18} />} title={about === 'phone' ? 'Get a code by email' : 'Get a code by text'} onClick={go(onOther)} />
+        <HelpRow icon={<Icon name={about === 'phone' ? 'mail' : 'phone'} size={18} />} title={about === 'phone' ? 'Get a code by email' : 'Get a code by text'} onClick={go(onOther)} />
         <HelpRow icon={APPLE} title="Continue with Apple" onClick={go(onApple)} />
         <HelpRow icon={GOOGLE} title="Continue with Google" onClick={go(onGoogle)} />
       </>)}
