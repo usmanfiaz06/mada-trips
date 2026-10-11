@@ -23,6 +23,7 @@ import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
+import { useVoice } from '@/lib/voice';
 import { colors, font, ff } from '@/theme';
 
 /*
@@ -47,6 +48,11 @@ export default function Ask() {
   const [intent, setIntent] = useState<AskIntent | null>(null);
   const [round, setRound] = useState(0);
   const [draft, setDraft] = useState('');
+  // Speak instead of type: the words land in the box as they're heard, to check before sending.
+  const voice = useVoice({
+    onText: (text) => setDraft(text),
+    onProblem: (p) => { buzz('soft'); toast(t(p === 'denied' ? 'ask.voice.denied' : p === 'none' ? 'ask.voice.none' : p === 'unsupported' ? 'ask.voice.unsupported' : 'ask.voice.failed')); },
+  });
   const [cta, setCta] = useState<Cta>(null);
   const [parsing, setParsing] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
@@ -113,10 +119,18 @@ export default function Ask() {
             </>
           ) : (
             <View style={styles.composer}>
-              <TextInput value={draft} onChangeText={setDraft} placeholder={intent ? t('ask.composerMore') : t('ask.composer')} placeholderTextColor={colors.muted} accessibilityLabel={t('ask.a11y.input')}
+              <TextInput value={draft} onChangeText={setDraft} placeholder={voice.listening ? t('ask.voice.listening') : intent ? t('ask.composerMore') : t('ask.composer')} placeholderTextColor={voice.listening ? colors.goldInk : colors.muted} accessibilityLabel={t('ask.a11y.input')}
                 onSubmitEditing={() => submit(draft)} returnKeyType="send" style={[styles.input, webNoOutline]} testID="ask-input" />
-              <Pressable accessibilityRole="button" accessibilityLabel={draft ? t('ask.a11y.send') : t('ask.a11y.talk')} onPress={() => (draft ? submit(draft) : toast(t('ask.voice')))} style={styles.send} testID="ask-send">
-                <Icon name={draft ? 'up' : 'mic'} color={colors.mist} size={20} />
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={voice.listening ? t('ask.a11y.stop') : draft ? t('ask.a11y.send') : t('ask.a11y.talk')}
+                accessibilityState={{ busy: voice.listening }}
+                onPress={() => {
+                  if (voice.listening) { voice.stop(); return; }
+                  if (draft) { void submit(draft); return; }
+                  buzz('tap'); void voice.start();
+                }}
+                style={[styles.send, voice.listening ? styles.listening : null]} testID="ask-send">
+                <Icon name={voice.listening ? 'close' : draft ? 'up' : 'mic'} color={voice.listening ? colors.green : colors.mist} size={20} />
               </Pressable>
             </View>
           )}
@@ -164,6 +178,7 @@ const styles = StyleSheet.create({
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 28, paddingHorizontal: 20, gap: 6, backgroundColor: 'rgba(233,226,216,0.96)' },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },
+  listening: { backgroundColor: colors.gold },
   send: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   demo: { height: 30, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.goldWash, justifyContent: 'center' },
 });

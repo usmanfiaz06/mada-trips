@@ -152,8 +152,8 @@
         "expo-camera",
         {
           "cameraPermission": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "To hear what you ask Mada when you tap the microphone. Nothing is recorded or kept.",
+          "recordAudioAndroid": true,
           "barcodeScannerEnabled": false
         }
       ],
@@ -162,7 +162,7 @@
         {
           "photosPermission": "To add a photo of a document or a profile picture you choose.",
           "cameraPermission": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
-          "microphonePermission": false
+          "microphonePermission": "To hear what you ask Mada when you tap the microphone. Nothing is recorded or kept."
         }
       ],
       [
@@ -197,6 +197,16 @@
           "supportedLocales": [
             "en",
             "ar"
+          ]
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "To hear what you ask Mada when you tap the microphone. Nothing is recorded or kept.",
+          "speechRecognitionPermission": "To turn what you say to Mada into words. Nothing is recorded or kept.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
           ]
         }
       ]
