@@ -51,7 +51,7 @@ function activityOf(r: Row, clock: { weekday: number; minutes: number } | null, 
     id: r.id, placeId: String(r.placeId), name: r.name, nameAr: r.nameAr, kind: r.kind as Activity["kind"], lat: r.lat, lon: r.lon, summary: r.summary, summaryAr: r.summaryAr,
     image, photo: null, hours: r.hours, openNow: st.open, closesAt: st.closesAt, indoor: r.indoor, family: r.family, free: r.free, website: r.website,
     wikipedia: r.wikipediaTitle ? `https://en.wikipedia.org/wiki/${encodeURIComponent(r.wikipediaTitle.replace(/ /g, "_"))}` : null, popularity: r.popularity,
-    distanceKm: near ? Math.round(kmBetween(near.lat, near.lon, r.lat, r.lon) * 10) / 10 : null, attributions,
+    distanceKm: near ? Math.round(kmBetween(near.lat, near.lon, r.lat, r.lon) * 10) / 10 : null, address: r.address ?? null, attributions,
   };
 }
 

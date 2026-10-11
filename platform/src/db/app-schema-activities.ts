@@ -32,6 +32,8 @@ export const appActivities = pgTable("app_activities", {
   family: boolean("family").notNull().default(false),
   free: boolean("free"),
   website: text("website"),
+  /** addr:* from OpenStreetMap, one line. */
+  address: text("address"),
   sitelinks: integer("sitelinks").notNull().default(0),
   pageviews: integer("pageviews").notNull().default(0),
   score: real("score").notNull().default(0),

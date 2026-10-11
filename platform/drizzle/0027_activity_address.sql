@@ -1,0 +1,1 @@
+ALTER TABLE "app_activities" ADD COLUMN "address" text;

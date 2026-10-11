@@ -55,11 +55,22 @@ export function overpassQuery(lat: number, lon: number, radiusKm: number): strin
 export type Candidate = {
   id: string; kind: ActivityKind; name: string; nameAr: string | null; lat: number; lon: number; tags: OsmTags; wikidata: string | null;
   wikipediaTitle: string | null; hours: string | null; indoor: boolean; family: boolean; free: boolean | null; website: string | null;
+  address: string | null;
 };
 
 type OsmElement = { type: "node" | "way" | "relation"; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: OsmTags };
 
 const norm = (s: string) => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+/** OSM's addr:* tags as one line ("Great Russell St 44, London WC1B 3DG"), or addr:full when that's what's mapped. */
+export function addressOf(tags: OsmTags): string | null {
+  const full = tags["addr:full"]?.trim();
+  if (full) return full.slice(0, 200);
+  const street = [tags["addr:street"] ?? tags["addr:place"], tags["addr:housenumber"]].filter(Boolean).join(" ").trim();
+  const town = [tags["addr:postcode"], tags["addr:city"]].filter(Boolean).join(" ").trim();
+  const line = [street, tags["addr:suburb"] ?? tags["addr:district"], town].filter((x) => x && x.trim()).join(", ");
+  return street && line ? line.slice(0, 200) : null;
+}
+
 const httpsUrl = (u: string | undefined) => (u && /^https?:\/\/[^\s]+$/.test(u) ? u.replace(/^http:/, "https:") : null);
 
 /** Overpass JSON → the places we'd show, one per thing (a museum mapped as a node and a building counts once). */
@@ -80,7 +91,7 @@ export function parseOverpass(data: unknown): Candidate[] {
     const c: Candidate = {
       id: `osm:${e.type[0]}${e.id}`, kind, name, nameAr: tags["name:ar"]?.trim() || (/[؀-ۿ]/.test(tags.name ?? "") && tags.name !== name ? tags.name! : null),
       lat, lon, tags, wikidata, wikipediaTitle: wp, hours: tags.opening_hours?.trim() || null, indoor: isIndoor(kind, tags), family: isFamily(kind, tags, name),
-      free: tags.fee === "no" ? true : tags.fee === "yes" ? false : null, website: httpsUrl(tags.website ?? tags["contact:website"]),
+      free: tags.fee === "no" ? true : tags.fee === "yes" ? false : null, website: httpsUrl(tags.website ?? tags["contact:website"]), address: addressOf(tags),
     };
     // One per Wikidata item, else per name: keep the richer record (hours, a relation over a node).
     const key = wikidata ?? `n:${norm(name)}`;

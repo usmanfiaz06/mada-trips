@@ -59,7 +59,7 @@ export async function gatherCity(city: CityRow, f: Fetch, now = new Date()): Pro
     id: c.id, placeId: city.id, kind: c.kind, name: c.w?.labelEn && c.name === c.tags.name && /[^\x20-\x7E]/.test(c.name) ? c.w.labelEn : c.name,
     nameAr: c.nameAr ?? c.w?.labelAr ?? null, lat: c.lat, lon: c.lon, wikidata: c.wikidata, wikipediaTitle: c.wikipediaTitle,
     summary: c.w?.descEn ?? null, summaryAr: c.w?.descAr ?? null, image: c.image as unknown as Record<string, unknown> | null, hours: c.hours, indoor: c.indoor,
-    family: c.family, free: c.free, website: c.website, sitelinks: c.w?.sitelinks ?? 0, pageviews: c.pageviews, score: c.score, popularity: pop[i]!, updatedAt: now,
+    family: c.family, free: c.free, website: c.website, address: c.address ?? null, sitelinks: c.w?.sitelinks ?? 0, pageviews: c.pageviews, score: c.score, popularity: pop[i]!, updatedAt: now,
   }));
   return { rows, status: rows.length ? (partial ? "partial" : "ok") : "none", problem: partial ? "Wikidata or pageviews did not answer" : null };
 }

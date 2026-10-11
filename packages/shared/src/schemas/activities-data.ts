@@ -14,13 +14,31 @@ const OSM: PlaceAttribution = { source: 'openstreetmap', text: '© OpenStreetMap
 
 type Row = [id: string, kind: ActivityKind, name: string, nameAr: string | null, lat: number, lon: number, summary: string | null, hours: string | null, popularity: number, extra?: { photo?: string; family?: boolean; indoor?: boolean; free?: boolean; wp?: string }];
 
+/** Street addresses as OpenStreetMap maps them (addr:*), for the places that have one. */
+const ADDRESSES: Readonly<Record<string, string>> = {
+  'osm:r1374029': 'Sultan Ahmet, Ayasofya Meydanı No:1, Fatih, İstanbul',
+  'osm:w24771046': 'Cankurtaran, 34122 Fatih, İstanbul',
+  'osm:w28116322': 'Alemdar, Yerebatan Cd. 1/3, Fatih, İstanbul',
+  'osm:w28119009': 'Bereketzade, Galata Kulesi, 34421 Beyoğlu, İstanbul',
+  'osm:w140528417': 'King Saud Rd, Al Murabba, Riyadh 12631',
+  'osm:w140528399': 'Imam Turki Ibn Abdullah Ibn Muhammad St, Ad Dirah, Riyadh 12634',
+  'osm:w38545510': 'King Fahd Rd, Al Olaya, Riyadh 12214',
+  'osm:w152183301': 'At-Turaif, Diriyah 13711',
+  'osm:w687543221': 'Al-Bujairi Terrace, Diriyah 13711',
+  'osm:w37392932': '1 Sheikh Mohammed bin Rashid Blvd, Downtown Dubai',
+  'osm:w571346011': 'Sheikh Zayed Rd, Trade Centre 2, Dubai',
+  'osm:w4317479': 'Great Russell St, London WC1B 3DG',
+  'osm:w4361093': 'Cromwell Rd, London SW7 5BD',
+  'osm:r11745282': 'Tower Hill, London EC3N 4AB',
+};
+
 const INDOOR = new Set<ActivityKind>(['museum', 'gallery', 'aquarium', 'mosque']);
 const FAMILY = new Set<ActivityKind>(['zoo', 'aquarium', 'theme_park', 'water_park', 'park']);
 
 const build = (placeId: string, rows: Row[]): Activity[] => rows.map(([id, kind, name, nameAr, lat, lon, summary, hours, popularity, x = {}]) => ({
   id, placeId, name, nameAr, kind, lat, lon, summary, summaryAr: null, image: null, photo: x.photo ?? null, hours, openNow: null, closesAt: null,
   indoor: x.indoor ?? INDOOR.has(kind), family: x.family ?? FAMILY.has(kind), free: x.free ?? null, website: null,
-  wikipedia: x.wp ? `https://en.wikipedia.org/wiki/${x.wp}` : null, popularity, distanceKm: null, attributions: [OSM],
+  wikipedia: x.wp ? `https://en.wikipedia.org/wiki/${x.wp}` : null, popularity, distanceKm: null, address: ADDRESSES[id] ?? null, attributions: [OSM],
 }));
 
 export const MOCK_ACTIVITIES: Readonly<Record<string, Activity[]>> = {
@@ -81,18 +99,18 @@ const exp = (supplier: Experience['supplier'], code: string, title: string, sar:
 
 export const MOCK_EXPERIENCES: Readonly<Record<string, Experience[]>> = {
   '745044': [
-    exp('hotelbeds', 'E-E10-IST-BOSDIN', 'Bosphorus dinner cruise', 245, 180, { summary: 'Dinner on the water from Kabataş pier, with a halal menu and the bridges lit up.', photo: 'istanbul-bosphorus', family: true, minAge: 0, rating: 4.6, reviews: 2140 }),
-    exp('hotelbeds', 'E-E10-IST-HSOPHIA', 'Hagia Sophia and Blue Mosque with a guide', 165, 150, { summary: 'A small group, a licensed guide, and the history you won’t read on the signs.', photo: 'istanbul-sultanahmet', rating: 4.7, reviews: 5120 }),
+    exp('hotelbeds', 'E-E10-IST-BOSDIN', 'Bosphorus dinner cruise', 245, 180, { summary: 'Dinner on the water from Kabataş pier, with a halal menu and the bridges lit up.', photo: 'istanbul-bosphorus', family: true, minAge: 0, rating: 4.6, reviews: 2140, meetingPoint: { kind: 'meet', address: 'Kabataş pier, Meclis-i Mebusan Cd., Beyoğlu, İstanbul', note: 'Be at the pier 20 minutes before boarding. The crew wear navy jackets.', lat: 41.03313, lon: 28.99343 } }),
+    exp('hotelbeds', 'E-E10-IST-HSOPHIA', 'Hagia Sophia and Blue Mosque with a guide', 165, 150, { summary: 'A small group, a licensed guide, and the history you won’t read on the signs.', photo: 'istanbul-sultanahmet', rating: 4.7, reviews: 5120, meetingPoint: { kind: 'meet', address: 'German Fountain, Sultanahmet Square, Fatih, İstanbul', note: 'Your guide holds a red Hotelbeds sign.', lat: 41.00703, lon: 28.97626 } }),
     exp('hotelbeds', 'E-E10-IST-CISTERN', 'Basilica Cistern: timed entry', 120, 60, { summary: 'A set time slot, so no queue.', family: true, minAge: 0 }),
     exp('getyourguide', '61922', 'Princes’ Islands day trip with lunch', 310, 420, { summary: 'Ferry to Büyükada and Heybeliada. No cars, just bikes and walks.', family: true, rating: 4.4, reviews: 880 }),
   ],
   '108410': [
-    exp('hotelbeds', 'E-E10-RUH-DIRIYAH', 'Diriyah at sunset with a local guide', 190, 150, { summary: 'At-Turaif’s mud-brick lanes, then dinner on the Bujairi terrace.', photo: 'riyadh-diriyah', family: true, minAge: 4, rating: 4.8, reviews: 412 }),
-    exp('hotelbeds', 'E-E10-RUH-EDGE', 'Edge of the World by 4×4', 420, 480, { summary: 'The Tuwaiq escarpment with a driver, a picnic and a long view.', photo: 'dubai-desert', minAge: 8, rating: 4.7, reviews: 960 }),
+    exp('hotelbeds', 'E-E10-RUH-DIRIYAH', 'Diriyah at sunset with a local guide', 190, 150, { summary: 'At-Turaif’s mud-brick lanes, then dinner on the Bujairi terrace.', photo: 'riyadh-diriyah', family: true, minAge: 4, rating: 4.8, reviews: 412, meetingPoint: { kind: 'meet', address: 'At-Turaif Visitor Centre, Diriyah 13711', note: 'Meet at the ticket desk 15 minutes before the start.', lat: 24.73326, lon: 46.57401 } }),
+    exp('hotelbeds', 'E-E10-RUH-EDGE', 'Edge of the World by 4×4', 420, 480, { summary: 'The Tuwaiq escarpment with a driver, a picnic and a long view.', photo: 'dubai-desert', minAge: 8, rating: 4.7, reviews: 960, meetingPoint: { kind: 'pickup', address: null, note: 'The driver collects you from your hotel lobby.', lat: null, lon: null } }),
     exp('hotelbeds', 'E-E10-RUH-CAMP', 'Desert camp evening', 280, 240, { summary: 'Dunes, a camp fire, Arabic coffee and dinner under the stars.', photo: 'desert-camp', family: true, minAge: 0, rating: 4.5, reviews: 380 }),
   ],
   '108841': [
-    exp('hotelbeds', 'E-E10-ULH-HEGRA', 'Hegra: the tombs by vintage Land Rover', 395, 180, { summary: 'Saudi Arabia’s first UNESCO site, with a Rawi storyteller.', photo: 'alula-hegra', family: true, minAge: 5, rating: 4.9, reviews: 1220 }),
+    exp('hotelbeds', 'E-E10-ULH-HEGRA', 'Hegra: the tombs by vintage Land Rover', 395, 180, { summary: 'Saudi Arabia’s first UNESCO site, with a Rawi storyteller.', photo: 'alula-hegra', family: true, minAge: 5, rating: 4.9, reviews: 1220, meetingPoint: { kind: 'meet', address: 'Hegra Welcome Centre, AlUla', note: null, lat: 26.78712, lon: 37.94877 } }),
     exp('hotelbeds', 'E-E10-ULH-STARS', 'Stargazing at Gharameel', 210, 120, { summary: 'Telescopes, a guide to the night sky, and very dark skies.', photo: 'desert-camp', family: true, minAge: 6, rating: 4.8, reviews: 310 }),
   ],
   '292223': [
