@@ -84,13 +84,13 @@ export function NetChrome({ children }: { children: ReactNode }) {
         <Animated.View entering={still ? FadeIn.duration(150) : SlideInUp.duration(380)} exiting={still ? FadeOut.duration(150) : FadeOut.duration(200)}
           style={[styles.strip, { top: statusTop }]} pointerEvents="box-none">
           <Pressable
-            onPress={() => { buzz('tap'); if (mode === 'maint') { useGates.setState({ maintenanceDismissed: false }); } else if (mode !== 'weak') setOutboxOpen(true); }}
+            onPress={() => { buzz('tap'); if (mode === 'maint') { useGates.setState({ maintenanceDismissed: false }); } else setOutboxOpen(true); }}
             accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={t('pill.a11y', { text })}
             style={({ pressed }) => [styles.pill, { backgroundColor: tone.bg }, mode === 'weak' ? styles.pillWeak : null, pressed ? { transform: [{ scale: 0.97 }] } : null]}
             testID={mode === 'offline' ? 'offline-banner' : mode === 'maint' ? 'maintenance-banner' : `net-pill-${mode}`}>
             {mode === 'sending' ? <ActivityIndicator size="small" color={tone.fg} style={{ transform: [{ scale: 0.7 }] }} /> : <View style={[styles.dot, { backgroundColor: tone.dot }]} />}
             <T v="caption" numberOfLines={1} style={[styles.text, { color: tone.fg }]}>{text}</T>
-            {mode !== 'weak' && mode !== 'sending' ? <Icon name="chevron" size={14} color={tone.fg} /> : null}
+            {mode !== 'sending' ? <Icon name="chevron" size={14} color={tone.fg} /> : null}
           </Pressable>
         </Animated.View>
       ) : null}

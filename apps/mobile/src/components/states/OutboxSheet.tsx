@@ -49,13 +49,14 @@ export function OutboxSheet({ visible, onClose }: { visible: boolean; onClose: (
   const items = useOutboxStore((s) => s.items);
   const online = useNet((s) => s.online);
   const offline = useNet((s) => s.deviceOffline);
-  const line = online === false ? (offline ? t('outbox.offline') : t('outbox.down')) : items.length ? t('outbox.down') : t('outbox.allSent');
+  const weak = useNet((s) => s.weak);
+  const line = online === false ? (offline ? t('outbox.offline') : t('outbox.down')) : items.length ? t('outbox.down') : weak ? t('outbox.weakLine') : t('outbox.allSent');
   return (
     <Sheet visible={visible} onClose={onClose} label={t('outbox.title')}>
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }} testID="outbox-sheet">
         <View style={styles.art}><ArtNoSignal width={80} height={60} /></View>
         <View style={{ flex: 1, gap: 2 }}>
-          <T style={font('h2')} accessibilityRole="header">{items.length ? t('outbox.title') : t('outbox.empty')}</T>
+          <T style={font('h2')} accessibilityRole="header">{items.length ? t('outbox.title') : weak && online !== false ? t('outbox.weakTitle') : t('outbox.empty')}</T>
           <T v="small">{line}</T>
         </View>
       </View>

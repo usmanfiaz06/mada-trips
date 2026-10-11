@@ -6,8 +6,8 @@ import { create } from 'zustand';
  * Is there a connection, and is it any good? One store the whole app reads.
  *
  *   online   true / false / null (not known yet: treated as online)
- *   weak     a connection that works but slowly: 2G or slow 3G, data saver, a long round trip, or our own requests
- *            taking more than 2.5 s on average. Screens say "slower than usual" sooner; nothing is blocked.
+ *   weak     a connection that works but slowly: 2G or slow 3G, data saver, a long round trip, or three of our own
+ *            requests in a row taking more than 6 s (one slow call is the server, not the connection). Screens say "slower than usual" sooner; nothing is blocked.
  *
  * Sources, all folded together:
  *   - @react-native-community/netinfo on phones (Wi-Fi/cellular, isInternetReachable),
@@ -31,6 +31,8 @@ export type NetState = {
   simulated: boolean;
   /** Our requests' consecutive network failures while the OS says online. */
   strikes: number;
+  /** Our requests in a row that took more than SLOW_MS (any quick one resets it). */
+  slowRun: number;
   /** The phone itself has no connection (or the demo switch). False with online === false means our server isn't answering. */
   deviceOffline: boolean;
 };
@@ -38,13 +40,18 @@ export type NetState = {
 type Os = { connected: boolean | null; reachable: boolean | null; type: string; weak: boolean };
 let os: Os = { connected: null, reachable: null, type: 'unknown', weak: false };
 
-export const useNet = create<NetState>(() => ({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, deviceOffline: false }));
+export const useNet = create<NetState>(() => ({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, slowRun: 0, deviceOffline: false }));
+
+/** A request slower than this counts towards "weak"; SLOW_RUN of them in a row turn the pill on. */
+export const SLOW_MS = 6000;
+export const SLOW_RUN = 3;
 
 function recompute() {
   const s = useNet.getState();
   const osOnline = os.connected === null ? null : os.connected && os.reachable !== false;
   const online = s.simulated || osOnline === false || s.strikes >= 2 ? false : osOnline;
-  const weak = !!online && (os.weak || (s.rtt !== null && s.rtt > 2500));
+  // One slow answer is the server thinking, not the connection: only a run of them, on a slow average, says "weak".
+  const weak = !!online && (os.weak || (s.slowRun >= SLOW_RUN && s.rtt !== null && s.rtt > SLOW_MS));
   const was = s.online;
   useNet.setState({ online, weak, type: os.type, deviceOffline: s.simulated || os.connected === false, ...(was !== online ? { since: Date.now() } : null) });
   if (was !== online) onlineManager.setOnline(online !== false);
@@ -85,7 +92,8 @@ export function simulateOffline(on: boolean) {
 export function reportReached(ms: number) {
   const s = useNet.getState();
   const rtt = s.rtt === null ? ms : Math.round(s.rtt * 0.7 + ms * 0.3);
-  useNet.setState({ rtt, strikes: 0 });
+  const slowRun = ms > SLOW_MS ? s.slowRun + 1 : ms < SLOW_MS / 2 ? 0 : s.slowRun;
+  useNet.setState({ rtt, strikes: 0, slowRun });
   recompute();
 }
 
@@ -150,6 +158,6 @@ export function startNet(): () => void {
 /** Tests: reset everything. */
 export function resetNet(next: Partial<Os> = {}) {
   os = { connected: null, reachable: null, type: 'unknown', weak: false, ...next };
-  useNet.setState({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, deviceOffline: false });
+  useNet.setState({ online: null, weak: false, type: 'unknown', since: Date.now(), rtt: null, simulated: false, strikes: 0, slowRun: 0, deviceOffline: false });
   recompute();
 }

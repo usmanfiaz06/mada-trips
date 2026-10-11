@@ -148,4 +148,6 @@ export const arResilience: ArSection<typeof resilienceCopy> = {
   'error.idempotencyConflict': 'أُرسل هذا من قبل ببيانات مختلفة. راجعه وأرسله مرة أخرى.',
   'error.inProgress': 'ما زلنا على المحاولة الأولى. انتظر ثواني.',
   'error.timeout': 'هذا يأخذ وقتًا طويلًا. لم يضع شيء مما عملته.',
+  'outbox.weakTitle': 'مادا أبطأ من المعتاد الآن',
+  'outbox.weakLine': 'كل شيء يعمل، لكنه يأخذ وقتًا أطول. ما ترسله ينتظر هنا حتى يصل.',
 };
