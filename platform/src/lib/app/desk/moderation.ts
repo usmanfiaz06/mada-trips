@@ -5,6 +5,7 @@ import { appUsers } from "@/db/app-schema";
 import { appDeskModeration } from "@/db/app-schema-desk";
 import { appPosts, appReports } from "@/db/app-schema-circles";
 import * as circlesModeration from "@/lib/app/circles/moderation";
+import * as circleCovers from "@/lib/app/circles/covers";
 import { appDeskBlocks } from "@/db/app-schema-desk";
 import { isNull } from "drizzle-orm";
 import { clip, engine } from "./adapters";
@@ -17,7 +18,7 @@ import { assertCap, deskAudit, DeskError, travellerName, type DeskActor } from "
  * Items the desk holds itself (app_desk_moderation) are decided here too.
  */
 
-export type ModerationSource = "desk" | "post" | "report";
+export type ModerationSource = "desk" | "post" | "report" | "cover";
 
 /**
  * The queue: rows the desk holds (app_desk_moderation), tips waiting in Circles (lib/app/circles/moderation.ts
@@ -33,8 +34,10 @@ export async function listModeration(status: "open" | "closed" = "open") {
     open ? circlesModeration.settleDue().catch(() => 0).then(() => circlesModeration.pendingQueue(100)).catch(() => []) : Promise.resolve([]),
     db.select().from(appReports).where(open ? eq(appReports.status, "open") : ne(appReports.status, "open")).orderBy(open ? asc(appReports.createdAt) : desc(appReports.reviewedAt)).limit(100).catch(() => []),
   ]);
+  // Circle cover photos waiting to be checked (lib/app/circles/covers.ts), after auto mode lets clean ones through.
+  const covers = open ? await circleCovers.settleCovers().catch(() => 0).then(() => circleCovers.coverQueue(100)).catch(() => []) : [];
   type Item = Omit<typeof appDeskModeration.$inferSelect, never> & { source: ModerationSource; authorName: string; reporterName: string; authorBlocked: boolean };
-  const userIds = [...new Set([...rows.map((r) => r.m.reporterUserId), ...posts.map((p) => p.authorId), ...reports.flatMap((r) => [r.reporterId, r.targetUserId])].filter((x): x is string => !!x))];
+  const userIds = [...new Set([...rows.map((r) => r.m.reporterUserId), ...posts.map((p) => p.authorId), ...covers.map((c) => c.by), ...reports.flatMap((r) => [r.reporterId, r.targetUserId])].filter((x): x is string => !!x))];
   const names = userIds.length ? await db.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, userIds)) : [];
   const nm = (id: string | null) => travellerName(names.find((n) => n.id === id)?.name);
   const blocks = await activeBlocks();
@@ -44,6 +47,11 @@ export async function listModeration(status: "open" | "closed" = "open") {
       id: p.id, kind: "tip", targetKind: "post", targetId: p.id, authorUserId: p.authorId, reporterUserId: null, reason: null, note: p.flagged ? `Flagged: ${p.flagged}` : null,
       snapshot: { city: p.city, place: p.place, text: p.body }, status: "open", decidedBy: null, decidedAt: null, decisionReason: null, createdAt: p.createdAt,
       source: "post" as const, authorName: nm(p.authorId), reporterName: "", authorBlocked: blocks.has(p.authorId),
+    })),
+    ...covers.map((c) => ({
+      id: c.circleId, kind: "cover", targetKind: "circle", targetId: c.circleId, authorUserId: c.by, reporterUserId: null, reason: null, note: null,
+      snapshot: { name: c.name, photoUrl: `/adminwork/desk/moderation/cover/${c.circleId}` }, status: "open", decidedBy: null, decidedAt: null, decisionReason: null, createdAt: c.createdAt,
+      source: "cover" as const, authorName: nm(c.by), reporterName: "", authorBlocked: !!c.by && blocks.has(c.by),
     })),
     ...reports.map((r) => ({
       id: r.id, kind: "report", targetKind: r.targetKind, targetId: r.targetId, authorUserId: r.targetUserId, reporterUserId: r.reporterId, reason: r.reason, note: r.note,
@@ -67,6 +75,12 @@ export async function decideModeration(actor: DeskActor, id: string, v: { decisi
     if (v.decision !== "approved" && v.decision !== "rejected") throw new DeskError("Approve or reject a tip");
     await engine(() => circlesModeration.decide(id, v.decision === "approved" ? "approve" : "reject", { kind: "agent", id: actor.id }, reason));
     await db.transaction((tx) => deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: "post", entityId: id, ref: "Tip", summary: `${v.decision === "approved" ? "Approved" : "Rejected"} a tip${reason ? `: ${clip(reason, 100)}` : ""}` }, { app: false }));
+    return;
+  }
+  if (source === "cover") {
+    if (v.decision !== "approved" && v.decision !== "rejected") throw new DeskError("Approve or reject a cover photo");
+    await engine(() => circleCovers.decideCover(id, v.decision === "approved" ? "approve" : "reject", { kind: "agent", id: actor.id }, reason));
+    await db.transaction((tx) => deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: "circle", entityId: id, ref: "Cover", summary: `${v.decision === "approved" ? "Approved" : "Rejected"} a circle cover photo${reason ? `: ${clip(reason, 100)}` : ""}` }, { app: false }));
     return;
   }
   if (source === "report") {

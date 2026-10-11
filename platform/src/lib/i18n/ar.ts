@@ -60,6 +60,7 @@ export const AR: Record<string, string> = {
   "Append-only · cannot be edited or deleted": "إضافة فقط · لا يمكن التعديل أو الحذف",
   "Approvals": "الموافقات",
   "Approve": "موافقة",
+  "Circle cover": "غلاف مجموعة",
   "Approved": "معتمد",
   "As on passport": "كما في جواز السفر",
   "At least 10 characters.": "10 أحرف على الأقل.",

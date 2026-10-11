@@ -61,14 +61,17 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
             return (
               <Card key={m.id} className={cx(sp.focus === m.id && "ring-2 ring-gold")}>
                 <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
-                  {m.kind === "tip" ? <Badge tone="info">{t("Tip")}</Badge> : <Badge tone={unsafe ? "bad" : "warn"}><ShieldAlert className="size-3" />{t("Report")} · {t(REASON[m.reason ?? "other"] ?? "Something else")}</Badge>}
+                  {m.kind === "tip" ? <Badge tone="info">{t("Tip")}</Badge> : m.kind === "cover" ? <Badge tone="info">{t("Circle cover")}</Badge> : <Badge tone={unsafe ? "bad" : "warn"}><ShieldAlert className="size-3" />{t("Report")} · {t(REASON[m.reason ?? "other"] ?? "Something else")}</Badge>}
                   {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
                   {m.status !== "open" && <Badge tone={DECISION[m.status]?.tone ?? "neutral"} dot>{t(DECISION[m.status]?.label ?? m.status)}</Badge>}
                   <span>· {timeAgo(m.createdAt, L)}</span>
                 </div>
                 <div className="mt-3 rounded-2xl bg-surface-2 p-4">
                   {(m.snapshot.place || m.snapshot.city) && <div className="mb-1 flex items-center gap-1.5 text-[13px] font-medium text-ink"><MapPin className="size-3.5 text-gold-2" />{m.snapshot.place}{m.snapshot.city ? ` · ${m.snapshot.city}` : ""}</div>}
-                  <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-ink-2">{m.snapshot.text ?? t("No text")}</p>
+                  {m.kind === "cover" && m.snapshot.photoUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <><div className="mb-1 text-[13px] font-medium text-ink">{m.snapshot.name}</div><img src={m.snapshot.photoUrl} alt={t("Circle cover")} className="aspect-[16/9] w-full rounded-xl object-cover" /></>
+                    : <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed text-ink-2">{m.snapshot.text ?? t("No text")}</p>}
                   <div className="mt-3 flex items-center gap-2 text-[12.5px] text-ink-3"><Avatar name={m.authorName} size={22} />{m.authorName}{m.authorBlocked && <Badge tone="bad"><Ban className="size-3" />{t("Blocked")}</Badge>}{m.kind === "report" && <span>· {t("reported by {name}", { name: m.reporterName })}</span>}</div>
                   {m.note && <p className="mt-2 text-[12.5px] italic text-ink-3">“{m.note}”</p>}
                 </div>
@@ -78,7 +81,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
                     <input type="hidden" name="id" value={m.id} /><input type="hidden" name="source" value={m.source} /><input type="hidden" name="blockAuthor" value={m.authorUserId ?? ""} />
                     <Input name="reason" maxLength={200} placeholder={m.kind === "tip" ? t("Reason, if you reject it") : t("Reason, if you remove it")} />
                     <div className="flex flex-wrap items-center gap-2">
-                      {m.kind === "tip" ? (
+                      {m.kind === "tip" || m.kind === "cover" ? (
                         <><SubmitButton name="decision" value="approved" variant="gold" size="sm">{t("Approve")}</SubmitButton><SubmitButton name="decision" value="rejected" variant="outline" size="sm">{t("Reject")}</SubmitButton></>
                       ) : (
                         <><SubmitButton name="decision" value="removed" variant="danger" size="sm">{t("Remove it")}</SubmitButton><SubmitButton name="decision" value="dismissed" variant="outline" size="sm">{t("Dismiss report")}</SubmitButton></>

@@ -109,7 +109,7 @@ export async function decideCover(circleId: string, decision: "approve" | "rejec
   return db.transaction(async (tx) => {
     const [d] = await tx.select().from(appCircleDetails).where(and(eq(appCircleDetails.circleId, circleId), eq(appCircleDetails.coverKind, "upload"))).for("update");
     if (!d || !d.coverFileId) throw new AppError("NOT_FOUND");
-    if (d.coverStatus !== "pending") throw new AppError("CONFLICT");
+    if (d.coverStatus !== "pending") throw new AppError("NOT_FOUND"); // already decided
     await tx.update(appCircleDetails).set({ coverStatus: decision === "approve" ? "approved" : "rejected", coverCheckedAt: new Date(), coverCheckedBy: by.id, coverNote: note ?? null })
       .where(eq(appCircleDetails.circleId, circleId));
     await appAuditLog(tx, { actorKind: by.kind, actorId: by.id, action: `circle.cover_${decision}d`, entityType: "circle", entityId: circleId, summary: `Cover photo ${decision}d${note ? `: ${note.slice(0, 120)}` : ""}` });
