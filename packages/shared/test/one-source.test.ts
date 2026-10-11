@@ -3,8 +3,9 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DESK_PHONE, DESK_TEL, LEGAL_UPDATED, MONTHS_AR } from '../src';
 
-/** The website (platform/public) and the app must agree on the desk number and the legal date. */
-const site = (f: string) => readFileSync(join(__dirname, '../../../platform/public', f), 'utf8');
+/** The website and the app must agree on the desk number and the legal date. The pages are read from the repo root,
+ *  their source: platform/public is only a copy made at build time (platform/scripts/copy-site.mjs) and gitignored. */
+const site = (f: string) => readFileSync(join(__dirname, '../../..', f), 'utf8');
 const LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 describe('one source of truth', () => {
