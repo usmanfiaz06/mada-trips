@@ -162,6 +162,7 @@ const platformEnv = {
   APP_ALLOW_MOCKS: "yes",
   SUPPLIER_MODE_HOTELS: "hotelbeds",
   SUPPLIER_MODE_TRANSFERS: "hotelbeds",
+  SUPPLIER_MODE_ACTIVITIES: "hotelbeds",
   SUPPLIER_MODE_SUPABASE: "live",
   HOTELBEDS_ENV: "test",
   HOTELBEDS_MAX_RESULTS: "200",

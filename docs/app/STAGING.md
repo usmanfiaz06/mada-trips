@@ -37,7 +37,7 @@ node tools/staging/vercel-staging.mjs               # create/update both project
 ```
 
 What it sets on `mada-staging`: `APP_ENV=staging`, `APP_STAYS_MODE=live`, `APP_ALLOW_MOCKS=yes`,
-`SUPPLIER_MODE_HOTELS=hotelbeds`, `SUPPLIER_MODE_TRANSFERS=hotelbeds`, `SUPPLIER_MODE_SUPABASE=live`,
+`SUPPLIER_MODE_HOTELS=hotelbeds`, `SUPPLIER_MODE_TRANSFERS=hotelbeds`, `SUPPLIER_MODE_ACTIVITIES=hotelbeds`, `SUPPLIER_MODE_SUPABASE=live`,
 `SUPPLIER_MODE_FLIGHT_STATUS=aerodatabox`, `HOTELBEDS_ENV=test`, `HOTELBEDS_MAX_RESULTS=200`, the keys above,
 `DATABASE_URL` (= the staging database), `APP_PUBLIC_URL`. On `mada-app-staging`: `EXPO_PUBLIC_API_MODE=live`,
 `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_DEMO_HINTS=yes`.
