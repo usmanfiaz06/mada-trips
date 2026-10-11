@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
-import { dayLabel, localizeDigits, type Activity, type Experience, type WhatsOn } from '@mada/shared';
+import { dayLabel, localizeDigits, travelEstimate, type Activity, type Experience, type WhatsOn } from '@mada/shared';
 import { Icon, type IconName } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { buzz } from '@/lib/haptics';
@@ -57,15 +57,22 @@ export function ThingPhoto({ x, style, children }: { x: Thing; style?: object; c
 
 const kindLabel = (a: Activity) => t(`things.kind.${a.kind}`);
 
+/** "12 min drive" or "6 min walk" from the hotel. */
+export function minutesFrom(from: { lat: number; lon: number }, a: { lat: number; lon: number }): string {
+  const e = travelEstimate(from, a);
+  return t(e.mode === 'walk' ? 'things.go.minWalk' : 'things.go.minDrive', { n: localizeDigits(String(e.min)) });
+}
+
 /** A place in a row of cards. */
-export function PlaceCard({ a, onPress, testID }: { a: Activity; onPress: () => void; testID?: string }) {
+export function PlaceCard({ a, onPress, from, testID }: { a: Activity; onPress: () => void; from?: { lat: number; lon: number } | null; testID?: string }) {
   const ar = isRTL();
   const line = openLine(a);
+  const away = from ? minutesFrom(from, a) : a.distanceKm !== null ? `${localizeDigits(String(a.distanceKm))} km` : null;
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={(ar && a.nameAr) || a.name} onPress={() => { buzz('tap'); onPress(); }} style={({ pressed }) => [s.card, shadow('card'), pressed && s.pressed]}>
       <ThingPhoto x={{ kind: 'activity', a }} style={{ height: 118 }} />
       <View style={s.cardBody}>
-        <T v="tiny" color={colors.goldInk} numberOfLines={1}>{kindLabel(a)}{a.distanceKm !== null ? ` · ${localizeDigits(String(a.distanceKm))} km` : ''}</T>
+        <T v="tiny" color={colors.goldInk} numberOfLines={1}>{kindLabel(a)}{away ? ` · ${away}` : ''}</T>
         <T v="h3" style={{ fontSize: 15, lineHeight: 19 }} numberOfLines={2}>{(ar && a.nameAr) || a.name}</T>
         {line ? <T v="tiny" color={a.openNow === false ? colors.badInk : colors.ok} numberOfLines={1}>{line}</T> : null}
       </View>
@@ -74,10 +81,12 @@ export function PlaceCard({ a, onPress, testID }: { a: Activity; onPress: () => 
 }
 
 /** A place as a list row (the full list). */
-export function PlaceRow({ a, onPress, fromHotel, testID }: { a: Activity; onPress: () => void; fromHotel?: boolean; testID?: string }) {
+export function PlaceRow({ a, onPress, fromHotel, testID }: { a: Activity; onPress: () => void; fromHotel?: { lat: number; lon: number } | null; testID?: string }) {
   const ar = isRTL();
   const line = openLine(a);
-  const meta = [kindLabel(a), a.distanceKm !== null ? t(fromHotel ? 'things.kmFromHotel' : 'things.kmAway', { km: localizeDigits(String(a.distanceKm)) }) : null, a.free ? t('things.free') : null].filter(Boolean).join(' · ');
+  // During a trip: "12 min drive" from the hotel (a straight-line guess); otherwise how far.
+  const away = fromHotel ? minutesFrom(fromHotel, a) : a.distanceKm !== null ? t('things.kmAway', { km: localizeDigits(String(a.distanceKm)) }) : null;
+  const meta = [kindLabel(a), away, a.free ? t('things.free') : null].filter(Boolean).join(' · ');
   return (
     <Pressable testID={testID} accessibilityRole="button" onPress={() => { buzz('tap'); onPress(); }} style={({ pressed }) => [s.row, shadow('card'), pressed && s.pressed]}>
       <ThingPhoto x={{ kind: 'activity', a }} style={{ width: 76, height: 76, borderRadius: 16 }} />
@@ -142,9 +151,10 @@ export function Rail({ children, testID }: { children: ReactNode; testID?: strin
 }
 
 /** A drawn map: no tiles from anyone's server, just where it is, and Maps to go there. */
-export function MiniMap({ lat, lon, name, from }: { lat: number; lon: number; name: string; from?: { lat: number; lon: number } | null }) {
+export function MiniMap({ lat, lon, name, from, onPress }: { lat: number; lon: number; name: string; from?: { lat: number; lon: number } | null; onPress?: () => void }) {
   const open = () => {
     buzz('tap');
+    if (onPress) return onPress();
     const label = encodeURIComponent(name);
     const url = Platform.OS === 'ios' ? `maps://?q=${label}&ll=${lat},${lon}` : Platform.OS === 'android' ? `geo:${lat},${lon}?q=${lat},${lon}(${label})` : `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`;
     void Linking.openURL(url).catch(() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=16/${lat}/${lon}`));

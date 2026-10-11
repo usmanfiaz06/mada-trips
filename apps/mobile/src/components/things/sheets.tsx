@@ -15,6 +15,7 @@ import { durationLine, openLine, priceLine, SUPPLIER_NAME, thingId, thingsApi, t
 import { toast } from '@/lib/toast';
 import { usePresence } from '@/lib/wallet';
 import { colors, ff, font } from '@/theme';
+import { GettingThere, MeetingPoint } from './go';
 import { MiniMap, ThingPhoto } from './parts';
 
 /* The detail sheet for one thing (photo with its credit, hours, the map, Add to my plan) and Book with Mada. */
@@ -29,6 +30,10 @@ export type ThingsContext = {
   day: string | null;
   ages: number[];
   near: { lat: number; lon: number; label: 'hotel' | 'you' | 'centre' } | null;
+  /** The trip's hotel, for "From the hotel" and the car's pickup. */
+  hotel: string | null;
+  /** How many are going on the trip (0 outside one). */
+  travellers: number;
 };
 
 const refOf = (x: Thing): ThingRef => ({ kind: x.kind, id: thingId(x) });
@@ -38,7 +43,9 @@ function Fact({ icon, children }: { icon: Parameters<typeof Icon>[0]['name']; ch
   return <View style={st.fact}><Icon name={icon} size={16} color={colors.goldInk} /><View style={{ flex: 1 }}>{children}</View></View>;
 }
 
-export function ThingSheet({ x, ctx, onClose, onBook }: { x: Thing | null; ctx: ThingsContext; onClose: () => void; onBook: (x: Thing) => void }) {
+export function ThingSheet({ x, ctx, onClose, onBook, onDirections, onRide }: {
+  x: Thing | null; ctx: ThingsContext; onClose: () => void; onBook: (x: Thing) => void; onDirections: (x: Thing) => void; onRide: (x: Thing) => void;
+}) {
   const ideas = useTripIdeas(ctx.tripId);
   const { add, remove } = useIdeaMutations(ctx.tripId);
   const [picking, setPicking] = useState(false);
@@ -78,7 +85,8 @@ export function ThingSheet({ x, ctx, onClose, onBook }: { x: Thing | null; ctx: 
               {x.a.distanceKm !== null ? <Fact icon="pin"><T v="small" color={colors.green}>{t(ctx.near?.label === 'hotel' ? 'things.kmFromHotel' : 'things.kmAway', { km: localizeDigits(String(x.a.distanceKm)) })}</T></Fact> : null}
               {x.a.family || x.a.indoor || x.a.free ? <Fact icon="star"><T v="small" color={colors.green}>{[x.a.family ? t('things.familyTag') : null, x.a.indoor ? t('things.indoor') : null, x.a.free ? t('things.free') : null].filter(Boolean).join(' · ')}</T></Fact> : null}
             </View>
-            <MiniMap lat={x.a.lat} lon={x.a.lon} name={x.a.name} from={ctx.near?.label === 'hotel' ? ctx.near : null} />
+            <MiniMap lat={x.a.lat} lon={x.a.lon} name={x.a.name} from={ctx.near?.label === 'hotel' ? ctx.near : null} onPress={() => onDirections(x)} />
+            <GettingThere x={x} ctx={ctx} onDirections={() => onDirections(x)} onRide={() => onRide(x)} />
             {x.a.wikipedia ? <Pressable onPress={() => open(x.a.wikipedia!)} accessibilityRole="link"><T v="small" style={st.link}>{t('things.readMore')}</T></Pressable> : null}
             <T v="tiny">{x.a.attributions.filter((a) => a.source !== 'wikimedia').map((a) => a.text).join(' · ')}</T>
           </>
@@ -92,6 +100,9 @@ export function ThingSheet({ x, ctx, onClose, onBook }: { x: Thing | null; ctx: 
               {x.e.minAge ? <Fact icon="user"><T v="small" color={colors.green}>{t('things.minAge', { age: x.e.minAge })}</T></Fact> : null}
               {x.e.freeCancel ? <Fact icon="check"><T v="small" color={colors.green}>{t('things.freeCancel')}</T></Fact> : null}
             </View>
+            <MeetingPoint x={x} />
+            {x.e.meetingPoint?.lat != null && x.e.meetingPoint.lon != null ? <MiniMap lat={x.e.meetingPoint.lat} lon={x.e.meetingPoint.lon} name={x.e.meetingPoint.address ?? x.e.title} from={ctx.near?.label === 'hotel' ? ctx.near : null} onPress={() => onDirections(x)} /> : null}
+            <GettingThere x={x} ctx={ctx} onDirections={() => onDirections(x)} onRide={() => onRide(x)} />
           </>
         ) : (
           <>
@@ -100,6 +111,7 @@ export function ThingSheet({ x, ctx, onClose, onBook }: { x: Thing | null; ctx: 
               <Fact icon="bell"><T v="small" color={colors.green}>{x.w.startsOn === x.w.endsOn ? dayLabel(x.w.startsOn, { today: x.w.startsOn }) : t('things.event.dates', { from: dayLabel(x.w.startsOn, { today: x.w.startsOn }), to: dayLabel(x.w.endsOn, { today: x.w.endsOn }) })}</T></Fact>
               {x.w.time || x.w.venue ? <Fact icon="pin"><T v="small" color={colors.green}>{[x.w.time ? localizeDigits(x.w.time) : null, x.w.venue].filter(Boolean).join(' · ')}</T></Fact> : null}
             </View>
+            {x.w.venue ? <GettingThere x={x} ctx={ctx} onDirections={() => onDirections(x)} onRide={() => onRide(x)} /> : null}
             {x.w.link ? <Pressable onPress={() => open(x.w.link!)} accessibilityRole="link"><T v="small" style={st.link}>{t('things.event.source')}</T></Pressable> : null}
           </>
         )}

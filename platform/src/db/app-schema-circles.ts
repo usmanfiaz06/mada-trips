@@ -14,7 +14,20 @@ const user = (name: string) => uuid(name).notNull().references(() => appUsers.id
 /** What a circle has beyond app_circles: its cover, where it's going, a pinned plan, and whether it is a 1:1 chat. */
 export const appCircleDetails = pgTable("app_circle_details", {
   circleId: uuid("circle_id").primaryKey().references(() => appCircles.id, { onDelete: "cascade" }),
-  cover: text("cover"), // istanbul | alula | riyadh | null (plain green)
+  // The cover (lib/app/circles/covers.ts): cover_kind icon | photo | upload, or null for an older row, where a cover
+  // key ("alula") is a photo and nothing is plain green. A photo's id lives in cover; a drawing in cover_icon and
+  // cover_color. An upload keeps the drawing or photo it replaced, which everyone else sees until it's approved.
+  cover: text("cover"),
+  coverKind: text("cover_kind"),
+  coverIcon: text("cover_icon"),
+  coverColor: text("cover_color"),
+  coverFileId: uuid("cover_file_id"),
+  coverStatus: text("cover_status"), // pending | approved | rejected (uploads)
+  coverBy: uuid("cover_by").references(() => appUsers.id, { onDelete: "set null" }),
+  coverAutoApproveAt: timestamp("cover_auto_approve_at", { withTimezone: true }),
+  coverCheckedAt: timestamp("cover_checked_at", { withTimezone: true }),
+  coverCheckedBy: text("cover_checked_by"),
+  coverNote: text("cover_note"),
   dest: text("dest"),
   dm: boolean("dm").notNull().default(false),
   // The two people of a 1:1 chat, sorted and joined, so there is only ever one.
@@ -22,7 +35,12 @@ export const appCircleDetails = pgTable("app_circle_details", {
   pinnedPlan: text("pinned_plan"),
   pinnedBy: uuid("pinned_by").references(() => appUsers.id, { onDelete: "set null" }),
   createdAt: createdAt(),
-}, (t) => [uniqueIndex("app_circle_details_dm_key").on(t.dmKey).where(sql`${t.dmKey} IS NOT NULL`)]);
+}, (t) => [
+  uniqueIndex("app_circle_details_dm_key").on(t.dmKey).where(sql`${t.dmKey} IS NOT NULL`),
+  index("app_circle_details_cover_queue_idx").on(t.coverStatus, t.createdAt).where(sql`${t.coverStatus} = 'pending'`),
+  check("app_circle_details_cover_kind", sql`${t.coverKind} IS NULL OR ${t.coverKind} IN ('icon', 'photo', 'upload')`),
+  check("app_circle_details_cover_status", sql`${t.coverStatus} IS NULL OR ${t.coverStatus} IN ('pending', 'approved', 'rejected')`),
+]);
 
 /**
  * Invites: to a circle (a person on Mada, or anyone with the link) and to Mada itself (by SMS, WhatsApp or link).

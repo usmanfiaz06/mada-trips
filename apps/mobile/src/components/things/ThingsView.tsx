@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { dayLabel, localizeDigits, type ThingsQuery, type ThingsResponse } from '@mada/shared';
+import { dayLabel, liveStay, localizeDigits, type ThingsQuery, type ThingsResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -11,9 +11,11 @@ import { StaleBadge } from '@/components/states/StaleBadge';
 import { ArtCompass } from '@/components/circles/art';
 import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
-import { useThings, type Thing } from '@/lib/things';
+import { thingId, useThings, type Thing } from '@/lib/things';
+import { useTrip } from '@/lib/trips';
 import { colors, ff, shadow } from '@/theme';
 import { EventRow, ExperienceCard, PlaceCard, PlaceRow, Rail } from './parts';
+import { DirectionsSheet, RideSheet } from './go';
 import { BookSheet, ThingSheet, type ThingsContext } from './sheets';
 
 /*
@@ -66,6 +68,10 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
   const [day, setDay] = useState<string | null>(initialDay);
   const [picked, setPicked] = useState<Thing | null>(null);
   const [booking, setBooking] = useState<Thing | null>(null);
+  const [going, setGoing] = useState<Thing | null>(null);
+  const [riding, setRiding] = useState<Thing | null>(null);
+  /** One sheet at a time: close this one, open the next once it has slid away. */
+  const then = (close: () => void, open: () => void) => { close(); setTimeout(open, 350); };
   const full = mode === 'full';
   const query: ThingsQuery = useMemo(() => ({
     ...(day ? { day } : {}),
@@ -76,7 +82,13 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
   }), [day, filters, full]);
   const q = useThings({ placeId, tripId }, query);
   const data = q.data;
-  const ctx: ThingsContext = { placeId: data?.place.id ?? placeId, city: data?.place.name ?? city, tripId, days, day: data?.day && days.includes(data.day) ? data.day : day, ages: data?.ages ?? [], near: data?.near ?? null };
+  const trip = useTrip(tripId).data?.trip ?? null;
+  const stay = trip ? liveStay(trip) : null;
+  const ctx: ThingsContext = {
+    placeId: data?.place.id ?? placeId, city: data?.place.name ?? city, tripId, days, day: data?.day && days.includes(data.day) ? data.day : day, ages: data?.ages ?? [], near: data?.near ?? null,
+    hotel: stay?.name ?? null, travellers: trip?.travellers.length ?? 0,
+  };
+  const hotelPoint = data?.near?.label === 'hotel' ? data.near : null;
   const toggle = (f: Filter) => {
     setFilters((prev) => {
       const next = new Set(prev);
@@ -127,8 +139,8 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
         {shown.length ? (
           <View style={{ gap: 10 }}>
             {full ? <T v="eyebrow">{t('things.places')}</T> : null}
-            {full ? shown.map((a) => <PlaceRow key={a.id} testID={`place-${a.id}`} a={a} fromHotel={data.near?.label === 'hotel'} onPress={() => setPicked({ kind: 'activity', a })} />)
-              : <Rail testID="things-rail">{shown.slice(0, 8).map((a) => <PlaceCard key={a.id} testID={`place-${a.id}`} a={a} onPress={() => setPicked({ kind: 'activity', a })} />)}</Rail>}
+            {full ? shown.map((a) => <PlaceRow key={a.id} testID={`place-${a.id}`} a={a} fromHotel={hotelPoint} onPress={() => setPicked({ kind: 'activity', a })} />)
+              : <Rail testID="things-rail">{shown.slice(0, 8).map((a) => <PlaceCard key={a.id} testID={`place-${a.id}`} a={a} from={hotelPoint} onPress={() => setPicked({ kind: 'activity', a })} />)}</Rail>}
           </View>
         ) : data.status === 'ready' && filters.size ? (
           <View style={[st.note, shadow('card')]} testID="things-nomatch">
@@ -182,8 +194,16 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
         </View>
       ) : null}
       {body()}
-      <ThingSheet x={picked} ctx={ctx} onClose={() => setPicked(null)} onBook={(x) => { setPicked(null); setTimeout(() => setBooking(x), 350); }} />
+      <ThingSheet
+        x={picked} ctx={ctx} onClose={() => setPicked(null)}
+        onBook={(x) => then(() => setPicked(null), () => setBooking(x))}
+        onDirections={(x) => then(() => setPicked(null), () => setGoing(x))}
+        onRide={(x) => then(() => setPicked(null), () => setRiding(x))}
+      />
       <BookSheet key={booking ? `${booking.kind}` : 'none'} x={booking} ctx={ctx} onClose={() => setBooking(null)} />
+      {/* Closing the chooser goes back to the place's sheet. */}
+      <DirectionsSheet x={going} ctx={ctx} onClose={() => { const x = going; then(() => setGoing(null), () => setPicked(x)); }} onRide={(x) => then(() => setGoing(null), () => setRiding(x))} />
+      <RideSheet key={riding ? thingId(riding) : 'none'} x={riding} ctx={ctx} onClose={() => setRiding(null)} />
     </View>
   );
 }
