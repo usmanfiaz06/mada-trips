@@ -292,6 +292,9 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
 
 /* ───────────── the adapter ───────────── */
 
+/** Availability while a traveller waits on the search screen: per try, and extra tries. */
+export const SEARCH_BUDGET = { timeoutMs: 8_000, retries: 1 } as const;
+
 export type StayQueryExtras = { childAges?: number[] };
 
 export type BookStayInput = {
@@ -315,8 +318,8 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     return new HotelbedsHotels(new HotelbedsClient({ product: "hotels", ...opts }), facts);
   }
 
-  availability(q: HotelbedsStayQuery) {
-    return this.client.request<HbAvailabilityResponse>({ method: "POST", path: "/hotel-api/1.0/hotels", body: availabilityBody(q), safe: true });
+  availability(q: HotelbedsStayQuery, budget: { timeoutMs?: number; retries?: number } = {}) {
+    return this.client.request<HbAvailabilityResponse>({ method: "POST", path: "/hotel-api/1.0/hotels", body: availabilityBody(q), safe: true, ...budget });
   }
 
   /** Up to 10 rate keys per call (cert. 2.6). Only for RECHECK rates (cert. 2.5). */
@@ -388,10 +391,12 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     const rooms = q.rooms || roomsFor(q.adults);
     const checkOut = addDays(q.checkIn, q.nights);
     const useCode = process.env.HOTELBEDS_USE_DESTINATION_CODES === "yes" && place.code;
+    // The traveller is waiting (the app gives up on a search after 20 s): two tries of 8 s at most, then a clear
+    // "Hotelbeds isn't answering, try again" rather than three tries of 12 s that the app never sees the end of.
     const res = await this.availability({
       checkIn: q.checkIn, checkOut, rooms: splitParty(adults, childAges, rooms),
       ...(useCode ? { destination: place.code } : { geolocation: { latitude: place.lat, longitude: place.lng, radius: place.radiusKm, unit: "km" as const } }),
-    });
+    }, SEARCH_BUDGET);
     const codes = (res.hotels?.hotels ?? []).map((h) => h.code);
     const facts = this.facts && codes.length ? await this.facts(codes).catch(() => undefined) : undefined;
     return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts });

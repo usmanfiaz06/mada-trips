@@ -102,6 +102,8 @@ export type HotelbedsRequest = {
   /** Safe to send again: GETs, availability and checkrates. Bookings and cancellations are not. */
   safe?: boolean;
   timeoutMs?: number;
+  /** At most this many extra attempts for this call (safe calls only; never more than the client allows). */
+  retries?: number;
 };
 
 const defaultLog = (l: HotelbedsLogLine) => {
@@ -175,7 +177,7 @@ export class HotelbedsClient {
 
   private async attempts<T>(r: HotelbedsRequest): Promise<T> {
     const safe = r.safe ?? r.method === "GET";
-    const max = safe ? 1 + this.retries : 1;
+    const max = safe ? 1 + Math.min(r.retries ?? this.retries, this.retries) : 1;
     let last: unknown;
     for (let attempt = 1; attempt <= max; attempt++) {
       try {

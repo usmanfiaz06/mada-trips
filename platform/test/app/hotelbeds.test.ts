@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { CancelSupplierVoucherResponse, CreateOrderResponse, PreviewResponse, StaySearchResponse, SupplierVoucherResponse, SupplierVouchersResponse, TransferOptionsResponse, ChooseTransferResponse, addDays, todayIn, type OrderDraft } from "@mada/shared";
 import { db } from "@/db";
-import { appOrders } from "@/db/app-schema-booking";
+import { appOffers, appOrders } from "@/db/app-schema-booking";
 import { appSupplierBookings } from "@/db/app-schema-hotelbeds";
 import { appHotelbedsHotels } from "@/db/app-schema-hotelbeds";
 import { HotelbedsClient, HotelbedsError, hotelbedsSignature, type FetchLike } from "@/lib/app/suppliers/hotelbeds/client";
-import { availabilityBody, decodeOfferId, encodeOfferId, occupanciesOf, offerOf, offersFromAvailability, splitParty, stayRule, type HbAvailabilityResponse } from "@/lib/app/suppliers/hotelbeds/hotels";
+import { HotelbedsHotels, SEARCH_BUDGET, availabilityBody, decodeOfferId, encodeOfferId, occupanciesOf, offerOf, offersFromAvailability, splitParty, stayRule, type HbAvailabilityResponse } from "@/lib/app/suppliers/hotelbeds/hotels";
 import { availabilityPath, quotesFrom, type HbTransferAvailability } from "@/lib/app/suppliers/hotelbeds/transfers";
 import { costHalalas, feeHalalas, pricingRules, sellHalalas, UnknownCurrency } from "@/lib/app/suppliers/hotelbeds/money";
 import { fixtureFetch, mockHotelbedsHotels, mockHotelbedsState, resetMockHotelbeds, setHotelbedsTestFetch } from "@/lib/app/suppliers/hotelbeds/mock";
@@ -85,6 +85,14 @@ describe("Hotelbeds client: signing, hosts, retries, errors", () => {
     const c = new HotelbedsClient({ product: "transfers", credentials: null, fetch: f, log: () => {} });
     await expect(c.request({ method: "GET", path: "/x" })).rejects.toMatchObject({ code: "NOT_CONFIGURED" });
     expect(calls).toHaveLength(0);
+  });
+
+  it("gives a traveller's search two short tries, not three long ones", async () => {
+    const a = scripted([{ status: 503, body: { error: { code: "SYSTEM_ERROR" } } }]);
+    const hb = new HotelbedsHotels(client(a.f, { retries: 2 }));
+    await expect(hb.search({ city: "Istanbul", checkIn: "2026-11-04", nights: 3, adults: 2, rooms: 1 } as never)).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    expect(a.calls).toHaveLength(1 + SEARCH_BUDGET.retries);
+    expect(SEARCH_BUDGET.timeoutMs).toBeLessThanOrEqual(8_000);
   });
 
   it("retries a safe call after a 5xx, never a booking", async () => {
@@ -260,6 +268,10 @@ describe("stays from Hotelbeds in the app", () => {
     const s = await hotelbedsStays(me.token, people.map((p) => p.id));
     expect(s.outcome).toBe("ok");
     expect(s.options[0]!.hotel).toMatchObject({ supplier: "hotelbeds", code: 99703 });
+    // Every option is stored (in one insert) under the id the app sees, with the option itself as the payload.
+    const rows = await db.select().from(appOffers).where(inArray(appOffers.id, s.options.map((o) => o.id)));
+    expect(rows).toHaveLength(s.options.length);
+    for (const o of s.options) expect(rows.find((r) => r.id === o.id)).toMatchObject({ kind: "stay", supplier: "hotelbeds", total: o.total.amount, payload: { id: o.id, name: o.name } });
     const bookable = s.options.find((o) => o.name === "TAKSIM CITY ROOMS")!;
     const recheck = s.options.find((o) => o.name === "SULTANAHMET GARDEN HOTEL")!;
     // A BOOKABLE rate: rate comments from the Content API, no checkrates.

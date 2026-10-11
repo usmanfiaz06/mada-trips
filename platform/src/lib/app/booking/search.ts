@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
@@ -38,6 +39,14 @@ const hhmm = (local: string) => local.slice(11, 16);
 /** Our price hold: 20 minutes from when the traveller saw it. */
 export const HOLD_MS = 20 * 60_000;
 const holdEnds = () => new Date(Date.now() + HOLD_MS);
+
+/**
+ * Every option of one search in one INSERT (ids made here, so each row already carries the option the app sees).
+ * One row at a time was two round trips per option to the database: with 200 Hotelbeds hotels that was minutes.
+ */
+async function storeOffers(rows: (typeof appOffers.$inferInsert)[]) {
+  for (let i = 0; i < rows.length; i += 250) await db.insert(appOffers).values(rows.slice(i, i + 250));
+}
 
 export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number, infants: number): FlightOption {
   const out = o.out[0]!;
@@ -91,15 +100,11 @@ export async function searchFlights(ownerId: string, input: FlightSearchRequest,
     unavailable.push({ carrier: "SV", airline: CARRIERS.SV!.name });
   }
   const search = { kind: "flight", destination: dest.key, from, depart, return: q.return, travellerIds: people.map((p) => p.id), infants: q.infants, cabin: q.cabin };
-  const options: FlightOption[] = [];
-  for (const o of offers) {
-    const [row] = await db.insert(appOffers).values({
-      ownerId, kind: "flight", supplier: o.supplier, supplierOfferId: o.id, search, payload: {}, total: 0, expiresAt: holdEnds(),
-    }).returning({ id: appOffers.id, expiresAt: appOffers.expiresAt });
-    const opt = { ...flightOptionOf(o, row!.id, n, q.infants), expiresAt: row!.expiresAt.toISOString() };
-    await db.update(appOffers).set({ payload: opt as unknown as Record<string, unknown>, total: opt.total.amount }).where(eq(appOffers.id, row!.id));
-    options.push(opt);
-  }
+  const expiresAt = holdEnds();
+  const options: FlightOption[] = offers.map((o) => ({ ...flightOptionOf(o, randomUUID(), n, q.infants), expiresAt: expiresAt.toISOString() }));
+  await storeOffers(offers.map((o, i) => ({
+    id: options[i]!.id, ownerId, kind: "flight", supplier: o.supplier, supplierOfferId: o.id, search, payload: options[i] as unknown as Record<string, unknown>, total: options[i]!.total.amount, expiresAt,
+  })));
   const b = dest.key === "istanbul" && q.return ? bundleFor(n, depart, q.return) : null;
   return {
     ...base, depart, outcome: options.length ? (unavailable.length ? "partial" : "ok") : "none", checked: CHECKED_FARES[dest.key] ?? 9, options, unavailable,
@@ -132,16 +137,12 @@ export async function searchStays(ownerId: string, input: StaySearchRequest, dem
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
   const { value: offers } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]));
-  const options: StayOption[] = [];
-  for (const h of offers) {
-    const [row] = await db.insert(appOffers).values({
-      ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search: { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) },
-      payload: {}, total: h.total.amount, expiresAt: holdEnds(),
-    }).returning({ id: appOffers.id, expiresAt: appOffers.expiresAt });
-    const opt = { ...stayOptionOf(h, row!.id, n, q.checkIn), expiresAt: row!.expiresAt.toISOString() };
-    await db.update(appOffers).set({ payload: opt as unknown as Record<string, unknown> }).where(eq(appOffers.id, row!.id));
-    options.push(opt);
-  }
+  const expiresAt = holdEnds();
+  const search = { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
+  const options: StayOption[] = offers.map((h) => ({ ...stayOptionOf(h, randomUUID(), n, q.checkIn), expiresAt: expiresAt.toISOString() }));
+  await storeOffers(offers.map((h, i) => ({
+    id: options[i]!.id, ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search, payload: options[i] as unknown as Record<string, unknown>, total: h.total.amount, expiresAt,
+  })));
   return { ...base, outcome: options.length ? "ok" : "none", options };
 }
 
