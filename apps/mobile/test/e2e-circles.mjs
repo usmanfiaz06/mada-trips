@@ -310,6 +310,24 @@ async function demo() {
   await see('Three ideas for Baku', 'ideas', 9000);
   await shot('new-circle-ideas');
 
+  step('share a plan, remove someone, leave');
+  await byTest('chat-tools').click();
+  await byTest('tool-share').click();
+  await byTest('share-alula2').click();
+  await see('You shared a plan', 'shared plan card');
+  await shot('new-circle-shared-plan');
+  await byTest('circle-settings').click();
+  await page.getByRole('button', { name: /Maha/ }).filter({ visible: true }).first().click();
+  await byTest('remove-member').click();
+  await see('Maha is out of the circle.', 'removed');
+  await see('You removed Maha', 'removed line', 6000);
+  await shot('new-circle-removed');
+  await byTest('circle-settings').click();
+  await byTest('leave').click();
+  await shot('new-circle-leave');
+  await byTest('leave-yes').click();
+  await see('Summer in Baku is deleted.', 'last one out deletes it');
+
   step('people');
   await go('/people');
   await see('Your people', 'people');

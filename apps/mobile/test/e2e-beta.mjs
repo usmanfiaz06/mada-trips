@@ -199,7 +199,9 @@ async function phone() {
   }
   step('phone: a request and its fares');
   await openAsk(page);
-  await k.ask('Dubai next month, just me');
+  await k.ask('Dubai, just me');
+  await k.see('When?', 'when (phone)', 12000);
+  await k.press(page.getByRole('button', { name: /^Eid al-Fitr/ }));
   await k.see('Tell us where and when', 'request form (phone)', 12000);
   await k.press(k.byTest('flight-request-send'));
   await k.see('I found 2 fares', 'fares (phone)', 20000);
