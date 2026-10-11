@@ -20,6 +20,7 @@ import { betaCopy } from './beta';
 import { storeCopy } from './store';
 import { thingsCopy } from './things';
 import { wordsCopy } from './words';
+import { askFlowCopy } from './ask-flow';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -50,6 +51,8 @@ export const en = {
   ...thingsCopy,
   // Request chips, needs, the desk's quotes and replies, and screen labels once written in code: packages/shared/src/copy/words.ts
   ...wordsCopy,
+  // Ask as a guided conversation: stays, quick dates, the phone sheet, request threads: packages/shared/src/copy/ask-flow.ts
+  ...askFlowCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',
