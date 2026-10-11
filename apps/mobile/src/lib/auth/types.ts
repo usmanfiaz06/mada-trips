@@ -5,7 +5,8 @@ export type SocialProvider = 'apple' | 'google';
 /** A Supabase access token, plus the name Apple shares only on the very first sign-in. */
 export type Identity = { accessToken: string; givenName?: string };
 
-export type AuthErrorCode = 'wrong' | 'expired' | 'wait' | 'tooMany' | 'cancelled' | 'unavailable' | 'offline' | 'taken' | 'noSession' | 'other';
+export type AuthErrorCode = 'wrong' | 'expired' | 'wait' | 'tooMany' | 'cancelled' | 'unavailable' | 'offline' | 'taken' | 'noSession'
+  | 'wrongPassword' | 'weakPassword' | 'leakedPassword' | 'other';
 
 /** Supabase's failures, in our words (COPY.md). `seconds` for 'wait'. */
 export class AuthError extends Error {
@@ -23,6 +24,10 @@ export class AuthError extends Error {
       case 'offline': return t('error.offline');
       case 'taken': return t('auth.error.identityTaken');
       case 'noSession': return t('auth.methods.confirmFirst');
+      // Never says whether the email has an account.
+      case 'wrongPassword': return t('auth.password.mismatch');
+      case 'weakPassword': return t('auth.password.weakServer');
+      case 'leakedPassword': return t('auth.password.leaked');
       default: return t('error.internal');
     }
   }
@@ -53,6 +58,19 @@ export interface AuthBackend {
   addEmail(email: string): Promise<void>;
   verifyAddedEmail(email: string, code: string): Promise<string>;
   link(provider: SocialProvider): Promise<string | null>;
+
+  /* Optional passwords, only ever with an email (docs/app/AUTH.md). Codes stay the default. */
+  signInWithPassword(email: string, password: string): Promise<Identity>;
+  /** Forgot password: a 6-digit code by email (Supabase's Reset password template carries {{ .Token }}, never a link). */
+  sendPasswordReset(email: string): Promise<void>;
+  /** The code from sendPasswordReset signs in; a new password is chosen next with setPassword (no nonce needed). */
+  verifyPasswordReset(email: string, code: string): Promise<Identity>;
+  /** Signed in: a code to the account's email or phone, to check it's you before the password changes. */
+  reauthenticate(): Promise<void>;
+  /** Set or change the password (`code` from reauthenticate). Returns a fresh access token for /auth/session/sync. */
+  setPassword(password: string, code?: string): Promise<string>;
+  /** Remove it: Supabase keeps no "no password", so it becomes a long random one nobody knows. */
+  removePassword(code?: string): Promise<string>;
   unlink(provider: SocialProvider): Promise<string>;
   signOut(): Promise<void>;
 }
@@ -69,6 +87,12 @@ export function fromSupabase(e: unknown): AuthError {
     const s = /after (\d+) seconds?/i.exec(msg);
     return s ? new AuthError('wait', undefined, Number(s[1])) : new AuthError('tooMany');
   }
+  if (code === 'invalid_credentials' || /invalid login credentials/i.test(msg)) return new AuthError('wrongPassword');
+  if (code === 'weak_password') {
+    const reasons = (e as { reasons?: string[] }).reasons ?? [];
+    return new AuthError(reasons.includes('pwned') || /pwned|leak/i.test(msg) ? 'leakedPassword' : 'weakPassword');
+  }
+  if (code === 'reauthentication_not_valid' || code === 'reauthentication_needed') return new AuthError('wrong');
   if (code === 'identity_already_exists' || code === 'phone_exists' || code === 'email_exists') return new AuthError('taken');
   if (code === 'session_not_found' || code === 'no_authorization') return new AuthError('noSession');
   if (/network|fetch/i.test(msg) || err.name === 'AuthRetryableFetchError') return new AuthError('offline');

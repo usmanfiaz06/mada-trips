@@ -1,5 +1,6 @@
 import './polyfill';
 import { Platform } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import { createClient, type Session, type SupabaseClient, type UserIdentity } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { secureSessionStorage } from './session-storage';
@@ -124,6 +125,33 @@ export const supabaseAuth: AuthBackend = {
   },
   async unlink(provider) {
     await run(supabase().auth.unlinkIdentity(await identityFor(provider)));
+    return freshToken();
+  },
+
+  async signInWithPassword(email, password) {
+    const { session } = await run(supabase().auth.signInWithPassword({ email: email.trim().toLowerCase(), password }));
+    return { accessToken: tokenOf(session) };
+  },
+  async sendPasswordReset(email) {
+    // OTP flow: the Reset password template carries {{ .Token }}; no redirect, no link.
+    const { error } = await supabase().auth.resetPasswordForEmail(email.trim().toLowerCase());
+    if (error) throw fromSupabase(error);
+  },
+  async verifyPasswordReset(email, code) {
+    const { session } = await run(supabase().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code, type: 'recovery' }));
+    return { accessToken: tokenOf(session) };
+  },
+  async reauthenticate() {
+    const { error } = await supabase().auth.reauthenticate();
+    if (error) throw fromSupabase(error);
+  },
+  async setPassword(password, code) {
+    await run(supabase().auth.updateUser({ password, nonce: code, data: { has_password: true } }));
+    return freshToken();
+  },
+  async removePassword(code) {
+    const random = Array.from(Crypto.getRandomBytes(32), (b) => b.toString(16).padStart(2, '0')).join('');
+    await run(supabase().auth.updateUser({ password: random, nonce: code, data: { has_password: false } }));
     return freshToken();
   },
 

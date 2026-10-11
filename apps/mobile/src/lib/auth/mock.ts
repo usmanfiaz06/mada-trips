@@ -1,4 +1,4 @@
-import { encodeMockSupabaseToken, type AuthProvider } from '@mada/shared';
+import { PASSWORD_MIN_LENGTH, encodeMockSupabaseToken, type AuthProvider } from '@mada/shared';
 import { deleteSecret, getSecret, setSecret } from '../storage';
 import { CODE_RESEND_SECONDS } from './config';
 import { AuthError, type AuthBackend, type Identity, type SocialProvider } from './types';
@@ -11,8 +11,10 @@ import { AuthError, type AuthBackend, type Identity, type SocialProvider } from 
  */
 
 export const MOCK_CODE = '123456';
+/** Stands in for Supabase's leaked-password check (Have I Been Pwned). */
+const LEAKED = new Set(['password123', 'password', '12345678', '123456789', 'qwerty123', 'iloveyou1']);
 
-type MockUser = { sub: string; phone: string | null; email: string | null; providers: AuthProvider[]; name: string | null; identities: string[] };
+type MockUser = { sub: string; phone: string | null; email: string | null; providers: AuthProvider[]; name: string | null; identities: string[]; password?: string | null };
 
 const users = new Map<string, MockUser>();
 const sentAt = new Map<string, number>();
@@ -180,6 +182,54 @@ export const mockAuth: AuthBackend = {
     if (u.providers.length <= 1) throw new AuthError('other');
     u.providers = u.providers.filter((p) => p !== provider);
     u.identities = u.identities.filter((i) => !i.startsWith(`${provider}:`));
+    return (await become(u)).accessToken;
+  },
+
+  async signInWithPassword(raw, password) {
+    await ready(); await delay();
+    const email = raw.trim().toLowerCase();
+    const u = find((x) => x.email === email);
+    // The same answer whether or not the email has an account.
+    if (!u || !u.password || u.password !== password) throw new AuthError('wrongPassword');
+    return become(u);
+  },
+  async sendPasswordReset(raw) {
+    await ready(); await delay();
+    const email = raw.trim().toLowerCase();
+    throttle(`reset:${email}`);
+    console.info(`[mock supabase] reset code to ${email}: ${MOCK_CODE}`);
+  },
+  async verifyPasswordReset(raw, code) {
+    await ready(); await delay();
+    const email = raw.trim().toLowerCase();
+    checkCode(`reset:${email}`, code);
+    // Supabase signs in with a recovery code only for an existing user; the mock makes one, like the email code.
+    const u = find((x) => x.email === email) ?? newUser({ email });
+    addProvider(u, 'email');
+    return become(u);
+  },
+  async reauthenticate() {
+    await ready(); await delay();
+    const u = me();
+    throttle(`reauth:${u.sub}`);
+    console.info(`[mock supabase] reauthentication code to ${u.email ?? u.phone}: ${MOCK_CODE}`);
+  },
+  async setPassword(password, code) {
+    await ready(); await delay();
+    const u = me();
+    if (code !== undefined) checkCode(`reauth:${u.sub}`, code);
+    if (password.length < PASSWORD_MIN_LENGTH) throw new AuthError('weakPassword');
+    if (LEAKED.has(password.toLowerCase())) throw new AuthError('leakedPassword');
+    u.password = password;
+    addProvider(u, 'password');
+    return (await become(u)).accessToken;
+  },
+  async removePassword(code) {
+    await ready(); await delay();
+    const u = me();
+    if (code !== undefined) checkCode(`reauth:${u.sub}`, code);
+    u.password = null;
+    u.providers = u.providers.filter((p) => p !== 'password');
     return (await become(u)).accessToken;
   },
 

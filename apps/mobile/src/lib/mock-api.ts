@@ -10,11 +10,12 @@ import { circlesMock } from './mock/circles';
 import { tripsMock } from './mock/trips';
 import { placesMock } from './mock/places';
 import { resilienceMock } from './mock/resilience';
+import { authMock } from './mock/auth';
 
 /** Extra endpoints per area: each returns null for paths it doesn't own. `user` is the signed-in mock user (mutable). */
 export type MockUser = User & { people: Person[] };
 export type AreaMock = (w: Wire, ctx: { user: MockUser | null; byPhone: Map<string, string> }) => Promise<WireResponse | null>;
-const AREA_MOCKS: AreaMock[] = [tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock];
+const AREA_MOCKS: AreaMock[] = [tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock, authMock];
 
 /*
  * EXPO_PUBLIC_API_MODE=mock: the Core API's rules, in memory, for design work and screenshots without a server.
@@ -154,7 +155,7 @@ export async function mockTransport(w: Wire): Promise<WireResponse> {
       }
       if (email && !user.email) { user.email = email; user.emailRelay = email.endsWith('@privaterelay.appleid.com'); }
       if (email && user.email === email) user.emailVerified = true;
-      user.methods = { apple: c.providers.includes('apple'), google: c.providers.includes('google'), phone: !!user.phone, email: c.providers.includes('email') };
+      user.methods = { apple: c.providers.includes('apple'), google: c.providers.includes('google'), phone: !!user.phone, email: c.providers.includes('email'), password: c.providers.includes('password') };
       if (!user.name && body.givenName) user.name = String(body.givenName).trim().split(/\s+/)[0]!.slice(0, 30);
       if (sync) return ok({ user: pub(user) });
       return ok({ tokens: issue(user.id), user: pub(user), isNew: !user.onboardedAt });
