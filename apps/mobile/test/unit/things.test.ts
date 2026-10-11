@@ -35,15 +35,15 @@ describe('things to do (mock)', () => {
     const fam = ThingsResponse.parse((await as('GET', '/places/108410/things?family=1')).json);
     expect(fam.activities.every((a) => a.family)).toBe(true);
     expect((await as('GET', '/places/108410/things?day=nope')).status).toBe(400);
-    expect((await as('GET', '/places/611717/things')).json.status).toBe('none');
+    expect(((await as('GET', '/places/611717/things')).json as J).status).toBe('none');
     expect((await mockTransport({ method: 'GET', path: '/places/108410/things' })).status).toBe(401);
   });
 
   it('a trip: from the hotel, its days, Book with Mada, Add to my plan on the itinerary', async () => {
     const trips = (await as('GET', '/trips')).json as J;
-    const trip = (trips.upcoming as J[]).find((x) => x.city === 'Istanbul') ?? (trips.upcoming as J[])[0];
+    const trip = ((trips.upcoming as J[]).find((x) => x.city === 'Istanbul') ?? (trips.upcoming as J[])[0])!;
     expect(trip).toBeTruthy();
-    const detail = (await as('GET', `/trips/${trip.id}`)).json.trip as J;
+    const detail = ((await as('GET', `/trips/${trip.id}`)).json as J).trip as J;
     const t = ThingsResponse.parse((await as('GET', `/trips/${trip.id}/things`)).json);
     expect(t.near?.label).toBe('hotel');
     expect(t.activities[0]!.distanceKm).not.toBeNull();
@@ -64,7 +64,7 @@ describe('things to do (mock)', () => {
     expect(ideas.ideas.map((i) => i.title)).toContain('Hagia Sophia');
     const itin = ItineraryResponse.parse((await as('GET', `/trips/${trip.id}/itinerary`)).json);
     expect(itin.days.find((d) => d.date === day)?.items.some((i) => i.title === 'Hagia Sophia' && i.kind === 'idea')).toBe(true);
-    expect((await as('DELETE', `/trips/${trip.id}/ideas/${add.json.idea.id}`)).status).toBe(200);
+    expect((await as('DELETE', `/trips/${trip.id}/ideas/${(add.json as J).idea.id}`)).status).toBe(200);
     expect((await as('POST', `/trips/${trip.id}/ideas`, { ref: { kind: 'activity', id: 'osm:n404' }, placeId: '745044', day: null })).status).toBe(404);
   });
 });

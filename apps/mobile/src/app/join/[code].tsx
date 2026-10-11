@@ -6,7 +6,7 @@ import { Faces } from '@/components/circles/ui';
 import { VGradient } from '@/components/Gradient';
 import { ErrorState, GoneState } from '@/components/states';
 import { Icon } from '@/components/Icon';
-import { Screen, useBottomInset } from '@/components/Layout';
+import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, useAct, usePreview } from '@/lib/circles';
@@ -73,6 +73,8 @@ export default function Join() {
     <Screen background={colors.night}>
       {p.circle?.cover ? <Image source={COVERS[p.circle.cover]} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
       <VGradient id="join-veil" stops={[[0, 'rgba(15,26,22,0.55)'], [0.24, 'rgba(15,26,22,0.05)'], [0.42, 'rgba(15,26,22,0.2)'], [0.66, 'rgba(15,26,22,0.92)'], [1, '#0f1a16']]} />
+      {/* Back at the top as on every pushed screen (Home when the link opened the app); "Not now" below does the same. */}
+      <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar dark onBack={leave} /></View>
       <View style={{ marginTop: 'auto', paddingHorizontal: 24, paddingBottom: 24 + bottom, gap: 12 }}>
         <Faces people={members} size={40} ring={colors.night} />
         <T v="eyebrow" color={colors.gold}>{t('circles.join.invitedYou', { name: p.from.short })}</T>

@@ -43,8 +43,10 @@ let n = 0;
 const step = (s) => console.log('·', s);
 const want = (name) => !ONLY || ONLY.includes(name);
 
-async function newPage(locale = 'en-GB') {
+async function newPage(locale = 'en-GB', beta = '') {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh' });
+  // The server's beta switches for the mock API (lib/mock/beta.ts), set before the app's first request.
+  await context.addInitScript((b) => { try { sessionStorage.setItem('mada.mockBeta', b); } catch { /* ignore */ } }, beta);
   const page = await context.newPage();
   page.on('pageerror', (e) => { errors.push(`pageerror: ${e.message}`); console.log('PAGEERROR', e.message); });
   page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource|contract/.test(m.text())) console.log('console.error', m.text().slice(0, 300)); });
@@ -55,7 +57,7 @@ function kit(page) {
   const shot = async (name, wait = 650) => { n += 1; await page.waitForTimeout(wait); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-${name}.png`) }); };
   const see = async (text, what, timeout = 9000) => {
     try { await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout }); return true; }
-    catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
+    catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); n += 1; await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-missing-${what.replace(/\W+/g, '-')}.png`) }).catch(() => {}); return false; }
   };
   const byTest = (id) => page.locator(`[data-testid="${id}"]`).filter({ visible: true }).last();
   const press = async (loc) => { loc = loc.filter({ visible: true }); await loc.first().evaluate((el) => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(200); await loc.first().click(); };
@@ -102,7 +104,7 @@ async function openAsk(page) {
 
 /* ───────────── 1. flights by request: the form → fares → pay → tickets → the trip ───────────── */
 async function flights() {
-  const { page, context } = await newPage();
+  const { page, context } = await newPage('en-GB', 'flights');
   const k = kit(page);
   step('flights: sign in with flights by request');
   await signIn(page, 'flights');
@@ -167,7 +169,7 @@ async function flights() {
 
 /* ───────────── 2. no verified phone: a number to reach you ───────────── */
 async function phone() {
-  const { page, context } = await newPage();
+  const { page, context } = await newPage('en-GB', 'flights,nophone');
   const k = kit(page);
   step('phone: email sign-in, phone later');
   await page.goto(`${ORIGIN}/?beta=flights,nophone`);
@@ -215,7 +217,7 @@ async function phone() {
 
 /* ───────────── 3. the desk paused Circles ───────────── */
 async function circles() {
-  const { page, context } = await newPage();
+  const { page, context } = await newPage('en-GB', 'limited');
   const k = kit(page);
   step('circles: paused');
   await signIn(page, 'limited');
@@ -227,7 +229,7 @@ async function circles() {
 
 /* ───────────── 4. Arabic ───────────── */
 async function arabic() {
-  const { page, context } = await newPage('ar-SA');
+  const { page, context } = await newPage('ar-SA', 'flights');
   const k = kit(page);
   step('arabic: the request and fares');
   await page.goto(`${ORIGIN}/?beta=flights`);

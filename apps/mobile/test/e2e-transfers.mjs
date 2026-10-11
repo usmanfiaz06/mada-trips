@@ -90,7 +90,7 @@ async function run(lang) {
   await byTest('voucher-cancel-confirm').click();
   await page.waitForTimeout(1500);
   await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
-  await see(c.cancelled, 'cancelled');
+  if (!(await byTest('voucher-ref').innerText().catch(() => '')).includes(c.cancelled)) errors.push(`${lang} cancelled not shown on the voucher`);
   if (await byTest('voucher-cancel').count()) errors.push(`${lang} cancel still offered after cancelling`);
   await shot('voucher-cancelled');
 

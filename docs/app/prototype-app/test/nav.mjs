@@ -17,7 +17,7 @@ const URL_ = pathToFileURL(resolve('dist/index.html')).href;
 
 /* Every stacked screen with params that open it with content (the demo account's trip, people and circles). */
 const STACK = [
-  ['passportSetup', {}], ['join', { code: 'ist-8k2' }], ['saved', {}], ['people', {}], ['newCircle', {}], ['friend', { id: 'sara' }],
+  ['passportSetup', { later: true }], ['join', { code: 'ist-8k2' }], ['saved', {}], ['people', {}], ['newCircle', {}], ['friend', { id: 'sara' }],
   ['ask', {}], ['trip', {}], ['disruption', {}], ['group', { id: 'family' }], ['profile', {}], ['plan', {}], ['city', {}],
   ['account', {}], ['accountSignin', {}], ['accountPrefs', {}], ['household', {}], ['householdPerson', { id: 'layla' }], ['accountSecurity', {}],
   ['accountPrivacy', {}], ['accountHelp', {}], ['accountLegal', {}], ['itinerary', {}], ['invoices', {}], ['invoice', {}], ['refund', {}],
@@ -37,8 +37,10 @@ const demo = async (page, text) => { await page.locator('.demo').getByRole('butt
 try {
   for (const [lang, w, h] of [['en', 1200, 920], ['ar', 1200, 920], ['en', 320, 640], ['ar', 320, 640]]) {
     step(`dock labels: ${lang} at ${w}`);
-    const page = await open({ width: w, height: h }, lang);
+    const page = await open({ width: 1200, height: 920 }, lang);
     await demo(page, 'Skip sign-up');
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(400);
     const phone = page.locator('.phone');
     const dock = phone.locator('.dock');
     const labels = await dock.locator('.dock-l').allInnerTexts();
@@ -83,7 +85,8 @@ try {
           const r = b.getBoundingClientRect();
           return r.width > 0 && r.top - py < 130 && (r.left - px < 140 || r.right - px > 250);
         });
-        return btns.map((b) => (b.getAttribute('aria-label') || b.textContent || '').trim()).filter(Boolean);
+        // A Back that names where it goes ("‹ Circles") is still the topbar's back button.
+        return btns.map((b) => (b.classList.contains('back') ? 'Back' : (b.getAttribute('aria-label') || b.textContent || '').trim())).filter(Boolean);
       }, [box.x, box.y]);
       const way = found.find((t) => /^(Back|Home|Close|Cancel|Not now|Done|Later|Choose again)/.test(t) || /back|close/i.test(t));
       if (!way) { errors.push(`${name}: no Back/Close at the top (top buttons: ${found.slice(0, 4).join(' | ') || 'none'})`); await phone.screenshot({ path: `${OUT}/missing-${name}.png` }); }

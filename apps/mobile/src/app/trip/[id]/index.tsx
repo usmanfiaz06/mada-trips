@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { dayLabel, formatSar, liveStay, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
+import { addDays, dayLabel, formatSar, liveStay, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Screen, Scroll, TopBar } from '@/components/Layout';
@@ -18,7 +18,6 @@ import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation
 import { colors } from '@/theme';
 import { TripHotelbeds } from '@/components/trips/Hotelbeds';
 import { ThingsView } from '@/components/things/ThingsView';
-import { addDays } from '@mada/shared';
 
 const tripDays = (from: string, to: string | null) => { const out: string[] = []; for (let d = from, i = 0; d <= (to ?? from) && i < 30; d = addDays(d, 1), i++) out.push(d); return out; };
 

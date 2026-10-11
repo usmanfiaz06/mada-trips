@@ -162,6 +162,8 @@ h1, h2, h3 { text-wrap: balance; }
 .dock button.on { background: var(--green); color: var(--mist); }
 .dock button.on .dock-l, .dock .orb .dock-l { color: var(--mist); }
 .dock .orb { flex: none; width: 60px; height: 60px; border-radius: 999px; gap: 1px; background: var(--green); }
+/* A 320-point phone: a little tighter, so "المجموعات" still fits whole. */
+@media (max-width: 360px) { .dock { gap: 2px; padding: 5px; } .dock button { padding: 0; } .dock button .dock-l { font-size: 10px; letter-spacing: -.01em; } .dock .orb { width: 56px; height: 56px; } }
 .dock .badge { position: absolute; }
 
 /* ---------- sheet ---------- */

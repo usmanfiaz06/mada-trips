@@ -143,7 +143,7 @@ export function WakeRow({ trip, rail }: { trip: TripDetail; rail: React.ReactNod
               <Tiny>{st.on ? t('td.plan.wakeSub', { time: plan.time }) : t('td.plan.wakeOffSub', { time: plan.time })}</Tiny>
             </Grow>
             <Switch testID="wake-switch" accessibilityLabel={t('td.wake.switch', { time: plan.time })} value={st.on} disabled={busy}
-              onValueChange={(v) => { void turn(v); }} trackColor={{ false: '#d6cec2', true: colors.green }} thumbColor={colors.paper}
+              onValueChange={(v) => { void turn(v); }} trackColor={{ false: '#d6cec2', true: colors.gold }} thumbColor={colors.paper}
               {...({ activeThumbColor: colors.paper } as object)} />
           </Row>
           <Tiny color={note ? colors.badInk : colors.inkSoft} style={{ marginTop: 4 }}>{stale ? t('td.wake.stale', { old: st.armed!.time, time: plan.time }) : line}</Tiny>

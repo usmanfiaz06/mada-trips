@@ -826,7 +826,8 @@ export function Join({ params }) {
     toast(`You’re in. ${FRIENDS[inv.from].short} can see you joined.`);
     replace('group', { id: gid });
   };
-  return <div className="screen push"><InvitePreview code={params.code} signedIn onJoin={join} onDecline={pop} /></div>;
+  /* A Back (or Home, from a link) at the top, as on every pushed screen; "Not now" below does the same. */
+  return <div className="screen push"><div style={{ position: 'absolute', top: 0, insetInline: 0, zIndex: 3 }}><TopBar dark onBack={pop} /></div><InvitePreview code={params.code} signedIn onJoin={join} onDecline={pop} /></div>;
 }
 
 /* Small drawings for empty states: friends, saved, circles. */
