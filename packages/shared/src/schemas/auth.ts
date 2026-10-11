@@ -85,7 +85,14 @@ export type SupabaseSessionRequest = z.infer<typeof SupabaseSessionRequest>;
 export const SupabaseSyncRequest = z.object({ accessToken: z.string().min(10).max(16_000) });
 export type SupabaseSyncRequest = z.infer<typeof SupabaseSyncRequest>;
 
-export const AUTH_PROVIDERS = ['phone', 'email', 'apple', 'google'] as const;
+/**
+ * Ways in. "password" is optional and only ever alongside an email (docs/app/AUTH.md): Supabase doesn't say whether a
+ * password is set, so the app records it in user_metadata.has_password when it sets or removes one.
+ */
+export const AUTH_PROVIDERS = ['phone', 'email', 'apple', 'google', 'password'] as const;
+
+/** Passwords are optional; when someone sets one it has at least this many characters (Supabase's minimum too). */
+export const PASSWORD_MIN_LENGTH = 8;
 export type AuthProvider = (typeof AUTH_PROVIDERS)[number];
 
 /**

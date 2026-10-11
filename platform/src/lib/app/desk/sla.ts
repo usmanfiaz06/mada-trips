@@ -3,7 +3,7 @@
  * Pure functions: the inbox, the presence endpoint and the tests all use the same clock maths.
  */
 
-export const DESK_KINDS = ["order", "ticketing", "chat", "request", "refund", "disruption", "moderation"] as const;
+export const DESK_KINDS = ["order", "ticketing", "chat", "request", "refund", "disruption", "moderation", "recovery"] as const;
 export type DeskKind = (typeof DESK_KINDS)[number];
 
 /** Minutes from when work reaches the desk to when it must be answered. */
@@ -15,6 +15,7 @@ export const SLA_MINUTES: Record<DeskKind, number> = {
   refund: 24 * 60,   // a decision on a refund within a day
   disruption: 10,    // travellers on a disrupted flight hear the plan within 10 minutes
   moderation: 24 * 60,
+  recovery: 24 * 60,   // "usually within a day", as the app promises after a recovery request
 };
 
 export type SlaState = "ok" | "soon" | "breached" | "met";

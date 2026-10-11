@@ -20,6 +20,7 @@ export function toUser(u: UserRow): User {
       google: !!u.googleSub || u.authProviders.includes("google"),
       phone: !!u.phone,
       email: u.authProviders.includes("email"),
+      password: u.authProviders.includes("password"),
     },
     emailVerified: u.emailVerified,
     onboardedAt: u.onboardedAt?.toISOString() ?? null,

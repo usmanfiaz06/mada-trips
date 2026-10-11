@@ -288,3 +288,25 @@ describe("POST /auth/sms-hook", () => {
     expect((await hook({ user: { phone: "966500000001" }, sms: { otp: "123123" } })).status).toBe(501);
   });
 });
+
+/* ───────────── optional passwords ───────────── */
+
+describe("a password, when someone sets one", () => {
+  it("is read from user_metadata.has_password, only alongside an email", async () => {
+    const { identityFromClaims } = await import("@/lib/app/suppliers/live/supabase");
+    const base = { sub: "2f0c6f8e-1111-4222-8333-944444444445", role: "authenticated", email: "sara@example.com", app_metadata: { provider: "email", providers: ["email"] } };
+    expect(identityFromClaims({ ...base, user_metadata: { has_password: true } }).providers).toEqual(["email", "password"]);
+    expect(identityFromClaims({ ...base, user_metadata: { has_password: false } }).providers).toEqual(["email"]);
+    expect(identityFromClaims({ ...base, email: undefined, phone: "966500001111", app_metadata: { provider: "phone", providers: ["phone"] }, user_metadata: { has_password: true } }).providers).toEqual(["phone"]);
+  });
+
+  it("shows on the account after sign-in and after a sync, and goes when removed", async () => {
+    const s = sub();
+    const email = `pw.${Date.now()}@example.com`;
+    const signedIn = await exchange(mock({ sub: s, email, providers: ["email", "password"] }));
+    expect(signedIn.user.methods.password).toBe(true);
+    const r = await call(sync, { body: { accessToken: mock({ sub: s, email, providers: ["email"] }) }, token: signedIn.tokens.accessToken, ip: freshIp() });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(MeResponse.parse(r.json).user.methods.password).toBe(false);
+  });
+});

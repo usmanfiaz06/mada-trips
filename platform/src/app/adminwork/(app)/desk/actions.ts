@@ -14,6 +14,7 @@ import {
 } from "@/lib/app/desk/adapters";
 import { pushPlan } from "@/lib/app/desk/disruptions";
 import { decideModeration } from "@/lib/app/desk/moderation";
+import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { deskAudit } from "@/lib/app/desk/core";
@@ -289,4 +290,17 @@ export async function statusPillAction(fd: FormData) {
   if (status !== "online" && status !== "away" && status !== "offline") return;
   await setAgentStatus(u, uuid(fd, "agentId"), status).catch(() => {});
   revalidatePath("/adminwork/desk", "layout");
+}
+
+/* ───────────── account recovery ───────────── */
+
+export async function recoveryAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const decision = z.enum(["approve", "decline"]).parse(str(fd, "decision"));
+    const id = uuid(fd, "id");
+    if (decision === "approve") { await approveRecovery(u, id, str(fd, "note")); return done("Account moved. We've told them on the new contact."); }
+    await declineRecovery(u, id, str(fd, "note"));
+    return done("Declined. We've told them on the new contact.");
+  } catch (e) { return toState(e); }
 }

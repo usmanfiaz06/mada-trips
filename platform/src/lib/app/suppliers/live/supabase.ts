@@ -59,7 +59,7 @@ export async function verifySupabaseToken(token: string, opts: SupabaseVerifyOpt
 type Claims = JWTPayload & {
   email?: string; phone?: string; role?: string; is_anonymous?: boolean;
   app_metadata?: { provider?: string; providers?: string[] };
-  user_metadata?: { email_verified?: boolean; full_name?: string; name?: string; given_name?: string };
+  user_metadata?: { email_verified?: boolean; full_name?: string; name?: string; given_name?: string; has_password?: boolean };
 };
 
 export function identityFromClaims(p: JWTPayload): SupabaseIdentity {
@@ -67,6 +67,8 @@ export function identityFromClaims(p: JWTPayload): SupabaseIdentity {
   if (!c.sub || c.role !== "authenticated" || c.is_anonymous) throw new AppError("UNAUTHORIZED");
   const providers = [...new Set([...(c.app_metadata?.providers ?? []), c.app_metadata?.provider ?? ""])]
     .filter((x): x is SupabaseIdentity["providers"][number] => PROVIDERS.has(x));
+  // Supabase doesn't put a password in the token; the app records one in user_metadata when it sets or removes it.
+  if (c.user_metadata?.has_password === true && c.email) providers.push("password");
   const phone = c.phone ? `+${String(c.phone).replace(/^\+/, "")}` : null;
   const email = c.email ? String(c.email).toLowerCase() : null;
   const emailVerified = !!email && (providers.includes("email") || c.user_metadata?.email_verified === true);

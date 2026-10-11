@@ -107,6 +107,12 @@ export const authCopyAr: Record<keyof typeof authCopy, string> = {
   'recover.sent.body': 'يتأكد شخص من مادا أنك أنت، من بيانات الجواز المحفوظة وآخر حجز لك، ثم ينقل حسابك. عادةً خلال يوم.',
   'recover.sent.reach': 'نتواصل معك على {contact}.',
   'recover.sent.done': 'العودة لتسجيل الدخول',
+  'recover.done.subject': 'نقلنا حسابك في مادا',
+  'recover.done.body': 'مادا: صار حسابك على هذا {kind}. افتح مادا للرحلات وادخل برمز.',
+  'recover.done.phone': 'الرقم',
+  'recover.done.email': 'البريد',
+  'recover.declined.subject': 'بخصوص حسابك في مادا',
+  'recover.declined.body': 'مادا: ما قدرنا نتأكد أنك أنت، فبقي حسابك كما هو. اتصل بنا على {phone} ونحلها معًا.',
 
   'auth.error.phoneRequired': 'وثّق رقم جوالك لتحجز. تأخذ دقيقة.',
   'auth.error.identityTaken': 'طريقة الدخول هذه مرتبطة بحساب آخر.',

@@ -6,6 +6,7 @@ import { appDeskItems } from "@/db/app-schema-desk";
 import { agentForOps, loadRota, primaryAgents, type Agent } from "./agents";
 import { destinationOf, listConversations, listOrders, listRefunds, listRequests, type OrderStage } from "./adapters";
 import { listModeration } from "./moderation";
+import { listRecovery } from "./recovery";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
 import { disruptedToday } from "./disruptions";
 import { routeFor, type Route } from "./routing";
@@ -25,8 +26,8 @@ export type InboxFilter = "mine" | "team" | "unassigned" | "escalated";
 const cut = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 async function sources(now: Date) {
-  const [orders, requests, chats, refunds, disrupted, moderation] = await Promise.all([
-    listOrders({ stage: "open" }), listRequests({ open: true }), listConversations(300), listRefunds("requested"), disruptedToday(now), listModeration("open"),
+  const [orders, requests, chats, refunds, disrupted, moderation, recovery] = await Promise.all([
+    listOrders({ stage: "open" }), listRequests({ open: true }), listConversations(300), listRefunds("requested"), disruptedToday(now), listModeration("open"), listRecovery("open"),
   ]);
   type Raw = Omit<InboxItem, "key" | "route" | "agentName" | "escalated" | "escalationNote">;
   const raw: Raw[] = [];
@@ -72,6 +73,10 @@ async function sources(now: Date) {
     const unsafe = m.kind === "report" && m.reason === "unsafe";
     raw.push({ kind: "moderation", id: m.id, title: m.kind === "tip" ? `${m.snapshot.place ?? ""}${m.snapshot.city ? ` · ${m.snapshot.city}` : ""}` : cut(m.snapshot.text ?? m.snapshot.name ?? m.targetKind, 70), note: m.kind === "tip" ? "Tip to review" : unsafe ? "Unsafe report" : "Report to review", sub: m.kind === "tip" ? `${m.authorName} · ${cut(m.snapshot.text ?? "", 60)}` : `${m.reporterName} → ${m.authorName}`,
       userId: m.authorUserId, userName: m.authorName, href: `/adminwork/desk/moderation?focus=${m.id}`, sla: slaFor("moderation", m.createdAt, now, { targetMinutes: unsafe ? 30 : undefined }), amount: null });
+  }
+  for (const r of recovery) {
+    raw.push({ kind: "recovery", id: r.id, title: r.name, note: r.account ? "Move an account" : "No account matches", sub: `${r.oldMasked} → ${r.newMasked}`,
+      userId: r.matchedUserId, userName: r.account?.shortName ?? r.name, href: `/adminwork/desk/recovery?focus=${r.id}`, sla: slaFor("recovery", r.createdAt, now), amount: null });
   }
   return raw;
 }

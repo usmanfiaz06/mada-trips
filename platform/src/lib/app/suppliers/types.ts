@@ -128,8 +128,8 @@ export type SupabaseIdentity = {
   emailVerified: boolean;
   /** Apple's private relay address. */
   isPrivateEmail: boolean;
-  /** Ways in Supabase knows: phone | email | apple | google. */
-  providers: ("phone" | "email" | "apple" | "google")[];
+  /** Ways in Supabase knows: phone | email | apple | google, and password when the app recorded one (user_metadata.has_password). */
+  providers: ("phone" | "email" | "apple" | "google" | "password")[];
   /** A name the provider shared, if any. */
   name: string | null;
 };

@@ -32,7 +32,7 @@ export const appUsers = pgTable("app_users", {
   supabaseUserId: text("supabase_user_id"),
   emailVerified: boolean("email_verified").notNull().default(false),
   phoneVerified: boolean("phone_verified").notNull().default(false),
-  // Ways in Supabase knows for this person: phone | email | apple | google.
+  // Ways in Supabase knows for this person: phone | email | apple | google, and password (optional, with an email).
   authProviders: text("auth_providers").array().notNull().default(sql`'{}'::text[]`),
   locale: text("locale").notNull().default("en"),
   alerts: text("alerts").notNull().default("quiet"), // quiet | everything

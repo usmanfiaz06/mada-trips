@@ -20,6 +20,7 @@ export default async function DeskLayout({ children }: { children: React.ReactNo
     { href: "/adminwork/desk/refunds", label: t("Refunds"), count: c.by.refund },
     { href: "/adminwork/desk/disruptions", label: t("Disruptions"), count: c.by.disruption, tone: c.by.disruption ? "bad" as const : undefined },
     { href: "/adminwork/desk/moderation", label: t("Moderation"), count: c.by.moderation },
+    { href: "/adminwork/desk/recovery", label: t("Account recovery"), count: c.by.recovery },
     { href: "/adminwork/desk/team", label: can(u, "desk.admin") ? t("Team & rota") : t("Team") },
   ];
   return (

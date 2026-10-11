@@ -115,6 +115,13 @@ export const authCopy = {
   'recover.sent.body': 'A person at Mada will check it’s you, using the passport details on file and your last booking, then move your account. Usually within a day.',
   'recover.sent.reach': 'We’ll reach you at {contact}.',
   'recover.sent.done': 'Back to sign-in',
+  // Sent by text or email to the new contact when the desk decides.
+  'recover.done.subject': 'Your Mada account has moved',
+  'recover.done.body': 'Mada: your account is now on this {kind}. Open Mada Trips and sign in with a code.',
+  'recover.done.phone': 'number',
+  'recover.done.email': 'email address',
+  'recover.declined.subject': 'About your Mada account',
+  'recover.declined.body': 'Mada: we couldn’t confirm it’s you, so your account stays as it was. Call us on {phone} and we’ll sort it out together.',
 
   // ───────────── errors from the Core API ─────────────
   'auth.error.phoneRequired': 'Verify your phone number to book. It takes a minute.',
