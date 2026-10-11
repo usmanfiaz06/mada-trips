@@ -253,7 +253,7 @@ export function TrackedFlights({ title }) {
           <div key={t.id} className="card rise td-track">
             <div className="spread">
               <span className="row" style={{ gap: 10 }}>
-                <span className="td-track-mark" style={{ background: t.brand || '#1e352d' }}>{t.iata}</span>
+                <AirlineMark flight={{ iata: t.iata, airline: t.airline, brand: t.brand }} size={44} />
                 <span className="col" style={{ gap: 0 }}><span className="h3" style={{ fontSize: 15 }}><span className="code">{t.code}</span>{t.airline ? ` · ${t.airline}` : ''}</span><span className="tiny">{when}</span></span>
               </span>
               {t.known ? <span className="pill ok"><span className="dot pulse" style={{ background: '#2f7a4b' }} />On time</span> : <span className="pill">Waiting</span>}

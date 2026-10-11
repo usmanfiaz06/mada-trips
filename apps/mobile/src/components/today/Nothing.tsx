@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import { addDays, dayLabel, durationLabel, FlightNumber, AIRPORT_CITY, todayIn, type TrackedFlightView } from '@mada/shared';
 import { ArtFriends, ArtPass } from '@/components/art/Arts';
+import { AirlineMark } from '@/components/booking/AirlineMark';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
@@ -117,7 +118,7 @@ export function TrackedFlights({ flights, title, onStop }: { flights: Shown[]; t
           <Box key={f.id} gap={12} testID={`tracked-${f.flightNumber}`}>
             <Spread>
               <Row gap={10}>
-                <View style={[styles.trackMark, { backgroundColor: f.brand ?? colors.green }]}><T style={{ color: '#fff', fontFamily: ff.ui700, fontSize: 12 }}>{f.flightNumber.slice(0, 2)}</T></View>
+                <AirlineMark carrier={f.flightNumber.slice(0, 2)} brand={f.brand} size={40} label={f.carrierName ?? undefined} />
                 <View><H3 size={15}>{f.flightNumber}{f.carrierName ? ` · ${f.carrierName}` : ''}</H3><Tiny>{when}</Tiny></View>
               </Row>
               {f.known ? <Tag tone="ok" label={t(f.status === 'delayed' ? 'td.track.late' : 'td.track.onTime')} icon={<Dot color={colors.ok} size={6} />} /> : <Tag label={t('td.track.waiting')} />}
