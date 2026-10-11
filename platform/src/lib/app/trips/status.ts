@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { AIRLINE_INFO, arriveInstant, dayPart, departInstant, outSegment, todayIn, type FlightStatus, type TrackFlightRequest, type TrackedFlightView, type TripDetail, type TripPhase } from "@mada/shared";
+import { AIRLINE_INFO, arriveInstant, dayPart, departInstant, outSegment, scheduleOnlyStatus, todayIn, type FlightStatus, type TrackFlightRequest, type TrackedFlightView, type TripDetail, type TripPhase } from "@mada/shared";
 import { db } from "@/db";
 import { appSegments, appTrackedFlights, appTrips } from "@/db/app-schema";
 import { appFlightEvents, appTrackedExtras, appTripFacts } from "@/db/app-schema-trips";
@@ -155,9 +155,11 @@ const durationOf = (i: FlightStatusInfo | null) => {
 
 export function toTrackedView(t: typeof appTrackedFlights.$inferSelect, e: typeof appTrackedExtras.$inferSelect | null): TrackedFlightView {
   const local = (v: string | null) => (v ? v.replace(" ", "T").slice(0, 16) : null);
+  // A schedule-only flight moves on with the clock between polls (departed, landed), and says it's by the schedule.
+  const sched = scheduleOnlyStatus({ status: t.status as FlightStatus, source: t.source, from: t.fromAirport, to: t.toAirport, departLocal: local(t.departLocal), arriveLocal: local(t.arriveLocal) });
   return {
     id: t.id, flightNumber: t.flightNumber, carrierName: t.carrierName, date: t.date, from: t.fromAirport, to: t.toAirport, departLocal: local(t.departLocal), arriveLocal: local(t.arriveLocal),
-    status: t.status as FlightStatus, gate: t.gate, terminal: t.terminal, source: t.source, updatedAt: t.updatedAt.toISOString(),
+    status: sched.status, scheduleOnly: sched.scheduleOnly, gate: t.gate, terminal: t.terminal, source: t.source, updatedAt: t.updatedAt.toISOString(),
     alerts: e?.alerts ?? false, known: e?.known ?? !!t.fromAirport, durationMin: e?.durationMin ?? null, brand: e?.brand ?? AIRLINE_INFO[t.flightNumber.slice(0, 2)]?.brand ?? null,
   };
 }

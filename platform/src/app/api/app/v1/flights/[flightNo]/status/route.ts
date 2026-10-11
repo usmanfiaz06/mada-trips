@@ -1,4 +1,4 @@
-import { AIRLINE_INFO, FlightNumber, isIsoDay, type FlightStatusResponse } from "@mada/shared";
+import { AIRLINE_INFO, FlightNumber, isIsoDay, scheduleOnlyStatus, type FlightStatusResponse } from "@mada/shared";
 import { requestContext } from "@/lib/app/context";
 import { AppError, json, resilient } from "@/lib/app/http";
 import { guestLimit, lookupFlight } from "@/lib/app/trips/status";
@@ -21,9 +21,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ flightNo: strin
     if (!isIsoDay(date)) throw new AppError("VALIDATION", { fields: { date: "Expected a day as YYYY-MM-DD" } });
     const info = await lookupFlight(raw, date);
     const dur = info?.departLocal && info.arriveLocal ? ((Number(info.arriveLocal.slice(11, 13)) * 60 + Number(info.arriveLocal.slice(14, 16)) - Number(info.departLocal.slice(11, 13)) * 60 - Number(info.departLocal.slice(14, 16))) + 1440) % 1440 : null;
+    // Schedule-only answers move on with the clock (departed, landed) and say so (P1-9).
+    const sched = info ? scheduleOnlyStatus(info) : null;
     const flight = info ? {
       flightNumber: info.flightNumber, carrierName: info.carrierName, date, from: info.from, to: info.to, departLocal: info.departLocal, arriveLocal: info.arriveLocal,
-      status: info.status, gate: info.gate, terminal: info.terminal, source: info.source, updatedAt: new Date().toISOString(), known: true, durationMin: dur, brand: AIRLINE_INFO[raw.slice(0, 2)]?.brand ?? null,
+      status: sched!.status, scheduleOnly: sched!.scheduleOnly, gate: info.gate, terminal: info.terminal, source: info.source, updatedAt: new Date().toISOString(), known: true, durationMin: dur, brand: AIRLINE_INFO[raw.slice(0, 2)]?.brand ?? null,
     } : null;
     return json({ flight } satisfies FlightStatusResponse, 200, { "Cache-Control": "private, max-age=60" });
   });

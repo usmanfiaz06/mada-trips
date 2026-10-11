@@ -103,6 +103,11 @@ export const TrackedFlight = z.object({
   terminal: z.string().nullable(),
   /** "Live · airline", "FlightAware". */
   source: z.string().nullable(),
+  /**
+   * No live feed for this flight: the status follows the published schedule (departed/landed by the clock), so the app
+   * can say "By the schedule" rather than "On time". Optional for older servers.
+   */
+  scheduleOnly: z.boolean().optional(),
   updatedAt: IsoDateTime,
 });
 export type TrackedFlight = z.infer<typeof TrackedFlight>;

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { IsoDateTime } from './common';
+import { zonedToInstant } from '../dates';
 
 /** Where an aircraft is right now, from open ADS-B data. Position and altitude only: no gates, delays or schedules. */
 export const FlightPosition = z.object({
@@ -103,4 +104,29 @@ export function estimatePosition(from: string, to: string, departAt: number, arr
   const fraction = Math.round(((now - departAt) / (arriveAt - departAt)) * 1000) / 1000;
   const [lat, lon] = greatCirclePoint([a[0], a[1]], [b[0], b[1]], fraction);
   return { lat, lon, fraction, basis };
+}
+
+/**
+ * A flight known only from its schedule (no live feed: the source isn't "Live · …") still moves on with the clock:
+ * past its scheduled departure it reads 'departed', past its scheduled arrival 'landed', so an evening view of a
+ * morning flight never says "On time" (LIVE-AUDIT P1-9). Live statuses, and anything already past 'scheduled' or
+ * 'on_time', are left as they are. Times are the airports' wall clocks; an airport we don't know the zone of is left.
+ */
+export function scheduleOnlyStatus<S extends string>(
+  f: { status: S; source: string | null; from: string | null; to: string | null; departLocal: string | null; arriveLocal: string | null },
+  now: Date = new Date(),
+): { status: S | 'departed' | 'landed'; scheduleOnly: boolean } {
+  const scheduleOnly = !(f.source ?? '').startsWith('Live');
+  if (!scheduleOnly || (f.status !== 'scheduled' && f.status !== 'on_time')) return { status: f.status, scheduleOnly };
+  const at = (local: string | null, code: string | null) => {
+    const tz = code ? AIRPORT_GEO[code]?.[2] : undefined;
+    if (!local || !tz) return null;
+    try { return zonedToInstant(local, tz).getTime(); } catch { return null; }
+  };
+  const t = now.getTime();
+  const arrive = at(f.arriveLocal, f.to);
+  if (arrive !== null && t >= arrive) return { status: 'landed', scheduleOnly };
+  const depart = at(f.departLocal, f.from);
+  if (depart !== null && t >= depart) return { status: 'departed', scheduleOnly };
+  return { status: f.status, scheduleOnly };
 }
