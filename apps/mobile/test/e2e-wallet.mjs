@@ -592,7 +592,7 @@ async function support() {
   await see('That file is over 10 MB. Send a smaller photo, or a screenshot of the page.', 'too big');
   await pickFile(() => byTest('support-attach').click(), 'insurance.pdf');
   await see('PDF · insurance.pdf', 'pdf sent');
-  await see('Got it. We’ll look at it and reply here within 5 minutes.', 'photo reply');
+  await see('Got it. We’ll look at it and reply here within 10 minutes.', 'photo reply');
 
   step('support: offline, queued, call and SMS');
   await context.setOffline(true);

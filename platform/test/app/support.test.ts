@@ -117,7 +117,7 @@ describe("talk to Mada", () => {
     expect(r.status, JSON.stringify(r.json)).toBe(201);
     const [mine, reply] = SendSupportMessageResponse.parse(r.json).messages;
     expect(mine!.attachment).toMatchObject({ name: "tag.jpg", mime: "image/jpeg" });
-    expect(reply!.body).toBe("Got it. We’ll look at it and reply here within 5 minutes.");
+    expect(reply!.body).toBe("Got it. We’ll look at it and reply here within 10 minutes.");
     const file = await callP(attachmentGet, { id: mine!.attachment!.id }, { token });
     expect(file.bytes.equals(JPEG)).toBe(true);
     const other = await signIn();

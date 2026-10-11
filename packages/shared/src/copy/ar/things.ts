@@ -104,8 +104,8 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.bookSheet.kids': 'أعمار الأطفال: {ages}',
   'things.bookSheet.message': 'رسالتك',
   'things.bookSheet.send': 'أرسل إلى مادا',
-  'things.bookSheet.byHand': 'يحجزه {agent} ويرسل لك السعر هنا، عادةً خلال 30 دقيقة.',
-  'things.bookSheet.byHandAway': 'يحجزه الفريق ويرسل لك السعر هنا، عادةً خلال 30 دقيقة.',
+  'things.bookSheet.byHand': 'يحجزه {agent} ويرسل لك السعر هنا، عادةً خلال ساعتين.',
+  'things.bookSheet.byHandAway': 'يحجزه الفريق ويرسل لك السعر هنا، عادةً خلال ساعتين.',
   'things.bookSheet.sent': 'أُرسل. سنرد في المحادثة.',
   'things.request.title': 'احجز {name}',
   'things.request.message': '{name} في {city}، {who}، {when}',
@@ -169,4 +169,5 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.ride.note': 'يحجز {agent} السيارة ويرسل لك السعر هنا قبل أي دفع.',
   'things.ride.noteAway': 'يحجز فريقنا السيارة ويرسل لك السعر هنا قبل أي دفع.',
   'things.ride.requestTitle': 'سيارة إلى {name}',
+  'things.ride.messageNoFrom': 'أرجو ترتيب سيارة إلى {name} يوم {day} الساعة {time}. {who}.',
 };

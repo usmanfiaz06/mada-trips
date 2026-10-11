@@ -47,7 +47,7 @@ export const placesCopy = {
   'places.city.localTime': 'Local time',
   'places.city.nearest': 'Nearest airport',
   'places.city.planByHandAway': 'We’ll put it together by hand. Mada replies here within 10 minutes, any hour.',
-  'places.city.planByHand': 'We’ll put it together by hand. {agent} replies here, usually within 20 minutes.',
+  'places.city.planByHand': 'We’ll put it together by hand. {agent} replies here, usually within 10 minutes.',
   'places.city.notFound': 'We can’t find that city.',
   'places.city.notFoundBody': 'Search again by its name or its airport code.',
   'places.city.search': 'Search cities',

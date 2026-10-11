@@ -51,7 +51,7 @@ export const arPlaces: ArSection<typeof placesCopy> = {
   'places.city.localTime': 'التوقيت المحلي',
   'places.city.nearest': 'أقرب مطار',
   'places.city.planByHandAway': 'نجهّزها يدويًا. ترد مادا هنا خلال 10 دقائق، في أي ساعة.',
-  'places.city.planByHand': 'نجهّزها يدويًا. يرد {agent} هنا، عادةً خلال 20 دقيقة.',
+  'places.city.planByHand': 'نجهّزها يدويًا. يرد {agent} هنا، عادةً خلال 10 دقائق.',
   'places.city.notFound': 'لم نجد هذه المدينة.',
   'places.city.notFoundBody': 'ابحث مرة أخرى باسمها أو برمز مطارها.',
   'places.city.search': 'ابحث عن مدن',

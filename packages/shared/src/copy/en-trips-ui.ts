@@ -76,7 +76,7 @@ export const enTripsUi = {
   'tr.sameAgain': 'Same again',
   'tr.sameAgainAsk': '{city} again, like {when}',
   'rq.tr.savedPhone': 'Saved on this phone',
-  'rq.tr.withinHour': 'Usually within the hour',
+  'rq.tr.withinHour': 'Usually within 2 hours',
 
   /* payments */
   'pay.title': 'Payments',
@@ -327,4 +327,5 @@ export const enTripsUi = {
   'cf.n.ok.other': 'A small fix ({n} letters). {airline} does this free. Mada sends it with a photo of the passport page.',
   'cf.n.too': 'That’s more than a spelling fix. Airlines allow up to 3 letters changed. A different name means a new ticket, so the fare rules apply.',
   'cf.n.askCost': 'Ask Mada what it would cost',
+  'tr.import.keep': 'Upload the confirmation and it\'s kept in your Wallet with your passports, ready offline.',
 } as const;

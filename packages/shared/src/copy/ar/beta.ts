@@ -8,7 +8,7 @@ import type { ArSection } from './types';
 
 export const arBeta: ArSection<typeof betaCopy> = {
   'beta.fr.title': 'أخبرنا إلى أين ومتى',
-  'beta.fr.body': 'يبحث أحد فريق مادا عن الأسعار ويحجز لك أفضلها. تصلك الخيارات هنا، عادةً خلال ساعة.',
+  'beta.fr.body': 'يبحث أحد فريق مادا عن الأسعار ويحجز لك أفضلها. تصلك الخيارات هنا، عادةً خلال ساعتين.',
   'beta.fr.route': 'من {from} إلى {to}',
   'beta.fr.oneWay': '{date}، ذهاب فقط',
   'beta.fr.travellers.one': 'مسافر واحد',

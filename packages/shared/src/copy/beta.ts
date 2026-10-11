@@ -6,7 +6,7 @@
 export const betaCopy = {
   // ───────────── flights by request: the form ─────────────
   'beta.fr.title': 'Tell us where and when',
-  'beta.fr.body': 'Someone at Mada finds the fares and holds the best ones for you. Your options arrive here, usually within the hour.',
+  'beta.fr.body': 'Someone at Mada finds the fares and holds the best ones for you. Your options arrive here, usually within 2 hours.',
   'beta.fr.route': '{from} to {to}',
   'beta.fr.oneWay': '{date}, one way',
   'beta.fr.travellers.one': '1 traveller',

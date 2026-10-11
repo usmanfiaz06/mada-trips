@@ -87,7 +87,7 @@ export const arTripsUi: ArSection<typeof enTripsUi> = {
   'tr.sameAgain': 'نفسها مرة أخرى',
   'tr.sameAgainAsk': '{city} مرة أخرى، مثل {when}',
   'rq.tr.savedPhone': 'محفوظ على هذا الجوال',
-  'rq.tr.withinHour': 'عادةً خلال ساعة',
+  'rq.tr.withinHour': 'عادةً خلال ساعتين',
   'pay.title': 'المدفوعات',
   'pay.emptyTitle': 'لم يُدفع شيء بعد.',
   'pay.emptyBody': 'كل دفعة في هذه الرحلة تظهر هنا مع فاتورتها الضريبية.',
@@ -334,4 +334,5 @@ export const arTripsUi: ArSection<typeof enTripsUi> = {
   'cf.n.ok.other': 'تصحيح بسيط ({n} حرفًا). تعمله {airline} مجانًا. وترسله مادا مع صورة صفحة الجواز.',
   'cf.n.too': 'هذا أكثر من تصحيح تهجئة. تسمح شركات الطيران بتغيير 3 أحرف كحد أقصى. الاسم المختلف يعني تذكرة جديدة، فتنطبق قواعد السعر.',
   'cf.n.askCost': 'اسأل مادا كم يكلف',
+  'tr.import.keep': 'ارفع تأكيد الحجز ليُحفظ في محفظتك مع جوازاتك، ومتاحًا دون اتصال.',
 };

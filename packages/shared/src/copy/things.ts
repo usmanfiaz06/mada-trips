@@ -107,8 +107,8 @@ export const thingsCopy = {
   'things.bookSheet.kids': 'Children’s ages: {ages}',
   'things.bookSheet.message': 'Your message',
   'things.bookSheet.send': 'Send to Mada',
-  'things.bookSheet.byHand': '{agent} books it and sends you the price here, usually within 30 minutes.',
-  'things.bookSheet.byHandAway': 'The team books it and sends you the price here, usually within 30 minutes.',
+  'things.bookSheet.byHand': '{agent} books it and sends you the price here, usually within 2 hours.',
+  'things.bookSheet.byHandAway': 'The team books it and sends you the price here, usually within 2 hours.',
   'things.bookSheet.sent': 'Sent. We’ll reply in the chat.',
   'things.request.title': 'Book {name}',
   'things.request.message': '{name} in {city}, {who}, {when}',
@@ -174,4 +174,5 @@ export const thingsCopy = {
   'things.ride.note': '{agent} books the car and sends the price here before anything is paid.',
   'things.ride.noteAway': 'The desk books the car and sends the price here before anything is paid.',
   'things.ride.requestTitle': 'A car to {name}',
+  'things.ride.messageNoFrom': 'Please arrange a car to {name} on {day} at {time}. {who}.',
 } as const;
