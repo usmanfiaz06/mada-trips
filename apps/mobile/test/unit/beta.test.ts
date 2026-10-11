@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ROUTES, addDays, normalizeContactPhone, todayIn } from '@mada/shared';
+import { ROUTES, addDays, normalizeContactPhone, setLocaleResolver, todayIn } from '@mada/shared';
 import { setTransport, type Wire } from '../../src/lib/api';
 import { mockTransport } from '../../src/lib/mock-api';
 import { setMockBeta } from '../../src/lib/mock/beta';
@@ -8,7 +8,6 @@ import { fileSize, fileUrl } from '../../src/lib/beta';
 import { finishSignIn } from '../../src/lib/auth';
 import { MOCK_CODE, mockAuth, resetMockAuth } from '../../src/lib/auth/mock';
 import { useSession } from '../../src/lib/session';
-import { setLocaleResolver } from '@mada/shared';
 
 /*
  * The beta in mock mode, the way the app meets it: flights by request (the form's answers → fares from the desk →
