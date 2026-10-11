@@ -187,6 +187,10 @@ const platformEnv = {
   APP_OTP_PEPPER: gen("APP_OTP_PEPPER", () => randomBytes(24).toString("hex")),
   SEED_PASSWORD: gen("STAGING_SEED_PASSWORD", () => randomBytes(9).toString("base64url")),
   APP_PUBLIC_URL: `https://${PLATFORM}.vercel.app`,
+  // Invite links (<base>/join/<code>) point at this copy, which serves /join itself; production's madatrips.sa 404s them.
+  APP_LINK_BASE_URL: `https://${PLATFORM}.vercel.app`,
+  // Testers who sign in with email may book; the desk calls the number they type at payment (switches.ts).
+  APP_BOOKING_REQUIRES_PHONE: "no",
 };
 
 const appEnv = {

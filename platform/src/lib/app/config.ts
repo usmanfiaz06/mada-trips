@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
  *   SUPABASE_SMS_HOOK_SECRET  "v1,whsec_…" from Supabase's Send SMS hook; signs the calls to /auth/sms-hook.
  *   PHONE_CODE_CHANNEL   whatsapp | sms | whatsapp_then_sms: how phone codes travel (phone-channel.ts, AUTH.md §5a).
  *   ZOHO_CPAAS_*         WhatsApp codes through Zoho CPaaS (suppliers/live/zoho-cpaas.ts).
+ *   APP_LINK_BASE_URL    the origin of links we hand out (invites: <base>/join/<code>). Defaults to https://madatrips.sa;
+ *                        a staging copy (APP_ENV=staging) falls back to its APP_PUBLIC_URL, which serves /join itself.
  *   APP_LEGACY_AUTH      "yes" keeps the direct /auth/otp, /auth/apple and /auth/google routes on a production
  *                        deployment ("no" turns them off anywhere). Supabase Auth replaces them (docs/app/AUTH.md).
  */
@@ -86,4 +88,11 @@ export function legacyAuthEnabled(): boolean {
   if (v === "yes") return true;
   if (v === "no") return false;
   return !isProductionDeploy();
+}
+
+/** The origin of links we hand out (invites, shares): madatrips.sa, or this staging copy's own URL (see the header). */
+export function publicLinkBase(): string {
+  const set = process.env.APP_LINK_BASE_URL?.trim();
+  const staging = process.env.APP_ENV === "staging" ? process.env.APP_PUBLIC_URL?.trim() : undefined;
+  return (set || staging || "https://madatrips.sa").replace(/\/+$/, "");
 }

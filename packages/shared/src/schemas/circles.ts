@@ -513,7 +513,8 @@ export const OkResponse = z.object({ ok: z.literal(true) });
 /** Invite links last 14 days (COPY: "It lasts 14 days"). */
 export const INVITE_TTL_DAYS = 14;
 export const INVITE_HOST = 'madatrips.sa';
-export const inviteUrl = (code: string) => `https://${INVITE_HOST}/join/${code}`;
+/** The invite page. `base` is the server's public link origin (APP_LINK_BASE_URL); production's by default. */
+export const inviteUrl = (code: string, base = `https://${INVITE_HOST}`) => `${base.replace(/\/+$/, '')}/join/${code}`;
 /** An invite code's shape: 8 letters or digits, a dash, 6 more (lowercase, no 0/1/i/l/o). */
 export const INVITE_CODE = /^[a-z0-9]{8}-[a-z0-9]{6}$/;
 /**
@@ -523,7 +524,8 @@ export const INVITE_CODE = /^[a-z0-9]{8}-[a-z0-9]{6}$/;
 export function inviteCodeIn(text: string | null | undefined): string | null {
   if (!text) return null;
   const s = text.trim().toLowerCase();
-  const link = /(?:madatrips\.sa|madatrips:\/)\/(?:join|i)\/([a-z0-9]{8}-[a-z0-9]{6})\b/.exec(s);
+  // Any host's /join/ or /i/ (madatrips.sa, a staging copy), or the app's own scheme.
+  const link = /(?:[a-z0-9.-]+\.[a-z]{2,}|madatrips:\/)\/(?:join|i)\/([a-z0-9]{8}-[a-z0-9]{6})\b/.exec(s);
   if (link) return link[1]!;
   const bare = /(?:^|[^a-z0-9-])([a-z0-9]{8}-[a-z0-9]{6})(?![a-z0-9-])/.exec(s);
   return bare ? bare[1]! : null;

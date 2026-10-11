@@ -11,7 +11,7 @@ import { db } from "@/db";
 import { appCircleMembers, appCircles, appUsers } from "@/db/app-schema";
 import { appCircleInvites, appFriendships } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
-import { pepper } from "../config";
+import { pepper, publicLinkBase } from "../config";
 import { decryptField, encryptField, hasDataKey } from "../crypto";
 import { AppError } from "../http";
 import { suppliers } from "../suppliers";
@@ -51,7 +51,7 @@ export function lookupOf(code: string): string | null {
 const expiry = (days: number = INVITE_TTL_DAYS) => new Date(Date.now() + days * 86_400_000);
 type InviteRow = typeof appCircleInvites.$inferSelect;
 const link = (r: Pick<InviteRow, "id" | "lookup" | "expiresAt" | "maxUses" | "uses">): InviteLink =>
-  ({ code: codeFor(r.lookup!), url: inviteUrl(codeFor(r.lookup!)), expiresAt: r.expiresAt.toISOString(), id: r.id, maxUses: r.maxUses ?? null, uses: r.uses ?? 0 });
+  ({ code: codeFor(r.lookup!), url: inviteUrl(codeFor(r.lookup!), publicLinkBase()), expiresAt: r.expiresAt.toISOString(), id: r.id, maxUses: r.maxUses ?? null, uses: r.uses ?? 0 });
 const isFull = (r: Pick<InviteRow, "maxUses" | "uses">) => r.maxUses != null && r.uses >= r.maxUses;
 const phoneAad = (inviteId: string) => `app_circle_invites:${inviteId}:phone`;
 export const phoneHash = (e164: string) => sha256hex(`${pepper()}:invite-phone:${e164}`);
@@ -114,8 +114,8 @@ export async function inviteByPhone(userId: string, input: Extract<CreateInviteR
 
 async function send(channel: string, phone: string, name: string, code: string, key: "sms.circles.invite" | "sms.circles.remind") {
   try {
-    if (channel === "whatsapp") await suppliers.whatsapp().sendTemplate(phone, "mada_invite", [name, inviteUrl(code)], currentLocale());
-    else await suppliers.sms().send(phone, t(key, { name, url: inviteUrl(code) }));
+    if (channel === "whatsapp") await suppliers.whatsapp().sendTemplate(phone, "mada_invite", [name, inviteUrl(code, publicLinkBase())], currentLocale());
+    else await suppliers.sms().send(phone, t(key, { name, url: inviteUrl(code, publicLinkBase()) }));
   } catch (e) {
     console.error("[circles] invite message not sent", (e as Error).message);
   }
