@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, bigint, bigserial, boolean, integer, timestamp, date, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
 import { appCircles, appMessages, appUsers } from "./app-schema";
 
 /*
@@ -42,6 +42,9 @@ export const appCircleInvites = pgTable("app_circle_invites", {
   phoneEnc: text("phone_enc"),
   channel: text("channel").notNull(), // app | link | sms | whatsapp
   lookup: text("lookup"),
+  // Link invites: how many people it lets in (null: anyone until it expires) and how many it has let in.
+  maxUses: integer("max_uses"),
+  uses: integer("uses").notNull().default(0),
   status: text("status").notNull().default("pending"), // pending | accepted | declined | cancelled
   acceptedBy: uuid("accepted_by").references(() => appUsers.id, { onDelete: "set null" }),
   remindedAt: timestamp("reminded_at", { withTimezone: true }),
@@ -185,3 +188,34 @@ export const appPresenceMarks = pgTable("app_presence_marks", {
   city: text("city"),
   createdAt: createdAt(),
 }, (t) => [primaryKey({ columns: [t.userId, t.otherId] })]);
+
+/** Reactions to a circle message: one row per person per emoji (shared REACTIONS). */
+export const appCircleReactions = pgTable("app_circle_reactions", {
+  messageId: uuid("message_id").notNull().references(() => appMessages.id, { onDelete: "cascade" }),
+  userId: user("user_id"),
+  emoji: text("emoji").notNull(),
+  createdAt: createdAt(),
+}, (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })]);
+
+/**
+ * The live channel's feed (lib/app/circles/live.ts): one row per change in a circle, written by database triggers
+ * (migration 0021) so no code path can forget, and read by GET /circles/live (SSE) and /circles/events. Rows name
+ * what changed, never its content. user_id targets one person (an invite, a removal) whether or not they're a member.
+ * No foreign keys: a row outlives the circle it describes, so a member hears that the circle is gone. Kept 3 days.
+ */
+export const appCircleEvents = pgTable("app_circle_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  circleId: uuid("circle_id").notNull(),
+  userId: uuid("user_id"),
+  actorId: uuid("actor_id"),
+  kind: text("kind").notNull(), // shared LiveKind
+  ref: text("ref"),
+  createdAt: createdAt(),
+}, (t) => [index("app_circle_events_circle_idx").on(t.circleId, t.id), index("app_circle_events_user_idx").on(t.userId, t.id).where(sql`${t.userId} IS NOT NULL`)]);
+
+/** Fixed-window counters for limits keyed by something other than a user (an IP's invite lookups). Swept daily. */
+export const appRateCounters = pgTable("app_rate_counters", {
+  key: text("key").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  n: integer("n").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.key, t.windowStart] })]);
