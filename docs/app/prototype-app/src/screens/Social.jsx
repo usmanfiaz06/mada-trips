@@ -773,7 +773,7 @@ export function Saved({ params = {} }) {
 /* ---------- opening an invite link ---------- */
 
 export const INVITES = {
-  'ist-8k2': { code: 'ist-8k2', source: 'eid', from: 'abdullah', circle: 'Istanbul for Eid', img: 'img/istanbul.jpg', members: ['abdullah', 'noor', 'khalid'], trip: 'Istanbul · 9–15 Mar' },
+  'ist-8k2': { code: 'ist-8k2', source: 'eid', from: 'abdullah', circle: 'Istanbul for Eid', img: 'img/istanbul-mosque.jpg', members: ['abdullah', 'noor', 'khalid'], trip: 'Istanbul · 9–15 Mar' },
   'old-4q1': { code: 'old-4q1', from: 'abdullah', expired: true, circle: 'Summer in Baku' },
 };
 
