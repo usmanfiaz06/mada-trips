@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  CreateOrderBody, DESTINATIONS, demoPassportTarget, normalizeContactPhone, entryChecks, money, seatsFor, t,
+  CreateOrderBody, DESTINATIONS, rangeLabel, demoPassportTarget, normalizeContactPhone, entryChecks, money, seatsFor, t,
   type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -38,7 +38,8 @@ export function orderView(o: OrderRow, now = Date.now()): OrderView {
   const problem = ["needs_answer", "fare_changed", "ticketing_failed"].includes(o.status);
   return {
     id: o.id, kind: o.kind as OrderView["kind"], status: o.status as OrderView["status"], step: Math.min(3, o.step),
-    title: snap.title ?? "", place: snap.place ?? "", depart: f?.out.date ?? null, departTime: f?.out.dep ?? null, from: f?.out.from ?? null, oneway: f ? !f.back : false,
+    // Dates are worded when read, in the reader's language (the order was made in the language of the moment).
+    title: f && snap.place ? `${snap.place} · ${rangeLabel(f.out.date, f.back?.date ?? null)}` : snap.title ?? "", place: snap.place ?? "", depart: f?.out.date ?? null, departTime: f?.out.dep ?? null, from: f?.out.from ?? null, oneway: f ? !f.back : false,
     photo: snap.photo ?? "istanbul-galata", carrier: f?.carrier ?? null, airline: f?.airline ?? null, flightNumber: f?.out.flightNumber ?? null, cabin: f?.cabin ?? null,
     // Quoted fares get their seats from the airline at check-in: none are invented here.
     seats: f && !(o.snapshot as { quotedFlight?: unknown }).quotedFlight ? seatsFor(o.travellerIds.length, f.cabin) : [], travellerIds: o.travellerIds,

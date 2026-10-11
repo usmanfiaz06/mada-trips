@@ -11,3 +11,8 @@
 .shake { animation: auth-shake .32s ease; }
 @keyframes auth-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 45% { transform: translateX(8px); } 70% { transform: translateX(-5px); } 85% { transform: translateX(3px); } }
 @media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
+/* The phone code's channel: WhatsApp's mark beside "We sent a code on WhatsApp to …" (screens/AuthHelp.jsx). */
+.auth-sent { display: flex; align-items: flex-start; gap: 8px; }
+.auth-sent .wa-mark { flex: none; width: 19px; height: 19px; margin-top: 2px; }
+.auth-sent p { margin: 0; }
+.auth-wait { color: #5f6b65; }

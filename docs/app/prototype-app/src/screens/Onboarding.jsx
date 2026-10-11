@@ -320,8 +320,7 @@ export default function Onboarding({ params = {} }) {
         <TopBar onBack={back} />
         <div className="scroll no-dock" style={{ padding: '24px 24px 0', gap: 16 }}>
           <h1 className="h1">Enter the code</h1>
-          <p className="body">Sent to {pretty || 'your phone'}. <button type="button" className="link" onClick={back}>Change number</button></p>
-          <CodeInput id="otp" about="phone" contact={digits} flow={social ? 'add' : 'signin'} onDone={codeOk} onChange={back}
+          <CodeInput id="otp" about="phone" contact={digits} shownAs={pretty || 'your phone'} channels={['whatsapp', 'sms']} flow={social ? 'add' : 'signin'} onDone={codeOk} onChange={back}
             onOther={() => goto('email')} {...otherWays} onLost={() => { setRecoverPrefill({ kind: 'phone', value: digits }); goto('recover'); }} />
         </div>
       </div>

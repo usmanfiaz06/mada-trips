@@ -66,17 +66,27 @@ function HelpRow({ icon, title, sub, onClick, disabled }) {
 const APPLE = <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1e352d" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.72-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.53 2.66-.39 6.6 1.1 8.75.73 1.05 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.41 1.2-2.47-.03-.01-2.3-.88-2.32-3.52zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.65-1.05 1.68-.92 2.67.97.08 1.96-.49 2.56-1.22z" /></svg>;
 const GOOGLE = <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.5z" /><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" /><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" /><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.5z" /></svg>;
 
+/* WhatsApp's glyph, in WhatsApp green: phone codes go on WhatsApp first (docs/app/AUTH.md, Zoho CPaaS). */
+export const WHATSAPP = <svg className="wa-mark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" /></svg>;
+
+/** In the demo, a number ending 0000 "isn't on WhatsApp": the code comes by SMS, and the screen says why. */
+export const NOT_ON_WHATSAPP = /0000$/;
+
 /**
- * "Didn't get the code?": a new code (after the countdown), the spam folder for email, the wrong number or address,
- * another way in (sign-in only), and "I can't use this number or email any more".
+ * "Didn't get the code?": a new code (after the countdown), the other channel for a phone code (SMS or WhatsApp),
+ * WhatsApp itself or the spam folder for email, the wrong number or address, another way in (sign-in only), and
+ * "I can't use this number or email any more".
  */
-export function CodeHelpSheet({ about, resendIn, onResend, onChange, flow, onOther, onApple, onGoogle, onLost, onClose }) {
+export function CodeHelpSheet({ about, resendIn, onResend, onChange, flow, onOther, onApple, onGoogle, onLost, onClose, channel, other, onSwitch }) {
   const go = (fn) => () => { onClose(); fn(); };
   return (
     <Sheet label="Didn’t get the code?" onClose={onClose}>
       <h2 className="h2">Didn’t get the code?</h2>
       <p className="body">Codes can take a minute to arrive. Here’s what else you can do.</p>
       <HelpRow icon={<Icon name="refund" size={18} />} title={resendIn > 0 ? `Send a new code in ${mmss(resendIn)}` : 'Send a new code'} disabled={resendIn > 0} onClick={go(onResend)} />
+      {other && <HelpRow icon={other === 'whatsapp' ? WHATSAPP : <Icon name="phone" size={18} />} disabled={resendIn > 0} onClick={go(onSwitch)}
+        title={other === 'sms' ? (resendIn > 0 ? `Send by SMS in ${mmss(resendIn)}` : 'Send by SMS instead') : (resendIn > 0 ? `Send on WhatsApp in ${mmss(resendIn)}` : 'Send on WhatsApp instead')} />}
+      {about === 'phone' && channel === 'whatsapp' && <HelpRow icon={WHATSAPP} title="Check WhatsApp" sub="It comes from Mada Trips, with a Copy code button." />}
       {about === 'email' && <HelpRow icon={<Icon name="mail" size={18} />} title="Check your spam or junk folder" sub={`It comes from Mada Trips, ${CODE_SENDER}.`} />}
       <HelpRow icon={<Icon name="edit" size={18} />} title={about === 'phone' ? 'Wrong number? Change it' : 'Wrong email? Change it'} onClick={go(onChange)} />
       {flow === 'signin' && (<>
@@ -94,7 +104,7 @@ export function CodeHelpSheet({ about, resendIn, onResend, onChange, flow, onOth
  * The code field and everything under it: tries left with a gentle shake, the pause after the third, the countdown
  * that turns into "Send a new code", Open Mail for email, and the help sheet.
  */
-export function CodeInput({ id = 'otp', about, contact, shownAs, onDone, onChange, flow = 'signin', onOther, onApple, onGoogle, onLost }) {
+export function CodeInput({ id = 'otp', about, contact, shownAs, onDone, onChange, flow = 'signin', onOther, onApple, onGoogle, onLost, channels, changeLabel = 'Change number' }) {
   const { s, toast } = useStore();
   const [code, setCode] = useState('');
   const [tries, setTries] = useState(0);
@@ -107,6 +117,11 @@ export function CodeInput({ id = 'otp', about, contact, shownAs, onDone, onChang
   const paused = pause && pause.until > Date.now();
   const shown = shownAs || (about === 'phone' ? prettyDigits(contact) : contact);
   const [lost, setLost] = useState(false);
+  /* Phone codes: on WhatsApp first, by SMS on request (or when WhatsApp can't reach the number). */
+  const [sent, setSent] = useState(() => (channels?.[0] === 'whatsapp' && NOT_ON_WHATSAPP.test(contact || '') ? { channel: 'sms', fellBack: true } : { channel: channels?.[0] || 'sms', fellBack: false }));
+  const other = channels ? channels.find((c) => c !== sent.channel) : null;
+  const sentLine = sent.channel === 'whatsapp' ? `We sent a code on WhatsApp to ${shown}.`
+    : sent.fellBack ? `We sent a code by SMS to ${shown}. WhatsApp couldn’t reach this number.` : `We sent a code by SMS to ${shown}.`;
 
   const check = (v) => {
     if (v === DEMO_CODE) { buzz(HAPTIC.success); onDone(); return; }
@@ -115,16 +130,24 @@ export function CodeInput({ id = 'otp', about, contact, shownAs, onDone, onChang
     setTries(used);
     if (used >= MAX_TRIES) setPause({ until: Date.now() + Math.max(PAUSE_SECONDS, resendIn) * 1000, seconds: Math.max(PAUSE_SECONDS, resendIn), open: true });
   };
-  const resend = () => {
+  const resend = (via) => {
     if (s.demo.offline) { toast('You’re offline. We’ll send it once you’re connected.'); return; }
     setTries(0); setCode(''); setPause(null); setResendIn(RESEND_SECONDS); buzz(HAPTIC.tap);
-    toast(`New code sent to ${shown}.`);
+    const next = !channels ? null : via === 'whatsapp' && NOT_ON_WHATSAPP.test(contact || '') ? { channel: 'sms', fellBack: true } : via ? { channel: via, fellBack: false } : sent;
+    if (next) setSent(next);
+    toast(!next ? `New code sent to ${shown}.` : next.channel === 'whatsapp' ? `New code sent on WhatsApp to ${shown}.` : `New code sent by SMS to ${shown}.`);
     setTimeout(() => input.current?.focus(), 50);
   };
   const left = MAX_TRIES - tries;
 
   return (
     <>
+      {channels && (
+        <div className="auth-sent" data-channel={sent.channel}>
+          {sent.channel === 'whatsapp' && WHATSAPP}
+          <p className="body"><span>{sentLine}</span> <button type="button" className="link" onClick={onChange}>{changeLabel}</button></p>
+        </div>
+      )}
       <div className="field">
         <label htmlFor={id}>6-digit code</label>
         <input id={id} ref={input} key={shake} className={'input otp' + (tries && !paused ? ' bad' : '') + (shake ? ' shake' : '')} inputMode="numeric" autoComplete="one-time-code" value={code} disabled={!!paused}
@@ -136,15 +159,23 @@ export function CodeInput({ id = 'otp', about, contact, shownAs, onDone, onChang
           ? <button type="button" className="link" onClick={() => setPause({ ...pause, open: true })}>Let’s take a short pause.</button>
           : resendIn > 0
             ? <span className="small num">New code in {mmss(resendIn)}</span>
-            : <button type="button" className="btn secondary small" onClick={resend}>Send a new code</button>}
+            : <button type="button" className="btn secondary small" onClick={() => resend()}>Send a new code</button>}
         {about === 'email' && <a className="btn secondary small" href="mailto:">Open Mail</a>}
       </div>
+      {other && !paused && (
+        <div className="row">
+          {resendIn > 0
+            ? <span className="small num auth-wait">{other === 'sms' ? `Send by SMS in ${mmss(resendIn)}` : `Send on WhatsApp in ${mmss(resendIn)}`}</span>
+            : <button type="button" className="link" onClick={() => resend(other)}>{other === 'sms' ? 'Send by SMS instead' : 'Send on WhatsApp instead'}</button>}
+        </div>
+      )}
       <div className="row"><button type="button" className="link" onClick={() => setHelp(true)}>Didn’t get the code?</button></div>
       <p className="tiny">Demo code: 123456</p>
-      {help && <CodeHelpSheet about={about} resendIn={resendIn} flow={flow} onClose={() => setHelp(false)} onResend={resend} onChange={onChange}
+      {help && <CodeHelpSheet about={about} resendIn={resendIn} flow={flow} onClose={() => setHelp(false)} onResend={() => resend()} onChange={onChange}
+        channel={channels ? sent.channel : null} other={other} onSwitch={() => resend(other)}
         onOther={onOther} onApple={onApple} onGoogle={onGoogle} onLost={onLost || (() => setLost(true))} />}
       {lost && <Overlay><RecoverScreen prefill={{}} onBack={() => setLost(false)} onDone={() => setLost(false)} /></Overlay>}
-      {pause?.open && <AuthPause until={pause.until} seconds={pause.seconds} onClose={() => setPause({ ...pause, open: false })} onDone={resend} />}
+      {pause?.open && <AuthPause until={pause.until} seconds={pause.seconds} onClose={() => setPause({ ...pause, open: false })} onDone={() => resend()} />}
     </>
   );
 }

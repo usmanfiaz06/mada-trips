@@ -8,7 +8,10 @@ import { appAuditLog } from "../../audit";
 import { AppError } from "../../http";
 import { HotelbedsError, hotelbedsEnv } from "./client";
 import { decodeOfferId, isHotelbedsOfferId, type HbPax } from "./hotels";
-import { hotelbedsBookingAllowed, hotelbedsHotels, hotelbedsMode, hotelbedsTransfers, staysMode } from "./app";
+import { dbFacts, hotelbedsBookingAllowed, hotelbedsHotels, hotelbedsMode, hotelbedsTransfers, staysMode } from "./app";
+import { buildVoucher } from "./voucher";
+import { costHalalas } from "./money";
+import type { Voucher } from "@mada/shared";
 
 /*
  * Booking on Hotelbeds from what the traveller chose, by the desk ("Book on Hotelbeds") or, for stays in live mode,
@@ -129,7 +132,7 @@ export async function bookStayOnHotelbeds(orderId: string, actor: DeskActor): Pr
       const cr = await hotels.checkRate([rateKey]);
       rateKey = cr.hotel?.rooms?.[0]?.rates?.[0]?.rateKey ?? rateKey;
     }
-    const stay = (o.snapshot as { stay?: { checkIn?: string; rooms?: number; name?: string } }).stay ?? {};
+    const stay = (o.snapshot as { stay?: { checkIn?: string; rooms?: number; name?: string; cancellation?: string; hotel?: { code?: number; category?: string | null } | null } }).stay ?? {};
     const { people, holder } = await partyOf(o.ownerId, o.travellerIds);
     const res = await hotels.book({
       rateKey, holder, paxes: paxesFor(people, stay.rooms ?? 1, stay.checkIn ?? new Date().toISOString().slice(0, 10), holder),
@@ -139,7 +142,8 @@ export async function bookStayOnHotelbeds(orderId: string, actor: DeskActor): Pr
     const b = res.booking;
     const [done] = await db.update(appSupplierBookings).set({
       status: b.status === "CONFIRMED" ? "confirmed" : "unknown", supplierRef: b.reference, rateKey, net: String(b.totalNet ?? b.hotel?.totalNet ?? ""), currency: b.currency ?? b.hotel?.currency ?? null,
-      details: { hotel: b.hotel?.name ?? stay.name ?? null, checkIn: b.hotel?.checkIn ?? null, checkOut: b.hotel?.checkOut ?? null, supplier: b.hotel?.supplier ?? null, rateComments: b.hotel?.rooms?.[0]?.rates?.[0]?.rateComments ?? null },
+      // Everything the voucher needs (voucher.ts): Hotelbeds' confirmation, the policy as the traveller saw it, our content.
+      details: { booking: b, cancellation: stay.cancellation ?? null, category: stay.hotel?.category ?? null, facts: b.hotel?.code ? (await dbFacts([Number(b.hotel.code)])).get(Number(b.hotel.code)) ?? null : null, agencyReference: o.ref ?? null },
       updatedAt: new Date(),
     }).where(eq(appSupplierBookings.id, row.id)).returning();
     await db.transaction(async (tx) => {
@@ -198,7 +202,7 @@ export async function bookTransferOnHotelbeds(requestId: string, actor: DeskActo
     const b = res.bookings[0]!;
     const [done] = await db.update(appSupplierBookings).set({
       status: b.status === "CONFIRMED" ? "confirmed" : "unknown", supplierRef: b.reference, net: String(b.totalAmount ?? tr.net), currency: b.currency ?? tr.currency,
-      details: { vehicle: tr.vehicle, kind: tr.kind, airport: tr.airport, arrival: tr.arrival, hotel: tr.hotel }, updatedAt: new Date(),
+      details: { booking: { ...b, holder }, transfer: tr }, updatedAt: new Date(),
     }).where(eq(appSupplierBookings.id, row.id)).returning();
     await db.transaction(async (tx) => {
       await tx.update(appRequests).set({ details: { ...(r.details as Record<string, unknown>), supplierRef: b.reference }, updatedAt: new Date() }).where(eq(appRequests.id, r.id));
@@ -232,4 +236,45 @@ export async function cancelSupplierBooking(id: string, actor: DeskActor, opts: 
 export async function orderForRequest(requestId: string) {
   const [o] = await db.select().from(appOrders).where(eq(appOrders.requestId, requestId)).orderBy(desc(appOrders.createdAt)).limit(1);
   return o ?? null;
+}
+
+/* ───────────── vouchers (the traveller's, the desk's) ───────────── */
+
+export function voucherOf(row: SupplierBookingRow): Voucher {
+  const d = row.details as { agencyReference?: string | null };
+  return buildVoucher({ id: row.id, product: row.product as "stay" | "transfer", status: row.status, supplierRef: row.supplierRef, agencyReference: d.agencyReference ?? row.clientReference, createdAt: row.createdAt, details: row.details as never });
+}
+
+/** A traveller's own voucher: confirmed or cancelled bookings only (one still being booked has no voucher yet). */
+export async function ownVoucherRow(ownerId: string, id: string): Promise<SupplierBookingRow> {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new AppError("NOT_FOUND");
+  const [row] = await db.select().from(appSupplierBookings).where(and(eq(appSupplierBookings.id, id), eq(appSupplierBookings.ownerId, ownerId)));
+  if (!row || !row.supplierRef || !["confirmed", "cancelled"].includes(row.status)) throw new AppError("NOT_FOUND");
+  return row;
+}
+
+/** Vouchers for one trip: its stay orders and its pickup requests. */
+export async function tripVouchers(ownerId: string, tripId: string): Promise<Voucher[]> {
+  const orders = await db.select({ id: appOrders.id }).from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.tripId, tripId)));
+  const requests = await db.select({ id: appRequests.id }).from(appRequests).where(and(eq(appRequests.ownerId, ownerId), eq(appRequests.tripId, tripId)));
+  const ids = [...orders.map((o) => o.id), ...requests.map((r) => r.id)];
+  if (!ids.length) return [];
+  const rows = await db.select().from(appSupplierBookings).where(and(eq(appSupplierBookings.ownerId, ownerId), inArray(appSupplierBookings.sourceId, ids), inArray(appSupplierBookings.status, ["confirmed", "cancelled"])))
+    .orderBy(desc(appSupplierBookings.createdAt));
+  return rows.filter((r) => r.supplierRef).map(voucherOf);
+}
+
+/** The traveller cancels from the voucher: first what it costs (simulation), then for real. */
+export async function cancelOwnVoucher(ownerId: string, id: string, confirm: boolean) {
+  const row = await ownVoucherRow(ownerId, id);
+  if (row.status !== "confirmed") throw new AppError("VALIDATION", { message: "This booking is already cancelled." });
+  const r = await cancelSupplierBooking(row.id, { name: "Traveller" }, { confirm });
+  let fee = 0;
+  try { fee = r.amount > 0 && r.currency ? Math.min(row.sell ?? Infinity, Math.ceil(costHalalas(r.amount, r.currency) / 100) * 100) : 0; } catch { fee = row.sell ?? 0; }
+  if (!r.simulated) {
+    await db.transaction(async (tx) => {
+      await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "supplier.cancelled_by_traveller", entityType: row.sourceKind === "order" ? "app_order" : "app_request", entityId: row.sourceId, summary: `Traveller cancelled ${row.supplierRef} (fee ${fee} halalas)` });
+    });
+  }
+  return { simulated: r.simulated, fee, supplierFee: { amount: r.amount, currency: r.currency }, row: r.row };
 }

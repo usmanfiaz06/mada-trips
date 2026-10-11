@@ -1,8 +1,10 @@
 import "server-only";
-import { inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
+import type { StayOption } from "@mada/shared";
 import { t } from "@mada/shared";
 import { db } from "@/db";
 import { appHotelbedsHotels } from "@/db/app-schema-hotelbeds";
+import { appOffers } from "@/db/app-schema-booking";
 import { isProductionDeploy, supplierMode } from "../../config";
 import { AppError } from "../../http";
 import { callSupplier, supplierDown } from "../../resilience/breaker";
@@ -136,12 +138,28 @@ export function hotelbedsTransfers(): HotelbedsTransfers {
 
 export function hotelbedsMode(product: HotelbedsProduct): "mock" | "live" { return supplierModeOf(product); }
 
+/** The offer as we last showed it, for a BOOKABLE rate that needs no call to Hotelbeds to stand (cert. 2.5). */
+async function storedOffer(supplierOfferId: string): Promise<BookingHotelOffer | null> {
+  const [row] = await db.select({ payload: appOffers.payload, supplier: appOffers.supplier }).from(appOffers).where(eq(appOffers.supplierOfferId, supplierOfferId)).orderBy(desc(appOffers.createdAt)).limit(1);
+  if (!row || row.supplier !== "hotelbeds") return null;
+  const s = row.payload as unknown as StayOption;
+  if (!s?.total) return null;
+  const label = s.label === "lowest" ? "lowest" : "best";
+  return {
+    id: supplierOfferId, supplier: "hotelbeds", label, name: s.name, area: s.area, address: s.address, note: s.note, rating: null,
+    nightly: { amount: Math.round(s.total.amount / Math.max(1, s.nights)), currency: "SAR" }, total: s.total, nights: s.nights, rooms: s.rooms,
+    cancellation: s.cancellation, freeCancelUntil: s.freeCancelUntil, cancelFee: null, imageUrl: s.hotel?.imageUrl ?? null, expiresAt: s.expiresAt,
+    meta: { photo: s.photo, focal: s.focal, noteOne: s.note, noteTwo: s.note, label, hotelCode: s.hotel?.code, imageUrl: s.hotel?.imageUrl ?? null, category: s.hotel?.category ?? null,
+      rateCommentsId: s.hotel?.rateCommentsId ?? null, rateComments: s.hotel?.rateComments ?? null, room: s.hotel?.room ?? null, board: s.hotel?.board ?? null },
+  };
+}
+
 /** The booking service's hotel supplier when stays come from Hotelbeds: errors come out as the app's envelope. */
 export function bookingHotelbeds(): BookingHotelSupplier {
   const inner = hotelbedsHotels();
   return {
     name: "hotelbeds",
     async search(q) { try { return await inner.search(q); } catch (e) { throw toAppError(e); } },
-    async price(id): Promise<BookingHotelOffer> { try { return await inner.price(id); } catch (e) { throw toAppError(e); } },
+    async price(id): Promise<BookingHotelOffer> { try { return await inner.price(id, await storedOffer(id)); } catch (e) { throw toAppError(e); } },
   };
 }
