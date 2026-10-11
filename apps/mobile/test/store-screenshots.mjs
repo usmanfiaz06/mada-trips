@@ -158,6 +158,8 @@ async function capture(lang, id) {
     // The mock build's demo controls are for design work, not the store.
     await k.page.evaluate((words) => {
       for (const el of document.querySelectorAll('[role="button"], button')) if (words.includes(el.textContent?.trim() ?? '')) el.style.visibility = 'hidden';
+      // Today's "Showing: Travel day" line from the demo panel ('td.demo.showing').
+      for (const el of document.querySelectorAll('div')) if (el.childElementCount === 0 && /^(Showing: |المعروض: )/.test(el.textContent ?? '')) el.style.visibility = 'hidden';
     }, ['Demo', DEMO_AR]);
     return await k.page.screenshot({ type: 'png' });
   } finally {
