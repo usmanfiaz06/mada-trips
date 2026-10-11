@@ -1,0 +1,20 @@
+[
+  {
+    "departure": {
+      "airport": { "icao": "OERK", "iata": "RUH", "name": "Riyadh King Khalid", "timeZone": "Asia/Riyadh" },
+      "scheduledTime": { "utc": "2027-05-10 06:40Z", "local": "2027-05-10 09:40+03:00" },
+      "terminal": "3", "gate": "C4", "quality": ["Basic", "Live"]
+    },
+    "arrival": {
+      "airport": { "icao": "LTFM", "iata": "IST", "name": "Istanbul", "timeZone": "Europe/Istanbul" },
+      "scheduledTime": { "utc": "2027-05-10 10:55Z", "local": "2027-05-10 13:55+03:00" },
+      "quality": ["Basic"]
+    },
+    "lastUpdatedUtc": "2027-05-10 06:02Z",
+    "number": "SV 263",
+    "status": "Canceled",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "airline": { "name": "Saudia", "iata": "SV", "icao": "SVA" }
+  }
+]

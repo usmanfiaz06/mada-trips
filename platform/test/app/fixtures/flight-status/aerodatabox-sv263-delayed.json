@@ -1,0 +1,45 @@
+[
+  {
+    "greatCircleDistance": { "meter": 2433000, "km": 2433, "mile": 1511.8, "nm": 1313.7, "feet": 7982283.5 },
+    "departure": {
+      "airport": { "icao": "OERK", "iata": "RUH", "name": "Riyadh King Khalid", "shortName": "King Khalid", "municipalityName": "Riyadh", "location": { "lat": 24.9576, "lon": 46.6988 }, "countryCode": "SA", "timeZone": "Asia/Riyadh" },
+      "scheduledTime": { "utc": "2027-05-10 06:40Z", "local": "2027-05-10 09:40+03:00" },
+      "revisedTime": { "utc": "2027-05-10 06:40Z", "local": "2027-05-10 09:40+03:00" },
+      "terminal": "3", "gate": "B12", "quality": ["Basic"]
+    },
+    "arrival": {
+      "airport": { "icao": "LTFM", "iata": "IST", "name": "Istanbul", "municipalityName": "Istanbul", "location": { "lat": 41.2753, "lon": 28.7519 }, "countryCode": "TR", "timeZone": "Europe/Istanbul" },
+      "scheduledTime": { "utc": "2027-05-10 10:55Z", "local": "2027-05-10 13:55+03:00" },
+      "quality": ["Basic"]
+    },
+    "lastUpdatedUtc": "2027-05-10 03:10Z",
+    "number": "TK 9663",
+    "status": "Expected",
+    "codeshareStatus": "IsCodeshared",
+    "isCargo": false,
+    "airline": { "name": "Turkish Airlines", "iata": "TK", "icao": "THY" }
+  },
+  {
+    "greatCircleDistance": { "meter": 2433000, "km": 2433, "mile": 1511.8, "nm": 1313.7, "feet": 7982283.5 },
+    "departure": {
+      "airport": { "icao": "OERK", "iata": "RUH", "name": "Riyadh King Khalid", "shortName": "King Khalid", "municipalityName": "Riyadh", "location": { "lat": 24.9576, "lon": 46.6988 }, "countryCode": "SA", "timeZone": "Asia/Riyadh" },
+      "scheduledTime": { "utc": "2027-05-10 06:40Z", "local": "2027-05-10 09:40+03:00" },
+      "revisedTime": { "utc": "2027-05-10 07:25Z", "local": "2027-05-10 10:25+03:00" },
+      "terminal": "3", "checkInDesk": "40-52", "gate": "C4", "quality": ["Basic", "Live"]
+    },
+    "arrival": {
+      "airport": { "icao": "LTFM", "iata": "IST", "name": "Istanbul", "municipalityName": "Istanbul", "location": { "lat": 41.2753, "lon": 28.7519 }, "countryCode": "TR", "timeZone": "Europe/Istanbul" },
+      "scheduledTime": { "utc": "2027-05-10 10:55Z", "local": "2027-05-10 13:55+03:00" },
+      "revisedTime": { "utc": "2027-05-10 11:40Z", "local": "2027-05-10 14:40+03:00" },
+      "terminal": "I", "baggageBelt": "12", "quality": ["Basic", "Live"]
+    },
+    "lastUpdatedUtc": "2027-05-10 04:58Z",
+    "number": "SV 263",
+    "callSign": "SVA263",
+    "status": "Delayed",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": { "reg": "HZ-AK11", "modeS": "710101", "model": "Boeing 777-300ER" },
+    "airline": { "name": "Saudia", "iata": "SV", "icao": "SVA" }
+  }
+]

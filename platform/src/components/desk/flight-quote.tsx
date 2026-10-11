@@ -97,12 +97,12 @@ export function FlightQuoteBuilder({ action, requestId, travellers, seed }: { ac
                 </select>
               </div>
 
-              <div className="space-y-1.5">
-                <div className="grid grid-cols-[52px_88px_58px_58px_minmax(0,1fr)_68px_68px_34px_24px] gap-1.5 px-0.5 text-[11.5px] text-ink-3">
+              <div className="space-y-1.5 overflow-x-auto">
+                <div className="grid min-w-[640px] grid-cols-[44px_84px_56px_56px_minmax(118px,1fr)_96px_96px_28px_20px] gap-1.5 px-0.5 text-[11.5px] text-ink-3">
                   <span /> <span>{t("Flight")}</span><span>{t("From")}</span><span>{t("To")}</span><span>{t("Date")}</span><span>{t("Departs")}</span><span>{t("Lands")}</span><span title={t("Lands the next day")}>+1</span><span />
                 </div>
                 {o.legs.map((l, k) => (
-                  <div key={k} className="grid grid-cols-[52px_88px_58px_58px_minmax(0,1fr)_68px_68px_34px_24px] items-center gap-1.5" data-testid={`leg-${i + 1}-${k + 1}`}>
+                  <div key={k} className="grid min-w-[640px] grid-cols-[44px_84px_56px_56px_minmax(118px,1fr)_96px_96px_28px_20px] items-center gap-1.5" data-testid={`leg-${i + 1}-${k + 1}`}>
                     <span className="text-[12px] text-ink-3">{t(l.direction === "out" ? "Out" : "Back")}</span>
                     <input className="field num h-9 px-2 uppercase" dir="ltr" placeholder="SV263" aria-label={t("Flight number")} value={l.flightNumber} onChange={(e) => setLeg(i, k, { flightNumber: e.target.value.toUpperCase() })} />
                     <input className="field num h-9 px-2 uppercase" dir="ltr" maxLength={3} aria-label={t("From")} value={l.from} onChange={(e) => setLeg(i, k, { from: e.target.value.toUpperCase() })} />

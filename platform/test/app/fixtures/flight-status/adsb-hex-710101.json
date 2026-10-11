@@ -1,0 +1,1 @@
+{ "ac": [ { "hex": "710101", "type": "adsb_icao", "flight": "SVA263  ", "r": "HZ-AK11", "t": "B77W", "alt_baro": 36000, "alt_geom": 36575, "gs": 471.2, "track": 318.4, "lat": 31.402, "lon": 36.115, "seen_pos": 1.2, "seen": 0.4 } ], "msg": "No error", "now": 1809928800000, "total": 1, "ctime": 1809928800000, "ptime": 1 }

@@ -2,7 +2,7 @@
 //
 //   DATABASE_URL=… npm run db:migrate && DATABASE_URL=… npm run db:seed
 //   DATABASE_URL=… npx tsx --conditions=react-server src/lib/app/desk/seed.ts
-//   DATABASE_URL=… APP_DATA_KEY=… APP_FLIGHTS_MODE=request APP_DESK_AUTOPILOT=off APP_BOOKING_REQUIRES_PHONE=no npm run dev
+//   DATABASE_URL=… APP_DATA_KEY=… APP_FLIGHTS_MODE=request APP_DESK_AUTOPILOT=off APP_BOOKING_REQUIRES_PHONE=no npx next dev --turbopack -p 3100
 //   BASE=http://localhost:3100 node test/e2e-beta-desk.mjs [shot-dir]
 //
 // A traveller (through the Core API, as the app does) sends a flight request; the agent opens it on the desk, sees

@@ -1,0 +1,25 @@
+{
+  "pagination": { "limit": 10, "offset": 0, "count": 2, "total": 2 },
+  "data": [
+    {
+      "flight_date": "2027-05-09",
+      "flight_status": "landed",
+      "departure": { "airport": "King Khalid International", "timezone": "Asia/Riyadh", "iata": "RUH", "icao": "OERK", "terminal": "3", "gate": "B10", "delay": null, "scheduled": "2027-05-09T09:40:00+00:00", "estimated": "2027-05-09T09:40:00+00:00", "actual": "2027-05-09T09:44:00+00:00", "estimated_runway": "2027-05-09T09:52:00+00:00", "actual_runway": "2027-05-09T09:52:00+00:00" },
+      "arrival": { "airport": "Istanbul Airport", "timezone": "Europe/Istanbul", "iata": "IST", "icao": "LTFM", "terminal": "I", "gate": null, "baggage": "9", "delay": null, "scheduled": "2027-05-09T13:55:00+00:00", "estimated": "2027-05-09T13:50:00+00:00", "actual": "2027-05-09T13:49:00+00:00", "estimated_runway": null, "actual_runway": null },
+      "airline": { "name": "Saudia", "iata": "SV", "icao": "SVA" },
+      "flight": { "number": "263", "iata": "SV263", "icao": "SVA263", "codeshared": null },
+      "aircraft": { "registration": "HZ-AK15", "iata": "B77W", "icao": "B77W", "icao24": "710105" },
+      "live": null
+    },
+    {
+      "flight_date": "2027-05-10",
+      "flight_status": "active",
+      "departure": { "airport": "King Khalid International", "timezone": "Asia/Riyadh", "iata": "RUH", "icao": "OERK", "terminal": "3", "gate": "C4", "delay": 45, "scheduled": "2027-05-10T09:40:00+00:00", "estimated": "2027-05-10T10:25:00+00:00", "actual": "2027-05-10T10:27:00+00:00", "estimated_runway": "2027-05-10T10:40:00+00:00", "actual_runway": "2027-05-10T10:40:00+00:00" },
+      "arrival": { "airport": "Istanbul Airport", "timezone": "Europe/Istanbul", "iata": "IST", "icao": "LTFM", "terminal": "I", "gate": null, "baggage": "12", "delay": 40, "scheduled": "2027-05-10T13:55:00+00:00", "estimated": "2027-05-10T14:35:00+00:00", "actual": null, "estimated_runway": null, "actual_runway": null },
+      "airline": { "name": "Saudia", "iata": "SV", "icao": "SVA" },
+      "flight": { "number": "263", "iata": "SV263", "icao": "SVA263", "codeshared": null },
+      "aircraft": { "registration": "HZ-AK11", "iata": "B77W", "icao": "B77W", "icao24": "710101" },
+      "live": { "updated": "2027-05-10T08:10:00+00:00", "latitude": 27.1, "longitude": 41.8, "altitude": 11277, "direction": 318, "speed_horizontal": 870, "speed_vertical": 0, "is_ground": false }
+    }
+  ]
+}

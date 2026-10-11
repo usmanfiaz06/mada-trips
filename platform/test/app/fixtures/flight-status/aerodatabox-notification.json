@@ -1,0 +1,38 @@
+{
+  "id": "ntf_7f3c2a",
+  "timestampUtc": "2027-05-12 05:31Z",
+  "subscription": {
+    "id": "SUB-ID-PLACEHOLDER",
+    "isActive": true,
+    "billingType": "CreditBased",
+    "createdOnUtc": "2027-05-11 10:00Z",
+    "subject": { "type": "FlightByNumber", "id": "SV263" },
+    "subscriber": { "type": "WebHook", "id": "https://madatrips.sa/api/app/v1/flights/alerts/aerodatabox/…" }
+  },
+  "balance": { "creditsRemaining": 37, "lastRefilledUtc": "2027-05-01 00:00Z", "lastDeductedUtc": "2027-05-12 05:31Z" },
+  "deliveryAttempt": { "seqNo": 1, "costCredits": 1, "timestampUtc": "2027-05-12 05:31Z" },
+  "flights": [
+    {
+      "notificationSummary": "Gate changed to D9; departure delayed by 20 minutes",
+      "departure": {
+        "airport": { "icao": "OERK", "iata": "RUH", "name": "Riyadh King Khalid", "timeZone": "Asia/Riyadh" },
+        "scheduledTime": { "utc": "2027-05-12 06:40Z", "local": "2027-05-12 09:40+03:00" },
+        "revisedTime": { "utc": "2027-05-12 07:00Z", "local": "2027-05-12 10:00+03:00" },
+        "terminal": "3", "gate": "D9", "quality": ["Basic", "Live"]
+      },
+      "arrival": {
+        "airport": { "icao": "LTFM", "iata": "IST", "name": "Istanbul", "timeZone": "Europe/Istanbul" },
+        "scheduledTime": { "utc": "2027-05-12 10:55Z", "local": "2027-05-12 13:55+03:00" },
+        "revisedTime": { "utc": "2027-05-12 11:15Z", "local": "2027-05-12 14:15+03:00" },
+        "quality": ["Basic", "Live"]
+      },
+      "lastUpdatedUtc": "2027-05-12 05:30Z",
+      "number": "SV 263",
+      "status": "Delayed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": { "reg": "HZ-AK12", "modeS": "710102", "model": "Boeing 777-300ER" },
+      "airline": { "name": "Saudia", "iata": "SV", "icao": "SVA" }
+    }
+  ]
+}
