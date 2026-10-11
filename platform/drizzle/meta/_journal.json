@@ -134,6 +134,13 @@
       "when": 1791662431816,
       "tag": "0018_supabase_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791676861528,
+      "tag": "0019_account_recovery",
+      "breakpoints": true
     }
   ]
 }

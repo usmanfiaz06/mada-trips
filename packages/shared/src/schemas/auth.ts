@@ -168,3 +168,33 @@ export function decodeMockSupabaseToken(token: string): MockSupabaseClaims | nul
     return null;
   }
 }
+
+/* ───────────── account recovery (signed out) ───────────── */
+
+/** A way to reach someone: a phone number (typed loosely, the server checks it) or an email address. */
+export const RecoveryContact = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('phone'), value: z.string().trim().min(6).max(32) }),
+  z.object({ kind: z.literal('email'), value: z.string().trim().toLowerCase().pipe(z.email()).pipe(z.string().max(254)) }),
+]);
+export type RecoveryContact = z.infer<typeof RecoveryContact>;
+
+/**
+ * "I can't use this number or email any more": a person on the desk checks it's them (passport details on file,
+ * their last booking) and moves the account to the new contact. Works signed out. The answer never says whether an
+ * account exists for the old contact.
+ */
+export const RecoveryRequest = z.object({
+  name: z.string().trim().min(1).max(80),
+  oldContact: RecoveryContact,
+  newContact: RecoveryContact,
+  note: z.string().trim().max(500).optional(),
+  locale: Locale.optional(),
+});
+export type RecoveryRequest = z.infer<typeof RecoveryRequest>;
+
+/** Always the same answer, whether or not an account matched. */
+export const RecoveryResponse = z.object({ received: z.literal(true) });
+export type RecoveryResponse = z.infer<typeof RecoveryResponse>;
+
+/** How many recovery requests one network or one old contact can send. */
+export const RECOVERY_LIMITS = { perIpPerHour: 5, perContactPerDay: 3 } as const;

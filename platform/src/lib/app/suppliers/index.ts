@@ -1,7 +1,7 @@
 import "server-only";
-import { supplierMode, type SupplierName } from "../config";
+import { isProductionDeploy, supplierMode, type SupplierName } from "../config";
 import type {
-  AiSupplier, EmailSupplier, FlightPositionsSupplier, FlightStatusSupplier, FlightSupplier, HotelSupplier, IdentitySupplier, PaymentSupplier, SmsSupplier, SupabaseAuthSupplier, WhatsAppSupplier,
+  AiSupplier, EmailSupplier, FlightPositionsSupplier, FlightStatusSupplier, FlightSupplier, HotelSupplier, IdentitySupplier, PaymentSupplier, SmsSupplier, SupabaseAdminSupplier, SupabaseAuthSupplier, WhatsAppSupplier,
 } from "./types";
 import { mockEmail, mockSms, mockWhatsApp } from "./mock/messaging";
 import { mockFlights } from "./mock/flights";
@@ -12,6 +12,7 @@ import { mockFlightPositions } from "./mock/flight-positions";
 import { mockAi } from "./mock/ai";
 import { mockIdentity } from "./mock/identity";
 import { mockSupabase } from "./mock/supabase";
+import { mockSupabaseAdmin } from "./mock/supabase-admin";
 import { metaWhatsApp, sesEmail, unifonicSms } from "./live/messaging";
 import { gdsFlights, myFatoorah, rateHawkHotels } from "./live/commerce";
 import { flightAware } from "./live/flight-status";
@@ -19,11 +20,13 @@ import { openAdsbPositions } from "./live/flight-positions";
 import { claudeAi } from "./live/ai";
 import { providerIdentity } from "./live/identity";
 import { liveSupabase } from "./live/supabase";
+import { liveSupabaseAdmin } from "./live/supabase-admin";
 import { taqnyatSms } from "./live/taqnyat";
 import { guarded } from "../resilience/breaker";
 
 export type * from "./types";
 export { outbox } from "./mock/outbox";
+export { mockSupabaseAdminLog } from "./mock/supabase-admin";
 
 /* One place decides mock or live, per supplier, on every call (so a test or an env change takes effect at once). */
 // Live adapters go through a timeout and a circuit breaker (resilience/breaker.ts); mocks stay deterministic.
@@ -44,6 +47,14 @@ export const suppliers = {
   identity: (): IdentitySupplier => pick("identity", mockIdentity, providerIdentity),
   /** Supabase Auth access tokens. Not behind a breaker: a bad token is the caller's problem, not an outage. */
   supabase: (): SupabaseAuthSupplier => (supplierMode("supabase") === "live" ? liveSupabase : mockSupabase),
+  /**
+   * Supabase's admin API, for the desk moving an account (recovery). Live needs SUPABASE_SERVICE_ROLE_KEY; without it
+   * the mock records the change, except on a production deployment, where a missing key refuses (NOT_CONFIGURED).
+   */
+  supabaseAdmin: (): SupabaseAdminSupplier => {
+    if (supplierMode("supabase") === "live" && (process.env.SUPABASE_SERVICE_ROLE_KEY || isProductionDeploy())) return liveSupabaseAdmin;
+    return mockSupabaseAdmin;
+  },
 };
 
 /** In mock SMS mode every sign-in code is this, so development and app review never need a real phone. */

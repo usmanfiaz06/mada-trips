@@ -142,3 +142,19 @@ export interface SupabaseAuthSupplier {
   readonly name: string;
   verify(accessToken: string): Promise<SupabaseIdentity>;
 }
+
+/** A phone (E.164) or an email address, as Supabase Auth holds it. */
+export type SupabaseContact = { kind: "phone" | "email"; value: string };
+
+/**
+ * Supabase Auth's admin API (service-role key), for the desk moving an account to a new number or email after a
+ * recovery request. Live: <SUPABASE_URL>/auth/v1/admin/users. Mock: in memory, recorded in mockSupabaseAdminLog.
+ */
+export interface SupabaseAdminSupplier {
+  readonly name: string;
+  /** Replace the user's phone or email, marked confirmed (a person on the desk has checked it's them). */
+  setContact(userId: string, contact: SupabaseContact): Promise<void>;
+  /** A new user with only this contact, confirmed. Returns its id. */
+  createUser(contact: SupabaseContact): Promise<string>;
+  deleteUser(userId: string): Promise<void>;
+}

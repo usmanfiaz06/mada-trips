@@ -13,6 +13,8 @@ export const ROUTES = {
   session: '/auth/session',
   /** Signed in: pick up a phone, email or provider just added in Supabase. */
   sessionSync: '/auth/session/sync',
+  /** Signed out: "I can't use this number or email any more". A person on the desk checks and moves the account. */
+  recovery: '/auth/recovery',
   me: '/me',
   people: '/people',
   /** GET, with the flight number in place of :flightNo (e.g. /flights/SV263/position). */
