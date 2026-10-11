@@ -200,7 +200,7 @@ export default function Pay() {
 
   const names = travellers.map((id) => personName(household.find((x) => x.id === id), selfName));
   const missing = (p?.missingPassports ?? []).map((id) => household.find((x) => x.id === id)).filter(Boolean);
-  const holdText = left === null ? null : expired ? t('pay.holdEnded') : t('pay.held', { time: `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` });
+  const holdText = left === null ? null : expired ? t('pay.holdEnded') : t('pay.held', { time: left >= 3_600_000 ? `${Math.floor(left / 3_600_000)}:${String(Math.floor((left % 3_600_000) / 60000)).padStart(2, '0')}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` : `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` });
 
   return (
     <Screen background={colors.night}>

@@ -229,7 +229,9 @@ async function circles() {
   const k = kit(page);
   step('circles: paused');
   await signIn(page, 'limited');
-  await k.byTest('dock-circles').click().catch(async () => { await page.goto(`${ORIGIN}/circles`); });
+  await k.byTest('dock-circles').click();
+  await page.waitForTimeout(800);
+  await k.press(page.getByRole('tab', { name: 'Circles', exact: true }));
   await k.see('Circles is paused for you', 'limited banner', 10000);
   await k.shot('circles-limited');
   await context.close();
@@ -254,7 +256,7 @@ async function arabic() {
   await page.waitForTimeout(1200);
   await k.byTest('dock-ask').click();
   await page.waitForTimeout(800);
-  await k.ask('اسطنبول في العيد، كلنا');
+  await k.ask('Istanbul for Eid, all of us');
   await k.see('أخبرنا إلى أين ومتى', 'arabic form', 12000);
   await k.shot('ar-request-form');
   await k.press(k.byTest('flight-request-send'));

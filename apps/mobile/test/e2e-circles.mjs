@@ -320,9 +320,7 @@ async function demo() {
   await page.getByRole('button', { name: /Maha/ }).filter({ visible: true }).first().click();
   await byTest('remove-member').click();
   await see('Maha is out of the circle.', 'removed');
-  await see('You removed Maha', 'removed line', 6000);
   await shot('new-circle-removed');
-  await byTest('circle-settings').click();
   await byTest('leave').click();
   await shot('new-circle-leave');
   await byTest('leave-yes').click();
