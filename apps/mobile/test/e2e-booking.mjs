@@ -396,7 +396,7 @@ async function requests() {
   await k.byTest('request-note').fill('Hessa walks slowly');
   await k.shot('umrah-note');
   await k.byTest('request-send').click();
-  await k.see('Sent to Mada.', 'sent');
+  await k.see(' at Mada', 'sent');
   await k.shot('umrah-sent');
   await k.see('replied', 'quote arrives', 20000);
   await k.see('Total', 'breakdown');
