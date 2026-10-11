@@ -138,7 +138,7 @@ async function run(lang) {
   step(`${lang}: a pushed screen keeps Back`);
   await byTest('dock-trips').click();
   await page.waitForTimeout(1200);
-  await page.getByText('Istanbul').first().click().catch(() => {});
+  await page.locator('[data-testid^="trip-card-"]').first().click().catch(() => errors.push(`${lang}: no trip card`));
   await page.waitForTimeout(1500);
   if (await byTest('topbar-back').count()) await shot('pushed-back');
   else errors.push(`${lang}: trip detail has no Back`);
