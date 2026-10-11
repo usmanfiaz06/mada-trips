@@ -31,7 +31,7 @@ export function coverInk(c: CircleCover | null | undefined): { text: string; sof
   return light ? { text: colors.green, soft: 'rgba(30,53,45,0.72)', light } : { text: colors.paper, soft: 'rgba(255,253,249,0.86)', light };
 }
 
-const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<CircleCover, { kind: 'icon' }>; w: number; h: number; layout: 'banner' | 'badge' | 'poster' }) {
+const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<CircleCover, { kind: 'icon' }>; w: number; h: number; layout: 'banner' | 'badge' | 'poster' | 'header' }) {
   const xml = useMemo(() => coverArtSvg(cover, { width: w, height: h, layout, side: isRTL() ? 'left' : 'right' }), [cover.icon, cover.color, w, h, layout]); // eslint-disable-line react-hooks/exhaustive-deps
   return <SvgXml xml={xml} width={w} height={h} style={StyleSheet.absoluteFill} pointerEvents="none" />;
 });
@@ -41,7 +41,7 @@ const Drawing = memo(function Drawing({ cover, w, h, layout }: { cover: Extract<
  * .nc-veil); drawings keep their own calm corner, so they get a lighter one in their own colour.
  */
 export function CoverArt({ cover, layout = 'banner', style, veil, children, testID }: {
-  cover: CircleCover | null | undefined; layout?: 'banner' | 'badge' | 'poster'; style?: StyleProp<ViewStyle>; veil?: boolean; children?: ReactNode; testID?: string;
+  cover: CircleCover | null | undefined; layout?: 'banner' | 'badge' | 'poster' | 'header'; style?: StyleProp<ViewStyle>; veil?: boolean; children?: ReactNode; testID?: string;
 }) {
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
   const onLayout = (e: LayoutChangeEvent) => {
@@ -135,7 +135,7 @@ export function CoverPicker({ value, onChange, upload, onUpload }: {
             return (
               <Pressable key={k} accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={t(`circles.cover.icon.${k}`)} testID={`cover-icon-${k}`}
                 onPress={() => { buzz('select'); onChange({ kind: 'icon', icon: k, color }); }} style={[s.cell, on ? s.cellOn : null]}>
-                <CoverBadge cover={{ kind: 'icon', icon: k, color }} size={48} radius={14} />
+                <CoverBadge cover={{ kind: 'icon', icon: k, color }} size={42} radius={13} />
               </Pressable>
             );
           })}
@@ -179,13 +179,12 @@ export function CoverPicker({ value, onChange, upload, onUpload }: {
           {upload ? (
             <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
               <CoverArt cover={upload} style={{ width: 96, height: 60, borderRadius: 14 }} />
-              <View style={{ flex: 1 }}><CoverStatus cover={{ ...upload, status: 'pending' }} /></View>
+              <T v="small" style={{ flex: 1 }}>{t('circles.cover.uploadBody')}</T>
             </View>
           ) : <T v="small">{t('circles.cover.uploadBody')}</T>}
           <Button size="small" block={false} variant={upload ? 'secondary' : 'primary'} style={{ alignSelf: 'flex-start' }} busy={busy}
             label={busy ? t('circles.cover.uploading') : upload ? t('circles.cover.another') : t('circles.cover.choose')} icon={<Icon name="scan" size={18} color={upload ? colors.green : colors.gold} />}
             onPress={pick} testID="cover-upload" />
-          {upload ? <T v="tiny">{t('circles.cover.uploadBody')}</T> : null}
           {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert">{problem}</T> : null}
         </View>
       ) : null}
@@ -194,12 +193,12 @@ export function CoverPicker({ value, onChange, upload, onUpload }: {
 }
 
 const s = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  cell: { padding: 3, borderRadius: 17, borderWidth: 2, borderColor: 'transparent' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, columnGap: 6 },
+  cell: { width: '15.6%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   cellOn: { borderColor: colors.goldDeep },
   dot: { width: 36, height: 36, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(30,53,45,0.12)' },
   dotOn: { borderWidth: 2, borderColor: colors.goldDeep, transform: [{ scale: 1.08 }], boxShadow: `0px 0px 0px 3px ${colors.sand}` },
-  photo: { width: 100, height: 64, borderRadius: 16, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden', justifyContent: 'flex-end' },
+  photo: { width: '31.6%', aspectRatio: 1.56, borderRadius: 16, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden', justifyContent: 'flex-end' },
   photoOn: { borderColor: colors.goldDeep },
   photoName: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: 'rgba(15,26,22,0.45)' },
   well: { backgroundColor: colors.mist, borderRadius: 24, padding: 16, gap: 10 },

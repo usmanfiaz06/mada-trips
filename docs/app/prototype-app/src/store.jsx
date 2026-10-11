@@ -375,7 +375,7 @@ export function demoAccount() {
     stamps: ['AZ', 'AE', 'BH', 'EG', 'GE', 'GB', 'FR', 'MY', 'MA', 'JO', 'QA', 'OM', 'ID', 'CH'],
     groups: [
       { id: 'eid', name: 'Istanbul for Eid', img: 'img/istanbul.jpg', members: ['omar', 'hessa', 'abdullah', 'noor', 'sara', 'ahmed'], admin: 'omar', unread: 2, sub: 'vote on the cruise', trip: 'Istanbul · 9–15 Mar', muted: false },
-      { id: 'family', name: 'Family', img: null, members: ['omar', 'hessa', 'sara', 'ahmed'], admin: 'omar', unread: 0, sub: 'documents', trip: null, muted: false },
+      { id: 'family', name: 'Family', img: null, cover: { kind: 'icon', icon: 'family', color: 'sand' }, members: ['omar', 'hessa', 'sara', 'ahmed'], admin: 'omar', unread: 0, sub: 'documents', trip: null, muted: false },
       { id: 'season', name: 'Riyadh Season', img: 'img/riyadh.jpg', members: ['omar', 'abdullah', 'khalid', 'faris', 'maha', 'yousef', 'noor', 'reem'], admin: 'abdullah', unread: 0, sub: '2 events', trip: null, muted: true },
     ],
     friends: ['abdullah', 'noor', 'khalid', 'faris'],

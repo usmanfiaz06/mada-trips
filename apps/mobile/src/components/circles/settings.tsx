@@ -61,9 +61,9 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
         </>) : mode === 'cover' ? (<>
           <T v="h2">{t('circles.cover.change')}</T>
           <CoverArt cover={cover} veil style={st.coverPreview}>
+            <CoverStatus cover={cover} onDark />
             <T style={[font('display', coverInk(cover).text), { marginTop: 'auto', fontSize: 26, lineHeight: 28 }]} numberOfLines={1}>{d.circle.name}</T>
           </CoverArt>
-          {cover?.kind === 'upload' ? <CoverStatus cover={cover} /> : null}
           <CoverPicker value={cover} onChange={setCover} upload={upload} onUpload={setUpload} />
           <Button label={t('circles.cover.save')} disabled={sameCover(cover, d.circle.cover)} busy={update.isPending} testID="cover-save"
             onPress={() => update.mutate({ cover: coverInput(cover) }, { onSuccess: () => { buzz('success'); setMode('main'); toast(t('circles.cover.saved')); } })} />

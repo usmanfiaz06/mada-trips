@@ -273,6 +273,60 @@ try {
   const copies = st.groups.filter((x) => x.name === 'Istanbul for Eid').length;
   if (copies !== 1) throw new Error(`${copies} Istanbul for Eid circles`);
   await shot('join-dedupe');
+
+  /* Covers: Icons (default, on six colours), Photos (with credits), Your photo (only you see it until it's checked). */
+  for (const lang of ['en', 'ar']) {
+    const L = (en, ar) => (lang === 'ar' ? ar : en);
+    step(`${lang}: circle covers`);
+    await seed({ friends: ['abdullah', 'noor', 'khalid', 'faris'], groups: DEMO_GROUPS.map((g) => (g.id === 'family' ? { ...g, cover: { kind: 'icon', icon: 'family', color: 'sand' } } : g)), circleThreads: {}, circleQueue: [] });
+    if (lang === 'ar') { await page.locator('[data-testid="lang-ar"]').click({ force: true }); await page.waitForTimeout(500); }
+    await toCirclesTab();
+    await phone.locator('.cx-tile').nth(2).scrollIntoViewIfNeeded();
+    await shot(`${lang}-covers-rail`);
+    await open('newCircle');
+    await phone.locator('#nc-name').fill(L('Desert weekend', 'عطلة البر'));
+    await see(L('Icons', 'رسومات'));
+    await phone.locator('.cover-cell').first().scrollIntoViewIfNeeded();
+    await shot(`${lang}-cover-picker-icons`);
+    await phone.getByRole('radio', { name: L('Camel', 'جمل'), exact: true }).click();
+    await phone.getByRole('radio', { name: L('Sand background', 'خلفية رملي'), exact: true }).click();
+    await scrollTop();
+    if (!(await phone.locator('.nc-preview.light svg').count())) throw new Error('no drawn cover in the preview');
+    await shot(`${lang}-cover-camel-sand`);
+    await phone.getByRole('radio', { name: L('Photos', 'صور'), exact: true }).click();
+    await phone.getByRole('radio', { name: L('Desert camp', 'مخيم في الصحراء'), exact: true }).click();
+    await see('Tommaso Ubezio / Unsplash');
+    await shot(`${lang}-cover-photos`);
+    await phone.getByRole('radio', { name: L('Your photo', 'صورتك'), exact: true }).click();
+    await phone.locator('.cover-picker input[type=file]').setInputFiles(resolve('../photos/abha-mountains-sm.jpg'));
+    await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'));
+    await scrollTop();
+    await shot(`${lang}-cover-upload-pending`);
+    await phone.getByRole('radio', { name: L('Icons', 'رسومات'), exact: true }).click();
+    await phone.getByRole('radio', { name: L('Green background', 'خلفية أخضر'), exact: true }).click();
+    await phone.getByRole('radio', { name: L('Hot-air balloon', 'منطاد'), exact: true }).click();
+    await click(L('Next', 'التالي'));
+    await phone.locator('.act .btn.primary').last().click();
+    await page.waitForTimeout(800);
+    let st2 = await state();
+    const made = st2.groups.find((g) => g.name === L('Desert weekend', 'عطلة البر'));
+    if (made?.cover?.kind !== 'icon' || made.cover.icon !== 'balloon' || made.cover.color !== 'green') throw new Error('cover not saved: ' + JSON.stringify(made?.cover));
+    await shot(`${lang}-cover-header-balloon`);
+    await phone.locator('.cx-faces').click();
+    await page.waitForTimeout(400);
+    await click(L('Change cover', 'تغيير الغلاف'));
+    await phone.getByRole('radio', { name: L('Rose background', 'خلفية وردي'), exact: true }).click();
+    await phone.getByRole('radio', { name: L('Birthday cake', 'كعكة عيد ميلاد'), exact: true }).click();
+    await shot(`${lang}-cover-settings`);
+    await click(L('Use this cover', 'استخدم هذا الغلاف'));
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    st2 = await state();
+    if (st2.groups.find((g) => g.id === made.id)?.cover?.icon !== 'cake') throw new Error('cover change not saved');
+    await shot(`${lang}-cover-header-cake`);
+    if (lang === 'ar') { await page.locator('[data-testid="lang-en"]').click({ force: true }).catch(() => {}); await page.waitForTimeout(400); }
+  }
 } catch (e) {
   errors.push('flow: ' + e.message.split('\n')[0]);
   console.log('FIRST ERROR:', e.message.slice(0, 600));

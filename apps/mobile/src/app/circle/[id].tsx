@@ -142,6 +142,7 @@ export default function CircleChat() {
   const cover = dm ? null : d.circle.cover;
   const ink = coverInk(cover);
   const onPhoto = !!cover && !ink.light;
+  const veiled = !!cover && cover.kind !== 'icon';
   const faces = (
     <Pressable accessibilityRole="button" accessibilityLabel={t('circles.chat.settingsA11y', { name: d.circle.name })} onPress={() => { buzz('tap'); setSheet('settings'); }}
       style={[st.faces, onPhoto ? st.facesPhoto : cover ? st.facesLight : null]} testID="circle-settings">
@@ -155,8 +156,8 @@ export default function CircleChat() {
       {dm ? <TopBar onBack={() => router.back()} backLabel={t('circles.back')} title={d.circle.name} right={faces} /> : (
         <View style={[st.head, cover ? { backgroundColor: colors.night } : null]} testID="circle-head">
           {cover ? (
-            <CoverArt cover={cover} style={StyleSheet.absoluteFill}>
-              {onPhoto ? <VGradient id="cx-head" stops={[[0, 'rgba(15,26,22,0.55)'], [0.4, 'rgba(15,26,22,0.25)'], [1, 'rgba(15,26,22,0.82)']]} /> : null}
+            <CoverArt cover={cover} layout="header" style={StyleSheet.absoluteFill}>
+              {veiled ? <VGradient id="cx-head" stops={[[0, 'rgba(15,26,22,0.55)'], [0.4, 'rgba(15,26,22,0.25)'], [1, 'rgba(15,26,22,0.82)']]} /> : null}
             </CoverArt>
           ) : null}
           <TopBar onBack={() => router.back()} backLabel={t('circles.back')} dark={onPhoto} right={faces} />

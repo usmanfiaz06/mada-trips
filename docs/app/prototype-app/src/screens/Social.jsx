@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserAvatar } from './Account.jsx';
 import { useStore, buzz, HAPTIC, PEOPLE } from '../store.jsx';
+import { CoverBg, CoverPicker, CoverStatus, coverLight, groupCover } from './covers.jsx';
 import { Icon, TopBar, Sheet, Toggle, InviteSheet, EmptyState, ArtFriends, ArtCompass, ArtEnvelope, ArtLantern, ArtBookmark, PermissionDenied } from '../ui.jsx';
 
 /* People on Mada who aren't in the household. */
@@ -31,7 +32,6 @@ export const SEED_POSTS = [
   { id: 'p5', who: 'Abdullah', uid: 'abdullah', initial: 'A', tone: 'green', rel: 'Friend', city: 'AlUla', place: 'Maraya at night', text: 'The concert hall is mirrors outside. Go for the light show, book the 9pm dinner in advance.', img: 'img/alula.jpg', saves: 19, kind: 'Things to do', when: 'Last month' },
 ];
 
-const COVERS = [null, 'img/istanbul.jpg', 'img/alula.jpg', 'img/riyadh.jpg'];
 
 export function Avatar({ id, size = 40, ring }) {
   if (id === 'omar') return <UserAvatar size={size} ring={ring} />;
@@ -245,7 +245,8 @@ export function NewCircle({ params = {} }) {
   const { s, set, pop, replace, toast } = useStore();
   const [stage, setStage] = useState('name');
   const [name, setName] = useState(params.name || '');
-  const [cover, setCover] = useState(s.trip ? 'img/istanbul.jpg' : 'img/alula.jpg');
+  /* Drawings first: a plane on the green until they pick something else (covers.jsx). */
+  const [cover, setCover] = useState({ kind: 'icon', icon: 'plane', color: 'green' });
   const [picked, setPicked] = useState(params.with ? [params.with] : []);
   const [q, setQ] = useState('');
   const [invite, setInvite] = useState(false);
@@ -264,8 +265,10 @@ export function NewCircle({ params = {} }) {
   const create = () => {
     const id = 'g' + Date.now();
     /* People are invited, not added: they're in once they say yes. */
-    const g = { id, name: name.trim(), img: cover, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: null, dest: null, muted: false, fresh: true };
+    const g = { id, name: name.trim(), cover, img: null, members: ['omar'], invited: picked.map((pid) => ({ id: pid, at: Date.now() })), admin: 'omar', unread: 0, sub: '', trip: null, dest: null, muted: false, fresh: true };
     set((p) => ({ groups: [g, ...p.groups] }));
+    /* Your own photo is checked before the circle sees it; in the prototype that takes a few seconds. */
+    if (cover?.kind === 'upload') setTimeout(() => set((p) => ({ groups: p.groups.map((x) => (x.id === id && x.cover?.kind === 'upload' ? { ...x, cover: { ...x.cover, status: 'approved' } } : x)) })), 12000);
     buzz(HAPTIC.success);
     toast(picked.length ? `Circle made. Invite sent to ${names(picked)}.` : 'Circle made. Share the link to bring people in.');
     replace('group', { id });
@@ -278,22 +281,22 @@ export function NewCircle({ params = {} }) {
     <div className="screen push">
       <TopBar onBack={pop} backLabel="Cancel" right={<span className="tiny" style={{ paddingRight: 8 }}>1 of 2</span>} />
       <div className="scroll no-dock nc-scroll">
-        <div className="nc-preview" style={cover ? { backgroundImage: `url(${cover})` } : null} aria-hidden="true">
-          <span className="nc-veil" />
+        <div className={'nc-preview' + (coverLight(cover) ? ' light' : '')} aria-hidden="true">
+          <CoverBg cover={cover} w={360} h={200} />
+          {cover?.kind !== 'icon' && <span className="nc-veil" />}
+          <CoverStatus cover={cover} onDark />
           <span className="nc-preview-name">{name.trim() || 'Your circle'}</span>
           <span className="nc-preview-sub">{picked.length ? `You and ${picked.length} more` : 'Just you, for now'}</span>
-        </div>
-        <div className="row nc-covers" role="radiogroup" aria-label="Cover">
-          {COVERS.map((c) => (
-            <button key={c || 'plain'} type="button" role="radio" aria-checked={cover === c ? 'true' : 'false'} aria-label={c ? c.split('/')[1].split('.')[0] : 'Plain green'} onClick={() => { setCover(c); buzz(HAPTIC.select); }}
-              className={'cover-dot' + (cover === c ? ' on' : '')} style={c ? { backgroundImage: `url(${c})` } : { background: '#1e352d' }} />
-          ))}
         </div>
         <div className="field">
           <label htmlFor="nc-name">Name it</label>
           <input id="nc-name" className={'input' + (dupe ? ' bad' : '')} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer in Baku" autoFocus />
           {dupe ? <span className="err" role="alert">You already have a circle called {name.trim()}.</span>
             : <span className="nc-ideas">{['Family', 'Eid trip', 'Weekend crew', 'Cousins'].map((t, i) => <React.Fragment key={t}>{i > 0 && <span aria-hidden="true"> · </span>}<button type="button" className="link" onClick={() => setName(t)}>{t}</button></React.Fragment>)}</span>}
+        </div>
+        <div className="field">
+          <label>Cover</label>
+          <CoverPicker value={cover} onChange={setCover} />
         </div>
       </div>
       <div className="act nc-act"><button type="button" className="btn primary block" disabled={!ok} onClick={() => { buzz(HAPTIC.tap); setStage('people'); }}>Next</button></div>
@@ -344,6 +347,7 @@ export function GroupInfo({ group, onClose }) {
   const { s, set, pop, toast } = useStore();
   const [sheet, setSheet] = useState(null);
   const [rename, setRename] = useState(group.name);
+  const [cover, setCover] = useState(() => groupCover(group));
   const [target, setTarget] = useState(null);
   const admin = group.admin === 'omar';
   const gid = group.id;
@@ -366,6 +370,23 @@ export function GroupInfo({ group, onClose }) {
       <input className="input" maxLength={40} value={rename} onChange={(e) => setRename(e.target.value)} aria-label="Circle name" />
       <span className="tiny">Everyone in the circle sees the new name.</span>
       <button type="button" className="btn primary block" disabled={rename.trim().length < 2 || rename.trim() === group.name} onClick={() => { run(patch({ name: rename.trim() }), opAdd(gid, sys(`You renamed the circle to ${rename.trim()}`))); setSheet(null); toast('Renamed.'); }}>Save</button>
+    </Sheet>
+  );
+  if (sheet === 'cover') return (
+    <Sheet label="Change cover" onClose={() => setSheet(null)}>
+      <h2 className="h2">Change cover</h2>
+      <div className={'nc-preview small' + (coverLight(cover) ? ' light' : '')} aria-hidden="true">
+        <CoverBg cover={cover} w={340} h={132} />
+        {cover?.kind !== 'icon' && <span className="nc-veil" />}
+        <CoverStatus cover={cover} onDark />
+        <span className="nc-preview-name">{group.name}</span>
+      </div>
+      <CoverPicker value={cover} onChange={setCover} />
+      <button type="button" className="btn primary block" onClick={() => {
+        run(patch({ cover, img: null }));
+        if (cover?.kind === 'upload') setTimeout(() => set((p) => ({ groups: p.groups.map((x) => (x.id === gid && x.cover?.kind === 'upload' ? { ...x, cover: { ...x.cover, status: 'approved' } } : x)) })), 12000);
+        buzz(HAPTIC.success); setSheet(null); toast('Cover changed');
+      }}>Use this cover</button>
     </Sheet>
   );
   if (sheet === 'add') return (
@@ -416,7 +437,10 @@ export function GroupInfo({ group, onClose }) {
     <Sheet label="Circle settings" onClose={onClose}>
       <div className="spread">
         <h2 className="h2">{group.name}</h2>
-        {admin && <button type="button" className="link" onClick={() => setSheet('rename')}>Rename</button>}
+        <span className="row" style={{ gap: 14 }}>
+          {admin && <button type="button" className="link" onClick={() => setSheet('rename')}>Rename</button>}
+          {admin && !group.dm && <button type="button" className="link" onClick={() => { setCover(groupCover(group)); setSheet('cover'); }}>Change cover</button>}
+        </span>
       </div>
       <span className="tiny">{group.members.length} {group.members.length === 1 ? 'person' : 'people'}{invited.length ? ` · ${invited.length} invited` : ''}{group.trip ? ' · ' + group.trip : ''} · {admin ? 'you’re the admin' : person(group.admin).short + ' is the admin'}</span>
       <div className="col" style={{ gap: 6 }}>

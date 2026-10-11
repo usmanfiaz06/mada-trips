@@ -393,8 +393,9 @@ export type CoverArtOptions = {
   height: number;
   /** banner: a wide cover with the drawing to one side (headers, previews, tiles, the invite page).
    *  badge: a small square with the drawing in the middle (list rows, avatars, the picker).
-   *  poster: a tall screen with the drawing in the upper part (the invite page). */
-  layout?: 'banner' | 'badge' | 'poster';
+   *  poster: a tall screen with the drawing in the upper part (the invite page).
+   *  header: a wide band under a top bar (a circle's chat). */
+  layout?: 'banner' | 'badge' | 'poster' | 'header';
   /** Which side the drawing sits on in a banner: the end of the line (right in English, left in Arabic). */
   side?: 'left' | 'right';
   /** Draw the dotted pattern (on by default). */
@@ -415,9 +416,14 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
   const parts: string[] = [`<rect width="${W}" height="${H}" fill="${c.bg}"/>`];
   let cx: number; let cy: number; let disc: number;
   if (layout === 'banner') {
-    disc = Math.min(H * 0.34, W * 0.24);
-    cx = o.side === 'left' ? disc * 1.25 + W * 0.04 : W - disc * 1.25 - W * 0.04;
+    disc = Math.min(H * 0.3, W * 0.2);
+    cx = o.side === 'left' ? disc * 1.3 + W * 0.04 : W - disc * 1.3 - W * 0.04;
     cy = H * 0.42;
+  } else if (layout === 'header') {
+    // Under a top bar whose end holds buttons: the drawing sits lower and a little in from the end.
+    disc = Math.min(H * 0.24, W * 0.16);
+    cx = o.side === 'left' ? disc * 1.25 + W * 0.12 : W - disc * 1.25 - W * 0.12;
+    cy = H * 0.62;
   } else if (layout === 'poster') {
     disc = Math.min(W * 0.3, H * 0.2);
     cx = W / 2; cy = H * 0.3;

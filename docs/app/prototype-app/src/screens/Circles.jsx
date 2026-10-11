@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useStore, buzz, HAPTIC, fmt } from '../store.jsx';
 import { Icon, Sun, TopBar, Sheet, Toggle, EmptyState, ArtCircles, ArtFriends, ArtLantern, ArtBookmark, ArtCompass, ArtMap, ArtChat, ErrorState, ArtDesk, ArtSignal, PermissionDenied } from '../ui.jsx';
 import { PLANS } from './Plan.jsx';
+import { CoverBg, CoverStatus, coverLight, groupCover } from './covers.jsx';
 import { CityResults } from './City.jsx';
 import { SEED_POSTS, FRIENDS, GroupInfo, PostDetail, Avatar as PAvatar, person, useSave, EmptyArt, useCircleClock, setOpenCircle, getThread, fold, opAdd, opMsg, opThread, opGroup, opQueue, sys, names, newId, familyOf, familyLabel, markPaid } from './Social.jsx';
 
@@ -294,12 +295,13 @@ export default function Circles() {
         <div className="chips scrollx" style={{ gap: 10 }}>
           {circles.map((g) => {
             const line = lastLine(g, getThread(s, g.id));
-            return g.img ? (
-              <button key={g.id} type="button" className="photo cx-tile" onClick={() => push('group', { id: g.id })}>
-                <img src={g.img} alt="" /><span className="cx-veil" />
+            const gc = groupCover(g);
+            return gc ? (
+              <button key={g.id} type="button" className={'photo cx-tile' + (coverLight(gc) ? ' light' : '')} onClick={() => push('group', { id: g.id })}>
+                <CoverBg cover={gc} w={210} h={128} /><span className="cx-veil" />
                 {g.unread > 0 && <span className="pill gold" style={{ position: 'absolute', top: 10, left: 10 }}>{g.unread} new</span>}
                 {g.muted && <span className="pill glass" style={{ position: 'absolute', top: 10, right: 10 }}>Muted</span>}
-                <span className="over" style={{ textAlign: 'start', gap: 2 }}><span className="display" style={{ fontSize: 22, color: '#fffdf9' }}>{g.name}</span><span className="tiny cx-line" style={{ color: 'rgba(255,253,249,.92)' }}>{line}</span></span>
+                <span className="over" style={{ textAlign: 'start', gap: 2 }}><span className="display cx-tile-name" style={{ fontSize: 22 }}>{g.name}</span><span className="tiny cx-line cx-tile-line">{line}</span></span>
               </button>
             ) : (
               <button key={g.id} type="button" className="card tap cx-tile plain" onClick={() => push('group', { id: g.id })}>
@@ -619,9 +621,12 @@ export function Group({ params = {} }) {
   const lastMine = [...thread.msgs].reverse().find((m) => m.who === 'omar' && m.t === 'text');
   const voters = (m) => m.vote.options.reduce((a, o) => a + o.votes.length, 0);
 
+  /* The cover behind the header (covers.jsx): paper words over a photo or the green, ink on a light drawing. */
+  const gcover = group.dm ? null : groupCover(group);
+  const onPhoto = !!gcover && !coverLight(gcover);
   const faces = (
-    <button type="button" className={'cx-faces' + (group.img ? ' on-photo' : '')} aria-label={`${group.name} settings and people`} onClick={() => setInfo(true)}>
-      <span className="stack">{group.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={28} ring={group.img ? 'rgba(15,26,22,.6)' : '#e9e2d8'} />)}</span>
+    <button type="button" className={'cx-faces' + (onPhoto ? ' on-photo' : gcover ? ' on-light' : '')} aria-label={`${group.name} settings and people`} onClick={() => setInfo(true)}>
+      <span className="stack">{group.members.slice(0, 3).map((m) => <PAvatar key={m} id={m} size={28} ring={onPhoto ? 'rgba(15,26,22,.6)' : gcover ? '#fffdf9' : '#e9e2d8'} />)}</span>
       {group.members.length > 3 && <span className="cx-more">+{group.members.length - 3}</span>}
     </button>
   );
@@ -631,12 +636,13 @@ export function Group({ params = {} }) {
       {group.dm ? (
         <TopBar onBack={pop} backLabel="Circles" title={group.name} right={faces} />
       ) : (
-        <div className={'cx-head' + (group.img ? ' photo-head' : '')}>
-          {group.img && <><img src={group.img} alt="" className="cx-head-bg" /><span className="cx-head-veil" /></>}
-          <div style={{ position: 'relative', zIndex: 1 }}><TopBar onBack={pop} backLabel="Circles" dark={!!group.img} right={faces} /></div>
+        <div className={'cx-head' + (onPhoto ? ' photo-head' : gcover ? ' light-head' : '')}>
+          {gcover && <><CoverBg cover={gcover} w={390} h={180} layout="header" className="cx-head-bg" />{gcover.kind !== 'icon' && <span className="cx-head-veil" />}</>}
+          <div style={{ position: 'relative', zIndex: 1 }}><TopBar onBack={pop} backLabel="Circles" dark={onPhoto} right={faces} /></div>
           <div className="cx-head-text">
             <h1 className="display">{group.name}</h1>
             <span className="cx-head-sub">{[dest && group.trip ? group.trip.replace('Somewhere new', dest) : dest || null, `${group.members.length} ${group.members.length === 1 ? 'person' : 'people'}`, invited.length ? `${invited.length} invited` : null, group.muted ? 'muted' : null].filter(Boolean).join(' · ')}</span>
+            <CoverStatus cover={gcover} onDark={onPhoto} />
           </div>
         </div>
       )}

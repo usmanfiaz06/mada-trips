@@ -70,6 +70,7 @@ export default function NewCircle() {
         <TopBar onBack={() => router.back()} backLabel={t('common.cancel')} right={<T v="tiny" style={{ paddingEnd: 8 }}>{t('circles.newCircle.step', { n: 1 })}</T>} />
         <ScrollView contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
           <CoverArt cover={cover} veil style={st.preview} testID="nc-preview">
+            <CoverStatus cover={cover} onDark />
             <View accessibilityElementsHidden style={{ marginTop: 'auto' }}>
               <T style={[font('display', ink.text), { fontSize: 36, lineHeight: 38 }]} balance={false}>{name.trim() || t('circles.newCircle.yours')}</T>
               <T style={{ fontSize: 13, fontFamily: ff.ui400, color: ink.soft, marginTop: 6 }}>{picked.length ? t('circles.newCircle.andMore', { count: picked.length }) : t('circles.newCircle.justYou')}</T>
@@ -88,7 +89,6 @@ export default function NewCircle() {
           </View>
           <View style={{ gap: 10 }}>
             <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.cover.a11y')}</T>
-            {cover?.kind === 'upload' ? <CoverStatus cover={cover} /> : null}
             <CoverPicker value={cover} onChange={setCover} upload={upload} onUpload={setUpload} />
           </View>
         </ScrollView>
