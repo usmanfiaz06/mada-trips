@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { DESK_PHONE, DESK_SMS, DESK_TEL, DESK_WHATSAPP, SUPPORT_TOPICS, checkUpload, formatSar, type SupportMessage, type SupportTopic } from '@mada/shared';
+import { DESK_PHONE, DESK_SMS, DESK_TEL, DESK_WHATSAPP, SUPPORT_TOPICS, checkUpload, formatSar, rangeLabel, wordFor, type SupportMessage, type SupportTopic } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Field } from '@/components/Field';
@@ -123,7 +123,7 @@ export default function Support() {
           <T v="tiny" testID="support-presence">{line}</T>
         </View>
       </View>
-      {th ? <View style={styles.about}><Icon name="trips" size={16} color={colors.goldInk} /><T v="caption" color={colors.goldInk} style={{ fontFamily: ff.ui600 }}>{t('support.about', { about: th.about })}</T></View> : null}
+      {th ? <View style={styles.about}><Icon name="trips" size={16} color={colors.goldInk} /><T v="caption" color={colors.goldInk} style={{ fontFamily: ff.ui600 }}>{t('support.about', { about: th.tripId && trip?.id === th.tripId ? `${t('support.aboutTrip', { city: trip.city })} · ${rangeLabel(trip.trip.startDate, trip.trip.endDate)}` : wordFor(th.about) })}</T></View> : null}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scroll} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120, gap: 10 }} keyboardShouldPersistTaps="handled">

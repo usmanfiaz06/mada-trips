@@ -260,8 +260,8 @@ export function HomeSheet({ visible, onClose }: { visible: boolean; onClose: () 
   );
 }
 
-const CURRENCIES: [string, string][] = [['SAR', 'Saudi riyal'], ['AED', 'UAE dirham'], ['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'Pound sterling']];
-export const currencyName = (c: string) => CURRENCIES.find((x) => x[0] === c)?.[1] ?? c;
+const CURRENCIES = ['SAR', 'AED', 'USD', 'EUR', 'GBP'] as const;
+export const currencyName = (c: string) => ((CURRENCIES as readonly string[]).includes(c) ? t(`currency.${c}` as 'currency.SAR') : c);
 
 export function CurrencySheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const account = useAccount();
@@ -271,7 +271,7 @@ export function CurrencySheet({ visible, onClose }: { visible: boolean; onClose:
     <Sheet visible={visible} onClose={onClose} label={t('account.currency')}>
       <T v="h2">{t('account.currency.title')}</T>
       <Group well>
-        {CURRENCIES.map(([c, n]) => <Row key={c} value={`${c} · ${n}`} right={cur === c ? <Icon name="check" color={colors.ok} width={2.4} /> : <View />}
+        {CURRENCIES.map((c) => <Row key={c} value={`${c} · ${currencyName(c)}`} right={cur === c ? <Icon name="check" color={colors.ok} width={2.4} /> : <View />}
           onPress={() => update.mutate({ currency: c as 'SAR' }, { onSuccess: () => { toast(c === 'SAR' ? t('account.currency.sar') : t('account.currency.other', { code: c })); onClose(); } })} />)}
       </Group>
       <T v="small">{t('account.currency.note')}</T>

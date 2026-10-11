@@ -22,6 +22,8 @@ const WORDS: Readonly<Record<string, CopyKey>> = {
   'flynas direct on Thursdays and Sundays, 4h 05m': 'dq.hand.tbilisi', 'Saudia direct to Charles de Gaulle, 6h 50m': 'dq.hand.paris',
   'Saudia direct to Denpasar three times a week, 9h 40m': 'dq.hand.bali', 'Saudia direct to Malé, 5h 30m': 'dq.hand.maldives',
   'one stop, about 9 hours': 'dq.hand.other',
+  // the server names a support conversation in English
+  'Your account': 'support.aboutAccount',
 };
 
 /** A stored English value in the display language: "Standard car" → "سيارة عادية". */

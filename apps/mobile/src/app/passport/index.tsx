@@ -91,7 +91,7 @@ function ScanStage() {
   const beam = useSharedValue(0);
   useEffect(() => { beam.set(withDelay(400, withRepeat(withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) }), -1, true))); }, [beam]);
   const beamStyle = useAnimatedStyle(() => ({ transform: [{ translateY: beam.get() * 176 }] }));
-  const rows: [string, string][] = [[t('passport.demo.nameOnTicket'), 'OMAR ALHARBI'], [t('passport.demo.passport'), 'A08•••41 · Saudi'], [t('passport.demo.valid'), 'Until June 2031']];
+  const rows: [string, string][] = [[t('passport.demo.nameOnTicket'), 'OMAR ALHARBI'], [t('passport.demo.passport'), t('passport.demo.passportValue')], [t('passport.demo.valid'), t('passport.demo.validValue')]];
   return (
     <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">

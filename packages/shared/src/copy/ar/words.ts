@@ -125,6 +125,15 @@ export const arWords: ArSection<typeof wordsCopy> = {
   'dq.oneWay': '{dates}، ذهاب فقط',
   'dq.from': 'من {from}',
   'dq.stay.cancel': 'الإلغاء مجاني حتى 7 أيام قبل الوصول. بعدها تُحسب الليلة الأولى.',
+  'passport.demo.passportValue': 'A08•••41 · سعودي',
+  'passport.demo.validValue': 'حتى يونيو 2031',
+
+  'currency.SAR': 'ريال سعودي',
+  'currency.AED': 'درهم إماراتي',
+  'currency.USD': 'دولار أمريكي',
+  'currency.EUR': 'يورو',
+  'currency.GBP': 'جنيه إسترليني',
+
   'ev.e1.title': 'بوليفارد وورلد في الليل',
   'ev.e1.when': 'كل مساء · 16:00–01:00',
   'ev.e1.where': 'موسم الرياض',

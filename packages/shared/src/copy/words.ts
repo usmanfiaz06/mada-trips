@@ -129,6 +129,17 @@ export const wordsCopy = {
   'dq.oneWay': '{dates}, one way',
   'dq.from': 'From {from}',
   'dq.stay.cancel': 'Free to cancel until 7 days before. After that, the first night.',
+  // ───────────── the passport intro's sample card ─────────────
+  'passport.demo.passportValue': 'A08•••41 · Saudi',
+  'passport.demo.validValue': 'Until June 2031',
+
+  // ───────────── currencies (Account › Currency) ─────────────
+  'currency.SAR': 'Saudi riyal',
+  'currency.AED': 'UAE dirham',
+  'currency.USD': 'US dollar',
+  'currency.EUR': 'Euro',
+  'currency.GBP': 'Pound sterling',
+
   // ───────────── Discover: what's on (EVENTS in schemas/circles.ts, by id) ─────────────
   'ev.e1.title': 'Boulevard World at night',
   'ev.e1.when': 'Every evening · 16:00–01:00',
