@@ -54,9 +54,24 @@ export const Activity = z.object({
   popularity: z.number().int().min(0).max(100),
   /** From the hotel (or wherever `near` pointed), straight line. */
   distanceKm: z.number().nonnegative().nullable(),
+  /** The street address as mapped in OpenStreetMap (addr:*), when it is. */
+  address: z.string().nullable().optional(),
   attributions: z.array(PlaceAttribution),
 });
 export type Activity = z.infer<typeof Activity>;
+
+/** Where an experience starts, as the supplier gives it (Hotelbeds: content.location.startingPoints[].meetingPoint). */
+export const MeetingPoint = z.object({
+  /** "Kabataş pier, gate 3", the supplier's words. */
+  address: z.string().nullable(),
+  /** The supplier's note on finding it ("Look for the guide with the yellow flag"). */
+  note: z.string().nullable(),
+  lat: z.number().min(-90).max(90).nullable(),
+  lon: z.number().min(-180).max(180).nullable(),
+  /** "meet" (go there yourself) or "pickup" (they collect you, usually from the hotel). */
+  kind: z.enum(['meet', 'pickup']).default('meet'),
+});
+export type MeetingPoint = z.infer<typeof MeetingPoint>;
 
 export const ExperienceSupplier = z.enum(['hotelbeds', 'getyourguide', 'viator']);
 export type ExperienceSupplier = z.infer<typeof ExperienceSupplier>;
@@ -85,6 +100,8 @@ export const Experience = z.object({
   minAge: z.number().int().min(0).max(99).nullable(),
   /** Free cancellation until shortly before, when the supplier says so. */
   freeCancel: z.boolean().nullable(),
+  /** Where it starts, when the supplier's data says. Null: it's on the voucher once booked. */
+  meetingPoint: MeetingPoint.nullable().optional(),
 });
 export type Experience = z.infer<typeof Experience>;
 
@@ -201,6 +218,28 @@ export const BookThingRequest = z.object({
 export type BookThingRequest = z.input<typeof BookThingRequest>;
 export const BookThingResponse = z.object({ request: BookingRequestView, message: z.string() });
 export type BookThingResponse = z.infer<typeof BookThingResponse>;
+
+/**
+ * "Get there with Mada": a car to a place, booked by the desk (in the beta every ride is a desk request, like an airport
+ * pickup). Pickup is the trip's hotel unless they say where.
+ */
+export const RideThingRequest = z.object({
+  ref: ThingRef,
+  placeId: z.string().regex(/^\d{1,10}$/),
+  tripId: Id.optional(),
+  day: IsoDay,
+  /** Local time at the pickup, "18:30". */
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  pickup: z.enum(['hotel', 'other']),
+  /** Where to pick them up, when not the hotel. */
+  pickupText: z.string().trim().max(160).optional(),
+  travellers: z.number().int().min(1).max(30).optional(),
+  message: z.string().trim().min(1).max(600).optional(),
+  clientId: z.string().min(8).max(80),
+}).refine((v) => v.pickup === 'hotel' || !!v.pickupText?.trim(), { message: 'Say where to pick you up', path: ['pickupText'] });
+export type RideThingRequest = z.input<typeof RideThingRequest>;
+export const RideThingResponse = z.object({ request: BookingRequestView, message: z.string() });
+export type RideThingResponse = z.infer<typeof RideThingResponse>;
 
 /** "Add to my plan": an idea on a day of the itinerary. Not booked, not held. */
 export const TripIdea = z.object({

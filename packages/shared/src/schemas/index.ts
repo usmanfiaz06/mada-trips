@@ -23,3 +23,4 @@ export * from './activities-logic';
 export * from './review';
 export * from './transfers';
 export * from './activities-data';
+export * from './directions';
