@@ -140,7 +140,7 @@ export async function writePlaces(sql: Sql, data: Awaited<ReturnType<typeof load
     const nameRow = (n: NameRow) => ({ place_id: n.placeId, kind: n.kind, name: n.name, norm: n.norm, label: n.label, rank: n.rank });
     for (const part of chunks(data.names, 2000)) {
       await tx`INSERT INTO app_place_names (place_id, kind, name, norm, label, rank)
-        SELECT place_id, kind, name, app_places_norm(norm), label, rank FROM json_populate_recordset(null::app_place_names, ${JSON.stringify(part.map(nameRow))}::json)
+        SELECT place_id, kind, name, app_places_norm(norm), label, rank FROM json_populate_recordset(null::app_place_names, ${JSON.stringify(part.map(nameRow))}::text::json)
         ON CONFLICT DO NOTHING`;
     }
     log(`names: ${data.names.length}`);

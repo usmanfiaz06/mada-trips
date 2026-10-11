@@ -21,7 +21,13 @@ import { createHash } from "node:crypto";
 
 const DEV_JWT_SECRET = "dev-only-mada-core-jwt-secret-do-not-use-in-production";
 
-export const isProductionDeploy = () => process.env.VERCEL_ENV === "production" || process.env.APP_ENV === "production";
+/**
+ * A production deployment: Vercel's production target, or APP_ENV=production anywhere. A staging copy sets
+ * APP_ENV=staging; it may be the production target of its own Vercel project (a stable *.vercel.app URL, crons,
+ * migrations on deploy) and still behaves as a non-production deployment: mocks allowed, Hotelbeds test keys book.
+ */
+export const isProductionDeploy = () =>
+  process.env.APP_ENV === "production" || (process.env.VERCEL_ENV === "production" && process.env.APP_ENV !== "staging");
 
 export function jwtSecret(): Uint8Array {
   const s = process.env.APP_JWT_SECRET;

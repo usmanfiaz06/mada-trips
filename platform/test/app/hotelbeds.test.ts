@@ -362,6 +362,17 @@ describe("stays from Hotelbeds in the app", () => {
     expect(staysMode()).toBe("request");
   });
 
+  it("a staging copy on its own Vercel production target is not production: test keys book, stays default to live", () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.APP_ENV = "staging";
+    process.env.SUPPLIER_MODE_HOTELS = "hotelbeds";
+    process.env.HOTELBEDS_ENV = "test";
+    expect(hotelbedsBookingAllowed("hotels").ok).toBe(true);
+    expect(staysMode()).toBe("live");
+    process.env.APP_STAYS_MODE = "live";
+    expect(staysMode()).toBe("live");
+  });
+
   it("answers a Hotelbeds outage with SUPPLIER_DOWN, not a hang", async () => {
     process.env.SUPPLIER_MODE_HOTELS = "hotelbeds-mock";
     clearSearchCache();
