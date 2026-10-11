@@ -163,7 +163,7 @@ async function flights() {
   }
   await k.byTest('dock-trips').click();
   await page.waitForTimeout(600);
-  await k.press(page.getByRole('button', { name: 'Requests', exact: true }).or(page.getByRole('tab', { name: 'Requests', exact: true })));
+  await k.press(k.byTest('tab-requests'));
   await k.see('Flights to Istanbul', 'requests tab', 10000);
   await k.shot('requests-tab');
   await k.press(k.byTest('open-flight-request'));

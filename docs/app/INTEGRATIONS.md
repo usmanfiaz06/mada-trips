@@ -65,8 +65,8 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 
 | Need | Recommended | Alternative | Cost model |
 |---|---|---|---|
-| Flight status, gate, delays, inbound aircraft | **FlightAware AeroAPI** (alerts and webhooks, never polling) | AeroDataBox (cheaper, less reliable) | **The one fixed cost worth paying:** about $100 a month minimum, plus per query. Early warnings are the core promise, so data quality matters here more than anywhere else. |
-| Live aircraft position (the plane on the map, the inbound aircraft, in-air progress) | **adsb.lol** open ADS-B data (no key, ODbL licence: commercial use with attribution) | OpenSky Network (free for non-commercial use; commercial needs an agreement) | Free. Position, altitude and speed only. Gates, delays and schedules still come from FlightAware. Cached 30–60 s per flight. |
+| Flight status, gate, delays, inbound aircraft | **AeroDataBox** for the beta (owner approved; RapidAPI or API.Market; flight-number alert webhooks, polling as the fallback). Code: `suppliers/live/aerodatabox.ts`, `lib/app/flight-status/*` | **aviationstack** (development only: the Free plan is 100 calls a month and **non-commercial**; production needs a paid plan or AeroDataBox) · **FlightAware AeroAPI** (kept as an option) | AeroDataBox Basic is free with 400 units a month (a status lookup costs 2, so about 200 lookups); Pro is $8 for 5,000. Alerts bill 1 credit per changed flight, credits bought from the same units. Add **one key** and it switches on: `AERODATABOX_API_KEY` (or `AVIATIONSTACK_API_KEY`, or `FLIGHTAWARE_API_KEY`); `SUPPLIER_MODE_FLIGHT_STATUS` only to force one. A shared cache, a polling cadence tuned to the plan and a hard monthly budget keep it inside the quota. See the suppliers README for confirmed and assumed API details. |
+| Live aircraft position (the plane on the map, the inbound aircraft, in-air progress) | **adsb.lol** open ADS-B data (no key, ODbL licence: commercial use with attribution), looked up by the aircraft's **ICAO hex** when the status supplier names it, else by callsign | OpenSky Network (free for non-commercial use; commercial needs an agreement) | Free. Position, altitude and speed only. **No community receivers in Riyadh, Jeddah or Madinah today** (0 aircraft within 60 nm on 11 Oct 2026; Dammam 15, Istanbul 17, Dubai 25), so Saudi departures appear only once they reach covered airspace; until then the app shows an **estimated** position on the great circle from the airline's times. Mada's own receivers fix this: docs/app/ADSB-RECEIVER.md, checked with `npm run adsb:coverage`. Cached 45 s per aircraft. |
 | Trip import from email | **Amazon SES inbound** | — | About $0.10 per 1,000 emails. Each user gets an address like `name@trips.madatrips.sa`, and Claude reads the email. |
 | Weather | **Apple WeatherKit** | Open-Meteo (free, open data) | Included with the Apple developer account (500k calls a month). |
 | Maps | **Apple MapKit** on iOS, **Google Maps SDK** on Android | — | Free on iOS. Google's mobile map display is free **[confirm]**. |
@@ -172,7 +172,7 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 5. Register an **SMS sender ID** with a Saudi provider, and set up **Supabase Auth** with Apple, Google, email codes and the SMS hook ([AUTH.md](AUTH.md)).
 6. Ask the accountant about **ZATCA e-invoicing** (phase 2).
 7. Book the **legal opinions** in 0.10.
-8. Ask **Travelfusion** for terms for flynas and flyadeal. Create free accounts for **RateHawk**, **FlightAware**, **PostHog**, **Sentry**, **Amazon SES** and the **Anthropic API**.
+8. Ask **Travelfusion** for terms for flynas and flyadeal. Create free accounts for **RateHawk**, **AeroDataBox** (on RapidAPI), **PostHog**, **Sentry**, **Amazon SES** and the **Anthropic API**.
 
 ---
 
@@ -184,7 +184,8 @@ The engineering on these is quick. The paperwork is slow, so open them before de
 |---|---|---|
 | Apple Developer Program | $99 a year | Required to publish on iOS |
 | Google Play Console | $25 once | Required to publish on Android |
-| FlightAware AeroAPI | About $100 a month minimum, plus queries | Early-warning data is the core promise. **It tracks flights only. It sells no seats and shows no fares.** |
+| AeroDataBox (flight status, the beta) | Free Basic (400 units a month) to start; Pro $8 a month for 5,000 units when travellers grow; alert credits come out of the same units | Early-warning data is the core promise. **It tracks flights only. It sells no seats and shows no fares.** FlightAware AeroAPI (about $100 a month minimum) stays an option if data quality needs it. |
+| ADS-B receivers in Riyadh and Jeddah (one-off) | Roughly SAR 900 to 1,400 each (docs/app/ADSB-RECEIVER.md) | Puts Saudi departures on the live map from the runway, for us and everyone using adsb.lol |
 | Supabase + Vercel | Plans already paid for Ops | Hosting |
 
 **Costs that grow only with use**
