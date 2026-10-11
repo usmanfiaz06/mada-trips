@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { appOffers } from "@/db/app-schema-booking";
 import { appHotelbedsHotels } from "@/db/app-schema-hotelbeds";
@@ -14,7 +14,8 @@ import { hotelbedsHotels, hotelVendor } from "./app";
  *   refreshHotelContent()   1. hotels seen in our offers this week but not stored yet (by code, 100 a call)
  *                           2. what changed since the last run (lastUpdateTime), for the destinations we sell
  *                           3. facility names (types/facilities), so the app can say "Wi-Fi", not "70/70"
- * Run daily: Vercel Cron → GET /api/cron/hotelbeds (lib/app/jobs.ts, platform/vercel.json).
+ * Run hourly (new hotels from searches; what changed only in the 03:xx UTC run): Vercel Cron → GET /api/cron/hotelbeds
+ * (lib/app/jobs.ts, platform/vercel.json). Hours with nothing new make no call to Hotelbeds.
  */
 
 type Facility = { code: number; group: number; name: string | null; paid: boolean };
@@ -36,12 +37,15 @@ function rowOf(h: HbContentHotel) {
   };
 }
 
+/** One upsert per batch (was one per hotel: 100 round trips to a far-away database, so a run could time out). */
 async function store(hotels: HbContentHotel[]) {
-  for (const h of hotels) {
-    const r = rowOf(h);
-    await db.insert(appHotelbedsHotels).values(r).onConflictDoUpdate({ target: appHotelbedsHotels.code, set: { ...r, code: undefined } as never });
-  }
-  return hotels.length;
+  const rows = [...new Map(hotels.map((h) => [h.code, rowOf(h)])).values()];
+  if (!rows.length) return 0;
+  // Every column rowOf writes, from the incoming row (excluded.<column>).
+  const columns = getTableColumns(appHotelbedsHotels) as Record<string, { name: string }>;
+  const set = Object.fromEntries(Object.keys(rows[0]!).filter((k) => k !== "code").map((k) => [k, sql.raw(`excluded."${columns[k]!.name}"`)]));
+  await db.insert(appHotelbedsHotels).values(rows).onConflictDoUpdate({ target: appHotelbedsHotels.code, set });
+  return rows.length;
 }
 
 async function loadFacilityNames(api: HotelbedsHotels) {
@@ -68,12 +72,15 @@ async function missingCodes(): Promise<number[]> {
 
 export type ContentRun = { missing: number; changed: number; calls: number; since: string | null };
 
-export async function refreshHotelContent(opts: { api?: HotelbedsHotels; maxCalls?: number } = {}): Promise<ContentRun> {
+export async function refreshHotelContent(opts: { api?: HotelbedsHotels; maxCalls?: number; changes?: boolean } = {}): Promise<ContentRun> {
   const api = opts.api ?? hotelbedsHotels();
   const maxCalls = opts.maxCalls ?? 40; // the evaluation keys allow 50 calls a day
   let calls = 0, missing = 0, changed = 0;
-  await loadFacilityNames(api); calls += 1;
   const todo = await missingCodes();
+  const changes = opts.changes ?? true;
+  // Nothing new and not the daily pass: no call to Hotelbeds at all (the job runs hourly).
+  if (!todo.length && !changes) return { missing: 0, changed: 0, calls: 0, since: null };
+  if (!facilityNames.size) { await loadFacilityNames(api); calls += 1; }
   for (let i = 0; i < todo.length && calls < maxCalls; i += 100) {
     const batch = todo.slice(i, i + 100);
     const r = await api.content({ codes: batch, from: 1, to: batch.length });
@@ -83,7 +90,7 @@ export async function refreshHotelContent(opts: { api?: HotelbedsHotels; maxCall
   // Changes since the last run, a day of overlap; first run: nothing to compare against, the by-code pass fills it.
   const [last] = await db.select({ at: sql<Date>`max(${appHotelbedsHotels.fetchedAt})` }).from(appHotelbedsHotels);
   const since = last?.at ? new Date(new Date(last.at).getTime() - 86_400_000).toISOString().slice(0, 10) : null;
-  if (since) {
+  if (since && changes) {
     const destinations = new Set(Object.values(HB_PLACES).map((p) => p.code).filter(Boolean));
     for (let from = 1; calls < maxCalls; from += 1000) {
       const r = await api.content({ from, to: from + 999, lastUpdateTime: since });
@@ -105,6 +112,8 @@ export async function hotelContent(code: number) {
 /** The daily job: only when stays come from Hotelbeds (real keys); nothing to do on the catalogue or the fixtures. */
 export async function hotelbedsContentJob(): Promise<Record<string, number>> {
   if (hotelVendor() !== "hotelbeds") return { skipped: 1 };
-  const r = await refreshHotelContent();
+  // Hourly: hotels that showed up in searches since the last run get their photos and facts within the hour; what
+  // changed at Hotelbeds is fetched once a day (03:xx UTC), as before.
+  const r = await refreshHotelContent({ changes: new Date().getUTCHours() === 3 });
   return { missing: r.missing, changed: r.changed, calls: r.calls };
 }

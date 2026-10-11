@@ -25,7 +25,7 @@ import { flightsJob } from "./flight-status/poll";
  *               SUPABASE_SERVICE_ROLE_KEY; the mock records the call when Supabase isn't set up)
  *   recovery    a recovery request's contact details (old and new number or email, name, note, IP hash) are wiped
  *               30 days after the desk closed it; the decision and dates stay for the record
- *   hotelbeds   Hotelbeds hotel content into app_hotelbeds_hotels, daily (suppliers/hotelbeds/content.ts)
+ *   hotelbeds   Hotelbeds hotel content into app_hotelbeds_hotels, hourly for new hotels, daily for changes (content.ts)
  *   flights     flight status for booked and tracked flights (flight-status/poll.ts): AeroDataBox alert subscriptions
  *               kept in step, polling where alerts aren't available; gate changes, delays and cancellations told once
  *   quotes      quotes whose hold has passed become expired (the traveller hears it once, and the thread says so);
