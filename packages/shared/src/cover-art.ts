@@ -422,7 +422,7 @@ export function coverArtSvg(cover: { icon: CoverIcon; color: CoverColor }, o: Co
   } else if (layout === 'header') {
     // Under a top bar whose end holds buttons: the drawing sits lower and a little in from the end.
     disc = Math.min(H * 0.24, W * 0.16);
-    cx = o.side === 'left' ? disc * 1.25 + W * 0.12 : W - disc * 1.25 - W * 0.12;
+    cx = o.side === 'left' ? disc * 1.25 + W * 0.16 : W - disc * 1.25 - W * 0.16;
     cy = H * 0.62;
   } else if (layout === 'poster') {
     disc = Math.min(W * 0.3, H * 0.2);

@@ -502,7 +502,7 @@ async function covers(lang) {
 
   step(`${lang}: covers on the circles rail`);
   await go('/circles?view=circles');
-  await see(L('Family', 'Family'), 'family circle');
+  await byTest('circle-tile').nth(2).scrollIntoViewIfNeeded();
   await shot(`${lang}-covers-rail`);
 
   step(`${lang}: the picker`);

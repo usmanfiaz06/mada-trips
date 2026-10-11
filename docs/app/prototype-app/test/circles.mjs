@@ -280,7 +280,8 @@ try {
     step(`${lang}: circle covers`);
     await seed({ friends: ['abdullah', 'noor', 'khalid', 'faris'], groups: DEMO_GROUPS.map((g) => (g.id === 'family' ? { ...g, cover: { kind: 'icon', icon: 'family', color: 'sand' } } : g)), circleThreads: {}, circleQueue: [] });
     if (lang === 'ar') { await page.locator('[data-testid="lang-ar"]').click({ force: true }); await page.waitForTimeout(500); }
-    await toCirclesTab();
+    if (lang === 'ar') { await phone.getByRole('button', { name: 'المجموعات', exact: true }).first().click(); await page.waitForTimeout(400); await phone.getByRole('tab', { name: 'المجموعات', exact: true }).click(); await page.waitForTimeout(400); }
+    else await toCirclesTab();
     await phone.locator('.cx-tile').nth(2).scrollIntoViewIfNeeded();
     await shot(`${lang}-covers-rail`);
     await open('newCircle');
@@ -305,7 +306,7 @@ try {
     await phone.getByRole('radio', { name: L('Icons', 'رسومات'), exact: true }).click();
     await phone.getByRole('radio', { name: L('Green background', 'خلفية أخضر'), exact: true }).click();
     await phone.getByRole('radio', { name: L('Hot-air balloon', 'منطاد'), exact: true }).click();
-    await click(L('Next', 'التالي'));
+    await phone.locator('.nc-act .btn.primary').click(); await page.waitForTimeout(400);
     await phone.locator('.act .btn.primary').last().click();
     await page.waitForTimeout(800);
     let st2 = await state();

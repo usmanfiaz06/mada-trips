@@ -194,7 +194,7 @@ export function CoverPicker({ value, onChange, upload, onUpload }: {
 
 const s = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8, columnGap: 6 },
-  cell: { width: '15.6%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
+  cell: { width: '15%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
   cellOn: { borderColor: colors.goldDeep },
   dot: { width: 36, height: 36, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(30,53,45,0.12)' },
   dotOn: { borderWidth: 2, borderColor: colors.goldDeep, transform: [{ scale: 1.08 }], boxShadow: `0px 0px 0px 3px ${colors.sand}` },
