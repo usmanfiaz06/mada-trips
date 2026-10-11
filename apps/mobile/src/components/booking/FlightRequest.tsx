@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import {
@@ -59,12 +59,10 @@ export function FlightRequestForm({ city, destKey, trip, who, setWho, people, se
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); }
   };
 
-  // The one action sits at the bottom of Ask (its CTA); it always sends what's on screen now.
-  const latest = useRef(send);
-  latest.current = send;
+  // The one action sits at the bottom of Ask (its CTA); it's renewed whenever an answer changes, so it sends what's on screen.
   useEffect(() => {
-    setCta({ label: t('beta.fr.send'), disabled: busy || !who.length, onPress: () => { void latest.current(); }, testID: 'flight-request-send' });
-  }, [busy, who.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    setCta({ label: t('beta.fr.send'), disabled: busy || !who.length, onPress: () => { void send(); }, testID: 'flight-request-send' });
+  }, [busy, who.join(), flex, cabin, bags, prefs.join(), note]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

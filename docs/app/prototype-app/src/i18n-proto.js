@@ -11,6 +11,10 @@ export const PROTO_AR = {
   'your phone': 'جوالك',
   // Sign-in help (screens/AuthHelp.jsx); everything else there is the catalogue's own words.
   'Demo password: {password}': 'كلمة مرور التجربة: {password}',
+  // Things to do (screens/Things.jsx): Faisal's reply and the request's note
+  'On it. I’ll check {name} and send you the price here, usually within 30 minutes.': 'تمام. سأتحقق من {name} وأرسل لك السعر هنا، عادةً خلال 30 دقيقة.',
+  'I’ll book {name} for {who} on {day} and send you the price here first.': 'سأحجز {name} لـ{who} يوم {day} وأرسل لك السعر هنا أولًا.',
+  'I’ll book {name} for {who} and send you the price here first.': 'سأحجز {name} لـ{who} وأرسل لك السعر هنا أولًا.',
   // Today
   'Last Eid, the four of you went to Baku.': 'في العيد الماضي سافرتم أنتم الأربعة إلى باكو.',
   '{name} is back': 'عاد {name}',

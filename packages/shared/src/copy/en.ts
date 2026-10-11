@@ -49,6 +49,7 @@ export const en = {
   ...thingsCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
+  'common.home': 'Home',
   'common.cancel': 'Cancel',
   'common.skip': 'Skip',
   'common.later': 'Later',
@@ -79,6 +80,7 @@ export const en = {
   'tabs.today': 'Today',
   'tabs.trips': 'Trips',
   'tabs.ask': 'Ask Mada',
+  'tabs.askShort': 'Ask',
   'tabs.circles': 'Circles',
   'tabs.wallet': 'Wallet',
 

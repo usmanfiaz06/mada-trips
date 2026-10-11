@@ -19,6 +19,6 @@
 .th-price { color: var(--green); font-size: 15px; }
 .th-facts { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: var(--mist); }
 .th-map { position: relative; height: 120px; border-radius: 18px; overflow: hidden; border: 0; padding: 0; background: #e6eee6; }
-.th-map svg { width: 100%; height: 100%; display: block; }
+.th-map > svg { width: 100%; height: 100%; display: block; }
 .th-map-btn { position: absolute; bottom: 10px; inset-inline-end: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 99px; background: var(--paper); font-size: 12px; font-weight: 600; color: var(--green); }
 .th-planned { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: #e8f1ea; }

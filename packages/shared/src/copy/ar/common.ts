@@ -9,6 +9,7 @@ import type { ArSection } from './types';
 
 export const arCommon: ArSection<typeof en> = {
   'common.back': 'رجوع',
+  'common.home': 'الرئيسية',
   'common.cancel': 'إلغاء',
   'common.skip': 'تخطٍّ',
   'common.later': 'لاحقًا',
@@ -36,6 +37,7 @@ export const arCommon: ArSection<typeof en> = {
   'tabs.today': 'اليوم',
   'tabs.trips': 'الرحلات',
   'tabs.ask': 'اسأل مادا',
+  'tabs.askShort': 'اسأل',
   'tabs.circles': 'المجموعات',
   'tabs.wallet': 'المحفظة',
   'welcome.title': 'علينا الباقي.',

@@ -8,7 +8,7 @@
 // a circle's chat (votes cast and closed, @Mada, a cost split, settings, rename, invite link), a new circle in two
 // steps (duplicate name, Mada-wide search, nobody found), your people (tabs, contacts, by phone), a friend's page,
 // Saved, invite links (signed in, expired, and signed out → sign up → lands in the circle), and a new account's
-// empty states. Screenshots every screen at 390×844. Fails on page errors or missing text.
+// empty states. Then, in English and Arabic: "Got an invite code?" → the invite → sign up → the circle, live. Screenshots every screen at 390×844. Fails on page errors or missing text.
 import { createServer, request as httpRequest } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -44,8 +44,8 @@ const errors = [];
 let n = 0;
 const step = (s) => console.log('·', s);
 
-async function newPage() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh' });
+async function newPage(locale = 'en-GB') {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh' });
   const page = await context.newPage();
   page.on('pageerror', (e) => { errors.push(`pageerror: ${e.message}`); console.log('PAGEERROR', e.message); });
   return { context, page };
@@ -196,7 +196,22 @@ async function demo() {
   await shot('chat-mada');
   await byTest('chat-input').fill('Who is in for the ferry?');
   await byTest('chat-send').click();
-  await see('I’m in.', 'reply', 9000);
+  await see('is typing', 'typing, live', 9000);
+  await shot('chat-typing');
+  await see('I’m in.', 'reply, live', 9000);
+
+  step('react: press and hold, pick, they react back');
+  const reply = text('I’m in.');
+  const box = await reply.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();
+  await byTest('reaction-bar').waitFor({ timeout: 4000 }).catch(() => errors.push('reactions: no bar after a long press'));
+  await shot('chat-react-bar');
+  await byTest('react-❤️').click();
+  await byTest('reaction-❤️').first().waitFor({ timeout: 6000 }).catch(() => errors.push('reactions: mine not shown'));
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="reaction-❤️"]')].some((e) => /2/.test(e.textContent ?? '')), null, { timeout: 9000 })
+    .catch(() => errors.push('reactions: theirs did not arrive live'));
+  await shot('chat-reacted');
   await byTest('chat-input').fill('Thanks');
   await byTest('chat-send').click();
   await see('Seen by', 'read receipt', 9000);
@@ -248,7 +263,22 @@ async function demo() {
   await byTest('invite-link-btn').click();
   await see('Invite to Eid in Istanbul', 'invite sheet');
   await page.waitForFunction(() => /madatrips\.sa\/join\//.test(document.querySelector('[data-testid="invite-link"]')?.value ?? ''), null, { timeout: 8000 }).catch(() => errors.push('link shown: no invite link'));
+  await byTest('invite-qr').waitFor({ timeout: 4000 }).catch(() => errors.push('invite: no QR code'));
+  await see('Send on WhatsApp', 'whatsapp first');
   await shot('invite-link');
+  await byTest('invite-settings').click();
+  await see('Lets in', 'link settings');
+  await page.getByRole('button', { name: '5 people', exact: true }).click();
+  await see('New link ready. The old one no longer works.', 'new link with a limit');
+  await see('0 of 5 joined.', 'limit shown');
+  await shot('invite-options');
+  await byTest('invite-turn-off').click();
+  await see('Turn off this link?', 'turn off confirm');
+  await byTest('invite-turn-off-yes').click();
+  await see('Link turned off. Nobody new can join with it.', 'turned off');
+  await shot('invite-turned-off');
+  await byTest('invite-new').click();
+  await page.waitForFunction(() => /madatrips\.sa\/join\//.test(document.querySelector('[data-testid="invite-link"]')?.value ?? ''), null, { timeout: 8000 }).catch(() => errors.push('invite: no new link'));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(500);
   await go('/circles');
@@ -390,8 +420,51 @@ async function joinSignedOut() {
   await context.close();
 }
 
+/*
+ * Installed from an invite page: "Got an invite code?" on the welcome screen, paste the link, see the invite, join
+ * (sign up first, then back), and the circle is live: someone types, answers, and it arrives without a refresh.
+ * In English and in Arabic.
+ */
+async function inviteToLive(lang) {
+  const { context, page } = await newPage(lang === 'ar' ? 'ar-SA' : 'en-GB');
+  const { shot, see, byTest } = kit(page);
+  const L = (en, ar) => (lang === 'ar' ? ar : en);
+  await page.goto(ORIGIN + '/');
+  await byTest('welcome-invite-code').waitFor({ timeout: 8000 });
+  await shot(`${lang}-welcome-invite-code`);
+  await byTest('welcome-invite-code').click();
+  await see(L('Paste the link or the code', 'الصق الرابط أو الرمز'), 'invite code screen');
+  await byTest('invite-code-input').fill('not a code');
+  await byTest('invite-code-go').click();
+  await see(L('That isn’t an invite code.', 'هذا ليس رمز دعوة.'), 'bad code');
+  await shot(`${lang}-invite-code-bad`);
+  await byTest('invite-code-input').fill('Join me on Mada Trips: https://madatrips.sa/join/ist8k2qa-aq2k8t');
+  await byTest('invite-code-go').click();
+  await see(L('Abdullah invited you', 'دعاك'), 'preview from the pasted link');
+  await shot(`${lang}-invite-preview`);
+  await byTest('join-go').click();
+  await see(L('Sign in to join. We’ll bring you back here.', 'سجّل الدخول لتنضم.'), 'sign in first');
+  await byTest('welcome-start').click();
+  await byTest('signin-phone').click();
+  await byTest('phone-input').fill(`5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`);
+  await byTest('phone-send').click();
+  await byTest('otp-input').fill('123456');
+  await byTest('name-input').fill(L('Sami', 'سامي'));
+  await byTest('name-go').click();
+  await byTest('alerts-allow').click();
+  await see('Booked. We’re on SV263', 'landed in the circle', 10000);
+  await shot(`${lang}-invite-landed`);
+  await byTest('chat-input').fill(L('Who is in for the ferry?', 'Who is in for the ferry?'));
+  await byTest('chat-send').click();
+  await see(L('is typing', 'يكتب'), 'someone typing, live', 9000);
+  await shot(`${lang}-live-typing`);
+  await see('I’m in.', 'their answer, live', 9000);
+  await shot(`${lang}-live-message`);
+  await context.close();
+}
+
 try {
-  for (const [name, fn] of [['demo', demo], ['fresh', fresh], ['join', joinSignedOut]]) {
+  for (const [name, fn] of [['demo', demo], ['fresh', fresh], ['join', joinSignedOut], ['live-en', () => inviteToLive('en')], ['live-ar', () => inviteToLive('ar')]]) {
     if (process.env.ONLY && !process.env.ONLY.split(',').includes(name)) continue;
     try { await fn(); } catch (e) { errors.push(`${name}: ${String(e?.message ?? e).split('\n')[0]}`); console.log(e); }
   }

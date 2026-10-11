@@ -26,6 +26,7 @@ import { usePresence, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { hhmm, nextTrip } from '@/lib/wallet-model';
 import { colors, ff } from '@/theme';
+import { AttachmentChip } from '@/components/booking/Attachment';
 
 const TOPIC_ICON: Record<SupportTopic, IconName> = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more' };
 
@@ -219,7 +220,9 @@ function Message({ m, hasTrip, onReply, onBag, onNoRef, onAction }: {
         </View>
       ) : null}
       <View style={[styles.msg, mine ? styles.me : styles.them]}>
-        {m.attachment && m.attachment.mime !== 'application/pdf' ? <View style={styles.photo}><Icon name="scan" color={colors.muted} /><T v="tiny" color={mine ? colors.onDark2 : colors.ink3}>{m.attachment.name}</T></View> : null}
+        {/* A file with a signed link opens (photos and PDFs from the desk, or your own); without one, its name. */}
+        {m.attachment?.url ? <AttachmentChip file={{ ...m.attachment, url: m.attachment.url }} mine={mine} />
+          : m.attachment && m.attachment.mime !== 'application/pdf' ? <View style={styles.photo}><Icon name="scan" color={colors.muted} /><T v="tiny" color={mine ? colors.onDark2 : colors.ink3}>{m.attachment.name}</T></View> : null}
         {m.body ? <T v="body" color={fg} style={{ fontSize: 15, lineHeight: 21 }}>{m.body}</T> : null}
         {c?.refund ? (
           <View style={styles.refund}>

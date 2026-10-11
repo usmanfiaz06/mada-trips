@@ -208,7 +208,7 @@ export function CityPage({ id }: { id: string }) {
           </View>
         </View>
       </Scroll>
-      <View style={[StyleSheet.absoluteFill, { pointerEvents: 'box-none' }]}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         <TopBar onBack={() => router.back()} dark />
       </View>
       <View style={s.fade} pointerEvents="none"><VGradient id="city-fade" stops={[[0, 'rgba(233,226,216,0)'], [0.35, colors.sand], [1, colors.sand]]} /></View>
