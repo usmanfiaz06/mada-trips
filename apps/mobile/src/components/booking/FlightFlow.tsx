@@ -94,6 +94,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const results = live && step >= steps.length && !!s && !(s.outcome === 'partial' && mode === 'normal') && s.outcome !== 'none' && options.length > 0;
 
   useEffect(() => {
+    if (byRequest) return; // the request form owns the action (FlightRequest.tsx)
     if (!results || !current) { setCta(null); return; }
     const block = blockLabel(entry.data);
     setCta({

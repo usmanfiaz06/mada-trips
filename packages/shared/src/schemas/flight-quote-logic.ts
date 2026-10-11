@@ -94,7 +94,7 @@ export function mockFareOptions(input: MockFareInput): FareOption[] {
     const pp = sarToHalalas(Math.round(c.ppSar * CABIN_FACTOR[cabin] * (input.return ? 1 : 0.6)));
     const prices: FarePrice[] = input.travellers.map((p) => {
       const type = fareType(p, input.depart);
-      return { personId: p.id, name: personName(p, input.selfName), type, amount: money(type === 'infant' ? Math.round(pp * 0.1) : type === 'child' ? Math.round(pp * 0.75) : pp) };
+      return { personId: p.id, name: personName(p, input.selfName), type, amount: money(type === 'infant' ? Math.round(pp * 0.1 / 100) * 100 : type === 'child' ? Math.round(pp * 0.75 / 100) * 100 : pp) };
     });
     return {
       id: `opt${i + 1}`, airline: CARRIERS[c.carrier]?.name ?? c.carrier, carrier: c.carrier, cabin, legs, prices, total: money(prices.reduce((a, p) => a + p.amount.amount, 0)),
