@@ -120,7 +120,7 @@ function Phone() {
   const store = useStore();
   const { s, bannerMsg, toastMsg, dismissBanner, openBanner, set } = store;
   const app = useAppStates(s, set);
-  useEffect(() => { window.__madaPush = (name, params) => store.push(name, params || {}); });
+  useEffect(() => { window.__madaPush = (name, params) => store.push(name, params || {}); window.__madaPop = () => store.pop(); });
   /* An invite link (…#join/ist-8k2) opens the invite, for new and signed-in people alike. */
   useEffect(() => {
     const m = /#join\/([\w-]+)/.exec(window.location.hash || '');

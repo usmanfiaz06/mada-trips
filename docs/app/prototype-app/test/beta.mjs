@@ -23,16 +23,15 @@ async function run(viewport, tag) {
   const click = async (text, opts = {}) => { await phone.getByRole(opts.role || 'button', { name: text, exact: opts.exact ?? true }).first().click(); await page.waitForTimeout(opts.wait ?? 350); };
   const see = async (text, what) => { try { await phone.getByText(text, { exact: false }).first().waitFor({ state: 'visible', timeout: 8000 }); } catch { errors.push(`${tag} ${what}: expected "${text}"`); console.log('MISSING', what, text); } };
   await page.evaluate(() => {
-    const st = { seed: 'demo', onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none' };
+    const st = { seed: 'demo', onboarded: true, user: { name: 'Omar' }, household: ['omar', 'hessa', 'sara', 'ahmed'], passportSaved: true, notifications: true, location: true, phase: 'none', demo: { flightsByRequest: true } };
     localStorage.setItem('mada-proto-v1', JSON.stringify(st));
     window.addEventListener('beforeunload', () => localStorage.setItem('mada-proto-v1', JSON.stringify(st)));
     location.reload();
   }).catch(() => {});
   await page.waitForLoadState('load');
   await page.waitForTimeout(600);
-  const demoPanel = page.locator('.demo');
-  if (await demoPanel.count()) await demoPanel.getByRole('button', { name: 'Flights by request (beta)', exact: true }).click().catch(() => errors.push(`${tag}: no demo switch`));
-  else await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('mada-proto-v1') || '{}'); s.demo = { ...(s.demo || {}), flightsByRequest: true }; localStorage.setItem('mada-proto-v1', JSON.stringify(s)); location.reload(); }).catch(() => {});
+  // The switch is on from the seed; on the desktop frame the demo panel shows it on.
+  if (viewport.width > 600 && !(await page.locator('.demo').getByRole('button', { name: 'Flights by request (beta)', exact: true }).count())) errors.push(`${tag}: no demo switch`);
   await page.waitForTimeout(500);
 
   step(`${tag}: Ask → Tell us where and when`);
