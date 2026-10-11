@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import Animated from 'react-native-reanimated';
@@ -239,3 +239,14 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' },
   dash: { flex: 1, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(30,53,45,0.3)' },
 });
+
+/**
+ * Who a request is for: the household's defaults until someone is picked by hand. The household can arrive after the
+ * flow opens (its query still loading), so the defaults are read on every render rather than frozen at the first one.
+ */
+export function useWho(defaults: () => string[]): [string[], Dispatch<SetStateAction<string[]>>] {
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const who = picked ?? defaults();
+  const set: Dispatch<SetStateAction<string[]>> = (v) => setPicked((p) => (typeof v === 'function' ? v(p ?? defaults()) : v));
+  return [who, set];
+}

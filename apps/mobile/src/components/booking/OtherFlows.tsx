@@ -25,7 +25,7 @@ import { Answered, SummaryChips } from './Conversation';
 import { dayName, rangeName } from './format';
 import { PhoneSheet, usePhoneNeeded } from './PhoneSheet';
 import { SearchSheet } from './SearchSheet';
-import { ArtSuitcase, Ask1, ChipWrap, Photo, Working, useSequence, enter } from './parts';
+import { ArtSuitcase, Ask1, ChipWrap, Photo, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 
@@ -70,7 +70,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const [checkIn, setCheckIn] = useState<string | null>(intent.depart && intent.depart >= today ? intent.depart : null);
   const [checkOut, setCheckOut] = useState<string | null>(intent.depart && intent.return && intent.return > intent.depart ? intent.return : null);
   const said = intent.travellerIds?.filter((id) => people.some((p) => p.id === id)) ?? [];
-  const [who, setWho] = useState<string[]>(said.length ? said : H.me ? [H.me] : []);
+  const [who, setWho] = useWho(() => (said.length ? said : H.me ? [H.me] : []));
   const [editing, setEditing] = useState<'where' | 'when' | null>(null);
   const [calendar, setCalendar] = useState(false);
   const [go, setGo] = useState(false);

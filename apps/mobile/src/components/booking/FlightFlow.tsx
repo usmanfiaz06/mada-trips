@@ -21,7 +21,7 @@ import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
-import { ArtCalendar, Ask1, Leg, Working, useSequence, enter } from './parts';
+import { ArtCalendar, Ask1, Leg, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow, SentRequest } from './Requests';
 import { Answered } from './Conversation';
 import { PhoneGate, usePhoneNeeded } from './PhoneSheet';
@@ -45,8 +45,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const [cityDraft, setCityDraft] = useState('');
   const [trip, setTrip] = useState<TripSearch>({ from: intent.from ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
   const nonHelper = H.nonHelper.map((p) => p.id);
-  const [who, setWho] = useState<string[]>(intent.travellerIds?.length ? intent.travellerIds : nonHelper.length ? nonHelper : H.me ? [H.me] : []);
-  const [whoDone, setWhoDone] = useState(!!intent.travellerIds?.length || nonHelper.length <= 1);
+  const [who, setWho] = useWho(() => (intent.travellerIds?.length ? intent.travellerIds : nonHelper.length ? nonHelper : H.me ? [H.me] : []));
+  // Asked only for a household of more than one, which may arrive after the flow opens.
+  const [whoDoneSet, setWhoDone] = useState<boolean | null>(intent.travellerIds?.length ? true : null);
+  const whoDone = whoDoneSet ?? nonHelper.length <= 1;
   const [mode, setMode] = useState<'normal' | 'others' | 'byhand' | 'flex'>('normal');
   const [editing, setEditing] = useState<{ month?: { month: number; year: number } | null } | null>(null);
   const [runKey, setRunKey] = useState(0);

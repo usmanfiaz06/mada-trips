@@ -18,7 +18,7 @@ import { Icon } from '../Icon';
 import { Pill } from '../Pill';
 import { ErrorState } from '../states/ErrorState';
 import { T } from '../Text';
-import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter } from './parts';
+import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter, useWho } from './parts';
 import { TravellerChips } from './Travellers';
 import { AttachmentChip } from './Attachment';
 import { FlightFares } from './FlightRequest';
@@ -51,7 +51,7 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
     if (k && (travellerIds?.length || (intent?.travellerCount && named.length >= intent.travellerCount))) a[k] = true;
     return a;
   });
-  const [who, setWho] = useState<string[]>(named.length ? named : H.me ? [H.me] : []);
+  const [who, setWho] = useWho(() => (named.length ? named : H.me ? [H.me] : []));
   const [needs, setNeeds] = useState<Record<string, NeedKey[]>>(() => ({ ...(intent?.needs ?? {}) }) as Record<string, NeedKey[]>);
   // What was typed is already the first bubble; the note is only for something new.
   const [note, setNote] = useState('');
