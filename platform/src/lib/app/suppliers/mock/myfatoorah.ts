@@ -1,68 +1,44 @@
-import type { PaymentResult } from "../types";
 import type { BookingPaymentSupplier } from "../booking-types";
+import { authorizeResult, captureResult, mockRef, readRef, refundResult, voidResult, type MockFlag } from "./stateless-card";
 
 /*
  * Mock MyFatoorah for booking (M2): authorise → (3-D Secure) → capture on issue, void on failure, refund. Idempotent by
  * key. Card numbers never reach us: the app tokenises with the provider's SDK and we only ever see its token.
  * Tokens the mock understands (the app's mock tokeniser makes them):
  *   …_3ds         the bank asks for a code first; 123456 passes, three wrong codes and the bank stops it
+ *                 (the tries are counted on the order: booking/orders.ts submitOtp)
  *   tok_decline   declined ("Your bank said no.")
  *   …_failcapture authorises, then capture fails (tickets fail to issue → void)
  * Anything else authorises.
+ *
+ * Stateless: everything the mock needs later is in the provider reference (stateless-card.ts), so authorise on one
+ * serverless instance and capture on another works (LIVE-AUDIT P0-4).
  */
 
-type Rec = { ref: string; amount: number; captured: number; refunded: number; status: PaymentResult["status"]; token: string; tries: number };
-const g = globalThis as unknown as { __madaMockMf?: { byRef: Map<string, Rec>; byKey: Map<string, PaymentResult> } };
-const store = (g.__madaMockMf ??= { byRef: new Map(), byKey: new Map() });
-let seq = 0;
-
 export const MOCK_3DS_CODE = "123456";
+
+const flagFor = (token: string): MockFlag =>
+  token === "tok_decline" || token.endsWith("_decline") ? "d" : token.endsWith("_3ds") ? "s" : token.includes("failcapture") ? "x" : "a";
 
 export const mockMyFatoorah: BookingPaymentSupplier = {
   name: "mock-myfatoorah",
   async authorize(input) {
-    const prior = store.byKey.get(input.idempotencyKey);
-    if (prior) return prior;
-    seq += 1;
-    const ref = `mf_${Date.now().toString(36)}_${seq}`;
-    let res: PaymentResult;
-    if (input.token === "tok_decline" || input.token.endsWith("_decline")) res = { status: "declined", providerRef: ref, declineReason: "do_not_honor" };
-    else if (input.token.endsWith("_3ds")) res = { status: "requires_action", providerRef: ref, redirectUrl: `https://mock.myfatoorah.invalid/3ds/${ref}` };
-    else res = { status: "authorized", providerRef: ref };
-    store.byRef.set(ref, { ref, amount: input.amount, captured: 0, refunded: 0, status: res.status, token: input.token, tries: 0 });
-    store.byKey.set(input.idempotencyKey, res);
-    return res;
+    const flag = flagFor(input.token);
+    return authorizeResult(mockRef(input.idempotencyKey, input.amount, flag), flag);
   },
   async completeAction(ref, code) {
-    const r = store.byRef.get(ref);
-    if (!r || r.status !== "requires_action") return { status: "failed", providerRef: ref, triesLeft: 0 };
-    if (code === MOCK_3DS_CODE) { r.status = "authorized"; return { status: "authorized", providerRef: ref }; }
-    r.tries += 1;
-    if (r.tries >= 3) { r.status = "declined"; return { status: "declined", providerRef: ref, triesLeft: 0, declineReason: "3ds_failed" }; }
-    return { status: "requires_action", providerRef: ref, triesLeft: 3 - r.tries };
+    const r = readRef(ref);
+    if (!r || r.flag !== "s") return { status: "failed", providerRef: ref, triesLeft: 0 };
+    if (code === MOCK_3DS_CODE) return { status: "authorized", providerRef: ref };
+    return { status: "requires_action", providerRef: ref };
   },
-  async capture(ref, amount) {
-    const r = store.byRef.get(ref);
-    if (!r || r.status !== "authorized" || r.token.includes("failcapture")) return { status: "failed", providerRef: ref };
-    r.captured = amount ?? r.amount;
-    r.status = "captured";
-    return { status: "captured", providerRef: ref };
+  async capture(ref) {
+    return captureResult(ref);
   },
   async void(ref) {
-    const r = store.byRef.get(ref);
-    if (!r || (r.status !== "authorized" && r.status !== "requires_action")) return { status: "failed", providerRef: ref };
-    r.status = "voided";
-    return { status: "voided", providerRef: ref };
+    return voidResult(ref);
   },
   async refund(ref, amount, key) {
-    const prior = store.byKey.get(key);
-    if (prior) return prior;
-    const r = store.byRef.get(ref);
-    if (!r || r.captured - r.refunded < amount) return { status: "failed", providerRef: ref };
-    r.refunded += amount;
-    r.status = r.refunded === r.captured ? "refunded" : "partially_refunded";
-    const res = { status: r.status, providerRef: `${ref}_rf${r.refunded}` };
-    store.byKey.set(key, res);
-    return res;
+    return refundResult(ref, amount, key);
   },
 };

@@ -475,6 +475,12 @@ export const OrderView = z.object({
   question: z.object({ text: z.string(), options: z.array(z.enum(['yes', 'call'])), calling: z.boolean() }).nullable(),
   fareChange: z.object({ perPerson: Money, total: Money, newTotal: Money }).nullable(),
   problem: z.string().nullable(),
+  /**
+   * Set only while status is 'ticketing_failed': what failed and what the traveller can do (POST /orders/:id/answer).
+   * cause 'payment': the card capture didn't go through · 'airline': the airline's system didn't issue the tickets.
+   * Nothing was charged in either case (the authorisation is released). Optional so older builds still parse.
+   */
+  failure: z.object({ cause: z.enum(['payment', 'airline']), actions: z.array(z.enum(['retry_by_phone', 'cancel'])) }).nullable().optional(),
   /** Over 8 seconds without finishing: "Taking longer than usual". */
   slow: z.boolean(),
   tripId: Id.nullable(),

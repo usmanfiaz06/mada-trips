@@ -9,10 +9,10 @@ import { appPayments, appQuotes, appRequests, appUsers } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { bookingSuppliers, agentFor, autopilotOn, householdOf, isUuid, newRef, today } from "./common";
 import {
-  DEMO_FARE_RISE_EACH, acceptFare, acceptOrder, answerQuestion, askQuestion, cancelOrder, confirmOrder, failTicketing, issueTickets, lockPrice, orderEvent,
+  CAPTURE_FAILED, DEMO_FARE_RISE_EACH, acceptFare, acceptOrder, answerQuestion, askQuestion, cancelOrder, confirmOrder, failTicketing, issueTickets, lockPrice, orderEvent,
   priceChanged, retryByPhone, returnCredit, startIssuing, type OrderRow,
 } from "./desk";
 import { authorize, chargeFor } from "./payments";
@@ -47,7 +47,9 @@ export function orderView(o: OrderRow, now = Date.now()): OrderView {
     bundle: !!snap.bundle, ref: o.ref, agent: o.agentName ? { name: o.agentName } : null, confirmedBy: o.confirmedByName ? { name: o.confirmedByName } : null,
     question: q && (o.status === "needs_answer" || q.calling) && q.answer !== "yes" ? { text: q.text, options: q.options, calling: !!q.calling } : null,
     fareChange: fc && o.status === "fare_changed" ? { perPerson: money(fc.perPerson), total: money(fc.total), newTotal: money(o.total + o.extra + fc.total) } : null,
-    problem: o.problem, slow: !done && !problem && o.status !== "requires_action" && now - o.createdAt.getTime() > SLOW_MS,
+    problem: o.problem,
+    failure: o.status === "ticketing_failed" ? { cause: o.problem === CAPTURE_FAILED ? "payment" : "airline", actions: ["retry_by_phone", "cancel"] } : null,
+    slow: !done && !problem && o.status !== "requires_action" && now - o.createdAt.getTime() > SLOW_MS,
     tripId: o.tripId, requestId: o.requestId,
     action: o.status === "requires_action" ? { kind: "otp", triesLeft: Math.max(0, 3 - o.otpTries), label: o.paymentLabel, amount: money(o.total) } : null,
     createdAt: o.createdAt.toISOString(), confirmedAt: o.confirmedAt?.toISOString() ?? null,
@@ -108,11 +110,14 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   const quotedFlight = !!priced.snapshot.quotedFlight && !!quoted;
   const f = priced.snapshot.flight as FlightOption | undefined;
 
+  // Known before the insert, so the desk request can point at its order in the same write (Trips → Requests).
+  const orderId = randomUUID();
   const res = await db.transaction(async (tx) => {
     const pay = charge.provider === "mada_credit" ? null
       : await authorize(tx, ownerId, charge, preview.total.amount, `order:${ownerId}:${body.idempotencyKey}`, preview.title, requestId);
     if (pay?.status === "declined" || pay?.status === "failed") return { outcome: "declined" as const };
     const status = pay?.status === "requires_action" ? "requires_action" : agentKind ? "pending_agent" : "paid_now";
+    const order = { id: orderId, status: status === "paid_now" ? "pending_agent" : status, failure: null };
     let deskRequest: string | null = requestId;
     if (agentKind && quotedFlight) {
       await tx.update(appRequests).set({ status: "with_agent", promisedBy: new Date(Date.now() + 30 * 60_000), updatedAt: new Date(),
@@ -122,13 +127,13 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
       const [r] = await tx.insert(appRequests).values({
         ownerId, kind: preview.kind === "stay" ? "stay" : preview.kind === "package" ? "trip" : "flight", status: "with_agent", summary: preview.title,
         travellerIds: preview.travellerIds, agentName, promisedBy: new Date(Date.now() + 15 * 60_000),
-        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
+        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", order, ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
       }).returning({ id: appRequests.id });
       deskRequest = r!.id;
     }
     const supplierId = priced.offerRows.find((r) => r.kind === "flight")?.supplierOfferId;
     const [o] = await tx.insert(appOrders).values({
-      ownerId, kind: preview.kind, status: status === "paid_now" ? "pending_agent" : status, step: 0, idempotencyKey: body.idempotencyKey,
+      id: orderId, ownerId, kind: preview.kind, status: status === "paid_now" ? "pending_agent" : status, step: 0, idempotencyKey: body.idempotencyKey,
       draft: body.draft as Record<string, unknown>,
       snapshot: { ...priced.snapshot, flightSupplierId: supplierId ?? null, place: priced.place, photo: preview.photo, title: preview.title, preview, ...(contact ? { contact } : {}) },
       supplierRef: quoted?.pnr ?? null,
@@ -166,7 +171,9 @@ export async function submitOtp(ownerId: string, id: string, code: string): Prom
   const o = await ownOrder(ownerId, id);
   if (o.status !== "requires_action" || !o.paymentId) throw new AppError("VALIDATION");
   const [p] = await db.select().from(appPayments).where(eq(appPayments.id, o.paymentId));
-  const r = await bookingSuppliers.payments().completeAction(p!.providerRef!, code);
+  const answer = await bookingSuppliers.payments().completeAction(p!.providerRef!, code);
+  // The third wrong code stops the payment. Counted on the order, so it holds across server instances.
+  const r = answer.status === "requires_action" && o.otpTries + 1 >= 3 ? { ...answer, status: "declined" as const, triesLeft: 0, declineReason: "3ds_failed" } : answer;
   const status = r.status === "authorized" ? (AGENT_KINDS.has(o.kind) ? "pending_agent" : "paid_now") : r.status === "requires_action" ? "requires_action" : "declined";
   await db.transaction(async (tx) => {
     await tx.update(appPayments).set({ status: r.status === "authorized" ? "authorized" : r.status === "requires_action" ? "requires_action" : "declined", updatedAt: new Date() }).where(eq(appPayments.id, p!.id));

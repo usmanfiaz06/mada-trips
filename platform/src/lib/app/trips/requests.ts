@@ -22,6 +22,7 @@ export type RequestDetails = {
   area?: TripRequestView["area"]; short?: string | null; detail?: string | null; withWhom?: TripRequestView["withWhom"]; withName?: string | null;
   outcome?: "yes" | "no" | null; scriptedOutcome?: "yes" | "no"; alt?: string | null; yesText?: string | null; quoteText?: string | null;
   quote?: number | null; clientKey?: string; askKind?: string; option?: string | null;
+  order?: { id: string; status: string; failure: "payment" | "airline" | null };
 };
 
 const PENDING = ["sent", "reviewing"];
@@ -34,7 +35,7 @@ export function toRequestView(r: RequestRow): TripRequestView {
     status: r.status as TripRequestView["status"], title: isFlightAsk(r.details) ? flightTitle((r.details as { search: FlightSearch }).search) : r.summary, short: d.short ?? null,
     detail: isFlightRequest(r.details) ? flightSummary((r.details as { search: FlightSearch }).search, r.travellerIds.length) : d.detail ?? null,
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
-    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null,
+    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: d.order ?? null,
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }

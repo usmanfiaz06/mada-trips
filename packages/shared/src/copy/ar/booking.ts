@@ -533,4 +533,5 @@ export const arBooking: ArSection<typeof bookingCopy> = {
   'done.alerts.on': 'التنبيهات مفعّلة لهذه الرحلة.',
   'done.seeTrip': 'اعرض الرحلة',
   'done.done': 'تم',
+  'wait.ticket.text.payment': 'لم تنجح عملية الدفع بالبطاقة، فلم تصدر التذاكر. لم يُخصم شيء وأُفرج عن التعليق على بطاقتك. ومقاعدك محجوزة لمدة ساعتين.',
 };

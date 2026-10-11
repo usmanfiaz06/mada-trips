@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, DESTINATIONS, ENTRY_RULES, PICKUP_SAR, addDays, instalments, legMinutes, sarToHalalas, seatsFor, t, zonedToInstant,
   type FareOption, type FlightOption, type OrderLine, type StayOption,
@@ -56,8 +56,31 @@ async function move(orderId: string, from: string[], fn: (tx: Tx, o: OrderRow) =
     const patch = await fn(tx, o);
     if (!patch) return o;
     const [u] = await tx.update(appOrders).set({ ...patch, updatedAt: new Date() }).where(eq(appOrders.id, orderId)).returning();
+    await syncRequest(tx, o, u!);
     return u!;
   });
+}
+
+/** What the order's request reads as in Trips → Requests while the order is in this state. */
+const requestStateFor = (status: string) =>
+  ["needs_answer", "fare_changed", "ticketing_failed"].includes(status) ? "needs_answer"
+    : ["pending_agent", "held", "price_locked", "issuing"].includes(status) ? "with_agent"
+      : status === "cancelled" ? "cancelled" : null;
+
+/**
+ * The request a booking made (Trips → Requests) follows the order: when the traveller has to answer (a question, a new
+ * fare, tickets that didn't issue) it reads 'needs_answer' with details.order = { id, status, failure }, not "Faisal is
+ * on it" (LIVE-AUDIT P1-2). Only written when what the request shows changes. A fare the desk quoted goes back to
+ * 'quoted' on cancel (reopenQuote), so only requests still with the desk are moved.
+ */
+async function syncRequest(tx: Tx, before: OrderRow, after: OrderRow) {
+  if (!after.requestId || after.kind === "quote") return;
+  const was = requestStateFor(before.status);
+  const now = requestStateFor(after.status);
+  if (!now || now === was) return;
+  const order = { id: after.id, status: after.status, failure: after.status === "ticketing_failed" ? (after.problem === CAPTURE_FAILED ? "payment" : "airline") : null };
+  await tx.update(appRequests).set({ status: now, updatedAt: new Date(), details: sql`${appRequests.details} || ${JSON.stringify({ order })}::jsonb` })
+    .where(and(eq(appRequests.id, after.requestId), inArray(appRequests.status, ["with_agent", "needs_answer"])));
 }
 
 export const acceptOrder = (orderId: string, agent: DeskAgent) => move(orderId, ["pending_agent"], async (tx, o) => {
@@ -94,6 +117,9 @@ export const startIssuing = (orderId: string, agent: DeskAgent) => move(orderId,
   await orderEvent(tx, o.id, "issuing", { kind: "agent", name: agent.name });
   return { status: "issuing", step: 3 };
 });
+
+/** The reason written on an order whose card capture failed at issue (orderView reports it as cause 'payment'). */
+export const CAPTURE_FAILED = "the card capture didn't go through";
 
 /** The airline didn't issue: the hold on the card is released (voided), the seats stay held for 2 hours. */
 export async function failTicketing(orderId: string, agent: DeskAgent, reason = "timed out"): Promise<OrderRow> {
@@ -182,7 +208,7 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
     const [u] = await tx.update(appOrders).set({ status: "confirmed", step: 3, ref, tripId, confirmedByName: agent.name, confirmedAt: now, updatedAt: now }).where(eq(appOrders.id, o.id)).returning();
     return { o: u!, failed: false };
   });
-  if (out.failed) return failTicketing(orderId, agent, "the card capture didn't go through");
+  if (out.failed) return failTicketing(orderId, agent, CAPTURE_FAILED);
   if (out.o.kind === "share") await settleShare(out.o);
   return out.o;
 }

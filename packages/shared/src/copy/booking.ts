@@ -520,4 +520,5 @@ export const bookingCopy = {
   'done.alerts.on': 'Alerts are on for this trip.',
   'done.seeTrip': 'See the trip',
   'done.done': 'Done',
+  'wait.ticket.text.payment': 'The card payment didn’t go through, so the tickets weren’t issued. Nothing was charged and the hold on your card is released. Your seats are still held for 2 hours.',
 } as const;
