@@ -22,11 +22,15 @@ import { providerIdentity } from "./live/identity";
 import { liveSupabase } from "./live/supabase";
 import { liveSupabaseAdmin } from "./live/supabase-admin";
 import { taqnyatSms } from "./live/taqnyat";
+import { zohoWhatsApp } from "./live/zoho-cpaas";
 import { guarded } from "../resilience/breaker";
 
 export type * from "./types";
 export { outbox } from "./mock/outbox";
 export { mockSupabaseAdminLog } from "./mock/supabase-admin";
+export { WhatsAppUndeliverable } from "./whatsapp-errors";
+export { MOCK_NOT_ON_WHATSAPP_SUFFIX } from "./mock/messaging";
+export { zohoWhatsAppConfigured } from "./live/zoho-cpaas";
 
 /* One place decides mock or live, per supplier, on every call (so a test or an env change takes effect at once). */
 // Live adapters go through a timeout and a circuit breaker (resilience/breaker.ts); mocks stay deterministic.
@@ -39,6 +43,8 @@ export const suppliers = {
   /** Live: Unifonic, or Taqnyat with SMS_PROVIDER=taqnyat. Also sends Supabase Auth's codes (auth/sms-hook). */
   sms: (): SmsSupplier => pick("sms", mockSms, process.env.SMS_PROVIDER === "taqnyat" ? taqnyatSms : unifonicSms),
   whatsapp: (): WhatsAppSupplier => pick("whatsapp", mockWhatsApp, metaWhatsApp),
+  /** Sign-in codes on WhatsApp (the Send SMS hook). Live: Zoho CPaaS, an Authentication template in en and ar. */
+  whatsappCodes: (): WhatsAppSupplier => pick("whatsapp", mockWhatsApp, zohoWhatsApp),
   flightStatus: (): FlightStatusSupplier => pick("flightStatus", mockFlightStatus, flightAware),
   /** Live by default (free, keyless open ADS-B). */
   flightPositions: (): FlightPositionsSupplier => pick("flightPositions", mockFlightPositions, openAdsbPositions),

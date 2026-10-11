@@ -17,6 +17,12 @@ export interface WhatsAppSupplier {
   readonly name: string;
   /** Approved template messages only (Meta requires templates outside a 24-hour customer window). */
   sendTemplate(to: string, template: string, params: string[], locale?: "en" | "ar"): Promise<Sent>;
+  /**
+   * A sign-in code through the approved Authentication-category template (the code in the body and on the copy-code
+   * button), in English or Arabic. Throws WhatsAppUndeliverable (suppliers/whatsapp-errors.ts) when WhatsApp says the
+   * number can't get it, so the Send SMS hook can fall back to SMS.
+   */
+  sendAuthCode(to: string, code: string, locale: "en" | "ar"): Promise<Sent>;
 }
 
 export interface EmailSupplier {

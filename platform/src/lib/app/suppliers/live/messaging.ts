@@ -28,6 +28,10 @@ export const metaWhatsApp: WhatsAppSupplier = {
     }, { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` })) as { messages?: { id: string }[] };
     return { id: data.messages?.[0]?.id ?? "" };
   },
+  /** Sign-in codes go through Zoho CPaaS (live/zoho-cpaas.ts). */
+  async sendAuthCode() {
+    return notConfigured("whatsapp sign-in codes (Meta Cloud API)", ["use Zoho CPaaS: suppliers.whatsappCodes()"]);
+  },
 };
 
 /** Amazon SES: the live adapter (SigV4 signing) lands with the first email flow in M2. */

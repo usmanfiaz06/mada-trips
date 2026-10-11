@@ -4,11 +4,14 @@ import { z } from "zod";
 import { maskPhone, t } from "@mada/shared";
 import { db } from "@/db";
 import { appAuditLog } from "./audit";
+import type { PhoneCodeChannel } from "@mada/shared";
+import { e164From, latestHint, markSent, phoneChannels, phoneCodeSetting } from "./phone-channel";
 import { suppliers } from "./suppliers";
 
 /*
- * Supabase Auth's "Send SMS" hook (docs/app/AUTH.md). Supabase makes the code; we deliver it through a Saudi sender
- * (Unifonic or Taqnyat, registered sender ID), which reaches Saudi numbers far better than Twilio does.
+ * Supabase Auth's "Send SMS" hook (docs/app/AUTH.md). Supabase makes the code; we deliver it on WhatsApp through Zoho
+ * CPaaS (an approved Authentication template) or by SMS through a Saudi sender (Unifonic or Taqnyat, registered sender
+ * ID), which reaches Saudi numbers far better than Twilio does. phone-channel.ts picks which.
  *
  * Calls are signed with Standard Webhooks (https://www.standardwebhooks.com): headers webhook-id, webhook-timestamp and
  * webhook-signature ("v1,<base64 HMAC-SHA256 of `${id}.${timestamp}.${body}`>", several separated by spaces), keyed by
@@ -60,11 +63,35 @@ export type SmsHookPayload = z.infer<typeof SmsHookPayload>;
 export const hookError = (status: number, message: string) =>
   new Response(JSON.stringify({ error: { http_code: status, message } }), { status, headers: { "content-type": "application/json" } });
 
-export async function deliverAuthSms(p: SmsHookPayload, ipHash: string | null): Promise<void> {
-  const digits = (p.user.new_phone || p.user.phone || "").replace(/\D/g, "");
-  if (digits.length < 8 || digits.length > 15) throw new Error("no phone number");
-  const to = `+${digits}`;
+export type Delivered = { channel: PhoneCodeChannel; fellBack: boolean };
+
+/**
+ * Sends Supabase's code on WhatsApp (Zoho CPaaS) or by SMS (phone-channel.ts decides): the app's hint for this number
+ * if it left one, otherwise the usual channel. With PHONE_CODE_CHANNEL=whatsapp_then_sms a WhatsApp refusal (not on
+ * WhatsApp, undelivered, the template refused) or outage sends the same code by SMS at once. Arabic when the person
+ * reads Arabic (user_metadata.locale). Never logs the code.
+ */
+export async function deliverAuthSms(p: SmsHookPayload, ipHash: string | null): Promise<Delivered> {
+  const to = e164From(p.user.new_phone || p.user.phone || "");
+  if (!to) throw new Error("no phone number");
   const locale = p.user.user_metadata?.locale === "ar" ? "ar" : "en";
-  await suppliers.sms().send(to, t("sms.otp", { code: p.sms.otp }, locale));
-  await appAuditLog(db, { actorKind: "system", actorId: null, action: "auth.otp_sent", entityType: "phone", entityId: maskPhone(to), summary: `Sign-in code sent to ${maskPhone(to)}`, data: { via: "supabase-hook" }, ipHash });
+  const channels = phoneChannels();
+  const hint = await latestHint(to).catch(() => null);
+  let channel: PhoneCodeChannel = hint?.wanted && channels.includes(hint.wanted) ? hint.wanted : channels[0]!;
+  let fellBack = false;
+  if (channel === "whatsapp") {
+    try {
+      await suppliers.whatsappCodes().sendAuthCode(to, p.sms.otp, locale);
+    } catch (e) {
+      if (phoneCodeSetting() !== "whatsapp_then_sms" || !channels.includes("sms")) throw e;
+      console.warn(`[app-api] auth/sms-hook: WhatsApp didn't take the code for ${maskPhone(to)}, sending by SMS (${e instanceof Error ? e.name : "unknown"})`);
+      channel = "sms";
+      fellBack = true;
+    }
+  }
+  if (channel === "sms") await suppliers.sms().send(to, t("sms.otp", { code: p.sms.otp }, locale));
+  if (hint) await markSent(hint.id, channel).catch(() => {});
+  const how = channel === "whatsapp" ? "on WhatsApp" : fellBack ? "by SMS (WhatsApp refused)" : "by SMS";
+  await appAuditLog(db, { actorKind: "system", actorId: null, action: "auth.otp_sent", entityType: "phone", entityId: maskPhone(to), summary: `Sign-in code sent ${how} to ${maskPhone(to)}`, data: { via: "supabase-hook", channel, fellBack, locale }, ipHash });
+  return { channel, fellBack };
 }
