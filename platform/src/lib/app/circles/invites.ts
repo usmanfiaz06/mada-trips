@@ -15,8 +15,9 @@ import { pepper, publicLinkBase } from "../config";
 import { decryptField, encryptField, hasDataKey } from "../crypto";
 import { AppError } from "../http";
 import { suppliers } from "../suppliers";
-import { createCircleInvites, details, incomingInvites, memberIds, membership, requireAdmin, assertInvitable, sysMessage } from "./circles";
-import { assertUnder, circleTrip, err, graphOf, isBlocked, notify, peopleByIds, sha256hex, type Db } from "./common";
+import { createCircleInvites, details, incomingInvites, memberIds, membership, requireAdmin, assertInvitable, sysMessage, sysMessageWrites } from "./circles";
+import { assertUnder, circleTrip, err, graphOf, isBlocked, notify, notifyWrite, peopleByIds, sha256hex, type Db } from "./common";
+import { afterResponse, atOnce } from "../batch";
 import { INVITE_LIMITS, hit, peek } from "./limits";
 import { currentLocale } from "../resilience/request";
 
@@ -68,24 +69,27 @@ async function invitesLastHour(userId: string, tx: Db = db) {
  * old one off.
  */
 export async function linkFor(userId: string, circleId: string | null, opts: LinkOptions = {}): Promise<InviteLink> {
-  if (circleId) await membership(circleId, userId);
   const mine = and(eq(appCircleInvites.inviterId, userId), eq(appCircleInvites.channel, "link"), eq(appCircleInvites.status, "pending"), isNotNull(appCircleInvites.lookup),
     circleId ? eq(appCircleInvites.circleId, circleId) : and(eq(appCircleInvites.kind, "mada"), sql`${appCircleInvites.circleId} IS NULL`));
   const replace = !!opts.fresh || opts.expiresInDays !== undefined || opts.maxUses !== undefined;
-  if (!replace) {
-    const [found] = await db.select().from(appCircleInvites)
+  // The membership check, the link we already have and the hourly count, side by side (each is a round trip).
+  const [, [found], used] = await Promise.all([
+    circleId ? membership(circleId, userId) : Promise.resolve(null),
+    replace ? Promise.resolve([]) : db.select().from(appCircleInvites)
       .where(and(mine, sql`${appCircleInvites.expiresAt} > now() + interval '1 day'`, sql`(${appCircleInvites.maxUses} IS NULL OR ${appCircleInvites.uses} < ${appCircleInvites.maxUses})`))
-      .orderBy(desc(appCircleInvites.createdAt)).limit(1);
-    if (found) return link(found);
-  }
-  assertUnder(await invitesLastHour(userId), LIMITS.invitesPerHour, 3600);
+      .orderBy(desc(appCircleInvites.createdAt)).limit(1),
+    invitesLastHour(userId),
+  ]);
+  if (found) return link(found);
+  assertUnder(used, LIMITS.invitesPerHour, 3600);
+  const insert = (x: Db) => x.insert(appCircleInvites).values({
+    kind: circleId ? "circle" : "mada", circleId, inviterId: userId, channel: "link", lookup: rand(8),
+    expiresAt: expiry(opts.expiresInDays ?? INVITE_TTL_DAYS), maxUses: opts.maxUses ?? null,
+  }).returning();
+  if (!replace) return link((await insert(db))[0]!);
   return db.transaction(async (tx) => {
-    if (replace) await tx.update(appCircleInvites).set({ status: "cancelled", respondedAt: new Date() }).where(mine);
-    const [row] = await tx.insert(appCircleInvites).values({
-      kind: circleId ? "circle" : "mada", circleId, inviterId: userId, channel: "link", lookup: rand(8),
-      expiresAt: expiry(opts.expiresInDays ?? INVITE_TTL_DAYS), maxUses: opts.maxUses ?? null,
-    }).returning();
-    return link(row!);
+    await tx.update(appCircleInvites).set({ status: "cancelled", respondedAt: new Date() }).where(mine);
+    return link((await insert(tx))[0]!);
   });
 }
 
@@ -169,21 +173,33 @@ export async function previewOrNull(code: string, viewerId: string | null, ipHas
 
 /** What anyone with the link sees. Members' first names only; nothing about trips beyond the circle's own line. */
 export async function preview(code: string, viewerId: string | null, ipHash: string | null = null, opts: { web?: boolean } = {}): Promise<InvitePreview> {
-  const lookup = await guardLookup(code, ipHash, opts.web);
-  const [r] = await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookup));
-  if (!r || (viewerId && (await isBlocked(viewerId, r.inviterId)))) throw err("NOT_FOUND", "circles.join.notFound");
-  const from = (await peopleByIds([r.inviterId])).get(r.inviterId)!;
+  // The code's HMAC check needs no database: the invite is read alongside the limits and used only once they pass.
+  const known = lookupOf(code);
+  const [lookup, [r]] = await Promise.all([
+    guardLookup(code, ipHash, opts.web),
+    known ? db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, known)) : Promise.resolve([] as InviteRow[]),
+  ]);
+  if (!r) throw err("NOT_FOUND", "circles.join.notFound");
+  const circleId = r.circleId;
+  // Everything else in one round: who sent it, the circle, its members, its cover (each read is a round trip).
+  const [blocked, inviter, circleRows, ids, , d] = await Promise.all([
+    viewerId ? isBlocked(viewerId, r.inviterId) : Promise.resolve(false),
+    peopleByIds([r.inviterId]),
+    circleId ? db.select().from(appCircles).where(eq(appCircles.id, circleId)) : Promise.resolve([]),
+    circleId ? memberIds(circleId) : Promise.resolve([] as string[]),
+    circleId ? settleCovers() : Promise.resolve(0),
+    circleId ? details(circleId) : Promise.resolve(null),
+  ]);
+  if (blocked) throw err("NOT_FOUND", "circles.join.notFound");
+  const from = inviter.get(r.inviterId)!;
   const status = r.status === "cancelled" || r.status === "declined" ? "cancelled" : r.expiresAt.getTime() < Date.now() ? "expired" : isFull(r) ? "full" : "open";
   let circle: InvitePreview["circle"] = null;
-  if (r.circleId) {
-    const [c] = await db.select().from(appCircles).where(eq(appCircles.id, r.circleId));
-    const ids = await memberIds(r.circleId);
-    const people = await peopleByIds(ids.slice(0, 4));
-    await settleCovers();
-    const d = await details(r.circleId);
-    circle = { name: c!.name, cover: publicCover(d, codeFor(lookup)), members: ids.slice(0, 4).map((i) => people.get(i)!), memberCount: ids.length, trip: await circleTrip(c!.tripId) };
+  if (circleId && circleRows[0]) {
+    const c = circleRows[0];
+    const [people, trip] = await Promise.all([peopleByIds(ids.slice(0, 4)), circleTrip(c.tripId)]);
+    circle = { name: c.name, cover: publicCover(d, codeFor(lookup)), members: ids.slice(0, 4).map((i) => people.get(i)!), memberCount: ids.length, trip };
   }
-  return { code: codeFor(lookup), status, kind: r.circleId ? "circle" : "mada", from, circle };
+  return { code: codeFor(lookup), status, kind: circleId ? "circle" : "mada", from, circle };
 }
 
 async function befriend(tx: Db, a: string, b: string) {
@@ -207,13 +223,15 @@ async function takePlace(tx: Db, r: InviteRow) {
  * hears about it: "Noor joined Eid trip", in the inbox and on their phone.
  */
 export async function accept(ref: string, userId: string, isId: boolean, ipHash: string | null = null): Promise<AcceptInviteResponse> {
-  const [, lookup] = await Promise.all([
+  // The code's own check (an HMAC) needs no database, so the invite is read alongside the limits; it is only used
+  // once they and the check have passed.
+  const known = isId ? null : lookupOf(ref);
+  const [, , [r]] = await Promise.all([
     hit(`invite:accept:${userId}`, INVITE_LIMITS.acceptsPerHour, 3600),
     isId ? Promise.resolve(null) : guardLookup(ref, ipHash),
+    isId ? db.select().from(appCircleInvites).where(and(eq(appCircleInvites.id, ref), eq(appCircleInvites.inviteeUserId, userId)))
+      : known ? db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, known)) : Promise.resolve([] as InviteRow[]),
   ]);
-  const [r] = isId
-    ? await db.select().from(appCircleInvites).where(and(eq(appCircleInvites.id, ref), eq(appCircleInvites.inviteeUserId, userId)))
-    : await db.select().from(appCircleInvites).where(eq(appCircleInvites.lookup, lookup!));
   if (!r) throw err("NOT_FOUND", "circles.join.notFound");
   // Everything the join needs to know, read side by side before the transaction (each read is a round trip).
   const [blocked, people, ids, circleRow, inviter] = await Promise.all([
@@ -233,17 +251,36 @@ export async function accept(ref: string, userId: string, isId: boolean, ipHash:
   if (r.circleId && ids.includes(userId)) return { circleId: r.circleId, friendId: null, already: true };
   const out = await db.transaction(async (tx) => {
     if (r.circleId) {
-      // A second tap that raced this one: the member row is already there, nothing more to write.
-      const joined = await tx.insert(appCircleMembers).values({ circleId: r.circleId, userId, role: "member" }).onConflictDoNothing().returning({ id: appCircleMembers.userId });
-      if (!joined.length) return { circleId: r.circleId, friendId: null, already: true };
-      await takePlace(tx, r); // full: throws, and the transaction takes the member row back out
-      await tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() })
-        .where(and(eq(appCircleInvites.circleId, r.circleId), eq(appCircleInvites.inviteeUserId, userId), eq(appCircleInvites.status, "pending")));
-      await sysMessage(tx, r.circleId, r.channel === "link" ? "joinedByLink" : "joined", userId, r.channel === "link" ? [r.inviterId] : []);
-      if (ids.includes(r.inviterId)) {
-        after.push(await notify(tx, r.inviterId, "circle.joined", ["notify.circles.joined.title", { name: me.short, circle: circleRow[0]?.name ?? "" }], ["notify.circles.joined.body"], `/circle/${r.circleId}`, { circleId: r.circleId, userId }, { push: true, locale }));
+      const circleId = r.circleId;
+      // In one statement: take a place on a link with a limit (none left: nobody joins) and add the member. A second
+      // tap that raced this one finds the member row there and changes nothing.
+      const [res] = await tx.execute<{ placed: number; joined: number }>(sql`
+        WITH place AS (
+          UPDATE app_circle_invites SET uses = uses + (CASE WHEN channel = 'link' THEN 1 ELSE 0 END)
+          WHERE id = ${r.id} AND (channel <> 'link' OR max_uses IS NULL OR uses < max_uses)
+            AND NOT EXISTS (SELECT 1 FROM app_circle_members WHERE circle_id = ${circleId} AND user_id = ${userId})
+          RETURNING id),
+        ins AS (
+          INSERT INTO app_circle_members (circle_id, user_id, role) SELECT ${circleId}, ${userId}, 'member' WHERE EXISTS (SELECT 1 FROM place)
+          ON CONFLICT DO NOTHING RETURNING user_id)
+        SELECT (SELECT count(*) FROM place)::int AS placed, (SELECT count(*) FROM ins)::int AS joined`);
+      if (!res?.joined) {
+        const [m] = await tx.select({ id: appCircleMembers.userId }).from(appCircleMembers).where(and(eq(appCircleMembers.circleId, circleId), eq(appCircleMembers.userId, userId)));
+        if (m) return { circleId, friendId: null, already: true };
+        throw err("NOT_FOUND", "circles.join.fullTitle");
       }
-      return { circleId: r.circleId, friendId: null, already: false };
+      const n = ids.includes(r.inviterId)
+        ? notifyWrite(tx, r.inviterId, "circle.joined", ["notify.circles.joined.title", { name: me.short, circle: circleRow[0]?.name ?? "" }], ["notify.circles.joined.body"], `/circle/${circleId}`, { circleId, userId }, { push: true, locale })
+        : null;
+      // The rest of joining, in one more statement.
+      await atOnce([
+        tx.update(appCircleInvites).set({ status: "accepted", acceptedBy: userId, respondedAt: new Date() })
+          .where(and(eq(appCircleInvites.circleId, circleId), eq(appCircleInvites.inviteeUserId, userId), eq(appCircleInvites.status, "pending"))),
+        ...sysMessageWrites(tx, circleId, r.channel === "link" ? "joinedByLink" : "joined", userId, r.channel === "link" ? [r.inviterId] : []),
+        n?.write,
+      ], tx);
+      if (n) after.push(n.push);
+      return { circleId, friendId: null, already: false };
     }
     const g = await graphOf(userId, tx);
     const already = g.friends.has(r.inviterId);
@@ -254,7 +291,8 @@ export async function accept(ref: string, userId: string, isId: boolean, ipHash:
     if (!already) after.push(await notify(tx, r.inviterId, "friend.joined", ["notify.circles.joinedMada.title", { name: me.short }], ["notify.circles.joinedMada.body"], `/friend/${userId}`, { userId }, { push: true, locale }));
     return { circleId: null, friendId: r.inviterId, already };
   });
-  for (const f of after) await f();
+  // The inviter's phone hears after the response has gone (their inbox already has it).
+  if (after.length) await afterResponse(async () => { for (const f of after) await f(); });
   return out;
 }
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { addDays, monthOf, personRef, rangeLabel, t, todayIn, type CopyKey, type Lang, type PersonRef, type SocialRelation, type Vars } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -167,15 +167,25 @@ export async function pastTrips(userIds: string[], tx: Db = db) {
 export async function notify(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null = null, opts: { push?: boolean; locale?: Lang } = {}) {
   // The caller may already know their language (read alongside its other reads): one round trip fewer.
   const locale = opts.locale ?? (await localeOfUser(userId, tx));
-  const tt = t(title[0], title[1], locale).slice(0, 64);
-  const bb = t(body[0], body[1], locale);
-  const [row] = await tx.insert(appNotifications).values({ userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data }).returning({ id: appNotifications.id });
-  return async () => {
-    if (!opts.push) return;
-    try {
-      const r = await pushToUser(userId, { title: tt, body: bb, data: { href, id: row!.id } });
-      if (r.sent) await db.update(appNotifications).set({ pushedAt: new Date() }).where(eq(appNotifications.id, row!.id));
-    } catch { /* the inbox has it */ }
+  const n = notifyWrite(tx, userId, kind, title, body, href, data, { push: opts.push, locale });
+  await n.write;
+  return n.push;
+}
+
+/** The inbox line as a write (to send with others: batch.ts atOnce), and the push to send once it's committed. */
+export function notifyWrite(tx: Db, userId: string, kind: string, title: [CopyKey, Vars?], body: [CopyKey, Vars?], href: string | null, data: Record<string, unknown> | null, opts: { push?: boolean; locale: Lang }) {
+  const id = randomUUID();
+  const tt = t(title[0], title[1], opts.locale).slice(0, 64);
+  const bb = t(body[0], body[1], opts.locale);
+  return {
+    write: tx.insert(appNotifications).values({ id, userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data }),
+    push: async () => {
+      if (!opts.push) return;
+      try {
+        const r = await pushToUser(userId, { title: tt, body: bb, data: { href, id } });
+        if (r.sent) await db.update(appNotifications).set({ pushedAt: new Date() }).where(eq(appNotifications.id, id));
+      } catch { /* the inbox has it */ }
+    },
   };
 }
 

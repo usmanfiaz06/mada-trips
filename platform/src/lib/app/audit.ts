@@ -15,7 +15,12 @@ export type AppAuditInput = {
 
 /** One row in the app's append-only audit trail. Call inside the same transaction as the change. */
 export async function appAuditLog(tx: Tx | typeof db, e: AppAuditInput) {
-  await tx.insert(appAudit).values({
+  await auditInsert(e, tx);
+}
+
+/** The audit row as a write to send with others in one statement (batch.ts atOnce). */
+export function auditInsert(e: AppAuditInput, tx: Tx | typeof db = db) {
+  return tx.insert(appAudit).values({
     actorKind: e.actorKind, actorId: e.actorId, action: e.action, entityType: e.entityType,
     entityId: e.entityId ?? null, summary: e.summary, data: e.data ?? null, ipHash: e.ipHash ?? null,
   });

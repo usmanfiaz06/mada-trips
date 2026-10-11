@@ -145,10 +145,15 @@ async function quoteFor(r: RequestRow): Promise<{ total: number; snapshot: Recor
 }
 
 /** Moves this traveller's requests on by age (mock desk only). `now` is injectable for tests. */
-export async function progressRequests(ownerId: string, now = Date.now()): Promise<void> {
-  if (!autopilotOn()) return;
+/** Moves the mock desk on. True when it changed something (callers that read alongside it read again). */
+export async function progressRequests(ownerId: string, now = Date.now()): Promise<boolean> {
+  if (!autopilotOn()) return false;
   const rows = await db.select().from(appRequests).where(and(eq(appRequests.ownerId, ownerId), sql`${appRequests.details}->>'source' = 'ask'`, sql`${appRequests.status} IN ('sent','reviewing','confirmed')`));
-  for (const r of rows) {
+  // Only what is due moves; nothing due, nothing written.
+  const due = rows.filter((r) => (r.status === "sent" && now - r.createdAt.getTime() > 4000) || (r.status === "reviewing" && now - r.createdAt.getTime() > 9000)
+    || (r.status === "confirmed" && now - r.updatedAt.getTime() > 15_000 && (r.details as AskDetails).askKind !== "package"));
+  if (!due.length) return false;
+  for (const r of due) {
     const age = now - r.createdAt.getTime();
     if (r.status === "sent" && age > 4000) {
       await db.update(appRequests).set({ status: "reviewing", updatedAt: new Date(now) }).where(and(eq(appRequests.id, r.id), eq(appRequests.status, "sent")));
@@ -182,18 +187,21 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
       await db.update(appRequests).set({ status: "done", updatedAt: new Date(now) }).where(and(eq(appRequests.id, r.id), eq(appRequests.status, "confirmed")));
     }
   }
+  return true;
 }
 
 export async function listBookingRequests(ownerId: string): Promise<BookingRequestView[]> {
-  await progressRequests(ownerId);
   const mine = and(eq(appRequests.ownerId, ownerId), sql`${appRequests.details}->>'source' = 'ask'`);
   // The requests and each one's latest quote, side by side (was one query per request).
-  const [rows, quotes] = await Promise.all([
+  const read = () => Promise.all([
     db.select().from(appRequests).where(mine).orderBy(desc(appRequests.createdAt)).limit(100),
     db.selectDistinctOn([appQuotes.requestId]).from(appQuotes)
       .where(sql`${appQuotes.requestId} IN (SELECT ${appRequests.id} FROM ${appRequests} WHERE ${mine})`)
       .orderBy(appQuotes.requestId, desc(appQuotes.createdAt)),
   ]);
+  // The mock desk moves on alongside the read; when it moved something, read again (rare: a few times a request).
+  const [moved, first] = await Promise.all([progressRequests(ownerId), read()]);
+  const [rows, quotes] = moved ? await read() : first;
   const latest = new Map(quotes.map((q) => [q.requestId, q]));
   return rows.map((r) => requestView(r, latest.get(r.id)));
 }

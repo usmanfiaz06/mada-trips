@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import {
   DEMO_PHASE_HEADER, TripPhase, derivePhase, demoNow, demoView, fareRulesFor, firstNameOf, outSegment, todayIn, TZ, AIRLINE_INFO,
   type TripDetail, type TripPhase as Phase, type SegmentDetail, type StayDetail, type PickupDetail, type TripTraveller, type FlightStatus,
@@ -64,29 +64,31 @@ function travellerOf(p: typeof appPeople.$inferSelect, selfName: string): TripTr
 }
 
 /** Everything but the clock, read from the tables. */
-/** Everything loadBase reads, for many trips of one owner at once: one query per table, all side by side. */
-async function readTrips(trips: TripRow[], tx: Exec = db) {
-  const ids = trips.map((t) => t.id);
-  const travellerIds = [...new Set(trips.flatMap((t) => t.travellerIds))];
-  const owners = [...new Set(trips.map((t) => t.ownerId))];
-  const [segs, stays, pickups, facts, charges, people, users, bookings] = await Promise.all([
+/**
+ * Everything loadBase reads, for all of one owner's trips that `where` picks: one query per table, all side by side
+ * with the trips themselves (the tables are read by a subquery on the trips, so nothing waits for the trip list).
+ */
+async function readTrips(ownerId: string, where: SQL, tx: Exec = db) {
+  const ids = tx.select({ id: appTrips.id }).from(appTrips).where(where);
+  const [trips, segs, stays, pickups, facts, charges, people, users, bookings] = await Promise.all([
+    tx.select().from(appTrips).where(where).orderBy(asc(appTrips.startDate)),
     tx.select().from(appSegments).where(inArray(appSegments.tripId, ids)).orderBy(asc(appSegments.sort), asc(appSegments.departLocal)),
     tx.select().from(appStays).where(inArray(appStays.tripId, ids)).orderBy(asc(appStays.checkIn)),
     tx.select().from(appPickups).where(inArray(appPickups.tripId, ids)).orderBy(asc(appPickups.at)),
     tx.select().from(appTripFacts).where(inArray(appTripFacts.tripId, ids)),
     tx.select({ tripId: appTripCharges.tripId, item: appTripCharges.item, amount: appTripCharges.amount }).from(appTripCharges).where(inArray(appTripCharges.tripId, ids)),
-    travellerIds.length ? tx.select().from(appPeople).where(and(inArray(appPeople.id, travellerIds), inArray(appPeople.ownerId, owners), isNull(appPeople.deletedAt))) : Promise.resolve([]),
-    tx.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(inArray(appUsers.id, owners)),
+    tx.select().from(appPeople).where(and(eq(appPeople.ownerId, ownerId), isNull(appPeople.deletedAt))),
+    tx.select({ id: appUsers.id, name: appUsers.name }).from(appUsers).where(eq(appUsers.id, ownerId)),
     tx.select({ tripId: appTripBookings.tripId, details: appTripBookings.details }).from(appTripBookings).where(inArray(appTripBookings.tripId, ids)),
   ]);
-  return { segs, stays, pickups, facts, charges, people, users, bookings };
+  return { trips, segs, stays, pickups, facts, charges, people, users, bookings };
 }
 
-/** Many trips' bases (GET /trips): the same as loadBase for each, in one round of queries instead of two per trip. */
-export async function loadBases(trips: TripRow[], tx: Exec = db): Promise<Omit<TripDetail, "clock">[]> {
-  if (!trips.length) return [];
-  const all = await readTrips(trips, tx);
-  return Promise.all(trips.map(async (trip) => {
+/** An owner's trips (those `where` picks) and their bases (GET /trips): what loadBase gives each, in one round of queries. */
+export async function loadBases(ownerId: string, where: SQL, tx: Exec = db): Promise<{ rows: TripRow[]; bases: Omit<TripDetail, "clock">[] }> {
+  const all = await readTrips(ownerId, where, tx);
+  const trips = all.trips;
+  const bases = await Promise.all(trips.map(async (trip) => {
     const facts = all.facts.find((f) => f.tripId === trip.id) ?? (await factsOf(trip.id, tx));
     return buildBase(trip, {
       segs: all.segs.filter((x) => x.tripId === trip.id), stays: all.stays.filter((x) => x.tripId === trip.id), pickups: all.pickups.filter((x) => x.tripId === trip.id),
@@ -94,6 +96,7 @@ export async function loadBases(trips: TripRow[], tx: Exec = db): Promise<Omit<T
       owner: all.users.find((u) => u.id === trip.ownerId), bookings: all.bookings.filter((b) => b.tripId === trip.id),
     });
   }));
+  return { rows: trips, bases };
 }
 
 export async function loadBase(trip: TripRow, tx: Exec = db): Promise<Omit<TripDetail, "clock">> {

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
+import { and, count, eq, isNull, ne } from "drizzle-orm";
 import {
   buildItinerary, calendarEvents, liveStay, moveNeeded, outSegment, rangeLong, shareText, sameTimeAsHome, todayIn, dayPart, backSegment,
   type ItineraryResponse, type TripCard, type TripDetail, type TripPhase, type TripsResponse,
@@ -36,9 +36,9 @@ export async function overview(ownerId: string, demo: TripPhase | null): Promise
     getBalance(ownerId),
   ]);
   lists.catch(() => {}); // awaited below; a failure there is reported there
-  const rows = await db.select().from(appTrips).where(and(eq(appTrips.ownerId, ownerId), ne(appTrips.status, "planning"))).orderBy(asc(appTrips.startDate));
+  const { rows, bases } = await loadBases(ownerId, and(eq(appTrips.ownerId, ownerId), ne(appTrips.status, "planning"))!);
   const now = new Date();
-  const details: TripDetail[] = (await loadBases(rows)).map((base) => withClock(base, null, now));
+  const details: TripDetail[] = bases.map((base) => withClock(base, null, now));
   // The trip Today is about: the first one still in play. A demo override applies to that trip only.
   const live = details.filter((d) => d.status !== "cancelled" && d.clock.phase !== "none");
   let current: TripDetail | null = live[0] ?? null;
