@@ -1,7 +1,7 @@
 import { Linking, Platform } from 'react-native';
 import { API_PREFIX } from '@mada/shared';
 import { API_ORIGIN } from './config';
-import { useFeature } from './net';
+import { useFeature } from './net/gates';
 
 /*
  * The beta's switches, as GET /config says (platform/src/lib/app/switches.ts), and files from the desk.

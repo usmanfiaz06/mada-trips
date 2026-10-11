@@ -12,8 +12,10 @@ import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { tripsApi, useTripMutation } from '@/lib/trips';
 import { colors, ff, radii, shadow, textEnd } from '@/theme';
+import { useWake, wakePlan } from '@/lib/wake';
 import { TripHero } from './common';
 import { useTripLocal } from './local';
+import { WakeRow } from './WakeRow';
 
 type PackItem = { id: string; t: string; sub: string; people?: boolean; problem?: { firstName: string; id: string } | null; own?: boolean };
 const mins = (a: string, b: string) => { const [h1, m1] = a.split(':').map(Number); const [h2, m2] = b.split(':').map(Number); return h2! * 60 + m2! - (h1! * 60 + m1!); };
@@ -95,6 +97,7 @@ function PickupSheet({ trip, open, onClose }: { trip: TripDetail; open: boolean;
   const timeOf = (o: number) => addMinutes(dep, o);
   const spare = mins(addMinutes(timeOf(pick), 35), pk.bagDrop);
   const airport = AIRPORT_NAME[out.from] ?? out.from;
+  const wakeOn = useWake(trip.id);
   return (
     <Sheet visible={open} onClose={onClose} label={t('td.pickup.label')}>
       <T v="h2">{t('td.pickup.when', { driver: pk.driver })}</T>
@@ -113,7 +116,7 @@ function PickupSheet({ trip, open, onClose }: { trip: TripDetail; open: boolean;
           );
         })}
       </View>
-      <Tiny>{t('td.pickup.wake', { time: addMinutes(timeOf(pick), -45) })}</Tiny>
+      {wakeOn.on && !wakeOn.time ? <Tiny>{t('td.pickup.wake', { time: addMinutes(timeOf(pick), -45) })}</Tiny> : null}
       <Button testID="pickup-save" label={pick === pk.offsetMin ? t('td.pickup.stays', { time: timeOf(pick) }) : t('td.pickup.move', { time: timeOf(pick) })} disabled={pick === pk.offsetMin} busy={save.isPending}
         onPress={() => save.mutate(pick, { onSuccess: () => { buzz('success'); toast(t('td.pickup.told', { driver: pk.driver, time: timeOf(pick) })); onClose(); } })} />
       {spare < 50 ? <T v="small" color={colors.badInk}>{t('td.pickup.tightNote')}</T> : null}
@@ -133,13 +136,14 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
   const packed = local.packed.length;
   const allPacked = packed >= items;
   const dep = out.departLocal.slice(11, 16);
-  const wake = pk ? pk.wake : addMinutes(dep, -200);
+  const wakeState = useWake(trip.id);
+  const wake = wakePlan(trip, wakeState.time)?.time ?? (pk ? pk.wake : addMinutes(dep, -200));
   const airport = AIRPORT_NAME[out.from] ?? out.from;
   const sleepHours = Math.round((mins('22:30', '24:00') + mins('00:00', wake)) / 60);
   const plan: { k: string; time: string; t: string; sub: string; state?: 'done' | 'now'; act?: [string, () => void] }[] = [
     { k: 'tonight', time: t('td.plan.tonight'), t: allPacked ? t('td.plan.packed') : t('td.plan.pack'), sub: allPacked ? t('td.plan.packedSub') : t('td.plan.packSub', { n: packed, total: items }), state: allPacked ? 'done' : 'now', act: allPacked ? undefined : [t('td.plan.seeList'), () => scrollTo?.(packY)] },
     { k: 'sleep', time: '22:30', t: t('td.plan.lights'), sub: t('td.plan.lightsSub', { n: sleepHours }) },
-    { k: 'wake', time: wake, t: t('td.plan.wake'), sub: t('td.plan.wakeSub') },
+    { k: 'wake', time: wake, t: t('td.plan.wake'), sub: '' },
     pk ? { k: 'pickup', time: pk.time, t: t('td.plan.atDoor', { driver: pk.driver }), sub: t('td.plan.atDoorSub', { car: pk.car ?? '', waits: pk.waits }), act: [t('td.plan.changePickup'), () => setSheet(true)] }
       : { k: 'pickup', time: addMinutes(dep, -155), t: t('td.plan.leave'), sub: t('td.plan.leaveSub', { airport }) },
     { k: 'airport', time: pk ? pk.airportBy : addMinutes(dep, -120), t: `${airport}, ${out.terminal ?? ''}`, sub: t('td.plan.airportSub', { time: addMinutes(dep, -60) }) },
@@ -164,7 +168,8 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
           <View>
             {plan.map((p, i) => (
               <Fragment key={p.k}>
-                {i === 3 ? <T style={styles.daymark}>{t('td.plan.tomorrow', { day: dayLabel(out.departLocal.slice(0, 10), { today: out.departLocal.slice(0, 10) }) })}</T> : null}
+                {i === 2 ? <T style={styles.daymark}>{t('td.plan.tomorrow', { day: dayLabel(out.departLocal.slice(0, 10), { today: out.departLocal.slice(0, 10) }) })}</T> : null}
+                {p.k === 'wake' ? <WakeRow trip={trip} rail={<View style={styles.rail}><View style={styles.railLine} /><View style={styles.railDot} /></View>} /> : (
                 <View style={styles.tl}>
                   <Num size={14} color={p.state ? colors.green : colors.ink2} style={{ width: 54, textAlign: textEnd(), paddingTop: 1 }}>{p.time}</Num>
                   <View style={styles.rail}>
@@ -176,7 +181,7 @@ export function DayBefore({ trip, scrollTo }: { trip: TripDetail; scrollTo?: (y:
                     <Tiny>{p.sub}</Tiny>
                     {p.act ? <TextLink testID={`plan-${p.k}`} label={p.act[0]} onPress={p.act[1]} /> : null}
                   </Grow>
-                </View>
+                </View>)}
               </Fragment>
             ))}
           </View>
