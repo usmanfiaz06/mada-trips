@@ -358,8 +358,8 @@ try {
     await p.see('Codes always work.', 'password sheet');
     await p.byTest('password-set').click();
     await p.see('First, a code to check it’s you.', 'reauth');
-    await p.byTest('reauth-send').click();
-    await p.byTest('reauth-code').fill('123456');
+    await p.byTest('pw-reauth-send').click();
+    await p.byTest('pw-reauth-code').fill('123456');
     await p.see('Your password needs', 'rules');
     await p.byTest('method-new-password').fill('istanbul');
     await p.page.locator('[data-testid="rule-lower-ok"]').waitFor({ timeout: 4000 }).catch(() => errors.push('password: lowercase rule should tick'));

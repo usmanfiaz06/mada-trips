@@ -111,7 +111,7 @@ async function run({ page, phone, returning }) {
   const otp = byTest('otp-input');
   if (!returning) {
     await otp.fill('000000');
-    await see('That code doesn’t match. Check the latest one we sent.', 'wrong code');
+    await see("That code doesn't match. 2 tries left.", 'wrong code');
     await shot('otp-wrong');
   }
   await otp.fill('123456');

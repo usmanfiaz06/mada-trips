@@ -238,7 +238,7 @@ export default function SignInMethods() {
             <T v="body">{t('auth.methods.reauthBody', { contact: user.email })}</T>
             {sentAt ? (
               <Field label={t('auth.methods.codeLabel', { contact: user.email })} big value={pw.code} keyboardType="number-pad" inputMode="numeric" autoComplete="one-time-code" textContentType="oneTimeCode"
-                error={problem} testID="reauth-code"
+                error={problem} testID="pw-reauth-code"
                 onChangeText={(v) => {
                   const d = v.replace(/\D/g, '').slice(-6);
                   setProblem(null);
@@ -252,7 +252,7 @@ export default function SignInMethods() {
             {sentAt && resendIn > 0 ? <T v="small" style={{ fontVariant: ['tabular-nums'] }}>{t('auth.code.resendIn', { time: `0:${String(resendIn).padStart(2, '0')}` })}</T> : (
               <>
                 {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert">{problem}</T> : null}
-                <Button variant={sentAt ? 'secondary' : 'primary'} label={sentAt ? t('otp.resend') : t('auth.methods.reauthSend')} busy={busy} testID="reauth-send"
+                <Button variant={sentAt ? 'secondary' : 'primary'} label={sentAt ? t('otp.resend') : t('auth.methods.reauthSend')} busy={busy} testID="pw-reauth-send"
                   onPress={() => withSession(async () => {
                     try { await auth().reauthenticate(); } catch (e) { if (!(e instanceof AuthError && e.code === 'wait')) throw e; }
                     setSentAt(Date.now()); setTick(Date.now());

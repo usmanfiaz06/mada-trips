@@ -352,7 +352,9 @@ async function signBackIn(page) {
   try { await again.waitFor({ state: 'visible', timeout: 5000 }); } catch { return; }
   await again.click();
   await page.waitForTimeout(1000);
-  if (await byTest('signin-phone').filter({ visible: true }).count()) {
+  // The sign-in screen puts the way this phone used last time first: one tap sends the code.
+  if (await byTest('signin-last').filter({ visible: true }).count()) await byTest('signin-last').click();
+  else if (await byTest('signin-phone').filter({ visible: true }).count()) {
     await byTest('signin-phone').click();
     await byTest('phone-input').fill('500004127');
     await byTest('phone-send').click();
