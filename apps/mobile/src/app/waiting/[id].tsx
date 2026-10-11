@@ -19,6 +19,7 @@ import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { colors, font, ff } from '@/theme';
+import { askNotifications } from '@/lib/notify-permission';
 
 /*
  * With Mada (Pay.jsx Waiting): live steps while the desk holds the seats, locks the price and issues the tickets, polled
@@ -211,7 +212,7 @@ function Confirmed({ o }: { o: OrderView }) {
             <T v="h3" style={{ fontSize: 15 }}>{t('done.alerts.title')}</T>
             <T v="small">{t('done.alerts.body')}</T>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Button size="small" block={false} label={t('done.alerts.allow')} onPress={() => { setAlerts('allowed'); buzz('success'); updateMe.mutate({ notifications: 'allowed' }); }} />
+              <Button size="small" block={false} label={t('done.alerts.allow')} onPress={async () => { const choice = await askNotifications().catch(() => 'declined' as const); setAlerts(choice); if (choice === 'allowed') buzz('success'); updateMe.mutate({ notifications: choice }); }} />
               <Button size="small" block={false} variant="ghost" label={t('common.notNow')} onPress={() => { setAlerts('declined'); updateMe.mutate({ notifications: 'declined' }); }} />
             </View>
           </View>

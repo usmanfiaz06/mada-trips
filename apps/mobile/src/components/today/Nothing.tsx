@@ -23,6 +23,7 @@ import { toast } from '@/lib/toast';
 import { newKey, tripsApi, tk, useGuestFlights, useTrips, useTripMutation, type GuestFlight } from '@/lib/trips';
 import { colors, ff, font, radii, shadow } from '@/theme';
 import { RequestsCard } from './common';
+import { askNotifications } from '@/lib/notify-permission';
 
 const SERVICES: [IconName, 'today.service.flight' | 'today.service.stay' | 'today.service.visa' | 'today.service.umrah' | 'today.service.car' | 'today.service.food' | 'today.service.todo', string][] = [
   ['flight', 'today.service.flight', 'flight'], ['stay', 'today.service.stay', 'stay'], ['visa', 'today.service.visa', 'visa'], ['umrah', 'today.service.umrah', 'umrah'],
@@ -205,7 +206,7 @@ export function TrackFlight({ guest }: { guest: boolean }) {
         <View style={styles.bigIc}><Icon name="bell" size={24} color={colors.goldInk} /></View>
         <T v="h2">{t('td.track.askTitle', { code })}</T>
         <T v="body" style={{ marginTop: -8 }}>{t('td.track.askBody')}</T>
-        <Button testID="track-allow" label={t('td.track.allow')} onPress={() => { if (!guest) updateMe.mutate({ notifications: 'allowed' }); void add(true); }} />
+        <Button testID="track-allow" label={t('td.track.allow')} onPress={async () => { const choice = await askNotifications().catch(() => 'declined' as const); if (!guest) updateMe.mutate({ notifications: choice }); void add(choice === 'allowed'); }} />
         <Button label={t('common.notNow')} variant="ghost" onPress={() => { if (!guest) updateMe.mutate({ notifications: 'declined' }); void add(false); }} />
       </Sheet>
     </>

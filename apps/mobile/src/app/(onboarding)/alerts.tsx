@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { Button } from '@/components/Button';
@@ -11,6 +10,7 @@ import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
+import { askNotifications } from '@/lib/notify-permission';
 import { useOnboarding } from '@/lib/onboarding';
 import { useUpdateMe } from '@/lib/queries';
 import { colors, font, radii, ff } from '@/theme';
@@ -30,8 +30,8 @@ export default function Alerts() {
   const finish = async (allow: boolean) => {
     setBusy(allow ? 'allow' : 'later');
     let choice: 'allowed' | 'declined' = allow ? 'allowed' : 'declined';
-    if (allow && Platform.OS !== 'web') {
-      try { choice = (await Notifications.requestPermissionsAsync()).granted ? 'allowed' : 'declined'; } catch { /* keep their answer */ }
+    if (allow) {
+      try { choice = await askNotifications(); } catch { /* keep their answer */ }
     }
     try { await update.mutateAsync({ notifications: choice, onboarded: true }); } catch { /* the app works without it; /me retries later */ }
     buzz('success');
