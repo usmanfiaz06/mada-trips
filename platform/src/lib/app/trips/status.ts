@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, eq, sql } from "drizzle-orm";
-import { AIRLINE_INFO, dayPart, outSegment, todayIn, type FlightStatus, type TrackFlightRequest, type TrackedFlightView, type TripDetail, type TripPhase } from "@mada/shared";
+import { AIRLINE_INFO, arriveInstant, dayPart, departInstant, outSegment, todayIn, type FlightStatus, type TrackFlightRequest, type TrackedFlightView, type TripDetail, type TripPhase } from "@mada/shared";
 import { db } from "@/db";
 import { appSegments, appTrackedFlights, appTrips } from "@/db/app-schema";
 import { appFlightEvents, appTrackedExtras, appTripFacts } from "@/db/app-schema-trips";
@@ -8,10 +8,12 @@ import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { suppliers, type FlightStatusInfo } from "../suppliers";
 import { notify } from "./notify";
+import { flightStatusNow } from "../flight-status/service";
 
 /*
- * Flight status: the flightStatus supplier (FlightAware AeroAPI live, a mock by default), pushed to us by alerts and
- * read on demand when a travel-day screen asks. Each change is told once (app_flight_events), then lands in the inbox
+ * Flight status: the flightStatus supplier (AeroDataBox, aviationstack or FlightAware live; a mock by default), pushed
+ * to us by alerts (AeroDataBox webhooks, the FlightAware relay), polled by /api/cron/flights, and read on demand
+ * through the shared cache (flight-status/service.ts) when a travel-day screen asks. Each change is told once (app_flight_events), then lands in the inbox
  * and goes out as a push. Positions on the map come from the separate open ADS-B route (flights/{no}/position).
  */
 
@@ -50,7 +52,7 @@ export async function refreshTrip(ownerId: string, trip: TripDetail, demo: TripP
     return changes;
   }
   if (!["daybefore", "travelday", "delayed", "inair"].includes(trip.clock.phase)) return [];
-  const info = await suppliers.flightStatus().lookup(out.flightNumber, day).catch(() => null);
+  const info = (await flightStatusNow(out.flightNumber, day, { departAt: departInstant(out).getTime(), arriveAt: arriveInstant(out).getTime() }).catch(() => null))?.info ?? null;
   if (!info) return [];
   if (info.gate && info.gate !== out.gate) {
     const c = await applyGate(ownerId, trip, out.id, out.flightNumber, day, out.gate, info.gate, info.source);
@@ -67,43 +69,80 @@ export async function refreshTrip(ownerId: string, trip: TripDetail, demo: TripP
   return changes;
 }
 
-/* ───────── FlightAware alerts (webhook) ───────── */
+/* ───────── status changes: FlightAware alerts, AeroDataBox alerts, and the polling job ───────── */
 
-export type AlertInput = { flightNumber: string; date: string; status?: FlightStatus; gate?: string | null; terminal?: string | null; delayMin?: number | null };
+export type AlertInput = { flightNumber: string; date: string; status?: FlightStatus; gate?: string | null; terminal?: string | null; delayMin?: number | null; source?: string };
 
-/** One alert for one flight: every trip segment and tracked flight on it is updated, and each owner told once. */
-export async function applyAlert(a: AlertInput): Promise<{ segments: number; tracked: number }> {
-  const segs = await db.select({ s: appSegments, ownerId: appTrips.ownerId }).from(appSegments).innerJoin(appTrips, eq(appTrips.id, appSegments.tripId))
+/** Delays are told at 15 minutes, then again each time they grow by another half hour (15, 45, 75…), never per minute. */
+export const delayStep = (min: number | null | undefined) => (min == null || min < 15 ? null : 15 + Math.floor((min - 15) / 30) * 30);
+
+/**
+ * One status update for one flight on one day, from any source: every trip segment and tracked flight on it is
+ * updated, and each owner is told once per change (app_flight_events): a gate change, a delay of 15 minutes or more
+ * (and each further half hour), a cancellation. Safe to repeat: a webhook retry or the next poll tells nobody twice.
+ */
+export async function applyAlert(a: AlertInput): Promise<{ segments: number; tracked: number; told: number }> {
+  const source = a.source ?? "FlightAware";
+  const key = source.toLowerCase().replace(/^live · |^schedule · /, "").replace(/\s+/g, "");
+  const step = delayStep(a.delayMin);
+  let told = 0;
+  const segs = await db.select({ s: appSegments, ownerId: appTrips.ownerId, tripStatus: appTrips.status }).from(appSegments).innerJoin(appTrips, eq(appTrips.id, appSegments.tripId))
     .where(and(eq(appSegments.flightNumber, a.flightNumber), sql`${appSegments.departLocal}::date = ${a.date}::date`));
-  for (const { s, ownerId } of segs) {
+  for (const { s, ownerId, tripStatus } of segs) {
+    if (tripStatus === "cancelled") continue;
     if (a.gate && a.gate !== s.gate) {
-      await db.update(appSegments).set({ gate: a.gate, statusSource: "FlightAware", updatedAt: new Date() }).where(eq(appSegments.id, s.id));
-      if (await firstTime(a.flightNumber, a.date, `gate:${ownerId}`, a.gate, "flightaware")) {
+      await db.update(appSegments).set({ gate: a.gate, statusSource: source, updatedAt: new Date() }).where(eq(appSegments.id, s.id));
+      if (await firstTime(a.flightNumber, a.date, `gate:${ownerId}`, a.gate, key)) {
+        told += 1;
         await notify(ownerId, { kind: "gate_change", level: "time_sensitive", copy: "notify.gateChange", vars: { gate: a.gate, flight: a.flightNumber, minutes: WALK_MIN }, href: `/trip/${s.tripId}` });
       }
     }
     if (a.status && a.status !== s.status) {
-      await db.update(appSegments).set({ status: a.status, statusSource: "FlightAware", ...(a.terminal ? { terminal: a.terminal } : {}), updatedAt: new Date() }).where(eq(appSegments.id, s.id));
-      if (a.status === "delayed" && a.delayMin && (await firstTime(a.flightNumber, a.date, `delay:${ownerId}`, String(a.delayMin), "flightaware"))) {
-        const [f] = await db.select({ segments: appTripFacts.segments }).from(appTripFacts).where(eq(appTripFacts.tripId, s.tripId));
-        await db.update(appTripFacts).set({ segments: { ...(f?.segments ?? {}), [s.id]: { ...(f?.segments?.[s.id] ?? {}), delayMin: a.delayMin, statusAt: new Date().toISOString() } } }).where(eq(appTripFacts.tripId, s.tripId));
+      await db.update(appSegments).set({ status: a.status, statusSource: source, ...(a.terminal ? { terminal: a.terminal } : {}), updatedAt: new Date() }).where(eq(appSegments.id, s.id));
+    }
+    if (a.delayMin != null && a.status !== "cancelled") {
+      const [f] = await db.select({ segments: appTripFacts.segments }).from(appTripFacts).where(eq(appTripFacts.tripId, s.tripId));
+      const prev = f?.segments?.[s.id] as { delayMin?: number } | undefined;
+      if (f && (prev?.delayMin ?? 0) !== a.delayMin) {
+        await db.update(appTripFacts).set({ segments: { ...(f.segments ?? {}), [s.id]: { ...(prev ?? {}), delayMin: a.delayMin, statusAt: new Date().toISOString() } } }).where(eq(appTripFacts.tripId, s.tripId));
+      }
+      if (step !== null && (await firstTime(a.flightNumber, a.date, `delay:${ownerId}`, String(step), key))) {
+        told += 1;
         await notify(ownerId, { kind: "flight_delayed", level: "time_sensitive", copy: "notify.trip.delayed", vars: { flight: a.flightNumber, minutes: a.delayMin }, href: `/disruption/${s.tripId}?kind=delay` });
       }
-      if (a.status === "cancelled" && (await firstTime(a.flightNumber, a.date, `cancelled:${ownerId}`, "cancelled", "flightaware"))) {
-        await db.update(appTripFacts).set({ disruption: { kind: "cancel", segmentId: s.id, cause: null, source: "FlightAware", decided: null } }).where(eq(appTripFacts.tripId, s.tripId));
-        await notify(ownerId, { kind: "flight_cancelled", level: "time_sensitive", copy: "notify.trip.cancelled", vars: { flight: a.flightNumber }, href: `/disruption/${s.tripId}?kind=cancel` });
-      }
+    }
+    if (a.status === "cancelled" && (await firstTime(a.flightNumber, a.date, `cancelled:${ownerId}`, "cancelled", key))) {
+      told += 1;
+      await db.update(appTripFacts).set({ disruption: { kind: "cancel", segmentId: s.id, cause: null, source, decided: null } }).where(eq(appTripFacts.tripId, s.tripId));
+      await notify(ownerId, { kind: "flight_cancelled", level: "time_sensitive", copy: "notify.trip.cancelled", vars: { flight: a.flightNumber }, href: `/disruption/${s.tripId}?kind=cancel` });
     }
   }
   const tracked = await db.select({ t: appTrackedFlights, alerts: appTrackedExtras.alerts }).from(appTrackedFlights).leftJoin(appTrackedExtras, eq(appTrackedExtras.trackedId, appTrackedFlights.id))
     .where(and(eq(appTrackedFlights.flightNumber, a.flightNumber), eq(appTrackedFlights.date, a.date)));
   for (const { t: tf, alerts } of tracked) {
-    await db.update(appTrackedFlights).set({ ...(a.status ? { status: a.status } : {}), ...(a.gate ? { gate: a.gate } : {}), ...(a.terminal ? { terminal: a.terminal } : {}), source: "FlightAware", updatedAt: new Date() }).where(eq(appTrackedFlights.id, tf.id));
-    if (alerts && a.gate && a.gate !== tf.gate && (await firstTime(a.flightNumber, a.date, `gate:${tf.userId}`, a.gate, "flightaware"))) {
+    await db.update(appTrackedFlights).set({ ...(a.status ? { status: a.status } : {}), ...(a.gate ? { gate: a.gate } : {}), ...(a.terminal ? { terminal: a.terminal } : {}), source, updatedAt: new Date() }).where(eq(appTrackedFlights.id, tf.id));
+    if (!alerts) continue;
+    // Someone else's booking: tell them what changed, never promise seats we aren't holding.
+    if (a.gate && a.gate !== tf.gate && (await firstTime(a.flightNumber, a.date, `gate:${tf.userId}`, a.gate, key))) {
+      told += 1;
       await notify(tf.userId, { kind: "gate_change", level: "time_sensitive", copy: "notify.gateChange", vars: { gate: a.gate, flight: a.flightNumber, minutes: WALK_MIN }, href: "/today" });
     }
+    if (step !== null && a.status !== "cancelled" && (await firstTime(a.flightNumber, a.date, `delay:${tf.userId}`, String(step), key))) {
+      told += 1;
+      await notify(tf.userId, { kind: "flight_delayed", level: "time_sensitive", copy: "notify.tracked.delayed", vars: { flight: a.flightNumber, minutes: a.delayMin! }, href: "/today" });
+    }
+    if (a.status === "cancelled" && (await firstTime(a.flightNumber, a.date, `cancelled:${tf.userId}`, "cancelled", key))) {
+      told += 1;
+      await notify(tf.userId, { kind: "flight_cancelled", level: "time_sensitive", copy: "notify.tracked.cancelled", vars: { flight: a.flightNumber }, href: "/today" });
+    }
   }
-  return { segments: segs.length, tracked: tracked.length };
+  return { segments: segs.length, tracked: tracked.length, told };
+}
+
+/** What a status lookup says, as an alert (only the statuses worth acting on; "scheduled" changes nothing). */
+export function alertFromInfo(info: FlightStatusInfo, date: string): AlertInput {
+  const status = info.status === "scheduled" ? undefined : info.status;
+  return { flightNumber: info.flightNumber, date, status, gate: info.gate, terminal: info.terminal, delayMin: info.delayMin ?? null, source: info.source };
 }
 
 /* ───────── tracked flights ───────── */
@@ -132,7 +171,7 @@ export async function listTracked(userId: string): Promise<TrackedFlightView[]> 
 
 /** The schedule for a flight number on a day, from the flightStatus supplier (null when the airline hasn't shared it). */
 export async function lookupFlight(flightNumber: string, date: string) {
-  return suppliers.flightStatus().lookup(flightNumber, date).catch(() => null);
+  return (await flightStatusNow(flightNumber, date).catch(() => null))?.info ?? null;
 }
 
 export async function trackFlight(userId: string, input: TrackFlightRequest, ipHash: string | null): Promise<TrackedFlightView> {

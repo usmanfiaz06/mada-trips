@@ -127,7 +127,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           <Card>
             <CardHead title={t("Price and payment")} hint={pay ? `${pay.label ?? pay.method}${pay.instalments > 1 ? ` · ${t("{n} payments", { n: pay.instalments })}` : ""}` : undefined}
               action={pay ? <StatusBadge map={PAY_STATUS} value={pay.status} /> : undefined} />
-            {quote && (
+            {quoted && o.order && (
+              <dl className="divide-y divide-line">
+                {(o.order.lines as { text: string; amount: number }[]).map((l, i) => <div key={i} className="flex justify-between gap-4 py-2 text-[13.5px]"><dt className="text-ink-2">{l.text}</dt><dd><Money v={l.amount} /></dd></div>)}
+              </dl>
+            )}
+            {quote && !quoted && (
               <dl className="divide-y divide-line">
                 {quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-4 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}
               </dl>

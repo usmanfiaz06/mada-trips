@@ -360,4 +360,8 @@ export const enTrips = {
   'notify.trip.cancelled.body': 'We’re holding seats on other flights. Tap to choose.',
   'notify.trip.delayed.title': '{flight} is late',
   'notify.trip.delayed.body': 'About {minutes} minutes late. We’re holding an earlier option.',
+  'notify.tracked.delayed.title': '{flight} is late',
+  'notify.tracked.delayed.body': 'About {minutes} minutes late, by the airline’s latest time.',
+  'notify.tracked.cancelled.title': '{flight} is cancelled',
+  'notify.tracked.cancelled.body': 'The airline cancelled it. Ask us if you need another way there.',
 } as const;

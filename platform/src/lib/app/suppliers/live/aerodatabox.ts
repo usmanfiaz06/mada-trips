@@ -148,3 +148,15 @@ export const aeroDataBox: FlightStatusSupplier = {
   // AeroDataBox has paid webhooks ("flight alerts", billed in credits); for the beta we poll from /api/cron/flights.
   async watch(flightNumber, date) { return { alertId: `poll:aerodatabox:${flightNumber}:${date}` }; },
 };
+
+/** A call to the AeroDataBox account's own endpoints (alert subscriptions, balance: FREE TIER, no units). */
+export async function adbFetch(path: string, init: { method?: string; body?: unknown } = {}): Promise<Response> {
+  const env = requireEnv("aerodatabox", ["AERODATABOX_API_KEY"]);
+  const m = MARKETS[adbMarket()];
+  return fetch(`${m.base}${path}`, {
+    method: init.method ?? "GET",
+    headers: { Accept: "application/json", ...(init.body !== undefined ? { "Content-Type": "application/json" } : {}), ...m.headers(env.AERODATABOX_API_KEY!) },
+    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    signal: AbortSignal.timeout(8_000),
+  });
+}

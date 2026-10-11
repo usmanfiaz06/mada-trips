@@ -343,4 +343,8 @@ export const arTrips: ArSection<typeof enTrips> = {
   'notify.trip.cancelled.body': 'نحجز مقاعد على رحلات أخرى. اضغط لتختار.',
   'notify.trip.delayed.title': '{flight} متأخرة',
   'notify.trip.delayed.body': 'متأخرة حوالي {minutes} دقيقة. نحجز لك خيارًا أبكر.',
+  'notify.tracked.delayed.title': '{flight} متأخرة',
+  'notify.tracked.delayed.body': 'متأخرة حوالي {minutes} دقيقة، حسب آخر وقت من شركة الطيران.',
+  'notify.tracked.cancelled.title': 'أُلغيت {flight}',
+  'notify.tracked.cancelled.body': 'ألغتها شركة الطيران. اسألنا إن احتجت طريقة أخرى للوصول.',
 };

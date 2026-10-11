@@ -7,7 +7,6 @@ import { mockEmail, mockSms, mockWhatsApp } from "./mock/messaging";
 import { mockFlights } from "./mock/flights";
 import { mockHotels } from "./mock/hotels";
 import { mockPayments } from "./mock/payments";
-import { mockFlightStatus } from "./mock/flight-status";
 import { mockFlightPositions } from "./mock/flight-positions";
 import { mockAi } from "./mock/ai";
 import { mockIdentity } from "./mock/identity";
@@ -15,7 +14,7 @@ import { mockSupabase } from "./mock/supabase";
 import { mockSupabaseAdmin } from "./mock/supabase-admin";
 import { metaWhatsApp, sesEmail, unifonicSms } from "./live/messaging";
 import { gdsFlights, myFatoorah, rateHawkHotels } from "./live/commerce";
-import { flightAware } from "./live/flight-status";
+import { flightStatusFor, flightStatusVendor } from "./flight-status-vendor";
 import { openAdsbPositions } from "./live/flight-positions";
 import { claudeAi } from "./live/ai";
 import { providerIdentity } from "./live/identity";
@@ -31,6 +30,7 @@ export { mockSupabaseAdminLog } from "./mock/supabase-admin";
 export { WhatsAppUndeliverable } from "./whatsapp-errors";
 export { MOCK_NOT_ON_WHATSAPP_SUFFIX } from "./mock/messaging";
 export { zohoWhatsAppConfigured } from "./live/zoho-cpaas";
+export { flightStatusVendor } from "./flight-status-vendor";
 
 /* One place decides mock or live, per supplier, on every call (so a test or an env change takes effect at once). */
 // Live adapters go through a timeout and a circuit breaker (resilience/breaker.ts); mocks stay deterministic.
@@ -45,7 +45,8 @@ export const suppliers = {
   whatsapp: (): WhatsAppSupplier => pick("whatsapp", mockWhatsApp, metaWhatsApp),
   /** Sign-in codes on WhatsApp (the Send SMS hook). Live: Zoho CPaaS, an Authentication template in en and ar. */
   whatsappCodes: (): WhatsAppSupplier => pick("whatsapp", mockWhatsApp, zohoWhatsApp),
-  flightStatus: (): FlightStatusSupplier => pick("flightStatus", mockFlightStatus, flightAware),
+  /** AeroDataBox, aviationstack or FlightAware, picked from the key that is set (flight-status-vendor.ts); mock otherwise. */
+  flightStatus: (): FlightStatusSupplier => flightStatusFor(flightStatusVendor()),
   /** Live by default (free, keyless open ADS-B). */
   flightPositions: (): FlightPositionsSupplier => pick("flightPositions", mockFlightPositions, openAdsbPositions),
   ai: (): AiSupplier => pick("ai", mockAi, claudeAi),

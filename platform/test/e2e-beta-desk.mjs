@@ -73,7 +73,7 @@ try {
   const id = r.json.request.id;
 
   step('desk: the request, its answers and the quote builder');
-  const { page } = await desk('desk1@madatrips.com');
+  let { page } = await desk('desk1@madatrips.com');
   await go(page, '/adminwork/desk/requests');
   await shot(page, 'requests-list');
   await go(page, `/adminwork/desk/requests/${id}`);
@@ -111,7 +111,10 @@ try {
   const o = await api('POST', '/orders', t.token, { draft, useCredit: false, payment: { method: 'card', cardId: t.cardId }, plan: 'full', expectedTotal: pv.total.amount, idempotencyKey: `e2e-${Date.now()}` });
   check(o.json?.outcome === 'created', `order ${JSON.stringify(o.json).slice(0, 200)}`);
 
-  step('desk: the order, the ticketed step');
+  step('desk: the order, the ticketed step (an agent with the issuing right)');
+  const lead = await desk('bader@madatrips.com');
+  const deskPage = page;
+  page = lead.page;
   await go(page, '/adminwork/desk/orders');
   await shot(page, 'orders-list');
   await go(page, `/adminwork/desk/orders/${id}`);
@@ -136,6 +139,7 @@ try {
   check(trip?.segments?.length === 2 && trip.segments[1].arriveLocal.startsWith(new Date(Date.parse(`${back}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10)), 'return lands the next day');
 
   step('Arabic desk: the builder in Arabic');
+  page = deskPage;
   await page.context().addCookies([{ name: 'mada_locale', value: 'ar', domain: new URL(BASE).hostname, path: '/adminwork' }]);
   const r2 = await api('POST', '/requests', t.token, { kind: 'flight', travellerIds: [t.me], search: { destination: 'dubai', destinationName: null, from: 'RUH', depart, return: null, cabin: 'business', carrier: null, flexDays: 0, bags: 'cabin', prefs: [] } });
   await go(page, `/adminwork/desk/requests/${r2.json.request.id}`);
