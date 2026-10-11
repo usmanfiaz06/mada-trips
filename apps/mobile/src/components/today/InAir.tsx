@@ -57,8 +57,8 @@ function AirMap({ trip, now }: { trip: TripDetail; now: () => number }) {
   const est = pos.data?.estimate;
   const timeT = est ? est.fraction : Math.min(1, Math.max(0, (now() - dep) / Math.max(1, arr - dep)));
   const tt = live ? Math.min(1, Math.max(0, km(a!, [p!.lat, p!.lon]) / Math.max(1, km(a!, b!)))) : timeT;
-  // seenAt is a real instant, so against the real clock (now() is the trip clock, virtual in a demo).
-  const seenMin = live ? Math.max(0, Math.floor((Date.now() - Date.parse(p!.seenAt)) / 60_000)) : 0;
+  // How old the fix was when we fetched it (both real instants; now() is the trip clock, virtual in a demo).
+  const seenMin = live ? Math.max(0, Math.floor((pos.dataUpdatedAt - Date.parse(p!.seenAt)) / 60_000)) : 0;
   const left = Math.max(0, Math.round((arr - now()) / 1000));
   const h = Math.floor(left / 3600);
   const m = Math.floor((left % 3600) / 60);
