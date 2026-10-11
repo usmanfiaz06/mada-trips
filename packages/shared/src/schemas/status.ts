@@ -45,6 +45,8 @@ export const ConfigResponse = z.object({
   serverTime: z.string(),
   /** Where "Update Mada" goes, per store. */
   storeUrls: z.object({ ios: z.string(), android: z.string() }),
+  /** How phone codes can travel, the usual way first (["whatsapp", "sms"]). Missing on older servers: SMS only. */
+  phoneChannels: z.array(z.enum(['whatsapp', 'sms'])).optional(),
 });
 export type ConfigResponse = z.infer<typeof ConfigResponse>;
 

@@ -15,6 +15,8 @@ export const ROUTES = {
   sessionSync: '/auth/session/sync',
   /** Signed out: "I can't use this number or email any more". A person on the desk checks and moves the account. */
   recovery: '/auth/recovery',
+  /** Signed out: which channel the next phone code takes (WhatsApp or SMS); GET …/:ticket says how it went. */
+  phoneChannel: '/auth/phone-channel',
   me: '/me',
   people: '/people',
   /** GET, with the flight number in place of :flightNo (e.g. /flights/SV263/position). */

@@ -204,3 +204,36 @@ export type RecoveryResponse = z.infer<typeof RecoveryResponse>;
 
 /** How many recovery requests one network or one old contact can send. */
 export const RECOVERY_LIMITS = { perIpPerHour: 5, perContactPerDay: 3 } as const;
+
+/* ───────────── phone codes: WhatsApp or SMS (docs/app/AUTH.md, Zoho CPaaS) ───────────── */
+
+/** How a phone sign-in code travels. Supabase makes the code; our Send SMS hook picks the channel. */
+export const PhoneCodeChannel = z.enum(['whatsapp', 'sms']);
+export type PhoneCodeChannel = z.infer<typeof PhoneCodeChannel>;
+
+/**
+ * Signed out, just before asking Supabase for a code: "send the next code to this number by …" (or no channel: the
+ * usual way). Supabase doesn't pass a channel to the Send SMS hook, so the hook reads this instead. The ticket then
+ * tells the app how the code actually went (WhatsApp can fall back to SMS).
+ */
+export const PhoneChannelRequest = z.object({
+  phone: z.string().trim().min(6).max(32),
+  channel: PhoneCodeChannel.optional(),
+});
+export type PhoneChannelRequest = z.infer<typeof PhoneChannelRequest>;
+
+export const PhoneChannelResponse = z.object({
+  ticket: z.uuid(),
+  /** The channels this server can send by, the usual one first. */
+  channels: z.array(PhoneCodeChannel),
+});
+export type PhoneChannelResponse = z.infer<typeof PhoneChannelResponse>;
+
+/** How the code for this ticket went. null: no code has gone out for it yet. */
+export const PhoneChannelSent = z.object({ sentVia: PhoneCodeChannel.nullable() });
+export type PhoneChannelSent = z.infer<typeof PhoneChannelSent>;
+
+/** Hints older than this are ignored by the hook (the same as the code's own life). */
+export const PHONE_CHANNEL_HINT_SECONDS = 600;
+/** Hints one network can leave in 10 minutes, and one number. */
+export const PHONE_CHANNEL_LIMITS = { perIpPer10Min: 30, perPhonePer10Min: 10 } as const;
