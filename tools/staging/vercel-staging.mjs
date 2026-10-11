@@ -27,6 +27,9 @@
  *   CRON_SECRET, APP_JWT_SECRET, APP_DATA_KEY, APP_OTP_PEPPER    generated here when missing (printed once, as a reminder
  *                                                                to keep them in the environment for the next run)
  *   OVERPASS_URL                                                 optional Overpass mirror for Things to do
+ *   STAGING_FUNCTION_REGION                                      optional Vercel region for mada-staging's functions, e.g.
+ *                                                                icn1 (Seoul) to sit next to a Seoul database; unset keeps
+ *                                                                the project's current region (Vercel's default is iad1)
  *
  * Idempotent: re-running updates settings and upserts env values. It never touches any other project.
  */
@@ -92,6 +95,7 @@ async function ensureProject(name, settings) {
     commandForIgnoringBuildStep: `if [ "$VERCEL_GIT_COMMIT_REF" = "${branch}" ]; then exit 1; else exit 0; fi`,
     // Vercel Authentication on preview URLs only, so the stable *.vercel.app production URL is open for testers.
     ssoProtection: { deploymentType: "preview" },
+    ...(settings.functionRegion ? { serverlessFunctionRegion: settings.functionRegion } : {}),
   };
   log(`  settings: ${JSON.stringify({ ...patch, commandForIgnoringBuildStep: "<branch guard>" })}`);
   if (!dryRun) p = await api("PATCH", `/v9/projects/${p.id}`, patch);
@@ -198,7 +202,7 @@ async function main() {
   log(`Team ${teamSlug} · branch ${branch}${dryRun ? " · DRY RUN" : ""}`);
   if (!env.STAGING_DATABASE_URL) warn("STAGING_DATABASE_URL is not set: mada-staging gets no DATABASE_URL, its build skips migrations with a warning, and app routes answer 503 until it is added.");
 
-  const platform = await ensureProject(PLATFORM, { framework: "nextjs", rootDirectory: "platform" });
+  const platform = await ensureProject(PLATFORM, { framework: "nextjs", rootDirectory: "platform", functionRegion: env.STAGING_FUNCTION_REGION?.trim() || null });
   await upsertEnv(platform, platformEnv);
 
   const app = await ensureProject(APP, {
