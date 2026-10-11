@@ -76,6 +76,13 @@ h1, h2, h3 { text-wrap: balance; }
 .grow { flex: 1 1 auto; min-width: 0; }
 .act { position: absolute; left: 20px; right: 20px; bottom: 28px; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
 .act.above-dock { bottom: 102px; }
+/* A screen whose actions follow its content: at least 28px of air above them, the page scrolls on short phones. */
+.screen.flow-screen { overflow-y: auto; }
+.screen.flow-screen > * { flex-shrink: 0; }
+/* The sign-in photo stack shrinks on shorter phones so every way in fits without scrolling. */
+@media (max-height: 900px) { .si-hero { zoom: .78; } }
+@media (max-height: 760px) { .si-hero { zoom: .62; } }
+.act.flow { position: static; margin: auto 20px 0; padding: 28px 0 28px; flex-shrink: 0; }
 .act-note { text-align: center; font-size: 13px; color: var(--ink-3); }
 
 /* ---------- type ---------- */

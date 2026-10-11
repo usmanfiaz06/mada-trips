@@ -215,9 +215,9 @@ export default function Onboarding({ params = {} }) {
     ),
 
     signin: (
-      <div className="screen">
+      <div className="screen flow-screen">
         <TopBar onBack={back} />
-        <div aria-hidden="true" style={{ position: 'relative', height: 250, margin: '8px 0 0' }}>
+        <div aria-hidden="true" className="si-hero" style={{ position: 'relative', height: 250, margin: '8px 0 0' }}>
           {[['img/alula.jpg', -9, -78, '.05s'], ['img/riyadh.jpg', 8, 78, '.15s'], ['img/istanbul.jpg', 0, 0, '.25s']].map(([src, rot, x, d]) => (
             <img key={src} src={src} alt="" style={{ position: 'absolute', left: '50%', top: 18, width: 168, height: 220, marginLeft: -84 + x, objectFit: 'cover', borderRadius: 24, border: '4px solid #fffdf9', boxShadow: '0 22px 40px -20px rgba(15,26,22,.6)', transform: `rotate(${rot}deg)`, animation: `rise .7s ${d} var(--ease) both` }} />
           ))}
@@ -227,7 +227,7 @@ export default function Onboarding({ params = {} }) {
           <h1 className="h1">Sign in to book and keep your trips.</h1>
           <p className="body">Your trips, documents and family stay on this phone and in your account.</p>
         </div>
-        <div className="act">
+        <div className="act flow">
           {showLast && (<>
             <button type="button" className="btn primary block" onClick={continueLast}>{last.contact && last.via !== 'apple' ? `Continue as ${maskContact(last.via, last.contact)}` : last.via === 'apple' ? 'Continue with Apple' : last.via === 'google' ? 'Continue with Google' : last.via === 'email' ? 'Continue with email' : 'Continue with phone number'}</button>
             <p className="act-note" style={{ margin: 0 }}>You used this last time on this phone.</p>
