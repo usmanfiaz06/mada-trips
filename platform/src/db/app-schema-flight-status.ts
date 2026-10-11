@@ -23,3 +23,20 @@ export const appSupplierUsage = pgTable("app_supplier_usage", {
   calls: integer("calls").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [primaryKey({ columns: [t.vendor, t.month] })]);
+
+/**
+ * AeroDataBox flight-alert webhook subscriptions, by flight NUMBER only (never by airport: an airport subscription
+ * bills a credit per flight per update). One row per flight number; a subscription covers every date of that number,
+ * so it's created when one of our flights on that number is within the alert window and removed once none is.
+ * status: active | removed | failed (the plan or balance refused it: we poll that flight instead).
+ */
+export const appFlightSubscriptions = pgTable("app_flight_subscriptions", {
+  vendor: text("vendor").notNull(),
+  flightNumber: text("flight_number").notNull(),
+  subscriptionId: text("subscription_id"),
+  status: text("status").notNull(),
+  error: text("error"),
+  lastEventAt: timestamp("last_event_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.vendor, t.flightNumber] })]);
