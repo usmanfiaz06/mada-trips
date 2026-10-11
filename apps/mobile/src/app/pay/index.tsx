@@ -15,6 +15,7 @@ import { T } from '@/components/Text';
 import { ApplePaySheet, CardsSheet, ThreeDsSheet, type PayMethod } from '@/components/booking/PaySheets';
 import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
+import { PhoneSheet, usePhoneNeeded } from '@/components/booking/PhoneSheet';
 import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
 import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
@@ -87,6 +88,11 @@ export default function Pay() {
   const askContact = !!user && !user.phone && !needsPhone;
   const [contact, setContact] = useState('');
   const [contactErr, setContactErr] = useState<string | null>(null);
+  // Booking needs a verified phone and this account has none (Ask asks earlier; a quote paid from a link lands here):
+  // said up front, verified in a sheet over the order, and the slide carries on after it.
+  const phoneNeeded = usePhoneNeeded();
+  const [phoneOpen, setPhoneOpen] = useState(false);
+
 
   const draft = useMemo(() => {
     if (!pd) return null;
@@ -185,6 +191,8 @@ export default function Pay() {
   };
 
   const confirm = async () => {
+    // Read from the session, not this render: right after the sheet verifies the number, the slide carries on.
+    if (phoneNeeded && !useSession.getState().user?.phone) { setPhoneOpen(true); buzz('soft'); setAttempt((a) => a + 1); return; }
     if (askContact && !normalizeContactPhone(contact)) {
       setContactErr(contact.trim() ? t('beta.contact.invalid') : t('beta.contact.needed')); buzz('warn'); setAttempt((a) => a + 1);
       return;
@@ -200,7 +208,7 @@ export default function Pay() {
       else if (method?.kind === 'card') await place({ method: 'card', cardId: method.id });
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') { setSheet('offline'); buzz('soft'); }
-      else if (e instanceof ApiError && e.code === 'PHONE_REQUIRED') { toast(e.message); router.push('/verify-phone?then=back'); }
+      else if (e instanceof ApiError && e.code === 'PHONE_REQUIRED') { setPhoneOpen(true); buzz('soft'); }
       else if (e instanceof ApiError && e.code === 'VALIDATION' && askContact) { setContactErr(e.message); buzz('warn'); }
       else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setBusy(false); setAttempt((a) => a + 1); }
@@ -289,6 +297,12 @@ export default function Pay() {
               <View style={{ alignSelf: 'flex-start' }}><LinkButton label={missing[0]!.isSelf ? t('pay.passports.scanYours') : t('pay.passports.scan', { name: personName(missing[0]) })} onPress={() => router.push('/wallet')} /></View>
             </Notice>
           ) : null}
+          {phoneNeeded ? (
+            <Notice icon="phone" title={t('ask.phone.payTitle')}>
+              <T v="small">{t('ask.phone.payBody')}</T>
+              <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('auth.verifyPhone.go')} onPress={() => setPhoneOpen(true)} testID="pay-phone-open" /></View>
+            </Notice>
+          ) : null}
           {askContact ? (
             <View style={[styles.well, { flexDirection: 'column', alignItems: 'stretch', gap: 8 }]} testID="pay-contact">
               <T v="h3" style={{ fontSize: 15 }}>{t('beta.contact.title')}</T>
@@ -334,6 +348,7 @@ export default function Pay() {
         </T>
       </View>
 
+      <PhoneSheet visible={phoneOpen} why={t('ask.phone.payBody')} onClose={() => setPhoneOpen(false)} onDone={() => { setPhoneOpen(false); void confirm(); }} />
       <Sheet visible={sheet === 'people'} label={t('pay.people.title')} onClose={() => setSheet(null)}>
         <T v="h2">{t('pay.people.title')}</T>
         <TravellerChips people={household} value={travellers} onChange={setTravellers} selfName={selfName} />
