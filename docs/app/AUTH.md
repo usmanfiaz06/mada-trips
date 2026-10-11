@@ -11,7 +11,8 @@
 ```
  app                         Supabase Auth                    Core API (platform/)
  ───                         ─────────────                    ────────────────────
- phone code    ───────────▶  signInWithOtp(phone) ──hook──▶   POST /auth/sms-hook ─▶ Unifonic / Taqnyat ─▶ SMS
+ phone code    ───────────▶  signInWithOtp(phone) ──hook──▶   POST /auth/sms-hook ─▶ Zoho CPaaS ─▶ WhatsApp  (§5a)
+                                                                                     ─▶ Unifonic / Taqnyat ─▶ SMS
  email code    ───────────▶  signInWithOtp(email)  ─────────▶ (Supabase's SMTP: ZeptoMail)
  Apple (iOS)   ── native ─▶  signInWithIdToken(apple, nonce)
  Google        ── native ─▶  signInWithIdToken(google)   (web: OAuth redirect to /auth-callback)
@@ -46,7 +47,9 @@ Then what Supabase proved is copied across: `supabase_user_id`, the phone (`phon
 |---|---|
 | `POST /api/app/v1/auth/session` | `{ accessToken, givenName?, device? }` → `{ tokens, user, isNew }` |
 | `POST /api/app/v1/auth/session/sync` | Bearer + `{ accessToken }` → `{ user }` |
-| `POST /api/app/v1/auth/sms-hook` | Supabase's *Send SMS* hook. Standard Webhooks signature with `SUPABASE_SMS_HOOK_SECRET`, 5-minute window. A phone change goes to the new number; Arabic when `user_metadata.locale` is `ar`. |
+| `POST /api/app/v1/auth/sms-hook` | Supabase's *Send SMS* hook. Standard Webhooks signature with `SUPABASE_SMS_HOOK_SECRET`, 5-minute window. Sends on WhatsApp or by SMS (§5a). A phone change goes to the new number; Arabic when `user_metadata.locale` is `ar`. |
+| `POST /api/app/v1/auth/phone-channel` | Signed out. `{ phone, channel? }` → `{ ticket, channels }`: the channel the next code to this number takes (§5a). 30 per network and 10 per number in 10 minutes; the number is kept only as a keyed hash. |
+| `GET /api/app/v1/auth/phone-channel/{ticket}` | `{ sentVia: "whatsapp" \| "sms" \| null }`: how that code actually went. |
 | `/auth/refresh`, `/auth/logout`, everything else | Unchanged. |
 | `/auth/otp/*`, `/auth/apple`, `/auth/google` | The pre-Supabase routes. Kept for tests and tools; **off on a production deployment** (404) unless `APP_LEGACY_AUTH=yes`. |
 
@@ -108,7 +111,54 @@ Supabase makes the code; our hook sends it through a Saudi aggregator with a CST
 | **Unifonic** (default) | `UNIFONIC_APP_SID`, `UNIFONIC_SENDER_ID` | Register the sender "MadaTrips" with CST through Unifonic. |
 | **Taqnyat** | `SMS_PROVIDER=taqnyat`, `TAQNYAT_BEARER_TOKEN`, `TAQNYAT_SENDER_NAME` | Same sender registration through Taqnyat. |
 
-Both need `SUPPLIER_MODE_SMS=live` (a production deployment defaults to live). Ask the provider to file the message text as an OTP template if they require it: `{code} is your Mada Trips code. It expires in 10 minutes. Never share it.` (and the Arabic version). WhatsApp authentication messages can later be sent from the same hook.
+Both need `SUPPLIER_MODE_SMS=live` (a production deployment defaults to live). Ask the provider to file the message text as an OTP template if they require it: `{code} is your Mada Trips code. It expires in 10 minutes. Never share it.` (and the Arabic version). SMS stays the fallback when codes go on WhatsApp (§5a).
+
+---
+
+## 5a. Phone codes on WhatsApp (Zoho CPaaS)
+
+Supabase still makes and checks the code. Our *Send SMS* hook now sends it on **WhatsApp** through **Zoho CPaaS** (`cpaas.zoho.com`, the Zoho product that holds ZeptoMail and a WhatsApp channel; Mada's Zoho data centre is `.com`), with an approved **Authentication** template that carries the code and a **Copy code** button. SMS (§5) stays as the other channel.
+
+**How the channel is chosen** (`platform/src/lib/app/phone-channel.ts`)
+
+| `PHONE_CODE_CHANNEL` | What happens |
+|---|---|
+| `whatsapp` (the default when WhatsApp is set up) | WhatsApp first. If WhatsApp refuses, Supabase hears "not sent" and the app offers *Send by SMS instead*. |
+| `whatsapp_then_sms` (recommended once both are live) | WhatsApp first; if WhatsApp refuses the number (not on WhatsApp, undelivered, template refused) or isn't answering, the **same code goes by SMS at once**, inside the same hook call. |
+| `sms` (the default when WhatsApp isn't set up) | SMS first; the app offers *Send on WhatsApp instead* when WhatsApp is set up. |
+
+"Set up" means live credentials are present (or mock mode). `GET /config` tells the app which channels exist, the usual one first (`phoneChannels: ["whatsapp", "sms"]`), so *Send by SMS instead* only shows when SMS is set up.
+
+**The app's choice reaches the hook through us, not Supabase.** We checked Supabase Auth's source: with a Send SMS hook enabled, `signInWithOtp({ options: { channel } })` is accepted but the channel is **not** in the hook's payload (`{ user, sms: { otp, phone } }`, `internal/hooks/v0hooks/v0hooks.go`). So the app, just before asking Supabase for a code, calls `POST /auth/phone-channel { phone, channel? }` (`app_phone_code_hints`, migration `0020_phone_code_channel`); the hook reads the newest hint for that number from the last 10 minutes, sends, and writes down how it went. The app reads that back with the ticket (`GET /auth/phone-channel/{ticket}`), so the code screen says *We sent a code on WhatsApp to …* (with WhatsApp's mark) or *by SMS*, and *WhatsApp couldn't reach this number* after a fallback. The app still passes `options.channel` to Supabase for completeness.
+
+**In the app.** The code screen names the channel and offers the other one (*Send by SMS instead* / *Send on WhatsApp instead*) once the minute between codes is up (Supabase's own limit); *Didn't get the code?* has the same switch and *Check WhatsApp* (it comes from Mada Trips with a Copy code button). Copy code puts the code on the clipboard and the code field takes a paste (or a whole pasted message). Android one-tap autofill (WhatsApp's zero-tap/one-tap handshake) is not built: it needs the app's package and signing hash on the template and a native receiver; copy code works without it.
+
+**Setup (Mada's Zoho and Meta accounts)**
+1. **Meta business verification** for Mada Trips in Meta Business Manager (the same verification as INTEGRATIONS.md 0.4). Without it the number stays on Meta's lowest messaging limit and the display name may not be approved.
+2. **A dedicated number** for WhatsApp: a Saudi number not already used in the WhatsApp or WhatsApp Business app (or remove it from the app first). It must receive one SMS or call for the verification code.
+3. In **Zoho CPaaS › Channels › WhatsApp**: connect a **WhatsApp Business Account (WABA)** through Meta's embedded sign-up, choosing the verified business and the dedicated number. **Display name: Mada Trips** (Meta reviews it against the business name).
+4. **Templates › New**, category **Authentication**, two of them (one per language): English (`en`) and Arabic (`ar`). Authentication templates have fixed wording from Meta ("*{code}* is your verification code." plus the optional "For your security, do not share this code." and "This code expires in 10 minutes."): turn on the security line and the 10-minute expiry. Button: **Copy code**. Name them e.g. `mada_code_en` and `mada_code_ar`; wait for *Approved*.
+5. Open each approved template and copy its **template key** (a UUID) or its alias, and note the name of its code placeholder (Zoho's own OTP example uses `code`).
+6. **Mail Agents / Agent › SMTP/API › API key**: generate a key for the agent that owns the WhatsApp sender.
+7. Into the platform's environment settings (Vercel; never in chat or git):
+   - `ZOHO_CPAAS_API_KEY`: the key from step 6 (with or without the `Zoho-enczapikey ` prefix)
+   - `ZOHO_CPAAS_WHATSAPP_SENDER`: the WhatsApp number with the country code, e.g. `+9665XXXXXXXX`
+   - `ZOHO_CPAAS_TEMPLATE_EN`, `ZOHO_CPAAS_TEMPLATE_AR`: the template keys (or aliases) from step 5
+   - `ZOHO_CPAAS_MERGE_KEY`: only if the placeholder isn't `code`
+   - `SUPPLIER_MODE_WHATSAPP=live` (a production deployment defaults to live)
+   - `PHONE_CODE_CHANNEL=whatsapp_then_sms` once SMS (§5) is live too; leave unset for WhatsApp only.
+
+*Check:* a code arrives on WhatsApp within 10 seconds from *Mada Trips* with a Copy code button, in English and in Arabic (an Arabic phone); Copy code then paste fills the code field and signs in; a number without WhatsApp gets the code by SMS (with `whatsapp_then_sms`) and the screen says so; *Send by SMS instead* after the minute sends an SMS; the Ops audit log shows `Sign-in code sent on WhatsApp to +966 •• ••• 1234` and never the code.
+
+**What Zoho's public API reference confirms** (OpenAPI 1.1.0 at `https://www.zoho.com/sites/zweb/json/api/cpaas/oas.json`, pages under `https://www.zoho.com/cpaas/help/api/api-home.html`, e.g. `get-whatsapp-message-details.html`): `POST https://cpaas.zoho.com/v1.1/whatsapp` with `Authorization: Zoho-enczapikey <key>` and `{ from, to, template_key | template_alias, merge_info: { <placeholder>: <value> }, client_reference }`; `200 { status: "success", data: { code: "MSG_101", message_id, request_id } }` ("Message queued"); errors `TM_3301`/`TM_3201` (400, with `SERR_110`/`GE_102` and the field), `TM_4001` (401: `SERR_157` bad key, `WA_103` template not valid for the agent), `TM_3601` (403: `WSE_107` sender on another agent); `GET /v1.1/whatsapp/logs/{message_id}` with `status` `sent | delivered | read | undelivered | failed | process_failed`. Sending is **asynchronous**: a missing variable or an unreachable number only shows in the log. The log list is limited to 40 requests a minute; no limit is published for sending.
+
+**Assumed, not in the public docs** (marked in `suppliers/live/zoho-cpaas.ts`; check in the Zoho console before going live):
+- the placeholder name (`ZOHO_CPAAS_MERGE_KEY`, default `code`);
+- that the Copy code button takes the same code automatically (the API has no separate button field; Meta fills an Authentication template's button from the body's code);
+- how quickly *undelivered* shows for a number not on WhatsApp: the adapter watches the log for up to `ZOHO_CPAAS_CONFIRM_MS` (default 1,500 ms) so a fallback to SMS still fits inside Supabase's **5-second** hook timeout. A later refusal isn't seen; the traveller then uses *Send by SMS instead*;
+- other data centres: `ZOHO_CPAAS_BASE_URL` (default `https://cpaas.zoho.com/v1.1`).
+
+The circuit breaker counts only transport trouble (timeouts, 5xx); a refused number is an answer and never opens the circuit. Invites and other WhatsApp templates still use Meta's Cloud API adapter (`WHATSAPP_TOKEN`, …).
 
 ---
 
@@ -124,6 +174,8 @@ Both need `SUPPLIER_MODE_SMS=live` (a production deployment defaults to live). A
 | `SUPABASE_JWT_SECRET` | Only for a project still on legacy HS256 keys |
 | `SUPABASE_SERVICE_ROLE_KEY` | Project Settings › API › *service_role* (secret). Only for the desk moving an account after a recovery request. Never in the app. |
 | `SUPPLIER_MODE_SMS`, `SMS_PROVIDER`, `UNIFONIC_*` or `TAQNYAT_*` | §5 |
+| `ZOHO_CPAAS_API_KEY`, `ZOHO_CPAAS_WHATSAPP_SENDER`, `ZOHO_CPAAS_TEMPLATE_EN`, `ZOHO_CPAAS_TEMPLATE_AR` (optional `ZOHO_CPAAS_MERGE_KEY`, `ZOHO_CPAAS_BASE_URL`, `ZOHO_CPAAS_CONFIRM_MS`), `SUPPLIER_MODE_WHATSAPP` | WhatsApp codes, §5a |
+| `PHONE_CODE_CHANNEL` | `whatsapp`, `sms` or `whatsapp_then_sms` (§5a) |
 | `APP_LEGACY_AUTH` | Leave unset (old routes off in production); `yes` keeps them on |
 | `APP_ALLOW_MOCKS` | Never on the real launch. `yes` lets a staging copy run the mock Supabase adapter |
 
@@ -145,8 +197,8 @@ The Supabase session is stored in the Keychain / Keystore (`expo-secure-store`, 
 No Supabase project is needed to develop, test or take screenshots.
 
 - **App**: without `EXPO_PUBLIC_SUPABASE_URL` (or with `EXPO_PUBLIC_API_MODE=mock`) the app uses Supabase's stand-in, `apps/mobile/src/lib/auth/mock.ts`: codes are always **123456**, 60 seconds between codes, Apple and Google answer at once (a stand-in sheet shows Apple's *Hide my email* choice), and it issues unsigned `mocksb.` tokens.
-- **Platform**: `SUPPLIER_MODE_SUPABASE=mock` (the default outside production) reads those tokens. `supplierMode` **refuses mock on a production deployment** unless `APP_ALLOW_MOCKS=yes`, like every other supplier, because anyone can mint a mock token. The SMS hook logs codes to the mock outbox instead of sending.
-- **Tests**: `platform/test/app/supabase-auth.test.ts` (the live verifier against a local key set: valid, expired, wrong issuer, audience, key and role, legacy HS256; find-or-create; linking by phone and email; phone before booking; sync conflicts; the SMS hook's signatures and replays), `apps/mobile/test/unit/auth.test.ts`, and `apps/mobile/test/e2e-auth.mjs`, which walks every way in on the web export with screenshots.
+- **Platform**: `SUPPLIER_MODE_SUPABASE=mock` (the default outside production) reads those tokens. `supplierMode` **refuses mock on a production deployment** unless `APP_ALLOW_MOCKS=yes`, like every other supplier, because anyone can mint a mock token. The SMS hook logs codes to the mock outbox instead of sending: on WhatsApp by default (`auth_code[en](123456)`), by SMS with `PHONE_CODE_CHANNEL=sms` or the app's hint. A number ending **0000** "isn't on WhatsApp" in both the platform's and the app's mocks, to try the fallback.
+- **Tests**: `platform/test/app/supabase-auth.test.ts` (the live verifier against a local key set: valid, expired, wrong issuer, audience, key and role, legacy HS256; find-or-create; linking by phone and email; phone before booking; sync conflicts; the SMS hook's signatures and replays), `platform/test/app/phone-codes.test.ts` (the Zoho adapter against a recorded fetch, the hook's channel choice, the fallback to SMS, the language, hints and tickets), `apps/mobile/test/unit/auth.test.ts` and `phone-channel.test.ts`, and `apps/mobile/test/e2e-auth.mjs`, which walks every way in on the web export with screenshots.
 
 ---
 
@@ -177,7 +229,7 @@ Mada already runs a Supabase project, so sign-in goes into that one: no new proj
 *Live check, 11 October 2026* (ZeptoMail, a throwaway inbox, the Core API on a local Postgres): every email arrived within 2 seconds, signed by `madatrips.sa` (DKIM), from the ZeptoMail bounce domain (SPF) and passing DMARC. The code for an existing address, the *Reset password* code and the *Reauthentication* code signed in, set a password, signed in with it, refused a wrong one, recovered a forgotten one and signed in with the new one; `/auth/session` created the account once and found it on every later sign-in; `/account/deletion` plus the purge left a tombstone with no email or Supabase id. **Failed:** the *Confirm signup* email still carried Supabase's default link, so a brand-new address got no code (fix the template, §2.3); and the link pointed at `http://localhost:3000`, so the *Site URL* is still the default (§2.5).
 
 **Pass 2: phone codes**
-1. Register the sender "MadaTrips" with CST through Unifonic or Taqnyat (§5); their OTP template in both languages.
+1. WhatsApp through Zoho CPaaS (§5a setup), and/or register the sender "MadaTrips" with CST through Unifonic or Taqnyat (§5) with their OTP template in both languages. With both, `PHONE_CODE_CHANNEL=whatsapp_then_sms`.
 2. *Providers › Phone*: on, no SMS provider. *Hooks › Send SMS*: HTTPS, `https://<ops domain>/api/app/v1/auth/sms-hook`, generate the secret, put it in the platform's `SUPABASE_SMS_HOOK_SECRET`.
 
 *Check:* codes arrive on STC, Mobily and Zain numbers within 30 seconds, from "MadaTrips", in the phone's language; an email account verifies its phone in Profile; booking stays blocked until it does; the hook refuses a call without the right signature.

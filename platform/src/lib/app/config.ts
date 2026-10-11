@@ -13,6 +13,8 @@ import { createHash } from "node:crypto";
  *   APP_ALLOW_MOCKS      "yes" to allow mock suppliers on a production deployment (never for the real launch).
  *   SUPABASE_URL         the Supabase project whose access tokens /auth/session accepts (SUPPLIER_MODE_SUPABASE=live).
  *   SUPABASE_SMS_HOOK_SECRET  "v1,whsec_…" from Supabase's Send SMS hook; signs the calls to /auth/sms-hook.
+ *   PHONE_CODE_CHANNEL   whatsapp | sms | whatsapp_then_sms: how phone codes travel (phone-channel.ts, AUTH.md §5a).
+ *   ZOHO_CPAAS_*         WhatsApp codes through Zoho CPaaS (suppliers/live/zoho-cpaas.ts).
  *   APP_LEGACY_AUTH      "yes" keeps the direct /auth/otp, /auth/apple and /auth/google routes on a production
  *                        deployment ("no" turns them off anywhere). Supabase Auth replaces them (docs/app/AUTH.md).
  */
