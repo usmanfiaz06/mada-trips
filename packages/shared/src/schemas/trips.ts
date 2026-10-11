@@ -204,8 +204,9 @@ export const Company = z.object({
 });
 export type Company = z.infer<typeof Company>;
 
-export const Voucher = z.object({ id: z.string(), kind: z.enum(['hotel', 'meal']), title: z.string(), body: z.string(), code: z.string() });
-export type Voucher = z.infer<typeof Voucher>;
+/** A prototype trip's vouchers (hotel, meal). A supplier booking's voucher is `Voucher` in transfers.ts. */
+export const TripVoucher = z.object({ id: z.string(), kind: z.enum(['hotel', 'meal']), title: z.string(), body: z.string(), code: z.string() });
+export type TripVoucher = z.infer<typeof TripVoucher>;
 
 export const TripRating = z.object({
   hotel: z.enum(['yes', 'no']).nullable(),
@@ -257,7 +258,7 @@ export const TripDetail = Trip.extend({
   noStay: NoStay.nullable(),
   /** Moved to another flight after a disruption. */
   rebooked: z.boolean(),
-  vouchers: z.array(Voucher),
+  vouchers: z.array(TripVoucher),
   bagReport: z.string().nullable(),
   /** First-evening picks chosen in the air; Mada books them on landing. */
   picks: z.array(z.string()),

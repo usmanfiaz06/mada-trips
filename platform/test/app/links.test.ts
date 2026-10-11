@@ -23,7 +23,7 @@ import { freshIp } from "./helpers";
 /* madatrips.sa links: the files that hand them to the app, and the pages and preview pictures for people without it. */
 
 let ipSeq = 0;
-const get = (handler: (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response> | Response, path: string, params: Record<string, string>, headers: Record<string, string> = {}) =>
+const get = <P extends Record<string, string>>(handler: (req: Request, ctx: { params: Promise<P> }) => Promise<Response> | Response, path: string, params: P, headers: Record<string, string> = {}) =>
   handler(new Request(`https://madatrips.sa${path}`, { headers: { "x-forwarded-for": `10.77.${(ipSeq += 1) >> 8}.${ipSeq & 255}`, ...headers } }), { params: Promise.resolve(params) });
 const meta = (html: string, prop: string) => new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
 

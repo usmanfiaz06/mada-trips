@@ -20,7 +20,9 @@
     "store:screenshots": "npm run store:screenshots -w @mada/mobile --",
     "setup": "npm install && npm --prefix platform ci",
     "app:preflight": "npm --prefix platform run app:preflight",
-    "app:jobs": "npm --prefix platform run app:jobs --"
+    "app:jobs": "npm --prefix platform run app:jobs --",
+    "hotelbeds:smoke": "npm --prefix platform run hotelbeds:smoke --",
+    "auth:check": "npm --prefix platform run auth:check --"
   },
   "devDependencies": {
     "eslint": "9.39.5",

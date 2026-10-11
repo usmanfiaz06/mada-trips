@@ -23,7 +23,7 @@ export function payableThrough(supplierName: string, vat: string, reference: str
 
 const FALLBACK_SUPPLIER = { name: "HOTELBEDS PROFESSIONAL SERVICES, S.L.U", vatNumber: "ESB38877676" };
 
-const title = (s: string | null | undefined) => (s ? s.toLowerCase().replace(/(^|[\s,(-])\p{L}/gu, (c) => c.toUpperCase()) : null);
+const title = (s: string | null | undefined) => (s?.trim() ? s.trim().toLowerCase().replace(/(^|[\s,(-])\p{L}/gu, (c) => c.toUpperCase()) : null);
 
 export type VoucherSource = {
   id: string;
