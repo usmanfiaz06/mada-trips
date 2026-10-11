@@ -4,6 +4,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { buzz } from '@/lib/haptics';
+import { t } from '@/lib/i18n';
 import { colors, radii } from '@/theme';
 import { useBottomInset } from './Layout';
 
@@ -51,7 +52,7 @@ export function Sheet({ visible, onClose, children, label }: { visible: boolean;
     <Modal visible={visible} transparent animationType="none" onRequestClose={close} statusBarTranslucent>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, shadeStyle]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" accessibilityRole="button" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel={t('sr.close')} accessibilityRole="button" />
         </Animated.View>
         <Animated.View style={[styles.sheet, { maxHeight: height * 0.88, paddingBottom: 28 + bottom }, sheetStyle]} accessibilityViewIsModal accessibilityLabel={label}>
           <GestureDetector gesture={pan}>

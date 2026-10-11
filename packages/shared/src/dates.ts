@@ -15,6 +15,9 @@ export const TZ = 'Asia/Riyadh';
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
 export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 export const WEEKDAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+export const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
+const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+const WEEKDAY_LETTERS_AR = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'] as const;
 
 /** Gregorian month names as Saudi readers know them (يناير…), and the weekdays. Arabic has no short weekday form. */
 export const MONTHS_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] as const;
@@ -26,6 +29,13 @@ export const monthName = (month0: number, locale?: Lang): string =>
 /** A weekday's name (0 = Sunday), short in English, in the display locale. */
 export const weekdayName = (dow: number, opts: { locale?: Lang; long?: boolean } = {}): string =>
   (localeOr(opts.locale) === 'ar' ? WEEKDAYS_AR : opts.long ? WEEKDAYS_LONG : WEEKDAYS)[((dow % 7) + 7) % 7]!;
+/** A month's full name (0-based), for a calendar's header: "October" / "أكتوبر". */
+export const monthLongName = (month0: number, locale?: Lang): string =>
+  (localeOr(locale) === 'ar' ? MONTHS_AR : MONTHS_LONG)[((month0 % 12) + 12) % 12]!;
+/** A calendar column's one-letter weekday (0 = Sunday): S M T W T F S, and in Arabic the letters Saudi calendars use
+ *  (ح ن ث ر خ ج س, as Intl's narrow Arabic weekdays). */
+export const weekdayLetter = (dow: number, locale?: Lang): string =>
+  (localeOr(locale) === 'ar' ? WEEKDAY_LETTERS_AR : WEEKDAY_LETTERS)[((dow % 7) + 7) % 7]!;
 const num = (n: number, locale?: Lang) => localizeDigits(String(n), locale);
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;

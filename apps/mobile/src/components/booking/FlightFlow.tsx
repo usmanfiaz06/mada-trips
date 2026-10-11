@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, nameIn, quickDates,
+  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, monthLongName, nameIn, quickDates,
   type AskIntent, type FlightOption, type FlightSearchResponse, type Person,
 } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
@@ -34,7 +34,6 @@ import { TravellerChips } from './Travellers';
 
 export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string } | null;
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
-const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
 export function FlightFlow({ intent, query, people, selfName, today, setCta }: { intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void }) {
@@ -158,7 +157,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     return (
       <View style={{ gap: 18 }}>
         {whereRow}
-        <Ask1 q={mo ? t('ask.q.whenIn', { month: mo.label ?? MONTH_LONG[mo.month - 1]! }) : t('ask.q.when')} options={opts} onPick={(v) => {
+        <Ask1 q={mo ? t('ask.q.whenIn', { month: mo.label ?? monthLongName(mo.month - 1) }) : t('ask.q.when')} options={opts} onPick={(v) => {
           if (v === 'pick') { setEditing({ month: mo }); return; }
           const q = quick.find((x) => x.id === v)!;
           setTrip({ ...trip, dep: q.dates[0], ret: trip.type === 'oneway' ? null : q.dates[1] });

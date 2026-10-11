@@ -313,6 +313,19 @@ async function demo() {
   await page.getByRole('button', { name: 'إسطنبول', exact: true }).first().click();
   await see('متى بتكون في إسطنبول؟', 'stay when');
   await shot('stay-when');
+  // The calendar sheet: the month and the weekday letters in Arabic, not "October" and S M T W T F S.
+  await tapText('أختار التواريخ بنفسي');
+  await see('اختر يوم الدخول، بعدين يوم الخروج', 'stay calendar');
+  for (const en of ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']) {
+    if (await page.getByText(en, { exact: false }).filter({ visible: true }).count()) errors.push(`stay calendar: English month "${en}"`);
+  }
+  const letters = await page.evaluate(() => [...document.querySelectorAll('div')].filter((d) => d.children.length === 0 && /^[A-Z]$/.test(d.textContent ?? '') && d.getBoundingClientRect().width > 0).map((d) => d.textContent));
+  if (letters.length) errors.push(`stay calendar: English weekday letters ${letters.join(' ')}`);
+  await see('ح', 'Arabic weekday letter');
+  await shot('stay-calendar');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(700);
+  if (await page.getByText('اختر يوم الدخول، بعدين يوم الخروج').filter({ visible: true }).count()) { await page.locator('[aria-label="أغلق"]').filter({ visible: true }).first().click(); await page.waitForTimeout(700); }
   await page.getByRole('button', { name: /^هالويكند/ }).first().click();
   await see('مين بيسكن؟', 'stay who');
   await shot('stay-who');

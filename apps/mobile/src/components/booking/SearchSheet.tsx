@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { AIRPORT_NAMES, monthName, localizeDigits, addDays, calendarMonths, daysBetween, quickDates, type Cabin } from '@mada/shared';
+import { AIRPORT_NAMES, monthName, monthLongName, weekdayLetter, localizeDigits, addDays, calendarMonths, daysBetween, quickDates, type Cabin } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { colors, font, ff } from '@/theme';
@@ -14,8 +14,6 @@ import { dayName } from './format';
 /* Edit a search in one place: where from, return or one way, quick picks, 12 months from today, cabin, babies. */
 
 export type TripSearch = { from: 'RUH' | 'JED' | 'DMM'; type: 'return' | 'oneway'; dep: string | null; ret: string | null; cabin: Cabin; infants: number; flex: boolean };
-
-const MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** `stay`: the same calendar for a hotel: check-in and check-out only (no airport, cabin, babies or one way). */
 export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay }: {
@@ -69,11 +67,11 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
         </ScrollView>
         <View style={styles.head}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('cal.prev')} disabled={page === 0} onPress={() => setPage(page - 1)} style={[styles.nav, page === 0 ? { opacity: 0.35 } : null]}><Icon name="back" size={18} /></Pressable>
-          <T v="h3" style={{ fontSize: 16 }}>{MONTH_LONG[pm.month0]} {pm.year}</T>
+          <T v="h3" style={{ fontSize: 16 }}>{monthLongName(pm.month0)} {localizeDigits(String(pm.year))}</T>
           <Pressable accessibilityRole="button" accessibilityLabel={t('cal.next')} disabled={page === 11} onPress={() => setPage(page + 1)} style={[styles.nav, page === 11 ? { opacity: 0.35 } : null]}><Icon name="chevron" size={18} /></Pressable>
         </View>
         <View style={styles.grid}>
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((x, i) => <View key={i} style={styles.cell}><T style={styles.wd}>{x}</T></View>)}
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => <View key={i} style={styles.cell}><T style={styles.wd}>{weekdayLetter(i)}</T></View>)}
           {Array.from({ length: lead }, (_, i) => <View key={`b${i}`} style={styles.cell} />)}
           {Array.from({ length: daysIn }, (_, i) => i + 1).map((dn) => {
             const x = `${pm.year}-${String(pm.month0 + 1).padStart(2, '0')}-${String(dn).padStart(2, '0')}`;
@@ -85,7 +83,7 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
               <View key={dn} style={[styles.cell, inRange ? { backgroundColor: '#f3ead8' } : flex ? { backgroundColor: '#f8f1e3' } : null]}>
                 <Pressable accessibilityRole="button" accessibilityLabel={dayName(x, today)} accessibilityState={{ disabled: past, selected: end }} disabled={past} onPress={() => pickDay(x)}
                   style={[styles.day, end ? { backgroundColor: colors.green } : null, x === today && !end ? styles.today : null]}>
-                  <T style={[styles.dayText, past ? styles.past : null, end ? { color: colors.mist, fontFamily: ff.ui700 } : null]}>{dn}</T>
+                  <T style={[styles.dayText, past ? styles.past : null, end ? { color: colors.mist, fontFamily: ff.ui700 } : null]}>{localizeDigits(String(dn))}</T>
                 </Pressable>
               </View>
             );
