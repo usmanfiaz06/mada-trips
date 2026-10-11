@@ -1,0 +1,12 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "مادا",
+    "NSCameraUsageDescription": "لقراءة جوازك، ولتصوير مستند أو صورتك الشخصية. لا يُرفع شيء قبل أن تراجعه.",
+    "NSPhotoLibraryUsageDescription": "لإضافة صورة مستند أو صورة شخصية تختارها.",
+    "NSFaceIDUsageDescription": "لفتح محفظتك والتطبيق ببصمة الوجه.",
+    "NSContactsUsageDescription": "لنريك من معارفك موجود على مادا. نطابق الأرقام على جوالك ولا نحفظها."
+  },
+  "android": {
+    "app_name": "مادا"
+  }
+}

@@ -19,7 +19,7 @@ export function PhoneForm({ title, body, initial = '', onSend, onSent, hint }: {
   title: string;
   body: string;
   initial?: string;
-  onSend: (e164: string) => Promise<void>;
+  onSend: (e164: string) => Promise<unknown>;
   onSent: (e164: string) => void;
   hint?: ReactNode;
 }) {

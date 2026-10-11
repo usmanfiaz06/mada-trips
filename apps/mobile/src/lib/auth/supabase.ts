@@ -2,6 +2,7 @@ import './polyfill';
 import { Platform } from 'react-native';
 import { createClient, type Session, type SupabaseClient, type UserIdentity } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
+import { sendViaHook } from './channel';
 import { secureSessionStorage } from './session-storage';
 import { nativeCredential, nativeSocial, redirectUrl } from './social';
 import { AuthError, fromSupabase, type AuthBackend, type Identity, type SocialProvider } from './types';
@@ -59,8 +60,11 @@ async function identityFor(provider: SocialProvider): Promise<UserIdentity> {
 export const supabaseAuth: AuthBackend = {
   kind: 'supabase',
 
-  async sendPhoneCode(phone) {
-    await run(supabase().auth.signInWithOtp({ phone: bare(phone), options: { channel: 'sms', shouldCreateUser: true } }));
+  async sendPhoneCode(phone, channel) {
+    // Supabase checks options.channel but doesn't pass it to the Send SMS hook; the hint (channel.ts) carries it.
+    return sendViaHook(phone, channel, async () => {
+      await run(supabase().auth.signInWithOtp({ phone: bare(phone), options: { channel: channel ?? 'sms', shouldCreateUser: true } }));
+    });
   },
   async verifyPhoneCode(phone, code) {
     const { session } = await run(supabase().auth.verifyOtp({ phone: bare(phone), token: code, type: 'sms' }));
@@ -97,8 +101,8 @@ export const supabaseAuth: AuthBackend = {
     } catch { return false; }
   },
 
-  async addPhone(phone) {
-    await run(supabase().auth.updateUser({ phone: bare(phone) }));
+  async addPhone(phone, channel) {
+    return sendViaHook(phone, channel, async () => { await run(supabase().auth.updateUser({ phone: bare(phone) })); });
   },
   async verifyAddedPhone(phone, code) {
     await run(supabase().auth.verifyOtp({ phone: bare(phone), token: code, type: 'phone_change' }));

@@ -6,7 +6,7 @@ import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useOnboarding } from '@/lib/onboarding';
 
-/** The SMS code. Right: signed in (new → name, known → Welcome back). Wrong: says so and clears (FLOWS.md §1). */
+/** The phone code (on WhatsApp or by SMS). Right: signed in (new → name, known → Welcome back). Wrong: says so and clears (FLOWS.md §1). */
 export default function Otp() {
   const router = useRouter();
   const phone = useOnboarding((s) => s.phone);
@@ -22,7 +22,7 @@ export default function Otp() {
           buzz('success');
           router.replace(next);
         }}
-        onResend={() => auth().sendPhoneCode(phone)}
+        onResend={(channel) => auth().sendPhoneCode(phone, channel)}
       />
     </Screen>
   );

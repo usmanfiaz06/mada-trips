@@ -45,7 +45,7 @@ export default function VerifyPhone() {
             toast(t('auth.verifyPhone.done'));
             leave();
           }}
-          onResend={() => auth().addPhone(phone)}
+          onResend={(channel) => auth().addPhone(phone, channel)}
         />
       </Screen>
     );

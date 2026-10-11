@@ -67,9 +67,9 @@ const styles = StyleSheet.create({
 });
 
 /** An inline text action ("Change number"). */
-export function LinkButton({ label, onPress, color = colors.green, size = 14 }: { label: string; onPress: () => void; color?: string; size?: number }) {
+export function LinkButton({ label, onPress, color = colors.green, size = 14, testID }: { label: string; onPress: () => void; color?: string; size?: number; testID?: string }) {
   return (
-    <Pressable accessibilityRole="button" onPress={() => { buzz('tap'); onPress(); }} hitSlop={10}>
+    <Pressable accessibilityRole="button" onPress={() => { buzz('tap'); onPress(); }} hitSlop={10} testID={testID}>
       <T v="h3" color={color} style={{ fontSize: size, textDecorationLine: 'underline' }}>{label}</T>
     </Pressable>
   );

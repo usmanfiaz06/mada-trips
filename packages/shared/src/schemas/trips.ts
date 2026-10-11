@@ -137,6 +137,8 @@ export const TripTraveller = z.object({
   isSelf: z.boolean(),
   birthYear: z.number().int().nullable(),
   passportExpiry: IsoDay.nullable(),
+  /** The e-ticket number the desk recorded when it issued (flights booked by request). */
+  ticketNumber: z.string().nullable().optional(),
 });
 export type TripTraveller = z.infer<typeof TripTraveller>;
 

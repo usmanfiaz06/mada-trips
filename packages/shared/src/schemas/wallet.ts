@@ -74,7 +74,7 @@ export function checkUpload(f: { type?: string | null; size?: number | null; nam
   return null;
 }
 
-export const FileInfo = z.object({ id: Id, name: z.string(), mime: z.string(), size: z.number().int().nonnegative() });
+export const FileInfo = z.object({ id: Id, name: z.string(), mime: z.string(), size: z.number().int().nonnegative(), /** A short-lived signed link, when the server gives one. */ url: z.string().nullable().optional() });
 export type FileInfo = z.infer<typeof FileInfo>;
 
 /* ───────────── documents ───────────── */

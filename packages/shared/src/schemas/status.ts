@@ -70,6 +70,8 @@ export const StatusResponse = z.object({
   degraded: z.array(SupplierHealth),
   maintenance: MaintenanceSchema,
   time: z.string(),
+  /** The launch guard (production): what keeps app routes closed, in plain words for the team. Empty when ready. */
+  launch: z.object({ ready: z.boolean(), problems: z.array(z.string()) }).optional(),
 });
 export type StatusResponse = z.infer<typeof StatusResponse>;
 

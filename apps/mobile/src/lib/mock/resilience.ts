@@ -13,6 +13,8 @@ export const resilienceMock: AreaMock = async (w) => {
       minVersion: '0.0.0', latestVersion: '0.1.0', maintenance: { on: false, message: null, until: null },
       features: { offlineOutbox: true, statusChecks: true, softUpdatePrompt: true }, serverTime: new Date().toISOString(),
       storeUrls: { ios: 'https://apps.apple.com/app/mada-trips', android: 'https://play.google.com/store/apps/details?id=sa.madatrips.app' },
+      // Phone codes on WhatsApp first, SMS on request (docs/app/AUTH.md).
+      phoneChannels: ['whatsapp', 'sms'],
     };
     return { status: 200, json: body };
   }

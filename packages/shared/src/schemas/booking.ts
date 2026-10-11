@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ContactPhone, FlightQuote, FlightRequestExtras, ThreadAttachment } from './flight-quote';
 import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay, Money } from './common';
 import { Cabin, FlightSegment, Pickup, Stay, Trip } from './trips';
 import { NEED_KEYS } from './booking-data';
@@ -281,6 +282,8 @@ export const CreateRequestBody = z.object({
     return: IsoDay.nullable(),
     cabin: Cabin.nullable(),
     carrier: z.string().max(3).nullable(),
+    /** Flights by request: how flexible, bags each, and what they'd like (schemas/flight-quote.ts). */
+    ...FlightRequestExtras.shape,
   }).nullish(),
   /** Asked from an entry check. */
   service: z.enum(['uk_eta', 'evisa', 'reentry', 'passport_renewal']).nullish(),
@@ -303,6 +306,8 @@ export const RequestQuote = z.object({
   needLines: z.array(z.string()),
   expiresAt: IsoDateTime.nullable(),
   status: z.enum(['open', 'accepted', 'expired', 'withdrawn']),
+  /** A flight request's fare options, each with flights, a price per person, bags and rules. */
+  flight: FlightQuote.nullable().optional(),
 });
 export type RequestQuote = z.infer<typeof RequestQuote>;
 
@@ -336,6 +341,8 @@ export const ThreadMessage = z.object({
   text: z.string(),
   /** An offer the agent made in the thread ("A hotel at the King Abdulaziz Gate"). */
   offer: z.object({ label: z.string(), perPerson: Money, accepted: z.boolean() }).nullable(),
+  /** A photo or PDF the agent sent, with a short-lived signed link to open it. */
+  attachment: ThreadAttachment.nullable().optional(),
   createdAt: IsoDateTime,
 });
 export type ThreadMessage = z.infer<typeof ThreadMessage>;
@@ -354,7 +361,8 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('trip'), flightOfferId: Id, bundle: z.boolean().default(false), travellerIds: z.array(Id).min(1).max(9) }),
   z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish() }),
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
-  z.object({ kind: z.literal('quote'), requestId: Id }),
+  /** optionId: which fare option of a flight quote (the first when there is only one). */
+  z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional() }),
   z.object({ kind: z.literal('esim'), count: z.number().int().min(1).max(12) }),
   /** Your share of a split in a circle, paid by card. The amount comes from the circle, never from the app. */
   z.object({ kind: z.literal('share'), circleId: Id, messageId: Id, shareKey: z.string().min(1).max(64) }),
@@ -415,6 +423,8 @@ export const CreateOrderBody = PreviewBody.extend({
   expectedTotal: HalalasAmount,
   /** One per slide: a retried request never books twice. */
   idempotencyKey: z.string().min(8).max(80),
+  /** Accounts without a verified phone, while booking allows it (GET /config features.bookingNeedsPhone off): a number to call. */
+  contactPhone: ContactPhone.optional(),
 });
 export type CreateOrderBody = z.input<typeof CreateOrderBody>;
 

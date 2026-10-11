@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AppleMark, GoogleMark } from '@/components/BrandMarks';
+import { AppleMark, GoogleMark, WhatsAppMark } from '@/components/BrandMarks';
 import { Icon, type IconName } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { AUTH_MODE } from '@/lib/auth';
+import { AUTH_MODE, type PhoneChannel } from '@/lib/auth';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useOnboarding } from '@/lib/onboarding';
@@ -43,11 +43,11 @@ export function HelpRow({ icon, title, sub, onPress, disabled, testID }: { icon:
 const glyph = (name: IconName) => <Icon name={name} size={18} color={colors.green} />;
 
 /**
- * "Didn't get the code?": a calm list of what else to do, on every code screen. A new code (after the minute),
- * the spam folder for email, the wrong number or address, another way in (sign-in only), and, when the number or
+ * "Didn't get the code?": a calm list of what else to do, on every code screen. A new code (after the minute), the
+ * other channel for a phone code (SMS or WhatsApp), WhatsApp itself or the spam folder for email, the wrong number or address, another way in (sign-in only), and, when the number or
  * address is gone for good, a request to the desk to move the account.
  */
-export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flow, onLeave }: {
+export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flow, onLeave, channel = null, other: otherChannel = null, onSwitch }: {
   about: 'phone' | 'email';
   /** The number or address the code went to (E.164 or an email), for the recovery request. */
   contact: string;
@@ -57,6 +57,11 @@ export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flo
   flow: CodeFlow;
   /** Close the sheet before going somewhere else. */
   onLeave: () => void;
+  /** A phone code's channel (WhatsApp or SMS), and the other one this server can send by. */
+  channel?: PhoneChannel | null;
+  other?: PhoneChannel | null;
+  /** A new code by the other channel. */
+  onSwitch?: () => void;
 }) {
   const router = useRouter();
   const go = (fn: () => void) => { onLeave(); fn(); };
@@ -68,6 +73,16 @@ export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flo
       <HelpRow icon={glyph('refund')} testID="help-resend"
         title={resendIn > 0 ? t('auth.help.resendIn', { time: mmss(resendIn) }) : t('auth.help.resend')}
         onPress={() => go(onResend)} disabled={resendIn > 0} />
+      {otherChannel && onSwitch ? (
+        <HelpRow icon={otherChannel === 'whatsapp' ? <WhatsAppMark size={18} /> : glyph('phone')} testID="help-switch-channel"
+          title={resendIn > 0
+            ? t(otherChannel === 'sms' ? 'auth.channel.useSmsIn' : 'auth.channel.useWhatsAppIn', { time: mmss(resendIn) })
+            : t(otherChannel === 'sms' ? 'auth.channel.useSms' : 'auth.channel.useWhatsApp')}
+          onPress={() => go(onSwitch)} disabled={resendIn > 0} />
+      ) : null}
+      {about === 'phone' && channel === 'whatsapp' ? (
+        <HelpRow icon={<WhatsAppMark size={18} />} title={t('auth.help.whatsappTitle')} sub={t('auth.help.whatsappBody')} testID="help-whatsapp" />
+      ) : null}
       {about === 'email' ? (
         <HelpRow icon={glyph('mail')} title={t('auth.help.spamTitle')} sub={t('auth.help.spamBody', { address: CODE_SENDER })} testID="help-spam" />
       ) : null}

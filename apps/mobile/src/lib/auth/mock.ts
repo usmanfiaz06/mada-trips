@@ -1,11 +1,12 @@
 import { encodeMockSupabaseToken, passwordMeetsRules, type AuthProvider } from '@mada/shared';
 import { deleteSecret, getSecret, setSecret } from '../storage';
+import { sendInMock } from './channel';
 import { CODE_RESEND_SECONDS } from './config';
 import { AuthError, type AuthBackend, type Identity, type SocialProvider } from './types';
 
 /*
  * Supabase Auth's stand-in, for mock-API mode, design work and tests (no Supabase project). Same shape as the real
- * thing: codes by SMS and email (always 123456, logged instead of sent), one code per minute per address, Apple and
+ * thing: codes on WhatsApp or by SMS, and by email (always 123456, logged instead of sent), one code per minute per address, Apple and
  * Google answer at once, identities with the same email join one user (Supabase's automatic linking), a phone or an
  * identity already on another user is refused. Tokens are unsigned `mocksb.` tokens the Core API reads in mock mode only.
  */
@@ -84,10 +85,12 @@ function me(): MockUser {
 export const mockAuth: AuthBackend = {
   kind: 'mock',
 
-  async sendPhoneCode(phone) {
+  async sendPhoneCode(phone, channel) {
     await ready(); await delay();
     throttle(`sms:${phone}`);
-    console.info(`[mock supabase] SMS to ${phone}: ${MOCK_CODE}`);
+    const sent = sendInMock(phone, channel);
+    console.info(`[mock supabase] ${sent.channel} to ${phone}: ${MOCK_CODE}`);
+    return sent;
   },
   async verifyPhoneCode(phone, code) {
     await ready(); await delay();
@@ -128,13 +131,15 @@ export const mockAuth: AuthBackend = {
 
   async hasSession() { await ready(); return !!current; },
 
-  async addPhone(phone) {
+  async addPhone(phone, channel) {
     await ready(); await delay();
     const u = me();
     if (find((x) => x.phone === phone && x.sub !== u.sub)) throw new AuthError('taken');
     throttle(`sms:${phone}`);
     pending.phone = phone;
-    console.info(`[mock supabase] SMS to ${phone}: ${MOCK_CODE}`);
+    const sent = sendInMock(phone, channel);
+    console.info(`[mock supabase] ${sent.channel} to ${phone}: ${MOCK_CODE}`);
+    return sent;
   },
   async verifyAddedPhone(phone, code) {
     await ready(); await delay();

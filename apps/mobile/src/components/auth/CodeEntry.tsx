@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, TextInput, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { OTP_MAX_TRIES, prettyPhone } from '@mada/shared';
+import { WhatsAppMark } from '@/components/BrandMarks';
 import { Button, LinkButton } from '@/components/Button';
 import { Field } from '@/components/Field';
 import { T } from '@/components/Text';
-import { CODE_RESEND_SECONDS, AuthError } from '@/lib/auth';
+import { CODE_RESEND_SECONDS, AuthError, usePhoneChannels, usePhoneCodes, type PhoneChannel } from '@/lib/auth';
 import { codeFrom } from '@/lib/auth/code';
 import { AUTO_FOCUS, SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
@@ -41,7 +42,8 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
   /** Back to the number or address, filled in. */
   onChange: () => void;
   onVerify: (code: string) => Promise<void>;
-  onResend: () => Promise<void>;
+  /** A new code; for a phone, optionally by the other channel ("Send by SMS instead"). */
+  onResend: (channel?: PhoneChannel) => Promise<unknown>;
   /** Sign-in offers other ways in; adding a way in from Profile doesn't. */
   flow: CodeFlow;
   demoHint?: string;
@@ -62,6 +64,14 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
   const shake = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
   // A number keeps its own order inside an Arabic sentence.
   const shown = about === 'phone' ? (isRTL() ? `\u2066${prettyPhone(contact)}\u2069` : prettyPhone(contact)) : contact;
+  // Phone codes go on WhatsApp or by SMS (lib/auth/channel.ts): say which, and offer the other one.
+  const channels = usePhoneChannels();
+  const sent = usePhoneCodes((s) => (about === 'phone' ? s.sent[contact] : undefined));
+  const channel: PhoneChannel | null = about === 'phone' ? sent?.channel ?? channels[0] ?? null : null;
+  const other: PhoneChannel | null = channel ? channels.find((c) => c !== channel) ?? null : null;
+  const sentLine = about === 'email' ? t('auth.email.sentTo', { email: shown })
+    : channel === 'whatsapp' ? t('auth.channel.sentWhatsApp', { phone: shown })
+      : sent?.fellBack ? t('auth.channel.sentSmsFallback', { phone: shown }) : t('auth.channel.sentSms', { phone: shown });
 
   useEffect(() => {
     const id = setInterval(() => { setResendIn((n) => (n > 0 ? n - 1 : 0)); setClock(Date.now()); }, 1000);
@@ -93,12 +103,13 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
     }
   };
 
-  const resend = async () => {
+  const resend = async (via?: PhoneChannel) => {
     try {
-      await onResend();
+      await onResend(via);
       setError(null); setCode(''); setTries(0); setPause(null); setResendIn(CODE_RESEND_SECONDS);
       buzz('tap');
-      toast(t('auth.code.resentTo', { contact: shown }));
+      const now = about === 'phone' ? usePhoneCodes.getState().sent[contact]?.channel : undefined;
+      toast(now === 'whatsapp' ? t('auth.channel.resentWhatsApp', { contact: shown }) : now === 'sms' ? t('auth.channel.resentSms', { contact: shown }) : t('auth.code.resentTo', { contact: shown }));
       input.current?.focus();
     } catch (e) {
       if (e instanceof AuthError && e.code === 'wait' && e.seconds) setResendIn(e.seconds);
@@ -109,8 +120,9 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
   return (
     <View style={{ paddingHorizontal: 24, paddingTop: 24, gap: 16 }}>
       <T v="h1" accessibilityRole="header">{title}</T>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 }}>
-        <T v="body">{about === 'phone' ? t('otp.sentTo', { phone: shown }) : t('auth.email.sentTo', { email: shown })}</T>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6 }} testID="code-sent-line">
+        {channel === 'whatsapp' ? <View accessibilityLabel={t('auth.channel.whatsapp')}><WhatsAppMark size={18} /></View> : null}
+        <T v="body">{sentLine}</T>
         <LinkButton label={about === 'phone' ? t('otp.change') : t('auth.email.change')} onPress={onChange} />
       </View>
       <Animated.View style={shake}>
@@ -126,15 +138,24 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
           ? <LinkButton label={t('auth.pause.title')} onPress={() => setPause((p) => (p ? { ...p, open: true } : p))} />
           : resendIn > 0
           ? <T v="small" style={{ fontVariant: ['tabular-nums'] }} testID="code-countdown">{t('auth.code.resendIn', { time: mmss(resendIn) })}</T>
-          : <Button variant="secondary" size="small" block={false} label={t('otp.resend')} onPress={resend} haptic={null} testID="code-resend" />}
+          : <Button variant="secondary" size="small" block={false} label={t('otp.resend')} onPress={() => resend()} haptic={null} testID="code-resend" />}
         {about === 'email' ? <Button variant="secondary" size="small" block={false} label={t('auth.email.openMail')} onPress={openMail} testID="open-mail" /> : null}
       </View>
+      {other && !paused ? (
+        <View style={{ flexDirection: 'row' }}>
+          {resendIn > 0
+            ? <T v="small" color={colors.ink3} style={{ fontVariant: ['tabular-nums'] }} testID="code-switch-wait">
+              {t(other === 'sms' ? 'auth.channel.useSmsIn' : 'auth.channel.useWhatsAppIn', { time: mmss(resendIn) })}</T>
+            : <LinkButton label={t(other === 'sms' ? 'auth.channel.useSms' : 'auth.channel.useWhatsApp')} onPress={() => { void resend(other); }} testID="code-switch-channel" />}
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row' }}>
         <LinkButton label={t('auth.help.link')} onPress={() => setHelp(true)} />
       </View>
       {SHOW_DEMO_HINTS && demoHint ? <T v="tiny" color={colors.ink3}>{demoHint}</T> : null}
 
-      <CodeHelpSheet visible={help} onClose={() => setHelp(false)} about={about} contact={contact} resendIn={resendIn} onResend={resend} onChange={onChange} flow={flow} />
+      <CodeHelpSheet visible={help} onClose={() => setHelp(false)} about={about} contact={contact} resendIn={resendIn} onResend={() => { void resend(); }} onChange={onChange} flow={flow}
+        channel={channel} other={other} onSwitch={() => { if (other) void resend(other); }} />
       <PauseSheet visible={!!pause?.open} seconds={pause?.seconds ?? PAUSE_SECONDS} until={pause?.until ?? 0} doneLabel={t('otp.resend')}
         onClose={() => setPause((p) => (p ? { ...p, open: false } : p))} onDone={() => { void resend(); }} />
     </View>

@@ -78,6 +78,20 @@ export const authCopy = {
   'auth.help.lost': 'I can’t use this number or email any more',
   'auth.help.lostSub': 'We’ll check it’s you and move your account.',
   'auth.code.resentTo': 'New code sent to {contact}.',
+
+  // ───────────── phone codes: WhatsApp or SMS (Zoho CPaaS, docs/app/AUTH.md) ─────────────
+  'auth.channel.sentWhatsApp': 'We sent a code on WhatsApp to {phone}.',
+  'auth.channel.sentSms': 'We sent a code by SMS to {phone}.',
+  'auth.channel.sentSmsFallback': 'We sent a code by SMS to {phone}. WhatsApp couldn’t reach this number.',
+  'auth.channel.useSms': 'Send by SMS instead',
+  'auth.channel.useWhatsApp': 'Send on WhatsApp instead',
+  'auth.channel.useSmsIn': 'Send by SMS in {time}',
+  'auth.channel.useWhatsAppIn': 'Send on WhatsApp in {time}',
+  'auth.channel.resentWhatsApp': 'New code sent on WhatsApp to {contact}.',
+  'auth.channel.resentSms': 'New code sent by SMS to {contact}.',
+  'auth.channel.whatsapp': 'WhatsApp',
+  'auth.help.whatsappTitle': 'Check WhatsApp',
+  'auth.help.whatsappBody': 'It comes from Mada Trips, with a Copy code button.',
   'auth.email.openMail': 'Open Mail',
 
   // ───────────── a short pause after too many wrong codes ─────────────

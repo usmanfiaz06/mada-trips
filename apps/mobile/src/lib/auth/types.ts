@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import type { PhoneChannel, PhoneSend } from './channel';
 
 export type SocialProvider = 'apple' | 'google';
 
@@ -39,8 +40,11 @@ export class AuthError extends Error {
  */
 export interface AuthBackend {
   readonly kind: 'supabase' | 'mock';
-  /** Sign in (or up) with a code by SMS. */
-  sendPhoneCode(phone: string): Promise<void>;
+  /**
+   * Sign in (or up) with a code to the phone: on WhatsApp or by SMS (channel.ts). No channel: the server's usual one.
+   * Says how it went (WhatsApp can fall back to SMS).
+   */
+  sendPhoneCode(phone: string, channel?: PhoneChannel): Promise<PhoneSend>;
   verifyPhoneCode(phone: string, code: string): Promise<Identity>;
   /** Sign in (or up) with a 6-digit code by email (not a magic link, so it works in the app). */
   sendEmailCode(email: string): Promise<void>;
@@ -53,7 +57,7 @@ export interface AuthBackend {
   /** Signed in already: is there a Supabase session to add ways in to? */
   hasSession(): Promise<boolean>;
   /** Add (or change) the phone: a code goes to the new number. */
-  addPhone(phone: string): Promise<void>;
+  addPhone(phone: string, channel?: PhoneChannel): Promise<PhoneSend>;
   verifyAddedPhone(phone: string, code: string): Promise<string>;
   addEmail(email: string): Promise<void>;
   verifyAddedEmail(email: string, code: string): Promise<string>;

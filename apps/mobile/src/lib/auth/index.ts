@@ -16,6 +16,7 @@ import { saveLastSignIn } from './last';
  * Accounts that began with Apple, Google or email verify a phone before their first booking (verify-phone screen).
  */
 export * from './types';
+export { phoneChannels, usePhoneChannels, usePhoneCodes, type PhoneChannel, type PhoneSend } from './channel';
 export { AUTH_MODE, CODE_RESEND_SECONDS } from './config';
 export { getLastSignIn, forgetLastSignIn, type LastSignIn } from './last';
 

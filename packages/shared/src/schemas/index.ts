@@ -16,3 +16,4 @@ export * from './desk';
 export * from './booking';
 export * from './status';
 export * from './places';
+export * from './flight-quote';

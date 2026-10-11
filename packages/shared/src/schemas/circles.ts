@@ -119,6 +119,8 @@ export const CircleMessage = Message.omit({ card: true, readAt: true, thread: tr
     what: z.string(), total: HalalasAmount, paidBy: Id, mode: SplitMode, reminded: z.boolean(), settled: z.boolean(), shares: z.array(SplitShare),
   }).nullable(),
   card: SharedCard.nullable(),
+  /** Reactions, one per person per emoji: who reacted with what. Older servers send none. */
+  reactions: z.array(z.object({ emoji: z.string(), ids: z.array(Id) })).default([]),
   mada: z.object({
     kind: z.enum(['welcome', 'answer', 'result', 'tie']),
     list: z.array(z.string()),
@@ -238,8 +240,22 @@ export const MemberPatchRequest = z.object({ role: z.literal('admin') });
 
 /* ───────────── invites ───────────── */
 
-export const InviteLink = z.object({ code: z.string(), url: z.string(), expiresAt: IsoDateTime });
+export const InviteLink = z.object({
+  code: z.string(), url: z.string(), expiresAt: IsoDateTime,
+  /** The invite behind the link, to turn it off (DELETE /invites/{id}). */
+  id: Id.nullable().default(null),
+  /** How many people the link lets in (null: no limit) and how many it has. */
+  maxUses: z.number().int().nullable().default(null),
+  uses: z.number().int().default(0),
+});
 export type InviteLink = z.infer<typeof InviteLink>;
+/** Choices for a new link: how long it lasts and how many people it lets in. `fresh` turns off the old link first. */
+export const LinkOptions = z.object({
+  expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(14)]).optional(),
+  maxUses: z.number().int().min(1).max(100).nullable().optional(),
+  fresh: z.boolean().optional(),
+});
+export type LinkOptions = z.infer<typeof LinkOptions>;
 
 
 export const SentInvite = z.object({
@@ -258,7 +274,7 @@ export type InvitesResponse = z.infer<typeof InvitesResponse>;
 
 export const CreateInviteRequest = z.union([
   z.object({ phone: PhoneE164, channel: z.enum(['sms', 'whatsapp']).default('sms') }),
-  z.object({ link: z.literal(true) }),
+  LinkOptions.extend({ link: z.literal(true) }),
 ]);
 export type CreateInviteRequest = z.input<typeof CreateInviteRequest>;
 export const CreateInviteResponse = z.object({ invite: SentInvite.nullable(), link: InviteLink.nullable(), onMada: PersonRef.nullable() });
@@ -266,7 +282,8 @@ export const CreateInviteResponse = z.object({ invite: SentInvite.nullable(), li
 /** What anyone with the link sees, signed in or not. */
 export const InvitePreview = z.object({
   code: z.string(),
-  status: z.enum(['open', 'expired', 'cancelled']),
+  /** full: a link for a set number of people, and they've all joined. */
+  status: z.enum(['open', 'expired', 'cancelled', 'full']),
   kind: z.enum(['circle', 'mada']),
   from: PersonRef,
   circle: z.object({ name: z.string(), cover: CoverKey.nullable(), members: z.array(PersonRef), memberCount: z.number().int(), trip: z.string().nullable() }).nullable(),
@@ -274,6 +291,25 @@ export const InvitePreview = z.object({
 export type InvitePreview = z.infer<typeof InvitePreview>;
 export const AcceptInviteResponse = z.object({ circleId: Id.nullable(), friendId: Id.nullable(), already: z.boolean() });
 export type AcceptInviteResponse = z.infer<typeof AcceptInviteResponse>;
+
+/* ───────────── live: what changed in your circles ───────────── */
+
+/**
+ * One change in a circle, as the live channel (GET /circles/live, Server-Sent Events) or its polling twin
+ * (GET /circles/events?after=) tells it. It names what changed, never the content: the app refetches what it shows,
+ * through the same member-checked endpoints.
+ */
+export const LiveKind = z.enum(['message', 'vote', 'split', 'reaction', 'member', 'invite', 'circle', 'read', 'typing']);
+export type LiveKind = z.infer<typeof LiveKind>;
+export const CircleLiveEvent = z.object({ id: z.number().int(), circleId: Id, kind: LiveKind, ref: z.string().nullable(), actor: Id.nullable() });
+export type CircleLiveEvent = z.infer<typeof CircleLiveEvent>;
+export const CircleEventsResponse = z.object({ events: z.array(CircleLiveEvent), cursor: z.number().int() });
+export type CircleEventsResponse = z.infer<typeof CircleEventsResponse>;
+
+/** The reactions a message can take. A short, warm set; no free-form emoji. */
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '🙏', '🔥'] as const;
+export const ReactRequest = z.object({ emoji: z.enum(REACTIONS) });
+export type ReactRequest = z.infer<typeof ReactRequest>;
 
 /* ───────────── tips ───────────── */
 
@@ -434,6 +470,22 @@ export const OkResponse = z.object({ ok: z.literal(true) });
 export const INVITE_TTL_DAYS = 14;
 export const INVITE_HOST = 'madatrips.sa';
 export const inviteUrl = (code: string) => `https://${INVITE_HOST}/join/${code}`;
+/** An invite code's shape: 8 letters or digits, a dash, 6 more (lowercase, no 0/1/i/l/o). */
+export const INVITE_CODE = /^[a-z0-9]{8}-[a-z0-9]{6}$/;
+/**
+ * The invite code in whatever someone pasted: the code itself, a madatrips.sa/join/ or /i/ link, or a whole
+ * WhatsApp message with the link in it. null when there isn't one.
+ */
+export function inviteCodeIn(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const s = text.trim().toLowerCase();
+  const link = /(?:madatrips\.sa|madatrips:\/)\/(?:join|i)\/([a-z0-9]{8}-[a-z0-9]{6})\b/.exec(s);
+  if (link) return link[1]!;
+  const bare = /(?:^|[^a-z0-9-])([a-z0-9]{8}-[a-z0-9]{6})(?![a-z0-9-])/.exec(s);
+  return bare ? bare[1]! : null;
+}
+/** Paths madatrips.sa hands to the app (apple-app-site-association, Android intent filters, the landing pages). */
+export const APP_LINK_PATHS = ['/join/', '/i/', '/trip/', '/plan/', '/city/'] as const;
 /** Limits per person per hour. */
 export const LIMITS = { invitesPerHour: 30, postsPerHour: 5, messagesPerMinute: 30, searchesPerMinute: 30 } as const;
 

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Mada Trips",
     "slug": "mada-trips",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "madatrips",
     "userInterfaceStyle": "light",
@@ -10,22 +10,97 @@
     "icon": "./assets/images/icon.png",
     "ios": {
       "bundleIdentifier": "sa.madatrips.app",
-      "associatedDomains": ["applinks:madatrips.sa"],
+      "associatedDomains": [
+        "applinks:madatrips.sa"
+      ],
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "To read your passport. Nothing is uploaded until you check the details.",
-        "NSFaceIDUsageDescription": "To open your Wallet."
+        "NSCameraUsageDescription": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
+        "NSPhotoLibraryUsageDescription": "To add a photo of a document or a profile picture you choose.",
+        "NSFaceIDUsageDescription": "To open your Wallet and the app with Face ID.",
+        "NSContactsUsageDescription": "To show who’s already on Mada. Numbers are matched on this phone and never stored.",
+        "CFBundleAllowMixedLocalizations": true,
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "privacyManifests": {
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "C617.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "35F9.1"
+            ]
+          },
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryDiskSpace",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "E174.1"
+            ]
+          }
+        ]
       }
     },
     "android": {
       "package": "sa.madatrips.app",
       "adaptiveIcon": {
         "backgroundColor": "#1e352d",
-        "foregroundImage": "./assets/images/icon-foreground.png"
+        "foregroundImage": "./assets/images/icon-foreground.png",
+        "monochromeImage": "./assets/images/icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "intentFilters": [{ "action": "VIEW", "autoVerify": true, "data": [{ "scheme": "https", "host": "madatrips.sa", "pathPrefix": "/join/" }], "category": ["BROWSABLE", "DEFAULT"] }]
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "madatrips.sa",
+              "pathPrefix": "/join/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "output": "single",
@@ -33,20 +108,36 @@
       "backgroundColor": "#e9e2d8"
     },
     "plugins": [
-      ["expo-contacts", { "contactsPermission": "To show who’s already on Mada. Numbers are matched on this phone and never stored." }],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "To show who’s already on Mada. Numbers are matched on this phone and never stored."
+        }
+      ],
       "expo-router",
       "expo-secure-store",
       "expo-video",
       [
         "expo-camera",
         {
-          "cameraPermission": "To read your passport. Nothing is uploaded until you check the details."
+          "cameraPermission": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "To add a photo of a document or a profile picture you choose.",
+          "cameraPermission": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "To open your Wallet."
+          "faceIDPermission": "To open your Wallet and the app with Face ID."
         }
       ],
       [
@@ -59,11 +150,41 @@
       ],
       "expo-font",
       "expo-sharing",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1e352d",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "supportedLocales": [
+            "en",
+            "ar"
+          ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "ar": "./locales/ar.json"
     }
   }
 }

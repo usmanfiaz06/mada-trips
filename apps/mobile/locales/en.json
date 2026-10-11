@@ -1,0 +1,12 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Mada Trips",
+    "NSCameraUsageDescription": "To read your passport, and to take a photo of a document or your profile picture. Nothing is uploaded until you check it.",
+    "NSPhotoLibraryUsageDescription": "To add a photo of a document or a profile picture you choose.",
+    "NSFaceIDUsageDescription": "To open your Wallet and the app with Face ID.",
+    "NSContactsUsageDescription": "To show who’s already on Mada. Numbers are matched on this phone and never stored."
+  },
+  "android": {
+    "app_name": "Mada Trips"
+  }
+}
