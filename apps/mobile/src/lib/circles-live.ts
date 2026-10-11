@@ -39,8 +39,7 @@ export function useLivePoll(fallbackMs: number): number {
 /** Who is typing in a circle right now (not you). */
 export function useTyping(circleId: string, me: string): string[] {
   const map = useLive((s) => s.typing[circleId]);
-  const now = Date.now();
-  return Object.entries(map ?? {}).filter(([id, until]) => id !== me && until > now).map(([id]) => id);
+  return Object.keys(map ?? {}).filter((id) => id !== me);
 }
 
 /* ───────────── applying events ───────────── */
@@ -71,7 +70,12 @@ export function applyEvent(e: LiveEvent, me = useSession.getState().user?.id ?? 
     case 'typing': {
       if (!e.actor || e.actor === me) return;
       useLive.setState((s) => ({ typing: { ...s.typing, [e.circleId]: { ...s.typing[e.circleId], [e.actor!]: Date.now() + 5_000 } } }));
-      setTimeout(() => useLive.setState((s) => ({ typing: { ...s.typing } })), 5_100);
+      // Expired entries go, so a stale "typing" never lingers.
+      setTimeout(() => useLive.setState((s) => {
+        const now = Date.now();
+        const c = Object.fromEntries(Object.entries(s.typing[e.circleId] ?? {}).filter(([, until]) => until > now));
+        return { typing: { ...s.typing, [e.circleId]: c } };
+      }), 5_100);
       return;
     }
     case 'message':

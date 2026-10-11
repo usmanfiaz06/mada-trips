@@ -95,6 +95,7 @@ export const thingsCopy = {
 
   // ───────────── an event ─────────────
   'things.event.dates': '{from} to {to}',
+  'things.event.until': 'until',
   'things.event.at': '{time} · {venue}',
   'things.event.source': 'Organiser’s page',
   'things.event.fromDesk': 'Picked by the Mada team',

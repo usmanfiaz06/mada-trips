@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { circleDest, joinNames, planById, type CircleMessage, type MadaAction, type PersonRef, type SplitShare } from '@mada/shared';
 import { Button } from '@/components/Button';
-import { Bubble, BubbleText, ShareCard, SplitCard, SysLine, Typing, VoteCard, VoteIcon, type Who } from '@/components/circles/chat';
+import { Bubble, BubbleText, ReactionBar, Reactions, ShareCard, SplitCard, SysLine, Typing, VoteCard, VoteIcon, type Who } from '@/components/circles/chat';
 import { ArtChat } from '@/components/circles/art';
 import { useSaveToggle } from '@/components/circles/hooks';
 import { CircleSettings } from '@/components/circles/settings';
@@ -17,6 +17,8 @@ import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
 import { COVERS, circlesApi, ck, queueMessage, sysText, useAct, useCircle, useMeId, useMergeMessages, useMessages } from '@/lib/circles';
 import { useOutbox } from '@/lib/net/outbox';
+import { isOffline } from '@/lib/net/state';
+import { useLive, useTyping } from '@/lib/circles-live';
 import { ErrorState, GoneState } from '@/components/states';
 import { OutboxStatus } from '@/components/states/OutboxList';
 import { buzz } from '@/lib/haptics';
@@ -38,6 +40,10 @@ export default function CircleChat() {
   const [opens, setOpens] = useState(0);
   const setSheet = (s: null | 'tools' | Tool | 'settings') => { if (s) setOpens((n) => n + 1); setSheetRaw(s); };
   const [asking, setAsking] = useState(false);
+  const [reacting, setReacting] = useState<string | null>(null);
+  const typingAt = useRef(0);
+  const liveMode = useLive((x) => x.mode);
+  const typingIds = useTyping(id, me);
   const scroller = useRef<ScrollView>(null);
   const input = useRef<TextInput>(null);
   const positions = useRef(new Map<string, number>());
@@ -90,6 +96,15 @@ export default function CircleChat() {
   const dismiss = useAct((mid: string) => circlesApi.dismiss(id, mid), () => []);
   const pin = useAct((pid: string) => circlesApi.update(id, { pin: { kind: 'plan', id: pid } }), () => [ck.circle(id), ck.messages(id)]);
   const on = { onSuccess: (r: { items: CircleMessage[] } | undefined) => { if (r) merge(r.items); }, onError: fail };
+  const react = useAct((a: { mid: string; emoji: string; on: boolean }) => circlesApi.react(id, a.mid, { emoji: a.emoji as never, on: a.on }), () => []);
+  const toggle = (mid: string, emoji: string, yes: boolean) => { setReacting(null); react.mutate({ mid, emoji, on: yes }, on); };
+  /** Tell the others "typing", at most every 3 s, only while the live channel is up. */
+  const typed = (v: string) => {
+    setDraft(v);
+    if (!v.trim() || liveMode === 'off' || isOffline() || Date.now() - typingAt.current < 3_000) return;
+    typingAt.current = Date.now();
+    circlesApi.typing(id).catch(() => {});
+  };
 
   if (circle.isError && (circle.error as ApiError)?.status === 404) {
     return <Screen><TopBar onBack={() => router.back()} backLabel={t('circles.back')} /><GoneState variant="full" /></Screen>;
@@ -225,7 +240,11 @@ export default function CircleChat() {
               ? reads.filter((r) => r.userId !== me && Date.parse(r.at) >= Date.parse(m.createdAt)).map((r) => people.get(r.userId)?.short).filter(Boolean) as string[] : [];
             return (
               <View key={m.id} onLayout={onLayout} style={{ gap: 4 }}>
-                <Bubble who={who} cont={cont}><BubbleText mine={who.kind === 'me'}>{m.body}</BubbleText></Bubble>
+                <Pressable onLongPress={() => { buzz('select'); setReacting(reacting === m.id ? null : m.id); }} delayLongPress={350} accessibilityHint={t('circles.react.hint')} testID="chat-bubble">
+                  <Bubble who={who} cont={cont}><BubbleText mine={who.kind === 'me'}>{m.body}</BubbleText></Bubble>
+                </Pressable>
+                {reacting === m.id ? <ReactionBar mine={who.kind === 'me'} onPick={(e) => toggle(m.id, e, !(m.reactions.find((r) => r.emoji === e)?.ids.includes(me)))} onClose={() => setReacting(null)} /> : null}
+                <Reactions list={m.reactions} me={me} mine={who.kind === 'me'} people={people} onToggle={(e, yes) => toggle(m.id, e, yes)} />
                 {seen.length ? <T style={st.seen} testID="seen">{dm ? t('circles.chat.seen') : t('circles.chat.seenBy', { names: joinNames(seen) })}</T> : null}
               </View>
             );
@@ -237,10 +256,11 @@ export default function CircleChat() {
             </View>
           ))}
           {asking ? <Typing text={t('circles.chat.madaTyping')} /> : null}
+          {!asking && typingIds.length ? <View testID="typing"><Typing text={typingIds.length === 1 ? t('circles.chat.typingOne', { name: people.get(typingIds[0]!)?.short ?? t('circles.someone') }) : t('circles.chat.typingMany', { names: joinNames(typingIds.map((u) => people.get(u)?.short ?? t('circles.someone'))) })} /></View> : null}
         </ScrollView>
         <View style={[st.composer, { bottom: 22 + bottom }]}>
           {!dm ? <Pressable accessibilityRole="button" accessibilityLabel={t('circles.chat.tools')} onPress={() => { buzz('tap'); setSheet('tools'); }} style={st.plus} testID="chat-tools"><Icon name="plus" size={20} color={colors.goldInk} /></Pressable> : null}
-          <TextInput ref={input} value={draft} onChangeText={setDraft} placeholder={dm ? t('circles.chat.placeholderDm', { name: d.circle.name }) : t('circles.chat.placeholder')} placeholderTextColor={colors.muted}
+          <TextInput ref={input} value={draft} onChangeText={typed} placeholder={dm ? t('circles.chat.placeholderDm', { name: d.circle.name }) : t('circles.chat.placeholder')} placeholderTextColor={colors.muted}
             accessibilityLabel={t('circles.chat.input')} onSubmitEditing={() => say()} returnKeyType="send" style={[st.input, font('body', colors.green), webNoOutline, dm ? { paddingStart: 14 } : null]} testID="chat-input" />
           <Pressable accessibilityRole="button" accessibilityLabel={t('circles.chat.send')} onPress={() => say()} style={st.send} testID="chat-send"><Icon name="up" color={colors.mist} size={18} /></Pressable>
         </View>

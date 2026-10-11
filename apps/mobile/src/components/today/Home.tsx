@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import Svg, { Circle, Defs, Path, Text as SvgText, TextPath } from 'react-native-svg';
-import { backSegment, daysBetween, dayOfMonth, destinationOf, formatNumber, formatSar, localizeDigits, liveStay, monthOf, outSegment, type RefundView, type TripDetail, type TripRating } from '@mada/shared';
+import { backSegment, rangeLabel, daysBetween, dayOfMonth, destinationOf, formatNumber, formatSar, localizeDigits, liveStay, monthOf, outSegment, type RefundView, type TripDetail, type TripRating } from '@mada/shared';
 import { Icon } from '@/components/Icon';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
@@ -163,7 +163,7 @@ export function Home({ trip }: { trip: TripDetail }) {
         <View style={[styles.recap, shadow('focal')]} testID="recap">
           {local.photos[0] ? <Image source={{ uri: local.photos[0] }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Photo k={trip.imageUrl} style={[StyleSheet.absoluteFill, { borderRadius: 0 }]} />}
           <Veil id="recap" />
-          <View style={{ position: 'absolute', top: 14, start: 14 }}><Tag tone="glass" label={trip.endDate ? `${dayOfMonth(trip.startDate)}–${dayOfMonth(trip.endDate)} ${monthOf(trip.endDate)}` : trip.startDate} /></View>
+          <View style={{ position: 'absolute', top: 14, start: 14 }}><Tag tone="glass" label={rangeLabel(trip.startDate, trip.endDate)} /></View>
           <Stamp day={start} label={dest.stamp} code={out?.to ?? ''} />
           <View style={{ padding: 18, gap: 12 }}>
             <View style={{ gap: 4 }}>

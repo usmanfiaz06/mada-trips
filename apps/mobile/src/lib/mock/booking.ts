@@ -3,6 +3,7 @@ import {
   ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
   money, parseAskRules, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
+  fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
   type RequestQuote, type StayOption, type ThreadMessage,
 } from '@mada/shared';
@@ -11,6 +12,14 @@ import type { AreaMock, MockUser } from '../mock-api';
 import { walletMock } from './wallet';
 import { circlesMock } from './circles';
 import { recordBookedTrip } from './trips';
+import { mockBeta } from './beta';
+
+/** A tiny PDF for the mock desk's e-tickets (opens in the browser's viewer). */
+const E_TICKET = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj 4 0 obj<</Length 52>>stream\nBT /F1 14 Tf 20 60 Td (Mada Trips e-ticket) Tj ET\nendstream endobj 5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
+const E_TICKET_B64 = typeof btoa === 'function' ? btoa(E_TICKET) : '';
+/** Tests and the e2e: how long the mock desk holds a fare (default 24 hours). */
+let mockFareHoldMs: number | null = null;
+export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for booking (M2): the Core API's booking endpoints in memory, running the same shared rules
@@ -19,8 +28,8 @@ import { recordBookedTrip } from './trips';
  */
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
-type Req = { id: string; owner: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number } };
+type Req = { id: string; owner: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
+type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -85,7 +94,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
 
 /* ───────────── the order sheet ───────────── */
 
-type Priced = { preview: OrderPreview; place: string; flight?: FlightOption; stay?: StayOption; travellers: Person[]; search?: Record<string, unknown> };
+type Priced = { preview: OrderPreview; place: string; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown> };
 
 async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body: ReturnType<typeof PreviewBody.parse>, bump = 0): Promise<Priced | WireResponse> {
   const d = body.draft;
@@ -93,6 +102,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
   const pick = (ids: string[]) => ids.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
   let lines: OrderLine[] = [];
   let title = ''; let photo = 'istanbul-galata'; let rule = ''; let agent = true; let hold: number | null = null; let place = '';
+  let kind: OrderPreview['kind'] = d.kind;
   let travellers: Person[] = [];
   const out: Partial<Priced> = {};
   const L = (key: string, icon: OrderLine['icon'], text: string, amount: number): OrderLine => ({ key, icon, text, amount });
@@ -139,6 +149,27 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     if (plan.price.stay) lines.push(L('stay', 'stay', tn('pay.line.planStay', Math.max(1, plan.days - 1), { rooms: n > 2 ? t('pay.line.connecting') : t('pay.line.aRoom') }), sarToHalalas(plan.price.stay)));
     lines.push(L('tours', 'star', t('pay.line.planTours', { count: n }), sarToHalalas((plan.price.experiences * n) / 4)));
     rule = t('pay.rule.package'); title = plan.title; photo = plan.photo; place = plan.city;
+  } else if (d.kind === 'quote' && requests.get(d.requestId)?.view.quote?.flight) {
+    // Flights by request: the fare the desk quoted, booked like a flight (authorised now, captured when ticketed).
+    const r = requests.get(d.requestId)!;
+    const q = r.view.quote!;
+    if (r.owner !== user.id || q.status !== 'open') return err('NOT_FOUND');
+    const fare = d.optionId ? q.flight!.options.find((o) => o.id === d.optionId) : q.flight!.options[0];
+    if (!fare) return err('NOT_FOUND');
+    travellers = pick(r.view.travellerIds);
+    const f = fareToFlightOption(fare, q.expiresAt ?? new Date(Date.now() + HOLD).toISOString(), q.id);
+    const s = (r.details.search ?? {}) as { destination?: string | null; destinationName?: string | null };
+    const dest = s.destination ? DESTINATIONS[s.destination] : null;
+    const paying = fare.prices.filter((p) => p.type !== 'infant');
+    const infants = fare.prices.filter((p) => p.type === 'infant');
+    const suffix = `${fare.cabin !== 'economy' ? ` · ${t(`cal.cabin.${fare.cabin}` as CopyKey)}` : ''}${f.back ? '' : ` · ${t('pay.line.oneWay')}`}`;
+    lines.push(L('flight', 'flight', `${tn('pay.line.flight', paying.length, { airline: fare.airline, how: f.stop ? t('pay.line.oneStop') : t('pay.line.direct') })}${suffix}`, paying.reduce((a, p) => a + p.amount.amount, 0)));
+    if (infants.length) lines.push(L('infants', 'flight', tn('pay.line.infants', infants.length), infants.reduce((a, p) => a + p.amount.amount, 0)));
+    rule = fare.refundable ? t('pay.rule.refund', { fee: fare.refundRule.replace(/^Refund minus /, '') }) : t('pay.rule.noRefund', { fee: fare.changeRule });
+    place = flightRequestCity({ destination: s.destination ?? null, destinationName: s.destinationName ?? null }) || fare.legs[0]!.to;
+    title = `${place} · ${rangeLabel(f.out.date, f.back?.date ?? null)}`;
+    photo = dest?.photo ?? 'riyadh-kingdom-centre'; hold = q.expiresAt ? Date.parse(q.expiresAt) : null; kind = 'trip';
+    out.flight = f; out.quoted = fare; out.search = { destination: s.destination ?? null, requestId: r.id };
   } else if (d.kind === 'quote') {
     const r = requests.get(d.requestId);
     if (!r || r.owner !== user.id || !r.view.quote || r.view.quote.status !== 'open') return err('NOT_FOUND');
@@ -168,10 +199,10 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
   const used = travel && body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
   const total = subtotal - discount - used;
   const preview: OrderPreview = {
-    kind: d.kind, title, photo, lines, subtotal: money(subtotal), promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
+    kind, title, photo, lines, subtotal: money(subtotal), promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
     credit: { balance: money(balance), used: money(used) }, total: money(total), rule, agent, holdExpiresAt: hold ? new Date(hold).toISOString() : null,
     instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
-    travellerIds: travellers.map((p) => p.id), missingPassports: d.kind === 'trip' || d.kind === 'package' ? travellers.filter((p) => !p.passport).map((p) => p.id) : [],
+    travellerIds: travellers.map((p) => p.id), missingPassports: kind === 'trip' || kind === 'package' ? travellers.filter((p) => !p.passport).map((p) => p.id) : [],
   };
   return { preview, place, travellers, ...out };
 }
@@ -184,13 +215,25 @@ const viewOf = ({ owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _
 
 function confirm(o: Order) {
   o.status = 'confirmed'; o.step = 3; o.ref = o.ref ?? newRef(); o.confirmedBy = o.agent; o.confirmedAt = nowIso(); o.nextAt = null;
+  // A quoted fare (flights by request): the mock desk records a PNR and a ticket number each, as a person would, and
+  // sends the e-tickets in the request's thread.
+  let tickets: string[] | undefined;
+  if (o.snap.quoted) {
+    tickets = o.travellers.map(() => `065${String(Math.floor(1e9 + Math.random() * 8.9e9))}`);
+    const r = o.snap.requestId ? requests.get(o.snap.requestId) : null;
+    if (r) {
+      r.view.status = 'paid'; r.view.updatedAt = nowIso();
+      r.messages.push({ id: uuid(), from: 'agent', authorName: o.agent?.name ?? null, text: t('desk.order.issued', { ref: o.ref }), offer: null, createdAt: nowIso(),
+        attachment: { id: uuid(), name: `e-tickets-${o.ref}.pdf`, mime: 'application/pdf', size: E_TICKET.length, url: `data:application/pdf;base64,${E_TICKET_B64}` } });
+    }
+  }
   // Like the server's desk: a confirmed flight or stay becomes a trip, so it shows in Trips and on Today.
   if ((o.kind === 'trip' || o.kind === 'stay') && !o.tripId && (o.snap.flight || o.snap.stay)) {
     const dest = o.snap.destination ? DESTINATIONS[o.snap.destination] : null;
     o.tripId = recordBookedTrip({
       owner: o.user, ref: o.ref, agentName: o.agent?.name ?? agentName(), city: dest?.name ?? o.place, country: dest ? ENTRY_RULES[dest.country]?.name ?? null : null, photo: dest?.photo ?? o.photo,
       travellers: o.travellers, flight: o.snap.flight, stay: o.snap.stay, bundle: o.bundle, lines: o.lines, extra: o.extra.amount, discount: o.snap.discount, creditUsed: o.creditUsed.amount,
-      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(),
+      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets,
     });
   }
   if (o.kind === 'quote' && o.requestId) { const r = requests.get(o.requestId); if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); } }
@@ -234,6 +277,16 @@ function advance(o: Order, now = Date.now()) {
 function progressRequest(r: Req, people: Person[], now = Date.now()) {
   const age = now - r.created;
   if (r.view.status === 'sent' && age > 4000) r.view.status = 'reviewing';
+  if (r.view.status === 'reviewing' && age > 9000 && r.details.flightRequest) {
+    const travellers = r.view.travellerIds.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
+    const s = r.details.search as { destination: string | null; destinationName: string | null; from: string | null; depart: string | null; return: string | null; cabin: FlightOption['cabin'] | null };
+    const options = mockFareOptions({ destination: s.destination, destinationName: s.destinationName, from: s.from, depart: s.depart ?? addDays(today(), 30), return: s.return, cabin: s.cabin, travellers });
+    const lead = tn('beta.fq.lead', options.length);
+    r.view.status = 'quoted'; r.view.updatedAt = nowIso();
+    r.view.quote = { id: uuid(), total: money(Math.min(...options.map((o) => o.total.amount))), breakdown: [], text: lead, lead, needLines: [], status: 'open', expiresAt: new Date(now + (mockFareHoldMs ?? 86_400_000)).toISOString(), flight: { options } };
+    r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: lead, offer: null, createdAt: nowIso() });
+    return;
+  }
   if (r.view.status === 'reviewing' && age > 9000) {
     const travellers = r.view.travellerIds.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
     const s = r.details.search as { destination?: string | null; carrier?: string | null; cabin?: FlightOption['cabin'] | null; return?: string | null } | null | undefined;
@@ -366,6 +419,9 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       const name = who ? personName(who) : '';
       title = b.service === 'uk_eta' ? t('request.title.eta') : b.service === 'evisa' ? t('request.title.evisa', { need: b.serviceFor?.need ?? 'Visa', name }) : b.service === 'reentry' ? t('request.title.reentry', { name }) : t('request.title.renewal', { name });
       detail = names;
+    } else if (b.search && b.kind === 'flight' && (mockBeta().flightsByRequest || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length)) {
+      title = flightRequestTitle(b.search);
+      detail = names;
     } else if (b.search) {
       const s = b.search;
       const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || '';
@@ -374,10 +430,11 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       detail = b.kind === 'stay' ? `${dates} · ${names}` : `From ${s.from ?? 'RUH'} · ${names}`;
     }
     const id = uuid();
+    const fr = b.kind === 'flight' && !!b.search && (mockBeta().flightsByRequest || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
     const req: Req = {
       id, owner: user.id, created: Date.now(), messages: [],
-      details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, clientId: b.clientId ?? null },
-      view: { id, kind: b.kind, status: 'sent', title, summary, detail, note: b.note || null, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
+      details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, clientId: b.clientId ?? null, flightRequest: fr },
+      view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: b.note || null, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
     };
     requests.set(id, req);
     return ok({ request: req.view }, 201);
@@ -440,14 +497,18 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const prior = [...orders.values()].find((o) => o.owner === user.id && o.key === b.idempotencyKey);
     if (prior) return ok({ outcome: prior.status === 'requires_action' ? 'requires_action' : 'created', order: viewOf(prior) }, 201);
     // Accounts that began with Apple, Google or email verify a phone before their first booking (AUTH.md).
-    if (!user.phone) return err('PHONE_REQUIRED');
+    if (!user.phone) {
+      // The beta: with booking open to accounts without a verified phone, a number to reach them instead (lib/mock/beta.ts).
+      if (mockBeta().bookingNeedsPhone) return err('PHONE_REQUIRED');
+      if (!b.contactPhone || !normalizeContactPhone(b.contactPhone)) return err('VALIDATION', t('beta.contact.needed'), { contactPhone: b.contactPhone ? 'invalid' : 'missing' });
+    }
     await new Promise((res) => setTimeout(res, 600));
     const priced = await price(w, user, ctx, b, demo.has('priceUp') && b.draft.kind === 'trip' ? 14_000 : 0);
     if ('status' in priced) return priced;
     const pv = priced.preview;
     if (pv.holdExpiresAt && Date.parse(pv.holdExpiresAt) <= Date.now()) return ok({ outcome: 'hold_ended', preview: pv });
     if (b.expectedTotal !== pv.total.amount) return ok({ outcome: 'price_changed', previousTotal: money(b.expectedTotal), preview: pv, changedBy: money(pv.total.amount - b.expectedTotal) });
-    if (b.draft.kind === 'trip' || b.draft.kind === 'stay') {
+    if ((b.draft.kind === 'trip' || b.draft.kind === 'stay') && !priced.quoted) {
       const s = priced.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
       const checks = entryChecks({ destination: s.destination, travellers: priced.travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null } });
       const blocked = checks.checks.find((c) => c.key === 'passport' && c.blocking);
@@ -474,14 +535,18 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const o: Order = {
       id: uuid(), kind: pv.kind, status: requires3ds ? 'requires_action' : 'pending_agent', step: 0, title: pv.title, place: priced.place,
       depart: f?.out.date ?? null, departTime: f?.out.dep ?? null, from: f?.out.from ?? null, oneway: f ? !f.back : false, photo: pv.photo,
-      carrier: f?.carrier ?? null, airline: f?.airline ?? null, flightNumber: f?.out.flightNumber ?? null, cabin: f?.cabin ?? null, seats: f ? seatsFor(priced.travellers.length, f.cabin) : [],
+      carrier: f?.carrier ?? null, airline: f?.airline ?? null, flightNumber: f?.out.flightNumber ?? null, cabin: f?.cabin ?? null, seats: f && !priced.quoted ? seatsFor(priced.travellers.length, f.cabin) : [],
       travellerIds: pv.travellerIds, lines: pv.lines, total: pv.total, extra: money(0), plan: label === 'Tabby' ? 'tabby' : label === 'Tamara' ? 'tamara' : 'full', paymentLabel: label,
       creditUsed: pv.credit.used, bundle: !!(priced.search as { bundle?: boolean } | undefined)?.bundle, ref: null, agent: { name: agentName() }, confirmedBy: null,
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
       owner: user.id, nextAt: requires3ds ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
-      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0 },
+      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null },
     };
+    if (priced.quoted && b.draft.kind === 'quote') {
+      const r = requests.get(b.draft.requestId);
+      if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); }
+    }
     if (demo.has('slowAgent')) o.nextAt = Date.now() + 4200;
     orders.set(o.id, o);
     if (pv.credit.used.amount) creditSpent.set(user.id, (creditSpent.get(user.id) ?? 0) + pv.credit.used.amount);

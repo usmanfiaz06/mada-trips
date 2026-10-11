@@ -1,12 +1,13 @@
 import {
   CITY_INFO, contactHash, CreateCircleRequest, CreateInviteRequest, CreatePostRequest, CreateSplitRequest, CreateVoteRequest, ERROR_CODES, EVENTS,
   HOME_CITY, LinkOptions, PLAN_SUMMARIES, REACTIONS, ReactRequest, ReportRequest, SaveRequest, SendCircleMessageRequest, UpdateCircleRequest, bookPrefill, checkSaudiMobile,
-  circleDest, inviteUrl, madaReply, maskPhone, personRef, planById, shareUnits, splitAmounts, t, votePhrase,
+  circleDest, inviteUrl, madaReply, maskPhone, personRef, planById, rangeLabel, shareUnits, splitAmounts, t, votePhrase,
   type AroundResponse, type CircleDetail, type CircleMessage, type CircleSummary, type CopyKey, type ErrorCode, type FriendView,
   type IncomingInvite, type InvitePreview, type MadaAction, type PersonRef, type Post, type SavedItem, type SearchHit, type SentInvite,
   type LiveKind, type SocialRelation, type StampsResponse, type SysEvent,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
+import { mockBeta } from './beta';
 import type { AreaMock, MockUser } from '../mock-api';
 
 
@@ -42,6 +43,16 @@ const no = (code: ErrorCode, copy?: CopyKey, extra?: Record<string, unknown>) =>
 const ok = (json: unknown, status = 200): WireResponse => ({ status, json });
 
 /* ───────────── the world ───────────── */
+
+
+/**
+ * The demo world's trip dates are written "10–14 Mar" (2027); like the server, they're worded when read, in the
+ * reader's language ("١٠–١٤ مارس" in Arabic), never sent as English to an Arabic reader.
+ */
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const day = (d: string, mon: string) => `2027-${String(MON.indexOf(mon) + 1).padStart(2, '0')}-${d.padStart(2, '0')}`;
+export const localDates = <S extends string | null | undefined>(s: S): S =>
+  (s ? s.replace(/\b(\d{1,2})(?:–(\d{1,2}))? (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/g, (_m, a: string, b: string | undefined, mon: string) => rangeLabel(day(a, mon), b ? day(b, mon) : null)) : s) as S;
 
 const P = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const ID = { abdullah: P(1), noor: P(2), khalid: P(3), faris: P(4), maha: P(5), yousef: P(6), reem: P(7), hessa: P(8), sara: P(9), ahmed: P(10) };
@@ -141,7 +152,7 @@ function friendView(me: string, id: string): FriendView {
   const f = pairOf(me, id);
   const friend = f?.status === 'accepted';
   return { ...ref(id), since: friend ? (id === ID.abdullah ? '2024' : id === ID.noor || id === ID.khalid ? '2025' : String(new Date(f!.acceptedAt ?? now()).getUTCFullYear())) : null,
-    places: p?.places ?? 0, trips: p?.trips ?? 0, going: friend ? p?.going ?? null : null, mutual: mutual(me, id), tag: isFamily(me, id) ? 'family' : (tagOf(me, id) as FriendView['tag']) };
+    places: p?.places ?? 0, trips: p?.trips ?? 0, going: friend ? localDates(p?.going ?? null) : null, mutual: mutual(me, id), tag: isFamily(me, id) ? 'family' : (tagOf(me, id) as FriendView['tag']) };
 }
 const befriend = (x: string, y: string, tag: { x?: string; y?: string } = {}, at = now()) => {
   const f = pairOf(x, y);
@@ -251,7 +262,7 @@ function summary(c: CircleRow, me: string): CircleSummary {
   const other = ms.find((m) => m.userId !== me);
   return {
     id: c.id, name: c.dm && other ? ref(other.userId).short : c.name, imageUrl: null, tripId: null, role: mine.role, memberCount: ms.length, muted: mine.muted, unread,
-    createdAt: new Date(c.createdAt).toISOString(), cover: (c.cover as CircleSummary['cover']) ?? null, dest: c.dest, dm: c.dm, trip: c.trip,
+    createdAt: new Date(c.createdAt).toISOString(), cover: (c.cover as CircleSummary['cover']) ?? null, dest: c.dest, dm: c.dm, trip: localDates(c.trip),
     adminId: ms.find((m) => m.role === 'admin')?.userId ?? null, preview: ms.slice(0, 3).map((m) => ref(m.userId)), invitedCount: pendingInvites(c.id).length,
     last: last ? toMessage(last) : null, fresh: !mine.lastReadAt && c.createdBy !== me && !c.dm,
   };
@@ -446,7 +457,7 @@ const routes: Route[] = [
       .map((e) => ({ id: e.id, circleId: e.circleId, kind: e.kind, ref: e.ref, actor: e.actor }));
     return ok({ events, cursor: Math.min(liveSeq, Math.max(after, events.at(-1)?.id ?? liveSeq)) });
   }],
-  [/^\/circles$/, 'GET', ({ me }) => ok({ circles: [...circles.values()].filter((c) => memberIds(c.id).includes(me)).map((c) => summary(c, me)).sort((a, b) => (circles.get(b.id)!.updatedAt - circles.get(a.id)!.updatedAt)), incoming: incoming(me) })],
+  [/^\/circles$/, 'GET', ({ me }) => ok({ circles: [...circles.values()].filter((c) => memberIds(c.id).includes(me)).map((c) => summary(c, me)).sort((a, b) => (circles.get(b.id)!.updatedAt - circles.get(a.id)!.updatedAt)), incoming: incoming(me), limited: mockBeta().limited })],
   [/^\/circles$/, 'POST', ({ me, body }) => {
     const b = parse(CreateCircleRequest, body);
     if ([...circles.values()].some((c) => !c.dm && memberIds(c.id).includes(me) && c.name.toLowerCase() === b.name.toLowerCase())) throw no('VALIDATION', 'circles.err.dupeName', { fields: { name: t('circles.err.dupeName') } });
@@ -682,7 +693,7 @@ const routes: Route[] = [
     const c = i.circleId ? circles.get(i.circleId) : null;
     const ids = c ? memberIds(c.id) : [];
     const preview: InvitePreview = { code: code!, status: i.status === 'cancelled' ? 'cancelled' : i.expiresAt < now() ? 'expired' : isFull(i) ? 'full' : 'open', kind: i.kind, from: ref(i.inviterId),
-      circle: c ? { name: c.name, cover: (c.cover as 'istanbul') ?? null, members: ids.slice(0, 4).map(ref), memberCount: ids.length, trip: c.trip } : i.kind === 'circle' ? { name: 'Summer in Baku', cover: null, members: [], memberCount: 0, trip: null } : null };
+      circle: c ? { name: c.name, cover: (c.cover as 'istanbul') ?? null, members: ids.slice(0, 4).map(ref), memberCount: ids.length, trip: localDates(c.trip) } : i.kind === 'circle' ? { name: 'Summer in Baku', cover: null, members: [], memberCount: 0, trip: null } : null };
     return ok(preview);
   }],
   [/^\/invites\/([\w-]+)$/, 'DELETE', ({ me }, id) => {
@@ -843,9 +854,9 @@ const routes: Route[] = [
     const covered = (c: string) => Object.keys(CITY_INFO).find((k) => k.toLowerCase() === c.toLowerCase()) ?? null;
     if (asked && !covered(asked)) throw no('NOT_FOUND');
     const city = (asked && covered(asked)) || trip?.city || HOME_CITY;
-    const sheet = [{ title: 'here' as const, rows: [{ city: HOME_CITY, note: 'here' }] }, ...(trip ? [{ title: 'trips' as const, rows: [{ city: trip.city, note: trip.dates }] }] : []),
+    const sheet = [{ title: 'here' as const, rows: [{ city: HOME_CITY, note: 'here' }] }, ...(trip ? [{ title: 'trips' as const, rows: [{ city: trip.city, note: localDates(trip.dates) }] }] : []),
       { title: 'worth' as const, rows: [{ city: 'AlUla', note: 'planned' }, ...(trip ? [] : [{ city: 'Istanbul', note: 'popular' }])] }];
-    return ok({ city, tripDates: trip && trip.city === city ? trip.dates : null, events: EVENTS[city] ?? [], plans: PLAN_SUMMARIES, sheet, covered: Object.entries(CITY_INFO).map(([c, i]) => ({ city: c, country: i.country })) });
+    return ok({ city, tripDates: trip && trip.city === city ? localDates(trip.dates) : null, events: EVENTS[city] ?? [], plans: PLAN_SUMMARIES, sheet, covered: Object.entries(CITY_INFO).map(([c, i]) => ({ city: c, country: i.country })) });
   }],
   [/^\/discover\/notify$/, 'POST', () => ok({ ok: true })],
   [/^\/discover\/around$/, 'GET', ({ me }) => ok(around(me))],
@@ -904,10 +915,10 @@ function around(me: string): AroundResponse {
   const going = friends.filter((f) => !fam.includes(f) && people.get(f)?.going?.startsWith(city));
   const mine = presence.get(me);
   return {
-    city, dates: trip?.dates ?? null, on: !!mine && mine.endsAt > now(), audience: mine?.audience ?? 'picked', endsAt: mine ? new Date(mine.endsAt).toISOString() : null,
+    city, dates: localDates(trip?.dates ?? null), on: !!mine && mine.endsAt > now(), audience: mine?.audience ?? 'picked', endsAt: mine ? new Date(mine.endsAt).toISOString() : null,
     options: { picked: (going.length ? going : friends.filter((f) => !fam.includes(f))).map(ref), close: friends.filter((f) => tagOf(me, f) === 'close').map(ref), family: fam.map(ref) },
     people: friends.filter((f) => !hidden.has(f)).map((f) => ({ f, p: presence.get(f) })).filter(({ p }) => p && p.endsAt > now() && p.city === city && p.ids.includes(me))
-      .map(({ f, p }) => { const m = marks.find((x) => x.userId === me && x.otherId === f); return { person: ref(f), city: p!.city, dates: p!.dates, hello: m?.mark === 'hello' ? 'sent' : m?.mark === 'no' ? 'no' : null }; }),
+      .map(({ f, p }) => { const m = marks.find((x) => x.userId === me && x.otherId === f); return { person: ref(f), city: p!.city, dates: localDates(p!.dates), hello: m?.mark === 'hello' ? 'sent' : m?.mark === 'no' ? 'no' : null }; }),
   };
 }
 
@@ -924,6 +935,8 @@ export const circlesMock: AreaMock = async (w: Wire, ctx) => {
   const isPreview = w.method === 'GET' && /^\/invites\/[\w-]+$/.test(url.pathname);
   if (!ctx.user && !isPreview) return fail('UNAUTHORIZED');
   if (ctx.user) ensure(ctx.user);
+  // The desk paused Circles for this account (lib/mock/beta.ts ?beta=limited, the server's lib/app/limits.ts).
+  if (mockBeta().limited && w.method === 'POST' && /^\/(posts|circles|circles\/[\w-]+\/(messages|votes|splits|invites)|circles\/dm|friends\/[\w-]+|invites)$/.test(url.pathname)) return fail('ACCOUNT_LIMITED');
   try {
     return await match.fn({ me: ctx.user?.id ?? '', body: (w.body ?? {}) as Record<string, unknown>, q: url.searchParams }, ...match.m!.slice(1));
   } catch (e) {

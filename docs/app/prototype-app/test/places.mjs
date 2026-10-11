@@ -148,6 +148,56 @@ try {
   await shot('city-missing');
   await back();
 
+  step('things to do on a city: Riyadh (hot day, indoors first, prayer time, book, what’s on)');
+  await page.evaluate(() => window.__madaPush('city', { id: '108410' }));
+  await page.waitForTimeout(700);
+  await see('Things to do');
+  await see('Indoor ideas first.');
+  await see('Some places pause for prayer.');
+  await see('National Museum of Saudi Arabia');
+  await phone.locator('[data-things="section"]').scrollIntoViewIfNeeded();
+  await shot('things-riyadh');
+  await see('Book with Mada');
+  await see('Riyadh Season: Boulevard World');
+  await phone.locator('.th-card', { hasText: 'National Museum of Saudi Arabia' }).first().click();
+  await page.waitForTimeout(500);
+  await see('Open in Maps');
+  await see('From OpenStreetMap. Times can change on holidays.');
+  await shot('things-place-sheet');
+  await phone.locator('.sheet').getByRole('button', { name: 'Book with Mada' }).click();
+  await page.waitForTimeout(500);
+  await see('Book National Museum of Saudi Arabia');
+  await shot('things-book-sheet');
+  await phone.getByRole('button', { name: 'Send to Mada' }).click();
+  await page.waitForTimeout(800);
+  st = await state();
+  if (!st.requests.some((r) => r.title === 'Book National Museum of Saudi Arabia' && r.kind === 'todo')) throw new Error('book with Mada made no request');
+  await shot('things-request-chat');
+  await back();
+
+  step('the full list, filters and sources');
+  await phone.getByRole('button', { name: 'See all' }).first().click();
+  await page.waitForTimeout(600);
+  await see('Things to do in Riyadh');
+  await phone.getByRole('button', { name: 'Family', exact: true }).click();
+  await page.waitForTimeout(300);
+  await shot('things-full-family');
+  await phone.getByRole('button', { name: 'Sources and licences' }).click();
+  await page.waitForTimeout(400);
+  await see('OpenStreetMap contributors, under the Open Database Licence (ODbL).');
+  await see('Weather: Open-Meteo.com, CC BY 4.0.');
+  await shot('things-sources');
+  await back();
+  await back();
+  await back();
+
+  step('a city with no list yet');
+  await page.evaluate(() => window.__madaPush('city', { id: '611717' }));
+  await page.waitForTimeout(600);
+  await see('We don’t have a list for Tbilisi yet.');
+  await shot('things-none');
+  await back();
+
   step('offline: the plan waits in the Outbox');
   await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('mada-proto-v1')); s.demo = { ...(s.demo || {}), offline: true }; localStorage.setItem('mada-proto-v1', JSON.stringify(s)); });
   await page.reload();

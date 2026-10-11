@@ -418,6 +418,8 @@ function useItinerary() {
   if (s.circles?.sharePaid && !s.requests.some((r) => r.kind === 'todo' && ['quote', 'paid', 'done'].includes(r.status))) add(second, { id: 'cruise', time: '19:30', icon: 'star', kind: 'booked', title: 'Bosphorus dinner cruise', sub: 'With Abdullah’s family · from Kabataş pier', status: 'booked', refundKey: 'share' });
   trq.filter((r) => r.kind === 'celebration' && r.day).forEach((r) => add(typeof r.day === 'number' ? addDays(outDay, r.day - 9) : r.day, { id: 'cel-' + r.id, time: '20:00', icon: 'star', kind: 'note', title: r.short, sub: 'The hotel knows. Something small in the room.' }));
 
+  /* Things to do the traveller added to their plan: on their day, or the first full day. */
+  (s.plannedIdeas || []).forEach((p, i) => add(p.day && days[p.day] ? p.day : second, { id: `plan-${i}`, time: null, icon: 'star', kind: 'idea', title: p.title, sub: p.sub, planned: true }));
   /* Free days get gentle ideas, never filler. Friday is Jumu'ah; Sunday the Grand Bazaar is shut. */
   const kids = (t.travellers || []).some((id) => /daughter|son/i.test(PEOPLE[id]?.role || ''));
   const pool = [
@@ -429,7 +431,7 @@ function useItinerary() {
   let k = 0;
   const lastFull = backDay ? addDays(backDay, -1) : outDayStay ? addDays(outDayStay, -1) : null;
   Object.values(days).forEach((day) => {
-    const booked = day.items.filter((i) => ['flight', 'booked', 'pick'].includes(i.kind)).length;
+    const booked = day.items.filter((i) => ['flight', 'booked', 'pick'].includes(i.kind) || i.planned).length;
     if (!booked && day.d !== outDay && day.d !== backDay) {
       const wd = weekday(day.d);
       const ideas = wd === 'Fri' ? [['Jumu’ah at Süleymaniye Mosque', 'Khutbah at 13:21. Be there by 12:45 for space inside.', null], ['Grand Bazaar', 'Open until 19:00. Closed on Sundays.', null]]

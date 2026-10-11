@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { CITY_INFO, type InviteLink, type Post, type PostKind } from '@mada/shared';
+import { CITY_INFO, type InviteLink, type LinkOptions, type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Field } from '@/components/Field';
@@ -16,35 +16,118 @@ import { useApiQuery } from '@/lib/net/hooks';
 import { GoneState } from '@/components/states';
 import { circlesApi, ck, cityCover, photoSource, useAct, useMeId, whenLabel } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors, ff } from '@/theme';
-import { Face, Input, Row, SheetScroll } from './ui';
+import { Face, Input, Row, SheetScroll, TextLink } from './ui';
+import { QrCode } from './QrCode';
 
 /* Sheets shared by several Circles screens: invite links, reports, the city picker, posting a tip, one tip opened. */
 
-/** Invite with a link. The link is shown so it can be selected by hand if copying is refused (FLOWS.md §8). */
-export function InviteSheet({ visible, onClose, what, load }: { visible: boolean; onClose: () => void; what: string; load: () => Promise<InviteLink> }) {
+/**
+ * Invite with a link (FLOWS.md §8): the link, its code and a QR code; WhatsApp first, then the system share sheet;
+ * how long it lasts and how many it lets in (a change makes a new link and turns the old one off); turning it off.
+ * The link is shown so it can be selected by hand if copying is refused.
+ */
+export function InviteSheet({ visible, onClose, what, load }: { visible: boolean; onClose: () => void; what: string; load: (o?: LinkOptions) => Promise<InviteLink> }) {
   const [link, setLink] = useState<InviteLink | null>(null);
-  useEffect(() => { if (visible && !link) load().then(setLink).catch(() => toast(t('error.internal'))); }, [visible, link, load]);
+  const [off, setOff] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [confirmOff, setConfirmOff] = useState(false);
+  const [days, setDays] = useState<1 | 7 | 14>(14);
+  const [cap, setCap] = useState<number | null>(null);
+  useEffect(() => { if (visible && !link && !off) load().then(setLink).catch(() => toast(t('error.internal'))); }, [visible, link, off, load]);
   const url = link?.url ?? '';
   const web = Platform.OS === 'web';
+  const text = t('circles.invite.shareText', { url });
+  const remake = async (o: LinkOptions, said: string) => {
+    setBusy(true);
+    try { const l = await load({ ...o, fresh: true }); setLink(l); setOff(false); buzz('success'); toast(said); } catch (e) { toast(e instanceof ApiError ? e.message : t('error.internal')); } finally { setBusy(false); }
+  };
+  const pick = (o: { days?: 1 | 7 | 14; cap?: number | null }) => {
+    const d = o.days ?? days;
+    const c = o.cap !== undefined ? o.cap : cap;
+    setDays(d); setCap(c);
+    void remake({ expiresInDays: d, maxUses: c }, t('circles.invite.made'));
+  };
+  const whatsapp = async () => {
+    if (!url) return;
+    const app = `whatsapp://send?text=${encodeURIComponent(text)}`;
+    try {
+      if (!web && (await Linking.canOpenURL(app))) await Linking.openURL(app);
+      else await Linking.openURL(`https://wa.me/?text=${encodeURIComponent(text)}`);
+      buzz('success');
+    } catch { toast(t('circles.invite.copyRefused')); }
+  };
   const share = async () => {
     if (!url) return;
     try {
       if (web) { await Clipboard.setStringAsync(url); toast(t('circles.invite.copied')); }
-      else await Share.share({ message: t('circles.invite.shareText', { url }) });
+      else await Share.share({ message: text });
       buzz('success');
     } catch {
       toast(t('circles.invite.copyRefused'));
     }
   };
+  const copyCode = async () => { try { await Clipboard.setStringAsync(link!.code); toast(t('circles.invite.codeCopied')); } catch { toast(t('circles.invite.copyRefused')); } };
+  const turnOff = async () => {
+    if (!link?.id) return;
+    setBusy(true);
+    try { await circlesApi.cancelInvite(link.id); setLink(null); setOff(true); setConfirmOff(false); buzz('success'); toast(t('circles.invite.turnedOff')); } catch (e) { toast(e instanceof ApiError ? e.message : t('error.internal')); } finally { setBusy(false); }
+  };
+  const until = link ? new Date(link.expiresAt).toLocaleDateString(getLocale() === 'ar' ? 'ar-SA' : 'en-GB', { day: 'numeric', month: 'short' }) : '';
+  const used = !link ? '' : link.maxUses != null ? t('circles.invite.usedOf', { uses: link.uses, max: link.maxUses }) : link.uses ? tn('circles.invite.usedOpen', link.uses) : '';
+
   return (
     <Sheet visible={visible} onClose={onClose} label={t('circles.invite.label')}>
-      <T v="h2">{t('circles.invite.title', { what })}</T>
-      <T v="small">{t('circles.invite.body')}</T>
-      <Input value={url.replace(/^https:\/\//, '')} editable={false} selectTextOnFocus accessibilityLabel={t('circles.invite.linkA11y')} testID="invite-link" />
-      <Button label={web ? t('circles.invite.copy') : t('circles.invite.shareNative')} icon={<Icon name="link" color={colors.mist} />} onPress={share} disabled={!url} testID="invite-copy" />
+      <SheetScroll>
+        <T v="h2">{t('circles.invite.title', { what })}</T>
+        <T v="small">{t('circles.invite.body')}</T>
+        {off ? (
+          <View style={{ gap: 12 }}>
+            <T v="small" style={{ fontFamily: ff.ui600 }} testID="invite-off">{t('circles.invite.turnedOff')}</T>
+            <Button label={t('circles.invite.makeNew')} busy={busy} onPress={() => remake({ expiresInDays: days, maxUses: cap }, t('circles.invite.made'))} testID="invite-new" />
+          </View>
+        ) : (<>
+          <View style={s.qrRow}>
+            {url ? <QrCode value={url} size={132} label={t('circles.invite.qrA11y')} /> : <View style={{ width: 132, height: 132 }} />}
+            <View style={{ flex: 1, gap: 6 }}>
+              <T v="tiny">{t('circles.invite.codeLabel')}</T>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${t('circles.invite.codeLabel')} ${link?.code ?? ''}`} onPress={copyCode} disabled={!link} testID="invite-code">
+                <T style={s.code} selectable>{link?.code ?? ' '}</T>
+              </Pressable>
+              <T v="tiny">{t('circles.invite.qrHint')}</T>
+            </View>
+          </View>
+          <Input value={url.replace(/^https:\/\//, '')} editable={false} selectTextOnFocus accessibilityLabel={t('circles.invite.linkA11y')} testID="invite-link" />
+          {link ? <T v="tiny" testID="invite-status">{[t('circles.invite.until', { date: until }), used].filter(Boolean).join(' ')}</T> : null}
+          <Button label={t('circles.invite.whatsapp')} icon={<Icon name="phone" color={colors.mist} />} onPress={whatsapp} disabled={!url} testID="invite-whatsapp" />
+          <Button variant="secondary" label={web ? t('circles.invite.copy') : t('circles.invite.more')} icon={<Icon name="link" />} onPress={share} disabled={!url} testID="invite-copy" />
+          <Row gap={16} wrap>
+            <TextLink label={t('circles.invite.options')} onPress={() => setSettings((v) => !v)} testID="invite-settings" />
+            {link?.id ? <TextLink label={t('circles.invite.turnOff')} color={colors.ink3} onPress={() => setConfirmOff(true)} testID="invite-turn-off" /> : null}
+          </Row>
+          {settings ? (
+            <View style={{ gap: 10 }} testID="invite-options">
+              <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.invite.lasts')}</T>
+              <Row wrap gap={8}>{([1, 7, 14] as const).map((d) => <Chip key={d} label={tn('circles.invite.days', d)} on={days === d} onPress={() => pick({ days: d })} />)}</Row>
+              <T v="small" style={{ fontFamily: ff.ui600 }}>{t('circles.invite.letsIn')}</T>
+              <Row wrap gap={8}>{([null, 2, 5, 10, 20] as const).map((c) => <Chip key={String(c)} label={c == null ? t('circles.invite.anyone') : tn('circles.invite.people', c)} on={cap === c} onPress={() => pick({ cap: c })} />)}</Row>
+            </View>
+          ) : null}
+          {confirmOff ? (
+            <View style={s.confirm} testID="invite-confirm-off">
+              <T v="h3">{t('circles.invite.turnOffTitle')}</T>
+              <T v="small">{t('circles.invite.turnOffBody')}</T>
+              <Row gap={8}>
+                <Button size="small" block={false} label={t('circles.invite.turnOff')} busy={busy} onPress={turnOff} testID="invite-turn-off-yes" />
+                <Button size="small" block={false} variant="ghost" label={t('common.cancel')} onPress={() => setConfirmOff(false)} />
+              </Row>
+            </View>
+          ) : null}
+        </>)}
+      </SheetScroll>
     </Sheet>
   );
 }
@@ -224,6 +307,9 @@ export function relLabel(p: Pick<Post, 'relation' | 'authorTrips'>): string {
 }
 
 const s = StyleSheet.create({
+  qrRow: { flexDirection: "row", alignItems: "center", gap: 16, padding: 12, borderRadius: 22, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
+  code: { fontFamily: ff.mono, fontSize: 17, letterSpacing: 0.5, color: colors.green, writingDirection: "ltr" },
+  confirm: { gap: 8, padding: 14, borderRadius: 18, backgroundColor: colors.mist },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingStart: 8, paddingEnd: 12, borderRadius: 18, backgroundColor: colors.mist },
   cityOn: { backgroundColor: colors.goldWash, borderWidth: 1.5, borderColor: colors.gold, paddingVertical: 6.5, paddingStart: 6.5, paddingEnd: 10.5 },
   cityImg: { width: 48, height: 48, borderRadius: 12 },

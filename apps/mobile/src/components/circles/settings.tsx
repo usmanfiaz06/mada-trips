@@ -44,7 +44,7 @@ export function CircleSettings({ visible, onClose, d, onGone }: { visible: boole
   const del = useAct(() => circlesApi.remove(id), () => [ck.list]);
   const sheetLabel = mode === 'rename' ? t('circles.settings.rename') : mode === 'add' ? t('circles.settings.addPeople') : t('circles.settings.label');
 
-  if (mode === 'invite') return <InviteSheet visible={visible} onClose={() => setMode('main')} what={d.circle.name} load={() => circlesApi.circleLink(id)} />;
+  if (mode === 'invite') return <InviteSheet visible={visible} onClose={() => setMode('main')} what={d.circle.name} load={(o) => circlesApi.circleLink(id, o)} />;
 
   return (
     <Sheet visible={visible} onClose={onClose} label={sheetLabel}>

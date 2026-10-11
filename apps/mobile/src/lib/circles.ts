@@ -7,7 +7,7 @@ import {
   ProfileResponse, SavedItem, SavedResponse, SearchResponse, SentMessages, StampsResponse, formatSar, joinNames, planById,
   type Audience, type CircleMessage, type CircleSummary, type CreateCircleRequest, type CreateInviteRequest, type CreatePostRequest,
   type CreateSplitRequest, type CreateVoteRequest, type MarkPaidRequest, type PersonRef, type PostKind, type ReportRequest, type SaveRequest,
-  type SendCircleMessageRequest, type SharedCard, type UpdateCircleRequest,
+  type SendCircleMessageRequest, type SharedCard, type UpdateCircleRequest, type LinkOptions, type ReactRequest,
 } from '@mada/shared';
 import { request } from './api';
 import { useApiMutation, useApiQuery } from './net/hooks';
@@ -15,12 +15,15 @@ import { registerOutboxKind, type EnqueueInput } from './net/outbox';
 import { API_ORIGIN } from './config';
 import { t } from './i18n';
 import { useSession } from './session';
+import { pollEvery, wireLive } from './circles-live';
 
 /*
  * The Circles client: circles and their chat, votes and splits, friends, invites, tips, saves, Discover and
- * Who's around. JSON through the shared, schema-checked `request`. Server state lives in React Query; an open chat
- * polls every 5 seconds (the API takes ?after= so a stream can replace the poll later without changing screens).
+ * Who's around. JSON through the shared, schema-checked `request`. Server state lives in React Query. Changes arrive
+ * on the live channel (circles-live.ts) and refetch what they touch; screens poll on their own (an open chat every
+ * 5 s) only while that channel is down.
  */
+wireLive();
 
 export const ck = {
   all: ['circles'] as const,
@@ -72,7 +75,7 @@ export const circlesApi = {
   makeAdmin: (id: string, uid: string) => request({ method: 'PATCH', path: `/circles/${id}/members/${uid}`, body: { role: 'admin' } }, OkResponse),
   removeMember: (id: string, uid: string) => request({ method: 'DELETE', path: `/circles/${id}/members/${uid}` }, OkResponse),
   invite: (id: string, userIds: string[]) => request({ method: 'POST', path: `/circles/${id}/invites`, body: { userIds } }, CircleDetail),
-  circleLink: (id: string) => request({ method: 'POST', path: `/circles/${id}/link` }, InviteLink),
+  circleLink: (id: string, o: LinkOptions = {}) => request({ method: 'POST', path: `/circles/${id}/link`, body: o }, InviteLink),
 
   invites: () => request({ method: 'GET', path: '/invites' }, InvitesResponse),
   createInvite: (b: CreateInviteRequest) => request({ method: 'POST', path: '/invites', body: b }, CreateInviteResponse),
@@ -81,6 +84,8 @@ export const circlesApi = {
   decline: (id: string) => request({ method: 'POST', path: `/invites/${id}/decline` }, OkResponse),
   remindInvite: (id: string) => request({ method: 'POST', path: `/invites/${id}/remind` }, OkResponse),
   cancelInvite: (id: string) => request({ method: 'DELETE', path: `/invites/${id}` }, OkResponse),
+  react: (id: string, mid: string, b: ReactRequest) => request({ method: 'POST', path: `/circles/${id}/messages/${mid}/reactions`, body: b }, Items),
+  typing: (id: string) => request({ method: 'POST', path: `/circles/${id}/typing`, retries: 0 }, OkResponse),
 
   friends: () => request({ method: 'GET', path: '/friends' }, FriendsResponse),
   addFriend: (userId: string) => request({ method: 'POST', path: '/friends', body: { userId } }, FriendStatus),
@@ -123,10 +128,10 @@ export function useMeId(): string {
   return useSession((s) => s.user?.id ?? '');
 }
 
-export const useCircles = () => useApiQuery({ queryKey: ck.list, queryFn: circlesApi.list, enabled: signedIn(), refetchInterval: 15_000 });
-export const useCircle = (id: string) => useApiQuery({ queryKey: ck.circle(id), queryFn: () => circlesApi.get(id), enabled: !!id && signedIn(), refetchInterval: 15_000, retry: false });
-/** An open chat polls every 5 seconds. */
-export const useMessages = (id: string, poll = true) => useApiQuery({ queryKey: ck.messages(id), queryFn: () => circlesApi.messages(id), enabled: !!id && signedIn(), refetchInterval: poll ? 5_000 : false, retry: false });
+export const useCircles = () => useApiQuery({ queryKey: ck.list, queryFn: circlesApi.list, enabled: signedIn(), refetchInterval: () => pollEvery(15_000) });
+export const useCircle = (id: string) => useApiQuery({ queryKey: ck.circle(id), queryFn: () => circlesApi.get(id), enabled: !!id && signedIn(), refetchInterval: () => pollEvery(15_000), retry: false });
+/** An open chat: live, or polled every 5 seconds while the live channel is down. */
+export const useMessages = (id: string, poll = true) => useApiQuery({ queryKey: ck.messages(id), queryFn: () => circlesApi.messages(id), enabled: !!id && signedIn(), refetchInterval: poll ? () => pollEvery(5_000) : false, retry: false });
 export const useFriends = () => useApiQuery({ queryKey: ck.friends, queryFn: circlesApi.friends, enabled: signedIn() });
 export const useProfile = (id: string) => useApiQuery({ queryKey: ck.profile(id), queryFn: () => circlesApi.profile(id), enabled: !!id && signedIn(), retry: false });
 export const useInvites = () => useApiQuery({ queryKey: ck.invites, queryFn: circlesApi.invites, enabled: signedIn() });

@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
 import { colors } from '@/theme';
+import { TripHotelbeds } from '@/components/trips/Hotelbeds';
 import { ThingsView } from '@/components/things/ThingsView';
 import { addDays } from '@mada/shared';
 
@@ -114,6 +115,7 @@ export default function TripDetail() {
               <Grow gap={0}><H3 size={15}>{home && arrive ? t('tm.detail.pickBoth') : home ? t('tm.detail.pickThere') : t('tm.detail.pickArrival')}</H3><Tiny>{[home ? t('tm.detail.inCity', { driver: home.driverName ?? '', city: home.city ?? '' }) : null, arrive ? t('tm.detail.inCity', { driver: arrive.driverName ?? '', city: arrive.city ?? trip.city }) : null].filter(Boolean).join(' · ')}{!stLive && !trip.noStay ? ` · ${t('tm.detail.needsAddr')}` : ''}</Tiny></Grow>
             </Box>
           ) : null}
+          <TripHotelbeds trip={trip} hasArrivalPickup={!!arrive} />
           {q.isError ? <StaleBadge testID="trip-fresh" updatedAt={q.dataUpdatedAt || null} stale /> : null}
           <Eyebrow style={{ marginTop: 8 }}>{t('tm.detail.manage')}</Eyebrow>
           <Box padding={6} gap={0}>

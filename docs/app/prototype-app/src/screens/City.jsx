@@ -3,6 +3,7 @@ import { useStore, buzz, HAPTIC, PEOPLE } from '../store.jsx';
 import { Icon, TopBar, Sheet, EmptyState, ArtCompass } from '../ui.jsx';
 import CITIES from '../data/cities.json';
 import { PLACES } from './Circles.jsx';
+import { ThingsSection } from './Things.jsx';
 
 /* Every city in the world we can name (bundled, no network: cities.json is built from GeoNames, CC BY 4.0, and
    OurAirports, public domain, by platform/scripts/places/export-bundles.ts). Search, and the page for any city.
@@ -229,6 +230,7 @@ export default function City({ params = {} }) {
           <Icon name="rain" size={20} color="#7d5d27" />
           <span className="small" style={{ color: '#1e352d' }}>The forecast shows here 10 days before you go.</span>
         </div>
+        <ThingsSection cityId={c.id} city={c.name} />
         {place ? (
           <>
             <div className="card rise d1" style={{ gap: 8 }}>

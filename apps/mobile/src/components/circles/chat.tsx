@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
-import { planById, type CircleMessage, type PersonRef, type SplitShare } from '@mada/shared';
+import { REACTIONS, joinNames, planById, type CircleMessage, type PersonRef, type SplitShare } from '@mada/shared';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
@@ -185,6 +185,40 @@ export function ShareCard({ m, saved, pinned, canPin, onOpenPlan, onSave, onPlan
 }
 
 /** "Mada is looking into it", while an answer is on its way. */
+/** The reactions under a message: each emoji with how many, yours highlighted; tap to add or take back yours. */
+export function Reactions({ list, me, mine, people, onToggle }: { list: CircleMessage['reactions']; me: string; mine: boolean; people: Map<string, PersonRef>; onToggle: (emoji: string, on: boolean) => void }) {
+  if (!list.length) return null;
+  return (
+    <View style={[st.reacts, mine ? { alignSelf: 'flex-end' } : { paddingStart: 40 }]} testID="reactions">
+      {list.map((r) => {
+        const own = r.ids.includes(me);
+        const names = joinNames(r.ids.map((id) => (id === me ? t('circles.you') : people.get(id)?.short ?? t('circles.someone'))));
+        return (
+          <Pressable key={r.emoji} accessibilityRole="button" accessibilityState={{ selected: own }} accessibilityLabel={t('circles.react.count', { emoji: r.emoji, names })}
+            onPress={() => { buzz('select'); onToggle(r.emoji, !own); }} style={[st.react, own ? st.reactOwn : null]} testID={`reaction-${r.emoji}`}>
+            <Text style={{ fontSize: 14 }}>{r.emoji}</Text>
+            {r.ids.length > 1 ? <T style={{ fontSize: 12, fontFamily: ff.ui600, color: own ? colors.goldInk : colors.ink3 }}>{r.ids.length}</T> : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Press and hold a message: six reactions to pick from. */
+export function ReactionBar({ mine, onPick, onClose }: { mine: boolean; onPick: (emoji: string) => void; onClose: () => void }) {
+  return (
+    <View style={[st.bar, mine ? { alignSelf: 'flex-end' } : { marginStart: 40 }]} accessibilityRole="menu" accessibilityLabel={t('circles.react.a11y')} testID="reaction-bar">
+      {REACTIONS.map((e) => (
+        <Pressable key={e} accessibilityRole="button" accessibilityLabel={t('circles.react.with', { emoji: e })} onPress={() => { buzz('select'); onPick(e); }} style={st.barItem} testID={`react-${e}`}>
+          <Text style={{ fontSize: 22 }}>{e}</Text>
+        </Pressable>
+      ))}
+      <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={onClose} style={st.barItem}><Icon name="close" size={16} color={colors.ink3} /></Pressable>
+    </View>
+  );
+}
+
 export function Typing({ text }: { text: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingStart: 40 }}>
@@ -195,6 +229,11 @@ export function Typing({ text }: { text: string }) {
 }
 
 const st = StyleSheet.create({
+  reacts: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: -4 },
+  react: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 9, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
+  reactOwn: { backgroundColor: '#f3ead8', borderColor: colors.gold },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 2, padding: 4, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, boxShadow: '0px 12px 28px -18px rgba(15,26,22,0.6)' },
+  barItem: { width: 40, height: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   rowMine: { flexDirection: 'row-reverse' },
   face: { width: 32 },

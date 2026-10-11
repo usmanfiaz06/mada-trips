@@ -48,7 +48,7 @@ export function ThingPhoto({ x, style, children }: { x: Thing; style?: object; c
   return (
     <View style={[s.photo, style]}>
       {src ? <Image source={src} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} accessibilityIgnoresInvertColors /> : (
-        <View style={[StyleSheet.absoluteFill, s.noPhoto]}><Icon name={icon} size={26} color={colors.gold} /></View>
+        <View style={[StyleSheet.absoluteFill, s.noPhoto]}><View style={s.noPhotoMark}><Icon name={icon} size={24} color={colors.goldInk} /></View></View>
       )}
       {children}
     </View>
@@ -113,12 +113,15 @@ export function ExperienceCard({ e, onPress, wide, testID }: { e: Experience; on
 
 /** An event as a row: the date block, what, when and where. */
 export function EventRow({ w, onPress, testID }: { w: WhatsOn; onPress: () => void; testID?: string }) {
-  const d = Number(w.startsOn.slice(8, 10));
-  const month = dayLabel(w.startsOn, { today: w.startsOn }).split(' ').slice(-1)[0] ?? '';
+  const today = new Date().toISOString().slice(0, 10);
+  const ongoing = w.startsOn < today && w.endsOn > w.startsOn;
+  const shownDay = ongoing ? w.endsOn : w.startsOn;
+  const d = Number(shownDay.slice(8, 10));
+  const month = dayLabel(shownDay, { today: shownDay }).split(' ').slice(-1)[0] ?? '';
   const when = w.startsOn === w.endsOn ? dayLabel(w.startsOn, { today: w.startsOn }) : t('things.event.dates', { from: dayLabel(w.startsOn, { today: w.startsOn }), to: dayLabel(w.endsOn, { today: w.endsOn }) });
   return (
     <Pressable testID={testID} accessibilityRole="button" onPress={() => { buzz('tap'); onPress(); }} style={({ pressed }) => [s.row, shadow('card'), pressed && s.pressed]}>
-      <View style={s.date}><T style={[font('h2', colors.paper), { fontSize: 22, lineHeight: 24 }]}>{localizeDigits(String(d))}</T><T v="tiny" color={colors.gold}>{month}</T></View>
+      <View style={s.date}>{ongoing ? <T v="tiny" color={colors.onDark2}>{t('things.event.until')}</T> : null}<T style={[font('h2', colors.paper), { fontSize: 22, lineHeight: 24 }]}>{localizeDigits(String(d))}</T><T v="tiny" color={colors.gold}>{month}</T></View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         <T v="h3" style={{ fontSize: 16 }} numberOfLines={2}>{w.title}</T>
         <T v="tiny" numberOfLines={1}>{[when, w.time ? localizeDigits(w.time) : null, w.venue].filter(Boolean).join(' · ')}</T>
@@ -168,7 +171,8 @@ export function MiniMap({ lat, lon, name, from }: { lat: number; lon: number; na
 
 export const s = StyleSheet.create({
   photo: { overflow: 'hidden', backgroundColor: colors.green2 },
-  noPhoto: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.green },
+  noPhoto: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldWash },
+  noPhotoMark: { width: 52, height: 52, borderRadius: 99, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,253,249,0.7)' },
   card: { width: 196, borderRadius: 20, backgroundColor: colors.paper, overflow: 'hidden' },
   wide: { width: 260 },
   cardBody: { padding: 12, gap: 3 },

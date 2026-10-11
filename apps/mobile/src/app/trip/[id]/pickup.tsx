@@ -92,7 +92,7 @@ export default function Pickup() {
           <PickCard testID={`pickup-${o.kind}-${i}`} on={chosen?.id === o.id} onPress={() => setPick(o.id)} radio
             title={`${o.vehicle} · ${t(o.kind === 'private' ? 'pickup.private' : 'pickup.shared')}`}
             sub={[t(o.kind === 'private' ? 'pickup.privateSub' : 'pickup.sharedSub'), t('pickup.upTo', { n: o.maxPax }), o.minutes ? t('pickup.minutes', { n: o.minutes }) : null].filter(Boolean).join(' · ')}
-            right={<T style={{ fontSize: 16, fontWeight: '600', color: colors.green }}>{formatSar(o.total.amount)}</T>}
+            right={formatSar(o.total.amount)}
             note={o.refundable && o.freeCancelUntil ? t('pickup.freeCancel', { date: shortDay(o.freeCancelUntil) }) : t('pickup.noCancel')} />
         </Rise>
       ))}

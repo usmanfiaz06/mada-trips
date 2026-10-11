@@ -137,7 +137,7 @@ export default function NewCircle() {
         {error ? <T v="small" color={colors.badInk} accessibilityRole="alert">{error}</T> : null}
       </ScrollView>
       <Act><Button label={picked.length ? t('circles.newCircle.make', { name: name.trim() }) : t('circles.newCircle.makeLater', { name: name.trim() })} busy={create.isPending} onPress={make} haptic={null} testID="circle-make" /></Act>
-      <InviteSheet visible={invite} onClose={() => setInvite(false)} what={name.trim() || t('circles.invite.yourCircle')} load={() => circlesApi.createInvite({ link: true }).then((r) => r.link!)} />
+      <InviteSheet visible={invite} onClose={() => setInvite(false)} what={name.trim() || t('circles.invite.yourCircle')} load={(o) => circlesApi.createInvite({ link: true, ...o }).then((r) => r.link!)} />
     </Screen>
   );
 }

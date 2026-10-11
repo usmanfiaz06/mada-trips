@@ -43,7 +43,7 @@ another schema than `public`, adjust the wrapper.
 | [Wikimedia Commons](https://commons.wikimedia.org/) imageinfo | The photo, its author and licence | Per file (CC BY, CC BY-SA, CC0, PD) | Only free licences are used (others are dropped); show "Photo: author, licence" linking to the file page. Files on English Wikipedia itself (often fair use) are never used |
 | [Wikidata](https://www.wikidata.org/) | Finding the matching Wikivoyage article (London, Ontario never gets London's guide) | CC0 | Nothing required |
 | [Wikivoyage](https://en.wikivoyage.org/) extracts | Understand, Get in, See, Do, Eat, Stay safe | CC BY-SA 4.0 | Show "From Wikivoyage, CC BY-SA" with a link beside every extract. Extracts are cut at a sentence end and marked "Shortened from the original"; they are never reworded. Listings (addresses, phones) are skipped. Share-alike: if we ever edit the text, the edit is CC BY-SA too |
-| OpenStreetMap Overpass (not used yet) | Points of interest, later | ODbL | Credit "© OpenStreetMap contributors"; share-alike on derived databases |
+| OpenStreetMap Overpass | Things to do: places worth a visit and their hours (`../activities/README.md`) | ODbL | Credit "© OpenStreetMap contributors"; share-alike on derived databases |
 
 Never scraped: only open dumps and the documented public APIs above. Every request sends
 `User-Agent: MadaTrips-Places/1.0 (+https://madatrips.sa; <PLACES_CONTACT>)` (set `PLACES_CONTACT` to a monitored

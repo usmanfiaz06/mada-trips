@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { DESTINATIONS, addDays, formatSar, householdOf, quickDates, type AskIntent, type Person } from '@mada/shared';
@@ -80,14 +80,17 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
           <Animated.View key={h.id} entering={enter(i + 1)}>
             <Card padding={0} selected={on} onPress={() => setPick(h.id)} accessibilityLabel={h.name} style={{ overflow: 'hidden', gap: 0 }}>
               <View style={styles.photo}>
-                <Photo name={h.photo} focal={h.focal} />
+                {h.hotel?.imageUrl ? <Image source={{ uri: h.hotel.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <Photo name={h.photo} focal={h.focal} />}
                 <Pill label={t(`search.label.${h.label}`)} variant={on ? 'gold' : 'default'} style={[styles.pillTL, on ? null : { backgroundColor: 'rgba(255,253,249,0.9)' }]} />
-                <Pill label={h.rating} style={[styles.pillTR, { backgroundColor: 'rgba(255,253,249,0.9)' }]} />
+                {h.rating || h.hotel?.category ? <Pill label={h.rating || h.hotel?.category || ''} style={[styles.pillTR, { backgroundColor: 'rgba(255,253,249,0.9)' }]} /> : null}
               </View>
               <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, gap: 4 }}>
                 <View style={styles.spread}><T v="h3" style={{ flex: 1 }}>{h.name}</T><T style={styles.price}>{formatSar(h.total.amount)}</T></View>
                 <T v="small">{h.area}</T>
                 <T v="small" color={colors.green}>{h.note}</T>
+                {/* A Hotelbeds room: its own cancellation rule, and the hotel's details (category, every photo, facilities). */}
+                {h.hotel ? <T v="small">{h.cancellation}</T> : null}
+                {h.hotel ? <Pressable testID={`hotel-details-${i}`} accessibilityRole="link" onPress={() => router.push(`/hotel/${h.hotel!.code}` as Href)}><T v="small" color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('hotel.details')}</T></Pressable> : null}
               </View>
             </Card>
           </Animated.View>

@@ -93,6 +93,7 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.via': 'عبر {supplier}',
 
   'things.event.dates': 'من {from} إلى {to}',
+  'things.event.until': 'حتى',
   'things.event.at': '{time} · {venue}',
   'things.event.source': 'صفحة المنظّم',
   'things.event.fromDesk': 'اختارها فريق مادا',

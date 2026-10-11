@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { addMinutes, AIRPORT_NAME, boardsAt, clockIn, formatSar, homePickup, liveStay, ltr, nameIn, outSegment, pickupPlan, seatText, type TripDetail } from '@mada/shared';
+import { addMinutes, dayLabel, AIRPORT_NAME, boardsAt, clockIn, formatSar, homePickup, liveStay, ltr, nameIn, outSegment, pickupPlan, seatText, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
@@ -50,7 +50,7 @@ export function FlightCard({ trip, predicted, updatedAt }: { trip: TripDetail; p
   return (
     <Box gap={12} testID="flight-card">
       <Spread>
-        <Row gap={10}><AirlineMark code={out.carrier} brand={out.brand} size={32} name={out.carrierName} /><View><H3 size={15}>{out.carrierName}</H3><Tiny>{out.flightNumber} · {out.departLocal.slice(0, 10) === trip.clock.today ? t('td.when.today') : out.departLocal.slice(0, 10)}</Tiny></View></Row>
+        <Row gap={10}><AirlineMark code={out.carrier} brand={out.brand} size={32} name={out.carrierName} /><View><H3 size={15}>{out.carrierName}</H3><Tiny>{out.flightNumber} · {out.departLocal.slice(0, 10) === trip.clock.today ? t('td.when.today') : dayLabel(out.departLocal.slice(0, 10), { today: trip.clock.today })}</Tiny></View></Row>
         {predicted ? <Tag tone="warn" label={t('td.fc.mayBeLate')} /> : late ? <Tag tone="warn" label={t('td.fc.late', { n: late })} /> : <Tag tone="ok" label={t('td.fc.onTime')} />}
       </Spread>
       <RouteLine dep={addMinutes(out.departLocal.slice(11, 16), late)} arr={addMinutes(out.arriveLocal.slice(11, 16), late)} from={out.from} to={out.to} durationMin={out.durationMin} big />
@@ -174,7 +174,7 @@ export function Cancelled({ trip }: { trip: TripDetail }) {
     <>
       <Rise>
         <Box tone="focal" padding={22} gap={14}>
-          <Eyebrow color={colors.gold}>{out.flightNumber} · {out.departLocal.slice(0, 10)}</Eyebrow>
+          <Eyebrow color={colors.gold}>{out.flightNumber} · {dayLabel(out.departLocal.slice(0, 10), { today: trip.clock.today })}</Eyebrow>
           <T v="h1" color={colors.mist} accessibilityRole="header">{t('td.cx.title', { airline: out.carrierName })}</T>
           <T v="body" color="#d6cfc3">{n > 1 ? t('td.cx.bodyAll', { n }) : t('td.cx.bodyOne')}</T>
           <Button testID="see-options" variant="gold" label={t('td.cx.options')} onPress={() => router.push(`/disruption/${trip.id}?kind=cancel` as Href)} />

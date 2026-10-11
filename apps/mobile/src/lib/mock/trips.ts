@@ -1,11 +1,11 @@
 import {
   ChangeFlightRequest, CompanyInvoiceRequest, CreateRefundRequest, CreateTripAskRequest, DisruptionChoiceRequest, ERROR_CODES, ImportTrackedRequest, MoveRequest,
   PatchTripRequest, SELLER, FLIGHT_POSITION_ATTRIBUTION, TrackFlightRequest, TripPhase, AIRLINE_INFO, SWITCH_OFFERS, CARRIERS, CATALOGUE_HOTELS, seatsFor,
-  addDays, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, derivePhase, deskStatus,
+  addDays, legMinutes, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, derivePhase, deskStatus,
   disruptionOptions, fareRulesFor, formatSar, homePickup, instalments, invoiceHtml, invoiceLinesFor, invoiceNumber, liveStay, moveNeeded, nameDistance, nightPrice,
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
-  type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
+  type FareOption, type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -141,6 +141,10 @@ export type BookedTrip = {
   photo: string | null;
   travellers: Person[];
   flight: FlightOption | null;
+  /** Flights by request: the fare the desk quoted (every leg), the airline's PNR and a ticket number per traveller. */
+  quoted?: FareOption | null;
+  pnr?: string | null;
+  tickets?: string[];
   stay: StayOption | null;
   bundle: boolean;
   lines: OrderLine[];
@@ -162,9 +166,23 @@ export function recordBookedTrip(b: BookedTrip): string {
   const travellers: TripTraveller[] = b.travellers.map((p) => ({
     id: p.id, firstName: p.firstName, fullName: `${p.givenNames || p.firstName} ${p.surname}`.trim(), initial: p.firstName.charAt(0).toUpperCase(),
     relation: p.relation, isSelf: p.isSelf, birthYear: p.dateOfBirth ? Number(p.dateOfBirth.slice(0, 4)) : null, passportExpiry: p.passport?.expiry ?? null,
+    ...(b.tickets?.[b.travellers.indexOf(p)] ? { ticketNumber: b.tickets[b.travellers.indexOf(p)] } : null),
   }));
   const segments: TripDetail['segments'] = [];
-  if (f) {
+  if (b.quoted) {
+    // A quoted fare: every leg as the agent entered it, no seats or terminals invented (the airline gives them at check-in).
+    const q = b.quoted;
+    const out = q.legs.filter((l) => l.direction === 'out');
+    const back = q.legs.filter((l) => l.direction === 'back');
+    for (const leg of [...out, ...back]) {
+      segments.push({
+        id: uuid(), carrier: leg.carrier, carrierName: CARRIERS[leg.carrier]?.name ?? q.airline, flightNumber: leg.flightNumber, from: leg.from, to: leg.to,
+        departLocal: `${leg.date}T${leg.dep}`, departTz: AIRPORT_TZ[leg.from] ?? 'Asia/Riyadh', arriveLocal: `${leg.arrDate ?? (leg.arr < leg.dep ? addDays(leg.date, 1) : leg.date)}T${leg.arr}`, arriveTz: AIRPORT_TZ[leg.to] ?? 'Asia/Riyadh',
+        durationMin: legMinutes(leg), cabin: q.cabin, terminal: null, gate: null, seats: [], baggage: q.baggage, status: 'scheduled', statusSource: 'Schedule', pnr: b.pnr ?? b.ref,
+        direction: leg === out[0] ? 'out' : leg === back[0] ? 'back' : 'connection', bookedGate: null, delayMin: null, predictedDelay: false, statusAt: null, brand: CARRIERS[leg.carrier]?.brand ?? null,
+      });
+    }
+  } else if (f) {
     const legs = [{ leg: f.out, dir: 'out' as const, back: false }, ...(f.back ? [{ leg: f.back, dir: 'back' as const, back: true }] : [])];
     for (const { leg, dir, back } of legs) {
       const arriveDay = leg.arr < leg.dep ? addDays(leg.date, 1) : leg.date;
@@ -200,12 +218,13 @@ export function recordBookedTrip(b: BookedTrip): string {
   }
   const startDate = f ? f.out.date : b.stay!.checkIn;
   const endDate = f ? f.back?.date ?? null : addDays(b.stay!.checkIn, b.stay!.nights);
+  const ref = b.pnr ?? b.ref;
   const flights = amountOf(['flight', 'infants']);
   const stayAmt = amountOf(['stay']);
   const pickupAmt = amountOf(['pickup']);
   const trip: Omit<TripDetail, 'clock'> = {
     id: uuid(), city: b.city, country: b.country, imageUrl: b.photo, startDate, endDate, travellerIds: travellers.map((p) => p.id), segments, stays, pickups,
-    status: 'booked', bookingRef: b.ref, confirmedBy: { id: b.agentName.toLowerCase(), name: b.agentName, photoUrl: null }, imported: false, createdAt: b.bookedAt,
+    status: 'booked', bookingRef: ref, confirmedBy: { id: b.agentName.toLowerCase(), name: b.agentName, photoUrl: null }, imported: false, createdAt: b.bookedAt,
     travellers, fare: f ? fareRulesFor(f.carrier) : null,
     prices: { flights: SAR(flights), stays: SAR(stayAmt), pickups: SAR(pickupAmt), discount: SAR(b.discount), total: SAR(flights + stayAmt + pickupAmt - b.discount) },
     noStay: null, rebooked: false, vouchers: [], bagReport: null, picks: [], rating: null, company: null, weather: null, disruption: null, openRequests: 0,

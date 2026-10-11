@@ -89,7 +89,7 @@ export default function Saved() {
           ))}
         </>) : null}
       </ScrollView>
-      <InviteSheet visible={!!share} onClose={() => setShare(null)} what={t('circles.invite.list', { city: share ?? '' })} load={() => circlesApi.createInvite({ link: true }).then((r) => r.link!)} />
+      <InviteSheet visible={!!share} onClose={() => setShare(null)} what={t('circles.invite.list', { city: share ?? '' })} load={(o) => circlesApi.createInvite({ link: true, ...o }).then((r) => r.link!)} />
     </Screen>
   );
 }

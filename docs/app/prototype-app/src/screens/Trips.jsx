@@ -5,6 +5,7 @@ import { Icon, TopBar, Route, Sheet, AirlineMark, useTicker, DepartureBoard, Emp
 import { UploadSheet } from './Wallet.jsx';
 import { RefundTracker, ReqTracker, reqStatus, reqLabel, refundQuote, isRefunded, timing, useUnqueue, tripPayments, refundMoney, MoveNotice, NoStayChoices } from './TripManage.jsx';
 import { TrackedFlights } from './Today.jsx';
+import { ThingsSection } from './Things.jsx';
 
 const REQ_STAGES = [
   ['queued', 'Waiting for a connection'],
@@ -334,6 +335,7 @@ export function TripDetail() {
           ))}
         </div>
 
+        <ThingsSection cityId="745044" city="Istanbul" trip={t} />
         <div className="card">
           <span className="h3">Travellers</span>
           <div className="row" style={{ flexWrap: 'wrap' }}>{t.travellers.map((id) => <span key={id} className="pill">{id === 'omar' ? (PEOPLE.omar.name === 'You' ? 'You' : `${PEOPLE.omar.name} (you)`) : PEOPLE[id]?.name}</span>)}</div>

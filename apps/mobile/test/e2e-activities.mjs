@@ -48,10 +48,12 @@ function kit(page, lang) {
     catch { errors.push(`${lang} ${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
   };
   const byTest = (id) => page.locator(`[data-testid="${id}"]`).filter({ visible: true }).first();
+  /** Tap something in a scroller, brought to the middle first (the city page's action bar covers the bottom). */
+  const tapTest = async (id) => { const l = byTest(id); await l.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'center' })); await page.waitForTimeout(400); await l.click(); };
   const go = async (path) => { await page.evaluate((p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); }, path); await page.waitForTimeout(900); };
   const scrollTo = async (id) => { await page.locator(`[data-testid="${id}"]`).first().scrollIntoViewIfNeeded().catch(() => {}); await page.waitForTimeout(400); };
   const closeSheet = async () => { await page.keyboard.press('Escape'); await page.waitForTimeout(600); const shade = page.locator('[aria-label="Close"], [aria-label="أغلق"], [aria-label="إغلاق"]').filter({ visible: true }); if (await shade.count()) { await shade.first().click().catch(() => {}); await page.waitForTimeout(500); } };
-  return { shot, see, byTest, go, scrollTo, closeSheet };
+  return { shot, see, byTest, tapTest, go, scrollTo, closeSheet };
 }
 
 async function signIn(page) {
@@ -74,7 +76,7 @@ async function run(lang) {
   const ar = lang === 'ar';
   const W = (en, arText) => (ar ? arText : en);
   const { page } = await newPage(ar ? 'ar-SA' : 'en-GB');
-  const { shot, see, byTest, go, scrollTo, closeSheet } = kit(page, lang);
+  const { shot, see, byTest, tapTest, go, scrollTo, closeSheet } = kit(page, lang);
   await signIn(page);
 
   step(`${lang}: Riyadh: today, places, book, what's on`);
@@ -93,14 +95,14 @@ async function run(lang) {
   await shot('city-things-more');
 
   step(`${lang}: a place's sheet`);
-  await byTest('place-osm:w140528417').click();
+  await tapTest('place-osm:w140528417');
   await see(W('Open in Maps', 'افتح في الخرائط'), 'map');
   await see(W('From OpenStreetMap', 'من OpenStreetMap'), 'hours source');
   await shot('place-sheet');
   await closeSheet();
 
   step(`${lang}: the full list and filters`);
-  await byTest('things-see-all').click();
+  await tapTest('things-see-all');
   await page.waitForTimeout(1200);
   await see(W('Things to do in Riyadh', 'ماذا تفعل في الرياض'), 'full title');
   await shot('things-full');
@@ -118,7 +120,7 @@ async function run(lang) {
 
   step(`${lang}: book an experience with Mada`);
   await scrollTo('things-book');
-  await byTest('exp-hotelbeds:E-E10-RUH-DIRIYAH').click();
+  await tapTest('exp-hotelbeds:E-E10-RUH-DIRIYAH');
   await see(W('Book with Mada', 'احجز مع مادا'), 'book button');
   await shot('experience-sheet');
   await byTest('thing-book').click();
@@ -133,12 +135,12 @@ async function run(lang) {
   step(`${lang}: an event, then the sources`);
   await go('/things/108410?city=Riyadh');
   await scrollTo('things-events');
-  await page.locator('[data-testid^="event-desk:"]').filter({ visible: true }).first().click();
+  { const ev = page.locator('[data-testid^="event-desk:"]').filter({ visible: true }).first(); await ev.evaluate((el) => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(300); await ev.click(); }
   await see(W('Picked by the Mada team', 'اختارها فريق مادا'), 'event source');
   await shot('event-sheet');
   await closeSheet();
   await scrollTo('things-sources');
-  await byTest('things-sources').click();
+  await tapTest('things-sources');
   await page.waitForTimeout(900);
   await see(W('OpenStreetMap contributors', 'مساهمو OpenStreetMap'), 'OSM credit');
   await see('Open-Meteo', 'Open-Meteo credit');
@@ -159,7 +161,7 @@ async function run(lang) {
   await scrollTo('things-section');
   await see(W('Things to do', 'ماذا تفعل'), 'trip section');
   await shot('trip-things');
-  await byTest('things-see-all').click();
+  await tapTest('things-see-all');
   await page.waitForTimeout(1200);
   await see(W('Near the hotel', 'قرب الفندق'), 'near the hotel filter');
   await page.getByRole('button', { name: W('Near the hotel', 'قرب الفندق'), exact: true }).filter({ visible: true }).first().click();
@@ -170,7 +172,7 @@ async function run(lang) {
   await page.locator('[data-testid="things-days"] [role="button"]').nth(2).click();
   await page.waitForTimeout(900);
   await shot('trip-things-day');
-  await byTest('place-osm:r1374029').click();
+  await tapTest('place-osm:r1374029');
   await page.waitForTimeout(600);
   await byTest('thing-add-plan').click();
   await page.waitForTimeout(1000);

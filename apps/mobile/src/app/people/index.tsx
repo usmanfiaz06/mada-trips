@@ -173,7 +173,7 @@ export default function People() {
           {found && found.length === 0 ? <T v="small">{t('circles.contacts.none')}</T> : found && found.every((p) => friendIds.has(p.id)) ? <T v="small">{t('circles.contacts.allFriends')}</T> : null}
         </SheetScroll>
       </Sheet>
-      <InviteSheet visible={sheet === 'link'} onClose={() => setSheet(null)} what={t('circles.invite.mada')} load={() => circlesApi.createInvite({ link: true }).then((r) => r.link!)} />
+      <InviteSheet visible={sheet === 'link'} onClose={() => setSheet(null)} what={t('circles.invite.mada')} load={(o) => circlesApi.createInvite({ link: true, ...o }).then((r) => r.link!)} />
     </Screen>
   );
 }

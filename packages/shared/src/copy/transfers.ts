@@ -61,6 +61,9 @@ export const transfersCopy = {
   'request.title.pickup': 'Airport pickup in {city}',
 
   // ───────────── vouchers ─────────────
+  'hotel.facilities': 'At the hotel',
+  'hotel.paid': 'extra charge',
+  'hotel.details': 'Hotel details',
   'voucher.title': 'Hotel voucher',
   'voucher.titleTransfer': 'Pickup voucher',
   'voucher.open': 'Hotel voucher',
