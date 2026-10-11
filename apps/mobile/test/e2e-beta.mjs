@@ -166,7 +166,7 @@ async function flights() {
   await k.press(page.getByRole('button', { name: 'Requests', exact: true }).or(page.getByRole('tab', { name: 'Requests', exact: true })));
   await k.see('Flights to Istanbul', 'requests tab', 10000);
   await k.shot('requests-tab');
-  await k.press(page.getByText('Flights to Istanbul', { exact: false }).filter({ visible: true }).first());
+  await k.press(k.byTest('open-flight-request'));
   await k.see('e-tickets-', 'e-ticket file', 10000);
   await page.locator('[data-testid="attachment"]').first().evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
   await k.shot('request-etickets');

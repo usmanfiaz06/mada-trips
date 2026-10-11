@@ -170,7 +170,13 @@ function RequestCard({ r }: { r: TripRequestView }) {
   const priced = (r.status === 'quoted' || r.status === 'awaiting_payment') && r.quote;
   return (
     <Box testID={`request-${r.kind}`}>
-      <Spread align="flex-start"><H3 style={{ flex: 1 }}>{r.title}</H3><RequestStatusPill r={r} /></Spread>
+      <Spread align="flex-start">
+        {r.kind === 'flight'
+          // A flight request opens with its fares, the thread and the e-tickets.
+          ? <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(`/ask/request/${r.id}` as Href)} testID="open-flight-request"><H3>{r.title}</H3></Pressable>
+          : <H3 style={{ flex: 1 }}>{r.title}</H3>}
+        <RequestStatusPill r={r} />
+      </Spread>
       {r.detail ? <Small>{r.detail}</Small> : null}
       <RequestTracker r={r} />
       {r.outcome === 'yes' && (r.status === 'confirmed' || r.status === 'done') ? <Row gap={6}><Icon name="check" size={14} color={colors.ok} width={2.4} /><Tiny>{r.yesText ?? t('tr.req.confirmedToday')}</Tiny></Row> : null}

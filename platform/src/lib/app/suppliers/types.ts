@@ -78,6 +78,24 @@ export type FlightStatusInfo = {
   gate: string | null;
   terminal: string | null;
   source: string;
+  /* Optional extras from suppliers that have them (AeroDataBox, aviationstack). departLocal/arriveLocal stay the best-known times. */
+  /** Best-known departure and arrival instants (actual, else revised/estimated, else scheduled), ISO UTC. */
+  departUtc?: string | null;
+  arriveUtc?: string | null;
+  /** The schedule, ISO UTC, for working out the delay. */
+  scheduledDepartUtc?: string | null;
+  scheduledArriveUtc?: string | null;
+  /** Wheels-up / actual off-block, ISO UTC, once known. */
+  actualDepartUtc?: string | null;
+  /** Minutes late at departure (best known), when the supplier says. */
+  delayMin?: number | null;
+  arrivalTerminal?: string | null;
+  arrivalGate?: string | null;
+  baggageBelt?: string | null;
+  /** The aircraft operating the flight: registration, ICAO 24-bit hex (lower case), model. Links status to ADS-B. */
+  aircraft?: { reg: string | null; hex: string | null; model: string | null } | null;
+  /** The supplier's own last-updated time, ISO UTC. */
+  updatedUtc?: string | null;
 };
 
 export interface FlightStatusSupplier {

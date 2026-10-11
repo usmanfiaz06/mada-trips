@@ -17,12 +17,29 @@ export type FlightPosition = z.infer<typeof FlightPosition>;
 /** Shown wherever a position is shown. adsb.lol data is ODbL: attribution is required. */
 export const FLIGHT_POSITION_ATTRIBUTION = 'Aircraft positions: adsb.lol (ODbL 1.0) · The OpenSky Network';
 
+/** Where a plane probably is, from its times alone (great-circle path between the airports). Never shown as live. */
+export const EstimatedPosition = z.object({
+  lat: z.number(),
+  lon: z.number(),
+  /** 0 at take-off, 1 at landing. */
+  fraction: z.number().min(0).max(1),
+  /** What the times came from: the airline's actual take-off, or the schedule. */
+  basis: z.enum(['actual', 'revised', 'schedule']),
+});
+export type EstimatedPosition = z.infer<typeof EstimatedPosition>;
+
 export const FlightPositionResponse = z.object({
   flightNumber: z.string(),
   callsign: z.string().nullable(),
   /** null when the flight isn't airborne or the feed is down. */
   position: FlightPosition.nullable(),
   attribution: z.string(),
+  /** ICAO 24-bit address of the aircraft operating the flight, when the status supplier knows it (with ?date=). */
+  hex: z.string().nullable().optional(),
+  /** How the live position was found: by the aircraft's hex address (most reliable) or by its callsign. */
+  match: z.enum(['hex', 'callsign']).nullable().optional(),
+  /** No live position but the flight should be in the air: where its times put it. Always labelled "estimated". */
+  estimate: EstimatedPosition.nullable().optional(),
 });
 export type FlightPositionResponse = z.infer<typeof FlightPositionResponse>;
 
@@ -41,32 +58,11 @@ export function icaoCallsign(flightNumber: string): string | null {
 
 /* ───────── linking status to position, and the honest estimate when no receiver sees the plane ───────── */
 
-/** Where a plane probably is, from its times alone (great-circle path between the airports). Never shown as live. */
-export const EstimatedPosition = z.object({
-  lat: z.number(),
-  lon: z.number(),
-  /** 0 at take-off, 1 at landing. */
-  fraction: z.number().min(0).max(1),
-  /** What the times came from: the airline's actual take-off, or the schedule. */
-  basis: z.enum(['actual', 'revised', 'schedule']),
-});
-export type EstimatedPosition = z.infer<typeof EstimatedPosition>;
-
-/** GET /flights/{no}/position?date=… adds these (older servers leave them out). */
-export const FlightPositionLink = z.object({
-  /** ICAO 24-bit address of the aircraft operating the flight, when the status supplier knows it. */
-  hex: z.string().nullable().optional(),
-  /** How the live position was found: by the aircraft's hex address (most reliable) or by its callsign. */
-  match: z.enum(['hex', 'callsign']).nullable().optional(),
-  /** When there's no live position but the flight should be in the air. */
-  estimate: EstimatedPosition.nullable().optional(),
-});
-
 /** Airports we draw and estimate between: [lat, lon, IANA zone]. */
 export const AIRPORT_GEO: Readonly<Record<string, readonly [number, number, string]>> = {
   RUH: [24.957, 46.698, 'Asia/Riyadh'], JED: [21.679, 39.156, 'Asia/Riyadh'], DMM: [26.471, 49.798, 'Asia/Riyadh'], MED: [24.553, 39.705, 'Asia/Riyadh'],
   AHB: [18.24, 42.657, 'Asia/Riyadh'], TIF: [21.483, 40.544, 'Asia/Riyadh'], TUU: [28.365, 36.619, 'Asia/Riyadh'], ELQ: [26.303, 43.774, 'Asia/Riyadh'],
-  AlU: [26.48, 38.129, 'Asia/Riyadh'], ULH: [26.483, 38.117, 'Asia/Riyadh'], NUM: [27.567, 35.244, 'Asia/Riyadh'],
+  ULH: [26.483, 38.117, 'Asia/Riyadh'], NUM: [27.567, 35.244, 'Asia/Riyadh'],
   IST: [41.275, 28.752, 'Europe/Istanbul'], SAW: [40.898, 29.309, 'Europe/Istanbul'], AYT: [36.899, 30.8, 'Europe/Istanbul'], TZX: [40.995, 39.79, 'Europe/Istanbul'],
   DXB: [25.253, 55.365, 'Asia/Dubai'], AUH: [24.433, 54.651, 'Asia/Dubai'], DOH: [25.273, 51.608, 'Asia/Qatar'], BAH: [26.271, 50.634, 'Asia/Bahrain'],
   KWI: [29.227, 47.969, 'Asia/Kuwait'], MCT: [23.593, 58.284, 'Asia/Muscat'], AMM: [31.723, 35.993, 'Asia/Amman'], CAI: [30.122, 31.406, 'Africa/Cairo'],

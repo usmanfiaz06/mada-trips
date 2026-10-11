@@ -43,15 +43,21 @@ export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "f
 // Things to do: Open-Meteo, OpenStreetMap/Wikidata and the events list (Ticketmaster only with TICKETMASTER_KEY) are too.
 const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions", "weather", "openData", "events"]);
 export type SupplierMode = "mock" | "live";
+/** Vendor names that mean "live" in SUPPLIER_MODE_<NAME>. */
+const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware"]);
+/** Any of these keys turns flight status live without SUPPLIER_MODE_FLIGHT_STATUS (the owner only adds the key). */
+export const FLIGHT_STATUS_KEYS = ["AERODATABOX_API_KEY", "AVIATIONSTACK_API_KEY", "FLIGHTAWARE_API_KEY"] as const;
 
 const envName = (s: SupplierName) => `SUPPLIER_MODE_${s.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`;
 
 /** Mock unless told otherwise, except on a production deployment, which defaults to live. */
 export function supplierMode(name: SupplierName): SupplierMode {
   const global = LIVE_BY_DEFAULT.has(name) ? "live" : process.env.SUPPLIER_MODE;
-  const raw = (process.env[envName(name)] ?? global ?? (isProductionDeploy() ? "live" : "mock")).toLowerCase();
-  // A vendor name means live with that vendor (SUPPLIER_MODE_HOTELS=hotelbeds, SUPPLIER_MODE_TRANSFERS=hotelbeds).
-  const mode: SupplierMode = raw === "live" || raw === "hotelbeds" ? "live" : "mock";
+  // Flight status picks itself from whichever vendor key is present (suppliers/flight-status-vendor.ts).
+  const auto = name === "flightStatus" && !process.env[envName(name)] && FLIGHT_STATUS_KEYS.some((k) => process.env[k]) ? "live" : undefined;
+  const raw = (process.env[envName(name)] ?? auto ?? global ?? (isProductionDeploy() ? "live" : "mock")).toLowerCase();
+  // A vendor name means live with that vendor (SUPPLIER_MODE_HOTELS=hotelbeds, SUPPLIER_MODE_FLIGHT_STATUS=aerodatabox).
+  const mode: SupplierMode = raw === "live" || LIVE_VENDORS.has(raw) ? "live" : "mock";
   if (mode === "mock" && isProductionDeploy() && process.env.APP_ALLOW_MOCKS !== "yes") {
     throw new Error(`Supplier ${name} is in mock mode on a production deployment. Set ${envName(name)}=live, or APP_ALLOW_MOCKS=yes for a staging copy.`);
   }

@@ -82,11 +82,11 @@ try {
   await shot(page, 'request-builder-empty');
   const fare = async (i, { code, airline, out, backNo, dep, arr, bdep, barr, price, bags, change, refund }) => {
     const f = page.getByTestId(`fare-${i}`);
-    await f.getByLabel('Airline code').fill(code);
+    await f.getByLabel('Airline code', { exact: true }).fill(code);
     await f.getByLabel('Airline', { exact: true }).fill(airline);
     const leg1 = page.getByTestId(`leg-${i}-1`), leg2 = page.getByTestId(`leg-${i}-2`);
-    await leg1.getByLabel('Flight number').fill(out); await leg1.getByLabel('Departs').fill(dep); await leg1.getByLabel('Lands').fill(arr);
-    await leg2.getByLabel('Flight number').fill(backNo); await leg2.getByLabel('Departs').fill(bdep); await leg2.getByLabel('Lands').fill(barr);
+    await leg1.getByLabel('Flight number', { exact: true }).fill(out); await leg1.getByLabel('Departs', { exact: true }).fill(dep); await leg1.getByLabel('Lands', { exact: true }).fill(arr);
+    await leg2.getByLabel('Flight number', { exact: true }).fill(backNo); await leg2.getByLabel('Departs', { exact: true }).fill(bdep); await leg2.getByLabel('Lands', { exact: true }).fill(barr);
     await f.locator('label', { hasText: 'Adult fare' }).locator('input').fill(price);
     await f.locator('label', { hasText: /^Bags/ }).locator('input').fill(bags);
     await f.locator('label', { hasText: /^Changes/ }).locator('input').fill(change);
