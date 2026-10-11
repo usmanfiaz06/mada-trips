@@ -2,7 +2,8 @@ import { requestContext } from "@/lib/app/context";
 import { SmsHookPayload, deliverAuthSms, hookError, verifyStandardWebhook } from "@/lib/app/sms-hook";
 
 // POST /api/app/v1/auth/sms-hook: Supabase Auth's "Send SMS" hook. Signed with Standard Webhooks using
-// SUPABASE_SMS_HOOK_SECRET; sends the code through our SMS adapter (Unifonic or Taqnyat live, logged in mock mode).
+// SUPABASE_SMS_HOOK_SECRET; sends the code on WhatsApp (Zoho CPaaS) or by SMS (Unifonic or Taqnyat), see
+// lib/app/phone-channel.ts; logged in mock mode.
 // Answers {} on success, or { error: { http_code, message } } as Supabase expects.
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(req: Request): Promise<Response> {
     await deliverAuthSms(payload, requestContext(req).ipHash);
   } catch (e) {
     console.warn("[app-api] auth/sms-hook could not send", e instanceof Error ? e.message : e);
-    return hookError(503, "The SMS provider did not take the message");
+    return hookError(503, "The WhatsApp or SMS provider did not take the code");
   }
   return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
 }

@@ -256,6 +256,7 @@ describe("POST /auth/sms-hook", () => {
 
   it("sends the code through the SMS adapter when the call is signed", async () => {
     vi.stubEnv("SUPABASE_SMS_HOOK_SECRET", SECRET);
+    vi.stubEnv("PHONE_CODE_CHANNEL", "sms"); // WhatsApp is the default when it's set up: test/app/phone-codes.test.ts
     const phone = newPhone();
     const r = await hook({ user: { id: "u1", phone: phone.slice(1) }, sms: { otp: "482913" } });
     expect(r).toEqual({ status: 200, json: {} });
