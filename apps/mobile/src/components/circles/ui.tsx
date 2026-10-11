@@ -173,11 +173,11 @@ export function GhostChip({ label, onPress, on }: { label: string; onPress: () =
 }
 
 /** A segmented control (Equally · By family · Custom). */
-export function Segmented<K extends string>({ options, value, onChange, label }: { options: [K, string][]; value: K; onChange: (k: K) => void; label: string }) {
+export function Segmented<K extends string>({ options, value, onChange, label, testID }: { options: [K, string][]; value: K; onChange: (k: K) => void; label: string; testID?: string }) {
   return (
     <View style={styles.seg} accessibilityRole="radiogroup" accessibilityLabel={label}>
       {options.map(([k, l]) => (
-        <Pressable key={k} accessibilityRole="radio" accessibilityState={{ checked: value === k }} accessibilityLabel={l} onPress={() => { buzz('select'); onChange(k); }}
+        <Pressable key={k} accessibilityRole="radio" accessibilityState={{ checked: value === k }} accessibilityLabel={l} onPress={() => { buzz('select'); onChange(k); }} testID={testID ? `${testID}-${k}` : undefined}
           style={[styles.segBtn, value === k ? styles.segOn : null]}>
           <T style={{ fontFamily: ff.ui600, fontSize: 14, color: value === k ? colors.green : colors.ink2 }}>{l}</T>
         </Pressable>

@@ -29,7 +29,7 @@ const Ok = z.object({ ok: z.literal(true) });
 /** A file picked on the phone: a local uri (native) or a File/Blob (web). */
 export type PickedFile = { uri: string; name: string; type: string; size: number; file?: Blob | null };
 
-async function multipart<S extends z.ZodType>(method: 'POST' | 'PUT', path: string, file: PickedFile, meta: unknown, schema: S): Promise<z.infer<S>> {
+export async function multipart<S extends z.ZodType>(method: 'POST' | 'PUT', path: string, file: PickedFile, meta: unknown, schema: S): Promise<z.infer<S>> {
   if (API_MODE === 'mock') {
     const r = await transport({ method, path, body: { __file: { name: file.name, type: file.type, size: file.size, uri: file.uri }, meta }, token: useSession.getState().tokens?.accessToken });
     if (r.status >= 400) {
