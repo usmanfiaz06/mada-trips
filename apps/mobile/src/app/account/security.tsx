@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -11,6 +11,7 @@ import { ArtPhone } from '@/components/wallet/Arts';
 import { SignOutSheet } from '@/components/wallet/SignOutSheet';
 import { Group, Row, Spinner, StatusPill, Toggle } from '@/components/wallet/ui';
 import { buzz } from '@/lib/haptics';
+import { useAppLock } from '@/lib/app-lock';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useAccount, useDevices, useUpdateAccount, walletApi, walletKeys } from '@/lib/wallet';
@@ -31,6 +32,8 @@ export default function Security() {
   const [checking, setChecking] = useState(false);
   const [faceErr, setFaceErr] = useState<string | null>(null);
   const on = account.data?.faceId !== false;
+  const appLock = useAppLock();
+  useEffect(() => { void appLock.hydrate(); }, [appLock]);
   const list = devices.data ?? [];
   const others = list.filter((d) => !d.current);
 
@@ -54,6 +57,11 @@ export default function Security() {
         <Row icon="lock" value={t('security.faceId')} sub={checking ? t('security.checking') : on ? t('security.on') : t('security.off')}
           right={checking ? <Spinner /> : <Toggle label={t('security.faceId')} value={on} onChange={(v) => (v ? turnOn() : setSheet('faceoff'))} testID="faceid-toggle" />} />
         {faceErr ? <T v="small" color={colors.badInk} style={{ padding: 16 }} accessibilityRole="alert">{faceErr}</T> : null}
+      </Group>
+      <Group>
+        <Row icon="lock" value={t('auth.bio.row')} sub={t('auth.bio.rowSub')}
+          right={<Toggle label={t('auth.bio.row')} value={appLock.on} testID="applock-toggle"
+            onChange={async (v) => { const ok = await appLock.setOn(v); if (ok) { buzz(v ? 'success' : 'tap'); toast(v ? t('auth.bio.on') : t('auth.bio.off')); } else { buzz('soft'); setFaceErr(t('security.faceFailed')); } }} />} />
       </Group>
       <Group label={t('security.signedInOn')}>
         {list.map((d) => (

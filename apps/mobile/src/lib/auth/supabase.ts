@@ -1,6 +1,5 @@
 import './polyfill';
 import { Platform } from 'react-native';
-import * as Crypto from 'expo-crypto';
 import { createClient, type Session, type SupabaseClient, type UserIdentity } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { secureSessionStorage } from './session-storage';
@@ -150,6 +149,7 @@ export const supabaseAuth: AuthBackend = {
     return freshToken();
   },
   async removePassword(code) {
+    const Crypto = await import('expo-crypto');
     const random = Array.from(Crypto.getRandomBytes(32), (b) => b.toString(16).padStart(2, '0')).join('');
     await run(supabase().auth.updateUser({ password: random, nonce: code, data: { has_password: false } }));
     return freshToken();

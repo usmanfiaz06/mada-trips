@@ -6,6 +6,7 @@ import { AUTH_MODE } from './config';
 import { mockAuth } from './mock';
 import { supabaseAuth } from './supabase';
 import type { AuthBackend, Identity } from './types';
+import { saveLastSignIn } from './last';
 
 /*
  * Sign-in, in two halves (docs/app/AUTH.md):
@@ -16,6 +17,7 @@ import type { AuthBackend, Identity } from './types';
  */
 export * from './types';
 export { AUTH_MODE, CODE_RESEND_SECONDS } from './config';
+export { getLastSignIn, forgetLastSignIn, type LastSignIn } from './last';
 
 export const auth = (): AuthBackend => (AUTH_MODE === 'supabase' ? supabaseAuth : mockAuth);
 
@@ -42,6 +44,11 @@ export async function finishSignIn(id: Identity, via: Via): Promise<'/verify-pho
   await useSession.getState().signIn(r.tokens, r.user);
   keepUser(r.user);
   const after = r.isNew ? '/name' : '/welcome-back';
+  const ob = useOnboarding.getState();
+  const contact = via === 'phone' ? r.user.phone ?? ob.phone : via === 'email' ? ob.email || r.user.email : r.user.emailRelay ? null : r.user.email;
+  void saveLastSignIn({ via, contact: contact || null });
+  // Face ID to reopen the app: offered once, on a phone that has it (app-lock.ts).
+  void import('../app-lock').then((m) => m.useAppLock.getState().maybeOffer()).catch(() => {});
   useOnboarding.getState().set({
     social: via === 'apple' || via === 'google' ? via : null,
     via,

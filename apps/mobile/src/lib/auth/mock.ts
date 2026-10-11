@@ -217,9 +217,9 @@ export const mockAuth: AuthBackend = {
   async setPassword(password, code) {
     await ready(); await delay();
     const u = me();
-    if (code !== undefined) checkCode(`reauth:${u.sub}`, code);
     if (!passwordMeetsRules(password)) throw new AuthError('weakPassword');
     if (LEAKED.has(password.toLowerCase())) throw new AuthError('leakedPassword');
+    if (code !== undefined) checkCode(`reauth:${u.sub}`, code);
     u.password = password;
     addProvider(u, 'password');
     return (await become(u)).accessToken;

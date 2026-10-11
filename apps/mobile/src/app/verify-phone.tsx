@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { prettyPhone } from '@mada/shared';
 import { LinkButton } from '@/components/Button';
 import { CodeEntry } from '@/components/auth/CodeEntry';
 import { PhoneForm } from '@/components/auth/PhoneForm';
 import { Screen, TopBar } from '@/components/Layout';
-import { T } from '@/components/Text';
 import { AuthError, auth, syncIdentity } from '@/lib/auth';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -38,8 +36,8 @@ export default function VerifyPhone() {
       <Screen>
         <TopBar onBack={() => setStep('number')} />
         <CodeEntry
-          title={t('otp.title')} about="phone" demoHint={t('otp.demo')}
-          sent={<><T v="body">{t('otp.sentTo', { phone: prettyPhone(phone) })}</T><LinkButton label={t('otp.change')} onPress={() => setStep('number')} /></>}
+          title={t('otp.title')} about="phone" demoHint={t('otp.demo')} flow="add"
+          contact={phone} onChange={() => setStep('number')}
           onVerify={async (code) => {
             const token = await auth().verifyAddedPhone(phone, code);
             await syncIdentity(token);
@@ -62,7 +60,7 @@ export default function VerifyPhone() {
       <PhoneForm
         title={t('auth.verifyPhone.title')}
         body={provider && onboarding ? t('auth.verifyPhone.body', { provider }) : t('auth.verifyPhone.bodyPlain')}
-        initial={user?.phone ?? ''}
+        initial={phone || (user?.phone ?? '')}
         onSend={async (p) => {
           if (!(await auth().hasSession())) throw new AuthError('noSession');
           await auth().addPhone(p);

@@ -116,7 +116,7 @@ export const authCopyAr: Record<keyof typeof authCopy, string> & Record<string, 
 
   'auth.password.use': 'استخدم كلمة المرور بدلًا من ذلك',
   'auth.password.useCode': 'أرسلوا لي رمزًا بالبريد بدلًا من ذلك',
-  'auth.password.title': 'ادخل بكلمة المرور',
+  'auth.password.title': 'كلمة المرور',
   'auth.password.body': 'فقط إذا أنشأتها من الملف الشخصي. الرموز تعمل دائمًا أيضًا.',
   'auth.password.label': 'كلمة المرور',
   'auth.password.show': 'إظهار',

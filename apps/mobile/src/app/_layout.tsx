@@ -13,6 +13,7 @@ import { ErrorBoundary as AppErrorBoundary } from '@/components/states/ErrorBoun
 import { CrashState } from '@/components/states/ErrorState';
 import { NetChrome } from '@/components/states/NetChrome';
 import { SessionExpired } from '@/components/states/SessionExpired';
+import { AppLock } from '@/components/auth/AppLock';
 import { useOutboxPump } from '@/lib/net/outbox';
 import { restoreCache, startPersistence } from '@/lib/net/persist';
 import { useRemoteConfig } from '@/lib/net/remote';
@@ -85,6 +86,7 @@ export default function RootLayout() {
             </NetChrome>
           </AppErrorBoundary>
           <SessionExpired />
+          <AppLock />
           <ToastHost />
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -1,18 +1,20 @@
-import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { Button } from '@/components/Button';
-import { GoogleMark } from '@/components/BrandMarks';
+import { AppleMark, GoogleMark } from '@/components/BrandMarks';
 import { AppleButton } from '@/components/auth/AppleButton';
 import { sayAuthError } from '@/components/auth/say';
+import { SHOW_APPLE } from '@/components/auth/CodeHelp';
 import { Act, Screen, TopBar } from '@/components/Layout';
 import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
-import { AUTH_MODE, AuthError, auth, finishSignIn, type SocialProvider } from '@/lib/auth';
+import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, type LastSignIn, type SocialProvider } from '@/lib/auth';
+import { maskContact } from '@/lib/auth/recovery';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
@@ -27,10 +29,16 @@ const PHOTOS = [
 ];
 
 /** Apple (iOS), Google, email or phone, all through Supabase Auth. Without a phone yet, Verify your phone comes next. */
-const SHOW_APPLE = Platform.OS === 'ios' || (AUTH_MODE === 'mock' && Platform.OS === 'web');
 
 export default function SignIn() {
   const router = useRouter();
+  // ?with=apple|google: "Try another way" on a code screen goes straight to that provider.
+  const { with: withProvider } = useLocalSearchParams<{ with?: SocialProvider }>();
+  // The way in this phone used last time goes first; the rest wait behind "Use another way".
+  const [last, setLast] = useState<LastSignIn | null>(null);
+  const [all, setAll] = useState(false);
+  const [lastBusy, setLastBusy] = useState(false);
+  useEffect(() => { void getLastSignIn().then(setLast); }, []);
   // Mock mode stands in for Apple's and Google's own sheets so the choices can be seen and tested.
   const [sheet, setSheet] = useState<SocialProvider | null>(null);
   const [hideEmail, setHideEmail] = useState(true);
@@ -58,6 +66,38 @@ export default function SignIn() {
   const tapProvider = (p: SocialProvider) => (AUTH_MODE === 'mock' ? setSheet(p) : continueWith(p));
   const go = (path: '/email' | '/phone') => { useOnboarding.getState().set({ social: null, via: path === '/email' ? 'email' : 'phone' }); router.push(path); };
 
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || (withProvider !== 'apple' && withProvider !== 'google')) return;
+    started.current = true;
+    if (withProvider === 'apple' && !SHOW_APPLE) return;
+    // Once, after the screen has settled (a later render must not cancel it).
+    setTimeout(() => tapProvider(withProvider), 350);
+  });
+
+  /** "Continue as …": a code goes straight to the number or address used last time. */
+  const continueLast = async () => {
+    if (!last) return;
+    if (last.via === 'apple' || last.via === 'google') { tapProvider(last.via); return; }
+    if (!last.contact) { go(last.via === 'email' ? '/email' : '/phone'); return; }
+    const isEmail = last.via === 'email';
+    useOnboarding.getState().set(isEmail ? { email: last.contact, via: 'email', social: null } : { phone: last.contact, via: 'phone', social: null });
+    setLastBusy(true);
+    try {
+      await (isEmail ? auth().sendEmailCode(last.contact) : auth().sendPhoneCode(last.contact));
+      router.push(isEmail ? '/email-code' : '/otp');
+    } catch (e) {
+      if (e instanceof AuthError && e.code === 'wait') { router.push(isEmail ? '/email-code' : '/otp'); return; }
+      buzz('soft');
+      toast(sayAuthError(e, isEmail ? 'email' : 'phone'));
+    } finally { setLastBusy(false); }
+  };
+  const lastLabel = !last ? '' : last.contact && last.via !== 'apple'
+    ? t('auth.signin.continueAs', { contact: maskContact(last.via === 'phone' ? 'phone' : 'email', last.contact) })
+    : last.via === 'apple' ? t('signin.apple') : last.via === 'google' ? t('signin.google') : last.via === 'email' ? t('auth.signin.email') : t('auth.signin.phone');
+  const lastIcon = last?.via === 'google' ? <GoogleMark size={19} /> : last?.via === 'apple' ? <AppleMark size={19} color={colors.mist} /> : undefined;
+  const showLast = !!last && !all && (last.via !== 'apple' || SHOW_APPLE);
+
   return (
     <Screen>
       <TopBar onBack={() => router.back()} />
@@ -78,11 +118,22 @@ export default function SignIn() {
         <T v="body">{t('signin.body')}</T>
       </View>
       <Act>
-        {SHOW_APPLE ? <AppleButton onPress={() => tapProvider('apple')} busy={busy === 'apple'} /> : null}
-        <Button variant="secondary" label={t('signin.google')} icon={<GoogleMark size={19} />} busy={busy === 'google' && !sheet} onPress={() => tapProvider('google')} testID="signin-google" />
-        <Button variant="secondary" label={t('auth.signin.email')} onPress={() => go('/email')} testID="signin-email" />
-        <Button variant="ghost" label={t('auth.signin.phone')} onPress={() => go('/phone')} testID="signin-phone" />
-        <T v="small" color={colors.ink3} style={{ textAlign: 'center' }}>{t('signin.note')}</T>
+        {showLast ? (
+          <>
+            <Button label={lastLabel} icon={lastIcon} busy={lastBusy || (!!busy && busy === last?.via)} onPress={continueLast} testID="signin-last" />
+            <T v="small" color={colors.ink3} style={{ textAlign: 'center' }}>{t('auth.signin.last')}</T>
+            <Button variant="ghost" label={t('auth.signin.another')} onPress={() => setAll(true)} testID="signin-another" />
+          </>
+        ) : null}
+        {showLast ? null : SHOW_APPLE ? <AppleButton onPress={() => tapProvider('apple')} busy={busy === 'apple'} /> : null}
+        {showLast ? null : <Button variant="secondary" label={t('signin.google')} icon={<GoogleMark size={19} />} busy={busy === 'google' && !sheet} onPress={() => tapProvider('google')} testID="signin-google" />}
+        {showLast ? null : (
+          <>
+            <Button variant="secondary" label={t('auth.signin.email')} onPress={() => go('/email')} testID="signin-email" />
+            <Button variant="ghost" label={t('auth.signin.phone')} onPress={() => go('/phone')} testID="signin-phone" />
+            <T v="small" color={colors.ink3} style={{ textAlign: 'center' }}>{t('signin.note')}</T>
+          </>
+        )}
       </Act>
 
       <Sheet visible={!!sheet} onClose={cancel} label={t('signin.sheet.title', { provider: sheet === 'google' ? 'Google' : 'Apple' })}>

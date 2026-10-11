@@ -71,13 +71,13 @@ export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flo
       {about === 'email' ? (
         <HelpRow icon={glyph('doc')} title={t('auth.help.spamTitle')} sub={t('auth.help.spamBody', { address: CODE_SENDER })} testID="help-spam" />
       ) : null}
-      <HelpRow icon={glyph('back')} title={about === 'phone' ? t('auth.help.changePhone') : t('auth.help.changeEmail')} onPress={() => go(onChange)} testID="help-change" />
+      <HelpRow icon={glyph(about === 'phone' ? 'bell' : 'doc')} title={about === 'phone' ? t('auth.help.changePhone') : t('auth.help.changeEmail')} onPress={() => go(onChange)} testID="help-change" />
       {flow === 'signin' ? (
         <>
           <T v="small" style={{ fontFamily: ff.ui600, marginTop: 6 }}>{t('auth.help.otherWay')}</T>
           <HelpRow icon={glyph(other === 'email' ? 'doc' : 'bell')} title={other === 'email' ? t('auth.help.useEmail') : t('auth.help.usePhone')} testID="help-other-code"
             onPress={() => go(() => { useOnboarding.getState().set({ via: other, social: null }); router.replace(other === 'email' ? '/email' : '/phone'); })} />
-          {SHOW_APPLE ? <HelpRow icon={<T style={{ fontSize: 17, lineHeight: 20 }} color={colors.green}>{''}</T>} title={t('signin.apple')} testID="help-apple"
+          {SHOW_APPLE ? <HelpRow icon={<AppleMark size={18} color={colors.green} />} title={t('signin.apple')} testID="help-apple"
             onPress={() => go(() => router.replace({ pathname: '/signin', params: { with: 'apple' } }))} /> : null}
           <HelpRow icon={<GoogleMark size={18} />} title={t('signin.google')} testID="help-google"
             onPress={() => go(() => router.replace({ pathname: '/signin', params: { with: 'google' } }))} />

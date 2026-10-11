@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button } from '@/components/Button';
+import { Button, LinkButton } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Field } from '@/components/Field';
 import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { looksLikeEmail, sayAuthError } from '@/components/auth/say';
+import { CodeHelpBody } from '@/components/auth/CodeHelp';
+import { openMail } from '@/components/auth/CodeEntry';
+import { PasswordField, PasswordRules } from '@/components/auth/PasswordField';
+import { CODE_RESEND_SECONDS } from '@/lib/auth';
+import { passwordMeetsRules } from '@mada/shared';
 import { AccountScreen } from '@/components/wallet/AccountScreen';
 import { Group, Notice, Row, StatusPill } from '@/components/wallet/ui';
 import { AUTH_MODE, AuthError, auth, syncIdentity, type SocialProvider } from '@/lib/auth';
@@ -43,6 +48,18 @@ export default function SignInMethods() {
   const [code, setCode] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
+  // "Didn't get the code?" inside the add-email sheet, with the same minute between codes.
+  const [emailHelp, setEmailHelp] = useState(false);
+  const [sentAt, setSentAt] = useState(0);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (emailStep !== 'code' && !pw) return;
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  });
+  const resendIn = sentAt ? Math.max(0, CODE_RESEND_SECONDS - Math.floor((tick - sentAt) / 1000)) : 0;
+  // Password: what they chose (set, change, remove), then a code to check it's them, then the new one.
+  const [pw, setPw] = useState<null | { action: 'set' | 'remove'; step: 'menu' | 'code' | 'new' | 'confirm'; code: string; value: string }>(null);
   const methods = { apple: false, google: false, phone: false, email: false, ...user?.methods };
   const shown = METHODS.filter((m) => m.id !== 'apple' || APPLE_HERE || methods.apple);
   const count = METHODS.filter((m) => methods[m.id]).length;
@@ -50,7 +67,7 @@ export default function SignInMethods() {
   const name = m ? t(m.name) : '';
 
   const open = (id: Method) => {
-    setProblem(null); setEmail(''); setCode(''); setEmailStep('address'); setChanging(false);
+    setProblem(null); setEmail(''); setCode(''); setEmailStep('address'); setChanging(false); setEmailHelp(false);
     if (id === 'phone' && !methods.phone) { router.push('/verify-phone?then=back'); return; }
     setSheet({ id, mode: methods[id] ? 'manage' : 'link' });
   };
@@ -81,7 +98,7 @@ export default function SignInMethods() {
     buzz('tap'); toast(t('signinMethods.removed', { name })); close();
   });
   const sendEmail = () => withSession(async () => {
-    try { await auth().addEmail(email); } catch (e) { if (!(e instanceof AuthError && e.code === 'wait')) throw e; }
+    try { await auth().addEmail(email); setSentAt(Date.now()); setTick(Date.now()); } catch (e) { if (!(e instanceof AuthError && e.code === 'wait')) throw e; }
     setEmailStep('code');
   });
   const verifyEmail = (value: string) => withSession(async () => {
@@ -99,7 +116,12 @@ export default function SignInMethods() {
     return t(x.sub);
   };
 
-  const emailForm = (
+  const emailForm = emailHelp ? (
+    <CodeHelpBody about="email" contact={email.trim().toLowerCase()} flow="add" resendIn={resendIn}
+      onResend={() => { setEmailHelp(false); setCode(''); void sendEmail(); }}
+      onChange={() => { setEmailHelp(false); setCode(''); setEmailStep('address'); }}
+      onLeave={() => { setEmailHelp(false); close(); }} />
+  ) : (
     <>
       {emailStep === 'address' ? (
         <>
@@ -113,6 +135,10 @@ export default function SignInMethods() {
           <Field label={t('otp.label')} big value={code} maxLength={6} keyboardType="number-pad" inputMode="numeric" autoComplete="one-time-code" textContentType="oneTimeCode"
             bad={!!problem} error={problem} editable={!busy} testID="method-email-code"
             onChangeText={(v) => { const d = v.replace(/\D/g, '').slice(0, 6); setCode(d); if (problem) setProblem(null); if (d.length === 6) verifyEmail(d); }} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
+            <Button variant="secondary" size="small" block={false} label={t('auth.email.openMail')} onPress={openMail} />
+            <LinkButton label={t('auth.help.link')} onPress={() => setEmailHelp(true)} />
+          </View>
           {AUTH_MODE === 'mock' ? <T v="tiny" color={colors.ink3}>{t('auth.email.demo')}</T> : null}
         </>
       )}
@@ -130,6 +156,13 @@ export default function SignInMethods() {
             right={<StatusPill label={methods[x.id] ? t('signinMethods.linked') : t('signinMethods.add')} tone={methods[x.id] ? 'ok' : 'muted'} />}
             onPress={() => open(x.id)} />
         ))}
+      </Group>
+      <Group>
+        <Row testID="method-password"
+          lead={<View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: methods.password ? colors.green : colors.mist, alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" size={18} color={methods.password ? colors.mist : colors.green} /></View>}
+          value={t('auth.methods.password')} sub={t('auth.methods.passwordSub')}
+          right={<StatusPill label={methods.password ? t('auth.methods.passwordOn') : t('signinMethods.add')} tone={methods.password ? 'ok' : 'muted'} />}
+          onPress={() => { setProblem(null); setSentAt(0); setPw({ action: 'set', step: 'menu', code: '', value: '' }); }} />
       </Group>
       {count === 1 ? <Notice warn title={t('signinMethods.onlyOne')} body={t('signinMethods.onlyOneBody')} testID="only-one" /> : null}
       {methods.apple ? <Card variant="well" style={{ gap: 6 }}><T v="h3" style={{ fontSize: 15 }}>{t('signinMethods.hideTitle')}</T><T v="small">{t('signinMethods.hideBody')}</T></Card> : null}
@@ -180,6 +213,81 @@ export default function SignInMethods() {
           </>
         )}
         <Button label={t('signinMethods.keep')} onPress={close} />
+      </Sheet>
+      <Sheet visible={!!pw} onClose={() => setPw(null)} label={t('auth.methods.password')}>
+        {!pw ? null : !user?.email ? (
+          <>
+            <T v="h2">{t('auth.methods.password')}</T>
+            <T v="body">{t('auth.methods.passwordNeedsEmail')}</T>
+            <Button label={t('auth.methods.addEmailGo')} onPress={() => { setPw(null); open('email'); }} />
+          </>
+        ) : pw.step === 'menu' ? (
+          <>
+            <T v="h2">{t('auth.methods.password')}</T>
+            <T v="body">{t('auth.methods.passwordBody')}</T>
+            {methods.password ? (
+              <>
+                <Button label={t('auth.methods.changePassword')} onPress={() => setPw({ ...pw, action: 'set', step: 'code' })} testID="password-change" />
+                <Button variant="secondary" style={{ backgroundColor: colors.mist }} color={colors.badInk} label={t('auth.methods.removePassword')} onPress={() => setPw({ ...pw, action: 'remove', step: 'code' })} testID="password-remove" />
+              </>
+            ) : <Button label={t('auth.methods.setPassword')} onPress={() => setPw({ ...pw, action: 'set', step: 'code' })} testID="password-set" />}
+          </>
+        ) : pw.step === 'code' ? (
+          <>
+            <T v="h2">{t('auth.methods.reauth')}</T>
+            <T v="body">{t('auth.methods.reauthBody', { contact: user.email })}</T>
+            {sentAt ? (
+              <Field label={t('auth.methods.codeLabel', { contact: user.email })} big value={pw.code} keyboardType="number-pad" inputMode="numeric" autoComplete="one-time-code" textContentType="oneTimeCode"
+                error={problem} testID="reauth-code"
+                onChangeText={(v) => {
+                  const d = v.replace(/\D/g, '').slice(-6);
+                  setProblem(null);
+                  setPw({ ...pw, code: d });
+                  if (d.length === 6) {
+                    if (pw.action === 'remove') setPw({ ...pw, code: d, step: 'confirm' });
+                    else setPw({ ...pw, code: d, step: 'new' });
+                  }
+                }} />
+            ) : null}
+            {sentAt && resendIn > 0 ? <T v="small" style={{ fontVariant: ['tabular-nums'] }}>{t('auth.code.resendIn', { time: `0:${String(resendIn).padStart(2, '0')}` })}</T> : (
+              <>
+                {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert">{problem}</T> : null}
+                <Button variant={sentAt ? 'secondary' : 'primary'} label={sentAt ? t('otp.resend') : t('auth.methods.reauthSend')} busy={busy} testID="reauth-send"
+                  onPress={() => withSession(async () => {
+                    try { await auth().reauthenticate(); } catch (e) { if (!(e instanceof AuthError && e.code === 'wait')) throw e; }
+                    setSentAt(Date.now()); setTick(Date.now());
+                  })} />
+              </>
+            )}
+            {AUTH_MODE === 'mock' ? <T v="tiny" color={colors.ink3}>{t('auth.email.demo')}</T> : null}
+          </>
+        ) : pw.step === 'confirm' ? (
+          <>
+            <T v="h2">{t('auth.methods.removePassword')}</T>
+            <T v="body">{t('auth.methods.removePasswordBody')}</T>
+            {problem ? <T v="small" color={colors.badInk} accessibilityRole="alert">{problem}</T> : null}
+            <Button variant="secondary" style={{ backgroundColor: colors.mist }} color={colors.badInk} label={t('auth.methods.removePassword')} busy={busy} testID="password-remove-confirm"
+              onPress={() => withSession(async () => {
+                try { await syncIdentity(await auth().removePassword(pw.code)); } catch (e) { if (e instanceof AuthError && e.code === 'wrong') setPw({ ...pw, code: '', step: 'code' }); throw e; }
+                buzz('success'); toast(t('auth.password.removed')); setPw(null); setSentAt(0);
+              })} />
+          </>
+        ) : (
+          <>
+            <T v="h2">{methods.password ? t('auth.methods.changePassword') : t('auth.methods.setPassword')}</T>
+            <View style={{ height: 0, overflow: 'hidden' }}>
+              <Field label={t('auth.email.label')} value={user.email} editable={false} autoComplete="email" textContentType="username" />
+            </View>
+            <PasswordField fresh label={t('auth.password.newLabel')} value={pw.value} onChangeText={(v) => { setProblem(null); setPw({ ...pw, value: v }); }} error={problem} testID="method-new-password" />
+            <PasswordRules value={pw.value} />
+            <Button label={t('auth.password.save')} disabled={!passwordMeetsRules(pw.value)} busy={busy} testID="method-password-save"
+              onPress={() => withSession(async () => {
+                try { await syncIdentity(await auth().setPassword(pw.value, pw.code)); } catch (e) { if (e instanceof AuthError && e.code === 'wrong') setPw({ ...pw, code: '', step: 'code' }); throw e; }
+                buzz('success'); toast(t('auth.password.saved')); setPw(null); setSentAt(0);
+              })} />
+          </>
+        )}
+        <Button variant="ghost" label={t('common.cancel')} onPress={() => setPw(null)} />
       </Sheet>
     </AccountScreen>
   );

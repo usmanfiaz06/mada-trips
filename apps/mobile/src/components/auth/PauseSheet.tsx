@@ -18,16 +18,17 @@ export const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padSt
  * Too many wrong codes or passwords in a row: a short, friendly pause with a countdown (the prototype's RateLimitSheet),
  * never a lock-out with no end. When it reaches zero the primary action comes back; Mada's desk is a call away.
  */
-export function PauseSheet({ visible, seconds, onDone, doneLabel, onClose }: {
-  visible: boolean; seconds: number; onDone: () => void; doneLabel: string; onClose: () => void;
+export function PauseSheet({ visible, seconds, until, onDone, doneLabel, onClose }: {
+  visible: boolean; seconds: number; until: number; onDone: () => void; doneLabel: string; onClose: () => void;
 }) {
-  const [left, setLeft] = useState(seconds);
-  useEffect(() => { if (visible) setLeft(seconds); }, [visible, seconds]);
+  // Counts down to `until`; reopening the sheet shows what's left, not a fresh start.
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!visible || left <= 0) return;
-    const id = setTimeout(() => setLeft((n) => n - 1), 1000);
-    return () => clearTimeout(id);
-  }, [visible, left]);
+    if (!visible) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [visible]);
+  const left = Math.min(seconds, Math.max(0, Math.ceil((until - now) / 1000)));
 
   return (
     <Sheet visible={visible} onClose={onClose} label={t('auth.pause.title')}>

@@ -1,8 +1,6 @@
 import { useRouter } from 'expo-router';
-import { LinkButton } from '@/components/Button';
 import { CodeEntry } from '@/components/auth/CodeEntry';
 import { Screen, TopBar } from '@/components/Layout';
-import { T } from '@/components/Text';
 import { auth, finishSignIn } from '@/lib/auth';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -16,8 +14,8 @@ export default function EmailCode() {
     <Screen>
       <TopBar onBack={() => router.back()} />
       <CodeEntry
-        title={t('auth.email.codeTitle')} about="email" demoHint={t('auth.email.demo')} testID="email-code-input"
-        sent={<><T v="body">{t('auth.email.sentTo', { email })}</T><LinkButton label={t('auth.email.change')} onPress={() => router.back()} /></>}
+        title={t('auth.email.codeTitle')} about="email" demoHint={t('auth.email.demo')} testID="email-code-input" flow="signin"
+        contact={email} onChange={() => (router.canGoBack() ? router.back() : router.replace('/email'))}
         onVerify={async (code) => {
           const id = await auth().verifyEmailCode(email, code);
           const next = await finishSignIn(id, 'email');

@@ -126,7 +126,7 @@ export const authCopy = {
   // ───────────── optional password (with an email; codes stay the default) ─────────────
   'auth.password.use': 'Use my password instead',
   'auth.password.useCode': 'Email me a code instead',
-  'auth.password.title': 'Sign in with your password',
+  'auth.password.title': 'Your password',
   'auth.password.body': 'Only if you set one in Profile. Codes always work too.',
   'auth.password.label': 'Password',
   'auth.password.show': 'Show',

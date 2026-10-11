@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button } from '@/components/Button';
+import { Button, LinkButton } from '@/components/Button';
 import { Field } from '@/components/Field';
 import { Act, Screen, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -11,6 +11,7 @@ import { AUTO_FOCUS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useOnboarding } from '@/lib/onboarding';
+import { colors } from '@/theme';
 
 /** Continue with email: a 6-digit code by email (not a link, so it works inside the app). */
 export default function Email() {
@@ -52,6 +53,10 @@ export default function Email() {
             placeholder={t('auth.email.placeholder')} error={(touched && email && !ok ? t('auth.email.problem') : null) ?? error}
             onSubmitEditing={send} returnKeyType="send" testID="email-input" autoFocus={AUTO_FOCUS}
           />
+          <View style={{ flexDirection: 'row' }}>
+            <LinkButton label={t('auth.password.use')} color={colors.ink3}
+              onPress={() => { set({ email: email.trim().toLowerCase(), via: 'email', social: null }); router.push('/email-password'); }} />
+          </View>
         </View>
         <Act>
           <Button label={t('auth.email.send')} disabled={!ok} busy={busy} onPress={send} testID="email-send" />
