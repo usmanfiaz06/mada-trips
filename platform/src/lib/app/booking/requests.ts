@@ -187,10 +187,16 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
 
 export async function listBookingRequests(ownerId: string): Promise<BookingRequestView[]> {
   await progressRequests(ownerId);
-  const rows = await db.select().from(appRequests).where(and(eq(appRequests.ownerId, ownerId), sql`${appRequests.details}->>'source' = 'ask'`)).orderBy(desc(appRequests.createdAt)).limit(100);
-  const out: BookingRequestView[] = [];
-  for (const r of rows) out.push(requestView(r, await latestQuote(r.id)));
-  return out;
+  const mine = and(eq(appRequests.ownerId, ownerId), sql`${appRequests.details}->>'source' = 'ask'`);
+  // The requests and each one's latest quote, side by side (was one query per request).
+  const [rows, quotes] = await Promise.all([
+    db.select().from(appRequests).where(mine).orderBy(desc(appRequests.createdAt)).limit(100),
+    db.selectDistinctOn([appQuotes.requestId]).from(appQuotes)
+      .where(sql`${appQuotes.requestId} IN (SELECT ${appRequests.id} FROM ${appRequests} WHERE ${mine})`)
+      .orderBy(appQuotes.requestId, desc(appQuotes.createdAt)),
+  ]);
+  const latest = new Map(quotes.map((q) => [q.requestId, q]));
+  return rows.map((r) => requestView(r, latest.get(r.id)));
 }
 
 export async function getBookingRequest(ownerId: string, id: string): Promise<BookingRequestView> {

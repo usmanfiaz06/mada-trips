@@ -7,7 +7,7 @@ import {
 import { db } from "@/db";
 import { appNotifications, appTrips } from "@/db/app-schema";
 import { getBalance } from "../credit";
-import { loadBase, withClock } from "./core";
+import { loadBase, loadBases, withClock } from "./core";
 import { listRefunds } from "./money";
 import { isOpen, listRequests } from "./requests";
 import { listTracked } from "./status";
@@ -29,13 +29,16 @@ function card(t: TripDetail): TripCard {
 }
 
 export async function overview(ownerId: string, demo: TripPhase | null): Promise<TripsResponse> {
+  // The lists below don't depend on the trips: they're read while the trips load (each query is a round trip).
+  const lists = Promise.all([
+    listRequests(ownerId), listRefunds(ownerId), listTracked(ownerId),
+    db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, ownerId), isNull(appNotifications.readAt))),
+    getBalance(ownerId),
+  ]);
+  lists.catch(() => {}); // awaited below; a failure there is reported there
   const rows = await db.select().from(appTrips).where(and(eq(appTrips.ownerId, ownerId), ne(appTrips.status, "planning"))).orderBy(asc(appTrips.startDate));
   const now = new Date();
-  const details: TripDetail[] = [];
-  for (const r of rows) {
-    const base = await loadBase(r);
-    details.push(withClock(base, null, now));
-  }
+  const details: TripDetail[] = (await loadBases(rows)).map((base) => withClock(base, null, now));
   // The trip Today is about: the first one still in play. A demo override applies to that trip only.
   const live = details.filter((d) => d.status !== "cancelled" && d.clock.phase !== "none");
   let current: TripDetail | null = live[0] ?? null;
@@ -48,11 +51,7 @@ export async function overview(ownerId: string, demo: TripPhase | null): Promise
   const isPast = (d: TripDetail) => d.status === "completed" || (d.status !== "cancelled" && d.clock.phase === "none" && (d.endDate ?? d.startDate) < today);
   const upcoming = details.filter((d) => d.status !== "cancelled" && !isPast(d)).map((d) => (current && d.id === current.id ? card(current) : card(d)));
   const past = details.filter(isPast).reverse().map(card);
-  const [requests, refunds, tracked, [unread], credit] = await Promise.all([
-    listRequests(ownerId), listRefunds(ownerId), listTracked(ownerId),
-    db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, ownerId), isNull(appNotifications.readAt))),
-    getBalance(ownerId),
-  ]);
+  const [requests, refunds, tracked, [unread], credit] = await lists;
   return {
     clock, currentId: current?.id ?? null, upcoming, past, requests, refunds, tracked, unread: unread?.n ?? 0,
     credit: { amount: credit, currency: "SAR" }, stamps: past.length,
