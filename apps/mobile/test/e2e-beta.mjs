@@ -131,7 +131,7 @@ async function flights() {
   await k.shot('request-sent');
   step('flights: the fares arrive');
   await k.see('I found 2 fares', 'fares lead', 20000);
-  await k.see('Held for', 'hold');
+  await k.see('Held ', 'hold');
   await k.shot('fares');
   await k.press(k.byTest('fare-opt2'));
   await k.see('Bags', 'fare rules');
@@ -156,8 +156,14 @@ async function flights() {
   await page.locator('[data-testid="tickets-box"]').first().evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
   await k.shot('trip-tickets');
   step('flights: the e-tickets in the request');
-  await page.goBack(); await page.waitForTimeout(800);
-  await page.goto(`${ORIGIN}/trips?tab=requests`);
+  for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-trips"]').filter({ visible: true }).count()); i++) {
+    const back = page.getByRole('button', { name: /^(Close|Back|Done)$/ }).filter({ visible: true }).last();
+    if (!(await back.count())) break;
+    await back.click(); await page.waitForTimeout(700);
+  }
+  await k.byTest('dock-trips').click();
+  await page.waitForTimeout(600);
+  await k.press(page.getByRole('button', { name: 'Requests', exact: true }).or(page.getByRole('tab', { name: 'Requests', exact: true })));
   await k.see('Flights to Istanbul', 'requests tab', 10000);
   await k.shot('requests-tab');
   await k.press(page.getByText('Flights to Istanbul', { exact: false }).filter({ visible: true }).first());

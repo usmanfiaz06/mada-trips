@@ -138,7 +138,7 @@ export function FlightFares({ r, today }: { r: BookingRequestView; today: string
       {left !== null && !ended && q.status === 'open' ? (
         <View style={[styles.hold]} accessibilityLiveRegion="polite">
           <T v="caption" color={colors.ok} style={{ fontFamily: ff.ui600, fontVariant: ['tabular-nums'] }}>
-            {left > 3 * 3_600_000 ? t('beta.fq.heldUntil', { time: new Date(until!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : t('beta.fq.held', { time: hhmm(left) })}
+            {left > 3 * 3_600_000 ? t('beta.fq.heldUntil', { time: `${rangeName(new Date(until! + 3 * 3_600_000).toISOString().slice(0, 10), null, today)} ${new Date(until! + 3 * 3_600_000).toISOString().slice(11, 16)}` }) : t('beta.fq.held', { time: hhmm(left) })}
           </T>
         </View>
       ) : null}
