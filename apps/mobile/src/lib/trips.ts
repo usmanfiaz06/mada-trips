@@ -273,7 +273,7 @@ export async function registerForPush(): Promise<void> {
     const N = await import('expo-notifications');
     const perm = await N.getPermissionsAsync();
     if (!perm.granted) return;
-    const token = (await N.getExpoPushTokenAsync()).data;
+    const token = (await N.getExpoPushTokenAsync({ projectId: (await import('./push-project')).pushProjectId() })).data;
     await tripsApi.registerDevice(token, Platform.OS === 'ios' ? 'ios' : 'android');
     registered = true;
   } catch { /* no project id in development builds, or no network: try again next launch */ }

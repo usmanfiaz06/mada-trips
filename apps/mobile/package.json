@@ -13,7 +13,10 @@
     "export:web": "node scripts/copy-ocr.mjs && expo export --platform web --output-dir dist --clear",
     "e2e:web": "node test/e2e-web.mjs",
     "test": "vitest run",
-    "e2e:resilience": "node test/e2e-resilience.mjs"
+    "e2e:resilience": "node test/e2e-resilience.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "eas-build-pre-install": "node scripts/eas-fonts.mjs",
+    "store:screenshots": "node test/store-screenshots.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/ibm-plex-sans-arabic": "0.4.2",
