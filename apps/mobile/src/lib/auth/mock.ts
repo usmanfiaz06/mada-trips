@@ -1,4 +1,4 @@
-import { PASSWORD_MIN_LENGTH, encodeMockSupabaseToken, type AuthProvider } from '@mada/shared';
+import { encodeMockSupabaseToken, passwordMeetsRules, type AuthProvider } from '@mada/shared';
 import { deleteSecret, getSecret, setSecret } from '../storage';
 import { CODE_RESEND_SECONDS } from './config';
 import { AuthError, type AuthBackend, type Identity, type SocialProvider } from './types';
@@ -12,7 +12,7 @@ import { AuthError, type AuthBackend, type Identity, type SocialProvider } from 
 
 export const MOCK_CODE = '123456';
 /** Stands in for Supabase's leaked-password check (Have I Been Pwned). */
-const LEAKED = new Set(['password123', 'password', '12345678', '123456789', 'qwerty123', 'iloveyou1']);
+const LEAKED = new Set(['password123!', 'passw0rd!', 'welcome1!', 'p@ssw0rd', 'qwerty123!']);
 
 type MockUser = { sub: string; phone: string | null; email: string | null; providers: AuthProvider[]; name: string | null; identities: string[]; password?: string | null };
 
@@ -218,7 +218,7 @@ export const mockAuth: AuthBackend = {
     await ready(); await delay();
     const u = me();
     if (code !== undefined) checkCode(`reauth:${u.sub}`, code);
-    if (password.length < PASSWORD_MIN_LENGTH) throw new AuthError('weakPassword');
+    if (!passwordMeetsRules(password)) throw new AuthError('weakPassword');
     if (LEAKED.has(password.toLowerCase())) throw new AuthError('leakedPassword');
     u.password = password;
     addProvider(u, 'password');
