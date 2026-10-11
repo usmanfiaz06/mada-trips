@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import {
-  MOCK_ACTIVITIES, THINGS_ATTRIBUTIONS, ThingsQuery, filterActivities, kmBetween, localClock, mockEvents, nextPrayer, openState,
+  MOCK_ACTIVITIES, THINGS_ATTRIBUTIONS, ThingsQuery, filterActivities, isUnfitThing, kmBetween, localClock, mockEvents, nextPrayer, openState,
   todayIdeas, utcOffsetMin, type Activity, type Experience, type PlaceAttribution, type PlaceImage, type ThingsResponse, type TodayWeather, type WhatsOn,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -128,7 +128,9 @@ export async function thingsFor(idOrSlug: string, rawQuery: Record<string, strin
   const near = q.near ? { lat: Number(q.near.split(",")[0]), lon: Number(q.near.split(",")[1]), label: "you" as const } : ctx.near ?? null;
 
   const c = await cityRow(place.id);
-  const rows = await db.select().from(appActivities).where(eq(appActivities.placeId, place.id)).orderBy(desc(appActivities.popularity)).limit(200);
+  // Lists loaded before the filter (P1-16) are cleaned as they're read: no aircraft exhibits or closed palaces.
+  const rows = (await db.select().from(appActivities).where(eq(appActivities.placeId, place.id)).orderBy(desc(appActivities.popularity)).limit(200))
+    .filter((r) => !isUnfitThing({ name: r.name, summary: r.summary }));
   let status: ThingsResponse["status"] = rows.length ? "ready" : "none";
   let acts: Activity[] = rows.map((r) => activityOf(r, isToday ? clock : null, near));
   if (!rows.length) {
@@ -177,7 +179,7 @@ export async function findThing(placeId: number, ref: { kind: "activity" | "expe
   const things = await thingsFor(String(placeId), { limit: "60" }, { now });
   if (ref.kind === "activity") {
     const [r] = await db.select().from(appActivities).where(and(eq(appActivities.id, ref.id), eq(appActivities.placeId, placeId)));
-    const a = r ? activityOf(r, null, null) : (MOCK_ACTIVITIES[String(placeId)] ?? []).find((x) => x.id === ref.id) ?? null;
+    const a = r && !isUnfitThing({ name: r.name, summary: r.summary }) ? activityOf(r, null, null) : r ? null : (MOCK_ACTIVITIES[String(placeId)] ?? []).find((x) => x.id === ref.id) ?? null;
     return a ? { place: things.place, title: a.name, sub: a.summary, activity: a, experience: null, event: null } : null;
   }
   if (ref.kind === "experience") {

@@ -42,12 +42,15 @@ export async function searchPlaces(input: string, limit = 8): Promise<PlaceSearc
   const q = normPlace(query);
   if (!q) return { query, results: [], suggestions: [] };
   const short = q.length < 3;
+  // "RIY" typed in capitals is an airport code; "Riy" is the start of a name. A lowercase code still matches, but
+  // below a name that starts with it, so "Riy" finds Riyadh before the towns near Riyan airport (RIY).
+  const code = /^[A-Z]{3}$/.test(query);
   const results = await rows<HitRow & { score: number }>(sql`
     WITH q AS (SELECT app_places_norm(${q}) AS q),
     m AS (
       SELECT n.place_id, n.kind, n.name, n.label,
         (CASE
-          WHEN n.kind = 'iata' THEN CASE WHEN n.norm = q.q THEN 1.2 ELSE 0 END
+          WHEN n.kind = 'iata' THEN CASE WHEN n.norm = q.q THEN (CASE WHEN ${code}::boolean THEN 1.2 ELSE 0.8 END) ELSE 0 END
           WHEN n.norm = q.q THEN 1.0
           WHEN n.norm LIKE q.q || '%' THEN 0.9 - least(0.15, (length(n.norm) - length(q.q)) * 0.005)
           WHEN n.norm LIKE '% ' || q.q || '%' THEN 0.72

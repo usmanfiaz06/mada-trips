@@ -566,3 +566,18 @@ describe("the desk's What's on", () => {
     await db.delete(appWhatsOn).where(eq(appWhatsOn.id, id));
   });
 });
+
+describe("things that aren't things to do (LIVE-AUDIT P1-16)", () => {
+  it("leaves out aircraft on display, closed palaces and government sites; keeps museums and heritage", async () => {
+    const { isUnfitThing } = await import("@mada/shared");
+    for (const name of ["F-15 Eagle", "Boeing 707", "C-130 Hercules", "Lockheed L-1011 TriStar", "Douglas DC-4"]) expect(isUnfitThing({ name })).toBe(true);
+    expect(isUnfitThing({ name: "Yamamah Palace", summary: "official residence of the King and seat of the royal court" })).toBe(true);
+    expect(isUnfitThing({ name: "Ministry of Interior", summary: "government building in Riyadh" })).toBe(true);
+    expect(isUnfitThing({ name: "Jet", tags: { historic: "aircraft" } })).toBe(true);
+    expect(isUnfitThing({ name: "Murabba Palace", summary: "historic palace, now a museum" })).toBe(false);
+    expect(isUnfitThing({ name: "Royal Saudi Air Force Museum" })).toBe(false);
+    expect(isUnfitThing({ name: "Masmak Fort", summary: "clay and mudbrick fort" })).toBe(false);
+    expect(isUnfitThing({ name: "Kingdom Centre", summary: "skyscraper in Riyadh" })).toBe(false);
+  });
+});
+

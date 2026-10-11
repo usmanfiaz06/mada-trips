@@ -26,6 +26,33 @@ export function kindOf(tags: OsmTags): ActivityKind | null {
   return null;
 }
 
+/*
+ * Places that aren't things to do, whatever OSM calls them (LIVE-AUDIT P1-16): aircraft and military hardware on
+ * display (an exhibit inside a museum is mapped on its own: "F-15", "C-130"), military and government sites, and
+ * palaces that are residences or offices (a royal court), not open to visitors. A museum, or a palace or fort that is
+ * a heritage site, stays. Used when a city is loaded from OpenStreetMap and again when it is shown (rows already held).
+ */
+const HARDWARE = /\b(f-\d{1,2}[a-z]?|c-130|kc-135|boeing\s?7\d7|dc-\d{1,2}|tri-?star|l-1011|lockheed|mig-\d+|fighter\s(jet|aircraft|plane)|jet\sfighter|bomber|warplane|airliner|aircraft|aeroplane|airplane|helicopter|missile|howitzer|artillery)\b/i;
+const OFFICIAL = /\b(royal court|ministry|embassy|consulate|government|military|air base|airbase|barracks|national guard|prison)\b/i;
+const VISITABLE = /\b(museum|heritage|historic(al)?|fort(ress)?|visitors?|tours?|open to the public|archaeolog\w*|unesco)\b/i;
+
+export function isUnfitThing(t: { name: string; summary?: string | null; tags?: OsmTags }): boolean {
+  const name = t.name ?? '';
+  if (/\bmuseum\b/i.test(name) || t.tags?.tourism === 'museum') return false;
+  const tags = t.tags ?? {};
+  if (tags.historic === 'aircraft' || tags.historic === 'tank' || tags.historic === 'cannon' || tags.historic === 'military' || tags.military || tags.landuse === 'military') return true;
+  if (tags.office === 'government' || tags.government || tags.building === 'government' || tags.amenity === 'townhall' || tags.diplomatic) return true;
+  if (HARDWARE.test(name)) return true;
+  const text = `${name} ${t.summary ?? ''}`;
+  if (OFFICIAL.test(text) && !VISITABLE.test(text)) return true;
+  // A palace is a thing to do only when it is a heritage site or a museum (Murabba Palace), not a residence or a court.
+  if (/\bpalace\b/i.test(name) || tags.historic === 'palace' || tags.building === 'palace') {
+    if (/\b(residence|royal court|official|seat of|offices?)\b/i.test(t.summary ?? '')) return true;
+    return !VISITABLE.test(t.summary ?? '');
+  }
+  return false;
+}
+
 const INDOOR: ReadonlySet<ActivityKind> = new Set(['museum', 'gallery', 'aquarium', 'mosque']);
 const FAMILY: ReadonlySet<ActivityKind> = new Set(['zoo', 'aquarium', 'theme_park', 'water_park', 'park']);
 

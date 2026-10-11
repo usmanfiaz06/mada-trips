@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
-import { popularityOf, rawScore, type PlaceImage } from "@mada/shared";
+import { isUnfitThing, popularityOf, rawScore, type PlaceImage } from "@mada/shared";
 import { db } from "@/db";
 import { appActivities, appActivityCities } from "@/db/app-schema-activities";
 import { appPlaces } from "@/db/app-schema-places";
@@ -52,7 +52,8 @@ export async function gatherCity(city: CityRow, f: Fetch, now = new Date()): Pro
     if (!c.wikipediaTitle && c.w?.enwiki) c.wikipediaTitle = c.w.enwiki;
   }
   keep.sort((a, b) => b.score - a.score);
-  const top = keep.slice(0, KEEP);
+  // Wikidata's description can say what the tags didn't ("official residence", "airliner").
+  const top = keep.filter((c) => !isUnfitThing({ name: c.name, summary: c.w?.descEn ?? null, tags: c.tags })).slice(0, KEEP);
   for (const c of top.slice(0, IMAGES_FOR)) if (c.w?.image) c.image = await commonsImage(f, c.w.image);
   const pop = popularityOf(top.map((c) => c.score));
   const rows = top.map((c, i) => ({

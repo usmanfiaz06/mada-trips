@@ -8,6 +8,7 @@ import { appPlaceGuides, appPlacePlans, appPlaces } from "@/db/app-schema-places
 import { runIngest } from "@/lib/app/places/ingest";
 import { pendingRefreshes } from "@/lib/app/places/guide";
 import { splitSections, trimExtract } from "@/lib/app/places/wiki";
+import { fitGuide, fitText } from "@/lib/app/places/editorial";
 import { destinationOf } from "@/lib/app/desk/adapters";
 import { GET as searchGet } from "@/app/api/app/v1/places/search/route";
 import { GET as popularGet } from "@/app/api/app/v1/places/popular/route";
@@ -113,6 +114,8 @@ describe("GET /places/search", () => {
     const lhr = PlaceSearchResponse.parse((await search("Heathrow")).json).results[0]!;
     expect(lhr).toMatchObject({ name: "London", countryCode: "GB", matched: { kind: "airport", label: "Heathrow (LHR)" } });
     expect((await names("tbs"))[0]).toBe("Tbilisi, GE");
+    // A lowercase three-letter start is a name first (Riyadh), not the code of a smaller place's airport.
+    expect((await names("riy"))[0]).toBe("Riyadh, SA");
   });
 
   it("finds a capital by its country, and old names", async () => {
@@ -337,5 +340,30 @@ describe("shared helpers", () => {
     expect(normPlace("أبها")).toBe(normPlace("ابها"));
     expect(planMessage({ city: "Tbilisi", travellers: 4, month: "2027-05" })).toBe("Tbilisi, 4 of us, sometime in May");
     expect(planMessage({ city: "Baku" })).toBe("Baku, dates to decide");
+  });
+});
+
+describe("what a city page won't show", () => {
+  const base = {
+    id: "1", name: "Riyadh", nameAr: null, region: null, country: "Saudi Arabia", countryCode: "SA", lat: 24.7, lon: 46.7, timezone: "Asia/Riyadh", population: 7_000_000,
+    served: true, curation: "curated" as const, photo: null, bookingKey: null, image: null, airports: [], currency: null, fetchedAt: null,
+    summary: { text: "Riyadh is the capital and largest city of Saudi Arabia.", url: "https://en.wikipedia.org/wiki/Riyadh" },
+    sections: [{ key: "understand" as const, title: "Understand", text: "Known by local wags as the Dead Center of the Kingdom.", trimmed: false, url: "https://en.wikivoyage.org/wiki/Riyadh#Understand" }],
+    attributions: [
+      { source: "wikipedia" as const, text: "From Wikipedia", url: "https://en.wikipedia.org/wiki/Riyadh", licence: "CC BY-SA 4.0", licenceUrl: null },
+      { source: "wikivoyage" as const, text: "From Wikivoyage", url: "https://en.wikivoyage.org/wiki/Riyadh", licence: "CC BY-SA 4.0", licenceUrl: null },
+    ],
+  };
+  it("drops Wikivoyage on Saudi cities, keeps Wikipedia's lead, and credits only what's shown", () => {
+    const g = fitGuide(base as never);
+    expect(g.sections).toEqual([]);
+    expect(g.summary?.text).toContain("capital");
+    expect(g.attributions.map((a) => a.source)).toEqual(["wikipedia"]);
+  });
+  it("drops a judging paragraph anywhere, word for word otherwise", () => {
+    expect(fitText("A city of markets.\n\nKnown for its brutal climate and tribal conservatism.")).toBe("A city of markets.");
+    expect(fitText("Wahhabi conservatism rules here.")).toBeNull();
+    const elsewhere = fitGuide({ ...base, countryCode: "GE", sections: [{ ...base.sections[0]!, text: "Old town.\n\nA boring place." }] } as never);
+    expect(elsewhere.sections[0]!.text).toBe("Old town.");
   });
 });

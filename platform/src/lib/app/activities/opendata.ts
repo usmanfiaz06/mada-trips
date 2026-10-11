@@ -13,7 +13,7 @@
  * Nothing is scraped: these are the documented public APIs, used within their usage policies (one city at a time,
  * results cached for 30 days).
  */
-import { isFamily, isIndoor, kindOf, type ActivityKind, type OsmTags } from "@mada/shared";
+import { isFamily, isIndoor, isUnfitThing, kindOf, type ActivityKind, type OsmTags } from "@mada/shared";
 import { placesUserAgent } from "../places/ingest";
 import type { Fetch } from "../places/wiki";
 
@@ -83,6 +83,8 @@ export function parseOverpass(data: unknown): Candidate[] {
     if (!name || name.length > 120) continue;
     const kind = kindOf(tags);
     if (!kind) continue;
+    // Aircraft on display, military and government sites, palaces that aren't open to visitors (P1-16).
+    if (isUnfitThing({ name, tags })) continue;
     const lat = e.lat ?? e.center?.lat;
     const lon = e.lon ?? e.center?.lon;
     if (lat == null || lon == null) continue;

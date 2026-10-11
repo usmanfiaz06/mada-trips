@@ -4,6 +4,7 @@ import type { CityGuide, GuideSection, PlaceAttribution, PlaceImage } from "@mad
 import { db } from "@/db";
 import { appPlaceGuides, appPlaces } from "@/db/app-schema-places";
 import { AppError } from "../http";
+import { fitGuide } from "./editorial";
 import { findPlace, type PlaceRowSql } from "./search";
 import { km } from "./sources";
 import { attributionFor, commonsImage, wikipediaSummary, wikivoyageSections, wikivoyageTitle, type Fetch } from "./wiki";
@@ -100,13 +101,14 @@ async function later(task: () => Promise<unknown>) {
 
 export function guideOf(place: PlaceRowSql, part: OpenPart | null, fetchedAt: Date | null): CityGuide {
   const attributions = [...(part?.attributions ?? []), attributionFor.geonames(), ...(place.airports.length ? [attributionFor.ourairports()] : [])];
-  return {
+  // Cached guides too: what we won't show is taken out as the guide is served (editorial.ts).
+  return fitGuide({
     id: String(place.id), name: place.name, nameAr: place.name_ar, region: place.region, country: place.country, countryCode: place.country_code,
     lat: place.lat, lon: place.lon, timezone: place.timezone, population: Number(place.population), served: place.served,
     curation: place.curation as CityGuide["curation"], photo: place.photo, bookingKey: place.booking_key, image: part?.image ?? null, summary: part?.summary ?? null,
     sections: part?.sections ?? [], airports: place.airports.slice(0, 4), currency: place.currency_code ? { code: place.currency_code, name: place.currency_name ?? place.currency_code } : null,
     attributions, fetchedAt: fetchedAt?.toISOString() ?? null,
-  };
+  });
 }
 
 export async function getGuide(idOrSlug: string, opts: { fetch?: Fetch; now?: Date } = {}): Promise<CityGuide> {
