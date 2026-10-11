@@ -10,6 +10,7 @@ import {
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { plannedFor } from './things-store';
+import { askRequestViews } from './booking';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for the trip companion: the same endpoints as platform/src/app/api/app/v1/{trips,refunds,
@@ -474,7 +475,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     return ok({
       clock: current?.clock ?? { phase: 'none', now: nowIso(), today, demo: !!demo }, currentId: current?.id ?? null,
       upcoming: details.filter((d) => d.status !== 'cancelled' && !isPast(d)).map((d) => card(current && current.id === d.id ? current : d)),
-      past: details.filter(isPast).map(card), requests: s.requests.map(pub), refunds: s.refunds.map(pubRefund), tracked: s.tracked,
+      past: details.filter(isPast).map(card), requests: [...s.requests.map(pub), ...askRequestViews(user.id)], refunds: s.refunds.map(pubRefund), tracked: s.tracked,
       unread: s.inbox.filter((n) => !n.readAt).length, credit: SAR(s.credit), stamps: details.filter(isPast).length,
     });
   }

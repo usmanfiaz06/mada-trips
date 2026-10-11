@@ -5,7 +5,7 @@ import {
   money, parseAskRules, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
-  type RequestQuote, type StayOption, type ThreadMessage,
+  type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -593,3 +593,17 @@ export const bookingMock: AreaMock = async (w, ctx) => {
 
 /** For the e2e script and tests: forget everything (a fresh install). */
 export function resetBookingMock() { offers.clear(); requests.clear(); orders.clear(); creditSpent.clear(); }
+
+/**
+ * Trips › Requests lists every request, as the server does (lib/app/trips/requests.ts): the ones made in Ask too.
+ * Read by the trips mock for GET /trips.
+ */
+export function askRequestViews(userId: string): TripRequestView[] {
+  const status: Record<string, TripRequestView['status']> = { queued: 'queued', sent: 'sent', reviewing: 'reviewing', quoted: 'quoted', paid: 'with_agent', done: 'done', cancelled: 'cancelled' };
+  return [...requests.values()].filter((r) => r.owner === userId && r.view.kind !== 'package').map((r) => ({
+    id: r.id, tripId: null, kind: r.view.kind, area: 'other' as const, status: status[r.view.status] ?? 'sent', title: r.view.title, short: null, detail: r.view.summary || r.view.detail || null,
+    withWhom: 'faisal' as const, withName: r.view.agent?.name ?? null, outcome: null, alt: null, yesText: null,
+    quote: r.view.quote && r.view.quote.status === 'open' ? r.view.quote.total : null, quoteText: r.view.quote?.lead ?? r.view.quote?.text ?? null,
+    createdAt: r.view.createdAt, updatedAt: r.view.updatedAt,
+  }));
+}

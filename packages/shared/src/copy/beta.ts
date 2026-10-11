@@ -54,6 +54,7 @@ export const betaCopy = {
   'beta.fq.heldUntil': 'Held until {time}',
   'beta.fq.ended': 'This hold has ended. Ask {agent} to check the fare again.',
   'beta.fq.pay': 'Pay {price}',
+  'beta.fq.see': 'See the fares',
   'beta.fq.another': 'Ask for another option',
   'beta.fq.anotherText': 'Could you look for another option?',
   'beta.fq.checkAgain': 'Could you check the fare again?',

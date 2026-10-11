@@ -1,4 +1,5 @@
 import "server-only";
+import { flightSummary, flightTitle, isFlightAsk, isFlightRequest, type FlightSearch } from "../booking/flight-requests";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { askSpec, deskStatus, formatSar, type CreateTripAskRequest, type TripDetail, type TripRequestView } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -29,7 +30,9 @@ export function toRequestView(r: RequestRow): TripRequestView {
   const d = (r.details ?? {}) as RequestDetails;
   return {
     id: r.id, tripId: r.tripId, kind: d.askKind ?? r.kind, area: d.area ?? (r.kind === "refund" ? "refund" : r.kind === "change" ? "change" : "other"),
-    status: r.status as TripRequestView["status"], title: r.summary, short: d.short ?? null, detail: d.detail ?? null,
+    // A flight request from Ask is worded when read, so its dates follow the reader's language (booking/flight-requests.ts).
+    status: r.status as TripRequestView["status"], title: isFlightAsk(r.details) ? flightTitle((r.details as { search: FlightSearch }).search) : r.summary, short: d.short ?? null,
+    detail: isFlightRequest(r.details) ? flightSummary((r.details as { search: FlightSearch }).search, r.travellerIds.length) : d.detail ?? null,
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
     quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null,
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),

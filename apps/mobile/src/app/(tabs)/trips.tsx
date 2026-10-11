@@ -185,7 +185,10 @@ function RequestCard({ r }: { r: TripRequestView }) {
         <Box tone="well" gap={8}>
           <AgentIntro />
           {r.quoteText ? <Small color={colors.green}>{r.quoteText}</Small> : null}
-          <SmallButton testID="pay-quote" tone="primary" label={t('tr.req.pay', { amount: formatSar(r.quote!.amount) })} onPress={() => router.push(`/pay?requestId=${r.id}` as Href)} />
+          {r.kind === 'flight'
+            // Flights by request: several fares to choose from, so the request opens with them.
+            ? <SmallButton testID="see-fares" tone="primary" label={t('beta.fq.see')} onPress={() => router.push(`/ask/request/${r.id}` as Href)} />
+            : <SmallButton testID="pay-quote" tone="primary" label={t('tr.req.pay', { amount: formatSar(r.quote!.amount) })} onPress={() => router.push(`/pay?requestId=${r.id}` as Href)} />}
         </Box>
       ) : null}
     </Box>

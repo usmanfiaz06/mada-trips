@@ -60,6 +60,7 @@ export const arBeta: ArSection<typeof betaCopy> = {
   'beta.fq.heldUntil': 'محجوز حتى {time}',
   'beta.fq.ended': 'انتهى حجز هذا السعر. اطلب من {agent} أن يتحقق منه مرة أخرى.',
   'beta.fq.pay': 'ادفع {price}',
+  'beta.fq.see': 'اطّلع على الأسعار',
   'beta.fq.another': 'اطلب خيارًا آخر',
   'beta.fq.anotherText': 'هل يمكنك البحث عن خيار آخر؟',
   'beta.fq.checkAgain': 'هل يمكنك التحقق من السعر مرة أخرى؟',
