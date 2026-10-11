@@ -427,7 +427,7 @@ try {
     await p.byTest('phone-send').click();
     await p.see('ما وصلك الرمز؟', 'ar link');
     await p.see('أرسلنا الرمز على واتساب إلى', 'ar whatsapp line');
-    await p.see('برسالة نصية بعد', 'ar sms switch waits');
+    await p.see('أرسلوه برسالة نصية بعد', 'ar sms switch waits');
     await p.shot('code');
     await p.page.getByText('ما وصلك الرمز؟', { exact: true }).first().click();
     await p.see('جرّب طريقة أخرى', 'ar sheet');

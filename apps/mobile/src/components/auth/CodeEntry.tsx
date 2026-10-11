@@ -62,8 +62,9 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
   const input = useRef<TextInput>(null);
   const x = useSharedValue(0);
   const shake = useAnimatedStyle(() => ({ transform: [{ translateX: x.get() }] }));
-  // A number keeps its own order inside an Arabic sentence.
-  const shown = about === 'phone' ? (isRTL() ? `\u2066${prettyPhone(contact)}\u2069` : prettyPhone(contact)) : contact;
+  // A number keeps its own order inside an Arabic sentence, and stays on one line.
+  const phoneText = about === 'phone' ? prettyPhone(contact).replace(/ /g, '\u00a0') : '';
+  const shown = about === 'phone' ? (isRTL() ? `\u2066${phoneText}\u2069` : phoneText) : contact;
   // Phone codes go on WhatsApp or by SMS (lib/auth/channel.ts): say which, and offer the other one.
   const channels = usePhoneChannels();
   const sent = usePhoneCodes((s) => (about === 'phone' ? s.sent[contact] : undefined));

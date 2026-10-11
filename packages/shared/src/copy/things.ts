@@ -119,9 +119,9 @@ export const thingsCopy = {
   // ───────────── sources ─────────────
   'things.sources': 'Sources',
   'things.sourcesTitle': 'Where this comes from',
-  'things.sourcesBody': 'Places, hours and photos come from open data, credited here under each licence. Tours and tickets come from our partners, and we book them for you.',
+  'things.sourcesBody': 'Places, hours and photos come from open sources, credited here under each licence. Tours and tickets come from our partners, and we book them for you.',
   'things.sourcesLink': 'Sources and licences',
-  'things.source.osm': 'Places and opening hours: © OpenStreetMap contributors, under the Open Database Licence (ODbL).',
+  'things.source.osm': 'Places and opening hours: OpenStreetMap contributors, under the Open Database Licence (ODbL).',
   'things.source.wikidata': 'Descriptions, Arabic names and photos: Wikidata (CC0) and Wikimedia Commons (each photo’s own licence, shown with it).',
   'things.source.wikipedia': 'How popular a place is: Wikipedia pageviews (Wikimedia Foundation).',
   'things.source.wikivoyage': 'City guides: Wikivoyage, CC BY-SA.',
