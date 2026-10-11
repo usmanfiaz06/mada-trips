@@ -171,7 +171,11 @@ export type CircleDetail = z.infer<typeof CircleDetail>;
 
 export const IncomingInvite = z.object({ inviteId: Id, from: PersonRef, circle: z.object({ id: Id, name: z.string(), cover: CoverKey.nullable(), memberCount: z.number().int() }), sentAt: IsoDateTime });
 export type IncomingInvite = z.infer<typeof IncomingInvite>;
-export const CirclesResponse = z.object({ circles: z.array(CircleSummary), incoming: z.array(IncomingInvite) });
+export const CirclesResponse = z.object({
+  circles: z.array(CircleSummary), incoming: z.array(IncomingInvite),
+  /** The desk paused posting and messages in Circles for this account (ACCOUNT_LIMITED). Absent from older servers. */
+  limited: z.boolean().optional(),
+});
 export type CirclesResponse = z.infer<typeof CirclesResponse>;
 export const CircleResponse = CircleDetail;
 

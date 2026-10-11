@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { CreatePostRequest, LIMITS, t, type Post, type PostKind } from "@mada/shared";
 import { db } from "@/db";
@@ -82,6 +83,7 @@ export async function getPost(me: string, id: string): Promise<Post> {
 }
 
 export async function createPost(me: string, raw: unknown, ipHash: string | null): Promise<Post> {
+  await assertNotLimited(me); // the desk paused Circles for this account (limits.ts)
   const p = CreatePostRequest.parse(raw);
   const [n] = await db.select({ n: sql<number>`count(*)::int` }).from(appPosts).where(and(eq(appPosts.authorId, me), sql`${appPosts.createdAt} > now() - interval '1 hour'`));
   assertUnder(n?.n ?? 0, LIMITS.postsPerHour, 3600);

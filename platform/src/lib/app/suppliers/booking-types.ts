@@ -15,7 +15,11 @@ export interface BookingFlightSupplier extends FlightSupplier {
   price(offerId: string, travellers: number): Promise<BookingFlightOffer>;
 }
 
-export type BookingHotelOffer = HotelOffer & { meta?: { photo: string; focal: string; noteOne: string; noteTwo: string; label: "best" | "quiet" | "water" | "lowest" } };
+export type BookingHotelOffer = HotelOffer & { meta?: {
+  photo: string; focal: string; noteOne: string; noteTwo: string; label: "best" | "quiet" | "water" | "lowest";
+  // Hotelbeds rooms (suppliers/hotelbeds/hotels.ts).
+  hotelCode?: number; imageUrl?: string | null; category?: string | null; rateCommentsId?: string | null; rateComments?: string | null; room?: string | null; board?: string | null;
+} };
 export interface BookingHotelSupplier extends HotelSupplier {
   search(q: Parameters<HotelSupplier["search"]>[0]): Promise<BookingHotelOffer[]>;
   price(offerId: string): Promise<BookingHotelOffer>;

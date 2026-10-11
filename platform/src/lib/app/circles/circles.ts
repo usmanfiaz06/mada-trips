@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import {
   CreateCircleRequest, CoverKey, REACTIONS, SharedCard, planById, t,
@@ -213,6 +214,7 @@ export async function createCircleInvites(tx: Db, circleId: string, circleName: 
 }
 
 export async function createCircle(userId: string, raw: unknown, ipHash: string | null): Promise<CircleDetail> {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const input = CreateCircleRequest.parse(raw);
   const invite = [...new Set(input.invite)];
   await assertInvitable(userId, invite);
@@ -314,6 +316,7 @@ export async function removeMember(circleId: string, userId: string, target: str
 
 /** The one conversation between two friends. Made the first time either of them opens it. */
 export async function openDm(userId: string, other: string): Promise<string> {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   if (other === userId) throw err("VALIDATION", "circles.err.self");
   const g = await graphOf(userId);
   if (g.blocked.has(other) || !(await liveUser(other))) throw new AppError("NOT_FOUND");

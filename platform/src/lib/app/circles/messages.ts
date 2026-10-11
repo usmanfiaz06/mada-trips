@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { and, asc, desc, eq, gt, lt, or, sql } from "drizzle-orm";
 import {
   CreateSplitRequest, CreateVoteRequest, bookPrefill, circleDest, madaReply, planById, shareUnits, splitAmounts, t, todayIn, votePhrase,
@@ -86,6 +87,7 @@ async function madaAnswer(circleId: string, text: string, prevAskedWhere: boolea
 }
 
 export async function sendMessage(circleId: string, userId: string, input: SendCircleMessageRequest): Promise<CircleMessage[]> {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   await membership(circleId, userId);
   await guardDm(circleId, userId);
   await rateLimit(userId);
@@ -147,6 +149,7 @@ async function lockMessage(tx: Db, circleId: string, messageId: string, kind: "v
 }
 
 export async function createVote(circleId: string, userId: string, raw: unknown) {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const v = CreateVoteRequest.parse(raw);
   await membership(circleId, userId);
   await rateLimit(userId);
@@ -241,6 +244,7 @@ export async function familyOfFn(members: string[]) {
 }
 
 export async function createSplit(circleId: string, userId: string, raw: unknown, ipHash: string | null) {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const s = CreateSplitRequest.parse(raw);
   await membership(circleId, userId);
   const members = await memberIds(circleId);

@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { and, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { CONTACT_SALT, LIMITS, checkSaudiMobile, type FriendTag, type FriendView, type FriendsResponse, type PersonRef, type ProfileResponse, type SearchHit } from "@mada/shared";
 import { db } from "@/db";
@@ -68,6 +69,7 @@ async function reachable(me: string, other: string) {
 
 /** Ask to be friends. If they already asked you, this says yes. */
 export async function requestFriend(me: string, other: string): Promise<{ status: "asked" | "friends" }> {
+  await assertNotLimited(me); // the desk paused Circles for this account (limits.ts)
   await reachable(me, other);
   const f = await pair(me, other);
   if (f?.status === "accepted") return { status: "friends" };

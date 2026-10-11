@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
 import {
@@ -89,6 +90,7 @@ export async function linkFor(userId: string, circleId: string | null, opts: Lin
 
 /** Invite a number to Mada by SMS or WhatsApp. Someone already on Mada comes back as a person to add instead. */
 export async function inviteByPhone(userId: string, input: Extract<CreateInviteRequest, { phone: string }>, ipHash: string | null): Promise<{ invite: SentInvite | null; onMada: PersonRef | null }> {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const [u] = await db.select({ id: appUsers.id }).from(appUsers).where(and(eq(appUsers.phone, input.phone), sql`${appUsers.deletedAt} IS NULL`));
   if (u) {
     if (u.id === userId) throw err("VALIDATION", "circles.err.self");
@@ -290,6 +292,7 @@ export async function cancel(inviteId: string, userId: string) {
 
 /** Invite people on Mada to a circle (the admin). */
 export async function inviteToCircle(circleId: string, userId: string, userIds: string[]) {
+  await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const m = await requireAdmin(circleId, userId);
   const ids = [...new Set(userIds)];
   await assertInvitable(userId, ids);

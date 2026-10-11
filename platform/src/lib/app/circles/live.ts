@@ -26,9 +26,9 @@ import { hit } from "./limits";
 
 export const LIVE = {
   /** How long one stream stays open before the app reconnects (Vercel functions are time-boxed). */
-  streamMs: Number(process.env.CIRCLES_LIVE_STREAM_MS ?? 25_000),
+  get streamMs() { return Number(process.env.CIRCLES_LIVE_STREAM_MS ?? 25_000); },
   /** How often a stream looks for new events. */
-  pollMs: Number(process.env.CIRCLES_LIVE_POLL_MS ?? 1_000),
+  get pollMs() { return Number(process.env.CIRCLES_LIVE_POLL_MS ?? 1_000); },
   /** Comment lines that keep proxies from closing a quiet stream. */
   heartbeatMs: 10_000,
   /** A gap in event ids (a transaction not yet committed) is waited for this long, then skipped (a rollback). */

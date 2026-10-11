@@ -1,0 +1,53 @@
+{
+  "$comment": "The store listing, the single source for App Store Connect, Google Play and the screenshot captions. Check lengths and rebuild LISTING.md with: npm run store:listing. Arabic is a first draft for the native writer (COPY.md §7.4).",
+  "urls": {
+    "marketing": "https://madatrips.sa",
+    "support": "https://madatrips.sa/support",
+    "privacy": "https://madatrips.sa/privacy",
+    "terms": "https://madatrips.sa/terms",
+    "deleteAccount": "https://madatrips.sa/delete-account"
+  },
+  "category": { "appStore": { "primary": "Travel", "secondary": "Navigation" }, "play": "Travel & Local" },
+  "contactEmail": "support@madatrips.sa",
+  "copyright": "2026 Mada Travel and Tourism",
+  "locales": {
+    "en": {
+      "appStoreLocale": "en-US",
+      "playLocale": "en-US",
+      "name": "Mada Trips",
+      "subtitle": "Travel, booked by real people",
+      "promotionalText": "Tell us where you want to go. A real person at Mada books it, watches every flight and is here day and night when plans change.",
+      "playShortDescription": "Tell us where. Real people at Mada book it and look after the whole trip.",
+      "keywords": "travel,flights,hotels,umrah,visa,trip planner,saudi,riyadh,jeddah,travel agent,family,itinerary",
+      "description": "Mada Trips is your travel partner from Riyadh. Tell us where you want to go, and a real person at Mada books it, watches it and fixes it when plans change.\n\nTELL US WHERE\nType or say it the way you would to a friend: “Istanbul for Eid, all of us.” We show the ways to get there with the full price, then Faisal or another Mada agent books it in your name and confirms in minutes.\n\nWE WATCH EVERY FLIGHT\nToday shows what matters right now: when to leave, your gate, boarding time and the weather where you land. Gate changes and delays reach you the moment we know.\n\nTHE FIX IS ALREADY WAITING\nDelayed or cancelled? We hold the next best options before the queue forms. Approve one with a tap and a person at Mada finishes it.\n\nTHE WHOLE HOUSEHOLD\nAdd the people you travel with once. Passports and IDs are read with the camera, checked against entry rules and kept encrypted, with Face ID on your Wallet.\n\nEVERY TRIP IN ONE PLACE\nFlights, hotels, transfers, payments, invoices and refunds, day by day. Shared with the family.\n\nCIRCLES\nPlan with the people you travel with: trip groups, saved places and polls, private to you.\n\nPEOPLE, DAY AND NIGHT\nTalk to Mada any hour. The person who answers can see your trip, so you never explain twice.\n\nFully in Arabic and English. Prices in Saudi riyals, VAT included, no surprises at the end.\n\nMada Trips is run by Mada Travel and Tourism, a licensed travel agency in Riyadh.",
+      "whatsNew": "Our first version. Tell us where you want to go and we book it, watch your flights and look after your household’s passports. We’d love to hear what you think: Profile › Help › Talk to Mada.",
+      "screenshots": [
+        { "id": "today", "caption": "Leave on time. We watch every flight." },
+        { "id": "ask", "caption": "Say where. We find the ways there." },
+        { "id": "trip", "caption": "Every trip, day by day, for the whole family." },
+        { "id": "disruption", "caption": "Delayed? The fix is already waiting." },
+        { "id": "wallet", "caption": "Every passport, checked and encrypted." },
+        { "id": "support", "caption": "Real people at Mada, day and night." }
+      ]
+    },
+    "ar": {
+      "appStoreLocale": "ar-SA",
+      "playLocale": "ar",
+      "name": "مادا للسفر",
+      "subtitle": "رحلتك يحجزها أشخاص حقيقيون",
+      "promotionalText": "قل لنا وجهتك. شخص حقيقي من فريق مادا يحجزها، ويتابع كل رحلة طيران، وموجود ليلًا ونهارًا حين تتغير الخطط.",
+      "playShortDescription": "قل لنا وجهتك. فريق مادا يحجزها ويعتني برحلتك كاملة.",
+      "keywords": "سفر,رحلات,طيران,فنادق,عمرة,تأشيرة,حجز,الرياض,جدة,وكالة سفر,عائلة,برنامج رحلة",
+      "description": "مادا شريكك في السفر من الرياض. قل لنا إلى أين تريد، وشخص حقيقي من فريق مادا يحجز رحلتك، ويتابعها، ويصلحها حين تتغير الخطط.\n\nقل لنا وجهتك\nاكتبها أو قلها كما تقولها لصديق: «إسطنبول في العيد، كلنا». نعرض لك طرق الوصول بالسعر الكامل، ثم يحجزها فيصل أو أحد وكلاء مادا باسمك ويؤكدها خلال دقائق.\n\nنتابع كل رحلة طيران\nتعرض صفحة اليوم ما يهمك الآن: متى تخرج، وبوابتك، ووقت الصعود، والطقس حيث تهبط. تغيير البوابة والتأخير يصلانك لحظة علمنا بهما.\n\nالحل جاهز قبل أن تسأل\nتأخرت رحلتك أو أُلغيت؟ نحجز لك أفضل البدائل قبل أن يتكوّن الطابور. وافق على أحدها بلمسة، ويكمله شخص من فريق مادا.\n\nالعائلة كلها\nأضف من تسافر معهم مرة واحدة. الجوازات والهويات تُقرأ بالكاميرا، وتُراجع مع اشتراطات الدخول، وتُحفظ مشفّرة، مع بصمة الوجه لمحفظتك.\n\nكل رحلاتك في مكان واحد\nالطيران والفنادق والتنقلات والمدفوعات والفواتير والمبالغ المستردة، يومًا بيوم، ومشتركة مع العائلة.\n\nالمجموعات\nخطط مع من تسافر معهم: مجموعات الرحلات والأماكن المحفوظة والتصويت، خاصة بكم.\n\nأشخاص حقيقيون ليلًا ونهارًا\nتحدّث مع مادا في أي ساعة. من يرد عليك يرى رحلتك، فلا تحتاج إلى الشرح مرتين.\n\nبالعربية والإنجليزية بالكامل. الأسعار بالريال السعودي شاملة الضريبة، بلا مفاجآت في النهاية.\n\nتطبيق مادا تديره مادا للسفر والسياحة، وكالة سفر مرخّصة في الرياض.",
+      "whatsNew": "إصدارنا الأول. قل لنا وجهتك ونحجزها، ونتابع رحلاتك، ونعتني بجوازات عائلتك. يسعدنا أن نسمع رأيك: الملف الشخصي › المساعدة › تحدّث مع مادا.",
+      "screenshots": [
+        { "id": "today", "caption": "اخرج في وقتك. نتابع كل رحلة." },
+        { "id": "ask", "caption": "قل وجهتك. نجد لك طرق الوصول." },
+        { "id": "trip", "caption": "كل رحلة، يومًا بيوم، للعائلة كلها." },
+        { "id": "disruption", "caption": "تأخرت رحلتك؟ الحل جاهز." },
+        { "id": "wallet", "caption": "كل جواز، مُراجَع ومشفّر." },
+        { "id": "support", "caption": "أشخاص حقيقيون من مادا، ليلًا ونهارًا." }
+      ]
+    }
+  }
+}

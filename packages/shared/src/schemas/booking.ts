@@ -173,6 +173,11 @@ export const StayOption = z.object({
   cancellation: z.string(),
   freeCancelUntil: IsoDay.nullable(),
   expiresAt: IsoDateTime,
+  /** A room from Hotelbeds: the hotel's code (for its details), category, photo, room and board, and the rate's essential information. */
+  hotel: z.object({
+    code: z.number().int(), category: z.string().nullable(), imageUrl: z.string().nullable(), room: z.string().nullable(), board: z.string().nullable(),
+    rateComments: z.string().nullable(), rateCommentsId: z.string().nullable().optional(), supplier: z.literal('hotelbeds'),
+  }).nullable().optional(),
 });
 export type StayOption = z.infer<typeof StayOption>;
 

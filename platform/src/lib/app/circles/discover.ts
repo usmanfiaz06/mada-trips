@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotLimited } from "../limits";
 import { and, eq, gt, inArray } from "drizzle-orm";
 import {
   CITY_INFO, EVENTS, HOME_CITY, PLAN_SUMMARIES, addDays, rangeLabel, zonedToInstant,
@@ -78,6 +79,7 @@ export async function around(me: string): Promise<AroundResponse> {
 
 /** Turn it on for one audience, or off. On a trip it ends the day after you fly home; at home, after 3 days. */
 export async function setPresence(me: string, input: { on: boolean; audience?: Audience; picked?: string[] }): Promise<AroundResponse> {
+  if (input.on) await assertNotLimited(me); // the desk paused Circles for this account (limits.ts)
   if (!input.on) {
     await db.delete(appPresence).where(eq(appPresence.userId, me));
     return around(me);

@@ -12,6 +12,7 @@ import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, today, travellersOf } from "./common";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
+import { hotelbedsRule, withHotelbedsEssentials } from "./hotelbeds-stays";
 import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-requests";
 
 /*
@@ -85,11 +86,13 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const before = row.payload as unknown as StayOption;
     // Rooms are priced by party size (one room for two or fewer, connecting rooms for more).
     if (before.rooms !== roomsFor(travellers.length)) row = (await repriceOffer(ownerId, row.id, travellers.length)).row;
+    // Hotelbeds: checkrates for a RECHECK rate, and the rate's essential information, before the traveller pays.
+    if (row.supplier === "hotelbeds") row = await withHotelbedsEssentials(ownerId, row);
     const s = row.payload as unknown as StayOption;
     const end = new Date(Date.parse(`${s.checkIn}T00:00:00Z`) + s.nights * 86_400_000).toISOString().slice(0, 10);
     lines = [line("stay", "stay", t("pay.line.hotel", { rooms: s.roomsLabel, dates: rangeLabel(s.checkIn, end), count: s.nights }), s.total.amount)];
     // A Hotelbeds room carries the hotel's own rule (worked out from its cancellation policies); the catalogue uses ours.
-    rule = row.supplier === "hotelbeds" ? s.cancellation : t("pay.rule.stay", { date: freeUntilLabel(s.checkIn) });
+    rule = row.supplier === "hotelbeds" ? hotelbedsRule(s) : t("pay.rule.stay", { date: freeUntilLabel(s.checkIn) });
     title = s.name;
     photo = s.photo;
     place = DESTINATIONS[(row.search as { destination: string }).destination]?.name ?? "";

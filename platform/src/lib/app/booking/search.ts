@@ -115,6 +115,7 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
     rating: h.rating ? h.rating.toFixed(1) : "", photo: h.meta?.photo ?? "hotel-room", focal: h.meta?.focal ?? "50% 50%",
     checkIn, nights: h.nights, rooms: roomsFor(n), roomsLabel: roomsLabel(n), total: money(h.total.amount), cancellation: h.cancellation,
     freeCancelUntil: h.freeCancelUntil, expiresAt: h.expiresAt,
+    ...(h.meta?.hotelCode ? { hotel: { code: h.meta.hotelCode, category: h.meta.category ?? null, imageUrl: h.meta.imageUrl ?? null, room: h.meta.room ?? null, board: h.meta.board ?? null, rateComments: h.meta.rateComments ?? null, rateCommentsId: h.meta.rateCommentsId ?? null, supplier: "hotelbeds" as const } } : {}),
   };
 }
 

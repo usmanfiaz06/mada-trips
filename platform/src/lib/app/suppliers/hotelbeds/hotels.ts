@@ -26,6 +26,7 @@ export type HbRate = {
   rateKey: string; rateClass?: string; rateType: "BOOKABLE" | "RECHECK"; net: string; sellingRate?: string; hotelMandatory?: boolean;
   allotment?: number; paymentType?: string; boardCode?: string; boardName?: string; rooms: number; adults: number; children: number; childrenAges?: string;
   cancellationPolicies?: HbCancellationPolicy[]; taxes?: { taxes?: HbTax[]; allIncluded?: boolean }; rateComments?: string; rateCommentsId?: string;
+  packaging?: boolean; promotions?: { code: string; name?: string; remark?: string }[]; offers?: { code: string; name?: string; amount?: string }[];
 };
 export type HbRoom = { code: string; name: string; rates: HbRate[] };
 export type HbHotel = {
@@ -122,7 +123,8 @@ export function availabilityBody(q: HotelbedsStayQuery) {
     occupancies: occupanciesOf(q.rooms),
     filter: {
       paymentType: "AT_WEB",
-      maxHotels: q.maxHotels ?? 30,
+      // Certification 2.3: as many hotels as possible per call (up to 2000); we choose what to show afterwards.
+      maxHotels: q.maxHotels ?? 2000,
       maxRatesPerRoom: 3,
       ...(q.maxRate ? { maxRate: q.maxRate } : {}),
       ...(q.minCategory ? { minCategory: q.minCategory } : {}),
@@ -169,7 +171,12 @@ export const isHotelbedsOfferId = (id: string) => id.startsWith("hb~");
 export type StayRule = { cancellation: string; freeCancelUntil: string | null; cancelFee: number | null; refundable: boolean; deadline: string | null };
 
 /** Days before the supplier's deadline that we stop offering free cancellation, so the desk has time to cancel. */
-const bufferDays = () => { const n = Number(process.env.APP_CANCEL_BUFFER_DAYS ?? 1); return Number.isInteger(n) && n >= 0 && n <= 7 ? n : 1; };
+const bufferDays = () => { const n = Number(process.env.APP_CANCEL_BUFFER_DAYS ?? 0); return Number.isInteger(n) && n >= 0 && n <= 7 ? n : 0; };
+
+/** "14 Nov, 23:59": the deadline as the hotel's clock shows it (the offset in `from` is the destination's, cert. 3.8). */
+export function hotelTime(from: string): { day: string; time: string } {
+  return { day: from.slice(0, 10), time: /T(\d{2}:\d{2})/.exec(from)?.[1] ?? "00:00" };
+}
 
 /**
  * Hotelbeds policies ("from this moment, this amount is charged", amounts in the contract currency, `from` with the
@@ -185,14 +192,17 @@ export function stayRule(rate: Pick<HbRate, "cancellationPolicies" | "rateClass"
     return { cancellation: t("hb.cancel.none"), freeCancelUntil: null, cancelFee: total, refundable: false, deadline: first?.from ?? null };
   }
   if (!first) return { cancellation: t("hb.cancel.freeAny"), freeCancelUntil: null, cancelFee: 0, refundable: true, deadline: null };
-  // Their deadline's own calendar day (the offset in `from` is the hotel's), less our margin.
-  const deadlineDay = first.from.slice(0, 10);
-  let freeUntil = addDays(deadlineDay, -bufferDays());
+  // Their deadline on the hotel's own clock (cert. 3.8), less any margin we choose to keep (APP_CANCEL_BUFFER_DAYS, default none).
+  const ht = hotelTime(first.from);
+  const buffer = bufferDays();
+  let freeUntil = addDays(ht.day, -buffer);
   const today = now.toISOString().slice(0, 10);
   if (freeUntil < today) freeUntil = today;
   const fee = feeHalalas(worst, net, total);
   const feeText = fee >= total ? t("hb.cancel.feeAll") : t("hb.cancel.feeSar", { amount: Math.round(fee / 100).toLocaleString("en-US") });
-  return { cancellation: t("hb.cancel.free", { date: shortDay(freeUntil), fee: feeText }), freeCancelUntil: freeUntil, cancelFee: fee, refundable: true, deadline: first.from };
+  const steps = policies.length > 1 ? ` ${policies.slice(1).map((p) => { const h = hotelTime(p.from); return t("hb.cancel.then", { date: shortDay(h.day), time: h.time, fee: t("hb.cancel.feeSar", { amount: Math.round(feeHalalas(Number(p.amount), net, total) / 100).toLocaleString("en-US") }) }); }).join(" ")}` : "";
+  const text = buffer ? t("hb.cancel.free", { date: shortDay(freeUntil), fee: feeText }) : t("hb.cancel.freeTime", { date: shortDay(ht.day), time: ht.time, fee: policies.length > 1 ? t("hb.cancel.feeSar", { amount: Math.round(feeHalalas(Number(first.amount), net, total) / 100).toLocaleString("en-US") }) : feeText });
+  return { cancellation: `${text}${steps}`, freeCancelUntil: freeUntil, cancelFee: fee, refundable: true, deadline: first.from };
 }
 
 /* ───────────── availability → offers ───────────── */
@@ -222,6 +232,8 @@ export function bestRate(h: HbHotel, rooms: number): { room: HbRoom; rate: HbRat
   for (const room of h.rooms ?? []) {
     for (const rate of room.rates ?? []) {
       if (rate.paymentType && rate.paymentType !== "AT_WEB") continue;
+      // Opaque (packaging) rates only inside a package with flights or transfers (cert. 3.5): never on their own.
+      if (rate.packaging) continue;
       if (rate.rooms && rate.rooms !== rooms) continue;
       if (!best || Number(rate.net) < Number(best.rate.net)) best = { room, rate };
     }
@@ -237,7 +249,9 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
   const f = o.facts?.get(h.code);
   const cityTax = payAtHotel(rate, rules);
   const stars = Number((h.categoryCode ?? "").match(/^(\d)/)?.[1] ?? 0);
-  const note = [room.name ? room.name.toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + "." : "", boardNote(rate), cityTax ? t("hb.note.cityTax", { amount: Math.ceil(cityTax / 100).toLocaleString("en-US") }) : ""].filter(Boolean).join(" ");
+  // Promotions can carry extras (cert. 2.7): their names go on the card.
+  const promos = [...(rate.promotions ?? []).map((p) => p.name ?? p.code), ...(rate.offers ?? []).map((p) => p.name ?? p.code)].filter(Boolean);
+  const note = [room.name ? room.name.toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + "." : "", boardNote(rate), promos.length ? t("hb.note.promo", { names: promos.join(", ") }) : "", cityTax ? t("hb.note.cityTax", { amount: Math.ceil(cityTax / 100).toLocaleString("en-US") }) : ""].filter(Boolean).join(" ");
   return {
     id: encodeOfferId(rate.rateKey, rate.rateType, o.party), supplier: "hotelbeds", label: "best",
     name: f?.name || h.name, area: [h.zoneName, stars ? t("hb.stars", { n: stars }) : null].filter(Boolean).join(" · "),
@@ -245,11 +259,14 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
     nightly: { amount: Math.round(total / o.nights), currency: "SAR" }, total: { amount: total, currency: "SAR" }, nights: o.nights, rooms: o.rooms,
     cancellation: rule.cancellation, freeCancelUntil: rule.freeCancelUntil, cancelFee: rule.cancelFee, imageUrl: f?.imageUrl ?? null,
     expiresAt: new Date((o.now ?? new Date()).getTime() + (o.expiresInMs ?? 20 * 60_000)).toISOString(),
-    meta: { photo: "hotel-room", focal: "50% 50%", noteOne: note, noteTwo: note, label: "best" },
+    meta: { photo: "hotel-room", focal: "50% 50%", noteOne: note, noteTwo: note, label: "best", hotelCode: h.code, imageUrl: f?.imageUrl ?? null, category: h.categoryName ?? null, rateCommentsId: rate.rateCommentsId ?? null, room: room.name, board: rate.boardName ?? rate.boardCode ?? null },
   };
 }
 
 /** The offers the app shows: one rate per hotel, cheapest first, the best-rated of the rest labelled "best". */
+/** How many hotels the app lists (HOTELBEDS_MAX_RESULTS; a certification staging shows them all, e.g. 200). */
+export const maxResults = () => { const n = Number(process.env.HOTELBEDS_MAX_RESULTS ?? 8); return Number.isInteger(n) && n > 0 ? Math.min(n, 500) : 8; };
+
 export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number }): BookingHotelOffer[] {
   const picked: { offer: BookingHotelOffer; stars: number }[] = [];
   for (const h of res.hotels?.hotels ?? []) {
@@ -260,7 +277,7 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
     } catch { /* a currency we can't price: skip that hotel rather than guess */ }
   }
   picked.sort((a, b) => a.offer.total.amount - b.offer.total.amount);
-  const list = picked.slice(0, o.limit ?? 6);
+  const list = picked.slice(0, o.limit ?? maxResults());
   if (!list.length) return [];
   // "lowest" is the cheapest; "best" is the highest category among the rest (ties: cheaper first).
   const lowest = list[0]!;
@@ -302,14 +319,17 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     return this.client.request<HbAvailabilityResponse>({ method: "POST", path: "/hotel-api/1.0/hotels", body: availabilityBody(q), safe: true });
   }
 
+  /** Up to 10 rate keys per call (cert. 2.6). Only for RECHECK rates (cert. 2.5). */
   checkRate(rateKeys: string[]) {
+    if (rateKeys.length < 1 || rateKeys.length > 10) throw new HotelbedsError("INVALID_REQUEST", "checkrates takes 1 to 10 rate keys");
     return this.client.request<HbCheckRateResponse>({ method: "POST", path: "/hotel-api/1.0/checkrates", body: { rooms: rateKeys.map((rateKey) => ({ rateKey })) }, safe: true });
   }
 
   /** Never retried by us: a booking that timed out is looked up by clientReference before trying again (desk). */
   book(b: BookStayInput) {
     return this.client.request<HbBookingResponse>({
-      method: "POST", path: "/hotel-api/1.0/bookings", safe: false, timeoutMs: 60_000,
+      // Certification 3.11: wait at least 60 seconds for a confirmation.
+      method: "POST", path: "/hotel-api/1.0/bookings", safe: false, timeoutMs: 65_000,
       body: {
         holder: b.holder,
         rooms: [{ rateKey: b.rateKey, paxes: b.paxes }],
@@ -342,6 +362,20 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     });
   }
 
+  /**
+   * A rate's comments ("essential information") for one check-in day, by its rateCommentsId (incoming|code|rateCodes).
+   * Content API rateCommentDetails, the online way the docs give; cached by the caller.
+   */
+  async rateCommentDetails(rateCommentsId: string, checkIn: string, language = "ENG"): Promise<string | null> {
+    const [incoming, code, rateCodes] = rateCommentsId.split("|");
+    if (!code) return null;
+    const r = await this.client.request<{ rateComments?: { description?: string }[]; description?: string }>({
+      method: "GET", path: "/hotel-content-api/1.0/types/ratecommentdetails", query: { date: checkIn, code: rateCommentsId, incoming, rateCodes, language, fields: "all" },
+    });
+    const text = (r.rateComments ?? []).map((c) => c.description).filter(Boolean).join(" ") || r.description || "";
+    return text.trim() || null;
+  }
+
   /* BookingHotelSupplier: the booking service's search and re-price. */
 
   async search(input: HotelSearch & StayQueryExtras) {
@@ -360,14 +394,14 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     });
     const codes = (res.hotels?.hotels ?? []).map((h) => h.code);
     const facts = this.facts && codes.length ? await this.facts(codes).catch(() => undefined) : undefined;
-    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts, limit: 6 });
+    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts });
   }
 
   /**
    * Today's price for one offer. A RECHECK rate goes through checkrates (Hotelbeds requires it); a bookable rate is
    * re-checked too, so the order sheet never shows a stale total. A different party size searches the same hotel again.
    */
-  async price(offerId: string) {
+  async price(offerId: string, stored?: BookingHotelOffer | null) {
     const d = decodeOfferId(offerId);
     if (!d) throw new HotelbedsError("NOT_FOUND", "Not a Hotelbeds offer");
     const key = parseRateKey(d.rateKey);
@@ -388,6 +422,8 @@ export class HotelbedsHotels implements BookingHotelSupplier {
       const nights = Math.max(1, Math.round((Date.parse(key.checkOut) - Date.parse(key.checkIn)) / 86_400_000));
       return offerOf(h, pick.room, pick.rate, { nights, party: d.party, rooms, checkIn: key.checkIn, facts });
     }
+    // A BOOKABLE rate is booked as it is (cert. 2.5: checkrates only for RECHECK): the offer we showed stands.
+    if (!d.recheck && stored) return { ...stored, expiresAt: new Date(Date.now() + 20 * 60_000).toISOString() };
     const res = await this.checkRate([d.rateKey]);
     const h = res.hotel;
     const room = h?.rooms?.[0];
@@ -397,6 +433,7 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     const checkIn = h.checkIn ?? key?.checkIn;
     const nights = Math.max(1, Math.round((Date.parse(h.checkOut ?? key?.checkOut ?? checkIn) - Date.parse(checkIn)) / 86_400_000));
     // After checkrates the rate is BOOKABLE: keep the (possibly new) key with the party size.
-    return offerOf(h, room, { ...rate, rateType: "BOOKABLE" }, { nights, party: d.party, rooms: rate.rooms || roomsFor(d.party), checkIn, facts });
+    const offer = offerOf(h, room, { ...rate, rateType: "BOOKABLE" }, { nights, party: d.party, rooms: rate.rooms || roomsFor(d.party), checkIn, facts });
+    return { ...offer, meta: { ...offer.meta!, rateComments: rate.rateComments ?? null } };
   }
 }
