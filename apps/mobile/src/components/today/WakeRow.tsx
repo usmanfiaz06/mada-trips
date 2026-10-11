@@ -29,7 +29,6 @@ function whatHappens(method: WakeMethod, time: string, note: ArmResult['note'] |
 /** The time sheet: five-minute steps, kept between 3 hours and 10 minutes before you leave. */
 function WakeTimeSheet({ plan, open, onClose, onSave }: { plan: WakePlan; open: boolean; onClose: () => void; onSave: (time: string | null) => void }) {
   const [time, setTime] = useState(plan.time);
-  useEffect(() => { if (open) setTime(plan.time); }, [open, plan.time]);
   const step = (d: number) => { buzz('select'); setTime((x) => stepWake(x, d, plan.leave)); };
   return (
     <Sheet visible={open} onClose={onClose} label={t('td.wake.sheetTitle')}>
@@ -156,7 +155,7 @@ export function WakeRow({ trip, rail }: { trip: TripDetail; rail: React.ReactNod
           </Row>
         </Grow>
       </View>
-      <WakeTimeSheet plan={plan} open={sheet === 'time'} onClose={() => setSheet(null)} onSave={(x) => { void saveTime(x); }} />
+      <WakeTimeSheet key={`${sheet === 'time'}-${plan.time}`} plan={plan} open={sheet === 'time'} onClose={() => setSheet(null)} onSave={(x) => { void saveTime(x); }} />
       <WakeHowSheet open={sheet === 'how'} onClose={() => setSheet(null)} method={method} />
     </>
   );
