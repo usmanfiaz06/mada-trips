@@ -14,6 +14,7 @@ export * from './wallet';
 export * from './circles';
 export * from './desk';
 export * from './booking';
+export * from './booking-words';
 export * from './status';
 export * from './places';
 export * from './flight-quote';

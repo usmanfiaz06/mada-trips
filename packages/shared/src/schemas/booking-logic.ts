@@ -3,9 +3,11 @@
  * behind POST /ask/parse in mock mode, and the fallback when the model is down), the household, fares and bundles,
  * entry checks, the desk's per-person quotes, promo codes, cards and seats. Pure functions, no I/O.
  */
-import { t } from '../copy';
-import { addDays, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay } from '../dates';
-import { sarToHalalas } from '../money';
+import { t, tn, type CopyKey } from '../copy';
+import type { Lang } from '../locale';
+import { commaList, wordFor } from './booking-words';
+import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
+import { formatSar, sarToHalalas } from '../money';
 import type { Person } from './people';
 import type { Cabin } from './trips';
 import {
@@ -424,89 +426,110 @@ function dayLabelShort(iso: string, today: string) {
 
 export type DeskQuote = { totalSar: number; breakdown: { personId: string | null; name: string; lines: { label: string; sar: number }[] }[]; text: string; lead: string | null; needLines: string[] };
 
-const youAll = (n: number) => (n === 1 ? 'you' : `all ${n} of you`);
-const fmtSar = (n: number) => Math.round(n).toLocaleString('en-US');
+const sar = (n: number, locale?: Lang) => formatSar(sarToHalalas(Math.round(n)), { locale });
+
+/** The next Tuesday at least 2 weeks out: the earliest visa appointment the mock desk offers. */
+const visaSlot = (today: string) => { const d = addDays(today, 14); return addDays(d, (2 - weekdayIdx(d) + 7) % 7); };
 
 export function deskQuote(input: {
   kind: string; answers: Record<string, string[]>; travellers: Person[]; needs: Record<string, NeedKey[]>; note: string; today: string;
   service?: string | null; serviceNeed?: string | null; byHand?: { ppSar: number; text: string; cabin: Cabin; oneway: boolean } | null;
+  /** The traveller's language. Defaults to the display locale. */
+  locale?: Lang;
 }): DeskQuote | null {
-  const { kind, answers, travellers: who, needs, note, today } = input;
+  const { kind, answers, travellers: who, needs, note, today, locale: l } = input;
   const n = Math.max(1, who.length);
   const name = (p: Person) => personName(p);
   if (input.service) {
     const each = input.service === 'uk_eta' ? DESK_PRICES.ukEtaEach : 0;
     const flat = input.service === 'evisa' ? DESK_PRICES.eVisa : input.service === 'reentry' ? DESK_PRICES.reentry : input.service === 'passport_renewal' ? DESK_PRICES.passportRenewal : 0;
     const total = each ? each * n : flat;
-    const label = input.service === 'uk_eta' ? 'UK ETA application' : input.service === 'reentry' ? 'Exit and re-entry visa, single, 90 days' : input.service === 'passport_renewal' ? 'Passport renewal appointment and forms' : `${input.serviceNeed ?? 'Visa'} application`;
+    const label = input.service === 'uk_eta' ? t('dq.service.eta', undefined, l) : input.service === 'reentry' ? t('dq.service.reentry', undefined, l)
+      : input.service === 'passport_renewal' ? t('dq.service.renewal', undefined, l) : t('dq.service.application', { need: input.serviceNeed ?? t('dq.title.visa', undefined, l) }, l);
     const breakdown = each ? who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label, sar: each }] })) : [{ personId: who[0]?.id ?? null, name: who[0] ? name(who[0]) : 'Guest', lines: [{ label, sar: flat }] }];
-    return { totalSar: total, breakdown, lead: null, needLines: [], text: `I’ll take care of it. SAR ${fmtSar(total)}, and I’ll send you the document here once it’s issued.` };
+    return { totalSar: total, breakdown, lead: null, needLines: [], text: t('dq.service.text', { price: sar(total, l) }, l) };
   }
   if (input.byHand) {
     const pp = fareSar(input.byHand.ppSar, input.byHand.cabin, input.byHand.oneway);
-    return { totalSar: pp * n, breakdown: who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label: 'Return flights, held', sar: pp }] })), lead: null, needLines: [],
-      text: `Best option: ${input.byHand.text}. SAR ${fmtSar(pp)} each, SAR ${fmtSar(pp * n)} for ${youAll(n)}. I can hold it until 18:00 tomorrow.` };
+    const label = t(input.byHand.oneway ? 'dq.hand.labelOneWay' : 'dq.hand.label', undefined, l);
+    return { totalSar: pp * n, breakdown: who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label, sar: pp }] })), lead: null, needLines: [],
+      text: tn('dq.hand.text', n, { option: wordFor(input.byHand.text, l), each: sar(pp, l), price: sar(pp * n, l) }, l) };
   }
+  const needLine = (k: NeedKey, p: Person, flights: boolean) => {
+    const v = { need: wordFor(NEED_LABELS[k], l), name: name(p) };
+    if (k === 'oxygen') return t('dq.need.oxygen', v, l);
+    if (k.startsWith('wheelchair')) return t(flights ? 'dq.need.wheelchair' : 'dq.need.wheelchairHere', v, l);
+    if (k === 'toilet' && flights) return t('dq.need.toilet', v, l);
+    return t(flights ? 'dq.need.other' : 'dq.need.otherHere', v, l);
+  };
   const needLines: string[] = [];
-  who.forEach((p) => (needs[p.id] ?? []).forEach((k) => {
-    if (k === 'oxygen') needLines.push(`Oxygen for ${name(p)}: I’ll arrange the airline’s approval. I need a doctor’s form 7 days before.`);
-    else if (k.startsWith('wheelchair')) needLines.push(`${NEED_LABELS[k]} for ${name(p)} on both flights, no charge.`);
-    else if (k === 'toilet') needLines.push(`${name(p)} sits near the toilet.`);
-    else needLines.push(`${NEED_LABELS[k]} for ${name(p)} on both flights.`);
-  }));
+  who.forEach((p) => (needs[p.id] ?? []).forEach((k) => needLines.push(needLine(k, p, true))));
   const anyWheelchair = who.some((p) => (needs[p.id] ?? []).some((k) => k.startsWith('wheelchair')));
   if (kind === 'umrah') {
     const near = (answers.stay ?? [])[0] === 'Steps from the Haram';
     const breakdown = who.map((p) => {
       const a = ageOn(p, today) ?? 30;
-      const lines = [{ label: a < 2 ? 'On a lap, flights and transfers' : 'Flights, 3 nights, train and transfers', sar: a < 2 ? DESK_PRICES.umrahInfant : a < 12 ? DESK_PRICES.umrahChild : DESK_PRICES.umrahAdult }];
-      if (near && a >= 2) lines.push({ label: 'Room steps from the Haram', sar: DESK_PRICES.umrahNearHaram });
-      if ((needs[p.id] ?? []).some((k) => k.startsWith('wheelchair'))) lines.push({ label: 'Wheelchair and pusher at the Haram, 3 days', sar: DESK_PRICES.umrahWheelchair });
+      const lines = [{ label: t(a < 2 ? 'dq.umrah.lap' : 'dq.umrah.package', undefined, l), sar: a < 2 ? DESK_PRICES.umrahInfant : a < 12 ? DESK_PRICES.umrahChild : DESK_PRICES.umrahAdult }];
+      if (near && a >= 2) lines.push({ label: t('dq.umrah.near', undefined, l), sar: DESK_PRICES.umrahNearHaram });
+      if ((needs[p.id] ?? []).some((k) => k.startsWith('wheelchair'))) lines.push({ label: t('dq.umrah.wheelchair', undefined, l), sar: DESK_PRICES.umrahWheelchair });
       return { personId: p.id, name: name(p), lines };
     });
-    const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, l) => x + l.sar, 0), 0);
-    const where = near ? 'steps from the Haram' : 'a short ride from the Haram';
-    const helped = who.filter((p) => (needs[p.id] ?? []).length).map((p) => `${name(p)}: ${(needs[p.id] ?? []).map((k) => (k === 'oxygen' ? 'oxygen, with airline approval' : NEED_LABELS[k].toLowerCase())).join(', ')}.`);
+    const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, li) => x + li.sar, 0), 0);
+    const where = t(near ? 'dq.umrah.whereNear' : 'dq.umrah.whereRide', undefined, l);
+    const helped = who.filter((p) => (needs[p.id] ?? []).length).map((p) => t('dq.umrah.helpedOne', {
+      name: name(p), needs: commaList((needs[p.id] ?? []).map((k) => (k === 'oxygen' ? t('dq.umrah.oxygen', undefined, l) : lower(wordFor(NEED_LABELS[k], l)))), l),
+    }, l));
+    const text = [tn('dq.umrah.text', n, { where, price: sar(total, l) }, l), helped.length ? t('dq.umrah.helped', { list: helped.join(' ') }, l) : '',
+      note ? t('dq.note', undefined, l) : '', t('dq.umrah.nusuk', undefined, l)].filter(Boolean).join(' ');
     return {
-      totalSar: total, breakdown, needLines: [...needLines, ...(anyWheelchair ? ['Rooms on a low floor, next to the lift.'] : [])],
-      lead: `Flights to Madinah, 3 nights ${where}, the Haramain train and transfers. Nusuk permits are yours to get; I’ll remind you.`,
-      text: `Flights to Madinah, 3 nights ${where}, the Haramain train and transfers for ${youAll(n)}: SAR ${fmtSar(total)}.${helped.length ? ` Arranged for each person. ${helped.join(' ')}` : ''}${note ? ' I’ve planned around your note.' : ''} Nusuk permits are yours to get; I’ll remind you.`,
+      totalSar: total, breakdown, needLines: [...needLines, ...(anyWheelchair ? [t('dq.umrah.lowFloor', undefined, l)] : [])],
+      lead: t('dq.umrah.lead', { where }, l), text,
     };
   }
   if (kind === 'visa') {
     const total = DESK_PRICES.visaAppointment * n;
-    return { totalSar: total, breakdown: who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label: 'Appointment, forms and checklist', sar: DESK_PRICES.visaAppointment }] })), lead: null, needLines: [],
-      text: `The earliest appointment is Tue 12 Jan, 10:20 at VFS Riyadh. I’ll book it and prepare every form. SAR ${fmtSar(DESK_PRICES.visaAppointment)} each, SAR ${fmtSar(total)} in total, plus the embassy fee paid on the day.` };
+    const slot = visaSlot(today);
+    return { totalSar: total, breakdown: who.map((p) => ({ personId: p.id, name: name(p), lines: [{ label: t('dq.visa.label', undefined, l), sar: DESK_PRICES.visaAppointment }] })), lead: null, needLines: [],
+      text: tn('dq.visa.text', n, { date: dayLabel(slot, { today, locale: l ?? undefined, hijri: false }), time: timeLabel('10:20', { locale: l }), each: sar(DESK_PRICES.visaAppointment, l), price: sar(total, l) }, l) };
   }
   if (kind === 'todo') {
     const picks = answers.pick ?? [];
-    const breakdown = who.map((p) => ({ personId: p.id, name: name(p), lines: picks.map((x) => ({ label: x, sar: (ageOn(p, today) ?? 30) < 12 ? Math.round((DESK_PRICES.todo[x] ?? 0) / 2) : DESK_PRICES.todo[x] ?? 0 })) }));
-    const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, l) => x + l.sar, 0), 0);
+    const breakdown = who.map((p) => ({ personId: p.id, name: name(p), lines: picks.map((x) => ({ label: wordFor(x, l), sar: (ageOn(p, today) ?? 30) < 12 ? Math.round((DESK_PRICES.todo[x] ?? 0) / 2) : DESK_PRICES.todo[x] ?? 0 })) }));
+    const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, li) => x + li.sar, 0), 0);
+    const here: string[] = [];
+    who.forEach((p) => (needs[p.id] ?? []).forEach((k) => here.push(needLine(k, p, false))));
     return { totalSar: total, breakdown, lead: null, needLines: [],
-      text: `${picks.join(', ')} for ${youAll(n)}: SAR ${fmtSar(total)}. Children under 12 are half price.${needLines.length ? ' ' + needLines.join(' ').replace(/ on both flights/g, '') : ''}` };
+      text: [tn('dq.todo.text', n, { picks: commaList(picks.map((x) => wordFor(x, l)), l), price: sar(total, l) }, l), ...here].join(' ') };
   }
   if (kind === 'car') {
-    return { totalSar: DESK_PRICES.car, breakdown: [], lead: null, needLines: [], text: `${(answers.size ?? ['A car'])[0]} with a driver, ${((answers.days ?? ['1 day'])[0] ?? '').toLowerCase()}: SAR ${fmtSar(DESK_PRICES.car)}, fuel and the driver included.` };
+    const size = (answers.size ?? [])[0];
+    const days = (answers.days ?? ['1 day'])[0] ?? '1 day';
+    return { totalSar: DESK_PRICES.car, breakdown: [], lead: null, needLines: [],
+      text: t('dq.car.text', { size: size ? wordFor(size, l) : t('dq.car.size', undefined, l), days: lower(wordFor(days, l)), price: sar(DESK_PRICES.car, l) }, l) };
   }
   return null;
 }
 
+/** Lower-case the first letter for the middle of an English sentence ("the whole trip"); Arabic has no case. */
+const lower = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
 /** How the agent answers a reply, until a person types it (the mock desk). Returns an offer when there is one. */
-export function deskReply(kind: string, text: string, n: number): { text: string; offer: { label: string; perPersonSar: number } | null } {
+export function deskReply(kind: string, text: string, n: number, locale?: Lang): { text: string; offer: { label: string; perPersonSar: number } | null } {
   const s = text.toLowerCase();
-  if (/closer|nearer|haram|walk/.test(s) && kind === 'umrah') {
+  if (/closer|nearer|haram|walk|أقرب|الحرم/.test(s) && kind === 'umrah') {
     const each = DESK_PRICES.closerToHaram;
-    return { text: `Yes. A hotel at the King Abdulaziz Gate, 2 minutes’ walk to the Haram. SAR ${each} more each, SAR ${fmtSar(each * n)} for ${n === 1 ? 'you' : `all ${n}`}. Shall I switch it?`, offer: { label: 'Room at the King Abdulaziz Gate', perPersonSar: each } };
+    return { text: tn('dq.reply.closer', n, { each: sar(each, locale), price: sar(each * n, locale) }, locale), offer: { label: t('dq.reply.closerLabel', undefined, locale), perPersonSar: each } };
   }
-  if (/cheaper|less|budget|price/.test(s)) return { text: 'I’ll look for a lower price on the same dates and reply here within 20 minutes.', offer: null };
-  if (/date|later|earlier|day|week/.test(s)) return { text: 'I’ll check those dates with the airline and the hotel, and reply here within 20 minutes.', offer: null };
-  return { text: 'Got it. I’ll check and reply here within 20 minutes.', offer: null };
+  if (/cheaper|less|budget|price|أقل|أرخص|السعر/.test(s)) return { text: t('dq.reply.cheaper', undefined, locale), offer: null };
+  if (/date|later|earlier|day|week|تاريخ|التواريخ|يوم|أسبوع/.test(s)) return { text: t(['flight', 'umrah', 'stay'].includes(kind) ? 'dq.reply.dates' : 'dq.reply.datesOther', undefined, locale), offer: null };
+  return { text: t('dq.reply.got', undefined, locale), offer: null };
 }
 
 /** The request title and one-line summary the desk and Trips show. */
-export function requestTitle(kind: string, answers: Record<string, string[]>, query: string): string {
-  const titles: Record<string, string> = { visa: 'Visa', umrah: 'Umrah', car: 'Car rental', food: 'Restaurant table', todo: 'Things to do', stay: 'A place to stay', flight: 'Flights', general: 'Request' };
-  if (kind === 'general' || kind === 'flight') return query || titles[kind]!;
+export function requestTitle(kind: string, answers: Record<string, string[]>, query: string, locale?: Lang): string {
+  const titles: Record<string, CopyKey> = { visa: 'dq.title.visa', umrah: 'dq.title.umrah', car: 'dq.title.car', food: 'dq.title.food', todo: 'dq.title.todo', stay: 'dq.title.stay', flight: 'dq.title.flight', general: 'dq.title.general' };
+  const title = t(titles[kind] ?? 'dq.title.general', undefined, locale);
+  if (kind === 'general' || kind === 'flight') return query || title;
   const where = (answers.where ?? [])[0];
-  return `${titles[kind] ?? 'Request'}${where ? `: ${where}` : ''}`;
+  return where ? t('dq.title.where', { title, where: wordFor(where, locale) }, locale) : title;
 }

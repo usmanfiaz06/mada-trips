@@ -147,10 +147,10 @@ export const bookingCopy = {
   'search.none.flex': 'Try a day either side',
   'search.none.stop': 'Allow one stop',
   'search.down.title': '{airline}’s system isn’t answering.',
-  'search.down.body': 'The other airlines are fine. Or Mada can search {airline} by hand and come back within 20 minutes.',
+  'search.down.body': 'The other airlines are fine. Or Mada can search {airline} by hand and come back within 2 hours.',
   'search.down.others': 'Show the others',
   'search.down.byHand': 'Ask Mada',
-  'search.down.note': 'We’ll search {airline} by hand and send you the options here within 20 minutes.',
+  'search.down.note': 'We’ll search {airline} by hand and send you the options here within 2 hours.',
   'search.stays.title': "Three places you'd like.",
   'search.stays.sub': '{dates} · {nights} nights · {rooms}',
   'search.stays.none.title': 'No rooms free on those dates.',
@@ -161,7 +161,7 @@ export const bookingCopy = {
   'search.byHand.title': 'We’re searching {city} for you.',
   'search.byHand.stayTitle': 'We’re finding rooms in {city} for you.',
   'search.byHand.queued': 'Saved. We start on {city} when you’re back online.',
-  'search.byHand.body': 'Options here within 20 minutes. You don’t need to stay on this screen.',
+  'search.byHand.body': 'Options here within 2 hours. You don’t need to stay on this screen.',
   'search.seeInTrips': 'See it in Trips',
 
   // ───────────── calendar ─────────────

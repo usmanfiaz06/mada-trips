@@ -2,7 +2,7 @@ import {
   AskParseRequest, CARRIERS, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
   ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, REQUEST_FORMS, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
-  money, parseAskRules, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
+  formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestTitle, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person, type RequestFormKind,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
@@ -87,7 +87,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
   return (CATALOGUE_HOTELS[destKey] ?? []).map((h) => ({
     id: uuid(), label: h.label, name: h.name, area: h.area, address: h.address, note: n > 2 ? h.note : n === 2 ? h.noteSmall.two : h.noteSmall.one,
     rating: h.rating.toFixed(1), photo: h.photo, focal: h.focal, checkIn, nights, rooms: roomsFor(n), roomsLabel: roomsLabel(n),
-    total: money(sarToHalalas(staySar(h.nightSar, nights, n))), cancellation: 'Free to cancel until 7 days before. After that, the first night.',
+    total: money(sarToHalalas(staySar(h.nightSar, nights, n))), cancellation: t('dq.stay.cancel'),
     freeCancelUntil: addDays(checkIn, -7), expiresAt: new Date(Date.now() + HOLD).toISOString(),
   }));
 }
@@ -294,7 +294,7 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
     if (s && r.view.kind === 'flight') {
       const dest = s.destination ? DESTINATIONS[s.destination] : null;
       const sv = s.carrier === 'SV' && dest ? CATALOGUE_FLIGHTS[dest.key]?.find((f) => f.carrier === 'SV') : null;
-      const hand = sv ? { ppSar: sv.ppSar, text: `Saudia ${sv.number}, direct, leaving ${sv.dep}` } : dest?.byHand ?? OTHER_CITY_BY_HAND;
+      const hand = sv ? { ppSar: sv.ppSar, text: t('dq.hand.sv', { flight: sv.number, time: timeLabel(sv.dep) }) } : dest?.byHand ?? OTHER_CITY_BY_HAND;
       byHand = { ...hand, cabin: (s.cabin === 'first' ? 'business' : s.cabin) ?? 'economy', oneway: !s.return } as const;
     }
     const q = deskQuote({ kind: r.view.kind, answers: r.details.answers, travellers, needs: r.details.needs as never, note: r.details.note, today: today(), service: r.details.service ?? null, serviceNeed: r.details.serviceNeed ?? null, byHand });
@@ -305,7 +305,7 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
         id: uuid(), total: money(sarToHalalas(q.totalSar)), text: q.text, lead: q.lead, needLines: q.needLines, status: 'open', expiresAt: new Date(now + 86_400_000).toISOString(),
         breakdown: q.breakdown.map((b) => ({ personId: b.personId, name: b.name, lines: b.lines.map((l) => ({ label: l.label, amount: sarToHalalas(l.sar) })) })),
       };
-    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: 'Got it. I’ll check and reply here within 20 minutes.', offer: null, createdAt: nowIso() });
+    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: t('dq.reply.got'), offer: null, createdAt: nowIso() });
   }
   if (r.view.status === 'paid' && now - Date.parse(r.view.updatedAt) > 15_000) r.view.status = 'done';
 }
@@ -408,10 +408,10 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (seen) return ok({ request: seen.view }, 201);
     if (!mine(b.travellerIds)) return err('NOT_FOUND');
     const travellers = b.travellerIds.map((id) => people.find((x) => x.id === id)!);
-    const names = travellers.map((x) => personName(x)).join(', ');
+    const names = commaList(travellers.map((x) => personName(x)));
     const form = REQUEST_FORMS[b.kind as RequestFormKind] ?? [];
-    const needSummary = travellers.filter((x) => (b.needs[x.id] ?? []).length).map((x) => `${personName(x)}: ${(b.needs[x.id] ?? []).map((k) => NEED_LABELS[k].toLowerCase()).join(', ')}`).join(' · ');
-    const summary = form.map((f) => (f.people ? names : f.needs ? needSummary : (b.answers[f.k] ?? []).join(', '))).filter(Boolean).join(' · ');
+    const needSummary = travellers.filter((x) => (b.needs[x.id] ?? []).length).map((x) => `${personName(x)}: ${commaList((b.needs[x.id] ?? []).map((k) => wordFor(NEED_LABELS[k])))}`).join(' · ');
+    const summary = form.map((f) => (f.people ? names : f.needs ? needSummary : commaList((b.answers[f.k] ?? []).map((x) => wordFor(x))))).filter(Boolean).join(' · ');
     let title = requestTitle(b.kind, b.answers, b.query);
     let detail = [summary || (b.kind === 'general' || b.kind === 'flight' ? '' : b.query), b.note ? `“${b.note}”` : ''].filter(Boolean).join(' · ') || b.query;
     if (b.service) {
@@ -425,9 +425,9 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     } else if (b.search) {
       const s = b.search;
       const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || '';
-      const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : `${rangeLabel(s.depart)}, one way`) : t('request.datesLater');
+      const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t('dq.oneWay', { dates: rangeLabel(s.depart) })) : t('request.datesLater');
       title = b.kind === 'stay' ? t('request.title.staysIn', { city }) : s.carrier ? t('request.title.airlineByHand', { airline: 'Saudia', city, dates }) : t('request.title.flightsTo', { city, dates });
-      detail = b.kind === 'stay' ? `${dates} · ${names}` : `From ${s.from ?? 'RUH'} · ${names}`;
+      detail = b.kind === 'stay' ? `${dates} · ${names}` : `${t('dq.from', { from: s.from ?? 'RUH' })} · ${names}`;
     }
     const id = uuid();
     const fr = b.kind === 'flight' && !!b.search && (mockBeta().flightsByRequest || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
@@ -468,18 +468,18 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const msg = req.messages.find((x) => x.id === body.messageId);
     if (!msg?.offer || msg.offer.accepted || req.view.quote.status !== 'open') return err('VALIDATION');
     const offer = msg.offer;
-    const NEAR = 'Room steps from the Haram';
+    const NEAR = t('dq.umrah.near');
+    const LAP = t('dq.umrah.lap');
     const breakdown = req.view.quote.breakdown.map((b) => {
-      if (/^On a lap/.test(b.lines[0]?.label ?? '')) return b;
+      if (b.lines[0]?.label === LAP) return b;
       const had = b.lines.find((l) => l.label === NEAR);
       return { ...b, lines: [...b.lines.filter((l) => l.label !== NEAR), { label: offer.label, amount: offer.perPerson.amount + (had?.amount ?? 0) }] };
     });
     const total = breakdown.reduce((a, b) => a + b.lines.reduce((x, l) => x + l.amount, 0), 0);
-    const fmt = (h: number) => Math.round(h / 100).toLocaleString('en-US');
-    req.view.quote = { ...req.view.quote, breakdown, total: money(total), text: `${req.view.quote.text} Now at the King Abdulaziz Gate, 2 minutes’ walk to the Haram. New total SAR ${fmt(total)}.`, lead: req.view.quote.lead ? `${req.view.quote.lead} Now at the King Abdulaziz Gate, 2 minutes’ walk to the Haram.` : null };
+        req.view.quote = { ...req.view.quote, breakdown, total: money(total), text: `${req.view.quote.text} ${t('dq.offer.quoteAdd')} ${t('dq.offer.newTotal', { price: formatSar(total) })}`, lead: req.view.quote.lead ? `${req.view.quote.lead} ${t('dq.offer.quoteAdd')}` : null };
     msg.offer = { ...offer, accepted: true };
     req.messages.push({ id: uuid(), from: 'me', authorName: null, text: t('request.switchYes'), offer: null, createdAt: nowIso() });
-    req.messages.push({ id: uuid(), from: 'agent', authorName: req.view.agent?.name ?? null, text: `Done. You’re at the King Abdulaziz Gate. New total SAR ${fmt(total)}. Pay when you’re ready.`, offer: null, createdAt: new Date(Date.now() + 5).toISOString() });
+    req.messages.push({ id: uuid(), from: 'agent', authorName: req.view.agent?.name ?? null, text: t('dq.offer.done', { price: formatSar(total) }), offer: null, createdAt: new Date(Date.now() + 5).toISOString() });
     return ok({ request: req.view, messages: req.messages });
   }
 

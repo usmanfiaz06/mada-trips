@@ -19,6 +19,7 @@ import { transfersCopy } from './transfers';
 import { betaCopy } from './beta';
 import { storeCopy } from './store';
 import { thingsCopy } from './things';
+import { wordsCopy } from './words';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -47,6 +48,8 @@ export const en = {
   ...storeCopy,
   // Things to do: open-data places, Book with Mada, what's on, today's ideas: packages/shared/src/copy/things.ts
   ...thingsCopy,
+  // Request chips, needs, the desk's quotes and replies, and screen labels once written in code: packages/shared/src/copy/words.ts
+  ...wordsCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',

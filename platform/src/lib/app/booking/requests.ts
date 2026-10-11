@@ -171,7 +171,7 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
         } else {
           // Nothing to price yet (a table, anything else): the agent answers in the thread.
           await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date(now), details: { ...d, quote: null, quoteText: null } }).where(eq(appRequests.id, r.id));
-          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: "Got it. I’ll check and reply here within 20 minutes." });
+          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: t("dq.reply.got") });
         }
         await tx.insert(appNotifications).values({
           userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),

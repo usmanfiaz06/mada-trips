@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bannedIn, bundleFor, calendarMonths, cardBrandOf, cardProblems, checkPromo, deskQuote, deskReply, entryChecks, fareSar, luhnOk, parseAskRules, quickDates, seatsFor,
+  bannedIn, bundleFor, calendarMonths, cardBrandOf, cardProblems, checkPromo, deskQuote, deskReply, requestTitle, wordFor, entryChecks, fareSar, luhnOk, parseAskRules, quickDates, seatsFor,
   weekendDates, type Person,
 } from '../src';
 
@@ -96,5 +96,22 @@ describe("the desk's words", () => {
     expect(deskQuote({ kind: 'todo', answers: { pick: ['Topkapı Palace tickets'] }, travellers: [OMAR, AHMED], needs: {}, note: '', today: TODAY })!.totalSar).toBe(85 + 43);
     expect(deskReply('umrah', 'Can we stay closer to the Haram?', 3).offer).toEqual({ label: 'Room at the King Abdulaziz Gate', perPersonSar: 380 });
     expect(bannedIn(deskReply('flight', 'cheaper?', 1).text)).toEqual([]);
+  });
+  it('words a price for one person in the singular, and a rental as a rental', () => {
+    const one = deskQuote({ kind: 'visa', answers: {}, travellers: [OMAR], needs: {}, note: '', today: TODAY, locale: 'en' })!;
+    expect(one.text).toContain('SAR 450, plus the embassy fee');
+    expect(one.text).not.toMatch(/each|in total/);
+    expect(deskQuote({ kind: 'visa', answers: {}, travellers: [OMAR, AHMED], needs: {}, note: '', today: TODAY, locale: 'en' })!.text).toContain('SAR 450 each, SAR 900 for all 2 of you');
+    const car = deskQuote({ kind: 'car', answers: { size: ['Standard car'], days: ['The whole trip'] }, travellers: [OMAR], needs: {}, note: '', today: TODAY, locale: 'en' })!;
+    expect(car.text).toMatch(/^Standard car, the whole trip: SAR 980\./);
+    expect(car.text).not.toMatch(/driver/);
+  });
+  it('speaks Arabic when the traveller does', () => {
+    const q = deskQuote({ kind: 'umrah', answers: { stay: ['Steps from the Haram'] }, travellers: [OMAR, AHMED], needs: { [OMAR.id]: ['wheelchairGate'] }, note: '', today: TODAY, locale: 'ar' })!;
+    expect(q.text.replace(/\u2066[^\u2069]*\u2069/g, '')).not.toMatch(/[A-Za-z]{3,}/); // names stay as they are
+    expect(q.breakdown[0]!.lines.map((l) => l.label).join(' ')).not.toMatch(/[A-Za-z]{3,}/);
+    expect(deskReply('car', 'Can we change the dates?', 1, 'ar').text).toBe('أتأكد من التواريخ وأرد عليك هنا خلال ساعتين.');
+    expect(requestTitle('car', { where: ['Riyadh'] }, '', 'ar')).toBe('تأجير سيارة: الرياض');
+    expect(wordFor('Standard car', 'ar')).toBe('سيارة عادية');
   });
 });

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, formatSar, householdOf, personName, todayIn,
+  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, listOf, wordFor, formatSar, householdOf, personName, todayIn,
   type AskIntent, type BookingRequestView, type CopyKey, type NeedKey, type Person, type RequestFormKind,
 } from '@mada/shared';
 import { bookingApi, bookingKeys, sendRequest, useBookingRequest, usePayDraft, useThread } from '@/lib/booking';
@@ -78,19 +78,19 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
               <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} />
               {!answers[f.k] ? <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('request.done')} onPress={() => setAnswers({ ...answers, [f.k]: true })} /> : null}
               {kind === 'visa' && who.some((id) => people.find((p) => p.id === id)?.relation === 'helper')
-                ? <T v="small">{t('request.helperVisa', { names: who.filter((id) => people.find((p) => p.id === id)?.relation === 'helper').map(nameOf).join(' and ') })}</T> : null}
+                ? <T v="small">{t('request.helperVisa', { names: listOf(who.filter((id) => people.find((p) => p.id === id)?.relation === 'helper').map(nameOf)) })}</T> : null}
             </>
           ) : null}
           {f.needs ? (
             <>
-              {unassigned.length ? <T v="small" color={colors.green}>{t('request.mentioned', { needs: unassigned.map((k) => NEED_LABELS[k].toLowerCase()).join(' and ') })}</T> : null}
+              {unassigned.length ? <T v="small" color={colors.green}>{t('request.mentioned', { needs: listOf(unassigned.map((k) => wordFor(NEED_LABELS[k]).toLowerCase())) })}</T> : null}
               {who.map((id) => (
                 <Card key={id} variant="well" padding={14} style={{ gap: 8 }}>
                   <T v="h3" style={{ fontSize: 15 }}>{nameOf(id)}</T>
                   <ChipWrap>
                     {NEED_KEYS.map((k) => {
                       const on = (needs[id] ?? []).includes(k);
-                      return <Toggle key={k} small label={NEED_LABELS[k]} on={on} hint={unassigned.includes(k)} accessibilityLabel={`${NEED_LABELS[k]} for ${nameOf(id)}`} onPress={() => {
+                      return <Toggle key={k} small label={wordFor(NEED_LABELS[k])} on={on} hint={unassigned.includes(k)} accessibilityLabel={t('need.for', { need: wordFor(NEED_LABELS[k]), name: nameOf(id) })} onPress={() => {
                         const cur = needs[id] ?? [];
                         let next = on ? cur.filter((x) => x !== k) : [...cur, k];
                         if (!on && k === 'wheelchairGate') next = next.filter((x) => x !== 'wheelchairSeat');
@@ -110,7 +110,7 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
               {f.options.map((o) => {
                 const cur = (answers[f.k] as string[] | undefined) ?? [];
                 const on = cur.includes(o);
-                return <Toggle key={o} label={o} on={on} onPress={() => setAnswers({ ...answers, [f.k]: f.multi ? (on ? cur.filter((x) => x !== o) : [...cur, o]) : [o] })} />;
+                return <Toggle key={o} label={wordFor(o)} on={on} onPress={() => setAnswers({ ...answers, [f.k]: f.multi ? (on ? cur.filter((x) => x !== o) : [...cur, o]) : [o] })} />;
               })}
             </ChipWrap>
           ) : null}

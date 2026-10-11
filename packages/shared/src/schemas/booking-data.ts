@@ -246,7 +246,7 @@ export const REQUEST_FORMS: Record<RequestFormKind, FormQuestion[]> = {
   visa: [
     { k: 'where', q: 'request.q.whichVisa', options: ['Schengen', 'UK', 'United States', 'Somewhere else'], from: [[/schengen|france|germany|italy|spain|europe/, 'Schengen'], [/\buk\b|britain|london|england/, 'UK'], [/\bus\b|\busa\b|america|united states/, 'United States']] },
     { k: 'who', q: 'request.q.forWho', people: true },
-    { k: 'when', q: 'request.q.whenTravel', options: ['This summer', 'In the next 3 months', 'Not sure yet'] },
+    { k: 'when', q: 'request.q.whenTravel', options: ['Within a month', 'In 1 to 3 months', 'Not sure yet'] },
   ],
   umrah: [
     { k: 'when', q: 'request.q.when', options: ['In Ramadan', 'After Eid', 'Pick dates later'], from: [[/ramadan/, 'In Ramadan'], [/after eid/, 'After Eid']] },
