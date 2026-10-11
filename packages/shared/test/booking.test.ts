@@ -103,14 +103,14 @@ describe("the desk's words", () => {
     expect(one.text).not.toMatch(/each|in total/);
     expect(deskQuote({ kind: 'visa', answers: {}, travellers: [OMAR, AHMED], needs: {}, note: '', today: TODAY, locale: 'en' })!.text).toContain('SAR 450 each, SAR 900 for all 2 of you');
     const car = deskQuote({ kind: 'car', answers: { size: ['Standard car'], days: ['The whole trip'] }, travellers: [OMAR], needs: {}, note: '', today: TODAY, locale: 'en' })!;
-    expect(car.text).toMatch(/^Standard car, the whole trip: SAR 980\./);
+    expect(car.text).toMatch(/^Standard car, the whole trip: SAR 1,300\./);
     expect(car.text).not.toMatch(/driver/);
   });
   it('speaks Arabic when the traveller does', () => {
     const q = deskQuote({ kind: 'umrah', answers: { stay: ['Steps from the Haram'] }, travellers: [OMAR, AHMED], needs: { [OMAR.id]: ['wheelchairGate'] }, note: '', today: TODAY, locale: 'ar' })!;
     expect(q.text.replace(/\u2066[^\u2069]*\u2069/g, '')).not.toMatch(/[A-Za-z]{3,}/); // names stay as they are
     expect(q.breakdown[0]!.lines.map((l) => l.label).join(' ')).not.toMatch(/[A-Za-z]{3,}/);
-    expect(deskReply('car', 'Can we change the dates?', 1, 'ar').text).toBe('أتأكد من التواريخ وأرد عليك هنا خلال ساعتين.');
+    expect(deskReply('car', 'Can we change the dates?', 1, 'ar').text).toBe('أتأكد من السيارة لهالأيام وأرسل لك السعر هنا خلال ساعتين.');
     expect(requestTitle('car', { where: ['Riyadh'] }, '', 'ar')).toBe('تأجير سيارة: الرياض');
     expect(wordFor('Standard car', 'ar')).toBe('سيارة عادية');
   });
@@ -143,7 +143,7 @@ describe('requests ask only what is missing, and say each thing once', () => {
   it('prices an outing per person, and a self-drive car without a driver', () => {
     const q = deskQuote({ kind: 'todo', answers: { pick: ['Boulevard World at night'], when: ['This weekend'] }, travellers: [OMAR, AHMED], needs: {}, note: '', today: TODAY })!;
     expect(q.totalSar).toBe(120 + 60);
-    expect(q.text).toBe('Boulevard World at night this weekend for both of you: SAR 180. Children under 12 are half price. Pay and I’ll book them.');
+    expect(q.text).toBe('Boulevard World at night this weekend for the 2 of you: SAR 180. Children under 12 are half price. Pay and I’ll book them.');
     const car = deskQuote({ kind: 'car', answers: { size: ['Standard car'], days: ['3 days'] }, travellers: [OMAR], needs: {}, note: '', today: TODAY })!;
     expect(car.text).not.toMatch(/driver/);
     expect(car.totalSar).toBe(260 * 3);

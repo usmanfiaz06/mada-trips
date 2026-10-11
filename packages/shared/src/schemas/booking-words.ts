@@ -24,6 +24,9 @@ const WORDS: Readonly<Record<string, CopyKey>> = {
   'one stop, about 9 hours': 'dq.hand.other',
   // the server names a support conversation in English
   'Your account': 'support.aboutAccount',
+  // Ask's newer chips (ask-flow.ts).
+  Jeddah: 'request.opt.jeddah', Dubai: 'request.opt.dubai', Today: 'request.opt.today', 'This weekend': 'request.opt.thisWeekend', 'Next week': 'request.opt.nextWeek',
+  'For my trip dates': 'request.opt.tripDates', 'Any day is fine': 'request.opt.anyDay', 'A car with a driver': 'request.opt.withDriver', 'A week': 'request.opt.aWeek',
 };
 
 /** A stored English value in the display language: "Standard car" → "سيارة عادية". */

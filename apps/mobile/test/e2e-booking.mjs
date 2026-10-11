@@ -586,7 +586,7 @@ async function asks() {
   const boxes = await page.locator('[data-testid="reply-input"], [data-testid="ask-input"]').filter({ visible: true }).count();
   if (boxes !== 1) errors.push(`outing: ${boxes} message boxes on screen`);
   await k.shot('outing-sent');
-  await k.see('Boulevard World at night this weekend for both of you: SAR 240.', 'priced answer', 20000);
+  await k.see('Boulevard World at night this weekend for the 2 of you: SAR 240.', 'priced answer', 20000);
   await k.see('Pay SAR 240', 'pay button');
   await k.shot('outing-priced');
   await k.tap('Can we go another day?');
@@ -608,7 +608,7 @@ async function asks() {
   await k.byTest('request-send').click();
   await k.see('Restaurant table: Riyadh', 'table title', 9000);
   await k.see('Can we go a little later?', 'table suggestion');
-  await k.see('I’m asking for a table for 1 in Riyadh, tonight: halal.', 'table answer', 20000);
+  await k.see('I’m asking for a table for one in Riyadh, tonight: halal.', 'table answer', 20000);
   if (await page.getByText(/airline/).filter({ visible: true }).count()) errors.push('table: the agent talks about airlines');
   await k.shot('table-answer');
   step('asks: back to the request from Trips');
