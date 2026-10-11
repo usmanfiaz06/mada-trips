@@ -96,7 +96,7 @@ export default function Pickup() {
             note={o.refundable && o.freeCancelUntil ? t('pickup.freeCancel', { date: shortDay(o.freeCancelUntil) }) : t('pickup.noCancel')} />
         </Rise>
       ))}
-      {chosen?.pickupNote ? <Box tone="cream" testID="pickup-meet"><Tiny>{chosen.pickupNote}</Tiny></Box> : null}
+      {chosen?.pickupNote ? <Box tone="cream" testID="pickup-meet"><Tiny style={{ writingDirection: 'ltr', textAlign: 'left' }}>{chosen.pickupNote}</Tiny></Box> : null}
       <Tiny>{t('pickup.note')}</Tiny>
       <Sheet visible={confirm} onClose={() => setConfirm(false)} label={t('pickup.sendTitle', { agent })}>
         <T v="h2">{t('pickup.sendTitle', { agent })}</T>

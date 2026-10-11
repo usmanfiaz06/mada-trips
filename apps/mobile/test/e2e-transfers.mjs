@@ -78,7 +78,7 @@ async function run(lang) {
   await shot('trip-vouchers');
   await byTest('voucher-0').click();
   await see(c.ref, 'voucher reference');
-  await see('1-3982401', 'HBX reference');
+  if (!/1-3982401/.test(await byTest('voucher-ref').innerText().catch(() => ''))) errors.push(`${lang} HBX reference missing`);
   await shot('voucher-top');
   await scroll(700);
   await see(c.essential, 'essential information');
@@ -89,7 +89,9 @@ async function run(lang) {
   await shot('voucher-cancel-sheet');
   await byTest('voucher-cancel-confirm').click();
   await page.waitForTimeout(1500);
+  await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
   await see(c.cancelled, 'cancelled');
+  if (await byTest('voucher-cancel').count()) errors.push(`${lang} cancel still offered after cancelling`);
   await shot('voucher-cancelled');
 
   step(`${lang}: airport pickup`);

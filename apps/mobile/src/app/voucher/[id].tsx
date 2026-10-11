@@ -21,6 +21,9 @@ import { colors } from '@/theme';
  * cancellation rule, and the payment statement (no price). Download it (the same page the server prints), or cancel:
  * Hotelbeds says what it costs first, then the traveller confirms.
  */
+/** Supplier text stays in English (the legal statement, the hotel's own notes): kept left to right inside Arabic. */
+const LTR = { writingDirection: 'ltr' as const, textAlign: 'left' as const };
+
 export default function VoucherScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const qc = useQueryClient();
@@ -69,9 +72,9 @@ export default function VoucherScreen() {
         {v.paxes.length ? <View style={{ gap: 2 }}><Tiny>{t('voucher.guests')}</Tiny>{v.paxes.map((p, i) => <Small key={i} color={colors.green}>{t('voucher.roomN', { n: p.room })} · {p.name}{p.child ? ` · ${t('voucher.child', { age: p.age ?? '' })}` : ''}</Small>)}</View> : null}
         {row(t('voucher.bookedOn'), v.bookedOn)}
       </Box>
-      {v.remarks ? <Box tone="cream" testID="voucher-remarks"><H3 size={15}>{t('voucher.remarks')}</H3><Small>{v.remarks}</Small></Box> : null}
+      {v.remarks ? <Box tone="cream" testID="voucher-remarks"><H3 size={15}>{t('voucher.remarks')}</H3><Small style={LTR}>{v.remarks}</Small></Box> : null}
       {v.cancellation ? <Box testID="voucher-cancellation"><H3 size={15}>{t('voucher.cancellation')}</H3><Small>{v.cancellation}</Small></Box> : null}
-      <Box testID="voucher-payment"><H3 size={15}>{t('voucher.payment')}</H3><Tiny>{v.payableThrough}</Tiny>{getLocale() === 'ar' ? <Tiny>{t('voucher.payableAr')}</Tiny> : null}</Box>
+      <Box testID="voucher-payment"><H3 size={15}>{t('voucher.payment')}</H3><Tiny style={LTR}>{v.payableThrough}</Tiny>{getLocale() === 'ar' ? <Tiny>{t('voucher.payableAr')}</Tiny> : null}</Box>
       <Button testID="voucher-download" variant="secondary" label={t('voucher.download')} onPress={() => void saveVoucher(v, getLocale())} />
       {v.canCancel ? <Button testID="voucher-cancel" variant="secondary" color={colors.badInk} label={t('voucher.cancel')} onPress={() => void check()} /> : null}
       <Sheet visible={sheet} onClose={() => setSheet(false)} label={t('voucher.cancel')}>
