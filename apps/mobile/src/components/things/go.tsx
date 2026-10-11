@@ -215,8 +215,9 @@ export function RideSheet({ x, ctx, onClose }: { x: Thing | null; ctx: ThingsCon
         <T v="eyebrow">{t('things.ride.time')}</T>
         <ScrollView
           ref={times} horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }} testID="ride-times"
-          // Start with the chosen time in view (10:00 is off the edge otherwise).
-          onContentSizeChange={(w) => { if (!scrolled.current) { scrolled.current = true; const x = Math.max(0, (w / TIMES.length) * TIMES.indexOf(time) - 40); times.current?.scrollTo({ x: isRTL() && Platform.OS !== 'web' ? Math.max(0, w - x - viewport.current) : x, animated: false }); } }}
+          // Start with the chosen time in view (10:00 is off the edge otherwise). Right to left, browsers count scrollLeft
+          // down from 0; native counts from the left edge of the content.
+          onContentSizeChange={(w) => { if (!scrolled.current) { scrolled.current = true; const x = Math.max(0, (w / TIMES.length) * TIMES.indexOf(time) - 40); times.current?.scrollTo({ x: !isRTL() ? x : Platform.OS === 'web' ? -x : Math.max(0, w - x - viewport.current), animated: false }); } }}
           onLayout={(e) => { viewport.current = e.nativeEvent.layout.width; }}
         >
           {TIMES.map((tm) => <Chip key={tm} label={localizeDigits(tm)} on={time === tm} onPress={() => { setTime(tm); reset(); }} />)}
