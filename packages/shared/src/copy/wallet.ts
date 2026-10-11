@@ -281,7 +281,7 @@ export const walletCopy = {
   'passport.field.check': 'Check this. It may not have read right.',
   'passport.field.badDate': 'Use the format DD/MM/YYYY, for example 22/06/2031.',
   'passport.field.badNumber': 'Letters and digits only, as on the photo page.',
-  'passport.field.badCountry': 'Write the country as on the passport, like Saudi Arabia.',
+  'passport.field.badCountry': 'Write the country or the nationality, like Saudi Arabia or Saudi.',
   'passport.expired.title': 'This passport has expired.',
   'passport.expired.body': "We'll save it, but it can't be used to travel. Mada can help you renew it.",
   'passport.fillMore.one': 'Fill in 1 more',

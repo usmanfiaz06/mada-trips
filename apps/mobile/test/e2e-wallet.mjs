@@ -363,8 +363,8 @@ async function walletFresh() {
   await byTest('pp-surname').fill('REYES');
   await byTest('pp-number').fill('P7149332');
   await byTest('pp-nationality').fill('Atlantis');
-  await see('Write the country as on the passport, like Saudi Arabia.', 'bad country');
-  await byTest('pp-nationality').fill('Philippines');
+  await see('Write the country or the nationality, like Saudi Arabia or Saudi.', 'bad country');
+  await byTest('pp-nationality').fill('Filipino');
   await byTest('pp-dob').fill('18/04/1991');
   await byTest('pp-expiry').fill('02/11/2022');
   await see('This passport has expired.', 'expired warning');

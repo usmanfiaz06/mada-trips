@@ -152,12 +152,42 @@ export const COUNTRIES: Record<string, string> = {
   UTO: 'Utopia',
 };
 
-/** The three-letter code for a country name or code ("Saudi Arabia" → "SAU"), or null. */
+/**
+ * What people write instead of the country's name: the nationality ("Saudi", "Emirati", "Pakistani"), a short name
+ * ("KSA", "UAE", "UK") or the name in Arabic ("السعودية", "سعودي"). Lower case, matched whole.
+ */
+const COUNTRY_WORDS: Record<string, string[]> = {
+  SAU: ['saudi', 'saudi arabian', 'ksa', 'kingdom of saudi arabia', 'السعودية', 'المملكة العربية السعودية', 'سعودي', 'سعودية'],
+  ARE: ['emirati', 'uae', 'emirates', 'الإمارات', 'الامارات', 'إماراتي', 'اماراتي', 'إماراتية'],
+  KWT: ['kuwaiti', 'الكويت', 'كويتي', 'كويتية'], QAT: ['qatari', 'قطر', 'قطري', 'قطرية'], BHR: ['bahraini', 'البحرين', 'بحريني', 'بحرينية'],
+  OMN: ['omani', 'عمان', 'عُمان', 'عماني', 'عمانية'], YEM: ['yemeni', 'اليمن', 'يمني', 'يمنية'], JOR: ['jordanian', 'الأردن', 'الاردن', 'أردني', 'اردني', 'أردنية'],
+  EGY: ['egyptian', 'مصر', 'مصري', 'مصرية'], LBN: ['lebanese', 'لبنان', 'لبناني', 'لبنانية'], SYR: ['syrian', 'سوريا', 'سوري', 'سورية'],
+  IRQ: ['iraqi', 'العراق', 'عراقي', 'عراقية'], PSE: ['palestinian', 'فلسطين', 'فلسطيني', 'فلسطينية'], SDN: ['sudanese', 'السودان', 'سوداني', 'سودانية'],
+  MAR: ['moroccan', 'المغرب', 'مغربي', 'مغربية'], DZA: ['algerian', 'الجزائر', 'جزائري'], TUN: ['tunisian', 'تونس', 'تونسي'], LBY: ['libyan', 'ليبيا', 'ليبي'],
+  TUR: ['turkish', 'turkey', 'turkiye', 'تركيا', 'تركي', 'تركية'], IRN: ['iranian', 'إيران', 'ايران', 'إيراني'], PAK: ['pakistani', 'باكستان', 'باكستاني', 'باكستانية'],
+  IND: ['indian', 'الهند', 'هندي', 'هندية'], BGD: ['bangladeshi', 'بنغلاديش', 'بنغلاديشي'], LKA: ['sri lankan', 'سريلانكا', 'سريلانكي'], NPL: ['nepali', 'nepalese', 'نيبال', 'نيبالي'],
+  PHL: ['filipino', 'filipina', 'philippine', 'الفلبين', 'فلبيني', 'فلبينية'], IDN: ['indonesian', 'إندونيسيا', 'اندونيسيا', 'إندونيسي', 'اندونيسية'],
+  MYS: ['malaysian', 'ماليزيا', 'ماليزي'], THA: ['thai', 'تايلاند', 'تايلندي'], VNM: ['vietnam', 'vietnamese', 'فيتنام', 'فيتنامي'],
+  CHN: ['chinese', 'الصين', 'صيني'], JPN: ['japanese', 'اليابان', 'ياباني'], KOR: ['korean', 'south korean', 'korea', 'كوريا', 'كوري'], SGP: ['singaporean'],
+  AUS: ['australian', 'أستراليا', 'استراليا'], NZL: ['new zealander', 'kiwi'], ETH: ['ethiopian', 'إثيوبيا', 'اثيوبيا', 'إثيوبي', 'اثيوبية'],
+  KEN: ['kenyan', 'كينيا', 'كيني'], NGA: ['nigerian', 'نيجيريا', 'نيجيري'], ZAF: ['south african'],
+  GBR: ['british', 'uk', 'great britain', 'britain', 'england', 'english', 'بريطانيا', 'بريطاني', 'المملكة المتحدة'], IRL: ['irish'],
+  USA: ['american', 'us', 'usa', 'united states of america', 'america', 'أمريكا', 'امريكا', 'أمريكي', 'امريكي', 'الولايات المتحدة'],
+  CAN: ['canadian', 'كندا', 'كندي'], MEX: ['mexican'], BRA: ['brazilian'], FRA: ['french', 'فرنسا', 'فرنسي'], DEU: ['german', 'ألمانيا', 'المانيا', 'ألماني'],
+  ITA: ['italian', 'إيطاليا', 'ايطاليا', 'إيطالي'], ESP: ['spanish', 'إسبانيا', 'اسبانيا', 'إسباني'], PRT: ['portuguese'], NLD: ['dutch', 'holland'], BEL: ['belgian'],
+  CHE: ['swiss'], AUT: ['austrian'], SWE: ['swedish'], NOR: ['norwegian'], DNK: ['danish'], FIN: ['finnish'], POL: ['polish'], GRC: ['greek'],
+  RUS: ['russian', 'روسيا', 'روسي'], UKR: ['ukrainian'],
+};
+const WORD_TO_CODE: Record<string, string> = Object.fromEntries(Object.entries(COUNTRY_WORDS).flatMap(([code, words]) => words.map((w) => [w, code])));
+
+/** The three-letter code for a country name, nationality or code ("Saudi Arabia", "Saudi", "سعودي" → "SAU"), or null. */
 export function countryCode(nameOrCode: string): string | null {
-  const v = (nameOrCode ?? '').trim();
+  const v = (nameOrCode ?? '').trim().replace(/\.$/, '');
   if (/^[A-Za-z]{3}$/.test(v) && COUNTRIES[v.toUpperCase()]) return v.toUpperCase() === 'GBD' ? 'GBR' : v.toUpperCase();
   const hit = Object.entries(COUNTRIES).find(([code, n]) => code.length === 3 && n.toLowerCase() === v.toLowerCase());
-  return hit ? hit[0] : null;
+  if (hit) return hit[0];
+  const key = v.toLowerCase().replace(/\s+/g, ' ');
+  return WORD_TO_CODE[key] ?? WORD_TO_CODE[key.replace(/^the /, '')] ?? null;
 }
 
 const nameFrom = (field: string) => {

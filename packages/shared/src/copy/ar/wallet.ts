@@ -281,7 +281,7 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'passport.field.check': 'راجع هذا. قد لا نكون قرأناه بدقة.',
   'passport.field.badDate': 'اكتبه بصيغة DD/MM/YYYY، مثل 22/06/2031.',
   'passport.field.badNumber': 'حروف وأرقام فقط، كما في صفحة الصورة.',
-  'passport.field.badCountry': 'اكتب الدولة كما في الجواز، مثل Saudi Arabia.',
+  'passport.field.badCountry': 'اكتب الدولة أو الجنسية، مثل السعودية أو سعودي.',
   'passport.expired.title': 'انتهت صلاحية هذا الجواز.',
   'passport.expired.body': 'سنحفظه، لكن لا يمكن السفر به. تقدر مادا تساعدك في تجديده.',
   'passport.fillMore.one': 'بقي حقل واحد',

@@ -159,6 +159,10 @@ it('converts days and countries', () => {
   assert.equal(dmyToIso('31/02/2031'), null);
   assert.equal(countryCode('Saudi Arabia'), 'SAU');
   assert.equal(countryCode('phl'), 'PHL');
+  for (const [said, code] of [['Saudi', 'SAU'], ['saudi ', 'SAU'], ['KSA', 'SAU'], ['سعودي', 'SAU'], ['Emirati', 'ARE'], ['UAE', 'ARE'], ['Egyptian', 'EGY'], ['Pakistani', 'PAK'], ['Indian', 'IND'], ['Filipino', 'PHL'], ['British', 'GBR'], ['the UK', 'GBR'], ['American', 'USA']] as const) {
+    assert.equal(countryCode(said), code, said);
+  }
+  assert.equal(countryCode('Atlantis'), null);
   assert.equal(countryCode('Atlantis'), null);
 });
 });
