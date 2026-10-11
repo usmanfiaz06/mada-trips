@@ -410,7 +410,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const travellers = b.travellerIds.map((id) => people.find((x) => x.id === id)!);
     const names = commaList(travellers.map((x) => personName(x)));
     const form = REQUEST_FORMS[b.kind as RequestFormKind] ?? [];
-    const needSummary = travellers.filter((x) => (b.needs[x.id] ?? []).length).map((x) => `${personName(x)}: ${commaList((b.needs[x.id] ?? []).map((k) => wordFor(NEED_LABELS[k])))}`).join(' · ');
+    const needSummary = travellers.filter((x) => (b.needs[x.id] ?? []).length).map((x) => `${personName(x)}: ${commaList((b.needs[x.id] ?? []).map((k) => wordFor(NEED_LABELS[k]).toLowerCase()))}`).join(' · ');
     const summary = form.map((f) => (f.people ? names : f.needs ? needSummary : commaList((b.answers[f.k] ?? []).map((x) => wordFor(x))))).filter(Boolean).join(' · ');
     let title = requestTitle(b.kind, b.answers, b.query);
     let detail = [summary || (b.kind === 'general' || b.kind === 'flight' ? '' : b.query), b.note ? `“${b.note}”` : ''].filter(Boolean).join(' · ') || b.query;

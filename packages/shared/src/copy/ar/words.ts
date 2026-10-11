@@ -142,7 +142,7 @@ export const arWords: ArSection<typeof wordsCopy> = {
   'currency.GBP': 'جنيه إسترليني',
 
   'ev.e1.title': 'بوليفارد وورلد في الليل',
-  'ev.e1.when': 'كل مساء · 16:00–01:00',
+  'ev.e1.when': 'كل مساء · من 16:00 حتى 01:00',
   'ev.e1.where': 'موسم الرياض',
   'ev.e2.title': 'عشاء في البر تحت النجوم',
   'ev.e2.when': 'الخميس والجمعة · 19:30',

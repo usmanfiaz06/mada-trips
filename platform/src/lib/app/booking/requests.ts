@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CreateRequestBody, DESTINATIONS, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, REQUEST_FORMS, deskQuote, deskReply, money, personName, rangeLabel, requestTitle, sarToHalalas, t,
+  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, REQUEST_FORMS, deskQuote, deskReply, money, personName, rangeLabel, requestTitle, sarToHalalas, t,
   type BookingRequestView, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestFormKind, type RequestQuote, type ThreadMessage,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -70,7 +70,7 @@ export async function ownRequest(ownerId: string, id: string): Promise<RequestRo
   return r;
 }
 
-const names = (ps: Person[]) => ps.map((p) => personName(p)).join(", ");
+const names = (ps: Person[]) => commaList(ps.map((p) => personName(p)));
 
 export async function createRequest(ownerId: string, input: CreateRequestInput, ipHash: string | null): Promise<BookingRequestView> {
   const b = CreateRequestBody.parse(input);
@@ -80,11 +80,12 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   }
   const travellers = await travellersOf(ownerId, b.travellerIds);
   const form = REQUEST_FORMS[b.kind as RequestFormKind] ?? [];
-  const needSummary = travellers.filter((p) => (b.needs[p.id] ?? []).length).map((p) => `${personName(p)}: ${(b.needs[p.id] ?? []).map((k) => NEED_LABELS[k].toLowerCase()).join(", ")}`).join(" · ");
-  const summaryLine = form.map((f) => (f.people ? names(travellers) : f.needs ? needSummary : (b.answers[f.k] ?? []).join(", "))).filter(Boolean).join(" · ");
+  const needSummary = travellers.filter((p) => (b.needs[p.id] ?? []).length).map((p) => `${personName(p)}: ${commaList((b.needs[p.id] ?? []).map((k) => wordFor(NEED_LABELS[k]).toLowerCase()))}`).join(" · ");
+  const summaryLine = form.map((f) => (f.people ? names(travellers) : f.needs ? needSummary : commaList((b.answers[f.k] ?? []).map((x) => wordFor(x))))).filter(Boolean).join(" · ");
   let title = requestTitle(b.kind, b.answers, b.query);
   let detail = [summaryLine || (b.kind === "general" || b.kind === "flight" ? "" : b.query), b.note ? `“${b.note}”` : ""].filter(Boolean).join(" · ") || b.query;
-  let promisedMin = 120;
+  // Every price, quote or set of options found by hand: within 2 hours, as the app promises (copy/words.ts).
+  const promisedMin = 120;
   if (b.service) {
     const who = b.serviceFor?.personId ? travellers.find((p) => p.id === b.serviceFor!.personId) ?? null : null;
     const name = who ? personName(who) : "";
@@ -97,13 +98,11 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || "";
     const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
     title = b.kind === "stay" ? t("request.title.staysIn", { city }) : s.carrier ? t("request.title.airlineByHand", { airline: s.carrier === "SV" ? "Saudia" : s.carrier, city, dates }) : t("request.title.flightsTo", { city, dates });
-    detail = b.kind === "stay" ? `${dates} · ${names(travellers)}` : `From ${s.from ?? "RUH"} · ${names(travellers)}${s.cabin ? ` · ${t(`cal.cabin.${s.cabin}` as never)}` : ""}`;
-    promisedMin = 20;
+    detail = b.kind === "stay" ? `${dates} · ${names(travellers)}` : `${t("dq.from", { from: s.from ?? "RUH" })} · ${names(travellers)}${s.cabin ? ` · ${t(`cal.cabin.${s.cabin}` as never)}` : ""}`;
   }
   const agentName = await agentFor(ownerId);
   // Flights by request (switches.ts): the desk sends fare options, and the request reads as the form's answers.
   const flightRequest = b.kind === "flight" && !!b.search && (flightsMode() === "request" || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
-  if (flightRequest) promisedMin = 60;
   const details: AskDetails = {
     source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: b.note || null, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
