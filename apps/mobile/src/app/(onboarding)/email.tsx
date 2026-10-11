@@ -25,6 +25,7 @@ export default function Email() {
 
   const go = (e: string) => { set({ email: e, via: 'email', social: null }); router.push('/email-code'); };
   const send = async () => {
+    if (busy) return; // one request per tap: a second within 60 s is refused by Supabase
     if (!ok) { setTouched(true); return; }
     const e = email.trim().toLowerCase();
     setBusy(true); setError(null);
