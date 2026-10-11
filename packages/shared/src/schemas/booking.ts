@@ -154,6 +154,37 @@ export const StaySearchRequest = z.object({
 });
 export type StaySearchRequest = z.input<typeof StaySearchRequest>;
 
+/** What Mada can say about an amenity or a view: only what the hotel's content or its rooms show. */
+export const StayAmenity = z.enum(['pool', 'beach', 'kidsClub', 'gym', 'spa', 'parking', 'connecting', 'accessible', 'familyRooms', 'wifi']);
+export type StayAmenity = z.infer<typeof StayAmenity>;
+export const StayView = z.enum(['sea', 'beach', 'burj', 'haram', 'city']);
+export type StayView = z.infer<typeof StayView>;
+
+/**
+ * A stay's facts in structure, so the app writes the card in the traveller's language and can sort, filter and refine
+ * by them: stars, the board, whether it can be cancelled, local tax paid at the hotel, where it is, what it has.
+ */
+export const StayFacts = z.object({
+  stars: z.number().int().min(0).max(5).nullable(),
+  apartment: z.boolean(),
+  board: z.enum(['RO', 'BB', 'HB', 'FB', 'AI', 'other']).nullable(),
+  /** The room as the hotel names it, tidied ("Deluxe double"). */
+  room: z.string().nullable(),
+  refundable: z.boolean(),
+  /** Local taxes paid at the hotel, in halalas (not in the price). */
+  payAtHotel: z.number().int().nullable(),
+  zone: z.string().nullable(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
+  /** Whether we hold the hotel's content (facilities, description): without it, "no pool" can't be said. */
+  content: z.boolean(),
+  amenities: z.array(StayAmenity),
+  views: z.array(StayView),
+  quiet: z.boolean(),
+  deal: z.boolean(),
+});
+export type StayFacts = z.infer<typeof StayFacts>;
+
 export const StayOption = z.object({
   id: Id,
   label: OptionLabel,
@@ -178,6 +209,11 @@ export const StayOption = z.object({
     code: z.number().int(), category: z.string().nullable(), imageUrl: z.string().nullable(), room: z.string().nullable(), board: z.string().nullable(),
     rateComments: z.string().nullable(), rateCommentsId: z.string().nullable().optional(), supplier: z.literal('hotelbeds'),
   }).nullable().optional(),
+  /** At most one "Best for you" and one "Lowest price" in a list; null for the rest (label stays for older apps). */
+  badge: z.enum(['best', 'lowest']).nullable().optional(),
+  /** How well it fits, 0–100 (stars, price, where it is): the "Recommended" order. */
+  score: z.number().optional(),
+  facts: StayFacts.nullable().optional(),
 });
 export type StayOption = z.infer<typeof StayOption>;
 
@@ -189,6 +225,10 @@ export const StaySearchResponse = z.object({
   cachedUntil: IsoDateTime,
 });
 export type StaySearchResponse = z.infer<typeof StaySearchResponse>;
+
+/** GET /offers/{id}/rooms: every room the hotel has for this stay and party, cheapest first (the one shown first). */
+export const StayRoomsResponse = z.object({ options: z.array(StayOption) });
+export type StayRoomsResponse = z.infer<typeof StayRoomsResponse>;
 
 /** Offers keep their price for the hold; "Check the price again" re-prices with the supplier. */
 export const OfferResponse = z.object({
@@ -407,6 +447,14 @@ export const OrderPreview = z.object({
   travellerIds: z.array(Id),
   /** People on the booking without a passport yet: book now, add within 48 hours. */
   missingPassports: z.array(Id),
+  /**
+   * A room: the facts the app repeats in the traveller's language before they pay (cancellation, local tax paid at the
+   * hotel, the hotel's own notes), so nothing at the last step is a surprise.
+   */
+  stay: z.object({
+    name: z.string(), checkIn: IsoDay, nights: z.number().int(), freeCancelUntil: IsoDay.nullable(), refundable: z.boolean(),
+    payAtHotel: Money.nullable(), essentials: z.string().nullable(), facts: StayFacts.nullable(),
+  }).nullable().optional(),
 });
 export type OrderPreview = z.infer<typeof OrderPreview>;
 export const PreviewResponse = z.object({ preview: OrderPreview });

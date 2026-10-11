@@ -20,6 +20,7 @@ import { arTransfers } from './transfers';
 import { arBeta } from './beta';
 import { arWords } from './words';
 import { arAskFlow } from './askFlow';
+import { arStays } from './stays';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
@@ -39,5 +40,6 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arBeta,
   ...arWords,
   ...arAskFlow,
+  ...arStays,
   ...arCommon,
 } as Record<string, string>;

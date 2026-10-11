@@ -1,5 +1,5 @@
 import {
-  AskParseRequest, CARRIERS, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
+  AskParseRequest, CARRIERS, catalogueFacts, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
   ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskFirstReply, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
   formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestText, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
@@ -88,7 +88,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
     id: uuid(), label: h.label, name: h.name, area: h.area, address: h.address, note: n > 2 ? h.note : n === 2 ? h.noteSmall.two : h.noteSmall.one,
     rating: h.rating.toFixed(1), photo: h.photo, focal: h.focal, checkIn, nights, rooms: roomsFor(n), roomsLabel: roomsLabel(n),
     total: money(sarToHalalas(staySar(h.nightSar, nights, n))), cancellation: t('dq.stay.cancel'),
-    freeCancelUntil: addDays(checkIn, -7), expiresAt: new Date(Date.now() + HOLD).toISOString(),
+    freeCancelUntil: addDays(checkIn, -7), expiresAt: new Date(Date.now() + HOLD).toISOString(), ...catalogueFacts(h.key),
   }));
 }
 

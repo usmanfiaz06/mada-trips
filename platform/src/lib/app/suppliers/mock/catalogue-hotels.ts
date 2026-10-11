@@ -1,4 +1,4 @@
-import { CATALOGUE_HOTELS, DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, sarToHalalas, staySar } from "@mada/shared";
+import { CATALOGUE_HOTELS, DESTINATIONS, catalogueFacts, HotelSearch as HotelSearchSchema, addDays, sarToHalalas, staySar } from "@mada/shared";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 
 /*
@@ -23,7 +23,7 @@ function offer(d: Decoded): BookingHotelOffer {
     note: h.note, rating: h.rating, nightly: { amount: Math.round(total / d.nights), currency: "SAR" }, total: { amount: total, currency: "SAR" },
     nights: d.nights, rooms, cancellation: "Free to cancel until 7 days before. After that, the first night.", freeCancelUntil: addDays(d.checkIn, -7),
     cancelFee: sarToHalalas(staySar(h.nightSar, 1, d.adults)), imageUrl: null, expiresAt: new Date(Date.now() + 20 * 60_000).toISOString(),
-    meta: { photo: h.photo, focal: h.focal, noteOne: h.noteSmall.one, noteTwo: h.noteSmall.two, label: h.label === "best" ? "best" : h.label === "quiet" ? "quiet" : "water" },
+    meta: { photo: h.photo, focal: h.focal, noteOne: h.noteSmall.one, noteTwo: h.noteSmall.two, label: h.label === "best" ? "best" : h.label === "quiet" ? "quiet" : "water", ...catalogueFacts(h.key) },
   };
 }
 

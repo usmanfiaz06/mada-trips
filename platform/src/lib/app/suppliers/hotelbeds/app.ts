@@ -10,7 +10,7 @@ import { AppError } from "../../http";
 import { callSupplier, supplierDown } from "../../resilience/breaker";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 import { HotelbedsClient, HotelbedsError, hotelbedsCredentials, hotelbedsEnv, type HotelbedsProduct } from "./client";
-import { HotelbedsHotels, type FactsLookup, type HotelFacts } from "./hotels";
+import { HotelbedsHotels, amenitiesOf, type FactsLookup, type HotelFacts } from "./hotels";
 import { HotelbedsTransfers } from "./transfers";
 import { mockHotelbedsHotels, mockHotelbedsTransfers } from "./mock";
 
@@ -111,6 +111,8 @@ export const dbFacts: FactsLookup = async (codes) => {
       out.set(r.code, {
         code: r.code, name: r.name, address: [r.address, r.city ? r.city.charAt(0) + r.city.slice(1).toLowerCase() : null].filter(Boolean).join(", ") || null,
         imageUrl: r.images[0] ? imageUrl(r.images[0].path) : null, phone: r.phone, latitude: r.latitude, longitude: r.longitude,
+        // What the facilities and the description show; a hotel with neither stored says nothing ("can't tell").
+        ...(r.facilities.length || r.description ? amenitiesOf(r.facilities.map((x) => x.name ?? "").filter(Boolean), r.description) : {}),
       });
     }
   } catch { /* the content table isn't there yet: names from availability */ }
@@ -150,7 +152,8 @@ async function storedOffer(supplierOfferId: string): Promise<BookingHotelOffer |
     nightly: { amount: Math.round(s.total.amount / Math.max(1, s.nights)), currency: "SAR" }, total: s.total, nights: s.nights, rooms: s.rooms,
     cancellation: s.cancellation, freeCancelUntil: s.freeCancelUntil, cancelFee: null, imageUrl: s.hotel?.imageUrl ?? null, expiresAt: s.expiresAt,
     meta: { photo: s.photo, focal: s.focal, noteOne: s.note, noteTwo: s.note, label, hotelCode: s.hotel?.code, imageUrl: s.hotel?.imageUrl ?? null, category: s.hotel?.category ?? null,
-      rateCommentsId: s.hotel?.rateCommentsId ?? null, rateComments: s.hotel?.rateComments ?? null, room: s.hotel?.room ?? null, board: s.hotel?.board ?? null },
+      rateCommentsId: s.hotel?.rateCommentsId ?? null, rateComments: s.hotel?.rateComments ?? null, room: s.hotel?.room ?? null, board: s.hotel?.board ?? null,
+      facts: s.facts ?? null, score: s.score, badge: s.badge ?? null },
   };
 }
 
@@ -161,5 +164,6 @@ export function bookingHotelbeds(): BookingHotelSupplier {
     name: "hotelbeds",
     async search(q) { try { return await inner.search(q); } catch (e) { throw toAppError(e); } },
     async price(id): Promise<BookingHotelOffer> { try { return await inner.price(id, await storedOffer(id)); } catch (e) { throw toAppError(e); } },
+    async rooms(id) { try { return await inner.rooms(id); } catch (e) { throw toAppError(e); } },
   };
 }

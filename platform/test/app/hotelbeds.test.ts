@@ -20,6 +20,7 @@ import { clearSearchCache } from "@/lib/app/booking/search";
 import { clearTransferCache } from "@/lib/app/transfers/service";
 import { POST as searchStays } from "@/app/api/app/v1/search/stays/route";
 import { POST as previewPost } from "@/app/api/app/v1/orders/preview/route";
+import { GET as roomsGet } from "@/app/api/app/v1/offers/[id]/rooms/route";
 import { POST as ordersPost } from "@/app/api/app/v1/orders/route";
 import { POST as peoplePost, GET as peopleGet } from "@/app/api/app/v1/people/route";
 import { POST as cardsPost } from "@/app/api/app/v1/cards/route";
@@ -176,9 +177,16 @@ describe("Hotelbeds hotels: requests and mapping", () => {
     expect(byName["TAKSIM CITY ROOMS"]!.total.amount).toBe(175_300);
     // Bosphorus: the AT_HOTEL rate is never sold; net 880 × 4 × 1.1 = 3,872 but the hotel's own price 1,049 × 4 = 4,196 stands.
     expect(byName["BOSPHORUS VIEW HOTEL"]!.total.amount).toBe(419_600);
-    // Cheapest first is "lowest"; the highest category of the rest leads as "best".
-    expect(offers[0]).toMatchObject({ name: "BOSPHORUS VIEW HOTEL", label: "best" });
-    expect(offers[1]).toMatchObject({ name: "TAKSIM CITY ROOMS", label: "lowest" });
+    // Ranked by fit (stars, value, where it is); exactly one "Best for you" (3 stars and up) and one "Lowest price".
+    const scores = offers.map((o) => o.meta!.score!);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(offers.filter((o) => o.meta!.badge === "best")).toHaveLength(1);
+    expect(offers.filter((o) => o.meta!.badge === "lowest")).toHaveLength(1);
+    const cheapest = [...offers].sort((a, b) => a.total.amount - b.total.amount)[0]!;
+    expect(cheapest).toMatchObject({ name: "TAKSIM CITY ROOMS", label: "lowest", meta: { badge: "lowest" } });
+    expect(offers.find((o) => o.meta!.badge === "best")!.meta!.facts!.stars).toBeGreaterThanOrEqual(3);
+    // The card's facts in structure: the app writes them in the traveller's language.
+    expect(byName["GALATA TOWER SUITES"]!.meta!.facts).toMatchObject({ board: "RO", refundable: false, room: "Double standard" });
     // Galata's cheapest is its non-refundable room-only rate.
     expect(byName["GALATA TOWER SUITES"]).toMatchObject({ note: "Double standard. Room only.", cancellation: "Not refundable once booked.", freeCancelUntil: null });
     // Its breakfast rate carries a city tax payable at the hotel: said in riyals.
@@ -267,7 +275,9 @@ describe("stays from Hotelbeds in the app", () => {
     const people = (await get(peopleGet, me.token)).json.people as { id: string }[];
     const s = await hotelbedsStays(me.token, people.map((p) => p.id));
     expect(s.outcome).toBe("ok");
-    expect(s.options[0]!.hotel).toMatchObject({ supplier: "hotelbeds", code: 99703 });
+    expect(s.options[0]!.hotel).toMatchObject({ supplier: "hotelbeds" });
+    expect(s.options.map((o) => o.hotel?.code)).toContain(99703);
+    expect(s.options.filter((o) => o.badge === "best")).toHaveLength(1);
     // Every option is stored (in one insert) under the id the app sees, with the option itself as the payload.
     const rows = await db.select().from(appOffers).where(inArray(appOffers.id, s.options.map((o) => o.id)));
     expect(rows).toHaveLength(s.options.length);
@@ -283,6 +293,14 @@ describe("stays from Hotelbeds in the app", () => {
     const p2 = PreviewResponse.parse((await post(previewPost, me.token, { draft: { kind: "stay", stayOfferId: recheck.id, travellerIds: people.map((p) => p.id) }, useCredit: false })).json).preview;
     expect(mockHotelbedsState().calls.filter((c) => c.path.endsWith("/checkrates"))).toHaveLength(1);
     expect(p2.rule).toMatch(/From the hotel: Check-in hour 14:00/);
+    // The order sheet repeats the stay's facts so the app says them plainly (free until, tax at the hotel, the hotel's notes).
+    expect(p1.stay).toMatchObject({ name: "TAKSIM CITY ROOMS", checkIn: bookable.checkIn, essentials: expect.stringMatching(/Check-in from 14:00/) });
+    // Hotel details: every room of the hotel for the same stay, each an offer the order sheet takes.
+    const rooms = await roomsGet(new Request(`http://t/api/app/v1/offers/${bookable.id}/rooms`, { headers: { authorization: `Bearer ${me.token}` } }), { params: Promise.resolve({ id: bookable.id }) });
+    const r = (await rooms.json()) as { options: { id: string; name: string; total: { amount: number } }[] };
+    expect(rooms.status).toBe(200);
+    expect(r.options[0]!.id).toBe(bookable.id);
+    expect(r.options.every((o) => o.name === "TAKSIM CITY ROOMS")).toBe(true);
     // Shown once more: no second checkrates while the offer is held.
     await post(previewPost, me.token, { draft: { kind: "stay", stayOfferId: recheck.id, travellerIds: people.map((p) => p.id) }, useCredit: false });
     expect(mockHotelbedsState().calls.filter((c) => c.path.endsWith("/checkrates"))).toHaveLength(1);

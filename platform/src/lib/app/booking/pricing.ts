@@ -48,6 +48,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   let agent = true;
   let hold: Date | null = null;
   let travellers: Person[] = [];
+  let stayFacts: OrderPreview["stay"] = null;
   let place = "";
   let kind: OrderPreview["kind"] = d.kind;
   const offerRows: OfferRow[] = [];
@@ -98,6 +99,10 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     lines = [line("stay", "stay", t("pay.line.hotel", { rooms: s.roomsLabel, dates: rangeLabel(s.checkIn, end), count: s.nights }), s.total.amount)];
     // A Hotelbeds room carries the hotel's own rule (worked out from its cancellation policies); the catalogue uses ours.
     rule = row.supplier === "hotelbeds" ? hotelbedsRule(s) : t("pay.rule.stay", { date: freeUntilLabel(s.checkIn) });
+    stayFacts = {
+      name: s.name, checkIn: s.checkIn, nights: s.nights, freeCancelUntil: s.freeCancelUntil, refundable: s.facts ? s.facts.refundable : !!s.freeCancelUntil,
+      payAtHotel: s.facts?.payAtHotel ? money(s.facts.payAtHotel) : null, essentials: s.hotel?.rateComments?.trim() || null, facts: s.facts ?? null,
+    };
     title = s.name;
     photo = s.photo;
     place = DESTINATIONS[(row.search as { destination: string }).destination]?.name ?? "";
@@ -207,6 +212,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id),
     missingPassports: kind === "trip" || kind === "package" ? missing : [],
+    stay: stayFacts,
   };
   return { preview, snapshot, travellers, offerRows, place };
 }

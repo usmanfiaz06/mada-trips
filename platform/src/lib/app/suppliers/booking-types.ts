@@ -1,4 +1,4 @@
-import type { FlightOffer, HotelOffer, Person } from "@mada/shared";
+import type { FlightOffer, HotelOffer, Person, StayFacts } from "@mada/shared";
 import type { FlightSupplier, HotelSupplier, PaymentResult, PaymentSupplier } from "./types";
 
 /*
@@ -19,10 +19,14 @@ export type BookingHotelOffer = HotelOffer & { meta?: {
   photo: string; focal: string; noteOne: string; noteTwo: string; label: "best" | "quiet" | "water" | "lowest";
   // Hotelbeds rooms (suppliers/hotelbeds/hotels.ts).
   hotelCode?: number; imageUrl?: string | null; category?: string | null; rateCommentsId?: string | null; rateComments?: string | null; room?: string | null; board?: string | null;
+  /** Structured facts (the app writes the card from them), the fit score and at most one badge each per list. */
+  facts?: StayFacts | null; score?: number; badge?: "best" | "lowest" | null;
 } };
 export interface BookingHotelSupplier extends HotelSupplier {
   search(q: Parameters<HotelSupplier["search"]>[0]): Promise<BookingHotelOffer[]>;
   price(offerId: string): Promise<BookingHotelOffer>;
+  /** Every room the hotel has for this stay and party (Hotelbeds); suppliers without a choice of rooms leave it out. */
+  rooms?(offerId: string): Promise<BookingHotelOffer[]>;
 }
 
 /** MyFatoorah-shaped: authorise (maybe 3-D Secure first), capture on issue, void on failure, refund. */

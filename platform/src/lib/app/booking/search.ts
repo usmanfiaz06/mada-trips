@@ -120,6 +120,7 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
     rating: h.rating ? h.rating.toFixed(1) : "", photo: h.meta?.photo ?? "hotel-room", focal: h.meta?.focal ?? "50% 50%",
     checkIn, nights: h.nights, rooms: roomsFor(n), roomsLabel: roomsLabel(n), total: money(h.total.amount), cancellation: h.cancellation,
     freeCancelUntil: h.freeCancelUntil, expiresAt: h.expiresAt,
+    ...(h.meta?.facts ? { facts: h.meta.facts, badge: h.meta.badge ?? null, score: h.meta.score ?? 0 } : {}),
     ...(h.meta?.hotelCode ? { hotel: { code: h.meta.hotelCode, category: h.meta.category ?? null, imageUrl: h.meta.imageUrl ?? null, room: h.meta.room ?? null, board: h.meta.board ?? null, rateComments: h.meta.rateComments ?? null, rateCommentsId: h.meta.rateCommentsId ?? null, supplier: "hotelbeds" as const } } : {}),
   };
 }
@@ -147,6 +148,29 @@ export async function searchStays(ownerId: string, input: StaySearchRequest, dem
 }
 
 export type OfferRow = typeof appOffers.$inferSelect;
+
+/**
+ * The rooms of the hotel in a stay offer, for its details screen: priced now for the same stay and party, each stored
+ * as an offer the order sheet can take. Suppliers without a choice of rooms answer with the offer itself.
+ */
+export async function stayRooms(ownerId: string, id: string): Promise<StayOption[]> {
+  const row = await ownOffer(ownerId, id);
+  if (row.kind !== "stay") throw new AppError("NOT_FOUND");
+  const shown = row.payload as unknown as StayOption;
+  const supplier = bookingSuppliers.hotels();
+  if (row.supplier !== "hotelbeds" || !supplier.rooms) return [shown];
+  const search = row.search as { travellerIds?: string[]; checkIn?: string };
+  const n = search.travellerIds?.length ?? 1;
+  const offers = await supplier.rooms(row.supplierOfferId);
+  if (!offers.length) return [shown];
+  const expiresAt = holdEnds();
+  const options = offers.map((h) => ({ ...stayOptionOf(h, h.id === row.supplierOfferId ? row.id : randomUUID(), n, search.checkIn ?? shown.checkIn), badge: null, expiresAt: expiresAt.toISOString() }));
+  const fresh = offers.map((h, i) => ({ h, o: options[i]! })).filter(({ h }) => h.id !== row.supplierOfferId);
+  if (fresh.length) await storeOffers(fresh.map(({ h, o }) => ({ id: o.id, ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search: row.search as Record<string, unknown>, payload: o as unknown as Record<string, unknown>, total: o.total.amount, expiresAt })));
+  // The room the traveller tapped stays first when it's still there, as it was shown.
+  const same = options.find((o) => o.id === row.id);
+  return same ? [shown, ...options.filter((o) => o !== same)] : options;
+}
 
 export async function ownOffer(ownerId: string, id: string): Promise<OfferRow> {
   if (!isUuid(id)) throw new AppError("NOT_FOUND");

@@ -1,4 +1,4 @@
-import { DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, roomsFor, shortDay, t, type HotelSearch } from "@mada/shared";
+import { CITY_CENTRES, DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, kmApart, roomsFor, shortDay, t, type HotelSearch, type StayAmenity, type StayFacts, type StayView } from "@mada/shared";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 import { HotelbedsClient, HotelbedsError, type HotelbedsClientOptions } from "./client";
 import { costHalalas, feeHalalas, pricingRules, sellHalalas, type PricingRules } from "./money";
@@ -55,7 +55,40 @@ export type HbContentHotel = {
 export type HbContentResponse = { auditData?: unknown; from?: number; to?: number; total?: number; hotels?: HbContentHotel[] };
 
 /** Static facts the offers use when we have them (content.ts reads them from our database). */
-export type HotelFacts = { code: number; name: string; address: string | null; imageUrl: string | null; phone: string | null; latitude: number | null; longitude: number | null };
+export type HotelFacts = {
+  code: number; name: string; address: string | null; imageUrl: string | null; phone: string | null; latitude: number | null; longitude: number | null;
+  /** From the stored content: what the facilities and description show (amenitiesOf). Absent when we hold no content. */
+  amenities?: StayAmenity[]; views?: StayView[]; quiet?: boolean;
+};
+
+/* ───────────── what the content shows ───────────── */
+
+const AMENITY_RULES: [StayAmenity, RegExp][] = [
+  ["pool", /\b(?:swimming )?pools?\b/i], ["beach", /\bbeach\b(?! towels?)|beachfront|private beach/i], ["kidsClub", /kids'? ?club|children'?s club|mini ?club|playground|children'?s (?:play|pool)|kids'? (?:area|pool)/i],
+  ["gym", /\bgym\b|fitness/i], ["spa", /\bspa\b|sauna|massage|hammam|turkish bath/i], ["parking", /parking|car park|garage/i],
+  ["connecting", /connecting rooms?|interconnecting/i], ["accessible", /wheelchair|accessible|adapted rooms?|disabled/i], ["familyRooms", /family rooms?|family suites?/i], ["wifi", /wi-?fi|wireless internet/i],
+];
+const VIEW_RULES: [StayView, RegExp][] = [
+  ["burj", /(?:view|views|overlook\w*) (?:of|over|onto) (?:the )?burj|burj (?:khalifa )?views?/i], ["haram", /(?:haram|kaaba|holy mosque) views?|views? (?:of|over|onto) (?:the )?(?:haram|kaaba|holy mosque)|overlooking the (?:haram|kaaba)/i],
+  ["sea", /sea[- ]?views?|ocean[- ]?views?|views? (?:of|over) the (?:sea|ocean|gulf|bosphorus)|overlooking the (?:sea|ocean|gulf|bosphorus)|bosphorus views?|sea[- ]facing/i],
+  ["beach", /beach views?|views? (?:of|over) the beach/i], ["city", /city views?|skyline views?|views? (?:of|over) the (?:city|skyline)/i],
+];
+
+/** The amenities, views and calm a hotel's own content shows (facility names and description). Nothing is guessed. */
+export function amenitiesOf(facilityNames: string[], description: string | null): { amenities: StayAmenity[]; views: StayView[]; quiet: boolean } {
+  const text = `${facilityNames.join(" | ")} | ${description ?? ""}`;
+  return {
+    amenities: AMENITY_RULES.filter(([, re]) => re.test(text)).map(([k]) => k),
+    views: VIEW_RULES.filter(([, re]) => re.test(text)).map(([k]) => k),
+    quiet: /\b(?:quiet|peaceful|tranquil|calm|serene)\b/i.test(description ?? ""),
+  };
+}
+
+/** Views a hotel's rooms say in their names ("Deluxe sea view"). */
+export function roomViews(h: HbHotel): StayView[] {
+  const names = (h.rooms ?? []).map((r) => r.name).join(" | ");
+  return VIEW_RULES.filter(([, re]) => re.test(names)).map(([k]) => k).concat(/\bsea\b|ocean/i.test(names) && /view/i.test(names) ? ["sea" as StayView] : []).filter((v, i, a) => a.indexOf(v) === i);
+}
 export type FactsLookup = (codes: number[]) => Promise<Map<number, HotelFacts>>;
 
 /* ───────────── where to search ───────────── */
@@ -241,6 +274,23 @@ export function bestRate(h: HbHotel, rooms: number): { room: HbRoom; rate: HbRat
   return best;
 }
 
+const BOARD_CODES = new Set(["RO", "BB", "HB", "FB", "AI"]);
+const boardOf = (r: HbRate): StayFacts["board"] => {
+  const c = (r.boardCode ?? "").toUpperCase();
+  if (BOARD_CODES.has(c)) return c as StayFacts["board"];
+  const n = (r.boardName ?? "").toLowerCase();
+  if (!n) return null;
+  if (/all inclusive/.test(n)) return "AI";
+  if (/full board/.test(n)) return "FB";
+  if (/half board/.test(n)) return "HB";
+  if (/breakfast/.test(n)) return "BB";
+  if (/room only|no meals/.test(n)) return "RO";
+  return "other";
+};
+/** Promotions that only restate the rate's rules ("Non-refundable rate. No amendments permitted.") add nothing to say. */
+const RULE_PROMO = /non[- ]?refundable|no amendments|no changes|no refund/i;
+const tidy = (x: string) => x.replace(/\s+/g, " ").replace(/\s+([.,)])/g, "$1").trim().replace(/[ .]+$/, "");
+
 export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): BookingHotelOffer {
   const rules = o.rules ?? pricingRules();
   const floor = rate.hotelMandatory && rate.sellingRate ? Number(rate.sellingRate) : null;
@@ -249,9 +299,20 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
   const f = o.facts?.get(h.code);
   const cityTax = payAtHotel(rate, rules);
   const stars = Number((h.categoryCode ?? "").match(/^(\d)/)?.[1] ?? 0);
-  // Promotions can carry extras (cert. 2.7): their names go on the card.
-  const promos = [...(rate.promotions ?? []).map((p) => p.name ?? p.code), ...(rate.offers ?? []).map((p) => p.name ?? p.code)].filter(Boolean);
-  const note = [room.name ? room.name.toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) + "." : "", boardNote(rate), promos.length ? t("hb.note.promo", { names: promos.join(", ") }) : "", cityTax ? t("hb.note.cityTax", { amount: Math.ceil(cityTax / 100).toLocaleString("en-US") }) : ""].filter(Boolean).join(" ");
+  // Promotions can carry extras (cert. 2.7): a real extra goes on the card; one that only restates the rules doesn't.
+  const promos = [...(rate.promotions ?? []).map((p) => p.name ?? p.code), ...(rate.offers ?? []).map((p) => p.name ?? p.code)].filter((x): x is string => !!x && !RULE_PROMO.test(x));
+  const deal = promos.some((p) => /discount|offer|deal|special/i.test(p));
+  const extras = promos.filter((p) => !/discount|offer|deal|special/i.test(p));
+  const roomName = room.name ? tidy(room.name).toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : "";
+  const note = [roomName ? `${roomName}.` : "", boardNote(rate), extras.length ? t("hb.note.promo", { names: extras.join(", ") }) : "", cityTax ? t("hb.note.cityTax", { amount: Math.ceil(cityTax / 100).toLocaleString("en-US") }) : ""].filter(Boolean).join(" ");
+  const lat = f?.latitude ?? (h.latitude ? Number(h.latitude) : null);
+  const lng = f?.longitude ?? (h.longitude ? Number(h.longitude) : null);
+  const views = [...new Set([...(f?.views ?? []), ...roomViews(h)])];
+  const facts: StayFacts = {
+    stars: stars || null, apartment: /apart|key/i.test(h.categoryName ?? ""), board: boardOf(rate), room: roomName || null, refundable: rule.refundable,
+    payAtHotel: cityTax || null, zone: h.zoneName ? tidy(h.zoneName) : null, lat: Number.isFinite(lat) ? lat : null, lng: Number.isFinite(lng) ? lng : null,
+    content: !!f?.amenities, amenities: f?.amenities ?? [], views, quiet: !!f?.quiet, deal,
+  };
   return {
     id: encodeOfferId(rate.rateKey, rate.rateType, o.party), supplier: "hotelbeds", label: "best",
     name: f?.name || h.name, area: [h.zoneName, stars ? t("hb.stars", { n: stars }) : null].filter(Boolean).join(" · "),
@@ -259,34 +320,57 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
     nightly: { amount: Math.round(total / o.nights), currency: "SAR" }, total: { amount: total, currency: "SAR" }, nights: o.nights, rooms: o.rooms,
     cancellation: rule.cancellation, freeCancelUntil: rule.freeCancelUntil, cancelFee: rule.cancelFee, imageUrl: f?.imageUrl ?? null,
     expiresAt: new Date((o.now ?? new Date()).getTime() + (o.expiresInMs ?? 20 * 60_000)).toISOString(),
-    meta: { photo: "hotel-room", focal: "50% 50%", noteOne: note, noteTwo: note, label: "best", hotelCode: h.code, imageUrl: f?.imageUrl ?? null, category: h.categoryName ?? null, rateCommentsId: rate.rateCommentsId ?? null, room: room.name, board: rate.boardName ?? rate.boardCode ?? null },
+    meta: { photo: "hotel-room", focal: "50% 50%", noteOne: note, noteTwo: note, label: "best", hotelCode: h.code, imageUrl: f?.imageUrl ?? null, category: h.categoryName ?? null, rateCommentsId: rate.rateCommentsId ?? null, room: room.name, board: rate.boardName ?? rate.boardCode ?? null, facts },
   };
 }
 
-/** The offers the app shows: one rate per hotel, cheapest first, the best-rated of the rest labelled "best". */
+/**
+ * How well a stay fits, 0–100: its stars (a 1-star room is rarely what a Mada traveller wants), its price against the
+ * others (value), where it is (from the city centre), and a little for free cancellation and breakfast.
+ */
+export function fitScore(x: { stars: number; total: number; km: number | null; refundable: boolean; breakfast: boolean }, prices: { min: number; median: number }, radiusKm: number): number {
+  const star = x.stars ? Math.min(1, Math.max(0, (x.stars - 1) / 4)) : 0.35;
+  const spread = Math.max(1, prices.median * 1.6 - prices.min);
+  const price = Math.min(1, Math.max(0, 1 - (x.total - prices.min) / spread));
+  const where = x.km == null ? 0.4 : Math.max(0, 1 - x.km / Math.max(2, radiusKm));
+  return Math.round(100 * (0.4 * star + 0.33 * price + 0.2 * where + (x.refundable ? 0.04 : 0) + (x.breakfast ? 0.03 : 0)));
+}
+
 /** How many hotels the app lists (HOTELBEDS_MAX_RESULTS; a certification staging shows them all, e.g. 200). */
 export const maxResults = () => { const n = Number(process.env.HOTELBEDS_MAX_RESULTS ?? 8); return Number.isInteger(n) && n > 0 ? Math.min(n, 500) : 8; };
 
-export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number }): BookingHotelOffer[] {
-  const picked: { offer: BookingHotelOffer; stars: number }[] = [];
+/**
+ * The offers the app shows: one rate per hotel, in the order that fits best (fitScore), with exactly one "Best for
+ * you" (the best fit at 3 stars and up) and one "Lowest price" (the cheapest); the rest carry no badge.
+ */
+export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number; city?: string | null }): BookingHotelOffer[] {
+  const picked: BookingHotelOffer[] = [];
   for (const h of res.hotels?.hotels ?? []) {
     const b = bestRate(h, o.rooms);
     if (!b) continue;
-    try {
-      picked.push({ offer: offerOf(h, b.room, b.rate, o), stars: Number((h.categoryCode ?? "").match(/^(\d)/)?.[1] ?? 0) });
-    } catch { /* a currency we can't price: skip that hotel rather than guess */ }
+    try { picked.push(offerOf(h, b.room, b.rate, o)); } catch { /* a currency we can't price: skip that hotel rather than guess */ }
   }
-  picked.sort((a, b) => a.offer.total.amount - b.offer.total.amount);
+  if (!picked.length) return [];
+  // The cheapest (by total) are kept when there are more than we show, then ranked by fit.
+  picked.sort((a, b) => a.total.amount - b.total.amount);
   const list = picked.slice(0, o.limit ?? maxResults());
-  if (!list.length) return [];
-  // "lowest" is the cheapest; "best" is the highest category among the rest (ties: cheaper first).
-  const lowest = list[0]!;
-  const rest = list.slice(1);
-  const best = [...rest].sort((a, b) => b.stars - a.stars || a.offer.total.amount - b.offer.total.amount)[0];
-  const ordered = best ? [best, lowest, ...rest.filter((x) => x !== best)] : [lowest];
-  return ordered.map((x) => {
-    const label = x === lowest && best ? "lowest" : "best";
-    return { ...x.offer, label, meta: { ...x.offer.meta!, label } };
+  const totals = list.map((x) => x.total.amount);
+  const prices = { min: totals[0]!, median: totals[Math.floor(totals.length / 2)]! };
+  const centre = o.city ? CITY_CENTRES[o.city] : undefined;
+  const place = o.city ? HB_PLACES[o.city] : undefined;
+  const scored = list.map((x) => {
+    const f = x.meta!.facts!;
+    const km = centre && f.lat != null && f.lng != null ? kmApart(centre, { lat: f.lat, lng: f.lng }) : null;
+    return { x, score: fitScore({ stars: f.stars ?? 0, total: x.total.amount, km, refundable: f.refundable, breakfast: ["BB", "HB", "FB", "AI"].includes(f.board ?? "") }, prices, place?.radiusKm ?? 8) };
+  });
+  scored.sort((a, b) => b.score - a.score || a.x.total.amount - b.x.total.amount);
+  const lowest = scored.reduce((m, y) => (y.x.total.amount < m.x.total.amount ? y : m));
+  const best = scored.find((y) => (y.x.meta!.facts!.stars ?? 0) >= 3 && y !== lowest) ?? scored.find((y) => y !== lowest) ?? null;
+  return scored.map((y) => {
+    const badge = y === best ? "best" : y === lowest ? "lowest" : null;
+    // label stays for apps from before badges: the cheapest says so, everything else as before.
+    const label = y === lowest ? "lowest" : "best";
+    return { ...y.x, label, meta: { ...y.x.meta!, label, score: y.score, badge } };
   });
 }
 
@@ -399,7 +483,32 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     }, SEARCH_BUDGET);
     const codes = (res.hotels?.hotels ?? []).map((h) => h.code);
     const facts = this.facts && codes.length ? await this.facts(codes).catch(() => undefined) : undefined;
-    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts });
+    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts, city: dest!.key });
+  }
+
+  /** Every room the hotel has for the same stay and party: one per room, board and refundability, cheapest first. */
+  async rooms(offerId: string): Promise<BookingHotelOffer[]> {
+    const d = decodeOfferId(offerId);
+    const key = d ? parseRateKey(d.rateKey) : null;
+    if (!d || !key) return [];
+    const rooms = roomsFor(d.party);
+    const res = await this.availability({ checkIn: key.checkIn, checkOut: key.checkOut, rooms: splitParty(d.party, [], rooms), hotelCodes: [key.hotelCode] }, SEARCH_BUDGET);
+    const h = res.hotels?.hotels?.[0];
+    if (!h) return [];
+    const facts = this.facts ? await this.facts([h.code]).catch(() => undefined) : undefined;
+    const nights = Math.max(1, Math.round((Date.parse(key.checkOut) - Date.parse(key.checkIn)) / 86_400_000));
+    const seen = new Map<string, BookingHotelOffer>();
+    for (const room of h.rooms ?? []) {
+      for (const rate of room.rates ?? []) {
+        if ((rate.paymentType && rate.paymentType !== "AT_WEB") || rate.packaging || (rate.rooms && rate.rooms !== rooms)) continue;
+        let o: BookingHotelOffer;
+        try { o = offerOf(h, room, rate, { nights, party: d.party, rooms, checkIn: key.checkIn, facts }); } catch { continue; }
+        const k = `${room.code}|${o.meta?.facts?.board}|${o.meta?.facts?.refundable}`;
+        const was = seen.get(k);
+        if (!was || o.total.amount < was.total.amount) seen.set(k, o);
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.total.amount - b.total.amount).slice(0, 12);
   }
 
   /**
