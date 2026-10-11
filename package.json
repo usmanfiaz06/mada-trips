@@ -22,7 +22,8 @@
     "setup": "npm install && npm --prefix platform ci",
     "app:preflight": "npm --prefix platform run app:preflight",
     "app:jobs": "npm --prefix platform run app:jobs --",
-    "hotelbeds:smoke": "npm --prefix platform run hotelbeds:smoke --"
+    "hotelbeds:smoke": "npm --prefix platform run hotelbeds:smoke --",
+    "adsb:coverage": "node platform/scripts/check-adsb-coverage.mjs"
   },
   "devDependencies": {
     "eslint": "9.39.5",
