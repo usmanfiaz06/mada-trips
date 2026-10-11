@@ -26,3 +26,4 @@ export * from './review';
 export * from './transfers';
 export * from './activities-data';
 export * from './directions';
+export * from './ask-arabic';

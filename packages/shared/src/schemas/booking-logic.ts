@@ -5,6 +5,7 @@
  */
 import { t, tn, type CopyKey } from '../copy';
 import { localizeDigits, type Lang } from '../locale';
+import { arabicForRules } from './ask-arabic';
 import { commaList, wordFor } from './booking-words';
 import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
 import { formatSar, sarToHalalas } from '../money';
@@ -79,7 +80,7 @@ export const personName = (p: Pick<Person, 'firstName' | 'isSelf'> | undefined |
 /* ───────────── reading what people type ───────────── */
 
 const FLIGHT_WORDS = /\b(flights?|fly|flying|plane|one[- ]?way|round[- ]?trip|return ticket|business class|economy|first class|premium economy|airfare|tickets? to)\b/;
-const STAY_WORDS = /\b(hotels?|rooms?|apartment|villa|resort|somewhere to stay|place to stay|a stay)\b/;
+const STAY_WORDS = /\b(hotels?|rooms?|apartments?|villas?|resorts?|suites?|chalets?|stays?|accommodations?|lodging|airbnb|somewhere to stay|places? to stay|where to stay|a stay)\b/;
 const PLAN_WORDS = /\b(itinerary|plan (a|my|the)|days in|weekend in|day trip|what to do in)\b/;
 
 /** An outing by name: "Boulevard World at night", "Riyadh Season", a concert, a match. A thing to do, priced per person. */
@@ -277,7 +278,9 @@ export function prefillAnswers(kind: string, text: string): Record<string, strin
 export type RuleIntent = ParsedDetails & ParsedWho & { kind: AskKindValue; needs: Record<string, NeedKey[]>; needsMentioned: NeedKey[]; answers: Record<string, string[]>; ask: 'where' | 'when' | 'return' | 'who' | null };
 
 /** The deterministic parser: the whole of what Ask understands in mock mode. */
-export function parseAskRules(text: string, ctx: { today: string; people: Person[] }): RuleIntent {
+export function parseAskRules(typed: string, ctx: { today: string; people: Person[] }): RuleIntent {
+  // Arabic is read by the same rules: the words they need are put in English first (ask-arabic.ts).
+  const text = arabicForRules(typed);
   const kind = parseKind(text);
   const d = parseDetails(text, ctx.today);
   const w = parseWho(text, ctx.people, ctx.today);
