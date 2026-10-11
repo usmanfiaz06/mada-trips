@@ -7,7 +7,7 @@ import {
 } from '@mada/shared';
 import { z } from 'zod';
 import { ApiError, request } from './api';
-import { API_MODE } from './config';
+import { API_MODE, SHOW_DEMO_HINTS } from './config';
 import { t } from './i18n';
 import { useSession } from './session';
 import { toast } from './toast';
@@ -26,11 +26,12 @@ export const useDemo = create<DemoState>((set) => ({
   toggle: (f) => set((s) => { const on = new Set(s.on); if (on.has(f)) on.delete(f); else on.add(f); return { on }; }),
   set: (f, v) => set((s) => { const on = new Set(s.on); if (v) on.add(f); else on.delete(f); return { on }; }),
 }));
-export const demoOn = (f: DemoFlag) => useDemo.getState().on.has(f);
+/** Demo switches only do anything where the demo hints are on (mock, dev and staging builds), never in production. */
+export const demoOn = (f: DemoFlag) => SHOW_DEMO_HINTS && useDemo.getState().on.has(f);
 
 /** The switches that matter to the server, as a query string. */
 function q(path: string): string {
-  const flags = [...useDemo.getState().on].filter((f) => f !== 'offline' && f !== 'faceIdFails');
+  const flags = SHOW_DEMO_HINTS ? [...useDemo.getState().on].filter((f) => f !== 'offline' && f !== 'faceIdFails') : [];
   return flags.length ? `${path}${path.includes('?') ? '&' : '?'}demo=${flags.join(',')}` : path;
 }
 
@@ -64,7 +65,8 @@ export const bookingApi = {
   preview: (b: PreviewBody) => call('POST', '/orders/preview', PreviewResponse, b),
   createOrder: (b: CreateOrderBody) => call('POST', '/orders', CreateOrderResponse, b, b.idempotencyKey),
   order: (id: string) => request({ method: 'GET', path: `/orders/${id}` }, OrderResponse),
-  activeOrders: () => request({ method: 'GET', path: '/orders' }, OrdersResponse),
+  // A guest has no orders: don't ask (the server answers 401, which only fills the console).
+  activeOrders: () => (useSession.getState().status === 'signedIn' ? request({ method: 'GET', path: '/orders' }, OrdersResponse) : Promise.resolve({ orders: [] })),
   otp: (id: string, code: string) => call('POST', `/orders/${id}/3ds`, OrderResponse, { code }),
   answer: (id: string, answer: 'yes' | 'call' | 'accept_fare' | 'stop' | 'retry_by_phone' | 'cancel') => call('POST', `/orders/${id}/answer`, OrderResponse, { answer }),
 };

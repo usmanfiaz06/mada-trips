@@ -600,10 +600,25 @@ export function resetBookingMock() { offers.clear(); requests.clear(); orders.cl
  */
 export function askRequestViews(userId: string): TripRequestView[] {
   const status: Record<string, TripRequestView['status']> = { queued: 'queued', sent: 'sent', reviewing: 'reviewing', quoted: 'quoted', paid: 'with_agent', done: 'done', cancelled: 'cancelled' };
-  return [...requests.values()].filter((r) => r.owner === userId && r.view.kind !== 'package').map((r) => ({
+  const asked: TripRequestView[] = [...requests.values()].filter((r) => r.owner === userId && r.view.kind !== 'package').map((r) => ({
     id: r.id, tripId: null, kind: r.view.kind, area: 'other' as const, status: status[r.view.status] ?? 'sent', title: r.view.title, short: null, detail: r.view.summary || r.view.detail || null,
     withWhom: 'faisal' as const, withName: r.view.agent?.name ?? null, outcome: null, alt: null, yesText: null,
     quote: r.view.quote && r.view.quote.status === 'open' ? r.view.quote.total : null, quoteText: r.view.quote?.lead ?? r.view.quote?.text ?? null,
     createdAt: r.view.createdAt, updatedAt: r.view.updatedAt,
+  }));
+  return [...asked, ...stuckOrderViews(userId)];
+}
+
+/**
+ * A booking that stopped for the traveller (tickets that didn't issue, a new fare, a question) is a request on Trips
+ * until it's answered, as the server's booking desk writes it (details.order): it opens the order.
+ */
+const orderRequestIds = new Map<string, string>();
+function stuckOrderViews(userId: string): TripRequestView[] {
+  return [...orders.values()].filter((o) => o.owner === userId && ['ticketing_failed', 'fare_changed', 'needs_answer'].includes(o.status)).map((o) => ({
+    id: orderRequestIds.get(o.id) ?? orderRequestIds.set(o.id, uuid()).get(o.id)!, tripId: null, kind: o.kind === 'stay' ? 'stay' : 'flight', area: 'other' as const, status: 'needs_answer' as const, title: o.place, short: null, detail: o.lines[0]?.text ?? null,
+    withWhom: 'faisal' as const, withName: o.agent?.name ?? null, outcome: null, alt: null, yesText: null, quote: null, quoteText: null,
+    order: { id: o.id, status: o.status, failure: o.status === 'ticketing_failed' ? (o.failure?.cause ?? 'airline') : null },
+    createdAt: o.createdAt, updatedAt: o.createdAt,
   }));
 }

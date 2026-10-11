@@ -131,7 +131,7 @@ async function flights() {
   await k.shot('request-sent');
   step('flights: the fares arrive');
   await k.see('I found 2 fares', 'fares lead', 20000);
-  await k.see('Held ', 'hold');
+  await k.see('Price held · ', 'hold');
   await k.shot('fares');
   await k.press(k.byTest('fare-opt2'));
   await k.see('Bags', 'fare rules');

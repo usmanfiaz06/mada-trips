@@ -17,7 +17,8 @@ import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
 import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
-import { bookingApi, demoOn, newIdempotencyKey, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
+import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
+import { HAS_APPLE_PAY } from '@/lib/device';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { joinAnd, listSep, t } from '@/lib/i18n';
@@ -54,6 +55,11 @@ export default function Pay() {
   }, [params.kind, params.circleId, params.messageId, params.shareKey, params.title, params.requestId]);
   const pd = linked ?? stored;
   const share = pd?.draft.kind === 'share' ? pd.draft : null;
+  // A quote opened again after it was paid (a notification, a reload): say so, never a SAR 0 slide to book.
+  const quoteId = pd?.draft.kind === 'quote' ? pd.draft.requestId : null;
+  const quoteReq = useBookingRequest(quoteId);
+  /** Back where the traveller came from, or Trips when this was opened on its own (a link, a reload). */
+  const leave = (to: string = '/trips?tab=requests') => { if (router.canGoBack()) router.back(); else router.replace(to as never); };
   const demo = useDemo((s) => s.on);
   const user = useSession((s) => s.user);
   const people = usePeople();
@@ -101,11 +107,31 @@ export default function Pay() {
   const p = accepted ?? previewQ.data;
   // The default way to pay: the default card, else Apple Pay.
   const def = cards.data?.cards.find((c) => c.id === cards.data!.defaultId);
-  const method: PayMethod | null = chosen ?? (!cards.data ? null : def ? { kind: 'card', id: def.id, label: def.label, brand: def.brand } : { kind: 'applepay', label: 'Apple Pay', brand: 'applepay' });
+  // Apple Pay only on an iPhone; elsewhere the default card, or the traveller adds one.
+  const method: PayMethod | null = chosen ?? (!cards.data ? null : def ? { kind: 'card', id: def.id, label: def.label, brand: def.brand } : HAS_APPLE_PAY ? { kind: 'applepay', label: 'Apple Pay', brand: 'applepay' } : null);
 
   if (!pd || !draft) {
     return (
-      <Screen><TopBar onBack={() => router.back()} /><View style={{ padding: 24 }}><Notice title={t('pay.missing')} /></View></Screen>
+      <Screen><TopBar onBack={() => leave()} /><View style={{ padding: 24 }}><Notice title={t('pay.missing')} /></View></Screen>
+    );
+  }
+  const qr = quoteReq.data;
+  const paid = !!qr && (qr.status === 'paid' || qr.status === 'done' || qr.quote?.status === 'accepted');
+  // An expired hold keeps its own "ask again" line below; a paid, cancelled or withdrawn quote has nothing to pay.
+  const closed = !!qr && (paid || qr.status === 'cancelled' || !qr.quote || qr.quote.status === 'withdrawn');
+  if (quoteId && qr && closed && !busy) {
+    return (
+      <Screen>
+        <TopBar onBack={() => leave()} />
+        <View style={{ padding: 24, gap: 14 }} testID={paid ? 'pay-already-paid' : 'pay-quote-gone'}>
+          <Notice icon={paid ? 'check' : 'visa'} iconColor={paid ? colors.ok : colors.goldInk} title={paid ? t('pay.paid.title') : t('pay.gone.title')}>
+            <T v="small">{qr.title}</T>
+            <T v="small">{paid ? t('pay.paid.body') : t('pay.gone.body')}</T>
+          </Notice>
+          {paid ? <Button label={t('pay.paid.see')} onPress={() => router.replace('/trips?tab=requests' as never)} testID="pay-paid-trips" />
+            : <Button label={t('pay.gone.open')} onPress={() => router.replace({ pathname: '/ask/request/[id]', params: { id: qr.id } })} />}
+        </View>
+      </Screen>
     );
   }
 
@@ -142,11 +168,12 @@ export default function Pay() {
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
     const out = await bookingApi.createOrder({ draft, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
     key.current = newIdempotencyKey();
-    if (out.outcome === 'created') { buzz('knock'); invalidate(); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
+    // The waiting screen opens on the order we already have, not a blank screen until its first poll answers.
+    if (out.outcome === 'created') { buzz('knock'); await invalidate(); qc.setQueryData(bookingKeys.order(out.order.id), out.order); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
     if (out.outcome === 'paid') {
       buzz('success'); invalidate(); usePayDraft.getState().clear();
       if (share) await settleShare(share);
-      router.back();
+      leave();
       toast(share ? t('pay.shareToast') : pd.draft.kind === 'esim' ? t('pay.esimToast') : t('pay.paidToast'));
       return;
     }
@@ -168,6 +195,7 @@ export default function Pay() {
       if (demoOn('offline')) { setSheet('offline'); buzz('soft'); return; }
       if (total === 0) { await place({ method: 'credit' }); return; }
       if (isApple) { setSheet('applepay'); return; }
+      if (!method) { setSheet('cards'); return; }
       if (method?.kind === 'new_card') await place({ method: 'new_card', token: method.token, brand: method.brand, last4: method.last4 });
       else if (method?.kind === 'card') await place({ method: 'card', cardId: method.id });
     } catch (e) {
@@ -192,20 +220,20 @@ export default function Pay() {
   const otp = async (c: string) => {
     if (!threeDs) return;
     const { order } = await bookingApi.otp(threeDs.orderId, c);
-    if (order.status === 'pending_agent') { setSheet(null); buzz('success'); invalidate(); router.replace({ pathname: '/waiting/[id]', params: { id: order.id } }); return; }
-    if (order.status === 'confirmed') { setSheet(null); buzz('success'); invalidate(); if (share) await settleShare(share); router.back(); toast(share ? t('pay.shareToast') : t('pay.paidToast')); return; }
+    if (order.status === 'pending_agent') { setSheet(null); buzz('success'); await invalidate(); qc.setQueryData(bookingKeys.order(order.id), order); router.replace({ pathname: '/waiting/[id]', params: { id: order.id } }); return; }
+    if (order.status === 'confirmed') { setSheet(null); buzz('success'); invalidate(); if (share) await settleShare(share); leave(); toast(share ? t('pay.shareToast') : t('pay.paidToast')); return; }
     if (order.status === 'declined') { setThreeDs({ ...threeDs, stopped: true, triesLeft: 0 }); buzz('warn'); return; }
     setThreeDs({ ...threeDs, triesLeft: order.action?.triesLeft ?? 0 }); buzz('warn');
   };
 
   const names = travellers.map((id) => personName(household.find((x) => x.id === id), selfName));
   const missing = (p?.missingPassports ?? []).map((id) => household.find((x) => x.id === id)).filter(Boolean);
-  const holdText = left === null ? null : expired ? t('pay.holdEnded') : t('pay.held', { time: left >= 3_600_000 ? `${Math.floor(left / 3_600_000)}:${String(Math.floor((left % 3_600_000) / 60000)).padStart(2, '0')}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` : `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` });
+  const holdText = left === null ? null : expired ? t('pay.holdEnded') : t('pay.heldFor', { time: left >= 3_600_000 ? `${Math.floor(left / 3_600_000)}:${String(Math.floor((left % 3_600_000) / 60000)).padStart(2, '0')}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` : `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, '0')}` });
 
   return (
     <Screen background={colors.night}>
       <View style={styles.hero}>
-        <Photo name={p?.photo ?? 'istanbul-galata'} />
+        <Photo name={p?.photo ?? (pd.draft.kind === 'quote' ? 'inflight-window' : 'istanbul-galata')} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,26,22,0.45)' }]} />
       </View>
       <TopBar onBack={() => router.back()} dark backLabel={t('pay.back')} />
@@ -280,7 +308,7 @@ export default function Pay() {
           <View style={styles.spread}>
             <View style={styles.row}>
               {total === 0 ? <><PayMark brand="credit" /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{t('pay.paidCredit')}</T></>
-                : <><PayMark brand={method?.brand ?? 'card'} /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{method?.label ?? ''}</T></>}
+                : <><PayMark brand={method?.brand ?? 'card'} /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{method?.label ?? (cards.data ? t('pay.method.add') : '')}</T></>}
             </View>
             <LinkButton label={t('pay.change')} onPress={() => setSheet('cards')} />
           </View>

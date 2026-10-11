@@ -364,4 +364,10 @@ export const enTrips = {
   'notify.tracked.delayed.body': 'About {minutes} minutes late, by the airline’s latest time.',
   'notify.tracked.cancelled.title': '{flight} is cancelled',
   'notify.tracked.cancelled.body': 'The airline cancelled it. Ask us if you need another way there.',
+  'rq.order.failed': 'Tickets didn\'t issue',
+  'rq.order.failedBody': 'The airline\'s system didn\'t issue the tickets. Nothing was charged. Mada can try again by phone, or you can cancel.',
+  'rq.order.failedPayment': 'The card payment didn\'t go through, so the tickets weren\'t issued. Nothing was charged. Mada can try again by phone, or you can cancel.',
+  'rq.order.answer': 'Needs your answer',
+  'rq.order.answerBody': 'Mada has a question about this booking.',
+  'rq.order.open': 'Open the booking',
 } as const;

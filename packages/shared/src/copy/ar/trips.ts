@@ -347,4 +347,10 @@ export const arTrips: ArSection<typeof enTrips> = {
   'notify.tracked.delayed.body': 'متأخرة حوالي {minutes} دقيقة، حسب آخر وقت من شركة الطيران.',
   'notify.tracked.cancelled.title': 'أُلغيت {flight}',
   'notify.tracked.cancelled.body': 'ألغتها شركة الطيران. اسألنا إن احتجت طريقة أخرى للوصول.',
+  'rq.order.failed': 'لم تصدر التذاكر',
+  'rq.order.failedBody': 'لم يُصدر نظام شركة الطيران التذاكر. لم يُخصم أي مبلغ. تستطيع مادا المحاولة مرة أخرى بالهاتف، أو يمكنك الإلغاء.',
+  'rq.order.failedPayment': 'لم تنجح عملية الدفع بالبطاقة، فلم تصدر التذاكر. لم يُخصم أي مبلغ. تستطيع مادا المحاولة مرة أخرى بالهاتف، أو يمكنك الإلغاء.',
+  'rq.order.answer': 'بانتظار ردّك',
+  'rq.order.answerBody': 'لدى مادا سؤال عن هذا الحجز.',
+  'rq.order.open': 'افتح الحجز',
 };

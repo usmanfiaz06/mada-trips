@@ -14,7 +14,10 @@ import { Scroll, Screen, useTopInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { TrackedFlights } from '@/components/today/Nothing';
 import { RefundTracker } from '@/components/trips/RefundTracker';
-import { RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
+import { orderNeedsYou, requestHref, RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
+import { useQueryClient } from '@tanstack/react-query';
+import { bookingApi } from '@/lib/booking';
+import { toast } from '@/lib/toast';
 import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { listSep, t } from '@/lib/i18n';
@@ -115,14 +118,14 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
   </>);
 }
 
-/** Booked somewhere else? Forward it or upload it (the upload sheet lives in the Wallet). */
+/** Booked somewhere else? Upload the confirmation: the Wallet's upload sheet keeps it with the passports. */
 function Imports() {
   const router = useRouter();
   return (
     <Box tone="well">
       <H3 size={15}>{t('tr.import.title')}</H3>
-      <Small>{t('tr.import.body')}</Small>
-      <SmallButton tone="paper" label={t('tr.import.upload')} onPress={() => router.push('/wallet')} />
+      <Small>{t('tr.import.keep')}</Small>
+      <SmallButton tone="paper" label={t('tr.import.upload')} onPress={() => router.push('/wallet?upload=booking' as Href)} testID="import-upload" />
     </Box>
   );
 }
@@ -167,17 +170,36 @@ const refundPill = (r: RefundView) => (r.stage === 'rejected' ? t('tr.ref.notApp
 
 function RequestCard({ r }: { r: TripRequestView }) {
   const router = useRouter();
+  const qc = useQueryClient();
+  const [acting, setActing] = useState(false);
   const priced = (r.status === 'quoted' || r.status === 'awaiting_payment') && r.quote;
+  const stuck = orderNeedsYou(r);
+  const answer = async (a: 'retry_by_phone' | 'cancel') => {
+    if (!stuck) return;
+    setActing(true); buzz('tap');
+    try { await bookingApi.answer(stuck.id, a); await qc.invalidateQueries({ queryKey: ['trips'] }); }
+    catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setActing(false); }
+  };
   return (
     <Box testID={`request-${r.kind}`}>
       <Spread align="flex-start">
-        {r.kind === 'flight'
-          // A flight request opens with its fares, the thread and the e-tickets.
-          ? <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(`/ask/request/${r.id}` as Href)} testID="open-flight-request"><H3>{r.title}</H3></Pressable>
-          : <H3 style={{ flex: 1 }}>{r.title}</H3>}
+        {/* Every request opens: a booking's order, the thread for an Ask request, the trip for a trip's own ask. */}
+        <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(requestHref(r) as Href)} testID={r.kind === 'flight' ? 'open-flight-request' : 'open-request'}><H3>{r.title}</H3></Pressable>
         <RequestStatusPill r={r} />
       </Spread>
       {r.detail ? <Small>{r.detail}</Small> : null}
+      {stuck ? (
+        <Box tone="well" gap={8} testID="request-order-stuck">
+          <AgentIntro />
+          <Small color={colors.green}>{stuck.status === 'ticketing_failed' ? (stuck.failure === 'payment' ? t('rq.order.failedPayment') : t('rq.order.failedBody')) : t('rq.order.answerBody')}</Small>
+          {stuck.status === 'ticketing_failed' ? (
+            <Row gap={8} style={{ flexWrap: 'wrap' }}>
+              <SmallButton testID="order-retry-phone" tone="primary" busy={acting} label={t('wait.ticket.phone')} onPress={() => void answer('retry_by_phone')} />
+              <SmallButton testID="order-cancel" tone="paper" disabled={acting} label={t('wait.ticket.cancel')} onPress={() => void answer('cancel')} />
+            </Row>
+          ) : <SmallButton testID="order-open" tone="primary" label={t('rq.order.open')} onPress={() => router.push(requestHref(r) as Href)} />}
+        </Box>
+      ) : null}
       <RequestTracker r={r} />
       {r.outcome === 'yes' && (r.status === 'confirmed' || r.status === 'done') ? <Row gap={6}><Icon name="check" size={14} color={colors.ok} width={2.4} /><Tiny>{r.yesText ?? t('tr.req.confirmedToday')}</Tiny></Row> : null}
       {r.outcome === 'no' ? (

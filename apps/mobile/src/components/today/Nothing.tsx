@@ -64,6 +64,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
       <Rise step={2}><Composer /></Rise>
       <RequestsCard />
       {(data?.tracked.length ?? 0) > 0 ? <TrackedFlights flights={data!.tracked} /> : null}
+      <TrackCard />
       {!hasPassport && (
         <Rise step={3}>
           <Card variant="notice" onPress={() => router.push('/wallet')} accessibilityLabel={t('today.passport.title')}>
@@ -90,7 +91,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
             </Spread>
             <View><T v="h3" color={colors.mist}>{t('today.tile.istanbul.title')}</T><T v="tiny" color={colors.onDark2}>{t('today.tile.istanbul.body')}</T></View>
           </Card>
-          <Card onPress={() => router.push(family ? '/circles' : '/wallet')} style={styles.smallTile} accessibilityLabel={family ? t('td.tile.circle') : t('today.tile.family.title')}>
+          <Card onPress={() => router.push(family ? '/circles' : '/household')} style={styles.smallTile} accessibilityLabel={family ? t('td.tile.circle') : t('today.tile.family.title')}>
             <View style={{ marginStart: -8, marginTop: -6 }}><ArtFriends width={66} height={50} /></View>
             <View><T v="h3">{family ? t('td.tile.circle') : t('today.tile.family.title')}</T><T v="tiny">{family ? t('td.tile.circleBody') : t('today.tile.family.body')}</T></View>
           </Card>
@@ -102,7 +103,37 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
 
 /* ───────── tracking a flight, signed in or not ───────── */
 
-type Shown = Pick<TrackedFlightView, 'id' | 'flightNumber' | 'carrierName' | 'date' | 'from' | 'to' | 'departLocal' | 'arriveLocal' | 'durationMin' | 'brand' | 'known' | 'alerts' | 'status'>;
+/** Signed in, nothing booked: "Track a flight", opening the same form a guest gets. */
+function TrackCard() {
+  const [open, setOpen] = useState(false);
+  if (open) return <TrackFlight guest={false} />;
+  return (
+    <Card onPress={() => setOpen(true)} accessibilityLabel={t('td.track.title')}>
+      <View style={[styles.trackMark, { backgroundColor: colors.goldWash }]}><Icon name="flight" size={20} color={colors.goldInk} /></View>
+      <View style={{ flex: 1, gap: 2 }}><T v="h3">{t('td.track.title')}</T><T v="small">{t('td.track.titleBody')}</T></View>
+      <Icon name="chevron" />
+    </Card>
+  );
+}
+
+type Shown = Pick<TrackedFlightView, 'id' | 'flightNumber' | 'carrierName' | 'date' | 'from' | 'to' | 'departLocal' | 'arriveLocal' | 'durationMin' | 'brand' | 'known' | 'alerts' | 'status'> & { source?: string | null };
+
+/**
+ * The pill: what the source says. A schedule-only source ("Schedule · …", or a guest's saved copy) never claims
+ * "On time", since nobody is watching the flight live.
+ */
+function trackedPill(f: Shown): { label: string; tone: 'ok' | 'warn' | 'default' | 'bad' } {
+  switch (f.status) {
+    case 'delayed': return { label: t('td.track.late'), tone: 'warn' };
+    case 'boarding': return { label: t('td.track.boarding'), tone: 'ok' };
+    case 'departed': return { label: t('td.track.departed'), tone: 'default' };
+    case 'in_air': return { label: t('td.track.inAir'), tone: 'default' };
+    case 'landed': return { label: t('td.track.landed'), tone: 'ok' };
+    case 'cancelled': return { label: t('td.track.cancelled'), tone: 'bad' };
+    case 'diverted': return { label: t('td.track.diverted'), tone: 'warn' };
+    default: return !f.source || /^schedule/i.test(f.source) ? { label: t('td.track.scheduleOnly'), tone: 'default' } : { label: t('td.track.onTime'), tone: 'ok' };
+  }
+}
 
 /** Flights the traveller asked us to watch. On the account (or this phone, for a guest), so they survive sign-up. */
 export function TrackedFlights({ flights, title, onStop }: { flights: Shown[]; title?: string; onStop?: (f: Shown) => void }) {
@@ -114,16 +145,17 @@ export function TrackedFlights({ flights, title, onStop }: { flights: Shown[]; t
     <View style={{ gap: 10 }}>
       {title ? <Eyebrow style={{ paddingHorizontal: 4 }}>{title}</Eyebrow> : null}
       {flights.map((f) => {
+        const pill = trackedPill(f);
         const when = f.date === today ? t('td.when.today') : f.date === addDays(today, 1) ? t('td.when.tomorrow') : dayLabel(f.date);
         return (
           <Box key={f.id} gap={12} testID={`tracked-${f.flightNumber}`}>
-            <Spread>
-              <Row gap={10}>
+            <Row gap={10}>
+              <Row gap={10} style={{ flex: 1, minWidth: 0 }}>
                 <AirlineMark carrier={f.flightNumber.slice(0, 2)} brand={f.brand} size={40} label={f.carrierName ?? undefined} />
-                <View><H3 size={15}>{f.flightNumber}{f.carrierName ? ` · ${f.carrierName}` : ''}</H3><Tiny>{when}</Tiny></View>
+                <View style={{ flex: 1, minWidth: 0 }}><H3 size={15} lines={2}>{f.flightNumber}{f.carrierName ? ` · ${f.carrierName}` : ''}</H3><Tiny>{when}</Tiny></View>
               </Row>
-              {f.known ? <Tag tone="ok" label={t(f.status === 'delayed' ? 'td.track.late' : 'td.track.onTime')} icon={<Dot color={colors.ok} size={6} />} /> : <Tag label={t('td.track.waiting')} />}
-            </Spread>
+              {f.known ? <Tag tone={pill.tone} label={pill.label} style={{ flexShrink: 0 }} icon={pill.tone === 'ok' ? <Dot color={colors.ok} size={6} /> : undefined} /> : <Tag label={t('td.track.waiting')} style={{ flexShrink: 0 }} />}
+            </Row>
             {f.known && f.departLocal && f.arriveLocal && f.from && f.to
               ? <RouteLine dep={f.departLocal.slice(11, 16)} arr={f.arriveLocal.slice(11, 16)} from={f.from} to={f.to} durationMin={f.durationMin} />
               : <Small>{t('td.track.unknown')}</Small>}

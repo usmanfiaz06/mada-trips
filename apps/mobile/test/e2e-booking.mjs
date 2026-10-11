@@ -155,7 +155,7 @@ async function flights() {
   await k.see('4 travellers · Saudia, direct', 'flight line');
   await k.see('Connecting rooms near Galata Tower · 6 nights', 'stay line');
   await k.see('If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.', 'rule');
-  await k.see('Held 19:', 'hold timer');
+  await k.see('Price held · 19:', 'hold timer');
   await k.shot('pay-sheet');
   step('pay: promo codes');
   await k.tap('Have a promo code?');
@@ -345,6 +345,17 @@ async function desk() {
   await k.byTest('question-yes').click();
   await k.see('The airline didn’t issue the tickets', 'ticketing failed', 15000);
   await k.shot('ticketing-failed');
+  // Closed while it waits for an answer: Today and Trips › Requests say so (not "Mada is on it"), and it opens again.
+  await k.byTest('wait-close').click();
+  await k.see("Your booking didn't go through", 'today: failed booking card', 15000);
+  await k.shot('today-failed-booking');
+  await k.byTest('dock-trips').click();
+  await k.byTest('tab-requests').click();
+  await k.see("Tickets didn't issue", 'requests: failed booking pill', 15000);
+  await k.see('Mada tries by phone', 'requests: the actions');
+  await k.shot('requests-failed-booking');
+  await k.byTest('open-flight-request').first().click();
+  await k.see('The airline didn’t issue the tickets', 'reopened from Trips', 15000);
   await k.byTest('ticket-retry').click();
   await k.see("You're going to Istanbul.", 'confirmed after phone', 20000);
   await k.shot('confirmed-after-problems', 1200);

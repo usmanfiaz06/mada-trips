@@ -11,6 +11,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { Sun } from '@/components/Sun';
 import { VGradient } from '@/components/Gradient';
+import { orderNeedsYou, requestHref, requestWhat } from '@/components/trips/Requests';
 import { Box, Grow, H3, Photo, Row, Small, Spread, Tag, Tiny, Veil, Display } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -108,13 +109,15 @@ export function RequestsCard() {
   const r = open[0];
   if (!r) return null;
   const priced = r.status === 'quoted' || r.status === 'awaiting_payment';
+  const stuck = orderNeedsYou(r);
+  const what = requestWhat(r);
   return (
-    <Box onPress={() => router.push('/trips?tab=requests' as Href)} label={r.title} testID="requests-card">
+    <Box onPress={() => router.push((stuck ? requestHref(r) : '/trips?tab=requests') as Href)} label={r.title} testID="requests-card">
       <Row gap={12}>
         <Avatar initial="F" tone="green" />
         <Grow>
-          <H3>{priced ? t('td.req.answer', { what: (r.short ?? r.title).toLowerCase() }) : t('td.req.working', { what: (r.short ?? r.title).toLowerCase() })}</H3>
-          <Small>{priced ? t('td.req.tap') : r.status === 'queued' ? t('td.req.queued') : t('td.req.usually')}</Small>
+          <H3>{stuck ? t('td.req.failed') : priced ? t('td.req.answer', { what }) : t('td.req.working', { what })}</H3>
+          <Small>{stuck ? t('td.req.failedTap') : priced ? t('td.req.tap') : r.status === 'queued' ? t('td.req.queued') : t('td.req.usually')}</Small>
         </Grow>
         <Icon name="chevron" />
       </Row>

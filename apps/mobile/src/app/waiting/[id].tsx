@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { G, Line } from 'react-native-svg';
@@ -63,7 +63,8 @@ export default function Waiting() {
   useEffect(() => { if (o?.status === 'fare_changed' || o?.status === 'ticketing_failed' || o?.status === 'needs_answer') buzz('warn'); }, [o?.status]);
   useEffect(() => { if (o?.status === 'cancelled') { toast(t('wait.cancelled')); router.replace('/today'); } }, [o?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!o) return <Screen background={colors.night}><View /></Screen>;
+  // Never a blank dark screen while the first answer comes: say what's happening at once.
+  if (!o) return <WaitingFirst error={q.isError && !q.isFetching} onRetry={() => void q.refetch()} onClose={() => router.replace('/today')} />;
   if (o.status === 'confirmed') return <Confirmed o={o} />;
 
   const act = async (answer: Parameters<typeof bookingApi.answer>[1]) => {
@@ -71,7 +72,9 @@ export default function Waiting() {
     try { const r = await bookingApi.answer(o.id, answer); qc.setQueryData(bookingKeys.order(o.id), r.order); if (answer === 'yes') setAnswered(true); }
     catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setActing(false); }
   };
-  const close = () => { finishInBackground(o.id); router.replace('/today'); };
+  // Waiting on the traveller (tickets that didn't issue, a new fare, a question): nothing is "finishing" until they
+  // answer, so no "we'll tell you" toast. Today and Trips keep the booking with its actions.
+  const close = () => { if (!['ticketing_failed', 'fare_changed', 'needs_answer'].includes(o.status)) finishInBackground(o.id); router.replace('/today'); };
   const rows = rowsOf(o);
   const agent = o.agent?.name ?? 'Mada';
   const withWhom = o.kind === 'stay' ? t('wait.with.hotel') : o.kind === 'package' ? t('wait.with.guides') : o.airline ?? t('wait.with.airline');
@@ -137,11 +140,11 @@ export default function Waiting() {
         ) : null}
         {o.status === 'ticketing_failed' ? (
           <Animated.View entering={enter(0)} style={styles.q}>
-            <T style={styles.qHead}>{t('wait.ticket.title')}</T>
-            <T style={styles.qBody}>{t('wait.ticket.text', { airline: o.airline ?? '' })}</T>
+            <T style={styles.qHead}>{o.failure?.cause === 'payment' ? t('wait.ticket.title.payment') : t('wait.ticket.title')}</T>
+            <T style={styles.qBody}>{o.failure?.cause === 'payment' ? t('wait.ticket.text.payment') : t('wait.ticket.text', { airline: o.airline ?? '' })}</T>
             <View style={styles.btns}>
-              <Button size="small" block={false} variant="gold" busy={acting} label={t('wait.ticket.phone')} onPress={() => act('retry_by_phone')} testID="ticket-retry" />
-              <Button size="small" block={false} variant="glass" label={t('wait.ticket.cancel')} onPress={() => act('cancel')} />
+              {!o.failure || o.failure.actions.includes('retry_by_phone') ? <Button size="small" block={false} variant="gold" busy={acting} label={t('wait.ticket.phone')} onPress={() => act('retry_by_phone')} testID="ticket-retry" /> : null}
+              {!o.failure || o.failure.actions.includes('cancel') ? <Button size="small" block={false} variant="glass" label={t('wait.ticket.cancel')} onPress={() => act('cancel')} /> : null}
             </View>
             <T style={[styles.doneText, { fontSize: 12 }]}>{t('wait.ticket.note')}</T>
           </Animated.View>
@@ -161,6 +164,37 @@ export default function Waiting() {
           </Animated.View>
         ) : null}
         <T style={styles.note}>{t('wait.note')}</T>
+      </View>
+    </Screen>
+  );
+}
+
+/** Before the order's first answer: the sun, what's happening, and after a while that it's safe to close. */
+function WaitingFirst({ error, onRetry, onClose }: { error: boolean; onRetry: () => void; onClose: () => void }) {
+  const top = useTopInset();
+  const [slow, setSlow] = useState(false);
+  useEffect(() => { const id = setTimeout(() => setSlow(true), 6000); return () => clearTimeout(id); }, []);
+  return (
+    <Screen background={colors.night}>
+      <View style={[styles.top, { marginTop: top + 14, justifyContent: 'flex-end' }]}>
+        <Pressable accessibilityRole="button" onPress={onClose} style={styles.clock} testID="wait-close"><T style={[styles.clockText, { fontFamily: ff.ui600 }]}>{t('wait.close')}</T></Pressable>
+      </View>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, paddingHorizontal: 32 }} accessibilityLiveRegion="polite" testID="waiting-first">
+        <Sun width={72} color={colors.gold} />
+        {error ? (
+          <>
+            <T style={[font('h3', colors.paper), { textAlign: 'center' }]}>{t('error.timeout')}</T>
+            <Button size="small" block={false} variant="gold" label={t('common.tryAgain')} onPress={onRetry} />
+          </>
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <ActivityIndicator color={colors.gold} />
+              <T style={[font('h3', colors.paper), { fontSize: 16 }]}>{t('wait.loading')}</T>
+            </View>
+            {slow ? <T style={{ fontFamily: ff.ui400, fontSize: 13, lineHeight: 18, color: 'rgba(255,253,249,0.75)', textAlign: 'center' }}>{t('wait.loadingSlow')}</T> : null}
+          </>
+        )}
       </View>
     </Screen>
   );
