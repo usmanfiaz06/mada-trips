@@ -36,6 +36,7 @@ const SIZES = [
   { id: 'play', w: 1080, h: 1920 },
 ];
 const PHONE = { width: 430, height: 932 };
+const DEMO_AR = 'تجربة'; // 'ask.demo.open' in Arabic
 
 /* ───────── serve the export ───────── */
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.ttf': 'font/ttf', '.otf': 'font/otf', '.mp4': 'video/mp4', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
@@ -56,7 +57,7 @@ const step = (s) => console.log('·', s);
 /* ───────── 1. the app screens ───────── */
 const WORDS = {
   en: { welcome: "We'll take it from here.", otp: 'Enter the code', back: 'Welcome back', where: 'Where to?', results: 'ways to get there', wallet: 'Wallet', disclosure: 'Mada', trip: 'Manage', delay: 'hours late' },
-  ar: { welcome: 'علينا الباقي.', otp: 'أدخل الرمز', back: 'أهلًا بعودتك', where: 'إلى أين؟', results: 'طرق للوصول', wallet: 'المحفظة', disclosure: 'مادا', trip: 'إدارة', delay: 'ساعات' },
+  ar: { welcome: 'علينا الباقي.', otp: 'أدخل الرمز', back: 'أهلًا بعودتك', where: 'إلى أين؟', results: 'ثلاث طرق للوصول.', wallet: 'المحفظة', disclosure: 'مادا', trip: 'إدارة', delay: 'ساعات' },
 };
 
 async function freshPage(lang) {
@@ -103,14 +104,14 @@ async function phase({ page, byTest }, p) {
 const SCREENS = {
   async today(k) {
     await phase(k, 'travelday');
-    await k.page.waitForTimeout(6500); // the gate change arrives
     return k.see('SV263', 'today');
   },
   async ask(k) {
     await phase(k, 'booked');
     await k.byTest('dock-ask').click();
     await k.see(k.w.where, 'ask');
-    await k.byTest('ask-input').fill(k.w === WORDS.ar ? 'إسطنبول في العيد، كلنا' : 'Istanbul for Eid, all of us');
+    // The mock reads English requests only; the Arabic screen answers in Arabic either way.
+    await k.byTest('ask-input').fill('Istanbul for Eid, all of us');
     await k.byTest('ask-send').click();
     const ok = await k.see(k.w.results, 'results', 20000);
     await k.page.waitForTimeout(1500);
@@ -144,8 +145,6 @@ const SCREENS = {
     await k.page.waitForTimeout(800);
     await k.byTest('help-talk').click();
     await k.page.waitForTimeout(1200);
-    const topic = k.page.locator('[data-testid="topic-bag"]').first();
-    if (await topic.count()) { await topic.click(); await k.page.waitForTimeout(2500); }
     return k.see(k.w.disclosure, 'support');
   },
 };
@@ -156,6 +155,10 @@ async function capture(lang, id) {
     const ok = await SCREENS[id](k);
     if (!ok) errors.push(`${lang} ${id}: the screen didn't show what it should`);
     await k.page.waitForTimeout(800);
+    // The mock build's demo controls are for design work, not the store.
+    await k.page.evaluate((words) => {
+      for (const el of document.querySelectorAll('[role="button"], button')) if (words.includes(el.textContent?.trim() ?? '')) el.style.visibility = 'hidden';
+    }, ['Demo', DEMO_AR]);
     return await k.page.screenshot({ type: 'png' });
   } finally {
     await k.context.close();

@@ -23,7 +23,7 @@ import { freshIp } from "./helpers";
 /* madatrips.sa links: the files that hand them to the app, and the pages and preview pictures for people without it. */
 
 let ipSeq = 0;
-const get = (handler: (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response> | Response, path: string, params: Record<string, string>, headers: Record<string, string> = {}) =>
+const get = <P extends Record<string, string>>(handler: (req: Request, ctx: { params: Promise<P> }) => Promise<Response> | Response, path: string, params: P, headers: Record<string, string> = {}) =>
   handler(new Request(`https://madatrips.sa${path}`, { headers: { "x-forwarded-for": `10.77.${(ipSeq += 1) >> 8}.${ipSeq & 255}`, ...headers } }), { params: Promise.resolve(params) });
 const meta = (html: string, prop: string) => new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
 
@@ -240,4 +240,27 @@ describe("other app links", () => {
     expect((await get(fontGet, "/links/font/instrument-serif.ttf", { file: "instrument-serif.ttf" })).headers.get("content-type")).toBe("font/ttf");
     expect((await get(coverGet, "/links/cover/..%2f..%2fpackage.json", { file: "../../package.json" })).status).toBe(404);
   });
+});
+
+/* LINKS_SHOTS=<dir>: also write the pages and pictures there, to look at (the e2e shots open them in a browser). */
+describe.runIf(!!process.env.LINKS_SHOTS)("shots", () => {
+  it("writes the invite page, the plan page and their pictures", async () => {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const dir = process.env.LINKS_SHOTS!;
+    mkdirSync(dir, { recursive: true });
+    const abdullah = await person("Abdullah");
+    const others = [await person("Noor"), await person("Khalid"), await person("Sara")];
+    const c = CircleDetail.parse((await call(circlesPost, { token: abdullah.token, ip: freshIp(), body: { name: "Istanbul for Eid", cover: "istanbul", invite: others.map((o) => o.id) } })).json);
+    const { POST: acceptPost } = await import("@/app/api/app/v1/invites/[ref]/accept/route");
+    for (const o of others) await call(withParams(acceptPost, { ref: c.invited.find((i) => i.person.id === o.id)!.inviteId }), { token: o.token, ip: freshIp() });
+    const link = InviteLink.parse((await call(withParams(linkPost, { id: c.circle.id }), { token: abdullah.token, ip: freshIp() })).json);
+    const ar = await circleLink(abdullah, "رحلة العلا مع العائلة", { cover: "alula" });
+    for (const [name, lang, code] of [["join-en", "en", link.code], ["join-ar", "ar", link.code], ["join-ar-name", "ar", ar.link.code]] as const) {
+      writeFileSync(`${dir}/${name}.html`, await (await get(joinGet, `/join/${code}?lang=${lang}`, { code })).text());
+      writeFileSync(`${dir}/${name}-og.png`, Buffer.from(await (await get(ogJoinGet, `/links/og/join/${code}?lang=${lang}`, { code })).arrayBuffer()));
+    }
+    writeFileSync(`${dir}/join-gone.html`, await (await get(joinGet, "/join/aaaaaaaa-bbbbbb", { code: "aaaaaaaa-bbbbbb" })).text());
+    writeFileSync(`${dir}/plan-en.html`, await (await get(planGet, "/plan/alula2", { id: "alula2" })).text());
+    writeFileSync(`${dir}/plan-en-og.png`, Buffer.from(await (await get(ogPlanGet, "/links/og/plan/alula2", { id: "alula2" })).arrayBuffer()));
+  }, 60_000);
 });

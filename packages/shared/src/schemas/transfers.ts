@@ -54,8 +54,8 @@ export const TRANSFER_ROUTES = {
 
 /* ───────────── vouchers (Hotelbeds certification §4) ───────────── */
 
-export const VoucherPax = z.object({ room: z.number().int(), name: z.string(), child: z.boolean(), age: z.number().int().nullable() });
-export const Voucher = z.object({
+export const SupplierVoucherPax = z.object({ room: z.number().int(), name: z.string(), child: z.boolean(), age: z.number().int().nullable() });
+export const SupplierVoucher = z.object({
   id: Id,
   kind: z.enum(['stay', 'transfer']),
   status: z.enum(['confirmed', 'cancelled', 'pending']),
@@ -65,7 +65,7 @@ export const Voucher = z.object({
   agencyReference: z.string().nullable(),
   bookedOn: IsoDay.nullable(),
   holder: z.string(),
-  paxes: z.array(VoucherPax),
+  paxes: z.array(SupplierVoucherPax),
   hotel: z.object({ name: z.string(), address: z.string().nullable(), category: z.string().nullable(), destination: z.string().nullable(), phone: z.string().nullable() }).nullable(),
   checkIn: IsoDay.nullable(),
   checkOut: IsoDay.nullable(),
@@ -79,22 +79,43 @@ export const Voucher = z.object({
   payableThrough: z.string(),
   canCancel: z.boolean(),
 });
-export type Voucher = z.infer<typeof Voucher>;
-export const VoucherResponse = z.object({ voucher: Voucher });
-export const VouchersResponse = z.object({ vouchers: z.array(Voucher) });
-export const CancelVoucherBody = z.object({ confirm: z.boolean() });
-export const CancelVoucherResponse = z.object({
+export type SupplierVoucher = z.infer<typeof SupplierVoucher>;
+export const SupplierVoucherResponse = z.object({ voucher: SupplierVoucher });
+export const SupplierVouchersResponse = z.object({ vouchers: z.array(SupplierVoucher) });
+export const CancelSupplierVoucherBody = z.object({ confirm: z.boolean() });
+export const CancelSupplierVoucherResponse = z.object({
   simulated: z.boolean(),
   /** What cancelling costs (or cost), in riyals at our rate, and as Hotelbeds states it. */
   fee: Money,
   supplierFee: z.object({ amount: z.number(), currency: z.string().nullable() }),
-  voucher: Voucher,
+  voucher: SupplierVoucher,
 });
-export type CancelVoucherResponse = z.infer<typeof CancelVoucherResponse>;
+export type CancelSupplierVoucherResponse = z.infer<typeof CancelSupplierVoucherResponse>;
 
-export const VOUCHER_ROUTES = {
+export const SUPPLIER_VOUCHER_ROUTES = {
   tripVouchers: (tripId: string) => `/trips/${tripId}/vouchers`,
   voucher: (id: string) => `/vouchers/${id}`,
   voucherHtml: (id: string, lang: 'en' | 'ar') => `/vouchers/${id}?format=html&lang=${lang}`,
   cancel: (id: string) => `/vouchers/${id}/cancel`,
 } as const;
+
+/* ───────────── hotel details (Content API, from our store) ───────────── */
+
+export const HotelDetails = z.object({
+  code: z.number().int(),
+  name: z.string(),
+  /** "4 stars", "3 keys", as the category says. */
+  category: z.string().nullable(),
+  address: z.string().nullable(),
+  phone: z.string().nullable(),
+  description: z.string().nullable(),
+  /** Every image Hotelbeds has, in their order (photos.hotelbeds.com, 1024 px). */
+  images: z.array(z.string()),
+  facilities: z.array(z.object({ name: z.string(), paid: z.boolean() })),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  source: z.literal('HBX Group'),
+});
+export type HotelDetails = z.infer<typeof HotelDetails>;
+export const HotelDetailsResponse = z.object({ hotel: HotelDetails });
+export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}` } as const;

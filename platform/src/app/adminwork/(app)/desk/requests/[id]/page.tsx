@@ -13,6 +13,7 @@ import { CHECKLISTS, destinationOf, getRequestFull } from "@/lib/app/desk/adapte
 import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Input, Money, Textarea, btn, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
+import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
@@ -107,6 +108,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         </div>
 
         <aside className="space-y-4">
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           {quote && (
             <Card>
               <CardHead title={t("Quote sent")} hint={`${fmtDate(quote.createdAt, L, true)}${quote.expiresAt ? ` · ${t("held until {time}", { time: fmtDate(quote.expiresAt, L, true) })}` : ""}`} action={<Badge tone={quote.status === "accepted" ? "ok" : "info"}>{t(quote.status === "accepted" ? "Accepted" : quote.status === "expired" ? "Expired" : "Open")}</Badge>} />

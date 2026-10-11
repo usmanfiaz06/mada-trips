@@ -169,6 +169,13 @@
       "when": 1791722624424,
       "tag": "0023_activities_per_city",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791722694179,
+      "tag": "0024_hotelbeds",
+      "breakpoints": true
     }
   ]
 }

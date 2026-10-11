@@ -11,7 +11,7 @@ import { decodeOfferId, isHotelbedsOfferId, type HbPax } from "./hotels";
 import { dbFacts, hotelbedsBookingAllowed, hotelbedsHotels, hotelbedsMode, hotelbedsTransfers, staysMode } from "./app";
 import { buildVoucher } from "./voucher";
 import { costHalalas } from "./money";
-import type { Voucher } from "@mada/shared";
+import type { SupplierVoucher } from "@mada/shared";
 
 /*
  * Booking on Hotelbeds from what the traveller chose, by the desk ("Book on Hotelbeds") or, for stays in live mode,
@@ -240,7 +240,7 @@ export async function orderForRequest(requestId: string) {
 
 /* ───────────── vouchers (the traveller's, the desk's) ───────────── */
 
-export function voucherOf(row: SupplierBookingRow): Voucher {
+export function voucherOf(row: SupplierBookingRow): SupplierVoucher {
   const d = row.details as { agencyReference?: string | null };
   return buildVoucher({ id: row.id, product: row.product as "stay" | "transfer", status: row.status, supplierRef: row.supplierRef, agencyReference: d.agencyReference ?? row.clientReference, createdAt: row.createdAt, details: row.details as never });
 }
@@ -254,7 +254,7 @@ export async function ownVoucherRow(ownerId: string, id: string): Promise<Suppli
 }
 
 /** Vouchers for one trip: its stay orders and its pickup requests. */
-export async function tripVouchers(ownerId: string, tripId: string): Promise<Voucher[]> {
+export async function tripVouchers(ownerId: string, tripId: string): Promise<SupplierVoucher[]> {
   const orders = await db.select({ id: appOrders.id }).from(appOrders).where(and(eq(appOrders.ownerId, ownerId), eq(appOrders.tripId, tripId)));
   const requests = await db.select({ id: appRequests.id }).from(appRequests).where(and(eq(appRequests.ownerId, ownerId), eq(appRequests.tripId, tripId)));
   const ids = [...orders.map((o) => o.id), ...requests.map((r) => r.id)];

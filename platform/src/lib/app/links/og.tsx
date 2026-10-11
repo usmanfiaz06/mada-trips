@@ -1,3 +1,5 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource react */
 import "server-only";
 import { ImageResponse } from "next/og";
 import { PLANS, hasArabic, joinNames, planById, t, tn, type CoverKey, type InvitePreview, type Lang, type PersonRef } from "@mada/shared";
@@ -18,11 +20,11 @@ const NIGHT = "#0f1a16";
 
 async function fonts() {
   return [
+    // The whole IBM Plex Sans Arabic (Arabic and Latin in one file): Satori keeps one font per name and weight.
+    { name: "Plex", data: await asset("plex-400.ttf"), weight: 400 as const, style: "normal" as const },
+    { name: "Plex", data: await asset("plex-600.ttf"), weight: 600 as const, style: "normal" as const },
+    // Last, so text in "Plex" never falls back to it.
     { name: "Serif", data: await asset("instrument-serif.ttf"), weight: 400 as const, style: "normal" as const },
-    { name: "Plex", data: await asset("plex-latin-400.woff"), weight: 400 as const, style: "normal" as const },
-    { name: "Plex", data: await asset("plex-arabic-400.woff"), weight: 400 as const, style: "normal" as const },
-    { name: "Plex", data: await asset("plex-latin-600.woff"), weight: 600 as const, style: "normal" as const },
-    { name: "Plex", data: await asset("plex-arabic-600.woff"), weight: 600 as const, style: "normal" as const },
   ];
 }
 const dataUri = async (file: string, type: string) => `data:${type};base64,${(await asset(file)).toString("base64")}`;
@@ -37,7 +39,7 @@ function Line({ text, style }: { text: string; style: Record<string, string | nu
     if (latin && last !== undefined && !hasArabic(last)) runs[runs.length - 1] = `${last} ${w}`;
     else runs.push(w);
   }
-  return <div style={{ display: "flex", flexDirection: "row-reverse", flexWrap: "wrap-reverse", justifyContent: "flex-end", columnGap: "0.28em", ...style }}>{runs.map((r, i) => <span key={i}>{r}</span>)}</div>;
+  return <div style={{ display: "flex", flexDirection: "row-reverse", justifyContent: "flex-start", ...style }}>{runs.map((r, i) => <span key={i} style={{ marginLeft: i === runs.length - 1 ? 0 : "0.25em" }}>{r}</span>)}</div>;
 }
 
 function Faces({ people }: { people: PersonRef[] }) {
@@ -52,7 +54,23 @@ function Faces({ people }: { people: PersonRef[] }) {
   );
 }
 
-async function frame(o: { locale: Lang; cover: CoverKey | null; eyebrow: string; title: string; sub: string; people: PersonRef[] }) {
+type Frame = { locale: Lang; cover: CoverKey | null; eyebrow: string; title: string; sub: string; people: PersonRef[] };
+const HEADERS = { "Content-Type": "image/png", "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=3600", "X-Content-Type-Options": "nosniff" };
+
+/**
+ * Drawn up front, so a name the font tables can't shape (Satori's Arabic support has gaps) falls back to the same
+ * picture without words rather than a broken image.
+ */
+async function frame(o: Frame): Promise<Response> {
+  try {
+    return new Response(await (await draw(o)).arrayBuffer(), { headers: HEADERS });
+  } catch (e) {
+    console.warn("[links] preview picture fell back:", (e as Error).message.slice(0, 120));
+    return new Response(await (await draw({ ...o, eyebrow: "", title: "", sub: "" })).arrayBuffer(), { headers: HEADERS });
+  }
+}
+
+async function draw(o: Frame) {
   const rtl = o.locale === "ar";
   const cover = o.cover ? await dataUri(`${o.cover}.jpg`, "image/jpeg") : null;
   const mark = await dataUri("symbol-gold.svg", "image/svg+xml");
@@ -77,8 +95,8 @@ async function frame(o: { locale: Lang; cover: CoverKey | null; eyebrow: string;
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 18, alignItems: align, maxWidth: 820 }}>
             {o.people.length ? <Faces people={o.people} /> : null}
-            <Line text={o.eyebrow} style={{ color: GOLD, fontSize: rtl ? 30 : 24, fontWeight: 600, letterSpacing: rtl ? 0 : 3, textTransform: rtl ? "none" : "uppercase" }} />
-            <Line text={o.title} style={{ color: PAPER, fontFamily: arTitle ? "Plex" : "Serif", fontWeight: arTitle ? 600 : 400, fontSize: arTitle ? Math.round(size * 0.82) : size, lineHeight: arTitle ? 1.25 : 1.02, letterSpacing: arTitle ? 0 : -1 }} />
+            {o.eyebrow ? <Line text={o.eyebrow} style={{ color: GOLD, fontSize: rtl ? 30 : 24, fontWeight: 600, letterSpacing: rtl ? 0 : 3, textTransform: rtl ? "none" : "uppercase" }} /> : null}
+            {o.title ? <Line text={o.title} style={{ color: PAPER, fontFamily: arTitle ? "Plex" : "Serif", fontWeight: arTitle ? 600 : 400, fontSize: arTitle ? Math.round(size * 0.82) : size, lineHeight: arTitle ? 1.25 : 1.02, letterSpacing: arTitle ? 0 : -1 }} /> : null}
             {o.sub ? <Line text={o.sub} style={{ color: "rgba(255,253,249,0.86)", fontSize: 28 }} /> : null}
           </div>
         </div>
@@ -86,7 +104,6 @@ async function frame(o: { locale: Lang; cover: CoverKey | null; eyebrow: string;
     ),
     {
       width: W, height: H, fonts: await fonts(),
-      headers: { "Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=3600", "X-Content-Type-Options": "nosniff" },
     },
   );
 }

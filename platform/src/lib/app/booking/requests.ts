@@ -124,6 +124,9 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
 
 async function quoteFor(r: RequestRow): Promise<{ total: number; snapshot: Record<string, unknown>; lines: { label: string; amount: number; kind: string }[] } | null> {
   const d = r.details as AskDetails;
+  // An airport pickup picked from Hotelbeds: the price is the one the traveller saw (suppliers/hotelbeds).
+  const tr = (r.details as { transfer?: { total: number; vehicle: string } }).transfer;
+  if (tr) return { total: tr.total, snapshot: { source: "hotelbeds-transfer", breakdown: [], text: `${tr.vehicle}, all in.`, lead: null, needLines: [] }, lines: [{ label: d.title, amount: tr.total, kind: "service" }] };
   const travellers = r.travellerIds.length ? await travellersOf(r.ownerId, r.travellerIds) : [];
   let byHand: { ppSar: number; text: string; cabin: "economy" | "premium" | "business"; oneway: boolean } | null = null;
   if (d.search && d.askKind === "flight") {

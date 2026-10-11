@@ -1,4 +1,4 @@
-import { t, type CopyLocale, type Voucher } from "@mada/shared";
+import { t, type CopyLocale, type SupplierVoucher } from "@mada/shared";
 import type { HbBooking, HotelFacts } from "./hotels";
 import type { HbTransferBooking } from "./transfers";
 
@@ -35,8 +35,8 @@ export type VoucherSource = {
   details: { booking?: HbBooking | HbTransferBooking; cancellation?: string | null; facts?: HotelFacts | null; category?: string | null; transfer?: Record<string, unknown> | null };
 };
 
-export function buildVoucher(src: VoucherSource): Voucher {
-  const status: Voucher["status"] = src.status === "cancelled" ? "cancelled" : src.status === "confirmed" ? "confirmed" : "pending";
+export function buildVoucher(src: VoucherSource): SupplierVoucher {
+  const status: SupplierVoucher["status"] = src.status === "cancelled" ? "cancelled" : src.status === "confirmed" ? "confirmed" : "pending";
   const ref = src.supplierRef ?? "";
   if (src.product === "stay") {
     const b = (src.details.booking ?? {}) as HbBooking;
@@ -77,7 +77,7 @@ export function buildVoucher(src: VoucherSource): Voucher {
 const esc = (s: string | number | null | undefined) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /** A standalone, printable page (print to PDF from any browser). No scripts, no remote assets. */
-export function voucherHtml(v: Voucher, locale: CopyLocale): string {
+export function voucherHtml(v: SupplierVoucher, locale: CopyLocale): string {
   const L = (k: string, vars?: Record<string, string | number>) => t(k as never, vars, locale);
   const row = (label: string, value: string | null | undefined) => (value ? `<tr><th>${esc(label)}</th><td>${esc(value)}</td></tr>` : "");
   const ltr = (s: string | null | undefined) => (s ? `<bdi dir="ltr">${esc(s)}</bdi>` : "");

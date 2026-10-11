@@ -13,6 +13,7 @@ import { flightQuoteOf } from "./booking/flight-requests";
 import { localeOfUser } from "./locale";
 import { suppliers } from "./suppliers";
 import { notify } from "./trips/notify";
+import { hotelbedsContentJob } from "./suppliers/hotelbeds/content";
 
 /*
  * Scheduled jobs (Vercel Cron → GET /api/cron/{job} with CRON_SECRET; locally `npm run app:jobs -- all`). Each is
@@ -23,11 +24,12 @@ import { notify } from "./trips/notify";
  *               SUPABASE_SERVICE_ROLE_KEY; the mock records the call when Supabase isn't set up)
  *   recovery    a recovery request's contact details (old and new number or email, name, note, IP hash) are wiped
  *               30 days after the desk closed it; the decision and dates stay for the record
+ *   hotelbeds   Hotelbeds hotel content into app_hotelbeds_hotels, daily (suppliers/hotelbeds/content.ts)
  *   quotes      quotes whose hold has passed become expired (the traveller hears it once, and the thread says so);
  *               bookings stuck at the bank's code for 30 minutes are cancelled, nothing charged
  */
 
-export const JOBS = ["exports", "deletions", "recovery", "quotes"] as const;
+export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds"] as const;
 export type JobName = (typeof JOBS)[number];
 export type JobResult = Record<string, number>;
 
@@ -122,7 +124,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: () => quotesJob() };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: () => quotesJob(), hotelbeds: () => hotelbedsContentJob() };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

@@ -1,9 +1,11 @@
 // Arabic UI text. The English string is the key; anything missing falls back to English.
 import { AR_DESK } from "../app/desk/ar";
+import { AR_HOTELBEDS } from "../app/suppliers/hotelbeds/desk-ar";
 import { AR_DESK_THINGS } from "../app/desk/ar-things";
 
 export const AR: Record<string, string> = {
   ...AR_DESK, // the app desk (src/lib/app/desk/ar.ts); keys below win
+  ...AR_HOTELBEDS, // the desk's Hotelbeds card
   ...AR_DESK_THINGS,
   ", retail only": "، للأفراد فقط",
   "1 more approval needed.": "مطلوب موافقة واحدة إضافية.",

@@ -149,6 +149,17 @@ export function fixtureFetch(opts: { fail?: (method: string, path: string) => { 
       return reply(200, { ...content, _note: undefined, hotels, total: hotels.length });
     }
 
+    if (init.method === "GET" && path === "/hotel-content-api/1.0/types/facilities") {
+      return reply(200, { from: 1, to: 4, total: 4, facilities: [
+        { code: 70, facilityGroupCode: 70, description: { languageCode: "ENG", content: "Wi-fi" } },
+        { code: 260, facilityGroupCode: 60, description: { languageCode: "ENG", content: "Outdoor swimming pool" } },
+        { code: 320, facilityGroupCode: 70, description: { languageCode: "ENG", content: "Car park" } },
+        { code: 295, facilityGroupCode: 70, description: { languageCode: "ENG", content: "Airport shuttle" } },
+      ] });
+    }
+    if (init.method === "GET" && path === "/hotel-content-api/1.0/types/ratecommentdetails") {
+      return reply(200, { auditData: {}, rateComments: [{ dateStart: "2026-01-01", dateEnd: "2027-12-31", description: "Check-in from 14:00. A refundable deposit of EUR 50 per room is taken at the hotel. Guests must show the passport used for the booking." }] });
+    }
     if (init.method === "GET" && path.startsWith("/transfer-api/1.0/availability/")) {
       const r = transfersAvailability(path);
       return r ? reply(200, r) : reply(204, null);

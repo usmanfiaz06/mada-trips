@@ -26,7 +26,7 @@ export const appHotelbedsHotels = pgTable("app_hotelbeds_hotels", {
   description: text("description"),
   // Image paths under https://photos.hotelbeds.com/giata/{size}/, in Hotelbeds' visual order.
   images: jsonb("images").$type<{ path: string; type: string | null }[]>().notNull().default(sql`'[]'::jsonb`),
-  facilities: jsonb("facilities").$type<{ code: number; group: number }[]>().notNull().default(sql`'[]'::jsonb`),
+  facilities: jsonb("facilities").$type<{ code: number; group: number; name?: string | null; paid?: boolean }[]>().notNull().default(sql`'[]'::jsonb`),
   lastUpdate: text("last_update"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("app_hotelbeds_hotels_dest_idx").on(t.destinationCode)]);

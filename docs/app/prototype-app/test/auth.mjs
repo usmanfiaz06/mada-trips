@@ -337,7 +337,7 @@ try {
   await shot('code-sms-instead');
   await page.clock.runFor(61_000);
   await click('Didn’t get the code?');
-  await click('Send on WhatsApp instead');
+  await phone.locator('.auth-help-row', { hasText: 'Send on WhatsApp instead' }).click(); await page.waitForTimeout(350);
   await see('We sent a code on WhatsApp to +966 51 234 0004.');
   await phone.locator('#otp').fill('123456');
   await see('What should we call you?');

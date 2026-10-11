@@ -4,6 +4,7 @@
     { "path": "/api/cron/quotes", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/exports", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/deletions", "schedule": "17 2 * * *" },
-    { "path": "/api/cron/recovery", "schedule": "23 2 * * *" }
+    { "path": "/api/cron/recovery", "schedule": "23 2 * * *" },
+    { "path": "/api/cron/hotelbeds", "schedule": "41 3 * * *" }
   ]
 }

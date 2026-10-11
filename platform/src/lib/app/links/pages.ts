@@ -87,7 +87,7 @@ body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Plex Arabic',sans-se
 .av:first-child{margin-inline-start:0}
 .av.green{background:var(--green);color:var(--sand)}.av.gold{background:var(--gold);color:var(--green)}
 .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:0}
-[dir=rtl] .eyebrow{letter-spacing:0;font-size:14px}
+[dir=rtl] .eyebrow{letter-spacing:0;font-size:14px;text-transform:none}
 h1{font-family:'Instrument Serif','Plex Arabic',Georgia,serif;font-weight:400;font-size:46px;line-height:1;letter-spacing:-.01em;margin:0;text-wrap:balance;overflow-wrap:anywhere}
 h1.ar{font-weight:600;font-size:38px;line-height:1.2;letter-spacing:0}
 h1.long{font-size:36px}
@@ -108,7 +108,7 @@ h1.long{font-size:36px}
 .code p{margin:0;font-size:13px;line-height:1.45;color:rgba(255,253,249,.82)}
 .code p b{color:var(--paper)}
 .code .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
-.code code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:17px;letter-spacing:.04em;color:var(--gold);direction:ltr;unicode-bidi:isolate;user-select:all;-webkit-user-select:all}
+.code code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;letter-spacing:.02em;white-space:nowrap;color:var(--gold);direction:ltr;unicode-bidi:isolate;user-select:all;-webkit-user-select:all}
 .copy{min-height:40px;padding:0 16px;border-radius:999px;border:0;background:var(--paper);color:var(--green);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;flex:none}
 .desk{display:none;font-size:13px;color:rgba(255,253,249,.7);text-align:center;margin:0}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;background:var(--paper);color:var(--green);padding:12px 18px;border-radius:999px;font-size:14px;font-weight:600;box-shadow:0 12px 30px rgba(0,0,0,.35);max-width:calc(100% - 32px);text-align:center}

@@ -14,6 +14,7 @@ import { getRequestFull } from "@/lib/app/desk/adapters";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Field, Input, Money, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
+import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
@@ -163,6 +164,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <aside className="space-y-4">
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           {o.stage === "issued" && (
             <Card className="bg-ok-soft/40">
               <div className="mb-3 flex items-center gap-2 text-ok"><BadgeCheck className="size-5" /><span className="text-[15px] font-medium">{t("Confirmed by {name} at Mada", { name: r.agentName ?? "—" })}</span></div>
