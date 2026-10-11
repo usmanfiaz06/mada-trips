@@ -177,6 +177,18 @@ try {
   await page.waitForTimeout(600);
   await shot('circles');
 
+  step('an invite link: the preview (as the madatrips.sa/join page shows it) and an expired one');
+  await page.evaluate(() => window.__madaPush('join', { code: 'ist-8k2' }));
+  await page.waitForTimeout(600);
+  await see('إن انضممت، يرون', 'invite preview');
+  await shot('invite-preview');
+  await page.evaluate(() => window.__madaPop());
+  await page.evaluate(() => window.__madaPush('join', { code: 'old-4q1' }));
+  await page.waitForTimeout(600);
+  await see('انتهت صلاحية هذه الدعوة.', 'expired invite');
+  await shot('invite-expired');
+  await page.evaluate(() => window.__madaPop());
+
   step('the crash screen: Arabic words, the holding pattern drawn as it is');
   await demo('App crashed');
   await see('نحلّق قليلًا ريثما نعود.', 'crash title');
