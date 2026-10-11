@@ -28,13 +28,14 @@ function km([a, b]: [number, number], [c, d]: [number, number]) {
   return 6371 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
-function usePosition(flight: string | null, enabled: boolean) {
+function usePosition(flight: string | null, day: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['trips', 'position', flight],
+    queryKey: ['trips', 'position', flight, day],
     enabled: enabled && !!flight,
     refetchInterval: 60_000,
     retry: false,
-    queryFn: () => request({ method: 'GET', path: flightPositionPath(flight!) }, FlightPositionResponse),
+    // With the day, the server names the aircraft (its ICAO hex) and finds it on ADS-B by that, or estimates where it is.
+    queryFn: () => request({ method: 'GET', path: `${flightPositionPath(flight!)}?date=${day}` }, FlightPositionResponse),
   });
 }
 
@@ -46,13 +47,17 @@ function AirMap({ trip, now }: { trip: TripDetail; now: () => number }) {
   const seg = back ? backSegment(trip)! : outSegment(trip)!;
   const dep = departInstant(seg).getTime();
   const arr = arriveInstant(seg).getTime();
-  const pos = usePosition(seg.flightNumber, !offline);
+  const pos = usePosition(seg.flightNumber, seg.departLocal.slice(0, 10), !offline);
   const p = pos.data?.position;
   const a = AIRPORT_LL[seg.from];
   const b = AIRPORT_LL[seg.to];
   const live = !!(p && a && b && !p.onGround);
-  const timeT = Math.min(1, Math.max(0, (now() - dep) / Math.max(1, arr - dep)));
+  // No receiver sees the plane (most of Saudi airspace has none yet): the server's estimate from the airline's actual
+  // take-off when it has one, else ours from the booked times. Either way the label says "estimated".
+  const est = pos.data?.estimate;
+  const timeT = est ? est.fraction : Math.min(1, Math.max(0, (now() - dep) / Math.max(1, arr - dep)));
   const tt = live ? Math.min(1, Math.max(0, km(a!, [p!.lat, p!.lon]) / Math.max(1, km(a!, b!)))) : timeT;
+  const seenMin = live ? Math.floor((now() - Date.parse(p!.seenAt)) / 60_000) : 0;
   const left = Math.max(0, Math.round((arr - now()) / 1000));
   const h = Math.floor(left / 3600);
   const m = Math.floor((left % 3600) / 60);
@@ -75,10 +80,11 @@ function AirMap({ trip, now }: { trip: TripDetail; now: () => number }) {
         <SvgText x={310} y={124} textAnchor="end" fontFamily={ff.ui600} fontSize={11} fill="rgba(255,253,249,.8)">{seg.to}</SvgText>
       </Svg>
       <View style={{ padding: 18, gap: 6 }}>
-        <T style={{ color: colors.gold, fontSize: 13, lineHeight: 17, fontFamily: ff.ui600 }}>{live ? t('td.air.live', { alt: Math.round((p!.altitudeFt ?? 0) / 100) * 100 }) : t('td.air.estimated')}</T>
+        <T style={{ color: colors.gold, fontSize: 13, lineHeight: 17, fontFamily: ff.ui600 }}>{live ? (seenMin >= 2 ? t('td.air.liveAgo', { alt: Math.round((p!.altitudeFt ?? 0) / 100) * 100, min: seenMin }) : t('td.air.live', { alt: Math.round((p!.altitudeFt ?? 0) / 100) * 100 })) : t('td.air.estimated')}</T>
         <Row align="baseline" gap={8}><Num size={44} color={colors.paper}>{isRTL() ? durationLabel(h * 60 + m) : `${h}h ${String(m).padStart(2, '0')}m`}</Num><T style={{ fontSize: 18, lineHeight: 22, fontFamily: ff.ui500, color: colors.paper }}>{t('td.air.to', { city: back ? (trip.segments[0]?.from === 'RUH' ? 'Riyadh' : seg.to) : trip.city })}</T></Row>
         {dest.city === 'Istanbul' && !back ? <T v="small" color="rgba(255,253,249,0.88)">{t('td.air.lookLeft')}</T> : null}
         {live ? <Tiny color="rgba(255,253,249,0.6)">{t('td.air.sources', { sources: pos.data!.attribution.replace(/^Aircraft positions:\s*/, '') })}</Tiny> : null}
+        {!live && pos.isSuccess ? <Tiny color="rgba(255,253,249,0.6)">{t('td.air.noReceiver')}</Tiny> : null}
       </View>
     </View>
   );

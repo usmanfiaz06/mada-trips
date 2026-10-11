@@ -310,6 +310,8 @@ export const arTripsToday: ArSection<typeof enTripsToday> = {
   'td.talk.arrival': '{agent} يتابع وصولك.',
   'td.air.estimated': 'في الجو · تقديري، بلا حاجة لإشارة',
   'td.air.live': 'في الجو · {alt} قدم، رُصدت الآن',
+  'td.air.liveAgo': 'في الجو · {alt} قدم، رُصدت قبل {min} دقيقة',
+  'td.air.noReceiver': 'لا يلتقط أي جهاز استقبال هذه الطائرة الآن، فنحدد موقعها حسب أوقاتها.',
   'td.air.to': 'إلى {city}',
   'td.air.sources': 'مواقع الطائرات: {sources}',
   'td.air.lookLeft': 'انظر يسارًا بعد 40 دقيقة تقريبًا: جبال طوروس.',

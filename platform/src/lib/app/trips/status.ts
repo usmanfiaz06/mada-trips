@@ -191,7 +191,11 @@ export async function trackFlight(userId: string, input: TrackFlightRequest, ipH
     await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "flight.tracked", entityType: "app_tracked_flight", entityId: t!.id, summary: `Tracking ${input.flightNumber} on ${input.date}`, data: { alerts: input.alerts }, ipHash });
     return toTrackedView(t!, e!);
   });
-  if (input.alerts && info) await suppliers.flightStatus().watch(input.flightNumber, input.date).catch(() => null);
+  if (input.alerts && info) {
+    await suppliers.flightStatus().watch(input.flightNumber, input.date).catch(() => null);
+    // AeroDataBox alerts: subscribe this flight number now if it flies within the alert window (else the job will).
+    if (Date.parse(`${input.date}T00:00:00Z`) - Date.now() < 72 * 3_600_000) await import("../flight-status/alerts").then((m) => m.subscribeNow(input.flightNumber)).catch(() => null);
+  }
   return row;
 }
 

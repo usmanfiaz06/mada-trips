@@ -4,6 +4,7 @@ import { json, route } from "@/lib/app/http";
 import { launchStatus } from "@/lib/app/launch";
 import { degradedSuppliers } from "@/lib/app/resilience/breaker";
 import { runtimeConfig } from "@/lib/app/resilience/runtime";
+import { flightStatusVendor } from "@/lib/app/suppliers";
 
 // GET /api/app/v1/status → { status: ok | degraded | down, degraded: [{ name, label, state, since }], maintenance, time }.
 // Public and cached for 15 seconds: the app checks it when a supplier call fails, and before a search, to say
@@ -16,6 +17,6 @@ export const GET = route(async () => {
     ? "down" : degraded.length ? "degraded" : "ok";
   // The launch guard: on production, what keeps app routes closed (launch.ts). Ready and empty elsewhere.
   const launch = launchStatus();
-  const body: StatusResponse = { status: launch.ready ? status : "down", degraded, maintenance: cfg.maintenance, time: new Date().toISOString(), launch };
+  const body: StatusResponse = { status: launch.ready ? status : "down", degraded, maintenance: cfg.maintenance, time: new Date().toISOString(), launch, flightStatusSource: flightStatusVendor() };
   return json(body, 200, { "Cache-Control": "public, max-age=15, s-maxage=15, stale-while-revalidate=60" });
 }, { ungated: true });

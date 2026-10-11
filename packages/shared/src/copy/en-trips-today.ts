@@ -301,6 +301,8 @@ export const enTripsToday = {
   // in the air
   'td.air.estimated': 'In the air · estimated, no signal needed',
   'td.air.live': 'In the air · {alt} ft, seen just now',
+  'td.air.liveAgo': 'In the air · {alt} ft, seen {min} min ago',
+  'td.air.noReceiver': 'No receiver can see this plane right now, so we place it by its times.',
   'td.air.to': 'to {city}',
   'td.air.sources': 'Aircraft positions: {sources}',
   'td.air.lookLeft': 'Look left in about 40 minutes: the Taurus Mountains.',
