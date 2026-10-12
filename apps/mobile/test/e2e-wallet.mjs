@@ -9,8 +9,12 @@
 // delete), Mada credit and cards (default, remove the default), Profile and every account screen (details, email,
 // phone, sign-in methods, preferences and loyalty, household with the helper's iqama and exit visa, security and
 // devices, privacy with the copy and deletion, help and legal, sign-out), support (topics, the bag form, urgent help,
-// offline queue with call and SMS, attachments) and the inbox. Screenshots every step at 390×844; fails on any page
-// error or missing text.
+// offline queue with call and SMS, attachments) and the inbox. Passports inside a booking (ONLY=booking): a new
+// account's order sheet asks for the passport right there, a photo uploaded from files is read on the phone, checked
+// beside its thumbnail with one detail edited, kept as an encrypted copy after the consent line, and the sheet comes
+// back exactly as it was; then the copy is viewed, deleted and added again as a PDF from the Wallet; and the demo
+// family's "Hessa's passport" opens from the booking and drops back to it. Screenshots every step at 390×844; fails
+// on any page error or missing text.
 import { createServer, request as httpRequest } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -272,13 +276,13 @@ async function walletFresh() {
   await pickFile(() => byTest('camera-choose').click(), 'noura-baddigit.jpg');
   await see('Is this right?', 'confirm', 150_000);
   await see('Read from your photo. Check every letter. One detail may not have read right.', 'doubt notice');
-  await see('Check this. It may not have read right.', 'check this');
+  await see('Please check', 'please check');
   await shot('passport-confirm-doubt');
   const v = async (id) => page.locator(`[data-testid="pp-${id}"]`).inputValue();
   if ((await v('number')) !== 'B47120385') errors.push(`passport number read as ${await v('number')}`);
   if ((await v('surname')) !== 'ALQAHTANI') errors.push(`surname read as ${await v('surname')}`);
   await byTest('pp-dob').fill('17/05/1992');
-  await gone('Check this. It may not have read right.', 'doubt cleared');
+  await gone('Please check', 'doubt cleared');
   await byTest('pp-expiry').fill('31/02/2033');
   await see('Use the format DD/MM/YYYY, for example 22/06/2031.', 'bad date');
   await byTest('pp-expiry').fill('04/09/2033');
@@ -626,12 +630,134 @@ async function support() {
   await byTest('inbox-all').click();
   await context.close();
 }
+/* ───────────── 6. passports inside a booking, and the passport copy ───────────── */
+async function passportInBooking() {
+  const { page, context } = await newPage();
+  const { shot, see, gone, byTest, pickFile, press } = kit(page);
+  step('booking passports: a new account books, the order sheet asks for the passport right there');
+  const phone = `5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`;
+  await signIn(page, phone, { returning: false });
+  await byTest('dock-ask').click();
+  await see('Where to?', 'ask');
+  await byTest('ask-input').fill('Istanbul for Eid, just me');
+  await byTest('ask-send').click();
+  await see('Three ways to get there.', 'results', 15_000);
+  await press(byTest('ask-review'));
+  await see('Everything included. No fees later.', 'order sheet', 12_000);
+  await byTest('booking-passports').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await see('Tap a name to add or check a passport. You stay right here.', 'passports in the booking');
+  await page.waitForTimeout(800);
+  const total = await byTest('pay-total').innerText();
+  await see('Add passport', 'add passport');
+  await see('No passport yet. It takes a minute.', 'missing line');
+  if (await page.getByText('Scan yours now').filter({ visible: true }).count()) errors.push('booking passports: still sends people to the Wallet');
+  await shot('booking-passport-missing');
+
+  step('booking passports: upload a photo of the page from files, read on the phone');
+  await page.locator('[data-testid^="pp-row-"]').filter({ visible: true }).first().click();
+  await see('Scan it once. Never type it again.', 'passport sheet over the booking');
+  await pickFile(() => byTest('passport-upload').click(), 'noura-baddigit.jpg');
+  await see('Reading your passport…', 'reading the upload');
+  await see('Is this right?', 'verify', 150_000);
+  await see('Your passport', 'whose passport');
+  await see('Check each detail against your photo.', 'compare with the photo');
+  await see('NOURA FAHAD ALQAHTANI', 'full name as on the passport');
+  await see('Please check', 'low confidence in amber');
+  const v = async (id) => page.locator(`[data-testid="pp-${id}"]`).inputValue();
+  if ((await v('number')) !== 'B47120385') errors.push(`booking passports: number read as ${await v('number')}`);
+  if ((await v('issuer')) !== 'Saudi Arabia') errors.push(`booking passports: issuer read as ${await v('issuer')}`);
+  await shot('booking-passport-verify');
+  await byTest('confirm-thumb').click();
+  await page.locator('[data-testid="confirm-zoom"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => errors.push('booking passports: the photo does not open bigger'));
+  await shot('booking-passport-zoom');
+  await page.getByRole('button', { name: 'Back', exact: true }).last().click();
+  await page.waitForTimeout(500);
+  step('booking passports: one detail edited, the copy kept after the consent line');
+  await byTest('pp-dob-check').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await shot('booking-passport-please-check');
+  await byTest('pp-dob').fill('17/05/1992');
+  await gone('Please check', 'checked detail no longer amber');
+  await byTest('pp-issued').fill('05/09/2023');
+  await byTest('confirm-consent').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await see('We keep a copy so Mada can send it for visas or bookings that ask for one. Only you and the Mada agent on your booking can see it. You can delete it anytime.', 'consent line');
+  await shot('booking-passport-consent');
+  await byTest('passport-save').click();
+  await see('Passport saved. It fills in every booking from now on.', 'saved');
+
+  step('booking passports: back on the order sheet, exactly as it was, now ready');
+  await see('Everything included. No fees later.', 'same order sheet');
+  if (!page.url().includes('/pay')) errors.push(`booking passports: ended on ${page.url()}, not the order sheet`);
+  const after = await byTest('pay-total').innerText();
+  if (after !== total) errors.push(`booking passports: the order sheet changed (${total} → ${after})`);
+  await byTest('booking-passports').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await see('Every passport is ready.', 'all ready');
+  await see('Noura Fahad Alqahtani', 'name filled from the passport');
+  await see('Valid until 4 Sep 2033', 'ready line');
+  await shot('booking-passport-ready');
+
+  step('passport copy: viewed in the Wallet, deleted, added again as a PDF');
+  await page.getByRole('button', { name: /^Back$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(600);
+  for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-wallet"]').filter({ visible: true }).count()); i += 1) {
+    await page.getByRole('button', { name: /^(Close|Back)$/ }).filter({ visible: true }).last().click().catch(() => {});
+    await page.waitForTimeout(600);
+  }
+  await byTest('dock-wallet').click();
+  await see('Noura Fahad Alqahtani', 'passport card');
+  await press(byTest('copy-row'));
+  await see('Only you and the Mada agent on your booking can see it.', 'who can see the copy');
+  await page.locator('[data-testid="copy-image"]').locator('visible=true').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => errors.push('passport copy: the image does not show'));
+  await shot('passport-copy-view');
+  await byTest('copy-delete').click();
+  await see('Delete the passport copy?', 'delete asks');
+  await see('The file is removed for good.', 'delete says what goes');
+  await shot('passport-copy-delete');
+  await byTest('copy-delete-yes').click();
+  await see('Passport copy deleted.', 'deleted');
+  await see('Not kept. Visas and some airlines ask for one.', 'row says not kept');
+  await shot('passport-copy-deleted');
+  await press(byTest('copy-row'));
+  await see('We keep a copy so Mada can send it for visas or bookings that ask for one.', 'consent before adding');
+  await pickFile(() => byTest('copy-add').click(), 'insurance.pdf');
+  await see('Passport copy kept, encrypted.', 'pdf kept');
+  await byTest('copy-pdf').waitFor({ state: 'visible', timeout: 8000 }).catch(() => errors.push('passport copy: the PDF row does not show'));
+  await shot('passport-copy-pdf');
+  await context.close();
+
+  step('booking passports: the family, "Hessa’s passport" from the booking, and Later drops back to it');
+  const demo = await newPage();
+  const d = kit(demo.page);
+  await signIn(demo.page, '500004127', { returning: true });
+  await d.byTest('dock-ask').click();
+  await d.see('Where to?', 'ask (demo)');
+  await d.byTest('ask-input').fill('Istanbul for Eid, all of us');
+  await d.byTest('ask-send').click();
+  await d.see('Three ways to get there.', 'results (demo)', 15_000);
+  await d.press(d.byTest('ask-review'));
+  await d.see('Everything included. No fees later.', 'order sheet (demo)', 12_000);
+  await d.byTest('booking-passports').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await d.see('Sara Alharbi', 'sara on the booking');
+  await d.see('Needs a look', 'sara needs a look');
+  await d.see('It needs 6 months left after you’re back', 'why it needs a look');
+  await d.shot('booking-passport-family');
+  await demo.page.locator('[data-testid^="pp-row-"]').filter({ hasText: 'Hessa' }).filter({ visible: true }).first().click();
+  await d.see('Scan Hessa’s passport once.', 'hessa from the booking');
+  await d.byTest('passport-by-hand').click();
+  await d.see('Hessa’s passport', 'hessa eyebrow');
+  await d.shot('booking-passport-hessa');
+  await demo.page.getByRole('button', { name: 'Back', exact: true }).first().click();
+  await demo.page.getByRole('button', { name: 'Later', exact: true }).first().click();
+  await d.see('Everything included. No fees later.', 'later drops back to the booking');
+  if (!demo.page.url().includes('/pay')) errors.push(`booking passports: Later ended on ${demo.page.url()}`);
+  await demo.context.close();
+}
 try {
   if (want('demo')) await walletDemo();
   if (want('lock')) await walletLock();
   if (want('fresh')) await walletFresh();
   if (want('account')) await account();
   if (want('support')) await support();
+  if (want('booking')) await passportInBooking();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);
