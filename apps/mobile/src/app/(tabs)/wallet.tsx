@@ -15,6 +15,7 @@ import { PayMark } from '@/components/PayMark';
 import { T } from '@/components/Text';
 import { LockScreen } from '@/components/wallet/LockScreen';
 import { PassportCard } from '@/components/wallet/PassportCard';
+import { PassportCopyRow } from '@/components/passport/PassportCopy';
 import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, PassSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -97,7 +98,8 @@ function Unlocked() {
     toast(t('wallet.renew.sent', { name: name(who) }));
   };
 
-  const myDocs = (docs.data ?? []).filter((d) => d.personId === who?.id);
+  // The passport copy has its own row under the passport card.
+  const myDocs = (docs.data ?? []).filter((d) => d.personId === who?.id && d.kind !== 'passport');
   const helper = who ? isHelper(who) : false;
   const asks = helper ? [[t('wallet.docs.iqama'), t('wallet.docs.notAdded')], [t('wallet.docs.exitVisa'), t('wallet.docs.exitNeeded')]].filter(([title]) => !myDocs.some((d) => d.title === title)) : [];
   const outSeg = trip?.trip.segments.find((s) => s.direction === 'out') ?? null;
@@ -130,6 +132,7 @@ function Unlocked() {
         <PassportCard person={who} validity={v} isSelf={!!who?.isSelf} name={name(who)} onScan={() => scan()} />
 
         {who?.passport ? <ValidityCard v={v} who={who} name={name(who)} trip={trip} onRenew={renew} /> : null}
+        {who ? <PassportCopyRow person={who} /> : null}
 
         <T v="eyebrow">{who?.isSelf ? t('wallet.docs.eyebrow') : t('wallet.docs.eyebrowOther', { name: name(who) })}</T>
         <QueryState query={docs} section badge skeleton={<SkeletonCard />}>{() => myDocs.length || asks.length ? (

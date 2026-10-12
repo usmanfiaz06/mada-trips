@@ -11,6 +11,7 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { AccountScreen } from '@/components/wallet/AccountScreen';
+import { PassportCopyRow } from '@/components/passport/PassportCopy';
 import { Group, PersonAvatar, Row, Source, StatusPill, UserAvatar } from '@/components/wallet/ui';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
@@ -80,6 +81,7 @@ export default function HouseholdPerson() {
         {st.text ? <T v="small" color={st.tone === 'warn' ? colors.badInk : colors.goldInk}>{st.text}</T> : null}
         {st.key !== 'ok' ? <Button label={st.key === 'none' ? (me ? t('household.scanMine') : t('household.scanTheirs')) : t('household.scanNew')} icon={<Icon name="scan" color={colors.gold} />} onPress={scan} testID="person-scan" /> : null}
       </Card>
+      <PassportCopyRow person={p} />
 
       <Group label={t('household.details')}>
         {!me ? <Row label={t('household.relation')} value={relationOf(p, d)} onPress={() => setSheet('relation')} src={<Source kind={d.relationLabel ? 'typed' : 'added'} />} testID="person-relation" /> : null}
