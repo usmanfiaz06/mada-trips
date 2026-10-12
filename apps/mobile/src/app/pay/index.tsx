@@ -16,17 +16,19 @@ import { ApplePaySheet, CardsSheet, ThreeDsSheet, type PayMethod } from '@/compo
 import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
 import { PhoneSheet, usePhoneNeeded } from '@/components/booking/PhoneSheet';
+import { TravellerPassports } from '@/components/passport/TravellerPassports';
 import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
 import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
 import { HAS_APPLE_PAY } from '@/lib/device';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
-import { joinAnd, listSep, t } from '@/lib/i18n';
+import { listSep, t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useCards } from '@/lib/wallet';
+import { travelEnds } from '@/lib/travel-ends';
 import { colors, font, radii, ff } from '@/theme';
 
 /*
@@ -291,12 +293,9 @@ export default function Pay() {
               {codeErr ? <T v="small" color={colors.badInk} accessibilityRole="alert">{codeErr}</T> : null}
             </View>
           ) : <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('pay.promo.open')} onPress={() => setPromoOpen(true)} /></View>) : null}
-          {missing.length ? (
-            <Notice icon="visa" iconColor={colors.goldInk} title={t('pay.passports.title', { names: joinAnd(missing.map((x) => (x!.isSelf ? t('circles.youLower') : personName(x)))) })}>
-              <T v="small">{t('pay.passports.body')}</T>
-              <View style={{ alignSelf: 'flex-start' }}><LinkButton label={missing[0]!.isSelf ? t('pay.passports.scanYours') : t('pay.passports.scan', { name: personName(missing[0]) })} onPress={() => router.push('/wallet')} /></View>
-            </Notice>
-          ) : null}
+          {/* Passports inside the booking (flights, packages, visas, Umrah): each traveller's, added or checked right here. */}
+          <TravellerPassports kind={pd.draft.kind === 'quote' ? qr?.kind : pd.draft.kind} people={household} travellerIds={p?.travellerIds ?? (hasPeople ? travellers : qr?.travellerIds ?? [])}
+            travelEnds={travelEnds(qc, pd.draft, qr)} selfName={selfName} note={missing.length ? t('pay.passports.body') : null} />
           {phoneNeeded ? (
             <Notice icon="phone" title={t('ask.phone.payTitle')}>
               <T v="small">{t('ask.phone.payBody')}</T>

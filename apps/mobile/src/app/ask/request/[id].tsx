@@ -1,12 +1,17 @@
 import { useRef } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { AgentDot } from '@/components/booking/parts';
 import { ReplyBar, SentRequest } from '@/components/booking/Requests';
+import { TravellerPassports } from '@/components/passport/TravellerPassports';
 import { useBookingRequest, useThread } from '@/lib/booking';
 import { t } from '@/lib/i18n';
+import { usePeople } from '@/lib/queries';
+import { useSession } from '@/lib/session';
+import { travelEnds } from '@/lib/travel-ends';
 import { colors } from '@/theme';
 
 /*
@@ -22,6 +27,11 @@ export default function RequestScreen() {
   const r = useBookingRequest(rid).data;
   const th = useThread(rid);
   const scroll = useRef<ScrollView>(null);
+  const qc = useQueryClient();
+  const people = usePeople();
+  const selfName = useSession((s) => s.user?.name ?? '');
+  // A visa, Umrah or flight request still being worked on shows each traveller's passport, added right here.
+  const passportsOpen = !!r && !['paid', 'done', 'cancelled'].includes(r.status);
   const agent = r?.agent?.name ?? 'Mada';
   const status = !r ? '' : th.data?.agentTyping ? t('presence.typing', { agent }) : r.status === 'quoted' ? t('ask.req.status.answered') : r.status === 'paid' || r.status === 'done' ? t('ask.req.status.paid')
     : r.status === 'reviewing' ? t('ask.req.status.onIt', { agent }) : r.status === 'cancelled' ? t('ask.req.cancelled') : t('ask.req.status.sent');
@@ -40,6 +50,7 @@ export default function RequestScreen() {
         ) : null}
         <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 24 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
+          {passportsOpen ? <View style={{ marginBottom: 14 }}><TravellerPassports kind={r!.kind} people={people.data ?? []} travellerIds={r!.travellerIds} selfName={selfName} travelEnds={travelEnds(qc, { kind: 'quote', requestId: rid }, r)} testID="request-passports" /></View> : null}
           <SentRequest id={rid} screen />
         </ScrollView>
         {r && r.status !== 'cancelled' ? <View style={[styles.bar, { paddingBottom: 16 + bottom }]}><ReplyBar requestId={rid} agent={agent} /></View> : null}
