@@ -12,6 +12,10 @@ describe('Ask: English ways to ask for a stay', () => {
     const r = parse('hotel in Dubai next weekend for 4');
     expect(r).toMatchObject({ kind: 'stay', destination: 'dubai', depart: '2026-10-22', return: '2026-10-24', count: 4 });
   });
+  it('"this weekend" is a day, not a curated plan', () => {
+    expect(parse('A desert camp with a chef this weekend').kind).toBe('general');
+    expect(parse('A weekend in AlUla').kind).toBe('plan');
+  });
   it('a flight with a stay word stays a flight', () => {
     expect(parse('flights to London for a 3 night stay').kind).toBe('flight');
   });

@@ -101,7 +101,8 @@ export function parseKind(text: string): AskKindValue {
   if (/restaurant|dinner|lunch|\btable\b|breakfast/.test(s)) return 'food';
   if (/\btours?\b|things to do|activit|museum|cruise|tickets/.test(s)) return 'todo';
   if (EVENT_WORDS.test(s)) return 'todo';
-  if (PLAN_WORDS.test(s) || (/alula|weekend/.test(s) && !/\bto\b/.test(s))) return 'plan';
+  // A curated plan is asked for by name or as a plan; "this weekend" alone is a day, not a plan ("a desert camp this weekend").
+  if (PLAN_WORDS.test(s) || (/al[- ]?ula/.test(s) && !/\bto\b/.test(s))) return 'plan';
   if (/\beid\b|\btrip\b|\breturn\b|\bto\b|same as last/.test(s) || Object.values(DESTINATIONS).some((d) => d.words.test(s))) return 'flight';
   return 'general';
 }
