@@ -11,6 +11,19 @@ export const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL ?? fallbackOrigin).re
 export const API_MODE: 'live' | 'mock' = process.env.EXPO_PUBLIC_API_MODE === 'mock' ? 'mock' : 'live';
 /** Development builds show the demo hints the prototype shows ("Demo code: 123456"). */
 export const SHOW_DEMO_HINTS = __DEV__ || API_MODE === 'mock' || process.env.EXPO_PUBLIC_DEMO_HINTS === 'yes';
+/** ?demo=1 once in a web session turns the demo switches on for that tab (testers who ask for them). */
+function demoAsked(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  try {
+    if (/[?&]demo=1\b/.test(window.location.search)) window.sessionStorage.setItem('mada.demo', '1');
+    return window.sessionStorage.getItem('mada.demo') === '1';
+  } catch { return false; }
+}
+/**
+ * The demo switches (Ask's "Demo" sheet, "end the hold"): development and mock builds, or when asked for
+ * (EXPO_PUBLIC_DEMO_SWITCHES=yes, or ?demo=1 on the web). Staging testers see the code hints, not the switches.
+ */
+export const SHOW_DEMO_SWITCHES = __DEV__ || API_MODE === 'mock' || process.env.EXPO_PUBLIC_DEMO_SWITCHES === 'yes' || demoAsked();
 /**
  * Focus the field when a screen opens on native only. On the web, focusing during the slide-in transition scrolls the
  * sliding container sideways and leaves the screen offset.

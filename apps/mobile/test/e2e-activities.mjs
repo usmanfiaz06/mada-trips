@@ -152,6 +152,14 @@ async function run(lang) {
   await shot('things-family-indoors');
   await page.getByRole('button', { name: W('Family', 'للعائلة'), exact: true }).filter({ visible: true }).first().click();
   await page.getByRole('button', { name: W('Indoors', 'في الداخل'), exact: true }).filter({ visible: true }).first().click();
+  // Said in words instead: "indoors, it's hot, for the kids" turns on the filters that fit, and says so.
+  await page.locator('[data-testid="things-wish"]').filter({ visible: true }).first().fill(W("indoors, it's hot, for the kids", 'مكان مكيف للأطفال'));
+  await page.locator('[data-testid="things-wish-send"]').filter({ visible: true }).first().click();
+  await page.waitForTimeout(900);
+  await see(W('Showing what fits', 'نعرض اللي يناسب'), 'things wish answer');
+  await shot('things-wish');
+  await page.getByRole('button', { name: W('Family', 'للعائلة'), exact: true }).filter({ visible: true }).first().click();
+  await page.getByRole('button', { name: W('Indoors', 'في الداخل'), exact: true }).filter({ visible: true }).first().click();
   await page.waitForTimeout(600);
 
   step(`${lang}: experiences: no meeting point yet → the voucher`);

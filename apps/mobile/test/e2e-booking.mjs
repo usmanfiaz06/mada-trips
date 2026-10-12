@@ -1,7 +1,7 @@
 // Booking (M2), end to end in headless Chromium against the web export in mock-API mode:
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
-//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,asks,phone to pick)
+//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,stays-ar,asks,phone to pick)
 //
 // Signs in as the demo account (50 000 4127, Omar's family) and walks every booking flow and edge case in FLOWS.md §2–4:
 // Ask (typed details, one question at a time, the calendar), search (results, fare rules, sort, the bundle, entry
@@ -39,8 +39,8 @@ let n = 0;
 const step = (s) => console.log('·', s);
 const want = (name) => !ONLY || ONLY.includes(name);
 
-async function newPage() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh' });
+async function newPage(locale = 'en-GB') {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh' });
   const page = await context.newPage();
   page.on('pageerror', (e) => { errors.push(`pageerror: ${e.message}`); console.log('PAGEERROR', e.message); });
   page.on('console', (m) => { if (m.type() === 'error' && !/favicon|Failed to load resource|contract/.test(m.text())) console.log('console.error', m.text().slice(0, 300)); });
@@ -144,6 +144,14 @@ async function flights() {
   await page.waitForTimeout(300);
   await k.shot('sorted-cheapest');
   await k.press(page.getByRole('tab', { name: 'Best' }));
+  step('flights: say what matters (direct, in the morning)');
+  await k.byTest('ask-input').fill('direct only, morning');
+  await k.byTest('ask-send').click();
+  await k.see('Direct only', 'flight wish chip');
+  await k.byTest('flights-answer').waitFor({ timeout: 5000 }).catch(() => errors.push('flights: no answer line'));
+  await k.shot('flights-refine');
+  await k.press(k.byTest('fwish-morning'));
+  await k.press(k.byTest('fwish-direct'));
   step('flights: travellers, entry checks, the bundle');
   await k.see('Rules checked today', 'entry checked');
   await k.press(k.byTest('bundle-add'));
@@ -434,7 +442,7 @@ async function requests() {
   await k.see('When are you in Istanbul?', 'stays when');
   await k.press(page.getByRole('button', { name: /^This weekend · / }));
   await k.press(k.byTest('stays-search'));
-  await k.see('Three places you\'d like.', 'stays', 12000);
+  await k.see('Three places for you in Istanbul', 'stays', 12000);
   await k.shot('stays');
   await k.press(k.byTest('ask-review'));
   await k.see('Free to cancel until', 'stay rule', 10000);
@@ -540,10 +548,12 @@ async function stays() {
   await k.see('Children, with their age on the day', 'kids ages');
   await k.shot('stay-who');
   await k.press(k.byTest('stays-search'));
-  await k.see("Three places you'd like.", 'stays results', 12000);
+  await k.see('Three places for you in Istanbul', 'stays results', 12000);
+  await k.see('Ranked for a family', 'stays: says who it ranked for');
   const photos = await page.locator('[data-testid^="stay-photo-"] img').evaluateAll((els) => els.map((e) => e.getAttribute('src')));
   if (new Set(photos).size < Math.min(3, photos.length) || !photos.length) errors.push(`stays: hotels share a photo (${photos.join(', ')})`);
   await k.shot('stay-results');
+  await refineStays(page, k);
   step('stays: change the dates from the summary');
   await k.press(k.byTest('stay-chip-when'));
   await k.see('When are you in Istanbul?', 'change dates');
@@ -560,6 +570,93 @@ async function stays() {
   await k.see('Dubai', 'summary city');
   await k.shot('stay-typed-dubai');
   await context.close();
+}
+
+/* ───────────── 7b. stays in Arabic: the same picks, wishes said in Arabic, the map right to left ───────────── */
+async function staysAr() {
+  const { page, context } = await newPage('ar-SA');
+  const k = kit(page);
+  await page.goto(ORIGIN + '/');
+  await k.byTest('welcome-start').waitFor({ timeout: 15000 });
+  await k.byTest('welcome-start').click();
+  await k.byTest('signin-phone').click();
+  await k.byTest('phone-input').fill('500004127');
+  await k.byTest('phone-send').click();
+  await k.byTest('otp-input').waitFor({ timeout: 10000 });
+  await k.byTest('otp-input').fill('123456');
+  await k.byTest('welcome-back-open').waitFor({ timeout: 10000 });
+  await k.byTest('welcome-back-open').click();
+  await page.waitForTimeout(1200);
+  await k.byTest('dock-ask').click();
+  await page.waitForTimeout(800);
+  step('stays (Arabic): asked in Arabic');
+  await k.ask('فندق في إسطنبول');
+  await page.getByRole('button').filter({ hasText: '·' }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(800);
+  await k.press(k.byTest('stays-search'));
+  await k.see('ثلاثة أماكن لك في', 'stays (Arabic) results', 12000);
+  const dir = await page.evaluate(() => document.documentElement.dir);
+  if (dir !== 'rtl') errors.push(`stays (Arabic): dir ${dir}`);
+  await k.shot('stay-results-ar');
+  await refineStays(page, k, true);
+  await context.close();
+}
+
+/** Three picks with reasons, at most one of each badge, plain lines; wishes said in the box; see all, sort, distance from, the map. */
+async function refineStays(page, k, ar = false) {
+  step(`stays${ar ? ' (Arabic)' : ''}: three picks, plain lines, one badge of each`);
+  const body = await page.evaluate(() => document.body.innerText);
+  for (const raw of ['Includes Non-refundable', 'No amendments permitted', 'Includes Special discount', 'ROOM ONLY']) if (body.includes(raw)) errors.push(`stays: raw supplier text "${raw}"`);
+  const picks = await page.locator('[data-testid^="stay-reason-"]').filter({ visible: true }).count();
+  if (picks !== 3) errors.push(`stays: ${picks} picks with a reason, want 3`);
+  const best = (body.match(ar ? /اختيارنا/g : /Our pick/g) ?? []).length;
+  if (best > 2) errors.push(`stays: "Our pick" ${best} times`);
+  await k.see(ar ? 'لـ ' : 'for 3 guests', 'stays: total for the party');
+  step(`stays${ar ? ' (Arabic)' : ''}: say what matters, in the box under the results`);
+  await k.byTest('ask-input').fill(ar ? 'فيه مسبح' : 'with a pool');
+  await k.byTest('ask-send').click();
+  await k.see(ar ? 'يناسب' : 'fits: Pool', 'refine answer');
+  await k.see(ar ? 'مسبح' : 'Pool', 'pool chip');
+  await k.shot(`stay-refine-pool${ar ? '-ar' : ''}`);
+  await k.byTest('ask-input').fill(ar ? 'قريب من السلطان أحمد' : 'closer to Sultanahmet');
+  await k.byTest('ask-send').click();
+  await k.see(ar ? 'ما فيه مكان' : 'Nothing here has all of that.', 'refine: nothing fits both, said plainly');
+  await k.see(ar ? 'اطلب من' : 'Ask Faisal to find it', 'refine: the desk offered');
+  await k.shot(`stay-refine-none${ar ? '-ar' : ''}`);
+  await k.press(k.byTest('wish-has:pool'));
+  await k.see(ar ? 'الأقرب على بعد' : 'The closest is', 'refine: near Sultanahmet, nearest first');
+  await k.shot(`stay-refine-near${ar ? '-ar' : ''}`);
+  await k.byTest('ask-input').fill(ar ? 'غرفة فيها بيانو' : 'a room with a piano');
+  await k.byTest('ask-send').click();
+  await k.see(ar ? 'ما فهمت مادا' : 'Mada didn’t catch what to change', 'refine: not read, said so');
+  await k.press(k.byTest('wish-near:sultanahmet'));
+  step(`stays${ar ? ' (Arabic)' : ''}: see all, sort, distance from, the map`);
+  await k.press(k.byTest('stays-see-all'));
+  await k.see(ar ? 'أماكن في' : 'places in Istanbul', 'see all heading');
+  await k.press(k.byTest('stays-sort'));
+  await k.press(k.byTest('sort-price'));
+  const prices = await page.locator('[data-testid^="stay-price-"]').filter({ visible: true }).allInnerTexts();
+  const num = (x) => Number(x.replace(/[^0-9٠-٩]/g, '').replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)));
+  if (prices.map(num).some((v, i, a) => i && v < a[i - 1])) errors.push(`stays: lowest price sort out of order (${prices.join(', ')})`);
+  await k.shot(`stay-all-price${ar ? '-ar' : ''}`);
+  await k.press(k.byTest('stays-distance'));
+  await k.press(k.byTest('dist-taksim'));
+  await k.see(ar ? 'من تقسيم' : 'from Taksim', 'distance from Taksim on the cards');
+  await k.shot(`stay-distance${ar ? '-ar' : ''}`);
+  await k.press(k.byTest('stays-view-map'));
+  await page.waitForTimeout(2500);
+  await k.byTest('stays-map').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.waitForTimeout(600);
+  const pins = await page.locator('[data-testid^="map-pin-"]').count();
+  if (pins < 3) errors.push(`stays map: ${pins} pins, want 3`);
+  await k.shot(`stay-map${ar ? '-ar' : ''}`, 1500);
+  if (pins) {
+    await page.locator('[data-testid^="map-pin-"]').first().click({ force: true });
+    if (!(await page.locator('[data-testid="stays-map-card"]').count())) errors.push('map: a pin opens its card');
+    await k.shot(`stay-map-card${ar ? '-ar' : ''}`);
+  }
+  await k.press(k.byTest('stays-view-list'));
+  await k.press(k.byTest('stays-back-picks'));
 }
 
 /* ───────────── 8. anything else: only the missing details, words said once, replies that fit ───────────── */
@@ -667,7 +764,7 @@ async function phone() {
   await k.see('doesn', 'wrong code inline');
   await k.shot('phone-sheet-code-wrong');
   await k.byTest('phone-sheet-code').fill('123456');
-  await k.see("Three places you'd like.", 'search carries on', 15000);
+  await k.see("Three places for you in", 'search carries on', 15000);
   await k.shot('phone-then-results');
   await k.press(k.byTest('ask-review'));
   await k.see('Free to cancel until', 'pay without asking again', 10000);
@@ -683,6 +780,7 @@ try {
   if (want('requests')) await requests();
   if (want('circles')) await circles();
   if (want('stays')) await stays();
+  if (want('stays-ar')) await staysAr();
   if (want('asks')) await asks();
   if (want('phone')) await phone();
 } catch (e) {

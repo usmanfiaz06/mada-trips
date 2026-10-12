@@ -18,7 +18,7 @@ import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Req
 import { MeBubble } from '@/components/booking/Conversation';
 import { ApiError } from '@/lib/api';
 import { bookingApi, useDemo } from '@/lib/booking';
-import { SHOW_DEMO_HINTS } from '@/lib/config';
+import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
@@ -106,10 +106,29 @@ export default function Ask() {
   else if (kind === 'esim') body = <EsimFlow key={round} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
 
+  /** The Ask box: type or speak. On results it refines them (hint and onSend from the flow); otherwise it asks anew. */
+  const composer = (hint: string, onSend: (text: string) => void, testID?: string) => (
+    <View style={styles.composer} testID={testID}>
+      <TextInput value={draft} onChangeText={setDraft} placeholder={voice.listening ? t('ask.voice.listening') : hint} placeholderTextColor={voice.listening ? colors.goldInk : colors.muted} accessibilityLabel={t('ask.a11y.input')}
+        onSubmitEditing={() => { if (draft.trim()) onSend(draft.trim()); }} returnKeyType="send" style={[styles.input, webNoOutline]} testID="ask-input" />
+      <Pressable accessibilityRole="button"
+        accessibilityLabel={voice.listening ? t('ask.a11y.stop') : draft ? t('ask.a11y.send') : t('ask.a11y.talk')}
+        accessibilityState={{ busy: voice.listening }}
+        onPress={() => {
+          if (voice.listening) { voice.stop(); return; }
+          if (draft.trim()) { onSend(draft.trim()); return; }
+          buzz('tap'); void voice.start();
+        }}
+        style={[styles.send, voice.listening ? styles.listening : null]} testID="ask-send">
+        <Icon name={voice.listening ? 'close' : draft ? 'up' : 'mic'} color={voice.listening ? colors.green : colors.mist} size={20} />
+      </Pressable>
+    </View>
+  );
+
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TopBar onBack={() => router.back()} backLabel={t('ask.close')} right={SHOW_DEMO_HINTS ? (
+        <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={SHOW_DEMO_SWITCHES ? (
           <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable>
         ) : undefined} />
         <T v="tiny" style={{ marginHorizontal: 24, marginBottom: 8 }}>{t('ask.disclosure')}</T>
@@ -118,7 +137,13 @@ export default function Ask() {
           <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
         </ScrollView>
         <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
-          {cta && !offline ? (
+          {cta && !offline && cta.refine ? (
+            <>
+              {/* Results: say what matters (typed or spoken) to refine them; the one action stays below. */}
+              {composer(cta.refine.hint, (text) => { setDraft(''); cta.refine!.onSubmit(text); }, cta.refine.testID)}
+              <Button label={cta.label} disabled={cta.disabled} onPress={cta.onPress} testID={cta.testID ?? 'ask-cta'} />
+            </>
+          ) : cta && !offline ? (
             <>
               <Button label={cta.label} disabled={cta.disabled} onPress={cta.onPress} testID={cta.testID ?? 'ask-cta'} />
               <View style={{ alignSelf: 'center' }}><LinkButton label={t('ask.somethingElse')} size={13} onPress={() => setCta(null)} /></View>
@@ -128,23 +153,7 @@ export default function Ask() {
               <ReplyBar requestId={replyTo.id} agent={replyTo.agent} />
               <View style={{ alignSelf: 'center' }}><LinkButton label={t('ask.somethingElse')} size={13} onPress={() => setAskNew(true)} testID="ask-something-else" /></View>
             </>
-          ) : (
-            <View style={styles.composer}>
-              <TextInput value={draft} onChangeText={setDraft} placeholder={voice.listening ? t('ask.voice.listening') : intent ? t('ask.composerMore') : t('ask.composer')} placeholderTextColor={voice.listening ? colors.goldInk : colors.muted} accessibilityLabel={t('ask.a11y.input')}
-                onSubmitEditing={() => submit(draft)} returnKeyType="send" style={[styles.input, webNoOutline]} testID="ask-input" />
-              <Pressable accessibilityRole="button"
-                accessibilityLabel={voice.listening ? t('ask.a11y.stop') : draft ? t('ask.a11y.send') : t('ask.a11y.talk')}
-                accessibilityState={{ busy: voice.listening }}
-                onPress={() => {
-                  if (voice.listening) { voice.stop(); return; }
-                  if (draft) { void submit(draft); return; }
-                  buzz('tap'); void voice.start();
-                }}
-                style={[styles.send, voice.listening ? styles.listening : null]} testID="ask-send">
-                <Icon name={voice.listening ? 'close' : draft ? 'up' : 'mic'} color={voice.listening ? colors.green : colors.mist} size={20} />
-              </Pressable>
-            </View>
-          )}
+          ) : composer(voice.listening ? t('ask.voice.listening') : intent ? t('ask.composerMore') : t('ask.composer'), (text) => submit(text))}
         </View>
       </KeyboardAvoidingView>
       <DemoSheet visible={demoOpen} onClose={() => setDemoOpen(false)} />

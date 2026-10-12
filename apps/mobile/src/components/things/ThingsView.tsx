@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { dayLabel, liveStay, localizeDigits, type ThingsQuery, type ThingsResponse } from '@mada/shared';
+import { dayLabel, liveStay, localizeDigits, parseThingWishes, thingWishLabel, type ThingWish, type ThingsQuery, type ThingsResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -67,6 +67,24 @@ function TodayCard({ data }: { data: ThingsResponse }) {
 export function ThingsView({ placeId, city, tripId = null, days = [], mode, initialDay = null }: Props) {
   const router = useRouter();
   const [filters, setFilters] = useState<Set<Filter>>(new Set());
+  // "Indoors, it's hot, for the kids, tonight": said once, it turns on the filters that fit, and says so.
+  const [wish, setWish] = useState('');
+  const [wishAnswer, setWishAnswer] = useState<string | null>(null);
+  const sayWish = () => {
+    const text = wish.trim();
+    if (!text) return;
+    const p = parseThingWishes(text);
+    const map: Partial<Record<ThingWish['k'], Filter>> = { indoor: 'indoor', outdoor: 'outdoor', kids: 'family', today: 'open', tonight: 'open' };
+    const on = p.wishes.map((w) => map[w.k]).filter((f): f is Filter => !!f);
+    if (!on.length) { setWishAnswer(t('refine.notRead')); return; }
+    setFilters((prev) => {
+      const next = new Set(prev);
+      for (const f of on) { next.add(f); if (f === 'indoor') next.delete('outdoor'); if (f === 'outdoor') next.delete('indoor'); }
+      return next;
+    });
+    setWishAnswer(t('refine.t.applied', { wishes: p.wishes.filter((w) => map[w.k]).map(thingWishLabel).join(isRTL() ? '، ' : ', ') }));
+    setWish('');
+  };
   const [day, setDay] = useState<string | null>(initialDay);
   const [picked, setPicked] = useState<Thing | null>(null);
   const [booking, setBooking] = useState<Thing | null>(null);
@@ -186,6 +204,12 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
               {days.map((d) => <Chip key={d} label={dayLabel(d, { today: d })} on={day === d} onPress={() => setDay(d)} />)}
             </ScrollView>
           ) : null}
+          <View style={st.wishBox}>
+            <TextInput value={wish} onChangeText={setWish} placeholder={t('things.ask.hint')} placeholderTextColor={colors.muted} accessibilityLabel={t('things.ask.hint')} returnKeyType="send"
+              onSubmitEditing={sayWish} style={[st.wishInput, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]} testID="things-wish" />
+            <Pressable accessibilityRole="button" accessibilityLabel={t('ask.a11y.send')} onPress={sayWish} style={st.wishSend} testID="things-wish-send"><Icon name="up" size={18} color={colors.mist} /></Pressable>
+          </View>
+          {wishAnswer ? <T v="small" color={colors.green} testID="things-wish-answer">{wishAnswer}</T> : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20, flexGrow: 0 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }} testID="things-filters">
             {!day ? <Chip label={t('things.filter.open')} on={filters.has('open')} onPress={() => toggle('open')} /> : null}
             <Chip label={data?.ages.length ? t('things.filter.kids', { ages: data.ages.map((a) => localizeDigits(String(a))).join(ar ? '، ' : ', ') }) : t('things.filter.family')} on={filters.has('family')} onPress={() => toggle('family')} />
@@ -212,6 +236,9 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
 }
 
 const st = StyleSheet.create({
+  wishBox: { height: 48, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 16, paddingEnd: 4, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  wishInput: { flex: 1, minWidth: 0, fontSize: 15, color: colors.green },
+  wishSend: { width: 40, height: 40, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   link: { color: colors.goldInk, fontFamily: ff.ui600 },
   today: { gap: 4, padding: 16, borderRadius: 22, backgroundColor: colors.green },

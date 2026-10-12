@@ -146,6 +146,12 @@
         }
       ],
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "To measure how far hotels and places are from where you are, when you ask. Used once, never kept."
+        }
+      ],
       "expo-secure-store",
       "expo-video",
       [

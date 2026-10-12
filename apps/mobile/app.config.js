@@ -6,6 +6,9 @@
 //   EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
 //                       Google Sign-In's native SDK needs the iOS client id's reversed form as a URL scheme, known
 //                       only once the Google Cloud project exists (docs/app/AUTH.md).
+//   GOOGLE_MAPS_ANDROID_API_KEY
+//                       the hotel map on Android (react-native-maps draws Google Maps there; iOS uses Apple Maps with
+//                       no key). Without it Android shows the drawn map instead (src/components/maps).
 //   SENTRY_ORG, SENTRY_PROJECT (+ SENTRY_AUTH_TOKEN as an EAS secret)
 //                       uploads source maps so crash reports show real file names. Without them nothing is uploaded.
 //
@@ -36,6 +39,10 @@ module.exports = ({ config }) => {
   if (process.env.SENTRY_ORG && process.env.SENTRY_PROJECT) {
     out.plugins.push(['@sentry/react-native/expo', { organization: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT, url: 'https://sentry.io/' }]);
   }
+
+  const mapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
+  if (mapsKey) out.android = { ...(config.android ?? {}), config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } };
+  out.extra.mapsAndroid = !!mapsKey;
 
   // Directions from Things to do (src/lib/directions.ts): Android 11+ only lets canOpenURL see apps declared here.
   out.plugins.push(withRideAppQueries);

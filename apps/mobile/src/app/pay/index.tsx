@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindow
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatSar, householdOf, normalizeContactPhone, personName, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
+import { formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
 import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -21,7 +21,7 @@ import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
 import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
 import { HAS_APPLE_PAY } from '@/lib/device';
-import { SHOW_DEMO_HINTS } from '@/lib/config';
+import { SHOW_DEMO_HINTS, SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { listSep, t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
@@ -315,8 +315,17 @@ export default function Pay() {
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>
-            {share ? null : <T v="small">{t('pay.allIn')}</T>}
-            <T v="small">{p?.rule ?? ''}</T>
+            {/* A room: the same facts as on its card, said again before paying (nothing new at the last step). */}
+            {share ? null : <T v="small" testID="pay-all-in">{p?.stay?.payAtHotel ? t('pay.plusTax', { amount: formatSar(p.stay.payAtHotel.amount, { bare: true }) }) : t('pay.allIn')}</T>}
+            {p?.stay ? (
+              <View style={{ gap: 4, marginTop: 4 }} testID="pay-stay-rule">
+                <View style={styles.row}>
+                  <Icon name={p.stay.refundable ? 'check' : 'refund'} size={16} color={p.stay.refundable ? colors.ok : colors.ink3} />
+                  <T v="small" color={p.stay.refundable ? colors.ok : colors.ink2} style={{ flex: 1 }}>{p.stay.refundable ? (p.stay.freeCancelUntil ? t('hotel.cancelFree', { date: shortDay(p.stay.freeCancelUntil) }) : t('stay.freeCancelAny')) : t('pay.stayNoRefund')}</T>
+                </View>
+                {p.stay.essentials ? <T v="tiny">{t('hb.essential', { text: p.stay.essentials })}</T> : null}
+              </View>
+            ) : <T v="small">{p?.rule ?? ''}</T>}
           </View>
           <View style={styles.spread}>
             <View style={styles.row}>
@@ -343,7 +352,7 @@ export default function Pay() {
         )}
         <T v="tiny" style={{ textAlign: 'center' }}>
           {p?.agent === false ? t('pay.nowNote') : t('pay.agentNote')}
-          {SHOW_DEMO_HINTS && hold ? <T v="tiny" style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }} onPress={() => setHoldSkip(24 * 3600_000)}> {t('pay.demoHold')}</T> : null}
+          {SHOW_DEMO_SWITCHES && hold ? <T v="tiny" style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }} onPress={() => setHoldSkip(24 * 3600_000)}> {t('pay.demoHold')}</T> : null}
         </T>
       </View>
 

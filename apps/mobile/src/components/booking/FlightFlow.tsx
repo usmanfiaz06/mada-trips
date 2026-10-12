@@ -5,8 +5,7 @@ import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
   AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, monthLongName, nameIn, quickDates,
-  type AskIntent, type FlightOption, type FlightSearchResponse, type Person,
-} from '@mada/shared';
+  type AskIntent, type FlightOption, type FlightSearchResponse, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
@@ -21,7 +20,7 @@ import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { dayName, rangeName } from './format';
-import { ArtCalendar, Ask1, Leg, Working, useSequence, useWho, enter } from './parts';
+import { ArtCalendar, Ask1, Leg, MadaDot, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow, SentRequest } from './Requests';
 import { Answered } from './Conversation';
 import { PhoneGate, usePhoneNeeded } from './PhoneSheet';
@@ -32,7 +31,8 @@ import { TravellerChips } from './Travellers';
 
 /* Flights in Ask: one question at a time (where, when, back when, who), then Mada shows its work and three options. */
 
-export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string } | null;
+/** The one action at the bottom of Ask; with refine, the box above it says what matters for these results. */
+export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string; refine?: { hint: string; onSubmit: (text: string) => void; testID?: string } } | null;
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
@@ -56,6 +56,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const [open, setOpen] = useState<string | null>(null);
   const [bundle, setBundle] = useState(false);
   const [sort, setSort] = useState<'best' | 'cheapest' | 'fastest' | 'earliest'>('best');
+  // Wishes said in the box under the results ("morning, direct, with bags"): chips that filter, and one line back.
+  const [fwishes, setFwishes] = useState<FlightWish[]>([]);
+  const [funread, setFunread] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Flights by request (the beta): no live fares; the form goes to Mada and the fares come back in the request.
   const byRequest = useFlightsByRequest();
@@ -94,7 +97,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     if (sort === 'earliest') list.sort((a, b) => a.out.dep.localeCompare(b.out.dep));
     return list;
   }, [s, sort]);
-  const current: FlightOption | undefined = options.find((o) => o.id === pick) ?? s?.options[0];
+  const refinedF = useMemo(() => refineFlights(options, fwishes), [options, fwishes]);
+  const shownOptions = fwishes.length && refinedF.matches.length ? refinedF.matches : options;
+  const current: FlightOption | undefined = shownOptions.find((o) => o.id === pick) ?? shownOptions[0] ?? s?.options[0];
   const showBundle = !!s?.bundle && trip.type === 'return';
   const total = (current?.total.amount ?? 0) + (bundle && showBundle ? s!.bundle!.total.amount : 0);
   const blocking = entry.data?.checks.filter((c) => c.blocking) ?? [];
@@ -109,6 +114,16 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       onPress: () => {
         usePayDraft.getState().set({ draft: { kind: 'trip', flightOfferId: current.id, bundle: bundle && showBundle, travellerIds: who }, title: dest!.name, destination: dest!.key, askAgain: query });
         router.push('/pay');
+      },
+      refine: {
+        hint: t('flights.ask.hint'), testID: 'flights-refine',
+        onSubmit: (text) => {
+          const p = parseFlightWishes(text);
+          buzz('tap');
+          if (!p.wishes.length) { setFunread(true); return; }
+          setFunread(false); setPick(null);
+          setFwishes((w) => [...w.filter((x) => !p.wishes.some((y) => flightWishKey(y) === flightWishKey(x))), ...p.wishes]);
+        },
       },
     });
   }, [results, current?.id, total, entry.data, bundle, who.join()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -272,7 +287,24 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
           </Pressable>
         ))}
       </View>
-      {options.map((f, i) => {
+      {fwishes.length || funread ? (
+        <View style={{ gap: 8 }} testID="flights-wishes">
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {fwishes.map((w) => (
+              <Pressable key={flightWishKey(w)} accessibilityRole="button" accessibilityLabel={t('stays.wishes.remove', { wish: flightWishLabel(w, options.find((o) => o.carrier === w.carrier)?.airline) })}
+                onPress={() => { buzz('select'); setFunread(false); setFwishes((x) => x.filter((y) => flightWishKey(y) !== flightWishKey(w))); }} style={styles.wish} testID={`fwish-${flightWishKey(w)}`}>
+                <T v="small" color={colors.mist} style={{ fontFamily: ff.ui600 }}>{flightWishLabel(w, options.find((o) => o.carrier === w.carrier)?.airline)}</T>
+                <Icon name="close" size={14} color={colors.mist} />
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.answer} testID="flights-answer">
+            <MadaDot size={26} />
+            <T v="small" color={colors.green} style={{ flex: 1 }}>{funread ? t('refine.notRead') : `${refinedF.answer}${fwishes.length && !refinedF.matches.length ? ` ${t('refine.closest')}` : ''}`}</T>
+          </View>
+        </View>
+      ) : null}
+      {shownOptions.map((f, i) => {
         const on = current?.id === f.id;
         return (
           <Animated.View key={f.id} entering={enter(i + 2)}>
@@ -333,6 +365,8 @@ const styles = StyleSheet.create({
   summary: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 18, backgroundColor: colors.paper },
   sortTab: { paddingVertical: 4, borderBottomWidth: 2, borderColor: 'transparent' },
   sortOn: { borderColor: colors.gold },
+  wish: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 99, backgroundColor: colors.green },
+  answer: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 18, backgroundColor: colors.paper },
   opt: { paddingVertical: 14, paddingHorizontal: 16, gap: 10 },
   spread: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   price: { fontFamily: ff.ui600, fontSize: 17, color: colors.green, fontVariant: ['tabular-nums'] },

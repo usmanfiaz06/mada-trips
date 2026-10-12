@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
-import { useRouter, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { DESTINATIONS, addDays, ageOn, daysBetween, formatSar, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person } from '@mada/shared';
+import { DESTINATIONS, addDays, ageOn, daysBetween, formatSar, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t, tn } from '@/lib/i18n';
@@ -28,11 +27,10 @@ import { SearchSheet } from './SearchSheet';
 import { ArtSuitcase, Ask1, ChipWrap, Photo, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
+import { StayResults } from './StayResults';
 
 /* Stays, curated plans and eSIMs in Ask. */
 
-/** Hotels drawn at once; "Show more" adds the next page. */
-const STAYS_PAGE = 10;
 /** Where people stay most, after their own recent cities. Live cities first; the rest Mada books by hand. */
 const POPULAR = ['dubai', 'istanbul', 'london', 'jeddah', 'alula', 'abha', 'cairo', 'baku'];
 /** Cities the search knows besides the ones sold live (Mada finds rooms there by hand). */
@@ -79,6 +77,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const [pick, setPick] = useState<string | null>(null);
   const [byHand, setByHand] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  /** What the traveller asked for that the list couldn't show: it goes to the desk with the search. */
+  const [deskNote, setDeskNote] = useState<string | null>(null);
 
   const dest = destOf(city);
   const live = !!dest && !dest.byHand;
@@ -97,8 +97,6 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   // Entry checks don't depend on the rooms: asked at the same time as the search, not after it.
   const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, flags], enabled: searching, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers }) });
   // A city can answer with a couple of hundred hotels: draw a page at a time, cheapest first.
-  const [page, setPage] = useState<{ of: unknown; n: number }>({ of: null, n: STAYS_PAGE });
-  const shown = page.of === search.data ? page.n : STAYS_PAGE;
   const s = search.data;
   const cur = s?.options.find((o) => o.id === pick) ?? s?.options[0];
   const ready = searching && step >= 2 && s?.outcome === 'ok' && !!cur;
@@ -109,13 +107,13 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
       setCta({ label: phoneNeeded ? t('ask.phone.thenSearch') : live ? t('ask.stay.search', { guests: tn('ask.stay.guests', n) }) : t('ask.stay.askMada'), testID: 'stays-search', onPress: start });
       return;
     }
-    if (!ready || !cur) { setCta(null); return; }
-    const block = blockLabel(entry.data);
-    setCta({ label: block ?? t('search.review', { price: formatSar(cur.total.amount) }), disabled: !!block, testID: 'ask-review', onPress: () => { usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: cur.id, travellerIds: who }, title: cur.name, destination: dest!.key, askAgain: query }); router.push('/pay'); } });
-  }, [phase, ready, cur?.id, entry.data, who.join(), phoneNeeded, live]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Results set their own action (StayResults: Review, and the box to say what matters).
+    if (!ready) setCta(null);
+  }, [phase, ready, who.join(), phoneNeeded, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const review = (o: StayOption) => { usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest!.key, askAgain: query }); router.push('/pay'); };
   useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const change = (what: 'where' | 'when') => { setGo(false); setPick(null); setByHand(false); setEditing(what); };
+  const change = (what: 'where' | 'when') => { setGo(false); setPick(null); setByHand(false); setDeskNote(null); setEditing(what); };
   const summary = city && checkIn && checkOut ? (
     <SummaryChips items={[
       { label: cityLabel(city), onPress: () => change('where'), testID: 'stay-chip-where' },
@@ -200,7 +198,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
       <View style={{ gap: 14 }}>
         {summary}
         <ByHand city={cityLabel(city!)} stay queued={demo.has('offline')} />
-        <RequestFlow kind="stay" query={query} intent={null} people={people} selfName={selfName} autoSend travellerIds={who}
+        <RequestFlow kind="stay" query={deskNote ? `${query} · ${deskNote}` : query} intent={null} people={people} selfName={selfName} autoSend travellerIds={who}
           search={{ destination: dest?.key ?? null, destinationName: dest ? null : city!.name, from: null, depart: checkIn, return: checkOut, cabin: null, carrier: null }} />
       </View>
     );
@@ -211,44 +209,9 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
   }
   return (
-    <View style={{ gap: 12 }}>
-      <Animated.View entering={enter(0)} style={{ gap: 8 }}>
-        <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('search.stays.title')}</T>
-        {summary}
-      </Animated.View>
-      {s.options.slice(0, shown).map((h, i) => {
-        const on = cur?.id === h.id;
-        // Each hotel's own photo (Hotelbeds sends one per hotel); the catalogue's library photo otherwise.
-        const img = h.hotel?.imageUrl ?? null;
-        return (
-          <Animated.View key={h.id} entering={enter(i < STAYS_PAGE ? i + 1 : 0)}>
-            <Card padding={0} selected={on} onPress={() => setPick(h.id)} accessibilityLabel={h.name} style={{ overflow: 'hidden', gap: 0 }}>
-              <View style={styles.photo} testID={`stay-photo-${i}`}>
-                {img ? <ExpoImage source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={h.id} accessible={false} /> : <Photo name={h.photo} focal={h.focal} />}
-                <Pill label={t(`search.label.${h.label}`)} variant={on ? 'gold' : 'default'} style={[styles.pillTL, on ? null : { backgroundColor: 'rgba(255,253,249,0.9)' }]} />
-                {h.rating || h.hotel?.category ? <Pill label={h.rating || h.hotel?.category || ''} style={[styles.pillTR, { backgroundColor: 'rgba(255,253,249,0.9)' }]} /> : null}
-              </View>
-              <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, gap: 4 }}>
-                <View style={styles.spread}><T v="h3" style={{ flex: 1 }}>{h.name}</T><T style={styles.price}>{formatSar(h.total.amount)}</T></View>
-                <T v="small">{h.area}</T>
-                <T v="small" color={colors.green}>{h.note}</T>
-                {/* A Hotelbeds room: its own cancellation rule, and the hotel's details (category, every photo, facilities). */}
-                {h.hotel ? <T v="small">{h.cancellation}</T> : null}
-                {h.hotel ? <Pressable testID={`hotel-details-${i}`} accessibilityRole="link" onPress={() => router.push(`/hotel/${h.hotel!.code}` as Href)}><T v="small" color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('hotel.details')}</T></Pressable> : null}
-              </View>
-            </Card>
-          </Animated.View>
-        );
-      })}
-      {s.options.length > shown ? (
-        <View style={{ gap: 8, alignItems: 'center' }}>
-          <T v="tiny">{t('search.stays.shown', { shown, count: s.options.length })}</T>
-          <Button variant="secondary" label={t('search.stays.more', { count: Math.min(STAYS_PAGE, s.options.length - shown) })} onPress={() => setPage({ of: search.data, n: shown + STAYS_PAGE })} testID="stays-more" />
-        </View>
-      ) : null}
-      <EntryChecks result={entry.data} destination={dest!.key} travellerIds={who} depart={checkIn!} ret={checkOut} answer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} remove={(id) => setWho((w) => w.filter((x) => x !== id))} />
-      <View style={{ height: 60 }} />
-    </View>
+    <StayResults s={s} city={dest!.key} cityName={cityLabel(city!)} dates={rangeName(checkIn!, checkOut!, today)} people={people} who={who} checkIn={checkIn!} summary={summary}
+      block={blockLabel(entry.data)} setCta={setCta} onReview={review} onDesk={(note) => { buzz('tap'); setDeskNote(note); setByHand(true); }}
+      entry={<EntryChecks result={entry.data} destination={dest!.key} travellerIds={who} depart={checkIn!} ret={checkOut} answer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} remove={(id) => setWho((w) => w.filter((x) => x !== id))} />} />
   );
 }
 
