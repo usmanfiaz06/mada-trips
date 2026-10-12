@@ -14,14 +14,16 @@ import { T } from '@/components/Text';
 import { t } from '@/lib/i18n';
 import { rise, riseStyle } from '@/lib/motion';
 import { usePeople } from '@/lib/queries';
-import { BLANK, SAMPLE_MRZ, usePassportScan } from '@/lib/passport-scan';
+import { BLANK, SAMPLE_MRZ, isPdf, usePassportScan } from '@/lib/passport-scan';
 import { warmUp } from '@/lib/ocr';
+import { chooseFile } from '@/lib/pick';
 import { colors, ff } from '@/theme';
 
 /**
  * "Scan it once. Never type it again." (prototype Onboarding passport step, as "Add your passport"): a sample page
- * with a scan beam filling a booking form, then the camera, or typing it by hand. `?person=` scans for someone in
- * the household; without it, the account holder's own.
+ * with a scan beam filling a booking form, then the camera, a photo or PDF from files, or typing it by hand.
+ * `?person=` scans for someone in the household; without it, the account holder's own. It opens as a sheet over
+ * wherever it was asked for (a booking, the Wallet, a household page) and goes back there when it's done.
  */
 export default function PassportIntro() {
   const router = useRouter();
@@ -36,6 +38,15 @@ export default function PassportIntro() {
 
   const later = () => router.back();
   const byHand = () => { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK }); router.push('/passport/confirm'); };
+  // A photo goes to the camera screen to be read there; a PDF can't be read on the phone, so it's typed beside it.
+  const upload = async () => {
+    const f = await chooseFile();
+    if (!f) return;
+    if (isPdf(f)) { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK, copy: f, keepCopy: true }); router.push('/passport/confirm'); return; }
+    warmUp();
+    set({ incoming: f });
+    router.push('/passport/camera');
+  };
   const toCamera = async () => {
     warmUp();
     if (perm?.granted) { router.push('/passport/camera'); return; }
@@ -64,6 +75,7 @@ export default function PassportIntro() {
         {/* Always in sight, right above the button it's about. */}
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingHorizontal: 4 }}><Icon name="lock" size={16} color={colors.inkSoft} /><T v="small" color={colors.inkSoft} style={{ flex: 1 }}>{t('passport.lock')}</T></View>
         <Button label={t('passport.scan')} icon={<Icon name="scan" color={colors.gold} />} onPress={toCamera} testID="passport-scan-start" />
+        <Button variant="secondary" label={t('passport.upload')} icon={<Icon name="doc" />} onPress={upload} style={{ backgroundColor: colors.mist }} testID="passport-upload" />
         <Button variant="ghost" label={t('passport.byHand')} onPress={byHand} testID="passport-by-hand" />
       </Act>
 

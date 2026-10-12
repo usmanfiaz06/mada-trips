@@ -1,5 +1,5 @@
 import {
-  CreateDocumentMeta, DESK_PHONE, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
+  CreateDocumentMeta, DESK_PHONE, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
   UpdatePersonRequest, checkSaudiMobile, firstNameOf, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
@@ -163,8 +163,13 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (!parsed.success) return err('VALIDATION', { fields: fieldsOf(parsed.error.issues) });
     const meta = parsed.data;
     if (!ownPerson(meta.personId)) return err('NOT_FOUND');
-    const old = meta.replaces ? s.docs.find((d) => d.id === meta.replaces) : null;
+    // A passport copy (the Core API's rule): needs the file, one per person, and never the number beside it.
+    const copy = meta.kind === 'passport';
+    if (copy && !up.__file) return err('VALIDATION', { fields: { file: 'missing' } });
+    if (copy) meta.fields = passportCopyFields(meta.fields ?? {});
+    const old = meta.replaces ? s.docs.find((d) => d.id === meta.replaces) : copy ? s.docs.find((d) => d.kind === 'passport' && d.personId === meta.personId) ?? null : null;
     if (meta.replaces && !old) return err('NOT_FOUND');
+    if (old?.file) s.files.delete(old.file.id);
     const fileId = up.__file ? uuid() : null;
     if (fileId && up.__file) s.files.set(fileId, up.__file.uri);
     const doc: WalletDocument = {
@@ -184,8 +189,16 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (w.method === 'DELETE') {
       if (!d.removable) return err('FORBIDDEN', { copy: 'wallet.docs.setup' });
       s.docs = s.docs.filter((x) => x.id !== d.id);
+      if (d.file) s.files.delete(d.file.id);
       return ok({ ok: true });
     }
+  }
+  // The file itself: the real API streams the decrypted bytes; here, the picked file's own address on this phone.
+  r = m(/^\/documents\/([^/]+)\/file$/);
+  if (r && w.method === 'GET') {
+    const d = s.docs.find((x) => x.id === r![1]);
+    const uri = d?.file ? s.files.get(d.file.id) : null;
+    return uri ? ok({ uri }) : err('NOT_FOUND');
   }
   r = m(/^\/documents\/([^/]+)\/share$/);
   if (r) {
@@ -208,6 +221,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
     if (w.method === 'DELETE') {
       if (p.isSelf) return err('FORBIDDEN');
       user.people = user.people.filter((x) => x.id !== p.id);
+      for (const d of s.docs) if (d.personId === p.id && d.file) s.files.delete(d.file.id);
       s.docs = s.docs.filter((d) => d.personId !== p.id);
       delete s.details[p.id];
       return ok({ ok: true });

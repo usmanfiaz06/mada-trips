@@ -80,6 +80,8 @@ export default function RootLayout() {
                 <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
                 <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
                 <Stack.Screen name="ask" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+                {/* Adding a passport rises over wherever it was asked for (a booking, the Wallet) and drops back to it. */}
+                <Stack.Screen name="passport" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                 <Stack.Screen name="update" options={{ animation: 'fade', gestureEnabled: false }} />
                 <Stack.Screen name="maintenance" options={{ animation: 'fade', gestureEnabled: false }} />
               </Stack>

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { CameraView } from 'expo-camera';
 import { Image } from 'expo-image';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
-import { checkUpload, fontFamilies, type MrzResult } from '@mada/shared';
+import { COUNTRIES, checkUpload, fontFamilies, type MrzResult } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { PermissionDenied } from '@/components/states';
 import { Icon } from '@/components/Icon';
@@ -13,22 +13,27 @@ import { T } from '@/components/Text';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { readPassport, warmUp } from '@/lib/ocr';
-import { choosePhoto, takePhoto } from '@/lib/pick';
-import { BLANK, DEMO_FIELDS, SAMPLE_MRZ, usePassportScan } from '@/lib/passport-scan';
+import { chooseFile, choosePhoto, takePhoto } from '@/lib/pick';
+import { BLANK, DEMO_FIELDS, SAMPLE_MRZ, isPdf, usePassportScan } from '@/lib/passport-scan';
+import type { PickedFile } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { colors } from '@/theme';
 
 type Stage = 'choose' | 'demo' | 'reading' | 'failed';
 
 /**
- * The camera (prototype Onboarding camera step): photograph the photo page, choose a photo, or the demo passport.
- * The two lines at the bottom are read on the phone; the photo isn't uploaded or kept. Wrong file, unreadable page
- * and a reader that won't load each get their own words, then "Try again" or "Enter it by hand".
+ * The camera (prototype Onboarding camera step): photograph the photo page, choose a photo, upload a photo or PDF
+ * from files, or the demo passport. The two lines at the bottom are always read on the phone. The picture stays on
+ * the phone with the details for the traveller to compare; it's sent (encrypted at rest) only if they choose to keep
+ * a copy when they confirm. A PDF can't be read here, so it goes straight to typing the details beside it.
+ * Wrong file, unreadable page and a reader that won't load each get their own words, then "Try again" or "Enter it
+ * by hand" (which keeps the photo to compare with).
  */
 export default function PassportCamera() {
   const router = useRouter();
   const set = usePassportScan((s) => s.set);
   const [stage, setStage] = useState<Stage>('choose');
+  const picked = useRef<PickedFile | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [fileErr, setFileErr] = useState<string | null>(null);
@@ -46,7 +51,7 @@ export default function PassportCamera() {
     const tm = setTimeout(() => {
       if (demo('scanFails')) { setFailWhy(null); setStage('failed'); buzz('soft'); return; }
       buzz('success');
-      set({ fields: DEMO_FIELDS, doubt: [], fromPhoto: false, manual: false });
+      set({ fields: DEMO_FIELDS, doubt: [], fromPhoto: false, manual: false, copy: null });
       router.replace('/passport/confirm');
     }, 2200);
     return () => clearTimeout(tm);
@@ -54,17 +59,20 @@ export default function PassportCamera() {
 
   const found = (r: MrzResult) => {
     const f = r.fields!;
-    set({ fields: { given: f.given, surname: f.surname, number: f.number, nationality: f.nationality, dob: f.dob, expiry: f.expiry, sex: f.sex, issuer: f.issuer }, doubt: r.doubtful, fromPhoto: true, manual: false });
+    set({ fields: { given: f.given, surname: f.surname, number: f.number, nationality: f.nationality, dob: f.dob, expiry: f.expiry, sex: f.sex, issuer: COUNTRIES[f.issuer] ?? f.issuer, issued: '' }, doubt: r.doubtful, fromPhoto: true, manual: false, copy: picked.current, keepCopy: true });
     buzz(r.doubtful.length ? 'soft' : 'success');
     router.replace('/passport/confirm');
   };
 
-  const read = async (uri: string, meta?: { type?: string; size?: number; name?: string }) => {
+  const read = async (uri: string, meta?: PickedFile, opts: { pdfOk?: boolean } = {}) => {
     setFileErr(null);
     if (meta) {
-      const bad = checkUpload(meta, { photosOnly: true });
+      const bad = checkUpload(meta, { photosOnly: !opts.pdfOk });
       if (bad) { setFileErr(t(bad === 'wallet.upload.tooBig' ? 'passport.camera.tooBig' : bad === 'wallet.upload.photoOnly' ? 'wallet.upload.photoOnly' : 'passport.camera.notPhoto')); buzz('soft'); return; }
+      // A PDF of the page: typed beside it, and kept as the copy if they say so.
+      if (isPdf(meta)) { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK, copy: meta, keepCopy: true }); router.replace('/passport/confirm'); return; }
     }
+    picked.current = meta ?? { uri, name: 'passport.jpg', type: 'image/jpeg', size: 0 };
     const mine = ++run.current;
     setPhoto(uri); setProgress(0); setStage('reading');
     try {
@@ -89,7 +97,18 @@ export default function PassportCamera() {
     if (f) read(f.uri, f);
   };
   const choose = async () => { const f = await choosePhoto(); if (f) read(f.uri, f); };
-  const byHand = () => { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK }); router.replace('/passport/confirm'); };
+  const fromFiles = async () => { const f = await chooseFile(); if (f) read(f.uri, f, { pdfOk: true }); };
+  // A file chosen on the intro: read it as this screen opens.
+  useEffect(() => {
+    const f = usePassportScan.getState().incoming;
+    if (!f) return undefined;
+    set({ incoming: null });
+    const tm = setTimeout(() => { void read(f.uri, f, { pdfOk: true }); }, 0);
+    return () => clearTimeout(tm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // By hand after a photo that wouldn't read: the photo stays beside the fields to copy from.
+  const byHand = () => { set({ manual: true, fromPhoto: false, doubt: [], fields: BLANK, copy: picked.current, keepCopy: true }); router.replace('/passport/confirm'); };
 
   return (
     <View style={styles.camera} testID="passport-camera">
@@ -110,6 +129,7 @@ export default function PassportCamera() {
             </View>
             <Button variant="gold" icon={<Icon name="scan" color={colors.green} />} label={t('passport.camera.take')} onPress={shoot} testID="camera-take" />
             <Button variant="onDark" label={t('passport.camera.choose')} onPress={choose} testID="camera-choose" />
+            <Button variant="onDark" label={t('passport.camera.file')} onPress={fromFiles} testID="camera-file" />
             {denied ? <PermissionDenied kind="camera" onSkip={() => { setDenied(false); choose(); }} skipLabel={t('passport.camera.choose')} /> : null}
             {fileErr ? <T v="small" color="#e6c88f" style={{ textAlign: 'center' }} accessibilityRole="alert" testID="camera-file-problem">{fileErr}</T> : null}
             <Button variant="ghost" color="#d6cfc3" label={t('passport.camera.useDemo')} onPress={() => { setFileErr(null); setStage('demo'); }} testID="camera-demo" />
@@ -137,7 +157,7 @@ export default function PassportCamera() {
                 {[t('passport.camera.tip1'), t('passport.camera.tip2'), t('passport.camera.tip3')].map((x) => <T key={x} v="body" color="#d6cfc3">{`•  ${x}`}</T>)}
               </View>
             )}
-            <Button variant="gold" label={t('common.tryAgain')} onPress={() => { setFailWhy(null); setPhoto(null); setStage('choose'); }} testID="camera-retry" />
+            <Button variant="gold" label={t('common.tryAgain')} onPress={() => { setFailWhy(null); setPhoto(null); picked.current = null; setStage('choose'); }} testID="camera-retry" />
             <Button variant="onDark" label={t('passport.byHand')} onPress={byHand} testID="camera-by-hand" />
           </View>
         ) : null}
