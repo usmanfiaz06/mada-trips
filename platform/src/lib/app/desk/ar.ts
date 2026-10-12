@@ -666,4 +666,6 @@ export const AR_DESK: Record<string, string> = {
   "Check the fares": "تحقّق من الأسعار",
   "Already confirmed by call": "تم التأكيد بالاتصال مسبقًا",
   "This booking has a verified phone": "لهذا الحجز رقم موثّق",
+  "Passport copy": "نسخة الجواز",
+  "Passport copies open while this booking needs them, and every look is logged.": "تُفتح نسخ الجوازات ما دام هذا الحجز يحتاجها، وكل اطلاع مسجّل.",
 };

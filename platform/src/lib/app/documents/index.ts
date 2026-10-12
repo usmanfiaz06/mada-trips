@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
-import { CreateDocumentMeta, t, type CopyKey, type DocumentGrant, type WalletDocument } from "@mada/shared";
+import { CreateDocumentMeta, passportCopyFields, t, type CopyKey, type DocumentGrant, type WalletDocument } from "@mada/shared";
 import { db } from "@/db";
 import { appPeople, appTrips } from "@/db/app-schema";
 import { appDocumentGrants, appDocuments, appFiles } from "@/db/app-schema-wallet";
@@ -83,7 +83,15 @@ export async function createDocument(
   }
   const meta = parsed.data;
   const person = await ownPerson(ownerId, meta.personId);
-  const old = meta.replaces ? await ownDocument(ownerId, meta.replaces) : null;
+  // A passport copy is the photo page itself: one per person, a new one replaces the old, and only the fields the
+  // traveller confirmed (never the number, which lives encrypted on the person) are kept beside it.
+  const passportCopy = meta.kind === "passport";
+  if (passportCopy && !file) throw new AppError("VALIDATION", { fields: { file: "missing" } });
+  if (passportCopy) meta.fields = passportCopyFields(meta.fields ?? {});
+  const previousCopy = passportCopy && !meta.replaces
+    ? (await db.select().from(appDocuments).where(and(eq(appDocuments.ownerId, ownerId), eq(appDocuments.personId, person.id), eq(appDocuments.kind, "passport"), isNull(appDocuments.deletedAt))).orderBy(desc(appDocuments.createdAt)).limit(1))[0] ?? null
+    : null;
+  const old = meta.replaces ? await ownDocument(ownerId, meta.replaces) : previousCopy;
   if (old && old.personId !== meta.personId) throw new AppError("VALIDATION", { fields: { replaces: "Another person's document" } });
   const detail = meta.detail ?? (meta.validUntil ? t("wallet.docs.validUntil", { date: monthYear(meta.validUntil) }) : t("wallet.docs.added"));
 

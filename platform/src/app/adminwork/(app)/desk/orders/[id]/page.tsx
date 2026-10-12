@@ -11,6 +11,7 @@ import { amountInput, sar } from "@/lib/money";
 import { isUuid } from "@/lib/security";
 import { agentForOps } from "@/lib/app/desk/agents";
 import { getRequestFull } from "@/lib/app/desk/adapters";
+import { copyWindowOpen, travellersWithCopy } from "@/lib/app/desk/passport-copy";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Field, Input, Money, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
@@ -41,6 +42,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   if (!o) notFound();
   if (!o.isOrder) redirect(`/adminwork/desk/requests/${id}`);
   const r = o.request, d = o.desk, pay = o.payment;
+  // Passport copies the travellers chose to keep: opened only while this booking needs them, each look audited.
+  const [copies, copyOpen] = await Promise.all([travellersWithCopy(o.travellers.map((p) => p.id)), copyWindowOpen(r)]);
   const act = can(u, "desk.act"), issue = can(u, "desk.issue");
   const open = ["awaiting", "held", "needs_answer", "price_changed", "failed"].includes(o.stage);
   const ev = o.events ?? [];
@@ -101,7 +104,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           </Card>
 
           <Card pad={false}>
-            <div className="px-6 pt-6"><CardHead title={t("Travellers")} hint={issue ? t("Full passport numbers open for 30 seconds, and every look is logged.") : t("Passport numbers are masked. Issuing rights show them in full.")} /></div>
+            <div className="px-6 pt-6"><CardHead title={t("Travellers")} hint={`${issue ? t("Full passport numbers open for 30 seconds, and every look is logged.") : t("Passport numbers are masked. Issuing rights show them in full.")}${copies.size ? ` ${t("Passport copies open while this booking needs them, and every look is logged.")}` : ""}`} /></div>
             <div className="overflow-x-auto">
               <table className="w-full text-[13.5px]">
                 <thead><tr className="text-[12px] text-ink-3">{[t("Name"), t("Born"), t("Nationality"), t("Passport"), t("Expires")].map((h) => <th key={h} className="whitespace-nowrap border-b border-line px-4 py-2.5 text-start font-normal first:ps-6 last:pe-6">{h}</th>)}</tr></thead>
@@ -113,7 +116,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                         <td className="px-4 py-3 ps-6"><span className="block text-ink">{p.name}</span><span className="block text-[12px] text-ink-3">{t(p.relation === "self" ? "Account holder" : p.relation[0]!.toUpperCase() + p.relation.slice(1))}</span></td>
                         <td className="num whitespace-nowrap px-4 py-3 text-ink-2">{p.dateOfBirth ? fmtDate(p.dateOfBirth, L) : "—"}</td>
                         <td className="px-4 py-3 text-ink-2">{p.nationality ?? "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{p.passportMasked ? <PassportReveal masked={p.passportMasked} can={issue && p.hasPassport} reveal={revealAction.bind(null, p.id, r.id)} /> : <span className="text-warn">{t("Missing")}</span>}</td>
+                        <td className="whitespace-nowrap px-4 py-3">{p.passportMasked ? <PassportReveal masked={p.passportMasked} can={issue && p.hasPassport} reveal={revealAction.bind(null, p.id, r.id)} /> : <span className="text-warn">{t("Missing")}</span>}
+                          {copies.has(p.id) && act && copyOpen ? <a href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" className="ms-2 text-[12px] text-info underline-offset-2 hover:underline">{t("Passport copy")}</a> : null}</td>
                         <td className="whitespace-nowrap px-4 py-3 pe-6">{p.passportExpiry ? <span className={short ? "text-bad" : "text-ink-2"}>{fmtDate(p.passportExpiry, L)}{short ? ` · ${t("under 6 months")}` : ""}</span> : "—"}</td>
                       </tr>
                     );

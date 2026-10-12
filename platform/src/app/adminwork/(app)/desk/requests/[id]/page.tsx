@@ -10,6 +10,7 @@ import { fmtDate, timeAgo } from "@/lib/dates";
 import { isUuid } from "@/lib/security";
 import { agentForOps } from "@/lib/app/desk/agents";
 import { CHECKLISTS, destinationOf, getRequestFull } from "@/lib/app/desk/adapters";
+import { copyWindowOpen, travellersWithCopy } from "@/lib/app/desk/passport-copy";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Input, Money, Textarea, btn, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
@@ -46,6 +47,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   // Flights by request: the form's answers as facts, fares with the quote builder (components/desk/flight-quote.tsx).
   const fr = x.flightAsk ? flightFacts(r.details, x.travellers, L) : null;
   const flightQuote = quote ? flightQuoteOf(quote.offerSnapshot) : null;
+  // Passport copies the travellers chose to keep: opened only while this request needs them, each look audited.
+  const [copies, copyOpen] = await Promise.all([travellersWithCopy(x.travellers.map((p) => p.id)), copyWindowOpen(r)]);
+  const copyLinks = act && copyOpen ? x.travellers.filter((p) => copies.has(p.id)) : [];
 
   return (
     <>
@@ -62,6 +66,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           <span className="text-ink">{x.user.name || t("Traveller")}</span>
           {x.user.phone && <a href={`tel:${x.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{x.user.phone}</a>}
           {x.travellers.length > 0 && <span>{x.travellers.map((p) => p.name.split(" ")[0]).join(", ")}</span>}
+          {copyLinks.map((p) => <a key={p.id} href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" title={t("Passport copies open while this booking needs them, and every look is logged.")} className="text-info underline-offset-2 hover:underline">{t("Passport copy")} · {p.name.split(" ")[0]}</a>)}
         </div>
       </header>
 
