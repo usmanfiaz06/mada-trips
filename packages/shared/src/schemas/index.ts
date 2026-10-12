@@ -30,3 +30,4 @@ export * from './ask-arabic';
 export * from './landmarks';
 export * from './stay-wishes';
 export * from './stay-fit';
+export * from './passport-ready';
