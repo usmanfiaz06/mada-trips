@@ -176,7 +176,7 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
         } else {
           // Nothing to price yet (a table, anything else): the agent answers in the thread.
           await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date(now), details: { ...d, quote: null, quoteText: null } }).where(eq(appRequests.id, r.id));
-          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: deskFirstReply(d.askKind, d.answers, Math.max(1, cur.travellerIds.length)) });
+          await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: deskFirstReply(d.askKind, d.answers, Math.max(1, cur.travellerIds.length, Number(d.answers.party?.[0]) || 0)) });
         }
         await tx.insert(appNotifications).values({
           userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),

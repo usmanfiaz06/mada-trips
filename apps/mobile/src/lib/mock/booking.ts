@@ -305,7 +305,7 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
         id: uuid(), total: money(sarToHalalas(q.totalSar)), text: q.text, lead: q.lead, needLines: q.needLines, status: 'open', expiresAt: new Date(now + 86_400_000).toISOString(),
         breakdown: q.breakdown.map((b) => ({ personId: b.personId, name: b.name, lines: b.lines.map((l) => ({ label: l.label, amount: sarToHalalas(l.sar) })) })),
       };
-    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: deskFirstReply(r.view.kind, r.details.answers, Math.max(1, travellers.length)), offer: null, createdAt: nowIso() });
+    } else r.messages.push({ id: uuid(), from: 'agent', authorName: r.view.agent?.name ?? null, text: deskFirstReply(r.view.kind, r.details.answers, Math.max(1, travellers.length, Number(r.details.answers.party?.[0]) || 0)), offer: null, createdAt: nowIso() });
   }
   if (r.view.status === 'paid' && now - Date.parse(r.view.updatedAt) > 15_000) r.view.status = 'done';
 }

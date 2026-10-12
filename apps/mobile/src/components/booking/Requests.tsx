@@ -20,6 +20,7 @@ import { ErrorState } from '../states/ErrorState';
 import { T } from '../Text';
 import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter, useWho } from './parts';
 import { TravellerChips } from './Travellers';
+import { TravellerPassports } from '../passport/TravellerPassports';
 import { AttachmentChip } from './Attachment';
 import { FlightFares } from './FlightRequest';
 import { Answered, ThreadBubble, TypingDots, clock } from './Conversation';
@@ -73,7 +74,9 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
   const send = async () => {
     setBusy(true);
     try {
-      const plain = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === true ? ['yes'] : v]));
+      const plain: Record<string, string[]> = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === true ? ['yes'] : v]));
+      // "A table for 2" from someone whose household has only them: the party is 2, not who's in the profile.
+      if (intent?.travellerCount && intent.travellerCount > who.length) plain.party = [String(intent.travellerCount)];
       const r = await sendRequest({ kind: kind as never, query, answers: plain, travellerIds: who, needs, note: note.trim(), search: search ?? null });
       buzz('success');
       setSent({ id: r?.id ?? null });
@@ -106,6 +109,8 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
             {f.people ? (
               <>
                 <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} />
+                {/* Each traveller's passport, right here (add, needs a look, or ready): nobody is sent to the Wallet. */}
+                <TravellerPassports kind={kind} people={people} travellerIds={who} selfName={selfName} />
                 <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={who.length === 1 ? t('ask.q.just', { name: nameOf(who[0]!) }) : t('ask.q.these', { count: who.length })} onPress={() => answer(f.k, true)} testID="request-who-done" />
                 {kind === 'visa' && who.some((id) => people.find((p) => p.id === id)?.relation === 'helper')
                   ? <T v="small">{t('request.helperVisa', { names: listOf(who.filter((id) => people.find((p) => p.id === id)?.relation === 'helper').map(nameOf)) })}</T> : null}
