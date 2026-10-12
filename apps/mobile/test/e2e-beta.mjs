@@ -131,7 +131,8 @@ async function flights() {
   await k.shot('request-sent');
   step('flights: the fares arrive');
   await k.see('I found 2 fares', 'fares lead', 20000);
-  await k.see('Price held · ', 'hold');
+  // The fares card keeps its own timer ("Held for 1:59:40", or "Held until …" for a long hold); Pay says "Price held · … left".
+  await k.see(/Held (for|until) /, 'hold');
   await k.shot('fares');
   await k.press(k.byTest('fare-opt2'));
   await k.see('Bags', 'fare rules');
@@ -141,6 +142,7 @@ async function flights() {
   await k.press(k.byTest('fares-pay'));
   await k.see('Everything included. No fees later.', 'pay sheet', 12000);
   await k.see('Istanbul', 'pay title');
+  await k.see('Price held · ', 'pay hold');
   await k.shot('pay');
   await k.slide();
   await k.see('Booking now', 'waiting', 12000);

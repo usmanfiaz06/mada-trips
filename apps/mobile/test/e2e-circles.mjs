@@ -201,7 +201,11 @@ async function demo() {
   await see('I’m in.', 'reply, live', 9000);
 
   step('react: press and hold, pick, they react back');
+  // A second reply lands about 5 s after the first and scrolls the chat: let it arrive, so the press isn't mid-scroll.
+  await see('Me too, if it’s after the 10th.', 'second reply, live', 9000);
+  await page.waitForTimeout(600);
   const reply = text('I’m in.');
+  await reply.scrollIntoViewIfNeeded();
   const box = await reply.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down(); await page.waitForTimeout(700); await page.mouse.up();

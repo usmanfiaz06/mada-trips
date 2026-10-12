@@ -12,6 +12,9 @@ const OUT = process.argv[2] || 'test/shots-places';
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
 const page = await browser.newPage({ viewport: { width: 1200, height: 920 } });
+// Hours and today's ideas are read against Riyadh's clock: run at a fixed late morning there (11:30, a Sunday; the
+// clock runs on from it) so a hot day has indoor places open whatever the real time.
+await page.clock.install({ time: new Date('2026-10-11T08:30:00Z') });
 const errors = [];
 const requests = [];
 page.on('pageerror', (e) => { errors.push('pageerror: ' + e.message); console.log('PAGEERROR', e.message); });
