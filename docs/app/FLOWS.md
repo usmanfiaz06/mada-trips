@@ -31,7 +31,7 @@ People get into the app first. Only alerts are asked during sign-up; the passpor
 
 | What | When | Where |
 |---|---|---|
-| Passport | Today shows "Add your passport". At payment, missing passports show a gentle note: book now, add them within 48 hours. | The same scan screen (photo reading, demo passport, by hand, expired warning). |
+| Passport | Today shows "Add your passport". Inside a booking (the order sheet, visa, Umrah and flight requests), each traveller shows **Add passport**, **Needs a look** (with why: expired, or under 6 months left after the trip) or a check mark; a tap opens the passport flow over the booking and comes back to exactly the same place. Missing passports can still wait: book now, add them within 48 hours. Never sent out to the Wallet. | The same scan screen, as a sheet: take a photo, choose a photo, **upload a photo or PDF from files**, the demo passport, or by hand. See §7 "Passport check and copy". |
 | Family | Today's "Add your family", or "Someone else" when choosing who's going. | Account → Household. |
 | Alerts (if declined) | After the first booking ("Want gate changes on this phone?") or when tracking a flight. | — |
 | Location | On the first travel day, for leave times. | — |
@@ -112,6 +112,8 @@ The demo panel can jump to any of these moments.
 | **Unlock with Face ID** | **Face ID fails** (demo switch): "Use passcode" |
 | **Household:** passport card per person, validity check against the next trip | No trip yet: shows the plain expiry instead |
 | **Add a document:** scan or upload, choose its type | The scan can fail, as in onboarding |
+| **Passport check and copy:** the two lines (MRZ) are read on the phone. The details come back to check, with a thumbnail of the photo page beside them (tap to enlarge): full name as on the passport, number, nationality, date of birth, sex, issue and expiry dates, issuing country. Details read with low confidence are amber with "Please check"; every one can be edited; one button confirms. Then the confirmed details go to the server (the number encrypted), and the photo or PDF goes only if **Keep a copy of this page** is on, under the line: "We keep a copy so Mada can send it for visas or bookings that ask for one. Only you and the Mada agent on your booking can see it. You can delete it anytime." The names fill the booking. | **A PDF:** can't be read on the phone, so the details are typed beside it. **Unreadable photo → by hand:** the photo stays beside the fields. **Copy didn't upload:** the passport is saved, and the toast says to add the copy from the Wallet. **Copy off:** nothing but the details is sent. |
+| **Passport copy in the Wallet** (and on a household page): "Passport copy · Kept encrypted", to view, replace (the consent line shows first) or delete (the file is removed for good). One copy per person; a new one replaces the old. Family members' copies the same way ("Hessa's passport"). | **No copy kept:** "Not kept. Visas and some airlines ask for one", with Add a copy. **Mada staff:** see a copy only from a booking that needs passports (flight, package, visa, Umrah), while it's live (to 30 days after the trip, or 90 days after the request last changed); every look is in the audit trail. |
 | **Boarding passes** | Shown only after check-in opens. Before that: "Opens at check-in". |
 
 ## 8. Circles

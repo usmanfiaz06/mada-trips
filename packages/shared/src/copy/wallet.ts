@@ -976,7 +976,6 @@ export const walletCopy = {
   'pp.copy.add': 'Add a copy',
   'pp.copy.replace': 'Replace copy',
   'pp.copy.delete': 'Delete copy',
-  'pp.copy.who': 'Only you and the Mada agent on your booking can see it.',
   'pp.copy.pdf': 'PDF of the photo page',
   'pp.copy.openPdf': 'Open the PDF',
   'pp.copy.deleteTitle': 'Delete the passport copy?',

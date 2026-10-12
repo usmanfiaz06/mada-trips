@@ -406,5 +406,5 @@ export const DESK_WHATSAPP = 'https://wa.me/966566682662';
  * The day the terms and privacy policy last changed. The app's Legal screen shows it, and the website's
  * /terms and /privacy pages (platform/public, EN and AR) must say the same day: platform/test/legal-date.test.ts checks.
  */
-export const LEGAL_UPDATED = '2026-10-11';
+export const LEGAL_UPDATED = '2026-10-12';
 
