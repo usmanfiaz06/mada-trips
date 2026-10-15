@@ -40,24 +40,17 @@ function maplibre(): Promise<ML> {
   return loading;
 }
 
-/** A pin: the price in a pill, or, where pills would pile up, a dot that grows into its pill when the map zooms in. */
-function pinEl(label: string, kind: 'hotel' | 'on' | 'mark' | 'dot', onClick?: () => void, testId?: string): HTMLElement {
+/** A pin: the price in a pill. */
+function pinEl(label: string, kind: 'hotel' | 'on' | 'mark', onClick?: () => void, testId?: string): HTMLElement {
   const el = document.createElement(onClick ? 'button' : 'div');
-  if (kind === 'dot') {
-    if (testId) el.setAttribute('data-testid', testId);
-    el.setAttribute('aria-label', label);
-    if (onClick) el.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
-    Object.assign(el.style, { width: '12px', height: '12px', borderRadius: '99px', padding: '0', background: colors.paper, border: `2px solid ${colors.green}`, boxShadow: '0 2px 6px -2px rgba(15,26,22,0.5)', cursor: onClick ? 'pointer' : 'default', zIndex: '0' } as Partial<CSSStyleDeclaration>);
-    return el;
-  }
   el.textContent = kind === 'mark' ? `★ ${label}` : label;
   if (testId) el.setAttribute('data-testid', testId);
   if (onClick) { el.setAttribute('aria-label', label); el.addEventListener('click', (e) => { e.stopPropagation(); onClick(); }); }
   Object.assign(el.style, {
-    font: '600 12px Inter, system-ui, sans-serif', padding: '4px 8px', borderRadius: '99px', whiteSpace: 'nowrap', cursor: onClick ? 'pointer' : 'default',
+    font: '600 11px Inter, system-ui, sans-serif', padding: '3px 7px', borderRadius: '99px', whiteSpace: 'nowrap', cursor: onClick ? 'pointer' : 'default',
     border: `1px solid ${kind === 'on' ? colors.green : 'rgba(30,53,45,0.12)'}`, boxShadow: '0 4px 12px -6px rgba(15,26,22,0.45)',
     background: kind === 'on' ? colors.green : kind === 'mark' ? colors.goldWash : colors.paper, color: kind === 'on' ? colors.mist : colors.green,
-    zIndex: kind === 'on' ? '3' : kind === 'mark' ? '2' : '1', direction: getLocale() === 'ar' ? 'rtl' : 'ltr',
+    zIndex: kind === 'on' ? '1000' : kind === 'mark' ? '900' : '1', direction: getLocale() === 'ar' ? 'rtl' : 'ltr',
   } as Partial<CSSStyleDeclaration>);
   return el;
 }
@@ -104,44 +97,22 @@ export function StaysMap(props: StaysMapProps) {
     return () => { map.current?.remove(); map.current = null; };
   }, [lib]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The pins follow the list (sort, filters, wishes), the selection, and the zoom: pills that would pile up give way
-  // to the better-ranked one and become dots, which grow back into pills as the map zooms in.
-  const draw = () => {
-    const m = map.current;
-    if (!lib || !m) return;
-    pins.current.forEach((p) => p.remove());
-    const taken: { x: number; y: number; w: number; h: number }[] = [];
-    const free = (x: number, y: number, w: number, h: number) => {
-      const hit = taken.some((r) => Math.abs(r.x - x) < (r.w + w) / 2 && Math.abs(r.y - y) < (r.h + h) / 2);
-      if (!hit) taken.push({ x, y, w, h });
-      return !hit;
-    };
-    const place = (lng: number, lat: number, label: string, pad = 0) => {
-      const q = (m as unknown as { project: (p: [number, number]) => { x: number; y: number } }).project([lng, lat]);
-      return free(q.x, q.y, 16 + label.length * 7 + pad, 26 + pad);
-    };
-    const out: MLMarker[] = [];
-    // Landmarks and the selection keep their pills whatever else is near; hotels follow the list's order.
-    for (const k of marks) { place(k.lng, k.lat, `★ ${k.name}`, 4); out.push(new lib.Marker({ element: pinEl(k.name, 'mark') }).setLngLat([k.lng, k.lat]).addTo(m)); }
-    const sel = points.find((p) => p.selected);
-    if (sel) { place(sel.lng, sel.lat, sel.label, 4); out.push(new lib.Marker({ element: pinEl(sel.label, 'on', single ? undefined : () => pick.current?.(sel.id), `map-pin-${sel.id}`) }).setLngLat([sel.lng, sel.lat]).addTo(m)); }
-    for (const p of points) {
-      if (p === sel) continue;
-      const pill = place(p.lng, p.lat, p.label);
-      out.push(new lib.Marker({ element: pinEl(p.label, pill ? 'hotel' : 'dot', single ? undefined : () => pick.current?.(p.id), `map-pin-${p.id}`) }).setLngLat([p.lng, p.lat]).addTo(m));
-    }
-    pins.current = out;
-  };
-  const drawRef = useRef(draw);
-  useEffect(() => { drawRef.current = draw; });
-  useEffect(() => { draw(); }, [lib, points, marks, single]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Every place shows its price, however close they sit: the traveller zooms in. The list's order decides which pill
+  // sits on top where two touch; landmarks and the chosen place are always on top.
   useEffect(() => {
     const m = map.current;
     if (!lib || !m) return;
-    const on = () => drawRef.current();
-    (m as unknown as { on: (e: string, f: () => void) => void; off: (e: string, f: () => void) => void }).on('moveend', on);
-    return () => (m as unknown as { off: (e: string, f: () => void) => void }).off('moveend', on);
-  }, [lib]);
+    pins.current.forEach((p) => p.remove());
+    const n = points.length;
+    pins.current = [
+      ...marks.map((k) => new lib.Marker({ element: pinEl(k.name, 'mark') }).setLngLat([k.lng, k.lat]).addTo(m)),
+      ...points.map((p, i) => {
+        const el = pinEl(p.label, p.selected ? 'on' : 'hotel', single ? undefined : () => pick.current?.(p.id), `map-pin-${p.id}`);
+        if (!p.selected) el.style.zIndex = String(n - i);
+        return new lib.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(m);
+      }),
+    ];
+  }, [lib, points, marks, single]);
 
   // Refit when the set of places changes (a wish filtered the list), not when only the selection moves.
   const key = points.map((p) => p.id).join() + marks.map((k) => k.id).join();

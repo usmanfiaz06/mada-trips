@@ -151,12 +151,9 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
           : <Button variant="secondary" size="small" block={false} label={t('otp.resend')} onPress={() => resend()} haptic={null} testID="code-resend" />}
         {about === 'email' ? <Button variant="secondary" size="small" block={false} label={t('auth.email.openMail')} onPress={openMail} testID="open-mail" /> : null}
       </View>
-      {other && !paused ? (
+      {other && !paused && resendIn === 0 ? (
         <View style={{ flexDirection: 'row' }}>
-          {resendIn > 0
-            ? <T v="small" color={colors.ink3} style={{ fontVariant: ['tabular-nums'] }} testID="code-switch-wait">
-              {t(other === 'sms' ? 'auth.channel.useSmsIn' : 'auth.channel.useWhatsAppIn', { time: mmss(resendIn) })}</T>
-            : <LinkButton label={t(other === 'sms' ? 'auth.channel.useSms' : 'auth.channel.useWhatsApp')} onPress={() => { void resend(other); }} testID="code-switch-channel" />}
+          <LinkButton label={t(other === 'sms' ? 'auth.channel.useSms' : 'auth.channel.useWhatsApp')} onPress={() => { void resend(other); }} testID="code-switch-channel" />
         </View>
       ) : null}
       <View style={{ flexDirection: 'row' }}>
