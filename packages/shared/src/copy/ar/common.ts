@@ -159,7 +159,7 @@ export const arCommon: ArSection<typeof en> = {
   'trips.past.page': 'التأشيرات · الأختام',
   'trips.past.first': 'أول رحلة',
   'trips.requests.empty.title': 'لا شيء ينتظر مادا.',
-  'trips.requests.empty.body': 'أرسل له أي طلب: تأشيرة، طاولة الليلة، سيارة ليوم كامل. يصل هنا وتتابع تقدّمه.',
+  'trips.requests.empty.body': 'أرسل لنا أي طلب: تأشيرة، طاولة الليلة، سيارة ليوم كامل. يصل هنا وتتابع تقدّمه.',
   'trips.requests.empty.action': 'أرسل طلبًا إلى مادا',
   'trips.past.empty.title': 'كل رحلة تترك ختمًا.',
   'trips.past.empty.body': 'ختمك الأول مكانه هنا. تبقى رحلاتك هنا مع كل إيصال، فتأخذ الرحلة التالية دقيقة.',

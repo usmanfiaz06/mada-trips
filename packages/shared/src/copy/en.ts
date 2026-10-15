@@ -217,7 +217,7 @@ export const en = {
   'trips.past.page': 'Visas · Stamps',
   'trips.past.first': 'Your first',
   'trips.requests.empty.title': 'Nothing waiting on Mada.',
-  'trips.requests.empty.body': 'Send him anything: a visa, a table tonight, a car for the day. It lands here and you watch it move.',
+  'trips.requests.empty.body': 'Send us anything: a visa, a table tonight, a car for the day. It lands here and you watch it move.',
   'trips.requests.empty.action': 'Send Mada a request',
   'trips.past.empty.title': 'Every trip leaves a stamp.',
   'trips.past.empty.body': 'Your first one goes right there. Trips stay here with every receipt, so the next one takes a minute.',
