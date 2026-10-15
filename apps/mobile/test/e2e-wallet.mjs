@@ -320,6 +320,7 @@ async function walletFresh() {
   await see('Share with Mada', 'doc actions');
   await byTest('doc-share').click();
   await see('Shared with Mada for this trip only. Your agent can see it, not download it.', 'shared');
+  await page.waitForTimeout(1000); // the list refetches after the sheet closes; reopen once it has
   await press(page.getByRole('button', { name: 'Visa' }));
   await see('Mada can see it until', 'shared until');
   await shot('docs-shared');
