@@ -93,7 +93,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
       <Head title={t('circles.yours')} right={list.length ? String(list.length) : undefined} />
       {circles.isSuccess && list.length === 0 ? (
         <Animated.View entering={rise(1)} style={riseStyle(1)}>
-          <EmptyState art={<ArtCircles />} title={t('circles.empty.title')} body={t('circles.empty.body')}
+          <EmptyState art={<ArtCircles />} title={t('circles.empty.title')}
             action={<Button label={t('circles.empty.action')} onPress={() => router.push('/circle/new')} testID="first-circle" />}
             ideas={(['family', 'eid', 'weekend', 'cousins'] as const).map((k) => [t(`circles.idea.${k}`), () => router.push({ pathname: '/circle/new', params: { name: t(`circles.idea.${k}`) } })] as [string, () => void])} />
         </Animated.View>
@@ -131,7 +131,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
       {fr.length > 0 || posts.length > 0 ? (<>
         <Head title={t('circles.known.title')} right={t('circles.known.newest')} />
         {known.isSuccess && posts.length === 0 ? (
-          <EmptyState compact art={<ArtLantern width={80} height={60} />} title={t('circles.known.emptyTitle')} body={t('circles.known.emptyBody')}
+          <EmptyState compact art={<ArtLantern width={80} height={60} />} title={t('circles.known.emptyTitle')}
             action={<TextLink label={t('circles.known.emptyAction')} onPress={onDiscover} />} />
         ) : null}
         {posts.map((p) => {
@@ -151,7 +151,7 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
 
       <Head title={t('circles.saved.title')} right={savedList.length ? <TextLink label={t('circles.friends.seeAll')} onPress={() => router.push('/saved')} /> : undefined} />
       {saved.isSuccess && savedList.length === 0 ? (
-        <EmptyState compact art={<ArtBookmark width={80} height={60} />} title={t('circles.saved.emptyTitle')} body={t('circles.saved.emptyBody')}
+        <EmptyState compact art={<ArtBookmark width={80} height={60} />} title={t('circles.saved.emptyTitle')}
           action={<TextLink label={t('circles.saved.emptyAction')} onPress={onDiscover} />} />
       ) : savedList.length ? (
         <View style={st.grid}>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { buzz } from '@/lib/haptics';
-import { colors, font, radii, shadow } from '@/theme';
+import { colors, font } from '@/theme';
 import { Chip } from './Chip';
 import { Icon } from './Icon';
 import { T } from './Text';
@@ -48,13 +48,13 @@ export function EmptyState({ art, title, body, action, ideas, compact, onPress, 
       : <View style={styles.row}>{inner}</View>;
   }
   return (
-    <View style={[styles.es, shadow('card')]} accessibilityLabel={title}>
+    <View style={styles.es} accessibilityLabel={title}>
       {art ? <ArtStage height={stageHeight}>{art}</ArtStage> : null}
       <T style={[font('displaySmall'), styles.inset]} accessibilityRole="header">{title}</T>
-      {body ? <T v="small" style={[styles.inset, { marginTop: -4 }]}>{body}</T> : null}
+      {body ? <T v="small" style={[styles.inset, { marginTop: -6 }]}>{body}</T> : null}
       {action ? <View style={styles.inset}>{action}</View> : null}
       {ideas?.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }}>
           {ideas.map(([label, fn]) => <Chip key={label} label={label} onPress={fn} />)}
         </ScrollView>
       ) : null}
@@ -63,8 +63,8 @@ export function EmptyState({ art, title, body, action, ideas, compact, onPress, 
 }
 
 const styles = StyleSheet.create({
-  es: { gap: 12, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 18, borderRadius: radii.hero, backgroundColor: colors.paper },
-  inset: { marginHorizontal: 4 },
+  es: { gap: 14, paddingTop: 4, paddingBottom: 6 },
+  inset: { marginHorizontal: 2 },
   stage: { borderRadius: 20, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(125,93,39,0.1)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12, paddingStart: 12, paddingEnd: 14, borderRadius: 22, backgroundColor: colors.paper },
   tile: { width: 80, height: 64, borderRadius: 16, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f6efe2', borderWidth: 1, borderColor: 'rgba(125,93,39,0.1)' },

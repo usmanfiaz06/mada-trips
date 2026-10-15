@@ -92,9 +92,8 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
             <View style={{ gap: 12 }}>
               <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
                 <View style={styles.waitPhoto}><Icon name="user" size={26} color="rgba(217,183,122,0.55)" /></View>
-                <View style={{ flex: 1, gap: 6 }}>
+                <View style={{ flex: 1 }}>
                   <T style={[font('display', colors.mist), { fontSize: 26, lineHeight: 27 }]}>{isSelf ? t('wallet.passport.emptyTitle') : t('wallet.passport.waitingOther', { name })}</T>
-                  <T v="tiny" color={colors.onDark2}>{t('wallet.passport.emptyBody')}</T>
                 </View>
               </View>
               <T style={styles.waitMrz} numberOfLines={1}>{'P<SAU<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'}</T>

@@ -59,7 +59,6 @@ export const enTripsUi = {
   'tr.payments': 'Payments',
   'tr.tracking': 'Flights you’re tracking',
   'tr.import.title': 'Booked somewhere else?',
-  'tr.import.body': 'Upload the PDF and we’ll watch it like any Mada trip.',
   'tr.import.upload': 'Upload a booking',
   'tr.req.send': 'Send Mada a request',
   'tr.req.pay': 'Pay {amount}',
@@ -327,5 +326,4 @@ export const enTripsUi = {
   'cf.n.ok.other': 'A small fix ({n} letters). {airline} does this free. Mada sends it with a photo of the passport page.',
   'cf.n.too': 'That’s more than a spelling fix. Airlines allow up to 3 letters changed. A different name means a new ticket, so the fare rules apply.',
   'cf.n.askCost': 'Ask Mada what it would cost',
-  'tr.import.keep': 'Upload the confirmation and it\'s kept in your Wallet with your passports, ready offline.',
 } as const;

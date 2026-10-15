@@ -72,10 +72,9 @@ export default function Trips() {
 function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Parameters<typeof TrackedFlights>[0]['flights']; ask: (p?: string) => void }) {
   const router = useRouter();
   if (!trips.length) return (<>
-    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero, shadow('card')]}>
+    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero]}>
       <DepartureBoard onPick={(city) => ask(`Flights to ${city.charAt(0) + city.slice(1).toLowerCase()}`)} />
-      <T style={[font('display'), { fontSize: 32, lineHeight: 33 }]}>{t('trips.empty.title')}</T>
-      <T v="small">{t('trips.empty.body')}</T>
+      <T style={font('displaySmall')}>{t('trips.empty.title')}</T>
       <Button label={t('trips.empty.action')} onPress={() => ask()} />
     </Animated.View>
     <T v="eyebrow">{t('trips.ideas.title')}</T>
@@ -122,11 +121,10 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
 function Imports() {
   const router = useRouter();
   return (
-    <Box tone="well">
-      <H3 size={15}>{t('tr.import.title')}</H3>
-      <Small>{t('tr.import.keep')}</Small>
+    <Spread style={{ paddingHorizontal: 4 }}>
+      <Small>{t('tr.import.title')}</Small>
       <SmallButton tone="paper" label={t('tr.import.upload')} onPress={() => router.push('/wallet?upload=booking' as Href)} testID="import-upload" />
-    </Box>
+    </Spread>
   );
 }
 
@@ -135,7 +133,7 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
   const queued = useTripOutbox();
   const shown = requests.filter((r) => r.area !== 'refund');
   if (!shown.length && !refunds.length && !queued.length) return (
-    <EmptyState art={<ArtPaperPlane width={280} height={112} />} title={t('trips.requests.empty.title')} body={t('trips.requests.empty.body')}
+    <EmptyState art={<ArtPaperPlane width={280} height={112} />} title={t('trips.requests.empty.title')}
       action={<Button label={t('tr.req.send')} onPress={() => ask()} />}
       ideas={(['visa', 'table', 'car', 'umrah'] as const).map((k) => [t(`trips.requests.idea.${k}`), () => ask(t(`trips.requests.idea.${k}`))] as [string, () => void])} />
   );
@@ -225,7 +223,7 @@ function RequestCard({ r }: { r: TripRequestView }) {
 
 function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) {
   if (!trips.length) return (
-    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero, shadow('card')]}>
+    <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero]}>
       <View style={styles.ppEmpty}>
         <T style={styles.ppTitle}>{t('trips.past.page')}</T>
         {([[18, 22, -12], [62, 16, 8], [28, 60, 6], [70, 58, -6]] as const).map(([x, y, r], k) => (
@@ -234,8 +232,7 @@ function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) 
           </View>
         ))}
       </View>
-      <T style={[font('display'), { fontSize: 32, lineHeight: 33 }]}>{t('trips.past.empty.title')}</T>
-      <T v="small">{t('trips.past.empty.body')}</T>
+      <T style={font('displaySmall')}>{t('trips.past.empty.title')}</T>
       <Button label={t('trips.past.empty.action')} onPress={() => ask()} />
     </Animated.View>
   );
@@ -254,7 +251,7 @@ const styles = StyleSheet.create({
   plus: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   seg: { height: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.mist, justifyContent: 'center' },
   segOn: { backgroundColor: colors.green },
-  hero: { gap: 14, padding: 18, borderRadius: radii.hero, backgroundColor: colors.paper },
+  hero: { gap: 16, paddingTop: 4 },
   idea: { width: 124, height: 150, borderRadius: 20, overflow: 'hidden', justifyContent: 'flex-end' },
   card: { backgroundColor: colors.paper, borderRadius: radii.card, overflow: 'hidden' },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingStart: 16, paddingEnd: 10 },

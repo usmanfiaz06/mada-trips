@@ -100,7 +100,6 @@ function SignedIn() {
         <Pressable accessibilityRole="button" style={{ flex: 1, gap: 2 }} onPress={() => router.push('/account')} testID="profile-name">
           <T v="h1" style={{ fontSize: 26, lineHeight: 30 }}>{a?.preferredName || (self?.passport ? fullNameOf(self) : '') || display || t('profile.yourAccount')}</T>
           <T v="small" style={{ fontVariant: ['tabular-nums'] }}>{user?.phone ? prettyPhone(user.phone) : user?.email ?? (self?.passport ? t('profile.addPhone') : t('profile.addPassport'))}</T>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 }}><T v="caption" color={colors.goldInk} style={{ fontFamily: ff.ui600, fontSize: 13 }}>{t('profile.details')}</T><Icon name="chevron" size={14} width={2.4} color={colors.goldInk} /></View>
         </Pressable>
       </View>
 

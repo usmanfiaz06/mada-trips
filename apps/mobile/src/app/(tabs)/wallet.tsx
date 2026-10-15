@@ -173,7 +173,7 @@ function Unlocked() {
             <T v="tiny">{outSeg ? t('wallet.passes.notYet', { flight: outSeg.flightNumber, date: fullDay(outSeg.departLocal.slice(0, 10)) }) : t('wallet.passes.noFlights')}</T>
           </Card>
         ) : (
-          <EmptyState compact art={<ArtPass width={100} height={75} />} title={t('wallet.passes.emptyTitle')} body={t('wallet.passes.emptyBody')}
+          <EmptyState compact art={<ArtPass width={100} height={75} />} title={t('wallet.passes.emptyTitle')}
             action={<LinkButton label={t('wallet.passes.plan')} onPress={() => router.push('/ask')} />} />
         )}
 
@@ -228,9 +228,9 @@ function ValidityCard({ v, who, name, trip, onRenew }: { v: Validity; who: Perso
   let head = ''; let body = '';
   switch (v.kind) {
     case 'expired': head = t('wallet.validity.expired', { date: fullDay(v.expiry) }); body = t('wallet.validity.expiredBody'); break;
-    case 'valid': head = t('wallet.validity.validUntil', { date: fullDay(v.expiry) }); body = t('wallet.validity.validUntilBody'); break;
+    case 'valid': head = t('wallet.validity.validUntil', { date: fullDay(v.expiry) }); break;
     case 'notOnTrip': head = t('wallet.validity.notOnTrip', { name, city: v.trip.city }); break;
-    case 'ready': head = t('wallet.validity.ready', { city: v.trip.city }); body = t('wallet.validity.readyBody', { days: v.need, country: v.trip.country }); break;
+    case 'ready': head = t('wallet.validity.ready', { city: v.trip.city }); break;
     case 'spare': head = t('wallet.validity.spare', { city: v.trip.city, days: v.left - v.need }); body = t('wallet.validity.spareBody', { city: v.trip.city, country: v.trip.country, need: v.need, name, left: v.left }); break;
     case 'blocked': head = who.isSelf ? t('wallet.validity.blockedYou', { city: v.trip.city }) : t('wallet.validity.blocked', { name, city: v.trip.city }); body = t('wallet.validity.blockedBody', { name, date: fullDay(v.expiry), country: v.trip.country, need: v.need, until: shortDay(v.until) }); break;
     default: break;
