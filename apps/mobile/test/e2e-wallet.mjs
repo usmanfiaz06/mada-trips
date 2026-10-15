@@ -160,7 +160,7 @@ async function walletDemo() {
   await see('Added when you set up Mada. To remove it, talk to Mada.', 'setup doc');
   await shot('wallet-doc-sheet');
   await byTest('doc-share').click();
-  await see('Shared with Mada for this trip only. Faisal can see it, not download it.', 'shared toast');
+  await see('Shared with Mada for this trip only. Your agent can see it, not download it.', 'shared toast');
   await page.waitForTimeout(800);
   step('wallet: money');
   await page.mouse.move(195, 400);
@@ -319,9 +319,9 @@ async function walletFresh() {
   await press(page.getByRole('button', { name: 'Visa' }));
   await see('Share with Mada', 'doc actions');
   await byTest('doc-share').click();
-  await see('Shared with Mada for this trip only. Faisal can see it, not download it.', 'shared');
+  await see('Shared with Mada for this trip only. Your agent can see it, not download it.', 'shared');
   await press(page.getByRole('button', { name: 'Visa' }));
-  await see('Faisal can see it until', 'shared until');
+  await see('Mada can see it until', 'shared until');
   await shot('docs-shared');
   await byTest('doc-delete').click();
   await see('Deleted from this phone and from Mada.', 'deleted');
@@ -477,7 +477,7 @@ async function account() {
 
   step('preferences and loyalty');
   await press(byTest('profile-prefs'));
-  await see('Faisal uses these on every booking for you.', 'prefs');
+  await see('Mada uses these on every booking for you.', 'prefs');
   await see('Saudia Alfursan', 'loyalty');
   await press(byTest('assist-infant'));
   await press(byTest('assist-bassinet'));
@@ -538,7 +538,7 @@ async function account() {
   await press(byTest('profile-help'));
   await see('Questions people ask', 'help');
   await press(text('Who books my trip?'));
-  await see('A person at Mada, usually Faisal.', 'faq');
+  await see('A person at Mada: your Mada agent.', 'faq');
   await shot('help');
   await press(byTest('help-call'));
   await see('+966 56 668 2662. Day and night, in Arabic or English.', 'call sheet');

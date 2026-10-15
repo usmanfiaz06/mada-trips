@@ -37,7 +37,7 @@ export const arAskFlow: ArSection<typeof askFlowCopy> = {
   'ask.stay.kids': 'الأطفال وأعمارهم يوم الدخول: {names}. الفنادق تسعّر الأطفال حسب العمر.',
   'ask.stay.roomsNote': 'غرف جنب بعض، عشان العائلة تكون مع بعض.',
   'ask.stay.adultsOnly': 'غرف للكبار. أضف أحد لو فيه غيركم.',
-  'ask.stay.byHandNote': 'أسعار {city} ما تطلع في التطبيق للحين. فيصل يدوّر على الغرف ويرد عليك هنا بالأسعار.',
+  'ask.stay.byHandNote': 'أسعار {city} ما تطلع في التطبيق للحين. مادا تدوّر على الغرف وترد عليك هنا بالأسعار.',
   'ask.stay.search': 'اعرض الأماكن لـ{guests}',
   'ask.stay.askMada': 'خل مادا تدوّر على غرف',
   'ask.stay.cal.title': 'تواريخك',
@@ -52,7 +52,7 @@ export const arAskFlow: ArSection<typeof askFlowCopy> = {
   'ask.stay.cal.done': 'اعتمد هالتواريخ',
 
   'ask.phone.title': 'رقم جوالك',
-  'ask.phone.body': 'شركات الطيران والفنادق وفيصل يحتاجون رقم يوصل لك وأنت مسافر. بنرسل لك رمز من 6 أرقام. ما ياخذ إلا دقيقة.',
+  'ask.phone.body': 'شركات الطيران والفنادق ومادا يحتاجون رقم يوصل لك وأنت مسافر. بنرسل لك رمز من 6 أرقام. ما ياخذ إلا دقيقة.',
   'ask.phone.gateTitle': 'شي واحد قبل ما نبحث',
   'ask.phone.later': 'مو الحين',
   'ask.phone.beforeSearch': 'قبل ما نعرض لك الأماكن بنطلب رقم جوالك، مرة وحدة بس. الفنادق تحتاج طريقة توصل لك فيها.',

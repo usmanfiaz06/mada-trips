@@ -67,7 +67,6 @@ export const en = {
   'common.continue': 'Continue',
   'common.tryAgain': 'Try again',
   'common.offline.banner': "You're offline. Everything for your trips is on this phone.",
-  'common.agentName': 'Faisal',
   /* Mada vs Faisal (COPY.md §1): actions say Mada; the person appears as presence or as the one who acted. */
   'action.talk': 'Talk to Mada',
   'action.ask': 'Ask Mada',
@@ -78,6 +77,7 @@ export const en = {
   'presence.typing': '{agent} is typing…',
   'presence.replies': 'Usually replies in {minutes} min',
   'presence.covering': '{agent} is covering for {usual} tonight. {pronoun} has your whole trip.',
+  'presence.here': 'Mada is here',
   'presence.away': 'Replies within 10 minutes, any hour',
   'presence.offline': 'You’re offline. {agent} sees your messages when you’re back',
   'actor.confirmed': 'Confirmed by {agent} at Mada',
@@ -105,7 +105,7 @@ export const en = {
   'welcomeBack.notMe': 'That’s not me',
 
   // ───────────── onboarding: sign in ─────────────
-  'signin.badge': 'Confirmed by Faisal at Mada',
+  'signin.badge': 'Confirmed by a person at Mada',
   'signin.title': 'Sign in to book and keep your trips.',
   'signin.body': 'Your trips, documents and family stay on this phone and in your account.',
   'signin.apple': 'Continue with Apple',
@@ -126,7 +126,7 @@ export const en = {
   'phone.title': 'Your mobile number',
   'phone.titleSocial': 'One more thing: your mobile',
   'phone.body': "We'll text a 6-digit code. Used for sign-in and urgent trip updates only.",
-  'phone.bodySocial': 'You’re signed in with {provider}. Gate changes and Faisal’s messages come by SMS and WhatsApp, so we need a number that’s with you.',
+  'phone.bodySocial': 'You’re signed in with {provider}. Gate changes and messages from Mada come by SMS and WhatsApp, so we need a number that’s with you.',
   'phone.label': 'Mobile number',
   'phone.placeholder': '5X XXX XXXX',
   'phone.problem.prefix': 'Saudi mobile numbers start with 5 after +966.',
@@ -154,7 +154,7 @@ export const en = {
 
   // ───────────── onboarding: name ─────────────
   'name.title': 'What should we call you?',
-  'name.body': 'Just a first name. Faisal uses it when he messages you.',
+  'name.body': 'Just a first name. It’s what your Mada agent calls you.',
   'name.label': 'First name',
   'name.go': 'Let’s go',
   'name.goNamed': 'Let’s go, {name}',
@@ -200,7 +200,7 @@ export const en = {
   'trips.tab.requests': 'Requests',
   'trips.tab.past': 'Past',
   'trips.empty.title': 'Your name’s not on the board yet.',
-  'trips.empty.body': 'Tap a city to see it, or tell us where. Faisal books it and stays with you until you’re home.',
+  'trips.empty.body': 'Tap a city to see it, or tell us where. Mada books it and stays with you until you’re home.',
   'trips.empty.action': 'Where to?',
   'trips.empty.board': 'Departures · {city}',
   'trips.ideas.title': 'Easy from here this winter',
@@ -216,7 +216,7 @@ export const en = {
   'trips.requests.idea.umrah': 'Umrah in Ramadan',
   'trips.past.page': 'Visas · Stamps',
   'trips.past.first': 'Your first',
-  'trips.requests.empty.title': 'Nothing waiting on Faisal.',
+  'trips.requests.empty.title': 'Nothing waiting on Mada.',
   'trips.requests.empty.body': 'Send him anything: a visa, a table tonight, a car for the day. It lands here and you watch it move.',
   'trips.requests.empty.action': 'Send Mada a request',
   'trips.past.empty.title': 'Every trip leaves a stamp.',
@@ -238,7 +238,7 @@ export const en = {
   'wallet.docs.emptyBody': 'A visa, a national ID or travel insurance. We’ll watch the dates.',
   'wallet.passes.eyebrow': 'For this trip',
   'wallet.passes.emptyTitle': 'No boarding passes yet',
-  'wallet.passes.emptyBody': 'Tickets and vouchers land here the moment Faisal confirms a trip. They work offline.',
+  'wallet.passes.emptyBody': 'Tickets and vouchers land here the moment Mada confirms a trip. They work offline.',
   'wallet.passes.plan': 'Plan a trip',
 
   // ───────────── circles ─────────────
@@ -296,6 +296,8 @@ export const en = {
   'notify.refund.body': '{amount} is on its way to your {card}.',
   'notify.digest.title': 'Tomorrow',
   'notify.digest.body': 'Pickup {pickup} · Check-in closes {checkin} · {temp}° in {city}',
+  'otp.continue': 'Continue',
+  'otp.checking': 'Checking the code…',
 } as const;
 
 export type CopyKey = keyof typeof en;

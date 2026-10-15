@@ -32,8 +32,8 @@ export const authCopy = {
 
   // ───────────── verify your phone ─────────────
   'auth.verifyPhone.title': 'Verify your phone',
-  'auth.verifyPhone.body': 'You’re signed in with {provider}. Before your first booking we need a mobile number that’s with you, for gate changes and Faisal’s messages.',
-  'auth.verifyPhone.bodyPlain': 'Before your first booking we need a mobile number that’s with you, for gate changes and Faisal’s messages.',
+  'auth.verifyPhone.body': 'You’re signed in with {provider}. Before your first booking we need a mobile number that’s with you, for gate changes and messages from Mada.',
+  'auth.verifyPhone.bodyPlain': 'Before your first booking we need a mobile number that’s with you, for gate changes and messages from Mada.',
   'auth.verifyPhone.later': 'Later',
   'auth.verifyPhone.done': 'Your number is verified.',
   'auth.verifyPhone.needed': 'Verify your phone to book.',
@@ -54,7 +54,7 @@ export const authCopy = {
   'auth.methods.addEmailGo': 'Add my email',
   'auth.methods.addPhoneGo': 'Add my number',
   'auth.methods.emailManage': 'You can sign in with a code sent to {email}.',
-  'auth.methods.phoneKept': 'Your number stays. It’s how Faisal reaches you on a trip.',
+  'auth.methods.phoneKept': 'Your number stays. It’s how Mada reaches you on a trip.',
   'auth.methods.changePhone': 'Use a different number',
   'auth.methods.changeEmail': 'Use a different email',
   'auth.methods.confirmFirst': 'Sign in again to change this.',

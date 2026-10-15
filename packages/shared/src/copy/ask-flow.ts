@@ -35,7 +35,7 @@ export const askFlowCopy = {
   'ask.stay.kids': 'Children, with their age on the day: {names}. Hotels price children by age.',
   'ask.stay.roomsNote': 'Rooms side by side, so the family stays together.',
   'ask.stay.adultsOnly': 'Rooms for adults. Add someone if more are coming.',
-  'ask.stay.byHandNote': 'Mada doesn’t show {city} prices in the app yet. Faisal finds the rooms and replies here with prices.',
+  'ask.stay.byHandNote': 'Mada doesn’t show {city} prices in the app yet. Mada finds the rooms and replies here with prices.',
   'ask.stay.search': 'Show places for {guests}',
   'ask.stay.askMada': 'Ask Mada to find rooms',
   'ask.stay.cal.title': 'Your dates',
@@ -49,7 +49,7 @@ export const askFlowCopy = {
 
   // ───────────── your phone, asked early ─────────────
   'ask.phone.title': 'Your mobile number',
-  'ask.phone.body': 'Airlines, hotels and Faisal need a number that reaches you while you travel. We’ll text a 6-digit code. It takes a minute.',
+  'ask.phone.body': 'Airlines, hotels and Mada need a number that reaches you while you travel. We’ll text a 6-digit code. It takes a minute.',
   'ask.phone.gateTitle': 'One thing before we search',
   'ask.phone.later': 'Not now',
   'ask.phone.beforeSearch': 'Before we show places, we’ll ask for your mobile number, once. Hotels need a way to reach you.',

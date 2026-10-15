@@ -118,7 +118,7 @@ export const enTrips = {
   'sr.bassinet.none': 'Bassinets are for babies under 2 and under 11 kg. No one on this trip is that young.',
   'sr.bassinet.title': 'Bassinet seat',
   'sr.bassinet.short': 'Bassinet',
-  'sr.bassinet.alt': 'The bassinet row is taken on the way there. Faisal moved you to row 14 with a spare seat beside you instead.',
+  'sr.bassinet.alt': 'The bassinet row is taken on the way there. We moved you to row 14 with a spare seat beside you instead.',
   'sr.seats.keep': 'Seats together',
   'sr.seats.keepBoth': 'Seats together, both ways',
   'sr.seats.kids': 'Children beside a parent',
