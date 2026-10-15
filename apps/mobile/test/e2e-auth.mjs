@@ -75,7 +75,7 @@ async function fresh(name, { locale = 'en-GB', last = null, clock = false } = {}
   await page.goto(ORIGIN + '/');
   await page.evaluate(() => document.fonts.ready);
   await byTest('welcome-start').click();
-  if (locale === 'en-GB') await see('Sign in to book and keep your trips.', 'signin');
+  if (locale === 'en-GB') await see('Sign in to Mada.', 'signin');
   else await page.waitForTimeout(1200);
   return { context, page, shot, see, gone, byTest, tap };
 }
@@ -261,7 +261,7 @@ try {
     await p.see('Enter the code', 'code screen');
     await p.see('New code in 0:5', 'countdown under the code');
     await p.see('We sent a code on WhatsApp to', 'whatsapp line');
-    await p.see('Send by SMS in 0:', 'sms waits for the countdown');
+    if (await p.page.getByText('Send by SMS in').count()) errors.push('help-phone: a second countdown for SMS');
     await p.tap('Didn’t get the code?');
     await p.see('Codes can take a minute to arrive.', 'help sheet');
     await p.see('Send a new code in 0:', 'resend waits for the countdown');
@@ -295,7 +295,7 @@ try {
     await p.see('We’ll reach you at omar.', 'reach on the new contact');
     await p.shot('recover-sent');
     await p.byTest('recover-done').click();
-    await p.see('Sign in to book and keep your trips.', 'back to sign-in');
+    await p.see('Sign in to Mada.', 'back to sign-in');
     await p.context.close();
   }
 
@@ -437,7 +437,7 @@ try {
     await p.byTest('phone-send').click();
     await p.see('ما وصلك الرمز؟', 'ar link');
     await p.see('أرسلنا الرمز على واتساب إلى', 'ar whatsapp line');
-    await p.see('أرسلوه برسالة نصية بعد', 'ar sms switch waits');
+    if (await p.page.getByText('أرسلوه برسالة نصية بعد').count()) errors.push('ar: a second countdown for SMS');
     await p.shot('code');
     await p.page.getByText('ما وصلك الرمز؟', { exact: true }).first().click();
     await p.see('جرّب طريقة أخرى', 'ar sheet');
@@ -462,7 +462,7 @@ try {
     await p.byTest('phone-send').click();
     await p.see('We sent a code on WhatsApp to +966', 'whatsapp line');
     if (!(await p.byTest('whatsapp-mark').count())) errors.push('whatsapp: no WhatsApp mark beside the line');
-    await p.see('Send by SMS in 0:', 'sms after the countdown');
+    if (await p.page.getByText('Send by SMS in').count()) errors.push('whatsapp: a second countdown for SMS');
     await p.shot('code');
     await p.tap('Didn’t get the code?');
     await p.see('Check WhatsApp', 'check whatsapp row');
@@ -474,7 +474,11 @@ try {
     await p.byTest('help-switch-channel').click();
     await p.see('New code sent by SMS to', 'resent by sms');
     await p.see('We sent a code by SMS to +966', 'sms line');
-    await p.see('Send on WhatsApp in 0:', 'whatsapp offered back');
+    // One countdown only; the other channel is offered once it ends.
+    await p.see('New code in 0:', 'one countdown');
+    if (await p.page.getByText('Send on WhatsApp in').count()) errors.push('sms: a second countdown for WhatsApp');
+    await p.page.clock.runFor(61_000);
+    await p.see('Send on WhatsApp instead', 'whatsapp offered back');
     if (await p.byTest('whatsapp-mark').count()) errors.push('whatsapp: the mark should go with an SMS code');
     await p.shot('code-sms');
     await p.byTest('otp-input').fill('123456');
@@ -490,7 +494,8 @@ try {
     await p.byTest('phone-send').click();
     await p.see('We sent a code by SMS to +966', 'sms line');
     await p.see('WhatsApp couldn’t reach this number.', 'why sms');
-    await p.see('Send on WhatsApp in 0:', 'whatsapp still offered');
+    await p.see('New code in 0:', 'one countdown');
+    if (await p.page.getByText('Send on WhatsApp in').count()) errors.push('not-whatsapp: a second countdown for WhatsApp');
     await p.shot('code');
     await p.context.close();
   }

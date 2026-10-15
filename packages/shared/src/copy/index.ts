@@ -112,11 +112,9 @@ export const BANNED: readonly string[] = [
 
 /**
  * Strings allowed to use a banned word, each with the reason. Keep this list short; every entry is reviewed.
- * "data" is the section name COPY.md §5.10 itself uses ("Your data") and the prototype's privacy promise.
+ * "data" is the section name COPY.md §5.10 itself uses ("Your data").
  */
-export const BANNED_ALLOW: Readonly<Partial<Record<CopyKey, readonly string[]>>> = {
-  'signin.note': ['data'],
-};
+export const BANNED_ALLOW: Readonly<Partial<Record<CopyKey, readonly string[]>>> = {};
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const norm = (s: string) => s.replace(/[’‘]/g, "'");

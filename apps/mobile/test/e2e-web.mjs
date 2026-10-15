@@ -81,7 +81,7 @@ async function run({ page, phone, returning }) {
 
   step('sign in');
   await byTest('welcome-start').click();
-  await see('Sign in to book and keep your trips.', 'signin');
+  await see('Sign in to Mada.', 'signin');
   if (!returning) {
     await shot('signin');
     await byTest('signin-apple').click();
@@ -168,8 +168,7 @@ async function run({ page, phone, returning }) {
   await see('Your passport isn’t here yet.', 'wallet');
   await shot('wallet');
   await byTest('dock-ask').click();
-  await see('Instant answers from Mada.', 'ask');
-  await see('ask only what we need', 'ask heading');
+  await see('Where to?', 'ask heading');
   await shot('ask');
 }
 

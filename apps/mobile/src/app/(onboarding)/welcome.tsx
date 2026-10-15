@@ -41,11 +41,11 @@ export default function Welcome() {
               <T v="body" color="#e1dacd" style={{ fontSize: 18, lineHeight: 26 }}>{t('welcome.body')}</T>
             </Animated.View>
           </View>
-          <View style={{ gap: 10 }}>
+          <View style={{ gap: 18 }}>
             <Button variant="gold" label={t('welcome.start')} onPress={() => { useOnboarding.getState().reset(); router.push('/signin'); }} testID="welcome-start" />
-            <Button variant="glass" label={t('welcome.track')} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} />
-            <View style={{ alignItems: 'center', paddingTop: 2 }}>
-              <LinkButton label={t('circles.code.welcome')} color="#e1dacd" onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
+            <View style={styles.links}>
+              <LinkButton label={t('welcome.track')} color="#e1dacd" size={15} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} testID="welcome-track" />
+              <LinkButton label={t('circles.code.welcome')} color="#e1dacd" size={15} onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
             </View>
           </View>
         </View>
@@ -56,4 +56,5 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
+  links: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 2 },
 });

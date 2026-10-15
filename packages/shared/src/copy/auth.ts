@@ -214,5 +214,4 @@ export const authCopy = {
   'auth.bio.on.android': 'Mada opens with your fingerprint on this phone.',
   'auth.bio.off.android': 'Mada opens without a fingerprint.',
   'auth.bio.unlock.android': 'Open with fingerprint',
-  'auth.signin.badge': 'A real person checks every booking',
 } as const;

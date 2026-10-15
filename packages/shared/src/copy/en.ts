@@ -95,9 +95,9 @@ export const en = {
 
   // ───────────── onboarding: welcome ─────────────
   'welcome.title': "We'll take it from here.",
-  'welcome.body': "Tell us where you're going. We'll find it, book it, and stay with you until you're home.",
+  'welcome.body': "Say where. We book it and stay with you until you're home.",
   'welcome.start': 'Start',
-  'welcome.track': 'Just track a flight',
+  'welcome.track': 'Track a flight',
   'welcomeBack.titleNamed': 'Welcome back, {name}.',
   'welcomeBack.title': 'Welcome back.',
   'welcomeBack.line': 'Everything is where you left it.',
@@ -105,13 +105,10 @@ export const en = {
   'welcomeBack.notMe': 'That’s not me',
 
   // ───────────── onboarding: sign in ─────────────
-  'signin.badge': 'Confirmed by a person at Mada',
-  'signin.title': 'Sign in to book and keep your trips.',
-  'signin.body': 'Your trips, documents and family stay on this phone and in your account.',
+  'signin.title': 'Sign in to Mada.',
   'signin.apple': 'Continue with Apple',
   'signin.google': 'Continue with Google',
   'signin.phone': 'Use my phone number',
-  'signin.note': 'Bookings stay private. We never sell your data.',
   'signin.sheet.title': 'Continue with {provider}?',
   'signin.sheet.shareEmail': 'Share my email',
   'signin.sheet.shareEmailSub': 'The email on your Apple ID',
@@ -175,7 +172,6 @@ export const en = {
   'today.eid.days': 'Eid is {count} days away.',
   'today.eid.soon': 'Eid al-Fitr is coming.',
   'today.composer.title': 'Where to next?',
-  'today.composer.body': "A place, a date, who's going. Any way you like.",
   'today.service.flight': 'Flights',
   'today.service.stay': 'Stays',
   'today.service.visa': 'Visas',
@@ -184,9 +180,9 @@ export const en = {
   'today.service.food': 'Tables',
   'today.service.todo': 'Things to do',
   'today.passport.title': 'Add your passport',
-  'today.passport.body': "One scan and we'll fill it in on every booking.",
+  'today.passport.body': 'One scan',
   'today.tile.alula.title': 'AlUla',
-  'today.tile.alula.body': 'Two days, planned for you. 1h 20m from Riyadh.',
+  'today.tile.alula.body': '1h 20m from Riyadh',
   'today.tile.istanbul.title': 'Istanbul',
   'today.tile.istanbul.body': '4h 15m from Riyadh',
   'today.tile.family.title': 'Add your family',
@@ -200,7 +196,6 @@ export const en = {
   'trips.tab.requests': 'Requests',
   'trips.tab.past': 'Past',
   'trips.empty.title': 'Your name’s not on the board yet.',
-  'trips.empty.body': 'Tap a city to see it, or tell us where. Mada books it and stays with you until you’re home.',
   'trips.empty.action': 'Where to?',
   'trips.empty.board': 'Departures · {city}',
   'trips.ideas.title': 'Easy from here this winter',
@@ -217,10 +212,8 @@ export const en = {
   'trips.past.page': 'Visas · Stamps',
   'trips.past.first': 'Your first',
   'trips.requests.empty.title': 'Nothing waiting on Mada.',
-  'trips.requests.empty.body': 'Send us anything: a visa, a table tonight, a car for the day. It lands here and you watch it move.',
   'trips.requests.empty.action': 'Send Mada a request',
   'trips.past.empty.title': 'Every trip leaves a stamp.',
-  'trips.past.empty.body': 'Your first one goes right there. Trips stay here with every receipt, so the next one takes a minute.',
   'trips.past.empty.action': 'Earn the first stamp',
 
   // ───────────── wallet ─────────────
@@ -231,14 +224,12 @@ export const en = {
   'wallet.passport.country': 'Kingdom of Saudi Arabia',
   'wallet.passport.notAdded': 'Not added yet',
   'wallet.passport.emptyTitle': 'Your passport isn’t here yet.',
-  'wallet.passport.emptyBody': 'One scan, on this phone. We check it against every trip.',
   'wallet.passport.scan': 'Scan it now',
   'wallet.docs.eyebrow': 'Your other documents',
   'wallet.docs.emptyTitle': 'No other documents yet',
-  'wallet.docs.emptyBody': 'A visa, a national ID or travel insurance. We’ll watch the dates.',
+  'wallet.docs.emptyBody': 'Visa, ID or insurance',
   'wallet.passes.eyebrow': 'For this trip',
   'wallet.passes.emptyTitle': 'No boarding passes yet',
-  'wallet.passes.emptyBody': 'Tickets and vouchers land here the moment Mada confirms a trip. They work offline.',
   'wallet.passes.plan': 'Plan a trip',
 
   // ───────────── circles ─────────────
@@ -246,7 +237,6 @@ export const en = {
   'circles.tab.circles': 'Circles',
   'circles.yours': 'Your circles',
   'circles.empty.title': 'Your people, in one place.',
-  'circles.empty.body': 'Make a circle for the people you travel with. Plan together, vote on dates and split the costs.',
   'circles.empty.action': 'Make your first circle',
   'circles.idea.family': 'Family',
   'circles.idea.eid': 'Eid trip',
@@ -254,13 +244,12 @@ export const en = {
   'circles.idea.cousins': 'Cousins',
   'circles.friends': 'Friends',
   'circles.friends.emptyTitle': 'Bring your people.',
-  'circles.friends.emptyBody': 'Add the friends you travel with. Only they see your trips and tips.',
+  'circles.friends.emptyBody': 'Only they see your trips and tips.',
   'circles.friends.add': 'Add friends',
 
   // ───────────── ask ─────────────
   'ask.placeholder': 'Where to?',
   'ask.placeholderTrip': 'Anything for {city}?',
-  'ask.disclosure': 'Instant answers from Mada. A person at Mada confirms anything you book.',
   'ask.soon': 'Ask opens in the next build. Talk to Mada for anything in the meantime.',
 
   // ───────────── problems the server reports (COPY.md §5.6: calm, what happened, what we do) ─────────────

@@ -204,5 +204,4 @@ export const authCopyAr: Record<keyof typeof authCopy, string> & Record<string, 
   'auth.bio.on.android': 'مادا تُفتح ببصمتك على هذا الجوال.',
   'auth.bio.off.android': 'مادا تُفتح دون بصمة.',
   'auth.bio.unlock.android': 'افتح بالبصمة',
-  'auth.signin.badge': 'شخص حقيقي يراجع كل حجز',
 };

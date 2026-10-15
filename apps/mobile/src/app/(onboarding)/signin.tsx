@@ -9,9 +9,7 @@ import { AppleButton } from '@/components/auth/AppleButton';
 import { sayAuthError } from '@/components/auth/say';
 import { SHOW_APPLE } from '@/components/auth/CodeHelp';
 import { Act, Screen, TopBar } from '@/components/Layout';
-import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
-import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, type LastSignIn, type SocialProvider } from '@/lib/auth';
 import { maskContact } from '@/lib/auth/recovery';
@@ -107,15 +105,9 @@ export default function SignIn() {
             <Image source={p.src} style={StyleSheet.absoluteFill} contentFit="cover" />
           </Animated.View>
         ))}
-        <View style={styles.badge}>
-          <Animated.View entering={rise(6)} style={riseStyle(6)}>
-            <Pill variant="dark" height={32} label={t('auth.signin.badge')} icon={<Sun width={18} />} style={{ paddingHorizontal: 14 }} />
-          </Animated.View>
-        </View>
       </View>
-      <View style={{ paddingHorizontal: 24, paddingTop: 20, gap: 10 }}>
+      <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
         <T v="h1" accessibilityRole="header">{t('signin.title')}</T>
-        <T v="body">{t('signin.body')}</T>
       </View>
       <Act>
         {showLast ? (
@@ -131,7 +123,6 @@ export default function SignIn() {
           <>
             <Button variant="secondary" label={t('auth.signin.email')} onPress={() => go('/email')} testID="signin-email" />
             <Button variant="ghost" label={t('auth.signin.phone')} onPress={() => go('/phone')} testID="signin-phone" />
-            <T v="small" color={colors.ink3} style={{ textAlign: 'center' }}>{t('signin.note')}</T>
           </>
         )}
       </Act>
@@ -159,7 +150,6 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   photos: { height: 230, marginTop: 4, alignItems: 'center' },
   photo: { position: 'absolute', top: 14, width: 156, height: 204, borderRadius: radii.card, borderWidth: 4, borderColor: colors.paper, overflow: 'hidden', backgroundColor: colors.mist },
-  badge: { position: 'absolute', start: 0, end: 0, bottom: -4, alignItems: 'center' },
   option: { borderRadius: radii.card, padding: 16, gap: 4, backgroundColor: colors.mist },
   optionOn: { borderWidth: 2, borderColor: colors.green, padding: 14 },
 });
