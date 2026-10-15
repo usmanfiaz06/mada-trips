@@ -157,7 +157,7 @@ async function firstRun() {
   step('first run follows the phone: Arabic, right to left');
   await page.goto(ORIGIN + '/');
   await see('علينا الباقي.', 'welcome title');
-  await see('قل لنا وجهتك.', 'welcome body');
+  await see('قل لنا وين.', 'welcome body');
   await page.evaluate(() => document.fonts.ready);
   const font = await page.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family).join(','));
   if (!/InterTight_400Regular/.test(font)) errors.push(`fonts: ${font}`);
