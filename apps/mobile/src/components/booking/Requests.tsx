@@ -353,9 +353,8 @@ export function ByHand({ city, stay, queued }: { city: string; stay?: boolean; q
       <View style={styles.stage}><ArtMap /></View>
       <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
         <MadaDot size={40} />
-        <View style={{ flex: 1, gap: 2 }}>
+        <View style={{ flex: 1 }}>
           <T v="h3">{queued ? t('search.byHand.queued', { city }) : stay ? t('search.byHand.stayTitle', { city }) : t('search.byHand.title', { city })}</T>
-          <T v="small">{t('search.byHand.body')}</T>
         </View>
       </View>
     </Animated.View>

@@ -138,7 +138,6 @@ export default function HotelScreen() {
         </Pressable>
       ) : null}
       {h.phone ? <Box gap={4}><Tiny>{t('voucher.phone')}</Tiny><Small color={colors.green}>{h.phone}</Small></Box> : null}
-      <Tiny style={{ textAlign: 'center' }}>{t('stays.checked')}</Tiny>
     </TripScreen>
   );
 }

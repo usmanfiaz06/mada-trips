@@ -156,7 +156,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
         </T>
         {summary}
         {mode === 'picks'
-          ? <T v="tiny" testID="stays-shape">{t(`stays.shape.${shape.shape}`, { because: shape.because })} {tn('stays.picks.from', total)}</T>
+          ? <T v="tiny" testID="stays-shape">{t(`stays.shape.${shape.shape}`)} · {tn('stays.picks.from', total)}</T>
           : <T v="tiny">{t('stays.sub')}</T>}
       </Animated.View>
 
@@ -229,7 +229,6 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
           <View style={{ alignSelf: 'center' }}><LinkButton label={t('stays.backToPicks')} size={13} onPress={() => { setMode('picks'); setView('list'); }} testID="stays-back-picks" /></View>
         </>
       )}
-      <T v="tiny" style={{ textAlign: 'center' }}>{t('stays.checked')}</T>
       {entry}
       <View style={{ height: 120 }} />
 

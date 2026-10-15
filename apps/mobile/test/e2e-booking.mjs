@@ -166,7 +166,7 @@ async function flights() {
   await k.see('Price held · 19:', 'hold timer');
   await k.shot('pay-sheet');
   step('pay: promo codes');
-  await k.tap('Have a promo code?');
+  await k.tap('Promo code');
   await k.byTest('promo-input').fill('RAMADAN');
   await k.byTest('promo-apply').click();
   await k.see('That code ended on 30 March.', 'expired code');
@@ -498,7 +498,7 @@ async function circles() {
   await k.press(k.byTest('pay-share'));
   await k.see('Your share · Istanbul for Eid', 'share sheet', 10000);
   await k.see('Cruise tickets, your share', 'share line');
-  if (await page.getByText('Have a promo code?').filter({ visible: true }).count()) errors.push('share: promo offered');
+  if (await page.getByText('Promo code').filter({ visible: true }).count()) errors.push('share: promo offered');
   await k.shot('share-pay');
   await k.slide();
   await k.see('Paid. Your circle can see it.', 'share paid toast', 10000);
@@ -515,7 +515,7 @@ async function stays() {
   await openAsk(page);
   step('stays: nothing said, so Mada asks where');
   await k.ask('A place to stay');
-  await k.see('Where would you like to stay?', 'stays where');
+  await k.see('Which city?', 'stays where');
   await k.see('Popular', 'popular cities');
   if (await page.getByText('Checking 120 places').filter({ visible: true }).count()) errors.push('stays: searched before asking where');
   await k.shot('stay-where');
@@ -545,7 +545,7 @@ async function stays() {
   await k.see('2 guests · 1 room for 2', 'two guests');
   await k.press(page.getByRole('button', { name: /^Sara, \d+$/ }));
   await k.see('2 connecting rooms', 'family rooms');
-  await k.see('Children, with their age on the day', 'kids ages');
+  await k.see('Hotels price children by age', 'kids ages');
   await k.shot('stay-who');
   await k.press(k.byTest('stays-search'));
   await k.see('Three places for you in Istanbul', 'stays results', 12000);
@@ -564,7 +564,7 @@ async function stays() {
   await openAsk(page);
   await k.ask('A hotel in Dubai next weekend for 4');
   await k.see('Who’s staying?', 'straight to who', 9000);
-  if (await page.getByText('Where would you like to stay?').filter({ visible: true }).count()) errors.push('stays: asked where after it was said');
+  if (await page.getByText('Which city?').filter({ visible: true }).count()) errors.push('stays: asked where after it was said');
   if (await page.getByText('When are you in').filter({ visible: true }).count()) errors.push('stays: asked when after it was said');
   await k.see('4 guests · 2 connecting rooms', 'four guests');
   await k.see('Dubai', 'summary city');

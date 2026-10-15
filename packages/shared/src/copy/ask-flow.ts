@@ -17,7 +17,7 @@ export const askFlowCopy = {
   'ask.when.school': 'School break',
 
   // ───────────── stays ─────────────
-  'ask.stay.q.where': 'Where would you like to stay?',
+  'ask.stay.q.where': 'Which city?',
   'ask.stay.q.when': 'When are you in {city}?',
   'ask.stay.q.nights': 'Checking in {day}. For how many nights?',
   'ask.stay.q.who': 'Who’s staying?',
@@ -32,9 +32,7 @@ export const askFlowCopy = {
   'ask.stay.guests.one': '1 guest',
   'ask.stay.guests.other': '{count} guests',
   'ask.stay.until': 'until {day}',
-  'ask.stay.kids': 'Children, with their age on the day: {names}. Hotels price children by age.',
-  'ask.stay.roomsNote': 'Rooms side by side, so the family stays together.',
-  'ask.stay.adultsOnly': 'Rooms for adults. Add someone if more are coming.',
+  'ask.stay.kids': '{names} on the day. Hotels price children by age.',
   'ask.stay.byHandNote': 'Mada doesn’t show {city} prices in the app yet. Mada finds the rooms and replies here with prices.',
   'ask.stay.search': 'Show places for {guests}',
   'ask.stay.askMada': 'Ask Mada to find rooms',

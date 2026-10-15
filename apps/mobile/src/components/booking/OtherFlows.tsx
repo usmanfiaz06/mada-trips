@@ -175,10 +175,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
         </Animated.View>
         {intent.travellerCount && intent.travellerCount > who.length ? <T v="small">{t('ask.q.whoSaid', { count: intent.travellerCount })}</T> : null}
         <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} agesOn={checkIn!} />
-        <Card variant="well" style={{ gap: 6 }}>
-          <View style={styles.spread}><T v="h3" style={{ fontSize: 15 }}>{tn('ask.stay.guests', n)}</T><T v="h3" style={{ fontSize: 15 }} testID="stay-rooms">{rooms}</T></View>
-          <T v="small">{kids.length ? t('ask.stay.kids', { names: joinAnd(kids.map((k) => t('ask.flow.childAge', { name: personName(k, selfName), age: ageOn(k, checkIn!) ?? '' }))) }) : n > 2 ? t('ask.stay.roomsNote') : t('ask.stay.adultsOnly')}</T>
-        </Card>
+        {kids.length ? <T v="small" testID="stay-rooms">{t('ask.stay.kids', { names: joinAnd(kids.map((k) => t('ask.flow.childAge', { name: personName(k, selfName), age: ageOn(k, checkIn!) ?? '' }))) })}</T> : null}
         {!live ? <T v="small">{t('ask.stay.byHandNote', { city: cityLabel(city!) })}</T> : null}
         {phoneNeeded ? (
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }} testID="stay-phone-note">
@@ -215,7 +212,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   );
 }
 
-/** "Where would you like to stay?": type to search, or tap a recent or popular city. */
+/** "Which city?": type to search, or tap a recent or popular city. */
 function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => void }) {
   const [q, setQ] = useState('');
   const term = q.trim().toLowerCase();

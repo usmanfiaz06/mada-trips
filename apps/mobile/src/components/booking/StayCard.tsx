@@ -21,13 +21,11 @@ export function StayCard({ h, i, on, guests, reason, distance, evidence, onPress
   const img = h.hotel?.imageUrl ?? null;
   // At most one badge per list: "Our pick" and "Lowest price" (older answers without badges keep their label).
   const badge = noBadge ? null : h.badge !== undefined ? (h.badge ? t(h.badge === 'best' ? 'stays.badge.best' : 'search.label.lowest') : null) : t(`search.label.${h.label}`);
-  const stars = h.facts?.stars ?? null;
   return (
     <Card padding={0} selected={on} onPress={onPress} accessibilityLabel={`${h.name}, ${formatSar(h.total.amount)}`} style={{ overflow: 'hidden', gap: 0 }}>
       <View style={[s.photo, compact ? { height: 96 } : null]} testID={`stay-photo-${i}`}>
         {img ? <ExpoImage source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={h.id} accessible={false} /> : <Photo name={h.photo} focal={h.focal} />}
         {badge ? <Pill label={badge} variant={on ? 'gold' : 'default'} style={[s.tl, on ? null : s.glass]} /> : null}
-        {stars ? <Pill label={`★ ${tn('stay.starsCount', stars, { n: stars })}`} style={[s.tr, s.glass]} /> : null}
       </View>
       <View style={s.body}>
         {reason ? <T v="small" color={colors.goldInk} style={{ fontFamily: ff.ui600 }} testID={`stay-reason-${i}`}>{reason}</T> : null}
@@ -64,7 +62,6 @@ export function StayCard({ h, i, on, guests, reason, distance, evidence, onPress
 const s = StyleSheet.create({
   photo: { height: 132, position: 'relative', backgroundColor: colors.stage },
   tl: { position: 'absolute', top: 10, start: 10 },
-  tr: { position: 'absolute', top: 10, end: 10 },
   glass: { backgroundColor: 'rgba(255,253,249,0.92)' },
   body: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, gap: 5 },
   spread: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
