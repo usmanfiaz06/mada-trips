@@ -57,7 +57,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
   return (
     <>
       <View style={{ gap: 8 }}>
-        <Rise step={0}><T style={font('displayXL')} accessibilityRole="header">{t('today.nothing.title')}</T></Rise>
+        <Rise step={0}><T style={font('display')} accessibilityRole="header">{t('today.nothing.title')}</T></Rise>
         <Rise step={1}><T v="body">{eidLine(new Date())}{pastLine ? ` ${pastLine}` : ''}</T></Rise>
       </View>
       <Rise step={2}><Composer /></Rise>

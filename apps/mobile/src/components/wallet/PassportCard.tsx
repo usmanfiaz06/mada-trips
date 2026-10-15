@@ -82,10 +82,12 @@ export function PassportCard({ person, validity, isSelf, name, onScan }: { perso
               <T v="eyebrow" color={colors.gold} style={{ fontSize: 11 }}>{t('wallet.passport.eyebrow')}</T>
               <T v="tiny" color={colors.onDark3} style={{ fontSize: 11 }}>{COUNTRY[issuer] ?? t('wallet.passport.issuedBy', { country: issuer })}</T>
             </View>
-            <View style={[styles.chip, { backgroundColor: chip.bg }]} testID="passport-chip">
-              <View style={[styles.dot, { backgroundColor: chip.fg }]} />
-              <T v="caption" color={chip.fg} style={{ fontFamily: fontFamilies.ui600 }} numberOfLines={1}>{chip.text}</T>
-            </View>
+            {missing ? null : (
+              <View style={[styles.chip, { backgroundColor: chip.bg }]} testID="passport-chip">
+                <View style={[styles.dot, { backgroundColor: chip.fg }]} />
+                <T v="caption" color={chip.fg} style={{ fontFamily: fontFamilies.ui600 }} numberOfLines={1}>{chip.text}</T>
+              </View>
+            )}
           </View>
 
           {missing ? (
