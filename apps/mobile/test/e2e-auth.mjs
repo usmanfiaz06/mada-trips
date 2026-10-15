@@ -87,10 +87,20 @@ async function verifyPhone(p, { wrong = false, label = 'verify' } = {}) {
   await p.byTest('phone-send').click();
   await p.see('Enter the code', `${label} code`);
   if (wrong) {
-    await p.byTest('otp-input').fill('000000');
+    // Typed one digit at a time: nothing moves until Continue, and Continue only lights up at the sixth digit.
+    const field = p.byTest('otp-input');
+    await field.click();
+    await field.pressSequentially('00000', { delay: 40 });
+    if (!(await p.byTest('otp-continue').isDisabled())) errors.push(`${label}: Continue is live before the sixth digit`);
+    await field.pressSequentially('0', { delay: 40 });
+    await p.page.waitForTimeout(400);
+    if (!(await p.page.getByText('Enter the code').count())) errors.push(`${label}: a typed code was checked before Continue`);
+    await p.shot(`${label}-typed`);
+    await p.byTest('otp-continue').click();
     await p.see("That code doesn't match. 2 tries left.", `${label} wrong code`);
     await p.shot(`${label}-wrong`);
   }
+  // Filled in whole (the phone's suggestion, a paste): checked at once.
   await p.byTest('otp-input').fill('123456');
   return phone;
 }

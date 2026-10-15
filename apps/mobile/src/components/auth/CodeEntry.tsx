@@ -133,9 +133,16 @@ export function CodeEntry({ title, about, contact, onChange, onVerify, onResend,
           ref={input} label={t('otp.label')} big value={code} editable={!busy && !paused} autoFocus={AUTO_FOCUS} testID={testID}
           keyboardType="number-pad" inputMode="numeric" autoComplete={OTP_AUTOCOMPLETE} textContentType="oneTimeCode"
           bad={!!error} error={error}
-          onChangeText={(v) => { const d = codeFrom(v, code); setCode(d); if (error) setError(null); if (d.length === 6) void submit(d); }}
+          onChangeText={(v) => {
+            const d = codeFrom(v, code); setCode(d); if (error) setError(null);
+            // A code that arrives whole (the phone's suggestion, a paste) is checked at once; one typed digit by digit
+            // waits for Continue, so nothing moves before the traveller means it to.
+            if (d.length === 6 && d.length - code.length > 1) void submit(d);
+          }}
+          onSubmitEditing={() => void submit(code)} returnKeyType="done"
         />
       </Animated.View>
+      <Button label={busy ? t('otp.checking') : t('otp.continue')} busy={busy} disabled={code.length !== 6 || paused} onPress={() => void submit(code)} testID="otp-continue" />
       <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         {paused && !pause?.open
           ? <LinkButton label={t('auth.pause.title')} onPress={() => setPause((p) => (p ? { ...p, open: true } : p))} />
