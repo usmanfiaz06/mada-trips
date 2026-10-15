@@ -7,6 +7,7 @@ import {
   CITY_CENTRES, anchorName, anchorOfLandmark, distanceFrom, distanceLabel, formatSar, kmApart, landmarkById, landmarksIn, mergeWishes, parseStayWishes, reasonsLine, refineStays, sortByDistance, sortStays,
   tripShape, wishKey, wishLabel, type DistanceAnchor, type Person, type StayOption, type StaySearchResponse, type StaySort, type StayWish,
 } from '@mada/shared';
+import { agentName, useAgent } from '@/lib/agent';
 import { useStayAnchor } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
@@ -52,6 +53,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const [distOpen, setDistOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const onDuty = useAgent();
   const stored = useStayAnchor((x) => x.byCity[city]);
   const setStored = useStayAnchor((x) => x.set);
   const first = landmarksIn(city)[0];
@@ -176,7 +178,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
           <MadaDot size={26} />
           <View style={{ flex: 1, gap: 8 }}>
             <T v="small" color={colors.green}>{answer}</T>
-            {offerDesk ? <View style={{ alignSelf: 'flex-start' }}><Button size="small" block={false} variant="secondary" label={t('stays.desk', { agent: 'Faisal' })} onPress={() => onDesk(deskNote)} testID="stays-desk" /></View> : null}
+            {offerDesk ? <View style={{ alignSelf: 'flex-start' }}><Button size="small" block={false} variant="secondary" label={t('stays.desk', { agent: agentName(onDuty) })} onPress={() => onDesk(deskNote)} testID="stays-desk" /></View> : null}
           </View>
         </View>
       ) : null}

@@ -621,7 +621,7 @@ async function refineStays(page, k, ar = false) {
   await k.byTest('ask-input').fill(ar ? 'قريب من السلطان أحمد' : 'closer to Sultanahmet');
   await k.byTest('ask-send').click();
   await k.see(ar ? 'ما فيه مكان' : 'Nothing here has all of that.', 'refine: nothing fits both, said plainly');
-  await k.see(ar ? 'اطلب من' : 'Ask Faisal to find it', 'refine: the desk offered');
+  await k.see(ar ? 'اطلب من' : 'to find it', 'refine: the desk offered');
   await k.shot(`stay-refine-none${ar ? '-ar' : ''}`);
   await k.press(k.byTest('wish-has:pool'));
   await k.see(ar ? 'الأقرب على بعد' : 'The closest is', 'refine: near Sultanahmet, nearest first');
