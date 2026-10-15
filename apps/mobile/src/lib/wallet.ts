@@ -165,7 +165,7 @@ export const useTrips = () => useApiQuery({ queryKey: walletKeys.trips, enabled:
 export function usePresence(threadId?: string) {
   const q = useApiQuery({ queryKey: walletKeys.presence(threadId), enabled: useOn(), refetchInterval: 30_000, queryFn: () => walletApi.presence(threadId) });
   const offline = useDeviceOffline();
-  const data = useMemo(() => (offline && q.data ? { ...q.data, online: false, typing: false, line: t('presence.offline', { agent: q.data.agent?.name ?? t('common.agentName') }) } : q.data), [offline, q.data]);
+  const data = useMemo(() => (offline && q.data ? { ...q.data, online: false, typing: false, line: t('presence.offline', { agent: q.data.agent?.name ?? t('presence.title') }) } : q.data), [offline, q.data]);
   return offline ? { ...q, data } : q;
 }
 

@@ -27,6 +27,7 @@ import { demo } from '@/lib/wallet-demo';
 import { hhmm, nextTrip } from '@/lib/wallet-model';
 import { colors, ff } from '@/theme';
 import { AttachmentChip } from '@/components/booking/Attachment';
+import { MadaMark } from '@/components/trips/ui';
 
 const TOPIC_ICON: Record<SupportTopic, IconName> = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more' };
 
@@ -100,8 +101,11 @@ export default function Support() {
   const smsBody = encodeURIComponent(queued.map((i) => i.meta?.text).filter(Boolean).join('\n') || t('support.offline.smsBody'));
   const who = presence.data?.agent;
   const away = phoneOffline || presence.data?.online === false;
-  const line = typing && !away ? t('presence.typing', { agent: who?.name ?? 'Faisal' })
-    : presence.data?.line ?? (phoneOffline ? t('presence.offline', { agent: 'Faisal' }) : `${t('presence.online', { agent: 'Faisal' })} · ${t('presence.replies', { minutes: 2 })}`);
+  // COPY.md §1: the person is presence, and only when the server names one. Nobody assigned (or no answer yet): Mada is here.
+  const line = typing && !away && who ? t('presence.typing', { agent: who.name })
+    : presence.data?.line ?? (phoneOffline ? t('presence.offline', { agent: who?.name ?? t('presence.title') })
+      : who ? `${t('presence.online', { agent: who.name })} · ${t('presence.replies', { minutes: presence.data?.replyMinutes ?? 2 })}`
+        : `${t('presence.here')} · ${t('presence.replies', { minutes: 10 })}`);
   const what = th?.tripId && trip ? t('support.aboutTrip', { city: trip.city }) : t('support.account');
   const name = user?.name;
 
@@ -115,7 +119,7 @@ export default function Support() {
       } />
       <View style={styles.head}>
         <View>
-          <View style={[styles.avatar, { backgroundColor: colors.green }]}><T style={{ fontFamily: ff.ui600, fontSize: 20, color: colors.sand }}>{who?.initial ?? 'F'}</T></View>
+          {who ? <View style={[styles.avatar, { backgroundColor: colors.green }]}><T style={{ fontFamily: ff.ui600, fontSize: 20, color: colors.sand }}>{who.initial}</T></View> : <MadaMark size={52} />}
           {away ? <View style={[styles.dot, styles.dotAway]} testID="support-presence-away" /> : <View style={styles.dot} />}
         </View>
         <View style={{ flex: 1, gap: 1 }}>
@@ -228,7 +232,7 @@ function Message({ m, hasTrip, onReply, onBag, onNoRef, onAction }: {
           <View style={styles.refund}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <T v="h3" style={{ fontSize: 15 }}>{formatSar(c.refund.amount)}</T>
-              <View style={styles.pill}><T v="caption" style={{ fontFamily: ff.ui600 }}>{c.refund.stage === 'sent' ? t('support.refund.sent') : c.refund.stage === 'rejected' ? t('support.refund.withFaisal') : t('support.refund.onWay')}</T></View>
+              <View style={styles.pill}><T v="caption" style={{ fontFamily: ff.ui600 }}>{c.refund.stage === 'sent' ? t('support.refund.sent') : c.refund.stage === 'rejected' ? t('support.refund.withMada') : t('support.refund.onWay')}</T></View>
             </View>
             <T v="small">{c.refund.title}</T>
             <T v="small" color={colors.green}>{`${t(REFUND_STAGE[c.refund.stage] ?? 'support.refund.stage.requested')}. ${t('support.refund.to', { card: c.refund.card })}`}</T>

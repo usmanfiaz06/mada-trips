@@ -4,21 +4,25 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { t } from '@/lib/i18n';
 import { talkToMada } from '@/lib/net/talk';
 import { colors, ff } from '@/theme';
+import { useAgentLabel } from '@/lib/agent';
 import { Avatar } from '../Avatar';
+import { MadaMark } from '../trips/ui';
 import { Button } from '../Button';
 import { ArtRouteGap } from './art';
 import { T } from '../Text';
 
 /**
  * COPY.md §5.6 "Supplier not answering": "Saudia's system isn't answering." Two forms:
- *   - booking: a person has it ("Faisal is booking this by hand. You don't need to do anything.") with their face;
+ *   - booking: someone has it ("{agent} is booking this by hand. You don't need to do anything."): the person's face when the
+ *     server named one (introduced once, COPY.md §1), otherwise Mada with its mark;
  *   - otherwise: we keep trying, and Mada can book it by hand (Talk to Mada).
  * Use it inside a screen where the results would be; the rest of the screen stays usable. A screen with its own way
  * forward (booking search: "Show the others", "Ask Mada") passes `body` and `actions` in place of Talk to Mada.
  */
 export function SupplierDown({ supplier, booking, agent, initial, body, actions, testID }: { supplier?: string; booking?: boolean; agent?: string; initial?: string; body?: string; actions?: ReactNode; testID?: string }) {
   const name = supplier ?? t('supplierDown.generic');
-  const person = agent ?? t('common.agentName');
+  const person = agent ?? t('presence.title');
+  const who = useAgentLabel(agent ? { name: agent } : null);
   return (
     <Animated.View entering={FadeIn.duration(300)} style={styles.card} accessibilityRole="alert" testID={testID ?? 'supplier-down'}>
       <View style={styles.row}>
@@ -32,8 +36,8 @@ export function SupplierDown({ supplier, booking, agent, initial, body, actions,
         <View style={styles.actions}>{actions}</View>
       ) : booking ? (
         <View style={styles.who}>
-          <Avatar initial={initial ?? person.charAt(0)} tone="green" size={28} />
-          <T v="caption" style={{ fontFamily: ff.ui500, color: colors.ink2 }}>{t('actor.intro', { agent: person })}</T>
+          {agent ? <Avatar initial={initial ?? agent.charAt(0)} tone="green" size={28} /> : <MadaMark size={28} />}
+          <T v="caption" style={{ fontFamily: ff.ui500, color: colors.ink2 }}>{who.label}</T>
         </View>
       ) : (
         <Button size="small" variant="secondary" block={false} label={t('action.talk')} onPress={() => talkToMada()} style={{ alignSelf: 'flex-start', backgroundColor: colors.mist }} testID="supplier-talk" />

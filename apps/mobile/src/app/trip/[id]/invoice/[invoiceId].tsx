@@ -10,6 +10,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { dl } from '@/components/trips/money';
 import { Box, Grow, H3, Num, Row, Small, Spread, TextLink, Tiny, TripScreen } from '@/components/trips/ui';
+import { agentName } from '@/lib/agent';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -129,7 +130,7 @@ export default function InvoiceScreen() {
       ) : null}
       {draft ? (
         <Box tone="warn" style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
-          <Icon name="doc" size={20} /><Grow><H3 size={15}>{t('inv.draft.title')}</H3><Small>{t('inv.draft.body', { agent: trip?.agent.name ?? 'Faisal' })}</Small></Grow>
+          <Icon name="doc" size={20} /><Grow><H3 size={15}>{t('inv.draft.title')}</H3><Small>{t('inv.draft.body', { agent: agentName(trip?.agent) })}</Small></Grow>
         </Box>
       ) : null}
       <View style={[styles.paper, draft ? styles.paperDraft : null]} testID="invoice-paper" accessibilityLabel={t(`inv.kind.${doc.kind}`)}>
@@ -176,7 +177,7 @@ export default function InvoiceScreen() {
       {doc.kind === 'tax' && !draft ? (
         <Box tone="well" gap={6}>
           <Row><Icon name="lock" size={16} /><Small color={colors.green} style={{ fontFamily: ff.ui600, flex: 1 }}>{t('inv.issuedTo', { name: doc.company?.name ?? '', day: dl(doc.issuedAt) })}</Small></Row>
-          <Small>{t('inv.cantEdit', { agent: trip?.agent.name ?? 'Faisal' })}</Small>
+          <Small>{t('inv.cantEdit', { agent: agentName(trip?.agent) })}</Small>
           <Button label={t('inv.askReissue')} variant="secondary" size="small" block={false} busy={ask.isPending} onPress={() => ask.mutate(undefined, { onSuccess: () => { buzz('success'); toast(t('inv.reissueSent')); router.push('/trips?tab=requests' as Href); } })} />
         </Box>
       ) : null}

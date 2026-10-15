@@ -9,6 +9,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { ArtSuitcase } from '@/components/trips/Arts';
 import { AgentNote, Box, H3, IconTile, PickCard, Rise, Row, Small, Spread, Tag, Tiny, TripScreen } from '@/components/trips/ui';
+import { agentName } from '@/lib/agent';
 import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -30,7 +31,7 @@ export default function Pickup() {
   const [pick, setPick] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const agent = trip?.agent.name ?? 'Faisal';
+  const agent = agentName(trip?.agent);
   const d = q.data;
   const chosen: TransferOption | undefined = d?.options.find((o) => o.id === pick) ?? d?.options[0];
 
@@ -103,7 +104,7 @@ export default function Pickup() {
         {chosen ? (
           <Spread><H3 size={15} style={{ flex: 1 }}>{chosen.vehicle} · {t(chosen.kind === 'private' ? 'pickup.private' : 'pickup.shared')}</H3><Tag tone="gold" label={t('pickup.total', { amount: (chosen.total.amount / 100).toLocaleString('en-US') })} /></Spread>
         ) : null}
-        <AgentNote initial={agent.charAt(0)}>{t('pickup.sendBody', { agent })}</AgentNote>
+        <AgentNote initial={trip?.agent.initial}>{t('pickup.sendBody', { agent })}</AgentNote>
         <Button testID="pickup-send" label={t('pickup.send')} busy={busy} onPress={() => void send()} />
         <Button label={t('pickup.keep')} variant="secondary" onPress={() => setConfirm(false)} />
       </Sheet>

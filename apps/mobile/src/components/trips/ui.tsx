@@ -9,9 +9,10 @@ import { Icon, type IconName } from '@/components/Icon';
 import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { VGradient } from '@/components/Gradient';
+import { Sun } from '@/components/Sun';
 import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
-import { useAgent as useAgentName } from '@/lib/trips';
+import { useAgent as useAgentOnDuty, useAgentLabel, type AgentOnDuty } from '@/lib/agent';
 import { useDeviceOffline } from '@/lib/net/state';
 import { rise, riseStyle as webSafeRiseStyle } from '@/lib/motion';
 import { colors, ff, font, radii, shadow } from '@/theme';
@@ -279,10 +280,20 @@ export function Steps({ items, light }: { items: { text: string; state: 'done' |
 
 /* ───────── people ───────── */
 
-/** The agent's face, with a green dot when online (.td-face). */
-export function AgentFace({ initial, size = 36, online = true, ring = colors.sand }: { initial: string; size?: number; online?: boolean; ring?: string }) {
+/** Mada's mark: the sun on a green disc, where a face would go when no person is assigned (COPY.md §6: faces belong to people). */
+export function MadaMark({ size = 36 }: { size?: number }) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: 99, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' }} accessibilityElementsHidden>
+      <Sun width={size * 0.62} color={colors.gold} />
+    </View>
+  );
+}
+
+/** The agent's face, with a green dot when online (.td-face). With no initial (nobody assigned), the Mada mark. */
+export function AgentFace({ initial, size = 36, online = true, ring = colors.sand }: { initial: string | null | undefined; size?: number; online?: boolean; ring?: string }) {
   // Nobody shows as online while this phone itself has no connection.
   const offline = useDeviceOffline();
+  if (!initial) return <MadaMark size={size} />;
   return (
     <View style={{ width: size, height: size, borderRadius: 99, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' }} accessibilityElementsHidden>
       <T style={{ color: colors.gold, fontFamily: ff.ui600, fontSize: size * 0.39, lineHeight: size * 0.5 }}>{initial}</T>
@@ -295,7 +306,7 @@ export function AgentFace({ initial, size = 36, online = true, ring = colors.san
  * "Faisal is with you today." / "Talk to Mada" (COPY.md §1: the action says Mada; the person is presence).
  * A quiet line with a face, not a big button. Opens the support thread (built in the Wallet area at /support).
  */
-export function TalkLine({ note, agentInitial = 'F', dark, about }: { note: string; agentInitial?: string; dark?: boolean; about?: string }) {
+export function TalkLine({ note, agentInitial, dark, about }: { note: string; agentInitial?: string | null; dark?: boolean; about?: string }) {
   const router = useRouter();
   return (
     <Pressable testID="talk-line" accessibilityRole="button" accessibilityLabel={`${note} ${t('action.talk')}`} onPress={() => { buzz('tap'); router.push((about ? `/support?about=${encodeURIComponent(about)}` : '/support') as Href); }}
@@ -310,8 +321,8 @@ export function TalkLine({ note, agentInitial = 'F', dark, about }: { note: stri
   );
 }
 
-/** "F · Faisal, your Mada agent" with a short line from him (.tm-faisal). */
-export function AgentNote({ initial = 'F', children }: { initial?: string; children: ReactNode }) {
+/** A face (or the Mada mark when nobody is assigned) with a short line from them (.tm-faisal). */
+export function AgentNote({ initial, children }: { initial?: string | null; children: ReactNode }) {
   return (
     <Row align="flex-start" gap={10}>
       <AgentFace initial={initial} size={32} online={false} />
@@ -376,8 +387,20 @@ const styles = StyleSheet.create({
   actWrap: { position: 'absolute', start: 0, end: 0, bottom: 0, height: 210 },
 });
 
-/** "F · Faisal, your Mada agent": introducing the person on duty, once (COPY.md §1). */
-export function AgentIntro() {
-  const agent = useAgentName();
-  return <Row><AgentFace initial={agent.initial} size={32} online={false} /><H3 size={14}>{t('actor.intro', { agent: agent.name })}</H3></Row>;
+/**
+ * Who is speaking in a box from the desk (COPY.md §1). The first time this phone meets the person on duty:
+ * "F · Faisal, your Mada agent"; after that their face, their name and the Mada mark. Nobody assigned: the mark and "Mada".
+ * Pass `agent` to name the person a request or message came from; otherwise it's whoever is on duty.
+ */
+export function AgentIntro({ agent: given }: { agent?: AgentOnDuty | null }) {
+  const onDuty = useAgentOnDuty();
+  const agent = given === undefined ? onDuty : given;
+  const { label, intro } = useAgentLabel(agent);
+  return (
+    <Row>
+      <AgentFace initial={agent?.initial} size={32} online={false} />
+      <H3 size={14}>{label}</H3>
+      {agent && !intro ? <MadaMark size={16} /> : null}
+    </Row>
+  );
 }

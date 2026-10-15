@@ -47,7 +47,7 @@ export function describeError(e: unknown, opts: { supplierName?: string; agent?:
       return {
         kind, supplier: label, primary: opts.booking ? null : 'talk', reference,
         title: t('supplierDown.title', { supplier: label }),
-        body: opts.booking ? t('supplierDown.bodyBooking', { agent: opts.agent ?? t('common.agentName') }) : t('supplierDown.body'),
+        body: opts.booking ? t('supplierDown.bodyBooking', { agent: opts.agent ?? t('presence.title') }) : t('supplierDown.body'),
       };
     }
     case 'gone':
