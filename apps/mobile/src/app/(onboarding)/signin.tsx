@@ -9,7 +9,9 @@ import { AppleButton } from '@/components/auth/AppleButton';
 import { sayAuthError } from '@/components/auth/say';
 import { SHOW_APPLE } from '@/components/auth/CodeHelp';
 import { Act, Screen, TopBar } from '@/components/Layout';
+import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
+import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, type LastSignIn, type SocialProvider } from '@/lib/auth';
 import { maskContact } from '@/lib/auth/recovery';
@@ -18,7 +20,7 @@ import { t } from '@/lib/i18n';
 import { rise, riseStyle } from '@/lib/motion';
 import { useOnboarding } from '@/lib/onboarding';
 import { toast } from '@/lib/toast';
-import { colors, radii, shadow } from '@/theme';
+import { colors, font, radii, shadow } from '@/theme';
 
 const PHOTOS = [
   { src: require('../../../assets/images/alula.jpg'), x: -78 },
@@ -105,9 +107,15 @@ export default function SignIn() {
             <Image source={p.src} style={StyleSheet.absoluteFill} contentFit="cover" />
           </Animated.View>
         ))}
+        <View style={styles.badge}>
+          <Animated.View entering={rise(6)} style={riseStyle(6)}>
+            <Pill variant="dark" height={32} label={t('signin.badge')} icon={<Sun width={18} />} style={{ paddingHorizontal: 14 }} />
+          </Animated.View>
+        </View>
       </View>
-      <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
-        <T v="h1" accessibilityRole="header">{t('signin.title')}</T>
+      <View style={{ paddingHorizontal: 24, paddingTop: 26, gap: 8 }}>
+        <T style={font('display')} accessibilityRole="header">{t('signin.title')}</T>
+        <T v="body" color={colors.ink2}>{t('signin.body')}</T>
       </View>
       <Act>
         {showLast ? (
@@ -148,8 +156,9 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  photos: { height: 230, marginTop: 4, alignItems: 'center' },
-  photo: { position: 'absolute', top: 14, width: 156, height: 204, borderRadius: radii.card, borderWidth: 4, borderColor: colors.paper, overflow: 'hidden', backgroundColor: colors.mist },
+  photos: { height: 268, marginTop: 4, alignItems: 'center' },
+  photo: { position: 'absolute', top: 14, width: 168, height: 230, borderRadius: radii.card, borderWidth: 4, borderColor: colors.paper, overflow: 'hidden', backgroundColor: colors.mist },
+  badge: { position: 'absolute', start: 0, end: 0, bottom: -4, alignItems: 'center' },
   option: { borderRadius: radii.card, padding: 16, gap: 4, backgroundColor: colors.mist },
   optionOn: { borderWidth: 2, borderColor: colors.green, padding: 14 },
 });

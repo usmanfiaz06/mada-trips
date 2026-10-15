@@ -104,7 +104,9 @@ export const en = {
   'welcomeBack.notMe': 'That’s not me',
 
   // ───────────── onboarding: sign in ─────────────
+  'signin.badge': 'A real person checks every booking',
   'signin.title': 'Sign in to Mada.',
+  'signin.body': 'Your trips, your people, one place.',
   'signin.apple': 'Continue with Apple',
   'signin.google': 'Continue with Google',
   'signin.phone': 'Use my phone number',
