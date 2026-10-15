@@ -116,9 +116,9 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const change = (what: 'where' | 'when') => { setGo(false); setPick(null); setByHand(false); setDeskNote(null); setEditing(what); };
   const summary = city && checkIn && checkOut ? (
     <SummaryChips items={[
-      { label: cityLabel(city), onPress: () => change('where'), testID: 'stay-chip-where' },
-      { label: datesLabel, onPress: () => change('when'), testID: 'stay-chip-when' },
-      { label: whoLabel, onPress: () => { setGo(false); setPick(null); }, testID: 'stay-chip-who' },
+      { label: cityLabel(city), onPress: () => change('where'), testID: 'stay-chip-where', icon: 'pin' },
+      { label: datesLabel, onPress: () => change('when'), testID: 'stay-chip-when', icon: 'calendar' },
+      { label: whoLabel, onPress: () => { setGo(false); setPick(null); }, testID: 'stay-chip-who', icon: 'user' },
     ]} />
   ) : null;
   const sheet = calendar ? (

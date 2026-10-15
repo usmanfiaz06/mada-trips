@@ -212,4 +212,13 @@ export const staysCopy = {
   'refine.t.none': 'Nothing here fits all of that.',
   'refine.t.applied': 'Showing what fits: {wishes}.',
   'things.ask.hint': 'Tell Mada what matters: indoors, for children, tonight',
+  'stays.picks.from.one': 'Chosen from 1 place. Totals for the stay, taxes in.',
+  'stays.picks.from.other': 'Chosen from {count} places. Totals for the stay, taxes in.',
+  'stays.sort.nearTo': 'Nearest to {place}',
+  'stays.filters': 'Filters',
+  'stays.filtersCount': 'Filters · {n}',
+  'stays.filtersHint': 'Or just tell Mada what matters in the box below.',
+  'stays.filtersDone': 'Show places',
+  'stays.distanceFrom': 'Distance from',
+  'stays.distanceFromPick': 'Choose a place',
 } as const;

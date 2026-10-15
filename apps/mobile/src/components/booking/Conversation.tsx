@@ -58,17 +58,26 @@ export function Answered({ q, a, onChange, testID }: { q: string; a: string; onC
   );
 }
 
-/** The summary before searching: every choice as a chip, tap one to change it. */
-export function SummaryChips({ items }: { items: { label: string; onPress: () => void; testID?: string; a11y?: string }[] }) {
+/**
+ * The search in one calm card: where, when and who on a line each, one pencil. Tap a part to change just that part;
+ * the pencil changes the first. Reads as "what I asked for", not as three loose buttons.
+ */
+export function SummaryChips({ items }: { items: { label: string; onPress: () => void; testID?: string; a11y?: string; icon?: 'pin' | 'calendar' | 'user' }[] }) {
+  if (!items.length) return null;
   return (
-    <View style={styles.chips}>
-      {items.map((it) => (
-        <Pressable key={it.label} accessibilityRole="button" accessibilityLabel={it.a11y ?? t('ask.flow.changeIt', { what: it.label })} onPress={() => { buzz('select'); it.onPress(); }}
-          style={({ pressed }) => [styles.chip, pressed ? { transform: [{ scale: 0.97 }] } : null]} testID={it.testID}>
-          <T style={[font('h3'), { fontSize: 14, flexShrink: 1 }]} numberOfLines={1}>{it.label}</T>
-          <Icon name="edit" size={13} color={colors.ink3} />
-        </Pressable>
-      ))}
+    <View style={styles.summary} testID="summary-bar">
+      <View style={{ flex: 1, gap: 4 }}>
+        {items.map((it, i) => (
+          <Pressable key={it.label} accessibilityRole="button" accessibilityLabel={it.a11y ?? t('ask.flow.changeIt', { what: it.label })} onPress={() => { buzz('select'); it.onPress(); }}
+            style={({ pressed }) => [styles.summaryRow, pressed ? { opacity: 0.6 } : null]} testID={it.testID}>
+            {it.icon ? <Icon name={it.icon} size={15} color={i === 0 ? colors.green : colors.ink3} /> : null}
+            <T style={[i === 0 ? font('h3') : font('small'), { fontSize: i === 0 ? 16 : 14, flexShrink: 1, color: i === 0 ? colors.green : colors.ink2 }]} numberOfLines={1}>{it.label}</T>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={t('ask.flow.changeIt', { what: items[0]!.label })} onPress={() => { buzz('select'); items[0]!.onPress(); }} style={styles.summaryEdit} testID="summary-edit">
+        <Icon name="edit" size={15} color={colors.green} />
+      </Pressable>
     </View>
   );
 }
@@ -109,6 +118,9 @@ export function ThreadBubble({ mine, name, text, time, children, queued }: { min
 }
 
 const styles = StyleSheet.create({
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, paddingEnd: 8, borderRadius: 18, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 22 },
+  summaryEdit: { width: 36, height: 36, borderRadius: 99, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.mist },
   meWrap: { alignSelf: 'flex-end', maxWidth: '82%', alignItems: 'flex-end', gap: 3 },
   me: { backgroundColor: colors.green, paddingVertical: 11, paddingHorizontal: 16, borderRadius: 22, borderBottomEndRadius: 6 },
   timeEnd: { paddingHorizontal: 6 },

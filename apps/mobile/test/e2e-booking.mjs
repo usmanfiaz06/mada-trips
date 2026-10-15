@@ -639,6 +639,7 @@ async function refineStays(page, k, ar = false) {
   const num = (x) => Number(x.replace(/[^0-9٠-٩]/g, '').replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)));
   if (prices.map(num).some((v, i, a) => i && v < a[i - 1])) errors.push(`stays: lowest price sort out of order (${prices.join(', ')})`);
   await k.shot(`stay-all-price${ar ? '-ar' : ''}`);
+  await k.press(k.byTest('stays-sort'));
   await k.press(k.byTest('stays-distance'));
   await k.press(k.byTest('dist-taksim'));
   await k.see(ar ? 'من تقسيم' : 'from Taksim', 'distance from Taksim on the cards');

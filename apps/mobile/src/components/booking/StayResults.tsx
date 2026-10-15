@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
 import Animated from 'react-native-reanimated';
@@ -51,6 +51,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const [shown, setShown] = useState(PAGE);
   const [distOpen, setDistOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const stored = useStayAnchor((x) => x.byCity[city]);
   const setStored = useStayAnchor((x) => x.set);
   const first = landmarksIn(city)[0];
@@ -153,9 +154,10 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
         <T v="h2" style={{ fontSize: 24, lineHeight: 30 }} accessibilityRole="header" testID="stays-heading">
           {mode === 'picks' ? t(picks.length >= 3 ? 'stays.picks.title' : 'stays.picks.titleFew', { city: cityName }) : tn('stays.count', list.length, { city: cityName })}
         </T>
-        {mode === 'picks' ? <T v="small">{tn('stays.picks.sub', total, { dates, guests: tn('ask.stay.guests', guests) })}</T> : <T v="small">{t('stays.sub')}</T>}
-        {mode === 'picks' ? <T v="tiny" testID="stays-shape">{t(`stays.shape.${shape.shape}`, { because: shape.because })}</T> : null}
         {summary}
+        {mode === 'picks'
+          ? <T v="tiny" testID="stays-shape">{t(`stays.shape.${shape.shape}`, { because: shape.because })} {tn('stays.picks.from', total)}</T>
+          : <T v="tiny">{t('stays.sub')}</T>}
       </Animated.View>
 
       {wishes.length ? (
@@ -178,36 +180,20 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
           </View>
         </View>
       ) : null}
-      {quick.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingEnd: 8 }} style={{ marginHorizontal: -20 }}>
-          <View style={{ width: 12 }} />
-          {quick.slice(0, 6).map((w) => (
-            <Pressable key={wishKey(w)} accessibilityRole="button" onPress={() => { buzz('select'); setUnread(null); setWishes((x) => mergeWishes(x, [w])); setPick(null); if (w.k === 'near') { const l = landmarkById(w.id); if (l) { setStored(city, anchorOfLandmark(l)); setSort('near'); } } }}
-              style={st.quick} testID={`quick-${wishKey(w)}`}>
-              <Icon name="plus" size={14} color={colors.green} />
-              <T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }}>{wishLabel(w, lang)}</T>
-            </Pressable>
-          ))}
-        </ScrollView>
-      ) : null}
-
       {mode === 'all' ? (
         <View style={st.controls} testID="stays-controls">
-          <Pressable accessibilityRole="button" onPress={() => setSortOpen(true)} style={st.control} testID="stays-sort">
-            <T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }} numberOfLines={1}>{t('stays.sortValue', { sort: sortLabel })}</T><Icon name="chevron" size={14} />
+          <Pressable accessibilityRole="button" onPress={() => setSortOpen(true)} style={[st.control, { flexShrink: 1 }]} testID="stays-sort">
+            <T v="small" color={colors.green} style={{ fontFamily: ff.ui500, flexShrink: 1 }} numberOfLines={1}>{sort === 'near' && anchor ? t('stays.sort.nearTo', { place: anchorName(anchor, lang) }) : t('stays.sortValue', { sort: sortLabel })}</T><Icon name="chevron" size={14} />
           </Pressable>
-          {anchor ? (
-            <Pressable accessibilityRole="button" onPress={() => setDistOpen(true)} style={[st.control, { flexShrink: 1 }]} testID="stays-distance">
-              <Icon name="pin" size={14} /><T v="small" color={colors.green} style={{ fontFamily: ff.ui500, flexShrink: 1 }} numberOfLines={1}>{anchorName(anchor, lang)}</T>
+          {quick.length || wishes.length ? (
+            <Pressable accessibilityRole="button" onPress={() => setFiltersOpen(true)} style={st.control} testID="stays-filters">
+              <Icon name="filter" size={14} /><T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }}>{wishes.length ? t('stays.filtersCount', { n: wishes.length }) : t('stays.filters')}</T>
             </Pressable>
           ) : null}
-          <View style={st.seg} accessibilityRole="tablist" accessibilityLabel={t('stays.view.a11y')}>
-            {(['list', 'map'] as const).map((v) => (
-              <Pressable key={v} accessibilityRole="tab" accessibilityState={{ selected: view === v }} onPress={() => { buzz('select'); setView(v); setMapSel(null); }} style={[st.segBtn, view === v ? st.segOn : null]} testID={`stays-view-${v}`}>
-                <T v="small" color={view === v ? colors.mist : colors.green} style={{ fontFamily: ff.ui600 }}>{t(`stays.view.${v}`)}</T>
-              </Pressable>
-            ))}
-          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel={t(view === 'map' ? 'stays.view.list' : 'stays.view.map')} onPress={() => { buzz('select'); setView(view === 'map' ? 'list' : 'map'); setMapSel(null); }}
+            style={[st.round, view === 'map' ? st.roundOn : null]} testID={view === 'map' ? 'stays-view-list' : 'stays-view-map'}>
+            <Icon name={view === 'map' ? 'list' : 'map'} size={18} color={view === 'map' ? colors.mist : colors.green} />
+          </Pressable>
         </View>
       ) : null}
 
@@ -219,7 +205,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
       ) : view === 'map' ? (
         <View style={{ gap: 10 }}>
           <View>
-            <StaysMap points={mapPoints} marks={marks} height={420} onPick={(id) => { buzz('select'); setMapSel(id); setPick(id); }} testID="stays-map" />
+            <StaysMap points={mapPoints} marks={marks} height={520} onPick={(id) => { buzz('select'); setMapSel(id); setPick(id); }} testID="stays-map" />
             {sel ? (
               <Pressable accessibilityRole="button" accessibilityLabel={sel.name} onPress={details(sel) ?? (() => setPick(sel.id))} style={st.mapCard} testID="stays-map-card">
                 <View style={st.mapPhoto}>{sel.hotel?.imageUrl ? <ExpoImage source={{ uri: sel.hotel.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} /> : <Photo name={sel.photo} focal={sel.focal} />}</View>
@@ -252,10 +238,38 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
         <T v="h2">{t('stays.sort.a11y')}</T>
         {(['best', 'price', 'stars', ...(anchor ? ['near' as const] : [])] as Sort[]).map((k) => (
           <Pressable key={k} accessibilityRole="radio" accessibilityState={{ checked: sort === k }} onPress={() => { buzz('select'); setSort(k); setSortOpen(false); }} style={[st.sortRow, sort === k ? st.sortOn : null]} testID={`sort-${k}`}>
-            <T v="h3" style={{ fontSize: 15, flex: 1 }} color={sort === k ? colors.mist : colors.green}>{k === 'near' && anchor ? `${t('stays.sort.near')} · ${anchorName(anchor, lang)}` : t(`stays.sort.${k}`)}</T>
+            <T v="h3" style={{ fontSize: 15, flex: 1 }} color={sort === k ? colors.mist : colors.green}>{k === 'near' && anchor ? t('stays.sort.nearTo', { place: anchorName(anchor, lang) }) : t(`stays.sort.${k}`)}</T>
             {sort === k ? <Icon name="check" size={18} color={colors.mist} /> : null}
           </Pressable>
         ))}
+        <Pressable accessibilityRole="button" onPress={() => { setSortOpen(false); setDistOpen(true); }} style={st.distRow} testID="stays-distance">
+          <Icon name="pin" size={16} color={colors.green} />
+          <View style={{ flex: 1 }}>
+            <T v="small" style={{ fontFamily: ff.ui600 }}>{t('stays.distanceFrom')}</T>
+            <T v="tiny">{anchor ? anchorName(anchor, lang) : t('stays.distanceFromPick')}</T>
+          </View>
+          <Icon name="chevron" size={16} />
+        </Pressable>
+      </Sheet>
+      <Sheet visible={filtersOpen} label={t('stays.filters')} onClose={() => setFiltersOpen(false)}>
+        <T v="h2">{t('stays.filters')}</T>
+        <T v="small">{t('stays.filtersHint')}</T>
+        {[...wishes, ...quick.slice(0, 6)].map((w) => {
+          const on = wishes.some((x) => wishKey(x) === wishKey(w));
+          return (
+            <Pressable key={wishKey(w)} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={[st.sortRow, on ? st.sortOn : null]} testID={`quick-${wishKey(w)}`}
+              onPress={() => {
+                buzz('select'); setUnread(null); setPick(null);
+                if (on) { remove(w); return; }
+                setWishes((x) => mergeWishes(x, [w]));
+                if (w.k === 'near') { const l = landmarkById(w.id); if (l) { setStored(city, anchorOfLandmark(l)); setSort('near'); } }
+              }}>
+              <T v="h3" style={{ fontSize: 15, flex: 1 }} color={on ? colors.mist : colors.green}>{wishLabel(w, lang)}</T>
+              {on ? <Icon name="check" size={18} color={colors.mist} /> : <Icon name="plus" size={18} color={colors.green} />}
+            </Pressable>
+          );
+        })}
+        <Button label={t('stays.filtersDone')} onPress={() => setFiltersOpen(false)} testID="stays-filters-done" />
       </Sheet>
     </View>
   );
@@ -271,9 +285,9 @@ const st = StyleSheet.create({
   answer: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 18, backgroundColor: colors.paper },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   control: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 36, paddingHorizontal: 12, borderRadius: 99, backgroundColor: colors.paper },
-  seg: { flexDirection: 'row', marginStart: 'auto', borderRadius: 99, backgroundColor: colors.paper, padding: 3 },
-  segBtn: { height: 30, paddingHorizontal: 12, borderRadius: 99, justifyContent: 'center' },
-  segOn: { backgroundColor: colors.green },
+  round: { marginStart: 'auto', width: 36, height: 36, borderRadius: 99, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
+  roundOn: { backgroundColor: colors.green },
+  distRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.line, marginTop: 6 },
   sortRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.mist },
   sortOn: { backgroundColor: colors.green },
   mapCard: { position: 'absolute', start: 10, end: 10, bottom: 10, flexDirection: 'row', gap: 12, padding: 10, borderRadius: 18, backgroundColor: colors.paper, boxShadow: '0px 10px 30px -14px rgba(15,26,22,0.5)' },

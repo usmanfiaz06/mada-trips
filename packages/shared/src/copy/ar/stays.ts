@@ -235,4 +235,13 @@ export const arStays: ArSection<typeof staysCopy> = {
   'refine.t.none': 'ما فيه شي هنا يجمع كل هذا.',
   'refine.t.applied': 'نعرض اللي يناسب: {wishes}.',
   'things.ask.hint': 'قل لمادا وش يهمك: داخلي، للأطفال، الليلة',
+  'stays.picks.from.one': 'من مكان واحد. السعر للإقامة كاملة شامل الضرائب.',
+  'stays.picks.from.other': 'اخترناها من {count} مكان. السعر للإقامة كاملة شامل الضرائب.',
+  'stays.sort.nearTo': 'الأقرب إلى {place}',
+  'stays.filters': 'تصفية',
+  'stays.filtersCount': 'تصفية · {n}',
+  'stays.filtersHint': 'أو اكتب لمادا وش يهمك في الخانة تحت.',
+  'stays.filtersDone': 'عرض الأماكن',
+  'stays.distanceFrom': 'المسافة من',
+  'stays.distanceFromPick': 'اختر مكانًا',
 };
