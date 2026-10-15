@@ -168,7 +168,7 @@ async function run({ page, phone, returning }) {
   await see('Your passport isn’t here yet.', 'wallet');
   await shot('wallet');
   await byTest('dock-ask').click();
-  await see('Where to?', 'ask heading');
+  await see('Flights to Istanbul', 'ask ideas');
   await shot('ask');
 }
 
