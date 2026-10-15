@@ -46,7 +46,7 @@ async function run(viewport, tag) {
   await click('Direct only');
   await shot('form-filled');
   await click('Send to Mada', { wait: 600 });
-  await see('Sent to Faisal', 'sent');
+  await see('Sent to Mada', 'sent');
   await shot('sent');
   step(`${tag}: the fares arrive`);
   await click('See it in Trips', { wait: 600 });

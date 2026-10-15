@@ -221,7 +221,7 @@ export default function Onboarding({ params = {} }) {
           {[['img/alula.jpg', -9, -78, '.05s'], ['img/riyadh.jpg', 8, 78, '.15s'], ['img/istanbul.jpg', 0, 0, '.25s']].map(([src, rot, x, d]) => (
             <img key={src} src={src} alt="" style={{ position: 'absolute', left: '50%', top: 18, width: 168, height: 220, marginLeft: -84 + x, objectFit: 'cover', borderRadius: 24, border: '4px solid #fffdf9', boxShadow: '0 22px 40px -20px rgba(15,26,22,.6)', transform: `rotate(${rot}deg)`, animation: `rise .7s ${d} var(--ease) both` }} />
           ))}
-          <div style={{ position: 'absolute', left: 0, right: 0, bottom: -4, display: 'flex', justifyContent: 'center' }}><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec', height: 32, padding: '0 14px', whiteSpace: 'nowrap', animation: 'rise .6s .5s var(--ease) both' }}><Sun width={18} />Confirmed by Faisal at Mada</span></div>
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: -4, display: 'flex', justifyContent: 'center' }}><span className="pill" style={{ background: '#1e352d', color: '#f6f2ec', height: 32, padding: '0 14px', whiteSpace: 'nowrap', animation: 'rise .6s .5s var(--ease) both' }}><Sun width={18} />Confirmed by a person at Mada</span></div>
         </div>
         <div style={{ padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <h1 className="h1">Sign in to book and keep your trips.</h1>

@@ -598,7 +598,7 @@ export function Waiting({ params }) {
           <span className="wait-agent">
             <span className="avatar sm green" style={{ position: 'relative' }}>F<i className="wait-dot" /></span>
             <span className="col" style={{ gap: 0 }}>
-              <b>Faisal at Mada</b>
+              <b>Mada</b>
               <span key={live} className="wait-live">{live}<span className="dots" aria-hidden="true"><i /><i /><i /></span></span>
             </span>
           </span>

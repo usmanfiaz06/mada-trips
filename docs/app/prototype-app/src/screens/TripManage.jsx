@@ -74,12 +74,12 @@ export function reqStatus(r, now = Date.now()) {
 }
 export function reqLabel(r, now) {
   const st = reqStatus(r, now);
-  const who = r.withName || WITH[r.with] || 'Faisal';
-  return { queued: 'Waiting for a connection', sent: 'Sent to Faisal', checking: `Faisal is asking ${who}`, yes: r.with === 'faisal' ? 'Done' : `Confirmed by ${who}`, no: 'Can’t do it', done: 'Done' }[st];
+  const who = r.withName || WITH[r.with] || 'Mada';
+  return { queued: 'Waiting for a connection', sent: 'Sent to Mada', checking: `Faisal is asking ${who}`, yes: r.with === 'faisal' ? 'Done' : `Confirmed by ${who}`, no: 'Can’t do it', done: 'Done' }[st];
 }
 export function ReqTracker({ r, now }) {
   const st = reqStatus(r, now);
-  const who = r.withName || WITH[r.with] || 'Faisal';
+  const who = r.withName || WITH[r.with] || 'Mada';
   if (st === 'done' || st === 'yes') return null;
   return (
     <Tracker items={[

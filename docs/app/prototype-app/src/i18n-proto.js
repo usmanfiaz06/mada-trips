@@ -77,7 +77,6 @@ export const PROTO_AR = {
   'window seats together': 'مقاعد متجاورة عند النافذة',
   'halal meals': 'وجبات حلال',
   'child meal for {name}': 'وجبة طفل لـ {name}',
-  'Faisal at Mada': 'فيصل من مادا',
   'On the line with Saudia': 'على الخط مع السعودية',
   'Holding four seats together': 'نحجز أربعة مقاعد متجاورة',
 };

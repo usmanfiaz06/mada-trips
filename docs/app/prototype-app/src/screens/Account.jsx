@@ -716,7 +716,7 @@ function Prefs() {
           <Row lead={<span className="acc-ic"><Icon name="plus" size={18} /></span>} value="Add a loyalty number" onClick={() => setSheet({ edit: null })} />
         </Group>
 
-        <Group label="Notes for Faisal">
+        <Group label="Notes for Mada">
           <div className="acc-row col" style={{ alignItems: 'stretch', gap: 8 }}>
             <label htmlFor="acc-notes" className="tiny">Anything that helps, like “Hessa prefers early flights” or “Ahmed gets travel sick.”</label>
             <textarea id="acc-notes" className="input acc-notes" maxLength={280} value={notes} onChange={(e) => setNotes(e.target.value)}

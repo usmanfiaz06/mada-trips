@@ -902,7 +902,7 @@ export function FlightFares({ r }) {
   const chosen = r.fares.find((f) => f.id === pick);
   return (
     <div className="col" style={{ gap: 10 }} data-test="fares">
-      {r.status === 'quote' && <span className="pill ok" style={{ alignSelf: 'flex-start' }}>{left ? `Held for ${Math.floor(left / 3600e3)}:${pad(Math.floor((left % 3600e3) / 60e3))}` : 'This hold has ended. Ask Faisal to check the fare again.'}</span>}
+      {r.status === 'quote' && <span className="pill ok" style={{ alignSelf: 'flex-start' }}>{left ? `Held for ${Math.floor(left / 3600e3)}:${pad(Math.floor((left % 3600e3) / 60e3))}` : 'This hold has ended. Ask Mada to check the fare again.'}</span>}
       {r.fares.map((f) => {
         const on = f.id === pick;
         return (
@@ -1518,7 +1518,7 @@ export function RequestThread({ requestId }) {
   };
   const suggestions = requestSuggestions(r);
   return (
-    <div className="req-thread" aria-label="Replies to Faisal">
+    <div className="req-thread" aria-label="Replies from Mada">
       {thread.map((m) => (
         <div key={m.id} className={'req-msg ' + (m.from === 'me' ? 'me' : 'them')}>
           {m.from !== 'me' && <span className="avatar sm green" aria-hidden="true">F</span>}
