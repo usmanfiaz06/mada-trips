@@ -75,7 +75,7 @@ function Readiness({ trip }: { trip: TripDetail }) {
         <Ring done={done.length} total={items.length} />
         <Grow>
           <H3 size={18}>{next ? t('td.ready.count', { done: done.length, total: items.length }) : t('td.ready.allSet')}</H3>
-          <Small>{next ? (todo.length === 1 ? t('td.ready.last', { k: next.k }) : t('td.ready.left', { n: todo.length })) : t('td.ready.nothing')}</Small>
+          {next ? (todo.length > 1 ? <Small>{t('td.ready.left', { n: todo.length })}</Small> : null) : <Small>{t('td.ready.nothing')}</Small>}
         </Grow>
       </Row>
       {todo.map((it, i) => (

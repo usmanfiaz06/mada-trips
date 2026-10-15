@@ -9,8 +9,7 @@ export const bookingCopy = {
   // ───────────── ask: start ─────────────
   'ask.close': 'Close',
   'ask.title': 'Where to?',
-  'ask.intro': "Say it any way you like. A place, dates, who's going. We'll ask only what we need.",
-  'ask.composer': 'Where to? Say it any way you like',
+  'ask.composer': 'A place, a date, who’s going',
   'ask.composerMore': 'Anything else?',
   'ask.a11y.input': 'Ask Mada',
   'ask.a11y.send': 'Send',
@@ -161,7 +160,6 @@ export const bookingCopy = {
   'search.byHand.title': 'We’re searching {city} for you.',
   'search.byHand.stayTitle': 'We’re finding rooms in {city} for you.',
   'search.byHand.queued': 'Saved. We start on {city} when you’re back online.',
-  'search.byHand.body': 'Options here within 2 hours. You don’t need to stay on this screen.',
   'search.seeInTrips': 'See it in Trips',
 
   // ───────────── calendar ─────────────
@@ -317,7 +315,7 @@ export const bookingCopy = {
   'pay.holdEnded': 'Hold ended',
   'pay.edit': 'Edit',
   'pay.justYou': 'Just you',
-  'pay.promo.open': 'Have a promo code?',
+  'pay.promo.open': 'Promo code',
   'pay.promo.label': 'Promo code',
   'pay.promo.apply': 'Apply',
   'pay.promo.line': 'Code {code} · 10% off',
@@ -345,7 +343,7 @@ export const bookingCopy = {
   'pay.slideTamara': 'Slide to book · 3 × {price}',
   'pay.slidePay': 'Slide to pay · {price}',
   'pay.busy': 'Checking with your bank',
-  'pay.agentNote': 'You’re only charged once it’s confirmed.',
+  'pay.agentNote': 'A person at Mada confirms it before you’re charged.',
   'pay.nowNote': 'Charged now.',
   'pay.demoHold': '(demo: end the hold)',
   'pay.recheck': 'Check the price again',

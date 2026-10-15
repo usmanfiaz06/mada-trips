@@ -131,7 +131,6 @@ export default function Ask() {
         <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={SHOW_DEMO_SWITCHES ? (
           <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable>
         ) : undefined} />
-        <T v="tiny" style={{ marginHorizontal: 24, marginBottom: 8 }}>{t('ask.disclosure')}</T>
         <ScrollView ref={scroll} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
@@ -179,9 +178,8 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
     ? [t('ask.idea.familyEid', { count: n }), t('ask.idea.hotel'), kid ? t('ask.idea.visaFor', { name: kid }) : t('ask.idea.visa'), t('ask.idea.umrah')]
     : [t('ask.idea.flights'), t('ask.idea.dubai'), t('ask.idea.hotel'), t('ask.idea.alula'), t('ask.idea.umrah')];
   return (
-    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
-      <T style={[font('display'), { fontSize: 40, lineHeight: 42 }]} accessibilityRole="header">{t('ask.title')}</T>
-      <T v="body">{t('ask.intro')}</T>
+    <Animated.View entering={enter(0)} style={{ gap: 20, paddingTop: 8 }}>
+      <T style={font('display')} accessibilityRole="header">{t('ask.title')}</T>
       <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>
       {busy ? (
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/waiting/[id]', params: { id: busy.id } })}>
@@ -193,7 +191,7 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
 }
 
 const styles = StyleSheet.create({
-  scroll: { paddingHorizontal: 20, gap: 16, paddingTop: 4 },
+  scroll: { paddingHorizontal: 20, gap: 16, paddingTop: 8 },
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 28, paddingHorizontal: 20, gap: 6, backgroundColor: 'rgba(233,226,216,0.96)' },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },

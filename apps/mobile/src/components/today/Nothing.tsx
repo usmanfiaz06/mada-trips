@@ -35,9 +35,8 @@ export function Composer({ title = t('today.composer.title') }: { title?: string
   return (
     <Card padding={18} style={[{ gap: 14 }, shadow('card')]}>
       <Card onPress={() => router.push('/ask')} padding={0} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'transparent' }} accessibilityLabel={title}>
-        <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flex: 1 }}>
           <T style={font('displaySmall')}>{title}</T>
-          <T v="small">{t('today.composer.body')}</T>
         </View>
         <View style={styles.mic}><Icon name="mic" color={colors.mist} size={20} /></View>
       </Card>
@@ -58,7 +57,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
   return (
     <>
       <View style={{ gap: 8 }}>
-        <Rise step={0}><T style={[font('display'), { fontSize: 46, lineHeight: 48 }]} accessibilityRole="header">{t('today.nothing.title')}</T></Rise>
+        <Rise step={0}><T style={font('displayXL')} accessibilityRole="header">{t('today.nothing.title')}</T></Rise>
         <Rise step={1}><T v="body">{eidLine(new Date())}{pastLine ? ` ${pastLine}` : ''}</T></Rise>
       </View>
       <Rise step={2}><Composer /></Rise>
@@ -69,7 +68,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
         <Rise step={3}>
           <Card variant="notice" onPress={() => router.push('/wallet')} accessibilityLabel={t('today.passport.title')}>
             <View style={styles.ppMini}><View style={styles.ppMiniRing} /></View>
-            <View style={{ flex: 1, gap: 4 }}><T v="h3">{t('today.passport.title')}</T><T v="small">{t('today.passport.body')}</T></View>
+            <View style={{ flex: 1 }}><T v="h3">{t('today.passport.title')}</T></View>
             <Icon name="chevron" />
           </Card>
         </Rise>
@@ -108,9 +107,9 @@ function TrackCard() {
   const [open, setOpen] = useState(false);
   if (open) return <TrackFlight guest={false} />;
   return (
-    <Card onPress={() => setOpen(true)} accessibilityLabel={t('td.track.title')}>
+    <Card variant="notice" onPress={() => setOpen(true)} accessibilityLabel={t('td.track.title')}>
       <View style={[styles.trackMark, { backgroundColor: colors.goldWash }]}><Icon name="flight" size={20} color={colors.goldInk} /></View>
-      <View style={{ flex: 1, gap: 2 }}><T v="h3">{t('td.track.title')}</T><T v="small">{t('td.track.titleBody')}</T></View>
+      <View style={{ flex: 1 }}><T v="h3">{t('td.track.title')}</T></View>
       <Icon name="chevron" />
     </Card>
   );

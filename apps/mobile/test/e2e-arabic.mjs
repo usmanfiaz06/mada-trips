@@ -235,7 +235,7 @@ async function firstRun() {
   await page.waitForTimeout(1500);
   await shot('wallet-empty');
   await byTest('dock-ask').click();
-  await see('إجابات فورية من مادا.', 'ask disclosure');
+  await see('إلى أين؟', 'ask heading');
   await shot('ask-empty');
   await context.close();
 }
@@ -308,7 +308,7 @@ async function demo() {
   await see('إلى أين؟', 'ask (stay)');
   await byTest('ask-input').fill('A place to stay');
   await byTest('ask-send').click();
-  await see('وين تبي تسكن؟', 'stay where');
+  await see('أي مدينة؟', 'stay where');
   await shot('stay-where');
   await page.getByRole('button', { name: 'إسطنبول', exact: true }).first().click();
   await see('متى بتكون في إسطنبول؟', 'stay when');
