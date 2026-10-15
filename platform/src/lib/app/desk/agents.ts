@@ -184,8 +184,8 @@ export async function presenceFor(userId: string, thread?: { kind: "request" | "
     typing = !!row;
   }
   const replies = copy("presence.replies", { minutes });
+  // Whoever is here is simply here; "covering for" is the desk's business, never the traveller's.
   const line = typing ? copy("presence.typing", { agent: agent.displayName })
-    : usual ? copy("presence.covering", { agent: agent.displayName, usual: usual.displayName, pronoun: agent.pronoun === "she" ? "She" : "He" })
     : online ? `${copy("presence.online", { agent: agent.displayName })} · ${replies}`
     : replies;
   return { title: copy("presence.title"), agent: toPresence(agent), usual: usual ? toPresence(usual) : null, covering: !!usual, online, typing, replyMinutes: minutes, line };

@@ -26,7 +26,6 @@ export const arCommon: ArSection<typeof en> = {
   'presence.online': '{agent} متصل الآن',
   'presence.typing': '{agent} يكتب…',
   'presence.replies': 'يرد عادةً خلال {minutes} د',
-  'presence.covering': '{agent} بدلًا من {usual} الليلة، وعلى اطلاع برحلتك كاملة.',
   'presence.here': 'مادا هنا',
   'presence.away': 'نرد خلال 10 دقائق، في أي ساعة',
   'presence.offline': 'أنت غير متصل. سيرى {agent} رسائلك حين تعود',

@@ -164,7 +164,7 @@ export function Support({ params = {} }) {
             /* Mada vs Faisal: Mada is who you talk to; the person on duty shows as presence. */
             const h = new Date().getHours();
             const night = h >= 22 || h < 8;
-            return <span className="tiny row" style={{ gap: 6 }}><i className="presence-dot" aria-hidden="true" />{night ? 'Noura is covering for Faisal tonight · replies in about 5 min' : 'Faisal is online · usually replies in 2 min'}</span>;
+            return <span className="tiny row" style={{ gap: 6 }}><i className="presence-dot" aria-hidden="true" />{night ? 'Noura is here · usually replies in 5 min' : 'Faisal is here · usually replies in 2 min'}</span>;
           })()}
         </span>
       </div>

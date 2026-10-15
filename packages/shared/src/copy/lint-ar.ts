@@ -54,7 +54,7 @@ export const AR_LATIN_OK: readonly RegExp[] = [
 ];
 
 /** Placeholders Arabic may leave out, with the reason: Arabic marks gender in the verb, not with a pronoun. */
-const AR_OPTIONAL: Readonly<Record<string, readonly string[]>> = { 'presence.covering': ['pronoun'] };
+const AR_OPTIONAL: Readonly<Record<string, readonly string[]>> = {};
 
 const placeholders = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort();
 const PLURAL_SHORT = /\.(one|two|zero)$/;

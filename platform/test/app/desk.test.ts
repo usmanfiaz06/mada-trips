@@ -432,7 +432,7 @@ describe("assignment, inbox and presence", () => {
     expect(item.sla.target).toBe(4);
     let p = await presenceFor(user.id);
     expect(p).toMatchObject({ title: "Mada", covering: true, agent: { name: "Noura" }, usual: { name: "Faisal" } });
-    expect(p.line).toBe("Noura is covering for Faisal tonight. She has your whole trip.");
+    expect(p.line).toBe("Noura is online · Usually replies in 5 min");
 
     // Faisal comes on shift.
     await addShift(lead, { agentId: faisal.id, startsAt: new Date(now.getTime() - 600_000), endsAt: new Date(now.getTime() + 3600_000) });

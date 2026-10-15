@@ -131,7 +131,8 @@ function presence() {
   const agent = night ? noura : faisal;
   return {
     title: 'Mada', agent, usual: night ? faisal : null, covering: night, online: true, typing: false, replyMinutes: 2,
-    line: night ? t('presence.covering', { agent: 'Noura', usual: 'Faisal', pronoun: 'She' }) : `${t('presence.online', { agent: 'Faisal' })} · ${t('presence.replies', { minutes: 2 })}`,
+    // Whoever is here is simply here: no one is 'covering' for anyone in the traveller's eyes.
+    line: `${t('presence.online', { agent: night ? 'Noura' : 'Faisal' })} · ${t('presence.replies', { minutes: 2 })}`,
   };
 }
 

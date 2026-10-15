@@ -76,7 +76,6 @@ export const en = {
   'presence.online': '{agent} is online',
   'presence.typing': '{agent} is typing…',
   'presence.replies': 'Usually replies in {minutes} min',
-  'presence.covering': '{agent} is covering for {usual} tonight. {pronoun} has your whole trip.',
   'presence.here': 'Mada is here',
   'presence.away': 'Replies within 10 minutes, any hour',
   'presence.offline': 'You’re offline. {agent} sees your messages when you’re back',
