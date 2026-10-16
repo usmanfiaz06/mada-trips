@@ -983,4 +983,7 @@ export const walletCopy = {
   'pp.copy.deleted': 'Passport copy deleted.',
   'pp.copy.saved': 'Passport copy kept, encrypted.',
   'pp.copy.cantOpen': 'The copy didn’t open. Check your connection and try again.',
+  // The document sheet shows the stored file (owner audit, item 15).
+  'wallet.docs.noFile': 'No photo kept with this one. Replace it to add one.',
+  'wallet.docs.zoomHint': 'Pinch to zoom · double-tap to go closer',
 } as const;

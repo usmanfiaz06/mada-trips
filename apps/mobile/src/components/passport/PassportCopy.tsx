@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import type { Person } from '@mada/shared';
 import { ApiError } from '@/lib/api';
@@ -17,6 +16,7 @@ import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { Sheet } from '../Sheet';
 import { T } from '../Text';
+import { ZoomImage } from '../wallet/ZoomImage';
 
 /*
  * The passport copy in the Wallet and on a household page: whether one is kept, and a sheet to see it, replace it
@@ -93,11 +93,11 @@ export function PassportCopySheet({ person, visible, onClose }: { person: Person
                   <Icon name="doc" /><View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{t('pp.copy.pdf')}</T><T v="tiny">{t('pp.copy.openPdf')}</T></View><Icon name="chevron" />
                 </Card></View>
               ) : (
-                <View style={styles.frame}>
-                  {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={t('pp.copy.title')} testID="copy-image" />
-                    : failed ? <T v="small" style={{ textAlign: 'center', padding: 16 }}>{t('pp.copy.cantOpen')}</T>
-                      : <ActivityIndicator color={colors.green} />}
-                </View>
+                uri ? <View testID="copy-image"><ZoomImage uri={uri} label={t('pp.copy.title')} height={220} /></View> : (
+                  <View style={styles.frame}>
+                    {failed ? <T v="small" style={{ textAlign: 'center', padding: 16 }}>{t('pp.copy.cantOpen')}</T> : <ActivityIndicator color={colors.green} />}
+                  </View>
+                )
               )
             ) : null}
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>

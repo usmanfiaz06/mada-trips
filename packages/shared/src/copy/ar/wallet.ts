@@ -979,4 +979,6 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'pp.copy.deleted': 'انحذفت نسخة الجواز.',
   'pp.copy.saved': 'حفظنا نسخة الجواز مشفّرة.',
   'pp.copy.cantOpen': 'ما انفتحت النسخة. تأكد من الاتصال وحاول مرة ثانية.',
+  'wallet.docs.noFile': 'ما فيه صورة محفوظة معه. بدّله عشان تضيف وحدة.',
+  'wallet.docs.zoomHint': 'قرّب بإصبعين · اضغط مرتين تقرّب أكثر',
 };

@@ -318,6 +318,15 @@ async function walletFresh() {
   await see('Valid until Jun 2028', 'listed');
   await press(page.getByRole('button', { name: 'Visa' }));
   await see('Share with Mada', 'doc actions');
+  // The stored image shows on the sheet; a tap opens it to pinch and zoom (the file comes from /documents/:id/file).
+  await byTest('doc-image').waitFor({ state: 'visible', timeout: 8000 });
+  await page.waitForTimeout(600);
+  await shot('docs-sheet-image');
+  await byTest('doc-image').click();
+  await byTest('doc-zoom').waitFor({ state: 'visible', timeout: 4000 });
+  await see('Pinch to zoom', 'zoom hint');
+  await shot('docs-zoom');
+  await byTest('doc-zoom-back').click();
   await byTest('doc-share').click();
   await see('Shared with Mada for this trip only. Your agent can see it, not download it.', 'shared');
   await page.waitForTimeout(1000); // the list refetches after the sheet closes; reopen once it has

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { checkUpload, dmyToIso, formatSar, type CardBrand, type DocumentKind, type FlightSegment, type Person, type WalletDocument } from '@mada/shared';
 import { ApiError } from '@/lib/api';
 import { API_MODE } from '@/lib/config';
@@ -11,6 +12,7 @@ import { chooseFile, takePhoto } from '@/lib/pick';
 import { toast } from '@/lib/toast';
 import { useCards, useCredit, walletApi, walletKeys, type PickedFile } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
+import { loadCopy, openCopyPdf } from '@/lib/passport-copy';
 import { fmtDate, fullDay, fullNameOf, useOnOpen } from '@/lib/wallet-model';
 import { colors, ff, radii, textEnd } from '@/theme';
 import { Button } from '../Button';
@@ -24,6 +26,7 @@ import { Sheet } from '../Sheet';
 import { T } from '../Text';
 import { ArtReceipt } from './Arts';
 import { Spinner } from './ui';
+import { ZoomImage } from './ZoomImage';
 import { HAS_APPLE_PAY } from '@/lib/device';
 
 /* The Wallet's sheets (prototype Wallet.jsx): add a document, upload it, a document's actions, a boarding pass,
@@ -158,9 +161,17 @@ export function DocSheet({ doc, ask, onClose, onAdd, onReplace, tripId, onChange
   doc: WalletDocument | null; ask?: { title: string; sub: string } | null; onClose: () => void; onAdd: () => void; onReplace: (d: WalletDocument) => void; tripId?: string | null; onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [zoom, setZoom] = useState(false);
+  const { height } = useWindowDimensions();
   const visible = !!doc || !!ask;
   const title = doc?.title ?? ask?.title ?? '';
   const sub = doc?.detail ?? ask?.sub ?? '';
+  // The stored file (national ID, visa, insurance…): an image is fetched with the session only while the sheet is open
+  // and kept in memory; a PDF opens in the phone's own viewer. Same route as the passport copy (/documents/:id/file).
+  const pdf = doc?.file?.mime === 'application/pdf';
+  const image = useQuery({ queryKey: ['wallet', 'doc-file', doc?.id ?? ''], enabled: visible && !!doc?.file && !pdf, gcTime: 0, staleTime: 0, retry: 1, queryFn: () => loadCopy(doc!) });
+  const uri = visible && doc?.file && !pdf ? image.data ?? null : null;
+  useOnOpen(visible, () => setZoom(false));
   const run = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true);
     try { await fn(); toast(done); onChanged(); onClose(); } catch (e) { toast(e instanceof ApiError ? e.message : t('error.internal')); } finally { setBusy(false); }
@@ -174,6 +185,25 @@ export function DocSheet({ doc, ask, onClose, onAdd, onReplace, tripId, onChange
       {ask ? <Button label={t('wallet.docs.addIt')} onPress={() => { onClose(); onAdd(); }} testID="doc-add-it" /> : null}
       {doc ? (
         <>
+          {doc.file && !pdf ? (
+            zoom ? (
+              <View style={{ gap: 8 }}>
+                {uri ? <ZoomImage uri={uri} label={title} height={Math.min(520, height * 0.55)} testID="doc-zoom" /> : null}
+                <T v="tiny" style={{ textAlign: 'center' }}>{t('wallet.docs.zoomHint')}</T>
+                <Button variant="secondary" label={t('common.back')} onPress={() => setZoom(false)} style={{ backgroundColor: colors.mist }} testID="doc-zoom-back" />
+              </View>
+            ) : (
+              <Pressable accessibilityRole="imagebutton" accessibilityLabel={t('wallet.docs.view')} disabled={!uri} onPress={() => { buzz('tap'); setZoom(true); }} style={styles.docFrame} testID="doc-image">
+                {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityIgnoresInvertColors />
+                  : image.isError ? <T v="small" style={{ textAlign: 'center', padding: 16 }}>{t('pp.copy.cantOpen')}</T>
+                    : <ActivityIndicator color={colors.green} />}
+                {uri ? <View style={styles.docHint}><Icon name="scan" size={14} color={colors.paper} /><T v="caption" color={colors.paper}>{t('wallet.docs.view')}</T></View> : null}
+              </Pressable>
+            )
+          ) : doc.file && pdf ? (
+            <WellRow icon="doc" title={t('pp.copy.pdf')} sub={t('pp.copy.openPdf')} onPress={() => { openCopyPdf(doc).catch(() => toast(t('pp.copy.cantOpen'))); }} testID="doc-pdf" />
+          ) : <T v="tiny" testID="doc-no-file">{t('wallet.docs.noFile')}</T>}
+          {zoom ? null : (<>
           {doc.sharedUntil ? <T v="small" color={colors.ok}>{t('wallet.docs.sharedUntil', { date: fmtDate(doc.sharedUntil, true) })}</T> : null}
           <WellRow title={t('wallet.docs.replace')} sub={t('wallet.docs.replaceBody')} onPress={() => { onClose(); onReplace(doc); }} testID="doc-replace" />
           {doc.sharedUntil
@@ -182,6 +212,7 @@ export function DocSheet({ doc, ask, onClose, onAdd, onReplace, tripId, onChange
           {doc.removable
             ? <Button variant="ghost" color={colors.badInk} label={t('wallet.docs.delete')} busy={busy} onPress={() => run(() => walletApi.deleteDocument(doc.id), t('wallet.docs.deleted'))} testID="doc-delete" />
             : <T v="tiny">{t('wallet.docs.setup')}</T>}
+          </>)}
         </>
       ) : null}
     </Sheet>
@@ -382,6 +413,8 @@ export async function copyMasked(masked: string) {
 const well = { backgroundColor: colors.mist };
 
 const styles = StyleSheet.create({
+  docFrame: { height: 200, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
+  docHint: { position: 'absolute', bottom: 10, end: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(15,26,22,0.72)' },
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   airline: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   pill: { height: 26, borderRadius: 999, paddingHorizontal: 10, backgroundColor: colors.mist, justifyContent: 'center' },
