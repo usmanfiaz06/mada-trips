@@ -66,22 +66,22 @@ async function run(lang) {
   const row = byTest('wake-row');
   await row.scrollIntoViewIfNeeded();
   await page.mouse.wheel(0, 120);
-  await see(T('Wake-up alarm is off', 'منبّه الاستيقاظ متوقف'), 'wake off');
+  await see(T('Wake-up alarm is off', 'منبّه الصباح مقفل'), 'wake off');
   await shot('wake-off');
   const sw = byTest('wake-switch');
   await (await sw.locator('input').count() ? sw.locator('input').first() : sw).click();
   await see(T('weather and drive time', 'الطقس ومدة الطريق'), 'wake on');
-  await see(T('Nothing rings in the browser', 'لا شيء يرنّ في المتصفح'), 'web line');
+  await see(T('Nothing rings in the browser', 'ما فيه شي يرن في المتصفح'), 'web line');
   await shot('wake-on');
 
   step(`${lang}: change the time`);
   await byTest('wake-change').click();
   await byTest('wake-earlier').click();
   await byTest('wake-earlier').click();
-  await see(T('min before you leave', 'قبل خروجك'), 'minutes before leaving');
+  await see(T('min before you leave', 'قبل طلعتك'), 'minutes before leaving');
   await shot('wake-time-sheet');
   await byTest('wake-save').click();
-  await see(T('This phone wakes you at', 'هذا الجوال يوقظك'), 'toast after time change');
+  await see(T('This phone wakes you at', 'هذا الجوال يصحّيك'), 'toast after time change');
   await shot('wake-time-changed');
 
   step(`${lang}: how it works`);
@@ -94,7 +94,7 @@ async function run(lang) {
   if (await close.count()) await close.last().click().catch(() => {});
   await page.waitForTimeout(400);
   await (await sw.locator('input').count() ? sw.locator('input').first() : sw).click();
-  await see(T('Wake-up alarm is off', 'منبّه الاستيقاظ متوقف'), 'wake off again');
+  await see(T('Wake-up alarm is off', 'منبّه الصباح مقفل'), 'wake off again');
 
   step(`${lang}: Today is home: tapping Today on Today goes back to the top`);
   const scrolled = await byTest('today-scroll').evaluate((el) => el.scrollTop);

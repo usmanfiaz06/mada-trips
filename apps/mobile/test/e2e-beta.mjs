@@ -259,10 +259,10 @@ async function arabic() {
   await k.byTest('dock-ask').click();
   await page.waitForTimeout(800);
   await k.ask('Istanbul for Eid, all of us');
-  await k.see('أخبرنا إلى أين ومتى', 'arabic form', 12000);
+  await k.see('قل لنا وين ومتى', 'arabic form', 12000);
   await k.shot('ar-request-form');
   await k.press(k.byTest('flight-request-send'));
-  await k.see('وجدت سعرين', 'arabic fares', 20000);
+  await k.see('لقيت سعرين', 'arabic fares', 20000);
   const html = await page.content();
   if (/\b\d{1,2}–\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/.test(await page.innerText('body'))) errors.push('arabic: an English date range is in view');
   void html;

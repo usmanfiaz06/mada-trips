@@ -469,14 +469,14 @@ async function inviteToLive(lang) {
   await see(L('Paste the link or the code', 'الصق الرابط أو الرمز'), 'invite code screen');
   await byTest('invite-code-input').fill('not a code');
   await byTest('invite-code-go').click();
-  await see(L('That isn’t an invite code.', 'هذا ليس رمز دعوة.'), 'bad code');
+  await see(L('That isn’t an invite code.', 'هذا مو رمز دعوة.'), 'bad code');
   await shot(`${lang}-invite-code-bad`);
   await byTest('invite-code-input').fill('Join me on Mada Trips: https://madatrips.sa/join/ist8k2qa-aq2k8t');
   await byTest('invite-code-go').click();
   await see(L('Abdullah invited you', 'دعاك'), 'preview from the pasted link');
   await shot(`${lang}-invite-preview`);
   await byTest('join-go').last().click();
-  await see(L('Sign in to join. We’ll bring you back here.', 'سجّل الدخول لتنضم.'), 'sign in first');
+  await see(L('Sign in to join. We’ll bring you back here.', 'سجّل الدخول عشان تنضم.'), 'sign in first');
   await byTest('welcome-start').last().click();
   await byTest('signin-phone').last().click();
   await byTest('phone-input').last().fill(`5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`);
@@ -544,11 +544,11 @@ async function covers(lang) {
   await scroll(page, 300);
   await shot(`${lang}-cover-picker-photos`);
   await byTest('cover-tab-upload').click();
-  await see(L('We check it before the rest of the circle sees it.', 'نراجعها قبل أن يراها بقية المجموعة.'), 'upload body');
+  await see(L('We check it before the rest of the circle sees it.', 'نراجعها قبل ما يشوفها باقي المجموعة.'), 'upload body');
   await shot(`${lang}-cover-picker-upload`);
   const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), byTest('cover-upload').click()]);
   await chooser.setFiles(COVER_PHOTO);
-  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending upload');
+  await see(L('Only you see this until it’s checked', 'ما يشوفها غيرك لين نراجعها'), 'pending upload');
   await scroll(page, -600);
   await shot(`${lang}-cover-upload-pending`);
   // Back to a drawing for the circle itself.
@@ -577,12 +577,12 @@ async function covers(lang) {
   await byTest('cover-tab-upload').click();
   const [chooser2] = await Promise.all([page.waitForEvent('filechooser', { timeout: 8000 }), byTest('cover-upload').click()]);
   await chooser2.setFiles(COVER_PHOTO);
-  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending upload in settings');
+  await see(L('Only you see this until it’s checked', 'ما يشوفها غيرك لين نراجعها'), 'pending upload in settings');
   await byTest('cover-save').click();
   await see(L('Cover changed', 'تغيّر الغلاف'), 'saved upload');
   await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
-  await see(L('Only you see this until it’s checked', 'لا يراها غيرك حتى نراجعها'), 'pending in the header');
+  await see(L('Only you see this until it’s checked', 'ما يشوفها غيرك لين نراجعها'), 'pending in the header');
   await shot(`${lang}-cover-chat-header-upload-pending`);
   await context.close();
 }

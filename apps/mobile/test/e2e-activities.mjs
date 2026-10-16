@@ -89,8 +89,8 @@ async function run(lang) {
   await go('/city/108410');
   await see(W('Riyadh', 'الرياض'), 'city');
   await scrollTo('things-section');
-  await see(W('Things to do', 'ماذا تفعل'), 'section title');
-  await see(W('Indoor ideas first', 'الأفكار الداخلية أولًا'), 'hot day turns indoors');
+  await see(W('Things to do', 'وش تسوّي'), 'section title');
+  await see(W('Indoor ideas first', 'الأفكار الداخلية أول'), 'hot day turns indoors');
   await shot('city-things');
   await see(W('National Museum of Saudi Arabia', 'المتحف الوطني السعودي'), 'a place card');
   await scrollTo('things-book');
@@ -110,7 +110,7 @@ async function run(lang) {
   await scrollTo('thing-getting-there');
   await see('King Saud Rd', 'address');
   await see(W('Directions', 'الاتجاهات'), 'directions button');
-  await see(W('Get there with Mada', 'اذهب مع مادا'), 'ride button');
+  await see(W('Get there with Mada', 'روح مع مادا'), 'ride button');
   await shot('place-getting-there');
   await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return null; }; });
   await byTest('thing-directions').click();
@@ -126,7 +126,7 @@ async function run(lang) {
   await byTest('directions-ride').click();
   await page.waitForTimeout(900);
   await see(W('A car to National Museum', 'سيارة إلى المتحف الوطني'), 'ride sheet');
-  await see(W('Tell us where to pick you up.', 'أخبرنا أين نأخذك.'), 'no hotel outside a trip: say where');
+  await see(W('Tell us where to pick you up.', 'قل لنا من وين ناخذك.'), 'no hotel outside a trip: say where');
   await byTest('ride-where').fill('Kingdom Centre');
   await page.waitForTimeout(300);
   await shot('ride-sheet');
@@ -140,7 +140,7 @@ async function run(lang) {
   step(`${lang}: the full list and filters`);
   await tapTest('things-see-all');
   await page.waitForTimeout(1200);
-  await see(W('Things to do in Riyadh', 'ماذا تفعل في الرياض'), 'full title');
+  await see(W('Things to do in Riyadh', 'وش تسوّي في الرياض'), 'full title');
   await shot('things-full');
   await page.getByRole('button', { name: W('Family', 'للعائلة'), exact: true }).filter({ visible: true }).first().click();
   await page.waitForTimeout(800);
@@ -212,7 +212,7 @@ async function run(lang) {
   step(`${lang}: a city with no list yet`);
   await go('/city/611717');
   await scrollTo('things-section');
-  await see(W('We don’t have a list for Tbilisi yet', 'ليست لدينا قائمة لـ'), 'no list');
+  await see(W('We don’t have a list for Tbilisi yet', 'ما عندنا قائمة لـ'), 'no list');
   await shot('city-none');
 
   step(`${lang}: inside the Istanbul trip`);
@@ -221,15 +221,15 @@ async function run(lang) {
   await page.locator('[data-testid^="trip-card-"]').filter({ visible: true }).first().click();
   await page.waitForTimeout(1500);
   await scrollTo('things-section');
-  await see(W('Things to do', 'ماذا تفعل'), 'trip section');
+  await see(W('Things to do', 'وش تسوّي'), 'trip section');
   await shot('trip-things');
   await tapTest('things-see-all');
   await page.waitForTimeout(1200);
-  await see(W('Near the hotel', 'قرب الفندق'), 'near the hotel filter');
-  await page.getByRole('button', { name: W('Near the hotel', 'قرب الفندق'), exact: true }).filter({ visible: true }).first().click();
+  await see(W('Near the hotel', 'قريب من الفندق'), 'near the hotel filter');
+  await page.getByRole('button', { name: W('Near the hotel', 'قريب من الفندق'), exact: true }).filter({ visible: true }).first().click();
   await page.waitForTimeout(800);
   await see(W('min drive', 'د بالسيارة'), 'minutes from the hotel on the rows');
-  await see(W('min walk', 'د مشيًا'), 'a short walk from the hotel');
+  await see(W('min walk', 'د مشي'), 'a short walk from the hotel');
   await shot('trip-things-near');
   const tripId = await page.evaluate(() => new URL(location.href).searchParams.get('trip'));
   // A day of the trip: no "open now", what's on that day.

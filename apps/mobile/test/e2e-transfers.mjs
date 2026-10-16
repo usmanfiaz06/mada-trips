@@ -37,7 +37,7 @@ const step = (s) => console.log('·', s);
 
 const COPY = {
   en: { welcome: "We'll take it from here.", otp: 'Enter the code', back: 'Welcome back', voucher: 'Hotel voucher', ref: 'Booking reference', payable: 'acting as agent for the service operating company', essential: 'Essential information', cancel: 'Cancel this booking', free: 'Cancelling now is free.', cancelled: 'Cancelled', pickup: 'Airport pickup', private: 'Private', shared: 'Shared', send: 'Send to Mada', withAgent: 'With ', facilities: 'At the hotel' },
-  ar: { welcome: '', otp: '', back: '', voucher: 'قسيمة الفندق', ref: 'رقم الحجز', payable: 'acting as agent for the service operating company', essential: 'معلومات مهمة', cancel: 'ألغِ هذا الحجز', free: 'الإلغاء الآن مجاني.', cancelled: 'ملغى', pickup: 'الاستقبال من المطار', private: 'خاص', shared: 'مشترك', send: 'أرسله إلى مادا', withAgent: 'مع ', facilities: 'في الفندق' },
+  ar: { welcome: '', otp: '', back: '', voucher: 'قسيمة الفندق', ref: 'رقم الحجز', payable: 'acting as agent for the service operating company', essential: 'معلومات مهمة', cancel: 'ألغِ هذا الحجز', free: 'الإلغاء الحين مجاني.', cancelled: 'ملغي', pickup: 'الاستقبال من المطار', private: 'خاص', shared: 'مشترك', send: 'أرسله لمادا', withAgent: 'مع ', facilities: 'في الفندق' },
 };
 
 async function run(lang) {

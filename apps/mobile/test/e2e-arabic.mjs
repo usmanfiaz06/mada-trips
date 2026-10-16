@@ -144,7 +144,7 @@ async function signInDemo(page) {
   await byTest('signin-phone').click();
   await byTest('phone-input').fill('500004127');
   await byTest('phone-send').click();
-  await see('أدخل الرمز', 'otp');
+  await see('اكتب الرمز', 'otp');
   await byTest('otp-input').fill('123456');
   if (await see('حيّاك الله', 'welcome back', 8000)) await byTest('welcome-back-open').click();
   await page.waitForTimeout(1500);
@@ -176,14 +176,14 @@ async function firstRun() {
   await shot('phone-short');
   await input.fill(`5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`);
   await byTest('phone-send').click();
-  await see('أدخل الرمز', 'otp');
+  await see('اكتب الرمز', 'otp');
   await byTest('otp-input').fill('000000');
   await page.waitForTimeout(800);
   await shot('otp-wrong');
   await byTest('otp-input').fill('123456');
 
   step('name and alerts');
-  await see('بماذا نناديك؟', 'name');
+  await see('وش نناديك؟', 'name');
   await byTest('name-input').fill('عمر');
   await see('يلّا نبدأ يا عمر', 'name button');
   await shot('name');
@@ -235,7 +235,7 @@ async function firstRun() {
   await page.waitForTimeout(1500);
   await shot('wallet-empty');
   await byTest('dock-ask').click();
-  await see('إلى أين؟', 'ask heading');
+  await see('وين رايح؟', 'ask heading');
   await shot('ask-empty');
   await context.close();
 }
@@ -269,19 +269,19 @@ async function demo() {
   await see('المدفوعات', 'payments');
   await shot('payments');
   await back();
-  await tapText('برنامج الرحلة كاملًا');
-  await see('يومًا بيوم', 'itinerary');
+  await tapText('برنامج الرحلة كامل');
+  await see('يوم بيوم', 'itinerary');
   await shot('itinerary');
   await back();
   await tapText('غيّر الرحلة');
-  await see('ماذا تريد أن تغيّر؟', 'change flight');
+  await see('وش تبي تغيّر؟', 'change flight');
   await shot('change-flight');
   await back();
   await back();
 
   step('booking: Ask to the confirmation');
   await byTest('dock-ask').click();
-  await see('إلى أين؟', 'ask');
+  await see('وين رايح؟', 'ask');
   await byTest('ask-input').fill('Istanbul for Eid, all of us');
   await byTest('ask-send').click();
   await see('ثلاث طرق توصلك.', 'results', 15000);
@@ -297,7 +297,7 @@ async function demo() {
     await shot('3ds');
     await page.locator('input').last().fill('123456');
   }
-  await see('نحجز الآن', 'waiting', 12000);
+  await see('نحجز الحين', 'waiting', 12000);
   await shot('waiting');
   await see('مؤكدة', 'confirmed', 60000);
   await shot('confirmed');
@@ -305,7 +305,7 @@ async function demo() {
   step('booking: a stay asks where, when and who, right to left');
   await toTabs();
   await byTest('dock-ask').click();
-  await see('إلى أين؟', 'ask (stay)');
+  await see('وين رايح؟', 'ask (stay)');
   await byTest('ask-input').fill('A place to stay');
   await byTest('ask-send').click();
   await see('أي مدينة؟', 'stay where');
@@ -363,10 +363,10 @@ async function demo() {
   await see('أسئلة متكررة', 'help');
   await shot('help');
   await byTest('help-talk').click();
-  await see('إجابات فورية من مادا.', 'support disclosure');
+  await see('ردود فورية من مادا.', 'support disclosure');
   await shot('support');
   await byTest('topic-bag').click();
-  await see('نأسف على الحقيبة.', 'bag reply');
+  await see('نأسف على الشنطة.', 'bag reply');
   await shot('support-bag');
 
   step('circles');
