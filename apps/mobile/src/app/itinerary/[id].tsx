@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Linking, Platform, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { hotelHref } from '@/components/outcome/HotelName';
 import { buildIcs, calendarLink, dayLabel, dayOfMonth, liveStay, weekdayOf, type CalendarEvent, type ItineraryDay, type ItineraryItem, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
@@ -152,7 +153,7 @@ function ItemSheet({ trip, it, onClose }: { trip: TripDetail; it: Picked; onClos
         <Button variant="ghost" label={t('action.talk')} onPress={() => to('/support?topic=other')} />
       </>) : null}
       {it.kind === 'hotel' ? (<>
-        {st ? <ListRow first icon="pin" title={st.name} sub={st.address ?? ''} /> : null}
+        {st ? <ListRow first icon="pin" title={st.name} sub={st.address ?? ''} onPress={st.hotelCode ? () => to(hotelHref(st, trip) as string) : undefined} testID="itin-hotel" /> : null}
         {it.warn ? <Small color={colors.goldInk}>{it.warn}</Small> : null}
         <Small>{t('itin.hotelTimes', { name: lead || t('itin.yourName') })}</Small>
         <Button label={t('itin.hotelOptions')} onPress={() => to(`/trip/${trip.id}/hotel`)} />

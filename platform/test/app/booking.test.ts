@@ -183,15 +183,15 @@ describe("search", () => {
     const f = await family();
     const r = await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 6, travellerIds: f.four });
     const s = StaySearchResponse.parse(r.json);
-    expect(s.options.map((o) => o.name).sort()).toEqual(["Bosphorus view rooms", "Garden hotel in Sultanahmet", "Rooms near Galata Tower"]);
+    expect(s.options.map((o) => o.name).sort()).toEqual(["Bereketzade Hotel", "Bosphorus view rooms", "Garden hotel in Sultanahmet"]);
     // Ranked for a family of four with children (docs/app/RANKING.md): one best, one lowest, reasons from the facts.
     expect(s.shape).toMatchObject({ shape: "family" });
     expect(s.options.filter((o) => o.badge === "best")).toHaveLength(1);
     expect(s.options.filter((o) => o.badge === "lowest")).toHaveLength(1);
     expect(s.options[0]!.fit!.reasons.length).toBeGreaterThan(0);
-    expect(s.options.find((o) => o.name === "Rooms near Galata Tower")).toMatchObject({ total: { amount: 588_000 }, roomsLabel: "2 connecting rooms", rating: "9.1" });
+    expect(s.options.find((o) => o.name === "Bereketzade Hotel")).toMatchObject({ total: { amount: 588_000 }, roomsLabel: "2 connecting rooms", rating: "9.1" });
     const two = StaySearchResponse.parse((await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 6, travellerIds: [f.me, f.hessa] })).json);
-    expect(two.options.find((o) => o.name === "Rooms near Galata Tower")!.total.amount).toBe(Math.round(980 * 6 * 0.55) * 100);
+    expect(two.options.find((o) => o.name === "Bereketzade Hotel")!.total.amount).toBe(Math.round(980 * 6 * 0.55) * 100);
     expect((await post(searchStays, f.token, { destination: "baku", checkIn: EID_OUT, nights: 3, travellerIds: [f.me] })).json.outcome).toBe("by_hand");
     expect((await post(searchStays, f.token, { destination: "istanbul", checkIn: EID_OUT, nights: 3, travellerIds: [f.me] }, "?demo=noResults")).json.outcome).toBe("none");
   });
@@ -316,7 +316,7 @@ describe("the order sheet", () => {
     const draft: OrderDraft = { kind: "trip", flightOfferId: s.options[0]!.id, bundle: true, travellerIds: f.four };
     const p = await previewOf(f.token, draft);
     expect(p.lines.map((l) => [l.key, l.text, l.amount])).toEqual([
-      ["flight", "4 travellers · Saudia, direct", 864_000], ["stay", "Rooms near Galata Tower · Connecting rooms · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
+      ["flight", "4 travellers · Saudia, direct", 864_000], ["stay", "Bereketzade Hotel · Connecting rooms · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
     ]);
     expect(p.total.amount).toBe(1_496_000);
     expect(p.rule).toBe("If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.");
@@ -331,7 +331,7 @@ describe("the order sheet", () => {
     // Fewer travellers: the price follows.
     const two = await previewOf(f.token, { ...draft, travellerIds: [f.me, f.hessa] });
     expect(two.lines[0]!.amount).toBe(432_000);
-    expect(two.lines[1]!.text).toBe("Rooms near Galata Tower · A room · 6 nights");
+    expect(two.lines[1]!.text).toBe("Bereketzade Hotel · A room · 6 nights");
     // Credit is used first.
     const ownerId = (await db.execute<{ owner_id: string }>(rawSql`SELECT owner_id FROM app_offers WHERE id = ${s.options[0]!.id}`))[0]!.owner_id;
     await db.insert(appCreditLedger).values({ userId: ownerId, amount: 40_000, kind: "goodwill" });
@@ -371,7 +371,7 @@ describe("orders and the desk", () => {
     expect(segs.map((x) => [x.direction, x.flightNumber, x.fromAirport, x.toAirport]).sort()).toEqual([["back", "SV264", "IST", "RUH"], ["out", "SV263", "RUH", "IST"]]);
     expect(segs.find((x) => x.direction === "out")!.seats).toEqual(["14A", "14B", "14C", "14D"]);
     const [stay] = await db.select().from(appStays).where(eq(appStays.tripId, trip!.id));
-    expect(stay).toMatchObject({ name: "Rooms near Galata Tower", nights: 6, rooms: 2, price: 588_000 });
+    expect(stay).toMatchObject({ name: "Bereketzade Hotel", nights: 6, rooms: 2, price: 588_000 });
     const pickups = await db.select().from(appPickups).where(eq(appPickups.tripId, trip!.id));
     expect(pickups.map((x) => x.direction).sort()).toEqual(["from_airport", "to_airport"]);
     const [tb] = await db.select().from(appTripBookings).where(eq(appTripBookings.tripId, trip!.id));

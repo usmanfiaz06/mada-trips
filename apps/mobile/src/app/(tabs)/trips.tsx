@@ -14,6 +14,8 @@ import { TrackedFlights } from '@/components/today/Nothing';
 import { RefundTracker } from '@/components/trips/RefundTracker';
 import { TakeBack } from '@/components/trips/TakeBack';
 import { orderNeedsYou, requestHref, RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
+import { OnItCard, OutcomeCard, OutcomePill } from '@/components/outcome/Outcome';
+import { HotelName } from '@/components/outcome/HotelName';
 import { useQueryClient } from '@tanstack/react-query';
 import { bookingApi } from '@/lib/booking';
 import { toast } from '@/lib/toast';
@@ -173,9 +175,10 @@ function RequestCard({ r }: { r: TripRequestView }) {
       <Spread align="flex-start">
         {/* Every request opens: a booking's order, the thread for an Ask request, the trip for a trip's own ask. */}
         <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(requestHref(r) as Href)} testID={r.kind === 'flight' ? 'open-flight-request' : `open-request-${r.kind}`}><H3>{r.title}</H3></Pressable>
-        {r.withdrawn ? <Tag label={t('tb.pill')} /> : <RequestStatusPill r={r} />}
+        {r.withdrawn ? <Tag label={t('tb.pill')} /> : r.result ? <OutcomePill r={r.result} /> : <RequestStatusPill r={r} />}
       </Spread>
-      {r.detail ? <Small>{r.detail}</Small> : null}
+      {/* A hotel ask names its hotel, tappable to the hotel's page. */}
+      {r.area === 'hotel' && r.withName && r.detail === r.withName ? <HotelName name={r.withName} tripId={r.tripId} testID={`request-hotel-${r.kind}`} /> : r.detail ? <Small>{r.detail}</Small> : null}
       {r.withdrawn ? <View testID="request-withdrawn"><Tiny>{t('tb.withdrawnNote')}</Tiny></View> : null}
       {r.canTakeBack ? <TakeBack kind="request" id={r.id} testID={`take-back-${r.kind}`} /> : null}
       {stuck ? (
@@ -190,9 +193,11 @@ function RequestCard({ r }: { r: TripRequestView }) {
           ) : <SmallButton testID="order-open" tone="primary" label={t('rq.order.open')} onPress={() => router.push(requestHref(r) as Href)} />}
         </Box>
       ) : null}
-      <RequestTracker r={r} />
-      {r.outcome === 'yes' && (r.status === 'confirmed' || r.status === 'done') ? <Row gap={6}><Icon name="check" size={14} color={colors.ok} width={2.4} /><Tiny>{r.yesText ?? t('tr.req.confirmedToday')}</Tiny></Row> : null}
-      {r.outcome === 'no' ? (
+      {/* Open: what Mada is doing, by when and the cost. Closed: the outcome, its reason, the money, the next step. */}
+      {r.progress && !stuck ? <OnItCard progress={r.progress} requestId={r.id} testID={`on-it-${r.kind}`} /> : <RequestTracker r={r} />}
+      {r.result && !r.withdrawn ? <OutcomeCard compact result={r.result} tripId={r.tripId} again={r.title} testID={`outcome-${r.kind}`} /> : null}
+      {!r.result && r.outcome === 'yes' && (r.status === 'confirmed' || r.status === 'done') ? <Row gap={6}><Icon name="check" size={14} color={colors.ok} width={2.4} /><Tiny>{r.yesText ?? t('tr.req.confirmedToday')}</Tiny></Row> : null}
+      {!r.result && r.outcome === 'no' ? (
         <Box tone="well" gap={8}>
           <AgentIntro />
           <Small color={colors.green}>{r.alt ?? t('tr.req.cantDefault')}</Small>

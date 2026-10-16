@@ -45,6 +45,20 @@ export const outcomesCopy = {
   'oc.next.see_trip': 'See the trip',
   'oc.note': '{agent}’s note',
   'oc.by': 'Last word from {agent} · {time}',
+  // What Ask opens with for "Book another" and "Try other dates" after a booking that didn't go ahead.
+  'oc.again.flight': 'Flights to {place}',
+  'oc.again.stay': 'A stay in {place}',
+  // The hotel named wherever a stay shows (critique 6).
+  'hn.wait.asking': 'Asking {hotel}',
+  'hn.wait.said': '{hotel} said yes',
+  'hn.wait.detail': 'Your rooms at {hotel}',
+  'hn.done.rooms': 'Your rooms at {hotel} are booked.',
+  'notify.stayConfirmed.title': '{hotel} is booked',
+  'notify.stayConfirmed.body': 'Confirmed by {agent}. Booking {ref}.',
+  // The scripted desk's partial answers: seats for four kept together, connecting rooms.
+  'sr.celebration.partial': 'A cake and a card in the room. Balloons aren’t allowed in the rooms.',
+  'sr.seats.partial': 'Two pairs, across the aisle from each other. The row was already full.',
+  'ho.connecting.partial': 'Rooms next to each other on the same floor. The hotel has no connecting rooms left.',
   // ───────────── while it's open ─────────────
   'oi.title': 'Mada is on it',
   'oi.step.reading': 'Reading your request',

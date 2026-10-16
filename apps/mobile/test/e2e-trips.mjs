@@ -226,6 +226,11 @@ try {
   await byTest('ho-room').click(); await page.waitForTimeout(500);
   await shot('hotel-room-sheet');
   await closeSheet();
+  // Outcomes: a free early check-in the hotel says no to (refused, with the hotel named and nothing charged).
+  await byTest('ho-times').click(); await page.waitForTimeout(500);
+  await byTest('times-early-free').click(); await page.waitForTimeout(300);
+  await byTest('times-ask').click(); await page.waitForTimeout(1200);
+  await closeSheet();
   await back();
 
   step('special requests');
@@ -233,6 +238,11 @@ try {
   await page.waitForTimeout(900);
   await see('Anything you need?', 'special requests');
   await shot('special-requests');
+  // Outcomes: a birthday surprise the hotel can only partly do (a cake and a card, no balloons: partial).
+  await byTest('sr-celebration').click(); await page.waitForTimeout(500);
+  await page.getByText('Birthday', { exact: true }).last().click(); await page.waitForTimeout(400);
+  await byTest('sr-send').click({ timeout: 6000 }).catch(() => errors.push('celebration: send stayed disabled')); await page.waitForTimeout(1200);
+  await closeSheet();
   await byTest('sr-bags').click(); await page.waitForTimeout(500);
   await shot('special-bags-sheet');
   // Send it, then take it back from Trips › Requests before Mada has it (marked withdrawn, nothing charged).
@@ -242,6 +252,11 @@ try {
   await toTab();
   await tab('Trips');
   await byTest('tab-requests').click(); await page.waitForTimeout(800);
+  // While open: what Mada is doing, by when, the cost (never a vague "Mada is on it").
+  await see('Asking Bereketzade Hotel', 'on it: who Mada is asking, the hotel named');
+  await see('Usually by', 'on it: by when');
+  await see('Nothing is charged until you say yes', 'on it: the cost');
+  await shot('trips-request-on-it');
   await page.locator('[data-testid^="take-back-"]').first().click();
   await see('Take this back?', 'take back sheet');
   await shot('take-back-sheet');
@@ -249,6 +264,26 @@ try {
   await see('Taken back', 'request marked taken back');
   await byTest('request-withdrawn').first().waitFor({ state: 'visible', timeout: 6000 });
   await shot('trips-request-taken-back');
+
+  step('outcomes: refused and partial, each with why, the money and a way on');
+  // The scripted desk answers at 12 s; switch tabs to read again.
+  for (let i = 0; i < 12 && !(await byTest('outcome-celebration-partial').count() && await byTest('outcome-times-refused').count()); i += 1) {
+    await page.waitForTimeout(1500);
+    await byTest('tab-upcoming').click(); await page.waitForTimeout(300);
+    await byTest('tab-requests').click(); await page.waitForTimeout(500);
+  }
+  await byTest('outcome-times-refused').first().scrollIntoViewIfNeeded().catch(() => {});
+  await see('Not this time.', 'refused headline');
+  await see('Nothing was charged.', 'refused: the money');
+  await see('Couldn’t be done', 'refused pill');
+  await see('Bereketzade Hotel’s rules', 'refused: the hotel named in the reason');
+  await byTest('outcome-times-next-talk').first().waitFor({ state: 'visible', timeout: 4000 }).catch(() => errors.push('refused: no Talk to Mada button'));
+  await shot('trips-request-refused');
+  await byTest('outcome-celebration-partial').first().scrollIntoViewIfNeeded().catch(() => {});
+  await see('Some of it is done.', 'partial headline');
+  await see('A cake and a card in the room', 'partial: what was done, in the desk’s words');
+  await see('Partly done', 'partial pill');
+  await shot('trips-request-partial');
   await byTest('tab-upcoming').click(); await page.waitForTimeout(600);
 
   /* ── Last, because a refund takes the whole trip away: a cancellation chosen offline, sent on reconnect ── */

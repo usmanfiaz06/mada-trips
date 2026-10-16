@@ -328,7 +328,7 @@ export function roomsLabel(n: number) { return n > 2 ? t('search.rooms.connectin
 
 export function staySar(nightSar: number, nights: number, n: number) { return Math.round(nightSar * nights * (n > 2 ? 1 : SMALL_ROOM_FACTOR)); }
 
-/** Rooms near Galata Tower plus pickups, offered next to Istanbul flights. Ask and the order sheet both read this. */
+/** Bereketzade Hotel plus pickups, offered next to Istanbul flights. Ask and the order sheet both read this. */
 export function bundleFor(n: number, depart: string, ret: string | null) {
   const nights = ret ? Math.max(1, daysBetween(depart, ret)) : STAY_NIGHTS_DEFAULT;
   const hotel = CATALOGUE_HOTELS.istanbul![0]!;

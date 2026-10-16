@@ -21,7 +21,7 @@ const err = (code: ErrorCode, fields?: Record<string, string>): WireResponse => 
 
 const AR: Record<string, string> = { 745044: 'إسطنبول', 108410: 'الرياض', 108841: 'العلا', 292223: 'دبي', 2643743: 'لندن' };
 /** The prototype's hotels, where the mock trips stay. */
-const HOTELS: Record<string, { lat: number; lon: number }> = { 'Rooms near Galata Tower': { lat: 41.0262, lon: 28.9727 } };
+const HOTELS: Record<string, { lat: number; lon: number }> = { 'Bereketzade Hotel': { lat: 41.0262, lon: 28.9727 } };
 
 function placeOf(idOrName: string) {
   const hit = /^\d+$/.test(idOrName) ? mockPlaceHit(idOrName) : mockSearch(idOrName).results[0] ?? null;

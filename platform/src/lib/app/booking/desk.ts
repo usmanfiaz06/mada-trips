@@ -222,10 +222,13 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
     if (o.requestId && o.kind !== "quote") await tx.update(appRequests).set({ status: "confirmed", tripId, agentName: agent.name, updatedAt: now }).where(eq(appRequests.id, o.requestId));
     if (o.kind === "trip" || o.kind === "stay" || o.kind === "package") {
       const city = (o.snapshot as { place?: string }).place ?? "";
+      // A stay on its own names the hotel ("Swissôtel Makkah is booked"); a trip names the city.
+      const hotel = o.kind === "stay" ? (o.snapshot as { stay?: StayOption }).stay?.name ?? null : null;
+      const [tk, vars] = hotel ? ["notify.stayConfirmed", { hotel }] as const : ["notify.confirmed", { city }] as const;
       await tx.insert(appNotifications).values({
         userId: o.ownerId, kind: "booking_confirmed", level: "active",
-        title: t("notify.confirmed.title", { city }).slice(0, 32), body: t("notify.confirmed.body", { agent: agent.name, ref }).slice(0, 90),
-        href: tripId ? `/trips/${tripId}` : "/trips", data: withCopy({ orderId: o.id, ref }, { title: ["notify.confirmed.title", { city }], body: ["notify.confirmed.body", { agent: agent.name, ref }] }),
+        title: t(`${tk}.title`, vars).slice(0, 32), body: t(`${tk}.body`, { agent: agent.name, ref }).slice(0, 90),
+        href: tripId ? `/trip/${tripId}` : "/trips", data: withCopy({ orderId: o.id, ref }, { title: [`${tk}.title`, vars], body: [`${tk}.body`, { agent: agent.name, ref }] }),
       });
     }
     await orderEvent(tx, o.id, "confirmed", { kind: "agent", name: agent.name }, { ref });

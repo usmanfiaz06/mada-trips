@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import {
   AskParseResponse, GeocodeResponse, StayRoomsResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OfferResponse, OrderResponse, OrdersResponse,
-  PlanResponse, PlansResponse, PreviewResponse, RequestResponse, RequestsResponse, StaySearchResponse, BookingRequestView, ThreadMessage,
+  NudgeResponse, PlanResponse, PlansResponse, PreviewResponse, RequestResponse, RequestsResponse, StaySearchResponse, BookingRequestView, ThreadMessage,
   type CreateOrderBody, type CreateRequestBody, type DemoFlag, type EntryCheckRequest, type FlightSearchRequest, type OrderDraft, type PreviewBody, type StaySearchRequest,
   type DistanceAnchor,
 } from '@mada/shared';
@@ -64,6 +64,8 @@ export const bookingApi = {
   createRequest: (b: CreateRequestBody) => call('POST', '/requests', RequestResponse, b, b.clientId ? `req-${b.clientId}` : undefined),
   messages: (id: string) => call('GET', `/requests/${id}/messages`, MessagesResponse),
   postMessage: (id: string, text: string) => call('POST', `/requests/${id}/messages`, MessagesResponse, { text }),
+  /** Past the time Mada gave: tell the desk (once every 30 minutes). */
+  nudge: (id: string) => call('POST', `/requests/${id}/nudge`, NudgeResponse, {}),
   acceptOffer: (quoteId: string, messageId: string) => call('POST', `/quotes/${quoteId}/accept-offer`, QuoteOut, { messageId }),
   preview: (b: PreviewBody) => call('POST', '/orders/preview', PreviewResponse, b),
   createOrder: (b: CreateOrderBody) => call('POST', '/orders', CreateOrderResponse, b, b.idempotencyKey),

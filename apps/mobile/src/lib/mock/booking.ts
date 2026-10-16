@@ -6,6 +6,7 @@ import {
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
+  canNudge, progressFromStatus, resultFromLegacy, type OutcomeReason, type RequestResult,
   type HotelRequests,
   BookingPrefs, airlineRequests, bookingPrefsOf, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type TravelPrefs,
@@ -31,8 +32,8 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
  */
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
-type Req = { id: string; owner: string; withdrawn?: boolean; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
+type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
+type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -242,8 +243,28 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
 /* ───────────── the scripted desk ───────────── */
 
 const tickMs = (o: Order) => (o.demo.has('slowAgent') ? 4200 : 1200);
-const viewOf = ({ owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
-  ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000 });
+const viewOf = ({ why, owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
+  ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000, result: orderResult(v, why) });
+
+/** A booking that won't go ahead, as the server's booking desk records it (cancelResult): the traveller's own stop, nothing charged. */
+function orderResult(o: OrderView, why?: OutcomeReason): RequestResult | null {
+  if (o.status !== 'cancelled' && o.status !== 'declined') return null;
+  const mine = o.status === 'cancelled';
+  return {
+    kind: mine ? 'cancelled' : 'refused', reason: mine ? why ?? 'you_asked' : 'payment', with: o.airline, note: null, by: null, at: nowIso(),
+    money: o.creditUsed.amount > 0 ? { kind: 'credit', amount: o.creditUsed, by: null } : { kind: 'none', amount: null, by: null },
+    next: mine && why !== 'price' ? ['book_again'] : ['other_dates', 'talk'],
+  };
+}
+
+/** An Ask request with its outcome and, while open, what Mada is doing, by when and the cost (lib/app/outcomes.ts). */
+function outReq(x: Req): BookingRequestView {
+  const v = x.view;
+  const quote = v.quote && v.quote.status !== 'withdrawn' ? v.quote.total : null;
+  const result = resultFromLegacy({ status: v.status, withdrawn: x.withdrawn, updatedAt: v.updatedAt, quote: v.status === 'paid' || v.status === 'done' ? quote : null, booking: ['flight', 'stay', 'package'].includes(v.kind) });
+  const p = x.withdrawn ? null : progressFromStatus({ status: v.status, kind: v.kind, createdAt: v.createdAt, promisedBy: v.promisedBy, quote });
+  return { ...v, result, progress: p ? { ...p, nudgedAt: x.nudgedAt ?? null } : null };
+}
 
 function confirm(o: Order) {
   o.status = 'confirmed'; o.step = 3; o.ref = o.ref ?? newRef(); o.confirmedBy = o.agent; o.confirmedAt = nowIso(); o.nextAt = null;
@@ -452,13 +473,13 @@ export const bookingMock: AreaMock = async (w, ctx) => {
 
   /* requests */
   const all = () => [...requests.values()].filter((x) => x.owner === user.id);
-  if (key === 'GET /requests') { all().forEach((x) => progressRequest(x, people)); return ok({ requests: all().sort((a, b) => b.created - a.created).map((x) => x.view) }); }
+  if (key === 'GET /requests') { all().forEach((x) => progressRequest(x, people)); return ok({ requests: all().sort((a, b) => b.created - a.created).map(outReq) }); }
   if (key === 'POST /requests') {
     const p = CreateRequestBody.safeParse(body);
     if (!p.success) return bad(p.error.issues);
     const b = p.data;
     const seen = b.clientId ? all().find((x) => x.details.clientId === b.clientId) : null;
-    if (seen) return ok({ request: seen.view }, 201);
+    if (seen) return ok({ request: outReq(seen) }, 201);
     if (!mine(b.travellerIds)) return err('NOT_FOUND');
     const travellers = b.travellerIds.map((id) => people.find((x) => x.id === id)!);
     const names = commaList(travellers.map((x) => personName(x)));
@@ -491,7 +512,17 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: words.note, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
     };
     requests.set(id, req);
-    return ok({ request: req.view }, 201);
+    return ok({ request: outReq(req) }, 201);
+  }
+  r = m(/^\/requests\/([^/]+)\/nudge$/);
+  if (r && w.method === 'POST') {
+    // Past the time Mada gave: the desk is told, once every 30 minutes (lib/app/outcomes.ts nudgeRequest).
+    const req = requests.get(r[1]!);
+    if (!req || req.owner !== user.id) return err('NOT_FOUND');
+    const p = outReq(req).progress;
+    if (!p) return err('VALIDATION');
+    if (canNudge(p)) { req.nudgedAt = nowIso(); req.messages.push({ id: uuid(), from: 'me', authorName: null, text: t('oi.nudge.message'), offer: null, createdAt: nowIso() }); }
+    return ok({ progress: outReq(req).progress });
   }
   r = m(/^\/requests\/([^/]+)\/withdraw$/);
   if (r && w.method === 'POST') {
@@ -508,7 +539,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const req = requests.get(r[1]!);
     if (!req || req.owner !== user.id) return err('NOT_FOUND');
     progressRequest(req, people);
-    if (!r[2]) return ok({ request: req.view });
+    if (!r[2]) return ok({ request: outReq(req) });
     if (w.method === 'POST') {
       const text = String(body.text ?? '').trim();
       if (!text) return err('VALIDATION');
@@ -676,7 +707,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       else if (a === 'call' && o.status === 'needs_answer') { o.question = { ...o.question!, calling: true }; o.status = 'held'; o.nextAt = Date.now() + 3000; }
       else if (a === 'accept_fare' && o.status === 'fare_changed') { o.extra = money(o.extra.amount + (o.fareChange?.total.amount ?? 0)); o.fareChange = null; o.status = 'pending_agent'; o.nextAt = Date.now() + tickMs(o); }
       else if (a === 'retry_by_phone' && o.status === 'ticketing_failed') { o.problem = null; o.status = 'price_locked'; o.step = 2; o.nextAt = Date.now() + tickMs(o); }
-      else if ((a === 'stop' || a === 'cancel') && !['confirmed', 'cancelled'].includes(o.status)) { o.status = 'cancelled'; o.nextAt = null; creditSpent.set(user.id, Math.max(0, (creditSpent.get(user.id) ?? 0) - o.creditUsed.amount)); }
+      else if ((a === 'stop' || a === 'cancel') && !['confirmed', 'cancelled'].includes(o.status)) { o.why = o.status === 'fare_changed' ? 'price' : 'you_asked'; o.status = 'cancelled'; o.nextAt = null; creditSpent.set(user.id, Math.max(0, (creditSpent.get(user.id) ?? 0) - o.creditUsed.amount)); }
       else return err('VALIDATION');
       return ok({ order: viewOf(o) });
     }
@@ -701,6 +732,7 @@ export function askRequestViews(userId: string): TripRequestView[] {
     withWhom: 'faisal' as const, withName: r.view.agent?.name ?? null, outcome: null, alt: null, yesText: null,
     quote: r.view.quote && r.view.quote.status === 'open' ? r.view.quote.total : null, quoteText: r.view.quote?.lead ?? r.view.quote?.text ?? null,
     withdrawn: !!r.withdrawn, canTakeBack: !r.withdrawn && ['queued', 'sent', 'reviewing', 'quoted'].includes(r.view.status),
+    result: outReq(r).result, progress: outReq(r).progress,
     createdAt: r.view.createdAt, updatedAt: r.view.updatedAt,
   }));
   return [...asked, ...stuckOrderViews(userId)];

@@ -161,7 +161,7 @@ async function flights() {
   await k.press(k.byTest('ask-review'));
   await k.see('Istanbul · 9–15 Mar', 'pay title', 12000);
   await k.see('4 travellers · Saudia, direct', 'flight line');
-  await k.see('Rooms near Galata Tower · Connecting rooms · 6 nights', 'stay line');
+  await k.see('Bereketzade Hotel · Connecting rooms · 6 nights', 'stay line');
   await k.see('If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.', 'rule');
   await k.see('Price held · 19:', 'hold timer');
   await k.shot('pay-sheet');

@@ -8,6 +8,7 @@ import {
   type AskIntent, type BookingRequestView, type CopyKey, type NeedKey, type Person, type RequestFormKind,
 } from '@mada/shared';
 import { bookingApi, bookingKeys, sendRequest, useBookingRequest, usePayDraft, useThread } from '@/lib/booking';
+import { onItLine } from '@/components/outcome/Outcome';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, listSep, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -256,6 +257,8 @@ export function SentRequest({ id, screen }: { id: string | null; people?: Person
         {r.summary || r.detail ? <T v="small">{r.summary || r.detail}</T> : null}
         {r.note && r.note !== r.title && r.summary ? <T style={styles.quote}>“{r.note}”</T> : null}
         <RequestProgress r={r} />
+        {/* In Ask, by when and the cost under the steps (the request screen has the full card). */}
+        {!screen && r.progress ? <T v="tiny" testID="request-on-it-line">{onItLine(r.progress)}</T> : null}
       </Card>
       {answered && r.quote ? (
         <Card style={{ gap: 10 }}>

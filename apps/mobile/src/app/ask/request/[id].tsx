@@ -7,6 +7,7 @@ import { T } from '@/components/Text';
 import { AgentDot } from '@/components/booking/parts';
 import { ReplyBar, SentRequest } from '@/components/booking/Requests';
 import { TravellerPassports } from '@/components/passport/TravellerPassports';
+import { OnItCard, OutcomeCard } from '@/components/outcome/Outcome';
 import { useBookingRequest, useThread } from '@/lib/booking';
 import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
@@ -33,7 +34,7 @@ export default function RequestScreen() {
   // A visa, Umrah or flight request still being worked on shows each traveller's passport, added right here.
   const passportsOpen = !!r && !['paid', 'done', 'cancelled'].includes(r.status);
   const agent = r?.agent?.name ?? 'Mada';
-  const status = !r ? '' : th.data?.agentTyping ? t('presence.typing', { agent }) : r.status === 'quoted' ? t('ask.req.status.answered') : r.status === 'paid' || r.status === 'done' ? t('ask.req.status.paid')
+  const status = !r ? '' : r.result && !th.data?.agentTyping ? t(`oc.pill.${r.result.kind}`) : th.data?.agentTyping ? t('presence.typing', { agent }) : r.status === 'quoted' ? t('ask.req.status.answered') : r.status === 'paid' || r.status === 'done' ? t('ask.req.status.paid')
     : r.status === 'reviewing' ? t('ask.req.status.onIt', { agent }) : r.status === 'cancelled' ? t('ask.req.cancelled') : t('ask.req.status.sent');
   return (
     <Screen>
@@ -52,6 +53,9 @@ export default function RequestScreen() {
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: true })}>
           {passportsOpen ? <View style={{ marginBottom: 14 }}><TravellerPassports kind={r!.kind} people={people.data ?? []} travellerIds={r!.travellerIds} selfName={selfName} travelEnds={travelEnds(qc, { kind: 'quote', requestId: rid }, r)} testID="request-passports" /></View> : null}
           <SentRequest id={rid} screen />
+          {/* How it ended, or while it's open what Mada is doing, by when and the cost (schemas/outcomes.ts). */}
+          {r?.result ? <View style={{ marginTop: 14 }}><OutcomeCard result={r.result} again={r.title} testID="request-outcome" /></View>
+            : r?.progress ? <View style={{ marginTop: 14 }}><OnItCard progress={r.progress} requestId={rid} testID="request-on-it" /></View> : null}
         </ScrollView>
         {r && r.status !== 'cancelled' ? <View style={[styles.bar, { paddingBottom: 16 + bottom }]}><ReplyBar requestId={rid} agent={agent} /></View> : null}
       </KeyboardAvoidingView>

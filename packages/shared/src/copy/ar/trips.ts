@@ -197,7 +197,7 @@ export const arTrips: ArSection<typeof enTrips> = {
   'itin.checkIn': 'تسجيل الدخول · {name}',
   'itin.checkInSub': '{room} · {nights} ليالي',
   'itin.earlyCheckIn': '· دخول مبكر',
-  'itin.checkOut': 'المغادرة',
+  'itin.checkOut': 'المغادرة · {name}',
   'itin.checkOutSub': 'خلّ الشنط في الاستقبال إذا تبي تتمشى',
   'itin.lateCheckout': 'مغادرة متأخرة، مؤكدة',
   'itin.toAirport': '{driver} يوصّلك للمطار',

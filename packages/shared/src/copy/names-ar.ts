@@ -68,7 +68,7 @@ export const PHRASES_AR: Readonly<Record<string, string>> = {
   'The other airport, about 50 minutes from Galata.': 'المطار الآخر، على بعد 50 دقيقة تقريبًا من غلطة.',
   'Light rain. Pack the umbrella.': 'مطر خفيف. خذ المظلة.', 'Light rain. Dry by Thursday.': 'مطر خفيف. يصحو بحلول الخميس.',
   'light rain': 'مطر خفيف', 'Light rain': 'مطر خفيف', sunny: 'مشمس', Sunny: 'مشمس', clear: 'صافٍ', cloudy: 'غائم',
-  'Rooms near Galata Tower': 'غرف قرب برج غلطة', 'Airport pickup both ways': 'استقبال من المطار وتوصيل إليه',
+  'Bereketzade Hotel': 'فندق بركت زاده', 'Airport pickup both ways': 'استقبال من المطار وتوصيل إليه',
 };
 
 /** Patterns in supplier text: fees, refunds, bag allowances, doors, carousels and terminals. */

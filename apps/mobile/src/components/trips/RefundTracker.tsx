@@ -5,6 +5,7 @@ import { t } from '@/lib/i18n';
 import { agentName, useAgent } from '@/lib/agent';
 import { colors } from '@/theme';
 import { AgentIntro, Box, Small, SmallButton, Tracker } from './ui';
+import { OutcomeCard } from '@/components/outcome/Outcome';
 
 /** Requested → Approved → Sent → In your bank. Credit is instant; instalments go back through Tabby; a no comes with a reason. */
 export function RefundTracker({ r, onTalk }: { r: RefundView; onTalk?: () => void }) {
@@ -18,7 +19,10 @@ export function RefundTracker({ r, onTalk }: { r: RefundView; onTalk?: () => voi
           { title: t('rf.tr.requested'), sub: t('rf.tr.today'), state: 'done' },
           { title: decided ? t('rf.tr.couldnt', { agent }) : t('rf.tr.asking', { agent }), sub: decided ? null : t('rf.tr.withinDay'), state: decided ? 'done' : 'now' },
         ]} />
-        {decided ? (
+        {decided && r.result ? (<>
+          <OutcomeCard compact result={r.result} tripId={r.tripId} testID="refund-outcome" />
+          {r.alt ? <Small color={colors.green}>“{r.alt}”</Small> : null}
+        </>) : decided ? (
           <Box tone="well" gap={8}>
             <AgentIntro />
             {r.reject ? <Small color={colors.green}>“{r.reject}”</Small> : null}

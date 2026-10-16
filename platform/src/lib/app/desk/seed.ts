@@ -130,7 +130,7 @@ async function main() {
     { carrier: "SV", carrierName: "Saudia", flight: "SV264", from: "IST", to: "RUH", depart: `${day(dBack)} 15:30:00`, departTz: "Europe/Istanbul", arrive: `${day(dBack)} 19:35:00`, dur: 245 },
   ];
   await order({ who: sara, summary: "Riyadh to Istanbul, 4 travellers", city: "Istanbul", country: "Türkiye", start: day(34), end: day(40), segs: ist(34, 40), status: "with_agent", createdMin: 2,
-    lines: [{ label: "Flights · 2 adults, 2 children", amount: H(6980), kind: "flight" }, { label: "Rooms near Galata Tower · 6 nights", amount: H(5880), kind: "stay" }, { label: "Airport pickup", amount: H(240), kind: "pickup" }] });
+    lines: [{ label: "Flights · 2 adults, 2 children", amount: H(6980), kind: "flight" }, { label: "Bereketzade Hotel · 6 nights", amount: H(5880), kind: "stay" }, { label: "Airport pickup", amount: H(240), kind: "pickup" }] });
   await order({ who: hessa, summary: "Jeddah to Dubai with Maria", city: "Dubai", country: "UAE", start: day(12), end: day(16),
     segs: [{ carrier: "EK", carrierName: "Emirates", flight: "EK804", from: "JED", to: "DXB", depart: `${day(12)} 16:25:00`, arrive: `${day(12)} 20:25:00`, arriveTz: "Asia/Dubai", dur: 180 }],
     status: "with_agent", createdMin: 7, method: "tabby", label: "Tabby · 4 payments", instalments: 4, lines: [{ label: "Flights · 2 adults", amount: H(3420), kind: "flight" }] });

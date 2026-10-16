@@ -24,7 +24,7 @@ export const ISTANBUL_FLIGHTS: MockFlight[] = [
 ];
 
 export const ISTANBUL_HOTELS = [
-  { key: "galata", label: "best" as const, name: "Rooms near Galata Tower", area: "Beyoğlu · 3 min to the tower", nightSar: 980, note: "Connecting rooms on request. 3 minutes from the tower.", rating: 9.1, address: "Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul" },
+  { key: "galata", label: "best" as const, name: "Bereketzade Hotel", area: "Beyoğlu · 3 min to the tower", nightSar: 980, note: "Connecting rooms on request. 3 minutes from the tower.", rating: 9.1, address: "Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul" },
   { key: "sultan", label: "quiet" as const, name: "Garden hotel in Sultanahmet", area: "Old City · walk to the Blue Mosque", nightSar: 760, note: "Family suite. Breakfast included.", rating: 8.8, address: "Cankurtaran Mah., Akbıyık Cd. No: 21, 34122 Fatih/İstanbul" },
   { key: "bosphorus", label: "water" as const, name: "Bosphorus view rooms", area: "Beşiktaş · sea view", nightSar: 1420, note: "Two rooms side by side. Late checkout.", rating: 9.3, address: "Sinanpaşa Mah., Beşiktaş Cd. No: 8, 34353 Beşiktaş/İstanbul" },
 ];

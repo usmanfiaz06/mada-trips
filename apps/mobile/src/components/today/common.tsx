@@ -12,6 +12,7 @@ import { T } from '@/components/Text';
 import { Sun } from '@/components/Sun';
 import { VGradient } from '@/components/Gradient';
 import { orderNeedsYou, requestHref, requestWhat } from '@/components/trips/Requests';
+import { onItLine } from '@/components/outcome/Outcome';
 import { Box, Grow, H3, Photo, Row, Small, Spread, Tag, Tiny, Veil, Display } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -117,7 +118,7 @@ export function RequestsCard() {
         <Avatar initial="F" tone="green" />
         <Grow>
           <H3>{stuck ? t('td.req.failed') : priced ? t('td.req.answer', { what }) : t('td.req.working', { what })}</H3>
-          <Small>{stuck ? t('td.req.failedTap') : priced ? t('td.req.tap') : r.status === 'queued' ? t('td.req.queued') : t('td.req.usually')}</Small>
+          <Small>{stuck ? t('td.req.failedTap') : priced ? t('td.req.tap') : r.status === 'queued' ? t('td.req.queued') : r.progress ? onItLine(r.progress) : t('td.req.usually')}</Small>
         </Grow>
         <Icon name="chevron" />
       </Row>

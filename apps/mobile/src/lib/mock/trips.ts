@@ -7,6 +7,7 @@ import {
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
   splitEven, statementText, type TripMoney, type TripMoneyItem, type TripMoneyPending, type TripMoneySplit,
+  canNudge, outcomeNotifyKey, outcomeWhy, partialResult, progressFromStatus, refundResult, resultFromLegacy, type RequestResult,
   type FareOption, type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
@@ -24,7 +25,7 @@ import { circlesHooks, circlesMock } from './circles';
 
 type Charge = TripPayment & { lines: InvoiceLine[]; tripId: string; /** A friend in a circle paid this (owner audit item 31). */ friend?: string | null };
 type Doc = { id: string; number: string; tripId: string; chargeId: string; kind: 'simplified' | 'tax' | 'credit_note'; status: 'draft' | 'issued'; customer: string; company: TripDetail['company']; lines: InvoiceLine[]; againstId: string | null; paidWith: string | null; issuedAt: string };
-type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null; withdrawn?: boolean };
+type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null; withdrawn?: boolean; partial?: string | null; nudgedAt?: string | null };
 type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string; withdrawn?: boolean };
 type State = {
   trips: Omit<TripDetail, 'clock'>[];
@@ -110,7 +111,7 @@ function seed(user: MockUser, s: State, outDay = '2027-03-09', backDay = '2027-0
       { id: outId, carrier: 'SV', carrierName: 'Saudia', flightNumber: 'SV263', from: 'RUH', to: 'IST', departLocal: `${outDay}T09:40`, departTz: 'Asia/Riyadh', arriveLocal: `${outDay}T13:55`, arriveTz: 'Europe/Istanbul', durationMin: 255, cabin: 'economy', terminal: 'Terminal 3', gate: 'B12', seats: seats(14), baggage: '2 × 23 kg', status: 'scheduled', statusSource: 'Schedule', pnr: 'X7K2QD', direction: 'out', bookedGate: 'B12', delayMin: null, predictedDelay: false, statusAt: null, brand: '#0b6b52' },
       { id: uuid(), carrier: 'SV', carrierName: 'Saudia', flightNumber: 'SV264', from: 'IST', to: 'RUH', departLocal: `${backDay}T15:10`, departTz: 'Europe/Istanbul', arriveLocal: `${backDay}T19:20`, arriveTz: 'Asia/Riyadh', durationMin: 250, cabin: 'economy', terminal: 'Terminal 1', gate: null, seats: seats(16), baggage: '2 × 23 kg', status: 'scheduled', statusSource: 'Schedule', pnr: 'X7K2QD', direction: 'back', bookedGate: null, delayMin: null, predictedDelay: false, statusAt: null, brand: '#0b6b52' },
     ],
-    stays: [{ id: uuid(), name: 'Rooms near Galata Tower', area: 'Beyoğlu · 3 min to the tower', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', checkIn: outDay, nights: 6, rooms: 2, price: SAR(5880_00), cancellation: 'Free to cancel until 7 days before', status: 'booked', confirmation: 'GT-48213', phone: '+90 212 000 0000', addressShort: 'Galata Kulesi Sk. 12, Beyoğlu', walk: '3 min walk to Galata Tower', fromAirport: '45 min', roomType: null, plan: 'tabby', hotelCode: 99702, requests: { chips: ['highFloor', 'cot'], note: 'Rooms next to each other if you can.' } }],
+    stays: [{ id: uuid(), name: 'Bereketzade Hotel', area: 'Beyoğlu · 3 min to the tower', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', checkIn: outDay, nights: 6, rooms: 2, price: SAR(5880_00), cancellation: 'Free to cancel until 7 days before', status: 'booked', confirmation: 'GT-48213', phone: '+90 212 000 0000', addressShort: 'Galata Kulesi Sk. 12, Beyoğlu', walk: '3 min walk to Galata Tower', fromAirport: '45 min', roomType: null, plan: 'tabby', hotelCode: 99702, requests: { chips: ['highFloor', 'cot'], note: 'Rooms next to each other if you can.' } }],
     pickups: [
       { id: uuid(), direction: 'to_airport', at: new Date(zonedToInstant(`${outDay}T09:40`, 'Asia/Riyadh').getTime() - 155 * 60_000).toISOString(), driverName: 'Khalid', car: 'Black GMC Yukon', plate: null, meetingPoint: 'Your door', phone: '+966 55 014 2287', price: SAR(220_00), status: 'booked', room: 'room for 8 bags', waits: '10 min', offsetMin: -155, city: 'Riyadh' },
       { id: uuid(), direction: 'from_airport', at: zonedToInstant(`${outDay}T13:55`, 'Europe/Istanbul').toISOString(), driverName: 'Ahmet', car: 'Grey Mercedes Vito', plate: '34 MDA 21', meetingPoint: 'Door 3', phone: '+90 532 418 6610', price: SAR(220_00), status: 'booked', room: null, waits: '60 min', offsetMin: null, city: 'Istanbul' },
@@ -125,7 +126,7 @@ function seed(user: MockUser, s: State, outDay = '2027-03-09', backDay = '2027-0
   const paidAt = '2027-02-14T07:42:00.000Z';
   const plan = instalments(5880_00, 4).map((a, i) => ({ seq: i + 1, dueOn: addDays('2027-02-14', i * 30), amount: SAR(a), paid: i < 1 }));
   addCharge(s, trip, { item: 'flight', title: 'Flights · Saudia', sub: `SV263 and SV264 · ${n} travellers`, amount: SAR(2160_00 * n), method: 'card', label: 'Visa ending 41', paidAt, plan: null, creditUsed: SAR(0) });
-  addCharge(s, trip, { item: 'stay', title: 'Rooms near Galata Tower', sub: '6 nights · from 9 Mar', amount: SAR(5880_00), method: 'tabby', label: 'Visa ending 41', paidAt, plan, creditUsed: SAR(0) });
+  addCharge(s, trip, { item: 'stay', title: 'Bereketzade Hotel', sub: '6 nights · from 9 Mar', amount: SAR(5880_00), method: 'tabby', label: 'Visa ending 41', paidAt, plan, creditUsed: SAR(0) });
   addCharge(s, trip, { item: 'pickup', title: 'Airport pickup both ways', sub: 'Khalid in Riyadh · Ahmet in Istanbul', amount: SAR(440_00), method: 'card', label: 'Visa ending 41', paidAt, plan: null, creditUsed: SAR(0) });
   s.trips.push({ ...trip, id: uuid(), city: 'Baku', country: 'Azerbaijan', imageUrl: 'baku-old-city', startDate: '2026-03-30', endDate: '2026-04-04', status: 'completed', segments: [], stays: [], pickups: [], bookingRef: 'B4KU26', weather: null });
 }
@@ -293,7 +294,13 @@ function progressDesk(s: State) {
     if (next !== r.status) {
       r.status = next;
       r.updatedAt = nowIso();
-      if (next === 'confirmed' || next === 'done' || next === 'cancelled') r.outcome = r.scripted;
+      if (next === 'confirmed' || next === 'done' || next === 'cancelled') {
+        r.outcome = r.scripted;
+        // A scripted partial yes closes as a partial outcome, with what the hotel could do (schemas/outcomes.ts).
+        if (r.scripted === 'yes' && r.partial) { r.result = partialResult({ with: r.withName, note: r.partial, at: r.updatedAt, tripId: r.tripId }); r.yesText = r.partial; }
+        const res = resultOf(r);
+        if (res) notify(s, { kind: 'agent_reply', level: 'active', copy: outcomeNotifyKey(res.kind), vars: { what: r.title, why: { k: outcomeWhy(res)[0], v: outcomeWhy(res)[1] } }, href: '/trips?tab=requests' });
+      }
     }
   }
   for (const f of s.refunds) {
@@ -301,9 +308,21 @@ function progressDesk(s: State) {
   }
 }
 
-function notify(s: State, n: { kind: Notification['kind']; level: Notification['level']; copy: string; vars?: Vars; href?: string | null }) {
-  s.inbox.unshift({ id: uuid(), kind: n.kind, level: n.level, title: tk(`${n.copy}.title`, n.vars).slice(0, 32), body: tk(`${n.copy}.body`, n.vars).slice(0, 90), href: n.href ?? null, readAt: null, createdAt: nowIso() });
+type MockVars = Record<string, string | number | { k: CopyKey; v?: Vars }>;
+/** A parameter that is itself a copy key (a reason) is worded when read, in the reader's language (notify-copy.ts). */
+const wordVars = (vars?: MockVars): Vars => Object.fromEntries(Object.entries(vars ?? {}).map(([k, v]) => [k, typeof v === 'object' ? t(v.k, v.v) : v]));
+function notify(s: State, n: { kind: Notification['kind']; level: Notification['level']; copy: string; vars?: MockVars; href?: string | null }) {
+  const vars = wordVars(n.vars);
+  s.inbox.unshift({ id: uuid(), kind: n.kind, level: n.level, title: tk(`${n.copy}.title`, vars).slice(0, 32), body: tk(`${n.copy}.body`, vars).slice(0, 90), href: n.href ?? null, readAt: null, createdAt: nowIso(), ref: { copy: n.copy, vars: n.vars } } as State['inbox'][number]);
 }
+/** The inbox in the reader's language at read time, like the server's renderNotification. */
+const readInbox = (n: State['inbox'][number]) => {
+  const ref = (n as { ref?: { copy: string; vars?: MockVars } }).ref;
+  if (!ref) return n;
+  const { ref: _r, ...rest } = n as State['inbox'][number] & { ref?: unknown };
+  const vars = wordVars(ref.vars);
+  return { ...rest, title: tk(`${ref.copy}.title`, vars).slice(0, 32), body: tk(`${ref.copy}.body`, vars).slice(0, 90) };
+};
 
 /* ───────── payments, refunds, invoices ───────── */
 
@@ -438,10 +457,14 @@ function card(t: TripDetail): TripCard {
 /** Until the desk has it (lib/app/trips/requests.ts canTakeBack): not answered yet, no booking behind it, not a refund. */
 const TAKE_BACK = ['queued', 'sent', 'reviewing', 'quoted', 'awaiting_payment'];
 const canTakeBackReq = (r: Req) => TAKE_BACK.includes(r.status) && !r.order && !r.withdrawn && r.area !== 'refund';
-const pub = (r: Req): TripRequestView => { const { scripted: _s, clientKey: _c, ...v } = r; return { ...v, withdrawn: !!r.withdrawn, canTakeBack: canTakeBackReq(r) }; };
+/** How it ended (as lib/app/outcomes.ts reads it): what the desk recorded, else the old yes/no read as an outcome. */
+const resultOf = (r: Req): RequestResult | null => r.result ?? resultFromLegacy({ ...r, quote: r.quote, booking: !!r.order });
+const progressOf = (r: Req) => { if (r.withdrawn) return null; const p = progressFromStatus({ ...r, kind: r.kind, area: r.area }); return p ? { ...p, nudgedAt: r.nudgedAt ?? null } : null; };
+const pub = (r: Req): TripRequestView => { const { scripted: _s, clientKey: _c, partial: _p, nudgedAt: _n, ...v } = r; return { ...v, withdrawn: !!r.withdrawn, canTakeBack: canTakeBackReq(r), result: resultOf(r), progress: progressOf(r) }; };
 const pubRefund = (r: Ref): RefundView => {
   const base = ((r: Ref): RefundView => { const { items: _i, clientKey: _c, ...v } = r; return { ...v, reject: r.stage === 'rejected' ? r.reject : null, alt: r.stage === 'rejected' ? r.alt : null }; })(r);
-  return { ...base, stage: r.withdrawn ? 'rejected' : base.stage, reject: r.withdrawn ? null : base.reject, alt: r.withdrawn ? null : base.alt, withdrawn: !!r.withdrawn, canTakeBack: r.anyway && r.stage === 'requested' && !r.withdrawn };
+  const v = { ...base, stage: r.withdrawn ? 'rejected' as const : base.stage, reject: r.withdrawn ? null : base.reject, alt: r.withdrawn ? null : base.alt, withdrawn: !!r.withdrawn, canTakeBack: r.anyway && r.stage === 'requested' && !r.withdrawn };
+  return { ...v, result: refundResult(v) };
 };
 
 export const tripsMock: AreaMock = async (w: Wire, { user }) => {
@@ -449,6 +472,15 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
   const parts = (path ?? '').split('/').filter(Boolean);
   const head = parts[0];
   // Take back a trip's request or an "ask anyway" refund while the desk hasn't got it (marked, never deleted).
+  // Nudge a trip's request past its time (lib/app/outcomes.ts nudgeRequest); an Ask request is the booking mock's.
+  if (head === 'requests' && parts[2] === 'nudge' && w.method === 'POST' && user) {
+    const r = stateOf(user).requests.find((x) => x.id === parts[1]);
+    if (!r) return null;
+    const p = progressOf(r);
+    if (!p) return err('VALIDATION');
+    if (canNudge(p)) r.nudgedAt = nowIso();
+    return ok({ progress: progressOf(r) });
+  }
   if ((head === 'requests' || head === 'refunds') && parts[2] === 'withdraw' && w.method === 'POST' && user) {
     const s = stateOf(user);
     if (head === 'requests') {
@@ -489,7 +521,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
   const s = stateOf(user);
 
   if (head === 'notifications') {
-    if (w.method === 'GET') { const items = s.inbox.slice(0, 50); return ok({ items, next: null, unread: s.inbox.filter((n) => !n.readAt).length, notifications: items }); }
+    if (w.method === 'GET') { const items = s.inbox.slice(0, 50).map(readInbox); return ok({ items, next: null, unread: s.inbox.filter((n) => !n.readAt).length, notifications: items }); }
     const ids = (body.ids as string[] | undefined) ?? (parts[1] === 'read' || body.all ? s.inbox.map((n) => n.id) : []);
     if (parts[1] && parts[1] !== 'read') { const n = s.inbox.find((x) => x.id === parts[1]); if (!n) return err('NOT_FOUND'); n.readAt = body.read ? nowIso() : null; return ok({ notification: n }); }
     s.inbox.forEach((n) => { if (ids.includes(n.id) && !n.readAt) n.readAt = nowIso(); });
@@ -730,7 +762,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     }
     const spec = askSpec(trip, b.data);
     if ('problem' in spec) return err('VALIDATION', spec.problem);
-    const r = reqOf({ tripId: trip.id, kind: spec.kind, area: spec.area, status: spec.quote ? 'quoted' : 'sent', title: spec.title, short: spec.short, detail: spec.detail, withWhom: spec.withWhom, withName: spec.withName, alt: spec.alt, yesText: spec.yesText, quote: spec.quote ? SAR(spec.quote) : null, quoteText: spec.quoteText, scripted: spec.outcome, clientKey: b.data.clientKey });
+    const r = reqOf({ tripId: trip.id, kind: spec.kind, area: spec.area, status: spec.quote ? 'quoted' : 'sent', title: spec.title, short: spec.short, detail: spec.detail, withWhom: spec.withWhom, withName: spec.withName, alt: spec.alt, yesText: spec.yesText, quote: spec.quote ? SAR(spec.quote) : null, quoteText: spec.quoteText, scripted: spec.outcome, partial: spec.partial ?? null, clientKey: b.data.clientKey });
     s.requests.unshift(r);
     if (spec.quote) notify(s, { kind: 'agent_reply', level: 'active', copy: 'notify.trip.price', vars: { what: spec.short, amount: formatSar(spec.quote) }, href: '/trips?tab=requests' });
     const res = { request: pub(r), say: null, trip: reload() };

@@ -211,7 +211,7 @@ export const enTrips = {
   'itin.checkIn': 'Check in · {name}',
   'itin.checkInSub': '{room} · {nights} nights',
   'itin.earlyCheckIn': '· early check-in',
-  'itin.checkOut': 'Check out',
+  'itin.checkOut': 'Check out · {name}',
   'itin.checkOutSub': 'Leave bags at the desk if you want to walk',
   'itin.lateCheckout': 'Late checkout, confirmed',
   'itin.toAirport': '{driver} takes you to the airport',

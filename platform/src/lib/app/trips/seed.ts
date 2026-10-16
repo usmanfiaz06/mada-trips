@@ -60,7 +60,7 @@ export async function seedDemoTrip(userId: string, opts: { outDay?: string; back
       cabin: "economy", terminal: "Terminal 1", gate: null, seats: seats(16), baggage: "2 × 23 kg", status: "scheduled", statusSource: "Schedule", pnr: "X7K2QD",
     });
     const [stay] = await tx.insert(appStays).values({
-      tripId: trip!.id, name: "Rooms near Galata Tower", area: "Beyoğlu · 3 min to the tower", address: "Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul",
+      tripId: trip!.id, name: "Bereketzade Hotel", area: "Beyoğlu · 3 min to the tower", address: "Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul",
       checkIn: outDay, nights: 6, rooms: n > 2 ? 2 : 1, price: 5880_00, cancellation: "Free to cancel until 7 days before", status: "booked", confirmation: "GT-48213", supplier: "mock",
     }).returning();
     const [home] = await tx.insert(appPickups).values({
@@ -86,7 +86,7 @@ export async function seedDemoTrip(userId: string, opts: { outDay?: string; back
     const paidAt = new Date("2027-02-14T07:42:00Z");
     const customer = customerOf(base, user.name || "Omar Alharbi");
     await createCharge(tx, base, { ownerId: userId, tripId: trip!.id, paymentId: await pay("card", 2160_00 * n, "Visa ending 41", "mock"), item: "flight", title: "Flights · Saudia", sub: `SV263 and SV264 · ${n} travellers`, amount: 2160_00 * n, method: "card", label: "Visa ending 41", paidAt, customer });
-    await createCharge(tx, base, { ownerId: userId, tripId: trip!.id, paymentId: await pay("tabby", 5880_00, "Tabby", "tabby", 4), item: "stay", title: "Rooms near Galata Tower", sub: "6 nights · from 9 Mar", amount: 5880_00, method: "tabby", label: "Visa ending 41", plan: "tabby", instalments: instalmentPlan(5880_00, "tabby", "2027-02-14", 1), paidAt, customer });
+    await createCharge(tx, base, { ownerId: userId, tripId: trip!.id, paymentId: await pay("tabby", 5880_00, "Tabby", "tabby", 4), item: "stay", title: "Bereketzade Hotel", sub: "6 nights · from 9 Mar", amount: 5880_00, method: "tabby", label: "Visa ending 41", plan: "tabby", instalments: instalmentPlan(5880_00, "tabby", "2027-02-14", 1), paidAt, customer });
     await createCharge(tx, base, { ownerId: userId, tripId: trip!.id, paymentId: await pay("card", 440_00, "Visa ending 41", "mock"), item: "pickup", title: "Airport pickup both ways", sub: "Khalid in Riyadh · Ahmet in Istanbul", amount: 440_00, method: "card", label: "Visa ending 41", paidAt, customer });
     // Last Eid in Baku, so Past and the recap have something real to remember.
     await tx.insert(appTrips).values({ ownerId: userId, city: "Baku", country: "Azerbaijan", imageUrl: "baku-old-city", startDate: "2026-03-30", endDate: "2026-04-04", travellerIds: ids, status: "completed", bookingRef: "B4KU26", confirmedByName: "Faisal" });

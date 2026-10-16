@@ -110,7 +110,7 @@ describe("GET /trips and /trips/{id}", () => {
     const out = trip.segments.find((s) => s.direction === "out")!;
     expect(out).toMatchObject({ flightNumber: "SV263", terminal: "Terminal 3", gate: "B12", seats: ["14A", "14B", "14C", "14D"] });
     expect(trip.pickups.find((p) => p.direction === "to_airport")).toMatchObject({ driverName: "Khalid", offsetMin: -155 });
-    expect(trip.stays[0]).toMatchObject({ name: "Rooms near Galata Tower", address: expect.stringContaining("Galata Kulesi"), phone: "+90 212 000 0000" });
+    expect(trip.stays[0]).toMatchObject({ name: "Bereketzade Hotel", address: expect.stringContaining("Galata Kulesi"), phone: "+90 212 000 0000" });
     expect(trip.agent).toMatchObject({ name: "Faisal", initial: "F", online: true });
     expect(trip.prices.total.amount).toBe(8640_00 + 5880_00 + 440_00);
     expect(JSON.stringify(trip)).not.toMatch(/passport_number|numberMasked/);

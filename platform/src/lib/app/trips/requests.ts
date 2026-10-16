@@ -1,7 +1,7 @@
 import "server-only";
 import { flightSummary, flightTitle, isFlightAsk, isFlightRequest, type FlightSearch } from "../booking/flight-requests";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { askSpec, deskStatus, formatSar, type CreateTripAskRequest, type TripDetail, type TripRequestView } from "@mada/shared";
+import { askSpec, deskStatus, formatSar, partialResult, type CreateTripAskRequest, type TripDetail, type TripRequestView } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appQuotes, appRequests } from "@/db/app-schema";
 import { appTripIdempotency } from "@/db/app-schema-trips";
@@ -21,7 +21,7 @@ import { progressOfRequest, resultOfRequest } from "../outcomes";
 type RequestRow = typeof appRequests.$inferSelect;
 export type RequestDetails = {
   area?: TripRequestView["area"]; short?: string | null; detail?: string | null; withWhom?: TripRequestView["withWhom"]; withName?: string | null;
-  outcome?: "yes" | "no" | null; scriptedOutcome?: "yes" | "no"; alt?: string | null; yesText?: string | null; quoteText?: string | null;
+  outcome?: "yes" | "no" | null; scriptedOutcome?: "yes" | "no"; scriptedPartial?: string | null; alt?: string | null; yesText?: string | null; quoteText?: string | null;
   quote?: number | null; clientKey?: string; askKind?: string; option?: string | null;
   order?: { id: string; status: string; failure: "payment" | "airline" | null };
 };
@@ -76,7 +76,9 @@ export async function progressMockDesk(ownerId: string, tx: Exec = db): Promise<
     const next = deskStatus(r.createdAt.getTime(), now, d.scriptedOutcome, d.withWhom ?? "faisal");
     if (next === r.status) continue;
     const decided = next === "confirmed" || next === "done" || next === "cancelled";
-    await tx.update(appRequests).set({ status: next, updatedAt: new Date(), details: decided ? { ...d, outcome: d.scriptedOutcome } : d }).where(eq(appRequests.id, r.id));
+    // A scripted partial yes closes as a partial outcome (schemas/outcomes.ts), with what the hotel could do.
+    const result = decided && d.scriptedOutcome === "yes" && d.scriptedPartial ? partialResult({ with: d.withName ?? null, note: d.scriptedPartial, at: new Date(now).toISOString(), tripId: r.tripId }) : null;
+    await tx.update(appRequests).set({ status: next, updatedAt: new Date(), details: decided ? { ...d, outcome: d.scriptedOutcome, ...(result ? { result, yesText: d.scriptedPartial } : {}) } : d }).where(eq(appRequests.id, r.id));
   }
 }
 
@@ -133,7 +135,7 @@ export async function createAsk(ownerId: string, trip: TripDetail, input: Create
       travellerIds: input.travellerIds?.length ? input.travellerIds : trip.travellerIds,
       details: {
         area: spec.area, short: spec.short, detail: spec.detail, withWhom: spec.withWhom, withName: spec.withName, outcome: null, scriptedOutcome: spec.outcome,
-        alt: spec.alt, yesText: spec.yesText, quoteText: spec.quoteText, quote: spec.quote, clientKey: input.clientKey, askKind: spec.kind, option: input.option ?? null,
+        alt: spec.alt, yesText: spec.yesText, quoteText: spec.quoteText, quote: spec.quote, scriptedPartial: spec.partial ?? null, clientKey: input.clientKey, askKind: spec.kind, option: input.option ?? null,
       },
     });
     return { request: toRequestView(r) as unknown as Record<string, unknown> };

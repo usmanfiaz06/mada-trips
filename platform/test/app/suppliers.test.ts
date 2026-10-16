@@ -49,7 +49,7 @@ describe("mock flights", () => {
 describe("other mocks", () => {
   it("hotels: rooms near Galata Tower", async () => {
     const h = await suppliers.hotels().search({ city: "Istanbul", checkIn: "2027-03-09", nights: 6, adults: 4, rooms: 1 });
-    expect(h.map((x) => HotelOffer.parse(x).name)).toEqual(["Rooms near Galata Tower", "Garden hotel in Sultanahmet", "Bosphorus view rooms"]);
+    expect(h.map((x) => HotelOffer.parse(x).name)).toEqual(["Bereketzade Hotel", "Garden hotel in Sultanahmet", "Bosphorus view rooms"]);
     expect(h[0]!.total.amount).toBe(588000);
     expect(h[0]!.freeCancelUntil).toBe("2027-03-03");
   });

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { Id, IsoDateTime, IsoDay, Money } from './common';
 import type { CopyKey, Vars } from '../copy';
+import { dayLabel, timeLabel, todayIn, zonedParts } from '../dates';
+import type { Lang } from '../locale';
 
 /*
  * How a request ends, and what Mada is doing until it does (critique items 5 and 6).
@@ -70,6 +72,9 @@ export const RequestProgress = z.object({
   nudgedAt: IsoDateTime.nullable(),
 });
 export type RequestProgress = z.infer<typeof RequestProgress>;
+
+/** POST /requests/:id/nudge */
+export const NudgeResponse = z.object({ progress: RequestProgress });
 
 /** The desk's outcome form (Ops: request page). Amounts in halalas. */
 export const DeskOutcomeInput = z.object({
@@ -159,6 +164,14 @@ export function refundResult(f: {
   return null;
 }
 
+/** The scripted desk's partial yes (mock mode, both backends): what it could do, charged only for that. */
+export function partialResult(o: { with: string | null; note: string; quote?: { amount: number; currency: 'SAR' } | null; at: string; tripId?: string | null }): RequestResult {
+  return {
+    kind: 'partial', reason: 'part', with: o.with, note: o.note, by: null, at: o.at, next: defaultNext('partial', { trip: !!o.tripId }),
+    money: o.quote && o.quote.amount > 0 ? { kind: 'kept', amount: o.quote, by: null } : { kind: 'none', amount: null, by: null },
+  };
+}
+
 /** Where an open request stands when the desk hasn't said: who Mada is asking, Mada's usual time, the cost so far. */
 export function progressFromStatus(r: {
   status: string; withWhom?: 'airline' | 'hotel' | 'faisal' | null; withName?: string | null; kind?: string | null; area?: string | null;
@@ -212,3 +225,11 @@ export function onItCost(p: Pick<RequestProgress, 'cost'>, fmt: { amount: (halal
 
 /** The notification an outcome sends: notify.oc.<kind>.title / .body, with the reason as a nested key (read-time language). */
 export const outcomeNotifyKey = (kind: OutcomeKind) => `notify.oc.${kind === 'withdrawn' ? 'cancelled' : kind}` as const;
+
+/** "14:30" today, "Thu 22 Oct, 14:30" another day (Riyadh time): the by-when on an open request. */
+export function dueLabel(iso: string, opts: { locale?: Lang; now?: Date } = {}): string {
+  const time = timeLabel(iso, { locale: opts.locale });
+  const day = zonedParts(iso).date;
+  const today = todayIn(undefined, opts.now);
+  return day === today ? time : `${dayLabel(day, { today, locale: opts.locale })}, ${time}`;
+}

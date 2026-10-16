@@ -687,7 +687,7 @@ export function buildItinerary({ trip, requests, picks, planned = [] }: Itinerar
     }));
     const lateUntil = late?.short?.match(/\d\d:\d\d/)?.[0];
     add(stayOut, item({
-      id: 'h-out', time: lateUntil ?? '12:00', icon: 'stay', kind: 'hotel', title: tk('itin.checkOut'), sub: tk(late ? 'itin.lateCheckout' : 'itin.checkOutSub'),
+      id: 'h-out', time: lateUntil ?? '12:00', icon: 'stay', kind: 'hotel', title: tk('itin.checkOut', { name: st.name }), sub: tk(late ? 'itin.lateCheckout' : 'itin.checkOutSub'),
       warn: backDay && stayOut < backDay ? tk(daysBetween(stayOut, backDay) === 1 ? 'itin.warn.noRoom.one' : 'itin.warn.noRoom.other', { day: dayLabel(backDay, { today: backDay }), count: daysBetween(stayOut, backDay) }) : null,
     }));
   }
@@ -942,6 +942,8 @@ export type AskSpec = {
   outcome: 'yes' | 'no';
   alt: string | null;
   yesText: string | null;
+  /** The scripted desk's partial yes: what it could do instead of all of it (closes as a partial outcome). */
+  partial?: string | null;
 };
 
 export type AskInput = { area: 'special' | 'hotel' | 'other'; kind: string; option?: string; travellerIds?: readonly string[]; count?: number; day?: string; note?: string };
@@ -964,7 +966,8 @@ export function askSpec(trip: TripDetail, a: AskInput): AskSpec | { problem: str
   const all = !a.travellerIds?.length || who.length === trip.travellers.length;
   const whoTxt = all ? tk('sr.everyone') : joinPeople(who.map((p) => p.firstName));
   const legs = tk(back ? 'sr.bothFlights' : 'sr.theFlight');
-  const base = { area: a.area, kind: a.kind, detail: null, withName: null, quote: null, quoteText: null, vatRateBps: VAT_STANDARD_BPS, outcome: 'yes' as const, alt: null, yesText: null };
+  // A hotel ask names the hotel everywhere it's shown ("Asking Swissôtel Makkah", "Confirmed by Swissôtel Makkah").
+  const base = { area: a.area, kind: a.kind, detail: null, withName: a.area === 'hotel' ? st?.name ?? null : null, quote: null, quoteText: null, vatRateBps: VAT_STANDARD_BPS, outcome: 'yes' as const, alt: null, yesText: null };
   const needsFlight = ['wheelchair', 'meal', 'bassinet', 'seats', 'bags', 'sports'];
   if (a.area === 'special' && needsFlight.includes(a.kind) && !out) return { problem: tk('sr.noFlights', { airline }) };
   if (a.area === 'hotel' && !st) return { problem: tk('ho.none') };
@@ -988,12 +991,16 @@ export function askSpec(trip: TripDetail, a: AskInput): AskSpec | { problem: str
     }
     case 'seats': {
       const keep = a.option !== 'kids';
-      return { ...base, title: keep ? tk(back ? 'sr.seats.keepBoth' : 'sr.seats.keep') : tk('sr.seats.kids'), short: tk('sr.seats.short'), detail: legs, withWhom: 'airline', withName: airline, outcome: out?.carrier === 'XY' ? 'no' : 'yes', alt: tk('sr.seats.alt') };
+      return { ...base, title: keep ? tk(back ? 'sr.seats.keepBoth' : 'sr.seats.keep') : tk('sr.seats.kids'), short: tk('sr.seats.short'), detail: legs, withWhom: 'airline', withName: airline, outcome: out?.carrier === 'XY' ? 'no' : 'yes', alt: tk('sr.seats.alt'),
+        // Four or more kept together: the scripted desk gets pairs across the aisle (a partial outcome).
+        partial: keep && who.length >= 4 ? tk('sr.seats.partial') : null };
     }
     case 'celebration': {
       const what = ['Birthday', 'Anniversary', 'Something else'].includes(a.option ?? '') ? a.option! : 'Birthday';
       const day = a.day ?? addDays(trip.startDate, 2);
-      return { ...base, title: `${tk(`sr.celebration.${what === 'Something else' ? 'else' : what.toLowerCase()}`)} · ${dayLabel(day, { today: day })}`, short: tk(`sr.celebration.${what === 'Something else' ? 'else' : what.toLowerCase()}`) + (all ? '' : ` · ${whoTxt}`), detail: `${a.note || tk('sr.celebration.note')} · ${day}`, withWhom: 'hotel' };
+      return { ...base, title: `${tk(`sr.celebration.${what === 'Something else' ? 'else' : what.toLowerCase()}`)} · ${dayLabel(day, { today: day })}`, short: tk(`sr.celebration.${what === 'Something else' ? 'else' : what.toLowerCase()}`) + (all ? '' : ` · ${whoTxt}`), detail: `${a.note || tk('sr.celebration.note')} · ${day}`, withWhom: 'hotel', withName: st?.name ?? null,
+        // The scripted desk's partial yes: the cake and the card, not the balloons.
+        partial: what === 'Birthday' ? tk('sr.celebration.partial') : null };
     }
     case 'prayer':
       return { ...base, title: tk('sr.prayer.title'), short: tk('sr.prayer.short'), detail: st?.name ?? tk('sr.hotel'), withWhom: 'hotel' };
@@ -1044,7 +1051,7 @@ export function askSpec(trip: TripDetail, a: AskInput): AskSpec | { problem: str
       return { ...base, title: tk('ho.bed.extra'), short: tk('ho.short.bed'), detail: tk('ho.nightsAt', { name: st!.name, nights: st!.nights }), withWhom: 'hotel', quote: price, quoteText: tk('ho.bed.quote', { price: sar(price), nights: st!.nights }) };
     }
     case 'connecting':
-      return { ...base, title: tk('ho.connecting'), short: tk('ho.connecting'), detail: st!.name, withWhom: 'hotel' };
+      return { ...base, title: tk('ho.connecting'), short: tk('ho.connecting'), detail: st!.name, withWhom: 'hotel', partial: tk('ho.connecting.partial') };
     case 'esim': {
       const count = Math.max(1, Math.min(a.count ?? trip.travellers.length, 12));
       const price = ESIM_PRICE * count;

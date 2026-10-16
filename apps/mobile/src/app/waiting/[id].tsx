@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { G, Line } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
-import { dayLabel, formatSar, todayIn, type OrderView } from '@mada/shared';
+import { dayLabel, dueLabel, formatSar, ON_IT_MINUTES, todayIn, DESK_PHONE, type OrderView } from '@mada/shared';
+import { OutcomeCard } from '@/components/outcome/Outcome';
 import { Button } from '@/components/Button';
 import { VGradient } from '@/components/Gradient';
 import { Icon } from '@/components/Icon';
@@ -14,7 +15,7 @@ import { T } from '@/components/Text';
 import { Photo, useNow, enter } from '@/components/booking/parts';
 import { bookingApi, bookingKeys, finishInBackground, stopWatching, useOrder, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
-import { listSep, t, tn } from '@/lib/i18n';
+import { getLocale, listSep, t, tn } from '@/lib/i18n';
 import { useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -31,12 +32,16 @@ const NUM = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight',
 const elapsedLabel = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const FROM: Record<string, string> = { RUH: 'Riyadh', JED: 'Jeddah', DMM: 'Dammam' };
 
+const hotelOf = (o: OrderView) => o.lines.find((l) => l.icon === 'stay')?.text.split(' · ')[0] ?? null;
+
 function rowsOf(o: OrderView): [string, string, string][] {
   const n = Math.max(1, o.travellerIds.length);
   const nWord = (NUM[n] ?? String(n)).toLowerCase();
   const seats = o.seats.join(listSep());
   const price = t('wait.row.priceDetail', { price: formatSar(o.total.amount + o.extra.amount) });
-  if (o.kind === 'stay') return [[t('wait.row.hotel'), t('wait.row.hotelDone'), t('wait.row.hotelDetail')], [t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.roomsDetail')]];
+  // The hotel by name, from the order's stay line ("Bereketzade Hotel · Connecting rooms · 6 nights").
+  const hotel = hotelOf(o);
+  if (o.kind === 'stay') return [[hotel ? t('hn.wait.asking', { hotel }) : t('wait.row.hotel'), hotel ? t('hn.wait.said', { hotel }) : t('wait.row.hotelDone'), hotel ? t('hn.wait.detail', { hotel }) : t('wait.row.hotelDetail')], [t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.roomsDetail')]];
   if (o.kind === 'package') return [[t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.hotelDetail')], [t('wait.row.tours'), t('wait.row.toursDone'), t('wait.row.toursDetail')]];
   return [
     [tn('wait.row.seats', n, { count: nWord }), tn('wait.row.seatsDone', n, { count: nWord }), `${tn('wait.row.seatsDetail', n, { seats })}${o.cabin && o.cabin !== 'economy' ? `, ${o.cabin}` : ''}`],
@@ -61,11 +66,13 @@ export default function Waiting() {
   useEffect(() => { if (!knocked.current) { knocked.current = true; buzz('knock'); } }, []);
   useEffect(() => { if (o?.status === 'confirmed' && !confirmedBuzz.current) { confirmedBuzz.current = true; buzz('success'); stopWatching(o.id); usePayDraft.getState().clear(); void qc.invalidateQueries({ queryKey: ['trips'] }); } }, [o?.status, o?.id, qc]);
   useEffect(() => { if (o?.status === 'fare_changed' || o?.status === 'ticketing_failed' || o?.status === 'needs_answer') buzz('warn'); }, [o?.status]);
-  useEffect(() => { if (o?.status === 'cancelled') { toast(t('wait.cancelled')); router.replace('/today'); } }, [o?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A booking that won't go ahead stays on screen with its outcome (why, the money, what next); an older server sends none.
+  useEffect(() => { if (o?.status === 'cancelled' && !o.result) { toast(t('wait.cancelled')); router.replace('/today'); } }, [o?.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Never a blank dark screen while the first answer comes: say what's happening at once.
   if (!o) return <WaitingFirst error={q.isError && !q.isFetching} onRetry={() => void q.refetch()} onClose={() => router.replace('/today')} />;
   if (o.status === 'confirmed') return <Confirmed o={o} />;
+  if ((o.status === 'cancelled' || o.status === 'declined') && o.result) return <Ended o={o} />;
 
   const act = async (answer: Parameters<typeof bookingApi.answer>[1]) => {
     setActing(true); buzz('tap');
@@ -176,6 +183,7 @@ export default function Waiting() {
               )}
           </Animated.View>
         ) : null}
+        <ByWhen o={o} now={now} />
         <T style={styles.note}>{t('wait.note')}</T>
       </View>
     </Screen>
@@ -213,6 +221,38 @@ function WaitingFirst({ error, onRetry, onClose }: { error: boolean; onRetry: ()
   );
 }
 
+/** By when, always: Mada's usual time for a booking; once it passes, said plainly, with a call. */
+function ByWhen({ o, now }: { o: OrderView; now: number }) {
+  if (!['pending_agent', 'held', 'price_locked', 'issuing'].includes(o.status)) return null;
+  const due = new Date(Date.parse(o.createdAt) + ON_IT_MINUTES.order * 60_000).toISOString();
+  const time = dueLabel(due, { locale: getLocale() });
+  if (now <= Date.parse(due)) return <T style={styles.doneText} testID="wait-by">{t('oi.by.usual', { time })}</T>;
+  return (
+    <View style={{ gap: 8 }} testID="wait-late">
+      <T style={[styles.doneText, { color: '#e6c88f' }]}>{t('oi.late', { time })}</T>
+      <View style={styles.btns}><Button size="small" block={false} variant="glass" label={t('oi.call')} onPress={() => { void Linking.openURL(`tel:${DESK_PHONE.replace(/\s/g, '')}`).catch(() => {}); }} /></View>
+    </View>
+  );
+}
+
+/** A booking that won't go ahead: what happened, the money, and the way on. Never a toast and a jump to Today. */
+function Ended({ o }: { o: OrderView }) {
+  const router = useRouter();
+  const top = useTopInset();
+  const bottom = useBottomInset();
+  return (
+    <Screen background={colors.sand}>
+      <View style={{ paddingTop: top + 56, paddingHorizontal: 24, gap: 18, flex: 1 }} testID="wait-ended">
+        <T style={[font('eyebrow', colors.goldDeep)]}>{o.place}</T>
+        <OutcomeCard result={o.result!} tripId={o.tripId} again={o.place ? t(o.kind === 'stay' ? 'oc.again.stay' : 'oc.again.flight', { place: o.place }) : null} testID="order-outcome" />
+      </View>
+      <View style={{ paddingHorizontal: 20, paddingBottom: 28 + bottom }}>
+        <Button variant="ghost" label={t('done.done')} onPress={() => router.replace('/today')} testID="wait-ended-close" />
+      </View>
+    </Screen>
+  );
+}
+
 function Confirmed({ o }: { o: OrderView }) {
   const router = useRouter();
   const top = useTopInset();
@@ -220,7 +260,8 @@ function Confirmed({ o }: { o: OrderView }) {
   const user = useSession((s) => s.user);
   const updateMe = useUpdateMe();
   const agent = o.confirmedBy?.name ?? o.agent?.name ?? 'Mada';
-  const title = o.kind === 'stay' ? t('done.rooms') : t('done.going', { city: o.place });
+  const hotel = hotelOf(o);
+  const title = o.kind === 'stay' ? (hotel ? t('hn.done.rooms', { hotel }) : t('done.rooms')) : t('done.going', { city: o.place });
   const pills = [
     o.kind !== 'stay' ? t('done.tickets') : null,
     o.bundle || o.kind === 'stay' ? t('done.roomsBooked') : null,
