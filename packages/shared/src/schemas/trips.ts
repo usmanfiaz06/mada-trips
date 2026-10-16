@@ -4,6 +4,7 @@ import {
 } from './common';
 import { Invoice, PaymentMethod, RefundStage } from './commerce';
 import { HotelRequests } from './hotel-requests';
+import { RequestProgress, RequestResult } from './outcomes';
 
 export const Cabin = z.enum(['economy', 'premium', 'business', 'first']);
 export type Cabin = z.infer<typeof Cabin>;
@@ -338,6 +339,10 @@ export const TripRequestView = z.object({
   /** Taken back by the traveller (status 'cancelled'), and whether it still can be (the desk hasn't got it yet). Older servers send none. */
   withdrawn: z.boolean().optional(),
   canTakeBack: z.boolean().optional(),
+  /** How it ended (schemas/outcomes.ts): set once it's closed. Older servers send none. */
+  result: RequestResult.nullable().optional(),
+  /** While it's open: what Mada is doing, by when, and the cost. */
+  progress: RequestProgress.nullable().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -619,6 +624,8 @@ export const RefundView = z.object({
   /** Taken back by the traveller (stage reads 'rejected' for older apps). canTakeBack: an "ask anyway" the desk hasn't decided. */
   withdrawn: z.boolean().optional(),
   canTakeBack: z.boolean().optional(),
+  /** How it ended: approved (issued), declined (refused), or taken back. Older servers send none. */
+  result: RequestResult.nullable().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

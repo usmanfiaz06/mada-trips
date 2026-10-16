@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
-import { t as copy, type CopyKey, type Vars } from "@mada/shared";
+import { t as copy, type CopyKey, type OutcomeReason, type RequestResult, type Vars } from "@mada/shared";
 import { db, schema, type Tx } from "@/db";
 import {
   appMessages, appNotifications, appPayments, appPeople, appQuotes, appRefunds, appRequests, appSegments, appTrips, appUsers,
@@ -409,7 +409,7 @@ async function issueTicketsHere(actor: DeskActor, id: string, v: { pnr: string; 
 }
 
 /** Ticketing didn't work: release the card hold, close the order, and tell the traveller plainly that nothing was charged. */
-async function failTicketingHere(actor: DeskActor, id: string, v: { reason: string }) {
+async function failTicketingHere(actor: DeskActor, id: string, v: { reason: string; why?: OutcomeReason | null }) {
   assertCap(actor, "desk.act");
   const reason = v.reason.trim();
   if (reason.length < 3) throw new DeskError("Say what happened, for the team");
@@ -417,7 +417,7 @@ async function failTicketingHere(actor: DeskActor, id: string, v: { reason: stri
   if (o) {
     const agent = await engineAgent(actor);
     if (["held", "price_locked", "issuing"].includes(o.status)) await engine(() => booking.failTicketing(o.id, agent, reason));
-    else if (["pending_agent", "needs_answer", "fare_changed", "ticketing_failed", "requires_action"].includes(o.status)) await engine(() => booking.cancelOrder(o.id, { kind: "agent", name: agent.name }));
+    else if (["pending_agent", "needs_answer", "fare_changed", "ticketing_failed", "requires_action"].includes(o.status)) await engine(() => booking.cancelOrder(o.id, { kind: "agent", name: agent.name }, { reason: v.why ?? "other" }));
     else throw new DeskError("This order is already closed", "CONFLICT");
     await db.transaction(async (tx) => { await setDesk(tx, id, { failedAt: new Date().toISOString(), failReason: reason }); });
     await opsLog(actor, o, id, "desk.order.not_issued", `Marked ${o.ref ?? shortRef(id, "O")} not issued and released the card hold: ${clip(reason, 140)}`);
@@ -433,6 +433,9 @@ async function failTicketingHere(actor: DeskActor, id: string, v: { reason: stri
     for (const { p, res } of voids) await tx.update(appPayments).set({ status: res === "voided" ? "voided" : p.status, updatedAt: new Date() }).where(eq(appPayments.id, p.id));
     await claim(tx, r, actor);
     await setDesk(tx, id, { failedAt: new Date().toISOString(), failReason: reason }, { status: "cancelled" });
+    const me = await actingAgent(tx, actor);
+    const result: RequestResult = { kind: "refused", reason: v.why ?? "other", with: null, note: null, money: { kind: "none", amount: null, by: null }, next: ["other_dates", "talk"], by: me.name, at: new Date().toISOString() };
+    await tx.update(appRequests).set({ details: sql`${appRequests.details} || ${JSON.stringify({ result })}::jsonb` }).where(eq(appRequests.id, id));
     await madaMessage(tx, "request", id, `${copy("desk.order.notIssued")} ${copy("desk.order.notIssued.next")}`, { notIssued: true });
     await notify(tx, r.ownerId, { kind: "other", level: "time_sensitive", title: "notify.desk.notIssued.title", body: "notify.desk.notIssued.body", href: `/requests/${id}` });
     await deskAudit(tx, actor, { action: "desk.order.not_issued", entityType: "request", entityId: id, ref: shortRef(id, "O"),

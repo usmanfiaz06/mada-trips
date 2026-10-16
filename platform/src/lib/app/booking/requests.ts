@@ -1,4 +1,5 @@
 import "server-only";
+import { progressOfRequest, resultOfRequest } from "../outcomes";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, requestTitle, sarToHalalas, t,
@@ -84,7 +85,7 @@ export function requestView(r: RequestRow, q?: typeof appQuotes.$inferSelect): B
     id: r.id, kind: (d.askKind ?? "general") as BookingRequestView["kind"], status: VIEW_STATUS[r.status] ?? "sent",
     title: flight ? flightTitle(flight) : readTitle(d) ?? d.title ?? r.summary, summary: flight && d.flightRequest ? flightSummary(flight, r.travellerIds.length) : d.summaryLine ?? "",
     detail: d.detail ?? "", note: d.note ?? null, travellerIds: r.travellerIds, agent: r.agentName ? { name: r.agentName } : null, quote: quoteView(q),
-    promisedBy: r.promisedBy?.toISOString() ?? null, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
+    promisedBy: r.promisedBy?.toISOString() ?? null, result: resultOfRequest(r), progress: progressOfRequest(r), createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }
 

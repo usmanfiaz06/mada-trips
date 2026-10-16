@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, DESTINATIONS, ENTRY_RULES, PICKUP_SAR, addDays, instalments, legMinutes, sarToHalalas, seatsFor, t, zonedToInstant,
-  type FareOption, type FlightOption, type OrderLine, type StayOption,
+  type FareOption, type FlightOption, type OrderLine, type OutcomeReason, type RequestResult, type StayOption,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
@@ -80,7 +80,9 @@ async function syncRequest(tx: Tx, before: OrderRow, after: OrderRow) {
   const now = requestStateFor(after.status);
   if (!now || now === was) return;
   const order = { id: after.id, status: after.status, failure: after.status === "ticketing_failed" ? (after.problem === CAPTURE_FAILED ? "payment" : "airline") : null };
-  await tx.update(appRequests).set({ status: now, updatedAt: new Date(), details: sql`${appRequests.details} || ${JSON.stringify({ order })}::jsonb` })
+  // A booking that won't go ahead carries its outcome onto the request too (Trips → Requests reads it there).
+  const result = now === "cancelled" ? (after.snapshot as { result?: RequestResult }).result ?? null : null;
+  await tx.update(appRequests).set({ status: now, updatedAt: new Date(), details: sql`${appRequests.details} || ${JSON.stringify(result ? { order, result } : { order })}::jsonb` })
     .where(and(eq(appRequests.id, after.requestId), inArray(appRequests.status, ["with_agent", "needs_answer"])));
 }
 
@@ -132,7 +134,21 @@ export async function failTicketing(orderId: string, agent: DeskAgent, reason = 
   });
 }
 
-export async function cancelOrder(orderId: string, actor: { kind: "user" | "agent"; name: string }): Promise<OrderRow> {
+/**
+ * The outcome a cancelled booking carries (schemas/outcomes.ts): the traveller's own cancel reads "you asked", the desk's
+ * reads as refused with the reason it picked. Nothing was charged either way (the card hold is released, credit back).
+ */
+export function cancelResult(o: OrderRow, actor: { kind: "user" | "agent"; name: string }, why?: { reason: OutcomeReason; kind?: "refused" | "cancelled" }): RequestResult {
+  const mine = actor.kind === "user";
+  const kind = why?.kind ?? (mine ? "cancelled" : "refused");
+  const money = o.creditUsed > 0 ? { kind: "credit" as const, amount: { amount: o.creditUsed, currency: "SAR" as const }, by: null } : { kind: "none" as const, amount: null, by: null };
+  return {
+    kind, reason: why?.reason ?? (mine ? "you_asked" : "other"), with: (o.snapshot as { flight?: FlightOption }).flight?.airline ?? null, note: null, money,
+    next: mine ? ["book_again"] : ["other_dates", "talk"], by: actor.kind === "agent" && actor.name !== "Mada" ? actor.name : null, at: new Date().toISOString(),
+  };
+}
+
+export async function cancelOrder(orderId: string, actor: { kind: "user" | "agent"; name: string }, why?: { reason: OutcomeReason; kind?: "refused" | "cancelled" }): Promise<OrderRow> {
   return move(orderId, ["payment_requested", "requires_action", "pending_agent", "held", "price_locked", "needs_answer", "fare_changed", "ticketing_failed"], async (tx, o) => {
     await voidPayment(tx, o);
     await returnCredit(tx, o);
@@ -140,7 +156,7 @@ export async function cancelOrder(orderId: string, actor: { kind: "user" | "agen
     await orderEvent(tx, o.id, "cancelled", actor);
     await reopenQuote(tx, o);
     await appAuditLog(tx, { actorKind: actor.kind, actorId: actor.kind === "user" ? o.ownerId : actor.name, action: "order.cancelled", entityType: "app_order", entityId: o.id, summary: "Booking cancelled before it was confirmed; nothing was charged" });
-    return { status: "cancelled" };
+    return { status: "cancelled", snapshot: { ...(o.snapshot as Record<string, unknown>), result: cancelResult(o, actor, why) } };
   });
 }
 

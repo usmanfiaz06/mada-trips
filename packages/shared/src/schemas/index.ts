@@ -35,3 +35,4 @@ export * from './stay-wishes';
 export * from './stay-fit';
 export * from './passport-ready';
 export * from './now-path';
+export * from './outcomes';

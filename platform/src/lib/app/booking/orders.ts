@@ -2,7 +2,7 @@ import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   CreateOrderBody, DESTINATIONS, rangeLabel, demoPassportTarget, normalizeContactPhone, entryChecks, money, seatsFor, t,
-  type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
+  RequestResult, type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appPayments, appQuotes, appRequests, appUsers } from "@/db/app-schema";
@@ -57,8 +57,18 @@ export function orderView(o: OrderRow, now = Date.now()): OrderView {
     tripId: o.tripId, requestId: o.requestId,
     action: o.status === "requires_action" ? { kind: "otp", triesLeft: Math.max(0, 3 - o.otpTries), label: o.paymentLabel, amount: money(o.total) } : null,
     payRequest: payRequestOf(o),
+    result: orderResult(o),
     createdAt: o.createdAt.toISOString(), confirmedAt: o.confirmedAt?.toISOString() ?? null,
   };
+}
+
+/** A booking that won't go ahead, as an outcome (desk.ts cancelResult); older rows read as cancelled with nothing charged. */
+function orderResult(o: OrderRow): OrderView["result"] {
+  if (o.status !== "cancelled" && o.status !== "declined") return null;
+  const stored = RequestResult.safeParse((o.snapshot as { result?: unknown }).result);
+  if (stored.success) return stored.data;
+  const declined = o.status === "declined";
+  return { kind: declined ? "refused" : "cancelled", reason: declined ? "payment" : "mada", with: null, note: null, money: { kind: "none", amount: null, by: null }, next: ["other_dates", "talk"], by: null, at: (o.updatedAt ?? o.createdAt).toISOString() };
 }
 
 /** Someone else was asked to pay (owner audit item 31): kept on the snapshot, shown on the order until it is confirmed. */

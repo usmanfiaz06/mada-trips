@@ -1,4 +1,5 @@
 import { StayFit } from './stay-fit';
+import { RequestProgress, RequestResult } from './outcomes';
 import { HotelRequests } from './hotel-requests';
 import { z } from 'zod';
 import { ContactPhone, FlightQuote, FlightRequestExtras, ThreadAttachment } from './flight-quote';
@@ -394,6 +395,9 @@ export const BookingRequestView = z.object({
   agent: AgentInfo.nullable(),
   quote: RequestQuote.nullable(),
   promisedBy: IsoDateTime.nullable(),
+  /** How it ended, once closed; what Mada is doing, by when and the cost while open (schemas/outcomes.ts). */
+  result: RequestResult.nullable().optional(),
+  progress: RequestProgress.nullable().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -585,6 +589,8 @@ export const OrderView = z.object({
   action: z.object({ kind: z.literal('otp'), triesLeft: z.number().int(), label: z.string(), amount: Money }).nullable(),
   /** Set when someone else was asked to pay: who, in which circle, and whether they have. */
   payRequest: z.object({ userId: Id, name: z.string(), circleId: Id, messageId: Id, shareKey: z.string(), requestedAt: IsoDateTime, paidAt: IsoDateTime.nullable() }).nullable().optional(),
+  /** How a booking that won't go ahead ended (cancelled, not issued): the reason, the money, the next step. */
+  result: RequestResult.nullable().optional(),
   createdAt: IsoDateTime,
   confirmedAt: IsoDateTime.nullable(),
 });

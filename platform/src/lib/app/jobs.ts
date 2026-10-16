@@ -119,7 +119,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   let stopped = 0;
   for (const o of stuck) {
     try {
-      const u = await cancelOrder(o.id, { kind: "agent", name: "Mada" });
+      const u = await cancelOrder(o.id, { kind: "agent", name: "Mada" }, { reason: "payment", kind: "cancelled" });
       await notify(u.ownerId, { kind: "other", level: "passive", copy: "notify.orderStopped", href: "/trips", data: { orderId: o.id } });
       stopped += 1;
     } catch { /* moved on meanwhile */ }

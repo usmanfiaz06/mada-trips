@@ -13,7 +13,7 @@ import { agentForOps } from "@/lib/app/desk/agents";
 import { getRequestFull } from "@/lib/app/desk/adapters";
 import { copyWindowOpen, travellersWithCopy } from "@/lib/app/desk/passport-copy";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Badge, Card, CardHead, Field, Input, Money, Textarea } from "@/components/ui";
+import { Badge, Card, CardHead, Field, Input, Money, Select, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { HotelRequestsCard } from "@/components/desk/hotel-requests";
@@ -25,6 +25,7 @@ import { askAction, confirmCallAction, failAction, holdAction, issueAction, pric
 import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts";
 import { FareOption } from "@mada/shared";
 import { deskPrefs, payRequestOf } from "@/lib/app/booking/orders";
+import { OUTCOME_REASONS } from "@/components/desk/outcome";
 
 export const metadata = { title: "Order · Desk" };
 
@@ -270,6 +271,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                   <summary className="flex cursor-pointer items-center gap-2 text-[13.5px] text-bad"><XCircle className="size-4" />{t("Ticketing failed")}</summary>
                   <ActionForm action={failAction} className="mt-3 space-y-2">
                     <input type="hidden" name="id" value={r.id} />
+                    <Select name="why" defaultValue="sold_out" aria-label={t("Why, in the traveller's words")} options={OUTCOME_REASONS.filter(([k]) => !["done", "part", "you_asked"].includes(k)).map(([value, label]) => ({ value, label: t(label) }))} />
                     <Textarea name="reason" rows={2} required maxLength={300} placeholder={t("What happened, for the team")} />
                     <p className="text-[12px] text-ink-3">{t("Releases the card hold and tells the traveller nothing was charged.")}</p>
                     <SubmitButton variant="danger" className="w-full" confirm={t("Release the card hold and close this order?")}>{t("Release the hold and close")}</SubmitButton>

@@ -23,6 +23,7 @@ import { wordsCopy } from './words';
 import { askFlowCopy } from './ask-flow';
 import { staysCopy } from './stays';
 import { nowCopy } from './now';
+import { outcomesCopy } from './outcomes';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -59,6 +60,8 @@ export const en = {
   ...staysCopy,
   // The now path: a car right now, urgent help, the honest disruption screen: packages/shared/src/copy/now.ts
   ...nowCopy,
+  // How a request ends, and what Mada is doing until it does: packages/shared/src/copy/outcomes.ts
+  ...outcomesCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',

@@ -19,6 +19,9 @@ import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { deskAudit } from "@/lib/app/desk/core";
+import { setOutcome, setPromise } from "@/lib/app/outcomes";
+import { inRequestOwnerLocale } from "@/lib/app/locale";
+import { OutcomeKind, OutcomeNext, OutcomeReason, OnItStep, TZ, zonedToInstant } from "@mada/shared";
 
 /*
  * Server actions for the desk. Each one checks the signed-in person, hands the work to lib/app/desk (which checks the
@@ -143,7 +146,12 @@ export async function issueAction(_: ActionState, fd: FormData): Promise<ActionS
 }
 
 export async function failAction(_: ActionState, fd: FormData): Promise<ActionState> {
-  try { const u = await requirePerm("desk.act"); await failTicketing(u, uuid(fd, "id"), { reason: str(fd, "reason") }); return done("Card hold released. The traveller was told"); } catch (e) { return toState(e); }
+  try {
+    const u = await requirePerm("desk.act");
+    const why = OutcomeReason.safeParse(str(fd, "why"));
+    await failTicketing(u, uuid(fd, "id"), { reason: str(fd, "reason"), why: why.success ? why.data : null });
+    return done("Card hold released. The traveller was told");
+  } catch (e) { return toState(e); }
 }
 
 /** Returns the number to the browser for this one view; it is never put in the page. */
@@ -202,6 +210,42 @@ export async function checklistAction(_: ActionState, fd: FormData): Promise<Act
     const items = [...labels.map((label, i) => ({ label, done: ticked.has(String(i)) })), ...(extra ? [{ label: extra, done: false }] : [])];
     await saveChecklist(u, uuid(fd, "id"), items);
     return done("Checklist saved");
+  } catch (e) { return toState(e); }
+}
+
+/* ───────────── outcomes and promises (lib/app/outcomes.ts) ───────────── */
+
+const amountOrNull = (fd: FormData) => (str(fd, "amount") ? halalas(fd, "amount") : null);
+
+export async function outcomeAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const id = uuid(fd, "id");
+    const kind = OutcomeKind.exclude(["withdrawn"]).safeParse(str(fd, "kind"));
+    const reason = OutcomeReason.safeParse(str(fd, "reason"));
+    const money = z.enum(["none", "refund", "credit", "kept", "charged"]).safeParse(str(fd, "money"));
+    if (!kind.success || !reason.success || !money.success) throw new DeskError("Pick the outcome, the reason and the money");
+    const next = fd.getAll("next").map(String).filter((x) => OutcomeNext.safeParse(x).success) as OutcomeNext[];
+    const by = str(fd, "by");
+    await inRequestOwnerLocale(id, () => setOutcome(u, {
+      requestId: id, kind: kind.data, reason: reason.data, with: str(fd, "with") || null, note: str(fd, "note") || null, money: money.data,
+      amount: amountOrNull(fd), by: /^\d{4}-\d{2}-\d{2}$/.test(by) ? by : null, next: [...new Set(next)].slice(0, 3),
+    }));
+    return done("Closed. The traveller has the outcome");
+  } catch (e) { return toState(e); }
+}
+
+export async function promiseAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const id = uuid(fd, "id");
+    const step = OnItStep.safeParse(str(fd, "step"));
+    const cost = z.enum(["free", "quoted", "later", "paid"]).safeParse(str(fd, "cost"));
+    if (!step.success || !cost.success) throw new DeskError("Pick what we're doing and the cost");
+    let due: Date;
+    try { due = zonedToInstant(str(fd, "due"), TZ); } catch { throw new DeskError("Pick the time we'll answer by"); }
+    await inRequestOwnerLocale(id, () => setPromise(u, { requestId: id, step: step.data, with: str(fd, "with") || null, dueAt: due.toISOString(), cost: cost.data, amount: amountOrNull(fd) }));
+    return done("The traveller sees what we're doing and when");
   } catch (e) { return toState(e); }
 }
 

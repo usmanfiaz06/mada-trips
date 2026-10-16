@@ -1,11 +1,11 @@
 import "server-only";
 import { eq } from "drizzle-orm";
-import { t, type CopyKey, type Vars } from "@mada/shared";
+import { t, type CopyKey } from "@mada/shared";
 import { db } from "@/db";
 import { appNotifications } from "@/db/app-schema";
 import { pushToUser } from "../push";
 import { localeOfUser } from "../locale";
-import { withCopy } from "../notify-copy";
+import { resolveVars, withCopy, type NotifyVars } from "../notify-copy";
 import type { Exec } from "./core";
 
 /*
@@ -16,12 +16,14 @@ import type { Exec } from "./core";
 
 export type NotifyKind = "gate_change" | "leave_now" | "driver_here" | "booking_confirmed" | "connection_risk" | "flight_cancelled" | "flight_delayed" | "refund_moved" | "agent_reply" | "agent_needs_answer" | "document_problem" | "digest" | "circle" | "other";
 
-export async function notify(userId: string, n: { kind: NotifyKind; level: "time_sensitive" | "active" | "passive"; copy: string; vars?: Vars; href?: string | null; data?: Record<string, unknown> }, tx: Exec = db) {
-  // In the traveller's own language, whoever's action caused it.
+export async function notify(userId: string, n: { kind: NotifyKind; level: "time_sensitive" | "active" | "passive"; copy: string; vars?: NotifyVars; href?: string | null; data?: Record<string, unknown> }, tx: Exec = db) {
+  // In the traveller's own language, whoever's action caused it. A parameter may itself be a copy key (a reason),
+  // stored as a key so the inbox words it in the reader's language later (notify-copy.ts).
   const locale = await localeOfUser(userId, tx);
-  const title = t(`${n.copy}.title` as CopyKey, n.vars, locale).slice(0, 32);
-  const body = t(`${n.copy}.body` as CopyKey, n.vars, locale).slice(0, 90);
-  const copy = { title: [`${n.copy}.title` as CopyKey, n.vars] as [CopyKey, Vars?], body: [`${n.copy}.body` as CopyKey, n.vars] as [CopyKey, Vars?] };
+  const vars = resolveVars(n.vars, locale);
+  const title = t(`${n.copy}.title` as CopyKey, vars, locale).slice(0, 32);
+  const body = t(`${n.copy}.body` as CopyKey, vars, locale).slice(0, 90);
+  const copy = { title: [`${n.copy}.title` as CopyKey, n.vars] as [CopyKey, NotifyVars?], body: [`${n.copy}.body` as CopyKey, n.vars] as [CopyKey, NotifyVars?] };
   const [row] = await tx.insert(appNotifications).values({ userId, kind: n.kind, level: n.level, title, body, href: n.href ?? null, data: withCopy(n.data, copy) }).returning({ id: appNotifications.id });
   // Quiet hours and the notification budget are applied by the sender later (SCOPE.md §7); passive ones never push.
   if (n.level !== "passive") {

@@ -10,6 +10,7 @@ import { supplierMode } from "../config";
 import { AppError } from "../http";
 import type { Exec } from "./core";
 import { notify } from "./notify";
+import { progressOfRequest, resultOfRequest } from "../outcomes";
 
 /*
  * Asks from the trip (special requests, hotel options, an eSIM, a call about a change) go through the one request pipe,
@@ -57,6 +58,7 @@ export function toRequestView(r: RequestRow): TripRequestView {
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
     quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: orderOf(r.status, d.order, (d as { payRequest?: { name?: string } }).payRequest?.name ?? null),
     withdrawn: !!(d as { withdrawn?: boolean }).withdrawn, canTakeBack: canTakeBack(r),
+    result: resultOfRequest(r), progress: progressOfRequest(r),
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }

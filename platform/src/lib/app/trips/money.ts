@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  SELLER, creditLines, formatSar, invoiceHtml, invoiceLinesFor, invoiceNumber, outSegment, refundQuoteItems, zatcaQr, addDays,
+  SELLER, creditLines, formatSar, invoiceHtml, refundResult, invoiceLinesFor, invoiceNumber, outSegment, refundQuoteItems, zatcaQr, addDays,
   type Company, type CreateRefundRequest, type InvoiceDoc, type RefundView, type TripDetail, type TripPayment, type TripPaymentItem,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -217,6 +217,7 @@ export function toRefundView(g: GroupRow): RefundView {
     provider: g.provider, card: g.card, anyway: g.anyway, reject: g.stage === "rejected" ? g.reject : null, alt: g.stage === "rejected" ? g.alt : null, law: g.law, airline: g.airline,
     cancelledInstalments: g.cancelledCount ? { count: g.cancelledCount, amount: SAR(g.cancelledAmount) } : null,
     expectedBy: g.expectedBy?.toISOString() ?? null, sentAt: g.sentAt?.toISOString() ?? null, createdAt: g.createdAt.toISOString(), updatedAt: g.updatedAt.toISOString(),
+    result: refundResult({ stage: g.stage === "withdrawn" ? "rejected" : g.stage, withdrawn: g.stage === "withdrawn", destination: g.destination, amount: SAR(g.amount), reject: g.reject, expectedBy: g.expectedBy?.toISOString() ?? null, airline: g.airline, updatedAt: g.updatedAt.toISOString(), tripId: g.tripId }),
   };
 }
 

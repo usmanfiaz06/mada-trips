@@ -24,6 +24,8 @@ import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
 import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
 import { flightQuoteOf } from "@/lib/app/booking/flight-requests";
 import { ActivityCard } from "@/components/desk/activity";
+import { OutcomeCard } from "@/components/desk/outcome";
+import { progressOfRequest, resultOfRequest } from "@/lib/app/outcomes";
 
 export const metadata = { title: "Request · Desk" };
 
@@ -147,6 +149,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               </ActionForm>
             </Card>
           )}
+          <OutcomeCard requestId={r.id} act={act} open={!closed} result={closed ? resultOfRequest(r) : null} progress={progressOfRequest(r)} t={t} />
           {act && !closed && (
             <Card>
               <CardHead title={t("Ask or finish")} />
