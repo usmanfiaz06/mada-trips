@@ -305,6 +305,8 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     stayFacts[st!.id] = {
       addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel ? null : "+90 212 000 0000", fromAirport: "45 min",
       roomType: hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ?? null,
+      // What the traveller asked the hotel for on the order sheet (the stay repeats it; the desk and the supplier got it).
+      requests: (o.draft as { requests?: StayFacts["requests"] }).requests ?? null,
     };
   }
   if (f && lines.some((l) => l.key === "pickup")) {
@@ -313,8 +315,6 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     const [home] = await tx.insert(appPickups).values({
       tripId, direction: "to_airport", at: toAt, driverName: SV_DRIVER.home.driver, car: n > 3 ? "Black GMC Yukon" : "Grey Lexus ES", plate: null, meetingPoint: null,
       phone: SV_DRIVER.home.phone, price: f.back ? Math.round(pickupPrice / 2) : pickupPrice, status: "booked",
-      // What the traveller asked the hotel for on the order sheet (the stay repeats it; the desk and the supplier got it).
-      requests: (o.draft as { requests?: StayFacts["requests"] }).requests ?? null,
     }).returning({ id: appPickups.id });
     pickupFacts[home!.id] = { room: n > 3 ? "room for 8 bags" : "room for 4 bags", waits: SV_DRIVER.home.waits, offsetMin: -155, city: "Riyadh" };
     if (f.back) {
