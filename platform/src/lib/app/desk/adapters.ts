@@ -18,6 +18,7 @@ import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type
 import { isFlightAsk } from "@/lib/app/booking/flight-requests";
 import { contactOf } from "./flight-quotes";
 import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
+import { withCopy } from "@/lib/app/notify-copy";
 
 /*
  * Thin adapters for the desk. They read and write the M0 app_ tables directly, so the desk works today.
@@ -56,7 +57,8 @@ export const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 
 async function notify(tx: Tx, userId: string, n: { kind: string; level: "time_sensitive" | "active" | "passive"; title: CopyKey; body: CopyKey; vars?: Vars; href?: string | null; data?: Record<string, unknown> }) {
   const locale = await localeOfUser(userId, tx);
   await tx.insert(appNotifications).values({
-    userId, kind: n.kind, level: n.level, title: clip(copy(n.title, n.vars, locale), 32), body: clip(copy(n.body, n.vars, locale), 90), href: n.href ?? null, data: n.data ?? null,
+    userId, kind: n.kind, level: n.level, title: clip(copy(n.title, n.vars, locale), 32), body: clip(copy(n.body, n.vars, locale), 90), href: n.href ?? null,
+    data: withCopy(n.data, { title: [n.title, n.vars], body: [n.body, n.vars] }),
   });
 }
 
@@ -397,6 +399,7 @@ async function issueTicketsHere(actor: DeskActor, id: string, v: { pnr: string; 
       userId: r.ownerId, kind: "booking_confirmed", level: "active",
       title: clip(trip ? copy("notify.confirmed.title", { city: trip.city }) : copy("actor.confirmed", { agent: me.name }), 32),
       body: clip(copy("notify.confirmed.body", { agent: me.name, ref: pnr }), 90), href: r.tripId ? `/trips/${r.tripId}` : `/requests/${id}`,
+      data: withCopy(null, { title: trip ? ["notify.confirmed.title", { city: trip.city }] : ["actor.confirmed", { agent: me.name }], body: ["notify.confirmed.body", { agent: me.name, ref: pnr }] }),
     });
     await deskAudit(tx, actor, { action: "desk.order.issued", entityType: "request", entityId: id, ref: shortRef(id, "O"),
       summary: `Issued ${tickets.length || "the"} ticket${tickets.length === 1 ? "" : "s"} for ${shortRef(id, "O")} · PNR ${pnr} · captured ${sarText(pay.amount)}`, data: { pnr, tickets, paymentId: pay.id } });

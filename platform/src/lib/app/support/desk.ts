@@ -8,6 +8,7 @@ import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { getFile, readFileBytes } from "../documents/storage";
 import { sharedDocuments } from "../documents";
+import { withCopy } from "../notify-copy";
 import { threadMessages, toMessage } from "./threads";
 
 /*
@@ -85,7 +86,8 @@ export async function agentReply(threadId: string, agent: DeskAgent, body: strin
     const preview = text.length > 70 ? `${text.slice(0, 69)}…` : text;
     await tx.insert(appNotifications).values({
       userId: th.userId, kind: "agent_reply", level: "active", title: t("notify.supportReply.title"),
-      body: t("notify.supportReply.body", { name: agent.name, text: preview }).slice(0, 90), href: `/support/${threadId}`, data: { threadId },
+      body: t("notify.supportReply.body", { name: agent.name, text: preview }).slice(0, 90), href: `/support/${threadId}`,
+      data: withCopy({ threadId }, { title: ["notify.supportReply.title"], body: ["notify.supportReply.body", { name: agent.name, text: preview }] }),
     });
     await appAuditLog(tx, { actorKind: "agent", actorId: agent.opsUserId, action: "support.agent_replied", entityType: "app_support_thread", entityId: threadId, summary: `${agent.name} replied` });
     return m!;

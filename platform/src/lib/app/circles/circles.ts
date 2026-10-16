@@ -11,6 +11,7 @@ import { appCircleMembers, appCircles, appMessages, appNotifications, appTrips, 
 import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitShares, appCircleVotes, appBlocks, appFriendships } from "@/db/app-schema-circles";
 import { appAuditLog, auditInsert } from "../audit";
 import { atOnce } from "../batch";
+import { withCopy } from "../notify-copy";
 import { AppError } from "../http";
 import { coverColumns, coverFor, dropReplacedUpload, settleCovers, settled } from "./covers";
 import { err, graphOf, liveUser, peopleByIds, relationOf, tripLine, type Db } from "./common";
@@ -297,8 +298,9 @@ function invitesWrites(circleId: string, circleName: string, userIds: string[], 
       const l = ctx.locales.find((x) => x.id === u)?.locale ?? "en";
       const locale = isLocale(l) ? l : "en";
       return {
-        userId: u, kind: "circle.invite", level: "passive", href: "/circles", data: { circleId },
+        userId: u, kind: "circle.invite", level: "passive", href: "/circles",
         title: t("notify.circles.invite.title", { name: ctx.inviter.short }, locale).slice(0, 64), body: t("notify.circles.invite.body", { circle: circleName }, locale),
+        data: withCopy({ circleId }, { title: ["notify.circles.invite.title", { name: ctx.inviter.short }], body: ["notify.circles.invite.body", { circle: circleName }] }),
       };
     })),
   ];

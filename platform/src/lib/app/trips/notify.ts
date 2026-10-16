@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { appNotifications } from "@/db/app-schema";
 import { pushToUser } from "../push";
 import { localeOfUser } from "../locale";
+import { withCopy } from "../notify-copy";
 import type { Exec } from "./core";
 
 /*
@@ -20,7 +21,8 @@ export async function notify(userId: string, n: { kind: NotifyKind; level: "time
   const locale = await localeOfUser(userId, tx);
   const title = t(`${n.copy}.title` as CopyKey, n.vars, locale).slice(0, 32);
   const body = t(`${n.copy}.body` as CopyKey, n.vars, locale).slice(0, 90);
-  const [row] = await tx.insert(appNotifications).values({ userId, kind: n.kind, level: n.level, title, body, href: n.href ?? null, data: n.data ?? null }).returning({ id: appNotifications.id });
+  const copy = { title: [`${n.copy}.title` as CopyKey, n.vars] as [CopyKey, Vars?], body: [`${n.copy}.body` as CopyKey, n.vars] as [CopyKey, Vars?] };
+  const [row] = await tx.insert(appNotifications).values({ userId, kind: n.kind, level: n.level, title, body, href: n.href ?? null, data: withCopy(n.data, copy) }).returning({ id: appNotifications.id });
   // Quiet hours and the notification budget are applied by the sender later (SCOPE.md §7); passive ones never push.
   if (n.level !== "passive") {
     void pushToUser(userId, { title, body, data: { href: n.href ?? null, id: row!.id }, timeSensitive: n.level === "time_sensitive" })

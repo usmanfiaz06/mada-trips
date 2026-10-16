@@ -226,4 +226,6 @@ export const wordsCopy = {
   'pl.istanbul3.2.0.note': 'No cars on the islands, only bikes and carriages.',
   'pl.istanbul3.2.1.title': 'Künefe near Galata Tower',
   'pl.istanbul3.2.1.note': 'Noor’s tip: go before 8 in the evening.',
+  // An airport pickup priced from Hotelbeds (booking/requests.ts quoteFor).
+  'dq.transfer.allIn': '{vehicle}, all in.',
 } as const;

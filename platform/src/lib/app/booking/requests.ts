@@ -1,13 +1,14 @@
 import "server-only";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, sarToHalalas, t,
-  type BookingRequestView, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestQuote, type ThreadMessage,
+  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, requestTitle, sarToHalalas, t,
+  type BookingRequestView, type CopyKey, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestQuote, type ThreadMessage,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appNotifications, appQuotes, appRequests } from "@/db/app-schema";
 import { appAuditLog } from "../audit";
 import { messageAttachment } from "../file-links";
+import { withCopy, type VarRef } from "../notify-copy";
 import { AppError } from "../http";
 import { agentFor, autopilotOn, isUuid, today, travellersOf } from "./common";
 import { flightQuoteOf, flightSummary, flightTitle, isFlightAsk, isFlightRequest, type FlightSearch } from "./flight-requests";
@@ -28,10 +29,39 @@ export type AskDetails = {
   flightRequest?: boolean;
   // Read by Trips → Requests (lib/app/trips/requests.ts): one line, and the quote once there is one.
   short?: string; quote?: number | null; quoteText?: string | null; withWhom?: "faisal";
+  // A service title as its copy key and parameters, so it reads in the reader's language (readTitle).
+  titleCopy?: [string, Record<string, string>] | null;
 };
 
 const M0_KIND: Record<string, string> = { visa: "visa", umrah: "umrah", car: "car", food: "restaurant", todo: "activity", flight: "flight", stay: "stay", general: "general" };
 const SHORT: Record<string, string> = { visa: "visa", umrah: "Umrah trip", car: "car", food: "table", todo: "plans", flight: "flights", stay: "rooms", general: "request" };
+// "your table", "your flights": the thing the desk replied about, as a copy key so it reads in the reader's language.
+const WHAT: Record<string, string> = { visa: "visa", umrah: "umrah", car: "car", food: "table", todo: "plans", flight: "flights", stay: "rooms", general: "request" };
+export const whatKey = (kind: string | undefined) => `td.req.what.${WHAT[kind ?? "general"] ?? "request"}` as CopyKey;
+
+/** The title of a search by hand: the city and the dates, in the reader's language. */
+function searchTitle(kind: string, s: NonNullable<CreateRequestInput["search"]>): string {
+  const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || "";
+  const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
+  return kind === "stay" ? t("request.title.staysIn", { city }) : s.carrier ? t("request.title.airlineByHand", { airline: s.carrier === "SV" ? "Saudia" : s.carrier, city, dates }) : t("request.title.flightsTo", { city, dates });
+}
+
+/**
+ * A request's title in the reader's language, worded from what was asked (a service's key, a search's city and
+ * dates, the form's answers) rather than the words stored when it was sent; undefined for rows without those parts.
+ */
+export function readTitle(d: Partial<AskDetails>): string | undefined {
+  if (d.titleCopy) return t(d.titleCopy[0] as CopyKey, d.titleCopy[1]);
+  if ((d as { transfer?: unknown }).transfer) return undefined;
+  if (d.search && d.askKind && !d.service) return searchTitle(d.askKind, d.search);
+  if (d.source === "ask" && d.askKind && d.answers && typeof d.query === "string" && !d.service) return requestTitle(d.askKind, d.answers, d.query);
+  return undefined;
+}
+
+/** "table", "flights": the short name of what was asked, in the reader's language. */
+export const readShort = (d: Partial<AskDetails>) => (d.service ? readTitle(d) ?? d.short ?? "" : t(whatKey(d.askKind)));
+/** The same, as a parameter an inbox line renders when read. */
+const whatRef = (d: Partial<AskDetails>): VarRef => (d.service && d.titleCopy ? { k: d.titleCopy[0] as CopyKey, v: d.titleCopy[1] } : { k: whatKey(d.askKind) });
 
 const VIEW_STATUS: Record<string, BookingRequestView["status"]> = {
   queued: "queued", sent: "sent", reviewing: "reviewing", needs_answer: "reviewing", quoted: "quoted", awaiting_payment: "quoted", with_agent: "paid", confirmed: "paid", done: "done", cancelled: "cancelled",
@@ -52,7 +82,7 @@ export function requestView(r: RequestRow, q?: typeof appQuotes.$inferSelect): B
   const flight = isFlightAsk(d) && d.search ? d.search as FlightSearch : null;
   return {
     id: r.id, kind: (d.askKind ?? "general") as BookingRequestView["kind"], status: VIEW_STATUS[r.status] ?? "sent",
-    title: flight ? flightTitle(flight) : d.title ?? r.summary, summary: flight && d.flightRequest ? flightSummary(flight, r.travellerIds.length) : d.summaryLine ?? "",
+    title: flight ? flightTitle(flight) : readTitle(d) ?? d.title ?? r.summary, summary: flight && d.flightRequest ? flightSummary(flight, r.travellerIds.length) : d.summaryLine ?? "",
     detail: d.detail ?? "", note: d.note ?? null, travellerIds: r.travellerIds, agent: r.agentName ? { name: r.agentName } : null, quote: quoteView(q),
     promisedBy: r.promisedBy?.toISOString() ?? null, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
@@ -85,20 +115,22 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   const summaryLine = words.summary;
   let title = words.title;
   let detail = words.detail;
+  let titleCopy: [string, Record<string, string>] | null = null;
   // Every price, quote or set of options found by hand: within 2 hours, as the app promises (copy/words.ts).
   const promisedMin = 120;
   if (b.service) {
     const who = b.serviceFor?.personId ? travellers.find((p) => p.id === b.serviceFor!.personId) ?? null : null;
     const name = who ? personName(who) : "";
     const dest = b.serviceFor?.destination ? DESTINATIONS[b.serviceFor.destination] : null;
-    title = b.service === "uk_eta" ? t("request.title.eta") : b.service === "evisa" ? t("request.title.evisa", { need: b.serviceFor?.need ?? "Visa", name })
-      : b.service === "reentry" ? t("request.title.reentry", { name }) : t("request.title.renewal", { name });
+    const ref: [CopyKey, Record<string, string>] = b.service === "uk_eta" ? ["request.title.eta", {}] : b.service === "evisa" ? ["request.title.evisa", { need: b.serviceFor?.need ?? "Visa", name }]
+      : b.service === "reentry" ? ["request.title.reentry", { name }] : ["request.title.renewal", { name }];
+    titleCopy = ref;
+    title = t(ref[0], ref[1]);
     detail = [dest ? dest.name : "", names(travellers)].filter(Boolean).join(" · ");
   } else if (b.search) {
     const s = b.search;
-    const city = (s.destination && DESTINATIONS[s.destination]?.name) || s.destinationName || "";
     const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
-    title = b.kind === "stay" ? t("request.title.staysIn", { city }) : s.carrier ? t("request.title.airlineByHand", { airline: s.carrier === "SV" ? "Saudia" : s.carrier, city, dates }) : t("request.title.flightsTo", { city, dates });
+    title = searchTitle(b.kind, s);
     detail = b.kind === "stay" ? `${dates} · ${names(travellers)}` : `${t("dq.from", { from: s.from ?? "RUH" })} · ${names(travellers)}${s.cabin ? ` · ${t(`cal.cabin.${s.cabin}` as never)}` : ""}`;
   }
   const agentName = await agentFor(ownerId);
@@ -107,7 +139,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   const details: AskDetails = {
     source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: words.note, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
-    short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal",
+    short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal", titleCopy,
   };
   const r = await db.transaction(async (tx) => {
     const [row] = await tx.insert(appRequests).values({
@@ -126,13 +158,13 @@ async function quoteFor(r: RequestRow): Promise<{ total: number; snapshot: Recor
   const d = r.details as AskDetails;
   // An airport pickup picked from Hotelbeds: the price is the one the traveller saw (suppliers/hotelbeds).
   const tr = (r.details as { transfer?: { total: number; vehicle: string } }).transfer;
-  if (tr) return { total: tr.total, snapshot: { source: "hotelbeds-transfer", breakdown: [], text: `${tr.vehicle}, all in.`, lead: null, needLines: [] }, lines: [{ label: d.title, amount: tr.total, kind: "service" }] };
+  if (tr) return { total: tr.total, snapshot: { source: "hotelbeds-transfer", breakdown: [], text: t("dq.transfer.allIn", { vehicle: tr.vehicle }), lead: null, needLines: [] }, lines: [{ label: d.title, amount: tr.total, kind: "service" }] };
   const travellers = r.travellerIds.length ? await travellersOf(r.ownerId, r.travellerIds) : [];
   let byHand: { ppSar: number; text: string; cabin: "economy" | "premium" | "business"; oneway: boolean } | null = null;
   if (d.search && d.askKind === "flight") {
     const dest = d.search.destination ? DESTINATIONS[d.search.destination] : null;
     const sv = d.search.carrier === "SV" && dest ? CATALOGUE_FLIGHTS[dest.key]?.find((f) => f.carrier === "SV") : null;
-    const hand = sv ? { ppSar: sv.ppSar, text: `Saudia ${sv.number}, direct, leaving ${sv.dep}` } : dest?.byHand ?? OTHER_CITY_BY_HAND;
+    const hand = sv ? { ppSar: sv.ppSar, text: t("dq.hand.sv", { flight: sv.number, time: sv.dep }) } : dest?.byHand ?? OTHER_CITY_BY_HAND;
     byHand = { ...hand, cabin: (d.search.cabin === "first" ? "business" : d.search.cabin) ?? "economy", oneway: !d.search.return };
   }
   const q = deskQuote({ kind: d.askKind, answers: d.answers, travellers, needs: d.needs, note: d.note ?? "", today: today(), service: d.service ?? null, serviceNeed: d.serviceFor?.need ?? null, byHand });
@@ -180,7 +212,8 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
         }
         await tx.insert(appNotifications).values({
           userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),
-          body: t("notify.replied.body", { agent: cur.agentName ?? "Mada", what: d.short ?? "request" }).slice(0, 90), href: `/ask/request/${r.id}`, data: { requestId: r.id },
+          body: t("notify.replied.body", { agent: cur.agentName ?? "Mada", what: readShort(d) }).slice(0, 90), href: `/ask/request/${r.id}`,
+          data: withCopy({ requestId: r.id }, { title: ["notify.replied.title"], body: ["notify.replied.body", { agent: cur.agentName ?? "Mada", what: whatRef(d) }] }),
         });
       });
     }
@@ -267,6 +300,9 @@ export async function getQuote(ownerId: string, quoteId: string): Promise<Reques
 }
 
 const NEAR = "Room steps from the Haram";
+/** The line the offer replaces, as the desk wrote it (dq.umrah.near, in the traveller's language or in English). */
+const isNear = (label: string) => label === NEAR || label === t("dq.umrah.near");
+const isLap = (label: string) => /^On a lap/.test(label) || label.startsWith(t("dq.umrah.lap"));
 
 /** "Switch it": the agent's offer in the thread replaces the room on everyone's line, and the total follows. */
 export async function acceptThreadOffer(ownerId: string, quoteId: string, messageId: string): Promise<{ request: BookingRequestView; messages: ThreadMessage[] }> {
@@ -278,20 +314,20 @@ export async function acceptThreadOffer(ownerId: string, quoteId: string, messag
   const offer = card.offer;
   const snap = (q.offerSnapshot ?? {}) as { breakdown?: RequestQuote["breakdown"]; text?: string; lead?: string | null; needLines?: string[] };
   const breakdown = (snap.breakdown ?? []).map((b) => {
-    if (/^On a lap/.test(b.lines[0]?.label ?? "")) return b;
-    const had = b.lines.find((l) => l.label === NEAR);
-    return { ...b, lines: [...b.lines.filter((l) => l.label !== NEAR), { label: offer.label, amount: offer.perPerson + (had?.amount ?? 0) }] };
+    if (isLap(b.lines[0]?.label ?? "")) return b;
+    const had = b.lines.find((l) => isNear(l.label));
+    return { ...b, lines: [...b.lines.filter((l) => !isNear(l.label)), { label: offer.label, amount: offer.perPerson + (had?.amount ?? 0) }] };
   });
   const total = breakdown.length ? breakdown.reduce((a, b) => a + b.lines.reduce((x, l) => x + l.amount, 0), 0) : q.total + offer.perPerson * Math.max(1, r.travellerIds.length);
   const fmt = (h: number) => Math.round(h / 100).toLocaleString("en-US");
   await db.transaction(async (tx) => {
     await tx.update(appQuotes).set({
       total, lines: breakdown.flatMap((b) => b.lines.map((l) => ({ label: `${b.name}: ${l.label}`, amount: l.amount, kind: "service" }))),
-      offerSnapshot: { ...snap, breakdown, text: `${snap.text ?? ""} Now at the King Abdulaziz Gate, 2 minutes’ walk to the Haram. New total SAR ${fmt(total)}.`, lead: snap.lead ? `${snap.lead} Now at the King Abdulaziz Gate, 2 minutes’ walk to the Haram.` : null },
+      offerSnapshot: { ...snap, breakdown, text: `${snap.text ?? ""} ${t("dq.offer.quoteAdd")} ${t("dq.offer.newTotal", { price: `SAR ${fmt(total)}` })}`.trim(), lead: snap.lead ? `${snap.lead} ${t("dq.offer.quoteAdd")}` : null },
     }).where(eq(appQuotes.id, q.id));
     await tx.update(appMessages).set({ card: { offer: { ...offer, accepted: true } } }).where(eq(appMessages.id, m.id));
     await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "user", authorUserId: ownerId, body: t("request.switchYes") });
-    await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: r.agentName, body: `Done. You’re at the King Abdulaziz Gate. New total SAR ${fmt(total)}. Pay when you’re ready.`, createdAt: new Date(Date.now() + 5) });
+    await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: r.agentName, body: t("dq.offer.done", { price: `SAR ${fmt(total)}` }), createdAt: new Date(Date.now() + 5) });
     await tx.update(appRequests).set({ details: { ...(r.details as AskDetails), quote: total }, updatedAt: new Date() }).where(eq(appRequests.id, r.id));
     await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "quote.offer_accepted", entityType: "app_quote", entityId: q.id, summary: `Accepted ${offer.label}; new total ${total} halalas` });
   });
@@ -321,7 +357,8 @@ async function mockFlightQuote(r: RequestRow, now: number): Promise<void> {
     await tx.insert(appMessages).values({ threadKind: "request", threadId: r.id, authorKind: "agent", authorName: cur.agentName, body: lead, card: { quoteId: q!.id, flight: true } });
     await tx.insert(appNotifications).values({
       userId: r.ownerId, kind: "agent_reply", level: "active", title: t("notify.replied.title").slice(0, 32),
-      body: t("notify.replied.body", { agent: cur.agentName ?? "Mada", what: d.short ?? "flights" }).slice(0, 90), href: `/ask/request/${r.id}`, data: { requestId: r.id },
+      body: t("notify.replied.body", { agent: cur.agentName ?? "Mada", what: readShort(d) }).slice(0, 90), href: `/ask/request/${r.id}`,
+      data: withCopy({ requestId: r.id }, { title: ["notify.replied.title"], body: ["notify.replied.body", { agent: cur.agentName ?? "Mada", what: whatRef(d) }] }),
     });
   });
 }

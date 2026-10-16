@@ -228,4 +228,5 @@ export const arWords: ArSection<typeof wordsCopy> = {
   'pl.istanbul3.2.0.note': 'لا سيارات في الجزر، فقط دراجات وعربات خيل.',
   'pl.istanbul3.2.1.title': 'كنافة قرب برج غلطة',
   'pl.istanbul3.2.1.note': 'نصيحة نور: روح قبل 8 المساء.',
+  'dq.transfer.allIn': '{vehicle}، شامل كل شي.',
 };

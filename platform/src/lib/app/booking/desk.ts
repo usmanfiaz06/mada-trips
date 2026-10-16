@@ -9,6 +9,7 @@ import { appNotifications, appPayments, appPickups, appQuotes, appRequests, appS
 import { appOrderEvents, appOrders, appTripBookings } from "@/db/app-schema-booking";
 import { appTripCharges, appTripFacts, type StayFacts } from "@/db/app-schema-trips";
 import { appAuditLog } from "../audit";
+import { withCopy } from "../notify-copy";
 import { addCredit } from "../credit";
 import { AppError } from "../http";
 import { AIRPORT_TZ } from "../suppliers/mock/data";
@@ -200,7 +201,7 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
       await tx.insert(appNotifications).values({
         userId: o.ownerId, kind: "booking_confirmed", level: "active",
         title: t("notify.confirmed.title", { city }).slice(0, 32), body: t("notify.confirmed.body", { agent: agent.name, ref }).slice(0, 90),
-        href: tripId ? `/trips/${tripId}` : "/trips", data: { orderId: o.id, ref },
+        href: tripId ? `/trips/${tripId}` : "/trips", data: withCopy({ orderId: o.id, ref }, { title: ["notify.confirmed.title", { city }], body: ["notify.confirmed.body", { agent: agent.name, ref }] }),
       });
     }
     await orderEvent(tx, o.id, "confirmed", { kind: "agent", name: agent.name }, { ref });

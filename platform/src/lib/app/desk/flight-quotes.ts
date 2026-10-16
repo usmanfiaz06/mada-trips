@@ -7,6 +7,7 @@ import { appMessages, appNotifications, appQuotes, appRequests, appUsers } from 
 import { appAgents } from "@/db/app-schema-desk";
 import { isFlightAsk } from "@/lib/app/booking/flight-requests";
 import { inRequestOwnerLocale, localeOfUser } from "@/lib/app/locale";
+import { withCopy } from "@/lib/app/notify-copy";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, type DeskActor } from "./core";
 
 /*
@@ -63,7 +64,7 @@ async function agentName(tx: Tx | typeof db, actor: DeskActor) {
 async function notify(tx: Tx, userId: string, n: { title: CopyKey; body: CopyKey; vars?: Vars; href: string }) {
   const locale = await localeOfUser(userId, tx);
   const clip = (s: string, k: number) => (s.length > k ? `${s.slice(0, k - 1)}…` : s);
-  await tx.insert(appNotifications).values({ userId, kind: "agent_reply", level: "active", title: clip(copy(n.title, n.vars, locale), 32), body: clip(copy(n.body, n.vars, locale), 90), href: n.href });
+  await tx.insert(appNotifications).values({ userId, kind: "agent_reply", level: "active", title: clip(copy(n.title, n.vars, locale), 32), body: clip(copy(n.body, n.vars, locale), 90), href: n.href, data: withCopy(null, { title: [n.title, n.vars], body: [n.body, n.vars] }) });
 }
 
 /** Check the builder's options and make them the shape the app reads. Totals are always added up here. */

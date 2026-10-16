@@ -6,24 +6,32 @@ import { appDevices, appNotifications } from "@/db/app-schema";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { isExpoToken } from "../push";
+import { localeOfUser } from "../locale";
+import { renderNotification } from "../notify-copy";
+import type { Lang } from "@mada/shared";
 
 /* The inbox (the bell on Today) and the phones that receive pushes. */
 
 type Row = typeof appNotifications.$inferSelect;
-const toView = (n: Row): Notification => ({
-  // A kind this build doesn't know reads as 'other', so one new kind never breaks an older phone's whole inbox.
-  id: n.id, kind: NotificationKind.safeParse(n.kind).success ? (n.kind as Notification["kind"]) : "other", level: n.level as Notification["level"], title: n.title.slice(0, 32), body: n.body.slice(0, 90),
-  href: n.href, readAt: n.readAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString(),
-});
+const toView = (n: Row, locale: Lang): Notification => {
+  // The words in the reader's language now (notify-copy.ts), not the one they had when the line was written.
+  const words = renderNotification(n, locale);
+  return {
+    // A kind this build doesn't know reads as 'other', so one new kind never breaks an older phone's whole inbox.
+    id: n.id, kind: NotificationKind.safeParse(n.kind).success ? (n.kind as Notification["kind"]) : "other", level: n.level as Notification["level"], title: words.title.slice(0, 32), body: words.body.slice(0, 90),
+    href: n.href, readAt: n.readAt?.toISOString() ?? null, createdAt: n.createdAt.toISOString(),
+  };
+};
 
 export async function listNotifications(userId: string, before: string | null, limit = 30) {
   const where = before ? and(eq(appNotifications.userId, userId), lt(appNotifications.createdAt, new Date(before))) : eq(appNotifications.userId, userId);
   // The page and the unread count side by side (each query is a round trip).
-  const [rows, [unread]] = await Promise.all([
+  const [rows, [unread], locale] = await Promise.all([
     db.select().from(appNotifications).where(where).orderBy(desc(appNotifications.createdAt)).limit(limit + 1),
     db.select({ n: count() }).from(appNotifications).where(and(eq(appNotifications.userId, userId), isNull(appNotifications.readAt))),
+    localeOfUser(userId),
   ]);
-  const items = rows.slice(0, limit).map(toView);
+  const items = rows.slice(0, limit).map((r) => toView(r, locale));
   return { items, next: rows.length > limit ? items[items.length - 1]!.createdAt : null, unread: unread?.n ?? 0 };
 }
 
@@ -41,7 +49,7 @@ export async function markOne(userId: string, id: string, read: boolean): Promis
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new AppError("NOT_FOUND");
   const [row] = await db.update(appNotifications).set({ readAt: read ? new Date() : null }).where(and(eq(appNotifications.id, id), eq(appNotifications.userId, userId))).returning();
   if (!row) throw new AppError("NOT_FOUND");
-  return toView(row);
+  return toView(row, await localeOfUser(userId));
 }
 
 /** Registers this phone's Expo push token. A token moves to whoever signed in on that phone last. */

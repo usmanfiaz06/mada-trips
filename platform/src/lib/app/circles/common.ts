@@ -8,6 +8,7 @@ import { appBlocks, appFollows, appFriendships } from "@/db/app-schema-circles";
 import { AppError, resilient, type RouteOptions } from "../http";
 import { localeOfUser } from "../locale";
 import { pushToUser } from "../push";
+import { withCopy } from "../notify-copy";
 
 /* Helpers every circles module shares: people as others see them, who knows whom, blocks, limits, and routes. */
 
@@ -178,7 +179,7 @@ export function notifyWrite(tx: Db, userId: string, kind: string, title: [CopyKe
   const tt = t(title[0], title[1], opts.locale).slice(0, 64);
   const bb = t(body[0], body[1], opts.locale);
   return {
-    write: tx.insert(appNotifications).values({ id, userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data }),
+    write: tx.insert(appNotifications).values({ id, userId, kind, level: opts.push ? "active" : "passive", title: tt, body: bb, href, data: withCopy(data, { title, body }) }),
     push: async () => {
       if (!opts.push) return;
       try {
