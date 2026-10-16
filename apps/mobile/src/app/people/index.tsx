@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { checkSaudiMobile, contactHash, type FriendView, type SearchHit } from '@mada/shared';
@@ -116,13 +116,16 @@ export default function People() {
         )) : null}
 
         {tab === 'requests' && f ? (f.requests.length ? f.requests.map((x) => (
-          <View key={x.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 18, backgroundColor: colors.paper }}>
-            <Face p={x} />
+          <View key={x.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 12, borderRadius: 18, backgroundColor: colors.paper }} testID="request-row">
+            {/* The face and name open the profile (trips, places, tips) so you can see who is asking before you say yes. */}
+            <Pressable accessibilityRole="button" accessibilityLabel={t('circles.people.requestOpenA11y', { name: x.short })} onPress={() => { buzz('tap'); router.push(`/friend/${x.id}`); }} testID="request-open"><Face p={x} /></Pressable>
             <View style={{ flex: 1, gap: 6 }}>
-              <View><T v="h3" style={{ fontSize: 15 }}>{x.name}</T><T v="tiny">{t('circles.people.requestSub', { trips: x.trips, mutual: x.mutual })}</T></View>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('circles.people.requestOpenA11y', { name: x.short })} onPress={() => { buzz('tap'); router.push(`/friend/${x.id}`); }}>
+                <T v="h3" style={{ fontSize: 15 }}>{x.name}</T><T v="tiny">{t('circles.people.requestSub', { trips: x.trips, mutual: x.mutual })} · {t('circles.people.requestOpen')}</T>
+              </Pressable>
               <Row gap={8} wrap>
                 <Button size="small" block={false} label={t('circles.people.accept')} haptic="success" onPress={() => accept.mutate(x.id, { onSuccess: () => toast(t('circles.people.friendsNow', { name: x.short })) })} testID="request-accept" />
-                <Button size="small" block={false} variant="secondary" label={t('circles.people.decline')} onPress={() => decline.mutate(x.id, { onSuccess: () => toast(t('circles.people.declined', { name: x.short })) })} />
+                <Button size="small" block={false} variant="secondary" label={t('circles.people.decline')} onPress={() => decline.mutate(x.id, { onSuccess: () => toast(t('circles.people.declined', { name: x.short })) })} testID="request-decline" />
                 <Button size="small" block={false} variant="ghost" color={colors.badInk} label={t('circles.people.block')} onPress={() => block.mutate(x.id, { onSuccess: () => toast(t('circles.people.blocked', { name: x.short })) })} />
               </Row>
             </View>

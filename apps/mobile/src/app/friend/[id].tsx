@@ -70,9 +70,13 @@ export default function Friend() {
           {p.isFriend ? <Button size="small" block={false} label={t('circles.friend.message')} testID="friend-message" onPress={() => dm.mutate(undefined, { onSuccess: (r) => router.push(`/circle/${r.circleId}`), onError: fail })} /> : (<>
             <Button size="small" block={false} variant={p.following ? 'secondary' : 'primary'} label={p.following ? t('circles.friend.following') : t('circles.friend.follow')} testID="friend-follow"
               onPress={() => follow.mutate(undefined, { onSuccess: () => { buzz('select'); toast(p.following ? t('circles.friend.unfollowToast', { name: f.short }) : t('circles.friend.followToast', { name: f.short })); } })} />
-            {p.askedMe
-              ? <Button size="small" block={false} variant="secondary" label={t('circles.friend.acceptRequest')} onPress={() => accept.mutate(undefined, { onSuccess: () => toast(t('circles.people.friendsNow', { name: f.short })) })} />
-              : <Button size="small" block={false} variant="secondary" disabled={p.asked} label={p.asked ? t('circles.friend.asked') : t('circles.friend.add')} testID="friend-add"
+            {p.askedMe ? (<>
+              <Button size="small" block={false} label={t('circles.friend.acceptRequest')} testID="friend-accept" onPress={() => accept.mutate(undefined, { onSuccess: () => toast(t('circles.people.friendsNow', { name: f.short })) })} />
+              <Button size="small" block={false} variant="secondary" label={t('circles.people.decline')} testID="friend-decline" onPress={() => remove.mutate(undefined, { onSuccess: () => { toast(t('circles.people.declined', { name: f.short })); router.back(); } })} />
+            </>) : p.asked ? (
+              // Your own request, until they answer: take it back (nobody is told).
+              <Button size="small" block={false} variant="secondary" label={t('circles.friend.takeBack')} testID="friend-take-back" onPress={() => remove.mutate(undefined, { onSuccess: () => toast(t('circles.friend.tookBack', { name: f.short })), onError: fail })} />
+            ) : <Button size="small" block={false} variant="secondary" label={t('circles.friend.add')} testID="friend-add"
                 onPress={() => add.mutate(undefined, { onSuccess: () => toast(t('circles.friend.askedToast', { name: f.short })), onError: fail })} />}
           </>)}
           {p.isFriend ? <Button size="small" block={false} variant="secondary" label={t('circles.friend.planTogether')} onPress={() => router.push({ pathname: '/circle/new', params: { with: id } })} /> : null}

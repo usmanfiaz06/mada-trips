@@ -351,7 +351,7 @@ async function demo() {
   await see('Accept friend request', 'profile before accepting');
   await byTest('friend-decline').waitFor({ state: 'visible', timeout: 4000 });
   await shot('people-request-profile');
-  await page.goBack();
+  await page.getByRole('button', { name: /^Back$/ }).first().click();
   await page.waitForTimeout(600);
   await page.getByRole('tab', { name: /Requests/ }).click().catch(() => {});
   await byTest('request-accept').click();
