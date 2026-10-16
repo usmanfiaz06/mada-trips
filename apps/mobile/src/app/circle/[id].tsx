@@ -254,6 +254,7 @@ export default function CircleChat() {
                 </Pressable>
                 {reacting === m.id ? <ReactionBar mine={who.kind === 'me'} onPick={(e) => toggle(m.id, e, !(m.reactions.find((r) => r.emoji === e)?.ids.includes(me)))} onClose={() => setReacting(null)} /> : null}
                 <Reactions list={m.reactions} me={me} mine={who.kind === 'me'} people={people} onToggle={(e, yes) => toggle(m.id, e, yes)} />
+                {m.held ? <T style={[st.seen, { color: m.held.status === 'removed' ? colors.badInk : colors.ink3 }]} testID="chat-held">{m.held.why}</T> : null}
                 {seen.length ? <T style={st.seen} testID="seen">{dm ? t('circles.chat.seen') : t('circles.chat.seenBy', { names: joinNames(seen) })}</T> : null}
               </View>
             );
