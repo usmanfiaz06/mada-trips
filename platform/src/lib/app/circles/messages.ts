@@ -13,6 +13,8 @@ import { AppError } from "../http";
 import { supplierMode } from "../config";
 import { suppliers } from "../suppliers";
 import { addMessage, details, isDm, memberIds, membership, sysMessage, toMessages, type MessageRow } from "./circles";
+import { screen } from "./moderation";
+import { appDeskModeration } from "@/db/app-schema-desk";
 import { assertUnder, circleTrip, err, isBlocked, notify, peopleByIds, sar, type Db } from "./common";
 
 /*
@@ -38,6 +40,8 @@ export async function listMessages(circleId: string, userId: string, q: { before
   const after = decode(q.after ?? null);
   const where = and(
     eq(appMessages.threadKind, "circle"), eq(appMessages.threadId, circleId),
+    // A line held for a person shows to its author only (sendMessage).
+    or(sql`coalesce(${appMessages.card}->>'t', '') <> 'held'`, eq(appMessages.authorUserId, userId)),
     before ? or(lt(appMessages.createdAt, before.at), and(eq(appMessages.createdAt, before.at), lt(appMessages.id, before.id))) : undefined,
     after ? or(gt(appMessages.createdAt, after.at), and(eq(appMessages.createdAt, after.at), gt(appMessages.id, after.id))) : undefined,
   );
@@ -110,6 +114,20 @@ export async function sendMessage(circleId: string, userId: string, input: SendC
     .orderBy(desc(appMessages.createdAt)).limit(1);
   const prevCard = (prev?.card ?? {}) as { t?: string; askWhere?: boolean };
   const d = await details(circleId);
+  // The check (moderation.ts screen, without the venue rule: friends name places freely). A hold is soft: the line is
+  // kept, only its author sees it with the reason, and the desk decides (app_desk_moderation, kind "message").
+  const recent = await db.select({ body: appMessages.body }).from(appMessages)
+    .where(and(eq(appMessages.threadKind, "circle"), eq(appMessages.authorUserId, userId), sql`${appMessages.createdAt} > now() - interval '1 hour'`)).orderBy(desc(appMessages.createdAt)).limit(10);
+  const flag = screen(text, { noVenue: true, recent: recent.map((r) => r.body) });
+  if (flag) {
+    const held = await db.transaction(async (tx) => {
+      const row = await addMessage(tx, circleId, { author: "user", userId, body: text, card: { t: "held", flag, status: "pending" } });
+      await tx.insert(appDeskModeration).values({ kind: "message", targetKind: "message", targetId: row.id, authorUserId: userId, note: flag, snapshot: { text: text.slice(0, 1000), name: d.dm ? "Direct message" : "Circle message" } });
+      await appAuditLog(tx, { actorKind: "system", actorId: "screen", action: "message.held", entityType: "message", entityId: row.id, summary: `A circle message held for a person (${flag})` });
+      return row;
+    });
+    return toMessages([held]);
+  }
   const toMada = /@mada\b/i.test(text) || (prevCard.t === "mada" && !!prevCard.askWhere && !d.dest && !d.dm);
   const mine = await db.transaction(async (tx) => {
     const row = await addMessage(tx, circleId, { author: "user", userId, body: text });

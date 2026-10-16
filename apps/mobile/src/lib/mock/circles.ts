@@ -1,7 +1,7 @@
 import {
   CITY_INFO, contactHash, CreateCircleRequest, CreateInviteRequest, CreatePostRequest, CreateSplitRequest, CreateVoteRequest, ERROR_CODES, EVENTS,
   HOME_CITY, LinkOptions, PLAN_SUMMARIES, REACTIONS, ReactRequest, ReportRequest, SaveRequest, SendCircleMessageRequest, UpdateCircleRequest, bookPrefill, checkSaudiMobile,
-  circleDest, inviteUrl, madaReply, maskPhone, personRef, planById, rangeLabel, shareUnits, splitAmounts, t, votePhrase,
+  circleDest, inviteUrl, madaReply, screenContent, maskPhone, personRef, planById, rangeLabel, shareUnits, splitAmounts, t, votePhrase,
   type AroundResponse, type CircleDetail, type CircleMessage, type CircleSummary, type CopyKey, type ErrorCode, type FriendView,
   type CircleCover, type IncomingInvite, type InvitePreview, type MadaAction, type PersonRef, type Post, type SavedItem, type SearchHit, type SentInvite,
   type LiveKind, type SocialRelation, type StampsResponse, type SysEvent,
@@ -24,7 +24,7 @@ type CircleRow = { id: string; name: string; createdBy: string; cover: CircleCov
 type Member = { circleId: string; userId: string; role: 'admin' | 'member'; muted: boolean; lastReadAt: number | null; joinedAt: number };
 type Invite = { id: string; kind: 'circle' | 'mada'; circleId: string | null; inviterId: string; inviteeId: string | null; phone: string | null; channel: 'app' | 'link' | 'sms' | 'whatsapp'; lookup: string | null; status: 'pending' | 'accepted' | 'declined' | 'cancelled'; acceptedBy: string | null; remindedAt: number | null; expiresAt: number; at: number; maxUses?: number | null; uses?: number };
 type Friendship = { a: string; b: string; status: 'pending' | 'accepted'; tagA: string | null; tagB: string | null; at: number; acceptedAt: number | null };
-type PostRow = { id: string; authorId: string; city: string; place: string; body: string; kind: 'food' | 'todo'; audience: 'friends' | 'everyone'; photoKey: string | null; photoUrl: string | null; status: 'pending' | 'approved' | 'rejected'; approveAt: number | null; deleted: boolean; at: number };
+type PostRow = { id: string; authorId: string; city: string; place: string; body: string; kind: 'food' | 'todo'; audience: 'friends' | 'everyone'; photoKey: string | null; photoUrl: string | null; status: 'pending' | 'approved' | 'rejected'; approveAt: number | null; deleted: boolean; at: number; flag?: string | null };
 type Person = { id: string; full: string; short: string; phone: string | null; places: number; trips: number; going: string | null; tone?: 'green' | 'gold' | 'default' };
 
 const now = () => Date.now();
@@ -244,7 +244,8 @@ function toMessage(m: Msg): CircleMessage {
   const c = (m.card ?? {}) as Card;
   const kind = (['sys', 'vote', 'split', 'card', 'mada'].includes(String(c.t)) ? c.t : m.authorKind === 'mada' ? 'mada' : 'text') as CircleMessage['kind'];
   const author: CircleMessage['author'] = m.authorKind === 'user' && m.userId ? { kind: 'user', id: m.userId, name: ref(m.userId).short } : m.authorKind === 'agent' ? { kind: 'agent', id: 'faisal', name: m.agentName ?? '', photoUrl: null } : { kind: 'mada' };
-  const out: CircleMessage = { id: m.id, circleId: m.circleId, author, body: m.body, createdAt: new Date(m.at).toISOString(), kind, sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(m.id) };
+  const out: CircleMessage = { id: m.id, circleId: m.circleId, author, body: m.body, createdAt: new Date(m.at).toISOString(), kind, sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(m.id), held: null };
+  if (c.t === 'held') out.held = { why: t('mod.chat.held', { why: heldWhy(String(c.code)) }), status: 'pending' };
   if (kind === 'sys') out.sys = { event: c.event as SysEvent, actor: (c.actor as string) ?? null, users: (c.users as string[]) ?? [], text: (c.text as string) ?? null, amount: (c.amount as number) ?? null };
   if (kind === 'vote') out.vote = { q: String(c.q), kind: c.kind as 'dates', closed: !!c.closed, winner: (c.winner as string) ?? null, options: (c.options as { id: string; label: string }[]).map((o) => ({ ...o, votes: votes.filter((v) => v.mid === m.id && v.option === o.id).sort((a, b) => a.at - b.at).map((v) => v.userId) })) };
   if (kind === 'split') {
@@ -393,7 +394,8 @@ function othersReact(c: CircleRow, me: string, text: string, toMada: boolean) {
 
 /* ───────────── posts ───────────── */
 
-const BLOCKLIST = [/\b(?:\+?966|0)?5\d{8}\b/, /[\w.+-]+@[\w-]+\.[\w.]+/, /\bhttps?:\/\/|www\./i, /\b(?:fuck|shit|bitch|scam|nude)\w*/i];
+/** Why the check holds it, in the author's words (the server's circles/moderation.ts, the same shared rules). */
+const heldWhy = (code: string) => t(`mod.held.${code}` as CopyKey);
 function settle() { for (const p of posts) if (p.status === 'pending' && p.approveAt && p.approveAt <= now()) p.status = 'approved'; }
 function visiblePost(me: string, p: PostRow) {
   if (p.deleted || isBlocked(me, p.authorId)) return false;
@@ -405,6 +407,7 @@ function toPost(me: string, p: PostRow): Post {
     id: p.id, author: ref(p.authorId), relation: relation(me, p.authorId), authorTrips: people.get(p.authorId)?.trips ?? 0, city: p.city, place: p.place, text: p.body, kind: p.kind,
     audience: p.audience, photoKey: (p.photoKey as Post['photoKey']) ?? null, photoUrl: p.photoUrl, saves: (p.id.startsWith('00000000') ? [24, 11, 52, 38, 19][Number(p.id.slice(-1))] ?? 0 : 0) + saved.filter((s) => s.kind === 'post' && s.refId === p.id).length,
     saved: saved.some((s) => s.userId === me && s.kind === 'post' && s.refId === p.id), status: p.status, createdAt: new Date(p.at).toISOString(),
+    held: p.authorId === me && p.status === 'pending' && p.flag ? `${heldWhy(p.flag)} ${t('mod.held.when')}` : null,
     thanks: thanks.filter((x) => x.postId === p.id).length, thanked: thanks.some((x) => x.postId === p.id && x.userId === me),
   };
 }
@@ -557,6 +560,9 @@ const routes: Route[] = [
     }
     const prev = messages.filter((m) => m.circleId === c.id && m.card?.t !== 'sys').sort((a, b) => b.at - a.at)[0];
     const toMada = !c.dm && (/@mada\b/i.test(input.body) || (prev?.card?.t === 'mada' && !!prev.card.askWhere && !c.dest));
+    // The check, as the server does it: a hold keeps the line for its author only, with the reason.
+    const hold = screenContent({ text: input.body, noVenue: true, recent: messages.filter((m) => m.userId === me && m.at > now() - 3_600_000).map((m) => m.body) });
+    if (hold) return items(user(c.id, me, input.body, undefined, { t: 'held', code: hold.code }));
     const mine = user(c.id, me, input.body);
     othersReact(c, me, input.body, toMada);
     if (!toMada) return items(mine);
@@ -864,8 +870,8 @@ const routes: Route[] = [
   [/^\/posts$/, 'POST', ({ me, body }) => {
     const b = parse(CreatePostRequest, body);
     if (posts.filter((p) => p.authorId === me && p.at > now() - 3_600_000).length >= 5) throw no('RATE_LIMITED', undefined, { retryAfter: 3600, seconds: 3600 });
-    const flagged = BLOCKLIST.some((re) => re.test(`${b.place}\n${b.text}`));
-    const p: PostRow = { id: uuid(), authorId: me, city: b.city, place: b.place, body: b.text, kind: b.kind, audience: b.audience, photoKey: null, photoUrl: b.photo ?? null, status: 'pending', approveAt: flagged ? null : now() + 8000, deleted: false, at: now() };
+    const hold = screenContent({ text: b.text, place: b.place, recent: posts.filter((x) => x.authorId === me).map((x) => x.body) });
+    const p: PostRow = { id: uuid(), authorId: me, city: b.city, place: b.place, body: b.text, kind: b.kind, audience: b.audience, photoKey: null, photoUrl: b.photo ?? null, status: 'pending', approveAt: hold ? null : now() + 8000, deleted: false, at: now(), flag: hold?.code ?? null };
     posts.push(p);
     return ok({ post: toPost(me, p) }, 201);
   }],

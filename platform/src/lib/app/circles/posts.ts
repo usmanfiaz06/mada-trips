@@ -7,7 +7,9 @@ import { appPostPhotos, appPostThanks, appPosts, appSaved } from "@/db/app-schem
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { assertUnder, graphOf, notify, pastTrips, peopleByIds, relationOf, type Graph } from "./common";
-import { initialModeration, settleDue } from "./moderation";
+import { heldWhyKey, initialModeration, settleDue } from "./moderation";
+import { checkImage } from "../moderation/vision";
+import { appActivities } from "@/db/app-schema-activities";
 
 /*
  * Tips: a place, a line about it, a kind (food or things to do), who sees it (friends or everyone on Mada), an
@@ -35,7 +37,9 @@ async function serialize(me: string, rows: Row[], g: Graph): Promise<Post[]> {
     photoKey: (r.photoKey as Post["photoKey"]) ?? null, photoUrl: r.hasPhoto ? `/api/app/v1/posts/${r.id}/photo` : null,
     saves: saves.find((s) => s.ref === r.id)?.n ?? 0, saved: mine.some((s) => s.ref === r.id),
     thanks: thanks.find((x) => x.ref === r.id)?.n ?? 0, thanked: myThanks.some((x) => x.ref === r.id),
-    status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "pending", createdAt: r.createdAt.toISOString(),
+    status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "pending",
+    held: r.authorId !== me ? null : r.status === "rejected" ? t("mod.tip.rejected", { reason: r.moderationNote ?? "" }).trim() : r.status === "pending" && r.flagged ? `${t(heldWhyKey(r.flagged)!)} ${t("mod.held.when")}` : null,
+    createdAt: r.createdAt.toISOString(),
   }));
 }
 
@@ -90,9 +94,15 @@ export async function createPost(me: string, raw: unknown, ipHash: string | null
   const p = CreatePostRequest.parse(raw);
   const [n] = await db.select({ n: sql<number>`count(*)::int` }).from(appPosts).where(and(eq(appPosts.authorId, me), sql`${appPosts.createdAt} > now() - interval '1 hour'`));
   assertUnder(n?.n ?? 0, LIMITS.postsPerHour, 3600);
-  const mod = initialModeration(`${p.place}\n${p.text}`);
   const photo = p.photo ? /^data:(image\/\w+);base64,(.*)$/.exec(p.photo) : null;
   if (photo && Buffer.byteLength(photo[2]!, "base64") > 2_000_000) throw new AppError("VALIDATION", { copy: "circles.postTip.photoTooBig", fields: { photo: t("circles.postTip.photoTooBig") } });
+  // The author's recent tips (the same words again), the place in the places data (its category), the photo's check.
+  const [recent, known, imageFlag] = await Promise.all([
+    db.select({ body: appPosts.body }).from(appPosts).where(and(eq(appPosts.authorId, me), sql`${appPosts.createdAt} > now() - interval '30 days'`)).orderBy(desc(appPosts.createdAt)).limit(20),
+    db.select({ kind: appActivities.kind, wikidata: appActivities.wikidata }).from(appActivities).where(sql`lower(${appActivities.name}) = lower(${p.place})`).limit(1).catch(() => []),
+    photo ? checkImage(Buffer.from(photo[2]!, "base64"), photo[1]!) : Promise.resolve(null),
+  ]);
+  const mod = initialModeration(p.text, { place: p.place, recent: recent.map((r) => r.body), venue: known[0] ? { category: known[0].kind, wikidataClasses: null } : null, imageFlag });
   const row = await db.transaction(async (tx) => {
     const [r] = await tx.insert(appPosts).values({
       authorId: me, city: p.city, place: p.place, body: p.text, kind: p.kind, audience: p.audience, hasPhoto: !!photo, photoConsent: !!p.photoConsent,

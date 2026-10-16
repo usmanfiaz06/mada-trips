@@ -7,3 +7,4 @@ export * from './api';
 export * from './copy';
 export * from './schemas';
 export * from './cover-art';
+export * from './moderation';

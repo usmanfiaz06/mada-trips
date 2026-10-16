@@ -1,3 +1,4 @@
+import { unlistedVenue } from "@mada/shared/moderation";
 /*
  * Events from the Ticketmaster Discovery API v2 (free key from developer.ticketmaster.com, TICKETMASTER_KEY; 5,000
  * calls a day, 5 a second). Confirmed from the public docs: GET https://app.ticketmaster.com/discovery/v2/events.json
@@ -41,6 +42,8 @@ export function parseTicketmaster(data: unknown, placeId: string): WhatsOn[] {
     seen.add(key);
     const img = (e.images ?? []).filter((i) => i.url?.startsWith("https://")).sort((a, b) => (b.ratio === "16_9" ? 1 : 0) - (a.ratio === "16_9" ? 1 : 0) || (b.width ?? 0) - (a.width ?? 0))[0];
     const seg = e.classifications?.[0];
+    // Places Mada doesn't list (bars, nightclubs, adult venues, gambling): by the event's category, its name and its venue.
+    if (unlistedVenue({ name: e.name, text: e._embedded?.venues?.[0]?.name ?? null, category: [seg?.segment?.name, seg?.genre?.name].filter(Boolean).join(" ") })) continue;
     out.push({
       id: `tm:${e.id}`, source: "ticketmaster", placeId, title: e.name.slice(0, 160), body: [seg?.segment?.name, seg?.genre?.name].filter((x) => x && x !== "Undefined").join(" · ") || null,
       startsOn: start, endsOn: e.dates?.end?.localDate && /^\d{4}-\d{2}-\d{2}$/.test(e.dates.end.localDate) ? e.dates.end.localDate : start,

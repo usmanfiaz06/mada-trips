@@ -33,7 +33,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
   const rows = tab === "open" ? open : decided;
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={t("Moderation")} subtitle={t("Tips travellers share in Circles, and what people report. Decide with a reason; the author reads it.")} />
+      <PageHeader eyebrow={t("App desk")} title={t("Moderation")} subtitle={t("Tips, circle messages and DMs the check held, cover photos, and what people report. Decide with a reason: the author reads it, and a reporter hears back.")} />
       <Tabs active={tab} items={[
         { key: "open", label: t("To review"), count: open.length, href: "/adminwork/desk/moderation" },
         { key: "decided", label: t("Decided"), href: "/adminwork/desk/moderation?s=decided" },
@@ -61,7 +61,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
             return (
               <Card key={m.id} className={cx(sp.focus === m.id && "ring-2 ring-gold")}>
                 <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
-                  {m.kind === "tip" ? <Badge tone="info">{t("Tip")}</Badge> : m.kind === "cover" ? <Badge tone="info">{t("Circle cover")}</Badge> : <Badge tone={unsafe ? "bad" : "warn"}><ShieldAlert className="size-3" />{t("Report")} · {t(REASON[m.reason ?? "other"] ?? "Something else")}</Badge>}
+                  {m.kind === "tip" ? <Badge tone="info">{t("Tip")}</Badge> : m.kind === "message" ? <Badge tone="info">{t("Circle message")}</Badge> : m.kind === "cover" ? <Badge tone="info">{t("Circle cover")}</Badge> : <Badge tone={unsafe ? "bad" : "warn"}><ShieldAlert className="size-3" />{t("Report")} · {t(REASON[m.reason ?? "other"] ?? "Something else")}</Badge>}
                   {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
                   {m.status !== "open" && <Badge tone={DECISION[m.status]?.tone ?? "neutral"} dot>{t(DECISION[m.status]?.label ?? m.status)}</Badge>}
                   <span>· {timeAgo(m.createdAt, L)}</span>
@@ -79,9 +79,19 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
                 {m.status === "open" && (mod ? (
                   <ActionForm action={moderateAction} className="mt-4 space-y-2">
                     <input type="hidden" name="id" value={m.id} /><input type="hidden" name="source" value={m.source} /><input type="hidden" name="blockAuthor" value={m.authorUserId ?? ""} />
-                    <Input name="reason" maxLength={200} placeholder={m.kind === "tip" ? t("Reason, if you reject it") : t("Reason, if you remove it")} />
+                    {(m.kind === "tip" || m.kind === "message") && (
+                      <details className="text-[12.5px] text-ink-3">
+                        <summary className="cursor-pointer select-none">{t("Edit before approving")}</summary>
+                        <div className="mt-2 space-y-2">
+                          {m.kind === "tip" && <><input type="hidden" name="origPlace" value={m.snapshot.place ?? ""} /><Input name="editPlace" maxLength={120} defaultValue={m.snapshot.place ?? ""} aria-label={t("Place")} /></>}
+                          <input type="hidden" name="origText" value={m.snapshot.text ?? ""} />
+                          <textarea name="editText" rows={3} maxLength={1000} defaultValue={m.snapshot.text ?? ""} aria-label={t("Text")} className="w-full rounded-xl border border-line bg-surface p-2 text-[14px] text-ink" />
+                        </div>
+                      </details>
+                    )}
+                    <Input name="reason" maxLength={200} placeholder={m.kind === "tip" || m.kind === "message" ? t("Reason, if you reject it (the author reads it)") : t("Reason, if you remove it")} />
                     <div className="flex flex-wrap items-center gap-2">
-                      {m.kind === "tip" || m.kind === "cover" ? (
+                      {m.kind === "tip" || m.kind === "cover" || m.kind === "message" ? (
                         <><SubmitButton name="decision" value="approved" variant="gold" size="sm">{t("Approve")}</SubmitButton><SubmitButton name="decision" value="rejected" variant="outline" size="sm">{t("Reject")}</SubmitButton></>
                       ) : (
                         <><SubmitButton name="decision" value="removed" variant="danger" size="sm">{t("Remove it")}</SubmitButton><SubmitButton name="decision" value="dismissed" variant="outline" size="sm">{t("Dismiss report")}</SubmitButton></>

@@ -15,6 +15,7 @@
  */
 import { isFamily, isIndoor, isUnfitThing, kindOf, type ActivityKind, type OsmTags } from "@mada/shared";
 import { placesUserAgent } from "../places/ingest";
+import { unlistedVenue } from "@mada/shared/moderation";
 import type { Fetch } from "../places/wiki";
 
 export const OVERPASS_URL = process.env.OVERPASS_URL ?? "https://overpass-api.de/api/interpreter";
@@ -85,6 +86,8 @@ export function parseOverpass(data: unknown): Candidate[] {
     if (!kind) continue;
     // Aircraft on display, military and government sites, palaces that aren't open to visitors (P1-16).
     if (isUnfitThing({ name, tags })) continue;
+    // Places Mada doesn't list, by their OpenStreetMap tags (amenity=bar, shop=alcohol…) and name (@mada/shared/moderation).
+    if (unlistedVenue({ name, tags })) continue;
     const lat = e.lat ?? e.center?.lat;
     const lon = e.lon ?? e.center?.lon;
     if (lat == null || lon == null) continue;

@@ -5,6 +5,12 @@ import { appPosts } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { isProductionDeploy } from "../config";
 import { AppError } from "../http";
+import { flagOf, holdFromFlag, screenContent, type ScreenInput } from "@mada/shared/moderation";
+import { t, type CopyKey } from "@mada/shared";
+import { appNotifications } from "@/db/app-schema";
+import { localeOfUser } from "../locale";
+import { withCopy } from "../notify-copy";
+import { notify, type Db } from "./common";
 
 /*
  * Every tip is checked before it shows (FLOWS.md §8b). A tip starts "pending". The desk approves or rejects it with
@@ -22,25 +28,28 @@ export const moderationMode = (): "auto" | "manual" => {
 };
 const delaySeconds = () => Math.max(0, Number(process.env.APP_MODERATION_DELAY_SECONDS ?? 20) || 0);
 
-/** Words and shapes that send a tip to a person instead of through: contact details, links, abuse. Small on purpose. */
-const BLOCKLIST = [
-  /\b(?:\+?966|0)?5\d{8}\b/, // a phone number
-  /[\w.+-]+@[\w-]+\.[\w.]+/, // an email address
-  /\bhttps?:\/\/|www\./i, // a link
-  /\b(?:whatsapp me|call me|dm me|snap(?:chat)?|telegram)\b/i,
-  /\b(?:fuck|shit|bitch|bastard|slut|whore|kill|scam|fraud|nude|sex)\w*/i,
-  /\b(?:room|flat|apartment|house|villa)\s*(?:no\.?|number|#)\s*\d+/i, // someone's address
-];
-
-/** Why a text needs a person to look at it, or null when it's clean. */
-export function screen(text: string): string | null {
-  for (const re of BLOCKLIST) if (re.test(text)) return `matched ${re.source.slice(0, 40)}`;
-  return null;
+/**
+ * Why a text needs a person to look at it ("code: what", app_posts.flagged), or null when it's clean. The rules live
+ * in @mada/shared/moderation: contact details, links, a home address, abuse and profanity in English, Arabic and
+ * Arabizi, scam words, places Mada doesn't list (bars, nightclubs, adult venues, gambling, alcohol-led) by keyword and
+ * by category, and the same text posted again.
+ */
+export function screen(text: string, opts: Omit<ScreenInput, "text"> = {}): string | null {
+  const h = screenContent({ text, ...opts });
+  return h ? flagOf(h) : null;
 }
 
-/** The fields a new tip starts with. */
-export function initialModeration(text: string) {
-  const flagged = screen(text);
+/** The copy key that tells an author, plainly, why their words wait for a person. */
+export function heldWhyKey(flag: string | null | undefined): CopyKey | null {
+  const h = holdFromFlag(flag);
+  if (h) return `mod.held.${h.code}` as CopyKey;
+  return flag ? "mod.held.title" : null;
+}
+
+/** The fields a new tip starts with. A hold (text or photo) always waits for a person. */
+export function initialModeration(text: string, opts: Omit<ScreenInput, "text"> & { imageFlag?: string | null } = {}) {
+  const { imageFlag, ...rest } = opts;
+  const flagged = screen(text, rest) ?? imageFlag ?? null;
   const auto = moderationMode() === "auto" && !flagged;
   return { status: "pending" as const, flagged, autoApproveAt: auto ? new Date(Date.now() + delaySeconds() * 1000) : null };
 }
@@ -61,13 +70,37 @@ export async function pendingQueue(limit = 50) {
     .orderBy(asc(appPosts.createdAt)).limit(limit);
 }
 
-/** A person's decision on a tip. Recorded in the audit trail with who decided. */
-export async function decide(postId: string, decision: "approve" | "reject", by: { kind: "agent" | "system"; id: string }, note?: string) {
+/**
+ * A person's decision on a tip, optionally with the words edited first (a phone number taken out, a typo fixed).
+ * Recorded in the audit trail with who decided. The author is told: "Your tip is up", or why it didn't go up.
+ */
+export async function decide(postId: string, decision: "approve" | "reject", by: { kind: "agent" | "system"; id: string }, note?: string, edit?: { place?: string; body?: string }) {
   return db.transaction(async (tx) => {
-    const [p] = await tx.update(appPosts).set({ status: decision === "approve" ? "approved" : "rejected", moderatedAt: new Date(), moderatedBy: by.id, moderationNote: note ?? null })
-      .where(and(eq(appPosts.id, postId), isNull(appPosts.deletedAt))).returning({ id: appPosts.id, authorId: appPosts.authorId });
+    const set: Partial<typeof appPosts.$inferInsert> = { status: decision === "approve" ? "approved" : "rejected", moderatedAt: new Date(), moderatedBy: by.id, moderationNote: note ?? null };
+    const edited = !!(edit && (edit.place?.trim() || edit.body?.trim()));
+    if (edit?.place?.trim()) set.place = edit.place.trim().slice(0, 120);
+    if (edit?.body?.trim()) set.body = edit.body.trim().slice(0, 1000);
+    const [p] = await tx.update(appPosts).set(set)
+      .where(and(eq(appPosts.id, postId), isNull(appPosts.deletedAt))).returning({ id: appPosts.id, authorId: appPosts.authorId, place: appPosts.place });
     if (!p) throw new AppError("NOT_FOUND");
-    await appAuditLog(tx, { actorKind: by.kind, actorId: by.id, action: `post.${decision}d`, entityType: "post", entityId: postId, summary: `Tip ${decision}d${note ? `: ${note.slice(0, 120)}` : ""}` });
+    await appAuditLog(tx, { actorKind: by.kind, actorId: by.id, action: `post.${decision}d`, entityType: "post", entityId: postId, summary: `Tip ${decision}d${edited ? " after an edit" : ""}${note ? `: ${note.slice(0, 120)}` : ""}`, data: edited ? { edit } : null });
+    if (by.kind === "agent") {
+      if (decision === "approve") await notify(tx, p.authorId, "post.approved", ["notify.mod.approved.title"], ["notify.mod.approved.body", { place: p.place }], `/tip/${p.id}`, { postId: p.id });
+      else await notify(tx, p.authorId, "post.rejected", ["notify.mod.rejected.title"], ["notify.mod.rejected.body", { reason: note ?? "" }], null, { postId: p.id });
+    }
     return p;
+  });
+}
+
+/** The reporter hears back: "Thanks, we removed it", or that it stays and why. */
+export async function tellReporter(tx: Db, reporterId: string | null, targetKind: string, removed: boolean) {
+  if (!reporterId) return;
+  const what = { k: `mod.what.${["post", "message", "user", "circle"].includes(targetKind) ? targetKind : "post"}` as CopyKey };
+  const [lw, title, body] = removed ? [what, "notify.mod.removed.title", "notify.mod.removed.body"] as const : [what, "notify.mod.kept.title", "notify.mod.kept.body"] as const;
+  const locale = await localeOfUser(reporterId, tx);
+  const vars = { what: t(lw.k, undefined, locale) };
+  await tx.insert(appNotifications).values({
+    userId: reporterId, kind: "other", level: "passive", title: t(title, undefined, locale).slice(0, 64), body: t(body, vars, locale), href: null,
+    data: withCopy({ report: true }, { title: [title], body: [body, { what: lw }] }),
   });
 }

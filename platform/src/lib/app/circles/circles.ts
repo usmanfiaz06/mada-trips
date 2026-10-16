@@ -12,6 +12,7 @@ import { appCircleDetails, appCircleInvites, appCircleReactions, appCircleSplitS
 import { appAuditLog, auditInsert } from "../audit";
 import { atOnce } from "../batch";
 import { withCopy } from "../notify-copy";
+import { heldWhyKey } from "./moderation";
 import { AppError } from "../http";
 import { coverColumns, coverFor, dropReplacedUpload, settleCovers, settled } from "./covers";
 import { err, graphOf, liveUser, peopleByIds, relationOf, tripLine, type Db } from "./common";
@@ -97,8 +98,12 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
       : r.authorKind === "agent" ? { kind: "agent", id: r.authorOpsUserId ?? "agent", name: r.authorName ?? "", photoUrl: null } : { kind: "mada" };
     const msg: CircleMessage = {
       id: r.id, circleId: r.threadId, author, body: r.body, createdAt: r.createdAt.toISOString(), kind,
-      sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(r.id),
+      sys: null, vote: null, split: null, card: null, mada: null, reactions: reactionsOf(r.id), held: null,
     };
+    // Held by the check (messages.ts): its author reads why; a removed one says so.
+    if (c.t === "held") msg.held = c.status === "removed"
+      ? { why: t("mod.chat.removed", { reason: String(c.reason ?? "") }).trim(), status: "removed" }
+      : { why: t("mod.chat.held", { why: t(heldWhyKey(String(c.flag ?? "")) ?? "mod.held.title") }), status: "pending" };
     if (kind === "sys") msg.sys = { event: c.event as SysEvent, actor: (c.actor as string | null) ?? null, users: (c.users as string[]) ?? [], text: (c.text as string | null) ?? null, amount: (c.amount as number | null) ?? null };
     if (kind === "vote") {
       const opts = (c.options as { id: string; label: string }[]) ?? [];

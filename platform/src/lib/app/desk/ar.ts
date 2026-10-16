@@ -30,6 +30,16 @@ export const AR_DESK: Record<string, string> = {
   "Approve to the card it came from or to Mada credit, which is instant. A declined refund shows the traveller your reason.": "اعتمد الاسترداد إلى البطاقة الأصلية أو إلى رصيد مادا الفوري. عند الرفض يرى المسافر سببك.",
   "Today's flights with Mada travellers on board. Status from the airline feed, positions from open ADS-B. Travellers on a disrupted flight hear the plan within 10 minutes.": "رحلات اليوم التي على متنها مسافرو مادا. الحالة من شركة الطيران، والمواقع من بيانات ADS-B المفتوحة. يصل المسافرين على رحلة متأثرة الخطةُ خلال 10 دقائق.",
   "Tips travellers share in Circles, and what people report. Decide with a reason; the author reads it.": "النصائح التي يشاركها المسافرون في الدوائر، والبلاغات. قرّر مع ذكر السبب؛ صاحب المنشور يقرؤه.",
+  "Tips, circle messages and DMs the check held, cover photos, and what people report. Decide with a reason: the author reads it, and a reporter hears back.": "النصائح ورسائل المجموعات والرسائل الخاصة التي أوقفها الفحص، وصور الأغلفة، والبلاغات. قرّر مع ذكر السبب: صاحبها يقرؤه، والمبلِّغ يصله الرد.",
+  "Circle message": "رسالة مجموعة",
+  "Edit before approving": "عدّلها قبل الموافقة",
+  "Place": "المكان",
+  "Text": "النص",
+  "Reason, if you reject it (the author reads it)": "السبب إن رفضتها (صاحبها يقرؤه)",
+  "Edited and approved": "عُدّلت ووُوفق عليها",
+  "Report dismissed; the reporter is thanked": "رُفض البلاغ، وشكرنا المبلِّغ",
+  "Removed; the reporter is told": "أُزيل، وأبلغنا المبلِّغ",
+  "Done; the author is told why": "تم، وأبلغنا صاحبها بالسبب",
   "The people travellers talk to. Each traveller has their own agent; when that agent is off, whoever covers for them answers, then the shared queue.": "الأشخاص الذين يتحدث إليهم المسافرون. لكل مسافر موظفه الخاص؛ وعند غيابه يرد من يغطي عنه، ثم الطابور المشترك.",
 
   // status pill and presence

@@ -10,6 +10,8 @@ import { deleteFile, getFile, readFileBytes, readUpload, storeFile, type StoredF
 import { AppError } from "../http";
 import { assertUnder, err, type Db } from "./common";
 import { moderationMode } from "./moderation";
+import { checkImage } from "../moderation/vision";
+import { appAudit } from "@/db/app-schema";
 
 /*
  * A circle's cover: one of Mada's drawings on a colour, a photo we ship, or a photo someone uploaded.
@@ -72,7 +74,8 @@ export async function coverColumns(input: CoverIn | null, userId: string, previo
   if (previous?.coverKind === "upload" && previous.coverFileId === c.fileId) return {};
   const [f] = await tx.select().from(appFiles).where(and(eq(appFiles.id, c.fileId), eq(appFiles.ownerId, userId), eq(appFiles.purpose, "cover"), isNull(appFiles.deletedAt)));
   if (!f) throw err("VALIDATION", undefined, { cover: "Unknown upload" });
-  const auto = moderationMode() === "auto";
+  const [held] = await tx.select({ id: appAudit.id }).from(appAudit).where(and(eq(appAudit.entityType, "file"), eq(appAudit.entityId, f.id), eq(appAudit.action, "circle.cover_held"))).limit(1);
+  const auto = moderationMode() === "auto" && !held;
   // The drawing or photo it replaces stays on the row for everyone else until the upload is approved.
   return { coverKind: "upload", coverFileId: f.id, coverStatus: "pending", coverBy: userId, coverAutoApproveAt: auto ? new Date(Date.now() + delaySeconds() * 1000) : null, coverCheckedAt: null, coverCheckedBy: null, coverNote: null };
 }
@@ -84,6 +87,9 @@ export async function uploadCover(userId: string, req: Request, ipHash: string |
   const up = await readUpload(req, { allow: ["image/jpeg", "image/png", "image/webp", "image/heic"] });
   const f = await storeFile(db, userId, "cover", up);
   await appAuditLog(db, { actorKind: "user", actorId: userId, action: "circle.cover_uploaded", entityType: "file", entityId: f.id, summary: "Uploaded a circle cover photo (waiting to be checked)", ipHash });
+  // The image check (moderation/vision.ts): a hold keeps the cover for a person even in auto mode (coverColumns).
+  const held = await checkImage(up.bytes, up.mime);
+  if (held) await appAuditLog(db, { actorKind: "system", actorId: "vision", action: "circle.cover_held", entityType: "file", entityId: f.id, summary: `Cover photo held for a person (${held})` });
   return { fileId: f.id, status: "pending" };
 }
 

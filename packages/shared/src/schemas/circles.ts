@@ -166,6 +166,8 @@ export const CircleMessage = Message.omit({ card: true, readAt: true, thread: tr
   card: SharedCard.nullable(),
   /** Reactions, one per person per emoji: who reacted with what. Older servers send none. */
   reactions: z.array(z.object({ emoji: z.string(), ids: z.array(Id) })).default([]),
+  /** A line the check held for a person (only its author sees it until then), or one the desk took out. Older servers send none. */
+  held: z.object({ why: z.string(), status: z.enum(['pending', 'removed']) }).nullable().default(null),
   mada: z.object({
     kind: z.enum(['welcome', 'answer', 'result', 'tie']),
     list: z.array(z.string()),
@@ -383,6 +385,8 @@ export const Post = z.object({
   thanks: z.number().int().default(0),
   thanked: z.boolean().default(false),
   status: z.enum(['pending', 'approved', 'rejected']),
+  /** To its author only: why it waits for a person, or why it didn't go up, in plain words. Older servers send none. */
+  held: z.string().nullable().default(null),
   createdAt: IsoDateTime,
 });
 export type Post = z.infer<typeof Post>;

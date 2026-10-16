@@ -288,10 +288,13 @@ export async function moderateAction(_: ActionState, fd: FormData): Promise<Acti
     const u = await requirePerm("desk.moderate");
     const decision = z.enum(["approved", "rejected", "removed", "dismissed"]).parse(str(fd, "decision"));
     const source = str(fd, "source") === "post" ? "post" : str(fd, "source") === "report" ? "report" : str(fd, "source") === "cover" ? "cover" : "desk";
-    await decideModeration(u, uuid(fd, "id"), { decision, reason: str(fd, "reason") || null }, source);
+    // An edit before approving (a phone number taken out): the words the desk corrected, when they changed.
+    const editBody = str(fd, "editText"), editPlace = str(fd, "editPlace");
+    const edit = decision === "approved" && ((editBody && editBody !== str(fd, "origText")) || (editPlace && editPlace !== str(fd, "origPlace"))) ? { body: editBody || undefined, place: editPlace || undefined } : null;
+    await decideModeration(u, uuid(fd, "id"), { decision, reason: str(fd, "reason") || null, edit }, source);
     const author = str(fd, "blockAuthor");
     if (str(fd, "block") === "yes" && isUuid(author)) await blockTraveller(u, author, str(fd, "reason") || "Blocked from moderation");
-    return done(decision === "approved" ? "Tip approved" : decision === "dismissed" ? "Report dismissed" : "Done");
+    return done(decision === "approved" ? (edit ? "Edited and approved" : "Approved") : decision === "dismissed" ? "Report dismissed; the reporter is thanked" : decision === "removed" ? "Removed; the reporter is told" : "Done; the author is told why");
   } catch (e) { return toState(e); }
 }
 

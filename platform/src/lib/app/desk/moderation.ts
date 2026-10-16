@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { appUsers } from "@/db/app-schema";
 import { appDeskModeration } from "@/db/app-schema-desk";
 import { appPosts, appReports } from "@/db/app-schema-circles";
+import { appMessages } from "@/db/app-schema";
+import { notify } from "@/lib/app/circles/common";
 import * as circlesModeration from "@/lib/app/circles/moderation";
 import * as circleCovers from "@/lib/app/circles/covers";
 import { appDeskBlocks } from "@/db/app-schema-desk";
@@ -67,14 +69,15 @@ export async function activeBlocks() {
   return new Set(rows.map((r) => r.userId));
 }
 
-export async function decideModeration(actor: DeskActor, id: string, v: { decision: "approved" | "rejected" | "removed" | "dismissed"; reason?: string | null }, source: ModerationSource = "desk") {
+export async function decideModeration(actor: DeskActor, id: string, v: { decision: "approved" | "rejected" | "removed" | "dismissed"; reason?: string | null; edit?: { place?: string; body?: string } | null }, source: ModerationSource = "desk") {
   assertCap(actor, "desk.moderate");
   if ((v.decision === "rejected" || v.decision === "removed") && (v.reason?.trim().length ?? 0) < 5) throw new DeskError("Say why, so the author understands");
   const reason = v.reason?.trim() || undefined;
   if (source === "post") {
     if (v.decision !== "approved" && v.decision !== "rejected") throw new DeskError("Approve or reject a tip");
-    await engine(() => circlesModeration.decide(id, v.decision === "approved" ? "approve" : "reject", { kind: "agent", id: actor.id }, reason));
-    await db.transaction((tx) => deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: "post", entityId: id, ref: "Tip", summary: `${v.decision === "approved" ? "Approved" : "Rejected"} a tip${reason ? `: ${clip(reason, 100)}` : ""}` }, { app: false }));
+    const edit = v.edit && (v.edit.place?.trim() || v.edit.body?.trim()) ? v.edit : undefined;
+    await engine(() => circlesModeration.decide(id, v.decision === "approved" ? "approve" : "reject", { kind: "agent", id: actor.id }, reason, edit));
+    await db.transaction((tx) => deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: "post", entityId: id, ref: "Tip", summary: `${v.decision === "approved" ? "Approved" : "Rejected"} a tip${edit ? " after editing it" : ""}${reason ? `: ${clip(reason, 100)}` : ""}`, data: edit ? { edit } : undefined }, { app: false }));
     return;
   }
   if (source === "cover") {
@@ -91,6 +94,9 @@ export async function decideModeration(actor: DeskActor, id: string, v: { decisi
       if (r.status !== "open") throw new DeskError("Already decided", "CONFLICT");
       await tx.update(appReports).set({ status: v.decision === "removed" ? "actioned" : "dismissed", reviewedAt: new Date() }).where(eq(appReports.id, id));
       if (v.decision === "removed" && r.targetKind === "post") await tx.update(appPosts).set({ status: "rejected", moderatedAt: new Date(), moderatedBy: actor.id, moderationNote: reason ?? null }).where(eq(appPosts.id, r.targetId));
+      if (v.decision === "removed" && r.targetKind === "message") await tx.update(appMessages).set({ card: { t: "held", status: "removed", reason: reason ?? "" } }).where(eq(appMessages.id, r.targetId));
+      // The reporter hears back: "Thanks, we removed it", or that it stays.
+      await circlesModeration.tellReporter(tx, r.reporterId, r.targetKind, v.decision === "removed");
       await deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: r.targetKind, entityId: r.targetId, ref: "Report", summary: `${v.decision === "removed" ? "Removed" : "Dismissed"} a report on a ${r.targetKind}${reason ? `: ${clip(reason, 100)}` : ""}`, data: { reportId: id } });
     });
     return;
@@ -99,11 +105,22 @@ export async function decideModeration(actor: DeskActor, id: string, v: { decisi
     const [m] = await tx.select().from(appDeskModeration).where(eq(appDeskModeration.id, id)).for("update");
     if (!m) throw new DeskError("Not found", "NOT_FOUND");
     if (m.status !== "open") throw new DeskError("Already decided", "CONFLICT");
-    if (m.kind === "tip" && v.decision === "dismissed") throw new DeskError("Approve or reject a tip");
+    if ((m.kind === "tip" || m.kind === "message") && v.decision === "dismissed") throw new DeskError("Approve or reject it");
     if (m.kind === "report" && v.decision === "approved") throw new DeskError("Remove the content or dismiss the report");
     await tx.update(appDeskModeration).set({ status: v.decision, decidedBy: actor.id, decidedAt: new Date(), decisionReason: v.reason?.trim() || null }).where(eq(appDeskModeration.id, id));
-    const what = m.kind === "tip" ? `tip "${clip(m.snapshot.place ?? m.snapshot.text ?? "", 40)}"` : `report on a ${m.targetKind}`;
-    await deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: m.targetKind, entityId: m.targetId, ref: m.kind === "tip" ? "Tip" : "Report",
+    // A circle message the check held (circles/messages.ts): approved, it shows to everyone (edited if the desk edited
+    // it); rejected, its author sees "Not sent" with the reason, and is told.
+    if (m.kind === "message") {
+      const body = v.edit?.body?.trim();
+      if (v.decision === "approved") await tx.update(appMessages).set({ card: null, ...(body ? { body: body.slice(0, 4000) } : {}) }).where(eq(appMessages.id, m.targetId));
+      else {
+        await tx.update(appMessages).set({ card: { t: "held", status: "removed", reason: reason ?? "" } }).where(eq(appMessages.id, m.targetId));
+        if (m.authorUserId) await notify(tx, m.authorUserId, "message.removed", ["notify.mod.chatRemoved.title"], ["notify.mod.chatRemoved.body", { reason: reason ?? "" }], null, { messageId: m.targetId });
+      }
+    }
+    if (m.kind === "report") await circlesModeration.tellReporter(tx, m.reporterUserId, m.targetKind, v.decision === "removed");
+    const what = m.kind === "tip" ? `tip "${clip(m.snapshot.place ?? m.snapshot.text ?? "", 40)}"` : m.kind === "message" ? `circle message "${clip(m.snapshot.text ?? "", 40)}"` : `report on a ${m.targetKind}`;
+    await deskAudit(tx, actor, { action: `desk.moderation.${v.decision}`, entityType: m.targetKind, entityId: m.targetId, ref: m.kind === "tip" ? "Tip" : m.kind === "message" ? "Message" : "Report",
       summary: `${v.decision[0]!.toUpperCase()}${v.decision.slice(1)} ${what}${v.reason ? `: ${clip(v.reason, 100)}` : ""}`, data: { moderationId: id } });
   });
 }
