@@ -10,7 +10,9 @@ import { commaList, wordFor } from './booking-words';
 import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
 import { formatSar, sarToHalalas } from '../money';
 import type { Person } from './people';
+import { matchParty, parseParty, type SaidParty } from './party';
 import type { Cabin } from './trips';
+import type { AskIntent } from './booking';
 import {
   CABIN_FACTOR, CATALOGUE_HOTELS, DEMO_HELPER_IQAMA, DEMO_SHORT_PASSPORT, DESK_PRICES, DESTINATIONS, ENTRY_RULES, INFANT_FACTOR, MADA_BINS,
   NATIONALITY_ADJECTIVE, NEED_LABELS, NEED_WORDS, ONE_WAY_FACTOR, PICKUP_SAR, PROMOS, REQUEST_FORMS, SEAT_ROW, SMALL_ROOM_FACTOR, STAY_NIGHTS_DEFAULT,
@@ -127,7 +129,8 @@ export function needsIn(text: string): NeedKey[] {
 
 const nameRe = (n: string) => new RegExp(`\\b${n.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
 
-export type ParsedWho = { ids: string[] | null; count: number | null; infants: number };
+/** party: the counts and ages said, when they say more than the names do (the app asks when they don't map). */
+export type ParsedWho = { ids: string[] | null; count: number | null; infants: number; party: SaidParty | null };
 
 export function parseWho(text: string, people: Person[], today: string): ParsedWho {
   const s = ` ${text.toLowerCase()} `;
@@ -136,7 +139,13 @@ export function parseWho(text: string, people: Person[], today: string): ParsedW
   let infants = 0;
   if (/\btwins\b/.test(s)) infants = 2;
   else if (/\b(baby|infant|newborn)\b/.test(s)) infants = 1;
-  if (/just me|only me|\bfor me\b(?! and)|by myself|on my own|\balone\b|\bsolo\b/.test(s)) return { ids: me ? [me] : null, count: 1, infants };
+  if (/just me|only me|\bfor me\b(?! and)|by myself|on my own|\balone\b|\bsolo\b/.test(s)) return { ids: me ? [me] : null, count: 1, infants, party: null };
+  // Counts and ages ("2 adults and 3 kids aged 2, 6 and 13", "we are 5", "احنا ٥"): never fewer people than said.
+  const said = parseParty(text);
+  if (said && (said.adults != null || said.childAges.length || said.infants)) {
+    const m = matchParty(said, people, today);
+    return { ids: m.complete ? m.ids : null, count: m.seats, infants: m.lapInfants, party: said };
+  }
   let ids: string[] | null = null;
   let n: number | null = null;
   if (/all of us|whole family|the family|\bfamily\b|everyone|\ball (three|four|five|six)\b|the (three|four|five|six) of us|same as last/.test(s)) ids = H.nonHelper.map((p) => p.id);
@@ -148,9 +157,12 @@ export function parseWho(text: string, people: Person[], today: string): ParsedW
   if (/\b(helper|nanny|maid|housekeeper)\b/.test(s) && H.helper) { addMe(); picked.add(H.helper.id); }
   const nm = s.match(/\bfor (\d+|two|three|four|five|six)\b(?!\s*(?:nights?|days?|weeks?))|\b(\d+|two|three|four|five|six) (?:people|adults|travellers|passengers|of us)\b/);
   if (nm) n = toNum((nm[1] ?? nm[2])!);
+  else if (said?.total) n = said.total;
   if (picked.size) ids = [...picked];
   if (n && (!ids || ids.length < n)) ids = n <= H.nonHelper.length ? H.nonHelper.slice(0, n).map((p) => p.id) : null;
-  return { ids, count: n, infants };
+  // More people than the household holds ("we are 6" with five saved): the stepper asks who the others are.
+  const party = n && !ids ? { adults: null, childAges: [], infants, total: n } : null;
+  return { ids, count: n, infants, party };
 }
 
 export type ParsedDetails = {
@@ -291,9 +303,18 @@ export function parseAskRules(typed: string, ctx: { today: string; people: Perso
     if (!d.destination) ask = 'where';
     else if (!d.depart) ask = 'when';
     else if (d.tripType !== 'oneway' && !d.return) ask = 'return';
-    else if (!w.ids && H.nonHelper.length > 1) ask = 'who';
+    else if (!w.ids && (H.nonHelper.length > 1 || w.party)) ask = 'who';
   }
   return { kind, ...d, ...w, needs: needsByPerson(text, ctx.people), needsMentioned: needsIn(text.toLowerCase()), answers: prefillAnswers(kind, text), ask };
+}
+
+/** The rules' reading as the intent the app receives (POST /ask/parse in mock mode, and offline in the app). */
+export function askIntentOfRules(r: RuleIntent, kind: AskKindValue = r.kind): AskIntent {
+  return {
+    kind, destination: r.destination, destinationName: r.destinationName, from: r.from, depart: r.depart, return: r.return, tripType: r.tripType, monthOnly: r.monthOnly,
+    cabin: r.cabin, cabinNote: r.cabinNote, travellerIds: r.ids, travellerCount: r.count ? Math.min(9, r.count) : null, infants: Math.min(4, r.infants), party: r.party,
+    needs: r.needs, needsMentioned: r.needsMentioned, answers: r.answers, ask: r.ask, source: 'rules',
+  };
 }
 
 /* ───────────── fares, rooms, bundles ───────────── */

@@ -14,6 +14,8 @@ import { CardBrand } from './wallet';
 
 export * from './booking-data';
 export * from './booking-logic';
+export * from './party';
+export * from './ask-correction';
 
 /* ───────────── Ask ───────────── */
 
@@ -31,6 +33,17 @@ export const AskParseRequest = z.object({
   tripCity: z.string().max(60).nullish(),
 });
 export type AskParseRequest = z.input<typeof AskParseRequest>;
+
+/** Who was said to be going, by count and age ("2 adults and 3 kids aged 2, 6 and 13"). childAges: 2 to 17, null when not said. */
+export const SaidPartySchema = z.object({
+  adults: z.number().int().min(0).max(9).nullable(),
+  childAges: z.array(z.number().int().min(0).max(17).nullable()).max(9),
+  /** Under 2. */
+  infants: z.number().int().min(0).max(4),
+  /** Of the infants, how many have their own seat (the rest sit on a lap). */
+  infantSeats: z.number().int().min(0).max(4).optional(),
+  total: z.number().int().min(1).max(20).nullable(),
+});
 
 /** What Mada understood. Structure only: no prices, no availability (SCOPE.md §6). */
 export const AskIntent = z.object({
@@ -53,6 +66,8 @@ export const AskIntent = z.object({
   /** "for 4" when the household is smaller: the app asks for the others' names. */
   travellerCount: z.number().int().min(1).max(9).nullable(),
   infants: z.number().int().min(0).max(4),
+  /** The counts and ages said, when they say more than names do. The app asks (a stepper) when they don't map to the household. */
+  party: SaidPartySchema.nullable().optional(),
   /** Needs said in the same sentence as a name ("Hessa needs a wheelchair"). */
   needs: z.record(z.string(), z.array(NeedKeySchema)),
   /** Needs mentioned without a person, for the app to offer. */

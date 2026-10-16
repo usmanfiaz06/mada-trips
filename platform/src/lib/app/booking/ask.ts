@@ -1,5 +1,5 @@
 import "server-only";
-import { AskIntent, AskKind, DESTINATIONS, HomeAirport, isIsoDay, parseAskRules, type Person } from "@mada/shared";
+import { AskIntent, AskKind, DESTINATIONS, HomeAirport, askIntentOfRules, isIsoDay, parseAskRules, type Person } from "@mada/shared";
 import { bookingSuppliers, householdOf, today } from "./common";
 
 /*
@@ -12,11 +12,7 @@ export async function parseAsk(ownerId: string, text: string): Promise<AskIntent
   const people = await householdOf(ownerId);
   const day = today();
   const rules = parseAskRules(text, { today: day, people });
-  const fromRules: AskIntent = {
-    kind: rules.kind, destination: rules.destination, destinationName: rules.destinationName, from: rules.from, depart: rules.depart, return: rules.return,
-    tripType: rules.tripType, monthOnly: rules.monthOnly, cabin: rules.cabin, cabinNote: rules.cabinNote, travellerIds: rules.ids, travellerCount: rules.count,
-    infants: rules.infants, needs: rules.needs, needsMentioned: rules.needsMentioned, answers: rules.answers, ask: rules.ask, source: "rules",
-  };
+  const fromRules: AskIntent = askIntentOfRules(rules);
   let model: Awaited<ReturnType<ReturnType<typeof bookingSuppliers.ask>["parse"]>> = null;
   try {
     model = await bookingSuppliers.ask().parse(text, { today: day, people, destinations: Object.keys(DESTINATIONS) });
@@ -48,10 +44,11 @@ export function mergeModel(rules: AskIntent, m: NonNullable<Awaited<ReturnType<R
     tripType: m.tripType === "oneway" || m.tripType === "return" ? m.tripType : rules.tripType,
     monthOnly: m.monthOnly && m.monthOnly.month >= 1 && m.monthOnly.month <= 12 ? { month: m.monthOnly.month, year: m.monthOnly.year, label: m.monthOnly.label?.slice(0, 40) ?? null } : rules.monthOnly,
     cabin: cabin ?? rules.cabin,
-    travellerIds: ids && ids.length ? ids : rules.travellerIds,
-    travellerCount: m.travellerCount && m.travellerCount > 0 && m.travellerCount < 10 ? m.travellerCount : rules.travellerCount,
-    infants: Number.isInteger(m.infants) && m.infants >= 0 && m.infants <= 4 ? m.infants : rules.infants,
-    ask: m.ask === "where" || m.ask === "when" || m.ask === "return" || m.ask === "who" ? m.ask : rules.ask,
+    // Counts and ages that don't map to the household stay unmapped, whatever the model picked: the app asks.
+    travellerIds: rules.party && !rules.travellerIds ? null : ids && ids.length ? ids : rules.travellerIds,
+    travellerCount: rules.party ? rules.travellerCount : m.travellerCount && m.travellerCount > 0 && m.travellerCount < 10 ? m.travellerCount : rules.travellerCount,
+    infants: rules.party ? rules.infants : Number.isInteger(m.infants) && m.infants >= 0 && m.infants <= 4 ? m.infants : rules.infants,
+    ask: rules.party && !rules.travellerIds && (m.ask === "who" || !m.ask) ? rules.ask : m.ask === "where" || m.ask === "when" || m.ask === "return" || m.ask === "who" ? m.ask : rules.ask,
     source: "model",
   };
 }

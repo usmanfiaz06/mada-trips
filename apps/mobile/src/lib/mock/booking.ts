@@ -2,7 +2,7 @@ import {
   AskParseRequest, CARRIERS, catalogueFacts, rankStays, tripShape, CATALOGUE_FLIGHTS, CATALOGUE_HOTELS, CHECKED_FARES, CreateOrderBody, CreateRequestBody, DESK_PRICES, DESTINATIONS, DemoFlag,
   ENTRY_RULES, ERROR_CODES, EntryCheckRequest, FlightSearchRequest, NEED_LABELS, OTHER_CITY_BY_HAND, PLANS, PreviewBody, StaySearchRequest,
   addDays, addMinutes, bundleFor, checkPromo, demoPassportTarget, demoIqama, deskFirstReply, deskQuote, deskReply, entryChecks, fareSar, freeUntilLabel, infantSar, instalments,
-  formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestText, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
+  askIntentOfRules, formatSar, money, parseAskRules, timeLabel, wordFor, commaList, personName, rangeLabel, requestText, roomsFor, roomsLabel, sarToHalalas, seatsFor, staySar, t, tn, todayIn,
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
@@ -331,7 +331,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const p = AskParseRequest.safeParse(body);
     if (!p.success) return bad(p.error.issues);
     const r = parseAskRules(p.data.text, { today: today(), people });
-    return ok({ intent: { kind: r.kind, destination: r.destination, destinationName: r.destinationName, from: r.from, depart: r.depart, return: r.return, tripType: r.tripType, monthOnly: r.monthOnly, cabin: r.cabin, cabinNote: r.cabinNote, travellerIds: r.ids, travellerCount: r.count, infants: r.infants, needs: r.needs, needsMentioned: r.needsMentioned, answers: r.answers, ask: r.ask, source: 'rules' } });
+    return ok({ intent: askIntentOfRules(r) });
   }
   if (key === 'POST /search/flights') {
     const p = FlightSearchRequest.safeParse(body);

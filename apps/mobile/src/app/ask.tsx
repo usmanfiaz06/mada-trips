@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { householdOf, parseAskRules, todayIn, type AskIntent, type AskKind, type CopyKey, type Person } from '@mada/shared';
+import { askIntentOfRules, householdOf, parseAskRules, todayIn, type AskIntent, type AskKind, type CopyKey, type Person } from '@mada/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -83,7 +83,7 @@ export default function Ask() {
         // Offline: requests can still be written and saved; searching waits for a connection.
         // Offline: the same rules the server runs read it here, so requests can still be written and saved.
         const r = parseAskRules(v, { today, people: household });
-        setIntent({ kind: kindHint ?? r.kind, destination: r.destination, destinationName: r.destinationName, from: r.from, depart: r.depart, return: r.return, tripType: r.tripType, monthOnly: r.monthOnly, cabin: r.cabin, cabinNote: r.cabinNote, travellerIds: r.ids, travellerCount: r.count, infants: r.infants, needs: r.needs, needsMentioned: r.needsMentioned, answers: r.answers, ask: r.ask, source: 'rules' });
+        setIntent(askIntentOfRules(r, kindHint ?? r.kind));
         setRound((r) => r + 1);
       } else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setParsing(false); }
