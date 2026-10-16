@@ -16,6 +16,7 @@ import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { MeBubble } from '@/components/booking/Conversation';
+import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError } from '@/lib/api';
 import { bookingApi, useDemo } from '@/lib/booking';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
@@ -174,13 +175,18 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
   const H = householdOf(people, today);
   const n = H.nonHelper.length;
   const kid = H.kids[0]?.firstName;
+  // Asks as chips; places as photo tiles (AlUla, Dubai and Riyadh Season, so no chip says the same place).
   const ideas = n > 2
     ? [t('ask.idea.familyEid', { count: n }), t('ask.idea.hotel'), kid ? t('ask.idea.visaFor', { name: kid }) : t('ask.idea.visa'), t('ask.idea.umrah')]
-    : [t('ask.idea.flights'), t('ask.idea.dubai'), t('ask.idea.hotel'), t('ask.idea.alula'), t('ask.idea.umrah')];
+    : [t('ask.idea.flights'), t('ask.idea.hotel'), t('ask.idea.umrah')];
   return (
     <Animated.View entering={enter(0)} style={{ gap: 20, paddingTop: 8 }}>
-      <T style={font('display')} accessibilityRole="header">{t('ask.title')}</T>
+      <View style={{ gap: 8 }}>
+        <T style={font('display')} accessibilityRole="header">{t('ask.title')}</T>
+        <T v="body" color={colors.ink2}>{t('ask.intro')}</T>
+      </View>
       <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>
+      <IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={onPick} testID="ask-ideas" />
       {busy ? (
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/waiting/[id]', params: { id: busy.id } })}>
           <Notice icon="flight"><T v="small" color={colors.green}>{t('ask.resume', { place: busy.place })}</T></Notice>

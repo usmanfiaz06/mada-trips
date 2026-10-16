@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { dayLabel, formatSar, rangeLong, type RefundView, type TripCard, type TripRequestView } from '@mada/shared';
 import { ArtPaperPlane } from '@/components/art/Arts';
 import { DepartureBoard } from '@/components/art/DepartureBoard';
 import { EmptyState } from '@/components/EmptyState';
 import { Button } from '@/components/Button';
-import { VGradient } from '@/components/Gradient';
 import { Icon } from '@/components/Icon';
 import { Scroll, Screen, useTopInset } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -18,7 +16,7 @@ import { orderNeedsYou, requestHref, RequestStatusPill, RequestTracker } from '@
 import { useQueryClient } from '@tanstack/react-query';
 import { bookingApi } from '@/lib/booking';
 import { toast } from '@/lib/toast';
-import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny } from '@/components/trips/ui';
+import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, IdeaTiles, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny, type IdeaKey } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { listSep, t } from '@/lib/i18n';
 import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
@@ -26,11 +24,9 @@ import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
 
 type Tab = 'upcoming' | 'requests' | 'past';
-const IDEAS = [
-  { img: require('../../../assets/images/istanbul.jpg'), key: 'istanbul', ask: 'Flights to Istanbul' },
-  { img: require('../../../assets/images/alula.jpg'), key: 'alula', ask: 'A weekend in AlUla' },
-  { img: require('../../../assets/images/riyadh.jpg'), key: 'season', ask: 'Things to do in Riyadh this weekend' },
-] as const;
+const IDEA_KEYS: IdeaKey[] = ['istanbul', 'alula', 'dubai', 'season'];
+/** Three places that aren't already on the list: a trip to Istanbul doesn't get Istanbul suggested under it. */
+const ideasBeside = (trips: TripCard[]) => IDEA_KEYS.filter((k) => !trips.some((c) => c.city.toLowerCase().includes(k))).slice(0, 3);
 
 /** Trips (prototype Trips.jsx): Upcoming, Requests with live trackers, and Past with "Same again". */
 export default function Trips() {
@@ -78,18 +74,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
       <Button label={t('trips.empty.action')} onPress={() => ask()} />
     </Animated.View>
     <T v="eyebrow">{t('trips.ideas.title')}</T>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }}>
-      {IDEAS.map((it) => (
-        <Pressable key={it.key} onPress={() => { buzz('tap'); ask(it.ask); }} style={styles.idea} accessibilityRole="button" accessibilityLabel={t(`trips.idea.${it.key}.title`)}>
-          <Image source={it.img} style={StyleSheet.absoluteFill} contentFit="cover" />
-          <VGradient id={`idea-${it.key}`} stops={[[0.4, 'rgba(15,26,22,0)'], [1, 'rgba(15,26,22,0.75)']]} />
-          <View style={{ padding: 12, paddingEnd: 10 }}>
-            <T v="h3" color={colors.paper} style={{ fontSize: 14, lineHeight: 17 }}>{t(`trips.idea.${it.key}.title`)}</T>
-            <T v="tiny" color="rgba(255,253,249,0.8)" style={{ fontSize: 11, lineHeight: 14, fontFamily: ff.ui500 }}>{t(`trips.idea.${it.key}.sub`)}</T>
-          </View>
-        </Pressable>
-      ))}
-    </ScrollView>
+    <IdeaTiles keys={ideasBeside([])} onAsk={ask} />
     {tracked.length ? <TrackedFlights flights={tracked} title={t('tr.tracking')} /> : null}
     <Imports />
   </>);
@@ -97,7 +82,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
     {trips.map((c, i) => (
       <Animated.View key={c.id} entering={riseOn(i)} style={[riseStyle(i), styles.card, shadow('card')]}>
         <Pressable testID={`trip-card-${c.city}`} accessibilityRole="button" accessibilityLabel={t('tr.tripA11y', { city: c.city })} onPress={() => { buzz('tap'); router.push(`/trip/${c.id}` as Href); }}>
-          <Photo k={c.imageUrl} style={{ height: 210, borderRadius: 0, borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card }}>
+          <Photo k={c.imageUrl} style={{ height: 248, borderRadius: 0, borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card }}>
             <Shade id={`trip-${c.id}`} />
             <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
               <Display size={36} color={colors.paper}>{c.city}</Display>
@@ -114,6 +99,9 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
     ))}
     {tracked.length ? <TrackedFlights flights={tracked} title={t('tr.tracking')} /> : null}
     <Imports />
+    {/* Under the trips, the next ones: the same places the empty board offers, minus the one already booked. */}
+    <T v="eyebrow">{t('trips.ideas.title')}</T>
+    <IdeaTiles keys={ideasBeside(trips)} onAsk={ask} />
   </>);
 }
 
@@ -252,7 +240,6 @@ const styles = StyleSheet.create({
   seg: { height: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.mist, justifyContent: 'center' },
   segOn: { backgroundColor: colors.green },
   hero: { gap: 16, paddingTop: 4 },
-  idea: { width: 124, height: 150, borderRadius: 20, overflow: 'hidden', justifyContent: 'flex-end' },
   card: { backgroundColor: colors.paper, borderRadius: radii.card, overflow: 'hidden' },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingStart: 16, paddingEnd: 10 },
   ppEmpty: { height: 210, borderRadius: 18, backgroundColor: '#f6ecd8', borderWidth: 1, borderColor: 'rgba(125,93,39,0.15)', overflow: 'hidden' },

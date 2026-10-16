@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
@@ -37,6 +37,7 @@ const PHOTOS: Record<string, ImageSource> = {
   'tbilisi-old-town': require('../../../assets/photos/tbilisi-old-town.jpg'),
   'alula-elephant-rock': require('../../../assets/photos/alula-elephant-rock.jpg'),
   'family-walking': require('../../../assets/photos/family-walking.jpg'),
+  'dubai-skyline': require('../../../assets/photos/dubai-skyline.jpg'),
   istanbul: require('../../../assets/images/istanbul.jpg'),
   alula: require('../../../assets/images/alula.jpg'),
   riyadh: require('../../../assets/images/riyadh.jpg'),
@@ -351,6 +352,35 @@ export function TripScreen({ title, children, act, right, onBack, scrollRef }: {
   );
 }
 
+/* ───────── ideas: places as photo tiles ───────── */
+
+export type IdeaKey = 'istanbul' | 'alula' | 'season' | 'dubai';
+/** What each tile asks for, in the words Ask reads (the trip ideas on Trips and on Ask's first screen). */
+export const IDEAS: Record<IdeaKey, { photo: string; ask: string }> = {
+  istanbul: { photo: 'istanbul', ask: 'Flights to Istanbul' },
+  alula: { photo: 'alula', ask: 'A weekend in AlUla' },
+  season: { photo: 'riyadh', ask: 'Things to do in Riyadh this weekend' },
+  dubai: { photo: 'dubai-skyline', ask: 'Flights to Dubai next weekend' },
+};
+
+/** Places as photo tiles in a strip: the name and one fact on a shade, the whole tile a button that asks. */
+export function IdeaTiles({ keys, onAsk, testID }: { keys: IdeaKey[]; onAsk: (ask: string) => void; testID?: string }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 10, paddingHorizontal: 20 }} testID={testID}>
+      {keys.map((k) => (
+        <Pressable key={k} onPress={() => { buzz('tap'); onAsk(IDEAS[k].ask); }} style={({ pressed }) => [styles.idea, pressed ? { transform: [{ scale: 0.97 }] } : null]} accessibilityRole="button" accessibilityLabel={t(`trips.idea.${k}.title`)}>
+          <Image source={photoOf(IDEAS[k].photo)} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <VGradient id={`idea-${k}`} stops={[[0.4, 'rgba(15,26,22,0)'], [1, 'rgba(15,26,22,0.75)']]} />
+          <View style={{ padding: 12, paddingEnd: 10 }}>
+            <T v="h3" color={colors.paper} style={{ fontSize: 14, lineHeight: 17 }}>{t(`trips.idea.${k}.title`)}</T>
+            <T v="tiny" color="rgba(255,253,249,0.8)" style={{ fontSize: 11, lineHeight: 14, fontFamily: ff.ui500 }}>{t(`trips.idea.${k}.sub`)}</T>
+          </View>
+        </Pressable>
+      ))}
+    </ScrollView>
+  );
+}
+
 /** The entering animation for an Animated.View: reanimated on phones, nothing on the web (use riseStyle there). */
 export const riseOn = rise;
 /** The web's CSS rise, or nothing on phones. */
@@ -369,6 +399,7 @@ export const BigCheck = ({ size = 60 }: { size?: number }) => (
 );
 
 const styles = StyleSheet.create({
+  idea: { width: 124, height: 150, borderRadius: 20, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: colors.green2 },
   tag: { paddingHorizontal: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   glass: { borderWidth: 1, borderColor: 'rgba(255,253,249,0.18)' },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60, padding: 10, borderRadius: 18 },

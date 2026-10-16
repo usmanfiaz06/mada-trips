@@ -9,6 +9,7 @@ export const bookingCopy = {
   // ───────────── ask: start ─────────────
   'ask.close': 'Close',
   'ask.title': 'Where to?',
+  'ask.intro': 'Say it any way you like. We ask only what we need.',
   'ask.composer': 'A place, a date, who’s going',
   'ask.composerMore': 'Anything else?',
   'ask.a11y.input': 'Ask Mada',

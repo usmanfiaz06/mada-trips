@@ -206,6 +206,8 @@ export const en = {
   'trips.idea.alula.sub': '1h 20 · stars and rock',
   'trips.idea.season.title': 'Riyadh Season',
   'trips.idea.season.sub': 'No flight needed',
+  'trips.idea.dubai.title': 'Dubai',
+  'trips.idea.dubai.sub': '1h 55 · next weekend',
   'trips.requests.idea.visa': 'A Schengen visa',
   'trips.requests.idea.table': 'A table for tonight',
   'trips.requests.idea.car': 'A car with a driver',

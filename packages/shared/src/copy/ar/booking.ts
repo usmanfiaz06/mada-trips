@@ -10,6 +10,7 @@ import type { ArSection } from './types';
 export const arBooking: ArSection<typeof bookingCopy> = {
   'ask.close': 'أغلق',
   'ask.title': 'إلى أين؟',
+  'ask.intro': 'قلها بأي طريقة تحبها. ما نسأل إلا عن اللي نحتاجه.',
   'ask.composer': 'مكان، تاريخ، ومن معك',
   'ask.composerMore': 'شيء آخر؟',
   'ask.a11y.input': 'اسأل مادا',

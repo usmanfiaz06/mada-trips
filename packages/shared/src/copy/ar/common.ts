@@ -148,6 +148,8 @@ export const arCommon: ArSection<typeof en> = {
   'trips.idea.alula.sub': 'ساعة و20 د · نجوم وصخور',
   'trips.idea.season.title': 'موسم الرياض',
   'trips.idea.season.sub': 'بلا طيران',
+  'trips.idea.dubai.title': 'دبي',
+  'trips.idea.dubai.sub': 'ساعة و55 د · الويكند الجاي',
   'trips.requests.idea.visa': 'تأشيرة شنغن',
   'trips.requests.idea.table': 'طاولة لليلة',
   'trips.requests.idea.car': 'سيارة مع سائق',
