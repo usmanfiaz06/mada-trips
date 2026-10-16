@@ -4,7 +4,7 @@ import { useApiQuery } from '@/lib/net/hooks';
 import { useDeviceOffline } from '@/lib/net/state';
 import { z } from 'zod';
 import {
-  API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse,
+  API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse, FX_FALLBACK, FxResponse, type FxRates,
   DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, MoveCreditResponse, PeopleResponse,
   PersonDetailResponse, PresenceResponse, SendSupportMessageResponse, SupportThreadResponse, SupportUnreadResponse, walletPath, type TripDetail, type Notification,
   type AddCardRequest, type CreateDocumentMeta, type CreatePersonRequest, type SavePassportRequest, type SendSupportMessageRequest,
@@ -143,6 +143,7 @@ export const walletKeys = {
   presence: (id?: string) => ['support', 'presence', id ?? ''] as const,
   notifications: ['inbox'] as const,
   trips: ['wallet', 'trips'] as const,
+  fx: ['fx'] as const,
 };
 
 const useOn = () => useSession((s) => s.status) === 'signedIn';
@@ -150,6 +151,15 @@ const useOn = () => useSession((s) => s.status) === 'signedIn';
 export const useDocuments = () => useApiQuery({ queryKey: walletKeys.documents, enabled: useOn(), queryFn: async () => (await walletApi.documents()).documents });
 export const usePersonDetail = (id: string | undefined) => useApiQuery({ queryKey: walletKeys.person(id ?? ''), enabled: useOn() && !!id, queryFn: () => walletApi.person(id!) });
 export const useAccount = () => useApiQuery({ queryKey: walletKeys.account, enabled: useOn(), queryFn: async () => (await walletApi.account()).account });
+/** Today's exchange rates for the "≈ AED" line beside SAR amounts (GET /fx, public). Refreshed hourly; stale is fine. */
+export const useFx = () => useApiQuery({ queryKey: walletKeys.fx, queryFn: async () => (await request({ method: 'GET', path: '/fx' }, FxResponse)).fx, staleTime: 3600_000, retry: 1 });
+/** The display currency and the rates together: what Approx needs. */
+export function useDisplayCurrency(): { currency: string; fx: FxRates | null } {
+  const account = useAccount();
+  const currency = account.data?.currency ?? 'SAR';
+  const fx = useFx();
+  return { currency, fx: currency === 'SAR' ? null : fx.data ?? FX_FALLBACK };
+}
 export const useDevices = () => useApiQuery({ queryKey: walletKeys.devices, enabled: useOn(), queryFn: async () => (await walletApi.devices()).devices });
 export const useConsents = () => useApiQuery({ queryKey: walletKeys.consents, enabled: useOn(), queryFn: () => walletApi.consents() });
 export const useExport = () => useApiQuery({ queryKey: walletKeys.export, enabled: useOn(), queryFn: async () => (await walletApi.exportStatus()).export });

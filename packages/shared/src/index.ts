@@ -1,4 +1,5 @@
 export * from './money';
+export * from './fx';
 export * from './dates';
 export * from './locale';
 export * from './phone';
