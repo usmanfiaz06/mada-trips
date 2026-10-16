@@ -104,10 +104,11 @@ export function correctAsk(prev: AskIntent, text: string, ctx: { today: string; 
 
   const d = parseDetails(text, ctx.today);
   const arPlace = AR_PLACES.find(([re]) => re.test(s))?.[1] ?? null;
-  const place = arPlace ?? (d.destination && d.destination !== 'other' ? d.destination : null) ?? (d.destination === 'other' && /\bto\b/.test(s) ? 'other' : null);
-  if (place && (place !== prev.destination || (place === 'other' && d.destinationName !== prev.destinationName))) {
-    Object.assign(next, { destination: place, destinationName: place === 'other' ? d.destinationName : null });
-    if (DESTINATIONS[place] || place === 'other') changed.push('where');
+  // Only a city Mada knows: "closer to Sultanahmet" is a wish about these results, not a new place.
+  const place = arPlace ?? (d.destination && d.destination !== 'other' ? d.destination : null);
+  if (place && place !== prev.destination && DESTINATIONS[place]) {
+    Object.assign(next, { destination: place, destinationName: null });
+    changed.push('where');
   }
   if (d.from && d.from !== prev.from) { next.from = d.from; changed.push('where'); }
   if (d.cabin && d.cabin !== prev.cabin) { next.cabin = d.cabin; next.cabinNote = d.cabinNote; changed.push('cabin'); }

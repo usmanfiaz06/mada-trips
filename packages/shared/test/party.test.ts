@@ -130,6 +130,10 @@ describe('corrections while Ask is answering', () => {
     expect(correctAsk(base, 'that’s wrong', ctx)).toEqual({ type: 'unclear' });
     expect(correctAsk(base, 'غيّرها', ctx)).toEqual({ type: 'unclear' });
     expect(correctAsk(base, 'a visa for Sara', ctx)).toEqual({ type: 'new' });
+    // A wish about the results ("closer to Sultanahmet") is left to the results, not read as a new place.
+    expect(correctAsk(base, 'closer to Sultanahmet', ctx).type).not.toBe('apply');
+    expect(correctAsk(base, 'with a pool', ctx).type).not.toBe('apply');
+    expect(correctAsk(base, 'قريب من السلطان أحمد', ctx).type).not.toBe('apply');
   });
 });
 
