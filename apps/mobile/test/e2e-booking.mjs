@@ -666,6 +666,64 @@ async function refineStays(page, k, ar = false) {
 }
 
 /* ───────────── 8. anything else: only the missing details, words said once, replies that fit ───────────── */
+/* ───────────── a family by count and age: never fewer people than said; corrections change the answer ───────────── */
+async function family() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  await openAsk(page);
+  step('family: 2 adults and 3 kids aged 2, 6 and 13, two of them not saved yet');
+  await k.ask('Istanbul for Eid, 2 adults and 3 kids aged 2, 6 and 13');
+  await k.see('You said 2 adults and 3 children (2, 6, 13).', 'party said');
+  if (await page.getByText('Three ways to get there.').filter({ visible: true }).count()) errors.push('family: searched before asking who the five are');
+  await k.see('Omar ✓', 'adult matched');
+  await k.see('Sara ✓', 'the 13-year-old matched');
+  await k.see('A child, 6', 'the 6-year-old asked');
+  await k.see('A child, 2', 'the 2-year-old asked');
+  await k.see('Continue · 5 going', 'continue with five');
+  await k.shot('family-stepper');
+  await k.byTest('party-name-child-1').fill('Yousef');
+  await k.byTest('party-name-child-2').fill('Noura');
+  await k.press(k.byTest('party-continue'));
+  step('family: five people, night flights last, the price per person');
+  await k.see('Three ways to get there.', 'family results', 15000);
+  await k.see('5 people · Economy', 'five travellers');
+  await k.see('Daytime flights first, with a little one going.', 'family ranking line');
+  await k.see('Leaves at night', 'night flight labelled');
+  await k.see('Leaves at 02:10: a short night for little ones.', 'night flight reason');
+  const firstCard = await page.locator('[data-testid^="flight-"]').filter({ visible: true }).first().getAttribute('data-testid');
+  if (firstCard === 'flight-TK141') errors.push('family: the 02:10 departure is first for a family with a 2-year-old');
+  await k.see('Price per person', 'fare lines');
+  await k.see('Child, 2 to 11', 'child fare line');
+  await k.see('Ages 6, 2', 'child ages');
+  await k.see('Seats held together', 'seats together');
+  await k.shot('family-results');
+  step('family: a correction while the results are up (December), then one Mada can’t read');
+  await k.byTest('ask-input').fill('December');
+  await k.byTest('ask-send').click();
+  await k.see('When in December?', 'dates corrected, asked again');
+  if (await page.getByText('Mada didn’t catch what to change. Try a place').filter({ visible: true }).count()) errors.push('family: hotel-only error on a date correction');
+  await k.shot('family-corrected-month');
+  await k.ask('that’s wrong');
+  await k.see('What should Mada change?', 'which thing to change');
+  await k.shot('family-fix-prompt');
+  await k.tap('Who’s going');
+  await k.see('Continue · 5 going', 'who asked again, five kept', 10000);
+  await k.press(k.byTest('party-continue'));
+  await k.see('When in December?', 'back to the dates');
+  step('family: a correction in stays');
+  await openAsk(page);
+  await k.ask('A hotel in Istanbul next weekend');
+  await k.press(k.byTest('stays-search'));
+  await k.see('Three places for you in Istanbul', 'stays', 12000);
+  await k.byTest('ask-input').fill('we are 5');
+  await k.byTest('ask-send').click();
+  await k.see('5 guests', 'stays corrected to five', 10000);
+  if (await page.getByText('Try a place, a view, a pool').filter({ visible: true }).count()) errors.push('stays: hotel-only error on "we are 5"');
+  await k.shot('stays-corrected-five');
+  await context.close();
+}
+
 async function asks() {
   const { page, context } = await newPage();
   const k = kit(page);
@@ -900,6 +958,7 @@ try {
   if (want('phone')) await phone();
   if (want('money')) await money();
   if (want('money-ar')) await money('ar-SA');
+  if (want('family')) await family();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

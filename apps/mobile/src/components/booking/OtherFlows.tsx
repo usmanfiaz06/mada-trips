@@ -143,6 +143,16 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
       onClose={() => setCalendar(false)} onDone={(v) => { setCheckIn(v.dep); setCheckOut(v.ret); setCalendar(false); setEditing(null); }} />
   ) : null;
 
+  // Asked to change who's going, or counts that don't map: the stepper, before anything else is asked again.
+  if (needParty && intent.party && (phase === 'who' || intent.ask === 'who')) {
+    return (
+      <View style={{ gap: 16 }}>
+        {summary}
+        <PartyStep party={intent.party} people={people} today={checkIn ?? today} selfName={selfName} title={t('ask.stay.q.who')}
+          onDone={(ids, lapInfants) => { setWho(ids); setLap(lapInfants); setNeedParty(false); }} />
+      </View>
+    );
+  }
   /* 1. Where. */
   if (phase === 'where') {
     return (
@@ -186,15 +196,6 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   }
 
   /* 3. Who, and the rooms that makes: the household from the profile, children with their ages. Then search. */
-  if (phase === 'who' && needParty && intent.party) {
-    return (
-      <View style={{ gap: 16 }}>
-        {summary}
-        <PartyStep party={intent.party} people={people} today={checkIn!} selfName={selfName} title={t('ask.stay.q.who')}
-          onDone={(ids, lapInfants) => { setWho(ids); setLap(lapInfants); setNeedParty(false); }} />
-      </View>
-    );
-  }
   if (phase === 'who') {
     const kids = who.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p && (ageOn(p, checkIn!) ?? 30) < 18);
     return (

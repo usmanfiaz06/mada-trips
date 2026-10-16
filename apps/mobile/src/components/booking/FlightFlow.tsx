@@ -153,6 +153,13 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
       onDone={(v) => { setTrip(v); setEditing(null); setRunKey((k) => k + 1); setPick(null); }} />
   ) : null;
 
+  // Asked to change who's going ("What should Mada change?" → Who's going): the stepper comes first.
+  if (needParty && intent.party && intent.ask === 'who') {
+    return (
+      <PartyStep party={intent.party} people={people} today={today} selfName={selfName}
+        onDone={(ids, lap) => { setWho(ids); setTrip((x) => ({ ...x, infants: lap })); setNeedParty(false); setWhoDone(true); setPick(null); }} />
+    );
+  }
   if (!dest && !where.other) {
     return (
       <View style={{ gap: 12 }}>
