@@ -81,9 +81,12 @@ export function VoteCard({ m, me, total, canClose, people, onVote, onClose }: { 
   );
 }
 
-export function SplitCard({ m, me, people, onPay, onRemind, onMark }: { m: CircleMessage; me: string; people: Map<string, PersonRef>; onPay: (sh: SplitShare) => void; onRemind: () => void; onMark: (sh: SplitShare) => void }) {
+export function SplitCard({ m, me, people, onPay, onRemind, onMark, onTakeBack }: { m: CircleMessage; me: string; people: Map<string, PersonRef>; onPay: (sh: SplitShare) => void; onRemind: () => void; onMark: (sh: SplitShare) => void; onTakeBack?: () => void }) {
   const sp = m.split!;
   const iPaid = sp.paidBy === me;
+  const gone = !!sp.withdrawn;
+  // Yours to take back while nobody else has paid a share (owner audit, item 31).
+  const canTakeBack = !gone && !sp.settled && (iPaid || (m.author.kind === 'user' && (m.author as { id?: string }).id === me)) && sp.shares.every((sh) => !sh.paid || sh.ids.includes(sp.paidBy));
   const short = (id: string) => (id === me ? t('circles.you') : people.get(id)?.short ?? t('circles.someone'));
   const label = (sh: SplitShare) => {
     if (sp.mode !== 'family' || sh.ids.length === 1) return short(sh.ids[0]!);
@@ -101,7 +104,7 @@ export function SplitCard({ m, me, people, onPay, onRemind, onMark }: { m: Circl
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
           <T style={{ fontFamily: ff.ui700, fontSize: 17, color: colors.green, fontVariant: ['tabular-nums'] }}>{money(sp.total)}</T>
-          {sp.settled ? <Pill variant="ok" label={t('circles.split.settled')} /> : null}
+          {gone ? <Pill label={t('tb.split.pill')} /> : sp.settled ? <Pill variant="ok" label={t('circles.split.settled')} /> : null}
         </View>
       </View>
       <View>
@@ -125,7 +128,7 @@ export function SplitCard({ m, me, people, onPay, onRemind, onMark }: { m: Circl
           );
         })}
       </View>
-      {!sp.settled && mineSh && !mineSh.paid ? (
+      {gone ? <T v="tiny" testID="split-withdrawn">{t('tb.split.note')}</T> : !sp.settled && mineSh && !mineSh.paid ? (
         <Row wrap gap={10}>
           <Button size="small" block={false} label={t('circles.split.payMine', { amount: money(mineSh.amount) })} onPress={() => onPay(mineSh)} testID="pay-share" />
           <TextLink size={13} label={t('circles.split.cash')} onPress={() => onMark(mineSh)} testID="paid-cash" />
@@ -135,6 +138,7 @@ export function SplitCard({ m, me, people, onPay, onRemind, onMark }: { m: Circl
           label={sp.reminded ? t('circles.split.reminded') : t('circles.split.remind', { names: owing.map((sh) => (sh.ids.length > 1 ? short(sh.key) : short(sh.ids[0]!))).join(` ${t('circles.and')} `) })} />
       ) : null}
       {sp.settled ? <T v="tiny">{t('circles.split.allPaid')}</T> : null}
+      {canTakeBack && onTakeBack ? <TextLink size={13} label={t('tb.takeBack')} onPress={onTakeBack} testID="split-take-back" /> : null}
     </View>
   );
 }

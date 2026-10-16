@@ -912,4 +912,11 @@ export const enCircles = {
   'circles.around.makeCircle': 'Make a circle for {city}',
   'notify.circles.dm.title': '{name}',
   'notify.circles.dm.body': '{text}',
+  // Take back a split before anyone else pays (owner audit, item 31).
+  'tb.split.pill': 'Taken back',
+  'tb.split.note': 'Taken back before anyone paid. Nothing is owed.',
+  'tb.split.done': 'Split taken back. Nobody owes anything.',
+  'tb.split.paid': 'Someone already paid a share, so this split stays. Settle the rest in the chat.',
+  'tb.split.order': 'This split pays for a booking. Cancel it from the booking instead.',
+  'tb.split.gone': 'This split was taken back. Nothing to pay.',
 } as const;

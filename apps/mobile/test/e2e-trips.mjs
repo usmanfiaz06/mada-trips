@@ -225,7 +225,21 @@ try {
   await shot('special-requests');
   await byTest('sr-bags').click(); await page.waitForTimeout(500);
   await shot('special-bags-sheet');
+  // Send it, then take it back from Trips › Requests before Mada has it (marked withdrawn, nothing charged).
+  await byTest('sr-send').click(); await page.waitForTimeout(1200);
   await closeSheet();
+  step('take back a request');
+  await toTab();
+  await tab('Trips');
+  await byTest('tab-requests').click(); await page.waitForTimeout(800);
+  await page.locator('[data-testid^="take-back-"]').first().click();
+  await see('Take this back?', 'take back sheet');
+  await shot('take-back-sheet');
+  await byTest('take-back-yes').click();
+  await see('Taken back', 'request marked taken back');
+  await byTest('request-withdrawn').first().waitFor({ state: 'visible', timeout: 6000 });
+  await shot('trips-request-taken-back');
+  await byTest('tab-upcoming').click(); await page.waitForTimeout(600);
 
   /* ── Last, because a refund takes the whole trip away: a cancellation chosen offline, sent on reconnect ── */
   await toTab();

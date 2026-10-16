@@ -284,6 +284,7 @@ export async function markPaid(circleId: string, userId: string, messageId: stri
   await membership(circleId, userId);
   const rows = await db.transaction(async (tx) => {
     const { c } = await lockMessage(tx, circleId, messageId, "split");
+    if (c.withdrawn) throw err("VALIDATION", "tb.split.gone"); // taken back by whoever posted it (circles/take-back.ts)
     const [share] = await tx.select().from(appCircleSplitShares).where(and(eq(appCircleSplitShares.messageId, messageId), eq(appCircleSplitShares.key, input.key)));
     if (!share) throw new AppError("NOT_FOUND");
     const mine = share.userIds.includes(userId);

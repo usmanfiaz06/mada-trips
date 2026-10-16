@@ -22,6 +22,8 @@ import { GET as asksGet, POST as asksPost } from "@/app/api/app/v1/trips/[id]/re
 import { GET as dzGet, POST as dzPost } from "@/app/api/app/v1/trips/[id]/disruption/route";
 import { GET as refundsGet } from "@/app/api/app/v1/refunds/route";
 import { GET as refundGet } from "@/app/api/app/v1/refunds/[id]/route";
+import { POST as refundWithdrawPost } from "@/app/api/app/v1/refunds/[id]/withdraw/route";
+import { POST as requestWithdrawPost } from "@/app/api/app/v1/requests/[id]/withdraw/route";
 import { GET as invoiceGet } from "@/app/api/app/v1/invoices/[id]/route";
 import { GET as invoiceDocGet } from "@/app/api/app/v1/invoices/[id]/document/route";
 import { POST as companyPost } from "@/app/api/app/v1/invoices/[id]/company/route";
@@ -250,7 +252,15 @@ describe("refunds", () => {
     const pickup = pays.find((p) => p.item === "pickup")!;
     const r = await callP(withP(refundPost, { id: tid }), { token: C.token, phase: "daybefore", body: { paymentIds: [pickup.id], reason: "plans", destination: "credit", clientKey: key() } });
     const refund = RefundResponse.parse(r.json).refund;
-    expect(refund).toMatchObject({ anyway: true, stage: "requested", reject: null });
+    expect(refund).toMatchObject({ anyway: true, stage: "requested", reject: null, canTakeBack: true });
+    // A second "ask anyway", taken back before the desk decides: marked withdrawn on the group and each payment's row.
+    const again = RefundResponse.parse((await callP(withP(refundPost, { id: tid }), { token: C.token, phase: "daybefore", body: { paymentIds: [pickup.id], reason: "plans", destination: "credit", clientKey: key() } })).json).refund;
+    const back = await call(withP(refundWithdrawPost, { id: again.id }), { token: C.token });
+    expect(back.status, JSON.stringify(back.json)).toBe(200);
+    expect(back.json.refund).toMatchObject({ withdrawn: true, canTakeBack: false, stage: "rejected", reject: null });
+    const rows = await db.execute<{ stage: string }>(rawSql`SELECT f.stage FROM app_refunds f JOIN app_refund_items i ON i.refund_id = f.id WHERE i.group_id = ${again.id}`);
+    expect(rows.map((x) => x.stage)).toEqual(["withdrawn"]);
+    expect((await call(withP(refundWithdrawPost, { id: again.id }), { token: C.token })).status).toBe(400);
     await db.execute(rawSql`UPDATE app_refund_groups SET created_at = now() - interval '10 seconds' WHERE id = ${refund.id}`);
     const later = RefundResponse.parse((await call(withP(refundGet, { id: refund.id }), { method: "GET", token: C.token })).json).refund;
     expect(later.stage).toBe("rejected");
@@ -330,6 +340,25 @@ describe("special requests and hotel options", () => {
     expect(bags).toMatchObject({ status: "quoted", quote: { amount: 250_00 * 2 * 2 } });
     expect((await call(withP(asksPost, { id: tripId }), { token: A.token, body: { area: "special", kind: "bassinet", clientKey: key() } })).status).toBe(400);
     expect((await call(withP(asksPost, { id: tripId }), { token: A.token, body: { area: "special", kind: "rocket", clientKey: key() } })).status).toBe(400);
+  });
+
+  it("takes a request back until the desk has it: marked withdrawn (never deleted), quote withdrawn, audited", async () => {
+    const bags = TripAskResponse.parse((await call(withP(asksPost, { id: tripId }), { token: A.token, body: { area: "special", kind: "bags", count: 1, clientKey: key() } })).json).request!;
+    expect(bags).toMatchObject({ status: "quoted", canTakeBack: true, withdrawn: false });
+    const other = await signIn();
+    expect((await call(withP(requestWithdrawPost, { id: bags.id }), { token: other.token })).status).toBe(404); // not yours
+    const r = await call(withP(requestWithdrawPost, { id: bags.id }), { token: A.token });
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(r.json.request).toMatchObject({ id: bags.id, status: "cancelled", withdrawn: true, canTakeBack: false });
+    const [row] = await db.execute<{ status: string; withdrawn: string; q: string }>(rawSql`SELECT r.status, r.details->>'withdrawn' AS withdrawn, q.status AS q FROM app_requests r JOIN app_quotes q ON q.request_id = r.id WHERE r.id = ${bags.id}`);
+    expect(row).toMatchObject({ status: "cancelled", withdrawn: "true", q: "withdrawn" });
+    const audit = await db.execute<{ n: number }>(rawSql`SELECT count(*)::int AS n FROM app_audit WHERE action = 'request.withdrawn' AND entity_id = ${bags.id}`);
+    expect(audit[0]!.n).toBe(1);
+    expect((await call(withP(requestWithdrawPost, { id: bags.id }), { token: A.token })).status).toBe(400); // already taken back
+    // Once someone at the desk has it, it's theirs: talk to Mada instead.
+    const meal = TripAskResponse.parse((await call(withP(asksPost, { id: tripId }), { token: A.token, body: { area: "special", kind: "wheelchair", option: "gate", clientKey: key() } })).json).request!;
+    await db.execute(rawSql`UPDATE app_requests SET status = 'confirmed' WHERE id = ${meal.id}`);
+    expect((await call(withP(requestWithdrawPost, { id: meal.id }), { token: A.token })).status).toBe(400);
   });
 
   it("leaves a night sooner inside the free window and the night comes back", async () => {

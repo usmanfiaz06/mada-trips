@@ -263,6 +263,17 @@ async function demo() {
   await see('split by family', 'split card');
   await shot('chat-split');
   await see('paid their share', 'someone pays', 10000);
+  // A second split, taken back before anyone pays: the card stays, marked, and nobody owes anything.
+  await byTest('chat-tools').click();
+  await byTest('tool-split').click();
+  await byTest('split-what').fill('Taxi');
+  await byTest('split-total').fill('90');
+  await byTest('split-post').click();
+  await page.waitForTimeout(800);
+  await byTest('split-take-back').last().click();
+  await see('Split taken back. Nobody owes anything.', 'split taken back');
+  await byTest('split-withdrawn').last().waitFor({ state: 'visible', timeout: 5000 });
+  await shot('chat-split-taken-back');
   await byTest('chat-tools').click();
   await byTest('tool-vote').click();
   await byTest('vote-q').fill('Where for lunch');

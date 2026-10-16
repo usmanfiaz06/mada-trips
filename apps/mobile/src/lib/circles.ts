@@ -72,6 +72,7 @@ export const circlesApi = {
   split: (id: string, b: CreateSplitRequest) => request({ method: 'POST', path: `/circles/${id}/splits`, body: b }, Items),
   paid: (id: string, mid: string, b: MarkPaidRequest) => request({ method: 'POST', path: `/circles/${id}/splits/${mid}/paid`, body: b }, Items),
   remindSplit: (id: string, mid: string) => request({ method: 'POST', path: `/circles/${id}/splits/${mid}/remind` }, Items),
+  takeBackSplit: (id: string, mid: string) => request({ method: 'POST', path: `/circles/${id}/splits/${mid}/withdraw` }, Items),
   makeAdmin: (id: string, uid: string) => request({ method: 'PATCH', path: `/circles/${id}/members/${uid}`, body: { role: 'admin' } }, OkResponse),
   removeMember: (id: string, uid: string) => request({ method: 'DELETE', path: `/circles/${id}/members/${uid}` }, OkResponse),
   invite: (id: string, userIds: string[]) => request({ method: 'POST', path: `/circles/${id}/invites`, body: { userIds } }, CircleDetail),

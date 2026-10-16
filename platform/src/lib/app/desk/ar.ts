@@ -668,4 +668,8 @@ export const AR_DESK: Record<string, string> = {
   "This booking has a verified phone": "لهذا الحجز رقم موثّق",
   "Passport copy": "نسخة الجواز",
   "Passport copies open while this booking needs them, and every look is logged.": "تُفتح نسخ الجوازات ما دام هذا الحجز يحتاجها، وكل اطلاع مسجّل.",
+  // Builder W: hotel requests on an order, things the traveller took back.
+  "Requests for the hotel": "طلبات للفندق",
+  "Asked on the order sheet. Sent to the property with the booking; hotels do their best, none of it is a promise.": "طلبها المسافر في صفحة الدفع. تُرسل للفندق مع الحجز، والفنادق تجتهد ولا شيء منها مضمون.",
+  "Withdrawn by the traveller": "سحبه المسافر",
 };

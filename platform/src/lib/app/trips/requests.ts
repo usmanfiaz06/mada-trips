@@ -38,6 +38,13 @@ function orderOf(status: string, o: RequestDetails["order"]): TripRequestView["o
   return { id: o.id, status: now, failure: null };
 }
 
+/** Until the desk has it: not answered (open statuses), nobody assigned, no booking behind it, not a refund (those go by RefundView). */
+const BEFORE_ANSWER = ["queued", "sent", "reviewing", "quoted", "awaiting_payment"];
+export const canTakeBack = (r: Pick<RequestRow, "status" | "kind" | "agentOpsUserId" | "details">) => {
+  const d = (r.details ?? {}) as RequestDetails & { withdrawn?: boolean; payRequest?: unknown; source?: string };
+  return BEFORE_ANSWER.includes(r.status) && !r.agentOpsUserId && !d.order && !d.withdrawn && !d.payRequest && d.source !== "order" && r.kind !== "refund";
+};
+
 export function toRequestView(r: RequestRow): TripRequestView {
   const d = (r.details ?? {}) as RequestDetails;
   return {
@@ -47,6 +54,7 @@ export function toRequestView(r: RequestRow): TripRequestView {
     detail: isFlightRequest(r.details) ? flightSummary((r.details as { search: FlightSearch }).search, r.travellerIds.length) : d.detail ?? null,
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
     quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: orderOf(r.status, d.order),
+    withdrawn: !!(d as { withdrawn?: boolean }).withdrawn, canTakeBack: canTakeBack(r),
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }

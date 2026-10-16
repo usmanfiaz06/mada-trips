@@ -160,6 +160,8 @@ export const CircleMessage = Message.omit({ card: true, readAt: true, thread: tr
   vote: z.object({ q: z.string(), kind: VoteKind, options: z.array(VoteOption), closed: z.boolean(), winner: z.string().nullable() }).nullable(),
   split: z.object({
     what: z.string(), total: HalalasAmount, paidBy: Id, mode: SplitMode, reminded: z.boolean(), settled: z.boolean(), shares: z.array(SplitShare),
+    /** Taken back by whoever posted it, before anyone else paid. Older servers send none. */
+    withdrawn: z.boolean().optional(),
   }).nullable(),
   card: SharedCard.nullable(),
   /** Reactions, one per person per emoji: who reacted with what. Older servers send none. */

@@ -249,7 +249,7 @@ function toMessage(m: Msg): CircleMessage {
   if (kind === 'vote') out.vote = { q: String(c.q), kind: c.kind as 'dates', closed: !!c.closed, winner: (c.winner as string) ?? null, options: (c.options as { id: string; label: string }[]).map((o) => ({ ...o, votes: votes.filter((v) => v.mid === m.id && v.option === o.id).sort((a, b) => a.at - b.at).map((v) => v.userId) })) };
   if (kind === 'split') {
     const sh = shares.filter((s) => s.mid === m.id);
-    out.split = { what: String(c.what), total: Number(c.total), paidBy: String(c.paidBy), mode: c.mode as 'equal', reminded: !!c.remindedAt && now() - Number(c.remindedAt) < 20 * 3_600_000, settled: sh.every((s) => s.paidAt), shares: sh.map((s) => ({ key: s.key, ids: s.ids, amount: s.amount, paid: !!s.paidAt, paidAt: s.paidAt ? new Date(s.paidAt).toISOString() : null })) };
+    out.split = { what: String(c.what), total: Number(c.total), paidBy: String(c.paidBy), mode: c.mode as 'equal', reminded: !!c.remindedAt && now() - Number(c.remindedAt) < 20 * 3_600_000, settled: sh.every((s) => s.paidAt), withdrawn: !!c.withdrawn, shares: sh.map((s) => ({ key: s.key, ids: s.ids, amount: s.amount, paid: !!s.paidAt, paidAt: s.paidAt ? new Date(s.paidAt).toISOString() : null })) };
   }
   if (kind === 'card') out.card = c.card as CircleMessage['card'];
   if (kind === 'mada') out.mada = { kind: (c.kind as 'answer') ?? 'answer', list: (c.list as string[]) ?? [], foot: (c.foot as string) ?? null, actions: (c.actions as MadaAction[]) ?? [], askWhere: !!c.askWhere, ref: (c.ref as string) ?? null, done: !!c.done };
@@ -636,10 +636,22 @@ const routes: Route[] = [
     const mine = sh.ids.includes(me);
     if (!mine && m.card!.paidBy !== me) throw no('FORBIDDEN');
     if (sh.paidAt) return items(m);
+    if (m.card!.withdrawn) throw no('VALIDATION', 'tb.split.gone');
     sh.paidAt = now();
     emit(id!, 'split', m.id, me);
     const line = mine ? sys(id!, body.via === 'card' ? 'paid' : 'markedPaid', me, [me], { amount: sh.amount }) : sys(id!, 'markedPaid', me, sh.ids, { amount: sh.amount });
     return items(m, line);
+  }],
+  [/^\/circles\/([\w-]+)\/splits\/([\w-]+)\/withdraw$/, 'POST', ({ me }, id, mid) => {
+    // Take back a split while nobody else has paid: the card stays, marked, and can't be paid (circles/take-back.ts).
+    membership(id!, me);
+    const m = msgOf(id!, mid!, 'split');
+    if (m.userId !== me && m.card!.paidBy !== me) throw no('FORBIDDEN');
+    if (m.card!.withdrawn) return items(m);
+    if (shares.some((x) => x.mid === m.id && x.paidAt && !x.ids.includes(String(m.card!.paidBy)))) throw no('VALIDATION', 'tb.split.paid');
+    m.card = { ...m.card, withdrawn: true, cancelled: true };
+    emit(id!, 'split', m.id, me);
+    return items(m);
   }],
   [/^\/circles\/([\w-]+)\/splits\/([\w-]+)\/remind$/, 'POST', ({ me }, id, mid) => {
     membership(id!, me);
@@ -954,7 +966,7 @@ function blockUser(me: string, other: string) {
 }
 function payShare(cid: string, mid: string, key: string) {
   const sh = shares.find((s) => s.mid === mid && s.key === key);
-  if (!sh || sh.paidAt || !circles.has(cid)) return;
+  if (!sh || sh.paidAt || !circles.has(cid) || messages.find((x) => x.id === mid)?.card?.withdrawn) return;
   sh.paidAt = now();
   emit(cid, 'split', mid, sh.ids[0]!);
   sys(cid, 'paid', sh.ids[0]!, sh.ids, { amount: sh.amount });

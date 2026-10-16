@@ -211,7 +211,9 @@ type GroupRow = typeof appRefundGroups.$inferSelect;
 
 export function toRefundView(g: GroupRow): RefundView {
   return {
-    id: g.id, tripId: g.tripId, title: g.title, amount: SAR(g.amount), stage: g.stage as RefundView["stage"], destination: g.destination as RefundView["destination"],
+    // A refund taken back reads as closed to older apps ('rejected', with no reason) and as withdrawn to this one.
+    id: g.id, tripId: g.tripId, title: g.title, amount: SAR(g.amount), stage: (g.stage === "withdrawn" ? "rejected" : g.stage) as RefundView["stage"], destination: g.destination as RefundView["destination"],
+    withdrawn: g.stage === "withdrawn", canTakeBack: g.anyway && g.stage === "requested",
     provider: g.provider, card: g.card, anyway: g.anyway, reject: g.stage === "rejected" ? g.reject : null, alt: g.stage === "rejected" ? g.alt : null, law: g.law, airline: g.airline,
     cancelledInstalments: g.cancelledCount ? { count: g.cancelledCount, amount: SAR(g.cancelledAmount) } : null,
     expectedBy: g.expectedBy?.toISOString() ?? null, sentAt: g.sentAt?.toISOString() ?? null, createdAt: g.createdAt.toISOString(), updatedAt: g.updatedAt.toISOString(),

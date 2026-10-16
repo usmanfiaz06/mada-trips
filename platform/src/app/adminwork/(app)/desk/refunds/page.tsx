@@ -11,9 +11,10 @@ import { SlaClock } from "@/components/desk/live";
 import { approveRefundAction, rejectRefundAction } from "../actions";
 
 export const metadata = { title: "Refunds · Desk" };
-const STAGES = ["requested", "approved", "sent", "rejected"] as const;
+const STAGES = ["requested", "approved", "sent", "rejected", "withdrawn"] as const;
 const STAGE: Record<string, { label: string; tone: Tone }> = {
   requested: { label: "To decide", tone: "gold" }, approved: { label: "Approved · on its way", tone: "info" }, sent: { label: "Sent", tone: "ok" }, rejected: { label: "Declined", tone: "bad" },
+  withdrawn: { label: "Withdrawn by the traveller", tone: "neutral" },
 };
 
 export default async function RefundsPage({ searchParams }: { searchParams: Promise<{ s?: string; focus?: string }> }) {

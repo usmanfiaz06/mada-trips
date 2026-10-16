@@ -15,6 +15,7 @@ import { POST as pickPost } from "@/app/api/app/v1/circles/[id]/votes/[mid]/pick
 import { POST as splitPost } from "@/app/api/app/v1/circles/[id]/splits/route";
 import { POST as paidPost } from "@/app/api/app/v1/circles/[id]/splits/[mid]/paid/route";
 import { POST as remindSplitPost } from "@/app/api/app/v1/circles/[id]/splits/[mid]/remind/route";
+import { POST as withdrawSplitPost } from "@/app/api/app/v1/circles/[id]/splits/[mid]/withdraw/route";
 import { DELETE as memberDelete, PATCH as memberPatch } from "@/app/api/app/v1/circles/[id]/members/[uid]/route";
 import { POST as circleInvitesPost } from "@/app/api/app/v1/circles/[id]/invites/route";
 import { POST as linkPost } from "@/app/api/app/v1/circles/[id]/link/route";
@@ -253,6 +254,26 @@ describe("splits, to the halala", () => {
     expect((await paid(omar, abdullah.id)).status).toBe(200); // already paid: nothing changes
     const audit = await db.execute<{ n: number }>(raw`SELECT count(*)::int AS n FROM app_audit WHERE action = 'circle.share_paid' AND entity_id = ${s.id}`);
     expect(audit[0]!.n).toBe(2);
+  });
+
+  it("takes a split back while nobody else has paid; then it can't be paid; once someone paid it stays", async () => {
+    const { c, people } = await circleOf(3);
+    const [omar, hessa] = people as [Who, Who, Who];
+    const post = async () => SentMessages.parse((await split(omar, c.circle.id, { what: "Taxi", total: 9_000, paidBy: omar.id, mode: "equal", between: people.map((p) => p.id) })).json).items[0]!;
+    const s = await post();
+    const back = (w: Who, mid: string) => call(withParams(withdrawSplitPost, { id: c.circle.id, mid }), auth(w));
+    expect((await back(hessa, s.id)).status).toBe(403); // not hers
+    const r = await back(omar, s.id);
+    expect(r.status, JSON.stringify(r.json)).toBe(200);
+    expect(SentMessages.parse(r.json).items[0]!.split).toMatchObject({ withdrawn: true });
+    expect((await call(withParams(paidPost, { id: c.circle.id, mid: s.id }), { ...auth(hessa), body: { key: hessa.id, via: "cash" } })).status).toBe(400);
+    const shares = await db.execute<{ n: number }>(raw`SELECT count(*)::int AS n FROM app_circle_split_shares WHERE message_id = ${s.id}`);
+    expect(shares[0]!.n).toBe(3); // kept, never deleted
+    const audit = await db.execute<{ n: number }>(raw`SELECT count(*)::int AS n FROM app_audit WHERE action = 'circle.split_withdrawn' AND entity_id = ${s.id}`);
+    expect(audit[0]!.n).toBe(1);
+    const s2 = await post();
+    await call(withParams(paidPost, { id: c.circle.id, mid: s2.id }), { ...auth(hessa), body: { key: hessa.id, via: "cash" } });
+    expect((await back(omar, s2.id)).status).toBe(400);
   });
 });
 

@@ -332,4 +332,16 @@ export const enTripsUi = {
   'tr.past.refund': 'Refund of {amount} · {status}',
   'tr.past.noRefund': 'Nothing refunded yet',
   'tr.past.seeRefund': 'See refund',
+  // Take back what you sent, until the desk has it (owner audit, item 31).
+  'tb.takeBack': 'Take back',
+  'tb.title': 'Take this back?',
+  'tb.body': 'Mada stops working on it and nothing is charged. You can ask again any time.',
+  'tb.refundBody': 'Mada stops asking for it. Your booking stays exactly as it is.',
+  'tb.yes': 'Take it back',
+  'tb.keep': 'Keep it',
+  'tb.done': 'Taken back. Nothing was charged.',
+  'tb.pill': 'Taken back',
+  'tb.withdrawnNote': 'You took this back. Mada sees it closed.',
+  'tb.refundWithdrawn': 'You took this back. Nothing changed on your booking.',
+  'tb.tooLate': 'Mada already has this one. Talk to Mada to change it.',
 } as const;

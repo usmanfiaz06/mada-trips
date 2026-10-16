@@ -12,6 +12,7 @@ import { Scroll, Screen, useTopInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { TrackedFlights } from '@/components/today/Nothing';
 import { RefundTracker } from '@/components/trips/RefundTracker';
+import { TakeBack } from '@/components/trips/TakeBack';
 import { orderNeedsYou, requestHref, RequestStatusPill, RequestTracker } from '@/components/trips/Requests';
 import { useQueryClient } from '@tanstack/react-query';
 import { bookingApi } from '@/lib/booking';
@@ -139,9 +140,10 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
     {items.map((it, i) => it.type === 'refund' ? (
       <Animated.View key={it.r.id} entering={riseOn(i)} style={riseStyle(i)}>
         <Box testID="refund-card">
-          <Spread><H3>{t('tr.refund', { amount: formatSar(it.r.amount.amount) })}</H3><Tag label={refundPill(it.r)} tone={it.r.stage === 'rejected' ? 'warn' : it.r.stage === 'sent' ? 'ok' : 'default'} /></Spread>
+          <Spread><H3>{t('tr.refund', { amount: formatSar(it.r.amount.amount) })}</H3><Tag label={refundPill(it.r)} tone={it.r.withdrawn ? 'default' : it.r.stage === 'rejected' ? 'warn' : it.r.stage === 'sent' ? 'ok' : 'default'} /></Spread>
           <Small>{it.r.title}</Small>
-          <RefundTracker r={it.r} onTalk={() => router.push('/support?topic=refund' as Href)} />
+          {it.r.withdrawn ? <View testID="refund-withdrawn"><Tiny>{t('tb.refundWithdrawn')}</Tiny></View> : <RefundTracker r={it.r} onTalk={() => router.push('/support?topic=refund' as Href)} />}
+          {it.r.canTakeBack ? <TakeBack kind="refund" id={it.r.id} testID="refund-take-back" /> : null}
         </Box>
       </Animated.View>
     ) : (
@@ -152,7 +154,7 @@ function Requests({ requests, refunds, ask }: { requests: TripRequestView[]; ref
   </>);
 }
 
-const refundPill = (r: RefundView) => (r.stage === 'rejected' ? t('tr.ref.notApproved') : r.anyway ? t('tr.ref.withMada') : r.destination === 'credit' ? t('tr.ref.inCredit') : r.stage === 'sent' ? t('tr.ref.sent') : t('tr.ref.onWay'));
+const refundPill = (r: RefundView) => (r.withdrawn ? t('tb.pill') : r.stage === 'rejected' ? t('tr.ref.notApproved') : r.anyway ? t('tr.ref.withMada') : r.destination === 'credit' ? t('tr.ref.inCredit') : r.stage === 'sent' ? t('tr.ref.sent') : t('tr.ref.onWay'));
 
 function RequestCard({ r }: { r: TripRequestView }) {
   const router = useRouter();
@@ -171,9 +173,11 @@ function RequestCard({ r }: { r: TripRequestView }) {
       <Spread align="flex-start">
         {/* Every request opens: a booking's order, the thread for an Ask request, the trip for a trip's own ask. */}
         <Pressable style={{ flex: 1 }} accessibilityRole="link" onPress={() => router.push(requestHref(r) as Href)} testID={r.kind === 'flight' ? 'open-flight-request' : `open-request-${r.kind}`}><H3>{r.title}</H3></Pressable>
-        <RequestStatusPill r={r} />
+        {r.withdrawn ? <Tag label={t('tb.pill')} /> : <RequestStatusPill r={r} />}
       </Spread>
       {r.detail ? <Small>{r.detail}</Small> : null}
+      {r.withdrawn ? <View testID="request-withdrawn"><Tiny>{t('tb.withdrawnNote')}</Tiny></View> : null}
+      {r.canTakeBack ? <TakeBack kind="request" id={r.id} testID={`take-back-${r.kind}`} /> : null}
       {stuck ? (
         <Box tone="well" gap={8} testID="request-order-stuck">
           <AgentIntro />

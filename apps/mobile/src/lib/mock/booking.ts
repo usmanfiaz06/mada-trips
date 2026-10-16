@@ -29,7 +29,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
  */
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
-type Req = { id: string; owner: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
+type Req = { id: string; owner: string; withdrawn?: boolean; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
 type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
 
 const offers = new Map<string, Offer>();
@@ -461,6 +461,16 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     requests.set(id, req);
     return ok({ request: req.view }, 201);
   }
+  r = m(/^\/requests\/([^/]+)\/withdraw$/);
+  if (r && w.method === 'POST') {
+    // Take back an Ask request until the desk has answered (marked withdrawn, never deleted).
+    const req = requests.get(r[1]!);
+    if (!req || req.owner !== user.id) return err('NOT_FOUND');
+    if (!['queued', 'sent', 'reviewing', 'quoted'].includes(req.view.status) || req.withdrawn) return err('VALIDATION', t('tb.tooLate'));
+    req.withdrawn = true; req.view.status = 'cancelled'; req.view.updatedAt = nowIso();
+    if (req.view.quote) req.view.quote = { ...req.view.quote, status: 'withdrawn' };
+    return ok({ request: askRequestViews(user.id).find((x) => x.id === req.id) });
+  }
   r = m(/^\/requests\/([^/]+)(\/messages)?$/);
   if (r) {
     const req = requests.get(r[1]!);
@@ -626,6 +636,7 @@ export function askRequestViews(userId: string): TripRequestView[] {
     id: r.id, tripId: null, kind: r.view.kind, area: 'other' as const, status: status[r.view.status] ?? 'sent', title: r.view.title, short: null, detail: r.view.summary || r.view.detail || null,
     withWhom: 'faisal' as const, withName: r.view.agent?.name ?? null, outcome: null, alt: null, yesText: null,
     quote: r.view.quote && r.view.quote.status === 'open' ? r.view.quote.total : null, quoteText: r.view.quote?.lead ?? r.view.quote?.text ?? null,
+    withdrawn: !!r.withdrawn, canTakeBack: !r.withdrawn && ['queued', 'sent', 'reviewing', 'quoted'].includes(r.view.status),
     createdAt: r.view.createdAt, updatedAt: r.view.updatedAt,
   }));
   return [...asked, ...stuckOrderViews(userId)];

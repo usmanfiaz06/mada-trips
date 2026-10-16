@@ -111,7 +111,7 @@ export async function toMessages(rows: MessageRow[], tx: Db = db): Promise<Circl
       sh.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
       msg.split = {
         what: String(c.what ?? r.body), total: Number(c.total ?? 0), paidBy: String(c.paidBy), mode: (c.mode as "equal" | "family" | "custom") ?? "equal", reminded: !!c.remindedAt && Date.now() - Date.parse(String(c.remindedAt)) < 20 * 3600_000,
-        settled: sh.length > 0 && sh.every((s) => !!s.paidAt),
+        settled: sh.length > 0 && sh.every((s) => !!s.paidAt), withdrawn: !!c.withdrawn,
         shares: sh.map((s) => ({ key: s.key, ids: s.userIds, amount: Number(s.amount), paid: !!s.paidAt, paidAt: s.paidAt?.toISOString() ?? null })),
       };
     }

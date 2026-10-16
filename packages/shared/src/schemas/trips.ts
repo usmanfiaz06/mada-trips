@@ -335,6 +335,9 @@ export const TripRequestView = z.object({
    * it is 'pending_agent', 'confirmed' or 'cancelled', following the request. Optional for older builds.
    */
   order: z.object({ id: Id, status: z.string(), failure: z.enum(['payment', 'airline']).nullable() }).nullable().optional(),
+  /** Taken back by the traveller (status 'cancelled'), and whether it still can be (the desk hasn't got it yet). Older servers send none. */
+  withdrawn: z.boolean().optional(),
+  canTakeBack: z.boolean().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -545,6 +548,9 @@ export const RefundView = z.object({
   cancelledInstalments: z.object({ count: z.number().int(), amount: Money }).nullable(),
   expectedBy: IsoDateTime.nullable(),
   sentAt: IsoDateTime.nullable(),
+  /** Taken back by the traveller (stage reads 'rejected' for older apps). canTakeBack: an "ask anyway" the desk hasn't decided. */
+  withdrawn: z.boolean().optional(),
+  canTakeBack: z.boolean().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });

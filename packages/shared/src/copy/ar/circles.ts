@@ -948,4 +948,10 @@ export const arCircles: ArSection<typeof enCircles> = {
   'circles.around.makeCircle': 'سوّ دائرة لـ {city}',
   'notify.circles.dm.title': '{name}',
   'notify.circles.dm.body': '{text}',
+  'tb.split.pill': 'مسحوبة',
+  'tb.split.note': 'انسحبت قبل ما أحد يدفع. ما على أحد شي.',
+  'tb.split.done': 'انسحبت القسمة. ما على أحد شي.',
+  'tb.split.paid': 'فيه أحد دفع نصيبه، فالقسمة تبقى. كمّلوا الباقي في المحادثة.',
+  'tb.split.order': 'هذي القسمة تدفع حجز. ألغها من الحجز.',
+  'tb.split.gone': 'هذي القسمة انسحبت. ما فيه شي للدفع.',
 };

@@ -23,8 +23,8 @@ import { circlesHooks, circlesMock } from './circles';
 
 type Charge = TripPayment & { lines: InvoiceLine[]; tripId: string };
 type Doc = { id: string; number: string; tripId: string; chargeId: string; kind: 'simplified' | 'tax' | 'credit_note'; status: 'draft' | 'issued'; customer: string; company: TripDetail['company']; lines: InvoiceLine[]; againstId: string | null; paidWith: string | null; issuedAt: string };
-type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null };
-type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string };
+type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null; withdrawn?: boolean };
+type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string; withdrawn?: boolean };
 type State = {
   trips: Omit<TripDetail, 'clock'>[];
   charges: Charge[];
@@ -289,7 +289,7 @@ function progressDesk(s: State) {
     }
   }
   for (const f of s.refunds) {
-    if (f.anyway && f.stage === 'requested' && now - Date.parse(f.createdAt) > 7000) { f.stage = 'rejected'; f.updatedAt = nowIso(); }
+    if (f.anyway && f.stage === 'requested' && !f.withdrawn && now - Date.parse(f.createdAt) > 7000) { f.stage = 'rejected'; f.updatedAt = nowIso(); }
   }
 }
 
@@ -383,13 +383,35 @@ function card(t: TripDetail): TripCard {
   };
 }
 
-const pub = (r: Req): TripRequestView => { const { scripted: _s, clientKey: _c, ...v } = r; return v; };
-const pubRefund = (r: Ref): RefundView => { const { items: _i, clientKey: _c, ...v } = r; return { ...v, reject: r.stage === 'rejected' ? r.reject : null, alt: r.stage === 'rejected' ? r.alt : null }; };
+/** Until the desk has it (lib/app/trips/requests.ts canTakeBack): not answered yet, no booking behind it, not a refund. */
+const TAKE_BACK = ['queued', 'sent', 'reviewing', 'quoted', 'awaiting_payment'];
+const canTakeBackReq = (r: Req) => TAKE_BACK.includes(r.status) && !r.order && !r.withdrawn && r.area !== 'refund';
+const pub = (r: Req): TripRequestView => { const { scripted: _s, clientKey: _c, ...v } = r; return { ...v, withdrawn: !!r.withdrawn, canTakeBack: canTakeBackReq(r) }; };
+const pubRefund = (r: Ref): RefundView => {
+  const base = ((r: Ref): RefundView => { const { items: _i, clientKey: _c, ...v } = r; return { ...v, reject: r.stage === 'rejected' ? r.reject : null, alt: r.stage === 'rejected' ? r.alt : null }; })(r);
+  return { ...base, stage: r.withdrawn ? 'rejected' : base.stage, reject: r.withdrawn ? null : base.reject, alt: r.withdrawn ? null : base.alt, withdrawn: !!r.withdrawn, canTakeBack: r.anyway && r.stage === 'requested' && !r.withdrawn };
+};
 
 export const tripsMock: AreaMock = async (w: Wire, { user }) => {
   const [path, query] = w.path.split('?');
   const parts = (path ?? '').split('/').filter(Boolean);
   const head = parts[0];
+  // Take back a trip's request or an "ask anyway" refund while the desk hasn't got it (marked, never deleted).
+  if ((head === 'requests' || head === 'refunds') && parts[2] === 'withdraw' && w.method === 'POST' && user) {
+    const s = stateOf(user);
+    if (head === 'requests') {
+      const r = s.requests.find((x) => x.id === parts[1]);
+      if (!r) return null; // an Ask request: the booking mock's
+      if (!canTakeBackReq(r)) return err('VALIDATION', tk('tb.tooLate'));
+      r.status = 'cancelled'; r.withdrawn = true; r.updatedAt = nowIso();
+      return ok({ request: pub(r) });
+    }
+    const f = s.refunds.find((x) => x.id === parts[1]);
+    if (!f) return err('NOT_FOUND');
+    if (!(f.anyway && f.stage === 'requested' && !f.withdrawn)) return err('VALIDATION', tk('tb.tooLate'));
+    f.withdrawn = true; f.updatedAt = nowIso();
+    return ok({ refund: pubRefund(f) });
+  }
   if (!['trips', 'refunds', 'invoices', 'tracked', 'notifications', 'devices', 'flights'].includes(head ?? '')) return null;
   if (head === 'flights' && parts[2] === 'position') {
     // Like the mock positions supplier: SVA263 over the Gulf of Aqaba at cruise; anything else isn't airborne.

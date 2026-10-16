@@ -57,6 +57,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
       <header className="mb-6 animate-rise">
         <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
           <span className="num">{x.ref}</span><StatusBadge map={REQUEST_STATUS} value={r.status} />
+          {(r.details as { withdrawn?: boolean; withdrawnAt?: string }).withdrawn && <Badge tone="neutral" dot>{t("Withdrawn by the traveller")} · {timeAgo(new Date(String((r.details as { withdrawnAt?: string }).withdrawnAt ?? r.updatedAt)), L)}</Badge>}
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
           <span>· {timeAgo(r.createdAt, L)}</span>
           {x.contact && <ContactBadge contact={x.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}

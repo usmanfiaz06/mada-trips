@@ -7,6 +7,7 @@ import { listRequests } from "@/lib/app/desk/adapters";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Card, Empty, PageHeader, Table, Tabs, Td, Th } from "@/components/ui";
 import { REQUEST_STATUS, StatusBadge } from "@/components/desk/parts";
+import { Badge } from "@/components/ui";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 
 export const metadata = { title: "Requests · Desk" };
@@ -44,7 +45,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                       <span className="block text-[12px] text-ink-3"><span className="num">{r.ref}</span> · {timeAgo(r.createdAt, t.locale)}</span></Link></Td>
                     <Td className="whitespace-nowrap">{t(KIND[r.kind] ?? r.kind)}</Td>
                     <Td className="whitespace-nowrap">{r.userName}</Td>
-                    <Td><StatusBadge map={REQUEST_STATUS} value={r.status} /></Td>
+                    <Td>{(r.details as { withdrawn?: boolean } | null)?.withdrawn ? <Badge tone="neutral" dot>{t("Withdrawn by the traveller")}</Badge> : <StatusBadge map={REQUEST_STATUS} value={r.status} />}</Td>
                     <Td className="whitespace-nowrap">{sla ? <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} /> : <span className="text-[12.5px] text-ink-3">{fmtDate(r.updatedAt, t.locale, true)}</span>}</Td>
                     <Td className="whitespace-nowrap">{r.agentName ?? <span className="text-ink-4">—</span>}</Td>
                   </tr>

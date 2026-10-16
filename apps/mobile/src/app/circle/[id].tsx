@@ -93,6 +93,7 @@ export default function CircleChat() {
   const split = useAct((b: Parameters<typeof circlesApi.split>[1]) => circlesApi.split(id, b), () => []);
   const paid = useAct((a: { mid: string; key: string }) => circlesApi.paid(id, a.mid, { key: a.key, via: 'cash' }), () => []);
   const remind = useAct((mid: string) => circlesApi.remindSplit(id, mid), () => []);
+  const takeBack = useAct((mid: string) => circlesApi.takeBackSplit(id, mid), () => []);
   const dismiss = useAct((mid: string) => circlesApi.dismiss(id, mid), () => []);
   const pin = useAct((pid: string) => circlesApi.update(id, { pin: { kind: 'plan', id: pid } }), () => [ck.circle(id), ck.messages(id)]);
   const on = { onSuccess: (r: { items: CircleMessage[] } | undefined) => { if (r) merge(r.items); }, onError: fail };
@@ -204,7 +205,8 @@ export default function CircleChat() {
               <View key={m.id} onLayout={onLayout}><Bubble who={who} wide label={t('circles.chat.splitCost', { who: whoName(m) })}>
                 <SplitCard m={m} me={me} people={people} onPay={(sh) => payShare(m, sh)}
                   onRemind={() => remind.mutate(m.id, { ...on, onSuccess: (r) => { if (!r) return; merge(r.items); const names = m.split!.shares.filter((s) => !s.paid && !s.ids.includes(me)).map((s) => people.get(s.ids[0]!)?.short ?? ''); toast(t('circles.split.remindToast', { names: joinNames(names) })); } })}
-                  onMark={(sh) => paid.mutate({ mid: m.id, key: sh.key }, on)} />
+                  onMark={(sh) => paid.mutate({ mid: m.id, key: sh.key }, on)}
+                  onTakeBack={() => takeBack.mutate(m.id, { ...on, onSuccess: (r) => { if (!r) return; merge(r.items); buzz('success'); toast(t('tb.split.done')); } })} />
               </Bubble></View>
             );
             if (m.kind === 'card' && m.card) return (
@@ -252,6 +254,7 @@ export default function CircleChat() {
                 </Pressable>
                 {reacting === m.id ? <ReactionBar mine={who.kind === 'me'} onPick={(e) => toggle(m.id, e, !(m.reactions.find((r) => r.emoji === e)?.ids.includes(me)))} onClose={() => setReacting(null)} /> : null}
                 <Reactions list={m.reactions} me={me} mine={who.kind === 'me'} people={people} onToggle={(e, yes) => toggle(m.id, e, yes)} />
+                {m.held ? <T style={[st.seen, { color: m.held.status === 'removed' ? colors.badInk : colors.ink3 }]} testID="chat-held">{m.held.why}</T> : null}
                 {seen.length ? <T style={st.seen} testID="seen">{dm ? t('circles.chat.seen') : t('circles.chat.seenBy', { names: joinNames(seen) })}</T> : null}
               </View>
             );
