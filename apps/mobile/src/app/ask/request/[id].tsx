@@ -12,7 +12,7 @@ import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { travelEnds } from '@/lib/travel-ends';
-import { colors } from '@/theme';
+import { colors, font } from '@/theme';
 
 /*
  * One request as a conversation with the agent: who it's with and where it stands at the top, the request, the
@@ -41,9 +41,9 @@ export default function RequestScreen() {
         <TopBar onBack={() => router.back()} backLabel={t('common.back')} />
         {r ? (
           <View style={styles.head}>
-            <AgentDot name={agent} size={40} />
-            <View style={{ flex: 1 }}>
-              <T v="h3" accessibilityRole="header">{t('ask.req.withAgent', { agent })}</T>
+            <AgentDot name={agent} size={48} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <T style={font('displaySmall')} accessibilityRole="header">{t('ask.req.withAgent', { agent })}</T>
               <T v="small" accessibilityLiveRegion="polite" testID="request-status">{status}</T>
             </View>
           </View>
@@ -60,6 +60,6 @@ export default function RequestScreen() {
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingBottom: 10, borderBottomWidth: 1, borderColor: colors.line },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 14, borderBottomWidth: 1, borderColor: colors.line },
   bar: { paddingHorizontal: 20, paddingTop: 10, backgroundColor: colors.sand },
 });

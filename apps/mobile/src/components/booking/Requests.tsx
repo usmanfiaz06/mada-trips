@@ -250,7 +250,7 @@ export function SentRequest({ id, screen }: { id: string | null; people?: Person
           {canPay && phoneNeeded ? <T v="tiny">{t('ask.phone.beforePay')}</T> : null}
         </Card>
       ) : null}
-      <RequestThread request={r} />
+      <RequestThread request={r} stage={screen} />
       {screen ? null : <View style={{ alignSelf: 'center' }}><LinkButton label={t('search.seeInTrips')} onPress={() => router.replace('/trips')} testID="request-see-trips" /></View>}
       <PhoneSheet visible={phoneOpen} onClose={() => setPhoneOpen(false)} onDone={() => { setPhoneOpen(false); pay(); }} />
     </Animated.View>
@@ -314,8 +314,11 @@ export function ReplyBar({ requestId, agent }: { requestId: string; agent: strin
   );
 }
 
-/** Replies under a request, with the agent: who said it and when, the agent typing, offers with a button. */
-export function RequestThread({ request }: { request: BookingRequestView }) {
+/**
+ * Replies under a request, with the agent: who said it and when, the agent typing, offers with a button. `stage`:
+ * while nothing has been said yet, the map the request travels over fills the room the thread will take.
+ */
+export function RequestThread({ request, stage }: { request: BookingRequestView; stage?: boolean }) {
   const qc = useQueryClient();
   const th = useThread(request.id);
   const reply = useReply(request.id);
@@ -334,6 +337,7 @@ export function RequestThread({ request }: { request: BookingRequestView }) {
   const suggestions = requestSuggestions(request);
   return (
     <View style={{ gap: 10 }} accessibilityLabel={t('request.a11y.thread')}>
+      {stage && !msgs.length && !waiting ? <View style={styles.stage} testID="request-stage"><ArtMap /></View> : null}
       {msgs.map((m) => (
         <ThreadBubble key={m.id} mine={m.from === 'me'} name={m.authorName ?? agent} text={m.text} time={clock(m.createdAt)}>
           {m.attachment ? <AttachmentChip file={m.attachment} mine={m.from === 'me'} /> : null}
