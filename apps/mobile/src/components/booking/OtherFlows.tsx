@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { DESTINATIONS, addDays, ageOn, daysBetween, formatSar, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
+import { DESTINATIONS, permitAnswers, addDays, ageOn, daysBetween, formatSar, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t, tn } from '@/lib/i18n';
@@ -28,6 +28,7 @@ import { ArtSuitcase, Ask1, ChipWrap, CityStage, CityTiles, Photo, Working, useS
 import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 import { StayResults } from './StayResults';
+import { PartyStep, StayGuests } from './Party';
 
 /* Stays, curated plans and eSIMs in Ask. */
 
@@ -60,7 +61,11 @@ function stayDates(today: string): { id: string; label: string; dates: [string, 
   ];
 }
 
-export function StayFlow({ intent, query, people, selfName, today, setCta }: { intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void }) {
+export function StayFlow({ intent, query, people, selfName, today, setCta, onSync }: {
+  intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void;
+  /** What this flow has settled (asked here, not typed), so a correction typed later starts from it. */
+  onSync?: (patch: Partial<AskIntent>) => void;
+}) {
   const router = useRouter();
   const demo = useDemo((s) => s.on);
   const H = useMemo(() => householdOf(people, today), [people, today]);
@@ -72,6 +77,9 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const [checkOut, setCheckOut] = useState<string | null>(intent.depart && intent.return && intent.return > intent.depart ? intent.return : null);
   const said = intent.travellerIds?.filter((id) => people.some((p) => p.id === id)) ?? [];
   const [who, setWho] = useWho(() => (said.length ? said : H.me ? [H.me] : []));
+  // Counts or ages said that the household doesn't cover: the stepper asks who they are before the rooms are searched.
+  const [needParty, setNeedParty] = useState(!!intent.party && !said.length);
+  const [lap, setLap] = useState(intent.infants);
   const [editing, setEditing] = useState<'where' | 'when' | null>(null);
   const [calendar, setCalendar] = useState(false);
   const [go, setGo] = useState(false);
@@ -98,7 +106,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const step = useSequence(2, 700, searching ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null);
   const search = useQuery({ queryKey: ['booking', 'stays', dest?.key, checkIn, nights, who.join(), flags], enabled: searching, staleTime: 600_000, queryFn: () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who }) });
   // Entry checks don't depend on the rooms: asked at the same time as the search, not after it.
-  const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, flags], enabled: searching, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers }) });
+  // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
+  const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, !!intent.answers.permit, flags], enabled: searching, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }) });
   // A city can answer with a couple of hundred hotels: draw a page at a time, cheapest first.
   const s = search.data;
   const cur = s?.options.find((o) => o.id === pick) ?? s?.options[0];
@@ -106,13 +115,18 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   const start = () => { if (phoneNeeded) { setPhoneOpen(true); return; } buzz('tap'); if (city) recent.add(city); setGo(true); };
 
   useEffect(() => {
+    onSync?.({ destination: city ? city.key ?? 'other' : null, destinationName: city && !city.key ? city.name : null, depart: checkIn, return: checkOut, travellerIds: needParty ? intent.travellerIds : who, infants: lap });
+  }, [city?.key, city?.name, checkIn, checkOut, who.join(), needParty, lap]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (phase === 'who' && needParty) { setCta(null); return; }
     if (phase === 'who') {
       setCta({ label: phoneNeeded ? t('ask.phone.thenSearch') : live ? t('ask.stay.search', { guests: tn('ask.stay.guests', n) }) : t('ask.stay.askMada'), testID: 'stays-search', onPress: start });
       return;
     }
     // Results set their own action (StayResults: Review, and the box to say what matters).
     if (!ready) setCta(null);
-  }, [phase, ready, who.join(), phoneNeeded, live]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, ready, who.join(), phoneNeeded, live, needParty]); // eslint-disable-line react-hooks/exhaustive-deps
   const review = (o: StayOption) => { usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest!.key, askAgain: query }); router.push('/pay'); };
   useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -172,6 +186,15 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
   }
 
   /* 3. Who, and the rooms that makes: the household from the profile, children with their ages. Then search. */
+  if (phase === 'who' && needParty && intent.party) {
+    return (
+      <View style={{ gap: 16 }}>
+        {summary}
+        <PartyStep party={intent.party} people={people} today={checkIn!} selfName={selfName} title={t('ask.stay.q.who')}
+          onDone={(ids, lapInfants) => { setWho(ids); setLap(lapInfants); setNeedParty(false); }} />
+      </View>
+    );
+  }
   if (phase === 'who') {
     const kids = who.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p && (ageOn(p, checkIn!) ?? 30) < 18);
     return (
@@ -214,7 +237,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
   }
   return (
-    <StayResults s={s} city={dest!.key} cityName={cityLabel(city!)} dates={rangeName(checkIn!, checkOut!, today)} people={people} who={who} checkIn={checkIn!} summary={summary}
+    <StayResults guestLines={(o) => <StayGuests option={o} travellers={people.filter((p) => who.includes(p.id))} lapInfants={lap} onDay={checkIn!} testID="stay-guests" />} s={s} city={dest!.key} cityName={cityLabel(city!)} dates={rangeName(checkIn!, checkOut!, today)} people={people} who={who} checkIn={checkIn!} summary={summary}
       block={blockLabel(entry.data)} setCta={setCta} onReview={review} onDesk={(note) => { buzz('tap'); setDeskNote(note); setByHand(true); }}
       entry={<EntryChecks result={entry.data} destination={dest!.key} travellerIds={who} depart={checkIn!} ret={checkOut} answer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} remove={(id) => setWho((w) => w.filter((x) => x !== id))} />} />
   );

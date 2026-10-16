@@ -125,3 +125,10 @@ export function correctAsk(prev: AskIntent, text: string, ctx: { today: string; 
   next.ask = askOf(next, ctx.people);
   return { type: 'apply', intent: next, changed: [...new Set(changed)] };
 }
+
+/** "I have a permit": the entry-check answers that mark each traveller's visa and re-entry permit as in hand. */
+export function permitAnswers(intent: Pick<AskIntent, 'answers'>, travellerIds: string[], destination: string | null | undefined): Record<string, string> {
+  const c = destination ? DESTINATIONS[destination]?.country : null;
+  if (!intent.answers.permit?.length || !c) return {};
+  return Object.fromEntries(travellerIds.flatMap((id) => [[`${id}:${c}:visa`, 'has'], [`${id}:reentry`, 'has']]));
+}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { askIntentOfRules, householdOf, parseAskRules, todayIn, type AskIntent, type AskKind, type CopyKey, type Person } from '@mada/shared';
+import { REQUEST_FORMS, askIntentOfRules, correctAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -35,6 +35,10 @@ import { colors, font, ff } from '@/theme';
  */
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
+/** What the flow on screen has settled (asked there, not typed), so a correction starts from it. One Ask at a time. */
+let settled: Partial<AskIntent> = {};
+const onSync = (p: Partial<AskIntent>) => { settled = { ...settled, ...p }; };
+const forgetSettled = () => { settled = {}; };
 const PROMPT: Partial<Record<AskKind, CopyKey>> = { flight: 'ask.prompt.flight', stay: 'ask.prompt.stay', visa: 'ask.prompt.visa', umrah: 'ask.prompt.umrah', car: 'ask.prompt.car', food: 'ask.prompt.food', todo: 'ask.prompt.todo', esim: 'ask.prompt.esim' };
 
 export default function Ask() {
@@ -63,15 +67,51 @@ export default function Ask() {
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
   const scroll = useRef<ScrollView>(null);
+  // The corrections typed since the ask, shown as bubbles.
+  const [fixes, setFixes] = useState<string[]>([]);
+  const [fixing, setFixing] = useState<string | null>(null);
   const onReply = useCallback((r: { id: string; agent: string } | null) => { setReplyTo(r); setAskNew(false); }, []);
   const selfName = user?.name ?? '';
   const household = people.data ?? [];
 
-  const submit = async (text: string, kindHint?: AskKind) => {
+  /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
+  const correct = (text: string): 'done' | 'unclear' | 'new' => {
+    if (!intent || askNew || replyTo) return 'new';
+    const c = correctAsk({ ...intent, ...settled }, text, { today, people: household });
+    if (c.type !== 'apply') return c.type;
+    buzz('tap');
+    forgetSettled();
+    setFixes((f) => [...f, text]); setFixing(null); setDraft(''); setCta(null);
+    setIntent(c.intent); setRound((r) => r + 1);
+    toast(c.changed.length === 1 && c.changed[0] === 'permit' ? t('fix.permit') : t('fix.done'));
+    return 'done';
+  };
+  /** Mada couldn't tell what to change: ask again from that question, or start something new. */
+  const fix = (what: 'who' | 'when' | 'where' | 'new') => {
+    const text = fixing;
+    setFixing(null);
+    if (what === 'new') { if (text) void submit(text, undefined, true); return; }
+    if (!intent) return;
+    const base: AskIntent = { ...intent, ...settled, answers: { ...intent.answers } };
+    if (what === 'who') Object.assign(base, { travellerIds: null, party: base.party ?? partyOfPeople(household, base.travellerIds ?? [], today, base.infants) });
+    if (what === 'when') { Object.assign(base, { depart: null, return: null, monthOnly: null }); delete base.answers.when; }
+    if (what === 'where') { Object.assign(base, { destination: null, destinationName: null }); delete base.answers.where; }
+    buzz('tap');
+    forgetSettled();
+    setCta(null); setIntent({ ...base, ask: what }); setRound((r) => r + 1);
+  };
+
+  const submit = async (text: string, kindHint?: AskKind, fresh = false) => {
     const v = text.trim();
     if (!v) return;
+    if (!fresh && !kindHint) {
+      const r = correct(v);
+      if (r === 'done') return;
+      if (r === 'unclear') { buzz('soft'); setDraft(''); setFixing(v); return; }
+    }
     buzz('tap');
-    setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false);
+    forgetSettled();
+    setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
     if (status !== 'signedIn') { setNeedsSignIn(true); return; }
     setParsing(true);
     try {
@@ -101,8 +141,8 @@ export default function Ask() {
   let body: React.ReactNode;
   if (!intent) body = parsing ? null : <Start onPick={(x) => submit(x)} people={household} today={today} />;
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
-  else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} />;
-  else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} />;
+  else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
+  else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
   else if (kind === 'esim') body = <EsimFlow key={round} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
@@ -134,13 +174,21 @@ export default function Ask() {
         ) : undefined} />
         <ScrollView ref={scroll} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
+          {fixes.map((f, i) => <MeBubble key={`${i}-${f}`} text={f} testID="ask-fix" />)}
           <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
+          {fixing && intent ? <FixPrompt text={fixing} kind={intent.kind} onPick={fix} /> : null}
         </ScrollView>
         <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
           {cta && !offline && cta.refine ? (
             <>
               {/* Results: say what matters (typed or spoken) to refine them; the one action stays below. */}
-              {composer(cta.refine.hint, (text) => { setDraft(''); cta.refine!.onSubmit(text); }, cta.refine.testID)}
+              {composer(cta.refine.hint, (text) => {
+                setDraft('');
+                // Who, when or where changes the search itself; anything else refines these results.
+                const r = correct(text);
+                if (r === 'done') return;
+                if (cta.refine!.onSubmit(text) === false) setFixing(text);
+              }, cta.refine.testID)}
               <Button label={cta.label} disabled={cta.disabled} onPress={cta.onPress} testID={cta.testID ?? 'ask-cta'} />
             </>
           ) : cta && !offline ? (
@@ -164,6 +212,24 @@ export default function Ask() {
         <Button variant="ghost" label={t('common.notNow')} onPress={() => { setNeedsSignIn(false); router.back(); }} />
       </Sheet>
     </Screen>
+  );
+}
+
+/** "What should Mada change?": who, the dates or the place, asked again from that question; or a new ask. */
+function FixPrompt({ text, kind, onPick }: { text: string; kind: AskKind; onPick: (w: 'who' | 'when' | 'where' | 'new') => void }) {
+  const form = REQUEST_FORMS[kind as RequestFormKind] ?? [];
+  const searchable = kind === 'flight' || kind === 'stay';
+  const opts = ([['who', 'fix.who'], ['when', 'fix.when'], ['where', 'fix.where']] as const)
+    .filter(([w]) => searchable || form.some((f) => (w === 'who' ? f.people : f.k === w)));
+  return (
+    <Animated.View entering={enter(0)} style={{ gap: 10 }} testID="ask-fix-prompt">
+      <MeBubble text={text} />
+      <T v="h3">{t('fix.title')}</T>
+      <ChipWrap>
+        {opts.map(([w, k]) => <Chip key={w} label={t(k)} background={colors.paper} onPress={() => onPick(w)} />)}
+        <Chip label={t('fix.new')} background={colors.paper} onPress={() => onPick('new')} />
+      </ChipWrap>
+    </Animated.View>
   );
 }
 

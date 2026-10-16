@@ -33,10 +33,12 @@ import { MadaDot, Photo, enter } from './parts';
 const PAGE = 10;
 type Sort = StaySort | 'near';
 
-export function StayResults({ s, city, cityName, dates, people, who, checkIn, summary, entry, block, setCta, onReview, onDesk }: {
+export function StayResults({ s, city, cityName, dates, people, who, checkIn, summary, entry, block, setCta, onReview, onDesk, guestLines }: {
   s: StaySearchResponse; city: string; cityName: string; dates: string; people: Person[]; who: string[]; checkIn: string;
   summary: React.ReactNode; entry: React.ReactNode; block: string | null; setCta: (c: Cta) => void;
   onReview: (o: StayOption) => void; onDesk: (note: string) => void;
+  /** Who the rooms are for and the price per person, for the chosen place. */
+  guestLines?: (o: StayOption) => React.ReactNode;
 }) {
   const router = useRouter();
   const lang = getLocale();
@@ -101,7 +103,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const addText = (text: string) => {
     const p = parseStayWishes(text, city);
     buzz('tap');
-    if (!p.wishes.length) { setUnread(text); return; }
+    if (!p.wishes.length) { setUnread(text); return false; }
     setUnread(null);
     setWishes((w) => mergeWishes(w, p.wishes));
     setPick(null); setShown(PAGE);
@@ -109,6 +111,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
     const near = p.wishes.find((w): w is Extract<StayWish, { k: 'near' }> => w.k === 'near');
     const l = near ? landmarkById(near.id) : null;
     if (l) { setStored(city, anchorOfLandmark(l)); setSort('near'); }
+    return true;
   };
   const remove = (w: StayWish) => { buzz('select'); setUnread(null); setWishes((x) => x.filter((y) => wishKey(y) !== wishKey(w))); setPick(null); };
 
@@ -137,7 +140,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
     ...(first && shape.shape !== 'pilgrimage' ? [{ k: 'near', id: first.id, walk: false } as const] : []),
   ].filter((w) => !wishes.some((x) => wishKey(x) === wishKey(w as StayWish))) as StayWish[];
 
-  const answer = unread ? t('refine.notRead') : wishes.length ? refined.answer : null;
+  const answer = unread ? t('fix.notRead') : wishes.length ? refined.answer : null;
   const offerDesk = !!unread || (wishes.length > 0 && (!refined.matches.length || refined.unknown.length > 0));
   const deskNote = [...wishes.map((w) => wishLabel(w, lang)), unread].filter(Boolean).join(' · ');
   const sortLabel = t(sort === 'near' ? 'stays.sort.near' : `stays.sort.${sort}`);
@@ -232,6 +235,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
         </>
       )}
       {entry}
+      {cur && guestLines ? guestLines(cur) : null}
       <View style={{ height: 120 }} />
 
       <DistanceSheet visible={distOpen} city={city} cityName={cityName} value={anchor} onClose={() => setDistOpen(false)} onPick={(a) => { setStored(city, a); setSort('near'); setDistOpen(false); }} />

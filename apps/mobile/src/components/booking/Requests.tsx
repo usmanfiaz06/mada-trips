@@ -20,6 +20,7 @@ import { ErrorState } from '../states/ErrorState';
 import { T } from '../Text';
 import { AgentDot, ArtMap, ChipWrap, MadaDot, Notice, Toggle, enter, useWho } from './parts';
 import { TravellerChips } from './Travellers';
+import { PartyStep } from './Party';
 import { TravellerPassports } from '../passport/TravellerPassports';
 import { AttachmentChip } from './Attachment';
 import { FlightFares } from './FlightRequest';
@@ -53,6 +54,9 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
     return a;
   });
   const [who, setWho] = useWho(() => (named.length ? named : H.me ? [H.me] : []));
+  // "2 adults and 3 kids" for an Umrah or a visa: who they are is asked first (a stepper), never fewer than said.
+  const whoKey = form.find((f) => f.people)?.k ?? null;
+  const [needParty, setNeedParty] = useState(!!intent?.party && !named.length && !!whoKey && !autoSend);
   const [needs, setNeeds] = useState<Record<string, NeedKey[]>>(() => ({ ...(intent?.needs ?? {}) }) as Record<string, NeedKey[]>);
   // What was typed is already the first bubble; the note is only for something new.
   const [note, setNote] = useState('');
@@ -91,6 +95,9 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
 
   if (sent) return <SentRequest id={sent.id} people={people} selfName={selfName} />;
   if (autoSend) return null;
+  if (needParty && intent?.party) {
+    return <PartyStep party={intent.party} people={people} today={todayIn()} selfName={selfName} onDone={(ids) => { setWho(ids); if (whoKey) answer(whoKey, true); setNeedParty(false); }} />;
+  }
 
   const answeredText = (f: (typeof form)[number]) => (f.people ? joinAnd(who.map(nameOf))
     : f.needs ? (who.filter((id) => (needs[id] ?? []).length).map((id) => `${nameOf(id)}: ${(needs[id] ?? []).map((k) => wordFor(NEED_LABELS[k]).toLowerCase()).join(listSep())}`).join(' · ') || t('request.nothingNeeded'))
@@ -99,7 +106,8 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
   return (
     <View style={{ gap: 18 }}>
       {sysNote ? <Notice icon="doc"><T v="small">{sysNote}</T></Notice> : null}
-      {kind === 'umrah' ? <Notice icon="umrah" warn><T v="small">{t('request.umrahNusuk')}</T></Notice> : null}
+      {answers.permit ? <Notice icon="check"><T v="small" testID="request-permit">{t('fix.permit')}</T></Notice>
+        : kind === 'umrah' ? <Notice icon="umrah" warn><T v="small">{t('request.umrahNusuk')}</T></Notice> : null}
       {form.map((f, i) => {
         if (i > (done ? form.length : firstOpen)) return null;
         if (!isOpen(f.k, f)) return asked.has(f.k) ? <Answered key={f.k} q={t(f.q as CopyKey)} a={answeredText(f)} onChange={() => setEditing(f.k)} testID={`answered-${f.k}`} /> : null;

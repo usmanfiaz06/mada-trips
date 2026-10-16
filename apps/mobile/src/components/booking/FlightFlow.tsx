@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, formatSar, householdOf, monthLongName, nameIn, quickDates,
+  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
   type AskIntent, type FlightOption, type FlightSearchResponse, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -28,15 +28,20 @@ import { FlightRequestForm } from './FlightRequest';
 import { useFlightsByRequest } from '@/lib/beta';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
+import { FareBreakdown, PartyStep } from './Party';
 
 /* Flights in Ask: one question at a time (where, when, back when, who), then Mada shows its work and three options. */
 
 /** The one action at the bottom of Ask; with refine, the box above it says what matters for these results. */
-export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string; refine?: { hint: string; onSubmit: (text: string) => void; testID?: string } } | null;
+export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string; refine?: { hint: string; onSubmit: (text: string) => boolean | void; testID?: string } } | null;
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
-export function FlightFlow({ intent, query, people, selfName, today, setCta }: { intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void }) {
+export function FlightFlow({ intent, query, people, selfName, today, setCta, onSync }: {
+  intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void;
+  /** What this flow has settled (asked here, not typed), so a correction typed later starts from it. */
+  onSync?: (patch: Partial<AskIntent>) => void;
+}) {
   const router = useRouter();
   const demo = useDemo((s) => s.on);
   const H = useMemo(() => householdOf(people, today), [people, today]);
@@ -48,7 +53,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
   const [who, setWho] = useWho(() => (intent.travellerIds?.length ? intent.travellerIds : nonHelper.length ? nonHelper : H.me ? [H.me] : []));
   // Asked only for a household of more than one, which may arrive after the flow opens.
   const [whoDoneSet, setWhoDone] = useState<boolean | null>(intent.travellerIds?.length ? true : null);
-  const whoDone = whoDoneSet ?? nonHelper.length <= 1;
+  // Counts or ages said that the household doesn't cover ("2 adults and 3 kids aged 2, 6 and 13"): the stepper asks first.
+  const [needParty, setNeedParty] = useState(!!intent.party && !intent.travellerIds?.length);
+  const whoDone = !needParty && (whoDoneSet ?? nonHelper.length <= 1);
   const [mode, setMode] = useState<'normal' | 'others' | 'byhand' | 'flex'>('normal');
   const [editing, setEditing] = useState<{ month?: { month: number; year: number } | null } | null>(null);
   const [runKey, setRunKey] = useState(0);
@@ -83,20 +90,31 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
     queryFn: () => bookingApi.searchFlights({ from: trip.from, destination: dest!.key, depart: trip.dep!, return: trip.type === 'oneway' ? null : trip.ret, travellerIds: who, infants: trip.infants, cabin: trip.cabin, flexibleDays: mode === 'flex' || trip.flex ? 2 : 0 }),
   });
   const s: FlightSearchResponse | undefined = search.data;
+  // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
+  const permit = !!intent.answers.permit?.length;
   const entry = useQuery({
-    queryKey: ['booking', 'entry', dest?.key, who.join(), trip.dep, trip.ret, answers, flags],
+    queryKey: ['booking', 'entry', dest?.key, who.join(), trip.dep, trip.ret, answers, permit, flags],
     enabled: live && !!s,
-    queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: s!.depart, return: s!.return, answers }),
+    queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: s!.depart, return: s!.return, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }),
     placeholderData: (prev) => prev,
   });
 
+
+  const travellers = useMemo(() => who.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p), [who, people]);
+  // A child under 5 or a baby going: a 02:10 departure is never "best" or "earliest"; night flights go last.
+  const littleOnes = !!trip.dep && hasLittleOnes(travellers, trip.infants, trip.dep);
   const options = useMemo(() => {
     const list = [...(s?.options ?? [])];
     if (sort === 'cheapest') list.sort((a, b) => a.total.amount - b.total.amount);
     if (sort === 'fastest') list.sort((a, b) => a.out.durationMin - b.out.durationMin);
     if (sort === 'earliest') list.sort((a, b) => a.out.dep.localeCompare(b.out.dep));
-    return list;
-  }, [s, sort]);
+    const ranked = familyRank(list, littleOnes);
+    return sort === 'best' || sort === 'earliest' ? ranked : list.map((o) => ranked.find((r) => r.id === o.id)!);
+  }, [s, sort, littleOnes]);
+  const nightIds = useMemo(() => new Set(options.filter((o) => o.night).map((o) => o.id)), [options]);
+  useEffect(() => {
+    onSync?.({ destination: where.key ?? (where.other ? 'other' : null), destinationName: where.other, from: trip.from, depart: trip.dep, return: trip.ret, tripType: trip.type, cabin: trip.cabin, infants: trip.infants, travellerIds: whoDone ? who : intent.travellerIds });
+  }, [where.key, where.other, trip, who.join(), whoDone]); // eslint-disable-line react-hooks/exhaustive-deps
   const refinedF = useMemo(() => refineFlights(options, fwishes), [options, fwishes]);
   const shownOptions = fwishes.length && refinedF.matches.length ? refinedF.matches : options;
   const current: FlightOption | undefined = shownOptions.find((o) => o.id === pick) ?? shownOptions[0] ?? s?.options[0];
@@ -120,9 +138,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
         onSubmit: (text) => {
           const p = parseFlightWishes(text);
           buzz('tap');
-          if (!p.wishes.length) { setFunread(true); return; }
+          if (!p.wishes.length) { setFunread(true); return false; }
           setFunread(false); setPick(null);
           setFwishes((w) => [...w.filter((x) => !p.wishes.some((y) => flightWishKey(y) === flightWishKey(x))), ...p.wishes]);
+          return true;
         },
       },
     });
@@ -190,6 +209,16 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
         <Ask1 q={t('ask.q.return', { day: dayName(trip.dep, today) })} options={[[t('ask.q.after3', { day: dayName(addDays(trip.dep, 3), today) }), '3'], [t('ask.q.afterWeek', { day: dayName(addDays(trip.dep, 7), today) }), '7'], [t('ask.q.oneWay'), 'oneway'], [t('ask.q.pickDates'), 'pick']]}
           onPick={(v) => (v === 'pick' ? setEditing({}) : v === 'oneway' ? setTrip({ ...trip, type: 'oneway', ret: null }) : setTrip({ ...trip, ret: addDays(trip.dep!, Number(v)) }))} />
         {sheet}
+      </View>
+    );
+  }
+  if (needParty && intent.party) {
+    return (
+      <View style={{ gap: 18 }}>
+        {whereRow}
+        {whenRow}
+        <PartyStep party={intent.party} people={people} today={today} selfName={selfName}
+          onDone={(ids, lap) => { setWho(ids); setTrip((x) => ({ ...x, infants: lap })); setNeedParty(false); setWhoDone(true); setPick(null); }} />
       </View>
     );
   }
@@ -273,6 +302,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
       {blocking.length ? <T v="small" color={colors.goldInk}>{blocking.length === 1 ? t('search.blocking.one') : t('search.blocking.other', { count: blocking.length })}</T> : null}
       <Animated.View entering={enter(1)}><T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{words[Math.min(options.length, 3) - 1]}</T></Animated.View>
       {intent.cabinNote ? <T v="small">{intent.cabinNote}</T> : null}
+      {littleOnes && options.some((o) => o.night) ? <T v="small" testID="family-first">{t('search.family.first')}</T> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={t('search.a11y.edit')} onPress={() => setEditing({})} style={styles.summary} testID="search-edit">
         <View style={{ flex: 1, gap: 1 }}>
           <T v="h3" style={{ fontSize: 15 }}>{t('search.summary', { from: AIRPORT_NAMES[s.from] ?? s.from, to: dest!.name, dates: dateLabel })}</T>
@@ -300,7 +330,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
           </View>
           <View style={styles.answer} testID="flights-answer">
             <MadaDot size={26} />
-            <T v="small" color={colors.green} style={{ flex: 1 }}>{funread ? t('refine.notRead') : `${refinedF.answer}${fwishes.length && !refinedF.matches.length ? ` ${t('refine.closest')}` : ''}`}</T>
+            <T v="small" color={colors.green} style={{ flex: 1 }}>{funread ? t('fix.notRead') : `${refinedF.answer}${fwishes.length && !refinedF.matches.length ? ` ${t('refine.closest')}` : ''}`}</T>
           </View>
         </View>
       ) : null}
@@ -316,13 +346,14 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta }: {
                     <AirlineMark carrier={f.carrier} brand={f.brand} label={f.airline} />
                     <View style={{ gap: 2 }}>
                       <T v="h3" style={{ fontSize: 15 }}>{f.airline}</T>
-                      <Pill label={t(`search.label.${f.label}`)} variant={on ? 'gold' : 'default'} height={22} />
+                      <Pill label={nightIds.has(f.id) ? t('search.label.night') : t(`search.label.${f.label}`)} variant={on && !nightIds.has(f.id) ? 'gold' : 'default'} height={22} />
                     </View>
                   </View>
                   <T style={styles.price}>{formatSar(f.total.amount)}</T>
                 </View>
                 <Leg dep={f.out.dep} arr={f.out.arr} from={f.out.from} to={f.out.to} durationMin={f.out.durationMin} stop={f.stop} />
-                <T v="small">{f.reason}</T>
+                <T v="small">{nightIds.has(f.id) ? t('search.family.night', { time: f.out.dep }) : f.reason}</T>
+                {on && (travellers.length > 1 || f.infants) ? <FareBreakdown option={f} travellers={travellers} onDay={f.out.date} testID="fare-breakdown" /> : null}
               </Pressable>
               {on && open === f.id ? (
                 <Animated.View entering={enter(0)} style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 8 }}>
