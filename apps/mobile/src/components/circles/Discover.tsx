@@ -16,7 +16,7 @@ import { t } from '@/lib/i18n';
 import { colors, ff, font } from '@/theme';
 import { ArtMap } from './art';
 import { useSaveToggle } from './hooks';
-import { CitySheet, relLabel } from './sheets';
+import { CitySheet, relLabel, thanksLine } from './sheets';
 import { Face, GlassButton, PhotoFill } from './ui';
 
 const Arrow = () => <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.paper} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><Path d="M5 12h14M13 6l6 6-6 6" /></Svg>;
@@ -125,6 +125,7 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
                   <Icon name="pin" size={16} color={colors.gold} />
                   <T style={{ fontFamily: ff.ui600, fontSize: 14, color: 'rgba(255,253,249,0.92)' }}>{p.place}</T>
                 </View>
+                {thanksLine(p) ? <T style={{ fontSize: 12, color: 'rgba(255,253,249,0.8)', fontFamily: ff.ui500 }} testID="tip-thanks">{thanksLine(p)}</T> : null}
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
                   <GlassButton on={on} a11y={t('circles.tip.saveA11y', { place: p.place })} icon={<Bookmark on={on} />} label={String(p.saves)} onPress={() => togglePost(p)} testID="tip-bookmark" />
                   <GlassButton label={p.kind === 'food' ? t('circles.bookTable') : t('circles.planIt')} onPress={() => ask(p.kind === 'food' ? t('circles.tableAsk', { place: p.place }) : p.place)} icon={null} />

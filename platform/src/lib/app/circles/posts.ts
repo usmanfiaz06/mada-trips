@@ -21,17 +21,20 @@ async function serialize(me: string, rows: Row[], g: Graph): Promise<Post[]> {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
   const authors = [...new Set(rows.map((r) => r.authorId))];
-  const [people, trips, saves, mine] = await Promise.all([
+  const [people, trips, saves, mine, thanks, myThanks] = await Promise.all([
     peopleByIds(authors),
     pastTrips(authors),
     db.select({ ref: appSaved.refId, n: sql<number>`count(*)::int` }).from(appSaved).where(and(eq(appSaved.kind, "post"), inArray(appSaved.refId, ids))).groupBy(appSaved.refId),
     db.select({ ref: appSaved.refId }).from(appSaved).where(and(eq(appSaved.userId, me), eq(appSaved.kind, "post"), inArray(appSaved.refId, ids))),
+    db.select({ ref: appPostThanks.postId, n: sql<number>`count(*)::int` }).from(appPostThanks).where(inArray(appPostThanks.postId, ids)).groupBy(appPostThanks.postId),
+    db.select({ ref: appPostThanks.postId }).from(appPostThanks).where(and(eq(appPostThanks.userId, me), inArray(appPostThanks.postId, ids))),
   ]);
   return rows.map((r) => ({
     id: r.id, author: people.get(r.authorId)!, relation: relationOf(g, me, r.authorId), authorTrips: trips.filter((x) => x.ownerId === r.authorId).length,
     city: r.city, place: r.place, text: r.body, kind: r.kind === "food" ? "food" : "todo", audience: r.audience === "everyone" ? "everyone" : "friends",
     photoKey: (r.photoKey as Post["photoKey"]) ?? null, photoUrl: r.hasPhoto ? `/api/app/v1/posts/${r.id}/photo` : null,
     saves: saves.find((s) => s.ref === r.id)?.n ?? 0, saved: mine.some((s) => s.ref === r.id),
+    thanks: thanks.find((x) => x.ref === r.id)?.n ?? 0, thanked: myThanks.some((x) => x.ref === r.id),
     status: r.status === "approved" ? "approved" : r.status === "rejected" ? "rejected" : "pending", createdAt: r.createdAt.toISOString(),
   }));
 }
@@ -120,6 +123,12 @@ export async function thank(me: string, id: string) {
     const ins = await tx.insert(appPostThanks).values({ postId: id, userId: me }).onConflictDoNothing().returning({ p: appPostThanks.postId });
     if (ins.length) await notify(tx, post.author.id, "post.thanks", ["notify.circles.thanks.title", { name }], ["notify.circles.thanks.body", { place: post.place }], null, { postId: id });
   });
+}
+
+/** Thanks a person received across all their tips (the profile's "thanked 12 times"). */
+export async function thanksReceived(author: string): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(appPostThanks).innerJoin(appPosts, eq(appPosts.id, appPostThanks.postId)).where(and(eq(appPosts.authorId, author), isNull(appPosts.deletedAt)));
+  return row?.n ?? 0;
 }
 
 export async function photo(me: string, id: string): Promise<{ mime: string; data: Buffer }> {

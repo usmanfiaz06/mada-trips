@@ -129,6 +129,10 @@ async function demo() {
   await see('Saved to Riyadh. Find it in Circles → Saved.', 'saved toast');
   await byTest('tip-card').first().click();
   await see('Book a table', 'tip detail');
+  // Thanks are counted on the tip: "2 people thanked Abdullah", then "You and 2 others" once you do.
+  await see('thanked', 'thanks count on the tip');
+  await byTest('tip-thank').click();
+  await see('You and', 'your thanks counted');
   await shot('tip-detail');
   await byTest('tip-report').click();
   await see('What’s wrong?', 'report sheet');

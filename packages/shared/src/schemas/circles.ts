@@ -377,6 +377,9 @@ export const Post = z.object({
   photoUrl: z.string().nullable(),
   saves: z.number().int(),
   saved: z.boolean(),
+  /** People who thanked the author for this tip ("2 people thanked Abdullah for this"), and whether you did. Older servers send none. */
+  thanks: z.number().int().default(0),
+  thanked: z.boolean().default(false),
   status: z.enum(['pending', 'approved', 'rejected']),
   createdAt: IsoDateTime,
 });
@@ -399,6 +402,8 @@ export const ProfileResponse = z.object({
   asked: z.boolean(),
   askedMe: z.boolean(),
   followers: z.number().int(),
+  /** Thanks this person received across their tips. Older servers send none. */
+  thanks: z.number().int().default(0),
   circles: z.array(z.object({ id: Id, name: z.string(), memberCount: z.number().int() })),
   posts: z.array(Post),
 });

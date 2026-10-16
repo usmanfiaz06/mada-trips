@@ -7,7 +7,7 @@ import { appPeople, appUsers } from "@/db/app-schema";
 import { appFollows, appFriendships } from "@/db/app-schema-circles";
 import { AppError } from "../http";
 import { assertUnder, err, graphOf, liveUser, mutualCounts, nextTrip, notify, pastTrips, peopleByIds, relationOf, type Graph } from "./common";
-import { postsBy } from "./posts";
+import { postsBy, thanksReceived } from "./posts";
 
 /*
  * Friends are mutual (one asks, the other says yes, and nobody is told about a no). Following is one way and only
@@ -165,7 +165,7 @@ export async function profile(me: string, other: string): Promise<ProfileRespons
     WHERE coalesce(d.dm, false) = false ORDER BY c.updated_at DESC`);
   return {
     person: person!, isFriend: g.friends.has(other), following: g.following.has(other), asked: g.asked.has(other), askedMe: g.askedMe.has(other),
-    followers: followers?.n ?? 0, circles: shared.map((c) => ({ id: c.id, name: c.name, memberCount: Number(c.n) })),
+    followers: followers?.n ?? 0, thanks: await thanksReceived(other), circles: shared.map((c) => ({ id: c.id, name: c.name, memberCount: Number(c.n) })),
     posts: await postsBy(me, other),
   };
 }

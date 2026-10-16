@@ -171,6 +171,10 @@ describe("tips and moderation", () => {
     const n = await db.execute<{ n: number }>(raw`SELECT count(*)::int AS n FROM app_notifications WHERE user_id = ${reem.id} AND kind = 'post.thanks'`);
     expect(n[0]!.n).toBe(1);
     expect((await call(withParams(thanksPost, { id: p.id }), auth(reem))).status).toBe(400);
+    // The count is on the tip for everyone, "thanked" only for the person who did, and the author's profile tallies it.
+    expect((await get(withParams(postGet, { id: p.id }), omar)).json.post).toMatchObject({ thanks: 1, thanked: true });
+    expect((await get(withParams(postGet, { id: p.id }), reem)).json.post).toMatchObject({ thanks: 1, thanked: false });
+    expect((await get(withParams(profileGet, { id: reem.id }), omar)).json).toMatchObject({ thanks: 1 });
     for (let i = 0; i < 4; i += 1) await call(postsPost, { ...auth(reem), body: TIP });
     const limited = await call(postsPost, { ...auth(reem), body: TIP });
     expect(limited.status).toBe(429);

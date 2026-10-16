@@ -894,4 +894,12 @@ export const enCircles = {
   'circles.people.requestOpenA11y': 'See {name}’s profile',
   'circles.friend.takeBack': 'Take back request',
   'circles.friend.tookBack': 'Request taken back. {name} wasn’t told.',
+  // Thanks counts on tips and the profile (owner audit, item 23).
+  'circles.tip.thanks.one': '1 person thanked {name} for this',
+  'circles.tip.thanks.other': '{count} people thanked {name} for this',
+  'circles.tip.thanksYou': 'You thanked {name} for this',
+  'circles.tip.thanksYouOthers.one': 'You and 1 other thanked {name} for this',
+  'circles.tip.thanksYouOthers.other': 'You and {count} others thanked {name} for this',
+  'circles.friend.thanks.one': 'Thanked once for a tip',
+  'circles.friend.thanks.other': 'Thanked {count} times for tips',
 } as const;

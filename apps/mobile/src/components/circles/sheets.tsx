@@ -271,7 +271,8 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
   const [thanked, setThanked] = useState(false);
   const live = useApiQuery({ queryKey: ['circles', 'post', post?.id ?? ''], queryFn: () => circlesApi.post(post!.id), enabled: !!post, retry: false });
   const del = useAct((id: string) => circlesApi.deletePost(id));
-  const thank = useAct((id: string) => circlesApi.thank(id), () => []);
+  // A thank refreshes this tip and the feed, so the count under it ("2 people thanked Noor") moves at once.
+  const thank = useAct((id: string) => circlesApi.thank(id), (id) => [['circles', 'post', id], ['circles', 'posts'], ck.profile(post?.author.id ?? '')]);
   const report = useAct((r: { id: string; reason: string }) => circlesApi.report({ targetKind: 'post', targetId: r.id, reason: r.reason as 'other' }), () => []);
   if (!post) return <Sheet visible={false} onClose={onClose} label=""><View /></Sheet>;
   if (live.isError && (live.error as ApiError)?.status === 404) return (
@@ -281,6 +282,9 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
   const plan = () => { onClose(); router.push({ pathname: '/ask', params: { prefill: post.kind === 'food' ? t('circles.tableAsk', { place: post.place }) : post.place } }); };
   const rel = relLabel(post);
   const src = photoSource(post);
+  const fresh = live.data?.post ?? post;
+  const counted = { ...fresh, thanks: fresh.thanks + (thanked && !fresh.thanked ? 1 : 0), thanked: fresh.thanked || thanked };
+  const thanksText = thanksLine(counted);
   return (
     <Sheet visible onClose={onClose} label={post.place}>
       <SheetScroll>
@@ -302,8 +306,9 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
           <Row wrap gap={8}>
             <Button size="small" block={false} variant={post.saved ? 'gold' : 'secondary'} label={post.saved ? t('circles.saved') : t('circles.save')} onPress={() => onSave(post)} testID="tip-save" />
             <Button size="small" block={false} label={post.kind === 'food' ? t('circles.bookTable') : t('circles.tipDetail.planWith')} onPress={plan} />
-            {!mine ? <Button size="small" block={false} variant="secondary" disabled={thanked} label={thanked ? t('circles.tipDetail.thanked', { name: post.author.short }) : t('circles.tipDetail.thank', { name: post.author.short })} onPress={() => { setThanked(true); thank.mutate(post.id); }} /> : null}
+            {!mine ? <Button size="small" block={false} variant="secondary" disabled={counted.thanked} label={counted.thanked ? t('circles.tipDetail.thanked', { name: post.author.short }) : t('circles.tipDetail.thank', { name: post.author.short })} onPress={() => { setThanked(true); thank.mutate(post.id); }} testID="tip-thank" /> : null}
           </Row>
+          {thanksText ? <Row gap={6}><Icon name="star" size={14} color={colors.goldInk} /><T v="small" color={colors.goldInk} testID="tip-thanks">{thanksText}</T></Row> : null}
           {mine
             ? <Button variant="ghost" color={colors.badInk} label={t('circles.tipDetail.delete')} onPress={() => setMode('delete')} testID="tip-delete" />
             : <Button variant="ghost" color={colors.badInk} label={t('circles.tipDetail.report')} onPress={() => setMode('report')} testID="tip-report" />}
@@ -311,6 +316,14 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
       </SheetScroll>
     </Sheet>
   );
+}
+
+/** "2 people thanked Abdullah for this", "You and 1 other thanked Noor": the thanks under a tip, or null when none yet. */
+export function thanksLine(p: Pick<Post, 'thanks' | 'thanked' | 'author' | 'relation'>): string | null {
+  const name = p.relation === 'you' ? t('circles.you') : p.author.short;
+  if (!p.thanks) return null;
+  if (p.thanked) return p.thanks > 1 ? tn('circles.tip.thanksYouOthers', p.thanks - 1, { name }) : t('circles.tip.thanksYou', { name });
+  return tn('circles.tip.thanks', p.thanks, { name });
 }
 
 /** "Friend", "Mada traveller · 14 trips": who posted, from your side. */

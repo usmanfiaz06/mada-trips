@@ -92,6 +92,8 @@ function emit(circleId: string, kind: LiveKind, ref: string | null = null, actor
 let blocks: { by: string; who: string }[] = [];
 let posts: PostRow[] = [];
 let saved: { id: string; userId: string; kind: 'post' | 'plan'; refId: string; city: string; post: unknown; at: number }[] = [];
+/** Who thanked whom for a tip (one per person per tip, like app_post_thanks). Seeded tips start with a few. */
+let thanks: { postId: string; userId: string }[] = [];
 const presence = new Map<string, { city: string; dates: string | null; audience: 'picked' | 'close' | 'family'; ids: string[]; endsAt: number }>();
 let marks: { userId: string; otherId: string; mark: 'hidden' | 'hello' | 'no'; city: string | null }[] = [];
 const seeded = new Set<string>();
@@ -125,6 +127,7 @@ const SEED_POSTS: Omit<PostRow, 'id' | 'status' | 'approveAt' | 'deleted' | 'pho
   { authorId: ID.abdullah, city: 'AlUla', place: 'Maraya at night', body: 'The concert hall is mirrors outside. Go for the light show, book the 9pm dinner in advance.', kind: 'todo', audience: 'everyone', photoKey: 'alula', at: now() - 35 * DAY },
 ];
 posts = SEED_POSTS.map((p, i) => ({ ...p, id: P(100 + i), status: 'approved', approveAt: null, deleted: false, photoUrl: null }));
+thanks = [{ postId: P(100), userId: ID.abdullah }, { postId: P(100), userId: ID.maha }, { postId: P(101), userId: ID.noor }, { postId: P(101), userId: ID.reem }, { postId: P(104), userId: ID.noor }];
 
 /* ───────────── who knows whom ───────────── */
 
@@ -401,6 +404,7 @@ function toPost(me: string, p: PostRow): Post {
     id: p.id, author: ref(p.authorId), relation: relation(me, p.authorId), authorTrips: people.get(p.authorId)?.trips ?? 0, city: p.city, place: p.place, text: p.body, kind: p.kind,
     audience: p.audience, photoKey: (p.photoKey as Post['photoKey']) ?? null, photoUrl: p.photoUrl, saves: (p.id.startsWith('00000000') ? [24, 11, 52, 38, 19][Number(p.id.slice(-1))] ?? 0 : 0) + saved.filter((s) => s.kind === 'post' && s.refId === p.id).length,
     saved: saved.some((s) => s.userId === me && s.kind === 'post' && s.refId === p.id), status: p.status, createdAt: new Date(p.at).toISOString(),
+    thanks: thanks.filter((x) => x.postId === p.id).length, thanked: thanks.some((x) => x.postId === p.id && x.userId === me),
   };
 }
 
@@ -814,6 +818,7 @@ const routes: Route[] = [
       person: friendView(me, id!), isFriend: isFriend(me, id!), following: following(me).includes(id!),
       asked: friendships.some((f) => f.status === 'pending' && f.a === me && f.b === id), askedMe: friendships.some((f) => f.status === 'pending' && f.a === id && f.b === me),
       followers: 120 + (people.get(id!)?.places ?? 0) * 7 + follows.filter((f) => f.to === id).length,
+      thanks: thanks.filter((x) => posts.some((p) => p.id === x.postId && p.authorId === id && !p.deleted)).length,
       circles: shared.map((c) => ({ id: c.id, name: c.name, memberCount: memberIds(c.id).length })),
       posts: posts.filter((p) => p.authorId === id && p.status === 'approved' && visiblePost(me, p)).sort((a, b) => b.at - a.at).map((p) => toPost(me, p)),
     });
@@ -860,7 +865,13 @@ const routes: Route[] = [
   }],
   [/^\/posts\/([\w-]+)$/, 'GET', ({ me }, id) => { settle(); const p = posts.find((x) => x.id === id); if (!p || !visiblePost(me, p)) throw no('NOT_FOUND'); return ok({ post: toPost(me, p) }); }],
   [/^\/posts\/([\w-]+)$/, 'DELETE', ({ me }, id) => { const p = posts.find((x) => x.id === id && x.authorId === me && !x.deleted); if (!p) throw no('NOT_FOUND'); p.deleted = true; return ok({ ok: true }); }],
-  [/^\/posts\/([\w-]+)\/thanks$/, 'POST', ({ me }, id) => { const p = posts.find((x) => x.id === id); if (!p || !visiblePost(me, p)) throw no('NOT_FOUND'); if (p.authorId === me) throw no('VALIDATION', 'circles.err.self'); return ok({ ok: true }); }],
+  [/^\/posts\/([\w-]+)\/thanks$/, 'POST', ({ me }, id) => {
+    const p = posts.find((x) => x.id === id);
+    if (!p || !visiblePost(me, p)) throw no('NOT_FOUND');
+    if (p.authorId === me) throw no('VALIDATION', 'circles.err.self');
+    if (!thanks.some((x) => x.postId === p.id && x.userId === me)) thanks.push({ postId: p.id, userId: me });
+    return ok({ ok: true });
+  }],
 
   [/^\/saved$/, 'GET', ({ me }) => ok({ saved: saved.filter((s) => s.userId === me).sort((a, b) => b.at - a.at).map((s): SavedItem => ({ id: s.id, kind: s.kind, refId: s.refId, city: s.city, post: s.post as SavedItem['post'], savedAt: new Date(s.at).toISOString() })) })],
   [/^\/saved$/, 'POST', ({ me, body }) => {

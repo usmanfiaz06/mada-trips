@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
-import { ReportBody } from '@/components/circles/sheets';
+import { ReportBody, thanksLine } from '@/components/circles/sheets';
 import { ChoiceCard, Face, Row, RoundButton } from '@/components/circles/ui';
 import { Card } from '@/components/Card';
 import { Icon } from '@/components/Icon';
@@ -58,6 +58,7 @@ export default function Friend() {
           <View style={{ flex: 1, gap: 2 }}>
             <T v="h1" style={{ fontSize: 26, lineHeight: 30 }} accessibilityRole="header">{f.name}</T>
             <T v="small">{t('circles.friend.stats', { lead, places: f.places, followers: p.followers })}</T>
+            {p.thanks > 0 ? <T v="small" color={colors.goldInk} testID="friend-thanks">{tn('circles.friend.thanks', p.thanks)}</T> : null}
           </View>
         </Row>
         {here ? (
@@ -96,6 +97,7 @@ export default function Friend() {
             <T v="tiny">{`${x.city} · ${x.kind === 'food' ? t('circles.kind.food') : t('circles.kind.todo')} · ${whenLabel(x.createdAt)}`}</T>
             <T v="h3" style={{ fontSize: 15 }}>{x.place}</T>
             <T v="small" color={colors.inkSoft}>{x.text}</T>
+            {thanksLine(x) ? <T v="tiny" color={colors.goldInk}>{thanksLine(x)}</T> : null}
           </Card>
         )) : <T v="small">{t('circles.friend.noTips', { name: f.short })}</T>}
       </ScrollView>
