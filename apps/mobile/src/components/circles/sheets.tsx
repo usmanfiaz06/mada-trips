@@ -208,7 +208,7 @@ export function CitySheet({ visible, onClose, current, sheet, onPick, onGuide }:
 }
 
 /** Post a tip: city, place, the tip, kind, an optional photo everyone in it agreed to, who sees it. Checked before it shows. */
-export function PostSheet({ visible, onClose, cities, initialCity, onPosted }: { visible: boolean; onClose: () => void; cities: string[]; initialCity: string; onPosted: (audience: 'friends' | 'everyone') => void }) {
+export function PostSheet({ visible, onClose, cities, initialCity, onPosted }: { visible: boolean; onClose: () => void; cities: string[]; initialCity: string; onPosted: (audience: 'friends' | 'everyone', held?: string | null) => void }) {
   const [city, setCity] = useState(initialCity);
   const [place, setPlace] = useState('');
   const [text, setText] = useState('');
@@ -228,7 +228,7 @@ export function PostSheet({ visible, onClose, cities, initialCity, onPosted }: {
     setError(null); setPhoto(data); setConsent(false);
   };
   const post = () => create.mutate({ city, place: place.trim(), text: text.trim(), kind, audience, photo, photoConsent: photo ? consent : undefined }, {
-    onSuccess: () => { buzz('success'); setPlace(''); setText(''); setPhoto(null); setConsent(false); onPosted(audience); },
+    onSuccess: (r) => { buzz('success'); setPlace(''); setText(''); setPhoto(null); setConsent(false); onPosted(audience, r.post.held); },
     onError: (e) => setError(e instanceof ApiError ? e.message : t('error.internal')),
   });
   return (
@@ -303,6 +303,8 @@ export function PostDetail({ post, onClose, onSave }: { post: Post | null; onClo
           </Pressable>
           <T v="h2">{post.place}</T>
           <T v="body">{post.text}</T>
+          {/* Why it waits for a person, or why it didn't go up: to its author, in plain words (moderation). */}
+          {mine && post.held ? <T v="small" testID="tip-held" style={{ color: colors.ink2 }}>{post.held}</T> : null}
           <Row wrap gap={8}>
             <Button size="small" block={false} variant={post.saved ? 'gold' : 'secondary'} label={post.saved ? t('circles.saved') : t('circles.save')} onPress={() => onSave(post)} testID="tip-save" />
             <Button size="small" block={false} label={post.kind === 'food' ? t('circles.bookTable') : t('circles.tipDetail.planWith')} onPress={plan} />

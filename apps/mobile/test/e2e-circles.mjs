@@ -153,6 +153,15 @@ async function demo() {
   await see('being checked', 'pending tip');
   await shot('tip-pending');
 
+  step('a tip the check holds: the author is told why, plainly');
+  await scroll(page, -2000);
+  await byTest('post-tip').click();
+  await byTest('tip-place').fill('Sky Bar');
+  await byTest('tip-text').fill('Great cocktails on the roof at sunset, book ahead.');
+  await byTest('tip-post').click();
+  await see('Mada doesn’t list bars, nightclubs, adult venues or gambling.', 'held: places we don’t list');
+  await shot('tip-held');
+
   step('circles view');
   await text('Circles').click();
   await see('Noor is in Istanbul when you are.', 'who is around');

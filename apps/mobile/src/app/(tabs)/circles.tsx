@@ -51,7 +51,7 @@ export default function Circles() {
           : <CirclesHome onDiscover={() => setView('discover')} onOpenPost={setOpen} />}
       </Scroll>
       <PostSheet key={`post-${opens}`} visible={!!posting} onClose={() => setPosting(null)} cities={postCities} initialCity={posting ?? HOME_CITY}
-        onPosted={(audience) => { setPosting(null); setView('discover'); toast(audience === 'friends' ? t('circles.postTip.postedFriends') : t('circles.postTip.postedEveryone')); }} />
+        onPosted={(audience, held) => { setPosting(null); setView('discover'); toast(held ?? (audience === 'friends' ? t('circles.postTip.postedFriends') : t('circles.postTip.postedEveryone'))); }} />
       <PostDetail key={open?.id ?? 'none'} post={open} onClose={() => setOpen(null)} onSave={(p) => { togglePost(p); setOpen({ ...p, saved: !p.saved }); }} />
     </Screen>
   );
