@@ -169,6 +169,17 @@ try {
   await scroll(800);
   await shot('trip-detail-manage');
 
+  step('money: per person, who paid, the statement');
+  await tapText('Who paid what');
+  await see('spent on this trip', 'money screen');
+  await see('shared between everyone', 'money per person');
+  await see('Statement as PDF', 'money statement');
+  await shot('money');
+  await page.mouse.move(195, 420); await page.mouse.wheel(0, 900); await page.waitForTimeout(400);
+  await shot('money-lower');
+  await back();
+  await scroll(800);
+
   step('payments and invoices');
   await tapText('Payments and invoices');
   await page.waitForTimeout(800);

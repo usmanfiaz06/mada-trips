@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { Icon, type IconName } from '@/components/Icon';
 import { PayMark } from '@/components/PayMark';
 import { ArtReceipt } from '@/components/trips/Arts';
+import { Approx } from '@/components/wallet/Approx';
 import { Box, Eyebrow, Grow, H3, IconTile, Num, Rise, Row, Small, Spread, Tag, Tiny, TripScreen } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -35,6 +36,7 @@ export default function Payments() {
       <Rise style={{ gap: 4 }}>
         <Eyebrow>{trip ? t('pay.eyebrow', { city: trip.city, ref: trip.bookingRef ?? '' }) : ''}</Eyebrow>
         <Num size={38} style={{ lineHeight: 40 }}>{formatSar(q.data?.total.amount ?? 0)}</Num>
+        <Approx amount={q.data?.total.amount ?? 0} size={13} />
         <Small>{q.data?.refunded.amount ? t('pay.totalRefunded', { amount: formatSar(q.data.refunded.amount) }) : t('pay.total')}</Small>
       </Rise>
       {next ? (

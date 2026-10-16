@@ -6,7 +6,7 @@ import { create } from 'zustand';
 import { z } from 'zod';
 import {
   ChangeFlightResponse, ChangeOptionsResponse, DisruptionChoiceResponse, DisruptionResponse, FlightStatusResponse, InvoiceResponse, ItineraryResponse, MoveResponse,
-  PaymentsResponse, RefundQuoteResponse, RefundResponse, TRIP_ROUTES, TrackedResponse, TripAskResponse, TripPhase, TripRefreshResponse, TripResponse, TripsResponse,
+  PaymentsResponse, TripMoneyResponse, RefundQuoteResponse, RefundResponse, TRIP_ROUTES, TrackedResponse, TripAskResponse, TripPhase, TripRefreshResponse, TripResponse, TripsResponse,
   Notification, TrackedFlightView,
   type ChangeFlightRequest, type ChangeKind, type Company, type CreateRefundRequest, type CreateTripAskRequest, type DisruptionKind, type PatchTripRequest, type TrackFlightRequest,
 } from '@mada/shared';
@@ -113,6 +113,7 @@ export const tripsApi = {
   itinerary: (id: string) => get(TRIP_ROUTES.itinerary(id), ItineraryResponse),
   refresh: (id: string) => send('POST', TRIP_ROUTES.refresh(id), {}, TripRefreshResponse),
   payments: (id: string) => get(TRIP_ROUTES.payments(id), PaymentsResponse),
+  money: (id: string) => get(TRIP_ROUTES.money(id), TripMoneyResponse),
   refundQuote: (id: string) => get(TRIP_ROUTES.refundQuote(id), RefundQuoteResponse),
   refund: (id: string, body: CreateRefundRequest) => send('POST', TRIP_ROUTES.refunds(id), body, RefundResponse),
   cancelStay: (id: string, clientKey: string) => send('POST', TRIP_ROUTES.cancelStay(id), { clientKey }, RefundResponse),
@@ -147,6 +148,7 @@ export const tk = {
   trip: (id: string, phase: string | null) => ['trips', 'trip', id, phase ?? 'real'] as const,
   itinerary: (id: string, phase: string | null) => ['trips', 'itinerary', id, phase ?? 'real'] as const,
   payments: (id: string) => ['trips', 'payments', id] as const,
+  money: (id: string) => ['trips', 'money', id] as const,
   quote: (id: string, phase: string | null) => ['trips', 'quote', id, phase ?? 'real'] as const,
   invoice: (id: string) => ['trips', 'invoice', id] as const,
   disruption: (id: string, kind: string | undefined, phase: string | null) => ['trips', 'disruption', id, kind ?? '', phase ?? 'real'] as const,
@@ -172,6 +174,9 @@ export function useItinerary(id: string) {
 }
 export function usePayments(id: string) {
   return useQuery({ queryKey: tk.payments(id), queryFn: () => tripsApi.payments(id), enabled: signedIn() });
+}
+export function useTripMoney(id: string) {
+  return useQuery({ queryKey: tk.money(id), queryFn: () => tripsApi.money(id), enabled: signedIn() });
 }
 export function useRefundQuote(id: string) {
   const phase = useDemo((s) => s.phase);

@@ -57,6 +57,7 @@ export default function TripDetail() {
   const home = trip.pickups.find((p) => p.direction === 'to_airport' && p.status !== 'cancelled');
   const manage: [string, Parameters<typeof ListRow>[0]['icon'], string, string][] = [
     [`/itinerary/${trip.id}`, 'trips', t('tm.m.itinerary'), t('tm.m.itinerarySub')],
+    [`/trip/${trip.id}/money`, 'wallet', t('tm.m.money'), t('tm.m.moneySub')],
     [`/trip/${trip.id}/payments`, 'card', t('tm.m.payments'), nextDue ? t('tm.m.nextPayment', { amount: formatSar(nextDue.amount.amount), day: dayLabel(nextDue.dueOn, { today: nextDue.dueOn }) }) : t('tm.m.paymentsSub')],
     [`/trip/${trip.id}/change`, 'flight', t('tm.m.change'), tm.within24 ? t('tm.m.changeCall', { agent: trip.agent.name }) : t('tm.m.changeSub')],
     [`/trip/${trip.id}/hotel`, 'stay', t('tm.m.hotel'), stLive ? t('tm.m.hotelSub') : t('tm.m.hotelFind')],

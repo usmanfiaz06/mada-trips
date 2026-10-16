@@ -6,6 +6,7 @@ import {
   disruptionOptions, fareRulesFor, formatSar, homePickup, instalments, invoiceHtml, invoiceLinesFor, invoiceNumber, liveStay, moveNeeded, nameDistance, nightPrice,
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
+  splitEven, statementText, type TripMoney, type TripMoneyItem, type TripMoneyPending, type TripMoneySplit,
   type FareOption, type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
@@ -21,7 +22,7 @@ import { circlesHooks, circlesMock } from './circles';
  * (+966 50 000 4127) gets the prototype's Istanbul trip on first use; POST /trips/demo seeds it for anyone.
  */
 
-type Charge = TripPayment & { lines: InvoiceLine[]; tripId: string };
+type Charge = TripPayment & { lines: InvoiceLine[]; tripId: string; /** A friend in a circle paid this (owner audit item 31). */ friend?: string | null };
 type Doc = { id: string; number: string; tripId: string; chargeId: string; kind: 'simplified' | 'tax' | 'credit_note'; status: 'draft' | 'issued'; customer: string; company: TripDetail['company']; lines: InvoiceLine[]; againstId: string | null; paidWith: string | null; issuedAt: string };
 type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null; withdrawn?: boolean };
 type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string; withdrawn?: boolean };
@@ -36,6 +37,8 @@ type State = {
   credit: number;
   idem: Map<string, unknown>;
   seeded: boolean;
+  /** Splits in circles that belong to a trip: a booking's pay link (booking mock), read back for the Money screen. */
+  payLinks: { tripId: string; circleId: string; messageId: string }[];
 };
 
 const states = new Map<string, State>();
@@ -52,7 +55,7 @@ function err(code: ErrorCode, message?: string, fields?: Record<string, string>)
 function stateOf(user: MockUser): State {
   let s = states.get(user.id);
   if (!s) {
-    s = { trips: [], charges: [], docs: [], requests: [], refunds: [], inbox: [], tracked: [], credit: 0, idem: new Map(), seeded: false };
+    s = { trips: [], charges: [], docs: [], requests: [], refunds: [], inbox: [], tracked: [], credit: 0, idem: new Map(), seeded: false, payLinks: [] };
     states.set(user.id, s);
   }
   if (!s.seeded && user.phone === '+966500004127') seed(user, s);
@@ -159,6 +162,9 @@ export type BookedTrip = {
   creditUsed: number;
   paymentLabel: string;
   plan: 'full' | 'tabby' | 'tamara';
+  /** Someone in a circle paid the booking: their name, and the split that was the pay link. */
+  payer?: string | null;
+  payLink?: { circleId: string; messageId: string } | null;
   bookedAt: string;
 };
 
@@ -228,8 +234,10 @@ export function recordBookedTrip(b: BookedTrip): string {
   const flights = amountOf(['flight', 'infants']);
   const stayAmt = amountOf(['stay']);
   const pickupAmt = amountOf(['pickup']);
+  const tripId = uuid();
+  if (b.payLink) s.payLinks.push({ tripId, circleId: b.payLink.circleId, messageId: b.payLink.messageId });
   const trip: Omit<TripDetail, 'clock'> = {
-    id: uuid(), city: b.city, country: b.country, imageUrl: b.photo, startDate, endDate, travellerIds: travellers.map((p) => p.id), segments, stays, pickups,
+    id: tripId, city: b.city, country: b.country, imageUrl: b.photo, startDate, endDate, travellerIds: travellers.map((p) => p.id), segments, stays, pickups,
     status: 'booked', bookingRef: ref, confirmedBy: { id: b.agentName.toLowerCase(), name: b.agentName, photoUrl: null }, imported: false, createdAt: b.bookedAt,
     travellers, fare: f ? fareRulesFor(f.carrier) : null,
     prices: { flights: SAR(flights), stays: SAR(stayAmt), pickups: SAR(pickupAmt), discount: SAR(b.discount), total: SAR(flights + stayAmt + pickupAmt - b.discount) },
@@ -245,7 +253,7 @@ export function recordBookedTrip(b: BookedTrip): string {
     const plan = b.plan === 'full' ? null : instalments(amount, b.plan === 'tabby' ? 4 : 3).map((a, i) => ({ seq: i + 1, dueOn: addDays(paidAt.slice(0, 10), i * 30), amount: SAR(a), paid: i < 1 }));
     const title = b.lines.find((l) => (keys as readonly string[]).includes(l.key))?.text ?? item;
     const sub = item === 'flight' ? segments.map((x) => x.flightNumber).join(' and ') : item === 'stay' ? stays.map((x) => `${x.nights} ${x.nights === 1 ? 'night' : 'nights'}`).join('') : pickups.map((x) => x.driverName).join(' and ');
-    addCharge(s, trip, { item, title, sub, amount: SAR(amount), method, label: b.paymentLabel, paidAt, plan, creditUsed: SAR(item === 'flight' ? b.creditUsed : 0), discount: item === 'flight' ? b.discount : 0 });
+    addCharge(s, trip, { item, title, sub, amount: SAR(amount), method, label: b.paymentLabel, paidAt, plan, creditUsed: SAR(item === 'flight' ? b.creditUsed : 0), discount: item === 'flight' ? b.discount : 0, friend: b.payer ?? null });
   }
   notify(s, { kind: 'booking_confirmed', level: 'active', copy: 'notify.confirmed', vars: { city: b.city, agent: b.agentName, ref: b.ref }, href: `/trips/${trip.id}` });
   return trip.id;
@@ -299,8 +307,52 @@ function notify(s: State, n: { kind: Notification['kind']; level: Notification['
 
 /* ───────── payments, refunds, invoices ───────── */
 
+/** The trip's Money screen, as lib/app/trips/money-view.ts builds it: per traveller, who paid, pending, splits, the statement. */
+async function moneyOf(s: State, trip: TripDetail, token: string | null | undefined, ctx: Parameters<AreaMock>[1], me: string): Promise<TripMoney> {
+  const pays = payments(s, trip.id);
+  const ids = trip.travellers.map((p) => p.id);
+  const friendOf = (id: string) => s.charges.find((c) => c.id === id)?.friend ?? null;
+  const items: TripMoneyItem[] = pays.map((p) => {
+    const net = p.amount.amount - (p.refunded?.amount ?? 0);
+    const parts = ids.length ? splitEven(net, ids.length) : [];
+    return { id: p.id, item: p.item, title: p.title, amount: p.amount, refunded: p.refunded, paidAt: p.paidAt, invoiceId: p.invoiceId, paidBy: friendOf(p.id) ?? (p.method === 'credit' ? tk('pay.paidCredit') : p.method === 'tabby' ? 'Tabby' : p.method === 'tamara' ? 'Tamara' : p.label ?? p.method), perTraveller: parts.map((a, i) => ({ personId: ids[i]!, amount: SAR(a) })) };
+  });
+  const paid = pays.reduce((a, p) => a + p.amount.amount, 0);
+  const refunded = pays.reduce((a, p) => a + (p.refunded?.amount ?? 0), 0);
+  const per = new Map<string, number>(ids.map((id) => [id, 0]));
+  for (const it of items) for (const x of it.perTraveller) per.set(x.personId, (per.get(x.personId) ?? 0) + x.amount.amount);
+  const travellers = trip.travellers.map((p) => ({ personId: p.id, name: p.isSelf ? tk('money.you') : p.firstName, isSelf: p.isSelf, amount: SAR(per.get(p.id) ?? 0) }));
+  const payerSums = new Map<string, { amount: number; mine: boolean }>();
+  for (const p of pays) {
+    const friend = friendOf(p.id);
+    const name = friend ?? (p.method === 'credit' ? tk('pay.paidCredit') : p.method === 'tabby' ? 'Tabby' : p.method === 'tamara' ? 'Tamara' : p.label ?? p.method);
+    const cur = payerSums.get(name) ?? { amount: 0, mine: !friend };
+    payerSums.set(name, { amount: cur.amount + p.amount.amount - (p.refunded?.amount ?? 0), mine: !friend });
+    if (p.creditUsed.amount) { const k = tk('pay.paidCredit'); const c = payerSums.get(k) ?? { amount: 0, mine: true }; payerSums.set(k, { amount: c.amount + p.creditUsed.amount, mine: true }); }
+  }
+  const payers = [...payerSums.entries()].map(([name, v]) => ({ name, amount: SAR(v.amount), mine: v.mine })).sort((a, b) => b.amount.amount - a.amount.amount);
+  const pending: TripMoneyPending[] = s.requests.filter((r) => r.tripId === trip.id && (r.status === 'quoted' || r.status === 'awaiting_payment') && r.quote).map((r) => ({ id: r.id, title: r.title, amount: r.quote!, kind: 'you' as const, who: null, since: r.updatedAt }));
+  const splits: TripMoneySplit[] = [];
+  for (const link of s.payLinks.filter((l) => l.tripId === trip.id)) {
+    const r = await circlesMock({ method: 'GET', path: `/circles/${link.circleId}/messages`, token }, ctx);
+    const c = (await circlesMock({ method: 'GET', path: `/circles/${link.circleId}`, token }, ctx))?.json as { name?: string; members?: { id: string; short: string }[] } | undefined;
+    const page = r && r.status === 200 ? (r.json as { items: { id: string; split: { what: string; total: number; paidBy: string; settled: boolean; shares: { key: string; ids: string[]; amount: number; paid: boolean }[] } | null }[] }) : null;
+    const m = page?.items.find((x) => x.id === link.messageId && x.split);
+    if (!m?.split) continue;
+    const nameOf = (id: string) => (id === me ? tk('money.you') : c?.members?.find((x) => x.id === id)?.short ?? tk('circles.someone'));
+    splits.push({ circleId: link.circleId, circleName: c?.name ?? '', messageId: m.id, what: m.split.what, total: SAR(m.split.total), paidByName: nameOf(m.split.paidBy), settled: m.split.settled,
+      shares: m.split.shares.map((sh) => ({ key: sh.key, names: sh.ids.map(nameOf), amount: SAR(sh.amount), paid: sh.paid, mine: sh.ids.includes(me) })) });
+  }
+  const generatedAt = new Date();
+  const total = paid - refunded;
+  return {
+    tripId: trip.id, city: trip.city, ref: trip.bookingRef ?? null, total: SAR(total), paid: SAR(paid), refunded: SAR(refunded), pendingTotal: SAR(pending.reduce((a, p) => a + p.amount.amount, 0)), credit: SAR(s.credit),
+    items, travellers, payers, pending, splits, statement: statementText({ trip, items, travellers, payers, total, refunded, pending, generatedAt }), generatedAt: generatedAt.toISOString(),
+  };
+}
+
 function payments(s: State, tripId: string): TripPayment[] {
-  return s.charges.filter((c) => c.tripId === tripId).map(({ lines: _l, tripId: _t, ...c }) => {
+  return s.charges.filter((c) => c.tripId === tripId).map(({ lines: _l, tripId: _t, friend: _f, ...c }) => {
 // A reply in a direct thread (Circles' mock) lands in this inbox like the server's notification would.
 circlesHooks.notify = (userId, n) => { const s = states.get(userId); if (s) notify(s, n); };
 
@@ -551,6 +603,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     }
     return ok({ trip: reload(), changes });
   }
+  if (sub === 'money') return ok({ money: await moneyOf(s, trip, w.token, { user, byPhone: new Map() }, user.id) });
   if (sub === 'payments') {
     const p = payments(s, trip.id);
     return ok({ payments: p, total: SAR(p.reduce((a, x) => a + x.amount.amount, 0)), refunded: SAR(p.reduce((a, x) => a + (x.refunded?.amount ?? 0), 0)), credit: SAR(s.credit) });
