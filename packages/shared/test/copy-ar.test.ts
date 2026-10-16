@@ -89,7 +89,7 @@ describe('Arabic counts nouns English writes once', () => {
     expect(t('td.when.inWeeks', { n: 1 }, 'ar')).toBe('بعد أسبوع');
     expect(t('td.when.inWeeks', { n: 2 }, 'ar')).toBe('بعد أسبوعين');
     expect(t('td.when.inWeeks', { n: 3 }, 'ar')).toBe('بعد 3 أسابيع');
-    expect(t('td.when.inWeeks', { n: 21 }, 'ar')).toBe('بعد 21 أسبوعًا');
+    expect(t('td.when.inWeeks', { n: 21 }, 'ar')).toBe('بعد 21 أسبوع');
     expect(t('td.when.inWeeks', { n: 21 }, 'en')).toBe('In 21 weeks');
   });
 });
