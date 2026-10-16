@@ -921,4 +921,8 @@ export const arCircles: ArSection<typeof enCircles> = {
   'links.gone.body': 'ربما نقص من الرابط حرف، أو أُوقف. اطلب رابطًا جديدًا ممن أرسله.',
   'circles.invite.making': 'نجهّز رابط الدعوة…',
   'circles.invite.makeFailed': 'لم يصل رابط الدعوة. لم يضع شيء.',
+  'circles.people.requestOpen': 'شوف الملف',
+  'circles.people.requestOpenA11y': 'شوف ملف {name}',
+  'circles.friend.takeBack': 'اسحب الطلب',
+  'circles.friend.tookBack': 'انسحب الطلب. {name} ما يدري.',
 };

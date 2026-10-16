@@ -889,4 +889,9 @@ export const enCircles = {
   'links.gone.body': 'The link may be mistyped, or it was turned off. Ask the person who sent it for a new one.',
   'circles.invite.making': 'Making your invite link…',
   'circles.invite.makeFailed': 'The invite link didn\'t come through. Nothing was lost.',
+  // Friend requests: the row opens the profile; your own request can be taken back (owner audit, items 29 and 31).
+  'circles.people.requestOpen': 'See profile',
+  'circles.people.requestOpenA11y': 'See {name}’s profile',
+  'circles.friend.takeBack': 'Take back request',
+  'circles.friend.tookBack': 'Request taken back. {name} wasn’t told.',
 } as const;

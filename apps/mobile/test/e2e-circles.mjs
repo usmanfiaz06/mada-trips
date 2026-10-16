@@ -344,7 +344,16 @@ async function demo() {
   await shot('people-invited');
   await page.getByRole('tab', { name: /Requests/ }).click();
   await see('Reem Aldosari', 'request');
+  await see('See profile', 'request row opens the profile');
   await shot('people-requests');
+  // The row opens the person's profile, where Accept and Decline live too; back to the list to accept inline.
+  await byTest('request-open').first().click();
+  await see('Accept friend request', 'profile before accepting');
+  await byTest('friend-decline').waitFor({ state: 'visible', timeout: 4000 });
+  await shot('people-request-profile');
+  await page.goBack();
+  await page.waitForTimeout(600);
+  await page.getByRole('tab', { name: /Requests/ }).click().catch(() => {});
   await byTest('request-accept').click();
   await see('You and Reem are friends.', 'accepted');
   await byTest('people-add').click();

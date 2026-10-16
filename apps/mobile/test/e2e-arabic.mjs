@@ -284,16 +284,16 @@ async function demo() {
   await see('إلى أين؟', 'ask');
   await byTest('ask-input').fill('Istanbul for Eid, all of us');
   await byTest('ask-send').click();
-  await see('ثلاث طرق للوصول.', 'results', 15000);
+  await see('ثلاث طرق توصلك.', 'results', 15000);
   await shot('results');
   await byTest('ask-review').first().click();
-  await see('كل شيء مشمول. لا رسوم لاحقة.', 'pay sheet', 12000);
+  await see('كل شي مشمول. ولا رسوم بعدين.', 'pay sheet', 12000);
   await shot('pay-sheet');
   await scroll(500);
   await shot('pay-sheet-slider');
   await slide();
   await page.waitForTimeout(1500);
-  if (await page.getByText('بنكك يريد التأكد أنه أنت').count()) {
+  if (await page.getByText('بنكك يريد يتأكد إنك أنت').count()) {
     await shot('3ds');
     await page.locator('input').last().fill('123456');
   }
@@ -331,7 +331,7 @@ async function demo() {
   await shot('stay-who');
 
   step('booking: an outing asked when and who, then its thread');
-  await page.getByRole('button', { name: 'اسأل عن شيء آخر' }).filter({ visible: true }).first().click();
+  await page.getByRole('button', { name: 'اسأل عن شي ثاني' }).filter({ visible: true }).first().click();
   await byTest('ask-input').fill('Boulevard World at night in Riyadh');
   await byTest('ask-send').click();
   await see('متى تبي تروح؟', 'outing when');

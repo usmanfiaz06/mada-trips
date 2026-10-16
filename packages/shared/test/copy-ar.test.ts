@@ -73,7 +73,7 @@ describe('place and airline names in Arabic', () => {
     expect(nameIn('Saudia', 'ar')).toBe('السعودية');
     expect(nameIn('Pera Palace', 'ar')).toBe('Pera Palace');
     expect(nameIn('Istanbul', 'en')).toBe('Istanbul');
-    expect(stripIsolates(t('search.down.title', { airline: 'Pegasus Express' }, 'ar'))).toBe('نظام Pegasus Express لا يستجيب.');
+    expect(stripIsolates(t('search.down.title', { airline: 'Pegasus Express' }, 'ar'))).toBe('نظام Pegasus Express ما يرد.');
   });
 });
 
