@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { ageOn, localizeDigits, personName, type Person } from '@mada/shared';
+import { ageOn, dobOfTyped, localizeDigits, personName, todayIn, type Person } from '@mada/shared';
 import { api, ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
-import { keys } from '@/lib/queries';
+import { keys, usePeople } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { colors, font } from '@/theme';
 import { Button } from '../Button';
@@ -43,24 +43,32 @@ export function TravellerChips({ people, value, onChange, selfName = '', agesOn 
   );
 }
 
-const RELATIONS = [['family', 'person.rel.family'], ['friend', 'person.rel.friend'], ['helper', 'person.rel.helper'], ['colleague', 'person.rel.colleague']] as const;
+const RELATIONS = [['child', 'person.rel.child'], ['spouse', 'person.rel.spouse'], ['parent', 'person.rel.parent'], ['family', 'person.rel.family'], ['friend', 'person.rel.friend'], ['helper', 'person.rel.helper'], ['colleague', 'person.rel.colleague']] as const;
 
 export function AddPersonSheet({ visible, onClose, onAdded }: { visible: boolean; onClose: () => void; onAdded: (p: Person) => void }) {
   const qc = useQueryClient();
   const [given, setGiven] = useState('');
   const [surname, setSurname] = useState('');
   const [rel, setRel] = useState<(typeof RELATIONS)[number][0]>('family');
+  // A child needs an age (for the fare and the room), not a passport: the passport can come later.
+  const [age, setAge] = useState('');
   const [busy, setBusy] = useState(false);
-  const ok = given.trim().length > 1 && surname.trim().length > 1;
+  const people = usePeople().data ?? [];
+  const familyName = people.find((p) => p.isSelf)?.surname ?? '';
+  const today = todayIn();
+  const dob = age.trim() ? dobOfTyped(age, today) : null;
+  const ageBad = !!age.trim() && !dob;
+  const lastName = surname.trim() || familyName;
+  const ok = given.trim().length > 1 && lastName.length > 1 && !ageBad && (rel !== 'child' || !!dob);
   const first = given.trim().split(/\s+/)[0] ?? '';
   const add = async () => {
     setBusy(true);
     try {
-      const { person } = await api.addPerson({ givenNames: given.trim(), surname: surname.trim(), relation: rel });
+      const { person } = await api.addPerson({ givenNames: given.trim(), surname: lastName, relation: rel, ...(dob ? { dateOfBirth: dob } : {}) });
       await qc.invalidateQueries({ queryKey: keys.people });
       buzz('success');
       toast(t('person.added', { name: person.firstName }));
-      setGiven(''); setSurname('');
+      setGiven(''); setSurname(''); setAge('');
       onAdded(person);
     } catch (e) {
       toast(e instanceof ApiError ? e.message : t('error.internal'));
@@ -72,9 +80,11 @@ export function AddPersonSheet({ visible, onClose, onAdded }: { visible: boolean
       <T v="small">{t('person.add.body')}</T>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}><Field label={t('person.add.given')} value={given} onChangeText={setGiven} autoCapitalize="words" testID="add-given" /></View>
-        <View style={{ flex: 1 }}><Field label={t('person.add.surname')} value={surname} onChangeText={setSurname} autoCapitalize="words" testID="add-surname" /></View>
+        <View style={{ flex: 1 }}><Field label={t('person.add.surname')} value={surname} onChangeText={setSurname} placeholder={familyName} autoCapitalize="words" testID="add-surname" /></View>
       </View>
       <ChipWrap>{RELATIONS.map(([v, l]) => <Toggle key={v} label={t(l)} on={rel === v} onPress={() => setRel(v)} />)}</ChipWrap>
+      <Field label={t('person.add.age')} value={age} onChangeText={setAge} keyboardType="numbers-and-punctuation" error={ageBad ? t('person.add.ageBad') : null}
+        hint={rel === 'child' ? <T v="tiny">{t('person.add.ageHint')}</T> : undefined} testID="add-age" />
       {rel === 'helper' ? <T v="small" color={colors.green}>{t('person.add.helperNote')}</T> : null}
       <Button label={t('person.add.button', { name: first || t('person.add.them') })} disabled={!ok} busy={busy} onPress={add} />
     </Sheet>

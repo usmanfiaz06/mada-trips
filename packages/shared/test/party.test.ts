@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ageAt, askIntentOfRules, correctAsk, dobFromAge, familyRank, fareLines, hasLittleOnes, matchParty, parseAskRules, parseParty, weekendDates, type AskIntent, type Person,
+  ageAt, askIntentOfRules, correctAsk, dobFromAge, dobOfTyped, familyRank, fareLines, hasLittleOnes, matchParty, parseAskRules, parseParty, weekendDates, type AskIntent, type Person,
 } from '../src';
 
 const TODAY = '2026-10-16';
@@ -61,6 +61,14 @@ describe('who was said to be going', () => {
 describe('ages without a passport', () => {
   it('turns an age into a date of birth that reads as that age', () => {
     for (const a of [0, 1, 2, 6, 13, 40]) expect(ageAt(dobFromAge(a, TODAY), TODAY)).toBe(a);
+  });
+  it('reads an age or a date of birth as typed, in either language', () => {
+    expect(ageAt(dobOfTyped('6', TODAY), TODAY)).toBe(6);
+    expect(ageAt(dobOfTyped('٦', TODAY), TODAY)).toBe(6);
+    expect(ageAt(dobOfTyped('2 years', TODAY), TODAY)).toBe(2);
+    expect(dobOfTyped('2019-04-02', TODAY)).toBe('2019-04-02');
+    expect(dobOfTyped('2030-01-01', TODAY)).toBeNull();
+    expect(dobOfTyped('six', TODAY)).toBeNull();
   });
 });
 

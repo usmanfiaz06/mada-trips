@@ -200,3 +200,12 @@ export function familyRank<T extends { label: string; out: { dep: string } }>(op
   if (day.length && night.some((o) => o.label === 'best') && !day.some((o) => o.label === 'best')) day[0] = { ...day[0]!, label: 'best' };
   return [...day, ...night];
 }
+
+/** "6", "٦", "6 years" or "2019-04-02": a date of birth, or null when it reads as neither (or is in the future). */
+export function dobOfTyped(text: string, today: string): string | null {
+  const s = normalizeAsk(text).trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return isIsoDay(s) && s <= today ? s : null;
+  const age = s.match(/^(\d{1,3})(?:\s*(?:years?|yrs?|y|سنة|سنه|سنين|سنوات))?$/);
+  return age && Number(age[1]) <= 120 ? dobFromAge(Number(age[1]), today) : null;
+}
