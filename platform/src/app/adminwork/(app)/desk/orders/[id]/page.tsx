@@ -24,6 +24,7 @@ import { DeskTimeline, Facts, ORDER_STAGE, PAY_STATUS, StatusBadge, Thread } fro
 import { askAction, confirmCallAction, failAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
 import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts";
 import { FareOption } from "@mada/shared";
+import { deskPrefs, payRequestOf } from "@/lib/app/booking/orders";
 
 export const metadata = { title: "Order · Desk" };
 
@@ -58,6 +59,9 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   // Flights by request: the fare the traveller chose from the desk's quote.
   const quotedParse = FareOption.safeParse((o.order?.snapshot as { quotedFlight?: unknown } | undefined)?.quotedFlight);
   const quoted = quotedParse.success ? quotedParse.data : null;
+  // Preferences and loyalty as applied on the order sheet, and a friend asked to pay (booking/orders.ts).
+  const prefs = o.order ? deskPrefs(o.order.snapshot as Record<string, unknown>) : null;
+  const payRequest = o.order ? payRequestOf(o.order) : null;
 
   return (
     <>
@@ -174,6 +178,28 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <aside className="space-y-4">
+          {payRequest && (
+            <Card className={payRequest.paidAt ? "bg-ok-soft/40" : "bg-info-soft/40"}>
+              <CardHead title={payRequest.paidAt ? t("Paid by {name}", { name: payRequest.name }) : t("Waiting for {name} to pay", { name: payRequest.name })}
+                hint={payRequest.paidAt ? t("A friend in the traveller's circle paid the whole amount by card. Book as usual.") : t("The traveller asked a friend in their circle to pay. Nothing is charged until they do; the price holds as usual.")} />
+              <Facts rows={[[t("Asked"), fmtDate(payRequest.requestedAt, L, true)], ...(payRequest.paidAt ? [[t("Paid"), fmtDate(payRequest.paidAt, L, true)] as [string, React.ReactNode]] : [])]} />
+            </Card>
+          )}
+          {prefs && (
+            <Card>
+              <CardHead title={t("Preferences and loyalty")} hint={t("Applied from the traveller's saved preferences, as they saw them on the order sheet. Type the codes into the PNR; the hotel gets the remarks with the booking.")} />
+              <Facts rows={[
+                ...(prefs.summary.length ? [[t("Asked for"), prefs.summary.join(" · ")] as [string, React.ReactNode]] : []),
+                ...(prefs.ssr.length ? [[t("SSR"), <span key="ssr" className="num" dir="ltr">{prefs.ssr.join(" ")}</span>] as [string, React.ReactNode]] : []),
+                ...(prefs.remarks.length ? [[t("Seat remarks"), <span key="rm" className="num" dir="ltr">{prefs.remarks.join(" / ")}</span>] as [string, React.ReactNode]] : []),
+                ...(prefs.hotelRemarks.length ? [[t("Hotel remarks"), prefs.hotelRemarks.join(", ")] as [string, React.ReactNode]] : []),
+                ...(prefs.extras.seatsTogether ? [[t("Paid extra"), t("Seats together · {n} × SAR {each}", { n: prefs.extras.seatsTogether.count * prefs.extras.seatsTogether.legs, each: sar(prefs.extras.seatsTogether.perPerson) })] as [string, React.ReactNode]] : []),
+                ...prefs.loyalty.map((l) => [o.travellers.find((p) => p.id === l.personId)?.name ?? t("Traveller"), <span key={l.personId + l.program} dir="ltr"><span className="num">{l.number}</span> · {l.program}</span>] as [string, React.ReactNode]),
+                ...(prefs.notes ? [[t("Note"), prefs.notes] as [string, React.ReactNode]] : []),
+              ]} />
+              {!prefs.summary.length && !prefs.loyalty.length && <p className="text-[13px] text-ink-3">{t("Nothing asked for on this booking.")}</p>}
+            </Card>
+          )}
           <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           {o.stage === "issued" && (
             <Card className="bg-ok-soft/40">

@@ -489,6 +489,8 @@ async function account() {
   await press(byTest('profile-prefs'));
   await see('Mada uses these on every booking for you.', 'prefs');
   await see('Saudia Alfursan', 'loyalty');
+  await see('The room', 'prefs: the room group');
+  await see('You see these on every order sheet before you pay', 'prefs: applied at booking');
   await press(byTest('assist-infant'));
   await press(byTest('assist-bassinet'));
   await shot('prefs');

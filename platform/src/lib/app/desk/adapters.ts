@@ -93,7 +93,7 @@ async function claim(tx: Tx, r: typeof appRequests.$inferSelect, actor: DeskActo
 
 /* ═════════════ orders ═════════════ */
 
-export type OrderStage = "awaiting" | "held" | "needs_answer" | "price_changed" | "issued" | "failed" | "not_issued" | "other";
+export type OrderStage = "awaiting_payment" | "awaiting" | "held" | "needs_answer" | "price_changed" | "issued" | "failed" | "not_issued" | "other";
 export type BookingOrder = typeof appOrders.$inferSelect;
 
 /** The booking engine's order behind a request (app_orders.request_id), when the app made one. */
@@ -105,6 +105,7 @@ export async function linkedOrder(requestId: string): Promise<BookingOrder | nul
 /** The booking engine's states, as the desk names them. */
 export function bookingStage(status: string): OrderStage {
   switch (status) {
+    case "payment_requested": return "awaiting_payment";
     case "pending_agent": return "awaiting";
     case "held": case "price_locked": case "issuing": return "held";
     case "needs_answer": return "needs_answer";

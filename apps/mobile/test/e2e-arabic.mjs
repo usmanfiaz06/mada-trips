@@ -269,6 +269,11 @@ async function demo() {
   await see('المدفوعات', 'payments');
   await shot('payments');
   await back();
+  await tapText('مين دفع وش');
+  await see('صرفتها على هذي الرحلة', 'money screen');
+  await see('لكل شخص', 'money per person');
+  await shot('money');
+  await back();
   await tapText('برنامج الرحلة كامل');
   await see('يوم بيوم', 'itinerary');
   await shot('itinerary');
@@ -288,6 +293,8 @@ async function demo() {
   await shot('results');
   await byTest('ask-review').first().click();
   await see('كل شي مشمول. ولا رسوم بعدين.', 'pay sheet', 12000);
+  await see('تفضيلاتك', 'pay sheet: preferences row');
+  await see('بالريال السعودي', 'pay sheet: charged in SAR');
   await shot('pay-sheet');
   await scroll(500);
   await shot('pay-sheet-slider');

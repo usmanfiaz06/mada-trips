@@ -46,6 +46,7 @@ export async function StatusPill({ agent, onShift, action }: { agent: { id: stri
 }
 
 export const ORDER_STAGE: Record<string, { label: string; tone: Tone }> = {
+  awaiting_payment: { label: "Waiting for a friend to pay", tone: "info" },
   awaiting: { label: "Waiting to confirm", tone: "gold" },
   held: { label: "Held · issue tickets", tone: "info" },
   needs_answer: { label: "Waiting on traveller", tone: "neutral" },

@@ -194,6 +194,10 @@ export const LoyaltyNumber = z.object({ id: z.string().min(1).max(40), program: 
 export const ASSISTANCE = ['wchr', 'wchc', 'infant', 'bassinet'] as const;
 export const Currency = z.enum(['SAR', 'AED', 'USD', 'EUR', 'GBP']);
 
+export const ROOM_TYPES = ['any', 'double', 'twin', 'connecting'] as const;
+export const BED_TYPES = ['any', 'king', 'twin'] as const;
+export const FLOOR_PREFS = ['any', 'high', 'low'] as const;
+
 export const TravelPrefs = z.object({
   seat: z.enum(['window', 'aisle', 'any']),
   together: z.boolean(),
@@ -201,6 +205,11 @@ export const TravelPrefs = z.object({
   assist: z.array(z.enum(ASSISTANCE)).max(4),
   loyalty: z.array(LoyaltyNumber).max(16),
   notes: z.string().max(280),
+  /** The stay: room, bed, floor and a quiet room. Defaults keep older stored prefs valid (booking-prefs.ts maps them). */
+  room: z.enum(ROOM_TYPES).default('any'),
+  bed: z.enum(BED_TYPES).default('any'),
+  floor: z.enum(FLOOR_PREFS).default('any'),
+  quiet: z.boolean().default(false),
 }).refine((p) => !(p.assist.includes('wchr') && p.assist.includes('wchc')), { message: 'One wheelchair option', path: ['assist'] })
   .refine((p) => !p.assist.includes('bassinet') || p.assist.includes('infant'), { message: 'A bassinet needs an infant', path: ['assist'] })
   .refine((p) => new Set(p.loyalty.map((l) => l.program)).size === p.loyalty.length, { message: 'One number per programme', path: ['loyalty'] });

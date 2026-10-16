@@ -355,4 +355,8 @@ export const arTrips: ArSection<typeof enTrips> = {
   'rq.order.answer': 'ننتظر ردك',
   'rq.order.answerBody': 'عند مادا سؤال عن هذا الحجز.',
   'rq.order.open': 'افتح الحجز',
+
+  'notify.mp.paid.title': '{name} دفع',
+  'notify.mp.paid.body': 'مادا تحجز الحين. افتحه وتابع.',
+  'rq.order.payRequested': 'ننتظر {name} يدفع',
 };

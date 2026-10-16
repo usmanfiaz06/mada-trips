@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useOnChange, useOnOpen } from '@/lib/wallet-model';
 import { TextInput, View } from 'react-native';
-import { LOYALTY_PROGRAMS, normLoyalty, type TravelPrefs } from '@mada/shared';
+import { BED_TYPES, FLOOR_PREFS, LOYALTY_PROGRAMS, ROOM_TYPES, normLoyalty, type TravelPrefs } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { EmptyState } from '@/components/EmptyState';
@@ -44,6 +44,7 @@ export default function Prefs() {
   return (
     <AccountScreen title={t('prefs.title')} testID="prefs">
       <T v="body">{t('prefs.body')}</T>
+      <T v="small">{t('prefs.appliedNote')}</T>
       <Group label={t('prefs.seats')}>
         <View style={{ padding: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityLabel={t('prefs.seats')}>
           {(['window', 'aisle', 'any'] as const).map((id) => <Chip key={id} on={p.seat === id} label={t(`prefs.seat.${id}`)} onPress={() => setP({ seat: id })} />)}
@@ -61,6 +62,18 @@ export default function Prefs() {
           const off = id === 'bassinet' && !hasInfant;
           return <Row key={id} value={t(`prefs.assist.${id}`)} sub={off ? t('prefs.assist.bassinetOff') : t(`prefs.assist.${id}Sub`)} right={<Toggle label={t(`prefs.assist.${id}`)} value={p.assist.includes(id)} disabled={off} onChange={(v) => toggleAssist(id, v)} testID={`assist-${id}`} />} />;
         })}
+      </Group>
+      <Group label={t('prefs.stay')}>
+        <View style={{ padding: 16, gap: 10 }} testID="prefs-stay">
+          <T v="eyebrow">{t('prefs.room')}</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{ROOM_TYPES.map((id) => <Chip key={id} on={p.room === id} label={t(`bp.room.${id}`)} onPress={() => setP({ room: id })} />)}</View>
+          <T v="eyebrow">{t('prefs.bed')}</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{BED_TYPES.map((id) => <Chip key={id} on={p.bed === id} label={t(`bp.bed.${id}`)} onPress={() => setP({ bed: id })} />)}</View>
+          <T v="eyebrow">{t('prefs.floor')}</T>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{FLOOR_PREFS.map((id) => <Chip key={id} on={p.floor === id} label={t(`bp.floor.${id}`)} onPress={() => setP({ floor: id })} />)}</View>
+        </View>
+        <Row value={t('prefs.quiet')} sub={t('prefs.quietSub')} right={<Toggle label={t('prefs.quiet')} value={p.quiet} onChange={(v) => setP({ quiet: v })} testID="prefs-quiet" />} />
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}><T v="tiny">{t('prefs.stayNote')}</T></View>
       </Group>
       <Group label={t('prefs.loyalty')}>
         {p.loyalty.map((l) => {

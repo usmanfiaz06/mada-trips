@@ -31,9 +31,11 @@ const PENDING = ["sent", "reviewing"];
  * The order a booking's request follows. Its status is written when the traveller has to answer (needs_answer); at
  * other times it reads from the request's own state, which every step keeps current (the order may have moved on).
  */
-function orderOf(status: string, o: RequestDetails["order"]): TripRequestView["order"] {
+function orderOf(status: string, o: RequestDetails["order"], payer?: string | null): TripRequestView["order"] {
   if (!o) return null;
   if (status === "needs_answer") return o;
+  // A friend was asked to pay: the request waits for payment, and says for whom (booking/orders.ts requestPayment).
+  if (status === "awaiting_payment" && o.status === "payment_requested") return { id: o.id, status: "payment_requested", failure: null, payer: payer ?? null };
   const now = status === "confirmed" || status === "done" ? "confirmed" : status === "cancelled" ? "cancelled" : "pending_agent";
   return { id: o.id, status: now, failure: null };
 }
@@ -53,7 +55,7 @@ export function toRequestView(r: RequestRow): TripRequestView {
     status: r.status as TripRequestView["status"], title: isFlightAsk(r.details) ? flightTitle((r.details as { search: FlightSearch }).search) : r.summary, short: d.short ?? null,
     detail: isFlightRequest(r.details) ? flightSummary((r.details as { search: FlightSearch }).search, r.travellerIds.length) : d.detail ?? null,
     withWhom: d.withWhom ?? "faisal", withName: d.withName ?? null, outcome: d.outcome ?? null, alt: d.alt ?? null, yesText: d.yesText ?? null,
-    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: orderOf(r.status, d.order),
+    quote: d.quote ? { amount: d.quote, currency: "SAR" } : null, quoteText: d.quoteText ?? null, order: orderOf(r.status, d.order, (d as { payRequest?: { name?: string } }).payRequest?.name ?? null),
     withdrawn: !!(d as { withdrawn?: boolean }).withdrawn, canTakeBack: canTakeBack(r),
     createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };

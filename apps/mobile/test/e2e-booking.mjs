@@ -1,7 +1,7 @@
 // Booking (M2), end to end in headless Chromium against the web export in mock-API mode:
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
-//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,stays-ar,asks,phone to pick)
+//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,stays-ar,asks,phone,money,money-ar to pick)
 //
 // Signs in as the demo account (50 000 4127, Omar's family) and walks every booking flow and edge case in FLOWS.md §2–4:
 // Ask (typed details, one question at a time, the calendar), search (results, fare rules, sort, the bundle, entry
@@ -778,6 +778,115 @@ async function phone() {
   await context.close();
 }
 
+/* ───────────── money: preferences, loyalty, the display currency, a paid extra, a friend pays, the Money screen ───────────── */
+async function money(locale = 'en-GB') {
+  const ar = locale.startsWith('ar');
+  const { page, context } = await newPage(locale);
+  const k = kit(page);
+  if (ar) {
+    await page.goto(ORIGIN + '/');
+    await k.byTest('welcome-start').waitFor({ timeout: 15000 });
+    await k.byTest('welcome-start').click();
+    await k.byTest('signin-phone').click();
+    await k.byTest('phone-input').fill('500004127');
+    await k.byTest('phone-send').click();
+    await k.byTest('otp-input').waitFor({ timeout: 10000 });
+    await k.byTest('otp-input').fill('123456');
+    await k.byTest('welcome-back-open').waitFor({ timeout: 10000 });
+    await k.byTest('welcome-back-open').click();
+    await page.waitForTimeout(1200);
+  } else await signIn(page);
+  step(`money${ar ? ' (ar)' : ''}: prices shown in AED`);
+  await page.locator('[data-testid="dock-wallet"]').click();
+  await page.waitForFunction(() => !!window.__madaGo, null, { timeout: 15000 });
+  await page.evaluate(() => window.__madaGo('/account'));
+  await k.press(k.byTest('details-currency'));
+  await k.press(k.text(ar ? 'AED · ' : 'AED · UAE dirham'));
+  await page.waitForTimeout(800);
+  if (ar) {
+    for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-ask"]').filter({ visible: true }).count()); i++) {
+      const close = page.locator('[aria-label="رجوع"], [aria-label="إغلاق"], [aria-label="Back"], [aria-label="Close"]').filter({ visible: true }).last();
+      if (!(await close.count())) { await page.goBack(); } else await close.click();
+      await page.waitForTimeout(700);
+    }
+    await k.byTest('dock-ask').click();
+    await page.waitForTimeout(800);
+  } else await openAsk(page);
+  step('money: the order sheet applies the saved preferences and the Alfursan number');
+  if (ar) {
+    await k.ask('Istanbul for Eid, all of us');
+    await k.byTest('ask-review').first().waitFor({ timeout: 15000 });
+    await page.waitForTimeout(800);
+    await k.press(k.byTest('ask-review'));
+    await k.byTest('pay-prefs').waitFor({ timeout: 15000 });
+    await page.waitForTimeout(800);
+  } else await toPay(page, { bundle: false });
+  await k.see(ar ? 'تفضيلاتك' : 'Your preferences', 'prefs row');
+  await k.see(ar ? 'شباك' : 'Window', 'saved seat applied');
+  await k.see(ar ? '••••3377' : 'Saudia Alfursan ••••3377 added', 'loyalty attached');
+  await k.see('≈', 'approx in AED');
+  await k.see(ar ? 'بالريال السعودي' : 'in Saudi riyals', 'charged in SAR, said plainly');
+  await k.shot(`money-pay-prefs${ar ? '-ar' : ''}`);
+  step('money: change the preferences for this booking only');
+  await k.press(k.byTest('pay-prefs'));
+  await k.see(ar ? 'لهذا الحجز بس' : 'for this booking only', 'prefs sheet');
+  await k.press(page.getByRole('button', { name: ar ? 'ممر' : 'Aisle', exact: true }));
+  await k.shot(`money-prefs-sheet${ar ? '-ar' : ''}`);
+  await k.press(k.byTest('prefs-booking-done'));
+  await k.see(ar ? 'ممر' : 'Aisle', 'aisle for this booking');
+  step('money: loyalty per traveller, checked as typed');
+  await k.press(k.byTest('pay-loyalty'));
+  await page.locator('[data-testid^="loyalty-alfursan-"]').nth(1).fill('12');
+  await k.see(ar ? 'ما يشبه رقم' : 'doesn’t look like a Saudia Alfursan number', 'bad loyalty number');
+  await k.shot(`money-loyalty-sheet${ar ? '-ar' : ''}`);
+  await page.locator('[data-testid^="loyalty-alfursan-"]').nth(1).fill('9988776655');
+  await k.press(k.byTest('loyalty-booking-save'));
+  await k.see('+1', 'two numbers attached');
+  if (ar) { await context.close(); return; }
+  step('money: flynas prices seats together; it is only added by hand');
+  await openAsk(page);
+  await k.ask('Istanbul for Eid, all of us');
+  await k.see('Three ways to get there.', 'results', 12000);
+  await k.press(k.byTest('flight-XY125'));
+  await k.press(k.byTest('ask-review'));
+  await k.see('Everything included. No fees later.', 'pay sheet (flynas)', 12000);
+  await k.see('Sit together on flynas', 'extra offered');
+  const before = await k.byTest('pay-total').innerText();
+  await k.shot('money-extra-offered');
+  await k.press(k.byTest('pay-extra-seats-toggle'));
+  await k.see('Seats together · 8 × SAR 35', 'extra line once added');
+  await page.waitForTimeout(800);
+  const after = await k.byTest('pay-total').innerText();
+  if (before === after) errors.push(`extra: total did not change (${before})`);
+  await k.shot('money-extra-added');
+  await k.press(k.byTest('pay-extra-seats-toggle'));
+  step('money: ask Abdullah to pay');
+  await k.press(k.byTest('pay-ask-someone'));
+  await k.see('Who pays?', 'payer sheet');
+  await k.press(page.locator('[data-testid^="payer-Abdullah"]').filter({ visible: true }).first());
+  await k.shot('money-ask-someone');
+  await k.press(k.byTest('payer-send'));
+  await k.see('Paid by Abdullah', 'payer on the sheet');
+  await k.slide();
+  await k.see('Waiting for Abdullah to pay', 'payment requested', 15000);
+  await k.shot('money-waiting-for-abdullah', 300);
+  // Abdullah (the demo circle) pays his share a few seconds later; the order goes to the desk and books.
+  await k.see("You're going to Istanbul.", 'booked after Abdullah paid', 40000);
+  await k.shot('money-booked-by-abdullah', 1200);
+  step('money: the trip Money screen');
+  await k.press(k.byTest('see-trip'));
+  await page.waitForTimeout(1500);
+  await k.press(k.text('Money'));
+  await k.see('spent on this trip', 'money screen', 12000);
+  await k.see('Abdullah', 'paid by Abdullah');
+  await k.see('Per person', 'per person');
+  await k.see('Splits in your circles', 'the split');
+  await k.shot('money-screen');
+  await page.mouse.move(195, 420); await page.mouse.wheel(0, 900);
+  await k.shot('money-screen-lower');
+  await context.close();
+}
+
 try {
   if (want('flights')) await flights();
   if (want('edges')) await edges();
@@ -789,6 +898,8 @@ try {
   if (want('stays-ar')) await staysAr();
   if (want('asks')) await asks();
   if (want('phone')) await phone();
+  if (want('money')) await money();
+  if (want('money-ar')) await money('ar-SA');
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

@@ -10,6 +10,7 @@ export function RequestStatusPill({ r }: { r: TripRequestView }) {
   const agent = agentName(useAgent());
   const stuck = orderNeedsYou(r);
   if (stuck) return <Tag label={stuck.status === 'ticketing_failed' ? t('rq.order.failed') : t('rq.order.answer')} tone="warn" style={{ flexShrink: 0 }} />;
+  if (r.order?.status === 'payment_requested') return <Tag label={t('rq.order.payRequested', { name: r.order.payer ?? '' })} tone="gold" style={{ flexShrink: 0 }} />;
   const tone = r.status === 'confirmed' || r.status === 'done' ? 'ok' : r.status === 'cancelled' && r.outcome === 'no' ? 'warn' : r.status === 'quoted' || r.status === 'awaiting_payment' ? 'gold' : 'default';
   return <Tag label={requestLabel(r, agent)} tone={tone} style={{ flexShrink: 0 }} />;
 }

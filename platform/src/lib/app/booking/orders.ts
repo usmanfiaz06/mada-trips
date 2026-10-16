@@ -17,9 +17,13 @@ import {
 } from "./desk";
 import { authorize, chargeFor } from "./payments";
 import { spendCredit } from "../credit";
-import { priceDraft } from "./pricing";
+import { priceDraft, type AppliedSnapshot } from "./pricing";
 import { autoBookStay } from "../suppliers/hotelbeds/bookings";
 import { bookingRequiresPhone } from "../switches";
+import { memberIds, membership } from "../circles/circles";
+import { peopleByIds } from "../circles/common";
+import { createSplit, remindSplit } from "../circles/messages";
+import { notify } from "../trips/notify";
 
 /*
  * Orders: POST /orders authorises the payment and hands the booking to the desk ('pending_agent'); GET /orders/:id is
@@ -52,8 +56,23 @@ export function orderView(o: OrderRow, now = Date.now()): OrderView {
     slow: !done && !problem && o.status !== "requires_action" && now - o.createdAt.getTime() > SLOW_MS,
     tripId: o.tripId, requestId: o.requestId,
     action: o.status === "requires_action" ? { kind: "otp", triesLeft: Math.max(0, 3 - o.otpTries), label: o.paymentLabel, amount: money(o.total) } : null,
+    payRequest: payRequestOf(o),
     createdAt: o.createdAt.toISOString(), confirmedAt: o.confirmedAt?.toISOString() ?? null,
   };
+}
+
+/** Someone else was asked to pay (owner audit item 31): kept on the snapshot, shown on the order until it is confirmed. */
+export type PayRequest = { userId: string; name: string; circleId: string; messageId: string; shareKey: string; requestedAt: string; paidAt: string | null; paidBy?: string | null };
+export const payRequestOf = (o: Pick<OrderRow, "snapshot">): OrderView["payRequest"] => {
+  const pr = (o.snapshot as { payRequest?: PayRequest }).payRequest;
+  return pr ? { userId: pr.userId, name: pr.name, circleId: pr.circleId, messageId: pr.messageId, shareKey: pr.shareKey, requestedAt: pr.requestedAt, paidAt: pr.paidAt } : null;
+};
+
+/** What the desk reads of the preferences on a request: the summary, the codes, the numbers (full: the agent types them). */
+export function deskPrefs(snapshot: Record<string, unknown>) {
+  const a = snapshot.applied as AppliedSnapshot | undefined;
+  if (!a) return null;
+  return { summary: a.summary, ssr: a.ssr, remarks: a.remarks, hotelRemarks: a.hotelRemarks, loyalty: a.loyalty, notes: a.prefs.notes, extras: a.extras };
 }
 
 export async function ownOrder(ownerId: string, id: string): Promise<OrderRow> {
@@ -110,6 +129,11 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   if (body.draft.kind === "share" && (body.plan !== "full" || body.payment.method === "credit")) throw new AppError("VALIDATION");
 
   const agentKind = AGENT_KINDS.has(preview.kind);
+  // Someone in a circle pays: nothing is charged here; the order waits for them (requestPayment).
+  if (body.payment.method === "someone_else") {
+    if (!agentKind) throw new AppError("VALIDATION", { message: t("error.validation") });
+    return requestPayment(ownerId, body, priced, body.payment, contact, demo, ipHash, await agentP);
+  }
   const [charge, agentName] = await Promise.all([chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo), agentP]);
   const requestId = body.draft.kind === "quote" ? body.draft.requestId : null;
   // A fare the desk quoted for a flight request: the request itself goes with the order to the desk (no new row).
@@ -128,13 +152,13 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     let deskRequest: string | null = requestId;
     if (agentKind && quotedFlight) {
       await tx.update(appRequests).set({ status: "with_agent", promisedBy: new Date(Date.now() + 30 * 60_000), updatedAt: new Date(),
-        ...(contact ? { details: sql`${appRequests.details} || ${JSON.stringify({ contactPhone: contact.phone, contactVerified: false })}::jsonb` } : {}) }).where(eq(appRequests.id, quoted!.requestId));
+        details: sql`${appRequests.details} || ${JSON.stringify({ prefs: deskPrefs(priced.snapshot), ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) })}::jsonb` }).where(eq(appRequests.id, quoted!.requestId));
       await tx.update(appQuotes).set({ status: "accepted" }).where(eq(appQuotes.id, quoted!.id));
     } else if (agentKind) {
       const [r] = await tx.insert(appRequests).values({
         ownerId, kind: preview.kind === "stay" ? "stay" : preview.kind === "package" ? "trip" : "flight", status: "with_agent", summary: preview.title,
         travellerIds: preview.travellerIds, agentName, promisedBy: new Date(Date.now() + 15 * 60_000),
-        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", order, ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
+        details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", order, prefs: deskPrefs(priced.snapshot), ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
       }).returning({ id: appRequests.id });
       deskRequest = r!.id;
     }
@@ -167,6 +191,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
 }
 
 function outcomeOf(o: OrderRow): CreateOrderResponse {
+  if (o.status === "payment_requested") return { outcome: "payment_requested", order: orderView(o) };
   if (o.status === "requires_action") return { outcome: "requires_action", order: orderView(o) };
   if (o.status === "declined") return { outcome: "declined", message: t("pay.declined.body") };
   if (!AGENT_KINDS.has(o.kind) && o.status === "confirmed") return { outcome: "paid", order: orderView(o) };
@@ -196,9 +221,10 @@ export async function submitOtp(ownerId: string, id: string, code: string): Prom
   return orderView(await ownOrder(ownerId, id));
 }
 
-export async function answerOrder(ownerId: string, id: string, answer: "yes" | "call" | "accept_fare" | "stop" | "retry_by_phone" | "cancel"): Promise<OrderView> {
+export async function answerOrder(ownerId: string, id: string, answer: "yes" | "call" | "accept_fare" | "stop" | "retry_by_phone" | "cancel" | "remind"): Promise<OrderView> {
   const o = await ownOrder(ownerId, id);
   let u: OrderRow;
+  if (answer === "remind") return remindPayer(ownerId, id);
   if (answer === "yes" || answer === "call") u = await answerQuestion(o.id, ownerId, answer);
   else if (answer === "accept_fare") u = await acceptFare(o.id, ownerId);
   else if (answer === "retry_by_phone") u = await retryByPhone(o.id, ownerId);
@@ -215,7 +241,7 @@ export async function getOrder(ownerId: string, id: string): Promise<OrderView> 
 
 /** Orders still with the desk, for "close and finish in the background". */
 export async function activeOrders(ownerId: string): Promise<OrderView[]> {
-  const rows = await db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), inArray(appOrders.status, ["requires_action", "pending_agent", "held", "price_locked", "issuing", "needs_answer", "fare_changed", "ticketing_failed", "confirmed"])))
+  const rows = await db.select().from(appOrders).where(and(eq(appOrders.ownerId, ownerId), inArray(appOrders.status, ["payment_requested", "requires_action", "pending_agent", "held", "price_locked", "issuing", "needs_answer", "fare_changed", "ticketing_failed", "confirmed"])))
     .orderBy(desc(appOrders.createdAt)).limit(10);
   const out: OrderView[] = [];
   for (const r of rows) {
@@ -223,6 +249,95 @@ export async function activeOrders(ownerId: string): Promise<OrderView[]> {
     if (a.status !== "confirmed" || (a.confirmedAt && Date.now() - a.confirmedAt.getTime() < 10 * 60_000)) out.push(orderView(a));
   }
   return out;
+}
+
+/* ───────────── someone else pays (owner audit item 31) ───────────── */
+
+type PriceOf = Awaited<ReturnType<typeof priceDraft>>;
+
+/**
+ * "Ask Abdullah to pay": the order is written without a payment, status 'payment_requested', and a split for the
+ * whole amount goes into the circle with Abdullah's share unpaid, so the circle's own "Pay my share" is the pay link.
+ * The desk sees the request as waiting for payment. When Abdullah pays (fundRequestedOrder), it becomes a normal
+ * order with the desk.
+ */
+async function requestPayment(ownerId: string, body: CreateOrderInput, priced: PriceOf, pay: { userId: string; circleId: string }, contact: { phone: string; verified: false } | null, demo: Set<DemoFlag>, ipHash: string | null, agentName: string): Promise<CreateOrderResponse> {
+  const { preview } = priced;
+  if (pay.userId === ownerId) throw new AppError("VALIDATION", { fields: { userId: "yourself" } });
+  if (preview.credit.used.amount > 0) throw new AppError("VALIDATION", { message: t("error.validation") }); // credit is the owner's: a friend pays the full price
+  await membership(pay.circleId, ownerId);
+  const members = await memberIds(pay.circleId);
+  if (!members.includes(pay.userId)) throw new AppError("VALIDATION", { fields: { userId: "not_in_circle" } });
+  const payee = (await peopleByIds([pay.userId])).get(pay.userId);
+  const orderId = randomUUID();
+  const f = priced.snapshot.flight as FlightOption | undefined;
+  const requestedAt = new Date().toISOString();
+  // The split first (its own transaction, Circles' own rules), then the order that points at it.
+  const msg = await createSplit(pay.circleId, ownerId, {
+    what: t("mp.split.what", { title: preview.title }).slice(0, 40), total: preview.total.amount, paidBy: ownerId, mode: "custom", between: [ownerId, pay.userId], custom: { [ownerId]: 0, [pay.userId]: preview.total.amount },
+  }, ipHash, { orderId });
+  const payRequest: PayRequest = { userId: pay.userId, name: payee?.short ?? t("circles.someone"), circleId: pay.circleId, messageId: msg.id, shareKey: pay.userId, requestedAt, paidAt: null };
+  const order = await db.transaction(async (tx) => {
+    const [r] = await tx.insert(appRequests).values({
+      ownerId, kind: preview.kind === "stay" ? "stay" : preview.kind === "package" ? "trip" : "flight", status: "awaiting_payment", summary: preview.title,
+      travellerIds: preview.travellerIds, agentName, promisedBy: null,
+      details: { askKind: preview.kind, title: preview.title, detail: preview.lines.map((l) => l.text).join(" · "), source: "order", order: { id: orderId, status: "payment_requested", failure: null }, payRequest, prefs: deskPrefs(priced.snapshot), ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) },
+    }).returning({ id: appRequests.id });
+    const supplierId = priced.offerRows.find((x) => x.kind === "flight")?.supplierOfferId;
+    const [o] = await tx.insert(appOrders).values({
+      id: orderId, ownerId, kind: preview.kind, status: "payment_requested", step: 0, idempotencyKey: body.idempotencyKey,
+      draft: body.draft as Record<string, unknown>,
+      snapshot: { ...priced.snapshot, flightSupplierId: supplierId ?? null, place: priced.place, photo: preview.photo, title: preview.title, preview, payRequest, ...(contact ? { contact } : {}) },
+      lines: preview.lines, travellerIds: preview.travellerIds, subtotal: preview.subtotal.amount, discount: preview.promo?.status === "applied" ? preview.promo.discount.amount : 0,
+      promo: preview.promo?.status === "applied" ? preview.promo.code : null, creditUsed: 0, total: preview.total.amount, plan: "full",
+      paymentLabel: t("mp.method", { name: payRequest.name }), paymentMethod: { method: "someone_else", userId: pay.userId, circleId: pay.circleId, plan: "full", provider: "circle" },
+      paymentId: null, requestId: r!.id, agentName, demo: [...demo], autopilotAt: null,
+    }).returning();
+    await orderEvent(tx, o!.id, "payment_requested", { kind: "user" }, { userId: pay.userId, circleId: pay.circleId });
+    await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "order.payment_requested", entityType: "app_order", entityId: o!.id, summary: `Asked ${payRequest.name} to pay ${preview.total.amount} halalas for ${preview.title}`, ipHash });
+    return o!;
+  });
+  void f;
+  return { outcome: "payment_requested", order: orderView(order) };
+}
+
+/**
+ * The friend paid their share by card (circles/messages.ts markPaid calls this): the order carries their payment
+ * and goes to the desk like any other. Idempotent: a second call finds the order already moved.
+ */
+export async function fundRequestedOrder(orderId: string, payerId: string, paymentId: string | null): Promise<void> {
+  const [o] = await db.select().from(appOrders).where(eq(appOrders.id, orderId));
+  if (!o || o.status !== "payment_requested") return;
+  const pr = (o.snapshot as { payRequest?: PayRequest }).payRequest;
+  if (!pr || pr.userId !== payerId) return;
+  const now = new Date();
+  const agentName = o.agentName ?? (await agentFor(o.ownerId));
+  const updated = await db.transaction(async (tx) => {
+    const [u] = await tx.update(appOrders).set({
+      status: "pending_agent", paymentId, snapshot: { ...(o.snapshot as object), payRequest: { ...pr, paidAt: now.toISOString() } }, agentName,
+      autopilotAt: autopilotOn() ? new Date(Date.now() + tick(new Set(o.demo as DemoFlag[]))) : null, updatedAt: now,
+    }).where(and(eq(appOrders.id, o.id), eq(appOrders.status, "payment_requested"))).returning();
+    if (!u) return null;
+    if (o.requestId) {
+      await tx.update(appRequests).set({ status: "with_agent", promisedBy: new Date(Date.now() + 15 * 60_000), updatedAt: now,
+        details: sql`${appRequests.details} || ${JSON.stringify({ order: { id: o.id, status: "pending_agent", failure: null }, payRequest: { ...pr, paidAt: now.toISOString() } })}::jsonb` }).where(eq(appRequests.id, o.requestId));
+    }
+    await orderEvent(tx, o.id, "authorised", { kind: "user", name: pr.name }, { by: payerId, paymentId });
+    await appAuditLog(tx, { actorKind: "user", actorId: payerId, action: "order.paid_by_friend", entityType: "app_order", entityId: o.id, summary: `${pr.name} paid ${o.total} halalas for ${(o.snapshot as { title?: string }).title ?? "a booking"}` });
+    return u;
+  });
+  if (!updated) return;
+  await notify(o.ownerId, { kind: "other", level: "active", copy: "notify.mp.paid", vars: { name: pr.name }, href: `/waiting/${o.id}` }).catch(() => {});
+  if (updated.kind === "stay") await autoBookStay(updated.id).catch(() => {});
+}
+
+/** The owner nudges the friend: the circle's own reminder (once a day), from the order. */
+export async function remindPayer(ownerId: string, id: string): Promise<OrderView> {
+  const o = await ownOrder(ownerId, id);
+  const pr = (o.snapshot as { payRequest?: PayRequest }).payRequest;
+  if (o.status !== "payment_requested" || !pr) throw new AppError("VALIDATION");
+  await remindSplit(pr.circleId, ownerId, pr.messageId);
+  return orderView(o);
 }
 
 /* ───────────── the mock desk's autopilot ───────────── */

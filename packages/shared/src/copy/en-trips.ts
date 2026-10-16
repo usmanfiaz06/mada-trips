@@ -371,4 +371,9 @@ export const enTrips = {
   'rq.order.answer': 'Needs your answer',
   'rq.order.answerBody': 'Mada has a question about this booking.',
   'rq.order.open': 'Open the booking',
+
+  // Someone else paid for a booking (owner audit item 31)
+  'notify.mp.paid.title': '{name} paid',
+  'notify.mp.paid.body': 'Mada is booking now. Open it to follow along.',
+  'rq.order.payRequested': 'Waiting for {name} to pay',
 } as const;

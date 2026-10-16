@@ -2,7 +2,8 @@ import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import {
   DESK_PRICES, DESTINATIONS, PLANS, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
-  type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
+  BookingPrefs, airlineRequests, bookingPrefsOf, formatSar, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
+  type AppliedPrefs, type BookingLoyalty, type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appMessages, appQuotes, appRequests } from "@/db/app-schema";
@@ -11,6 +12,7 @@ import { membership } from "../circles/circles";
 import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, today, travellersOf } from "./common";
+import { getAccount } from "../account";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
 import { hotelbedsRule, withHotelbedsEssentials } from "./hotelbeds-stays";
 import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-requests";
@@ -19,6 +21,12 @@ import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-r
  * The order sheet: lines, the all-in total, promo code, Mada credit, instalments and the cancellation rule worked out
  * from this booking's own dates. The server prices; the app shows what comes back and sends the total it accepted.
  */
+
+/** What the order keeps of the preferences: the prefs as applied, the numbers in full, and what each supplier gets. */
+export type AppliedSnapshot = {
+  prefs: BookingPrefs; loyalty: BookingLoyalty[]; ssr: string[]; remarks: string[]; hotelRemarks: string[]; summary: string[];
+  extras: { seatsTogether: { count: number; legs: number; perPerson: number; total: number } | null };
+};
 
 export type Priced = {
   preview: OrderPreview;
@@ -39,8 +47,10 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   // Read up front, alongside whatever the draft needs (each query is a round trip): the household and the credit.
   const household = householdOf(ownerId);
   const balanceP = creditBalance(ownerId);
+  const accountP = getAccount(ownerId);
   household.catch(() => {});
   balanceP.catch(() => {});
+  accountP.catch(() => {});
   let lines: OrderLine[] = [];
   let title = "";
   let photo = "istanbul-galata";
@@ -173,8 +183,10 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const circle = await membership(d.circleId, ownerId);
     const [m] = await db.select({ card: appMessages.card }).from(appMessages)
       .where(and(eq(appMessages.id, d.messageId), eq(appMessages.threadKind, "circle"), eq(appMessages.threadId, d.circleId)));
-    const card = m?.card as { t?: string; what?: string } | null | undefined;
+    const card = m?.card as { t?: string; what?: string; cancelled?: boolean } | null | undefined;
     if (!card || card.t !== "split") throw new AppError("NOT_FOUND");
+    // A booking a friend was asked to pay, cancelled by its owner since: nothing to pay any more.
+    if (card.cancelled) throw new AppError("VALIDATION", { message: t("pay.shareGone") });
     const [share] = await db.select().from(appCircleSplitShares).where(and(eq(appCircleSplitShares.messageId, d.messageId), eq(appCircleSplitShares.key, d.shareKey)));
     if (!share || !share.userIds.includes(ownerId)) throw new AppError("NOT_FOUND");
     if (share.paidAt) throw new AppError("VALIDATION", { message: t("pay.shareGone") });
@@ -192,6 +204,38 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     agent = false;
     photo = "istanbul-galata";
     place = title;
+  }
+
+  // Preferences and loyalty applied (owner audit items 5, 6): the saved ones unless this booking says otherwise.
+  // A paid extra the fare prices (seats together on flynas) is a line only when the traveller added it this time.
+  let applied: AppliedPrefs | null = null;
+  if (kind === "trip" || kind === "stay" || kind === "package") {
+    const account = await accountP;
+    const prefs = body.prefs ? BookingPrefs.parse(body.prefs) : bookingPrefsOf(account.prefs);
+    const f = snapshot.flight as FlightOption | undefined;
+    const s = snapshot.stay as StayOption | undefined;
+    const carrier = f?.carrier ?? null;
+    const hotelName = s?.name ?? (snapshot.bundle ? t("pay.line.aRoom") : null);
+    const scope = snapshot.bundle ? "both" : prefScope(kind);
+    const n = Math.max(1, travellers.length);
+    const offer = f ? seatsTogetherOffer(prefs, body.extras, { carrier, travellers: n, legs: f.back ? 2 : 1 }) : null;
+    if (offer?.added) lines.push(line("seats", "flight", t("bp.extra.line", { count: offer.count * offer.legs, price: formatSar(offer.perPerson.amount) }), offer.total.amount));
+    const programmes = programmeFor({ carrier, hotelName: s?.name ?? null });
+    const people = travellers.length ? await household : [];
+    const selfId = people.find((p) => p.isSelf)?.id ?? null;
+    const ids = travellers.map((p) => p.id);
+    const loyalty = (body.loyalty ?? loyaltyToAttach(account.prefs.loyalty, programmes, selfId, ids)).filter((l) => ids.includes(l.personId) && programmes.includes(l.program));
+    const summary = prefsSummary(prefs, scope, n);
+    applied = {
+      prefs, summary, scope, programmes, loyalty: loyalty.map((l) => ({ ...l, programName: programmeName(l.program), masked: maskLoyalty(l.number) })),
+      extrasOffer: offer ? { key: "seatsTogether", perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
+    };
+    const air = scope !== "stay" ? airlineRequests(prefs, { carrier, travellers: n }) : { ssr: [], remarks: [] };
+    const appliedSnap: AppliedSnapshot = {
+      prefs, loyalty, ssr: air.ssr, remarks: air.remarks, hotelRemarks: scope !== "flight" ? hotelRemarks(prefs) : [], summary,
+      extras: { seatsTogether: offer?.added ? { count: offer.count, legs: offer.legs, perPerson: offer.perPerson.amount, total: offer.total.amount } : null },
+    };
+    snapshot.applied = appliedSnap;
   }
 
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
@@ -213,6 +257,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     travellerIds: travellers.map((p) => p.id),
     missingPassports: kind === "trip" || kind === "package" ? missing : [],
     stay: stayFacts,
+    applied,
   };
   return { preview, snapshot, travellers, offerRows, place };
 }

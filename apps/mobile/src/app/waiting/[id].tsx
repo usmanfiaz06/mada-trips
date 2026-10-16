@@ -74,17 +74,18 @@ export default function Waiting() {
   };
   // Waiting on the traveller (tickets that didn't issue, a new fare, a question): nothing is "finishing" until they
   // answer, so no "we'll tell you" toast. Today and Trips keep the booking with its actions.
-  const close = () => { if (!['ticketing_failed', 'fare_changed', 'needs_answer'].includes(o.status)) finishInBackground(o.id); router.replace('/today'); };
+  const close = () => { if (!['ticketing_failed', 'fare_changed', 'needs_answer', 'payment_requested'].includes(o.status)) finishInBackground(o.id); router.replace('/today'); };
   const rows = rowsOf(o);
   const agent = o.agent?.name ?? 'Mada';
   const withWhom = o.kind === 'stay' ? t('wait.with.hotel') : o.kind === 'package' ? t('wait.with.guides') : o.airline ?? t('wait.with.airline');
-  const live = o.status === 'needs_answer' ? t('wait.live.question', { agent }) : o.step >= 3 ? t('wait.live.almost') : t('wait.live.line', { agent, with: withWhom });
+  const live = o.status === 'payment_requested' ? t('mp.status', { name: o.payRequest?.name ?? '' }) : o.status === 'needs_answer' ? t('wait.live.question', { agent }) : o.step >= 3 ? t('wait.live.almost') : t('wait.live.line', { agent, with: withWhom });
   const elapsed = Math.max(0, Math.floor((now - Date.parse(o.createdAt)) / 1000));
   const today = todayIn();
   const sub = o.depart && o.departTime ? t(o.oneway ? 'wait.subOneWay' : 'wait.sub', { day: dayLabel(o.depart, { today }), time: o.departTime, from: FROM[o.from ?? ''] ?? o.from ?? '' })
     : o.lines[0]?.text.split(' · ').slice(1).join(' · ') ?? '';
   const step = o.status === 'pending_agent' ? 0 : o.step;
   const q2 = o.question;
+  const pr = o.status === 'payment_requested' ? o.payRequest : null;
 
   return (
     <Screen background={colors.night}>
@@ -113,6 +114,18 @@ export default function Waiting() {
         <T style={{ fontFamily: ff.ui400, fontSize: 15, color: 'rgba(255,253,249,0.82)' }}>{sub}</T>
       </View>
       <View style={[styles.panel, { marginBottom: 24 + bottom }]} accessibilityLiveRegion="polite">
+        {pr ? (
+          <Animated.View entering={enter(0)} style={styles.q} testID="wait-pay-request">
+            <T style={styles.qHead}>{t('mp.waiting.title', { name: pr.name })}</T>
+            <T style={styles.qBody}>{t('mp.waiting.body', { name: pr.name })}</T>
+            <T style={[styles.qHead, { color: '#e6c88f' }]}>{formatSar(o.total.amount)}</T>
+            <View style={styles.btns}>
+              <Button size="small" block={false} variant="gold" busy={acting} label={t('mp.remind', { name: pr.name })} onPress={async () => { await act('remind'); toast(t('mp.reminded', { name: pr.name })); }} testID="pay-request-remind" />
+              <Button size="small" block={false} variant="glass" label={t('mp.payMyself')} onPress={async () => { await act('cancel'); router.replace('/pay'); }} />
+              <Button size="small" block={false} variant="glass" label={t('mp.cancel')} onPress={() => act('cancel')} />
+            </View>
+          </Animated.View>
+        ) : null}
         {rows.map(([doing, doneLabel, detail], i) => {
           const state = i < step ? 'done' : i === step ? 'now' : 'todo';
           return (

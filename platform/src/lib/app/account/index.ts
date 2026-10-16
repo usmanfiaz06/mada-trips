@@ -22,7 +22,7 @@ import { attachPhone } from "../users";
 
 type AccountRow = typeof appAccounts.$inferSelect;
 
-export const DEFAULT_PREFS: Prefs = { seat: "any", together: true, meal: "halal", assist: [], loyalty: [], notes: "" };
+export const DEFAULT_PREFS: Prefs = { seat: "any", together: true, meal: "halal", assist: [], loyalty: [], notes: "", room: "any", bed: "any", floor: "any", quiet: false };
 
 /** The row, created on first use. */
 export async function accountRow(userId: string, tx: Tx | typeof db = db): Promise<AccountRow> {

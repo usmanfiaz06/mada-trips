@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindow
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type OrderPreview, type PayPlan } from '@mada/shared';
+import { formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type BookingLoyalty, type BookingPrefs, type OrderPreview, type PayPlan } from '@mada/shared';
 import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -18,6 +18,8 @@ import { TravellerChips } from '@/components/booking/Travellers';
 import { PhoneSheet, usePhoneNeeded } from '@/components/booking/PhoneSheet';
 import { HotelRequestsField, NO_HOTEL_REQUESTS } from '@/components/booking/HotelRequests';
 import { TravellerPassports } from '@/components/passport/TravellerPassports';
+import { AskSomeoneSheet, ExtrasCard, LoyaltyRow, LoyaltySheet, PrefsRow, PrefsSheet } from '@/components/booking/PrefsRows';
+import { Approx } from '@/components/wallet/Approx';
 import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
 import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, useDemo, useInvalidateBooking, usePayDraft, type PayDraft } from '@/lib/booking';
@@ -39,7 +41,7 @@ import { colors, font, radii, ff } from '@/theme';
  */
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
-type SheetName = null | 'people' | 'cards' | 'offline' | 'declined' | 'price' | 'blocked' | '3ds' | 'applepay';
+type SheetName = null | 'people' | 'cards' | 'offline' | 'declined' | 'price' | 'blocked' | '3ds' | 'applepay' | 'prefs' | 'loyalty' | 'payer';
 
 export default function Pay() {
   const router = useRouter();
@@ -85,6 +87,12 @@ export default function Pay() {
   const [acceptedState, setAcceptedState] = useState<{ key: string; preview: OrderPreview } | null>(null);
   const [blocked, setBlocked] = useState('');
   const [threeDs, setThreeDs] = useState<{ orderId: string; triesLeft: number; stopped: boolean; amount: number } | null>(null);
+  // Preferences, loyalty numbers and paid extras for this booking only (owner audit items 5, 6): null means the saved
+  // ones, as the server applies them; the extra is off every time until the traveller adds it on this sheet.
+  const [prefs, setPrefs] = useState<BookingPrefs | null>(null);
+  const [loyalty, setLoyalty] = useState<BookingLoyalty[] | null>(null);
+  const [seatsTogether, setSeatsTogether] = useState(false);
+  const [payer, setPayer] = useState<{ userId: string; circleId: string; name: string } | null>(null);
   const key = useRef(newIdempotencyKey());
   // The beta: an account without a verified phone gives a number to reach them (GET /config bookingNeedsPhone off).
   const needsPhone = useBookingNeedsPhone();
@@ -105,14 +113,15 @@ export default function Pay() {
   const flags = [...demo].sort().join(',');
   // A room: what to tell the hotel. Kept out of the preview (no price in it) and sent with the order.
   const [hotelAsks, setHotelAsks] = useState(NO_HOTEL_REQUESTS);
+  const applied = useMemo(() => ({ ...(prefs ? { prefs } : null), ...(loyalty ? { loyalty } : null), extras: { seatsTogether } }), [prefs, loyalty, seatsTogether]);
   const previewQ = useQuery({
-    queryKey: ['booking', 'preview', draft, promo, useCredit, flags],
+    queryKey: ['booking', 'preview', draft, promo, useCredit, flags, applied],
     enabled: !!draft,
     placeholderData: (p) => p,
-    queryFn: async () => (await bookingApi.preview({ draft: draft!, promo, useCredit })).preview,
+    queryFn: async () => (await bookingApi.preview({ draft: draft!, promo, useCredit, ...applied })).preview,
   });
   // A price the traveller accepted after it moved holds until they change what they're booking.
-  const choiceKey = `${travellers.join()}|${promo}|${useCredit}`;
+  const choiceKey = `${travellers.join()}|${promo}|${useCredit}|${seatsTogether}|${JSON.stringify(prefs)}|${JSON.stringify(loyalty)}`;
   const accepted = acceptedState?.key === choiceKey ? acceptedState.preview : null;
   const setAccepted = (pv: OrderPreview | null) => setAcceptedState(pv ? { key: choiceKey, preview: pv } : null);
   const p = accepted ?? previewQ.data;
@@ -154,7 +163,7 @@ export default function Pay() {
   const canSplit = !!p?.instalments && !isApple;
   const effPlan: PayPlan = canSplit ? plan : 'full';
   const charge = effPlan === 'tabby' ? p?.instalments?.tabby.amount ?? total : effPlan === 'tamara' ? p?.instalments?.tamara.amount ?? total : total;
-  const slideLabel = total === 0 ? t('pay.slideCredit') : effPlan === 'tabby' ? t('pay.slideTabby', { price: formatSar(charge) }) : effPlan === 'tamara' ? t('pay.slideTamara', { price: formatSar(charge) }) : p?.agent === false ? t('pay.slidePay', { price: formatSar(total) }) : t('pay.slide', { price: formatSar(total) });
+  const slideLabel = payer ? t('mp.send', { name: payer.name, price: formatSar(total) }) : total === 0 ? t('pay.slideCredit') : effPlan === 'tabby' ? t('pay.slideTabby', { price: formatSar(charge) }) : effPlan === 'tamara' ? t('pay.slideTamara', { price: formatSar(charge) }) : p?.agent === false ? t('pay.slidePay', { price: formatSar(total) }) : t('pay.slide', { price: formatSar(total) });
   const household = people.data ?? [];
   const H = householdOf(household, todayIn());
   const selfName = user?.name ?? '';
@@ -164,7 +173,7 @@ export default function Pay() {
     const c = code.trim().toUpperCase();
     if (!c) { setCodeErr(null); return; }
     try {
-      const out = (await bookingApi.preview({ draft, promo: c, useCredit })).preview;
+      const out = (await bookingApi.preview({ draft, promo: c, useCredit, ...applied })).preview;
       if (out.promo?.status === 'applied') { setPromo(c); setCodeErr(null); setPromoOpen(false); buzz('success'); }
       else setCodeErr(`${out.promo?.message ?? t('pay.promo.unknown')}${out.promo?.status === 'unknown' && SHOW_DEMO_HINTS ? ` (${t('pay.promo.demo')})` : ''}`);
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); }
@@ -178,8 +187,10 @@ export default function Pay() {
 
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
     const sent = draft.kind === 'stay' ? { ...draft, requests: hotelAsks } : draft;
-    const out = await bookingApi.createOrder({ draft: sent, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
+    const out = await bookingApi.createOrder({ draft: sent, promo, useCredit, ...applied, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
     key.current = newIdempotencyKey();
+    // A friend was asked to pay: nothing charged; the booking waits on the With Mada screen, and Trips shows it.
+    if (out.outcome === 'payment_requested') { buzz('success'); await invalidate(); qc.setQueryData(bookingKeys.order(out.order.id), out.order); toast(t('mp.sent', { name: out.order.payRequest?.name ?? '' })); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
     // The waiting screen opens on the order we already have, not a blank screen until its first poll answers.
     if (out.outcome === 'created') { buzz('knock'); await invalidate(); qc.setQueryData(bookingKeys.order(out.order.id), out.order); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
     if (out.outcome === 'paid') {
@@ -208,6 +219,7 @@ export default function Pay() {
       await new Promise((r) => setTimeout(r, 900));
       if (demoOn('offline')) { setSheet('offline'); buzz('soft'); return; }
       if (total === 0) { await place({ method: 'credit' }); return; }
+      if (payer) { await place({ method: 'someone_else', userId: payer.userId, circleId: payer.circleId }); return; }
       if (isApple) { setSheet('applepay'); return; }
       if (!method) { setSheet('cards'); return; }
       if (method?.kind === 'new_card') await place({ method: 'new_card', token: method.token, brand: method.brand, last4: method.last4 });
@@ -270,6 +282,10 @@ export default function Pay() {
               <LinkButton label={t('pay.edit')} onPress={() => setSheet('people')} />
             </View>
           ) : null}
+          {/* What Mada applies from the saved preferences, the loyalty number the booking earns on, and a paid extra the fare prices: each changeable here, for this booking only. */}
+          {p?.applied ? <PrefsRow applied={p.applied} changed={!!prefs} onChange={() => setSheet('prefs')} /> : null}
+          {p?.applied ? <LoyaltyRow applied={p.applied} onEdit={() => setSheet('loyalty')} /> : null}
+          {p?.applied?.extrasOffer ? <ExtrasCard offer={p.applied.extrasOffer} airline={p.lines[0]?.text.split(' · ')[1]?.replace(/,.*$/, '') ?? ''} onToggle={(on) => { setSeatsTogether(on); setAccepted(null); }} /> : null}
           {p?.promo?.status === 'applied' ? (
             <View style={styles.spread}>
               <View style={styles.row}><Icon name="star" size={20} /><T v="callout" color={colors.green} style={{ fontSize: 15 }}>{t('pay.promo.line', { code: p.promo.code })}</T><LinkButton label={t('pay.promo.remove')} size={13} onPress={() => { setPromo(null); setCode(''); }} /></View>
@@ -320,6 +336,7 @@ export default function Pay() {
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>
+            <Approx amount={total} testID="pay-approx" />
             {/* A room: the same facts as on its card, said again before paying (nothing new at the last step). */}
             {share ? null : <T v="small" testID="pay-all-in">{p?.stay?.payAtHotel ? t('pay.plusTax', { amount: formatSar(p.stay.payAtHotel.amount, { bare: true }) }) : t('pay.allIn')}</T>}
             {p?.stay ? (
@@ -335,10 +352,14 @@ export default function Pay() {
           <View style={styles.spread}>
             <View style={styles.row}>
               {total === 0 ? <><PayMark brand="credit" /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{t('pay.paidCredit')}</T></>
+                : payer ? <><Icon name="user" size={22} color={colors.green} /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }} testID="pay-payer">{t('mp.method', { name: payer.name })}</T></>
                 : <><PayMark brand={method?.brand ?? 'card'} /><T v="callout" color={colors.green} style={{ fontFamily: ff.ui500, fontSize: 15 }}>{method?.label ?? (cards.data ? t('pay.method.add') : '')}</T></>}
             </View>
-            <LinkButton label={t('pay.change')} onPress={() => setSheet('cards')} />
+            <LinkButton label={t('pay.change')} onPress={() => { setPayer(null); setSheet('cards'); }} />
           </View>
+          {/* Plainly: what is charged and in which currency. The display currency above is only a guide. */}
+          {total > 0 && !payer ? <T v="tiny" testID="pay-charged">{t('fx.charged', { amount: formatSar(total) })}{p?.agent === false ? '' : ` ${t('fx.chargedCard')}`}</T> : null}
+          {total > 0 && !share && p?.agent !== false && hasPeople && !payer && !p?.credit.used.amount ? <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('mp.ask')} onPress={() => setSheet('payer')} testID="pay-ask-someone" /></View> : null}
           {canSplit ? (
             <ChipWrap>
               {([['full', t('pay.plan.full')], ['tabby', t('pay.plan.tabby', { price: formatSar(p!.instalments!.tabby.amount, { bare: true }) })], ['tamara', t('pay.plan.tamara', { price: formatSar(p!.instalments!.tamara.amount, { bare: true }) })]] as const).map(([id, label]) => (
@@ -368,6 +389,9 @@ export default function Pay() {
         <T v="small">{t('pay.people.note')}</T>
         <Button label={t('pay.people.done', { price: formatSar(total) })} onPress={() => setSheet(null)} />
       </Sheet>
+      {p?.applied ? <PrefsSheet visible={sheet === 'prefs'} value={prefs ?? p.applied.prefs} scope={p.applied.scope} saved={p.applied.prefs} onClose={() => setSheet(null)} onSave={(v) => { setPrefs(v); setAccepted(null); setSheet(null); }} /> : null}
+      {p?.applied ? <LoyaltySheet visible={sheet === 'loyalty'} applied={p.applied} people={household} travellerIds={p.travellerIds} selfName={selfName} onClose={() => setSheet(null)} onSave={(l) => { setLoyalty(l); setSheet(null); }} /> : null}
+      <AskSomeoneSheet visible={sheet === 'payer'} price={total} onClose={() => setSheet(null)} onPick={(who) => { buzz('success'); setPayer(who); setUseCredit(false); setPlan('full'); setSheet(null); }} />
       {sheet === 'cards' ? <CardsSheet visible current={method} credit={share ? 0 : p?.credit.balance.amount ?? 0} onPick={(m) => { setMethod(m); setSheet(null); }} onClose={() => setSheet(null)} /> : null}
       <Sheet visible={sheet === 'offline'} label={t('pay.offline.title')} onClose={() => setSheet(null)}>
         <T v="h2">{t('pay.offline.title')}</T>

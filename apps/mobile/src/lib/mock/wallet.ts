@@ -1,5 +1,5 @@
 import {
-  CreateDocumentMeta, DESK_PHONE, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
+  CreateDocumentMeta, DESK_PHONE, FX_FALLBACK, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
   UpdatePersonRequest, checkSaudiMobile, firstNameOf, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
@@ -41,7 +41,7 @@ function err(code: ErrorCode, opts: { message?: string; copy?: CopyKey; vars?: R
 }
 const fieldsOf = (issues: { path: PropertyKey[]; message: string }[]) => Object.fromEntries(issues.map((i) => [i.path.map(String).join('.') || '_', i.message]));
 
-const DEFAULT_PREFS = { seat: 'any' as const, together: true, meal: 'halal' as const, assist: [], loyalty: [], notes: '' };
+const DEFAULT_PREFS = { seat: 'any' as const, together: true, meal: 'halal' as const, assist: [], loyalty: [], notes: '', room: 'any' as const, bed: 'any' as const, floor: 'any' as const, quiet: false };
 const blankDetails = (): PersonDetails => ({ relationLabel: null, meal: null, iqamaMasked: null, iqamaAt: null, exitVisa: { kind: 'none', until: null } });
 
 function fresh(): State {
@@ -142,6 +142,8 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
   const [path, query = ''] = w.path.split('?');
   const q = new URLSearchParams(query);
   const m = (re: RegExp) => re.exec(path!);
+  // Exchange rates for the display currency: public, the built-in table (platform/src/lib/app/fx.ts in mock mode).
+  if (path === '/fx' && w.method === 'GET') return ok({ fx: FX_FALLBACK });
   const owned = /^\/(documents|people\/[^/]+(\/passport)?|passport|account|me\/(email|phone|methods)|consents|export|cards|credit|support)/.test(path!);
   if (!owned) return null;
   // /people (GET, POST) is M0's.

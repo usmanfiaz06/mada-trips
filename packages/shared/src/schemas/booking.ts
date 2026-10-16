@@ -6,6 +6,7 @@ import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay, Money } from './co
 import { Cabin, FlightSegment, Pickup, Stay, Trip } from './trips';
 import { NEED_KEYS } from './booking-data';
 import { CardBrand } from './wallet';
+import { BookingExtras, BookingLoyalty, BookingLoyaltyBase, BookingPrefs } from './booking-prefs';
 
 /*
  * Booking (M2): Ask → search → entry check → order sheet → payment → the desk → a booked trip.
@@ -443,10 +444,31 @@ export const PreviewBody = z.object({
   draft: OrderDraft,
   promo: z.string().trim().max(20).nullish(),
   useCredit: z.boolean().default(true),
+  /** Preferences for this booking only; left out, the saved ones apply (booking-prefs.ts). */
+  prefs: BookingPrefs.nullish(),
+  /** Paid extras the traveller added on the sheet this time (never remembered). */
+  extras: BookingExtras.nullish(),
+  /** Loyalty numbers per traveller; left out, the account holder's saved numbers for this carrier or hotel apply. */
+  loyalty: z.array(BookingLoyalty).max(12).nullish(),
 });
 export type PreviewBody = z.input<typeof PreviewBody>;
 
 export const OrderLine = z.object({ key: z.string(), icon: z.enum(['flight', 'stay', 'car', 'star', 'doc', 'globe']), text: z.string(), amount: HalalasAmount });
+
+/** What the order sheet applied from the saved preferences, for its "Your preferences" and loyalty rows. */
+export const AppliedPrefs = z.object({
+  prefs: BookingPrefs,
+  /** Short labels in the traveller's language ("Window", "Seats together", "Halal"). */
+  summary: z.array(z.string()),
+  /** Which part of the preferences this booking uses. */
+  scope: z.enum(['flight', 'stay', 'both']),
+  loyalty: z.array(BookingLoyaltyBase.extend({ programName: z.string(), masked: z.string() })),
+  /** Programmes this booking earns on, for adding a number on the sheet. */
+  programmes: z.array(z.string()),
+  /** A paid extra the fare prices, with its price: on the order only when `added`. */
+  extrasOffer: z.object({ key: z.literal('seatsTogether'), perPerson: Money, count: z.number().int(), legs: z.number().int(), total: Money, added: z.boolean() }).nullable(),
+});
+export type AppliedPrefs = z.infer<typeof AppliedPrefs>;
 export type OrderLine = z.infer<typeof OrderLine>;
 
 export const OrderPreview = z.object({
@@ -477,6 +499,8 @@ export const OrderPreview = z.object({
     name: z.string(), checkIn: IsoDay, nights: z.number().int(), freeCancelUntil: IsoDay.nullable(), refundable: z.boolean(),
     payAtHotel: Money.nullable(), essentials: z.string().nullable(), facts: StayFacts.nullable(),
   }).nullable().optional(),
+  /** Preferences, loyalty and paid extras as applied to this booking (null for shares and eSIMs). */
+  applied: AppliedPrefs.nullable().optional(),
 });
 export type OrderPreview = z.infer<typeof OrderPreview>;
 export const PreviewResponse = z.object({ preview: OrderPreview });
@@ -488,6 +512,8 @@ export const PaymentChoice = z.discriminatedUnion('method', [
   z.object({ method: z.literal('applepay'), token: z.string().min(8).max(400) }),
   /** Mada credit covers it all. */
   z.object({ method: z.literal('credit') }),
+  /** Someone in a circle pays: the order waits for them (a split in the circle carries the pay link). */
+  z.object({ method: z.literal('someone_else'), userId: Id, circleId: Id }),
 ]);
 export type PaymentChoice = z.infer<typeof PaymentChoice>;
 
@@ -504,7 +530,7 @@ export const CreateOrderBody = PreviewBody.extend({
 export type CreateOrderBody = z.input<typeof CreateOrderBody>;
 
 export const OrderStatus = z.enum([
-  'requires_action', 'pending_agent', 'held', 'price_locked', 'issuing', 'needs_answer', 'fare_changed', 'ticketing_failed', 'confirmed', 'cancelled', 'declined',
+  'payment_requested', 'requires_action', 'pending_agent', 'held', 'price_locked', 'issuing', 'needs_answer', 'fare_changed', 'ticketing_failed', 'confirmed', 'cancelled', 'declined',
 ]);
 export type OrderStatus = z.infer<typeof OrderStatus>;
 
@@ -557,6 +583,8 @@ export const OrderView = z.object({
   requestId: Id.nullable(),
   /** 3-D Secure: the bank wants a code before authorising. */
   action: z.object({ kind: z.literal('otp'), triesLeft: z.number().int(), label: z.string(), amount: Money }).nullable(),
+  /** Set when someone else was asked to pay: who, in which circle, and whether they have. */
+  payRequest: z.object({ userId: Id, name: z.string(), circleId: Id, messageId: Id, shareKey: z.string(), requestedAt: IsoDateTime, paidAt: IsoDateTime.nullable() }).nullable().optional(),
   createdAt: IsoDateTime,
   confirmedAt: IsoDateTime.nullable(),
 });
@@ -574,11 +602,13 @@ export const CreateOrderResponse = z.discriminatedUnion('outcome', [
   z.object({ outcome: z.literal('blocked'), message: z.string() }),
   /** Charged now (requests, eSIMs): nothing for an agent to confirm. */
   z.object({ outcome: z.literal('paid'), order: OrderView }),
+  /** Someone else was asked to pay: nothing charged, the order waits for them. */
+  z.object({ outcome: z.literal('payment_requested'), order: OrderView }),
 ]);
 export type CreateOrderResponse = z.infer<typeof CreateOrderResponse>;
 
 export const ThreeDsBody = z.object({ code: z.string().regex(/^\d{6}$/) });
-export const OrderAnswerBody = z.object({ answer: z.enum(['yes', 'call', 'accept_fare', 'stop', 'retry_by_phone', 'cancel']) });
+export const OrderAnswerBody = z.object({ answer: z.enum(['yes', 'call', 'accept_fare', 'stop', 'retry_by_phone', 'cancel', 'remind']) });
 
 /* ───────────── what a confirmed booking writes into Trips ───────────── */
 

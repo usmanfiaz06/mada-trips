@@ -978,6 +978,15 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'pp.copy.deleted': 'انحذفت نسخة الجواز.',
   'pp.copy.saved': 'حفظنا نسخة الجواز مشفّرة.',
   'pp.copy.cantOpen': 'ما انفتحت النسخة. تأكد من النت وجرّب مرة ثانية.',
+
+  'prefs.stay': 'الغرفة',
+  'prefs.room': 'الغرفة',
+  'prefs.bed': 'السرير',
+  'prefs.floor': 'الدور',
+  'prefs.quiet': 'غرفة هادية',
+  'prefs.quietSub': 'بعيد عن المصعد والشارع، إذا قدر الفندق.',
+  'prefs.stayNote': 'نطلبها من كل فندق نحجزه لك. الفنادق تجتهد، وما في شيء مضمون.',
+  'prefs.appliedNote': 'تشوفها في كل صفحة دفع قبل ما تدفع، وتقدر تغيّرها لذاك الحجز بس.',
   'wallet.docs.noFile': 'ما فيه صورة محفوظة معه. بدّله عشان تضيف وحدة.',
   'wallet.docs.zoomHint': 'قرّب بإصبعين · اضغط مرتين تقرّب أكثر',
 };

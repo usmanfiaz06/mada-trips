@@ -334,7 +334,7 @@ export const TripRequestView = z.object({
    * 'fare_changed', 'needs_answer') and failure, for tickets that didn't issue, is 'payment' or 'airline'; otherwise
    * it is 'pending_agent', 'confirmed' or 'cancelled', following the request. Optional for older builds.
    */
-  order: z.object({ id: Id, status: z.string(), failure: z.enum(['payment', 'airline']).nullable() }).nullable().optional(),
+  order: z.object({ id: Id, status: z.string(), failure: z.enum(['payment', 'airline']).nullable(), /** Set while status is 'payment_requested': the friend asked to pay. */ payer: z.string().nullable().optional() }).nullable().optional(),
   /** Taken back by the traveller (status 'cancelled'), and whether it still can be (the desk hasn't got it yet). Older servers send none. */
   withdrawn: z.boolean().optional(),
   canTakeBack: z.boolean().optional(),
@@ -452,6 +452,74 @@ export const TripPayment = z.object({
 export type TripPayment = z.infer<typeof TripPayment>;
 
 export const PaymentsResponse = z.object({ payments: z.array(TripPayment), total: Money, refunded: Money, credit: Money });
+
+/* ───────── the trip's Money screen: who paid what, per traveller, pending, splits, the statement ───────── */
+
+/** One paid item on the trip, with how it divides between the travellers (flights per person; a room among all). */
+export const TripMoneyItem = z.object({
+  id: Id,
+  item: TripPaymentItem,
+  title: z.string(),
+  amount: Money,
+  refunded: Money.nullable(),
+  paidAt: IsoDateTime,
+  /** "Visa ending 41", "Apple Pay", "Paid by Abdullah". */
+  paidBy: z.string(),
+  invoiceId: Id.nullable(),
+  perTraveller: z.array(z.object({ personId: Id, amount: Money })),
+});
+export type TripMoneyItem = z.infer<typeof TripMoneyItem>;
+
+/** Something priced but not yet paid: an order waiting for a friend's payment, a quote waiting for yours. */
+export const TripMoneyPending = z.object({
+  id: Id,
+  title: z.string(),
+  amount: Money,
+  /** 'friend': someone was asked to pay (their name in `who`) · 'you': a quote waiting for your payment · 'desk': with the desk. */
+  kind: z.enum(['friend', 'you', 'desk']),
+  who: z.string().nullable(),
+  since: IsoDateTime,
+});
+export type TripMoneyPending = z.infer<typeof TripMoneyPending>;
+
+/** A split in a circle that belongs to this trip ("Dinner at Nusr-Et", or a booking a friend paid). */
+export const TripMoneySplit = z.object({
+  circleId: Id,
+  circleName: z.string(),
+  messageId: Id,
+  what: z.string(),
+  total: Money,
+  paidByName: z.string(),
+  shares: z.array(z.object({ key: z.string(), names: z.array(z.string()), amount: Money, paid: z.boolean(), mine: z.boolean() })),
+  settled: z.boolean(),
+});
+export type TripMoneySplit = z.infer<typeof TripMoneySplit>;
+
+export const TripMoney = z.object({
+  tripId: Id,
+  city: z.string(),
+  ref: z.string().nullable(),
+  /** Everything paid, less refunds: what the trip has cost so far. */
+  total: Money,
+  paid: Money,
+  refunded: Money,
+  /** Priced but not paid yet (sum of `pending`). */
+  pendingTotal: Money,
+  /** Mada credit on the account right now. */
+  credit: Money,
+  items: z.array(TripMoneyItem),
+  travellers: z.array(z.object({ personId: Id, name: z.string(), isSelf: z.boolean(), amount: Money })),
+  /** Who actually paid: by card label, Apple Pay, credit, or a friend's name. */
+  payers: z.array(z.object({ name: z.string(), amount: Money, mine: z.boolean() })),
+  pending: z.array(TripMoneyPending),
+  splits: z.array(TripMoneySplit),
+  /** A clean statement in words, ready to share as text; the HTML version is GET /trips/{id}/money/statement. */
+  statement: z.string(),
+  /** Rates used for the "≈ AED" line, so the statement and the screen agree. */
+  generatedAt: IsoDateTime,
+});
+export type TripMoney = z.infer<typeof TripMoney>;
+export const TripMoneyResponse = z.object({ money: TripMoney });
 
 export const InvoiceKind = z.enum(['simplified', 'tax', 'credit_note']);
 export const InvoiceLine = z.object({
@@ -703,6 +771,8 @@ export const TRIP_ROUTES = {
   itinerary: (id: string) => `/trips/${id}/itinerary`,
   refresh: (id: string) => `/trips/${id}/refresh`,
   payments: (id: string) => `/trips/${id}/payments`,
+  money: (id: string) => `/trips/${id}/money`,
+  moneyStatement: (id: string) => `/trips/${id}/money/statement`,
   refundQuote: (id: string) => `/trips/${id}/refunds/quote`,
   refunds: (id: string) => `/trips/${id}/refunds`,
   cancelStay: (id: string) => `/trips/${id}/stay/cancel`,

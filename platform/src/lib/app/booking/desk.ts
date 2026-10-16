@@ -5,7 +5,7 @@ import {
   type FareOption, type FlightOption, type OrderLine, type StayOption,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
-import { appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
+import { appMessages, appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
 import { appOrderEvents, appOrders, appTripBookings } from "@/db/app-schema-booking";
 import { appTripCharges, appTripFacts, type StayFacts } from "@/db/app-schema-trips";
 import { appAuditLog } from "../audit";
@@ -133,14 +133,22 @@ export async function failTicketing(orderId: string, agent: DeskAgent, reason = 
 }
 
 export async function cancelOrder(orderId: string, actor: { kind: "user" | "agent"; name: string }): Promise<OrderRow> {
-  return move(orderId, ["requires_action", "pending_agent", "held", "price_locked", "needs_answer", "fare_changed", "ticketing_failed"], async (tx, o) => {
+  return move(orderId, ["payment_requested", "requires_action", "pending_agent", "held", "price_locked", "needs_answer", "fare_changed", "ticketing_failed"], async (tx, o) => {
     await voidPayment(tx, o);
     await returnCredit(tx, o);
+    await closePayRequest(tx, o);
     await orderEvent(tx, o.id, "cancelled", actor);
     await reopenQuote(tx, o);
     await appAuditLog(tx, { actorKind: actor.kind, actorId: actor.kind === "user" ? o.ownerId : actor.name, action: "order.cancelled", entityType: "app_order", entityId: o.id, summary: "Booking cancelled before it was confirmed; nothing was charged" });
     return { status: "cancelled" };
   });
+}
+
+/** A booking a friend was asked to pay, cancelled first: the split's pay link closes (the share can't be paid any more). */
+async function closePayRequest(tx: Tx, o: OrderRow) {
+  const pr = (o.snapshot as { payRequest?: { messageId: string; paidAt: string | null } }).payRequest;
+  if (!pr || pr.paidAt) return;
+  await tx.update(appMessages).set({ card: sql`${appMessages.card} || '{"cancelled": true}'::jsonb` }).where(eq(appMessages.id, pr.messageId));
 }
 
 /** A fare the desk quoted goes back on the request when its booking is cancelled before issue (still payable while held). */

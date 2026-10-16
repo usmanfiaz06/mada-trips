@@ -36,6 +36,8 @@ export async function chargeFor(ownerId: string, choice: PaymentChoice, plan: Pa
     // A card that's new to the bank's records asks for a code first (3-D Secure).
     return { method: choice.brand === "mada" ? "mada" : "card", provider: "myfatoorah", token: mock ? `${choice.token}_3ds` : choice.token, label: cardLabel(choice), instalments: 1 };
   }
+  // Someone else pays: nothing is charged to this account (orders.ts requestPayment); never a charge here.
+  if (choice.method === "someone_else") throw new AppError("VALIDATION");
   const c = await ownCard(ownerId, choice.cardId);
   let token = decryptField(c.tokenEnc, `app_cards:${c.id}:token`);
   if (mock) {

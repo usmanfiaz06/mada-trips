@@ -983,6 +983,16 @@ export const walletCopy = {
   'pp.copy.deleted': 'Passport copy deleted.',
   'pp.copy.saved': 'Passport copy kept, encrypted.',
   'pp.copy.cantOpen': 'The copy didn’t open. Check your connection and try again.',
+
+  // ───────────── preferences applied at booking: the room (owner audit item 5) ─────────────
+  'prefs.stay': 'The room',
+  'prefs.room': 'Room',
+  'prefs.bed': 'Bed',
+  'prefs.floor': 'Floor',
+  'prefs.quiet': 'A quiet room',
+  'prefs.quietSub': 'Away from the lift and the street, when the hotel can.',
+  'prefs.stayNote': 'Asked of every hotel we book for you. Hotels do their best; none of it is a promise.',
+  'prefs.appliedNote': 'You see these on every order sheet before you pay, and can change them for that booking only.',
   // The document sheet shows the stored file (owner audit, item 15).
   'wallet.docs.noFile': 'No photo kept with this one. Replace it to add one.',
   'wallet.docs.zoomHint': 'Pinch to zoom · double-tap to go closer',

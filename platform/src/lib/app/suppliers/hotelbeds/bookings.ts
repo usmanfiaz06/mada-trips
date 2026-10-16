@@ -139,7 +139,8 @@ export async function bookStayOnHotelbeds(orderId: string, actor: DeskActor): Pr
     const hotelAsks = hotelRequestRemark(HotelRequests.nullish().parse((o.draft as { requests?: unknown }).requests));
     const res = await hotels.book({
       rateKey, holder, paxes: paxesFor(people, stay.rooms ?? 1, stay.checkIn ?? new Date().toISOString().slice(0, 10), holder),
-      clientReference: row.clientReference, remark: [`Mada Trips order ${o.ref ?? o.id.slice(0, 8)}`, ...(hotelAsks ? [hotelAsks] : [])].join(". ").slice(0, 250),
+      // The traveller's room preferences ride on the booking as the hotel's remark (booking-prefs.ts hotelRemarks).
+      clientReference: row.clientReference, remark: [`Mada Trips order ${o.ref ?? o.id.slice(0, 8)}`, ...((o.snapshot as { applied?: { hotelRemarks?: string[] } }).applied?.hotelRemarks ?? []), ...(hotelAsks ? [hotelAsks] : [])].join(". ").slice(0, 250),
       tolerancePct: Number(process.env.HOTELBEDS_TOLERANCE_PCT ?? 0) || undefined,
     });
     const b = res.booking;

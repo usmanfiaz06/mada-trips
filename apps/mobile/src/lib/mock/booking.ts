@@ -7,6 +7,8 @@ import {
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
   type HotelRequests,
+  BookingPrefs, airlineRequests, bookingPrefsOf, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
+  type AppliedPrefs, type TravelPrefs,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -30,7 +32,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; withdrawn?: boolean; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
+type Order = OrderView & { owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -53,6 +55,10 @@ const TZ_OFF: Record<string, number> = { DXB: 60, CAI: -60, LHR: -180, GYD: 60 }
 async function household(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1]): Promise<Person[]> {
   await walletMock({ method: 'GET', path: '/cards', token: w.token }, ctx); // the demo family arrives on first use
   return user.people.map((p) => (p.isSelf ? { ...p, firstName: p.firstName || user.name } : p));
+}
+async function savedPrefs(w: Wire, ctx: Parameters<AreaMock>[1]): Promise<TravelPrefs | null> {
+  const r = await walletMock({ method: 'GET', path: '/account', token: w.token }, ctx);
+  return (r?.json as { account?: { prefs?: TravelPrefs } } | undefined)?.account?.prefs ?? null;
 }
 async function creditBalance(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1]): Promise<number> {
   const r = await walletMock({ method: 'GET', path: '/credit', token: w.token }, ctx);
@@ -95,7 +101,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
 
 /* ───────────── the order sheet ───────────── */
 
-type Priced = { preview: OrderPreview; place: string; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown> };
+type Priced = { preview: OrderPreview; place: string; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown>; ssr?: string[]; hotelRemarks?: string[] };
 
 async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body: ReturnType<typeof PreviewBody.parse>, bump = 0): Promise<Priced | WireResponse> {
   const d = body.draft;
@@ -192,6 +198,30 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     lines = [L('esim', 'globe', t('pay.line.esim', { count: d.count }), sarToHalalas(DESK_PRICES.esimEach * d.count))];
     rule = t('pay.rule.esim'); title = t('pay.title.esim'); agent = false; place = title;
   }
+  // Preferences and loyalty applied (lib/app/booking/pricing.ts): the saved ones unless this booking says otherwise;
+  // a paid extra the fare prices is a line only when added this time.
+  let applied: AppliedPrefs | null = null;
+  if (kind === 'trip' || kind === 'stay' || kind === 'package') {
+    const saved = await savedPrefs(w, ctx);
+    const prefs = body.prefs ? BookingPrefs.parse(body.prefs) : bookingPrefsOf(saved);
+    const f = out.flight; const st = out.stay;
+    const carrier = f?.carrier ?? null;
+    const bundle = !!(out.search as { bundle?: boolean } | undefined)?.bundle;
+    const scope = bundle ? 'both' : prefScope(kind);
+    const n = Math.max(1, travellers.length);
+    const offer = f ? seatsTogetherOffer(prefs, body.extras, { carrier, travellers: n, legs: f.back ? 2 : 1 }) : null;
+    if (offer?.added) lines.push(L('seats', 'flight', t('bp.extra.line', { count: offer.count * offer.legs, price: formatSar(offer.perPerson.amount) }), offer.total.amount));
+    const programmes = programmeFor({ carrier, hotelName: st?.name ?? null });
+    const selfId = people.find((p) => p.isSelf)?.id ?? null;
+    const ids = travellers.map((p) => p.id);
+    const loyalty = (body.loyalty ?? loyaltyToAttach(saved?.loyalty, programmes, selfId, ids)).filter((l) => ids.includes(l.personId) && programmes.includes(l.program));
+    applied = {
+      prefs, summary: prefsSummary(prefs, scope, n), scope, programmes, loyalty: loyalty.map((l) => ({ ...l, programName: programmeName(l.program), masked: maskLoyalty(l.number) })),
+      extrasOffer: offer ? { key: 'seatsTogether', perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
+    };
+    out.ssr = scope !== 'stay' ? airlineRequests(prefs, { carrier, travellers: n }).ssr : [];
+    out.hotelRemarks = scope !== 'flight' ? hotelRemarks(prefs) : [];
+  }
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
   const travel = d.kind !== 'share'; // promo codes, credit and instalments are for travel
   const promo = travel ? checkPromo(body.promo, today(), subtotal) : null;
@@ -204,6 +234,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     credit: { balance: money(balance), used: money(used) }, total: money(total), rule, agent, holdExpiresAt: hold ? new Date(hold).toISOString() : null,
     instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id), missingPassports: kind === 'trip' || kind === 'package' ? travellers.filter((p) => !p.passport).map((p) => p.id) : [],
+    applied,
   };
   return { preview, place, travellers, ...out };
 }
@@ -234,7 +265,8 @@ function confirm(o: Order) {
     o.tripId = recordBookedTrip({
       owner: o.user, ref: o.ref, agentName: o.agent?.name ?? agentName(), city: dest?.name ?? o.place, country: dest ? ENTRY_RULES[dest.country]?.name ?? null : null, photo: dest?.photo ?? o.photo,
       travellers: o.travellers, flight: o.snap.flight, stay: o.snap.stay, bundle: o.bundle, lines: o.lines, extra: o.extra.amount, discount: o.snap.discount, creditUsed: o.creditUsed.amount,
-      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets, requests: o.snap.requests ?? null,
+      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets,
+      payer: o.payRequest?.name ?? null, payLink: o.payRequest ? { circleId: o.payRequest.circleId, messageId: o.payRequest.messageId } : null, requests: o.snap.requests ?? null,
     });
   }
   if (o.kind === 'quote' && o.requestId) { const r = requests.get(o.requestId); if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); } }
@@ -527,7 +559,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (!p.success) return bad(p.error.issues);
     const b = p.data;
     const prior = [...orders.values()].find((o) => o.owner === user.id && o.key === b.idempotencyKey);
-    if (prior) return ok({ outcome: prior.status === 'requires_action' ? 'requires_action' : 'created', order: viewOf(prior) }, 201);
+    if (prior) return ok({ outcome: prior.status === 'payment_requested' ? 'payment_requested' : prior.status === 'requires_action' ? 'requires_action' : 'created', order: viewOf(prior) }, 201);
     // Accounts that began with Apple, Google or email verify a phone before their first booking (AUTH.md).
     if (!user.phone) {
       // The beta: with booking open to accounts without a verified phone, a number to reach them instead (lib/mock/beta.ts).
@@ -550,7 +582,20 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (b.draft.kind === 'share' && (b.plan !== 'full' || pay.method === 'credit')) return err('VALIDATION');
     let label = t('pay.paidCredit');
     let requires3ds = false;
-    if (pv.total.amount > 0 && pay.method !== 'credit') {
+    // Someone in a circle pays (lib/app/booking/orders.ts requestPayment): a split for the whole price goes into the
+    // circle, with the friend's share unpaid; the order waits, nothing charged here.
+    let payRequest: NonNullable<OrderView['payRequest']> = null as never;
+    if (pay.method === 'someone_else') {
+      if (!['trip', 'stay', 'package'].includes(pv.kind) || pay.userId === user.id || pv.credit.used.amount > 0) return err('VALIDATION');
+      const circle = (await circlesMock({ method: 'GET', path: `/circles/${pay.circleId}`, token: w.token }, ctx))?.json as { name?: string; members?: { id: string; short: string }[] } | undefined;
+      const who = circle?.members?.find((m) => m.id === pay.userId);
+      if (!who) return err('VALIDATION', undefined, { userId: 'not_in_circle' });
+      const sp = await circlesMock({ method: 'POST', path: `/circles/${pay.circleId}/splits`, token: w.token, body: { what: t('mp.split.what', { title: pv.title }).slice(0, 40), total: pv.total.amount, paidBy: user.id, mode: 'custom', between: [user.id, pay.userId], custom: { [user.id]: 0, [pay.userId]: pv.total.amount } } }, ctx);
+      const made = sp?.json as { items?: { id: string }[] } | undefined;
+      if (!sp || sp.status !== 201 || !made?.items?.[0]) return err('VALIDATION');
+      payRequest = { userId: pay.userId, name: who.short, circleId: pay.circleId, messageId: made.items[0].id, shareKey: pay.userId, requestedAt: nowIso(), paidAt: null };
+      label = t('mp.method', { name: who.short });
+    } else if (pv.total.amount > 0 && pay.method !== 'credit') {
       if (b.plan !== 'full' && pay.method !== 'applepay' && pv.total.amount >= 100_000) label = b.plan === 'tabby' ? 'Tabby' : 'Tamara';
       else if (pay.method === 'applepay') label = 'Apple Pay';
       else if (pay.method === 'new_card') { label = t('pay.card.label', { brand: pay.brand === 'visa' ? 'Visa' : pay.brand === 'mastercard' ? 'Mastercard' : 'mada', last: pay.last4.slice(-2) }); requires3ds = true; }
@@ -565,14 +610,15 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const agentKind = ['trip', 'stay', 'package'].includes(pv.kind);
     const f = priced.flight;
     const o: Order = {
-      id: uuid(), kind: pv.kind, status: requires3ds ? 'requires_action' : 'pending_agent', step: 0, title: pv.title, place: priced.place,
+      id: uuid(), kind: pv.kind, status: payRequest ? 'payment_requested' : requires3ds ? 'requires_action' : 'pending_agent', step: 0, title: pv.title, place: priced.place, payRequest: payRequest ?? null,
+      applied: pv.applied ?? null, ssr: priced.ssr, hotelRemarks: priced.hotelRemarks,
       depart: f?.out.date ?? null, departTime: f?.out.dep ?? null, from: f?.out.from ?? null, oneway: f ? !f.back : false, photo: pv.photo,
       carrier: f?.carrier ?? null, airline: f?.airline ?? null, flightNumber: f?.out.flightNumber ?? null, cabin: f?.cabin ?? null, seats: f && !priced.quoted ? seatsFor(priced.travellers.length, f.cabin) : [],
       travellerIds: pv.travellerIds, lines: pv.lines, total: pv.total, extra: money(0), plan: label === 'Tabby' ? 'tabby' : label === 'Tamara' ? 'tamara' : 'full', paymentLabel: label,
       creditUsed: pv.credit.used, bundle: !!(priced.search as { bundle?: boolean } | undefined)?.bundle, ref: null, agent: { name: agentName() }, confirmedBy: null,
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
-      owner: user.id, nextAt: requires3ds ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
+      owner: user.id, nextAt: requires3ds || payRequest ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
       user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null, requests: b.draft.kind === 'stay' ? b.draft.requests ?? null : null },
     };
     if (priced.quoted && b.draft.kind === 'quote') {
@@ -582,12 +628,25 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (demo.has('slowAgent')) o.nextAt = Date.now() + 4200;
     orders.set(o.id, o);
     if (pv.credit.used.amount) creditSpent.set(user.id, (creditSpent.get(user.id) ?? 0) + pv.credit.used.amount);
+    if (payRequest) return ok({ outcome: 'payment_requested', order: viewOf(o) }, 200);
     if (requires3ds) return ok({ outcome: 'requires_action', order: viewOf(o) }, 201);
     if (!agentKind) { confirm(o); return ok({ outcome: 'paid', order: viewOf(o) }, 201); }
     return ok({ outcome: 'created', order: viewOf(o) }, 201);
   }
+  /** A booking a friend was asked to pay: when their share in the circle is paid, the order goes to the desk. */
+  const fund = async (o: Order) => {
+    const pr = o.payRequest;
+    if (o.status !== 'payment_requested' || !pr || pr.paidAt) return;
+    const r = await circlesMock({ method: 'GET', path: `/circles/${pr.circleId}/messages`, token: w.token }, ctx);
+    const page = r && r.status === 200 ? (r.json as { items: { id: string; split: { shares: { key: string; paid: boolean; paidAt: string | null }[] } | null }[] }) : null;
+    const sh = page?.items.find((x) => x.id === pr.messageId)?.split?.shares.find((x) => x.key === pr.shareKey);
+    if (!sh?.paid) return;
+    o.payRequest = { ...pr, paidAt: sh.paidAt ?? nowIso() };
+    o.status = 'pending_agent'; o.nextAt = Date.now() + tickMs(o);
+  };
   if (key === 'GET /orders') {
     const mineOrders = [...orders.values()].filter((o) => o.owner === user.id);
+    for (const o of mineOrders) await fund(o);
     mineOrders.forEach((o) => advance(o));
     return ok({ orders: mineOrders.filter((o) => o.status !== 'cancelled' && o.status !== 'declined').map(viewOf) });
   }
@@ -609,6 +668,10 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     }
     if (r[2] === '/answer') {
       const a = String(body.answer ?? '');
+      if (a === 'remind' && o.status === 'payment_requested' && o.payRequest) {
+        const rr = await circlesMock({ method: 'POST', path: `/circles/${o.payRequest.circleId}/splits/${o.payRequest.messageId}/remind`, token: w.token, body: {} }, ctx);
+        return rr && rr.status !== 200 ? rr : ok({ order: viewOf(o) });
+      }
       if (a === 'yes' && o.status === 'needs_answer') { o.question = null; o.status = 'held'; o.nextAt = Date.now() + tickMs(o); }
       else if (a === 'call' && o.status === 'needs_answer') { o.question = { ...o.question!, calling: true }; o.status = 'held'; o.nextAt = Date.now() + 3000; }
       else if (a === 'accept_fare' && o.status === 'fare_changed') { o.extra = money(o.extra.amount + (o.fareChange?.total.amount ?? 0)); o.fareChange = null; o.status = 'pending_agent'; o.nextAt = Date.now() + tickMs(o); }
@@ -617,6 +680,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       else return err('VALIDATION');
       return ok({ order: viewOf(o) });
     }
+    await fund(o);
     advance(o);
     return ok({ order: viewOf(o) });
   }
@@ -648,10 +712,10 @@ export function askRequestViews(userId: string): TripRequestView[] {
  */
 const orderRequestIds = new Map<string, string>();
 function stuckOrderViews(userId: string): TripRequestView[] {
-  return [...orders.values()].filter((o) => o.owner === userId && ['ticketing_failed', 'fare_changed', 'needs_answer'].includes(o.status)).map((o) => ({
-    id: orderRequestIds.get(o.id) ?? orderRequestIds.set(o.id, uuid()).get(o.id)!, tripId: null, kind: o.kind === 'stay' ? 'stay' : 'flight', area: 'other' as const, status: 'needs_answer' as const, title: o.place, short: null, detail: o.lines[0]?.text ?? null,
+  return [...orders.values()].filter((o) => o.owner === userId && ['ticketing_failed', 'fare_changed', 'needs_answer', 'payment_requested'].includes(o.status)).map((o) => ({
+    id: orderRequestIds.get(o.id) ?? orderRequestIds.set(o.id, uuid()).get(o.id)!, tripId: null, kind: o.kind === 'stay' ? 'stay' : 'flight', area: 'other' as const, status: o.status === 'payment_requested' ? 'awaiting_payment' as const : 'needs_answer' as const, title: o.place, short: null, detail: o.lines[0]?.text ?? null,
     withWhom: 'faisal' as const, withName: o.agent?.name ?? null, outcome: null, alt: null, yesText: null, quote: null, quoteText: null,
-    order: { id: o.id, status: o.status, failure: o.status === 'ticketing_failed' ? (o.failure?.cause ?? 'airline') : null },
+    order: { id: o.id, status: o.status, failure: o.status === 'ticketing_failed' ? (o.failure?.cause ?? 'airline') : null, payer: o.payRequest?.name ?? null },
     createdAt: o.createdAt, updatedAt: o.createdAt,
   }));
 }

@@ -271,7 +271,8 @@ export async function familyOfFn(members: string[], tx: Db = db) {
   return find;
 }
 
-export async function createSplit(circleId: string, userId: string, raw: unknown, ipHash: string | null) {
+/** `opts.orderId`: the split is the pay link for a booking (booking/orders.ts requestPayment); paying it funds the order. */
+export async function createSplit(circleId: string, userId: string, raw: unknown, ipHash: string | null, opts: { orderId?: string } = {}) {
   await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const s = CreateSplitRequest.parse(raw);
   await membership(circleId, userId);
@@ -286,7 +287,7 @@ export async function createSplit(circleId: string, userId: string, raw: unknown
     if (amounts.some((a) => a < 0) || amounts.reduce((a, b) => a + b, 0) !== s.total) throw err("VALIDATION", "circles.err.splitSum", { custom: t("circles.err.splitSum") });
   } else amounts = splitAmounts(s.total, units.length);
   const row = await db.transaction(async (tx) => {
-    const r = await addMessage(tx, circleId, { author: "user", userId, body: s.what, card: { t: "split", what: s.what, total: s.total, paidBy: s.paidBy, mode: s.mode, reminded: false, order: units.map((u) => u.key) } });
+    const r = await addMessage(tx, circleId, { author: "user", userId, body: s.what, card: { t: "split", what: s.what, total: s.total, paidBy: s.paidBy, mode: s.mode, reminded: false, order: units.map((u) => u.key), ...(opts.orderId ? { orderId: opts.orderId } : {}) } });
     await tx.insert(appCircleSplitShares).values(units.map((u, i) => ({
       messageId: r.id, key: u.key, userIds: u.ids, amount: amounts[i]!, paidAt: u.ids.includes(s.paidBy) ? new Date() : null, paidVia: u.ids.includes(s.paidBy) ? "bill" : null,
     })));
@@ -315,13 +316,19 @@ export async function markPaid(circleId: string, userId: string, messageId: stri
       : await sysMessage(tx, circleId, "markedPaid", userId, share.userIds, { amount: Number(share.amount) });
     await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "circle.share_paid", entityType: "circle_message", entityId: messageId, summary: `Share of ${sar(Number(share.amount))} marked paid (${via})`, data: { circleId, key: input.key, via, paymentId: input.paymentId ?? null }, ipHash });
     const [updated] = await tx.select().from(appMessages).where(eq(appMessages.id, messageId));
-    return [updated!, line];
+    return [updated!, line, c.orderId as string | undefined];
   });
   if (!rows.length) {
     const [m] = await db.select().from(appMessages).where(eq(appMessages.id, messageId));
     return toMessages([m!]);
   }
-  return toMessages(rows);
+  const [updated, line, orderId] = rows as [MessageRow, MessageRow, string | undefined];
+  // A booking's pay link, paid by card: the order goes to the desk (loaded here, not imported: booking imports Circles).
+  if (orderId && (input.via ?? "cash") === "card") {
+    const booking = await import("../booking/orders");
+    await booking.fundRequestedOrder(orderId, userId, input.paymentId ?? null);
+  }
+  return toMessages([updated, line]);
 }
 
 /** The person who paid reminds everyone still owing, once a day. They get a quiet notification. */
