@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { DESK_PHONE, DisruptionKind, type DisruptionChoiceResponse, type DisruptionOption } from '@mada/shared';
+import { DESK_PHONE, DisruptionKind, flightTruth, type DisruptionChoiceResponse, type DisruptionOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
 import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
@@ -10,7 +10,10 @@ import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, Rise, Row, Sm
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
-import { OUTBOX_DISRUPTION, discardQueued, toTab, isOfflineError, newKey, queueDisruption, tripsApi, useDisruption, useOffline, useTripMutation, useTripOutbox } from '@/lib/trips';
+import { ApiError } from '@/lib/api';
+import { useDeviceOffline } from '@/lib/net/state';
+import { hhmm } from '@/lib/wallet-model';
+import { OUTBOX_DISRUPTION, discardQueued, toTab, isOfflineError, newKey, queueDisruption, tripsApi, useDisruption, useOffline, useTrip, useTripMutation, useTripOutbox } from '@/lib/trips';
 import { colors, radii } from '@/theme';
 
 const TEL = `tel:${DESK_PHONE.replace(/\s/g, '')}`;
@@ -46,7 +49,14 @@ export default function Disruption() {
 
 
   if (!d) {
-    return <Screen><TopBar onBack={() => router.back()} right={<CallLink />} />{q.isError ? <Box style={{ margin: 16 }}><H3>{t('dz.offTitle')}</H3><Small>{t('dz.offBody', { phone: DESK_PHONE })}</Small><Button label={t('dz.callDesk')} onPress={call} /></Box> : null}</Screen>;
+    // Nothing has gone wrong (the server says so): say that, with the flight's state and when we last checked.
+    if (q.error instanceof ApiError && q.error.code === 'NOT_FOUND') return <AllWell id={id} />;
+    // "Offline" only when the phone really is; otherwise it's us, and we say so.
+    return (
+      <Screen><TopBar onBack={() => router.back()} right={<CallLink />} />
+        {q.isError ? <Box style={{ margin: 16 }}><T v="h3" testID="dz-unavailable">{offline || isOfflineError(q.error) ? t('dz.offTitle') : t('dz.cantReach')}</T><Small>{t('dz.offBody', { phone: DESK_PHONE })}</Small><Button label={t('dz.callDesk')} onPress={call} /></Box> : null}
+      </Screen>
+    );
   }
   const night = d.kind === 'night';
   const cur: DisruptionOption = d.options.find((o) => o.id === (pick ?? queued?.meta?.optionId)) ?? d.options[0]!;
@@ -174,7 +184,39 @@ export default function Disruption() {
   );
 }
 
+/**
+ * Nothing is wrong with the trip: the truth in one line ("Your flight is on time"), the last time we checked, and a
+ * way to Mada if something is wrong anyway. Never "no signal" while the phone is online.
+ */
+function AllWell({ id }: { id: string }) {
+  const router = useRouter();
+  const trip = useTrip(id);
+  const deviceOffline = useDeviceOffline();
+  const truth = flightTruth(trip.data?.trip.segments ?? []);
+  const checked = truth.checkedAt ?? (trip.dataUpdatedAt ? new Date(trip.dataUpdatedAt).toISOString() : null);
+  const headline = truth.state === 'on_time' ? t('dz.ok.onTime') : truth.state === 'delayed' ? t('dz.ok.late', { flight: truth.flight ?? '', mins: truth.delayMin })
+    : truth.state === 'landed' ? t('dz.ok.landed', { flight: truth.flight ?? '' }) : t('dz.ok.noFlight');
+  return (
+    <Screen>
+      <TopBar onBack={() => router.back()} backLabel={t('dz.today')} right={<CallLink />} />
+      <Scroll top={24} bottomPad={200}>
+        <Rise><View style={styles.ok}><Icon name="check" size={28} color={colors.green} /></View></Rise>
+        <Rise step={1}><T v="h1" accessibilityRole="header" style={{ fontSize: 32, lineHeight: 38 }} testID="dz-all-well">{headline}</T></Rise>
+        {truth.flight && truth.state === 'on_time' ? <Rise step={2}><T v="body" color={colors.inkSoft} style={{ fontSize: 17 }}>{truth.flight}</T></Rise> : null}
+        {checked ? <Rise step={2}><T v="tiny" testID="dz-checked">{t('dz.ok.checked', { time: hhmm(checked) })}</T></Rise> : null}
+        <Rise step={3}><T v="body">{t('dz.ok.body')}</T></Rise>
+        {deviceOffline ? <Small>{t('dz.offlineNote')}</Small> : null}
+      </Scroll>
+      <Act>
+        <Button testID="dz-ok-help" variant="secondary" label={t('dz.ok.help')} onPress={() => router.push(`/support?trip=${id}&topic=urgent`)} />
+        <Button variant="ghost" label={t('dz.backToday')} onPress={() => toTab(router, '/today')} />
+      </Act>
+    </Screen>
+  );
+}
+
 const styles = StyleSheet.create({
+  ok: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
   call: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 12, borderRadius: radii.pill, backgroundColor: colors.paper },
   pad: { paddingHorizontal: 20, paddingTop: 40, gap: 18 },
   wait: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },

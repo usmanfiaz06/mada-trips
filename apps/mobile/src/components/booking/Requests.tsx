@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, listOf, wordFor, formatSar, householdOf, nameIn, personName, todayIn,
+  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, carNowAsk, listOf, wordFor, formatSar, householdOf, nameIn, personName, todayIn,
   type AskIntent, type BookingRequestView, type CopyKey, type NeedKey, type Person, type RequestFormKind,
 } from '@mada/shared';
 import { bookingApi, bookingKeys, sendRequest, useBookingRequest, usePayDraft, useThread } from '@/lib/booking';
@@ -26,6 +26,7 @@ import { AttachmentChip } from './Attachment';
 import { FlightFares } from './FlightRequest';
 import { Answered, ThreadBubble, TypingDots, clock } from './Conversation';
 import { PhoneSheet, usePhoneNeeded } from './PhoneSheet';
+import { CarNow } from './CarNow';
 
 /* Requests a person at Mada completes: one question at a time, per-person needs, a note, then the quote and the thread. */
 
@@ -39,10 +40,22 @@ export const optionLabel = (o: string) => { const w = wordFor(o, getLocale()); r
 /** Inside Ask, the request's thread takes Ask's own composer (one box at the bottom, never two). */
 export const AskReplyContext = createContext<((r: { id: string; agent: string } | null) => void) | null>(null);
 
-export function RequestFlow({ kind, query, intent, people, selfName, sysNote, autoSend, search, onSent, travellerIds }: {
+type RequestFlowProps = {
   kind: RequestFormKind; query: string; intent: AskIntent | null; people: Person[]; selfName: string; sysNote?: string;
   autoSend?: boolean; search?: Parameters<typeof sendRequest>[0]['search']; onSent?: (id: string | null) => void; travellerIds?: string[];
-}) {
+};
+
+/**
+ * A car asked for now ("a taxi now", "سيارة الحين") is a car right now, never a form that offers tomorrow; the car
+ * form itself starts with now and in 15 minutes, which lead to the same place (critique 4).
+ */
+export function RequestFlow(props: RequestFlowProps) {
+  const [now, setNow] = useState(() => !props.autoSend && carNowAsk(props.kind, props.query));
+  if (now) return <CarNow query={props.query} city={props.intent?.answers?.where?.[0] ?? null} />;
+  return <RequestForm {...props} onNow={props.kind === 'car' && !props.autoSend ? () => setNow(true) : undefined} />;
+}
+
+function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend, search, onSent, travellerIds, onNow }: RequestFlowProps & { onNow?: () => void }) {
   const form = REQUEST_FORMS[kind] ?? [];
   const H = useMemo(() => householdOf(people, todayIn()), [people]);
   const named = (travellerIds ?? intent?.travellerIds ?? []).filter((id) => people.some((p) => p.id === id));
@@ -150,6 +163,7 @@ export function RequestFlow({ kind, query, intent, people, selfName, sysNote, au
             ) : null}
             {f.options ? (
               <ChipWrap>
+                {f.k === 'when' && onNow ? (['now.car.now', 'now.car.in15'] as const).map((k) => <Toggle key={k} label={t(k)} on={false} onPress={onNow} />) : null}
                 {f.options.map((o) => {
                   const cur = (answers[f.k] as string[] | undefined) ?? [];
                   const on = cur.includes(o);

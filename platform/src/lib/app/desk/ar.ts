@@ -100,6 +100,7 @@ export const AR_DESK: Record<string, string> = {
   "Needs a quote": "يحتاج تسعيرة",
   "Paid, finish it": "مدفوع، أكمله",
   "Waiting for a reply": "بانتظار الرد",
+  "Call back now": "اتصل به الآن",
   "Refund to decide": "استرداد بانتظار القرار",
   "Delayed": "متأخرة",
   "Cancelled": "ملغاة",

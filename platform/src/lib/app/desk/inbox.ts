@@ -1,6 +1,7 @@
 import "server-only";
 import { contactOf } from "./flight-quotes";
 import { cache } from "react";
+import { CALLBACK_MINUTES } from "@mada/shared";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { appDeskItems } from "@/db/app-schema-desk";
@@ -21,6 +22,8 @@ import { compareUrgency, DESK_KINDS, slaFor, type DeskKind, type Sla } from "./s
 export type InboxItem = {
   key: string; kind: DeskKind; id: string; title: string; sub: string; note: string; tag?: string | null; link?: { label: string; href: string } | null; userId: string | null; userName: string;
   href: string; sla: Sla; route: Route; agentName: string | null; escalated: boolean; escalationNote: string | null; amount: number | null;
+  /** Urgent help waiting on a call-back: above everything else, whatever its promise says. */
+  urgent?: boolean;
 };
 export type InboxFilter = "mine" | "team" | "unassigned" | "escalated";
 
@@ -60,6 +63,13 @@ async function sources(now: Date) {
     }
   }
   for (const c of chats) {
+    if (!c.waitingSince && !c.urgentSince) continue;
+    // Urgent help: Mada promised a call-back within 10 minutes of the traveller asking.
+    if (c.urgentSince) {
+      raw.push({ kind: "chat", id: `${c.kind}:${c.id}`, title: cut(c.lastBody || "Photo"), note: "Call back now", sub: `${c.userName}${c.summary ? ` · ${cut(c.summary, 40)}` : ""}`, userId: c.userId, userName: c.userName,
+        href: `/adminwork/desk/chats?t=${c.kind}:${c.id}`, sla: slaFor("chat", c.urgentSince, now, { targetMinutes: CALLBACK_MINUTES }), amount: null, tag: "Urgent", urgent: true });
+      continue;
+    }
     if (!c.waitingSince) continue;
     raw.push({ kind: "chat", id: `${c.kind}:${c.id}`, title: cut(c.lastBody || "Photo"), note: "Waiting for a reply", sub: `${c.userName}${c.summary ? ` · ${cut(c.summary, 40)}` : ""}`, userId: c.userId, userName: c.userName,
       href: `/adminwork/desk/chats?t=${c.kind}:${c.id}`, sla: slaFor("chat", c.waitingSince, now), amount: null });

@@ -536,6 +536,8 @@ async function markDoneHere(actor: DeskActor, id: string) {
 export type Conversation = {
   kind: "request" | "support"; id: string; userId: string | null; userName: string; lastBody: string; lastAt: Date; lastAuthor: string;
   waitingSince: Date | null; firstReplyAt: Date | null; summary: string | null;
+  /** Urgent help (a call-back promised, someone hurt) since the desk last replied: the inbox puts it first. */
+  urgentSince: Date | null;
 };
 
 /** Support chats and request threads, newest first, with how long the traveller has been waiting for a person. */
@@ -550,25 +552,30 @@ export async function listConversations(limit = 200): Promise<Conversation[]> {
       SELECT m.thread_kind, m.thread_id, min(m.created_at) AS since FROM ${appMessages} m
       LEFT JOIN agent_last a ON a.thread_kind = m.thread_kind AND a.thread_id = m.thread_id
       WHERE m.author_kind = 'user' AND m.created_at > coalesce(a.at, 'epoch') GROUP BY 1, 2
+    ), urgent AS (
+      SELECT m.thread_kind, m.thread_id, min(m.created_at) AS since FROM ${appMessages} m
+      LEFT JOIN agent_last a ON a.thread_kind = m.thread_kind AND a.thread_id = m.thread_id
+      WHERE m.created_at > coalesce(a.at, 'epoch') AND (m.card->>'intent' IN ('urgent', 'emergency') OR m.card->'callback' IS NOT NULL) GROUP BY 1, 2
     ), owner AS (
       SELECT DISTINCT ON (thread_kind, thread_id) thread_kind, thread_id, author_user_id FROM ${appMessages}
       WHERE author_user_id IS NOT NULL ORDER BY thread_kind, thread_id, created_at
     )
-    SELECT l.thread_kind, l.thread_id, l.author_kind, l.body, l.created_at, w.since, a.at AS agent_at,
+    SELECT l.thread_kind, l.thread_id, l.author_kind, l.body, l.created_at, w.since, a.at AS agent_at, ug.since AS urgent_since,
       coalesce(r.owner_id, st.user_id, o.author_user_id) AS user_id, u.name AS user_name, coalesce(r.summary, st.about) AS summary
     FROM last l
     LEFT JOIN waiting w ON w.thread_kind = l.thread_kind AND w.thread_id = l.thread_id
     LEFT JOIN agent_last a ON a.thread_kind = l.thread_kind AND a.thread_id = l.thread_id
+    LEFT JOIN urgent ug ON ug.thread_kind = l.thread_kind AND ug.thread_id = l.thread_id
     LEFT JOIN owner o ON o.thread_kind = l.thread_kind AND o.thread_id = l.thread_id
     LEFT JOIN ${appRequests} r ON l.thread_kind = 'request' AND r.id = l.thread_id
     LEFT JOIN ${appSupportThreads} st ON l.thread_kind = 'support' AND st.id = l.thread_id
     LEFT JOIN ${appUsers} u ON u.id = coalesce(r.owner_id, st.user_id, o.author_user_id)
     ORDER BY (w.since IS NULL), l.created_at DESC LIMIT ${limit}`);
-  type Row = { thread_kind: "request" | "support"; thread_id: string; author_kind: string; body: string; created_at: string | Date; since: string | Date | null; agent_at: string | Date | null; user_id: string | null; user_name: string | null; summary: string | null };
+  type Row = { thread_kind: "request" | "support"; thread_id: string; author_kind: string; body: string; created_at: string | Date; since: string | Date | null; agent_at: string | Date | null; urgent_since: string | Date | null; user_id: string | null; user_name: string | null; summary: string | null };
   const d = (x: string | Date | null) => (x ? new Date(x) : null);
   return (rows as unknown as Row[]).map((x) => ({
     kind: x.thread_kind, id: x.thread_id, userId: x.user_id, userName: travellerName(x.user_name), lastBody: x.body, lastAt: new Date(x.created_at), lastAuthor: x.author_kind,
-    waitingSince: d(x.since), firstReplyAt: d(x.agent_at), summary: x.summary,
+    waitingSince: d(x.since), firstReplyAt: d(x.agent_at), summary: x.summary, urgentSince: d(x.urgent_since),
   }));
 }
 

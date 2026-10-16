@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, desc, eq, gte, inArray, isNull } from "drizzle-orm";
-import { DESK_PHONE, firstNameOf, isSafetyIntent, supportReplies, type SupportAsk, type SupportContext, type SupportReply } from "@mada/shared";
+import { and, asc, desc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { DESK_PHONE, firstNameOf, isSafetyIntent, supportReplies, tripIsNow, zonedToInstant, type SupportAsk, type SupportContext, type SupportReply } from "@mada/shared";
 import { db } from "@/db";
 import { appPayments, appPeople, appRefunds, appSegments, appTrips } from "@/db/app-schema";
 import { appCards } from "@/db/app-schema-wallet";
@@ -27,14 +27,21 @@ async function context(userId: string, tripId: string | null): Promise<SupportCo
   const today = new Date().toISOString().slice(0, 10);
   const [trip] = tripId
     ? await db.select().from(appTrips).where(and(eq(appTrips.id, tripId), eq(appTrips.ownerId, userId)))
-    : await db.select().from(appTrips).where(and(eq(appTrips.ownerId, userId), gte(appTrips.startDate, today))).orderBy(asc(appTrips.startDate)).limit(1);
+    // The next trip, or the one under way (ends today or later), so urgent help knows a trip is happening now.
+    : await db.select().from(appTrips).where(and(eq(appTrips.ownerId, userId), or(gte(appTrips.startDate, today), gte(appTrips.endDate, today)))).orderBy(asc(appTrips.startDate)).limit(1);
   let tripCtx: SupportContext["trip"] = null;
   if (trip) {
-    const [seg] = await db.select({ carrierName: appSegments.carrierName }).from(appSegments).where(eq(appSegments.tripId, trip.id)).orderBy(asc(appSegments.sort)).limit(1);
+    const [seg] = await db.select({ carrierName: appSegments.carrierName, departLocal: appSegments.departLocal, departTz: appSegments.departTz }).from(appSegments).where(eq(appSegments.tripId, trip.id)).orderBy(asc(appSegments.sort)).limit(1);
     const people = trip.travellerIds.length
       ? await db.select({ givenNames: appPeople.givenNames, isSelf: appPeople.isSelf }).from(appPeople).where(inArray(appPeople.id, trip.travellerIds))
       : [];
-    tripCtx = { id: trip.id, bookingRef: trip.bookingRef, airline: seg?.carrierName ?? null, travellers: people.map((p) => ({ name: firstNameOf(p.givenNames), self: p.isSelf })) };
+    // Postgres hands the wall-clock time back as "2026-10-17 09:40:00".
+    let firstDepartUtc: string | null = null;
+    try { firstDepartUtc = seg ? zonedToInstant(seg.departLocal.replace(" ", "T").slice(0, 16), seg.departTz).toISOString() : null; } catch { firstDepartUtc = null; }
+    tripCtx = {
+      id: trip.id, bookingRef: trip.bookingRef, airline: seg?.carrierName ?? null, travellers: people.map((p) => ({ name: firstNameOf(p.givenNames), self: p.isSelf })),
+      city: trip.city, now: tripIsNow({ startDate: trip.startDate, endDate: trip.endDate ?? trip.startDate, firstDepartUtc }, Date.now()),
+    };
   }
   const [r] = await db.select({ amount: appRefunds.amount, stage: appRefunds.stage, reason: appRefunds.reason, label: appPayments.label })
     .from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId))

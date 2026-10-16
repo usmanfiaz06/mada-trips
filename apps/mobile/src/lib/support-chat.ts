@@ -6,6 +6,7 @@ import { useApiMutation } from './net/hooks';
 import { enqueue, registerOutboxKind, type EnqueueInput, type OutboxItem } from './net/outbox';
 import { queryClient } from './queries';
 import { walletKeys } from './wallet';
+import { withPhase } from './trips';
 
 /*
  * Sending to Mada goes through the outbox (lib/net/outbox.ts): written offline, it waits on the phone and goes in
@@ -57,7 +58,7 @@ export const newClientId = () => `c${Date.now().toString(36)}${(n++).toString(36
 type Send = { key: string; threadId: string; req: SendSupportMessageRequest & { clientId: string }; label: string };
 
 const outboxInput = ({ key, threadId, req, label }: Send): EnqueueInput => ({
-  kind: SUPPORT_KIND, label, method: 'POST', path: walletPath('supportMessages', { id: threadId }), body: req,
+  kind: SUPPORT_KIND, label, method: 'POST', path: withPhase(walletPath('supportMessages', { id: threadId })), body: req,
   meta: { threadId, key, clientId: req.clientId, text: req.body },
 });
 
@@ -74,7 +75,7 @@ export function sendToMada(key: string, threadId: string, req: SendSupportMessag
 export function useSendToMada(key: string, threadId: string | undefined, label: string) {
   const m = useApiMutation<{ messages: SupportMessage[] }, Send>({
     quiet: true,
-    mutationFn: (v, { idempotencyKey }) => request({ method: 'POST', path: walletPath('supportMessages', { id: v.threadId }), body: v.req, idempotencyKey }, SendSupportMessageResponse),
+    mutationFn: (v, { idempotencyKey }) => request({ method: 'POST', path: withPhase(walletPath('supportMessages', { id: v.threadId })), body: v.req, idempotencyKey }, SendSupportMessageResponse),
     queueWhenOffline: outboxInput,
     onSuccess: (r, v) => { if (r) deliver(v.key, v.threadId, r.messages); },
     onError: (e, v) => { if (v) enqueue(outboxInput(v)); },

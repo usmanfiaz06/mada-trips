@@ -11,7 +11,7 @@ import {
   type UpdateAccountRequest, type UpdatePersonRequest,
 } from '@mada/shared';
 import { ApiError, request, transport, refreshSession } from './api';
-import { tripsApi } from './trips';
+import { tripsApi, withPhase } from './trips';
 import { API_MODE, API_ORIGIN } from './config';
 import { keys as coreKeys } from './queries';
 import { useSession } from './session';
@@ -104,7 +104,8 @@ export const walletApi = {
   moveCredit: (cardId: string) => request({ method: 'POST', path: P('creditMove'), body: { cardId } }, MoveCreditResponse),
   openThread: (opts: { tripId?: string; about?: string } = {}) => request({ method: 'POST', path: P('supportThreads'), body: opts }, SupportThreadResponse),
   thread: (id: string) => request({ method: 'GET', path: P('supportThread', { id }) }, SupportThreadResponse),
-  sendMessage: (id: string, m: SendSupportMessageRequest) => request({ method: 'POST', path: P('supportMessages', { id }), body: m }, SendSupportMessageResponse),
+  // The demo phase rides along, so urgent help on a demo travel day opens the trip's disruption card.
+  sendMessage: (id: string, m: SendSupportMessageRequest) => request({ method: 'POST', path: withPhase(P('supportMessages', { id })), body: m }, SendSupportMessageResponse),
   sendAttachment: (id: string, file: PickedFile, clientId: string) => multipart('POST', P('supportAttachments', { id }), file, { clientId }, SendSupportMessageResponse),
   markRead: (id: string) => request({ method: 'POST', path: P('supportRead', { id }) }, Ok),
   unread: () => request({ method: 'GET', path: P('supportUnread') }, SupportUnreadResponse),

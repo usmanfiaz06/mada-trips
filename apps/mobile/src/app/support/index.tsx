@@ -29,7 +29,8 @@ import { colors, ff } from '@/theme';
 import { AttachmentChip } from '@/components/booking/Attachment';
 import { MadaMark } from '@/components/trips/ui';
 
-const TOPIC_ICON: Record<SupportTopic, IconName> = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more' };
+const TOPIC_ICON: Record<SupportTopic, IconName> = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more', urgent: 'bell' };
+const GRID_TOPICS = SUPPORT_TOPICS.filter((k) => k !== 'urgent');
 
 /**
  * Talk to Mada (prototype Support.jsx, COPY.md §1): one conversation, with the person on duty shown small under
@@ -128,6 +129,12 @@ export default function Support() {
         </View>
       </View>
       {th ? <View style={styles.about}><Icon name="trips" size={16} color={colors.goldInk} /><T v="caption" color={colors.goldInk} style={{ fontFamily: ff.ui600 }}>{t('support.about', { about: th.tripId && trip?.id === th.tripId ? `${t('support.aboutTrip', { city: trip.city })} · ${rangeLabel(trip.trip.startDate, trip.trip.endDate)}` : wordFor(th.about) })}</T></View> : null}
+      {/* Once the conversation has started, urgent help stays one tap away (any hour, a call-back within 10 minutes). */}
+      {th && messages.length ? (
+        <Pressable accessibilityRole="button" accessibilityHint={t('support.urgent.sub')} onPress={() => send('', { topic: 'urgent' })} style={styles.urgentPill} testID="urgent-pill">
+          <Icon name="bell" size={14} color={colors.mist} /><T v="caption" color={colors.mist} style={{ fontFamily: ff.ui600 }}>{t('support.urgent.button')}</T>
+        </Pressable>
+      ) : null}
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView ref={scroll} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120, gap: 10 }} keyboardShouldPersistTaps="handled">
@@ -136,8 +143,16 @@ export default function Support() {
             <View style={{ gap: 12 }}>
               <View style={{ alignItems: 'center' }}><ArtChat /></View>
               <Bubble them><T v="body" color={colors.green} style={{ fontSize: 15 }}>{name ? t('support.hiNamed', { name, what }) : t('support.hi', { what })}</T></Bubble>
+              {/* Urgent, any hour: a call-back from Mada within 10 minutes (and the trip's disruption card when it's on). */}
+              <Pressable accessibilityRole="button" onPress={() => send('', { topic: 'urgent' })} style={({ pressed }) => [styles.urgent, pressed ? { transform: [{ scale: 0.98 }] } : null]} testID="topic-urgent">
+                <Icon name="bell" size={20} color={colors.mist} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <T v="h3" color={colors.mist} style={{ fontSize: 15 }}>{t('support.urgent.button')}</T>
+                  <T v="tiny" color={colors.onDark2}>{t('support.urgent.sub')}</T>
+                </View>
+              </Pressable>
               <View style={styles.topics} accessibilityLabel={t('support.topics')}>
-                {SUPPORT_TOPICS.map((k) => (
+                {GRID_TOPICS.map((k) => (
                   <Pressable key={k} accessibilityRole="button" onPress={() => send('', { topic: k })} style={({ pressed }) => [styles.topic, pressed ? { transform: [{ scale: 0.98 }] } : null]} testID={`topic-${k}`}>
                     <Icon name={TOPIC_ICON[k]} size={18} /><T v="h3" style={{ fontSize: 14 }}>{t(`support.topic.${k}`)}</T>
                   </Pressable>
@@ -242,9 +257,34 @@ function Message({ m, hasTrip, onReply, onBag, onNoRef, onAction }: {
         {c?.choices && !c.picked ? <View style={{ gap: 6 }}>{c.choices.map((ch) => <Button key={ch.key} variant="secondary" size="small" style={{ backgroundColor: colors.mist, justifyContent: 'flex-start' }} label={ch.label} onPress={() => onReply(m, ch.key)} />)}</View> : null}
         {c?.form === 'bag' && !c.filed ? <BagForm hasTrip={hasTrip} onSend={onBag} onNone={onNoRef} /> : null}
         {c?.action ? <Button variant="gold" size="small" block={false} style={{ alignSelf: 'flex-start' }} label={c.action.label} onPress={() => onAction(c.action!.to)} /> : null}
-        {c?.urgent ? <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('support.callDesk')} onPress={() => Linking.openURL(DESK_TEL).catch(() => {})} testID="urgent-call" /> : null}
+        {c?.callback ? <CallbackCard by={c.callback.by} /> : null}
+        {c?.emergency ? (
+          <View style={{ gap: 6 }} testID="emergency-numbers">
+            <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('support.call997')} onPress={() => Linking.openURL('tel:997').catch(() => {})} testID="call-997" />
+            <Button variant="secondary" size="small" block={false} style={{ alignSelf: 'flex-start', backgroundColor: colors.mist }} label={t('support.call112')} onPress={() => Linking.openURL('tel:112').catch(() => {})} testID="call-112" />
+            <Button variant="secondary" size="small" block={false} style={{ alignSelf: 'flex-start', backgroundColor: colors.mist }} label={t('support.callMada')} onPress={() => Linking.openURL(DESK_TEL).catch(() => {})} />
+          </View>
+        ) : null}
+        {c?.urgent && !c.callback && !c.emergency && !c.disruption ? <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('support.callDesk')} onPress={() => Linking.openURL(DESK_TEL).catch(() => {})} testID="urgent-call" /> : null}
         <T style={{ fontSize: 11, opacity: 0.6, color: fg }}>{`${hhmm(m.createdAt)}${mine ? ` · ${t('support.read')}` : ''}`}</T>
       </View>
+    </View>
+  );
+}
+
+/** The promise, said plainly: who calls (Mada), by when, and what to do meanwhile. */
+function CallbackCard({ by }: { by: string }) {
+  return (
+    <View style={styles.callback} testID="callback-card">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <MadaMark size={26} />
+        <View style={{ flex: 1 }}>
+          <T v="h3" style={{ fontSize: 15 }}>{t('support.cb.title')}</T>
+          <T v="caption" color={colors.goldInk} style={{ fontFamily: ff.ui600 }} testID="callback-by">{t('support.cb.by', { time: hhmm(by) })}</T>
+        </View>
+      </View>
+      <T v="small">{t('support.cb.keep')}</T>
+      <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('support.callMada')} onPress={() => Linking.openURL(DESK_TEL).catch(() => {})} testID="callback-call" />
     </View>
   );
 }
@@ -292,6 +332,9 @@ const styles = StyleSheet.create({
   me: { backgroundColor: colors.green, borderTopStartRadius: 22, borderTopEndRadius: 6, borderBottomStartRadius: 22, borderBottomEndRadius: 22, alignSelf: 'flex-end' },
   photo: { width: 180, height: 110, borderRadius: 14, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center', gap: 4 },
   refund: { gap: 4, padding: 12, borderRadius: 14, backgroundColor: colors.mist },
+  callback: { gap: 8, padding: 12, borderRadius: 14, backgroundColor: colors.mist },
+  urgentPill: { marginHorizontal: 24, marginBottom: 6, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.green, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999 },
+  urgent: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.green, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16 },
   pill: { height: 24, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.paper, justifyContent: 'center' },
   well: { gap: 8, padding: 16, borderRadius: 24, backgroundColor: colors.mist },
   form: { gap: 8, padding: 12, borderRadius: 16, backgroundColor: colors.mist },

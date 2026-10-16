@@ -1,11 +1,12 @@
 import {
   CreateDocumentMeta, DESK_PHONE, FX_FALLBACK, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
-  UpdatePersonRequest, checkSaudiMobile, firstNameOf, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn,
+  UpdatePersonRequest, checkSaudiMobile, firstNameOf, isSafetyChoice, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn, tripIsNow, type SupportContext, type TripsResponse,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
+import { tripsMock } from './trips';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for the Wallet area: documents, the household, passports, account, cards, credit,
@@ -111,8 +112,8 @@ const threadJson = ({ messages: _m, readAt: _r, ...th }: Thread) => th;
 const unreadOf = (th: Thread) => th.messages.filter((m) => m.author.kind !== 'user' && Date.parse(m.createdAt) > th.readAt).length;
 const UPLOAD_OK = ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'application/pdf'];
 const TITLE: Record<WalletDocument['kind'], CopyKey> = { passport: 'docs.title.passport', visa: 'docs.title.visa', national_id: 'docs.title.national_id', iqama: 'docs.title.iqama', exit_reentry: 'docs.title.exit_reentry', insurance: 'docs.title.insurance', other: 'docs.title.other' };
-const TOPIC_INTENT: Record<SupportTopic, SupportIntent> = { change: 'change', refund: 'refund', bag: 'bag', docs: 'docs', airport: 'airport', other: 'other' };
-const TOPIC_KEY: Record<SupportTopic, CopyKey> = { change: 'support.topic.change', refund: 'support.topic.refund', bag: 'support.topic.bag', docs: 'support.topic.docs', airport: 'support.topic.airport', other: 'support.topic.other' };
+const TOPIC_INTENT: Record<SupportTopic, SupportIntent> = { change: 'change', refund: 'refund', bag: 'bag', docs: 'docs', airport: 'airport', other: 'other', urgent: 'urgent' };
+const TOPIC_KEY: Record<SupportTopic, CopyKey> = { change: 'support.topic.change', refund: 'support.topic.refund', bag: 'support.topic.bag', docs: 'support.topic.docs', airport: 'support.topic.airport', other: 'support.topic.other', urgent: 'support.topic.urgent' };
 
 type Upload = { __file?: { name: string; type: string; size: number; uri: string }; meta?: unknown };
 function checkFile(f: Upload['__file'], allow = UPLOAD_OK): WireResponse | null {
@@ -138,7 +139,24 @@ function presence() {
 
 /* ───────────── the handler ───────────── */
 
-export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
+/**
+ * The trip a support conversation is about when it's happening now (under way or within 24 hours, the demo clock's
+ * phase counts): the thread's trip, else the one Today is about, else the next one. Urgent help opens its card.
+ */
+async function supportTrip(w: Wire, ctx: Parameters<AreaMock>[1], tripId: string | null): Promise<SupportContext['trip']> {
+  const phase = new URLSearchParams(w.path.split('?')[1] ?? '').get('demoPhase');
+  const r = await tripsMock({ ...w, method: 'GET', path: phase ? `/trips?demoPhase=${phase}` : '/trips', body: undefined }, ctx).catch(() => null);
+  if (!r || r.status !== 200) return null;
+  const d = r.json as TripsResponse;
+  const card = d.upcoming.find((x) => x.id === (tripId ?? d.currentId)) ?? d.upcoming[0];
+  if (!card) return null;
+  const live = ['daybefore', 'travelday', 'delayed', 'cancelled', 'inair', 'landed'].includes(card.phase) || tripIsNow({ startDate: card.startDate, endDate: card.endDate ?? card.startDate }, Date.parse(d.clock.now));
+  // Only a trip happening now is passed: the other mock answers (seats, a missed flight) stay as they were.
+  return live ? { id: card.id, bookingRef: null, airline: null, travellers: [], city: card.city, now: true } : null;
+}
+
+export const walletMock: AreaMock = async (w: Wire, mctx) => {
+  const { user, byPhone } = mctx;
   const [path, query = ''] = w.path.split('?');
   const q = new URLSearchParams(query);
   const m = (re: RegExp) => re.exec(path!);
@@ -449,7 +467,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
       return { id: uuid(), threadId: th.id, author, body: text, card, attachment: null, clientId: null, createdAt: new Date(at).toISOString(), ...extra };
     };
     const me = (text: string, card: SupportMessage['card'] = null, extra: Partial<SupportMessage> = {}) => msg({ kind: 'user', id: user.id, name: user.name }, text, card, extra);
-    const ctx = { trip: null, refund: null, deskPhone: DESK_PHONE };
+    const ctx: SupportContext = { trip: await supportTrip(w, mctx, th.tripId), refund: null, deskPhone: DESK_PHONE };
     const mada = (rs: ReturnType<typeof supportReplies>) => rs.map((x) => msg({ kind: 'mada' }, x.body, x.card ?? null));
     let out: SupportMessage[];
     if (r[2] === '/attachments') {
@@ -476,7 +494,7 @@ export const walletMock: AreaMock = async (w: Wire, { user, byPhone }) => {
         const choice = target?.card?.choices?.find((c) => c.key === req.reply!.choice);
         if (!target || !choice) return err('VALIDATION', { fields: { 'reply.choice': 'Not one of the choices' } });
         target.card = { ...target.card, picked: choice.key };
-        out = [me(choice.label), ...mada(supportReplies({ kind: 'pick', choice: choice.key, label: choice.label }, ctx))];
+        out = [me(choice.label, isSafetyChoice(choice.key) ? { intent: 'urgent' } : null), ...mada(supportReplies({ kind: 'pick', choice: choice.key, label: choice.label }, ctx))];
       } else if (req.bag) {
         if ('none' in req.bag) {
           const target = th.messages.find((x) => x.id === (req.bag as { messageId: string }).messageId);

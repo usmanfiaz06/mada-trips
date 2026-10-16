@@ -198,7 +198,7 @@ export const arTripsUi2: ArSection<typeof enTripsUi2> = {
   'dz.callA11y': 'اتصل بفريق مادا على {phone}',
   'dz.callNumber': 'اتصل بفريق مادا على {phone}.',
   'dz.callDesk': 'اتصل بالفريق',
-  'dz.offTitle': 'ما فيه إشارة عشان نحمّل الخيارات.',
+  'dz.offTitle': 'ما عندك نت، فما نقدر نحمّل الخيارات.',
   'dz.offBody': 'اتصل بالفريق ونرتّبها بالتلفون. {phone}، أي وقت.',
   'dz.working': 'مادا تتولاها.',
   'dz.step.held': 'حجزنا المقاعد',

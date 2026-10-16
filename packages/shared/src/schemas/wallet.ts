@@ -322,16 +322,19 @@ export const MoveCreditResponse = z.object({ credit: Credit, moved: HalalasAmoun
 
 /* ───────────── support ───────────── */
 
-export const SUPPORT_TOPICS = ['change', 'refund', 'bag', 'docs', 'airport', 'other'] as const;
+/** `urgent` is its own button above the others (help at any hour), not one of the grid's topics. */
+export const SUPPORT_TOPICS = ['change', 'refund', 'bag', 'docs', 'airport', 'other', 'urgent'] as const;
 export const SupportTopic = z.enum(SUPPORT_TOPICS);
 export type SupportTopic = z.infer<typeof SupportTopic>;
-export const SupportIntent = z.enum(['urgent', 'bag', 'missed', 'refund', 'seat', 'change', 'docs', 'airport', 'other', 'photo', 'free']);
+/** `emergency` is someone hurt or unsafe (997); `urgent` is anything else that can't wait (a call-back within 10 minutes). */
+export const SupportIntent = z.enum(['emergency', 'urgent', 'bag', 'missed', 'refund', 'seat', 'change', 'docs', 'airport', 'other', 'photo', 'free']);
 export type SupportIntent = z.infer<typeof SupportIntent>;
 
 /** What a message is about. Order matters: someone hurt beats a lost bag (prototype Support.jsx). */
 export function supportIntent(text: string): SupportIntent {
   const t = (text || '').toLowerCase();
-  if (/\b(emergency|urgent|ambulance|hospital|medical|doctor|injured|injury|hurt|bleeding|collapsed|police|stolen|robbed|unwell|chest pain)\b|^\s*help\b|help me|lost (my |our |her |his )?passport/.test(t)) return 'urgent';
+  if (/\b(emergency|ambulance|hospital|medical|doctor|injured|injury|hurt|bleeding|collapsed|police|robbed|attacked|unsafe|unconscious|chest pain)\b/.test(t)) return 'emergency';
+  if (/\b(urgent|urgently|stolen|unwell)\b|^\s*help\b|help me|lost (my |our |her |his )?passport|عاجل|ضروري/.test(t)) return 'urgent';
   if (/\b(bag|bags|luggage|suitcase|baggage)\b/.test(t)) return 'bag';
   if (/missed|cancell?ed|cancel my flight|flight (was |is |got )?(cancel|delay)|delayed|rebook|stuck at|didn'?t (let|board)/.test(t)) return 'missed';
   if (/refund|charged|charge|payment|paid twice|money back|double|deducted/.test(t)) return 'refund';
@@ -355,6 +358,12 @@ export const SupportCard = z.object({
   resolved: z.boolean().optional(),
   rated: z.boolean().optional(),
   refund: z.object({ amount: HalalasAmount, title: z.string(), stage: z.string(), card: z.string() }).optional(),
+  /** Mada calls back by this time (urgent help, any hour). The desk sees it at the top of the inbox. */
+  callback: z.object({ by: IsoDateTime, problem: z.string().optional() }).optional(),
+  /** The disruption card: the trip it's about, when that trip is within 24 hours or under way. */
+  disruption: z.object({ tripId: Id, city: z.string() }).optional(),
+  /** Someone hurt or unsafe: the only card that shows 997 and 112. */
+  emergency: z.boolean().optional(),
 });
 export type SupportCard = z.infer<typeof SupportCard>;
 

@@ -599,8 +599,9 @@ async function support() {
   step('support: urgent help');
   await byTest('support-input').fill('Help, my son is hurt');
   await byTest('support-send').click();
-  await see('Call the desk now: +966 56 668 2662.', 'urgent');
-  await see('Call the desk now', 'urgent button');
+  // Someone hurt: the only time 997 shows, with Mada's number after it.
+  await see('call 997 for an ambulance in Saudi Arabia', 'emergency');
+  await see('Call 997, ambulance', 'emergency button');
   await shot('support-urgent');
 
   step('support: a photo and a file that is too big');

@@ -58,8 +58,10 @@ describe("talk to Mada", () => {
     const { token } = await signIn();
     const { thread } = await open(token);
     const urgent = await send(token, thread.id, { body: "Help, my son is hurt" });
-    expect(urgent[0]).toMatchObject({ author: { kind: "user" }, body: "Help, my son is hurt", card: { intent: "urgent" } });
-    expect(urgent[1]).toMatchObject({ author: { kind: "mada" }, card: { urgent: true } });
+    // Someone hurt: the only answer with 997, then Mada's number.
+    expect(urgent[0]).toMatchObject({ author: { kind: "user" }, body: "Help, my son is hurt", card: { intent: "emergency" } });
+    expect(urgent[1]).toMatchObject({ author: { kind: "mada" }, card: { urgent: true, emergency: true } });
+    expect(urgent[1]!.body).toContain("997");
     expect(urgent[1]!.body).toContain("+966 56 668 2662");
     const bag = await send(token, thread.id, { body: "", topic: "bag" });
     expect(bag[0]!.body).toBe("A missing bag");
@@ -125,6 +127,39 @@ describe("talk to Mada", () => {
     const pdf = await callP(attachPost, { id: thread.id }, { method: "POST", token, raw: form({ bytes: PDF, name: "statement.pdf", type: "application/pdf" }) });
     expect(pdf.json.messages[0].body).toBe("PDF · statement.pdf");
     expect((await callP(attachPost, { id: thread.id }, { method: "POST", token, raw: form({ bytes: EXE, name: "x.jpg", type: "image/jpeg" }) })).status).toBe(400);
+  });
+});
+
+describe("urgent at any hour", () => {
+  it("a trip within 24 hours opens its disruption card; a problem picked is a call-back promise, even with auto-replies off", async () => {
+    process.env.SUPPORT_AUTOREPLY = "off";
+    const { token, user } = await signIn();
+    const today = new Date().toISOString().slice(0, 10);
+    const [trip] = await db.insert(appTrips).values({ ownerId: user.id, city: "Istanbul", startDate: today, endDate: today }).returning();
+    const { thread } = await open(token, { tripId: trip!.id });
+    const urgent = await send(token, thread.id, { body: "", topic: "urgent" });
+    expect(urgent[0]).toMatchObject({ body: "It’s urgent", card: { intent: "urgent" } });
+    expect(urgent[1]!.card).toMatchObject({ urgent: true, disruption: { tripId: trip!.id, city: "Istanbul" } });
+    expect(urgent[1]!.body).not.toContain("997");
+    const picked = await send(token, thread.id, { body: "", reply: { messageId: urgent[1]!.id, choice: "dx-cancelled" } });
+    expect(picked[0]).toMatchObject({ body: "My flight is cancelled", card: { intent: "urgent" } });
+    const by = Date.parse(picked[1]!.card!.callback!.by);
+    expect(by - Date.now()).toBeGreaterThan(8 * 60_000);
+    expect(by - Date.now()).toBeLessThanOrEqual(10 * 60_000);
+    expect(picked[1]!.body).not.toContain("997");
+    // The desk sees it first.
+    const list = await listDeskThreads();
+    expect(list.find((x) => x.id === thread.id)!.urgent).toBe(true);
+    const firstCalm = list.findIndex((x) => !(x.urgent && x.unreadForDesk > 0));
+    expect(firstCalm === -1 || list.findIndex((x) => x.id === thread.id) < firstCalm).toBe(true);
+  });
+
+  it("no trip happening now: the promise straight away", async () => {
+    const { token } = await signIn();
+    const { thread } = await open(token);
+    const urgent = await send(token, thread.id, { body: "urgent, I need help" });
+    expect(urgent[1]!.card?.callback?.by).toBeTruthy();
+    expect(urgent[1]!.card?.disruption).toBeUndefined();
   });
 });
 

@@ -56,9 +56,9 @@ export async function listDeskThreads(opts: { status?: "open" | "closed" | "all"
       id: th.id, userId: th.userId, travellerName: name || "Traveller", phoneMasked: phone ? maskPhone(phone) : null, tripId: th.tripId, about: th.about,
       status: th.status as "open" | "closed", assignedOpsUserId: th.assignedOpsUserId, lastMessageAt: th.lastMessageAt?.toISOString() ?? null,
       lastMessage: last?.body ?? null, lastFrom: (last?.authorKind as DeskThreadSummary["lastFrom"]) ?? null, unreadForDesk: fromUser.length,
-      urgent: fromUser.some((m) => ["urgent", "airport"].includes(String((m.card as Record<string, unknown> | null)?.intent ?? ""))),
+      urgent: fromUser.some((m) => ["urgent", "emergency", "airport"].includes(String((m.card as Record<string, unknown> | null)?.intent ?? ""))),
     };
-  });
+  }).sort((a, b) => Number(b.urgent && b.unreadForDesk > 0) - Number(a.urgent && a.unreadForDesk > 0));
 }
 
 /** One conversation with everything the agent needs: messages, and documents the traveller shared for a trip. */

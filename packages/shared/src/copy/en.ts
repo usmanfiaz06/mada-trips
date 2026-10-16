@@ -22,6 +22,7 @@ import { thingsCopy } from './things';
 import { wordsCopy } from './words';
 import { askFlowCopy } from './ask-flow';
 import { staysCopy } from './stays';
+import { nowCopy } from './now';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -56,6 +57,8 @@ export const en = {
   ...askFlowCopy,
   // Stay results: the card's lines, sorting, refining by wishes (stays, flights, things to do): packages/shared/src/copy/stays.ts
   ...staysCopy,
+  // The now path: a car right now, urgent help, the honest disruption screen: packages/shared/src/copy/now.ts
+  ...nowCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',

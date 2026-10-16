@@ -84,7 +84,8 @@ export const useDemo = create<DemoState>((set) => ({
 if (useDemo.getState().offline) simulateOffline(true);
 
 /** Appends the demo phase so the server's trip clock shows that moment (ignored outside mock mode). */
-const withPhase = (path: string) => {
+/** A path with the demo clock's phase on it (demo builds only), so the server and the mock live in the same moment. */
+export const withPhase = (path: string) => {
   const p = useDemo.getState().phase;
   if (!p || !DEMO_ALLOWED) return path;
   return `${path}${path.includes('?') ? '&' : '?'}demoPhase=${p}`;

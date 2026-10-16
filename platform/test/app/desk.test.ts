@@ -98,6 +98,9 @@ describe("desk SLA maths", () => {
     const c = { sla: slaFor("refund", new Date("2026-10-10T09:00:00Z"), now), escalated: true };
     const d = { sla: slaFor("refund", new Date("2026-10-10T08:00:00Z"), now) };
     expect([a, c, d, b].sort(compareUrgency)).toEqual([b, c, a, d]);
+    // Urgent help waiting on a call-back goes above everything, even work already late.
+    const u = { sla: slaFor("chat", new Date("2026-10-10T09:59:00Z"), now, { targetMinutes: 10 }), urgent: true };
+    expect([a, c, d, b, u].sort(compareUrgency)[0]).toBe(u);
   });
   it("typical reply time is a median, rounded up, between 1 and 10", () => {
     expect(typicalReplyMinutes([1, 2, 3])).toBeNull();
@@ -355,6 +358,23 @@ describe("chat", () => {
     expect(msgs.map((m) => m.body).join(" ")).not.toContain("baggage desk");
     expect(msgs.at(-1)).toMatchObject({ authorKind: "agent", authorName: "Faisal", authorOpsUserId: counter.id });
     await expect(sendAgentReply(counter, "support", crypto.randomUUID(), { body: "Hi" })).rejects.toThrow(/not found/);
+  });
+
+  it("puts an urgent call-back at the top of the inbox until someone answers", async () => {
+    const { user } = await traveller("Huda Alsaud");
+    const threadId = crypto.randomUUID();
+    await db.insert(appMessages).values({ threadKind: "support", threadId, authorKind: "user", authorUserId: user.id, authorName: "Huda", body: "My flight is cancelled", card: { intent: "urgent" } });
+    await db.insert(appMessages).values({ threadKind: "support", threadId, authorKind: "mada", body: "Mada calls you back within 10 minutes.", card: { urgent: true, callback: { by: new Date(Date.now() + 600_000).toISOString() } } });
+    const c = (await listConversations()).find((x) => x.id === threadId)!;
+    expect(c.urgentSince).toBeTruthy();
+    const { items } = await deskInbox(new Date());
+    const at = items.findIndex((i) => i.id === `support:${threadId}`);
+    expect(items[at]).toMatchObject({ kind: "chat", note: "Call back now", urgent: true });
+    // Above every piece of work that isn't urgent help, late or not.
+    const firstOther = items.findIndex((i) => !i.urgent);
+    expect(firstOther === -1 || at < firstOther).toBe(true);
+    await sendAgentReply(counter, "support", threadId, { body: "Calling you now." });
+    expect((await listConversations()).find((x) => x.id === threadId)!.urgentSince).toBeNull();
   });
 });
 

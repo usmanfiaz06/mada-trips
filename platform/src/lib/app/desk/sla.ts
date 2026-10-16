@@ -38,10 +38,13 @@ export function slaFor(kind: DeskKind, openedAt: Date, now: Date = new Date(), o
   return { target, openedAt, dueAt, answeredAt, minutesLeft: Math.floor(left / 60_000), state };
 }
 
-/** Breached first, then whatever is due soonest. Escalated work floats up within its band. */
-export function compareUrgency(a: { sla: Sla; escalated?: boolean }, b: { sla: Sla; escalated?: boolean }) {
+/**
+ * Urgent help waiting on a call-back first (someone is stuck right now), then breached, then whatever is due
+ * soonest. Escalated work floats up within its band.
+ */
+export function compareUrgency(a: { sla: Sla; escalated?: boolean; urgent?: boolean }, b: { sla: Sla; escalated?: boolean; urgent?: boolean }) {
   const band = (x: { sla: Sla }) => (x.sla.state === "breached" ? 0 : x.sla.state === "soon" ? 1 : 2);
-  return band(a) - band(b) || Number(!!b.escalated) - Number(!!a.escalated) || a.sla.dueAt.getTime() - b.sla.dueAt.getTime();
+  return Number(!!b.urgent) - Number(!!a.urgent) || band(a) - band(b) || Number(!!b.escalated) - Number(!!a.escalated) || a.sla.dueAt.getTime() - b.sla.dueAt.getTime();
 }
 
 /** Median of first-reply times in minutes, rounded up, between 1 and 10. Null when there are too few to say. */

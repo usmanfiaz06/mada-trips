@@ -182,7 +182,7 @@ export const enTripsUi2 = {
   'dz.callA11y': 'Call the Mada desk on {phone}',
   'dz.callNumber': 'Call the Mada desk on {phone}.',
   'dz.callDesk': 'Call the desk',
-  'dz.offTitle': 'No signal to load the options.',
+  'dz.offTitle': 'You’re offline, so the options can’t load.',
   'dz.offBody': 'Call the desk and we’ll sort it by phone. {phone}, any hour.',
   'dz.working': 'Mada is on it.',
   'dz.step.held': 'Seats held',

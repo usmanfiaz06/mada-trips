@@ -2,7 +2,7 @@ import "server-only";
 import { messageAttachment } from "../file-links";
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
-  SupportCard, supportIntent, t, type FileInfo, type SendSupportMessageRequest, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic,
+  SupportCard, isSafetyChoice, supportIntent, t, type FileInfo, type SendSupportMessageRequest, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appTrips, appUsers } from "@/db/app-schema";
@@ -23,8 +23,8 @@ type ThreadRow = typeof appSupportThreads.$inferSelect;
 type MessageRow = typeof appMessages.$inferSelect;
 type StoredCard = SupportCard & { _clientId?: string; _file?: FileInfo };
 
-const TOPIC_INTENT: Record<SupportTopic, SupportIntent> = { change: "change", refund: "refund", bag: "bag", docs: "docs", airport: "airport", other: "other" };
-const TOPIC_KEY = { change: "support.topic.change", refund: "support.topic.refund", bag: "support.topic.bag", docs: "support.topic.docs", airport: "support.topic.airport", other: "support.topic.other" } as const;
+const TOPIC_INTENT: Record<SupportTopic, SupportIntent> = { change: "change", refund: "refund", bag: "bag", docs: "docs", airport: "airport", other: "other", urgent: "urgent" };
+const TOPIC_KEY = { change: "support.topic.change", refund: "support.topic.refund", bag: "support.topic.bag", docs: "support.topic.docs", airport: "support.topic.airport", other: "support.topic.other", urgent: "support.topic.urgent" } as const;
 
 export function toMessage(m: MessageRow): SupportMessage {
   const raw = (m.card ?? {}) as StoredCard;
@@ -167,8 +167,10 @@ export async function sendMessage(userId: string, threadId: string, req: SendSup
       const m = await patchCard(tx, threadId, req.reply.messageId, { picked: req.reply.choice });
       const choice = ((m.card ?? {}) as SupportCard).choices?.find((c) => c.key === req.reply!.choice);
       if (!choice) throw new AppError("VALIDATION", { fields: { "reply.choice": "Not one of the choices" } });
-      const mine = await own(choice.label);
-      return [mine, ...(auto ? await writeReplies(tx, threadId, await autoReplies({ ...ctx, kind: "pick", choice: choice.key, label: choice.label }), now) : [])];
+      // A choice on the disruption card is part of urgent help: always answered, and marked urgent for the desk.
+      const safety = isSafetyChoice(choice.key);
+      const mine = await own(choice.label, safety ? { intent: "urgent" } : {});
+      return [mine, ...(auto || safety ? await writeReplies(tx, threadId, await autoReplies({ ...ctx, kind: "pick", choice: choice.key, label: choice.label }), now) : [])];
     }
     if (req.bag) {
       if ("none" in req.bag) {
