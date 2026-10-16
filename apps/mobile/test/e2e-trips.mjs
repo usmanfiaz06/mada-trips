@@ -157,6 +157,14 @@ try {
   await byTest('trip-card-Istanbul').first().click();
   await page.waitForTimeout(1200);
   await shot('trip-detail');
+  step('the stay opens its hotel page');
+  await byTest('stay-open').click();
+  await page.waitForTimeout(1200);
+  await see('Your booking', 'booked hotel page');
+  await see('Rooms near Galata Tower', 'hotel name');
+  await see('Confirmation GT-48213', 'confirmation on the hotel page');
+  await shot('trip-hotel-page');
+  await back();
   await scroll(800);
   await shot('trip-detail-manage');
 

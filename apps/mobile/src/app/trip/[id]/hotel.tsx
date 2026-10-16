@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { ROOM_OPTIONS, addDays, addMinutes, dayLabel, formatSar, freeUntil, liveStay, nightPrice, outSegment, backSegment, rangeLabel, stayEnd, timing, type CreateTripAskRequest, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -40,7 +40,9 @@ export default function HotelOptions() {
   return (
     <TripScreen title={t('ho.title')}>
       <Rise><Box>
-        <Row><IconTile name="stay" /><View style={{ flex: 1 }}><H3 size={15}>{st.name}</H3><Tiny>{st.roomType ?? t(n > 2 ? 'trip.connectingRooms' : 'trip.aRoom')} · {rangeLabel(st.checkIn, last)} · {t('tm.detail.nights', { n: st.nights })}</Tiny></View></Row>
+        <Pressable accessibilityRole="link" accessibilityLabel={t('hotel.booked.openA11y', { name: st.name })} onPress={() => { buzz('tap'); router.push(`/hotel/${st.hotelCode ?? 'stay'}?trip=${trip.id}&stay=${st.id}&city=${encodeURIComponent(trip.city)}` as Href); }} testID="ho-open-hotel">
+          <Row><IconTile name="stay" /><View style={{ flex: 1 }}><H3 size={15}>{st.name}</H3><Tiny>{st.roomType ?? t(n > 2 ? 'trip.connectingRooms' : 'trip.aRoom')} · {rangeLabel(st.checkIn, last)} · {t('tm.detail.nights', { n: st.nights })} · {t('hotel.booked.open')}</Tiny></View></Row>
+        </Pressable>
         <Tiny>{t('ho.free', { day: freeUntil(st.checkIn) })}</Tiny>
       </Box></Rise>
       <Rise step={1}><Box padding={6} gap={0}>

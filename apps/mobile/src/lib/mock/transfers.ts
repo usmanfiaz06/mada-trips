@@ -25,6 +25,12 @@ const HOTELS: Record<number, HotelDetails> = {
     description: 'Rooms on a quiet lane three minutes from Galata Tower, with breakfast on the roof.', images: [], facilities: [{ name: 'Wi-fi', paid: false }, { name: 'Car park', paid: true }, { name: 'Airport shuttle', paid: true }],
     latitude: 41.0258, longitude: 28.974, source: 'HBX Group',
   },
+  // The demo trip's stay (trips.ts seed), so its stay card opens a hotel page.
+  99702: {
+    code: 99702, name: 'Rooms near Galata Tower', category: '4 stars', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', phone: '+90 212 000 0000',
+    description: 'Quiet rooms on a lane three minutes from Galata Tower. Connecting rooms on request, breakfast on the roof.', images: [], facilities: [{ name: 'Wi-fi', paid: false }, { name: 'Breakfast', paid: false }, { name: 'Connecting rooms', paid: false }, { name: 'Airport shuttle', paid: true }],
+    latitude: 41.0262, longitude: 28.9727, source: 'HBX Group',
+  },
 };
 
 async function tripOf(w: Wire, ctx: Parameters<AreaMock>[1], id: string): Promise<TripDetail | null> {

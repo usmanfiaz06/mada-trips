@@ -11,6 +11,8 @@ import { StaysMap } from '@/components/maps/StaysMap';
 import { ArtSuitcase } from '@/components/trips/Arts';
 import { Box, H3, Photo, Rise, Row, Small, Tag, Tiny, TripScreen } from '@/components/trips/ui';
 import { bookingApi, usePayDraft, useStayAnchor } from '@/lib/booking';
+import { useTrip } from '@/lib/trips';
+import { rangeLabel, stayEnd } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
 import { useHotelDetails } from '@/lib/transfers';
@@ -32,9 +34,13 @@ const rank = (name: string) => { const i = FIRST.findIndex((re) => re.test(name)
 export default function HotelScreen() {
   const router = useRouter();
   const lang = getLocale();
-  const { code, offer, guests: g, city = '', who = '' } = useLocalSearchParams<{ code: string; offer?: string; guests?: string; city?: string; who?: string }>();
+  const { code, offer, guests: g, city = '', who = '', trip: tripId = '', stay: stayId = '' } = useLocalSearchParams<{ code: string; offer?: string; guests?: string; city?: string; who?: string; trip?: string; stay?: string }>();
   const guests = Math.max(1, Number(g) || 1);
-  const q = useHotelDetails(Number(code));
+  // A booked stay (opened from the trip): the room and dates come from the trip; the hotel's content when it has a code.
+  const tripQ = useTrip(tripId || null);
+  const booked = tripId ? tripQ.data?.trip.stays.find((x) => x.id === stayId) ?? null : null;
+  const hasCode = Number.isInteger(Number(code)) && Number(code) > 0;
+  const q = useHotelDetails(hasCode ? Number(code) : 0);
   const shown = useQuery({ queryKey: ['booking', 'offer', offer], enabled: !!offer, queryFn: () => bookingApi.offer(offer!) });
   const rooms = useQuery({ queryKey: ['booking', 'rooms', offer], enabled: !!offer, staleTime: 300_000, queryFn: () => bookingApi.rooms(offer!) });
   const stored = useStayAnchor((x) => x.byCity[city]);
@@ -42,20 +48,27 @@ export default function HotelScreen() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [allFacilities, setAllFacilities] = useState(false);
   const [moreText, setMoreText] = useState(false);
-  const h = q.data?.hotel;
+  const details = q.data?.hotel;
+  // A catalogue stay has no supplier content: the page is the stay itself (name, address, phone, the walk).
+  const h = details ?? (booked ? { code: 0, name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null, source: 'HBX Group' as const } : undefined);
   const stay = shown.data?.stay ?? null;
   const options: StayOption[] = rooms.data?.options ?? (stay ? [stay] : []);
   const cur = options.find((o) => o.id === chosen) ?? options[0] ?? null;
-  const facilities = useMemo(() => (h?.facilities ?? []).filter((f) => !NOISE.test(f.name)).sort((a, b) => rank(a.name) - rank(b.name)), [h?.facilities]);
+  const facilities = useMemo(() => (details?.facilities ?? []).filter((f) => !NOISE.test(f.name)).sort((a, b) => rank(a.name) - rank(b.name)), [details?.facilities]);
 
-  if (!h) return <TripScreen title="">{q.isPending ? <View style={{ paddingTop: 40 }}><ActivityIndicator color={colors.green} /></View> : <EmptyState art={<ArtSuitcase />} title={t('error.notFound')} body="" />}</TripScreen>;
+  if (!h) return <TripScreen title="">{q.isPending || tripQ.isPending ? <View style={{ paddingTop: 40 }}><ActivityIndicator color={colors.green} /></View> : <EmptyState art={<ArtSuitcase />} title={t('error.notFound')} body="" />}</TripScreen>;
   const lat = h.latitude ?? stay?.facts?.lat ?? null;
   const lng = h.longitude ?? stay?.facts?.lng ?? null;
   const dist = cur && anchor ? distanceFrom(cur, anchor, lang) : null;
   const openMaps = () => {
-    if (lat == null || lng == null) return;
     buzz('tap');
     const label = encodeURIComponent(h.name);
+    if (lat == null || lng == null) {
+      // No pin: search the address by name (a catalogue stay).
+      const where = encodeURIComponent(`${h.name} ${h.address ?? ''}`.trim());
+      void Linking.openURL(Platform.OS === 'ios' ? `maps://?q=${where}` : Platform.OS === 'android' ? `geo:0,0?q=${where}` : `https://www.openstreetmap.org/search?query=${where}`).catch(() => {});
+      return;
+    }
     const url = Platform.OS === 'ios' ? `maps://?q=${label}&ll=${lat},${lng}` : Platform.OS === 'android' ? `geo:${lat},${lng}?q=${lat},${lng}(${label})` : `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
     void Linking.openURL(url).catch(() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`));
   };
@@ -67,7 +80,7 @@ export default function HotelScreen() {
   };
 
   return (
-    <TripScreen act={cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={review} testID="hotel-review" /> : undefined}>
+    <TripScreen act={booked ? <Button label={t('hotel.booked.options')} variant="secondary" onPress={() => router.push(`/trip/${tripId}/hotel` as never)} testID="hotel-booked-options" /> : cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={review} testID="hotel-review" /> : undefined}>
       {/* The photos run edge to edge and the name is the screen's serif line: the hotel, before its facts. */}
       {h.images.length ? (
         <ScrollView testID="hotel-images" horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
@@ -75,7 +88,18 @@ export default function HotelScreen() {
         </ScrollView>
       ) : null}
       <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
-      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{h.category ? <Tag tone="gold" label={h.category} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}<Tag label="HBX Group" /></Row></Rise>
+      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={h.category} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>
+
+      {/* Your booking: the room and dates as booked, the confirmation, the cancellation rule, the walk and the drive. */}
+      {booked ? (
+        <Box testID="hotel-booked" gap={6}>
+          <H3 size={15}>{booked.roomType ?? (booked.rooms > 1 ? t('trip.connectingRooms') : t('trip.aRoom'))}</H3>
+          <Small color={colors.green}>{rangeLabel(booked.checkIn, stayEnd(booked))} · {t('tm.detail.nights', { n: booked.nights })}</Small>
+          {booked.confirmation ? <Tiny>{t('hotel.booked.ref', { ref: booked.confirmation })}</Tiny> : null}
+          {booked.cancellation ? <Tiny>{booked.cancellation}</Tiny> : null}
+          {booked.walk || booked.fromAirport ? <Tiny>{[booked.walk, booked.fromAirport ? t('hotel.booked.fromAirport', { time: booked.fromAirport }) : null].filter(Boolean).join(' · ')}</Tiny> : null}
+        </Box>
+      ) : null}
 
       {/* Where it is. */}
       <Box testID="hotel-where" gap={10}>
@@ -85,7 +109,7 @@ export default function HotelScreen() {
         ) : null}
         {dist ? <Row gap={6}><Icon name="pin" size={16} /><T v="small" color={colors.green} style={{ flex: 1 }} testID="hotel-distance">{dist.text}</T></Row> : null}
         {h.address ? <Small>{h.address}</Small> : null}
-        {lat != null ? <Pressable accessibilityRole="link" onPress={openMaps} testID="hotel-open-maps"><Small color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('hotel.openMaps')}</Small></Pressable> : null}
+        {lat != null || h.address ? <Pressable accessibilityRole="link" onPress={openMaps} testID="hotel-open-maps"><Small color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('hotel.openMaps')}</Small></Pressable> : null}
       </Box>
 
       {/* The rooms for this stay. */}

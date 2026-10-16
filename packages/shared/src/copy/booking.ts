@@ -358,7 +358,7 @@ export const bookingCopy = {
   'pay.line.oneWay': 'one way',
   'pay.line.infants.one': '1 baby on a lap',
   'pay.line.infants.other': '{count} babies on a lap',
-  'pay.line.stay': '{rooms} near Galata Tower · {count} nights',
+  'pay.line.stay': '{hotel} · {rooms} · {count} nights',
   'pay.line.connecting': 'Connecting rooms',
   'pay.line.aRoom': 'A room',
   'pay.line.pickupBoth': 'Airport pickup both ways',

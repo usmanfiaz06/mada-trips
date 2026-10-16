@@ -169,6 +169,8 @@ export const StayDetail = Stay.extend({
   roomType: z.string().nullable(),
   /** How the stay was paid: in full, or in instalments. */
   plan: z.enum(['full', 'tabby', 'tamara']),
+  /** The hotel's code with the supplier (Hotelbeds), so the stay opens its hotel page. Null for a catalogue stay. Older servers send none. */
+  hotelCode: z.number().int().nullable().optional(),
 });
 export type StayDetail = z.infer<typeof StayDetail>;
 

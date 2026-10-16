@@ -243,4 +243,10 @@ export const arStays: ArSection<typeof staysCopy> = {
   'stays.filtersDone': 'عرض الأماكن',
   'stays.distanceFrom': 'المسافة من',
   'stays.distanceFromPick': 'اختر مكانًا',
+  'hotel.booked.tag': 'حجزك',
+  'hotel.booked.open': 'شوف الفندق',
+  'hotel.booked.openA11y': 'افتح {name}',
+  'hotel.booked.ref': 'رقم التأكيد {ref}',
+  'hotel.booked.fromAirport': '{time} من المطار',
+  'hotel.booked.options': 'خيارات الفندق',
 };

@@ -16,7 +16,7 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
 
-export type StayFacts = { phone?: string | null; addressShort?: string | null; walk?: string | null; fromAirport?: string | null; roomType?: string | null; plan?: "full" | "tabby" | "tamara" };
+export type StayFacts = { phone?: string | null; addressShort?: string | null; walk?: string | null; fromAirport?: string | null; roomType?: string | null; plan?: "full" | "tabby" | "tamara"; hotelCode?: number | null };
 export type PickupFacts = { room?: string | null; waits?: string | null; offsetMin?: number | null; city?: string | null };
 export type SegmentFacts = { bookedGate?: string | null; delayMin?: number | null; predictedDelay?: boolean; statusAt?: string | null };
 

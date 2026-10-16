@@ -220,4 +220,11 @@ export const staysCopy = {
   'stays.filtersDone': 'Show places',
   'stays.distanceFrom': 'Distance from',
   'stays.distanceFromPick': 'Choose a place',
+  // A booked stay opens its hotel page (owner audit, item 11).
+  'hotel.booked.tag': 'Your booking',
+  'hotel.booked.open': 'See the hotel',
+  'hotel.booked.openA11y': 'Open {name}',
+  'hotel.booked.ref': 'Confirmation {ref}',
+  'hotel.booked.fromAirport': '{time} from the airport',
+  'hotel.booked.options': 'Hotel options',
 } as const;

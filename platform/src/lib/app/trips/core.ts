@@ -137,6 +137,7 @@ function buildBase(trip: TripRow, { segs, stays, pickups, facts, charges, people
       id: s.id, name: s.name, area: s.area, address: s.address, checkIn: s.checkIn, nights: s.nights, rooms: s.rooms, price: { amount: s.price, currency: "SAR" },
       cancellation: s.cancellation, status: s.status as StayDetail["status"], confirmation: s.confirmation,
       phone: f.phone ?? null, addressShort: f.addressShort ?? null, walk: f.walk ?? null, fromAirport: f.fromAirport ?? null, roomType: f.roomType ?? null, plan: f.plan ?? "full",
+      hotelCode: f.hotelCode ?? null,
     };
   });
   const pickupList: PickupDetail[] = pickups.map((p) => {

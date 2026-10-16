@@ -125,7 +125,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     const bundle = d.bundle && dest.key === 'istanbul' && !!f.back;
     if (bundle) {
       const b = bundleFor(n, f.out.date, f.back!.date);
-      lines.push(L('stay', 'stay', t('pay.line.stay', { rooms: n > 2 ? t('pay.line.connecting') : t('pay.line.aRoom'), count: b.nights }), sarToHalalas(b.staySar)));
+      lines.push(L('stay', 'stay', t('pay.line.stay', { hotel: b.hotel.name, rooms: n > 2 ? t('pay.line.connecting') : t('pay.line.aRoom'), count: b.nights }), sarToHalalas(b.staySar)));
       lines.push(L('pickup', 'car', t('pay.line.pickupBoth'), sarToHalalas(b.pickupSar)));
     }
     rule = (f.refundable ? t('pay.rule.refund', { fee: f.refundRule.replace(/^Refund minus /, '') }) : t('pay.rule.noRefund', { fee: f.changeRule })) + (bundle ? ` ${t('pay.rule.rooms', { date: freeUntilLabel(f.out.date) })}` : '');

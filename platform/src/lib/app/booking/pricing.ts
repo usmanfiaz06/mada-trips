@@ -72,7 +72,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const bundle = d.bundle && dest.key === "istanbul" && !!f.back;
     if (bundle) {
       const b = bundleFor(n, f.out.date, f.back!.date);
-      lines.push(line("stay", "stay", t("pay.line.stay", { rooms: n > 2 ? t("pay.line.connecting") : t("pay.line.aRoom"), count: b.nights }), sarToHalalas(b.staySar)));
+      lines.push(line("stay", "stay", t("pay.line.stay", { hotel: b.hotel.name, rooms: n > 2 ? t("pay.line.connecting") : t("pay.line.aRoom"), count: b.nights }), sarToHalalas(b.staySar)));
       lines.push(line("pickup", "car", oneway ? t("pay.line.pickupOut") : t("pay.line.pickupBoth"), sarToHalalas(b.pickupSar)));
     }
     rule = (f.refundable ? t("pay.rule.refund", { fee: f.refundRule.replace(/^Refund minus /, "") }) : t("pay.rule.noRefund", { fee: f.changeRule }))

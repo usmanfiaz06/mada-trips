@@ -316,7 +316,7 @@ describe("the order sheet", () => {
     const draft: OrderDraft = { kind: "trip", flightOfferId: s.options[0]!.id, bundle: true, travellerIds: f.four };
     const p = await previewOf(f.token, draft);
     expect(p.lines.map((l) => [l.key, l.text, l.amount])).toEqual([
-      ["flight", "4 travellers · Saudia, direct", 864_000], ["stay", "Connecting rooms near Galata Tower · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
+      ["flight", "4 travellers · Saudia, direct", 864_000], ["stay", "Rooms near Galata Tower · Connecting rooms · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
     ]);
     expect(p.total.amount).toBe(1_496_000);
     expect(p.rule).toBe("If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.");
@@ -331,7 +331,7 @@ describe("the order sheet", () => {
     // Fewer travellers: the price follows.
     const two = await previewOf(f.token, { ...draft, travellerIds: [f.me, f.hessa] });
     expect(two.lines[0]!.amount).toBe(432_000);
-    expect(two.lines[1]!.text).toBe("A room near Galata Tower · 6 nights");
+    expect(two.lines[1]!.text).toBe("Rooms near Galata Tower · A room · 6 nights");
     // Credit is used first.
     const ownerId = (await db.execute<{ owner_id: string }>(rawSql`SELECT owner_id FROM app_offers WHERE id = ${s.options[0]!.id}`))[0]!.owner_id;
     await db.insert(appCreditLedger).values({ userId: ownerId, amount: 40_000, kind: "goodwill" });

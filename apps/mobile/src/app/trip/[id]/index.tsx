@@ -100,7 +100,10 @@ export default function TripDetail() {
           {st ? (
             <Box testID="stay-box">
               <Spread>
-                <Row style={{ flex: 1 }}><Icon name="stay" /><Grow gap={0}><H3 size={15}>{st.name}</H3><Tiny>{rangeLabel(st.checkIn, stayEnd(st))} · {t('tm.detail.nights', { n: st.nights })}</Tiny></Grow></Row>
+                {/* The name opens the hotel's own page (photos, map, what it has) with the room and dates as booked. */}
+                <Pressable style={{ flex: 1 }} accessibilityRole="link" accessibilityLabel={t('hotel.booked.openA11y', { name: st.name })} onPress={() => { buzz('tap'); router.push(`/hotel/${st.hotelCode ?? 'stay'}?trip=${trip.id}&stay=${st.id}&city=${encodeURIComponent(trip.city)}` as Href); }} testID="stay-open">
+                  <Row><Icon name="stay" /><Grow gap={0}><H3 size={15}>{st.name}</H3><Tiny>{rangeLabel(st.checkIn, stayEnd(st))} · {t('tm.detail.nights', { n: st.nights })} · {t('hotel.booked.open')}</Tiny></Grow></Row>
+                </Pressable>
                 {st.status === 'cancelled' ? <Tag label={t('tm.detail.cancelled')} /> : tm.allUsed ? <Tag tone="ok" label={t('tm.detail.stayed')} /> : <TextLink testID="cancel-stay" label={t('common.cancel')} onPress={() => setSheet('cancel')} />}
               </Spread>
               {st.status === 'cancelled' ? <Small>{t('tm.detail.refundOnWay')}</Small> : null}

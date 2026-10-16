@@ -16,7 +16,7 @@ import { newKey, tripsApi, useTrips, useTripMutation, useOffline } from '@/lib/t
 import { colors, ff, radii } from '@/theme';
 import { RequestsCard, TripHero } from './common';
 
-type Item = { id: string; ok: boolean; k: string; v: string; fix?: string; act?: 'flight' | 'stay' | 'passport' | 'esim' | 'car'; urgent?: boolean };
+type Item = { id: string; ok: boolean; k: string; v: string; fix?: string; act?: 'flight' | 'stay' | 'passport' | 'esim' | 'car'; urgent?: boolean; href?: string };
 
 /** The six things that make a trip ready, from the trip itself (SCOPE.md: readiness ring). */
 export function readinessItems(trip: TripDetail, esim: TripRequestView | null): Item[] {
@@ -37,7 +37,7 @@ export function readinessItems(trip: TripDetail, esim: TripRequestView | null): 
       ? { id: 'stay', ok: false, k: t('td.ready.noStay'), v: t('td.ready.staysCancelled'), fix: t('td.ready.findStay'), act: 'stay' }
       : !st
         ? (trip.noStay ? { id: 'stay', ok: true, k: t('td.ready.whereStaying'), v: trip.noStay.address } : { id: 'stay', ok: false, k: t('td.ready.noStay'), v: t('td.ready.noStayBody'), fix: t('td.ready.findStay'), act: 'stay' })
-        : { id: 'stay', ok: true, k: t('td.ready.stay'), v: t('td.ready.stayV', { name: st.name, nights: st.nights }) },
+        : { id: 'stay', ok: true, k: t('td.ready.stay'), v: t('td.ready.stayV', { name: st.name, nights: st.nights }), href: `/hotel/${st.hotelCode ?? 'stay'}?trip=${trip.id}&stay=${st.id}&city=${encodeURIComponent(trip.city)}` },
     problem
       ? { id: 'pass', ok: false, k: t('td.ready.ppOf', { name: problem.p.firstName }), v: problem.issue!.text, fix: t('td.ready.fixPp', { name: problem.p.firstName }), act: 'passport', urgent: true }
       : missing.length
@@ -92,7 +92,11 @@ function Readiness({ trip }: { trip: TripDetail }) {
       </Pressable>
       {open ? (
         <View style={{ gap: 10, paddingHorizontal: 4 }}>
-          {done.map((it) => <Row key={it.id} align="flex-start"><Icon name="check" size={18} color={colors.ok} width={2.4} /><Grow gap={0}><T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{it.k}</T><Tiny>{it.v}</Tiny></Grow></Row>)}
+          {done.map((it) => (
+            <Pressable key={it.id} disabled={!it.href} accessibilityRole={it.href ? 'link' : undefined} onPress={() => { if (it.href) { buzz('tap'); router.push(it.href as Href); } }} testID={it.href ? `ready-open-${it.id}` : undefined}>
+              <Row align="flex-start"><Icon name="check" size={18} color={colors.ok} width={2.4} /><Grow gap={0}><T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{it.k}</T><Tiny>{it.v}</Tiny></Grow>{it.href ? <Icon name="chevron" size={16} /> : null}</Row>
+            </Pressable>
+          ))}
         </View>
       ) : null}
       <EsimSheet trip={trip} open={esim} onClose={() => setEsim(false)} />
