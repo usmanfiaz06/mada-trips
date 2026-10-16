@@ -1206,8 +1206,8 @@ export const AR: Record<string, string> = {
   "Settled": "سُوّيت",
   "Settled through": "تُسوّى عبر",
   "{n} tickets": "{n} تذكرة",
-  "SNB": "البنك الأهلي السعودي",
-  "Company · SNB": "الشركة · الأهلي السعودي",
+  "BSF (B2C)": "البنك السعودي الفرنسي (B2C)",
+  "Company · BSF (B2C)": "الشركة · السعودي الفرنسي (B2C)",
   "Alinma (B2B Account)": "الإنماء (حساب الشركات)",
   "Company · Alinma (B2B Account)": "الشركة · الإنماء (حساب الشركات)",
   // Bank transactions
