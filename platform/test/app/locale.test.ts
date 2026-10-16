@@ -75,7 +75,7 @@ describe("the traveller's language", () => {
     const [a] = await db.select().from(appNotifications).where(eq(appNotifications.userId, ar.user.id));
     const [e] = await db.select().from(appNotifications).where(eq(appNotifications.userId, en.user.id));
     expect(stripIsolates(a!.title)).toBe("تغيّرت البوابة إلى C4");
-    expect(stripIsolates(a!.body)).toBe("الصعود إلى SV263 الآن من C4. المشي إليها 6 دقائق.");
+    expect(stripIsolates(a!.body)).toBe("الصعود إلى SV263 الحين من C4. المشي لها 6 دقائق.");
     expect(e!.title).toBe("Gate changed to C4");
   });
 

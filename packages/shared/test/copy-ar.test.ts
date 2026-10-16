@@ -21,7 +21,7 @@ describe('the Arabic catalogue', () => {
   it('writes the brand as مادا', () => {
     const wrong = Object.entries(AR).filter(([k, v]) => /مدى/.test(v) && !/Visa|Mastercard/.test(v)).map(([k]) => k);
     expect(wrong).toEqual([]);
-    expect(t('action.talk', undefined, 'ar')).toBe('تحدّث مع مادا');
+    expect(t('action.talk', undefined, 'ar')).toBe('كلّم مادا');
   });
   it('catches what it should', () => {
     const fake = { 'x.a': 'تم!', 'x.b': 'Done', 'x.c': 'مرحبًا {name}', 'x.d': 'هل أنت متأكد?', 'x.e': 'حدث خطأ ما' };
@@ -39,13 +39,13 @@ describe('t() and tn() in Arabic', () => {
   afterEach(() => resetDisplayPrefs());
   it('uses all six plural forms', () => {
     const forms = [0, 1, 2, 3, 10, 11, 99, 100, 101, 102, 103].map((n) => tn('otp.wrong', n, {}, 'ar'));
-    expect(forms[1]).toBe('الرمز غير مطابق. بقيت محاولة واحدة.');
-    expect(forms[2]).toBe('الرمز غير مطابق. بقيت محاولتان.');
-    expect(forms[3]).toBe('الرمز غير مطابق. بقيت 3 محاولات.');
-    expect(forms[5]).toBe('الرمز غير مطابق. بقيت 11 محاولة.');
-    expect(forms[7]).toBe('الرمز غير مطابق. بقيت 100 محاولة.');
-    expect(forms[9]).toBe('الرمز غير مطابق. بقيت محاولتان.'.replace('محاولتان', '102 محاولة'));
-    expect(forms[10]).toBe('الرمز غير مطابق. بقيت 103 محاولات.');
+    expect(forms[1]).toBe('الرمز مو صحيح. باقي محاولة وحدة.');
+    expect(forms[2]).toBe('الرمز مو صحيح. باقي محاولتين.');
+    expect(forms[3]).toBe('الرمز مو صحيح. باقي 3 محاولات.');
+    expect(forms[5]).toBe('الرمز مو صحيح. باقي 11 محاولة.');
+    expect(forms[7]).toBe('الرمز مو صحيح. باقي 100 محاولة.');
+    expect(forms[9]).toBe('الرمز مو صحيح. باقي 102 محاولة.');
+    expect(forms[10]).toBe('الرمز مو صحيح. باقي 103 محاولات.');
   });
   it('keeps codes left-to-right inside Arabic sentences', () => {
     const s = t('notify.confirmed.body', { agent: 'فيصل', ref: 'X7K2QD' }, 'ar');
@@ -56,7 +56,7 @@ describe('t() and tn() in Arabic', () => {
   });
   it('switches digits to Arabic-Indic when asked, except inside codes', () => {
     setDisplayPrefs({ locale: 'ar', digits: 'arab' });
-    expect(stripIsolates(t('notify.gateChange.body', { flight: 'SV263', gate: 'C4', minutes: 6 }))).toBe('الصعود إلى SV263 الآن من C4. المشي إليها ٦ دقائق.');
+    expect(stripIsolates(t('notify.gateChange.body', { flight: 'SV263', gate: 'C4', minutes: 6 }))).toBe('الصعود إلى SV263 الحين من C4. المشي لها ٦ دقائق.');
     expect(t('otp.label')).toBe('رمز من ٦ أرقام');
   });
   it('follows the display locale by default and falls back to English', () => {

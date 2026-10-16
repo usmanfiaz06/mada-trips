@@ -440,7 +440,7 @@ try {
     if (await p.page.getByText('أرسلوه برسالة نصية بعد').count()) errors.push('ar: a second countdown for SMS');
     await p.shot('code');
     await p.page.getByText('ما وصلك الرمز؟', { exact: true }).first().click();
-    await p.see('جرّب طريقة أخرى', 'ar sheet');
+    await p.see('جرّب طريقة ثانية', 'ar sheet');
     await p.see('افتح واتساب', 'ar check whatsapp');
     await p.shot('sheet');
     await p.byTest('help-lost').click();

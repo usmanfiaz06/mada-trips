@@ -146,7 +146,7 @@ async function signInDemo(page) {
   await byTest('phone-send').click();
   await see('أدخل الرمز', 'otp');
   await byTest('otp-input').fill('123456');
-  if (await see('أهلًا بعودتك', 'welcome back', 8000)) await byTest('welcome-back-open').click();
+  if (await see('حيّاك الله', 'welcome back', 8000)) await byTest('welcome-back-open').click();
   await page.waitForTimeout(1500);
 }
 
@@ -172,7 +172,7 @@ async function firstRun() {
   const input = byTest('phone-input');
   await input.fill('50 12');
   await input.blur();
-  await see('الرقم يبدو ناقصًا.', 'short number');
+  await see('الرقم شكله ناقص.', 'short number');
   await shot('phone-short');
   await input.fill(`5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`);
   await byTest('phone-send').click();
@@ -188,14 +188,14 @@ async function firstRun() {
   await see('يلّا نبدأ يا عمر', 'name button');
   await shot('name');
   await byTest('name-go').click();
-  await see('لن نزعجك إلا حين يهم الأمر.', 'alerts');
+  await see('ما نزعجك إلا إذا الموضوع يهمّك.', 'alerts');
   await page.waitForTimeout(2200);
   await shot('alerts');
   await byTest('alerts-allow').click();
 
   step('today');
-  await see('لا وجهة بعد.', 'today');
-  await see('إلى أين بعدها؟', 'composer');
+  await see('ما فيه وجهة بعد.', 'today');
+  await see('وين بعدها؟', 'composer');
   await shot('today');
 
   step('profile › language: digits and the Hijri date');
@@ -226,7 +226,7 @@ async function firstRun() {
 
   step('tabs');
   await byTest('dock-trips').click();
-  await see('اسمك ليس على اللوحة بعد.', 'trips empty');
+  await see('اسمك ما طلع على اللوحة بعد.', 'trips empty');
   await shot('trips-empty');
   await byTest('dock-circles').click();
   await see('هذا الأسبوع في', 'discover');

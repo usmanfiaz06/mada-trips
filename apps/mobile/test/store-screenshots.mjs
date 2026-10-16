@@ -57,7 +57,7 @@ const step = (s) => console.log('·', s);
 /* ───────── 1. the app screens ───────── */
 const WORDS = {
   en: { welcome: "We'll take it from here.", otp: 'Enter the code', back: 'Welcome back', where: 'Where to?', results: 'ways to get there', wallet: 'Wallet', disclosure: 'Mada', trip: 'Manage', delay: 'hours late' },
-  ar: { welcome: 'علينا الباقي.', otp: 'أدخل الرمز', back: 'أهلًا بعودتك', where: 'إلى أين؟', results: 'ثلاث طرق للوصول.', wallet: 'المحفظة', disclosure: 'مادا', trip: 'إدارة', delay: 'ساعات' },
+  ar: { welcome: 'علينا الباقي.', otp: 'أدخل الرمز', back: 'حيّاك الله', where: 'إلى أين؟', results: 'ثلاث طرق للوصول.', wallet: 'المحفظة', disclosure: 'مادا', trip: 'إدارة', delay: 'ساعات' },
 };
 
 async function freshPage(lang) {
