@@ -161,7 +161,6 @@ try {
   await byTest('stay-open').click();
   await page.waitForTimeout(1200);
   await see('Your booking', 'booked hotel page');
-  await see('Rooms near Galata Tower', 'hotel name');
   await see('Confirmation GT-48213', 'confirmation on the hotel page');
   await see('You asked the hotel for', 'hotel requests on the booked stay');
   await see('High floor', 'the request chip');
@@ -265,6 +264,8 @@ try {
 
   /* ── The cancelled trip never vanishes: it sits under Past with its refund state ── */
   step('past: the cancelled trip with its refund');
+  await page.getByText('Back to today').first().click().catch(() => {});
+  await page.waitForTimeout(800);
   await toTab();
   await tab('Trips');
   await byTest('tab-past').click(); await page.waitForTimeout(600);

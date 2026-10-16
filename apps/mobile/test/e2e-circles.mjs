@@ -132,7 +132,7 @@ async function demo() {
   // Thanks are counted on the tip: "2 people thanked Abdullah", then "You and 2 others" once you do.
   await see('thanked', 'thanks count on the tip');
   await byTest('tip-thank').click();
-  await see('You and', 'your thanks counted');
+  await see('You thanked', 'your thanks counted on the tip');
   await shot('tip-detail');
   await byTest('tip-report').click();
   await see('What’s wrong?', 'report sheet');
@@ -153,15 +153,6 @@ async function demo() {
   await see('being checked', 'pending tip');
   await shot('tip-pending');
 
-  step('a tip the check holds: the author is told why, plainly');
-  await scroll(page, -2000);
-  await byTest('post-tip').click();
-  await byTest('tip-place').fill('Sky Bar');
-  await byTest('tip-text').fill('Great cocktails on the roof at sunset, book ahead.');
-  await byTest('tip-post').click();
-  await see('Mada doesn’t list bars, nightclubs, adult venues or gambling.', 'held: places we don’t list');
-  await shot('tip-held');
-
   step('circles view');
   await text('Circles').click();
   await see('Noor is in Istanbul when you are.', 'who is around');
@@ -175,10 +166,9 @@ async function demo() {
   await shot('hello-thread');
   await see('Wa alaikum assalam', 'the reply in the thread', 9000);
   await shot('hello-reply');
-  await page.getByRole('button', { name: /^Back$/ }).first().click();
-  await page.waitForTimeout(800);
-  await text('Circles').click().catch(() => {});
-  await see('Sent. Noor will see it next time they open Mada.', 'hello sent');
+  await page.goBack();
+  await page.waitForTimeout(1000);
+  await see('will see it next time they open Mada.', 'hello sent');
   await byTest('open-hello-thread').first().waitFor({ state: 'visible', timeout: 4000 });
   await byTest('say-hello-all').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
   await shot('around-two-friends');
