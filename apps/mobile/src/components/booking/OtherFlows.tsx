@@ -24,7 +24,7 @@ import { Answered, SummaryChips } from './Conversation';
 import { dayName, rangeName } from './format';
 import { PhoneSheet, usePhoneNeeded } from './PhoneSheet';
 import { SearchSheet } from './SearchSheet';
-import { ArtSuitcase, Ask1, ChipWrap, Photo, Working, useSequence, useWho, enter } from './parts';
+import { ArtSuitcase, Ask1, ChipWrap, CityStage, CityTiles, Photo, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 import { StayResults } from './StayResults';
@@ -41,6 +41,9 @@ type Phase = 'where' | 'when' | 'nights' | 'who' | 'results';
 
 const cityLabel = (c: City) => nameIn(c.name, getLocale());
 const destOf = (c: City | null) => (c?.key ? DESTINATIONS[c.key] ?? null : null);
+/** A photo for cities Mada books by hand; any other city gets a room, which is what's being chosen. */
+const HAND_PHOTOS: Record<string, string> = { Makkah: 'makkah-clock-tower', Madinah: 'madinah-green-dome', Riyadh: 'riyadh-diriyah' };
+const cityPhoto = (c: City) => destOf(c)?.photo ?? HAND_PHOTOS[c.name] ?? 'hotel-room';
 
 /** The days a stay is usually for, with the year when it isn't this year. Weekends here are Thursday to Saturday. */
 function stayDates(today: string): { id: string; label: string; dates: [string, string] }[] {
@@ -135,6 +138,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     );
   }
   const whereRow = <Answered q={t('ask.stay.q.where')} a={cityLabel(city!)} onChange={() => change('where')} testID="stay-where-answer" />;
+  // The city's photo stands between the answer and the next question: the place, while the dates and the guests are picked.
+  const stage = <CityStage photo={cityPhoto(city!)} testID="stay-stage" />;
 
   /* 2. When: quick picks or the calendar; a check-in without a check-out asks how many nights. */
   if (phase === 'when') {
@@ -143,7 +148,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     return (
       <View style={{ gap: 18 }}>
         {whereRow}
-        <Ask1 q={t('ask.stay.q.when', { city: cityLabel(city!) })} options={opts} onPick={(v) => {
+        {stage}
+        <Ask1 q={t('ask.stay.q.when', { city: cityLabel(city!) })} options={opts} line={t('ask.stay.whenLine')} onPick={(v) => {
           if (v === 'pick') { setCalendar(true); return; }
           const q = stayDates(today).find((x) => x.id === v)!;
           setCheckIn(q.dates[0]); setCheckOut(q.dates[1]); setEditing(null);
@@ -157,7 +163,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     return (
       <View style={{ gap: 18 }}>
         {whereRow}
-        <Ask1 q={t('ask.stay.q.nights', { day: dayName(checkIn!, today) })} options={[...opts, [t('ask.q.pickDates'), 'pick']]}
+        {stage}
+        <Ask1 q={t('ask.stay.q.nights', { day: dayName(checkIn!, today) })} options={[...opts, [t('ask.q.pickDates'), 'pick']]} line={t('ask.stay.whenLine')}
           onPick={(v) => (v === 'pick' ? setCalendar(true) : setCheckOut(addDays(checkIn!, Number(v))))} />
         {sheet}
       </View>
@@ -169,13 +176,13 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
     const kids = who.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p && (ageOn(p, checkIn!) ?? 30) < 18);
     return (
       <View style={{ gap: 16 }}>
-        <Animated.View entering={enter(0)} style={{ gap: 10 }}>
-          <T v="h2" accessibilityRole="header">{t('ask.stay.q.who')}</T>
+        <Animated.View entering={enter(0)} style={{ gap: 12 }}>
+          <T style={font('displaySmall')} accessibilityRole="header">{t('ask.stay.q.who')}</T>
           {summary}
         </Animated.View>
         {intent.travellerCount && intent.travellerCount > who.length ? <T v="small">{t('ask.q.whoSaid', { count: intent.travellerCount })}</T> : null}
         <TravellerChips people={people} value={who} onChange={setWho} selfName={selfName} agesOn={checkIn!} />
-        {kids.length ? <T v="small" testID="stay-rooms">{t('ask.stay.kids', { names: joinAnd(kids.map((k) => t('ask.flow.childAge', { name: personName(k, selfName), age: ageOn(k, checkIn!) ?? '' }))) })}</T> : null}
+        {kids.length ? <T v="small" testID="stay-rooms">{t('ask.stay.kids', { names: joinAnd(kids.map((k) => t('ask.flow.childAge', { name: personName(k, selfName), age: ageOn(k, checkIn!) ?? '' }))) })}</T> : <T v="small">{t('ask.stay.whoLine')}</T>}
         {!live ? <T v="small">{t('ask.stay.byHandNote', { city: cityLabel(city!) })}</T> : null}
         {phoneNeeded ? (
           <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start' }} testID="stay-phone-note">
@@ -184,6 +191,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta }: { i
           </View>
         ) : null}
         <PhoneSheet visible={phoneOpen} onClose={() => setPhoneOpen(false)} onDone={() => { setPhoneOpen(false); if (city) recent.add(city); setGo(true); }} />
+        {stage}
         <View style={{ height: 40 }} />
       </View>
     );
@@ -224,11 +232,14 @@ function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => v
   }).slice(0, 6);
   const typed = q.trim().replace(/\s+/g, ' ');
   const exact = matches.some((m) => m.name.toLowerCase() === term || cityLabel(m) === typed);
-  const popular = POPULAR.map((k) => DESTINATIONS[k]).filter((d): d is NonNullable<typeof d> => !!d).map((d) => ({ key: d.key, name: d.name }));
+  const popular = POPULAR.map((k) => DESTINATIONS[k]).filter((d): d is NonNullable<typeof d> => !!d).filter((d) => !recent.some((r) => r.name === d.name));
   const chips = (list: City[], id: string) => <ChipWrap>{list.map((c) => <Chip key={`${id}-${c.name}`} label={cityLabel(c)} background={colors.paper} onPress={() => onPick(c)} />)}</ChipWrap>;
   return (
     <Animated.View entering={enter(0)} style={{ gap: 12 }}>
-      <T v="h2" accessibilityRole="header">{t('ask.stay.q.where')}</T>
+      <View style={{ gap: 6 }}>
+        <T style={font('displaySmall')} accessibilityRole="header">{t('ask.stay.q.where')}</T>
+        <T v="small">{t('ask.stay.whereLine')}</T>
+      </View>
       <View style={styles.search}>
         <Icon name="pin" size={18} color={colors.ink3} />
         <TextInput value={q} onChangeText={setQ} placeholder={t('ask.stay.cityHint')} placeholderTextColor={colors.muted} accessibilityLabel={t('ask.stay.q.where')} autoCorrect={false}
@@ -256,7 +267,10 @@ function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => v
       ) : (
         <>
           {recent.length ? <View style={{ gap: 8 }}><T v="eyebrow">{t('ask.stay.recent')}</T>{chips(recent, 'recent')}</View> : null}
-          <View style={{ gap: 8 }}><T v="eyebrow">{t('ask.stay.popular')}</T>{chips(popular.filter((p) => !recent.some((r) => r.name === p.name)), 'popular')}</View>
+          <View style={{ gap: 8 }}>
+            <T v="eyebrow">{t('ask.stay.popular')}</T>
+            <CityTiles testID="city-tiles" cities={popular.map((d) => ({ name: d.name, label: cityLabel({ key: d.key, name: d.name }), photo: d.photo }))} onPick={(name) => { const d = popular.find((x) => x.name === name)!; onPick({ key: d.key, name: d.name }); }} />
+          </View>
         </>
       )}
     </Animated.View>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path, Rect, Text as SvgText } from 'react-native-svg';
@@ -9,6 +9,7 @@ import { isRTL, t } from '@/lib/i18n';
 import { rise } from '@/lib/motion';
 import { colors, font, radii, ff } from '@/theme';
 import { Chip } from '../Chip';
+import { VGradient } from '../Gradient';
 import { Icon, type IconName } from '../Icon';
 import { Sun } from '../Sun';
 import { T } from '../Text';
@@ -33,6 +34,7 @@ const PHOTOS: Record<string, ImageSource> = {
   'makkah-clock-tower': require('../../../assets/photos/makkah-clock-tower.jpg'),
   'madinah-green-dome': require('../../../assets/photos/madinah-green-dome.jpg'),
   'passport-boarding-pass': require('../../../assets/photos/passport-boarding-pass.jpg'),
+  'riyadh-diriyah': require('../../../assets/photos/riyadh-diriyah.jpg'),
   'inflight-window': require('../../../assets/photos/inflight-window.jpg'),
   'inflight-wing': require('../../../assets/photos/inflight-wing.jpg'),
   'hotel-room': require('../../../assets/photos/hotel-room.jpg'),
@@ -92,13 +94,42 @@ export function ChipWrap({ children, style }: { children: ReactNode; style?: Sty
   return <View style={[styles.wrap, style]}>{children}</View>;
 }
 
-/** One question, answered with a tap (EXPERIENCE.md §5). */
-export function Ask1({ q, options, onPick }: { q: string; options: [string, string][]; onPick: (v: string) => void }) {
+/**
+ * One question, answered with a tap (EXPERIENCE.md §5). The question is the screen's one serif line: 30, a step
+ * inside the journey (40 is kept for its door: Welcome, Sign in, Ask, Today).
+ */
+export function Ask1({ q, options, onPick, line, children }: { q: string; options: [string, string][]; onPick: (v: string) => void; line?: string; children?: ReactNode }) {
   return (
-    <Animated.View entering={enter(0)} style={{ gap: 12 }}>
-      <T v="h2" accessibilityRole="header">{q}</T>
+    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
+      <T style={font('displaySmall')} accessibilityRole="header">{q}</T>
       <ChipWrap>{options.map(([label, v]) => <Chip key={label} label={label} background={colors.paper} onPress={() => onPick(v)} />)}</ChipWrap>
+      {line ? <T v="small">{line}</T> : null}
+      {children}
     </Animated.View>
+  );
+}
+
+/** The chosen city, as a photo with room to breathe: the feeling of the place while the dates and the guests are picked. */
+export function CityStage({ photo, focal, testID }: { photo: string; focal?: string; testID?: string }) {
+  return (
+    <View style={styles.stage} testID={testID} accessible={false}>
+      <Photo name={photo} focal={focal} />
+    </View>
+  );
+}
+
+/** Cities as photo tiles in a strip (the Trips ideas, in the picker): the name on a shade, the whole tile a button. */
+export function CityTiles({ cities, onPick, testID }: { cities: { name: string; label: string; photo: string; focal?: string }[]; onPick: (name: string) => void; testID?: string }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }} testID={testID}>
+      {cities.map((c) => (
+        <Pressable key={c.name} accessibilityRole="button" accessibilityLabel={c.label} onPress={() => { buzz('select'); onPick(c.name); }} style={({ pressed }) => [styles.tile, pressed ? { transform: [{ scale: 0.97 }] } : null]}>
+          <Photo name={c.photo} focal={c.focal} />
+          <VGradient id={`city-${c.name}`} stops={[[0.45, 'rgba(15,26,22,0)'], [1, 'rgba(15,26,22,0.78)']]} />
+          <View style={{ padding: 12 }}><T v="h3" color={colors.paper} style={{ fontSize: 16, lineHeight: 19 }} numberOfLines={1}>{c.label}</T></View>
+        </Pressable>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -225,6 +256,8 @@ const styles = StyleSheet.create({
   step: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mark: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  stage: { height: 150, borderRadius: radii.card, overflow: 'hidden', backgroundColor: colors.stage },
+  tile: { width: 150, height: 188, borderRadius: 20, overflow: 'hidden', justifyContent: 'flex-end', backgroundColor: colors.stage },
   toggle: { height: 40, borderRadius: 999, paddingHorizontal: 14, justifyContent: 'center' },
   toggleSmall: { height: 34, paddingHorizontal: 12 },
   hint: { borderWidth: 1.5, borderColor: colors.goldDeep },

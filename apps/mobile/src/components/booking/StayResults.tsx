@@ -11,7 +11,7 @@ import { agentName, useAgent } from '@/lib/agent';
 import { useStayAnchor } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
-import { colors, ff } from '@/theme';
+import { colors, ff, font } from '@/theme';
 import { Button, LinkButton } from '../Button';
 import { Icon } from '../Icon';
 import { Sheet } from '../Sheet';
@@ -153,7 +153,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   return (
     <View style={{ gap: 12 }}>
       <Animated.View entering={enter(0)} style={{ gap: 8 }}>
-        <T v="h2" style={{ fontSize: 24, lineHeight: 30 }} accessibilityRole="header" testID="stays-heading">
+        <T style={font('displaySmall')} accessibilityRole="header" testID="stays-heading">
           {mode === 'picks' ? t(picks.length >= 3 ? 'stays.picks.title' : 'stays.picks.titleFew', { city: cityName }) : tn('stays.count', list.length, { city: cityName })}
         </T>
         {summary}

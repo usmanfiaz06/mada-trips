@@ -16,6 +16,9 @@ export const arAskFlow: ArSection<typeof askFlowCopy> = {
   'ask.when.school': 'إجازة المدارس',
 
   'ask.stay.q.where': 'أي مدينة؟',
+  'ask.stay.whereLine': 'أي مدينة. وإذا ما طلعت أسعارها في التطبيق، مادا تدوّر لك على الغرف.',
+  'ask.stay.whenLine': 'كل غرفة توضح شروط الإلغاء قبل ما تدفع.',
+  'ask.stay.whoLine': 'الغرف تتسعّر على عدد اللي رايحين بالضبط.',
   'ask.stay.q.when': 'متى بتكون في {city}؟',
   'ask.stay.q.nights': 'الدخول {day}. كم ليلة؟',
   'ask.stay.q.who': 'مين بيسكن؟',

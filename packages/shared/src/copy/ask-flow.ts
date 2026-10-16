@@ -18,6 +18,9 @@ export const askFlowCopy = {
 
   // ───────────── stays ─────────────
   'ask.stay.q.where': 'Which city?',
+  'ask.stay.whereLine': 'Any city. Where the app has no prices, Mada finds the rooms.',
+  'ask.stay.whenLine': 'Every room shows its cancellation before you pay.',
+  'ask.stay.whoLine': 'Rooms are priced for exactly who’s going.',
   'ask.stay.q.when': 'When are you in {city}?',
   'ask.stay.q.nights': 'Checking in {day}. For how many nights?',
   'ask.stay.q.who': 'Who’s staying?',
