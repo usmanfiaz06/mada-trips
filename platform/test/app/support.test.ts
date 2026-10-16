@@ -87,7 +87,7 @@ describe("talk to Mada", () => {
     expect(choices.map((c) => c.key)).toEqual(["sv265", "xy125", "refund"]);
     const picked = await send(token, thread.id, { body: "", reply: { messageId: missed[1]!.id, choice: "sv265" } });
     expect(picked[0]!.body).toBe("Saudia SV265 · leaves 13:30");
-    expect(picked[1]!.body).toContain("Faisal confirms it");
+    expect(picked[1]!.body).toContain("Mada confirms it");
     expect((await callP(messagesPost, { id: thread.id }, { method: "POST", token, body: { body: "", reply: { messageId: missed[1]!.id, choice: "nope" } } })).status).toBe(400);
     const seat = await send(token, thread.id, { body: "Can I have a window seat?" });
     expect(seat[1]!.body).toMatch(/^We’ve asked Saudia for a window seat/);

@@ -934,7 +934,7 @@ export type AskSpec = {
   detail: string | null;
   withWhom: 'airline' | 'hotel' | 'faisal';
   withName: string | null;
-  /** A price Faisal confirms first (paid through Requests). */
+  /** A price Mada confirms first (paid through Requests). */
   quote: Halalas | null;
   quoteText: string | null;
   vatRateBps: number;
