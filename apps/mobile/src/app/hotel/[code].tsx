@@ -14,7 +14,7 @@ import { bookingApi, usePayDraft, useStayAnchor } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
 import { useHotelDetails } from '@/lib/transfers';
-import { colors, ff } from '@/theme';
+import { colors, ff, font } from '@/theme';
 
 /*
  * A hotel before booking (certification §5 for the content: HBX Group, from our store, never fetched live): every
@@ -67,13 +67,14 @@ export default function HotelScreen() {
   };
 
   return (
-    <TripScreen title={h.name} act={cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={review} testID="hotel-review" /> : undefined}>
+    <TripScreen act={cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={review} testID="hotel-review" /> : undefined}>
+      {/* The photos run edge to edge and the name is the screen's serif line: the hotel, before its facts. */}
       {h.images.length ? (
-        <ScrollView testID="hotel-images" horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {h.images.slice(0, 20).map((uri) => <Photo key={uri} uri={uri} style={{ width: 280, height: 190, borderRadius: 16 }} />)}
+        <ScrollView testID="hotel-images" horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
+          {h.images.slice(0, 20).map((uri) => <Photo key={uri} uri={uri} style={{ width: 300, height: 224, borderRadius: 20 }} />)}
         </ScrollView>
       ) : null}
-      <Rise><T v="h1" accessibilityRole="header">{h.name}</T></Rise>
+      <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
       <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{h.category ? <Tag tone="gold" label={h.category} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}<Tag label="HBX Group" /></Row></Rise>
 
       {/* Where it is. */}

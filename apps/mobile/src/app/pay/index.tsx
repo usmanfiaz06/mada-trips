@@ -247,11 +247,11 @@ export default function Pay() {
         <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(15,26,22,0.45)' }]} />
       </View>
       <TopBar onBack={() => router.back()} dark backLabel={t('pay.back')} />
-      <Animated.View entering={FadeInDown.duration(500)} style={[styles.sheet, { top: 128, height: height - 128 }]}>
+      <Animated.View entering={FadeInDown.duration(500)} style={[styles.sheet, { top: 150, height: height - 150 }]}>
         <View style={styles.grab} />
         <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 170 + bottom, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.spread}>
-            <T v="h2" style={{ flex: 1 }} accessibilityRole="header">{p?.title ?? pd.title}</T>
+            <T style={[font('displaySmall'), { flex: 1 }]} accessibilityRole="header">{p?.title ?? pd.title}</T>
             {holdText ? <View style={[styles.pill, expired ? null : styles.pillOk]} accessibilityLiveRegion="polite"><T v="caption" color={expired ? colors.green : colors.ok} style={{ fontFamily: ff.ui600, fontVariant: ['tabular-nums'] }}>{holdText}</T></View> : null}
           </View>
           {(p?.lines ?? []).map((l) => (
