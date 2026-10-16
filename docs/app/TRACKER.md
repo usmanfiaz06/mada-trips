@@ -12,7 +12,8 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 |---|---|---|
 | W · wiring | cancelled trips visible, booked stay → hotel page, document viewer, friend-request → profile, hello thread, hotel requests on pay, thanks counts, take-back for sent items, plural copy | items 2, 3, 5, 6 pushed; rest finishing |
 | M · money | preferences applied + re-confirmed extras, loyalty numbers per traveller, FX display (SAR charged), trip Money view, ask someone to pay | prefs/FX code in tree, Money view next |
-| A · Arabic + moderation | spoken Riyadh Arabic across copy, reader-language notifications, ARABIC.md voice guide, moderation rules (ar/en lists, venue rule, spam, image hook, chat screening, desk queue) | Today, trip, refunds, stays, errors pushed; moderation module next |
+| A · Arabic + moderation | spoken Riyadh Arabic across copy, reader-language notifications, ARABIC.md voice guide, moderation rules (ar/en lists, venue rule, spam, image hook, chat screening, desk queue) | **DONE** 1803a70: 2,561 ar lines rewritten, inbox renders in reader's language, moderation + desk queue, ARABIC.md (30 pairs for owner approval) |
+| F · family (unit 1 of Next) | stepper, age without passport, corrections in any flow, family ranking, per-person fare lines | started 16 Oct as a background session |
 
 ## Next, in order (critique items; start as slots free)
 
@@ -24,6 +25,11 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 6. **Web shell and 8% mode**: service-worker app shell, one-screen low-battery mode. (critique 14)
 7. **Native**: Live Activity, real boarding passes, Apple Wallet. (critique 15) — needs the Apple account and a build.
 8. **Social** (owner audit 10, 19, 21, 22, 24–27): public groups/trips/events, video and multi-attachments, badges, reviews, collections. After the beta.
+
+## Integration notes
+
+- After W and M land: fix stale platform `support.test` (expects "Faisal confirms it"; copy is now "Mada confirms it" since 7759801); rerun e2e-circles ("hello sent" from W's hello thread) and platform trips.test.
+- Owner to approve `docs/app/ARABIC.md` (30 before/after pairs).
 
 ## Decisions on record
 
