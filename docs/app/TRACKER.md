@@ -11,9 +11,10 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 | Unit | What | Status |
 |---|---|---|
 | W · wiring | cancelled trips visible, booked stay → hotel page, document viewer, friend-request → profile, hello thread, hotel requests on pay, thanks counts, take-back for sent items, plural copy | **DONE** 5aa5bc6 (all 8 + plural). Open: English stored stay text on Arabic hotel page; refunds that moved money and pay-link splits can't be taken back; no "opened by agent" signal |
-| M · money | preferences applied + re-confirmed extras, loyalty numbers per traveller, FX display (SAR charged), trip Money view, ask someone to pay | prefs/FX code in tree, Money view next |
+| M · money | preferences applied + re-confirmed extras, loyalty numbers per traveller, FX display (SAR charged), trip Money view, ask someone to pay | **DONE** c57a3b4. Open: extras card parses airline from text; hand-made splits need tripId; hotel loyalty matched by name; instalments not on Money screen |
 | A · Arabic + moderation | spoken Riyadh Arabic across copy, reader-language notifications, ARABIC.md voice guide, moderation rules (ar/en lists, venue rule, spam, image hook, chat screening, desk queue) | **DONE** 1803a70: 2,561 ar lines rewritten, inbox renders in reader's language, moderation + desk queue, ARABIC.md (30 pairs for owner approval) |
 | F · family (unit 1 of Next) | stepper, age without passport, corrections in any flow, family ranking, per-person fare lines | started 16 Oct as a background session |
+| O · outcomes (unit 3 of Next) | every request ends issued/refused/partial/cancelled with reason, deadline, next step; hotel named everywhere | started 16 Oct as a background session |
 | N · now path and truth (unit 2 of Next) | car now, urgent <24 h → disruption card + call-back, honest disruption screen | started 16 Oct as a background session |
 
 ## Next, in order (critique items; start as slots free)
@@ -29,7 +30,7 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 
 ## Integration notes
 
-- After W and M land: fix stale platform `support.test` (expects "Faisal confirms it"; copy is now "Mada confirms it" since 7759801); rerun e2e-circles ("hello sent" from W's hello thread) and platform trips.test.
+- W + M integrated (8f8bbcd): support.test fixed; platform support/trips/circles 52/52; e2e circles, trips, booking, wallet, arabic pass on a mock export (`EXPO_PUBLIC_API_MODE=mock` is required for e2e exports).
 - Owner to approve `docs/app/ARABIC.md` (30 before/after pairs).
 
 ## Decisions on record
