@@ -257,7 +257,7 @@ async function hotelbedsStays(token: string, travellerIds: string[]) {
 }
 
 async function bookStay(token: string, stayOfferId: string, travellerIds: string[], cardId: string) {
-  const draft: OrderDraft = { kind: "stay", stayOfferId, travellerIds };
+  const draft: OrderDraft = { kind: "stay", stayOfferId, travellerIds, requests: { chips: ["highFloor", "cot"], note: "Rooms next to each other if you can." } };
   const pv = await post(previewPost, token, { draft, useCredit: false });
   expect(pv.status, JSON.stringify(pv.json)).toBe(200);
   const preview = PreviewResponse.parse(pv.json).preview;
@@ -333,6 +333,8 @@ describe("stays from Hotelbeds in the app", () => {
     const body = [...mockHotelbedsState().bookings.values()].find((b) => b.body.clientReference === row.clientReference)!.body as { holder: { name: string }; rooms: { paxes: { type: string }[] }[]; remark: string };
     expect(body.holder.name.length).toBeGreaterThan(0);
     expect(body.rooms[0]!.paxes.length).toBe(ids.length);
+    // What the traveller asked the hotel for on the order sheet goes to the property as the remark.
+    expect(body.remark).toMatch(/High floor\. Baby cot\. Rooms next to each other if you can\./);
 
     // The voucher (cert. §4): reference, holder, room, board, essential info, the payment statement, no price.
     const v = await get(voucherGet, me.token, { id: row.id });

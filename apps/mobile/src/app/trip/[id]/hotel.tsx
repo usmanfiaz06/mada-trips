@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { ROOM_OPTIONS, addDays, addMinutes, dayLabel, formatSar, freeUntil, liveStay, nightPrice, outSegment, backSegment, rangeLabel, stayEnd, timing, type CreateTripAskRequest, type TripDetail } from '@mada/shared';
 import { Button } from '@/components/Button';
+import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { RequestStatusPill } from '@/components/trips/Requests';
@@ -44,6 +45,7 @@ export default function HotelOptions() {
           <Row><IconTile name="stay" /><View style={{ flex: 1 }}><H3 size={15}>{st.name}</H3><Tiny>{st.roomType ?? t(n > 2 ? 'trip.connectingRooms' : 'trip.aRoom')} · {rangeLabel(st.checkIn, last)} · {t('tm.detail.nights', { n: st.nights })} · {t('hotel.booked.open')}</Tiny></View></Row>
         </Pressable>
         <Tiny>{t('ho.free', { day: freeUntil(st.checkIn) })}</Tiny>
+        <HotelRequestsAsked requests={st.requests} testID="ho-asked" />
       </Box></Rise>
       <Rise step={1}><Box padding={6} gap={0}>
         <ListRow first testID="ho-room" icon="stay" title={t('ho.r.room')} sub={t('ho.r.roomSub')} onPress={() => setSheet('room')} />

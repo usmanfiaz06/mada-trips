@@ -1,4 +1,5 @@
 import "server-only";
+import { HotelRequests, hotelRequestRemark } from "@mada/shared";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { appPeople, appRequests, appUsers } from "@/db/app-schema";
@@ -134,9 +135,11 @@ export async function bookStayOnHotelbeds(orderId: string, actor: DeskActor): Pr
     }
     const stay = (o.snapshot as { stay?: { checkIn?: string; rooms?: number; name?: string; cancellation?: string; hotel?: { code?: number; category?: string | null } | null } }).stay ?? {};
     const { people, holder } = await partyOf(o.ownerId, o.travellerIds);
+    // What the traveller asked the hotel for on the order sheet goes to the property as part of the remark.
+    const hotelAsks = hotelRequestRemark(HotelRequests.nullish().parse((o.draft as { requests?: unknown }).requests));
     const res = await hotels.book({
       rateKey, holder, paxes: paxesFor(people, stay.rooms ?? 1, stay.checkIn ?? new Date().toISOString().slice(0, 10), holder),
-      clientReference: row.clientReference, remark: `Mada Trips order ${o.ref ?? o.id.slice(0, 8)}`,
+      clientReference: row.clientReference, remark: [`Mada Trips order ${o.ref ?? o.id.slice(0, 8)}`, ...(hotelAsks ? [hotelAsks] : [])].join(". ").slice(0, 250),
       tolerancePct: Number(process.env.HOTELBEDS_TOLERANCE_PCT ?? 0) || undefined,
     });
     const b = res.booking;

@@ -13,6 +13,8 @@ export * from './positions';
 export * from './wallet';
 export * from './circles';
 export * from './desk';
+export * from './booking-prefs';
+export * from './hotel-requests';
 export * from './booking';
 export * from './booking-words';
 export * from './editorial-words';

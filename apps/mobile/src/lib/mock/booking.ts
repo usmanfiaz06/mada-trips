@@ -6,6 +6,7 @@ import {
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
+  type HotelRequests,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -29,7 +30,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null } };
+type Order = OrderView & { owner: string; nextAt: number | null; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -233,7 +234,7 @@ function confirm(o: Order) {
     o.tripId = recordBookedTrip({
       owner: o.user, ref: o.ref, agentName: o.agent?.name ?? agentName(), city: dest?.name ?? o.place, country: dest ? ENTRY_RULES[dest.country]?.name ?? null : null, photo: dest?.photo ?? o.photo,
       travellers: o.travellers, flight: o.snap.flight, stay: o.snap.stay, bundle: o.bundle, lines: o.lines, extra: o.extra.amount, discount: o.snap.discount, creditUsed: o.creditUsed.amount,
-      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets,
+      paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets, requests: o.snap.requests ?? null,
     });
   }
   if (o.kind === 'quote' && o.requestId) { const r = requests.get(o.requestId); if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); } }
@@ -562,7 +563,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
       owner: user.id, nextAt: requires3ds ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
-      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null },
+      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null, requests: b.draft.kind === 'stay' ? b.draft.requests ?? null : null },
     };
     if (priced.quoted && b.draft.kind === 'quote') {
       const r = requests.get(b.draft.requestId);

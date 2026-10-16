@@ -16,6 +16,7 @@ import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Field, Input, Money, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
+import { HotelRequestsCard } from "@/components/desk/hotel-requests";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
@@ -200,6 +201,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               <div className="space-y-4">
                 {o.stage === "awaiting" && (
                   <ActionForm action={holdAction} className="space-y-2">
+          <HotelRequestsCard draft={o.order?.draft as Record<string, unknown> | undefined} t={t} />
                     <input type="hidden" name="id" value={r.id} />
                     <Field label={t("PNR from the GDS (optional)")}><Input name="pnr" maxLength={8} className="num uppercase" dir="ltr" placeholder="X7K2QD" /></Field>
                     <SubmitButton variant="gold" className="w-full"><BadgeCheck className="size-4" />{t("Confirm and hold")}</SubmitButton>

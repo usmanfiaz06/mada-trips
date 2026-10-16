@@ -16,6 +16,7 @@ import { ApplePaySheet, CardsSheet, ThreeDsSheet, type PayMethod } from '@/compo
 import { ChipWrap, Notice, Photo, useNow } from '@/components/booking/parts';
 import { TravellerChips } from '@/components/booking/Travellers';
 import { PhoneSheet, usePhoneNeeded } from '@/components/booking/PhoneSheet';
+import { HotelRequestsField, NO_HOTEL_REQUESTS } from '@/components/booking/HotelRequests';
 import { TravellerPassports } from '@/components/passport/TravellerPassports';
 import { ApiError } from '@/lib/api';
 import { useBookingNeedsPhone } from '@/lib/beta';
@@ -102,6 +103,8 @@ export default function Pay() {
     return 'travellerIds' in d ? { ...d, travellerIds: travellers } : d;
   }, [pd, travellers]);
   const flags = [...demo].sort().join(',');
+  // A room: what to tell the hotel. Kept out of the preview (no price in it) and sent with the order.
+  const [hotelAsks, setHotelAsks] = useState(NO_HOTEL_REQUESTS);
   const previewQ = useQuery({
     queryKey: ['booking', 'preview', draft, promo, useCredit, flags],
     enabled: !!draft,
@@ -174,7 +177,8 @@ export default function Pay() {
   };
 
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
-    const out = await bookingApi.createOrder({ draft, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
+    const sent = draft.kind === 'stay' ? { ...draft, requests: hotelAsks } : draft;
+    const out = await bookingApi.createOrder({ draft: sent, promo, useCredit, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
     key.current = newIdempotencyKey();
     // The waiting screen opens on the order we already have, not a blank screen until its first poll answers.
     if (out.outcome === 'created') { buzz('knock'); await invalidate(); qc.setQueryData(bookingKeys.order(out.order.id), out.order); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
@@ -312,6 +316,7 @@ export default function Pay() {
               {contactErr ? <T v="small" color={colors.badInk} accessibilityRole="alert">{contactErr}</T> : <T v="tiny">{t('beta.contact.note')}</T>}
             </View>
           ) : null}
+          {pd.draft.kind === 'stay' ? <HotelRequestsField value={hotelAsks} onChange={setHotelAsks} /> : null}
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>

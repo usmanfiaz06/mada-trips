@@ -1,4 +1,5 @@
 import { StayFit } from './stay-fit';
+import { HotelRequests } from './hotel-requests';
 import { z } from 'zod';
 import { ContactPhone, FlightQuote, FlightRequestExtras, ThreadAttachment } from './flight-quote';
 import { AirportCode, HalalasAmount, Id, IsoDateTime, IsoDay, Money } from './common';
@@ -409,7 +410,8 @@ export type OrderKind = z.infer<typeof OrderKind>;
 
 export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('trip'), flightOfferId: Id, bundle: z.boolean().default(false), travellerIds: z.array(Id).min(1).max(9) }),
-  z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish() }),
+  /** requests: what to tell the hotel (late check-in, high floor, a cot…), kept on the order and sent on as its remark. */
+  z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish(), requests: HotelRequests.nullish() }),
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
   /** optionId: which fare option of a flight quote (the first when there is only one). */
   z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional() }),

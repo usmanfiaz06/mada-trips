@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { anchorName, anchorOfLandmark, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
+import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
@@ -98,6 +99,7 @@ export default function HotelScreen() {
           {booked.confirmation ? <Tiny>{t('hotel.booked.ref', { ref: booked.confirmation })}</Tiny> : null}
           {booked.cancellation ? <Tiny>{booked.cancellation}</Tiny> : null}
           {booked.walk || booked.fromAirport ? <Tiny>{[booked.walk, booked.fromAirport ? t('hotel.booked.fromAirport', { time: booked.fromAirport }) : null].filter(Boolean).join(' · ')}</Tiny> : null}
+          <HotelRequestsAsked requests={booked.requests} testID="hotel-asked" />
         </Box>
       ) : null}
 

@@ -1,4 +1,5 @@
 import {
+  type HotelRequests,
   ChangeFlightRequest, CompanyInvoiceRequest, CreateRefundRequest, CreateTripAskRequest, DisruptionChoiceRequest, ERROR_CODES, ImportTrackedRequest, MoveRequest,
   PatchTripRequest, SELLER, FLIGHT_POSITION_ATTRIBUTION, TrackFlightRequest, TripPhase, AIRLINE_INFO, SWITCH_OFFERS, CARRIERS, CATALOGUE_HOTELS, seatsFor,
   addDays, legMinutes, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, derivePhase, deskStatus,
@@ -105,7 +106,7 @@ function seed(user: MockUser, s: State, outDay = '2027-03-09', backDay = '2027-0
       { id: outId, carrier: 'SV', carrierName: 'Saudia', flightNumber: 'SV263', from: 'RUH', to: 'IST', departLocal: `${outDay}T09:40`, departTz: 'Asia/Riyadh', arriveLocal: `${outDay}T13:55`, arriveTz: 'Europe/Istanbul', durationMin: 255, cabin: 'economy', terminal: 'Terminal 3', gate: 'B12', seats: seats(14), baggage: '2 × 23 kg', status: 'scheduled', statusSource: 'Schedule', pnr: 'X7K2QD', direction: 'out', bookedGate: 'B12', delayMin: null, predictedDelay: false, statusAt: null, brand: '#0b6b52' },
       { id: uuid(), carrier: 'SV', carrierName: 'Saudia', flightNumber: 'SV264', from: 'IST', to: 'RUH', departLocal: `${backDay}T15:10`, departTz: 'Europe/Istanbul', arriveLocal: `${backDay}T19:20`, arriveTz: 'Asia/Riyadh', durationMin: 250, cabin: 'economy', terminal: 'Terminal 1', gate: null, seats: seats(16), baggage: '2 × 23 kg', status: 'scheduled', statusSource: 'Schedule', pnr: 'X7K2QD', direction: 'back', bookedGate: null, delayMin: null, predictedDelay: false, statusAt: null, brand: '#0b6b52' },
     ],
-    stays: [{ id: uuid(), name: 'Rooms near Galata Tower', area: 'Beyoğlu · 3 min to the tower', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', checkIn: outDay, nights: 6, rooms: 2, price: SAR(5880_00), cancellation: 'Free to cancel until 7 days before', status: 'booked', confirmation: 'GT-48213', phone: '+90 212 000 0000', addressShort: 'Galata Kulesi Sk. 12, Beyoğlu', walk: '3 min walk to Galata Tower', fromAirport: '45 min', roomType: null, plan: 'tabby', hotelCode: 99702 }],
+    stays: [{ id: uuid(), name: 'Rooms near Galata Tower', area: 'Beyoğlu · 3 min to the tower', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', checkIn: outDay, nights: 6, rooms: 2, price: SAR(5880_00), cancellation: 'Free to cancel until 7 days before', status: 'booked', confirmation: 'GT-48213', phone: '+90 212 000 0000', addressShort: 'Galata Kulesi Sk. 12, Beyoğlu', walk: '3 min walk to Galata Tower', fromAirport: '45 min', roomType: null, plan: 'tabby', hotelCode: 99702, requests: { chips: ['highFloor', 'cot'], note: 'Rooms next to each other if you can.' } }],
     pickups: [
       { id: uuid(), direction: 'to_airport', at: new Date(zonedToInstant(`${outDay}T09:40`, 'Asia/Riyadh').getTime() - 155 * 60_000).toISOString(), driverName: 'Khalid', car: 'Black GMC Yukon', plate: null, meetingPoint: 'Your door', phone: '+966 55 014 2287', price: SAR(220_00), status: 'booked', room: 'room for 8 bags', waits: '10 min', offsetMin: -155, city: 'Riyadh' },
       { id: uuid(), direction: 'from_airport', at: zonedToInstant(`${outDay}T13:55`, 'Europe/Istanbul').toISOString(), driverName: 'Ahmet', car: 'Grey Mercedes Vito', plate: '34 MDA 21', meetingPoint: 'Door 3', phone: '+90 532 418 6610', price: SAR(220_00), status: 'booked', room: null, waits: '60 min', offsetMin: null, city: 'Istanbul' },
@@ -147,6 +148,8 @@ export type BookedTrip = {
   pnr?: string | null;
   tickets?: string[];
   stay: StayOption | null;
+  /** What the traveller asked the hotel for on the order sheet. */
+  requests?: HotelRequests | null;
   bundle: boolean;
   lines: OrderLine[];
   /** Halalas: the fare rise the traveller accepted, the promo discount, and the credit used. */
@@ -204,7 +207,7 @@ export function recordBookedTrip(b: BookedTrip): string {
       id: uuid(), name: b.stay?.name ?? galata.name, area: b.stay?.area ?? galata.area, address: b.stay?.address ?? galata.address, checkIn, nights, rooms: b.stay?.rooms ?? (n > 2 ? 2 : 1),
       price: SAR(amountOf(['stay'])), cancellation: b.stay?.cancellation ?? t('pay.rule.stay', { date: addDays(checkIn, -7) }), status: 'booked', confirmation: b.ref, phone: '+90 212 000 0000',
       addressShort: b.stay ? null : 'Galata Kulesi Sk. 12, Beyoğlu', walk: b.stay ? null : '3 min walk to Galata Tower', fromAirport: '45 min', roomType: b.stay?.hotel?.room ?? b.stay?.roomsLabel ?? (n > 2 ? 'Connecting rooms' : 'A quiet room'), plan: b.plan,
-      hotelCode: b.stay?.hotel?.code ?? null,
+      hotelCode: b.stay?.hotel?.code ?? null, requests: b.requests ?? null,
     });
   }
   const pickups: TripDetail['pickups'] = [];

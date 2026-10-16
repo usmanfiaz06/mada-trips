@@ -163,6 +163,8 @@ try {
   await see('Your booking', 'booked hotel page');
   await see('Rooms near Galata Tower', 'hotel name');
   await see('Confirmation GT-48213', 'confirmation on the hotel page');
+  await see('You asked the hotel for', 'hotel requests on the booked stay');
+  await see('High floor', 'the request chip');
   await shot('trip-hotel-page');
   await back();
   await scroll(800);

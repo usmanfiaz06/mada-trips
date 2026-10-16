@@ -446,6 +446,11 @@ async function requests() {
   await k.shot('stays');
   await k.press(k.byTest('ask-review'));
   await k.see('Free to cancel until', 'stay rule', 10000);
+  // Requests for the hotel, on the sheet before paying: chips and a line in your own words.
+  await k.see('Requests for the hotel', 'hotel requests field');
+  await k.byTest('hr-chip-highFloor').click();
+  await k.byTest('hr-chip-cot').click();
+  await k.byTest('hr-note').fill('Rooms next to each other if you can.');
   await k.shot('stay-pay');
   await page.goBack();
   step('plans: AlUla');

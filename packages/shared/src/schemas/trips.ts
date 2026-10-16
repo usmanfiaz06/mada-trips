@@ -3,6 +3,7 @@ import {
   AgentRef, AirportCode, BookingRef, CarrierCode, FlightNumber, HalalasAmount, Id, IsoDateTime, IsoDay, LocalDateTime, Money, TimeZone,
 } from './common';
 import { Invoice, PaymentMethod, RefundStage } from './commerce';
+import { HotelRequests } from './hotel-requests';
 
 export const Cabin = z.enum(['economy', 'premium', 'business', 'first']);
 export type Cabin = z.infer<typeof Cabin>;
@@ -171,6 +172,8 @@ export const StayDetail = Stay.extend({
   plan: z.enum(['full', 'tabby', 'tamara']),
   /** The hotel's code with the supplier (Hotelbeds), so the stay opens its hotel page. Null for a catalogue stay. Older servers send none. */
   hotelCode: z.number().int().nullable().optional(),
+  /** What the traveller asked the hotel for on the order sheet. Older servers send none. */
+  requests: HotelRequests.nullable().optional(),
 });
 export type StayDetail = z.infer<typeof StayDetail>;
 
