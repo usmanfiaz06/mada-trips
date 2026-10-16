@@ -13,6 +13,7 @@ import type { AreaMock, MockUser } from '../mock-api';
 import { plannedFor } from './things-store';
 import { askRequestViews } from './booking';
 
+import { circlesHooks, circlesMock } from './circles';
 /*
  * EXPO_PUBLIC_API_MODE=mock for the trip companion: the same endpoints as platform/src/app/api/app/v1/{trips,refunds,
  * invoices,tracked,notifications,devices,flights/{no}/status}, in memory, running the same rules from @mada/shared
@@ -300,6 +301,9 @@ function notify(s: State, n: { kind: Notification['kind']; level: Notification['
 
 function payments(s: State, tripId: string): TripPayment[] {
   return s.charges.filter((c) => c.tripId === tripId).map(({ lines: _l, tripId: _t, ...c }) => {
+// A reply in a direct thread (Circles' mock) lands in this inbox like the server's notification would.
+circlesHooks.notify = (userId, n) => { const s = states.get(userId); if (s) notify(s, n); };
+
     const items = s.refunds.filter((r) => r.stage !== 'rejected' && !r.anyway).flatMap((r) => r.items).filter((i) => i.chargeId === c.id);
     const credited = items.reduce((a, i) => a + i.credited, 0);
     return { ...c, refunded: items.length ? SAR(credited) : null, creditNoteId: items.find((i) => i.creditNoteId)?.creditNoteId ?? null };

@@ -42,14 +42,15 @@ export default function NewCircle() {
   const all = useMemo(() => friends.data?.friends ?? [], [friends.data]);
   // "Plan a trip together" arrives with that friend already picked, until they're taken off.
   const [withOff, setWithOff] = useState(false);
-  const withF = params.with && !withOff ? all.find((x) => x.id === params.with) ?? null : null;
-  const picked = withF && !chosen.some((x) => x.id === withF.id) ? [withF, ...chosen] : chosen;
+  const withIds = params.with && !withOff ? params.with.split(',') : [];
+  const withF = withIds.map((id) => all.find((x) => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x && !chosen.some((c) => c.id === x.id));
+  const picked = [...withF, ...chosen];
   const family = all.filter((f) => f.tag === 'family');
   const others = all.filter((f) => f.tag !== 'family');
   const dupe = (circles.data?.circles ?? []).some((c) => !c.dm && c.name.trim().toLowerCase() === name.trim().toLowerCase());
   const ok = name.trim().length >= 2 && !dupe;
   const isOn = (id: string) => picked.some((p) => p.id === id);
-  const toggle = (p: PersonRef) => { buzz('select'); if (withF && p.id === withF.id) { setWithOff(true); return; } setPicked(isOn(p.id) ? chosen.filter((x) => x.id !== p.id) : [...chosen, p]); };
+  const toggle = (p: PersonRef) => { buzz('select'); if (withF.some((x) => x.id === p.id)) { setWithOff(true); setPicked([...withF.filter((x) => x.id !== p.id), ...chosen]); return; } setPicked(isOn(p.id) ? chosen.filter((x) => x.id !== p.id) : [...chosen, p]); };
   const tag = useMemo(() => (id: string, rel?: string, mutual?: number) => (family.some((f) => f.id === id) || rel === 'family' ? t('circles.newCircle.tagFamily') : all.some((f) => f.id === id) || rel === 'friend' ? t('circles.newCircle.tagFriend') : t('circles.newCircle.tagMada', { count: mutual ?? 0 })), [family, all]);
   const create = useAct(circlesApi.create, () => [ck.list]);
   const make = () => create.mutate({ name: name.trim(), cover: coverInput(cover), invite: picked.map((p) => p.id) }, {

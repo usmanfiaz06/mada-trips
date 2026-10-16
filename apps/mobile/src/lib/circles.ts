@@ -112,7 +112,7 @@ export const circlesApi = {
   notifyCity: (city: string) => request({ method: 'POST', path: '/discover/notify', body: { city } }, OkResponse),
   around: () => request({ method: 'GET', path: '/discover/around' }, AroundResponse),
   presence: (b: { on: boolean; audience?: Audience }) => request({ method: 'PUT', path: '/discover/around', body: b }, AroundResponse),
-  aroundAction: (userId: string, action: 'hello' | 'notNow' | 'hide') => request({ method: 'POST', path: '/discover/around', body: { userId, action } }, AroundResponse),
+  aroundAction: (userId: string, action: 'hello' | 'notNow' | 'hide') => request({ method: 'POST', path: '/discover/around', body: { userId, action } }, AroundResponse.extend({ circleId: z.string().nullable().optional() })),
   stamps: () => request({ method: 'GET', path: '/discover/stamps' }, StampsResponse),
 
   report: (b: ReportRequest) => request({ method: 'POST', path: '/reports', body: b }, OkResponse),

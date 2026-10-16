@@ -902,4 +902,14 @@ export const enCircles = {
   'circles.tip.thanksYouOthers.other': 'You and {count} others thanked {name} for this',
   'circles.friend.thanks.one': 'Thanked once for a tip',
   'circles.friend.thanks.other': 'Thanked {count} times for tips',
+  // Say hello opens a thread; several friends in the city (owner audit, item 30).
+  'circles.around.openThread': 'Open the thread',
+  'circles.around.helloOpened': 'Salam sent. {name} can reply right here.',
+  'circles.around.many.one': '1 friend is in {city}',
+  'circles.around.many.other': '{count} friends are in {city}',
+  'circles.around.helloAll': 'Say hello to everyone',
+  'circles.around.helloAllDone': 'Salam sent to {names}.',
+  'circles.around.makeCircle': 'Make a circle for {city}',
+  'notify.circles.dm.title': '{name}',
+  'notify.circles.dm.body': '{text}',
 } as const;

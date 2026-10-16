@@ -225,11 +225,19 @@ function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: (
 
 /** Who's around: city only, the people you choose, off when you fly home. A friend who shared their city shows on top. */
 function Around({ data }: { data: AroundResponse }) {
+  const router = useRouter();
   const [sheet, setSheet] = useState<null | 'who' | 'person' | 'report'>(null);
   const [who, setWho] = useState<Audience>(data.audience);
   const [target, setTarget] = useState<PersonRef | null>(null);
   const presence = useAct(circlesApi.presence, () => [ck.around]);
-  const act = useAct((a: { id: string; action: 'hello' | 'notNow' | 'hide' }) => circlesApi.aroundAction(a.id, a.action), () => [ck.around]);
+  const act = useAct((a: { id: string; action: 'hello' | 'notNow' | 'hide' }) => circlesApi.aroundAction(a.id, a.action), () => [ck.around, ck.list]);
+  // A hello is a real thread: it opens with your salam as the first line, and the reply lands there.
+  const hello = (p: PersonRef) => act.mutate({ id: p.id, action: 'hello' }, { onSuccess: (r) => { if (r.circleId) { toast(t('circles.around.helloOpened', { name: p.short })); router.push(`/circle/${r.circleId}`); } } });
+  const waiting = data.people.filter((p) => !p.hello);
+  const helloAll = async () => {
+    for (const p of waiting) await act.mutateAsync({ id: p.person.id, action: 'hello' }).catch(() => {});
+    buzz('success'); toast(t('circles.around.helloAllDone', { names: joinAnd(waiting.map((p) => p.person.short)) }));
+  };
   const report = useAct(circlesApi.report, () => [ck.around]);
   const names = (ps: PersonRef[]) => ps.map((p) => p.short);
   const joinN = (ps: PersonRef[]) => { const n = names(ps); return n.length <= 1 ? n[0] ?? '' : joinAnd(n); };
@@ -241,6 +249,17 @@ function Around({ data }: { data: AroundResponse }) {
   ];
   return (
     <View style={[st.focal, shadow('focal')]}>
+      {/* Several friends in the city: one line for all of them, a hello each in one go, or a circle for the city. */}
+      {data.people.length > 1 ? (
+        <View style={{ gap: 10 }} testID="around-many">
+          <T v="h3" color={colors.mist}>{tn('circles.around.many', data.people.length, { city: data.city })}</T>
+          <Row gap={10} style={{ flexWrap: 'wrap' }}>
+            {waiting.length > 1 ? <Button size="small" block={false} variant="gold" label={t('circles.around.helloAll')} haptic="knock" onPress={() => void helloAll()} testID="say-hello-all" /> : null}
+            <Button size="small" block={false} variant="onDark" label={t('circles.around.makeCircle', { city: data.city })} onPress={() => router.push({ pathname: '/circle/new', params: { with: data.people.map((p) => p.person.id).join(','), name: data.city } })} testID="around-make-circle" />
+          </Row>
+          <View style={{ height: 1, backgroundColor: 'rgba(233,226,216,0.12)' }} />
+        </View>
+      ) : null}
       {data.people.map((p) => (
         <View key={p.person.id} style={{ gap: 14 }}>
           <Row gap={12}>
@@ -253,9 +272,14 @@ function Around({ data }: { data: AroundResponse }) {
               <Icon name="more" color={colors.mist} />
             </Pressable>
           </Row>
-          {p.hello ? <T v="small" style={{ fontFamily: ff.ui600 }} color="#e6c88f">{p.hello === 'sent' ? t('circles.around.helloSent', { name: p.person.short }) : t('circles.around.notNowDone')}</T> : (
+          {p.hello ? (
+            <Row gap={12} style={{ flexWrap: 'wrap' }}>
+              <T v="small" style={{ fontFamily: ff.ui600, flexShrink: 1 }} color="#e6c88f">{p.hello === 'sent' ? t('circles.around.helloSent', { name: p.person.short }) : t('circles.around.notNowDone')}</T>
+              {p.hello === 'sent' && p.threadId ? <Button size="small" block={false} variant="onDark" label={t('circles.around.openThread')} onPress={() => router.push(`/circle/${p.threadId}`)} testID="open-hello-thread" /> : null}
+            </Row>
+          ) : (
             <Row gap={10}>
-              <Button size="small" block={false} variant="gold" label={t('circles.around.sayHello')} haptic="knock" onPress={() => act.mutate({ id: p.person.id, action: 'hello' })} testID="say-hello" />
+              <Button size="small" block={false} variant="gold" label={t('circles.around.sayHello')} haptic="knock" onPress={() => hello(p.person)} testID="say-hello" />
               <Button size="small" block={false} variant="onDark" label={t('common.notNow')} onPress={() => act.mutate({ id: p.person.id, action: 'notNow' })} />
             </Row>
           )}

@@ -22,6 +22,6 @@ export const PUT = route(async (req) => {
 export const POST = route(async (req) => {
   const { userId } = await authenticate(req);
   const input = await body(req, AroundActionRequest);
-  await aroundAction(userId, input.userId, input.action);
-  return json(await around(userId));
+  const { circleId } = await aroundAction(userId, input.userId, input.action);
+  return json({ ...(await around(userId)), circleId });
 });

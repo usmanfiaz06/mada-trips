@@ -480,7 +480,8 @@ export const AroundResponse = z.object({
   endsAt: IsoDateTime.nullable(),
   /** Who each choice would show you to. */
   options: z.object({ picked: z.array(PersonRef), close: z.array(PersonRef), family: z.array(PersonRef) }),
-  people: z.array(z.object({ person: PersonRef, city: z.string(), dates: z.string().nullable(), hello: z.enum(['sent', 'no']).nullable() })),
+  /** threadId: the direct thread a hello opened (reply there). Older servers send none. */
+  people: z.array(z.object({ person: PersonRef, city: z.string(), dates: z.string().nullable(), hello: z.enum(['sent', 'no']).nullable(), threadId: Id.nullable().optional() })),
 });
 export type AroundResponse = z.infer<typeof AroundResponse>;
 export const PresenceRequest = z.object({ on: z.boolean(), audience: Audience.optional(), picked: z.array(Id).max(100).optional() });

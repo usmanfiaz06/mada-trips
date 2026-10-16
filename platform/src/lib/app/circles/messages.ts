@@ -117,6 +117,12 @@ export async function sendMessage(circleId: string, userId: string, input: SendC
     return row;
   });
   const out: MessageRow[] = [mine];
+  // A direct thread: the other person is told, and the notification opens the thread (a hello's reply lands there).
+  if (d.dm) {
+    const others = (await memberIds(circleId)).filter((u) => u !== userId);
+    const me = (await peopleByIds([userId])).get(userId);
+    for (const u of others) await notify(db, u, "circle.dm", ["notify.circles.dm.title", { name: me?.short ?? "" }], ["notify.circles.dm.body", { text: text.slice(0, 80) }], `/circle/${circleId}`, { circleId, messageId: mine.id }, { push: true });
+  }
   if (toMada && !d.dm) {
     const r = await madaAnswer(circleId, text, !!prevCard.askWhere);
     out.push(await db.transaction(async (tx) => {

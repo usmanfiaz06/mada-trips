@@ -10,6 +10,10 @@ import { appPresence, appPresenceMarks } from "@/db/app-schema-circles";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { graphOf, nextTrip, notify, pastTrips, peopleByIds, stampMonth } from "./common";
+import { addMessage, openDm } from "./circles";
+import { appCircleDetails } from "@/db/app-schema-circles";
+import { localeOfUser } from "../locale";
+import { t } from "@mada/shared";
 
 /*
  * Discover: what's on this week in your city or your trip's city, Mada's plans, and the city picker. Who's around:
@@ -67,12 +71,16 @@ export async function around(me: string): Promise<AroundResponse> {
   const theirs = friends.length ? await db.select().from(appPresence).where(and(inArray(appPresence.userId, friends), gt(appPresence.endsAt, new Date()))) : [];
   const shown = theirs.filter((p) => p.city.toLowerCase() === here.city.toLowerCase() && p.audienceIds.includes(me));
   const people = await peopleByIds(shown.map((p) => p.userId));
+  // The direct thread a hello opened, so the card can say "Open the thread".
+  const helloed = shown.filter((p) => marks.some((x) => x.otherId === p.userId && x.mark === "hello"));
+  const dms = helloed.length ? await db.select({ id: appCircleDetails.circleId, key: appCircleDetails.dmKey }).from(appCircleDetails).where(inArray(appCircleDetails.dmKey, helloed.map((p) => [me, p.userId].sort().join(":")))) : [];
   return {
     city: here.city, dates: here.dates, on: !!mine, audience: (mine?.audience as Audience) ?? "picked", endsAt: mine?.endsAt.toISOString() ?? null,
     options: { picked: refs(ids.picked), close: refs(ids.close), family: refs(ids.family) },
     people: shown.map((p) => {
       const m = marks.find((x) => x.otherId === p.userId && x.city === p.city);
-      return { person: people.get(p.userId)!, city: p.city, dates: p.fromDate ? rangeLabel(p.fromDate, p.toDate) : null, hello: m?.mark === "hello" ? "sent" : m?.mark === "no" ? "no" : null };
+      const hello = m?.mark === "hello" ? "sent" : m?.mark === "no" ? "no" : null;
+      return { person: people.get(p.userId)!, city: p.city, dates: p.fromDate ? rangeLabel(p.fromDate, p.toDate) : null, hello, threadId: hello === "sent" ? dms.find((d) => d.key === [me, p.userId].sort().join(":"))?.id ?? null : null };
     }),
   };
 }
@@ -94,19 +102,29 @@ export async function setPresence(me: string, input: { on: boolean; audience?: A
   return around(me);
 }
 
-/** Say hello (they get a quiet notification), not now, or hide them here. They aren't told about the last two. */
-export async function aroundAction(me: string, other: string, action: "hello" | "notNow" | "hide") {
+/**
+ * Say hello: a real thread. The direct thread between you opens (or is found) with "Salam. I see you're in Istanbul
+ * too." as your first line, and they get a notification that opens it, so the reply lands in the same place (owner
+ * audit, item 30). Not now, or hide them here: they aren't told. Returns the thread for a hello.
+ */
+export async function aroundAction(me: string, other: string, action: "hello" | "notNow" | "hide"): Promise<{ circleId: string | null }> {
   const g = await graphOf(me);
   if (!g.friends.has(other) || g.blocked.has(other)) throw new AppError("NOT_FOUND");
   const [p] = await db.select().from(appPresence).where(eq(appPresence.userId, other));
   const mark = action === "hide" ? "hidden" : action === "hello" ? "hello" : "no";
+  const [prior] = await db.select().from(appPresenceMarks).where(and(eq(appPresenceMarks.userId, me), eq(appPresenceMarks.otherId, other)));
+  const circleId = action === "hello" && p ? await openDm(me, other) : null;
   await db.transaction(async (tx) => {
     await tx.insert(appPresenceMarks).values({ userId: me, otherId: other, mark, city: p?.city ?? null }).onConflictDoUpdate({ target: [appPresenceMarks.userId, appPresenceMarks.otherId], set: { mark, city: p?.city ?? null, createdAt: new Date() } });
-    if (action === "hello" && p) {
+    // One hello per city: a second tap just reopens the thread.
+    if (circleId && p && !(prior?.mark === "hello" && prior.city === p.city)) {
+      const locale = await localeOfUser(me, tx);
+      await addMessage(tx, circleId, { author: "user", userId: me, body: t("circles.around.helloText", { city: p.city }, locale) });
       const name = (await peopleByIds([me], tx)).get(me)!.short;
-      await notify(tx, other, "around.hello", ["notify.circles.hello.title", { name }], ["notify.circles.hello.body", { city: p.city }], `/friend/${me}`);
+      await notify(tx, other, "around.hello", ["notify.circles.hello.title", { name }], ["notify.circles.hello.body", { city: p.city }], `/circle/${circleId}`, { circleId }, { push: true });
     }
   });
+  return { circleId };
 }
 
 /* ───────────── stamps ───────────── */

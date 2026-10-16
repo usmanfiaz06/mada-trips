@@ -159,8 +159,20 @@ async function demo() {
   await see('Tell friends you’re in Istanbul', 'presence toggle');
   await see('Istanbul for Eid', 'circles');
   await shot('circles');
-  await byTest('say-hello').click();
+  await see('2 friends are in Istanbul', 'several friends in the city');
+  await byTest('say-hello').first().click();
+  // A real thread: your salam is the first line, Noor replies in it, and the reply lands in the inbox too.
+  await see('Salam. I see you’re in Istanbul too.', 'hello as the first line of the thread');
+  await shot('hello-thread');
+  await see('Wa alaikum assalam', 'the reply in the thread', 9000);
+  await shot('hello-reply');
+  await page.getByRole('button', { name: /^Back$/ }).first().click();
+  await page.waitForTimeout(800);
+  await text('Circles').click().catch(() => {});
   await see('Sent. Noor will see it next time they open Mada.', 'hello sent');
+  await byTest('open-hello-thread').first().waitFor({ state: 'visible', timeout: 4000 });
+  await byTest('say-hello-all').waitFor({ state: 'hidden', timeout: 2000 }).catch(() => {});
+  await shot('around-two-friends');
   await page.getByRole('switch').first().click();
   await see('Who can see you’re in Istanbul?', 'presence sheet');
   await byTest('audience-family').click();

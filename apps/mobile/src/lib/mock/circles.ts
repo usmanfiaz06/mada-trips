@@ -178,6 +178,7 @@ function seedDemo(me: string) {
   invites.push({ id: uuid(), kind: 'mada', circleId: null, inviterId: me, inviteeId: null, phone: null, channel: 'link', lookup: null, status: 'accepted', acceptedBy: ID.yousef, remindedAt: null, expiresAt: now() + 7 * DAY, at: now() - 8 * DAY });
   befriend(me, ID.yousef, {}, now() - 8 * DAY);
   presence.set(ID.noor, { city: 'Istanbul', dates: '10–14 Mar', audience: 'picked', ids: [me], endsAt: now() + 200 * DAY });
+  presence.set(ID.abdullah, { city: 'Istanbul', dates: '9–15 Mar', audience: 'picked', ids: [me], endsAt: now() + 200 * DAY });
 
   const eid = uuid();
   circles.set(eid, { id: eid, name: 'Istanbul for Eid', createdBy: me, cover: { kind: 'photo', id: 'istanbul' }, dest: 'Istanbul', dm: false, dmKey: null, trip: 'Istanbul · 9–15 Mar', pinned: null, pinnedBy: null, createdAt: mins(9000), updatedAt: 0 });
@@ -516,14 +517,7 @@ const routes: Route[] = [
     const other = String(body.userId ?? '');
     if (!people.has(other) || isBlocked(me, other)) throw no('NOT_FOUND');
     if (!isFriend(me, other)) throw no('FORBIDDEN', 'circles.err.blocked');
-    const key = [me, other].sort().join(':');
-    const found = [...circles.values()].find((c) => c.dmKey === key);
-    if (found) return ok({ circleId: found.id });
-    const id = uuid();
-    circles.set(id, { id, name: `${ref(me).short} and ${ref(other).short}`, createdBy: me, cover: null, dest: null, dm: true, dmKey: key, trip: null, pinned: null, pinnedBy: null, createdAt: now(), updatedAt: now() });
-    members.push({ circleId: id, userId: me, role: 'admin', muted: false, lastReadAt: now(), joinedAt: now() }, { circleId: id, userId: other, role: 'admin', muted: false, lastReadAt: now(), joinedAt: now() });
-    sys(id, 'dm', null, [me, other]);
-    return ok({ circleId: id });
+    return ok({ circleId: ensureDm(me, other) });
   }],
   [/^\/circles\/([\w-]+)$/, 'GET', ({ me }, id) => ok(detail(id!, me))],
   [/^\/circles\/([\w-]+)$/, 'PATCH', ({ me, body }, id) => {
@@ -913,9 +907,25 @@ const routes: Route[] = [
   [/^\/discover\/around$/, 'POST', ({ me, body }) => {
     const other = String(body.userId ?? '');
     if (!isFriend(me, other)) throw no('NOT_FOUND');
+    const prior = marks.find((m) => m.userId === me && m.otherId === other);
+    const city = presence.get(other)?.city ?? null;
     marks = marks.filter((m) => !(m.userId === me && m.otherId === other));
-    marks.push({ userId: me, otherId: other, mark: body.action === 'hide' ? 'hidden' : body.action === 'hello' ? 'hello' : 'no', city: presence.get(other)?.city ?? null });
-    return ok(around(me));
+    marks.push({ userId: me, otherId: other, mark: body.action === 'hide' ? 'hidden' : body.action === 'hello' ? 'hello' : 'no', city });
+    let circleId: string | null = null;
+    if (body.action === 'hello' && city) {
+      // A real thread: your salam as the first line; the friend replies in it, and the reply lands in the inbox too.
+      circleId = ensureDm(me, other);
+      if (!(prior?.mark === 'hello' && prior.city === city)) {
+        const cid = circleId;
+        user(cid, me, t('circles.around.helloText', { city }));
+        if (SIMULATED.has(other)) later(2600, () => {
+          const reply = user(cid, other, `Wa alaikum assalam! Yes, until the 14th. Coffee in Karaköy?`);
+          emit(cid, 'message', reply.id, other);
+          circlesHooks.notify?.(me, { kind: 'circle.dm', level: 'active', copy: 'notify.circles.dm', vars: { name: ref(other).short, text: reply.body }, href: `/circle/${cid}` });
+        });
+      }
+    }
+    return ok({ ...around(me), circleId });
   }],
   [/^\/discover\/stamps$/, 'GET', ({ me }) => {
     const demo = isDemo(me);
@@ -949,6 +959,21 @@ function payShare(cid: string, mid: string, key: string) {
   emit(cid, 'split', mid, sh.ids[0]!);
   sys(cid, 'paid', sh.ids[0]!, sh.ids, { amount: sh.amount });
 }
+/** The trips mock owns the inbox; it registers how a Circles event lands there (a reply in a direct thread). */
+export const circlesHooks: { notify: ((userId: string, n: { kind: 'circle.dm'; level: 'active'; copy: string; vars?: Record<string, string | number>; href?: string | null }) => void) | null } = { notify: null };
+
+/** The direct thread between two people, made on first use (like openDm on the server). */
+function ensureDm(me: string, other: string): string {
+  const key = [me, other].sort().join(':');
+  const found = [...circles.values()].find((c) => c.dmKey === key);
+  if (found) return found.id;
+  const id = uuid();
+  circles.set(id, { id, name: `${ref(me).short} and ${ref(other).short}`, createdBy: me, cover: null, dest: null, dm: true, dmKey: key, trip: null, pinned: null, pinnedBy: null, createdAt: now(), updatedAt: now() });
+  members.push({ circleId: id, userId: me, role: 'admin', muted: false, lastReadAt: now(), joinedAt: now() }, { circleId: id, userId: other, role: 'admin', muted: false, lastReadAt: now(), joinedAt: now() });
+  sys(id, 'dm', null, [me, other]);
+  return id;
+}
+
 function around(me: string): AroundResponse {
   const trip = tripOf(me);
   const city = trip?.city ?? HOME_CITY;
@@ -961,7 +986,11 @@ function around(me: string): AroundResponse {
     city, dates: localDates(trip?.dates ?? null), on: !!mine && mine.endsAt > now(), audience: mine?.audience ?? 'picked', endsAt: mine ? new Date(mine.endsAt).toISOString() : null,
     options: { picked: (going.length ? going : friends.filter((f) => !fam.includes(f))).map(ref), close: friends.filter((f) => tagOf(me, f) === 'close').map(ref), family: fam.map(ref) },
     people: friends.filter((f) => !hidden.has(f)).map((f) => ({ f, p: presence.get(f) })).filter(({ p }) => p && p.endsAt > now() && p.city === city && p.ids.includes(me))
-      .map(({ f, p }) => { const m = marks.find((x) => x.userId === me && x.otherId === f); return { person: ref(f), city: p!.city, dates: localDates(p!.dates), hello: m?.mark === 'hello' ? 'sent' : m?.mark === 'no' ? 'no' : null }; }),
+      .map(({ f, p }) => {
+        const m = marks.find((x) => x.userId === me && x.otherId === f);
+        const hello = m?.mark === 'hello' ? 'sent' : m?.mark === 'no' ? 'no' : null;
+        return { person: ref(f), city: p!.city, dates: localDates(p!.dates), hello, threadId: hello === 'sent' ? [...circles.values()].find((c) => c.dmKey === [me, f].sort().join(':'))?.id ?? null : null };
+      }),
   };
 }
 

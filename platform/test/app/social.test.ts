@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { sql as raw } from "drizzle-orm";
+import { and, eq, sql as raw } from "drizzle-orm";
+import { appMessages, appNotifications } from "@/db/app-schema";
+import { POST as msgsPost } from "@/app/api/app/v1/circles/[id]/messages/route";
 import { AroundResponse, CONTACT_SALT, DiscoverResponse, FriendsResponse, InvitesResponse, PostsResponse, ProfileResponse, SavedResponse, SearchResponse, StampsResponse, addDays, todayIn } from "@mada/shared";
 import { createHash } from "node:crypto";
 import { db } from "@/db";
@@ -233,8 +235,23 @@ describe("discover, who's around, stamps", () => {
     me = AroundResponse.parse((await get(aroundGet, omar)).json);
     expect(me.people.map((p) => [p.person.short, p.city])).toEqual([["Noor", "Istanbul"]]);
     expect(AroundResponse.parse((await get(aroundGet, abdullah)).json).people).toEqual([]); // not her audience, not in Istanbul
-    me = AroundResponse.parse((await call(aroundPost, { ...auth(omar), body: { userId: noor.id, action: "hello" } })).json);
+    const helloed = await call(aroundPost, { ...auth(omar), body: { userId: noor.id, action: "hello" } });
+    me = AroundResponse.parse(helloed.json);
     expect(me.people[0]!.hello).toBe("sent");
+    // A hello is a real thread: the direct thread opens with Omar's salam, Noor's notification opens it, and her reply comes back as one.
+    const threadId = (helloed.json as { circleId: string }).circleId;
+    expect(threadId).toBeTruthy();
+    expect(me.people[0]!.threadId).toBe(threadId);
+    const thread = await db.select().from(appMessages).where(and(eq(appMessages.threadId, threadId), eq(appMessages.authorKind, "user")));
+    expect(thread.map((m) => m.body)).toEqual(["Salam. I see you’re in Istanbul too."]);
+    const [hi] = await db.select().from(appNotifications).where(and(eq(appNotifications.userId, noor.id), eq(appNotifications.kind, "around.hello")));
+    expect(hi).toMatchObject({ title: "Omar said hello", href: `/circle/${threadId}` });
+    await call(withParams(msgsPost, { id: threadId }), { ...auth(noor), body: { body: "Wa alaikum assalam! Coffee tomorrow?" } });
+    const [reply] = await db.select().from(appNotifications).where(and(eq(appNotifications.userId, omar.id), eq(appNotifications.kind, "circle.dm")));
+    expect(reply).toMatchObject({ title: "Noor", body: "Wa alaikum assalam! Coffee tomorrow?", href: `/circle/${threadId}` });
+    // A second hello in the same city doesn't repeat the line.
+    await call(aroundPost, { ...auth(omar), body: { userId: noor.id, action: "hello" } });
+    expect(await db.select().from(appMessages).where(and(eq(appMessages.threadId, threadId), eq(appMessages.authorKind, "user")))).toHaveLength(2);
     me = AroundResponse.parse((await call(aroundPost, { ...auth(omar), body: { userId: noor.id, action: "hide" } })).json);
     expect(me.people).toEqual([]);
     await call(aroundPut, { method: "PUT", ...auth(noor), body: { on: false } });
