@@ -50,11 +50,14 @@ export async function overview(ownerId: string, demo: TripPhase | null): Promise
   const today = todayIn();
   const isPast = (d: TripDetail) => d.status === "completed" || (d.status !== "cancelled" && d.clock.phase === "none" && (d.endDate ?? d.startDate) < today);
   const upcoming = details.filter((d) => d.status !== "cancelled" && !isPast(d)).map((d) => (current && d.id === current.id ? card(current) : card(d)));
-  const past = details.filter(isPast).reverse().map(card);
+  // Past keeps every trip the traveller paid for: the ones taken (stamps) and the ones cancelled, with the refund state
+  // read from `refunds` by tripId. A cancelled trip never vanishes from the list (owner audit, item 9).
+  const taken = details.filter(isPast);
+  const past = details.filter((d) => isPast(d) || d.status === "cancelled").reverse().map(card);
   const [requests, refunds, tracked, [unread], credit] = await lists;
   return {
     clock, currentId: current?.id ?? null, upcoming, past, requests, refunds, tracked, unread: unread?.n ?? 0,
-    credit: { amount: credit, currency: "SAR" }, stamps: past.length,
+    credit: { amount: credit, currency: "SAR" }, stamps: taken.length,
   };
 }
 

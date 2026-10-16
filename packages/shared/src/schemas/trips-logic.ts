@@ -465,7 +465,7 @@ export function changeOptions(kind: ChangeKind, trip: TripDetail, count: number)
     return [
       opt({ id: 'dm1', title: `${dl(addDays(outDay, -1))} · ${dep}`, sub: `${tk('trip.change.dayEarlier')} ${backSub}`, diffPerPerson: 120 * SAR, say: tk('trip.change.flyOn', { day: dl(addDays(outDay, -1)) }), movesOutDate: true }),
       opt({ id: 'dp1', title: `${dl(addDays(outDay, 1))} · ${dep}`, sub: `${tk('trip.change.dayLater')} ${backSub}`, diffPerPerson: 0, say: tk('trip.change.flyOn', { day: dl(addDays(outDay, 1)) }), movesOutDate: true }),
-      opt({ id: 'dp2', title: `${dl(addDays(outDay, 2))} · ${dep}`, sub: tk('trip.change.noSeats', { n: count }), soldOut: true }),
+      opt({ id: 'dp2', title: `${dl(addDays(outDay, 2))} · ${dep}`, sub: tn('trip.change.noSeats', count), soldOut: true }),
     ].filter((o) => !back || o.soldOut || addDays(outDay, o.id === 'dm1' ? -1 : 1) < dayPart(back.departLocal));
   }
   if (kind === 'time') {

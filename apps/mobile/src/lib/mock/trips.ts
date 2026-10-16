@@ -475,7 +475,8 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     return ok({
       clock: current?.clock ?? { phase: 'none', now: nowIso(), today, demo: !!demo }, currentId: current?.id ?? null,
       upcoming: details.filter((d) => d.status !== 'cancelled' && !isPast(d)).map((d) => card(current && current.id === d.id ? current : d)),
-      past: details.filter(isPast).map(card), requests: [...s.requests.map(pub), ...askRequestViews(user.id)], refunds: s.refunds.map(pubRefund), tracked: s.tracked,
+      // Past keeps cancelled trips too (with the refund state read from `refunds`); stamps count only the trips taken.
+      past: details.filter((d) => isPast(d) || d.status === 'cancelled').reverse().map(card), requests: [...s.requests.map(pub), ...askRequestViews(user.id)], refunds: s.refunds.map(pubRefund), tracked: s.tracked,
       unread: s.inbox.filter((n) => !n.readAt).length, credit: SAR(s.credit), stamps: details.filter(isPast).length,
     });
   }

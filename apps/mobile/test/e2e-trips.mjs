@@ -239,6 +239,19 @@ try {
   await page.waitForTimeout(800);
   await shot('trips-after-refund');
 
+  /* ── The cancelled trip never vanishes: it sits under Past with its refund state ── */
+  step('past: the cancelled trip with its refund');
+  await toTab();
+  await tab('Trips');
+  await byTest('tab-past').click(); await page.waitForTimeout(600);
+  await byTest('past-chip-cancelled').click().catch(() => {});
+  await see('Cancelled', 'cancelled tag under Past');
+  await see('Refund of', 'refund line on the cancelled trip');
+  await shot('trips-past-cancelled');
+  await byTest('past-see-refund').first().click();
+  await page.waitForTimeout(600);
+  await see('Refund', 'refund tracker from the past trip');
+
 } catch (e) {
   errors.push(`crash: ${e.message}`);
   console.log('CRASH', e.message);

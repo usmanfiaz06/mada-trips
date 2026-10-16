@@ -59,7 +59,7 @@ export default function Trips() {
         {list.isError && data ? <StaleBadge testID="trips-fresh" updatedAt={list.dataUpdatedAt || null} stale /> : null}
         {tab === 'upcoming' && <Upcoming trips={data?.upcoming ?? []} tracked={data?.tracked ?? []} ask={ask} />}
         {tab === 'requests' && <Requests requests={data?.requests ?? []} refunds={data?.refunds ?? []} ask={ask} />}
-        {tab === 'past' && <Past trips={data?.past ?? []} ask={ask} />}
+        {tab === 'past' && <Past trips={data?.past ?? []} refunds={data?.refunds ?? []} ask={ask} />}
       </Scroll>
     </Screen>
   );
@@ -209,7 +209,11 @@ function RequestCard({ r }: { r: TripRequestView }) {
   );
 }
 
-function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) {
+function Past({ trips, refunds, ask }: { trips: TripCard[]; refunds: RefundView[]; ask: (p?: string) => void }) {
+  const router = useRouter();
+  const [only, setOnly] = useState<'all' | 'cancelled'>('all');
+  const cancelled = trips.filter((p) => p.status === 'cancelled');
+  const shown = only === 'cancelled' ? cancelled : trips;
   if (!trips.length) return (
     <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero]}>
       <View style={styles.ppEmpty}>
@@ -225,13 +229,36 @@ function Past({ trips, ask }: { trips: TripCard[]; ask: (p?: string) => void }) 
     </Animated.View>
   );
   return (<>
-    {trips.map((p) => (
-      <Box key={p.id} testID={`past-${p.city}`}>
-        <Spread><H3>{p.city}</H3><Tiny>{rangeLong(p.startDate, p.endDate)}</Tiny></Spread>
-        {p.note ? <Small>{p.note}</Small> : <Small>{p.justYou ? t('tr.justYou') : p.travellerNames.join(listSep())}</Small>}
-        <SmallButton tone="soft" label={t('tr.sameAgain')} onPress={() => ask(t('tr.sameAgainAsk', { city: p.city, when: (p.when ?? t('td.lastTime')).toLowerCase() }))} />
-      </Box>
-    ))}
+    {/* A trip you paid for never disappears: cancelled ones sit here with their refund, and a chip to see just those. */}
+    {cancelled.length ? (
+      <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="tablist">
+        {(['all', 'cancelled'] as const).map((k) => (
+          <Pressable key={k} testID={`past-chip-${k}`} accessibilityRole="tab" accessibilityState={{ selected: only === k }} onPress={() => { buzz('select'); setOnly(k); }} style={[styles.chip, only === k ? styles.chipOn : null]}>
+            <T style={font('small', only === k ? colors.mist : colors.green)}>{k === 'all' ? t('tr.past.all') : t('tr.past.cancelled')}{k === 'cancelled' ? ` · ${cancelled.length}` : ''}</T>
+          </Pressable>
+        ))}
+      </View>
+    ) : null}
+    {shown.map((p) => {
+      const gone = p.status === 'cancelled';
+      const refund = gone ? refunds.filter((r) => r.tripId === p.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null : null;
+      return (
+        <Box key={p.id} testID={`past-${p.city}`}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('tr.tripA11y', { city: p.city })} onPress={() => { buzz('tap'); router.push(`/trip/${p.id}` as Href); }} testID={gone ? `past-open-${p.city}` : undefined}>
+            <Spread><Row gap={8}><H3>{p.city}</H3>{gone ? <Tag tone="warn" label={t('tr.past.cancelled')} /> : null}</Row><Tiny>{rangeLong(p.startDate, p.endDate)}</Tiny></Spread>
+            {p.note ? <Small>{p.note}</Small> : <Small>{p.justYou ? t('tr.justYou') : p.travellerNames.join(listSep())}</Small>}
+          </Pressable>
+          {gone ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }} testID="past-refund-line">
+              <Small style={{ flex: 1 }} color={colors.green}>{refund ? t('tr.past.refund', { amount: formatSar(refund.amount.amount), status: refundPill(refund).toLowerCase() }) : t('tr.past.noRefund')}</Small>
+              {refund ? <SmallButton tone="soft" icon="refund" label={t('tr.past.seeRefund')} onPress={() => router.push('/trips?tab=requests' as Href)} testID="past-see-refund" />
+                : <SmallButton tone="soft" label={t('action.talk')} onPress={() => router.push('/support?topic=refund' as Href)} />}
+              <SmallButton tone="paper" icon="card" label={t('tr.payments')} onPress={() => router.push(`/trip/${p.id}/payments` as Href)} />
+            </View>
+          ) : <SmallButton tone="soft" label={t('tr.sameAgain')} onPress={() => ask(t('tr.sameAgainAsk', { city: p.city, when: (p.when ?? t('td.lastTime')).toLowerCase() }))} />}
+        </Box>
+      );
+    })}
   </>);
 }
 
@@ -239,6 +266,8 @@ const styles = StyleSheet.create({
   plus: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   seg: { height: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.mist, justifyContent: 'center' },
   segOn: { backgroundColor: colors.green },
+  chip: { height: 34, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.paper, justifyContent: 'center' },
+  chipOn: { backgroundColor: colors.green },
   hero: { gap: 16, paddingTop: 4 },
   card: { backgroundColor: colors.paper, borderRadius: radii.card, overflow: 'hidden' },
   foot: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingStart: 16, paddingEnd: 10 },

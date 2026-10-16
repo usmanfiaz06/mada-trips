@@ -395,6 +395,11 @@ describe("travel day: status refresh, disruption, notifications and devices", ()
     expect(r.refund).toMatchObject({ law: true, amount: { amount: 8640_00 + 1470_00 + 440_00 } });
     const list = TripsResponse.parse((await call(tripsGet, { method: "GET", token: C.token })).json);
     expect(list.currentId).toBeNull();
+    // The cancelled trip stays on the list under Past, with its refund beside it; it earns no stamp.
+    expect(list.upcoming).toHaveLength(0);
+    expect(list.past.map((p) => [p.city, p.status])).toEqual([["Istanbul", "cancelled"], ["Baku", "completed"]]);
+    expect(list.refunds.find((x) => x.tripId === tid)).toMatchObject({ amount: { amount: 8640_00 + 1470_00 + 440_00 } });
+    expect(list.stamps).toBe(1);
   });
 });
 

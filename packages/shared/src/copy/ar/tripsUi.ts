@@ -333,4 +333,9 @@ export const arTripsUi: ArSection<typeof enTripsUi> = {
   'cf.n.ok.other': 'تصحيح بسيط ({n} حرفًا). تعمله {airline} مجانًا. وترسله مادا مع صورة صفحة الجواز.',
   'cf.n.too': 'هذا أكثر من تصحيح تهجئة. تسمح شركات الطيران بتغيير 3 أحرف كحد أقصى. الاسم المختلف يعني تذكرة جديدة، فتنطبق قواعد السعر.',
   'cf.n.askCost': 'اسأل مادا كم يكلف',
+  'tr.past.all': 'الكل',
+  'tr.past.cancelled': 'ملغية',
+  'tr.past.refund': 'استرداد {amount} · {status}',
+  'tr.past.noRefund': 'ما رجع شي للحين',
+  'tr.past.seeRefund': 'شوف الاسترداد',
 };

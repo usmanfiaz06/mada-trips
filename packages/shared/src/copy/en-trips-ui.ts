@@ -326,4 +326,10 @@ export const enTripsUi = {
   'cf.n.ok.other': 'A small fix ({n} letters). {airline} does this free. Mada sends it with a photo of the passport page.',
   'cf.n.too': 'That’s more than a spelling fix. Airlines allow up to 3 letters changed. A different name means a new ticket, so the fare rules apply.',
   'cf.n.askCost': 'Ask Mada what it would cost',
+  // Past: cancelled trips stay on the list with their refund (owner audit, item 9).
+  'tr.past.all': 'All',
+  'tr.past.cancelled': 'Cancelled',
+  'tr.past.refund': 'Refund of {amount} · {status}',
+  'tr.past.noRefund': 'Nothing refunded yet',
+  'tr.past.seeRefund': 'See refund',
 } as const;
