@@ -1,7 +1,7 @@
 // Booking (M2), end to end in headless Chromium against the web export in mock-API mode:
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
-//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,circles,stays,stays-ar,asks,phone,money,money-ar to pick)
+//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,umrah,circles,stays,stays-ar,asks,phone,money,money-ar to pick)
 //
 // Signs in as the demo account (50 000 4127, Omar's family) and walks every booking flow and edge case in FLOWS.md §2–4:
 // Ask (typed details, one question at a time, the calendar), search (results, fare rules, sort, the bundle, entry
@@ -76,7 +76,9 @@ function kit(page) {
     for (let i = 1; i <= 12; i += 1) { await page.mouse.move(b.x + 30 + ((b.width - 40) * i) / 12, y); await page.waitForTimeout(16); }
     await page.mouse.up();
   };
-  return { shot, see, byTest, press, tap, text, closeSheet, ask, demo, slide };
+  /** A hotel row: its name opens the hotel's page, so choose it by the price on the end side. */
+  const choose = async (id) => { const l = byTest(id); await l.evaluate((el) => el.scrollIntoView({ block: 'center' })); await page.waitForTimeout(200); const b = await l.boundingBox(); await page.mouse.click(b.x + b.width - 30, b.y + b.height / 2); await page.waitForTimeout(300); };
+  return { shot, see, byTest, press, tap, text, closeSheet, ask, demo, slide, choose };
 }
 
 async function signIn(page) {
@@ -136,10 +138,13 @@ async function flights() {
   await k.see('SAR 8,640', 'saudia price');
   await k.shot('results');
   step('flights: fare rules, sort');
-  await k.press(k.byTest('flight-SV263'));
+  await k.press(k.byTest('flight-rules-SV263'));
+  await k.see('Fare rules · Saudia', 'fare rules sheet');
   await k.see('Refund minus SAR 400 per person', 'fare rules');
   await k.see('SV264', 'return flight');
   await k.shot('fare-rules');
+  await k.press(k.byTest('fare-rules-done'));
+  await page.waitForTimeout(500);
   await k.press(page.getByRole('tab', { name: 'Cheapest' }));
   await page.waitForTimeout(300);
   await k.shot('sorted-cheapest');
@@ -154,6 +159,13 @@ async function flights() {
   await k.press(k.byTest('fwish-direct'));
   step('flights: travellers, entry checks, the bundle');
   await k.see('Rules checked today', 'entry checked');
+  await k.see('Add connecting rooms at Bereketzade Hotel and airport pickup?', 'bundle names the hotel');
+  if ((await page.getByText('Galata Tower and airport').filter({ visible: true }).count()) > 0) errors.push('bundle: still says Galata Tower');
+  await k.press(k.byTest('bundle-hotel'));
+  await k.see('Beyoğlu · 3 min to the tower', 'bundle hotel page');
+  await k.shot('bundle-hotel');
+  await page.getByRole('button', { name: 'Back' }).filter({ visible: true }).last().click();
+  await k.see('Three ways to get there.', 'back to results', 8000);
   await k.press(k.byTest('bundle-add'));
   await k.see('Review · SAR 14,960', 'review with rooms');
   await k.shot('bundle-entry');
@@ -397,25 +409,93 @@ async function deskSlow() {
   await context.close();
 }
 
+/* ───────────── Umrah around the permit ───────────── */
+async function umrah() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  await openAsk(page);
+  step('umrah: "I have a permit" typed as a correction');
+  await k.ask('Umrah after Eid');
+  await k.see('Do you have your Nusuk permit?', 'permit first');
+  await k.press(k.byTest('umrah-permit-no'));
+  await k.ask('I have a permit');
+  await k.see('Which day is your permit?', 'permit day');
+  await k.press(k.byTest('umrah-day-pick'));
+  await page.waitForTimeout(500);
+  await page.locator('[aria-label="Next month"]').filter({ visible: true }).first().click().catch(() => {});
+  await page.getByRole('button', { name: /\b20\b/ }).filter({ visible: true }).first().click();
+  await k.press(k.byTest('search-go'));
+  await k.see('And the time slot?', 'slot');
+  await k.press(k.byTest('umrah-slot-morning'));
+  await k.see('the day before', 'check in the night before');
+  await k.shot('umrah-permit-slot');
+  await k.press(k.byTest('umrah-who-done'));
+  step('umrah: Makkah by distance, the hotel page, Madinah first, the train, flights');
+  await k.press(k.byTest('umrah-nights-makkah-4'));
+  await k.see('4 nights', 'nights');
+  await k.press(k.byTest('umrah-hotel-open-hilton-suites-makkah'));
+  await k.see('Hilton Suites Makkah', 'hotel page', 8000);
+  await k.see('6 min walk', 'walk on the hotel page');
+  await k.shot('umrah-hotel-page');
+  await page.getByRole('button', { name: 'Back' }).filter({ visible: true }).last().click();
+  await k.see('Where to stay in Makkah?', 'back to Makkah', 8000);
+  await k.choose('umrah-hotel-hilton-suites-makkah');
+  await k.press(k.byTest('umrah-madinah-before'));
+  await k.see('Steps from the Prophet’s Mosque', 'madinah band');
+  await k.choose('umrah-hotel-oberoi-madinah');
+  await k.press(k.byTest('umrah-fly-RUH'));
+  await k.see('Your Umrah', 'plan');
+  await k.see('Haramain train from Madinah to Makkah', 'train');
+  await k.see('Fly into Madinah, home from Jeddah.', 'airports');
+  await k.see('Morning', 'permit in the plan');
+  if ((await page.getByText('Wheelchair to the gate').filter({ visible: true }).count()) > 0) errors.push('umrah: needs open without being asked');
+  await k.press(k.byTest('umrah-needs'));
+  await k.see('Wheelchair to the gate', 'needs behind the chip');
+  await k.shot('umrah-plan-madinah');
+  await k.press(k.byTest('umrah-send'));
+  await k.see(' at Mada', 'sent');
+  await k.see('Hilton Suites Makkah, 4 nights', 'summary names the hotel', 8000);
+  await k.see('Planned around your permit', 'quote says the permit back', 20000);
+  await k.shot('umrah-quote');
+  await context.close();
+}
+
 /* ───────────── 5. requests, stays, plans, eSIM ───────────── */
 async function requests() {
   const { page, context } = await newPage();
   const k = kit(page);
   await signIn(page);
   await openAsk(page);
-  step('requests: Umrah with needs per person');
+  step('requests: Umrah without a permit, the last ten nights, needs behind a chip');
   await k.ask('Umrah in Ramadan, Hessa needs a wheelchair');
-  await k.see('Every traveller needs their own Nusuk permit.', 'nusuk');
-  await k.see('Who’s going?', 'who');
-  await k.press(page.getByRole('button', { name: 'Hessa', exact: true }));
-  await k.press(k.byTest('request-who-done'));
-  await k.see('Anything we should arrange for each person?', 'needs');
-  await k.shot('umrah-needs');
-  await k.tap('Done');
-  await k.tap('Steps from the Haram');
-  await k.byTest('request-note').fill('Hessa walks slowly');
-  await k.shot('umrah-note');
-  await k.byTest('request-send').click();
+  await k.see('Do you have your Nusuk permit?', 'permit first');
+  if ((await page.getByText('Anything we should arrange for each person?').filter({ visible: true }).count()) > 0) errors.push('umrah: needs shown first');
+  await k.press(k.byTest('umrah-permit-no'));
+  await k.see('Each person needs a Nusuk permit', 'permit explained');
+  await k.shot('umrah-no-permit');
+  await k.press(k.byTest('umrah-permit-help'));
+  await k.see('Mada watches for slots on your dates', 'help line');
+  await k.see('When are you hoping to go?', 'when');
+  await k.press(k.byTest('umrah-when-lastten'));
+  await k.see('The last ten nights of Ramadan', 'last ten warning');
+  await k.see('permits go within minutes of opening', 'last ten body');
+  await k.shot('umrah-last-ten');
+  await k.see('Omar and Hessa', 'who, from the words');
+  await k.see('Where to stay in Makkah?', 'makkah');
+  await k.see('Steps from the Haram', 'band steps');
+  await k.see('A 5 to 10 minute walk', 'band walk');
+  await k.see('By the hotel shuttle', 'band shuttle');
+  await k.shot('umrah-makkah');
+  await k.choose('umrah-hotel-swissotel-makkah');
+  await k.press(k.byTest('umrah-madinah-no'));
+  await k.press(k.byTest('umrah-fly-RUH'));
+  await k.see('Your Umrah', 'plan');
+  await k.see('Swissôtel Makkah', 'hotel named');
+  await k.see('About SAR', 'plan total');
+  await k.see('Wheelchair', 'needs open because it was said');
+  await k.shot('umrah-plan');
+  await k.press(k.byTest('umrah-send'));
   await k.see(' at Mada', 'sent');
   await k.shot('umrah-sent');
   await k.see('replied', 'quote arrives', 20000);
@@ -963,6 +1043,7 @@ try {
   if (want('pay')) await pay();
   if (want('desk')) await desk();
   if (want('requests')) await requests();
+  if (want('umrah')) await umrah();
   if (want('circles')) await circles();
   if (want('stays')) await stays();
   if (want('stays-ar')) await staysAr();

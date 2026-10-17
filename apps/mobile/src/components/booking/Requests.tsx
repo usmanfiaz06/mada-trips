@@ -141,24 +141,7 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
             {f.needs ? (
               <>
                 {unassigned.length ? <T v="small" color={colors.green}>{t('request.mentioned', { needs: listOf(unassigned.map((k) => wordFor(NEED_LABELS[k]).toLowerCase())) })}</T> : null}
-                {who.map((id) => (
-                  <Card key={id} variant="well" padding={14} style={{ gap: 8 }}>
-                    <T v="h3" style={{ fontSize: 15 }}>{nameOf(id)}</T>
-                    <ChipWrap>
-                      {NEED_KEYS.map((k) => {
-                        const on = (needs[id] ?? []).includes(k);
-                        return <Toggle key={k} small label={wordFor(NEED_LABELS[k])} on={on} hint={unassigned.includes(k)} accessibilityLabel={t('need.for', { need: wordFor(NEED_LABELS[k]), name: nameOf(id) })} onPress={() => {
-                          const cur = needs[id] ?? [];
-                          let next = on ? cur.filter((x) => x !== k) : [...cur, k];
-                          if (!on && k === 'wheelchairGate') next = next.filter((x) => x !== 'wheelchairSeat');
-                          if (!on && k === 'wheelchairSeat') next = next.filter((x) => x !== 'wheelchairGate');
-                          setNeeds({ ...needs, [id]: next });
-                        }} />;
-                      })}
-                    </ChipWrap>
-                    {(needs[id] ?? []).includes('oxygen') ? <T v="small" color={colors.green}>{t('request.oxygen')}</T> : null}
-                  </Card>
-                ))}
+                <NeedsPicker who={who} needs={needs} onChange={setNeeds} hinted={unassigned} nameOf={nameOf} />
                 <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={Object.values(needs).some((x) => x.length) ? t('request.done') : t('request.nothingNeeded')} onPress={() => answer(f.k, true)} />
               </>
             ) : null}
@@ -193,6 +176,34 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
         </Animated.View>
       ) : null}
     </View>
+  );
+}
+
+/** Per person, what they need (a wheelchair to the gate, oxygen, a soft meal): toggles under each name. */
+export function NeedsPicker({ who, needs, onChange, hinted = [], nameOf }: {
+  who: string[]; needs: Record<string, NeedKey[]>; onChange: (n: Record<string, NeedKey[]>) => void; hinted?: NeedKey[]; nameOf: (id: string) => string;
+}) {
+  return (
+    <>
+      {who.map((id) => (
+        <Card key={id} variant="well" padding={14} style={{ gap: 8 }}>
+          <T v="h3" style={{ fontSize: 15 }}>{nameOf(id)}</T>
+          <ChipWrap>
+            {NEED_KEYS.map((k) => {
+              const on = (needs[id] ?? []).includes(k);
+              return <Toggle key={k} small label={wordFor(NEED_LABELS[k])} on={on} hint={hinted.includes(k)} accessibilityLabel={t('need.for', { need: wordFor(NEED_LABELS[k]), name: nameOf(id) })} onPress={() => {
+                const cur = needs[id] ?? [];
+                let next = on ? cur.filter((x) => x !== k) : [...cur, k];
+                if (!on && k === 'wheelchairGate') next = next.filter((x) => x !== 'wheelchairSeat');
+                if (!on && k === 'wheelchairSeat') next = next.filter((x) => x !== 'wheelchairGate');
+                onChange({ ...needs, [id]: next });
+              }} />;
+            })}
+          </ChipWrap>
+          {(needs[id] ?? []).includes('oxygen') ? <T v="small" color={colors.green}>{t('request.oxygen')}</T> : null}
+        </Card>
+      ))}
+    </>
   );
 }
 

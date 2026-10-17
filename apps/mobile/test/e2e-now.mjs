@@ -85,6 +85,9 @@ async function run(lang) {
     await see('بعد ربع ساعة', 'in 15');
     await never('بكرة', 'no tomorrow');
     await shot('car-now');
+    await go(`/ask?prefill=${encodeURIComponent('تاكسي الحين في أبها')}`);
+    await see('متى تبيها؟', 'taxi now in Abha is a car');
+    await shot('taxi-now-ar');
     await context.close();
     return;
   }
@@ -113,9 +116,11 @@ async function run(lang) {
   await see('Car cancelled. Nothing to pay.', 'cancelled');
   await shot('car-now-cancelled');
 
-  step('car now: none free');
+  step('car now: "Get me a taxi now in Abha" is a car now, not a flight; none free');
   await home();
-  await go(`/ask?prefill=${encodeURIComponent('I need a car now in Abha')}`);
+  await go(`/ask?prefill=${encodeURIComponent('Get me a taxi now in Abha')}`);
+  await see('When should it come?', 'taxi now is a car');
+  await never('Checking flights', 'not a flight search');
   await byTest('car-now-when-now').click();
   await byTest('car-now-place').fill('Abha airport');
   await byTest('car-now-send').click();

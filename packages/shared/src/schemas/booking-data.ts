@@ -259,7 +259,7 @@ export const REQUEST_FORMS: Record<RequestFormKind, FormQuestion[]> = {
     { k: 'when', q: 'request.q.whenTravel', options: ['Within a month', 'In 1 to 3 months', 'Not sure yet'] },
   ],
   umrah: [
-    { k: 'when', q: 'request.q.when', options: ['In Ramadan', 'After Eid', 'Pick dates later'], from: [[/ramadan/, 'In Ramadan'], [/after eid/, 'After Eid']] },
+    { k: 'when', q: 'request.q.when', options: ['In Ramadan', 'After Eid', 'Pick dates later'], from: [[/last (?:ten|10)|العشر/, 'The last ten nights'], [/ramadan/, 'In Ramadan'], [/after eid|بعد (?:ال)?(?:عيد|eid)/, 'After Eid']] },
     { k: 'who', q: 'request.q.whoGoing', people: true },
     { k: 'needs', q: 'request.q.needs', needs: true },
     { k: 'stay', q: 'request.q.makkahStay', options: ['Steps from the Haram', 'Good value, short ride'], from: [[/haram|close|near|walk/, 'Steps from the Haram']] },

@@ -25,6 +25,7 @@ import { staysCopy } from './stays';
 import { nowCopy } from './now';
 import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
+import { umrahCopy } from './umrah';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -65,6 +66,8 @@ export const en = {
   ...outcomesCopy,
   // No signal, and almost no battery: packages/shared/src/copy/offline.ts
   ...offlineCopy,
+  // Umrah around the permit, and the flight fare rules sheet: packages/shared/src/copy/umrah.ts
+  ...umrahCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',

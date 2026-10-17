@@ -134,9 +134,9 @@ export function CityTiles({ cities, onPick, testID }: { cities: { name: string; 
 }
 
 /** A choice that can be on: the prototype's aria-pressed chip, green when chosen. */
-export function Toggle({ label, on, onPress, small, hint, accessibilityLabel }: { label: string; on: boolean; onPress: () => void; small?: boolean; hint?: boolean; accessibilityLabel?: string }) {
+export function Toggle({ label, on, onPress, small, hint, accessibilityLabel, testID }: { label: string; on: boolean; onPress: () => void; small?: boolean; hint?: boolean; accessibilityLabel?: string; testID?: string }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected: on }} onPress={() => { buzz('select'); onPress(); }}
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? label} accessibilityState={{ selected: on }} onPress={() => { buzz('select'); onPress(); }} testID={testID}
       style={({ pressed }) => [styles.toggle, small ? styles.toggleSmall : null, { backgroundColor: on ? colors.green : colors.paper }, hint && !on ? styles.hint : null, pressed ? { transform: [{ scale: 0.97 }] } : null]}>
       <T style={[font('h3', on ? colors.mist : colors.green), small ? { fontSize: 13 } : { fontSize: 15 }]} numberOfLines={1}>{label}</T>
     </Pressable>

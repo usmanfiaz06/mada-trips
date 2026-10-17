@@ -15,10 +15,15 @@ import { dayName } from './format';
 
 export type TripSearch = { from: 'RUH' | 'JED' | 'DMM'; type: 'return' | 'oneway'; dep: string | null; ret: string | null; cabin: Cabin; infants: number; flex: boolean };
 
-/** `stay`: the same calendar for a hotel: check-in and check-out only (no airport, cabin, babies or one way). */
-export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay }: {
+/**
+ * `stay`: the same calendar for a hotel: check-in and check-out only (no airport, cabin, babies or one way).
+ * `day`: one day only (the Umrah permit's), with its own title; the day comes back as `dep`.
+ */
+export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay: stayOnly, day }: {
   visible: boolean; value: TripSearch; today: string; month?: { month: number; year: number } | null; adults: number; onClose: () => void; onDone: (v: TripSearch) => void; stay?: boolean;
+  day?: { title: string };
 }) {
+  const stay = stayOnly || !!day;
   const { height } = useWindowDimensions();
   const [s, setS] = useState(value);
   const [pickRet, setPickRet] = useState(value.type === 'return' && !!value.dep && !value.ret);
@@ -34,29 +39,29 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
 
   const pickDay = (x: string) => {
     buzz('select');
-    if (s.type === 'oneway') { setS({ ...s, dep: x, ret: null }); return; }
+    if (s.type === 'oneway' || day) { setS({ ...s, dep: x, ret: null }); return; }
     if (!pickRet || !s.dep || x <= s.dep) { setS({ ...s, dep: x, ret: null }); setPickRet(true); return; }
     setS({ ...s, ret: x }); setPickRet(false);
   };
   const n = s.dep && s.ret ? daysBetween(s.dep, s.ret) : 0;
-  const status = stay ? (!s.dep ? t('ask.stay.cal.pickBoth') : !s.ret ? t('ask.stay.cal.pickOut', { day: dayName(s.dep, today) }) : tn('ask.stay.cal.range', n, { from: dayName(s.dep, today), to: dayName(s.ret, today) }))
+  const status = day ? (s.dep ? dayName(s.dep, today) : day.title) : stay ? (!s.dep ? t('ask.stay.cal.pickBoth') : !s.ret ? t('ask.stay.cal.pickOut', { day: dayName(s.dep, today) }) : tn('ask.stay.cal.range', n, { from: dayName(s.dep, today), to: dayName(s.ret, today) }))
     : !s.dep ? (s.type === 'oneway' ? t('cal.pickOut') : t('cal.pickBoth'))
     : s.type === 'oneway' ? t('cal.leaving', { day: dayName(s.dep, today) })
       : !s.ret ? t('cal.pickReturn', { day: dayName(s.dep, today) })
         : tn('cal.range', n, { from: dayName(s.dep, today), to: dayName(s.ret, today) });
-  const canSearch = !!s.dep && (s.type === 'oneway' || !!s.ret);
+  const canSearch = !!s.dep && (s.type === 'oneway' || !!s.ret || !!day);
 
   return (
-    <Sheet visible={visible} onClose={onClose} label={stay ? t('ask.stay.cal.title') : t('cal.title')}>
+    <Sheet visible={visible} onClose={onClose} label={day ? day.title : stay ? t('ask.stay.cal.title') : t('cal.title')}>
       <ScrollView style={{ maxHeight: height * 0.78 }} contentContainerStyle={{ gap: 12, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
-        <T v="h2">{stay ? t('ask.stay.cal.title') : t('cal.title')}</T>
+        <T v="h2">{day ? day.title : stay ? t('ask.stay.cal.title') : t('cal.title')}</T>
         {stay ? null : <Seg label={t('cal.from')} value={s.from} options={(['RUH', 'JED', 'DMM'] as const).map((c) => [c, AIRPORT_NAMES[c]!])} onChange={(from) => setS({ ...s, from })} />}
         {stay ? null : <Seg label={t('cal.type')} value={s.type} options={[['return', t('cal.return')], ['oneway', t('cal.oneway')]]} onChange={(type) => { setS({ ...s, type, ret: type === 'oneway' ? null : s.ret }); setPickRet(type === 'return' && !!s.dep && !s.ret); }} />}
-        <ChipWrap>
+        {day ? null : <ChipWrap>
           {quickDates(today).map((q) => (
             <Toggle key={q.id} small label={q.label} on={s.dep === q.dates[0] && s.ret === q.dates[1]} onPress={() => { setS({ ...s, type: 'return', dep: q.dates[0], ret: q.dates[1] }); setPickRet(false); setPage(Math.max(0, idxOf(q.dates[0]))); }} />
           ))}
-        </ChipWrap>
+        </ChipWrap>}
         <T v="h3" style={{ fontSize: 15 }} accessibilityLiveRegion="polite">{status}</T>
         <ScrollView ref={strip} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} accessibilityLabel={t('cal.months')}>
           {months.map((m, i) => (
@@ -76,8 +81,8 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
           {Array.from({ length: daysIn }, (_, i) => i + 1).map((dn) => {
             const x = `${pm.year}-${String(pm.month0 + 1).padStart(2, '0')}-${String(dn).padStart(2, '0')}`;
             const past = x < today;
-            const end = x === s.dep || (s.type === 'return' && x === s.ret);
-            const inRange = s.type === 'return' && !!s.dep && !!s.ret && x > s.dep && x < s.ret;
+            const end = x === s.dep || (s.type === 'return' && !day && x === s.ret);
+            const inRange = s.type === 'return' && !day && !!s.dep && !!s.ret && x > s.dep && x < s.ret;
             const flex = s.flex && !!s.dep && !end && Math.abs(daysBetween(s.dep, x)) <= 2;
             return (
               <View key={dn} style={[styles.cell, inRange ? { backgroundColor: '#f3ead8' } : flex ? { backgroundColor: '#f8f1e3' } : null]}>
@@ -105,7 +110,7 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
           </View>
         </View>
         </>)}
-        <Button label={stay ? (canSearch ? t('ask.stay.cal.done') : !s.dep ? t('ask.stay.cal.pickIn') : t('ask.stay.cal.pickOutButton')) : canSearch ? t('cal.search') : !s.dep ? t('cal.pickDate') : t('cal.pickReturnDate')} disabled={!canSearch} onPress={() => onDone(s)} testID="search-go" />
+        <Button label={day ? t('request.done') : stay ? (canSearch ? t('ask.stay.cal.done') : !s.dep ? t('ask.stay.cal.pickIn') : t('ask.stay.cal.pickOutButton')) : canSearch ? t('cal.search') : !s.dep ? t('cal.pickDate') : t('cal.pickReturnDate')} disabled={!canSearch} onPress={() => onDone(s)} testID="search-go" />
       </ScrollView>
     </Sheet>
   );

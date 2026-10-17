@@ -13,6 +13,7 @@ import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, type Cta } from '@/components/booking/FlightFlow';
 import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
+import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { MeBubble } from '@/components/booking/Conversation';
@@ -145,6 +146,7 @@ export default function Ask() {
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
   else if (kind === 'esim') body = <EsimFlow key={round} />;
+  else if (kind === 'umrah') body = <UmrahFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
 
   /** The Ask box: type or speak. On results it refines them (hint and onSend from the flow); otherwise it asks anew. */

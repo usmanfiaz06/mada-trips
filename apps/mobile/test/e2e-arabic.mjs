@@ -350,6 +350,17 @@ async function demo() {
   await see('جاهز ·', 'request priced', 20000);
   await shot('request-priced');
 
+  step('booking: Umrah asks for the permit first, and says the last ten nights plainly');
+  await byTest('ask-something-else').click();
+  await byTest('ask-input').fill('عمرة في العشر الأواخر');
+  await byTest('ask-send').click();
+  await see('عندك تصريح نسك؟', 'umrah permit');
+  await byTest('umrah-permit-no').click();
+  await see('كل شخص يحتاج تصريح من نسك', 'permit explained');
+  await byTest('umrah-permit-help').click();
+  await see('العشر الأواخر من رمضان', 'last ten warning');
+  await shot('umrah-ar');
+
   step('wallet');
   await toTabs();
   await byTest('dock-wallet').click();

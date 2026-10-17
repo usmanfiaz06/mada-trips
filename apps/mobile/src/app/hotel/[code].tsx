@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { anchorName, anchorOfLandmark, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
+import { anchorName, anchorOfLandmark, catalogueHotelByKey, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
 import { EmptyState } from '@/components/EmptyState';
@@ -44,14 +44,18 @@ export default function HotelScreen() {
   const q = useHotelDetails(hasCode ? Number(code) : 0);
   const shown = useQuery({ queryKey: ['booking', 'offer', offer], enabled: !!offer, queryFn: () => bookingApi.offer(offer!) });
   const rooms = useQuery({ queryKey: ['booking', 'rooms', offer], enabled: !!offer, staleTime: 300_000, queryFn: () => bookingApi.rooms(offer!) });
-  const stored = useStayAnchor((x) => x.byCity[city]);
-  const anchor = stored ?? (landmarksIn(city)[0] ? anchorOfLandmark(landmarksIn(city)[0]!) : null);
+  const cityKey = city || catalogueHotelByKey(code)?.city || '';
+  const stored = useStayAnchor((x) => x.byCity[cityKey]);
+  const anchor = stored ?? (landmarksIn(cityKey)[0] ? anchorOfLandmark(landmarksIn(cityKey)[0]!) : null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [allFacilities, setAllFacilities] = useState(false);
   const [moreText, setMoreText] = useState(false);
   const details = q.data?.hotel;
   // A catalogue stay has no supplier content: the page is the stay itself (name, address, phone, the walk).
-  const h = details ?? (booked ? { code: 0, name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null, source: 'HBX Group' as const } : undefined);
+  // A hotel from Mada's own catalogue (the Istanbul bundle's, an Umrah hotel near the Haram), opened by its key before booking.
+  const cat = !hasCode && !tripId ? catalogueHotelByKey(code) : null;
+  const h = details ?? (booked ? { code: 0, name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null, source: 'HBX Group' as const }
+    : cat ? { code: 0, name: cat.name, category: cat.area, address: cat.address, phone: null, description: cat.note, images: [], facilities: [], latitude: cat.lat, longitude: cat.lng, source: 'HBX Group' as const } : undefined);
   const stay = shown.data?.stay ?? null;
   const options: StayOption[] = rooms.data?.options ?? (stay ? [stay] : []);
   const cur = options.find((o) => o.id === chosen) ?? options[0] ?? null;
@@ -109,6 +113,7 @@ export default function HotelScreen() {
         {lat != null && lng != null ? (
           <StaysMap single height={180} points={[{ id: 'hotel', lat, lng, label: h.name, selected: true }]} marks={anchor ? [{ id: anchor.id, lat: anchor.lat, lng: anchor.lng, name: anchorName(anchor, lang) }] : []} testID="hotel-map" />
         ) : null}
+        {!dist && cat?.minutes ? <Row gap={6}><Icon name="pin" size={16} /><T v="small" color={colors.green} style={{ flex: 1 }} testID="hotel-distance">{t(cat.band === 'shuttle' ? 'umrah.hotel.shuttle' : 'umrah.hotel.walk', { min: cat.minutes })}{anchor ? ` · ${anchorName(anchor, lang)}` : ''}</T></Row> : null}
         {dist ? <Row gap={6}><Icon name="pin" size={16} /><T v="small" color={colors.green} style={{ flex: 1 }} testID="hotel-distance">{dist.text}</T></Row> : null}
         {h.address ? <Small>{h.address}</Small> : null}
         {lat != null || h.address ? <Pressable accessibilityRole="link" onPress={openMaps} testID="hotel-open-maps"><Small color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('hotel.openMaps')}</Small></Pressable> : null}
@@ -161,7 +166,7 @@ export default function HotelScreen() {
       {h.description ? (
         <Pressable onPress={() => setMoreText(!moreText)} accessibilityRole="button">
           <Small lines={moreText ? undefined : 4}>{h.description}</Small>
-          {!moreText ? <Small color={colors.green} style={{ fontFamily: ff.ui500 }}>{t('hotel.readMore')}</Small> : null}
+          {!moreText && h.description.length > 180 ? <Small color={colors.green} style={{ fontFamily: ff.ui500 }}>{t('hotel.readMore')}</Small> : null}
         </Pressable>
       ) : null}
       {h.phone ? <Box gap={4}><Tiny>{t('voucher.phone')}</Tiny><Small color={colors.green}>{h.phone}</Small></Box> : null}

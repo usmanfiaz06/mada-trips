@@ -6,6 +6,8 @@
 import { t, tn, type CopyKey } from '../copy';
 import { localizeDigits, type Lang } from '../locale';
 import { arabicForRules } from './ask-arabic';
+import { carNowAsk } from './now-path';
+import { umrahDeskQuote, umrahSummary } from './umrah';
 import { commaList, wordFor } from './booking-words';
 import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
 import { formatSar, sarToHalalas } from '../money';
@@ -92,14 +94,19 @@ const GENERIC_TODO = /^(?:some )?(?:things?|something|stuff) to do\b|^(?:a |some
 
 export type AskKindValue = 'flight' | 'stay' | 'plan' | 'esim' | 'visa' | 'umrah' | 'car' | 'food' | 'todo' | 'general';
 
+/** A taxi, a ride, a cab or a driver, asked for now: a car right now, whatever place follows ("a taxi now in Abha"). */
+const RIDE_NOW = /\b(taxi|cab|ride|uber|careem|driver|chauffeur|lift|car)\b/;
+const NOW_WORDS = /\b(now|right now|right away|asap|immediately|straight away|this minute)\b/;
+
 export function parseKind(text: string): AskKindValue {
   const s = text.toLowerCase();
+  if (RIDE_NOW.test(s) && NOW_WORDS.test(s) && !/\b(rent|rental|hire|self[- ]drive|flights?|fly)\b/.test(s)) return 'car';
   if (/\bumrah\b|makkah|mecca|madinah|medina/.test(s)) return 'umrah';
   if (/\bvisa\b|schengen|\beta\b|appointment/.test(s)) return 'visa';
   if (FLIGHT_WORDS.test(s)) return 'flight';
   if (/\besim\b|data plan|sim card|\bdata\b/.test(s)) return 'esim';
   if (STAY_WORDS.test(s)) return 'stay';
-  if (/\bcars?\b|car rental|rent a car|\bdriver\b|\brental\b/.test(s)) return 'car';
+  if (/\bcars?\b|car rental|rent a car|\bdriver\b|\brental\b|\btaxis?\b|\bcabs?\b|\buber\b|\bcareem\b/.test(s)) return 'car';
   if (/restaurant|dinner|lunch|\btable\b|breakfast/.test(s)) return 'food';
   if (/\btours?\b|things to do|activit|museum|cruise|tickets/.test(s)) return 'todo';
   if (EVENT_WORDS.test(s)) return 'todo';
@@ -294,7 +301,8 @@ export type RuleIntent = ParsedDetails & ParsedWho & { kind: AskKindValue; needs
 export function parseAskRules(typed: string, ctx: { today: string; people: Person[] }): RuleIntent {
   // Arabic is read by the same rules: the words they need are put in English first (ask-arabic.ts).
   const text = arabicForRules(typed);
-  const kind = parseKind(text);
+  // "تاكسي الحين في أبها": a car right now (الحين reads as "tonight" for a table, so the typed words decide).
+  const kind = carNowAsk('', typed) && !/\b(?:flights?|fly)\b/.test(text) ? 'car' : parseKind(text);
   const d = parseDetails(text, ctx.today);
   const w = parseWho(text, ctx.people, ctx.today);
   const H = householdOf(ctx.people, ctx.today);
@@ -541,6 +549,17 @@ export function deskQuote(input: {
   const needLines: string[] = [];
   who.forEach((p) => (needs[p.id] ?? []).forEach((k) => needLines.push(needLine(k, p, true))));
   const anyWheelchair = who.some((p) => (needs[p.id] ?? []).some((k) => k.startsWith('wheelchair')));
+  if (kind === 'umrah' && answers.makkahHotel?.length) {
+    // Planned in the app around the permit: the hotels, nights, train and flights as chosen.
+    const q = umrahDeskQuote(answers, who.map((p) => ({ id: p.id, name: name(p), age: ageOn(p, today) ?? 30 })), l);
+    if (q) {
+      who.forEach((p) => { if ((needs[p.id] ?? []).some((k) => k.startsWith('wheelchair'))) q.breakdown.push({ personId: p.id, name: name(p), lines: [{ label: t('dq.umrah.wheelchair', undefined, l), sar: DESK_PRICES.umrahWheelchair }] }); });
+      const extra = who.filter((p) => (needs[p.id] ?? []).some((k) => k.startsWith('wheelchair'))).length * DESK_PRICES.umrahWheelchair;
+      const total = q.totalSar + extra;
+      const text = extra ? q.text.replace(sar(q.totalSar, l), sar(total, l)) : q.text;
+      return { totalSar: total, breakdown: q.breakdown, lead: q.lead, text, needLines: [...needLines, ...(anyWheelchair ? [t('dq.umrah.lowFloor', undefined, l)] : [])] };
+    }
+  }
   if (kind === 'umrah') {
     const near = (answers.stay ?? [])[0] === 'Steps from the Haram';
     const breakdown = who.map((p) => {
@@ -671,6 +690,12 @@ export function requestText(input: { kind: string; answers: Record<string, strin
   const { kind, answers, query, names, needSummary, locale } = input;
   const form = REQUEST_FORMS[kind as RequestFormKind] ?? [];
   const title = requestTitle(kind, answers, query, locale);
+  if (kind === 'umrah' && answers.makkahHotel?.length) {
+    const summary = umrahSummary(answers, names, needSummary, locale);
+    const n = input.note.trim();
+    const note = n && n.toLowerCase() !== query.trim().toLowerCase() ? n : null;
+    return { title, summary, detail: [summary, note ? `“${note}”` : ''].filter(Boolean).join(' · '), note };
+  }
   const parts = form.map((f) => (f.people ? names : f.needs ? needSummary : commaList((answers[f.k] ?? []).map((x) => wordFor(x, locale)), locale)));
   // Where it is, when the form doesn't ask (an outing in Riyadh); never the title's own words again.
   if (!form.some((f) => f.k === 'where') && answers.where?.length) parts.unshift(commaList(answers.where.map((x) => wordFor(x, locale)), locale));

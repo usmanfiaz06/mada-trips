@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AIRPORT_NAMES, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
+  AIRPORT_NAMES, CATALOGUE_HOTELS, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
   type AskIntent, type FlightOption, type FlightSearchResponse, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -15,6 +15,7 @@ import { Card } from '../Card';
 import { EmptyState } from '../EmptyState';
 import { Icon } from '../Icon';
 import { Pill } from '../Pill';
+import { Sheet } from '../Sheet';
 import { SupplierDown } from '../states/SupplierDown';
 import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
@@ -60,7 +61,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const [editing, setEditing] = useState<{ month?: { month: number; year: number } | null } | null>(null);
   const [runKey, setRunKey] = useState(0);
   const [pick, setPick] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  // The fare rules (bags, change, refund) of one option, in a sheet over the results.
+  const [rulesOf, setRulesOf] = useState<string | null>(null);
   const [bundle, setBundle] = useState(false);
   const [sort, setSort] = useState<'best' | 'cheapest' | 'fastest' | 'earliest'>('best');
   // Wishes said in the box under the results ("morning, direct, with bags"): chips that filter, and one line back.
@@ -303,6 +305,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const nights = s.return ? daysBetween(s.depart, s.return) : 0;
   const dateLabel = trip.type === 'oneway' ? t('search.summaryOneWay', { date: rangeName(s.depart, null, today) }) : rangeName(s.depart, s.return, today);
   const words = [t('search.ways.one'), t('search.ways.two'), t('search.ways.three')];
+  // The bundle's hotel, by name, opens its page.
+  const bundleHotel = s.bundle ? Object.values(CATALOGUE_HOTELS).flat().find((h) => h.name === s.bundle!.hotelName) ?? null : null;
   return (
     <View style={{ gap: 12 }}>
       <Animated.View entering={enter(0)} style={styles.rowTiny}><Icon name="check" color={colors.ok} size={16} width={2.4} /><T v="tiny">{t('search.checked', { count: s.checked, people: who.length })}</T></Animated.View>
@@ -347,7 +351,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
           <Animated.View key={f.id} entering={enter(i + 2)}>
             <Card padding={0} selected={on} style={{ gap: 0 }}>
               <Pressable accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${f.airline}, ${formatSar(f.total.amount)}`}
-                onPress={() => { buzz('select'); if (on) setOpen(open === f.id ? null : f.id); else { setPick(f.id); setOpen(null); } }} style={styles.opt} testID={`flight-${f.out.flightNumber}`}>
+                onPress={() => { buzz('select'); setPick(f.id); }} style={styles.opt} testID={`flight-${f.out.flightNumber}`}>
                 <View style={styles.spread}>
                   <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
                     <AirlineMark carrier={f.carrier} brand={f.brand} label={f.airline} />
@@ -362,16 +366,11 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
                 <T v="small">{nightIds.has(f.id) ? t('search.family.night', { time: f.out.dep }) : f.reason}</T>
                 {on && (travellers.length > 1 || f.infants) ? <FareBreakdown option={f} travellers={travellers} onDay={f.out.date} testID="fare-breakdown" /> : null}
               </Pressable>
-              {on && open === f.id ? (
-                <Animated.View entering={enter(0)} style={{ paddingHorizontal: 16, paddingBottom: 14, gap: 8 }}>
-                  <View style={styles.divider} />
-                  {([[t('search.rule.bags'), f.bags], [t('search.rule.change'), f.changeRule], [t('search.rule.cancel'), f.refundRule],
-                    ...(f.back ? [[t('search.rule.return'), `${f.back.flightNumber} · ${dayName(f.back.date, today)}`]] : []),
-                    ...(f.infants ? [[t('search.rule.lap'), t('search.rule.lapValue', { price: formatSar(f.infantPrice.amount) })]] : [])] as [string, string][]).map(([k, v]) => (
-                    <View key={k} style={styles.spread}><T v="small">{k}</T><T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{v}</T></View>
-                  ))}
-                </Animated.View>
-              ) : on ? <T v="tiny" style={{ paddingHorizontal: 16, paddingBottom: 12 }}>{t('search.tapAgain')}</T> : null}
+              <Pressable accessibilityRole="button" accessibilityLabel={t('search.rules.a11y', { airline: f.airline })} hitSlop={8}
+                onPress={() => { buzz('tap'); setRulesOf(f.id); }} style={styles.rulesLink} testID={`flight-rules-${f.out.flightNumber}`}>
+                <Icon name="doc" size={14} color={colors.green} />
+                <T v="small" color={colors.green} style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }}>{t('search.rules')}</T>
+              </Pressable>
             </Card>
           </Animated.View>
         );
@@ -385,7 +384,13 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
       {showBundle ? (
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <View style={{ flex: 1, gap: 3 }}>
-            <T v="h3">{who.some((id) => people.find((p) => p.id === id)?.relation === 'helper') ? t('search.bundle.helper') : who.length > 2 ? t('search.bundle.family') : who.length === 2 ? t('search.bundle.two') : t('search.bundle.one')}</T>
+            <T v="h3">{t(who.some((id) => people.find((p) => p.id === id)?.relation === 'helper') ? 'search.bundle.helper' : who.length > 2 ? 'search.bundle.family' : who.length === 2 ? 'search.bundle.two' : 'search.bundle.one', { hotel: s.bundle!.hotelName })}</T>
+            {bundleHotel ? (
+              <Pressable accessibilityRole="link" accessibilityLabel={t('search.bundle.hotelA11y', { hotel: s.bundle!.hotelName })} hitSlop={6} testID="bundle-hotel"
+                onPress={() => { buzz('tap'); router.push(`/hotel/${bundleHotel.key}?city=${dest!.key}&guests=${who.length}` as Href); }}>
+                <T v="small" color={colors.green} style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }}>{s.bundle!.hotelName}</T>
+              </Pressable>
+            ) : null}
             <T v="small">{tn('search.bundle.nights', nights, { price: formatSar(s.bundle!.total.amount) })}</T>
           </View>
           <Button size="small" block={false} variant={bundle ? 'primary' : 'secondary'} style={bundle ? undefined : { backgroundColor: colors.mist }} label={bundle ? t('search.bundle.added') : t('search.bundle.add')} haptic="select" onPress={() => setBundle(!bundle)} testID="bundle-add" />
@@ -393,11 +398,35 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
       ) : null}
       <View style={{ height: 60 }} />
       {sheet}
+      <FareRules option={rulesOf ? options.find((o) => o.id === rulesOf) ?? null : null} today={today} onClose={() => setRulesOf(null)} />
     </View>
   );
 }
 
+/** Bags, change and refund for one fare, over the results; the return flight and a lap infant's price when they apply. */
+function FareRules({ option: f, today, onClose }: { option: FlightOption | null; today: string; onClose: () => void }) {
+  if (!f) return null;
+  const rows = [[t('search.rule.bags'), f.bags], [t('search.rule.change'), f.changeRule], [t('search.rule.cancel'), f.refundRule],
+    ...(f.back ? [[t('search.rule.return'), `${f.back.flightNumber} · ${dayName(f.back.date, today)}`]] : []),
+    ...(f.infants ? [[t('search.rule.lap'), t('search.rule.lapValue', { price: formatSar(f.infantPrice.amount) })]] : [])] as [string, string][];
+  return (
+    <Sheet visible label={t('search.rules.title', { airline: f.airline })} onClose={onClose}>
+      <View style={{ gap: 12 }} testID="fare-rules">
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <AirlineMark carrier={f.carrier} brand={f.brand} label={f.airline} />
+          <T v="h2" style={{ flex: 1 }}>{t('search.rules.title', { airline: f.airline })}</T>
+        </View>
+        {rows.map(([k, v]) => (
+          <View key={k} style={[styles.spread, { alignItems: 'flex-start' }]}><T v="small">{k}</T><T v="small" color={colors.green} style={{ fontFamily: ff.ui600, flexShrink: 1 }}>{v}</T></View>
+        ))}
+        <Button label={t('request.done')} onPress={onClose} testID="fare-rules-done" />
+      </View>
+    </Sheet>
+  );
+}
+
 const styles = StyleSheet.create({
+  rulesLink: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 16, paddingBottom: 14, marginTop: -4 },
   input: { height: 52, borderRadius: radii.input, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.paper, paddingHorizontal: 16, fontSize: 17 },
   rowTiny: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   summary: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 18, backgroundColor: colors.paper },

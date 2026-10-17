@@ -1,5 +1,5 @@
 import "server-only";
-import { AskIntent, AskKind, DESTINATIONS, HomeAirport, askIntentOfRules, isIsoDay, parseAskRules, type Person } from "@mada/shared";
+import { AskIntent, AskKind, DESTINATIONS, HomeAirport, askIntentOfRules, carNowAsk, isIsoDay, parseAskRules, type Person } from "@mada/shared";
 import { bookingSuppliers, householdOf, today } from "./common";
 
 /*
@@ -20,7 +20,10 @@ export async function parseAsk(ownerId: string, text: string): Promise<AskIntent
     console.warn("[ask] the model didn't answer; using the rules", e instanceof Error ? e.message : "");
   }
   if (!model) return AskIntent.parse(fromRules);
-  return AskIntent.parse(mergeModel(fromRules, model, people, day));
+  const merged = mergeModel(fromRules, model, people, day);
+  // "A taxi now in Abha" is a car right now, whatever the model made of the place.
+  if (rules.kind === "car" && carNowAsk("car", text)) merged.kind = "car";
+  return AskIntent.parse(merged);
 }
 
 /** Keep what the model said only where it is a real value; the rules fill the rest (needs and form answers always). */
