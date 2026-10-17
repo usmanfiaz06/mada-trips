@@ -135,7 +135,7 @@ async function flights() {
   await k.see('Three ways to get there.', 'results', 12000);
   await k.see('Riyadh → Istanbul · 9–15 Mar 2027', 'summary');
   await k.see('4 people · Economy', 'party');
-  await k.see('SAR 8,640', 'saudia price');
+  await k.see('SAR 8,100', 'saudia price'); // Ahmed is 10: a child fare
   await k.shot('results');
   step('flights: fare rules, sort');
   await k.press(k.byTest('flight-rules-SV263'));
@@ -167,12 +167,13 @@ async function flights() {
   await page.getByRole('button', { name: 'Back' }).filter({ visible: true }).last().click();
   await k.see('Three ways to get there.', 'back to results', 8000);
   await k.press(k.byTest('bundle-add'));
-  await k.see('Review · SAR 14,960', 'review with rooms');
+  await k.see('Review · SAR 14,420', 'review with rooms');
   await k.shot('bundle-entry');
   step('flights: the order sheet');
   await k.press(k.byTest('ask-review'));
   await k.see('Istanbul · 9–15 Mar', 'pay title', 12000);
-  await k.see('4 travellers · Saudia, direct', 'flight line');
+  await k.see('3 adults · Saudia, direct', 'flight line');
+  await k.see('1 child fare (2 to 11, or a baby with a seat)', 'child fare line');
   await k.see('Bereketzade Hotel · Connecting rooms · 6 nights', 'stay line');
   await k.see('If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.', 'rule');
   await k.see('Price held · 19:', 'hold timer');
@@ -186,7 +187,7 @@ async function flights() {
   await k.byTest('promo-input').fill('EID10');
   await k.byTest('promo-apply').click();
   await k.see('Code EID10 · 10% off', 'promo applied');
-  await k.see('SAR 14,660', 'total after promo');
+  await k.see('SAR 14,120', 'total after promo');
   await k.shot('promo-applied');
   step('pay: who is going');
   await k.tap('Edit');
