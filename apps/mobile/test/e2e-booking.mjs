@@ -966,7 +966,8 @@ async function money(locale = 'en-GB') {
   } else await openAsk(page);
   step('money: the order sheet applies the saved preferences and the Alfursan number');
   if (ar) {
-    await k.ask('Istanbul for Eid, all of us');
+    // Typed in Arabic: Mada answers each message in the language it is written in.
+    await k.ask('إسطنبول في العيد مع العائلة');
     await k.byTest('ask-review').first().waitFor({ timeout: 15000 });
     await page.waitForTimeout(800);
     await k.press(k.byTest('ask-review'));
