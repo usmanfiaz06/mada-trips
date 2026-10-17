@@ -6,16 +6,19 @@ at most 3 run at once; a dependent unit starts only after the one before it is i
 
 Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critique (scorecard 5.1/10, 15 changes) → `scratchpad/CRITIQUE.md`.
 
-## In flight (17 Oct)
+## In flight (17 Oct, round 2: target ≥ 9/10 on every critique dimension)
 
 | Unit | What | Status |
 |---|---|---|
-| U · Umrah (Next 4) | permit-first Umrah, Makkah distance bands with named hotels, Madinah, Haramain, last-ten-nights warning; parser "taxi now" → car; bundle names the hotel; visible fare "Rules" link | started 17 Oct, session_012zVYc7M9ZXTLs4ymLNRe7o |
-| S · offline shell + 8% mode (Next 6) | service worker, cached trip offline, queued messages, low-battery screen | started 17 Oct, session_017G6Ew7RnxLE7Kii7UWv8nv |
-| L · native (Next 7) | Live Activity + Dynamic Island, real boarding passes (BCBP import), Apple Wallet .pkpass, NATIVE.md owner steps | started 17 Oct on owner's request (4th slot), session_0171JzMP5syiTg9p3seyBrmn |
-| P · polish | red platform tests (activities, places, auth flake), duplicate cards, real child/infant fares, hold-ended + price-down + 3DS branch, extras carrier, split tripId, waiting-screen made-up details | started 17 Oct, session_01NVAgKWJjayiCpo83VzFAwJ |
+| E · eSIM on Airalo | supplier adapter + mock, plan suggestion per trip, pay, install (iOS link / Android QR), data left, top-up, desk | started, session_019PTxzsmbZA74N6so2w188q |
+| G · guests + language (Next 5) | guests search/see prices/open links, sign-in sheet at account actions returning to the same place; language switch keeps state; reply in input language; Arabic leak sweep | started, session_01Sk1iYRJ91x9cQXdekzSK7f |
+| V · speed | baseline → parallel/streamed search, caches, /trips < 800 ms, Lighthouse ≥ 90, before/after table | started, session_01TUBJcpn9XT9ZDAD5KMGYaY |
+
+Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh eyes, read-only) → fix every dimension < 9 → rerun until all ≥ 9.
 
 ## Done
+
+- U Umrah 2a27865 · S offline + 8% f4c03f5 · P polish 99dc1da, b031925 · L native b28466d, beb83f0 (+ alarm module source a2d380c). Combined check in progress 17 Oct.
 
 - W wiring 5aa5bc6. Open: English stay text on Arabic hotel page; refunds that moved money / pay-link splits can't be taken back; no "opened by agent" signal.
 - M money c57a3b4. Open: hotel loyalty matched by name; instalments not on Money screen.
@@ -47,7 +50,7 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 
 - Owner asked (17 Oct): guests browsing prices — recommended for web AND mobile (Apple 5.1.1(v): don't force sign-in before account features); awaiting go-ahead.
 - Cars: Hotelbeds Transfers is already wired for pre-booked airport pickups (transfers/service.ts); car-now has no on-demand supplier (Careem/Uber have no open booking API) → call-back. Proposed: offer Hotelbeds transfer for any ride ≥ supplier lead time.
-- eSIM: today a fixed SAR 39 placeholder (EsimFlow), no supplier. Proposed: Airalo Partner API (or eSIM Go), one-tap iOS install link.
+- eSIM: today a fixed SAR 39 placeholder (EsimFlow), no supplier. Owner chose Airalo (17 Oct), one-tap iOS install link.
 
 - Background stays warm off-white; actionable surfaces a touch lighter (not pure white).
 - Design bar: serif for journey headlines, one warm line per screen, photos with room, no voids, labels over sentences.
