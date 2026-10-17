@@ -28,6 +28,7 @@ Every outside system sits behind an interface in [`types.ts`](types.ts). Route h
 | `ai` | `AiSupplier` (parseIntent, answer) | Claude via `@anthropic-ai/sdk` (structured intent, short answers under COPY.md; banned-word check before anything goes out; server-side refusal fallback on) | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` (default `claude-opus-5-5`) | Rule-based: finds the city, Eid (9 Mar 2027), "4 of us", and the one missing detail to ask for. Never prices. |
 | `identity` | `IdentitySupplier` (Sign in with Apple / Google, pre-Supabase routes only) | Verifies the provider's identity token against Apple's / Google's published keys (jose JWKS) | `APPLE_CLIENT_IDS`, `GOOGLE_CLIENT_IDS` (comma-separated audiences) | Accepts `mock:<id>[:<email>]`; an `@privaterelay.appleid.com` email counts as Apple's hidden email. |
 | `supabase` | `SupabaseAuthSupplier` (verify an access token; see docs/app/AUTH.md) | jose against the project's JWKS (`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`); legacy HS256 with `SUPABASE_JWT_SECRET`. Not behind a breaker: a bad token is not an outage. | `SUPABASE_URL`, optional `SUPABASE_JWT_SECRET` | Reads the app's unsigned `mocksb.` tokens (`encodeMockSupabaseToken` in @mada/shared). Refused on a production deployment unless `APP_ALLOW_MOCKS=yes`. |
+| `esim` | `EsimSupplier` (`esim-types.ts`: packages, order, findOrder, sim, usage, top-ups, refund) | **Airalo Partner API v2** (`live/airalo.ts`; `SUPPLIER_MODE_ESIM=live` or `airalo`). Service: `lib/app/esim/service.ts` | `AIRALO_CLIENT_ID`, `AIRALO_CLIENT_SECRET`, `AIRALO_ENV=sandbox\|live`, optional `AIRALO_BASE_URL`, `AIRALO_ALLOW_LIVE_OUTSIDE_PRODUCTION`, `APP_ESIM_MARKUP_BPS` (default 3000 = 30%) | Shared fixtures (`schemas/esim-data.ts`): Türkiye (Merhaba), the UAE (Burj Mobile), the UK (Uki Mobile), Saudi Arabia (Red Sand), Europe (Eurolink) and Global (Discover). Deterministic ICCID and codes; usage switches on once installed. `test-out-of-stock-…` or `?demo=esimFails` → refused (the order comes back refunded). |
 
 ## Live aircraft positions (open ADS-B)
 
@@ -86,6 +87,34 @@ Override the public base with `AERODATABOX_WEBHOOK_BASE_URL` (else `APP_PUBLIC_U
 |---|---|---|
 | AeroDataBox | Bases and headers: RapidAPI `https://aerodatabox.p.rapidapi.com` + `X-RapidAPI-Key`, `X-RapidAPI-Host: aerodatabox.p.rapidapi.com`; API.Market `https://prod.api.market/api/v1/aedbx/aerodatabox` + `x-api-market-key`; direct `https://api.aerodatabox.com` + `X-Api-Key` (OpenAPI v1.15.4.0). `GET /flights/{searchBy}/{flightNumber}/{dateLocal}` (searchBy Number, Reg, CallSign or Icao24) with `dateLocalRole`, `withAircraftImage`, `withLocation`; 204 when unknown. Fields: scheduled/revised/predicted/runway times in `utc` and `local`, terminal, gate, check-in desk, baggage belt, quality (Basic/Live/Approximate), status enum incl. `Canceled`, `CanceledUncertain`, `Diverted`; aircraft `reg`, `modeS` (hex), `model`. Status is TIER 2 = 2 units; Basic 400 units/month at 1 req/s. Webhooks: `POST /subscriptions/webhook/FlightByNumber/{no}` {url, maxDeliveryRetries}, `DELETE /subscriptions/webhook/{id}`, `GET /subscriptions/balance`, 1 credit per flight per notification, credits = units, no expiry, notifications cover −6 h…+72 h. | The lower-case `number` path segment; time strings like `2026-10-11 06:40Z` (parsed leniently either way); notifications carry no signature; subscription limits per plan. |
 | aviationstack | `https://api.aviationstack.com/v1/flights?access_key=…` over HTTPS on Free; filters `flight_iata`, `flight_icao`, `flight_date` (Basic plan and up only); fields departure/arrival scheduled/estimated/actual/runway, terminal, gate, baggage, delay; `flight_status` scheduled/active/landed/cancelled/incident/diverted; aircraft `registration`, `icao24`; `live`. Errors `{error:{code,message}}` (`invalid_access_key` seen live). Free: 100 calls/month, non-commercial. | Times are the airport's local wall clock despite `+00:00`; `usage_limit_reached` is the quota error code. |
+
+## eSIMs: Airalo
+
+**Flow.** `GET /esim/plans` picks the coverage (the country's own plans, else the smallest region with every country,
+else global) and 2–3 sizes that last the trip, priced from Airalo's `net_price` (USD) × 3.75 × (1 + `APP_ESIM_MARKUP_BPS`)
+rounded up to a riyal. The order sheet prices the package again on the server (draft `{ kind: "esim", packageId, where,
+travellerIds, tripId }`, or `topupOf` for a top-up). Once the card is captured (`orders.ts` → `confirmOrder`),
+`fulfilEsimOrder` writes one `app_esims` row per eSIM, claims the purchase, **looks the order up at Airalo by its
+description (`mada:<orderId>`) before buying**, then orders all of them in one call. Airalo has no idempotency key; the
+description look-up is what makes a retry, a second server or the desk's "order again" safe (code 83, a duplicate within
+a second, is answered by looking again). A definite no (out of stock, package gone) refunds the card at once
+(`app_refunds`, approved) or puts Mada credit back, marks the eSIMs refunded with a `refused` outcome and the refund
+date, closes the order with it, and tells the traveller. No answer at all and nothing found: `stuck`, for the desk
+(Desk → eSIMs: send install details again, refund one eSIM, or check Airalo and order).
+
+**Guards.** `AIRALO_ENV=sandbox` on a production deployment refuses to sell (sandbox eSIMs can't be installed); live keys
+outside production refuse unless `AIRALO_ALLOW_LIVE_OUTSIDE_PRODUCTION=yes`. Both answer `NOT_CONFIGURED` at pricing,
+before anyone pays.
+
+**Usage and webhooks.** Usage is read at most every 20 minutes per eSIM (Airalo caches as long). Opt in to low-data
+notices with `POST /v2/notifications/opt-in {"type":"webhook_low_data","webhook_url":"<APP_PUBLIC_URL>/api/app/v1/esim/airalo/webhook"}`;
+the route answers Airalo's HEAD check and verifies `airalo-signature` (HMAC-SHA512 of the body with the client secret).
+
+**Confirmed vs assumed** (docs read 2026-10-17, developers.partners.airalo.com). Confirmed: one host for sandbox and
+production (`https://partners-api.airalo.com/v2`), form-encoded token (3 a minute), multipart orders, `filter[description]`
+on `GET /orders`, usage fields and statuses, top-up and refund endpoints, the webhook signature. Assumed until the first
+sandbox call: `validity`/`quantity` types (read either way), page 2+ of `/packages` as an object (read either way), the
+async-order webhook (not used).
 
 ## Adding a supplier
 

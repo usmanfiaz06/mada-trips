@@ -4,7 +4,7 @@ import { toQR } from 'toqr';
 import { colors } from '@/theme';
 
 /** A real QR code for a link (toqr, error correction M), drawn as one path. Scans from a phone held next to it. */
-export function QrCode({ value, size = 168, label }: { value: string; size?: number; label: string }) {
+export function QrCode({ value, size = 168, label, testID = 'invite-qr' }: { value: string; size?: number; label: string; testID?: string }) {
   const { n, d } = useMemo(() => {
     const cells = toQR(value);
     const n = Math.round(Math.sqrt(cells.length));
@@ -14,7 +14,7 @@ export function QrCode({ value, size = 168, label }: { value: string; size?: num
   }, [value]);
   const q = 2; // the quiet zone, in modules
   return (
-    <Svg width={size} height={size} viewBox={`${-q} ${-q} ${n + 2 * q} ${n + 2 * q}`} accessibilityRole="image" accessibilityLabel={label} testID="invite-qr">
+    <Svg width={size} height={size} viewBox={`${-q} ${-q} ${n + 2 * q} ${n + 2 * q}`} accessibilityRole="image" accessibilityLabel={label} testID={testID}>
       <Rect x={-q} y={-q} width={n + 2 * q} height={n + 2 * q} fill="#ffffff" rx={1.2} />
       <Path d={d} fill={colors.green} />
     </Svg>

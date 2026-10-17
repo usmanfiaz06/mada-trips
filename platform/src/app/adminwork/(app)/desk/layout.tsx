@@ -18,6 +18,7 @@ export default async function DeskLayout({ children }: { children: React.ReactNo
     { href: "/adminwork/desk/requests", label: t("Requests"), count: c.by.request },
     { href: "/adminwork/desk/chats", label: t("Chats"), count: c.by.chat },
     { href: "/adminwork/desk/refunds", label: t("Refunds"), count: c.by.refund },
+    { href: "/adminwork/desk/esims", label: t("eSIMs") },
     { href: "/adminwork/desk/disruptions", label: t("Disruptions"), count: c.by.disruption, tone: c.by.disruption ? "bad" as const : undefined },
     { href: "/adminwork/desk/moderation", label: t("Moderation"), count: c.by.moderation },
     { href: "/adminwork/desk/recovery", label: t("Account recovery"), count: c.by.recovery },

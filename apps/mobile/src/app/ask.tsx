@@ -145,7 +145,7 @@ export default function Ask() {
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
-  else if (kind === 'esim') body = <EsimFlow key={round} />;
+  else if (kind === 'esim') body = <EsimFlow key={round} intent={intent} />;
   else if (kind === 'umrah') body = <UmrahFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
 

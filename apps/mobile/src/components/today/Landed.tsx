@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { EsimTripCard } from '@/components/esim/parts';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { addMinutes, arrivalPickup, destinationOf, liveStay, outSegment, sameTimeAsHome, signName, type TripDetail } from '@mada/shared';
 import { Avatar } from '@/components/Avatar';
@@ -128,6 +129,7 @@ export function Landed({ trip }: { trip: TripDetail }) {
           ) : null}
         </Box>
       </Rise>
+      <EsimTripCard tripId={trip.id} />
       <TalkLine note={t('td.talk.arrival', { agent: trip.agent.name })} agentInitial={trip.agent.initial} about={trip.city} />
       <AddressSheet trip={trip} open={sheet === 'address'} onClose={() => setSheet(null)} />
       <BagSheet trip={trip} open={sheet === 'bag'} onClose={() => setSheet(null)} onDone={() => { setSheet(null); tick('bags'); }} />

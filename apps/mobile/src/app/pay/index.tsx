@@ -198,6 +198,13 @@ export default function Pay() {
     if (out.outcome === 'paid') {
       buzz('success'); invalidate(); usePayDraft.getState().clear();
       if (share) await settleShare(share);
+      // An eSIM: straight to installing it (or, for a top-up, back to the eSIM); a refund shows there as an outcome.
+      if (pd.draft.kind === 'esim' && (pd.draft.packageId || pd.draft.topupOf)) {
+        void qc.invalidateQueries({ queryKey: ['esim'] });
+        if (pd.draft.topupOf) { router.replace({ pathname: '/esim/[id]', params: { id: pd.draft.topupOf } }); toast(out.order.status === 'cancelled' ? t('es.refunded.title') : t('es.topupToast')); }
+        else router.replace({ pathname: '/esims', params: { order: out.order.id } });
+        return;
+      }
       leave();
       toast(share ? t('pay.shareToast') : pd.draft.kind === 'esim' ? t('pay.esimToast') : t('pay.paidToast'));
       return;

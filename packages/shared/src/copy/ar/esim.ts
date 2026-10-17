@@ -131,6 +131,8 @@ export const arEsim: ArSection<typeof esimCopy> = {
   'es.tr.talk': 'كلّم مادا',
   'es.tr.message': 'شريحة eSIM حقت {where} ما تتصل ({iccid}).',
   'es.trip.cta': 'خذ شريحة eSIM',
+  'es.ready.none': 'نت من أول ما تهبط. اختر الباقة اللي تناسب رحلتك.',
+  'es.ready.installed': 'شريحة eSIM لـ {n} · منزّلة، وتشتغل لما تهبط',
 
   'notify.esim.low.title': 'شريحتك قربت تخلص',
   'notify.esim.low.body': '{where}: باقي {percent}٪. اشحن من التطبيق.',

@@ -3,14 +3,13 @@ import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { DESTINATIONS, permitAnswers, addDays, ageOn, daysBetween, formatSar, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
+import { DESTINATIONS, esimDays, permitAnswers, addDays, ageOn, daysBetween, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t, tn } from '@/lib/i18n';
 import { useRecentCities, type RecentCity } from '@/lib/recent-cities';
 import { colors, font, radii, ff } from '@/theme';
 import { Button } from '../Button';
-import { Card } from '../Card';
 import { Chip } from '../Chip';
 import { Icon } from '../Icon';
 import { EmptyState } from '../EmptyState';
@@ -29,6 +28,7 @@ import { ByHand, RequestFlow } from './Requests';
 import { TravellerChips } from './Travellers';
 import { StayResults } from './StayResults';
 import { PartyStep, StayGuests } from './Party';
+import { EsimPlanner } from '../esim/EsimPlanner';
 
 /* Stays, curated plans and eSIMs in Ask. */
 
@@ -328,19 +328,11 @@ export function PlanFlow({ query, people, today }: { query: string; people: Pers
   );
 }
 
-export function EsimFlow() {
-  const router = useRouter();
-  const n = 1;
-  return (
-    <Animated.View entering={enter(0)} style={{ gap: 12 }}>
-      <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('esim.title')}</T>
-      <Card>
-        <View style={styles.spread}><T v="h3">{t('esim.plan')}</T><T style={styles.price}>{t('esim.each', { price: formatSar(3900) })}</T></View>
-        <T v="small">{t('esim.body')}</T>
-      </Card>
-      <Button label={t('search.review', { price: formatSar(3900 * n) })} onPress={() => { usePayDraft.getState().set({ draft: { kind: 'esim', count: n }, title: t('pay.title.esim') }); router.push('/pay'); }} />
-    </Animated.View>
-  );
+/** Ask "data for Istanbul": the eSIM planner for that place and those days (components/esim/EsimPlanner.tsx). */
+export function EsimFlow({ intent }: { intent?: AskIntent | null }) {
+  const days = intent?.depart && intent?.return ? esimDays(intent.depart, intent.return) : null;
+  const dest = intent?.destination && intent.destination !== 'other' ? intent.destination : null;
+  return <Animated.View entering={enter(0)}><EsimPlanner destination={dest} days={days} /></Animated.View>;
 }
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;

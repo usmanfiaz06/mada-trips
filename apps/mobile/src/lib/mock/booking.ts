@@ -17,6 +17,7 @@ import { walletMock } from './wallet';
 import { circlesMock } from './circles';
 import { recordBookedTrip } from './trips';
 import { mockBeta } from './beta';
+import { fulfilEsimMock, priceEsimMock, resetEsimMock, type EsimSnap } from './esim';
 
 /** A tiny PDF for the mock desk's e-tickets (opens in the browser's viewer). */
 const E_TICKET = '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 120]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj 4 0 obj<</Length 52>>stream\nBT /F1 14 Tf 20 60 Td (Mada Trips e-ticket) Tj ET\nendstream endobj 5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF';
@@ -33,7 +34,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
+type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -106,7 +107,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
 
 /* ───────────── the order sheet ───────────── */
 
-type Priced = { preview: OrderPreview; place: string; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown>; ssr?: string[]; hotelRemarks?: string[] };
+type Priced = { preview: OrderPreview; place: string; esim?: EsimSnap; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown>; ssr?: string[]; hotelRemarks?: string[] };
 
 async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body: ReturnType<typeof PreviewBody.parse>, bump = 0): Promise<Priced | WireResponse> {
   const d = body.draft;
@@ -204,6 +205,12 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     const name = (await circlesMock({ method: 'GET', path: `/circles/${d.circleId}`, token: w.token }, ctx))?.json as { circle?: { name?: string } } | undefined;
     lines = [L('share', 'doc', t('pay.line.share', { what: m.split!.what }), sh.amount)];
     rule = t('pay.rule.share'); title = t('pay.title.share', { circle: name?.circle?.name ?? '' }); agent = false; photo = 'riyadh-kingdom-centre'; place = title;
+  } else if (d.packageId || d.topupOf) {
+    // A plan from the eSIM supplier (mock/esim.ts, the server's esim/service.ts), priced from its own package.
+    const e = priceEsimMock(people, user.id, d);
+    if (!e) return err('NOT_FOUND');
+    lines = e.lines; rule = e.rule; title = e.title; agent = false; photo = 'inflight-window'; place = e.place; travellers = e.travellers;
+    out.esim = e.snap;
   } else {
     lines = [L('esim', 'globe', t('pay.line.esim', { count: d.count }), sarToHalalas(DESK_PRICES.esimEach * d.count))];
     rule = t('pay.rule.esim'); title = t('pay.title.esim'); agent = false; place = title;
@@ -253,7 +260,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
 
 const tickMs = (o: Order) => (o.demo.has('slowAgent') ? 4200 : 1200);
 const viewOf = ({ why, owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, resends: _rs, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
-  ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000, result: orderResult(v, why) });
+  ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000, result: v.result ?? orderResult(v, why) });
 
 /** A booking that won't go ahead, as the server's booking desk records it (cancelResult): the traveller's own stop, nothing charged. */
 function orderResult(o: OrderView, why?: OutcomeReason): RequestResult | null {
@@ -277,6 +284,11 @@ function outReq(x: Req): BookingRequestView {
 
 function confirm(o: Order) {
   o.status = 'confirmed'; o.step = 3; o.ref = o.ref ?? newRef(); o.confirmedBy = o.agent; o.confirmedAt = nowIso(); o.nextAt = null;
+  // An eSIM is bought once the payment is captured; when the supplier says no, the order comes back refunded.
+  if (o.snap.esim) {
+    const refused = fulfilEsimMock({ id: o.id, owner: o.owner, total: o.total.amount, creditUsed: o.creditUsed.amount }, o.snap.esim, o.demo.has('esimFails'));
+    if (refused) { o.status = 'cancelled'; o.result = refused; if (o.creditUsed.amount) creditSpent.set(o.owner, Math.max(0, (creditSpent.get(o.owner) ?? 0) - o.creditUsed.amount)); }
+  }
   // A quoted fare (flights by request): the mock desk records a PNR and a ticket number each, as a person would, and
   // sends the e-tickets in the request's thread.
   let tickets: string[] | undefined;
@@ -671,7 +683,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
       owner: user.id, nextAt: requires3ds || payRequest ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
-      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null, requests: b.draft.kind === 'stay' ? b.draft.requests ?? null : null },
+      user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null, requests: b.draft.kind === 'stay' ? b.draft.requests ?? null : null, esim: priced.esim ?? null },
     };
     if (priced.quoted && b.draft.kind === 'quote') {
       const r = requests.get(b.draft.requestId);
@@ -747,7 +759,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
 };
 
 /** For the e2e script and tests: forget everything (a fresh install). */
-export function resetBookingMock() { offers.clear(); requests.clear(); orders.clear(); creditSpent.clear(); }
+export function resetBookingMock() { offers.clear(); requests.clear(); orders.clear(); creditSpent.clear(); resetEsimMock(); }
 
 /**
  * Trips › Requests lists every request, as the server does (lib/app/trips/requests.ts): the ones made in Ask too.

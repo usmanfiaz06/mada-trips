@@ -134,6 +134,8 @@ export const esimCopy = {
   'es.tr.talk': 'Talk to Mada',
   'es.tr.message': 'My eSIM for {where} isn’t connecting ({iccid}).',
   'es.trip.cta': 'Get an eSIM',
+  'es.ready.none': 'Internet from the moment you land. Pick a size for the trip.',
+  'es.ready.installed': 'eSIM for {n} · installed, on when you land',
 
   // ───────────── notices ─────────────
   'notify.esim.low.title': 'Your eSIM is running low',

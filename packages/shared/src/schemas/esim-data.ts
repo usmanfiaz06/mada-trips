@@ -4,12 +4,12 @@
  * like Airalo's (`merhaba-7days-1gb`, net price in USD); the live adapter reads the real ones from Airalo.
  */
 
-export type EsimCoverageKind = 'local' | 'regional' | 'global';
+type CoverageKind = 'local' | 'regional' | 'global';
 
 /** A package as a supplier sells it, in our words. netUsd is what Mada pays; the traveller's price adds the markup. */
 export type EsimPackage = {
   id: string;
-  coverage: { kind: EsimCoverageKind; code: string; name: string; countries: string[] };
+  coverage: { kind: CoverageKind; code: string; name: string; countries: string[] };
   /** Gigabytes; null for unlimited. */
   gb: number | null;
   days: number;

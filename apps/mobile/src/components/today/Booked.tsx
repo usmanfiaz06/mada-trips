@@ -1,25 +1,22 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { destinationOf, formatSar, liveStay, outSegment, passportIssue, seatText, ESIM_PRICE, type TripDetail, type TripRequestView } from '@mada/shared';
-import { Avatar } from '@/components/Avatar';
-import { Button } from '@/components/Button';
+import { destinationOf, liveStay, outSegment, passportIssue, seatText, type EsimView, type TripDetail, type TripRequestView } from '@mada/shared';
+import { useEsims } from '@/lib/esim';
 import { Icon } from '@/components/Icon';
-import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { MoveNotice } from '@/components/trips/MoveNotice';
 import { Box, Grow, H3, Photo, Ring, Rise, Row, Small, SmallButton, Spread, Tag, Tiny, Veil } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { dirSign, listSep, t } from '@/lib/i18n';
-import { toast } from '@/lib/toast';
-import { newKey, tripsApi, useTrips, useTripMutation, useOffline } from '@/lib/trips';
+import { useTrips } from '@/lib/trips';
 import { colors, ff, radii } from '@/theme';
 import { RequestsCard, TripHero } from './common';
 
 type Item = { id: string; ok: boolean; k: string; v: string; fix?: string; act?: 'flight' | 'stay' | 'passport' | 'esim' | 'car'; urgent?: boolean; href?: string };
 
 /** The six things that make a trip ready, from the trip itself (SCOPE.md: readiness ring). */
-export function readinessItems(trip: TripDetail, esim: TripRequestView | null): Item[] {
+export function readinessItems(trip: TripDetail, esim: TripRequestView | null, esims: readonly EsimView[] = []): Item[] {
   const out = outSegment(trip);
   const back = trip.segments.find((s) => s.direction === 'back');
   const st = liveStay(trip);
@@ -44,9 +41,12 @@ export function readinessItems(trip: TripDetail, esim: TripRequestView | null): 
         ? { id: 'pass', ok: false, k: t(n === 1 ? 'td.ready.passport' : 'td.ready.passports'), v: t('td.ready.ppMissing', { names: missing.map((p) => p.firstName).join(listSep()) }), fix: t('td.ready.addPp'), act: 'passport' }
         : { id: 'pass', ok: true, k: t(n === 1 ? 'td.ready.passport' : 'td.ready.passports'), v: n === 1 ? t('td.ready.ppValid', { country: dest.country }) : t('td.ready.ppValidAll', { n, country: dest.country }) },
     { id: 'entry', ok: true, k: t('td.ready.entry'), v: n === 1 ? t('td.ready.entryV') : t('td.ready.entryAll', { n }) },
-    esim
+    // eSIMs bought for this trip (Airalo); an older eSIM request still reads as before.
+    esims.length
+      ? { id: 'data', ok: true, k: t('td.ready.data'), v: esims.every((e) => e.installedAt) ? t('es.ready.installed', { n: esims.length }) : t('td.ready.esimDone', { n: esims.length }), href: `/esims?trip=${trip.id}` }
+      : esim
       ? { id: 'data', ok: esim.status === 'done' || esim.status === 'confirmed', k: t('td.ready.data'), v: esim.status === 'done' || esim.status === 'confirmed' ? t('td.ready.esimDone', { n: esim.short?.match(/\d+/)?.[0] ?? n }) : t('td.ready.esimWaiting'), fix: esim.status === 'done' || esim.status === 'confirmed' ? undefined : t('td.ready.esimPay'), act: 'esim' }
-      : { id: 'data', ok: false, k: t('td.ready.data'), v: n === 1 ? t('td.ready.dataOne', { price: formatSar(ESIM_PRICE) }) : t('td.ready.dataMany', { price: formatSar(ESIM_PRICE) }), fix: t('td.ready.setUp'), act: 'esim' },
+      : { id: 'data', ok: false, k: t('td.ready.data'), v: t('es.ready.none'), fix: t('td.ready.setUp'), act: 'esim' },
     home || arrive
       ? { id: 'pickup', ok: true, k: t('td.ready.pickups'), v: t(home && arrive ? 'td.ready.bothWays' : 'td.ready.oneWay', { wait: arrive?.waits ?? '60 min' }) }
       : { id: 'pickup', ok: false, k: t('td.ready.noPickup'), v: t('td.ready.noPickupBody'), fix: t('td.ready.addPickup'), act: 'car' },
@@ -56,17 +56,17 @@ export function readinessItems(trip: TripDetail, esim: TripRequestView | null): 
 function Readiness({ trip }: { trip: TripDetail }) {
   const router = useRouter();
   const { data } = useTrips();
-  const [esim, setEsim] = useState(false);
   const [open, setOpen] = useState(false);
   const esimReq = (data?.requests ?? []).find((r) => r.tripId === trip.id && r.kind === 'esim') ?? null;
-  const items = readinessItems(trip, esimReq);
+  const bought = (useEsims({ trip: trip.id }).data?.esims ?? []).filter((e) => e.status !== 'refunded');
+  const items = readinessItems(trip, esimReq, bought);
   const todo = items.filter((i) => !i.ok).sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
   const done = items.filter((i) => i.ok);
   const next = todo[0];
   const act = (it: Item) => {
     buzz('tap');
     if (it.act === 'passport') router.push('/wallet');
-    else if (it.act === 'esim') { if (esimReq) router.push('/trips?tab=requests' as Href); else setEsim(true); }
+    else if (it.act === 'esim') router.push((esimReq ? '/trips?tab=requests' : `/esim/plans?trip=${trip.id}`) as Href);
     else router.push(`/ask?intent=${it.act}` as Href);
   };
   return (
@@ -99,37 +99,7 @@ function Readiness({ trip }: { trip: TripDetail }) {
           ))}
         </View>
       ) : null}
-      <EsimSheet trip={trip} open={esim} onClose={() => setEsim(false)} />
     </Box>
-  );
-}
-
-/** Data on landing: pick who needs it. Mada confirms the eSIMs and the price lands in Requests. */
-function EsimSheet({ trip, open, onClose }: { trip: TripDetail; open: boolean; onClose: () => void }) {
-  const [who, setWho] = useState(trip.travellers.map((p) => p.id));
-  const offline = useOffline();
-  const ask = useTripMutation(() => tripsApi.ask(trip.id, { area: 'other', kind: 'esim', count: who.length, travellerIds: who, clientKey: newKey() }));
-  const dest = destinationOf(trip);
-  return (
-    <Sheet visible={open} onClose={onClose} label={t('td.esim.sheetTitle', { country: dest.country })}>
-      <T v="h2">{t('td.esim.sheetTitle', { country: dest.country })}</T>
-      <Small style={{ marginTop: -8 }}>{t('td.esim.sheetBody')}</Small>
-      <View style={{ gap: 8 }}>
-        {trip.travellers.map((p) => {
-          const on = who.includes(p.id);
-          return (
-            <Pressable key={p.id} accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={() => { buzz('select'); setWho(on ? who.filter((x) => x !== p.id) : [...who, p.id]); }} style={[styles.person, on ? { backgroundColor: '#f3ead8' } : null]}>
-              <Avatar initial={p.initial} size={32} />
-              <Grow gap={0}><H3 size={15}>{p.firstName}</H3><Tiny>{t(`td.rel.${p.relation}` as never)}</Tiny></Grow>
-              <View style={[styles.tickbox, on ? { backgroundColor: colors.green, borderColor: colors.green } : null]}>{on ? <Icon name="check" size={14} color={colors.paper} width={2.6} /> : null}</View>
-            </Pressable>
-          );
-        })}
-      </View>
-      {offline ? <Box tone="warn"><H3>{t('td.offline.title')}</H3><Small>{t('td.esim.offline')}</Small></Box> : null}
-      <Button testID="esim-send" label={t('td.esim.send', { price: formatSar(ESIM_PRICE * who.length) })} disabled={!who.length || offline} busy={ask.isPending}
-        onPress={() => ask.mutate(undefined, { onSuccess: () => { buzz('success'); toast(t('td.esim.sent')); onClose(); }, onError: () => toast(t('error.offline')) })} />
-    </Sheet>
   );
 }
 

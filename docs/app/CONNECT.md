@@ -21,7 +21,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 10 | Hotelbeds Activities / Viator / GetYourGuide | things to do | Ready | Owner |
 | 11 | TBO | flights (and a second hotel source) | To build | Owner + code |
 | 12 | Flights today | desk books by request (`APP_FLIGHTS_MODE=request`) | Ready | — |
-| 13 | eSIM (Airalo or eSIM Go) | data on landing | To build | Owner + code |
+| 13 | eSIM (Airalo) | data on landing | Built, needs Airalo keys | Owner |
 | 14 | Car right now (on demand) | instant car | No open supplier | Decision |
 | 15 | AeroDataBox | flight status, gates, delays | Ready | Owner |
 | 16 | APNs + Expo push | notifications, Live Activity updates | Ready | Owner (after #1) |
@@ -102,12 +102,20 @@ TBO (TBO Holidays / TBO Air) can give real flight search, fares and ticketing, w
 ### 12. Flights today
 Nothing to do: flights go to the desk as requests until TBO (or another GDS) is connected.
 
-### 13. eSIM — to build
-1. Choose a supplier: **Airalo Partner** (widest coverage, simple API) or **eSIM Go** (lower wholesale). Apply as a
-   reseller; agree wholesale prices; get sandbox keys into Vercel.
-2. Code: plans for the trip's country and days, order after payment, one-tap install link on iPhone (iOS 17.4+), QR
-   for Android, data-left and top-up on the trip, desk view.
-3. Ask your accountant how VAT applies to reselling data.
+### 13. eSIM — Airalo (built, needs keys)
+Built: plans for the trip's country and days in 2–3 sizes, one eSIM per traveller, the phone check, paid on the order
+sheet, bought from Airalo once the card is captured (never twice), iPhone one-tap install, Android QR and codes, what's
+left and top-ups on the trip, "Not connecting?", the desk's eSIM page, an automatic refund when Airalo can't give one.
+Runs on mock fixtures until the keys are in.
+1. Sign the Airalo Partner agreement; in the Partner Platform create API credentials (sandbox first). Add Vercel's
+   outbound IPs to the allowlist if you turn it on.
+2. Vercel (staging first): `AIRALO_CLIENT_ID`, `AIRALO_CLIENT_SECRET`, `AIRALO_ENV=sandbox`, `SUPPLIER_MODE_ESIM=live`,
+   `APP_ESIM_MARKUP_BPS` (e.g. 3000 for 30% over Airalo's net price). Sandbox orders cost nothing and can't be installed.
+3. Opt in to low-data notices (Partner Platform or `POST /v2/notifications/opt-in`) with
+   `<APP_PUBLIC_URL>/api/app/v1/esim/airalo/webhook`.
+4. For launch: switch the Airalo account to production (one way), top up the Airalo balance, set `AIRALO_ENV=live` on
+   production only.
+5. Ask your accountant how VAT applies to reselling data.
 
 ### 14. Car right now — decision
 Careem and Uber have no open booking API for agencies. Options: (a) keep "Mada calls you back" for instant cars

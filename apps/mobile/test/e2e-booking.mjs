@@ -561,8 +561,9 @@ async function requests() {
   await k.shot('plan-pay');
   step('eSIM');
   await openAsk(page);
+  // The whole eSIM journey (plans, phone check, pay, install, top up) is test/e2e-esim.mjs; here only that Ask opens it.
   await k.ask('An eSIM for the trip');
-  await k.see('An eSIM for Türkiye, ready on landing.', 'esim');
+  await k.see('Which trip is it for?', 'esim');
   await k.shot('esim');
   await context.close();
 }
