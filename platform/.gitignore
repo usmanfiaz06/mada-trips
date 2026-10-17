@@ -7,3 +7,6 @@ next-env.d.ts
 # The website is copied in at build time (scripts/copy-site.mjs)
 /public/*
 !/public/adminwork/
+
+# Local blob store written by tests and dev runs (uploads, document images); never committed.
+.data/
