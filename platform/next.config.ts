@@ -29,8 +29,10 @@ const config: NextConfig = {
     return cfg;
   },
   // Boarding-pass barcodes (lib/app/boarding) and Wallet signing run as plain Node packages; the zxing .wasm is read
-  // from disk, so it's traced into every function that may read or draw a barcode.
-  serverExternalPackages: ["zxing-wasm", "node-forge"],
+  // from disk, so it's traced into every function that may read or draw a barcode. postgres is loaded from node_modules
+  // as installed, so scripts/patch-postgres.mjs (one round trip per query) applies; a bundled copy could come from
+  // the build cache, made before the patch.
+  serverExternalPackages: ["zxing-wasm", "node-forge", "postgres"],
   outputFileTracingIncludes: {
     "/api/app/v1/**": ["./node_modules/zxing-wasm/dist/full/zxing_full.wasm"],
     "/adminwork/**": ["./node_modules/zxing-wasm/dist/full/zxing_full.wasm"],

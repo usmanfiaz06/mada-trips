@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { and, eq, sql as rawSql } from "drizzle-orm";
 import {
   AskParseResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OrderResponse, OrdersResponse, PlanResponse, PlansResponse,
@@ -116,6 +116,23 @@ describe("Ask: what people type", () => {
     expect(AskParseResponse.parse((await post(askParse, f.token, { text: "Flights to Dubai next weekend" })).json).intent).toMatchObject({ destination: "dubai", ask: "who" });
     expect(AskParseResponse.parse((await post(askParse, f.token, { text: "something nice" })).json).intent.kind).toBe("general");
     expect(AskParseResponse.parse((await post(askParse, f.token, { text: "Flights to Muscat in March" })).json).intent).toMatchObject({ destination: "other", destinationName: "Muscat", monthOnly: { month: 3 } });
+  });
+
+  it("asks the model only when the rules leave something open (live mode)", async () => {
+    const f = await family();
+    const { claudeAsk } = await import("@/lib/app/suppliers/live/ask-claude");
+    const spy = vi.spyOn(claudeAsk, "parse").mockResolvedValue(null);
+    process.env.SUPPLIER_MODE_AI = "live";
+    try {
+      const full = AskParseResponse.parse((await post(askParse, f.token, { text: "Istanbul for Eid, Hessa and me" })).json).intent;
+      expect(full).toMatchObject({ kind: "flight", destination: "istanbul", depart: EID_OUT, return: EID_BACK, source: "rules" });
+      expect(spy).not.toHaveBeenCalled();
+      await post(askParse, f.token, { text: "Flights to Dubai next weekend" });
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete process.env.SUPPLIER_MODE_AI;
+      spy.mockRestore();
+    }
   });
 
   it("reads a guest's words too, and needs a sentence", async () => {

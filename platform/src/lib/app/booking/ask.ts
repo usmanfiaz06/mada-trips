@@ -14,6 +14,8 @@ export async function parseAsk(ownerId: string | null, text: string): Promise<As
   const day = today();
   const rules = parseAskRules(text, { today: day, people });
   const fromRules: AskIntent = askIntentOfRules(rules);
+  // The rules read the whole flight (a known city, the days, who): nothing is left for the model, so it isn't asked.
+  if (rulesComplete(fromRules)) return AskIntent.parse(fromRules);
   let model: Awaited<ReturnType<ReturnType<typeof bookingSuppliers.ask>["parse"]>> = null;
   try {
     model = await bookingSuppliers.ask().parse(text, { today: day, people, destinations: Object.keys(DESTINATIONS) });
@@ -25,6 +27,12 @@ export async function parseAsk(ownerId: string | null, text: string): Promise<As
   // "A taxi now in Abha" is a car right now, whatever the model made of the place.
   if (rules.kind === "car" && carNowAsk("car", text)) merged.kind = "car";
   return AskIntent.parse(merged);
+}
+
+/** A flight the rules read in full: where (one of ours), when, back when or one way, and who, with nothing to ask. */
+export function rulesComplete(r: AskIntent): boolean {
+  return r.kind === "flight" && !r.ask && !!r.destination && r.destination !== "other" && !!DESTINATIONS[r.destination]
+    && !!r.depart && (r.tripType === "oneway" || !!r.return) && !r.monthOnly && !(r.party && !r.travellerIds?.length);
 }
 
 /** Keep what the model said only where it is a real value; the rules fill the rest (needs and form answers always). */

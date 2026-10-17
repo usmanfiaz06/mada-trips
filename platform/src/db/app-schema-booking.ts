@@ -15,6 +15,17 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
 
+/**
+ * A supplier's answer to one search (the same city, days, party and cabin), shared by every server instance for 10
+ * minutes (booking/search.ts): asked again within that time, Hotelbeds isn't asked again. No traveller in it; rows over
+ * an hour old are cleared as new ones are written. Migration: drizzle/0032_search_cache.sql.
+ */
+export const appSearchCache = pgTable("app_search_cache", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  createdAt: createdAt(),
+}, (t) => [index("app_search_cache_created_idx").on(t.createdAt)]);
+
 /** A supplier offer shown to one traveller: our id, the supplier's id, the snapshot the price came from, its hold. */
 export const appOffers = pgTable("app_offers", {
   id: id(),

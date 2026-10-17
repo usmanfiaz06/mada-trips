@@ -225,6 +225,13 @@
       "when": 1792253356432,
       "tag": "0031_guests_translations",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792257064959,
+      "tag": "0032_search_cache",
+      "breakpoints": true
     }
   ]
 }

@@ -223,19 +223,23 @@ export function toRefundView(g: GroupRow): RefundView {
   };
 }
 
-/** In mock mode the desk answers an "ask anyway" after 7 seconds: no, with the reason and another way. */
-async function progressMockRefunds(ownerId: string) {
+/** In mock mode the desk answers an "ask anyway" after 7 seconds: no, with the reason and another way. Returns what it moved. */
+async function progressMockRefunds(ownerId: string): Promise<GroupRow[]> {
   let mock = false;
   try { mock = supplierMode("payments") === "mock"; } catch { mock = false; }
-  if (!mock) return;
-  await db.update(appRefundGroups).set({ stage: "rejected", updatedAt: new Date() })
-    .where(and(eq(appRefundGroups.ownerId, ownerId), eq(appRefundGroups.anyway, true), eq(appRefundGroups.stage, "requested"), sql`${appRefundGroups.createdAt} < now() - interval '7 seconds'`));
+  if (!mock) return [];
+  return db.update(appRefundGroups).set({ stage: "rejected", updatedAt: new Date() })
+    .where(and(eq(appRefundGroups.ownerId, ownerId), eq(appRefundGroups.anyway, true), eq(appRefundGroups.stage, "requested"), sql`${appRefundGroups.createdAt} < now() - interval '7 seconds'`))
+    .returning();
 }
 
 export async function listRefunds(ownerId: string, tripId?: string): Promise<RefundView[]> {
-  await progressMockRefunds(ownerId);
-  const rows = await db.select().from(appRefundGroups).where(tripId ? and(eq(appRefundGroups.ownerId, ownerId), eq(appRefundGroups.tripId, tripId)) : eq(appRefundGroups.ownerId, ownerId)).orderBy(desc(appRefundGroups.createdAt));
-  return rows.map(toRefundView);
+  // The mock desk's move and the read go side by side (one round trip); what it moved replaces what the read saw.
+  const [moved, rows] = await Promise.all([
+    progressMockRefunds(ownerId),
+    db.select().from(appRefundGroups).where(tripId ? and(eq(appRefundGroups.ownerId, ownerId), eq(appRefundGroups.tripId, tripId)) : eq(appRefundGroups.ownerId, ownerId)).orderBy(desc(appRefundGroups.createdAt)),
+  ]);
+  return rows.map((r) => toRefundView(moved.find((m) => m.id === r.id) ?? r));
 }
 
 export async function getRefund(ownerId: string, id: string): Promise<RefundView> {

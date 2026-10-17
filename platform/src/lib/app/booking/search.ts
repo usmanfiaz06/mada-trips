@@ -1,13 +1,13 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, childSar, childSeats, flightTotal, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
   type StayOption, type StaySearchRequest, type StaySearchResponse, EntryCheckRequest as EntrySchema, FlightSearchRequest as FlightSchema, StaySearchRequest as StaySchema,
 } from "@mada/shared";
 import { db } from "@/db";
-import { appOffers } from "@/db/app-schema-booking";
+import { appOffers, appSearchCache } from "@/db/app-schema-booking";
 import { supplierMode } from "../config";
 import { AppError } from "../http";
 import type { BookingFlightOffer, BookingHotelOffer } from "../suppliers/booking-types";
@@ -18,6 +18,8 @@ import { guestPeople } from "../guest";
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
  * stored as an offer with our own id and the supplier's hold (20 minutes), so the order sheet prices exactly that.
+ * A live supplier's answer is also kept in app_search_cache, so every server instance shares it (a hotel search takes
+ * Hotelbeds seconds; the shared copy is one database read).
  */
 
 const CACHE_MS = 10 * 60_000;
@@ -25,14 +27,39 @@ type CacheEntry<T> = { at: number; value: T };
 const g = globalThis as unknown as { __madaSearchCache?: Map<string, CacheEntry<unknown>> };
 const cache = (g.__madaSearchCache ??= new Map());
 
-async function cached<T>(key: string, run: () => Promise<T>): Promise<{ value: T; at: number }> {
+/**
+ * The supplier's answer for this key: this instance's copy, else (shared) the database's, else the supplier's.
+ * `saved` settles when a new answer is in the database; callers await it with their own writes (no extra wait).
+ */
+export async function cached<T>(key: string, run: () => Promise<T>, shared = false): Promise<{ value: T; at: number; saved: Promise<void> }> {
+  const done = Promise.resolve();
   const hit = cache.get(key) as CacheEntry<T> | undefined;
-  if (hit && Date.now() - hit.at < CACHE_MS) return { value: hit.value, at: hit.at };
+  if (hit && Date.now() - hit.at < CACHE_MS) return { value: hit.value, at: hit.at, saved: done };
+  if (shared) {
+    const row = await db.select({ value: appSearchCache.value, at: appSearchCache.createdAt }).from(appSearchCache)
+      .where(and(eq(appSearchCache.key, key), sql`${appSearchCache.createdAt} > now() - interval '10 minutes'`)).limit(1)
+      .then((r) => r[0], () => undefined);
+    if (row) {
+      const at = Math.min(row.at.getTime(), Date.now());
+      remember(key, { at, value: row.value });
+      return { value: row.value as T, at, saved: done };
+    }
+  }
   const value = await run();
   const at = Date.now();
-  cache.set(key, { at, value });
+  remember(key, { at, value });
+  // One statement: this answer in, answers over an hour old out. A failure only costs the next instance a search.
+  const saved = shared
+    ? db.execute(sql`WITH gone AS (DELETE FROM app_search_cache WHERE created_at < now() - interval '1 hour')
+        INSERT INTO app_search_cache (key, value, created_at) VALUES (${key}, ${JSON.stringify(value)}::jsonb, now())
+        ON CONFLICT (key) DO UPDATE SET value = excluded.value, created_at = excluded.created_at`).then(() => undefined, (e) => { console.warn("[search] cache not saved", e instanceof Error ? e.message : ""); })
+    : done;
+  return { value, at, saved };
+}
+
+function remember(key: string, entry: CacheEntry<unknown>) {
+  cache.set(key, entry);
   if (cache.size > 500) for (const [k, v] of cache) if (Date.now() - v.at > CACHE_MS) cache.delete(k);
-  return { value, at };
 }
 export const clearSearchCache = () => cache.clear();
 
@@ -99,8 +126,9 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
   const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, kids, q.infants, q.cabin]);
   let offers: BookingFlightOffer[];
   let at: number;
+  let saved: Promise<void>;
   try {
-    ({ value: offers, at } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin })));
+    ({ value: offers, at, saved } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin }), supplierMode("flights") === "live"));
   } catch (e) {
     if (e instanceof SupplierDown) return { ...base, depart, outcome: "partial", checked: 0, options: [], unavailable: [{ carrier: "*", airline: "The airline" }], cachedUntil: until(Date.now()) };
     throw e;
@@ -113,9 +141,9 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
   const search = { kind: "flight", destination: dest.key, from, depart, return: q.return, travellerIds: people.map((p) => p.id), infants: q.infants, cabin: q.cabin };
   const expiresAt = holdEnds();
   const options: FlightOption[] = offers.map((o) => ({ ...flightOptionOf(o, randomUUID(), n, q.infants, kids), expiresAt: expiresAt.toISOString() }));
-  await storeOffers(offers.map((o, i) => ({
+  await Promise.all([saved, storeOffers(offers.map((o, i) => ({
     id: options[i]!.id, ownerId, kind: "flight", supplier: o.supplier, supplierOfferId: o.id, search, payload: options[i] as unknown as Record<string, unknown>, total: options[i]!.total.amount, expiresAt,
-  })));
+  })))]);
   const b = dest.key === "istanbul" && q.return ? bundleFor(n, depart, q.return) : null;
   return {
     ...base, depart, outcome: options.length ? (unavailable.length ? "partial" : "ok") : "none", checked: CHECKED_FARES[dest.key] ?? 9, options, unavailable,
@@ -150,15 +178,15 @@ export async function searchStays(ownerId: string | null, input: StaySearchReque
   const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape]);
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
-  const { value: offers } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]));
+  const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
   const expiresAt = holdEnds();
   const search = { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
   // Ranked for this trip, with one "Best for you" and one "Lowest price"; the reasons are stored with each offer.
   const ranked = rankStays(offers.map((h) => ({ h, name: h.name, total: h.total, facts: h.meta?.facts ?? null })), { shape: shape.shape, city: dest.key, radiusKm: 8 });
   const options: StayOption[] = ranked.map((r) => ({ ...stayOptionOf(r.h, randomUUID(), n, q.checkIn), label: r.badge === "lowest" ? "lowest" as const : "best" as const, badge: r.badge, score: r.score, fit: r.fit, expiresAt: expiresAt.toISOString() }));
-  await storeOffers(ranked.map(({ h }, i) => ({
+  await Promise.all([saved, storeOffers(ranked.map(({ h }, i) => ({
     id: options[i]!.id, ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search, payload: options[i] as unknown as Record<string, unknown>, total: h.total.amount, expiresAt,
-  })));
+  })))]);
   return { ...base, outcome: options.length ? "ok" : "none", options, shape: { shape: shape.shape, because: shape.because, travellers: shape.travellers, under12: shape.under12 } };
 }
 
