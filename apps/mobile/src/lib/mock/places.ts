@@ -1,7 +1,7 @@
 import { CityGuide, PlaceId, PlanPlaceRequest, ERROR_CODES, normPlace, planMessage, t, type ErrorCode, type PlaceHit } from '@mada/shared';
 import type { WireResponse } from '../api';
 import type { AreaMock } from '../mock-api';
-import { bookingMock } from './booking';
+import { bookingMock, retitleRequest } from './booking';
 import CITIES from './places-cities.json';
 import GUIDES from './places-guides.json';
 
@@ -131,9 +131,7 @@ export const placesMock: AreaMock = async (w, ctx) => {
     const made = await bookingMock({ method: 'POST', path: '/requests', token: w.token, body: { kind: 'general', query: message, answers: {}, needs: {}, note: '', travellerIds: b.data.travellerIds, clientId: b.data.clientId } }, ctx);
     if (!made || made.status >= 400) return made ?? err('INTERNAL');
     const view = (made.json as { request: { id: string; title: string; detail: string; summary: string } }).request;
-    view.title = t('places.request.title', { city: c.hit.name });
-    view.detail = `${t('places.request.detail', { city: c.hit.name, country: c.hit.country })} · ${message}`;
-    view.summary = message;
+    retitleRequest(view.id, Object.assign(view, { title: t('places.request.title', { city: c.hit.name }), detail: `${t('places.request.detail', { city: c.hit.name, country: c.hit.country })} · ${message}`, summary: message }));
     await bookingMock({ method: 'POST', path: `/requests/${view.id}/messages`, token: w.token, body: { text: message } }, ctx);
     return ok({ request: view, message }, 201);
   }

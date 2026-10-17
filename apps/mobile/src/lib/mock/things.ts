@@ -4,7 +4,7 @@ import {
 } from '@mada/shared';
 import type { WireResponse } from '../api';
 import type { AreaMock } from '../mock-api';
-import { bookingMock } from './booking';
+import { bookingMock, retitleRequest } from './booking';
 import { mockPlaceHit, mockSearch } from './places';
 import { tripsMock } from './trips';
 import { plannedIdeas } from './things-store';
@@ -154,9 +154,7 @@ export const thingsMock: AreaMock = async (w, ctx) => {
     const made = await bookingMock({ method: 'POST', path: '/requests', token: w.token, body: { kind: 'todo', query: message, answers: {}, needs: {}, note: '', travellerIds: b.data.travellerIds, clientId: b.data.clientId } }, ctx);
     if (!made || made.status >= 400) return made ?? err('INTERNAL');
     const view = (made.json as { request: { id: string; title: string; detail: string; summary: string } }).request;
-    view.title = t('things.request.title', { name: th.title });
-    view.detail = `${th.p.name} · ${who} · ${when}`;
-    view.summary = `${who} · ${when}`;
+    retitleRequest(view.id, Object.assign(view, { title: t('things.request.title', { name: th.title }), detail: `${th.p.name} · ${who} · ${when}`, summary: `${who} · ${when}` }));
     await bookingMock({ method: 'POST', path: `/requests/${view.id}/messages`, token: w.token, body: { text: message } }, ctx);
     return ok({ request: view, message }, 201);
   }
@@ -182,9 +180,8 @@ export const thingsMock: AreaMock = async (w, ctx) => {
     const made = await bookingMock({ method: 'POST', path: '/requests', token: w.token, body: { kind: 'car', query: message, answers: {}, needs: {}, note: '', travellerIds: [], clientId: b.data.clientId } }, ctx);
     if (!made || made.status >= 400) return made ?? err('INTERNAL');
     const view = (made.json as { request: { id: string; title: string; detail: string; summary: string } }).request;
-    view.title = t('things.ride.requestTitle', { name: th.title });
-    view.detail = [`${from} → ${th.title}`, `${day} ${b.data.time}`, who].join(' · ');
-    view.summary = view.detail;
+    const rideDetail = [`${from} → ${th.title}`, `${day} ${b.data.time}`, who].join(' · ');
+    retitleRequest(view.id, Object.assign(view, { title: t('things.ride.requestTitle', { name: th.title }), detail: rideDetail, summary: rideDetail }));
     await bookingMock({ method: 'POST', path: `/requests/${view.id}/messages`, token: w.token, body: { text: message } }, ctx);
     return ok({ request: view, message }, 201);
   }

@@ -758,6 +758,15 @@ export const bookingMock: AreaMock = async (w, ctx) => {
   return err('NOT_FOUND');
 };
 
+/**
+ * A request asked from its own screen (a city's plan, an outing, a ride) keeps the words that screen gave it, as the
+ * server keeps its titleCopy: the stored request changes, not only the copy sent back, so the thread and lists read them.
+ */
+export function retitleRequest(id: string, words: { title: string; detail: string; summary: string }) {
+  const r = requests.get(id);
+  if (r) Object.assign(r.view, words);
+}
+
 /** For the e2e script and tests: forget everything (a fresh install). */
 export function resetBookingMock() { offers.clear(); requests.clear(); orders.clear(); creditSpent.clear(); resetEsimMock(); }
 

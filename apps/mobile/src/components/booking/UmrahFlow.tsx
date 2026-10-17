@@ -56,8 +56,11 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   const named = (intent.travellerIds ?? []).filter((id) => people.some((p) => p.id === id));
   const [who, setWho] = useWho(() => (named.length ? named : H.nonHelper.length ? H.nonHelper.map((p) => p.id) : H.me ? [H.me] : []));
   const [lap, setLap] = useState(intent.infants ?? 0);
-  const [needParty, setNeedParty] = useState(!!intent.party && !named.length);
-  const [whoDone, setWhoDone] = useState(!!named.length || H.nonHelper.length <= 1);
+  const [needPartySet, setNeedParty] = useState<boolean | null>(null);
+  const needParty = needPartySet ?? (!!intent.party && !named.length);
+  // Read from the household as it loads: a first render before the people arrive must not settle who's going.
+  const [whoDoneSet, setWhoDone] = useState<boolean | null>(null);
+  const whoDone = whoDoneSet ?? (!!named.length || H.nonHelper.length <= 1);
   const [needs, setNeeds] = useState<Record<string, NeedKey[]>>(() => ({ ...(intent.needs ?? {}) }) as Record<string, NeedKey[]>);
   // A wheelchair or oxygen said in the words opens the needs; otherwise they wait behind the chip.
   const [needsOpen, setNeedsOpen] = useState(!!intent.needsMentioned?.length || Object.values(intent.needs ?? {}).some((x) => x.length));
