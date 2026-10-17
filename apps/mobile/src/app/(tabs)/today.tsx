@@ -10,6 +10,7 @@ import { InAir } from '@/components/today/InAir';
 import { Landed } from '@/components/today/Landed';
 import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
+import { LowPowerEntry } from '@/components/today/LowPower';
 import { useSession } from '@/lib/session';
 import { clockOffset, serverNow } from '@/lib/net/clock';
 import { registerForPush, useCarryOverGuestFlights, useTrip, useTrips } from '@/lib/trips';
@@ -60,6 +61,7 @@ export default function Today() {
       <Wash hour={todayHour()} />
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140, paddingTop: top + 10, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" testID="today-scroll">
         <TodayHeader clock={clock} unread={trips.data?.unread ?? 0} />
+        {status === 'signedIn' ? <LowPowerEntry /> : null}
         {body}
       </ScrollView>
       <BannerHost />

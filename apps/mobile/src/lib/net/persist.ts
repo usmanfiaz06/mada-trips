@@ -2,6 +2,8 @@ import { dehydrate, hydrate, type Query, type QueryKey } from '@tanstack/react-q
 import { queryClient } from '../queries';
 import { useSession } from '../session';
 import { kvReadJson, kvWriteJson } from './kv';
+import { clearOutbox } from './outbox';
+import { forgetShell } from './shell';
 
 /*
  * The offline copy of server state: React Query's cache, saved to the phone so the app opens with trips, the
@@ -10,7 +12,8 @@ import { kvReadJson, kvWriteJson } from './kv';
  * What is kept, and for how long, is a list of rules by query key (`persistQueries`) or a query's own
  * `meta: { persist: maxAgeMs }`. Anything else (search results, prices, previews, positions) is never kept: a
  * price from yesterday is worse than no price. Saved at most once a second after a change; restored before the first
- * screen draws; dropped when the traveller signs out or a different account signs in.
+ * screen draws; dropped when the traveller signs out or a different account signs in (with the outbox, so nothing
+ * queued by one account is sent as another, and the web shell's files: lib/net/shell.ts).
  * Only what the server already sends the app is kept (passport numbers come masked); it lives in the app's own
  * storage and goes with the app.
  */
@@ -105,6 +108,8 @@ export function startPersistence(): () => void {
     // Signed out, or someone else signed in on this phone: nothing of the last account stays.
     if ((prev.status === 'signedIn' && s.status === 'signedOut') || (prev.user && s.user && prev.user.id !== s.user.id)) {
       void clearCache();
+      clearOutbox();
+      forgetShell();
       if (s.status === 'signedOut') queryClient.clear();
     }
     prev = s;

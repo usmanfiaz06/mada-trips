@@ -24,6 +24,7 @@ import { askFlowCopy } from './ask-flow';
 import { staysCopy } from './stays';
 import { nowCopy } from './now';
 import { outcomesCopy } from './outcomes';
+import { offlineCopy } from './offline';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -62,6 +63,8 @@ export const en = {
   ...nowCopy,
   // How a request ends, and what Mada is doing until it does: packages/shared/src/copy/outcomes.ts
   ...outcomesCopy,
+  // No signal, and almost no battery: packages/shared/src/copy/offline.ts
+  ...offlineCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',

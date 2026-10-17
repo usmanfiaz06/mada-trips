@@ -16,6 +16,7 @@ import { SessionExpired } from '@/components/states/SessionExpired';
 import { AppLock } from '@/components/auth/AppLock';
 import { useOutboxPump } from '@/lib/net/outbox';
 import { restoreCache, startPersistence } from '@/lib/net/persist';
+import { registerShell } from '@/lib/net/shell';
 import { useRemoteConfig } from '@/lib/net/remote';
 import { initReporting } from '@/lib/net/report';
 import { startNet } from '@/lib/net/state';
@@ -31,6 +32,8 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 initReporting(Constants.expoConfig?.version);
 startNet();
 startPersistence();
+// The web build: a reload with no signal opens the app and the trips saved on this device (public/sw.js).
+registerShell();
 
 /** expo-router's boundary for the layout itself: the same calm crash screen. */
 export function ErrorBoundary({ retry }: { error: Error; retry: () => Promise<void> }) {
@@ -84,6 +87,8 @@ export default function RootLayout() {
                 <Stack.Screen name="passport" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
                 <Stack.Screen name="update" options={{ animation: 'fade', gestureEnabled: false }} />
                 <Stack.Screen name="maintenance" options={{ animation: 'fade', gestureEnabled: false }} />
+                {/* Low battery: no animation in, none out. */}
+                <Stack.Screen name="battery" options={{ animation: 'none', contentStyle: { backgroundColor: '#000' } }} />
               </Stack>
             </NetChrome>
           </AppErrorBoundary>

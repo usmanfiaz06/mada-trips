@@ -165,5 +165,11 @@ export function useOutboxPump() {
   }, [waiting]);
 }
 
+/** Signed out, or someone else signed in: what the last account queued is never sent as the next one. */
+export function clearOutbox() {
+  useOutboxStore.setState({ items: [] });
+  void kvWriteJson(KEY, null);
+}
+
 /** Tests. */
 export function resetOutbox() { useOutboxStore.setState({ items: [], loaded: true }); handlers.clear(); running = null; }

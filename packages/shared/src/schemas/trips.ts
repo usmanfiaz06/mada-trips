@@ -175,6 +175,9 @@ export const StayDetail = Stay.extend({
   hotelCode: z.number().int().nullable().optional(),
   /** What the traveller asked the hotel for on the order sheet. Older servers send none. */
   requests: HotelRequests.nullable().optional(),
+  /** The hotel's name and address in Arabic, to show a driver who reads Arabic. Older servers send none. */
+  nameAr: z.string().nullable().optional(),
+  addressAr: z.string().nullable().optional(),
 });
 export type StayDetail = z.infer<typeof StayDetail>;
 
