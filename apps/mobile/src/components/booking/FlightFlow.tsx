@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, Platform } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AIRPORT_NAMES, CATALOGUE_HOTELS, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
-  type AskIntent, type FlightOption, type FlightSearchResponse, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
+  type AskIntent, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type Household, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
@@ -40,6 +40,44 @@ export type Cta = { label: string; disabled?: boolean; onPress: () => void; test
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
+/* The first search of a flow, built the same way here and in useFlightHeadStart, so a search started early is the one the flow shows. */
+const tripOf = (intent: AskIntent): TripSearch => ({ from: intent.from ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
+const whoOf = (intent: AskIntent, H: Household): string[] => (intent.travellerIds?.length ? intent.travellerIds : H.nonHelper.length ? H.nonHelper.map((p) => p.id) : H.me ? [H.me] : []);
+const flightsKey = (dest: string | undefined, trip: TripSearch, who: string[], flex: boolean, runKey: number, flags: string) => ['booking', 'flights', dest, trip, who.join(), flex, runKey, flags];
+const flightsBody = (dest: string, trip: TripSearch, who: string[], flex: boolean): FlightSearchRequest => ({ from: trip.from, destination: dest, depart: trip.dep!, return: trip.type === 'oneway' ? null : trip.ret, travellerIds: who, infants: trip.infants, cabin: trip.cabin, flexibleDays: flex || trip.flex ? 2 : 0 });
+const entryKey = (dest: string | undefined, who: string[], depart: string | null, ret: string | null, answers: Record<string, string>, permit: boolean, flags: string) => ['booking', 'entry', dest, who.join(), depart, ret, answers, permit, flags];
+
+/**
+ * Ask starts the flight search and the entry check from the words as the phone reads them (the same rules as the
+ * server), while the server reads them too. When the server's reading opens the same search, the flow finds it already
+ * on its way; when it doesn't, nothing shown changes (the flow runs its own).
+ */
+export function useFlightHeadStart(people: Person[], today: string) {
+  const qc = useQueryClient();
+  const demo = useDemo((s) => s.on);
+  const byRequest = useFlightsByRequest();
+  const phoneNeeded = usePhoneNeeded();
+  return (intent: AskIntent) => {
+    if (byRequest || phoneNeeded || intent.kind !== 'flight' || intent.ask || !people.length) return;
+    const dest = intent.destination ? DESTINATIONS[intent.destination] : undefined;
+    const trip = tripOf(intent);
+    if (!dest || dest.byHand || !trip.dep || (trip.type === 'return' && !trip.ret)) return;
+    const H = householdOf(people, today);
+    // Who is going is settled without asking (FlightFlow's whoDone): named, or a household of one.
+    if ((intent.party && !intent.travellerIds?.length) || !(intent.travellerIds?.length || H.nonHelper.length <= 1)) return;
+    const who = whoOf(intent, H);
+    if (!who.length) return;
+    const flags = [...demo].sort().join(',');
+    const ret = trip.type === 'oneway' ? null : trip.ret;
+    const permit = !!intent.answers.permit?.length;
+    void qc.prefetchQuery({ queryKey: flightsKey(dest.key, trip, who, false, 0, flags), queryFn: () => bookingApi.searchFlights(flightsBody(dest.key, trip, who, false)), staleTime: 600_000 });
+    void qc.prefetchQuery({
+      queryKey: entryKey(dest.key, who, trip.dep, ret, {}, permit, flags), staleTime: 60_000,
+      queryFn: () => bookingApi.entry({ destination: dest.key, travellerIds: who, depart: trip.dep!, return: ret, answers: permitAnswers(intent, who, dest.key) }),
+    });
+  };
+}
+
 export function FlightFlow({ intent, query, people, selfName, today, setCta, onSync }: {
   intent: AskIntent; query: string; people: Person[]; selfName: string; today: string; setCta: (c: Cta) => void;
   /** What this flow has settled (asked here, not typed), so a correction typed later starts from it. */
@@ -51,9 +89,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const [where, setWhere] = useState<{ key: string | null; other: string | null }>({ key: intent.destination && intent.destination !== 'other' ? intent.destination : null, other: intent.destination === 'other' ? intent.destinationName : null });
   const [askingCity, setAskingCity] = useState(false);
   const [cityDraft, setCityDraft] = useState('');
-  const [trip, setTrip] = useState<TripSearch>({ from: intent.from ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
+  const [trip, setTrip] = useState<TripSearch>(() => tripOf(intent));
   const nonHelper = H.nonHelper.map((p) => p.id);
-  const [who, setWho] = useWho(() => (intent.travellerIds?.length ? intent.travellerIds : nonHelper.length ? nonHelper : H.me ? [H.me] : []));
+  const [who, setWho] = useWho(() => whoOf(intent, H));
   // Asked only for a household of more than one, which may arrive after the flow opens.
   const [whoDoneSet, setWhoDone] = useState<boolean | null>(intent.travellerIds?.length ? true : null);
   // Counts or ages said that the household doesn't cover ("2 adults and 3 kids aged 2, 6 and 13"): the stepper asks first.
@@ -85,21 +123,24 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && (whoDone || byRequest);
   const live = ready && !byHand && !!dest && !byRequest && !phoneNeeded;
   const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), t('search.working.matching', { count: who.length })];
-  const step = useSequence(steps.length, 750, live ? `${runKey}` : null);
   const flags = [...demo].sort().join(',');
   const search = useQuery({
-    queryKey: ['booking', 'flights', dest?.key, trip, who.join(), mode === 'flex', runKey, flags],
+    queryKey: flightsKey(dest?.key, trip, who, mode === 'flex', runKey, flags),
     enabled: live,
     staleTime: 600_000,
-    queryFn: () => bookingApi.searchFlights({ from: trip.from, destination: dest!.key, depart: trip.dep!, return: trip.type === 'oneway' ? null : trip.ret, travellerIds: who, infants: trip.infants, cabin: trip.cabin, flexibleDays: mode === 'flex' || trip.flex ? 2 : 0 }),
+    queryFn: () => bookingApi.searchFlights(flightsBody(dest!.key, trip, who, mode === 'flex')),
   });
   const s: FlightSearchResponse | undefined = search.data;
+  const step = useSequence(steps.length, 750, live ? `${runKey}` : null, !!s && !search.isFetching);
   // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
   const permit = !!intent.answers.permit?.length;
+  // Checked alongside the search, for the days asked; again only if the search moved the days (a day either side).
+  const entryDep = s?.depart ?? trip.dep;
+  const entryRet = s ? s.return : trip.type === 'oneway' ? null : trip.ret;
   const entry = useQuery({
-    queryKey: ['booking', 'entry', dest?.key, who.join(), trip.dep, trip.ret, answers, permit, flags],
-    enabled: live && !!s,
-    queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: s!.depart, return: s!.return, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }),
+    queryKey: entryKey(dest?.key, who, entryDep, entryRet, answers, permit, flags),
+    enabled: live && !!entryDep,
+    queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: entryDep!, return: entryRet, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }),
     placeholderData: (prev) => prev,
   });
 

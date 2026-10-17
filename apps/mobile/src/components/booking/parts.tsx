@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import Animated from 'react-native-reanimated';
@@ -77,15 +77,28 @@ export function Working({ lines, step }: { lines: string[]; step: number }) {
   );
 }
 
-/** Runs n steps, ms apart, whenever `run` changes. */
-export function useSequence(n: number, ms: number, run: string | null) {
+/** How fast the steps left run once the work is done: the list still ticks through, the results don't wait for it. */
+const STEP_DONE_MS = 110;
+
+/**
+ * Runs n steps, ms apart, whenever `run` changes. Once `done` (the answer is in), the steps not reached yet follow
+ * STEP_DONE_MS apart instead: the traveller sees Mada's work, never a wait made up on top of it.
+ */
+export function useSequence(n: number, ms: number, run: string | null, done = false) {
   const [step, setStep] = useState(0);
+  const started = useRef<{ run: string; at: number } | null>(null);
   useEffect(() => {
     if (run === null) return undefined;
-    const ts = [setTimeout(() => setStep(0), 0)];
-    ts.push(...Array.from({ length: n }, (_, i) => setTimeout(() => setStep(i + 1), ms * (i + 1))));
+    const fresh = started.current?.run !== run;
+    if (fresh) started.current = { run, at: Date.now() };
+    const since = Date.now() - started.current!.at;
+    const ts = fresh ? [setTimeout(() => setStep(0), 0)] : [];
+    ts.push(...Array.from({ length: n }, (_, i) => {
+      const due = done ? Math.min(ms * (i + 1), since + STEP_DONE_MS * (i + 1)) : ms * (i + 1);
+      return setTimeout(() => setStep((s) => Math.max(s, i + 1)), Math.max(1, due - since));
+    }));
     return () => ts.forEach(clearTimeout);
-  }, [run, n, ms]);
+  }, [run, n, ms, done]);
   return step;
 }
 

@@ -9,6 +9,7 @@ import { IBMPlexSansArabic_600SemiBold } from '@expo-google-fonts/ibm-plex-sans-
 import { IBMPlexSansArabic_700Bold } from '@expo-google-fonts/ibm-plex-sans-arabic/700Bold';
 import { ReemKufi_500Medium } from '@expo-google-fonts/reem-kufi/500Medium';
 import { JetBrainsMono_400Regular } from '@expo-google-fonts/jetbrains-mono/400Regular';
+import { Platform } from 'react-native';
 import { fontFamilies } from '@mada/shared';
 import { thmanyah } from './arabic-fonts';
 import type { CopyLocale } from '@mada/shared';
@@ -43,6 +44,20 @@ export function fontsFor(locale: CopyLocale): Record<string, number> {
       [f.ui700]: IBMPlexSansArabic_700Bold,
       [f.mono]: JetBrainsMono_400Regular,
     };
+  }
+  // On the web the same faces come as WOFF2 cut to the Latin the copy uses (scripts/web-fonts.sh): about 190 KB
+  // instead of 650 KB before the first screen can draw. Native keeps the full files.
+  if (Platform.OS === 'web') {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    return {
+      [f.display]: require('../../assets/fonts/web/InstrumentSerif_400Regular.woff2'),
+      [f.ui400]: require('../../assets/fonts/web/InterTight_400Regular.woff2'),
+      [f.ui500]: require('../../assets/fonts/web/InterTight_500Medium.woff2'),
+      [f.ui600]: require('../../assets/fonts/web/InterTight_600SemiBold.woff2'),
+      [f.ui700]: require('../../assets/fonts/web/InterTight_700Bold.woff2'),
+      [f.mono]: require('../../assets/fonts/web/JetBrainsMono_400Regular.woff2'),
+    };
+    /* eslint-enable @typescript-eslint/no-require-imports */
   }
   return {
     [f.display]: InstrumentSerif_400Regular,

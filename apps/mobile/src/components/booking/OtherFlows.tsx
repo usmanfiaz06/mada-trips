@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSession } from '@/lib/session';
 import { DESTINATIONS, esimDays, permitAnswers, addDays, ageOn, daysBetween, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -104,8 +105,17 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   const flags = [...demo].sort().join(',');
   const searching = phase === 'results' && live && !byHand;
   const steps = [t('search.working.stays'), n > 2 ? t('search.working.together') : t('search.working.quiet')];
-  const step = useSequence(2, 700, searching ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null);
-  const search = useQuery({ queryKey: ['booking', 'stays', dest?.key, checkIn, nights, who.join(), flags], enabled: searching, staleTime: 600_000, queryFn: () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who }) });
+  const staysKey = ['booking', 'stays', dest?.key, checkIn, nights, who.join(), flags];
+  const staysFn = () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who });
+  const search = useQuery({ queryKey: staysKey, enabled: searching, staleTime: 600_000, queryFn: staysFn });
+  const step = useSequence(2, 700, searching ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null, !!search.data && !search.isFetching);
+  // Hotels take seconds to answer: the search starts while "who's going" is on screen, the likely next tap.
+  const qc = useQueryClient();
+  const signedIn = useSession((x) => x.status === 'signedIn');
+  const likely = signedIn && phase === 'who' && live && !byHand && !needParty && !phoneNeeded && who.length > 0;
+  useEffect(() => {
+    if (likely) void qc.prefetchQuery({ queryKey: staysKey, queryFn: staysFn, staleTime: 600_000 });
+  }, [likely, dest?.key, checkIn, nights, who.join(), flags]); // eslint-disable-line react-hooks/exhaustive-deps
   // Entry checks don't depend on the rooms: asked at the same time as the search, not after it.
   // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
   const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, !!intent.answers.permit, flags], enabled: searching, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }) });

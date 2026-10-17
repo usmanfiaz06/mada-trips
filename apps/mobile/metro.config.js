@@ -9,6 +9,20 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 const config = getDefaultConfig(projectRoot);
 config.watchFolders = [...new Set([...(config.watchFolders ?? []), path.resolve(workspaceRoot, 'packages/shared')])];
 config.resolver.nodeModulesPaths = [path.resolve(projectRoot, 'node_modules'), path.resolve(workspaceRoot, 'node_modules')];
+// The web's fonts are WOFF2 (theme/fonts.ts, scripts/web-fonts.sh).
+config.resolver.assetExts = [...new Set([...config.resolver.assetExts, 'woff2'])];
+
+/*
+ * zod's error messages in 50 languages (about 270 KB of the web download, read before the first screen): the app never
+ * shows zod's own messages or switches its language, so its locale index resolves to English only (zod-locales.js).
+ */
+const zodLocales = path.join(projectRoot, 'src/lib/zod-locales.js');
+const zodLocalesIndex = /[\\/]zod[\\/]v4[\\/]locales[\\/]index\.c?js$/;
+const resolveBefore = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const r = (resolveBefore ?? context.resolveRequest)(context, moduleName, platform);
+  return r.type === 'sourceFile' && zodLocalesIndex.test(r.filePath) ? { type: 'sourceFile', filePath: zodLocales } : r;
+};
 
 /*
  * Thmanyah (theme/arabic-fonts.ts): its files can't live in this public repo, so when assets/fonts/thmanyah/ holds

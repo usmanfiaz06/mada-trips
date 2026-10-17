@@ -10,7 +10,7 @@ import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
-import { FlightFlow, type Cta } from '@/components/booking/FlightFlow';
+import { FlightFlow, useFlightHeadStart, type Cta } from '@/components/booking/FlightFlow';
 import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
 import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
@@ -77,6 +77,7 @@ export default function Ask() {
   const onReply = useCallback((r: { id: string; agent: string } | null) => { setReplyTo(r); setAskNew(false); }, []);
   const selfName = user?.name ?? '';
   const household = people.data ?? [];
+  const headStart = useFlightHeadStart(household, today);
 
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
@@ -120,6 +121,8 @@ export default function Ask() {
     setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
     // Anyone can ask and see prices; signing in waits for an account action (lib/signin-ask.ts).
     setParsing(true);
+    // The flight search starts from the phone's own reading while the server reads the words (FlightFlow.tsx).
+    if (!kindHint || kindHint === 'flight') { const r = parseAskRules(v, { today, people: household }); headStart(askIntentOfRules(r, kindHint ?? r.kind)); }
     try {
       const { intent: it } = await bookingApi.parse(v);
       const next = kindHint ? { ...it, kind: kindHint } : it;

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
+import { Skeleton } from '@/components/states/Skeleton';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { dayLabel, formatSar, nameIn, rangeLong, type RefundView, type TripCard, type TripRequestView } from '@mada/shared';
@@ -22,7 +23,7 @@ import { toast } from '@/lib/toast';
 import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, IdeaTiles, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny, type IdeaKey } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { getLocale, listSep, t } from '@/lib/i18n';
-import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
+import { OUTBOX_ASK, usePrefetchTrip, useTripOutbox, useTrips } from '@/lib/trips';
 import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
 
@@ -60,7 +61,7 @@ export default function Trips() {
           ))}
         </View>
         {list.isError && data ? <StaleBadge testID="trips-fresh" updatedAt={list.dataUpdatedAt || null} stale /> : null}
-        {tab === 'upcoming' && <Upcoming trips={data?.upcoming ?? []} tracked={data?.tracked ?? []} ask={ask} />}
+        {tab === 'upcoming' && (!data && list.isPending ? <TripCardLoading /> : <Upcoming trips={data?.upcoming ?? []} tracked={data?.tracked ?? []} ask={ask} />)}
         {tab === 'requests' && <Requests requests={data?.requests ?? []} refunds={data?.refunds ?? []} ask={ask} />}
         {tab === 'past' && <Past trips={data?.past ?? []} refunds={data?.refunds ?? []} ask={ask} />}
       </Scroll>
@@ -68,8 +69,25 @@ export default function Trips() {
   );
 }
 
+/** The first answer on its way (nothing kept from before): a trip card's shape, not the "no trips yet" board. */
+function TripCardLoading() {
+  return (
+    <View style={[styles.card, shadow('card')]} accessible accessibilityRole="progressbar" accessibilityLabel="Loading" testID="trips-loading">
+      <Skeleton height={248} radius={0} />
+      <View style={styles.foot}>
+        <Skeleton width="auto" height={12} style={{ flex: 1 }} />
+        <Skeleton width={96} height={34} radius={17} />
+        <Skeleton width={96} height={34} radius={17} />
+      </View>
+    </View>
+  );
+}
+
 function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Parameters<typeof TrackedFlights>[0]['flights']; ask: (p?: string) => void }) {
   const router = useRouter();
+  const prefetch = usePrefetchTrip();
+  const first = trips[0]?.id;
+  useEffect(() => { if (first) prefetch(first); }, [first]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!trips.length) return (<>
     <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero]}>
       <DepartureBoard onPick={(city) => ask(t('trips.board.ask', { city: nameIn(city.charAt(0) + city.slice(1).toLowerCase(), getLocale()) }))} />
@@ -84,7 +102,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
   return (<>
     {trips.map((c, i) => (
       <Animated.View key={c.id} entering={riseOn(i)} style={[riseStyle(i), styles.card, shadow('card')]}>
-        <Pressable testID={`trip-card-${c.city}`} accessibilityRole="button" accessibilityLabel={t('tr.tripA11y', { city: c.city })} onPress={() => { buzz('tap'); router.push(`/trip/${c.id}` as Href); }}>
+        <Pressable testID={`trip-card-${c.city}`} accessibilityRole="button" accessibilityLabel={t('tr.tripA11y', { city: c.city })} onPressIn={() => prefetch(c.id)} onPress={() => { buzz('tap'); router.push(`/trip/${c.id}` as Href); }}>
           <Photo k={c.imageUrl} style={{ height: 248, borderRadius: 0, borderTopLeftRadius: radii.card, borderTopRightRadius: radii.card }}>
             <Shade id={`trip-${c.id}`} />
             <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>

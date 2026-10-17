@@ -169,6 +169,11 @@ export function useTrip(id: string | null | undefined) {
   const phase = useDemo((s) => s.phase);
   return useQuery({ queryKey: tk.trip(id ?? '', phase), queryFn: () => tripsApi.trip(id!), enabled: !!id && signedIn() });
 }
+/** A trip's page read ahead, for the likely next tap (the first card, a card being pressed): it then opens drawn. */
+export function usePrefetchTrip() {
+  const phase = useDemo((s) => s.phase);
+  return (id: string) => { if (signedIn()) void queryClient.prefetchQuery({ queryKey: tk.trip(id, phase), queryFn: () => tripsApi.trip(id), staleTime: 30_000 }); };
+}
 export function useItinerary(id: string) {
   const phase = useDemo((s) => s.phase);
   return useQuery({ queryKey: tk.itinerary(id, phase), queryFn: () => tripsApi.itinerary(id), enabled: signedIn() });

@@ -21,6 +21,9 @@ export const scrub = (s: string) => s.replace(SECRET, '[kept on the phone]');
 
 export function initReporting(release?: string) {
   if (!DSN || sentry) return;
+  // The env name is written out here (not DSN) so a build without a DSN folds this branch away and leaves the SDK
+  // out of the bundle (about a fifth of the web download); a build with one keeps it.
+  if (!process.env.EXPO_PUBLIC_SENTRY_DSN) return;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const S = require('@sentry/react-native') as SentryLike;
