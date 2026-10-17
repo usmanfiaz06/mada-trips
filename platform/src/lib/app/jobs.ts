@@ -15,6 +15,7 @@ import { suppliers } from "./suppliers";
 import { notify } from "./trips/notify";
 import { hotelbedsContentJob } from "./suppliers/hotelbeds/content";
 import { flightsJob } from "./flight-status/poll";
+import { liveJob } from "./live";
 
 /*
  * Scheduled jobs (Vercel Cron → GET /api/cron/{job} with CRON_SECRET; locally `npm run app:jobs -- all`). Each is
@@ -28,11 +29,13 @@ import { flightsJob } from "./flight-status/poll";
  *   hotelbeds   Hotelbeds hotel content into app_hotelbeds_hotels, hourly for new hotels, daily for changes (content.ts)
  *   flights     flight status for booked and tracked flights (flight-status/poll.ts): AeroDataBox alert subscriptions
  *               kept in step, polling where alerts aren't available; gate changes, delays and cancellations told once
+ *   live        the lock-screen flights (Live Activities): pushes what changed by the clock (boarding, in the air,
+ *               landed) and ends them after landing (live/index.ts)
  *   quotes      quotes whose hold has passed become expired (the traveller hears it once, and the thread says so);
  *               bookings stuck at the bank's code for 30 minutes are cancelled, nothing charged
  */
 
-export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights"] as const;
+export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights", "live"] as const;
 export type JobName = (typeof JOBS)[number];
 export type JobResult = Record<string, number>;
 
@@ -127,7 +130,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: () => quotesJob(), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob() };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: () => quotesJob(), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob() };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

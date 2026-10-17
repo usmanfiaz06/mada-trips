@@ -3,12 +3,14 @@ import { AR_DESK } from "../app/desk/ar";
 import { AR_HOTELBEDS } from "../app/suppliers/hotelbeds/desk-ar";
 import { AR_DESK_THINGS } from "../app/desk/ar-things";
 import { AR_DESK_OUTCOMES } from "../app/desk/ar-outcomes";
+import { AR_DESK_BOARDING } from "../app/desk/ar-boarding";
 
 export const AR: Record<string, string> = {
   ...AR_DESK, // the app desk (src/lib/app/desk/ar.ts); keys below win
   ...AR_HOTELBEDS, // the desk's Hotelbeds card
   ...AR_DESK_THINGS,
   ...AR_DESK_OUTCOMES,
+  ...AR_DESK_BOARDING,
   ", retail only": "، للأفراد فقط",
   "1 more approval needed.": "مطلوب موافقة واحدة إضافية.",
   "1 · Cleared funds": "1 · الأموال المحصّلة",

@@ -28,6 +28,13 @@ const config: NextConfig = {
     cfg.resolve.modules = [...(cfg.resolve.modules ?? ["node_modules"]), resolve(here, "node_modules")];
     return cfg;
   },
+  // Boarding-pass barcodes (lib/app/boarding) and Wallet signing run as plain Node packages; the zxing .wasm is read
+  // from disk, so it's traced into every function that may read or draw a barcode.
+  serverExternalPackages: ["zxing-wasm", "node-forge"],
+  outputFileTracingIncludes: {
+    "/api/app/v1/**": ["./node_modules/zxing-wasm/dist/full/zxing_full.wasm"],
+    "/adminwork/**": ["./node_modules/zxing-wasm/dist/full/zxing_full.wasm"],
+  },
   poweredByHeader: false,
   devIndicators: false,
   async redirects() {

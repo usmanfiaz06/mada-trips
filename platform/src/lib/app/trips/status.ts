@@ -9,6 +9,7 @@ import { AppError } from "../http";
 import { suppliers, type FlightStatusInfo } from "../suppliers";
 import { notify } from "./notify";
 import { flightStatusNow } from "../flight-status/service";
+import { flightChanged } from "../live";
 
 /*
  * Flight status: the flightStatus supplier (AeroDataBox, aviationstack or FlightAware live; a mock by default), pushed
@@ -66,6 +67,8 @@ export async function refreshTrip(ownerId: string, trip: TripDetail, demo: TripP
       changes.push({ kind: "cancelled", segmentId: out.id, from: out.status, to: "cancelled", title: `${out.flightNumber} is cancelled`, body: "We're holding seats on other flights." });
     }
   }
+  // The lock screen and Wallet passes follow (live/index.ts).
+  if (changes.length) await flightChanged([trip.id]);
   return changes;
 }
 
@@ -136,6 +139,8 @@ export async function applyAlert(a: AlertInput): Promise<{ segments: number; tra
       await notify(tf.userId, { kind: "flight_cancelled", level: "time_sensitive", copy: "notify.tracked.cancelled", vars: { flight: a.flightNumber }, href: "/today" });
     }
   }
+  // The lock screen and Wallet passes follow (live/index.ts).
+  await flightChanged(segs.filter((x) => x.tripStatus !== "cancelled").map((x) => x.s.tripId));
   return { segments: segs.length, tracked: tracked.length, told };
 }
 

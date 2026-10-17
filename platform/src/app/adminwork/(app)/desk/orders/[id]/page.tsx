@@ -16,6 +16,7 @@ import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Field, Input, Money, Select, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
+import { BoardingPassesCard } from "@/components/desk/boarding";
 import { HotelRequestsCard } from "@/components/desk/hotel-requests";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer } from "@/components/desk/forms";
@@ -202,6 +203,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </Card>
           )}
           <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
+          {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}
           {o.stage === "issued" && (
             <Card className="bg-ok-soft/40">
               <div className="mb-3 flex items-center gap-2 text-ok"><BadgeCheck className="size-5" /><span className="text-[15px] font-medium">{t("Confirmed by {name} at Mada", { name: r.agentName ?? "—" })}</span></div>

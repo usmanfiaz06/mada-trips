@@ -26,6 +26,7 @@ import { nowCopy } from './now';
 import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
 import { umrahCopy } from './umrah';
+import { nativeCopy } from './native';
 
 export const en = {
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
@@ -68,6 +69,8 @@ export const en = {
   ...offlineCopy,
   // Umrah around the permit, and the flight fare rules sheet: packages/shared/src/copy/umrah.ts
   ...umrahCopy,
+  // The lock-screen flight, boarding passes, Apple Wallet: packages/shared/src/copy/native.ts
+  ...nativeCopy,
   // ───────────── common ─────────────
   'common.back': 'Back',
   'common.home': 'Home',
