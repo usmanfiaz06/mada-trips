@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- A normal permission: lets the app ask the Clock app to set or dismiss an alarm. No prompt. -->
+  <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+  <queries>
+    <intent><action android:name="android.intent.action.SET_ALARM" /></intent>
+    <intent><action android:name="android.intent.action.DISMISS_ALARM" /></intent>
+    <intent><action android:name="android.intent.action.SHOW_ALARMS" /></intent>
+  </queries>
+</manifest>
