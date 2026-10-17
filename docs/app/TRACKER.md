@@ -12,6 +12,7 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 |---|---|---|
 | E · eSIM on Airalo | supplier adapter + mock, plan suggestion per trip, pay, install (iOS link / Android QR), data left, top-up, desk | started, session_019PTxzsmbZA74N6so2w188q |
 | G · guests + language (Next 5) | guests search/see prices/open links, sign-in sheet at account actions returning to the same place; language switch keeps state; reply in input language; Arabic leak sweep | started, session_01Sk1iYRJ91x9cQXdekzSK7f |
+| EA · eSIM Access + pricing desk | owner registered with eSIM Access (not Airalo): live adapter, margin rules/rounding/guard on the desk, catalogue sync, balance alerts, support actions, ESIM.md | started 17 Oct, session_01SoXoJxBgEB4nDLC2gbpTc2 |
 | V · speed | baseline → parallel/streamed search, caches, /trips < 800 ms, Lighthouse ≥ 90, before/after table | started, session_01TUBJcpn9XT9ZDAD5KMGYaY |
 
 Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh eyes, read-only) → fix every dimension < 9 → rerun until all ≥ 9.
@@ -50,7 +51,7 @@ Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh
 
 - Owner asked (17 Oct): guests browsing prices — recommended for web AND mobile (Apple 5.1.1(v): don't force sign-in before account features); awaiting go-ahead.
 - Cars: Hotelbeds Transfers is already wired for pre-booked airport pickups (transfers/service.ts); car-now has no on-demand supplier (Careem/Uber have no open booking API) → call-back. Proposed: offer Hotelbeds transfer for any ride ≥ supplier lead time.
-- eSIM: today a fixed SAR 39 placeholder (EsimFlow), no supplier. Owner chose Airalo (17 Oct), one-tap iOS install link.
+- eSIM: today a fixed SAR 39 placeholder (EsimFlow), no supplier. Owner registered with eSIM Access (17 Oct); Airalo adapter kept as optional second, one-tap iOS install link.
 
 - Background stays warm off-white; actionable surfaces a touch lighter (not pure white).
 - Design bar: serif for journey headlines, one warm line per screen, photos with room, no voids, labels over sentences.
