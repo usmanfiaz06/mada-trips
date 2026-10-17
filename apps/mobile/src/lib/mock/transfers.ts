@@ -33,6 +33,12 @@ const HOTELS: Record<number, HotelDetails> = {
   },
 };
 
+/** The demo hotels' words in Arabic, as GET /hotels/{code}/translation answers once the translator has run. */
+const HOTELS_AR: Record<number, { description: string; facilities: Record<string, string> }> = {
+  99701: { description: 'غرف في زقاق هادئ على بعد ثلاث دقائق من برج غلطة، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', 'Car park': 'موقف سيارات', 'Airport shuttle': 'توصيل من المطار' } },
+  99702: { description: 'غرف هادئة في زقاق على بعد ثلاث دقائق من برج غلطة. غرف متصلة عند الطلب، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', Breakfast: 'فطور', 'Connecting rooms': 'غرف متصلة', 'Airport shuttle': 'توصيل من المطار' } },
+};
+
 async function tripOf(w: Wire, ctx: Parameters<AreaMock>[1], id: string): Promise<TripDetail | null> {
   const r = await tripsMock({ ...w, method: 'GET', path: `/trips/${id}`, body: undefined }, ctx);
   return r && r.status === 200 ? (r.json as { trip: TripDetail }).trip : null;
@@ -74,13 +80,20 @@ export const transfersMock: AreaMock = async (w, ctx) => {
   const isTransfers = parts[0] === 'trips' && (parts[2] === 'transfers' || parts[2] === 'vouchers');
   if (!isTransfers && parts[0] !== 'vouchers' && parts[0] !== 'hotels') return null;
   const { user } = ctx;
-  if (!user) return err('UNAUTHORIZED');
-  const s = stateOf(user.id);
-
+  // A hotel page is open to anyone (the server's openRoute); "Translate" has the desk's Arabic for the demo hotels.
   if (parts[0] === 'hotels') {
     const h = HOTELS[Number(parts[1])];
-    return h ? ok({ hotel: h }) : err('NOT_FOUND');
+    if (!h) return err('NOT_FOUND');
+    if (parts[2] === 'translation') {
+      const to = new URLSearchParams(w.path.split('?')[1] ?? '').get('to') === 'en' ? 'en' : 'ar';
+      if (to === 'en') return ok({ lang: 'en', description: h.description, facilities: h.facilities.map((f) => f.name), machine: false });
+      const ar = HOTELS_AR[h.code];
+      return ar ? ok({ lang: 'ar', description: ar.description, facilities: h.facilities.map((f) => ar.facilities[f.name] ?? f.name), machine: true }) : err('NOT_CONFIGURED');
+    }
+    return ok({ hotel: h });
   }
+  if (!user) return err('UNAUTHORIZED');
+  const s = stateOf(user.id);
   if (parts[0] === 'vouchers') {
     // A voucher belongs to a trip this account has listed vouchers for.
     const tripId = s.seen.get(parts[1] ?? '');

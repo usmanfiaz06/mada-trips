@@ -30,6 +30,8 @@ import { useFlightsByRequest } from '@/lib/beta';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
 import { FareBreakdown, PartyStep } from './Party';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
+import { flightPickKey, noteAskPick, pendingPick, usedPendingPick } from '@/lib/resume';
 
 /* Flights in Ask: one question at a time (where, when, back when, who), then Mada shows its work and three options. */
 
@@ -124,6 +126,17 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const total = (current?.total.amount ?? 0) + (bundle && showBundle ? s!.bundle!.total.amount : 0);
   const blocking = entry.data?.checks.filter((c) => c.blocking) ?? [];
   const results = live && step >= steps.length && !!s && !(s.outcome === 'partial' && mode === 'normal') && s.outcome !== 'none' && options.length > 0;
+  // Back after signing in, a language switch or a reload: the flight that was picked, picked again (lib/resume.ts).
+  useEffect(() => {
+    const want = results ? pendingPick('flight') : null;
+    if (!want) return;
+    usedPendingPick();
+    const o = options.find((x) => flightPickKey(x) === want);
+    // Once, when the results arrive: the saved pick is outside React (lib/resume.ts), so it can't be derived in render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (o) setPick(o.id);
+  }, [results]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (results && current) noteAskPick({ kind: 'flight', key: flightPickKey(current) }); }, [results, current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (byRequest) return; // the request form owns the action (FlightRequest.tsx)
@@ -132,6 +145,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
     setCta({
       label: block ?? t('search.review', { price: formatSar(total) }), disabled: !!block || entry.isFetching && !entry.data, testID: 'ask-review',
       onPress: () => {
+        // A guest signs in here, and comes back to this very option (lib/resume.ts).
+        if (!requireAccount('book', ASK_RESUME)) return;
         usePayDraft.getState().set({ draft: { kind: 'trip', flightOfferId: current.id, bundle: bundle && showBundle, travellerIds: who }, title: dest!.name, destination: dest!.key, askAgain: query });
         router.push('/pay');
       },

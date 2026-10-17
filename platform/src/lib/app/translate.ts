@@ -1,9 +1,12 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import { languageOfText } from "@mada/shared";
 import type { HotelTranslationResponse, Lang } from "@mada/shared";
 import { db } from "@/db";
 import { appTranslations } from "@/db/app-schema-booking";
+import { appMessages, appRequests } from "@/db/app-schema";
+import { appSupportThreads } from "@/db/app-schema-wallet";
 import { AppError } from "./http";
 import { suppliers } from "./suppliers";
 import { hotelContent } from "./suppliers/hotelbeds/content";
@@ -30,6 +33,30 @@ export async function hotelTranslation(code: number, to: Lang): Promise<HotelTra
   const out = await suppliers.ai().translate(source, to).catch(() => null);
   if (!out) throw new AppError("NOT_CONFIGURED");
   const body: HotelTranslationResponse = { lang: to, description: h.description ? out[0] || null : null, facilities: out.slice(1), machine: true };
+  await db.insert(appTranslations).values({ key, lang: to, sourceHash, body }).onConflictDoUpdate({ target: [appTranslations.key, appTranslations.lang], set: { sourceHash, body, createdAt: new Date() } });
+  return body;
+}
+
+/**
+ * One message the desk (or Mada) wrote in the other language, for its reader: only someone whose conversation it is
+ * (their support thread, their request) may ask. Translated once and kept, like a hotel's words.
+ */
+export async function messageTranslation(userId: string, messageId: string, to: Lang): Promise<{ lang: Lang; text: string; machine: boolean }> {
+  if (!/^[0-9a-f-]{36}$/i.test(messageId)) throw new AppError("NOT_FOUND");
+  const [m] = await db.select().from(appMessages).where(eq(appMessages.id, messageId)).limit(1);
+  if (!m || m.authorKind === "user") throw new AppError("NOT_FOUND");
+  const owner = m.threadKind === "support"
+    ? (await db.select({ u: appSupportThreads.userId }).from(appSupportThreads).where(eq(appSupportThreads.id, m.threadId)).limit(1))[0]?.u
+    : m.threadKind === "request" ? (await db.select({ u: appRequests.ownerId }).from(appRequests).where(eq(appRequests.id, m.threadId)).limit(1))[0]?.u : null;
+  if (owner !== userId) throw new AppError("NOT_FOUND");
+  if (languageOfText(m.body) === to) return { lang: to, text: m.body, machine: false };
+  const key = `message:${m.id}`;
+  const sourceHash = hashOf([m.body]);
+  const [kept] = await db.select().from(appTranslations).where(and(eq(appTranslations.key, key), eq(appTranslations.lang, to))).limit(1);
+  if (kept && kept.sourceHash === sourceHash) return kept.body as { lang: Lang; text: string; machine: boolean };
+  const out = await suppliers.ai().translate([m.body], to).catch(() => null);
+  if (!out?.[0]) throw new AppError("NOT_CONFIGURED");
+  const body = { lang: to, text: out[0], machine: true };
   await db.insert(appTranslations).values({ key, lang: to, sourceHash, body }).onConflictDoUpdate({ target: [appTranslations.key, appTranslations.lang], set: { sourceHash, body, createdAt: new Date() } });
   return body;
 }

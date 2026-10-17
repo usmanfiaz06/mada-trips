@@ -105,7 +105,8 @@ const err = (code: ErrorCode, fields?: Record<string, string>): WireResponse => 
 export const placesMock: AreaMock = async (w, ctx) => {
   const [path = '', query = ''] = w.path.split('?');
   if (!path.startsWith('/places/')) return null;
-  if (!ctx.user) return err('UNAUTHORIZED');
+  // Reading places is open to anyone (the server's openRoute); asking Mada to plan one needs an account.
+  if (!ctx.user && w.method !== 'GET') return err('UNAUTHORIZED');
   const params = new URLSearchParams(query);
   if (w.method === 'GET' && path === '/places/search') {
     const q = (params.get('q') ?? '').trim();

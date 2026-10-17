@@ -9,6 +9,7 @@ import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
 import { durationLine, openLine, priceLine, type Thing } from '@/lib/things';
 import { colors, ff, font, shadow } from '@/theme';
+import { writtenIn } from '@/components/booking/Translate';
 
 /* The pieces Things to do is made of: cards for places, experiences and events, a small drawn map, and the photo. */
 
@@ -109,7 +110,7 @@ export function ExperienceCard({ e, onPress, wide, testID }: { e: Experience; on
         {e.freeCancel ? <View style={s.badge}><T v="tiny" color={colors.green}>{t('things.freeCancel')}</T></View> : null}
       </ThingPhoto>
       <View style={s.cardBody}>
-        <T v="h3" style={{ fontSize: 15, lineHeight: 19 }} numberOfLines={2}>{e.title}</T>
+        <T v="h3" style={{ fontSize: 15, lineHeight: 19 }} numberOfLines={2} {...writtenIn(e.title)}>{e.title}</T>
         {meta ? <T v="tiny" numberOfLines={1}>{meta}</T> : null}
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
           <T style={[font('h3', colors.green), { fontSize: 15, fontFamily: ff.ui600 }]}>{priceLine(e)}</T>
@@ -132,7 +133,7 @@ export function EventRow({ w, onPress, testID }: { w: WhatsOn; onPress: () => vo
     <Pressable testID={testID} accessibilityRole="button" onPress={() => { buzz('tap'); onPress(); }} style={({ pressed }) => [s.row, shadow('card'), pressed && s.pressed]}>
       <View style={s.date}>{ongoing ? <T v="tiny" color={colors.onDark2}>{t('things.event.until')}</T> : null}<T style={[font('h2', colors.paper), { fontSize: 22, lineHeight: 24 }]}>{localizeDigits(String(d))}</T><T v="tiny" color={colors.gold}>{month}</T></View>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <T v="h3" style={{ fontSize: 16 }} numberOfLines={2}>{w.title}</T>
+        <T v="h3" style={{ fontSize: 16 }} numberOfLines={2} {...writtenIn(w.title)}>{w.title}</T>
         <T v="tiny" numberOfLines={1}>{[when, w.time ? localizeDigits(w.time) : null, w.venue].filter(Boolean).join(' · ')}</T>
         <T v="tiny" color={colors.goldInk} numberOfLines={1}>{w.source === 'desk' ? t('things.event.fromDesk') : 'Ticketmaster'}</T>
       </View>

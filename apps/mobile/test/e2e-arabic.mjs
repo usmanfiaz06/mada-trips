@@ -287,7 +287,8 @@ async function demo() {
   step('booking: Ask to the confirmation');
   await byTest('dock-ask').click();
   await see('وين رايح؟', 'ask');
-  await byTest('ask-input').fill('Istanbul for Eid, all of us');
+  // Typed in Arabic, as an Arabic reader would: Mada answers each message in the language it is written in.
+  await byTest('ask-input').fill('إسطنبول في العيد مع العائلة');
   await byTest('ask-send').click();
   await see('ثلاث طرق توصلك.', 'results', 15000);
   await shot('results');
@@ -313,7 +314,7 @@ async function demo() {
   await toTabs();
   await byTest('dock-ask').click();
   await see('وين رايح؟', 'ask (stay)');
-  await byTest('ask-input').fill('A place to stay');
+  await byTest('ask-input').fill('مكان أسكن فيه');
   await byTest('ask-send').click();
   await see('أي مدينة؟', 'stay where');
   await shot('stay-where');
@@ -338,8 +339,11 @@ async function demo() {
   await shot('stay-who');
 
   step('booking: an outing asked when and who, then its thread');
-  await page.getByRole('button', { name: 'اسأل عن شي ثاني' }).filter({ visible: true }).first().click();
-  await byTest('ask-input').fill('Boulevard World at night in Riyadh');
+  // A fresh Ask (typed in Arabic, the words would otherwise read as a change to the stay: "in Riyadh").
+  await toTabs();
+  await byTest('dock-ask').click();
+  await see('وين رايح؟', 'ask (outing)');
+  await byTest('ask-input').fill('بوليفارد وورلد بالليل في الرياض');
   await byTest('ask-send').click();
   await see('متى تبي تروح؟', 'outing when');
   await page.getByRole('button', { name: 'هالويكند', exact: true }).first().click();

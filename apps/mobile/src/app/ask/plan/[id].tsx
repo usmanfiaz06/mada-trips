@@ -20,6 +20,7 @@ import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { colors, font, ff } from '@/theme';
+import { requireAccount } from '@/lib/signin-ask';
 
 /* A curated plan, day by day (Plan.jsx). Book it all through the same order sheet; change something in Ask. */
 
@@ -34,6 +35,7 @@ export default function PlanScreen() {
   const saves = useSaved();
   const savedItem = saves.data?.saved.find((x) => x.kind === 'plan' && x.refId === String(id));
   const toggleSave = async () => {
+    if (!requireAccount('save')) return;
     buzz('select');
     try {
       if (savedItem) await circlesApi.unsave(savedItem.id);
@@ -87,7 +89,7 @@ export default function PlanScreen() {
       <Act>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <Button label={t('plan.book', { price: formatSar(p.total.amount) })} testID="plan-book" onPress={() => { usePayDraft.getState().set({ draft: { kind: 'package', planId: p.id, travellerIds: travellers }, title: planWords(p).title }); router.push('/pay'); }} />
+            <Button label={t('plan.book', { price: formatSar(p.total.amount) })} testID="plan-book" onPress={() => { if (!requireAccount('book')) return; usePayDraft.getState().set({ draft: { kind: 'package', planId: p.id, travellerIds: travellers }, title: planWords(p).title }); router.push('/pay'); }} />
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel={savedItem ? t('plan.saved') : t('plan.save')} accessibilityState={{ selected: !!savedItem }} onPress={toggleSave} testID="plan-save"
             style={[styles.save, { backgroundColor: savedItem ? colors.green : colors.paper }]}>

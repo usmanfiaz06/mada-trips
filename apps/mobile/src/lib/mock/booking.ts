@@ -32,6 +32,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
  * the same order lifecycle, moved on by a scripted desk as the app polls. Demo switches arrive as ?demo=….
  */
 
+/** owner '' is a guest's search: the first account to book it takes it (as search.ts ownOffer does). */
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
 type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
@@ -123,7 +124,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     travellers = pick(d.travellerIds);
     if (travellers.length !== d.travellerIds.length) return err('NOT_FOUND');
     const o = offers.get(d.flightOfferId);
-    if (!o || o.owner !== user.id || o.kind !== 'flight') return err('NOT_FOUND');
+    if (!o || !mayUse(o, user) || o.kind !== 'flight') return err('NOT_FOUND');
     let f = o.option as FlightOption;
     const s = o.search as { destination: string; from: string; depart: string; return: string | null; infants: number; cabin: FlightOption['cabin'] };
     const kids = childSeats(travellers, f.out.date);
@@ -152,7 +153,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
   } else if (d.kind === 'stay') {
     travellers = pick(d.travellerIds);
     const o = offers.get(d.stayOfferId);
-    if (!o || o.owner !== user.id || o.kind !== 'stay') return err('NOT_FOUND');
+    if (!o || !mayUse(o, user) || o.kind !== 'stay') return err('NOT_FOUND');
     let s = o.option as StayOption;
     const se = o.search as { destination: string };
     if (s.rooms !== roomsFor(travellers.length)) { s = { ...stayOptions(se.destination, s.checkIn, s.nights, travellers.length).find((x) => x.name === s.name)!, id: o.id }; o.option = s; }
@@ -387,18 +388,35 @@ function progressRequest(r: Req, people: Person[], now = Date.now()) {
 
 /* ───────────── the handler ───────────── */
 
+/** An offer this caller may see: their own; a guest's (no owner) for a guest, or for the account that books it. */
+function mayUse(o: Offer, user: MockUser | null): boolean {
+  if (!o.owner) { if (user) o.owner = user.id; return true; }
+  return !!user && o.owner === user.id;
+}
+/** A guest's travellers, as the phone describes them (lib/guest.ts): ids and ages only. */
+function guestHousehold(body: Record<string, unknown>): Person[] {
+  const said = Array.isArray(body.guests) ? (body.guests as { id: string; dateOfBirth: string | null; isSelf?: boolean }[]) : [];
+  const ids = Array.isArray(body.travellerIds) ? (body.travellerIds as string[]) : said.map((g) => g.id);
+  return ids.map((id, i) => {
+    const g = said.find((x) => x.id === id);
+    return { id, isSelf: g?.isSelf ?? i === 0, givenNames: '', surname: '', firstName: '', relation: (g?.isSelf ?? i === 0) ? 'self' : 'family', dateOfBirth: g?.dateOfBirth ?? null, sex: null, nationality: null, passport: null, createdAt: new Date(0).toISOString() } satisfies Person;
+  });
+}
+/** What a guest may call without an account (platform lib/app/guest.ts). */
+const GUEST_OK = /^\/(ask\/parse|search\/|offers\/|plans|geocode)/;
+
 export const bookingMock: AreaMock = async (w, ctx) => {
   const [path, query = ''] = w.path.split('?');
   const owned = /^\/(ask\/parse|search\/|offers\/|plans|requests|quotes\/|orders|geocode)/.test(path!);
   if (!owned) return null;
   const user = ctx.user;
-  if (!user) return err('UNAUTHORIZED');
+  if (!user && !GUEST_OK.test(path!)) return err('UNAUTHORIZED');
   const demo = new Set((new URLSearchParams(query).get('demo') ?? '').split(',').filter((x) => DemoFlag.safeParse(x).success) as DemoFlag[]);
   const key = `${w.method} ${path}`;
   const body = (w.body ?? {}) as Record<string, unknown>;
   const m = (re: RegExp) => re.exec(path!);
   const bad = (issues: { path: PropertyKey[]; message: string }[]) => err('VALIDATION', undefined, Object.fromEntries(issues.map((i) => [i.path.map(String).join('.') || '_', i.message])));
-  const people = await household(w, user, ctx);
+  const people = user ? await household(w, user, ctx) : guestHousehold(body);
   const mine = (ids: string[]) => ids.every((id) => people.some((p) => p.id === id));
 
   if (key === 'POST /ask/parse') {
@@ -428,7 +446,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     let opts = flightOptions(dest.key, from, depart, q.return, q.cabin, q.travellerIds.length, q.infants, kids);
     const unavailable: { carrier: string; airline: string }[] = [];
     if (demo.has('supplierDown') && opts.some((o) => o.carrier === 'SV')) { opts = opts.filter((o) => o.carrier !== 'SV'); unavailable.push({ carrier: 'SV', airline: 'Saudia' }); }
-    for (const o of opts) offers.set(o.id, { id: o.id, owner: user.id, kind: 'flight', option: o, search: { destination: dest.key, from, depart, return: q.return, infants: q.infants, cabin: q.cabin, travellerIds: q.travellerIds }, expiresAt: Date.now() + HOLD });
+    for (const o of opts) offers.set(o.id, { id: o.id, owner: user?.id ?? '', kind: 'flight', option: o, search: { destination: dest.key, from, depart, return: q.return, infants: q.infants, cabin: q.cabin, travellerIds: q.travellerIds }, expiresAt: Date.now() + HOLD });
     const b = dest.key === 'istanbul' && q.return ? bundleFor(q.travellerIds.length, depart, q.return) : null;
     return ok({
       ...base, depart, outcome: opts.length ? (unavailable.length ? 'partial' : 'ok') : 'none', checked: CHECKED_FARES[dest.key] ?? 9, options: opts, unavailable,
@@ -449,7 +467,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const shape = tripShape(people.filter((x) => p.data.travellerIds.includes(x.id)), p.data.checkIn);
     const opts: StayOption[] = rankStays(stayOptions(dest.key, p.data.checkIn, p.data.nights, p.data.travellerIds.length), { shape: shape.shape, city: dest.key, radiusKm: 8 })
       .map((o) => ({ ...o, label: o.badge === 'lowest' ? 'lowest' as const : o.label }));
-    for (const o of opts) offers.set(o.id, { id: o.id, owner: user.id, kind: 'stay', option: o, search: { destination: dest.key, checkIn: p.data.checkIn, nights: p.data.nights, travellerIds: p.data.travellerIds }, expiresAt: Date.now() + HOLD });
+    for (const o of opts) offers.set(o.id, { id: o.id, owner: user?.id ?? '', kind: 'stay', option: o, search: { destination: dest.key, checkIn: p.data.checkIn, nights: p.data.nights, travellerIds: p.data.travellerIds }, expiresAt: Date.now() + HOLD });
     return ok({ ...base, outcome: 'ok', options: opts, shape: { shape: shape.shape, because: shape.because, travellers: shape.travellers, under12: shape.under12 } });
   }
   if (key === 'POST /search/entry') {
@@ -465,7 +483,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
   if (rooms) {
     // The hotel's other rooms for the same stay: a bigger room, and the same room cheaper without free cancellation.
     const o = offers.get(rooms[1]!);
-    if (!o || o.owner !== user.id || o.kind !== 'stay') return err('NOT_FOUND');
+    if (!o || !mayUse(o, user) || o.kind !== 'stay') return err('NOT_FOUND');
     const s0 = o.option as StayOption;
     const f = s0.facts;
     const variant = (k: string, factor: number, room: string, refundable: boolean): StayOption => {
@@ -480,7 +498,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
   let r = m(/^\/offers\/([^/]+)(\/price)?$/);
   if (r) {
     const o = offers.get(r[1]!);
-    if (!o || o.owner !== user.id) return err('NOT_FOUND');
+    if (!o || !mayUse(o, user)) return err('NOT_FOUND');
     let changedBy: number | null = null;
     if (r[2] && w.method === 'POST') {
       o.expiresAt = Date.now() + HOLD; o.option = { ...o.option, expiresAt: new Date(o.expiresAt).toISOString() }; changedBy = 0;
@@ -497,12 +515,15 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     return ok({ kind: o.kind, flight: o.kind === 'flight' ? o.option : null, stay: o.kind === 'stay' ? o.option : null, expired: o.expiresAt <= Date.now(), changedBy });
   }
   if (key === 'GET /plans' || m(/^\/plans\/([^/]+)$/)) {
-    const n = Math.max(1, people.filter((p) => p.relation !== 'helper').length);
+    const asked = Number(new URLSearchParams(query).get('travellers'));
+    const n = user ? Math.max(1, people.filter((p) => p.relation !== 'helper').length) : Number.isInteger(asked) && asked >= 1 && asked <= 9 ? asked : 2;
     const sum = (p: (typeof PLANS)[string]) => ({ id: p.id, title: p.title, sub: p.sub, photo: p.photo, city: p.city, days: p.days, stops: p.plan.reduce((a, d) => a + d.stops.length, 0), total: money(sarToHalalas((p.price.flights * n) / 2 + p.price.stay + (p.price.experiences * n) / 4)), travellers: n });
     if (key === 'GET /plans') return ok({ plans: Object.values(PLANS).map(sum) });
     const plan = PLANS[decodeURIComponent(m(/^\/plans\/([^/]+)$/)![1]!)];
     return plan ? ok({ plan: { ...sum(plan), plan: plan.plan } }) : err('NOT_FOUND');
   }
+
+  if (!user) return err('UNAUTHORIZED');
 
   /* requests */
   const all = () => [...requests.values()].filter((x) => x.owner === user.id);

@@ -25,6 +25,7 @@ import { ArtBookmark, ArtLantern } from './art';
 import { CoverArt, CoverBadge, coverInk } from './Cover';
 import { ReportBody } from './sheets';
 import { ChoiceCard, Face, Faces, Head, Row, TextLink, Toggle } from './ui';
+import { writtenIn } from '@/components/booking/Translate';
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
 
@@ -141,8 +142,8 @@ export function CirclesHome({ onDiscover, onOpenPost }: { onDiscover: () => void
               {src ? <Image source={src} style={st.knownImg} contentFit="cover" /> : <View style={[st.knownImg, { backgroundColor: p.author.tone === 'green' ? colors.green : p.author.tone === 'gold' ? colors.gold : colors.mist, alignItems: 'center', justifyContent: 'center' }]}><T style={[font('h2', p.author.tone === 'green' ? colors.sand : colors.green), { fontSize: 24 }]}>{p.author.initial}</T></View>}
               <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
                 <T v="tiny"><T v="tiny" style={{ fontFamily: ff.ui700, color: colors.green }}>{p.relation === 'you' ? t('circles.you') : p.author.short}</T>{` · ${p.city} · ${whenLabel(p.createdAt)}${p.status === 'pending' ? ` · ${t('circles.post.checking')}` : ''}`}</T>
-                <T v="h3" style={{ fontSize: 15 }}>{p.place}</T>
-                <T v="small" color={colors.inkSoft} numberOfLines={2}>{p.text}</T>
+                <T v="h3" style={{ fontSize: 15 }} {...writtenIn(p.place)}>{p.place}</T>
+                <T v="small" color={colors.inkSoft} numberOfLines={2} {...writtenIn(p.text)}>{p.text}</T>
               </View>
             </Pressable>
           );
@@ -203,8 +204,8 @@ function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: (
           </View>
         ) : null}
         <View style={{ padding: 14, gap: 2 }}>
-          <T style={[font('display', ink.text), { fontSize: 22, lineHeight: 24 }]} numberOfLines={1}>{c.name}</T>
-          <T v="tiny" color={ink.light ? 'rgba(30,53,45,0.8)' : 'rgba(255,253,249,0.92)'} numberOfLines={1}>{line}</T>
+          <T style={[font('display', ink.text), { fontSize: 22, lineHeight: 24 }]} numberOfLines={1} {...writtenIn(c.name)}>{c.name}</T>
+          <T v="tiny" color={ink.light ? 'rgba(30,53,45,0.8)' : 'rgba(255,253,249,0.92)'} numberOfLines={1} {...writtenIn(line)}>{line}</T>
         </View>
       </Pressable>
     );
@@ -216,8 +217,8 @@ function Tile({ c, line, onPress }: { c: CircleSummary; line: string; onPress: (
         {c.unread > 0 ? <Pill variant="gold" label={t('circles.unread', { count: c.unread })} /> : null}
       </View>
       <View style={{ gap: 0 }}>
-        <T v="h3" style={{ fontSize: 15 }} numberOfLines={1}>{c.name}</T>
-        <T v="tiny" numberOfLines={2}>{line}</T>
+        <T v="h3" style={{ fontSize: 15 }} numberOfLines={1} {...writtenIn(c.name)}>{c.name}</T>
+        <T v="tiny" numberOfLines={2} {...writtenIn(line)}>{line}</T>
       </View>
     </Pressable>
   );

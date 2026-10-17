@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { REQUEST_FORMS, askIntentOfRules, correctAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
-import { useQuery } from '@tanstack/react-query';
+import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
-import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, type Cta } from '@/components/booking/FlightFlow';
@@ -18,12 +17,15 @@ import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { MeBubble } from '@/components/booking/Conversation';
 import { IdeaTiles } from '@/components/trips/ui';
-import { ApiError } from '@/lib/api';
+import { ApiError, api } from '@/lib/api';
+import { carryOverGuestPeople } from '@/lib/guest';
+import { keys, usePeople } from '@/lib/queries';
+import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo } from '@/lib/booking';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
-import { usePeople } from '@/lib/queries';
+import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
+import { ASK_RESUME } from '@/lib/signin-ask';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useVoice } from '@/lib/voice';
@@ -38,13 +40,15 @@ import { colors, font, ff } from '@/theme';
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 /** What the flow on screen has settled (asked there, not typed), so a correction starts from it. One Ask at a time. */
 let settled: Partial<AskIntent> = {};
-const onSync = (p: Partial<AskIntent>) => { settled = { ...settled, ...p }; };
+// Also kept on the phone (lib/resume.ts): a sign-in, a language switch or a reload comes back to the same search.
+const onSync = (p: Partial<AskIntent>) => { settled = { ...settled, ...p }; noteAskSettled(p); };
 const forgetSettled = () => { settled = {}; };
 const PROMPT: Partial<Record<AskKind, CopyKey>> = { flight: 'ask.prompt.flight', stay: 'ask.prompt.stay', visa: 'ask.prompt.visa', umrah: 'ask.prompt.umrah', car: 'ask.prompt.car', food: 'ask.prompt.food', todo: 'ask.prompt.todo', esim: 'ask.prompt.esim' };
 
 export default function Ask() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ prefill?: string; intent?: string }>();
+  const params = useLocalSearchParams<{ prefill?: string; intent?: string; resume?: string }>();
+  const qc = useQueryClient();
   const bottom = useBottomInset();
   const status = useSession((s) => s.status);
   const user = useSession((s) => s.user);
@@ -63,7 +67,6 @@ export default function Ask() {
   const [cta, setCta] = useState<Cta>(null);
   const [parsing, setParsing] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [needsSignIn, setNeedsSignIn] = useState(false);
   // A request sent from here: its thread takes the bottom box (one composer, never two). "Ask something else" gives it back.
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
@@ -112,27 +115,81 @@ export default function Ask() {
     }
     buzz('tap');
     forgetSettled();
+    // Mada answers in the language this was written in, whatever the app is set to (per message).
+    setVoice(languageOfText(v));
     setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
-    if (status !== 'signedIn') { setNeedsSignIn(true); return; }
+    // Anyone can ask and see prices; signing in waits for an account action (lib/signin-ask.ts).
     setParsing(true);
     try {
       const { intent: it } = await bookingApi.parse(v);
-      setIntent(kindHint ? { ...it, kind: kindHint } : it);
+      const next = kindHint ? { ...it, kind: kindHint } : it;
+      saveAsk(v, next);
+      setIntent(next);
       setRound((r) => r + 1);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') {
         // Offline: requests can still be written and saved; searching waits for a connection.
         // Offline: the same rules the server runs read it here, so requests can still be written and saved.
         const r = parseAskRules(v, { today, people: household });
-        setIntent(askIntentOfRules(r, kindHint ?? r.kind));
+        const next = askIntentOfRules(r, kindHint ?? r.kind);
+        saveAsk(v, next);
+        setIntent(next);
         setRound((r) => r + 1);
       } else toast(e instanceof Error ? e.message : t('error.internal'));
     } finally { setParsing(false); }
   };
 
+  /**
+   * The saved search back on screen, with the option picked (lib/resume.ts). Signed in since it was saved: the people
+   * added as a guest move onto the account first, so the search runs for them.
+   */
+  const restore = async () => {
+    const snap = await loadAsk();
+    if (!snap) return false;
+    let it = snap.intent;
+    if (useSession.getState().status === 'signedIn') {
+      const map = await carryOverGuestPeople(api).catch(() => new Map<string, string>());
+      if (map.size) {
+        remapAsk(map);
+        it = { ...it, travellerIds: it.travellerIds?.map((id) => map.get(id) ?? id) ?? null };
+        await qc.invalidateQueries({ queryKey: keys.people });
+      }
+    }
+    forgetSettled();
+    // The words' language answers again, unless the reader switched the app's language since (then the app's wins).
+    setVoice(!snap.app || snap.app === appLocale() ? languageOfText(snap.query) : null);
+    setQuery(snap.query); setCta(null); setFixes([]); setFixing(null); setReplyTo(null); setAskNew(false);
+    setIntent(it); setRound((r) => r + 1);
+    return true;
+  };
+  // Signed in over this screen ("Sign in to book this"): the same search again, for the account's people.
+  const prevStatus = useRef(status);
+  useEffect(() => {
+    const was = prevStatus.current;
+    prevStatus.current = status;
+    // Quietly: the end of sign-in says "Back where you were." when it lands here (alerts, welcome back).
+    if (was !== 'signedIn' && status === 'signedIn' && intent) void restore();
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The answer's language is this conversation's only: the rest of the app keeps the app's.
+  useEffect(() => () => setVoice(null), []);
+  const answering = useVoiceLocale((v) => v.voice);
+  const dirProps = answering ? ({ dir: answering === 'ar' ? 'rtl' : 'ltr', style: { gap: 16, direction: answering === 'ar' ? 'rtl' : 'ltr' } } as object) : null;
+  /** The other language, mid-ask: saved first, so the app restarts into the same search with the same option. */
+  const switchTo = async () => {
+    const next = appLocale() === 'ar' ? 'en' : 'ar';
+    buzz('tap');
+    flushAsk();
+    if (Platform.OS === 'web') { try { globalThis.history?.replaceState(null, '', ASK_RESUME); } catch { /* */ } }
+    else await setRelaunchTo(ASK_RESUME);
+    const ok = await switchLanguage(next);
+    if (!ok) toast(t('lang.restart.manual'));
+  };
+
   useEffect(() => {
     const id = setTimeout(() => {
-      if (params.prefill) void submit(String(params.prefill));
+      if (params.resume) void restore().then((ok) => { if (ok) toast(t('resume.back')); });
+      else if (params.prefill) void submit(String(params.prefill));
       else if (params.intent && PROMPT[params.intent as AskKind]) void submit(t(PROMPT[params.intent as AskKind]!), params.intent as AskKind);
     }, 0);
     return () => clearTimeout(id);
@@ -140,7 +197,7 @@ export default function Ask() {
 
   const kind = intent?.kind;
   let body: React.ReactNode;
-  if (!intent) body = parsing ? null : <Start onPick={(x) => submit(x)} people={household} today={today} />;
+  if (!intent) body = parsing ? null : <Start onPick={(x) => submit(x)} onResume={() => { void restore(); }} people={household} today={today} />;
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
@@ -171,14 +228,23 @@ export default function Ask() {
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={SHOW_DEMO_SWITCHES ? (
-          <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable>
-        ) : undefined} />
+        <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={(
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {/* The other language, without losing this search (lib/resume.ts). */}
+            <Pressable accessibilityRole="button" accessibilityLabel={tShared('ask.lang.a11y', undefined, appLocale())} onPress={() => { void switchTo(); }} style={styles.demo} testID="ask-lang">
+              <T v="caption" color={colors.green}>{appLocale() === 'ar' ? tShared('ask.lang.toEnglish', undefined, 'en') : tShared('ask.lang.toArabic', undefined, 'ar')}</T>
+            </Pressable>
+            {SHOW_DEMO_SWITCHES ? <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable> : null}
+          </View>
+        )} />
         <ScrollView ref={scroll} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={{ gap: 16 }} {...dirProps}>
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
+          {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
           {fixes.map((f, i) => <MeBubble key={`${i}-${f}`} text={f} testID="ask-fix" />)}
           <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
           {fixing && intent ? <FixPrompt text={fixing} kind={intent.kind} onPick={fix} /> : null}
+          </View>
         </ScrollView>
         <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
           {cta && !offline && cta.refine ? (
@@ -207,12 +273,6 @@ export default function Ask() {
         </View>
       </KeyboardAvoidingView>
       <DemoSheet visible={demoOpen} onClose={() => setDemoOpen(false)} />
-      <Sheet visible={needsSignIn} label={t('ask.signin.title')} onClose={() => { setNeedsSignIn(false); router.back(); }}>
-        <T v="h2">{t('ask.signin.title')}</T>
-        <T v="body">{t('ask.signin.body')}</T>
-        <Button label={t('ask.signin.go')} onPress={() => { setNeedsSignIn(false); router.replace('/signin'); }} />
-        <Button variant="ghost" label={t('common.notNow')} onPress={() => { setNeedsSignIn(false); router.back(); }} />
-      </Sheet>
     </Screen>
   );
 }
@@ -235,8 +295,11 @@ function FixPrompt({ text, kind, onPick }: { text: string; kind: AskKind; onPick
   );
 }
 
-function Start({ onPick, people, today }: { onPick: (x: string) => void; people: Person[]; today: string }) {
+function Start({ onPick, onResume, people, today }: { onPick: (x: string) => void; onResume: () => void; people: Person[]; today: string }) {
   const router = useRouter();
+  // A search from earlier (before a restart, a sign-in, a language switch): one tap back to it.
+  const [last, setLast] = useState<string | null>(null);
+  useEffect(() => { void peekAsk().then((s) => setLast(s?.query ?? null)); }, []);
   // The app was closed (or killed) while Mada was booking: pick it up from the server.
   const active = useQuery({ queryKey: ['booking', 'active'], queryFn: async () => (await bookingApi.activeOrders()).orders });
   const busy = active.data?.find((o) => !['confirmed', 'cancelled', 'declined'].includes(o.status));
@@ -253,6 +316,11 @@ function Start({ onPick, people, today }: { onPick: (x: string) => void; people:
         <T style={font('display')} accessibilityRole="header">{t('ask.title')}</T>
         <T v="body" color={colors.ink2}>{t('ask.intro')}</T>
       </View>
+      {last ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={t('resume.pickUpA11y', { what: last })} onPress={() => { buzz('tap'); onResume(); }} testID="ask-pick-up">
+          <Notice icon="calendar"><T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('resume.pickUp')}</T><T v="small" numberOfLines={1}>{last}</T></Notice>
+        </Pressable>
+      ) : null}
       <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>
       <IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={onPick} testID="ask-ideas" />
       {busy ? (

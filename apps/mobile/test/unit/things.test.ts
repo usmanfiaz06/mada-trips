@@ -44,7 +44,8 @@ describe('things to do (mock)', () => {
     expect(fam.activities.every((a) => a.family)).toBe(true);
     expect((await as('GET', '/places/108410/things?day=nope')).status).toBe(400);
     expect(((await as('GET', '/places/611717/things')).json as J).status).toBe('none');
-    expect((await mockTransport({ method: 'GET', path: '/places/108410/things' })).status).toBe(401);
+    // Open to guests, like the server (lib/app/guest.ts); a trip's ideas still need an account.
+    expect((await mockTransport({ method: 'GET', path: '/places/108410/things' })).status).toBe(200);
   });
 
   it('a trip: from the hotel, its days, Book with Mada, Add to my plan on the itinerary', async () => {

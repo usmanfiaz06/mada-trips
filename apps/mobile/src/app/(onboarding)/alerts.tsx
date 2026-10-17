@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { Button } from '@/components/Button';
 import { VGradient } from '@/components/Gradient';
@@ -14,6 +14,8 @@ import { askNotifications } from '@/lib/notify-permission';
 import { useOnboarding } from '@/lib/onboarding';
 import { useUpdateMe } from '@/lib/queries';
 import { colors, font, radii, ff } from '@/theme';
+import { takeReturnTo } from '@/lib/resume';
+import { toast } from '@/lib/toast';
 
 const PREVIEW = [
   { title: () => t('notify.gateChange.title', { gate: 'C4' }), body: () => t('notify.gateChange.body', { flight: 'SV263', gate: 'C4', minutes: 6 }), delay: 400 },
@@ -36,8 +38,11 @@ export default function Alerts() {
     try { await update.mutateAsync({ notifications: choice, onboarded: true }); } catch { /* the app works without it; /me retries later */ }
     buzz('success');
     useOnboarding.getState().reset();
+    // Asked to sign in from somewhere ("Sign in to book this"): back there, as it was (lib/resume.ts).
+    const back = await takeReturnTo();
     router.dismissAll?.();
-    router.replace('/today');
+    if (back) { router.dismissTo(back as Href); toast(t('resume.back')); }
+    else router.replace('/today');
   };
 
   return (

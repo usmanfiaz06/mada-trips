@@ -27,6 +27,7 @@ import { arOffline } from './offline';
 import { arUmrah } from './umrah';
 import { arNative } from './native';
 import { arEsim } from './esim';
+import { arGuest } from './guest';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
@@ -53,5 +54,6 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arUmrah,
   ...arNative,
   ...arEsim,
+  ...arGuest,
   ...arCommon,
 } as Record<string, string>;

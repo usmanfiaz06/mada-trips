@@ -129,6 +129,11 @@ export const HotelTranslationResponse = z.object({
   machine: z.boolean(),
 });
 export type HotelTranslationResponse = z.infer<typeof HotelTranslationResponse>;
+/** A message the desk or Mada wrote, in the reader's language (GET /messages/{id}/translation?to=). */
+export const MessageTranslationResponse = z.object({ lang: z.enum(['en', 'ar']), text: z.string(), machine: z.boolean() });
+export type MessageTranslationResponse = z.infer<typeof MessageTranslationResponse>;
+export const messageTranslationPath = (id: string, to: 'en' | 'ar') => `/messages/${id}/translation?to=${to}`;
+
 export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}`, translation: (code: number, to: 'en' | 'ar') => `/hotels/${code}/translation?to=${to}` } as const;
 
 export { voucherHtml } from './voucher-html';

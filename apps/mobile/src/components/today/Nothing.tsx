@@ -13,10 +13,10 @@ import { VGradient } from '@/components/Gradient';
 import { Icon, type IconName } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { Box, Display, Eyebrow, H3, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
+import { Box, Display, Eyebrow, H3, IdeaTiles, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
 import { eidLine } from '@/lib/days';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { usePeople, useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -24,6 +24,7 @@ import { newKey, tripsApi, tk, useGuestFlights, useTrips, useTripMutation, type 
 import { colors, ff, font, radii, shadow } from '@/theme';
 import { RequestsCard } from './common';
 import { askNotifications } from '@/lib/notify-permission';
+import { requireAccount } from '@/lib/signin-ask';
 
 const SERVICES: [IconName, 'today.service.flight' | 'today.service.stay' | 'today.service.visa' | 'today.service.umrah' | 'today.service.car' | 'today.service.food' | 'today.service.todo', string][] = [
   ['flight', 'today.service.flight', 'flight'], ['stay', 'today.service.stay', 'stay'], ['visa', 'today.service.visa', 'visa'], ['umrah', 'today.service.umrah', 'umrah'],
@@ -248,18 +249,21 @@ export function Guest() {
   const router = useRouter();
   const flights = useGuestFlights((s) => s.flights);
   const remove = useGuestFlights((s) => s.remove);
-  const clear = useSession((s) => s.clear);
   return (
     <>
-      <Rise><Display size={44}>{t('td.guest.title')}</Display></Rise>
-      <Rise step={1}><TrackFlight guest /></Rise>
+      {/* Looking around: where to first (search and prices need no account), then a flight to watch. */}
+      <Rise><Display size={44}>{t('ask.title')}</Display></Rise>
+      <Rise step={1}><IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={(x) => router.push({ pathname: '/ask', params: { prefill: x } })} testID="guest-ideas" /></Rise>
+      <Rise step={1}><Button label={t('ask.composer')} variant="secondary" onPress={() => router.push('/ask')} testID="guest-ask" /></Rise>
+      <Rise step={2}><H3>{t('td.guest.title')}</H3></Rise>
+      <Rise step={2}><TrackFlight guest /></Rise>
       <TrackedFlights flights={flights.map((f) => ({ ...f, status: 'scheduled' as const }))} onStop={(f) => remove(f.id)} />
       {!flights.length ? <EmptyState compact art={<ArtPass width={80} height={60} />} title={t('td.guest.emptyTitle')} body={t('td.guest.emptyBody')} /> : null}
       <Rise step={2}>
         <Box tone="well">
           <H3>{t('td.guest.cardTitle')}</H3>
           <Small>{t('td.guest.cardBody')}{flights.length ? ` ${t('td.guest.comeWith')}` : ''}</Small>
-          <Button label={t('td.guest.signIn')} variant="secondary" block={false} onPress={() => { void clear().then(() => router.replace('/signin')); }} />
+          <Button label={t('td.guest.signIn')} variant="secondary" block={false} onPress={() => requireAccount('trips', '/today')} testID="guest-signin" />
         </Box>
       </Rise>
     </>
@@ -272,7 +276,8 @@ export function useLastTripLine(): string | null {
   const p = data?.past[0];
   if (!p) return null;
   const n = p.travellerCount;
-  const you = n <= 1 ? t('trip.ofYou.one') : n === 2 ? t('trip.ofYou.two') : t('trip.ofYou.many', { n: ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] ?? n });
+  // English writes the number as a word ("the four of you"); Arabic as a number (no English word inside Arabic).
+  const you = n <= 1 ? t('trip.ofYou.one') : n === 2 ? t('trip.ofYou.two') : t('trip.ofYou.many', { n: getLocale() === 'ar' ? n : ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] ?? n });
   return t('td.lastTrip', { when: p.when ?? t('td.lastTime'), you, city: p.city });
 }
 

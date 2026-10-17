@@ -25,7 +25,8 @@ import { api } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { colors } from '@/theme';
 import { fontsFor } from '@/theme/fonts';
-import { bootLocale, getLocale, isRTL } from '@/lib/i18n';
+import { appLocale, bootLocale, getLocale, isRTL } from '@/lib/i18n';
+import { SignInSheet } from '@/components/auth/SignInSheet';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 // When things go wrong (FLOWS.md §12): crash reports (Sentry, only with a DSN), the connection, the offline copy.
@@ -63,7 +64,7 @@ export default function RootLayout() {
   // The server writes notifications, texts and emails in the language saved on the account: keep it this launch's.
   const savedLocale = useSession((s) => s.user?.locale);
   useEffect(() => {
-    if (status === 'signedIn' && savedLocale && savedLocale !== getLocale()) void api.updateMe({ locale: getLocale() }).catch(() => {});
+    if (status === 'signedIn' && savedLocale && savedLocale !== appLocale()) void api.updateMe({ locale: appLocale() }).catch(() => {});
   }, [status, savedLocale]);
 
   const ready = (fontsLoaded || !!fontError) && status !== 'loading' && restored && localeReady;
@@ -93,6 +94,7 @@ export default function RootLayout() {
             </NetChrome>
           </AppErrorBoundary>
           <SessionExpired />
+          <SignInSheet />
           <AppLock />
           <ToastHost />
         </QueryClientProvider>

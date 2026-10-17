@@ -69,7 +69,16 @@ export const PHRASES_AR: Readonly<Record<string, string>> = {
   'Light rain. Pack the umbrella.': 'مطر خفيف. خذ المظلة.', 'Light rain. Dry by Thursday.': 'مطر خفيف. يصحو بحلول الخميس.',
   'light rain': 'مطر خفيف', 'Light rain': 'مطر خفيف', sunny: 'مشمس', Sunny: 'مشمس', clear: 'صافٍ', cloudy: 'غائم',
   'Bereketzade Hotel': 'فندق بركت زاده', 'Airport pickup both ways': 'استقبال من المطار وتوصيل إليه',
+  // Documents set up for an account in English (their stored title).
+  'National ID': 'الهوية الوطنية', 'Schengen visa': 'تأشيرة شنغن', 'Travel insurance': 'تأمين سفر', Iqama: 'الإقامة',
+  // Entry rules' one line when nothing else needs saying (booking-data.ts ENTRY_RULES ok).
+  'No visa needed.': 'ما تحتاج تأشيرة.', 'Visa on arrival.': 'تأشيرة عند الوصول.', 'Visa on arrival, USD 25.': 'تأشيرة عند الوصول، 25 دولار.',
+  'Visa-free for 90 days.': 'بدون تأشيرة لمدة 90 يوم.', 'Visa-free for a year.': 'بدون تأشيرة لمدة سنة.',
+  'Visa-free with a valid Saudi iqama.': 'بدون تأشيرة مع إقامة سعودية سارية.',
+  'A UK ETA for each Saudi passport: online, GBP 16, usually 3 days.': 'تصريح ETA البريطاني لكل جواز سعودي: أونلاين، 16 جنيه، غالبًا خلال 3 أيام.',
 };
+
+const MONTHS_AR: Readonly<Record<string, string>> = { Jan: 'يناير', Feb: 'فبراير', Mar: 'مارس', Apr: 'أبريل', May: 'مايو', Jun: 'يونيو', Jul: 'يوليو', Aug: 'أغسطس', Sep: 'سبتمبر', Oct: 'أكتوبر', Nov: 'نوفمبر', Dec: 'ديسمبر' };
 
 /** Patterns in supplier text: fees, refunds, bag allowances, doors, carousels and terminals. */
 const PATTERNS_AR: readonly [RegExp, (m: RegExpExecArray) => string][] = [
@@ -80,6 +89,13 @@ const PATTERNS_AR: readonly [RegExp, (m: RegExpExecArray) => string][] = [
   [/^carousel (\d+)$/i, (m) => `السير ${m[1]}`],
   [/^Terminal (\d+)$/, (m) => `الصالة ${m[1]}`],
   [/^(\d+) min$/, (m) => `${m[1]} د`],
+  // A document's stored line ("Valid until 2030", "Multi-entry until Jun 2028").
+  [/^Valid until (\d{4})$/, (m) => `سارية لين ${m[1]}`],
+  [/^Valid until ([A-Z][a-z]{2}) (\d{4})$/, (m) => `سارية لين ${MONTHS_AR[m[1]!] ?? m[1]} ${m[2]}`],
+  [/^Multi-entry until ([A-Z][a-z]{2}) (\d{4})$/, (m) => `دخول متعدد لين ${MONTHS_AR[m[1]!] ?? m[1]} ${m[2]}`],
+  // A hotel's category as the Core API writes it ("4 stars", "3 keys", "5 stars superior").
+  [/^(\d) stars?( superior)?$/, (m) => `${m[1]} نجوم${m[2] ? ' فاخر' : ''}`],
+  [/^(\d) keys?$/, (m) => `${m[1]} مفاتيح`],
   [/^(\d+)[–-](\d+) min$/, (m) => `${m[1]}–${m[2]} د`],
   [/^(Visa|Mastercard|mada|Card) ending (\d{2,4})$/, (m) => `${m[1] === 'mada' ? 'مدى' : m[1] === 'Card' ? 'البطاقة' : m[1]} المنتهية بـ \u2066${m[2]}\u2069`],
 ];

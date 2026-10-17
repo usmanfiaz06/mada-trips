@@ -8,6 +8,7 @@ import {
 } from '@mada/shared';
 import { z } from 'zod';
 import { ApiError, request } from './api';
+import { guestPartySize, guestTravellers } from './guest';
 import { API_MODE, SHOW_DEMO_HINTS } from './config';
 import { t } from './i18n';
 import { useSession } from './session';
@@ -46,19 +47,27 @@ async function call<S extends z.ZodType>(method: 'GET' | 'POST', path: string, s
   return request({ method, path: q(path), body, ...(idempotencyKey ? { idempotencyKey } : null) }, schema);
 }
 
+const isGuest = () => useSession.getState().status !== 'signedIn';
+function withGuests<B extends { travellerIds: string[] }>(b: B): B {
+  return isGuest() ? { ...b, guests: guestTravellers(b.travellerIds) } : b;
+}
+/** A guest's plans are priced for the people they've said (two until they say). */
+const guestCount = () => (isGuest() ? `?travellers=${guestPartySize()}` : '');
+
 const QuoteOut = z.object({ request: BookingRequestView, messages: z.array(ThreadMessage) });
 
 export const bookingApi = {
   parse: (text: string, tripCity?: string | null) => call('POST', '/ask/parse', AskParseResponse, { text, tripCity }),
-  searchFlights: (b: FlightSearchRequest) => call('POST', '/search/flights', FlightSearchResponse, b),
-  searchStays: (b: StaySearchRequest) => call('POST', '/search/stays', StaySearchResponse, b),
-  entry: (b: EntryCheckRequest) => call('POST', '/search/entry', EntryCheckResponse, b),
+  // Without an account the people going are described (ids and ages from this phone), never stored on the server.
+  searchFlights: (b: FlightSearchRequest) => call('POST', '/search/flights', FlightSearchResponse, withGuests(b)),
+  searchStays: (b: StaySearchRequest) => call('POST', '/search/stays', StaySearchResponse, withGuests(b)),
+  entry: (b: EntryCheckRequest) => call('POST', '/search/entry', EntryCheckResponse, withGuests(b)),
   offer: (id: string) => call('GET', `/offers/${id}`, OfferResponse),
   reprice: (id: string) => call('POST', `/offers/${id}/price`, OfferResponse, {}),
   rooms: (id: string) => call('GET', `/offers/${id}/rooms`, StayRoomsResponse),
   geocode: (q: string, city: string) => call('GET', `/geocode?q=${encodeURIComponent(q)}&city=${encodeURIComponent(city)}`, GeocodeResponse),
-  plans: () => call('GET', '/plans', PlansResponse),
-  plan: (id: string) => call('GET', `/plans/${encodeURIComponent(id)}`, PlanResponse),
+  plans: () => call('GET', `/plans${guestCount()}`, PlansResponse),
+  plan: (id: string) => call('GET', `/plans/${encodeURIComponent(id)}${guestCount()}`, PlanResponse),
   requests: () => call('GET', '/requests', RequestsResponse),
   request: (id: string) => call('GET', `/requests/${id}`, RequestResponse),
   createRequest: (b: CreateRequestBody) => call('POST', '/requests', RequestResponse, b, b.clientId ? `req-${b.clientId}` : undefined),
@@ -86,8 +95,10 @@ export const bookingKeys = {
 };
 
 const useOn = () => useSession((s) => s.status === 'signedIn');
-export const usePlans = () => useQuery({ queryKey: bookingKeys.plans, enabled: useOn(), queryFn: async () => (await bookingApi.plans()).plans });
-export const usePlan = (id: string) => useQuery({ queryKey: bookingKeys.plan(id), enabled: useOn() && !!id, queryFn: async () => (await bookingApi.plan(id)).plan });
+/** Plans read the same for a guest, or for anyone opening a shared plan link before choosing anything. */
+const useOpen = () => useSession((s) => s.status !== 'loading');
+export const usePlans = () => useQuery({ queryKey: bookingKeys.plans, enabled: useOpen(), queryFn: async () => (await bookingApi.plans()).plans });
+export const usePlan = (id: string) => useQuery({ queryKey: bookingKeys.plan(id), enabled: useOpen() && !!id, queryFn: async () => (await bookingApi.plan(id)).plan });
 /** A request, polled while Mada is working on it. */
 export function useBookingRequest(id: string | null) {
   return useQuery({

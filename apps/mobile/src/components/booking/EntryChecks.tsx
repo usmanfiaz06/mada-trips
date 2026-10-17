@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { addDays, type EntryCheckResponse } from '@mada/shared';
+import { addDays, nameIn, type EntryCheckResponse } from '@mada/shared';
 import { sendRequest } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors } from '@/theme';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
 import { T } from '../Text';
 import { Notice, enter } from './parts';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /* Everything that could stop someone boarding, before anyone pays (FLOWS.md §2). Blocking checks hold the review. */
 
@@ -20,8 +21,9 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
 }) {
   const [asked, setAsked] = useState<Record<string, boolean>>({});
   if (!result) return null;
-  const what = result.domestic ? t('entry.domestic') : result.nationalities.length ? t('entry.for', { country: result.countryName, nationalities: result.nationalities.join(' and ') }) : t('entry.forYour', { country: result.countryName });
+  const what = result.domestic ? t('entry.domestic') : result.nationalities.length ? t('entry.for', { country: result.countryName, nationalities: joinAnd(result.nationalities) }) : t('entry.forYour', { country: result.countryName });
   const ask = async (key: string, service: 'uk_eta' | 'evisa' | 'reentry' | 'passport_renewal', personId: string | null, need: string | null, answerKey: string | null) => {
+    if (!requireAccount('chat', ASK_RESUME)) return;
     setAsked((a) => ({ ...a, [key]: true }));
     buzz('success');
     try {
@@ -33,7 +35,7 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
     <View style={{ gap: 10 }}>
       <Animated.View entering={enter(0)} style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
         <Icon name="check" color={colors.ok} size={14} width={2.4} />
-        <T v="tiny" style={{ flex: 1 }}>{t('entry.checked', { what })}{!result.checks.length && result.okText ? ` · ${result.okText}` : ''}</T>
+        <T v="tiny" style={{ flex: 1 }}>{t('entry.checked', { what })}{!result.checks.length && result.okText ? ` · ${nameIn(result.okText, getLocale())}` : ''}</T>
       </Animated.View>
       {result.checks.map((c) => {
         const k = `${c.personId ?? 'all'}:${c.key}`;

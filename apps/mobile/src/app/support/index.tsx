@@ -25,9 +25,11 @@ import { toast } from '@/lib/toast';
 import { usePresence, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { hhmm, nextTrip } from '@/lib/wallet-model';
-import { colors, ff } from '@/theme';
+import { colors, ff, font } from '@/theme';
 import { AttachmentChip } from '@/components/booking/Attachment';
 import { MadaMark } from '@/components/trips/ui';
+import { herePath, requireAccount } from '@/lib/signin-ask';
+import { DeskWords } from '@/components/booking/Translate';
 
 const TOPIC_ICON: Record<SupportTopic, IconName> = { change: 'flight', refund: 'refund', bag: 'bag', docs: 'visa', airport: 'pin', other: 'more', urgent: 'bell' };
 const GRID_TOPICS = SUPPORT_TOPICS.filter((k) => k !== 'urgent');
@@ -38,6 +40,30 @@ const GRID_TOPICS = SUPPORT_TOPICS.filter((k) => k !== 'urgent');
  * offline: messages wait on the phone, with call and SMS to the desk. `?trip=` opens the trip's conversation.
  */
 export default function Support() {
+  const status = useSession((x) => x.status);
+  return status === 'signedIn' ? <SupportChat /> : <GuestSupport />;
+}
+
+/**
+ * Without an account (a "Mada" link, Help): what the conversation is and one way in; the desk's phone works for
+ * anyone, day and night. Signing in comes straight back here (lib/signin-ask.ts).
+ */
+function GuestSupport() {
+  const router = useRouter();
+  return (
+    <Screen>
+      <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} />
+      <View style={{ paddingHorizontal: 20, gap: 16, paddingTop: 12 }} testID="support-guest">
+        <T v="h1" accessibilityRole="header">{t('signin.ask.chat')}</T>
+        <T v="body" color={colors.ink2}>{t('signin.ask.body')}</T>
+        <Button label={t('signin.ask.go')} onPress={() => requireAccount('chat', herePath() ?? '/support')} testID="support-guest-signin" />
+        <Button variant="secondary" label={t('support.call', { phone: DESK_PHONE })} onPress={() => Linking.openURL(DESK_TEL).catch(() => {})} testID="support-guest-call" />
+      </View>
+    </Screen>
+  );
+}
+
+function SupportChat() {
   const router = useRouter();
   const { trip: tripParam, topic, thread: threadParam } = useLocalSearchParams<{ trip?: string; topic?: string; thread?: string }>();
   const user = useSession((s) => s.user);
@@ -242,7 +268,8 @@ function Message({ m, hasTrip, onReply, onBag, onNoRef, onAction }: {
         {/* A file with a signed link opens (photos and PDFs from the desk, or your own); without one, its name. */}
         {m.attachment?.url ? <AttachmentChip file={{ ...m.attachment, url: m.attachment.url }} mine={mine} />
           : m.attachment && m.attachment.mime !== 'application/pdf' ? <View style={styles.photo}><Icon name="scan" color={colors.muted} /><T v="tiny" color={mine ? colors.onDark2 : colors.ink3}>{m.attachment.name}</T></View> : null}
-        {m.body ? <T v="body" color={fg} style={{ fontSize: 15, lineHeight: 21 }}>{m.body}</T> : null}
+        {m.body && !mine ? <DeskWords id={m.id} text={m.body} style={[font('body', fg), { fontSize: 15, lineHeight: 21 }]} />
+          : m.body ? <T v="body" color={fg} style={{ fontSize: 15, lineHeight: 21 }}>{m.body}</T> : null}
         {c?.refund ? (
           <View style={styles.refund}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>

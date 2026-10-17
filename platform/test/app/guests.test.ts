@@ -17,6 +17,8 @@ import { GET as ordersGet } from "@/app/api/app/v1/orders/route";
 import { POST as previewPost } from "@/app/api/app/v1/orders/preview/route";
 import { GET as peopleGet } from "@/app/api/app/v1/people/route";
 import { GET as circlesGet } from "@/app/api/app/v1/circles/route";
+import { GET as messageTr } from "@/app/api/app/v1/messages/[id]/translation/route";
+import { GET as hotelTr } from "@/app/api/app/v1/hotels/[code]/translation/route";
 import { callP, signIn } from "./wallet-helpers";
 import { freshIp } from "./helpers";
 
@@ -96,6 +98,14 @@ describe("guests", () => {
       last = (await callP(askParse, {}, { method: "POST", headers: asGuest(ip), body: { text: "Riyadh" } })).status;
     }
     expect(last).toBe(429);
+  });
+
+  it("Translate: a message only for its own conversation, a hotel's words for anyone, never made up", async () => {
+    expect((await callP(messageTr, { id: randomUUID() }, { headers: asGuest(), query: "?to=ar" })).status).toBe(401);
+    const a = await signIn();
+    expect((await callP(messageTr, { id: randomUUID() }, { token: a.token, query: "?to=ar" })).status).toBe(404);
+    // A hotel that isn't in the store: not found; the mock translator never invents a translation (501).
+    expect((await callP(hotelTr, { code: "999999991" }, { headers: asGuest(), query: "?to=ar" })).status).toBe(404);
   });
 
   it("a message's language is read from its letters", () => {

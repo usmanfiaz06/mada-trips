@@ -8,6 +8,7 @@ import { colors, font } from '@/theme';
 import { Icon } from '../Icon';
 import { T } from '../Text';
 import { AgentDot, MadaDot, enter } from './parts';
+import { DeskWords } from './Translate';
 
 /*
  * The conversation's pieces: the traveller's words on the end side (green), Mada's on the start side, an answered
@@ -102,13 +103,15 @@ function Dot({ delay }: { delay: number }) {
 }
 
 /** One message in a thread: who, what, when. */
-export function ThreadBubble({ mine, name, text, time, children, queued }: { mine: boolean; name: string; text?: string; time?: string | null; children?: ReactNode; queued?: boolean }) {
+export function ThreadBubble({ mine, name, text, time, children, queued, id }: { mine: boolean; name: string; text?: string; time?: string | null; children?: ReactNode; queued?: boolean; id?: string }) {
   return (
     <View style={[styles.theirRow, mine ? styles.mineRow : null]}>
       {!mine ? <AgentDot name={name} size={28} /> : null}
       <View style={{ flexShrink: 1, gap: 3, alignItems: mine ? 'flex-end' : 'flex-start' }}>
         <View style={[mine ? styles.bubbleMine : styles.bubbleThem, { gap: 6 }]}>
-          {text ? <T style={[font('callout', mine ? colors.mist : colors.green), { lineHeight: 21 }]}>{text}</T> : null}
+          {/* The desk's words in the other language: as written, with "Translate" (Translate.tsx). */}
+          {text && !mine && id ? <DeskWords id={id} text={text} style={[font('callout', colors.green), { lineHeight: 21 }]} />
+            : text ? <T style={[font('callout', mine ? colors.mist : colors.green), { lineHeight: 21 }]}>{text}</T> : null}
           {children}
         </View>
         {time || queued ? <T v="tiny" style={{ paddingHorizontal: 6 }}>{queued ? t('ask.flow.sendsOnline') : mine ? time : `${name} · ${time}`}</T> : null}

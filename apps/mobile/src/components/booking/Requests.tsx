@@ -28,6 +28,7 @@ import { FlightFares } from './FlightRequest';
 import { Answered, ThreadBubble, TypingDots, clock } from './Conversation';
 import { PhoneSheet, usePhoneNeeded } from './PhoneSheet';
 import { CarNow } from './CarNow';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /* Requests a person at Mada completes: one question at a time, per-person needs, a note, then the quote and the thread. */
 
@@ -90,6 +91,8 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
   const [asked] = useState(() => new Set(form.filter((f) => !answers[f.k]).map((f) => f.k)));
 
   const send = async () => {
+    // Writing to Mada is an account action: asked here, and the request is still here after signing in.
+    if (!requireAccount('chat', ASK_RESUME)) return;
     setBusy(true);
     try {
       const plain: Record<string, string[]> = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === true ? ['yes'] : v]));
@@ -251,7 +254,7 @@ export function SentRequest({ id, screen }: { id: string | null; people?: Person
   const answered = ['quoted', 'paid', 'done'].includes(r.status);
   const agent = r.agent?.name ?? 'Mada';
   const canPay = !r.quote?.flight && r.status === 'quoted' && r.quote?.status === 'open' && (r.quote?.total.amount ?? 0) > 0;
-  const pay = () => { usePayDraft.getState().set({ draft: { kind: 'quote', requestId: r.id }, title: r.title }); router.push('/pay'); };
+  const pay = () => { if (!requireAccount('book')) return; usePayDraft.getState().set({ draft: { kind: 'quote', requestId: r.id }, title: r.title }); router.push('/pay'); };
   return (
     <Animated.View entering={enter(0)} style={{ gap: 14 }}>
       {screen ? null : (
@@ -375,7 +378,7 @@ export function RequestThread({ request, stage }: { request: BookingRequestView;
     <View style={{ gap: 10 }} accessibilityLabel={t('request.a11y.thread')}>
       {stage && !msgs.length && !waiting ? <View style={styles.stage} testID="request-stage"><ArtMap /></View> : null}
       {msgs.map((m) => (
-        <ThreadBubble key={m.id} mine={m.from === 'me'} name={m.authorName ?? agent} text={m.text} time={clock(m.createdAt)}>
+        <ThreadBubble key={m.id} id={m.id} mine={m.from === 'me'} name={m.authorName ?? agent} text={m.text} time={clock(m.createdAt)}>
           {m.attachment ? <AttachmentChip file={m.attachment} mine={m.from === 'me'} /> : null}
           {m.offer && !m.offer.accepted ? <Button size="small" block={false} variant="gold" style={{ alignSelf: 'flex-start' }} label={t('request.switch')} onPress={() => accept(m.id)} /> : null}
         </ThreadBubble>

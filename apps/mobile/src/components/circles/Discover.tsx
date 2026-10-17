@@ -2,22 +2,24 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
-import { eventWords, planWords, type Post, type PostKind } from '@mada/shared';
+import { eventWords, nameIn, planWords, type Post, type PostKind } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
 import { InlineError } from '@/components/states';
 import { T } from '@/components/Text';
-import { COVERS, photoSource, useDiscover, usePosts } from '@/lib/circles';
+import { COVERS, phoneCity, photoSource, useDiscover, usePosts } from '@/lib/circles';
 import { buzz } from '@/lib/haptics';
 import { placesApi } from '@/lib/places';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { colors, ff, font } from '@/theme';
 import { ArtMap } from './art';
 import { useSaveToggle } from './hooks';
 import { CitySheet, relLabel, thanksLine } from './sheets';
 import { Face, GlassButton, PhotoFill } from './ui';
+import { requireAccount } from '@/lib/signin-ask';
+import { useSession } from '@/lib/session';
 
 const Arrow = () => <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.paper} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><Path d="M5 12h14M13 6l6 6-6 6" /></Svg>;
 const Bookmark = ({ on }: { on: boolean }) => <Svg width={16} height={16} viewBox="0 0 24 24" fill={on ? colors.green : 'none'} stroke={on ? colors.green : colors.paper} strokeWidth={2} strokeLinejoin="round"><Path d="M6 3h12v18l-6-4-6 4z" /></Svg>;
@@ -35,18 +37,21 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
   const [picking, setPicking] = useState(false);
   const [filter, setFilter] = useState<PostKind | null>(null);
   const d = useDiscover(picked);
-  const city = d.data?.city ?? picked ?? '';
+  // Never blank: until Discover answers, the city asked for, else the phone's (lib/circles.ts phoneCity).
+  const city = d.data?.city ?? picked ?? phoneCity();
+  const cityShown = nameIn(city, getLocale());
   const posts = usePosts(city || null, filter);
   const { isSaved, togglePost } = useSaveToggle();
   const ask = (prefill: string) => router.push({ pathname: '/ask', params: { prefill } });
   const feed = posts.data?.posts ?? [];
+  const guest = useSession((s) => s.status !== 'signedIn');
 
   return (
     <>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline' }}>
         <T v="h2" style={{ fontSize: 22, lineHeight: 28 }}>{t('circles.discover.on')} </T>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('circles.discover.cityA11y', { city })} onPress={() => { buzz('tap'); setPicking(true); }} style={s.citySwitch} testID="city-switch">
-          <T style={[font('h2', colors.goldInk), { fontSize: 22, lineHeight: 28, textDecorationLine: 'underline', textDecorationColor: 'rgba(185,143,74,0.45)' }]}>{city}</T>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('circles.discover.cityA11y', { city: cityShown })} onPress={() => { buzz('tap'); setPicking(true); }} style={s.citySwitch} testID="city-switch">
+          <T style={[font('h2', colors.goldInk), { fontSize: 22, lineHeight: 28, textDecorationLine: 'underline', textDecorationColor: 'rgba(185,143,74,0.45)' }]}>{cityShown}</T>
           <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={colors.goldInk} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><Path d="M6 9l6 6 6-6" /></Svg>
         </Pressable>
       </View>
@@ -54,13 +59,13 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.bleed} contentContainerStyle={s.rail}>
         {(d.data?.events ?? []).map((ev, i) => { const e = { ...ev, ...eventWords(ev) }; return (
-          <Pressable key={e.id} accessibilityRole="button" accessibilityLabel={e.title} onPress={() => { buzz('tap'); ask(t('circles.discover.eventAsk', { title: e.title, city })); }} style={[s.story, { width: 236, minHeight: 300 }]}>
+          <Pressable key={e.id} accessibilityRole="button" accessibilityLabel={e.title} onPress={() => { buzz('tap'); ask(t('circles.discover.eventAsk', { title: e.title, city: cityShown })); }} style={[s.story, { width: 236, minHeight: 300 }]}>
             <PhotoFill source={COVERS[e.photoKey]} veil="story" position={['50% 40%', '30% 70%', '70% 30%'][i % 3]} />
             <View style={s.top}><Pill variant="glass" label={e.tag} /></View>
             <View style={s.body}>
               <T style={[font('display', colors.paper), { fontSize: 26, lineHeight: 28 }]} balance={false}>{e.title}</T>
               <T v="small" color="rgba(255,253,249,0.88)">{e.when}{'\n'}{e.where}</T>
-              <GlassButton label={t('circles.discover.book')} after={<Arrow />} onPress={() => ask(t('circles.discover.eventAsk', { title: e.title, city }))} />
+              <GlassButton label={t('circles.discover.book')} after={<Arrow />} onPress={() => ask(t('circles.discover.eventAsk', { title: e.title, city: cityShown }))} />
             </View>
           </Pressable>
         ); })}
@@ -94,8 +99,15 @@ export function Discover({ picked, setPicked, onPost, onOpen }: { picked: string
 
       {d.view === 'error' || d.view === 'offline' ? <InlineError problem={d.problem} onRetry={d.retry} /> : null}
       {posts.view === 'error' || posts.view === 'offline' ? <InlineError problem={posts.problem} onRetry={posts.retry} /> : null}
+      {/* Tips are people's: without an account, one line and the way in (the week and the plans above are for all). */}
+      {guest ? (
+        <View style={{ gap: 10 }} testID="tips-guest">
+          <T v="small" color={colors.ink2}>{t('signin.ask.body')}</T>
+          <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} variant="secondary" label={t('signin.ask.go')} onPress={() => requireAccount('circles')} />
+        </View>
+      ) : null}
       {posts.isSuccess && feed.length === 0 ? (
-        <EmptyState art={<ArtMap />} title={filter === 'food' ? t('circles.discover.empty.food', { city }) : filter === 'todo' ? t('circles.discover.empty.todo', { city }) : t('circles.discover.empty.all', { city })}
+        <EmptyState art={<ArtMap />} title={filter === 'food' ? t('circles.discover.empty.food', { city: cityShown }) : filter === 'todo' ? t('circles.discover.empty.todo', { city: cityShown }) : t('circles.discover.empty.all', { city: cityShown })}
           body={t('circles.discover.empty.body')} action={<Button label={t('circles.discover.empty.action')} onPress={() => onPost(city)} />}
           ideas={filter ? [[t('circles.discover.empty.allTips'), () => setFilter(null)]] : undefined} />
       ) : null}

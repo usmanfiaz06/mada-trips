@@ -21,6 +21,7 @@ import { ChipWrap, Leg, MadaDot, Toggle, enter, useNow } from './parts';
 import { TravellerChips } from './Travellers';
 import type { Cta } from './FlightFlow';
 import type { TripSearch } from './SearchSheet';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /*
  * Flights by request (the beta, GET /config features.flightsByRequest): instead of live fares, "Tell us where and
@@ -47,7 +48,7 @@ export function FlightRequestForm({ city, destKey, trip, who, setWho, people, se
   const dates = trip.type === 'oneway' || !trip.ret ? t('beta.fr.oneWay', { date: rangeName(trip.dep!, null, today) }) : rangeName(trip.dep!, trip.ret, today);
 
   const send = async () => {
-    if (!who.length) return;
+    if (!who.length || !requireAccount('chat', ASK_RESUME)) return;
     setBusy(true);
     try {
       const r = await sendRequest({
@@ -146,7 +147,7 @@ export function FlightFares({ r, today }: { r: BookingRequestView; today: string
       {options.map((o, i) => <FareCard key={o.id} o={o} i={i} on={o.id === chosen?.id} today={today} onPick={() => { buzz('select'); setPick(o.id); }} disabled={!payable} />)}
       {payable ? (
         <Button label={t('beta.fq.pay', { price: formatSar(fareTotal(chosen!)) })} testID="fares-pay"
-          onPress={() => { usePayDraft.getState().set({ draft: { kind: 'quote', requestId: r.id, optionId: chosen!.id }, title: r.title }); router.push('/pay'); }} />
+          onPress={() => { if (!requireAccount('book')) return; usePayDraft.getState().set({ draft: { kind: 'quote', requestId: r.id, optionId: chosen!.id }, title: r.title }); router.push('/pay'); }} />
       ) : null}
     </View>
   );

@@ -21,6 +21,7 @@ import { DistanceSheet } from './DistanceSheet';
 import type { Cta } from './FlightFlow';
 import { StayCard } from './StayCard';
 import { MadaDot, Photo, enter } from './parts';
+import { noteAskPick, pendingPick, stayPickKey, usedPendingPick } from '@/lib/resume';
 
 /*
  * Stay results the way people decide (docs/app/EXPERIENCE.md §2, RANKING.md): three picks first, each with a reason
@@ -99,6 +100,19 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
 
   const visible = mode === 'picks' ? picks.map((x) => x.o) : list;
   const cur = s.options.find((o) => o.id === pick) ?? visible[0] ?? null;
+  // Back after signing in, a language switch or a reload: the stay that was picked, picked again (lib/resume.ts).
+  useEffect(() => {
+    const want = pendingPick('stay');
+    if (!want) return;
+    usedPendingPick();
+    const o = s.options.find((x) => stayPickKey(x) === want);
+    if (!o) return;
+    // Once, when the results arrive: the saved pick is outside React (lib/resume.ts), so it can't be derived in render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPick(o.id);
+    if (!visible.some((x) => x.id === o.id)) setMode('all');
+  }, [s]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (cur) noteAskPick({ kind: 'stay', key: stayPickKey(cur) }); }, [cur?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addText = (text: string) => {
     const p = parseStayWishes(text, city);

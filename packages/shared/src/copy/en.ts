@@ -28,10 +28,13 @@ import { offlineCopy } from './offline';
 import { umrahCopy } from './umrah';
 import { nativeCopy } from './native';
 import { esimCopy } from './esim';
+import { guestCopy } from './guest';
 
 export const en = {
   // eSIMs through Airalo: the plan for the trip, installing, what's left, top-ups: packages/shared/src/copy/esim.ts
   ...esimCopy,
+  // Guests, keeping your place, answering in your language, Translate: packages/shared/src/copy/guest.ts
+  ...guestCopy,
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
   ...walletCopy,
   // Circles, Discover and people (M4): packages/shared/src/copy/en-circles.ts

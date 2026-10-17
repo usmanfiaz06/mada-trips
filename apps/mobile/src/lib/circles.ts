@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
   AcceptInviteResponse, AroundResponse, BlocksResponse, CircleDetail, CircleResponse, CirclesResponse, ContactsMatchResponse, CreateInviteResponse,
   DiscoverResponse, FriendsResponse, InviteLink, InvitePreview, InvitesResponse, MessagesPage, OkResponse, PostResponse, PostsResponse,
-  ProfileResponse, SavedItem, SavedResponse, SearchResponse, SentMessages, StampsResponse, formatSar, joinNames, planById,
+  ProfileResponse, SavedItem, SavedResponse, SearchResponse, SentMessages, StampsResponse, HOME_CITY, formatSar, joinNames, planById,
   type Audience, type CircleMessage, type CircleSummary, type CreateCircleRequest, type CreateInviteRequest, type CreatePostRequest,
   type CreateSplitRequest, type CreateVoteRequest, type MarkPaidRequest, type PersonRef, type PostKind, type ReportRequest, type SaveRequest,
   type SendCircleMessageRequest, type SharedCard, type UpdateCircleRequest, type LinkOptions, type ReactRequest,
@@ -139,7 +139,23 @@ export const useInvites = () => useApiQuery({ queryKey: ck.invites, queryFn: cir
 export const usePosts = (city: string | null, kind: PostKind | null) => useApiQuery({ queryKey: ck.posts(city, kind), queryFn: () => circlesApi.posts(city, kind), enabled: !!city && signedIn(), refetchInterval: 20_000 });
 export const useKnownPosts = () => useApiQuery({ queryKey: ck.known, queryFn: circlesApi.known, enabled: signedIn(), refetchInterval: 20_000 });
 export const useSaved = () => useApiQuery({ queryKey: ck.saved, queryFn: circlesApi.saved, enabled: signedIn() });
-export const useDiscover = (city: string | null) => useApiQuery({ queryKey: ck.discover(city), queryFn: () => circlesApi.discover(city), enabled: signedIn(), placeholderData: (p) => p });
+/**
+ * The city Discover opens on for someone without trips to go by: the phone's (its time zone), when we cover it,
+ * else home. Never empty, so "On this week in …" always names a place.
+ */
+export function phoneCity(): string {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? '';
+    if (zone === 'Europe/Istanbul') return 'Istanbul';
+  } catch { /* no Intl time zone: home */ }
+  return HOME_CITY;
+}
+// Open to guests (the Core API answers Discover without an account), on the phone's city until they pick one.
+export const useDiscover = (city: string | null) => {
+  const guest = useSession((s) => s.status !== 'signedIn');
+  const asked = city ?? (guest ? phoneCity() : null);
+  return useApiQuery({ queryKey: ck.discover(asked), queryFn: () => circlesApi.discover(asked), enabled: useSession((s) => s.status !== 'loading'), placeholderData: (p) => p });
+};
 export const useAround = () => useApiQuery({ queryKey: ck.around, queryFn: circlesApi.around, enabled: signedIn() });
 export const useStamps = () => useApiQuery({ queryKey: ck.stamps, queryFn: circlesApi.stamps, enabled: signedIn() });
 export const useSearch = (term: string) => useApiQuery({ queryKey: ck.search(term), queryFn: () => circlesApi.search(term), enabled: term.trim().length > 0 && signedIn(), placeholderData: (p) => p });

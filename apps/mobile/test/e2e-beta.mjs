@@ -258,7 +258,8 @@ async function arabic() {
   await page.waitForTimeout(1200);
   await k.byTest('dock-ask').click();
   await page.waitForTimeout(800);
-  await k.ask('Istanbul for Eid, all of us');
+  // Typed in Arabic: Mada answers each message in the language it is written in.
+  await k.ask('إسطنبول في العيد مع العائلة');
   await k.see('قل لنا وين ومتى', 'arabic form', 12000);
   await k.shot('ar-request-form');
   await k.press(k.byTest('flight-request-send'));

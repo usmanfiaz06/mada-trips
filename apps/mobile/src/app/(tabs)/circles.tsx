@@ -13,6 +13,11 @@ import { useDiscover, useFriends } from '@/lib/circles';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { colors } from '@/theme';
+import { requireAccount } from '@/lib/signin-ask';
+import { useSession } from '@/lib/session';
+import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
+import { ArtMap } from '@/components/circles/art';
 
 /** Circles (prototype Circles.jsx): Discover, and your circles, friends, saves and passport. Discover first. */
 export default function Circles() {
@@ -23,7 +28,8 @@ export default function Circles() {
   const [posting, setPosting] = useState<string | null>(null);
   const [open, setOpen] = useState<Post | null>(null);
   const [opens, setOpens] = useState(0);
-  const startPost = (city: string) => { setOpens((n) => n + 1); setPosting(city); };
+  const guest = useSession((s) => s.status !== 'signedIn');
+  const startPost = (city: string) => { if (!requireAccount('circles')) return; setOpens((n) => n + 1); setPosting(city); };
   const friends = useFriends();
   const requests = friends.data?.requests.length ?? 0;
   const [city, setCity] = useState<string | null>(null);
@@ -41,14 +47,18 @@ export default function Circles() {
             ? <RoundButton dark a11y={t('circles.a11y.postTip')} icon={<Icon name="plus" color={colors.mist} />} onPress={() => startPost(d.data?.city ?? HOME_CITY)} testID="post-tip" />
             : (
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <RoundButton a11y={requests ? t('circles.a11y.peopleRequests', { count: requests }) : t('circles.a11y.people')} badge={requests > 0} icon={<Icon name="circles" />} onPress={() => router.push('/people')} testID="people" />
-                <RoundButton dark a11y={t('circles.a11y.new')} icon={<Icon name="plus" color={colors.mist} />} onPress={() => router.push('/circle/new')} testID="new-circle" />
+                <RoundButton a11y={requests ? t('circles.a11y.peopleRequests', { count: requests }) : t('circles.a11y.people')} badge={requests > 0} icon={<Icon name="circles" />} onPress={() => { if (requireAccount('circles', '/circles?view=circles')) router.push('/people'); }} testID="people" />
+                <RoundButton dark a11y={t('circles.a11y.new')} icon={<Icon name="plus" color={colors.mist} />} onPress={() => { if (requireAccount('circles', '/circles?view=circles')) router.push('/circle/new'); }} testID="new-circle" />
               </View>
             )}
         </View>
         {view === 'discover'
           ? <Discover picked={city} setPicked={setCity} onPost={startPost} onOpen={setOpen} />
-          : <CirclesHome onDiscover={() => setView('discover')} onOpenPost={setOpen} />}
+          // Circles are people: without an account, what they are and one way in (Discover stays open to all).
+          : guest ? (
+            <EmptyState art={<ArtMap />} title={t('signin.ask.circles')} body={t('signin.ask.body')}
+              action={<Button label={t('signin.ask.go')} onPress={() => requireAccount('circles', '/circles?view=circles')} testID="circles-guest-signin" />} />
+          ) : <CirclesHome onDiscover={() => setView('discover')} onOpenPost={setOpen} />}
       </Scroll>
       <PostSheet key={`post-${opens}`} visible={!!posting} onClose={() => setPosting(null)} cities={postCities} initialCity={posting ?? HOME_CITY}
         onPosted={(audience, held) => { setPosting(null); setView('discover'); toast(held ?? (audience === 'friends' ? t('circles.postTip.postedFriends') : t('circles.postTip.postedEveryone'))); }} />

@@ -40,7 +40,8 @@ export function useMe() {
 
 export function usePeople() {
   const status = useSession((s) => s.status);
-  return useQuery({ queryKey: keys.people, enabled: status === 'signedIn', queryFn: async () => (await api.people()).people });
+  // A guest has a household too, on the phone (lib/guest.ts): who's going works the same before an account.
+  return useQuery({ queryKey: [...keys.people, status], enabled: status !== 'loading', queryFn: async () => (await api.people()).people });
 }
 
 export function useUpdateMe() {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { API_MODE } from '@/lib/config';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { formatSar, type Person, type WalletDocument } from '@mada/shared';
+import { formatSar, nameIn, type Person, type WalletDocument } from '@mada/shared';
 import { ArtCardSlot, ArtPass } from '@/components/art/Arts';
 import { Button, LinkButton } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -19,7 +19,7 @@ import { PassportCopyRow } from '@/components/passport/PassportCopy';
 import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
 import { BoardingPasses } from '@/components/wallet/BoardingPasses';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -28,6 +28,7 @@ import { useWalletLock } from '@/lib/wallet-lock';
 import { fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
 import { colors, ff, shadow } from '@/theme';
 import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
+import { requireAccount } from '@/lib/signin-ask';
 
 /** The Wallet (prototype Wallet.jsx): locked with Face ID, passports for the whole household, documents, passes, money. */
 export default function Wallet() {
@@ -43,14 +44,13 @@ export default function Wallet() {
 }
 
 function SignedOut() {
-  const router = useRouter();
   const top = useTopInset();
   return (
     <Screen>
       <Scroll top={top + 10}>
         <T v="h1" style={{ fontSize: 34, lineHeight: 38 }} accessibilityRole="header">{t('wallet.title')}</T>
         <EmptyState art={<ArtCardSlot kind="doc" />} title={t('wallet.signedOut.title')} body={t('wallet.signedOut.body')}
-          action={<Button label={t('wallet.signedOut.action')} onPress={() => router.push('/welcome')} />} />
+          action={<Button label={t('wallet.signedOut.action')} onPress={() => requireAccount('wallet', '/wallet')} testID="wallet-signin" />} />
       </Scroll>
     </Screen>
   );
@@ -135,9 +135,9 @@ function Unlocked() {
         <QueryState query={docs} section badge skeleton={<SkeletonCard />}>{() => myDocs.length || asks.length ? (
           <>
             {myDocs.map((d) => (
-              <Card key={d.id} onPress={() => setDocOpen(d)} accessibilityLabel={d.title} style={styles.rowCard}>
+              <Card key={d.id} onPress={() => setDocOpen(d)} accessibilityLabel={nameIn(d.title, getLocale())} style={styles.rowCard}>
                 <Icon name={d.kind === 'visa' || /visa/i.test(d.title) ? 'visa' : 'doc'} />
-                <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{d.title}</T><T v="tiny">{d.detail}</T></View>
+                <View style={{ flex: 1 }}><T v="h3" style={{ fontSize: 15 }}>{nameIn(d.title, getLocale())}</T><T v="tiny">{nameIn(d.detail, getLocale())}</T></View>
                 <Icon name="chevron" />
               </Card>
             ))}

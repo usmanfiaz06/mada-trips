@@ -98,7 +98,8 @@ export const thingsMock: AreaMock = async (w, ctx) => {
   const book = path === '/things/book';
   const ride = path === '/things/ride';
   if (!place && !trip && !book && !ride) return null;
-  if (!ctx.user) return err('UNAUTHORIZED');
+  // A city's things are open to anyone; a trip's ideas, booking and rides need an account.
+  if (!ctx.user && !(place && w.method === 'GET')) return err('UNAUTHORIZED');
   const raw = Object.fromEntries(new URLSearchParams(query).entries());
 
   if (place && w.method === 'GET') {

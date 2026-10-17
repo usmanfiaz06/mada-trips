@@ -84,7 +84,29 @@ if (web && typeof document !== 'undefined') {
   document.head.appendChild(style);
 }
 
-export const getLocale = (): CopyLocale => locale;
+/*
+ * The language Mada is answering in right now. A message typed in the other language (Arabic in an English app, or
+ * the other way round) gets its answer in that language: Ask sets it per message (setVoice) and clears it when it
+ * closes. The layout's direction and the fonts stay the launch's; only the words follow the message.
+ */
+let voice: CopyLocale | null = null;
+type VoiceState = { voice: CopyLocale | null };
+export const useVoiceLocale = create<VoiceState>(() => ({ voice: null }));
+export function setVoice(next: CopyLocale | null) {
+  const v = next && next !== locale ? next : null;
+  if (v === voice) return;
+  voice = v;
+  // Prices, dates and names written by the shared formatters follow the answer's language too.
+  setDisplayPrefs({ locale: v ?? locale });
+  useVoiceLocale.setState({ voice: v });
+}
+/** The language words are written in now: the message's while Ask answers one in the other language, else the app's. */
+export const speakingLocale = (): CopyLocale => voice ?? locale;
+
+/** The language words are in right now: Ask's answer language while it answers a message in the other one, else the app's. */
+export const getLocale = (): CopyLocale => voice ?? locale;
+/** The app's own language (the one chosen, or the phone's): for saving it and for switching it, never the answer's. */
+export const appLocale = (): CopyLocale => locale;
 /** Right-to-left this launch. Use for what CSS/Yoga can't flip by itself: icons, swipes, translateX, gradients. */
 export const isRTL = (): boolean => locale === 'ar';
 /** 1 in left-to-right, −1 in right-to-left: multiply horizontal offsets and swipe distances by it. */
@@ -94,17 +116,18 @@ export const flipX = () => (locale === 'ar' ? [{ scaleX: -1 }] : []);
 /** Old name, kept for callers: the catalogue locale is set at start and changes only with a restart. */
 export const setLocale = (_l: CopyLocale) => { I18nManager.allowRTL(true); };
 
-export const t = (key: CopyKey, vars?: Vars) => tShared(key, vars, locale);
+export const t = (key: CopyKey, vars?: Vars) => tShared(key, vars, voice ?? locale);
 
 /** The list separator: ", " in English, the Arabic comma "، " in Arabic. */
-export const listSep = (): string => (locale === 'ar' ? '، ' : ', ');
+export const listSep = (): string => ((voice ?? locale) === 'ar' ? '، ' : ', ');
 /** "Sara, Hessa and Ahmed" / "سارة، حصة وأحمد": in Arabic "و" joins the last name with no space. */
 export function joinAnd(items: readonly string[]): string {
   if (items.length <= 1) return items[0] ?? '';
-  const and = tShared('circles.and', undefined, locale);
-  return `${items.slice(0, -1).join(listSep())} ${and}${locale === 'ar' ? '' : ' '}${items[items.length - 1]}`;
+  const l = voice ?? locale;
+  const and = tShared('circles.and', undefined, l);
+  return `${items.slice(0, -1).join(l === 'ar' ? '، ' : ', ')} ${and}${l === 'ar' ? '' : ' '}${items[items.length - 1]}`;
 }
-export const tn = (base: string, count: number, vars?: Vars) => tnShared(base, count, vars, locale);
+export const tn = (base: string, count: number, vars?: Vars) => tnShared(base, count, vars, voice ?? locale);
 
 /** Display settings that apply without a restart. Components that show them subscribe here. */
 type DisplayState = { digits: Digits; hijri: boolean; set: (p: { digits?: Digits; hijri?: boolean }) => void };

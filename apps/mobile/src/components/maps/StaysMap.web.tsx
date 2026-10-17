@@ -84,6 +84,8 @@ export function StaysMap(props: StaysMapProps) {
       const one = all.length === 1 ? all[0]! : null;
       const m = new lib.Map({
         container: el, style: STYLE, attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, interactive: !single,
+        // The map's own controls speak the reader's language too (the data's credit stays as its owners write it).
+        locale: { 'AttributionControl.ToggleAttribution': t('map.credits'), 'Marker.Title': t('map.marker'), 'NavigationControl.ZoomIn': t('map.zoomIn'), 'NavigationControl.ZoomOut': t('map.zoomOut') },
         ...(one ? { center: [one.lng, one.lat], zoom: 14 } : b ? { bounds: [[b.west, b.south], [b.east, b.north]], fitBoundsOptions: { padding: 40, maxZoom: single ? 15 : 14 } } : {}),
       });
       m.on('error', () => { /* a tile that didn't load: the rest of the map stays */ });

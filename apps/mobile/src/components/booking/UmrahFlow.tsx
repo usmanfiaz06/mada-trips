@@ -23,6 +23,7 @@ import { NeedsPicker, SentRequest } from './Requests';
 import { SearchSheet } from './SearchSheet';
 import { TravellerChips } from './Travellers';
 import { ChipWrap, Notice, Toggle, enter, useWho } from './parts';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /*
  * Umrah, built around the permit (critique: a pilgrim plans from the Nusuk day and slot, not from a form). First the
@@ -99,7 +100,7 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   useEffect(() => { onSync?.({ answers: a, travellerIds: whoDone ? who : intent.travellerIds }); }, [a, who.join(), whoDone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async () => {
-    if (!plan) return;
+    if (!plan || !requireAccount('chat', ASK_RESUME)) return;
     setBusy(true);
     try {
       const band = umrahHotel(v('makkahHotel'))?.band;

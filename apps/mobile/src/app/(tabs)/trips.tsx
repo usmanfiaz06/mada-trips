@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { dayLabel, formatSar, rangeLong, type RefundView, type TripCard, type TripRequestView } from '@mada/shared';
+import { dayLabel, formatSar, nameIn, rangeLong, type RefundView, type TripCard, type TripRequestView } from '@mada/shared';
 import { ArtPaperPlane } from '@/components/art/Arts';
 import { DepartureBoard } from '@/components/art/DepartureBoard';
 import { EmptyState } from '@/components/EmptyState';
@@ -21,7 +21,7 @@ import { bookingApi } from '@/lib/booking';
 import { toast } from '@/lib/toast';
 import { AgentIntro, Box, riseOn, riseStyle, Display, Eyebrow, Grow, H3, IdeaTiles, Photo, Row, Shade, Small, SmallButton, Spread, Tag, Tiny, type IdeaKey } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { listSep, t } from '@/lib/i18n';
+import { getLocale, listSep, t } from '@/lib/i18n';
 import { OUTBOX_ASK, useTripOutbox, useTrips } from '@/lib/trips';
 import { colors, font, radii, shadow, ff } from '@/theme';
 import Animated from 'react-native-reanimated';
@@ -72,7 +72,7 @@ function Upcoming({ trips, tracked, ask }: { trips: TripCard[]; tracked: Paramet
   const router = useRouter();
   if (!trips.length) return (<>
     <Animated.View entering={riseOn(0)} style={[riseStyle(0), styles.hero]}>
-      <DepartureBoard onPick={(city) => ask(`Flights to ${city.charAt(0) + city.slice(1).toLowerCase()}`)} />
+      <DepartureBoard onPick={(city) => ask(t('trips.board.ask', { city: nameIn(city.charAt(0) + city.slice(1).toLowerCase(), getLocale()) }))} />
       <T style={font('displaySmall')}>{t('trips.empty.title')}</T>
       <Button label={t('trips.empty.action')} onPress={() => ask()} />
     </Animated.View>

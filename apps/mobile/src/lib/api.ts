@@ -7,7 +7,7 @@ import {
 } from '@mada/shared';
 import { API_MODE, API_ORIGIN } from './config';
 import { useSession } from './session';
-import { getLocale, t } from './i18n';
+import { speakingLocale, t } from './i18n';
 import { noteServerTime } from './net/clock';
 import { getAppVersion, noteBusy, noteMaintenance, noteSessionExpired, noteUpgradeRequired, setAppVersion, useGates } from './net/gates';
 import { breadcrumb } from './net/report';
@@ -83,7 +83,8 @@ async function httpTransport(w: Wire): Promise<WireResponse> {
       signal: ctrl.signal,
       headers: {
         Accept: 'application/json',
-        'Accept-Language': getLocale(),
+        // The language Mada is answering in (a message typed in the other language gets its answer in it).
+        'Accept-Language': speakingLocale(),
         [HEADERS.appVersion]: getAppVersion(),
         ...(w.body !== undefined ? { 'Content-Type': 'application/json' } : null),
         ...(w.token ? { Authorization: `Bearer ${w.token}` } : null),
@@ -294,11 +295,15 @@ export function deviceInfo(): DeviceInfo {
   };
 }
 
+/** No account on this phone (looking around, or a shared link opened first): the household is the phone's. */
+const guest = () => { const s = useSession.getState().status; return s === 'guest' || s === 'signedOut'; };
+
 export const api = {
   me: () => request({ method: 'GET', path: ROUTES.me }, MeResponse),
   updateMe: (patch: UpdateMeRequest) => request({ method: 'PATCH', path: ROUTES.me, body: patch }, MeResponse),
-  people: () => request({ method: 'GET', path: ROUTES.people }, PeopleResponse),
-  addPerson: (p: CreatePersonRequest) => request({ method: 'POST', path: ROUTES.people, body: p }, PersonResponse),
+  // A guest's household lives on the phone (lib/guest.ts) until they sign in.
+  people: async () => (guest() ? { people: await (await import('./guest')).guestPeople() } : request({ method: 'GET', path: ROUTES.people }, PeopleResponse)),
+  addPerson: async (p: CreatePersonRequest) => (guest() ? { person: await (await import('./guest')).addGuestPerson(p) } : request({ method: 'POST', path: ROUTES.people, body: p }, PersonResponse)),
   async logout() {
     const s = useSession.getState();
     try {

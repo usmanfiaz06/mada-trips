@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Button } from '@/components/Button';
 import { Act, Screen, useTopInset } from '@/components/Layout';
@@ -11,6 +11,8 @@ import { t } from '@/lib/i18n';
 import { rise, riseStyle } from '@/lib/motion';
 import { useOnboarding } from '@/lib/onboarding';
 import { colors, font, shadow } from '@/theme';
+import { takeReturnTo } from '@/lib/resume';
+import { toast } from '@/lib/toast';
 
 const POLAROIDS = [
   { src: require('../../../assets/images/alula.jpg'), rot: '-14deg', x: -86 },
@@ -44,7 +46,14 @@ export default function WelcomeBack() {
         <Animated.View entering={rise(12)} style={riseStyle(12)}><T v="body" color={colors.inkSoft} style={{ textAlign: 'center' }}>{t('welcomeBack.line')}</T></Animated.View>
       </View>
       <Act>
-        <Button label={t('welcomeBack.open')} onPress={() => { buzz('success'); router.replace('/today'); }} testID="welcome-back-open" haptic={null} />
+        <Button label={t('welcomeBack.open')} onPress={async () => {
+          buzz('success');
+          // Asked to sign in from somewhere ("Sign in to book this"): back there, as it was (lib/resume.ts).
+          const back = await takeReturnTo();
+          router.dismissAll?.();
+          if (back) { router.dismissTo(back as Href); toast(t('resume.back')); }
+          else router.replace('/today');
+        }} testID="welcome-back-open" haptic={null} />
         <Button variant="ghost" label={t('welcomeBack.notMe')} onPress={async () => { await api.logout(); router.replace('/signin'); }} />
       </Act>
     </Screen>

@@ -6,12 +6,15 @@ import { deleteSecret, getSecret, setSecret } from './storage';
  * Who is using the app. Tokens are kept in secure storage and mirrored here; the user profile comes from /me.
  *   loading   reading secure storage at launch
  *   signedOut nobody: onboarding
- *   guest     "Just track a flight": the app without an account (FLOWS.md §1)
+ *   guest     looking around without an account: search, prices, hotels, Discover, tracking a flight. Sign-in is
+ *             asked only at an account action (components/auth/SignInSheet). Kept across launches.
  *   signedIn  tokens present (the profile may still be loading)
  */
 export type SessionStatus = 'loading' | 'signedOut' | 'guest' | 'signedIn';
 
 const KEY = 'mada.session.v1';
+/** Chose to look around without an account: the next launch opens the app, not the welcome. */
+const GUEST_KEY = 'mada.guest.v1';
 
 type State = {
   status: SessionStatus;
@@ -35,13 +38,15 @@ export const useSession = create<State>((set, get) => ({
       const raw = await getSecret(KEY);
       const tokens = raw ? (JSON.parse(raw) as AuthTokens) : null;
       const usable = tokens && Date.parse(tokens.refreshExpiresAt) > Date.now();
-      set({ status: usable ? 'signedIn' : 'signedOut', tokens: usable ? tokens : null });
+      const guest = !usable && (await getSecret(GUEST_KEY).catch(() => null)) === '1';
+      set({ status: usable ? 'signedIn' : guest ? 'guest' : 'signedOut', tokens: usable ? tokens : null });
     } catch {
       set({ status: 'signedOut', tokens: null });
     }
   },
   async signIn(tokens, user) {
     await setSecret(KEY, JSON.stringify(tokens));
+    void deleteSecret(GUEST_KEY).catch(() => {});
     set({ status: 'signedIn', tokens, user });
   },
   async setTokens(tokens) {
@@ -49,9 +54,10 @@ export const useSession = create<State>((set, get) => ({
     set({ tokens });
   },
   setUser(user) { set({ user }); },
-  becomeGuest() { set({ status: 'guest', tokens: null, user: null }); },
+  becomeGuest() { set({ status: 'guest', tokens: null, user: null }); void setSecret(GUEST_KEY, '1').catch(() => {}); },
   async clear() {
     await deleteSecret(KEY);
+    await deleteSecret(GUEST_KEY).catch(() => {});
     set({ status: 'signedOut', tokens: null, user: null });
   },
 }));

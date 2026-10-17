@@ -17,7 +17,7 @@ import { colors, font } from '@/theme';
 const VIDEO = require('../../../assets/video/welcome.mp4');
 const POSTER = require('../../../assets/images/welcome.jpg');
 
-/** "We'll take it from here." over the film, Start, or just track a flight without an account (FLOWS.md §1). */
+/** "We'll take it from here." over the film: look around first (no account), or sign in on one line (FLOWS.md §1). */
 export default function Welcome() {
   const router = useRouter();
   const top = useTopInset();
@@ -42,10 +42,14 @@ export default function Welcome() {
             </Animated.View>
           </View>
           <View style={{ gap: 18 }}>
-            <Button variant="gold" label={t('welcome.start')} onPress={() => { useOnboarding.getState().reset(); router.push('/signin'); }} testID="welcome-start" />
+            {/* The app first: search, prices, hotels, Discover and tracking a flight need no account. Sign-in is asked at
+                booking (components/auth/SignInSheet), and here on one line for someone who already has one. */}
+            <Button variant="gold" label={t('welcome.browse')} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} testID="welcome-browse" />
             <View style={styles.links}>
-              <LinkButton label={t('welcome.track')} color="#e1dacd" size={15} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} testID="welcome-track" />
-              <LinkButton label={t('circles.code.welcome')} color="#e1dacd" size={15} onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
+              <LinkButton label={t('welcome.signin')} color="#e1dacd" size={15} onPress={() => { useOnboarding.getState().reset(); router.push('/signin'); }} testID="welcome-start" />
+            </View>
+            <View style={styles.links}>
+              <LinkButton label={t('circles.code.welcome')} color="#e1dacd" size={13} onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
             </View>
           </View>
         </View>

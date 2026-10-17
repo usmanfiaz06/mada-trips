@@ -29,6 +29,7 @@ import { TravellerChips } from './Travellers';
 import { StayResults } from './StayResults';
 import { PartyStep, StayGuests } from './Party';
 import { EsimPlanner } from '../esim/EsimPlanner';
+import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /* Stays, curated plans and eSIMs in Ask. */
 
@@ -127,7 +128,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
     // Results set their own action (StayResults: Review, and the box to say what matters).
     if (!ready) setCta(null);
   }, [phase, ready, who.join(), phoneNeeded, live, needParty]); // eslint-disable-line react-hooks/exhaustive-deps
-  const review = (o: StayOption) => { usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest!.key, askAgain: query }); router.push('/pay'); };
+  const review = (o: StayOption) => { if (!requireAccount('book', ASK_RESUME)) return; usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest!.key, askAgain: query }); router.push('/pay'); };
   useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const change = (what: 'where' | 'when') => { setGo(false); setPick(null); setByHand(false); setDeskNote(null); setEditing(what); };

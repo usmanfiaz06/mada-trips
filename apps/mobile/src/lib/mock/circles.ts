@@ -1023,7 +1023,9 @@ export const circlesMock: AreaMock = async (w: Wire, ctx) => {
   sampleInvites();
   playDue();
   const isPreview = w.method === 'GET' && /^\/invites\/[\w-]+$/.test(url.pathname);
-  if (!ctx.user && !isPreview) return fail('UNAUTHORIZED');
+  // Discover (the week, the plans) is open to anyone, like the server's.
+  const isOpen = w.method === 'GET' && url.pathname === '/discover';
+  if (!ctx.user && !isPreview && !isOpen) return fail('UNAUTHORIZED');
   if (ctx.user) ensure(ctx.user);
   // The desk paused Circles for this account (lib/mock/beta.ts ?beta=limited, the server's lib/app/limits.ts).
   if (mockBeta().limited && w.method === 'POST' && /^\/(posts|circles|circles\/[\w-]+\/(messages|votes|splits|invites)|circles\/dm|friends\/[\w-]+|invites)$/.test(url.pathname)) return fail('ACCOUNT_LIMITED');

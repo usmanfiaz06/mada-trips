@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  CancelSupplierVoucherResponse, ChooseTransferResponse, HOTEL_ROUTES, HotelDetailsResponse, SUPPLIER_VOUCHER_ROUTES, SupplierVoucherResponse, SupplierVouchersResponse,
+  CancelSupplierVoucherResponse, ChooseTransferResponse, HOTEL_ROUTES, HotelDetailsResponse, HotelTranslationResponse, SUPPLIER_VOUCHER_ROUTES, SupplierVoucherResponse, SupplierVouchersResponse,
   TRANSFER_ROUTES, TransferOptionsResponse, voucherHtml, type SupplierVoucher,
 } from '@mada/shared';
 import { request } from './api';
@@ -19,6 +19,8 @@ export const transfersApi = {
   voucher: (id: string) => request({ method: 'GET', path: SUPPLIER_VOUCHER_ROUTES.voucher(id) }, SupplierVoucherResponse),
   cancel: (id: string, confirm: boolean) => request({ method: 'POST', path: SUPPLIER_VOUCHER_ROUTES.cancel(id), body: { confirm } }, CancelSupplierVoucherResponse),
   hotel: (code: number) => request({ method: 'GET', path: HOTEL_ROUTES.hotel(code) }, HotelDetailsResponse),
+  /** The hotel's own words in the reader's language, translated once on the server ("Translate"). */
+  hotelTranslation: (code: number, to: 'en' | 'ar') => request({ method: 'GET', path: HOTEL_ROUTES.translation(code, to) }, HotelTranslationResponse),
 };
 
 const signedIn = () => !!useSession.getState().tokens;
@@ -28,6 +30,7 @@ export const transferKeys = {
   vouchers: (tripId: string) => ['trips', 'vouchers', tripId] as const,
   voucher: (id: string) => ['vouchers', id] as const,
   hotel: (code: number) => ['hotels', code] as const,
+  translation: (code: number, to: string) => ['hotels', code, 'translation', to] as const,
 };
 
 export function useTransferOptions(tripId: string) {
@@ -40,7 +43,8 @@ export function useVoucher(id: string) {
   return useQuery({ queryKey: transferKeys.voucher(id), queryFn: () => transfersApi.voucher(id), enabled: !!id && signedIn() });
 }
 export function useHotelDetails(code: number) {
-  return useQuery({ queryKey: transferKeys.hotel(code), queryFn: () => transfersApi.hotel(code), enabled: code > 0 && signedIn(), staleTime: 24 * 3_600_000 });
+  // Open to anyone: a hotel page (shared or found while looking around) needs no account.
+  return useQuery({ queryKey: transferKeys.hotel(code), queryFn: () => transfersApi.hotel(code), enabled: code > 0, staleTime: 24 * 3_600_000 });
 }
 
 /**

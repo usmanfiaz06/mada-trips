@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { anchorName, anchorOfLandmark, catalogueHotelByKey, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
+import { anchorName, anchorOfLandmark, nameIn, catalogueHotelByKey, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
 import { EmptyState } from '@/components/EmptyState';
@@ -16,7 +16,11 @@ import { useTrip } from '@/lib/trips';
 import { rangeLabel, stayEnd } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
-import { useHotelDetails } from '@/lib/transfers';
+import { transferKeys, transfersApi, useHotelDetails } from '@/lib/transfers';
+import { api } from '@/lib/api';
+import { accountIds } from '@/lib/guest';
+import { herePath, requireAccount } from '@/lib/signin-ask';
+import { TranslateToggle, WrittenInEnglish, useTranslated } from '@/components/booking/Translate';
 import { colors, ff, font } from '@/theme';
 
 /*
@@ -59,6 +63,10 @@ export default function HotelScreen() {
   const stay = shown.data?.stay ?? null;
   const options: StayOption[] = rooms.data?.options ?? (stay ? [stay] : []);
   const cur = options.find((o) => o.id === chosen) ?? options[0] ?? null;
+  // The hotel wrote its words in English: on an Arabic page they show as written, with "Translate" (translated once, kept).
+  const tr = useTranslated(transferKeys.translation(Number(code), lang), () => transfersApi.hotelTranslation(Number(code), lang));
+  const canTranslate = lang === 'ar' && !!details && (!!details.description || details.facilities.length > 0);
+  const trNames = useMemo(() => new Map((details?.facilities ?? []).filter((f) => f.name).map((f, i) => [f.name, tr.data?.facilities[i] ?? null])), [details?.facilities, tr.data]);
   const facilities = useMemo(() => (details?.facilities ?? []).filter((f) => !NOISE.test(f.name)).sort((a, b) => rank(a.name) - rank(b.name)), [details?.facilities]);
 
   if (!h) return <TripScreen title="">{q.isPending || tripQ.isPending ? <View style={{ paddingTop: 40 }}><ActivityIndicator color={colors.green} /></View> : <EmptyState art={<ArtSuitcase />} title={t('error.notFound')} body="" />}</TripScreen>;
@@ -77,15 +85,19 @@ export default function HotelScreen() {
     const url = Platform.OS === 'ios' ? `maps://?q=${label}&ll=${lat},${lng}` : Platform.OS === 'android' ? `geo:${lat},${lng}?q=${lat},${lng}(${label})` : `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`;
     void Linking.openURL(url).catch(() => Linking.openURL(`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`));
   };
-  const review = () => {
+  const review = async () => {
     if (!cur) return;
+    // Looking around without an account: "Sign in to book this", then back on this hotel with this room.
+    if (!requireAccount('book', herePath() ?? `/hotel/${code}?${new URLSearchParams({ ...(offer ? { offer } : {}), guests: String(guests), city, who }).toString()}`)) return;
     buzz('tap');
-    usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: cur.id, travellerIds: who.split(',').filter(Boolean) }, title: cur.name, destination: city });
+    // People added before signing in are the account's now (lib/guest.ts).
+    const ids = await accountIds(who.split(',').filter(Boolean), api);
+    usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: cur.id, travellerIds: ids }, title: cur.name, destination: city });
     router.push('/pay');
   };
 
   return (
-    <TripScreen act={booked ? <Button label={t('hotel.booked.options')} variant="secondary" onPress={() => router.push(`/trip/${tripId}/hotel` as never)} testID="hotel-booked-options" /> : cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={review} testID="hotel-review" /> : undefined}>
+    <TripScreen act={booked ? <Button label={t('hotel.booked.options')} variant="secondary" onPress={() => router.push(`/trip/${tripId}/hotel` as never)} testID="hotel-booked-options" /> : cur ? <Button label={t('search.review', { price: formatSar(cur.total.amount) })} onPress={() => { void review(); }} testID="hotel-review" /> : undefined}>
       {/* The photos run edge to edge and the name is the screen's serif line: the hotel, before its facts. */}
       {h.images.length ? (
         <ScrollView testID="hotel-images" horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
@@ -93,7 +105,7 @@ export default function HotelScreen() {
         </ScrollView>
       ) : null}
       <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
-      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={h.category} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>
+      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={nameIn(h.category, lang)} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>
 
       {/* Your booking: the room and dates as booked, the confirmation, the cancellation rule, the walk and the drive. */}
       {booked ? (
@@ -159,16 +171,19 @@ export default function HotelScreen() {
       {facilities.length ? (
         <Box testID="hotel-facilities">
           <H3 size={15}>{t('hotel.facilities')}</H3>
-          <Row gap={6} style={{ flexWrap: 'wrap' }}>{(allFacilities ? facilities : facilities.slice(0, 10)).map((f) => <Tag key={f.name} label={f.paid ? `${f.name} · ${t('hotel.paid')}` : f.name} />)}</Row>
+          <Row gap={6} style={{ flexWrap: 'wrap' }}>{(allFacilities ? facilities : facilities.slice(0, 10)).map((f) => { const name = trNames.get(f.name) ?? f.name; return <Tag key={f.name} label={f.paid ? `${name} · ${t('hotel.paid')}` : name} />; })}</Row>
           {facilities.length > 10 ? <Pressable onPress={() => setAllFacilities(!allFacilities)} testID="hotel-facilities-all"><Small color={colors.green} style={{ textDecorationLine: 'underline' }}>{allFacilities ? t('hotel.fewer') : t('hotel.allFacilities', { count: facilities.length })}</Small></Pressable> : null}
         </Box>
       ) : null}
       {h.description ? (
-        <Pressable onPress={() => setMoreText(!moreText)} accessibilityRole="button">
-          <Small lines={moreText ? undefined : 4}>{h.description}</Small>
+        <Pressable onPress={() => setMoreText(!moreText)} accessibilityRole="button" testID="hotel-description">
+          {tr.data?.description ? <Small lines={moreText ? undefined : 4}>{tr.data.description}</Small>
+            : canTranslate ? <WrittenInEnglish><Small lines={moreText ? undefined : 4}>{h.description}</Small></WrittenInEnglish>
+              : <Small lines={moreText ? undefined : 4}>{h.description}</Small>}
           {!moreText && h.description.length > 180 ? <Small color={colors.green} style={{ fontFamily: ff.ui500 }}>{t('hotel.readMore')}</Small> : null}
         </Pressable>
       ) : null}
+      {canTranslate ? <TranslateToggle on={tr.on} loading={tr.loading} failed={tr.failed} translated={!!tr.data} toggle={tr.toggle} testID="hotel-translate" /> : null}
       {h.phone ? <Box gap={4}><Tiny>{t('voucher.phone')}</Tiny><Small color={colors.green}>{h.phone}</Small></Box> : null}
     </TripScreen>
   );
