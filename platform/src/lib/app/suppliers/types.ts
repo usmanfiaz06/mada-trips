@@ -122,6 +122,11 @@ export interface AiSupplier {
   parseIntent(text: string, context: { today: string; home: string }): Promise<Intent>;
   /** A short open answer under COPY.md rules ("we", answer first, no banned words). */
   answer(question: string, context: { today: string; city?: string | null }): Promise<string>;
+  /**
+   * Text someone wrote (a hotel's description, facility names) in the reader's language, one out per one in, same
+   * order. Null when it can't (the mock, a refusal): the reader keeps the original.
+   */
+  translate(texts: string[], to: "en" | "ar"): Promise<string[] | null>;
 }
 
 export type VerifiedIdentity = { provider: "apple" | "google"; sub: string; email: string | null; emailVerified: boolean; isPrivateEmail: boolean };

@@ -72,4 +72,16 @@ export const claudeAi: AiSupplier = {
     if (!out || bannedIn(out).length) return "Faisal can answer that one. Send it to him from Ask.";
     return out.trim();
   },
+  async translate(texts, to) {
+    if (!texts.length) return [];
+    const out = await create({
+      system: `Translate each string a hotel wrote about itself into ${to === "ar" ? "Modern Standard Arabic as read in Saudi Arabia" : "plain British English"}. Keep names, numbers, times and codes as they are. Add nothing, leave nothing out. Answer with the translations only, in the same order.`,
+      user: JSON.stringify(texts.map((t) => t.slice(0, 4000))),
+      format: { type: "object", additionalProperties: false, required: ["out"], properties: { out: { type: "array", items: { type: "string" } } } },
+      maxTokens: 4096,
+    });
+    if (!out) return null;
+    const parsed = JSON.parse(out) as { out?: unknown };
+    return Array.isArray(parsed.out) && parsed.out.length === texts.length && parsed.out.every((x) => typeof x === "string") ? (parsed.out as string[]) : null;
+  },
 };

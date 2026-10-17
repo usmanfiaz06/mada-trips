@@ -67,8 +67,8 @@ describe("ingestion", () => {
 });
 
 describe("GET /places/search", () => {
-  it("needs a signed-in traveller and a query", async () => {
-    expect((await search("tbilisi", "")).status).toBe(401);
+  it("answers a guest too, and needs a query", async () => {
+    expect((await search("tbilisi", "")).status).toBe(200);
     expect((await search("   ")).status).toBe(400);
   });
 
@@ -258,7 +258,7 @@ describe("GET /places/:id (the city guide)", () => {
     fakeWeb();
     expect((await guide("999999999")).status).toBe(404);
     expect((await guide("sd")).status).toBe(404);
-    expect((await guide(TBILISI, "")).status).toBe(401);
+    expect((await guide(TBILISI, "")).status).toBe(200);
     // A name works as well as an id ("Mecca" is another name for Makkah).
     expect(PlaceResponse.parse((await guide("mecca")).json).place.name).toBe("Makkah");
   });
@@ -327,7 +327,7 @@ describe("GET /places/popular", () => {
     expect(r.places.map((p) => p.name)).toContain("Rome"); // asked for above, and not one of ours
     expect(r.places.findIndex((p) => p.name === "Rome")).toBeGreaterThan(r.places.findIndex((p) => p.name === "Tbilisi"));
     expect((await callP(popularGet, {}, { token, query: "?from=riyadh" })).status).toBe(400);
-    expect((await callP(popularGet, {}, { query: "?from=RUH" })).status).toBe(401);
+    expect((await callP(popularGet, {}, { query: "?from=RUH" })).status).toBe(200);
   });
 });
 

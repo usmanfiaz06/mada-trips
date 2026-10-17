@@ -305,8 +305,8 @@ describe("partner adapters", () => {
 describe("GET /places/:id/things", () => {
   const get = (id: string, query = "", tok = token) => callP(thingsGet, { id }, { token: tok, query });
 
-  it("needs a signed-in traveller, a known city and sane filters", async () => {
-    expect((await get(String(ALULA), "", "")).status).toBe(401);
+  it("answers a guest too, and needs a known city and sane filters", async () => {
+    expect((await get(String(ALULA), "", "")).status).toBe(200);
     expect((await get("nowhere-at-all")).status).toBe(404);
     expect((await get(String(ALULA), "?near=far")).status).toBe(400);
     expect((await get(String(ALULA), "?day=2026-13-40")).status).toBe(400);

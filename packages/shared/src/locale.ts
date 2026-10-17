@@ -172,3 +172,21 @@ export function pluralKeys(base: string, n: number, locale?: Lang): string[] {
   const c = pluralCategory(n, locale);
   return c === 'other' ? [`${base}.other`] : [`${base}.${c}`, `${base}.other`];
 }
+
+/**
+ * The language a message is written in, by its letters: Arabic script → 'ar', Latin → 'en'. Digits, codes, emoji
+ * and names in the other script don't decide it ("SV 123 بكرة" is Arabic). Null when there are no letters at all.
+ * Mada answers each message in the language it was written in, whatever the app is set to.
+ */
+export function languageOfText(text: string): Lang | null {
+  let ar = 0;
+  let latin = 0;
+  for (const ch of text) {
+    const c = ch.codePointAt(0)!;
+    if ((c >= 0x0600 && c <= 0x06ff) || (c >= 0x0750 && c <= 0x077f) || (c >= 0xfb50 && c <= 0xfdff) || (c >= 0xfe70 && c <= 0xfeff)) ar += 1;
+    else if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || (c >= 0xc0 && c <= 0x24f)) latin += 1;
+  }
+  if (!ar && !latin) return null;
+  // Arabic wins ties and mixes: a few Latin letters are usually a flight number, a brand or a hotel's name.
+  return ar >= latin * 0.25 && ar > 0 ? 'ar' : 'en';
+}

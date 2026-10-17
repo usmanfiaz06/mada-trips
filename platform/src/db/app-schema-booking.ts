@@ -18,7 +18,8 @@ const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull(
 /** A supplier offer shown to one traveller: our id, the supplier's id, the snapshot the price came from, its hold. */
 export const appOffers = pgTable("app_offers", {
   id: id(),
-  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  // Null for a guest's search (lib/app/guest.ts): the account that books it takes it (search.ts ownOffer).
+  ownerId: uuid("owner_id").references(() => appUsers.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(), // flight | stay
   supplier: text("supplier").notNull(),
   supplierOfferId: text("supplier_offer_id").notNull(),
@@ -122,3 +123,16 @@ export const appPaymentWebhooks = pgTable("app_payment_webhooks", {
   result: text("result").notNull(), // applied | ignored | unknown_payment
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("app_payment_webhooks_event_key").on(t.provider, t.eventId)]);
+
+/**
+ * Text written in one language (a hotel's description, the desk's words) translated for a reader of the other, made
+ * once and kept: key is what was translated ("hotel:123"), source_hash the original it was made from, so an edited
+ * original is translated again. Migration: drizzle/0031_guests_translations.sql.
+ */
+export const appTranslations = pgTable("app_translations", {
+  key: text("key").notNull(),
+  lang: text("lang").notNull(),
+  sourceHash: text("source_hash").notNull(),
+  body: jsonb("body").$type<Record<string, unknown>>().notNull(),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("app_translations_key_lang_idx").on(t.key, t.lang)]);

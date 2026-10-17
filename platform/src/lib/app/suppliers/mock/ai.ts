@@ -21,4 +21,8 @@ export const mockAi: AiSupplier = {
   async answer(question) {
     return `We'll check that and come back with an answer. Faisal can also help: ${question.slice(0, 60)}`;
   },
+  // No translator without the model: the reader keeps the original (never a made-up translation).
+  async translate() {
+    return null;
+  },
 };

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, childSar, childSeats, flightTotal, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
@@ -13,6 +13,7 @@ import { AppError } from "../http";
 import type { BookingFlightOffer, BookingHotelOffer } from "../suppliers/booking-types";
 import { SupplierDown } from "../suppliers/mock/flights";
 import { bookingSuppliers, householdOf, isUuid, today, travellersOf } from "./common";
+import { guestPeople } from "../guest";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -71,13 +72,16 @@ export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number
   };
 }
 
-export async function searchFlights(ownerId: string, input: FlightSearchRequest, demo: Set<DemoFlag>): Promise<FlightSearchResponse> {
+/** Who is going: the household's people when signed in, else the people a guest said (priced, never stored). */
+const partyOf = (ownerId: string | null, ids: string[], guests: Parameters<typeof guestPeople>[1]) => (ownerId ? travellersOf(ownerId, ids) : Promise.resolve(guestPeople(ids, guests)));
+
+export async function searchFlights(ownerId: string | null, input: FlightSearchRequest, demo: Set<DemoFlag>): Promise<FlightSearchResponse> {
   const q = FlightSchema.parse(input);
   const dest = DESTINATIONS[q.destination];
   if (!dest) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
   if (q.return && q.return <= q.depart) throw new AppError("VALIDATION", { fields: { return: "Return must be after the day out" } });
   if (q.depart < today()) throw new AppError("VALIDATION", { fields: { depart: "That day has passed" } });
-  const people = await travellersOf(ownerId, q.travellerIds);
+  const people = await partyOf(ownerId, q.travellerIds, q.guests);
   const n = people.length;
   // Children 2 to 11 and babies with a seat fly on a child fare (their age on the day out).
   const kids = childSeats(people, q.depart);
@@ -132,11 +136,11 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
   };
 }
 
-export async function searchStays(ownerId: string, input: StaySearchRequest, demo: Set<DemoFlag>): Promise<StaySearchResponse> {
+export async function searchStays(ownerId: string | null, input: StaySearchRequest, demo: Set<DemoFlag>): Promise<StaySearchResponse> {
   const q = StaySchema.parse(input);
   const dest = DESTINATIONS[q.destination];
   if (!dest) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
-  const people = await travellersOf(ownerId, q.travellerIds);
+  const people = await partyOf(ownerId, q.travellerIds, q.guests);
   const n = people.length;
   const base = { destination: dest.key, destinationName: dest.name, cachedUntil: new Date(Date.now() + CACHE_MS).toISOString() };
   if (!CATALOGUE_HOTELS[dest.key] && supplierMode("hotels") === "mock") return { ...base, outcome: "by_hand", options: [] };
@@ -164,7 +168,7 @@ export type OfferRow = typeof appOffers.$inferSelect;
  * The rooms of the hotel in a stay offer, for its details screen: priced now for the same stay and party, each stored
  * as an offer the order sheet can take. Suppliers without a choice of rooms answer with the offer itself.
  */
-export async function stayRooms(ownerId: string, id: string): Promise<StayOption[]> {
+export async function stayRooms(ownerId: string | null, id: string): Promise<StayOption[]> {
   const row = await ownOffer(ownerId, id);
   if (row.kind !== "stay") throw new AppError("NOT_FOUND");
   const shown = row.payload as unknown as StayOption;
@@ -183,10 +187,20 @@ export async function stayRooms(ownerId: string, id: string): Promise<StayOption
   return same ? [shown, ...options.filter((o) => o !== same)] : options;
 }
 
-export async function ownOffer(ownerId: string, id: string): Promise<OfferRow> {
+/**
+ * The offer as its owner may see it. An offer a guest searched has no owner: a guest can read it, and the first
+ * account to use it (the guest who just signed in to book it) takes it, so the order sheet prices exactly that.
+ */
+export async function ownOffer(ownerId: string | null, id: string): Promise<OfferRow> {
   if (!isUuid(id)) throw new AppError("NOT_FOUND");
-  const [row] = await db.select().from(appOffers).where(and(eq(appOffers.id, id), eq(appOffers.ownerId, ownerId)));
+  const [row] = await db.select().from(appOffers).where(and(eq(appOffers.id, id), ownerId ? or(eq(appOffers.ownerId, ownerId), isNull(appOffers.ownerId)) : isNull(appOffers.ownerId)));
   if (!row) throw new AppError("NOT_FOUND");
+  if (ownerId && !row.ownerId) {
+    const [claimed] = await db.update(appOffers).set({ ownerId }).where(and(eq(appOffers.id, id), isNull(appOffers.ownerId))).returning();
+    // Someone else took it in the same instant: it isn't this account's.
+    if (!claimed) throw new AppError("NOT_FOUND");
+    return claimed;
+  }
   return row;
 }
 
@@ -203,7 +217,7 @@ export function offerView(row: OfferRow, changedBy: number | null = null): Offer
  * "Check the price again": the supplier prices the offer for this many travellers now, and the hold starts again.
  * Used by the order sheet when the hold ends and when the travellers change.
  */
-export async function repriceOffer(ownerId: string, id: string, travellerCount?: number, children?: number, demo?: Set<DemoFlag>): Promise<{ row: OfferRow; changedBy: number }> {
+export async function repriceOffer(ownerId: string | null, id: string, travellerCount?: number, children?: number, demo?: Set<DemoFlag>): Promise<{ row: OfferRow; changedBy: number }> {
   const row = await ownOffer(ownerId, id);
   const search = row.search as { travellerIds?: string[]; infants?: number; checkIn?: string };
   const n = travellerCount ?? search.travellerIds?.length ?? 1;
@@ -236,14 +250,14 @@ export async function repriceOffer(ownerId: string, id: string, travellerCount?:
 
 /* ───────────── entry checks ───────────── */
 
-export async function checkEntry(ownerId: string, input: EntryCheckRequest, demo: Set<DemoFlag>): Promise<EntryCheckResponse> {
+export async function checkEntry(ownerId: string | null, input: EntryCheckRequest, demo: Set<DemoFlag>): Promise<EntryCheckResponse> {
   const q = EntrySchema.parse(input);
   if (!DESTINATIONS[q.destination]) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
-  const travellers = await travellersOf(ownerId, q.travellerIds);
+  const travellers = await partyOf(ownerId, q.travellerIds, q.guests);
   const mock = supplierMode("flights") === "mock";
   return entryChecks({
     destination: q.destination, travellers, depart: q.depart, return: q.return, answers: q.answers, today: today(),
-    demo: { passportProblemFor: demo.has("passportProblem") ? demoPassportTarget(await householdOf(ownerId)) : null }, iqamaOf: mock ? demoIqama : undefined,
+    demo: { passportProblemFor: demo.has("passportProblem") && ownerId ? demoPassportTarget(await householdOf(ownerId)) : null }, iqamaOf: mock ? demoIqama : undefined,
   });
 }
 

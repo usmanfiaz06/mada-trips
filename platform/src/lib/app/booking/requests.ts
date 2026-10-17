@@ -2,7 +2,7 @@ import "server-only";
 import { progressOfRequest, resultOfRequest } from "../outcomes";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
-  CreateRequestBody, DESTINATIONS, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, requestTitle, sarToHalalas, t,
+  CreateRequestBody, DESTINATIONS, languageOfText, commaList, wordFor, mockFareOptions, tn, NEED_LABELS, OTHER_CITY_BY_HAND, CATALOGUE_FLIGHTS, deskFirstReply, deskQuote, deskReply, money, personName, rangeLabel, requestText, requestTitle, sarToHalalas, t,
   type BookingRequestView, type CopyKey, type CreateRequestBody as CreateRequestInput, type NeedKey, type Person, type RequestQuote, type ThreadMessage,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -268,7 +268,8 @@ export async function threadOf(ownerId: string, id: string, now = Date.now()): P
   let typing = false;
   if (autopilotOn() && last?.authorKind === "user") {
     if (now - last.createdAt.getTime() >= REPLY_MS) {
-      const reply = deskReply((r.details as AskDetails).askKind ?? "general", last.body, Math.max(1, r.travellerIds.length));
+      // The mock desk answers in the language the traveller wrote in, as the desk does.
+      const reply = deskReply((r.details as AskDetails).askKind ?? "general", last.body, Math.max(1, r.travellerIds.length), languageOfText(last.body) ?? undefined);
       await db.insert(appMessages).values({
         threadKind: "request", threadId: r.id, authorKind: "agent", authorName: r.agentName, body: reply.text,
         card: reply.offer ? { offer: { label: reply.offer.label, perPerson: sarToHalalas(reply.offer.perPersonSar), accepted: false } } : null,

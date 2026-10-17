@@ -1,6 +1,6 @@
 import type { HotelDetails } from "@mada/shared";
 import { AppError, json } from "@/lib/app/http";
-import { withParams } from "@/lib/app/trips/route";
+import { openRoute } from "@/lib/app/guest";
 import { hotelContent } from "@/lib/app/suppliers/hotelbeds/content";
 
 // GET /api/app/v1/hotels/{code} → { hotel }: a Hotelbeds hotel's content from our store (category, every image,
@@ -15,7 +15,8 @@ function categoryOf(code: string | null): string | null {
   return `${m[1]} ${CATEGORY[m[2]!] ?? m[2]!.toLowerCase()}`;
 }
 
-export const GET = withParams<{ code: string }>(async (_req, { code }) => {
+// Open to guests: a hotel page (shared or found) opens for anyone.
+export const GET = openRoute<{ code: string }>("read", async (_req, _auth, { code }) => {
   const n = Number(code);
   if (!Number.isInteger(n) || n <= 0) throw new AppError("NOT_FOUND");
   const h = await hotelContent(n);

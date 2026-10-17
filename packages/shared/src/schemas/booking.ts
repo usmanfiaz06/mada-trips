@@ -93,6 +93,14 @@ export const OptionLabel = z.enum(['best', 'lowest', 'earliest', 'fastest', 'bag
 export const DemoFlag = z.enum(['offline', 'decline', 'priceUp', 'noResults', 'supplierDown', 'agentQuestion', 'passportProblem', 'needs3ds', 'fareGone', 'ticketingFails', 'slowAgent', 'faceIdFails', 'priceDown', 'esimFails']);
 export type DemoFlag = z.infer<typeof DemoFlag>;
 
+/**
+ * Someone searching without an account: the people they said are going, kept on their phone (ids made there). The
+ * server prices for them and keeps nothing personal; signed in, the household on the account is used instead.
+ */
+export const GuestTraveller = z.object({ id: Id, dateOfBirth: IsoDay.nullable(), isSelf: z.boolean().default(false) });
+export type GuestTraveller = z.input<typeof GuestTraveller>;
+const Guests = z.array(GuestTraveller).max(12).optional();
+
 export const FlightSearchRequest = z.object({
   from: HomeAirport,
   /** A DESTINATIONS key. */
@@ -104,6 +112,8 @@ export const FlightSearchRequest = z.object({
   cabin: Cabin.default('economy'),
   /** ±days the traveller allows; with no flights on the day, 1 moves the search a day later. */
   flexibleDays: z.number().int().min(0).max(3).default(0),
+  /** Without an account: who travellerIds are (GuestTraveller). Ignored when signed in. */
+  guests: Guests,
 });
 export type FlightSearchRequest = z.input<typeof FlightSearchRequest>;
 
@@ -176,6 +186,7 @@ export const StaySearchRequest = z.object({
   checkIn: IsoDay,
   nights: z.number().int().min(1).max(60),
   travellerIds: z.array(Id).min(1).max(12),
+  guests: Guests,
 });
 export type StaySearchRequest = z.input<typeof StaySearchRequest>;
 
@@ -282,6 +293,7 @@ export const EntryCheckRequest = z.object({
   depart: IsoDay,
   return: IsoDay.nullable(),
   answers: EntryAnswers.default({}),
+  guests: Guests,
 });
 export type EntryCheckRequest = z.input<typeof EntryCheckRequest>;
 

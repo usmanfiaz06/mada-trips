@@ -2,7 +2,7 @@ import "server-only";
 import { messageAttachment } from "../file-links";
 import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import {
-  SupportCard, isSafetyChoice, supportIntent, t, type FileInfo, type SendSupportMessageRequest, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic,
+  languageOfText, SupportCard, isSafetyChoice, supportIntent, t, type FileInfo, type SendSupportMessageRequest, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appTrips, appUsers } from "@/db/app-schema";
@@ -11,6 +11,7 @@ import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { getFile, readFileBytes, storeFile, type StoredFile } from "../documents/storage";
 import { autoReplies, autoReplyOn, isSafetyIntent, type Reply } from "./replies";
+import { inLocale } from "../resilience/request";
 
 /*
  * Talk to Mada (Support.jsx): one conversation per traveller, and one per trip. Messages live in app_messages with
@@ -199,7 +200,11 @@ export async function sendMessage(userId: string, threadId: string, req: SendSup
         return [mine, ...await writeReplies(tx, threadId, await autoReplies({ ...ctx, kind: "bag", ref: "SV 482913", to: th.tripId ? "Our hotel" : "Home" }), now)];
       }
     }
-    const replies = auto || isSafetyIntent(intent) ? await autoReplies({ ...ctx, kind: "intent", intent }) : [];
+    // Mada answers in the language the message was written in, whatever the app is set to (an Arabic message in an
+    // English app gets Arabic back, and the other way round).
+    const said = languageOfText(req.body ?? "");
+    const reply = () => autoReplies({ ...ctx, kind: "intent", intent });
+    const replies = auto || isSafetyIntent(intent) ? await (said ? inLocale(said, reply) : reply()) : [];
     return [mine, ...await writeReplies(tx, threadId, replies, now)];
   });
   await appAuditLog(db, { actorKind: "user", actorId: userId, action: attachment ? "support.attachment_sent" : "support.message_sent", entityType: "app_support_thread", entityId: threadId, summary: attachment ? "Sent a file to Mada" : "Wrote to Mada", ipHash });

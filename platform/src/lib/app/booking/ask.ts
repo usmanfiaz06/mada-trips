@@ -8,8 +8,9 @@ import { bookingSuppliers, householdOf, today } from "./common";
  * from this household only). If the model is down or declines, the rules answer. Nothing here carries a price.
  */
 
-export async function parseAsk(ownerId: string, text: string): Promise<AskIntent> {
-  const people = await householdOf(ownerId);
+export async function parseAsk(ownerId: string | null, text: string): Promise<AskIntent> {
+  // A guest has no household: names aren't matched, "me and my wife" is still two.
+  const people = ownerId ? await householdOf(ownerId) : [];
   const day = today();
   const rules = parseAskRules(text, { today: day, people });
   const fromRules: AskIntent = askIntentOfRules(rules);

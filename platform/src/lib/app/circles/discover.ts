@@ -22,8 +22,9 @@ import { t } from "@mada/shared";
 
 const coveredCity = (c: string) => Object.keys(CITY_INFO).find((k) => k.toLowerCase() === c.trim().toLowerCase()) ?? null;
 
-export async function discover(me: string, cityParam: string | null): Promise<DiscoverResponse> {
-  const trip = await nextTrip(me);
+export async function discover(me: string | null, cityParam: string | null): Promise<DiscoverResponse> {
+  // A guest has no trips: the city asked for (the phone's, sent by the app), else home.
+  const trip = me ? await nextTrip(me) : null;
   const tripCity = trip ? coveredCity(trip.city) : null;
   const city = (cityParam && coveredCity(cityParam)) || tripCity || HOME_CITY;
   if (cityParam && !coveredCity(cityParam)) throw new AppError("NOT_FOUND");

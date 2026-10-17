@@ -118,6 +118,17 @@ export const HotelDetails = z.object({
 });
 export type HotelDetails = z.infer<typeof HotelDetails>;
 export const HotelDetailsResponse = z.object({ hotel: HotelDetails });
-export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}` } as const;
+/**
+ * The hotel's own words (written in English by the hotel or the desk) in the reader's language, on request: the
+ * page shows the original with a "Translate" toggle. `machine` says it was translated for them, not written so.
+ */
+export const HotelTranslationResponse = z.object({
+  lang: z.enum(['en', 'ar']),
+  description: z.string().nullable(),
+  facilities: z.array(z.string()),
+  machine: z.boolean(),
+});
+export type HotelTranslationResponse = z.infer<typeof HotelTranslationResponse>;
+export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}`, translation: (code: number, to: 'en' | 'ar') => `/hotels/${code}/translation?to=${to}` } as const;
 
 export { voucherHtml } from './voucher-html';

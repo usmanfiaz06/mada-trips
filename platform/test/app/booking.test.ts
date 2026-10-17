@@ -118,8 +118,9 @@ describe("Ask: what people type", () => {
     expect(AskParseResponse.parse((await post(askParse, f.token, { text: "Flights to Muscat in March" })).json).intent).toMatchObject({ destination: "other", destinationName: "Muscat", monthOnly: { month: 3 } });
   });
 
-  it("needs a session and a sentence", async () => {
-    expect((await callP(askParse, {}, { method: "POST", body: { text: "Istanbul" } })).status).toBe(401);
+  it("reads a guest's words too, and needs a sentence", async () => {
+    // Open to guests (lib/app/guest.ts): no household, the same reading.
+    expect((await callP(askParse, {}, { method: "POST", body: { text: "Istanbul" } })).status).toBe(200);
     const { token } = await signIn();
     expect((await post(askParse, token, { text: "" })).status).toBe(400);
   });
