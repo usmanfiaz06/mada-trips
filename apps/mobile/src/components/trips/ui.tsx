@@ -228,16 +228,19 @@ export function Cells({ items }: { items: { k: string; v: string; flash?: boolea
 
 /* ───────── progress ───────── */
 
-/** A ring that fills on arrival. */
-export function Ring({ done, total, size = 56, stroke = 6, dark }: { done: number; total: number; size?: number; stroke?: number; dark?: boolean }) {
+/** A ring that fills on arrival. `label` replaces "done/total" in the middle when the numbers are big (data in MB). */
+export function Ring({ done, total, size = 56, stroke = 6, dark, label }: { done: number; total: number; size?: number; stroke?: number; dark?: boolean; label?: string }) {
   const r = (size - stroke) / 2;
   const C = 2 * Math.PI * r;
   const full = done >= total;
+  const text = full ? '✓' : label ?? `${done}/${total}`;
+  // Whatever the text, it stays inside the ring: smaller type for longer text.
+  const fontSize = size * (text.length <= 3 ? 0.27 : text.length <= 5 ? 0.22 : 0.17);
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} accessibilityLabel={`${done} of ${total}`}>
       <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={dark ? 'rgba(255,253,249,.14)' : '#efe9e0'} strokeWidth={stroke} />
       <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={full ? colors.okBright : colors.gold} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${C}`} strokeDashoffset={C * (1 - done / Math.max(1, total))} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      <SvgText x={size / 2} y={size / 2 + size * 0.1} textAnchor="middle" fontFamily={ff.ui600} fontSize={size * 0.27} fill={dark ? colors.paper : colors.green}>{full ? '✓' : `${done}/${total}`}</SvgText>
+      <SvgText x={size / 2} y={size / 2 + size * 0.1} textAnchor="middle" fontFamily={ff.ui600} fontSize={fontSize} fill={dark ? colors.paper : colors.green}>{text}</SvgText>
     </Svg>
   );
 }

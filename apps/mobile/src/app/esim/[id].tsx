@@ -90,7 +90,7 @@ export default function EsimScreen() {
               {u?.expiresAt ? <Tiny>{t('es.ends', { date: shortDay(u.expiresAt.slice(0, 10), getLocale()) })}</Tiny> : null}
               {e.topups.length ? <Tiny>{e.topups.map((x) => planLabel(x, t)).join(' · ')}</Tiny> : null}
             </View>
-            {u && !u.unlimited && u.totalMb ? <Ring done={u.leftMb ?? 0} total={u.totalMb} /> : null}
+            {u && !u.unlimited && u.totalMb ? <Ring done={u.leftMb ?? 0} total={u.totalMb} label={`${Math.round(((u.leftMb ?? 0) / u.totalMb) * 100)}%`} /> : null}
           </Spread>
           <Row gap={8}>
             {e.plan.topup ? <SmallButton testID="esim-topup" label={t('es.topup')} tone="primary" onPress={() => setTopup(true)} grow /> : null}
