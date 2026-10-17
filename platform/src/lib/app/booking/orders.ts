@@ -24,6 +24,7 @@ import { memberIds, membership } from "../circles/circles";
 import { peopleByIds } from "../circles/common";
 import { createSplit, remindSplit } from "../circles/messages";
 import { notify } from "../trips/notify";
+import { fulfilEsimOrder } from "../esim/service";
 
 /*
  * Orders: POST /orders authorises the payment and hands the booking to the desk ('pending_agent'); GET /orders/:id is
@@ -193,11 +194,18 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   // Charged now: nothing for an agent to confirm (requests, eSIMs).
   if (res.paidNow) {
     const done = await confirmOrder(res.order.id, { name: agentName });
+    // An eSIM is bought from the supplier once the card is captured; if it can't be, the order comes back refunded.
+    if (done.kind === "esim" && done.status === "confirmed") return { outcome: "paid", order: orderView(await afterEsim(done, demo)) };
     return { outcome: "paid", order: orderView(done) };
   }
   // Stays in live mode (APP_STAYS_MODE=live) are booked on Hotelbeds now; in request mode the desk books them.
   if (res.order.kind === "stay") await autoBookStay(res.order.id);
   return outcomeOf(res.order);
+}
+
+async function afterEsim(o: OrderRow, demo: Set<DemoFlag>): Promise<OrderRow> {
+  await fulfilEsimOrder(o.id, { demoFail: demo.has("esimFails") });
+  return (await db.select().from(appOrders).where(eq(appOrders.id, o.id)))[0] ?? o;
 }
 
 function outcomeOf(o: OrderRow): CreateOrderResponse {
@@ -227,7 +235,10 @@ export async function submitOtp(ownerId: string, id: string, code: string): Prom
     if (status === "declined") await returnCredit(tx, o);
     await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: `payment.3ds_${r.status === "authorized" ? "passed" : status === "declined" ? "stopped" : "wrong"}`, entityType: "app_payment", entityId: p!.id, summary: "Bank code checked" });
   });
-  if (status === "paid_now") return orderView(await confirmOrder(o.id, { name: o.agentName ?? (await agentFor(ownerId)) }));
+  if (status === "paid_now") {
+    const done = await confirmOrder(o.id, { name: o.agentName ?? (await agentFor(ownerId)) });
+    return orderView(done.kind === "esim" && done.status === "confirmed" ? await afterEsim(done, new Set(o.demo as DemoFlag[])) : done);
+  }
   return orderView(await ownOrder(ownerId, id));
 }
 

@@ -71,7 +71,7 @@ export default function Pay() {
   const people = usePeople();
   const cards = useCards();
   const now = useNow(1000);
-  const initialTravellers = pd && 'travellerIds' in pd.draft ? pd.draft.travellerIds : [];
+  const initialTravellers = pd && 'travellerIds' in pd.draft ? pd.draft.travellerIds ?? [] : [];
   const [travellers, setTravellers] = useState<string[]>(initialTravellers);
   const [promo, setPromo] = useState<string | null>(null);
   const [promoOpen, setPromoOpen] = useState(false);

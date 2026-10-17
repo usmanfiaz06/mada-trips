@@ -40,3 +40,4 @@ export * from './cards';
 export * from './umrah';
 export * from './bcbp';
 export * from './boarding';
+export * from './esim';

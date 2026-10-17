@@ -16,6 +16,7 @@ import { getAccount } from "../account";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
 import { hotelbedsRule, withHotelbedsEssentials } from "./hotelbeds-stays";
 import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-requests";
+import { priceEsim } from "../esim/service";
 
 /*
  * The order sheet: lines, the all-in total, promo code, Mada credit, instalments and the cancellation rule worked out
@@ -218,6 +219,17 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     photo = "riyadh-kingdom-centre";
     place = circle.name;
     snapshot.share = { circleId: d.circleId, messageId: d.messageId, key: d.shareKey, amount: Number(share.amount) };
+  } else if (d.packageId || d.topupOf) {
+    // A plan from the eSIM supplier (esim/service.ts), priced from its own package; ordered once the card is captured.
+    const e = await priceEsim(ownerId, d);
+    lines = e.lines;
+    rule = e.rule;
+    title = e.title;
+    agent = false;
+    photo = "inflight-window";
+    place = e.place;
+    travellers = e.travellerIds.length ? await travellersOf(ownerId, e.travellerIds, household) : [];
+    snapshot.esim = e.snapshot;
   } else {
     lines = [line("esim", "globe", t("pay.line.esim", { count: d.count }), sarToHalalas(DESK_PRICES.esimEach * d.count))];
     rule = t("pay.rule.esim");

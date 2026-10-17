@@ -45,14 +45,14 @@ export function pepper(): string {
 }
 
 export type SupplierName = (typeof SUPPLIERS)[number];
-export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase", "activities", "events", "weather", "openData", "transfers"] as const;
+export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "flightStatus", "flightPositions", "ai", "email", "identity", "supabase", "activities", "events", "weather", "openData", "transfers", "esim"] as const;
 
 /** Free, keyless open data: live by default everywhere. Only SUPPLIER_MODE_FLIGHT_POSITIONS switches it (not SUPPLIER_MODE). */
 // Things to do: Open-Meteo, OpenStreetMap/Wikidata and the events list (Ticketmaster only with TICKETMASTER_KEY) are too.
 const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions", "weather", "openData", "events"]);
 export type SupplierMode = "mock" | "live";
 /** Vendor names that mean "live" in SUPPLIER_MODE_<NAME>. */
-const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware"]);
+const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware", "airalo"]);
 /** Any of these keys turns flight status live without SUPPLIER_MODE_FLIGHT_STATUS (the owner only adds the key). */
 export const FLIGHT_STATUS_KEYS = ["AERODATABOX_API_KEY", "AVIATIONSTACK_API_KEY", "FLIGHTAWARE_API_KEY"] as const;
 

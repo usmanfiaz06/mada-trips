@@ -104,7 +104,7 @@ export function parseKind(text: string): AskKindValue {
   if (/\bumrah\b|makkah|mecca|madinah|medina/.test(s)) return 'umrah';
   if (/\bvisa\b|schengen|\beta\b|appointment/.test(s)) return 'visa';
   if (FLIGHT_WORDS.test(s)) return 'flight';
-  if (/\besim\b|data plan|sim card|\bdata\b/.test(s)) return 'esim';
+  if (/\be-?sims?\b|data plan|sim card|\bdata\b|\broaming\b|\bmobile internet\b|\binternet\b|\bsim\b/.test(s)) return 'esim';
   if (STAY_WORDS.test(s)) return 'stay';
   if (/\bcars?\b|car rental|rent a car|\bdriver\b|\brental\b|\btaxis?\b|\bcabs?\b|\buber\b|\bcareem\b/.test(s)) return 'car';
   if (/restaurant|dinner|lunch|\btable\b|breakfast/.test(s)) return 'food';

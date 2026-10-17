@@ -90,7 +90,7 @@ export type AskParseResponse = z.infer<typeof AskParseResponse>;
 export const OptionLabel = z.enum(['best', 'lowest', 'earliest', 'fastest', 'bags', 'quiet', 'water']);
 
 /** Demo switches (FLOWS.md): honoured only when the supplier runs in mock mode. Sent as ?demo=a,b or X-Mada-Demo. */
-export const DemoFlag = z.enum(['offline', 'decline', 'priceUp', 'noResults', 'supplierDown', 'agentQuestion', 'passportProblem', 'needs3ds', 'fareGone', 'ticketingFails', 'slowAgent', 'faceIdFails', 'priceDown']);
+export const DemoFlag = z.enum(['offline', 'decline', 'priceUp', 'noResults', 'supplierDown', 'agentQuestion', 'passportProblem', 'needs3ds', 'fareGone', 'ticketingFails', 'slowAgent', 'faceIdFails', 'priceDown', 'esimFails']);
 export type DemoFlag = z.infer<typeof DemoFlag>;
 
 export const FlightSearchRequest = z.object({
@@ -441,7 +441,11 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
   /** optionId: which fare option of a flight quote (the first when there is only one). */
   z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional() }),
-  z.object({ kind: z.literal('esim'), count: z.number().int().min(1).max(12) }),
+  /** packageId: the plan picked (schemas/esim.ts), one eSIM per traveller; topupOf: more GB on an eSIM already bought. */
+  z.object({
+    kind: z.literal('esim'), count: z.number().int().min(1).max(12), packageId: z.string().min(1).max(80).optional(), where: z.string().max(20).optional(),
+    tripId: Id.nullish(), travellerIds: z.array(Id).max(12).optional(), topupOf: Id.optional(),
+  }),
   /** Your share of a split in a circle, paid by card. The amount comes from the circle, never from the app. */
   z.object({ kind: z.literal('share'), circleId: Id, messageId: Id, shareKey: z.string().min(1).max(64) }),
 ]);

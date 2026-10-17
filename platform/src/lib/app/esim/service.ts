@@ -1,0 +1,413 @@
+import "server-only";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import {
+  DESTINATIONS, ESIM_MARKUP_BPS, EsimPlansQuery, addDays, esimCountriesOf, esimDays, esimPrice, esimStatusOf, esimWhereKey, formatSar, money, personName, planOf, suggestEsimPlans,
+  t, tn, todayIn, topupPlans, type CopyKey, type EsimPackage, type EsimPlan, type EsimPlansResponse, type EsimUsage, type EsimView, type OrderLine, type RequestResult,
+} from "@mada/shared";
+import { db } from "@/db";
+import { appPayments, appRefunds, appTrips, appUsers } from "@/db/app-schema";
+import { appOrders } from "@/db/app-schema-booking";
+import { appEsims } from "@/db/app-schema-esim";
+import { appAuditLog } from "../audit";
+import { isProductionDeploy, supplierMode } from "../config";
+import { addCredit } from "../credit";
+import { AppError } from "../http";
+import { suppliers } from "../suppliers";
+import { EsimRefused, type EsimSim, type EsimSupplierOrder } from "../suppliers/esim-types";
+import { airaloEnv, verifyAiraloSignature } from "../suppliers/live/airalo";
+import { markMockEsimInstalled } from "../suppliers/mock/esim";
+import { bookingSuppliers, householdOf, isUuid, travellersOf } from "../booking/common";
+import { orderEvent } from "../booking/desk";
+import { notify } from "../trips/notify";
+
+/*
+ * eSIMs (Airalo), docs in platform/src/lib/app/suppliers/README.md and the shared rules in schemas/esim.ts.
+ *
+ *   plans      GET /esim/plans: 2–3 sizes for the trip's country (or region) and days, priced from the supplier's net
+ *              price plus APP_ESIM_MARKUP_BPS, and who on the trip already has one.
+ *   pricing    priceEsim: the order sheet's line, from the supplier's own package (never a price from the app).
+ *   fulfil     after the payment is captured (orders.ts → confirmOrder → fulfilEsimOrder): one supplier order for all
+ *              the eSIMs, our order id as its description. Before buying it looks that description up, so a retry, a
+ *              second server or the desk's "order again" never buys twice. A definite no → the payment is refunded at
+ *              once and the order closes with a refund outcome. No answer at all → 'stuck' until the desk looks.
+ *   on trip    usage read through the supplier at most every 20 minutes (Airalo caches that long), top-ups, installed.
+ */
+
+type Row = typeof appEsims.$inferSelect;
+type OrderRow = typeof appOrders.$inferSelect;
+type Coverage = EsimPackage["coverage"];
+export type EsimSnapshot = {
+  packageId: string; coverage: Coverage; gb: number | null; days: number; netUsd: number; operator: string; topup: boolean;
+  unit: number; count: number; travellerIds: string[]; tripId: string | null; topupOf: string | null; apn: EsimPackage["apn"]; roaming: boolean;
+};
+
+const USAGE_TTL_MS = 20 * 60_000;
+const CLAIM_MS = 90_000;
+
+export function markupBps(): number {
+  const n = Number(process.env.APP_ESIM_MARKUP_BPS);
+  return Number.isFinite(n) && n >= 0 && n <= 20_000 ? Math.round(n) : ESIM_MARKUP_BPS;
+}
+const sup = () => suppliers.esim();
+const supplierName = () => (supplierMode("esim") === "live" ? "airalo" : "mock") as "airalo" | "mock";
+
+/**
+ * Whether a real eSIM may be bought here. Sandbox keys on a production deployment would sell an eSIM that can't be
+ * installed; live keys outside production would spend real money on tests (unless AIRALO_ALLOW_LIVE_OUTSIDE_PRODUCTION=yes).
+ */
+export function esimOrderingAllowed(): { ok: true } | { ok: false; why: string } {
+  if (supplierMode("esim") === "mock") return { ok: true };
+  const env = airaloEnv();
+  if (env === "sandbox" && isProductionDeploy()) return { ok: false, why: "AIRALO_ENV=sandbox on a production deployment: sandbox eSIMs can't be installed." };
+  if (env === "live" && !isProductionDeploy() && process.env.AIRALO_ALLOW_LIVE_OUTSIDE_PRODUCTION !== "yes") return { ok: false, why: "Live Airalo keys outside production. Use the sandbox here." };
+  return { ok: true };
+}
+
+/** "Türkiye", "Europe", in the reader's language when Mada writes the name; the supplier's title otherwise. */
+export const whereName = (c: Pick<Coverage, "code" | "name">, locale?: "en" | "ar") => { const k = esimWhereKey(c.code); return k ? t(k as CopyKey, undefined, locale) : c.name; };
+const whereRef = (c: Pick<Coverage, "code" | "name">) => { const k = esimWhereKey(c.code); return k ? { k: k as CopyKey } : c.name; };
+const sizeText = (gb: number | null, days: number) => (gb === null ? t("es.size.unlimited", { days }) : t("es.size.gb", { gb, days }));
+
+/** Local packages for one country plus the regional and global ones. */
+async function packagesFor(countries: string[]): Promise<EsimPackage[]> {
+  const global = sup().packages({ global: true });
+  global.catch(() => {});
+  const local = countries.length === 1 ? await sup().packages({ country: countries[0]! }) : [];
+  return [...local, ...(await global)];
+}
+
+/* ───────────── plans ───────────── */
+
+export async function esimPlans(ownerId: string, raw: Record<string, string | undefined>): Promise<EsimPlansResponse> {
+  const q = EsimPlansQuery.parse(raw);
+  let countries: string[] = [];
+  let days = q.days ?? 7;
+  let start: string | null = null;
+  let tripId: string | null = null;
+  let travellerIds: string[] | null = null;
+  if (q.tripId) {
+    const [trip] = await db.select().from(appTrips).where(and(eq(appTrips.id, q.tripId), eq(appTrips.ownerId, ownerId)));
+    if (!trip) throw new AppError("NOT_FOUND");
+    countries = esimCountriesOf({ city: trip.city, country: trip.country });
+    days = q.days ?? esimDays(trip.startDate, trip.endDate);
+    start = trip.startDate;
+    tripId = trip.id;
+    travellerIds = trip.travellerIds;
+  } else if (q.countries) countries = q.countries.split(",");
+  else if (q.destination) {
+    const d = DESTINATIONS[q.destination.toLowerCase()];
+    countries = d ? [d.country] : /^[A-Z]{2}$/.test(q.destination) ? [q.destination] : [];
+  }
+  const household = await householdOf(ownerId);
+  const onTrip = travellerIds?.length ? household.filter((p) => travellerIds!.includes(p.id)) : household;
+  const has = tripId
+    ? new Set((await db.select({ p: appEsims.travellerId }).from(appEsims).where(and(eq(appEsims.ownerId, ownerId), eq(appEsims.tripId, tripId), sql`${appEsims.status} <> 'refunded'`))).map((r) => r.p))
+    : new Set<string | null>();
+  const people = (onTrip.length ? onTrip : household).map((p) => ({ id: p.id, name: personName(p) || t("es.list.forYou"), has: has.has(p.id) }));
+  const base = { days, start, tripId, people, supplier: supplierName() };
+  if (!countries.length) return { ...base, outcome: "none", where: null, plans: [], recommended: null };
+  const s = suggestEsimPlans(await packagesFor(countries), { countries, days, markupBps: markupBps() });
+  if (!s.coverage || !s.plans.length) return { ...base, outcome: "none", where: { countries, code: countries[0]!, kind: "local" }, plans: [], recommended: null };
+  return { ...base, outcome: "ok", where: { countries, code: s.coverage.code, kind: s.coverage.kind }, plans: s.plans, recommended: s.recommended };
+}
+
+/* ───────────── the order sheet ───────────── */
+
+type EsimDraft = { kind: "esim"; count: number; packageId?: string; where?: string; tripId?: string | null; travellerIds?: string[]; topupOf?: string };
+
+/** The line, title and rule for an eSIM on the order sheet, priced from the supplier's own package. */
+export async function priceEsim(ownerId: string, d: EsimDraft): Promise<{ lines: OrderLine[]; title: string; rule: string; place: string; snapshot: EsimSnapshot; travellerIds: string[] }> {
+  const allowed = esimOrderingAllowed();
+  if (!allowed.ok) { console.warn("[esim]", allowed.why); throw new AppError("NOT_CONFIGURED"); }
+  const bps = markupBps();
+  if (d.topupOf) {
+    const row = await ownEsim(ownerId, d.topupOf);
+    if (!row.iccid || ["refunded", "ordering", "stuck"].includes(row.status)) throw new AppError("VALIDATION");
+    const plan = row.plan as unknown as EsimPlan;
+    const p = (await sup().topupPackages(row.iccid)).find((x) => x.id === d.packageId);
+    if (!p) throw new AppError("NOT_FOUND");
+    const unit = esimPrice(p.netUsd, bps);
+    const where = whereName(plan.coverage);
+    return {
+      lines: [{ key: "esim", icon: "globe", text: t("pay.line.esimTopup", { size: sizeText(p.gb, p.days) }), amount: unit }],
+      title: t("pay.title.esimTopup", { where }), rule: t("pay.rule.esimPlan"), place: where, travellerIds: row.travellerId ? [row.travellerId] : [],
+      snapshot: { packageId: p.id, coverage: plan.coverage, gb: p.gb, days: p.days, netUsd: p.netUsd, operator: plan.operator, topup: true, unit, count: 1, travellerIds: [], tripId: row.tripId, topupOf: row.id, apn: p.apn, roaming: p.roaming },
+    };
+  }
+  if (!d.packageId) throw new AppError("VALIDATION");
+  const code = d.where ?? "";
+  const list = /^[A-Z]{2}$/.test(code) ? await packagesFor([code]) : await sup().packages({ global: true });
+  const p = list.find((x) => x.id === d.packageId);
+  if (!p) throw new AppError("NOT_FOUND");
+  const travellers = d.travellerIds?.length ? await travellersOf(ownerId, d.travellerIds) : [];
+  const count = travellers.length || d.count;
+  let tripId: string | null = null;
+  if (d.tripId && isUuid(d.tripId)) {
+    const [trip] = await db.select({ id: appTrips.id }).from(appTrips).where(and(eq(appTrips.id, d.tripId), eq(appTrips.ownerId, ownerId)));
+    tripId = trip?.id ?? null;
+  }
+  const unit = esimPrice(p.netUsd, bps);
+  const where = whereName(p.coverage);
+  return {
+    lines: [{ key: "esim", icon: "globe", text: tn("pay.line.esimPlan", count, { where, size: sizeText(p.gb, p.days) }), amount: unit * count }],
+    title: t("pay.title.esimFor", { where }), rule: t("pay.rule.esimPlan"), place: where, travellerIds: travellers.map((x) => x.id),
+    snapshot: { packageId: p.id, coverage: p.coverage, gb: p.gb, days: p.days, netUsd: p.netUsd, operator: p.operator, topup: p.topup, unit, count, travellerIds: travellers.map((x) => x.id), tripId, topupOf: null, apn: p.apn, roaming: p.roaming },
+  };
+}
+
+/* ───────────── after the payment is captured ───────────── */
+
+const descriptionOf = (o: Pick<OrderRow, "id">, topup: boolean) => `mada:${o.id}${topup ? ":topup" : ""}`;
+const snapOf = (o: OrderRow) => (o.snapshot as { esim?: EsimSnapshot }).esim ?? null;
+
+/** Ordered once the card is captured (or credit covered it). Safe to call again: it never buys twice. */
+export async function fulfilEsimOrder(orderId: string, opts: { demoFail?: boolean; actor?: string } = {}): Promise<void> {
+  const [o] = await db.select().from(appOrders).where(eq(appOrders.id, orderId));
+  if (!o || o.kind !== "esim" || o.status !== "confirmed") return;
+  const s = snapOf(o);
+  if (!s) return;
+  if (s.topupOf) return fulfilTopup(o, s, opts);
+  // One row per eSIM, written before anything is bought (idempotent by order and index).
+  const rows = Array.from({ length: s.count }, (_, i) => ({
+    ownerId: o.ownerId, orderId: o.id, idx: i, tripId: s.tripId, travellerId: s.travellerIds[i] ?? null, supplier: supplierName(), packageId: s.packageId,
+    plan: { id: s.packageId, coverage: s.coverage, gb: s.gb, days: s.days, operator: s.operator, topup: s.topup }, netUsdCents: Math.round(s.netUsd * 100), status: "ordering",
+  }));
+  await db.insert(appEsims).values(rows).onConflictDoNothing();
+  // Claim the purchase: one caller at a time; a claim older than CLAIM_MS (a crashed call) can be taken over.
+  const claimed = await db.update(appEsims).set({ problem: "ordering", updatedAt: new Date() })
+    .where(and(eq(appEsims.orderId, o.id), eq(appEsims.idx, 0), isNull(appEsims.iccid), inArray(appEsims.status, ["ordering", "stuck"]),
+      or(isNull(appEsims.problem), sql`${appEsims.problem} <> 'ordering'`, lt(appEsims.updatedAt, new Date(Date.now() - CLAIM_MS))))).returning({ id: appEsims.id });
+  if (!claimed.length) return;
+  const description = descriptionOf(o, false);
+  let bought: EsimSupplierOrder | null = null;
+  let refused: EsimRefused | null = null;
+  try {
+    bought = await sup().findOrder(description);
+    if (!bought) {
+      try {
+        bought = await sup().order({ packageId: s.packageId, quantity: s.count, description, demoFail: opts.demoFail });
+      } catch (e) {
+        if (!(e instanceof EsimRefused) || !e.duplicate) throw e;
+        // Airalo saw the same order a second ago: it may have gone through. Look before anything else.
+        await new Promise((r) => setTimeout(r, 1500));
+        bought = await sup().findOrder(description);
+      }
+    }
+  } catch (e) {
+    if (e instanceof EsimRefused) refused = e;
+    else {
+      // No answer: it may or may not have been bought. Look once more; otherwise the desk sorts it out (never a second buy).
+      bought = await sup().findOrder(description).catch(() => null);
+      if (!bought) {
+        await db.update(appEsims).set({ status: "stuck", problem: e instanceof Error ? e.message.slice(0, 200) : "no answer", updatedAt: new Date() }).where(eq(appEsims.orderId, o.id));
+        await db.transaction(async (tx) => {
+          await orderEvent(tx, o.id, "esim_stuck", { kind: "system" });
+          await appAuditLog(tx, { actorKind: "system", actorId: null, action: "esim.stuck", entityType: "app_order", entityId: o.id, summary: "eSIM supplier didn't answer; nothing bought twice. Check on the desk." });
+        });
+        return;
+      }
+    }
+  }
+  if (!bought || bought.sims.length < s.count) {
+    await refundOrder(o, s, { why: refused?.reason ?? "no eSIM came back", actor: opts.actor ?? null, rows: "all" });
+    return;
+  }
+  await db.transaction(async (tx) => {
+    for (const [i, sim] of bought!.sims.slice(0, s.count).entries()) {
+      await tx.update(appEsims).set({ status: "ready", supplierOrderId: bought!.id, iccid: sim.iccid, install: installOf(sim), problem: null, updatedAt: new Date() })
+        .where(and(eq(appEsims.orderId, o.id), eq(appEsims.idx, i)));
+    }
+    await orderEvent(tx, o.id, "esim_ordered", { kind: "system" }, { supplierOrderId: bought!.id, count: s.count });
+    await appAuditLog(tx, { actorKind: "system", actorId: null, action: "esim.ordered", entityType: "app_order", entityId: o.id, summary: `Bought ${s.count} eSIM(s) ${s.packageId} (supplier order ${bought!.id})` });
+  });
+}
+
+const installOf = (s: EsimSim) => ({ lpa: s.lpa, smdp: s.smdp, matchingId: s.matchingId, iosLink: s.iosLink, apn: s.apn, roaming: s.roaming });
+
+async function fulfilTopup(o: OrderRow, s: EsimSnapshot, opts: { demoFail?: boolean; actor?: string }) {
+  const [row] = await db.select().from(appEsims).where(eq(appEsims.id, s.topupOf!));
+  if (!row?.iccid) return;
+  if ((row.topups ?? []).some((x) => (x as { orderId?: string }).orderId === o.id)) return;
+  const description = descriptionOf(o, true);
+  try {
+    const found = await sup().findOrder(description);
+    const r = found ? { id: found.id } : await sup().topup({ iccid: row.iccid, packageId: s.packageId, description });
+    await db.update(appEsims).set({
+      topups: sql`${appEsims.topups} || ${JSON.stringify([{ orderId: o.id, supplierOrderId: r.id, packageId: s.packageId, gb: s.gb, days: s.days, at: new Date().toISOString() }])}::jsonb`,
+      usageCheckedAt: null, status: row.status === "used_up" || row.status === "expired" ? "active" : row.status, updatedAt: new Date(),
+    }).where(eq(appEsims.id, row.id));
+  } catch (e) {
+    if (!(e instanceof EsimRefused)) {
+      const again = await sup().findOrder(description).catch(() => null);
+      if (again) return fulfilTopup(o, s, opts);
+    }
+    await refundOrder(o, s, { why: e instanceof Error ? e.message : "top-up refused", actor: opts.actor ?? null, rows: "none" });
+  }
+}
+
+/**
+ * Money back for eSIMs we couldn't give (or the desk refunds): the card refund at once (or Mada credit back), recorded
+ * in app_refunds, the eSIMs marked refunded with the outcome, the order closed with it, and a line to the traveller.
+ */
+async function refundOrder(o: OrderRow, s: EsimSnapshot, how: { why: string; actor: string | null; rows: "all" | "none" | string[]; amount?: number }) {
+  const amount = how.amount ?? o.total;
+  const credit = how.amount === undefined ? o.creditUsed : 0;
+  const by = addDays(todayIn(), 10);
+  let refunded = false;
+  if (amount > 0 && o.paymentId) {
+    const [p] = await db.select().from(appPayments).where(eq(appPayments.id, o.paymentId));
+    if (p?.providerRef && ["captured", "partially_refunded"].includes(p.status)) {
+      const r = await bookingSuppliers.payments().refund(p.providerRef, amount, `esim-refund:${o.id}:${how.rows === "all" || how.rows === "none" ? "order" : how.rows.join(",")}`).catch(() => null);
+      refunded = !!r && (r.status === "refunded" || r.status === "partially_refunded");
+      await db.insert(appRefunds).values({ paymentId: p.id, amount, stage: refunded ? "approved" : "requested", destination: "original", reason: `eSIM not delivered: ${how.why}`.slice(0, 200), expectedBy: new Date(Date.parse(`${by}T12:00:00Z`)), providerRef: r?.providerRef ?? null });
+      if (refunded) await db.update(appPayments).set({ status: amount >= p.amount ? "refunded" : "partially_refunded", updatedAt: new Date() }).where(eq(appPayments.id, p.id));
+    }
+  }
+  const result: RequestResult = {
+    kind: "refused", reason: "sold_out", with: null, note: null,
+    money: amount > 0 ? { kind: "refund", amount: money(amount), by } : credit > 0 ? { kind: "credit", amount: money(credit), by: null } : { kind: "none", amount: null, by: null },
+    next: ["talk"], by: how.actor, at: new Date().toISOString(),
+  };
+  await db.transaction(async (tx) => {
+    if (credit > 0) await addCredit(tx, { userId: o.ownerId, amount: credit, kind: "adjustment", note: "eSIM not delivered: credit back", actor: { kind: "system", id: null } });
+    if (how.rows === "all") await tx.update(appEsims).set({ status: "refunded", result, problem: how.why.slice(0, 200), updatedAt: new Date() }).where(eq(appEsims.orderId, o.id));
+    else if (Array.isArray(how.rows)) await tx.update(appEsims).set({ status: "refunded", result, problem: how.why.slice(0, 200), updatedAt: new Date() }).where(inArray(appEsims.id, how.rows));
+    const whole = how.rows === "all" || how.rows === "none";
+    if (whole) await tx.update(appOrders).set({ status: "cancelled", snapshot: { ...(o.snapshot as Record<string, unknown>), result }, updatedAt: new Date() }).where(eq(appOrders.id, o.id));
+    await orderEvent(tx, o.id, "esim_refunded", how.actor ? { kind: "agent", name: how.actor } : { kind: "system" }, { amount, credit, why: how.why, cardRefunded: refunded });
+    await appAuditLog(tx, { actorKind: how.actor ? "agent" : "system", actorId: how.actor, action: "esim.refunded", entityType: "app_order", entityId: o.id, summary: `eSIM refund of ${amount + credit} halalas (${how.why})${amount > 0 && !refunded ? "; card refund to do by hand" : ""}` });
+  });
+  await notify(o.ownerId, { kind: "refund_moved", level: "active", copy: "notify.esim.refund", vars: { amount: formatSar(amount + credit) }, href: s.topupOf ? `/esim/${s.topupOf}` : `/esims?order=${o.id}` }).catch(() => {});
+}
+
+/* ───────────── what the traveller sees ───────────── */
+
+export async function ownEsim(ownerId: string, id: string): Promise<Row> {
+  if (!isUuid(id)) throw new AppError("NOT_FOUND");
+  const [r] = await db.select().from(appEsims).where(and(eq(appEsims.id, id), eq(appEsims.ownerId, ownerId)));
+  if (!r) throw new AppError("NOT_FOUND");
+  return r;
+}
+
+export function esimView(r: Row, names: Map<string, string> = new Map()): EsimView {
+  const plan = r.plan as unknown as EsimView["plan"];
+  return {
+    id: r.id, orderId: r.orderId, tripId: r.tripId, travellerId: r.travellerId, travellerName: r.travellerId ? names.get(r.travellerId) ?? null : null,
+    status: r.status as EsimView["status"], plan, where: whereName(plan.coverage), iccid: r.iccid, install: (r.install as EsimView["install"]) ?? null,
+    usage: (r.usage as EsimUsage | null) ?? null,
+    topups: (r.topups ?? []).map((x) => { const y = x as { gb: number | null; days: number; at: string }; return { gb: y.gb, days: y.days, at: y.at }; }),
+    result: (r.result as RequestResult | null) ?? null, installedAt: r.installedAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(),
+  };
+}
+
+async function namesOf(ownerId: string): Promise<Map<string, string>> {
+  return new Map((await householdOf(ownerId)).map((p) => [p.id, personName(p)]));
+}
+
+/** Usage from the supplier, at most every 20 minutes, and the status it implies. Never throws: the last read stands. */
+async function refreshed(r: Row): Promise<Row> {
+  if (!r.iccid || ["ordering", "refunded", "stuck"].includes(r.status)) return r;
+  if (r.usageCheckedAt && Date.now() - r.usageCheckedAt.getTime() < USAGE_TTL_MS) return r;
+  try {
+    const u = await sup().usage(r.iccid);
+    const status = esimStatusOf(r.status as EsimView["status"], u, !!r.installedAt);
+    const [x] = await db.update(appEsims).set({ usage: u, usageCheckedAt: new Date(), status, updatedAt: new Date() }).where(eq(appEsims.id, r.id)).returning();
+    return x ?? r;
+  } catch {
+    return r;
+  }
+}
+
+export async function listEsims(ownerId: string, f: { orderId?: string | null; tripId?: string | null } = {}): Promise<EsimView[]> {
+  const where = [eq(appEsims.ownerId, ownerId)];
+  if (f.orderId) { if (!isUuid(f.orderId)) return []; where.push(eq(appEsims.orderId, f.orderId)); }
+  if (f.tripId) { if (!isUuid(f.tripId)) return []; where.push(eq(appEsims.tripId, f.tripId)); }
+  const rows = await db.select().from(appEsims).where(and(...where)).orderBy(desc(appEsims.createdAt), appEsims.idx).limit(50);
+  const names = await namesOf(ownerId);
+  const fresh = await Promise.all(rows.map(refreshed));
+  return fresh.map((r) => esimView(r, names));
+}
+
+export async function getEsim(ownerId: string, id: string): Promise<EsimView> {
+  return esimView(await refreshed(await ownEsim(ownerId, id)), await namesOf(ownerId));
+}
+
+/** The traveller says it's installed: it switches on when they land (the mock supplier starts counting from now). */
+export async function markInstalled(ownerId: string, id: string): Promise<EsimView> {
+  const r = await ownEsim(ownerId, id);
+  if (!r.iccid || ["ordering", "refunded", "stuck"].includes(r.status)) throw new AppError("VALIDATION");
+  if (!r.installedAt) {
+    const now = new Date();
+    if (r.supplier === "mock") markMockEsimInstalled(r.iccid, now.toISOString());
+    await db.update(appEsims).set({ installedAt: now, status: r.status === "ready" ? "installed" : r.status, usageCheckedAt: null, updatedAt: now }).where(eq(appEsims.id, r.id));
+  }
+  return getEsim(ownerId, id);
+}
+
+export async function esimTopups(ownerId: string, id: string): Promise<{ esim: EsimView; plans: EsimPlan[] }> {
+  const esim = await getEsim(ownerId, id);
+  if (!esim.iccid || ["ordering", "refunded", "stuck"].includes(esim.status)) return { esim, plans: [] };
+  const list = await sup().topupPackages(esim.iccid).catch((e) => { if (e instanceof EsimRefused) return []; throw e; });
+  return { esim, plans: topupPlans(list.map((p) => ({ ...p, coverage: esim.plan.coverage })), markupBps()) };
+}
+
+/* ───────────── Airalo's webhook ───────────── */
+
+/** Low data or near the end: a line to the traveller with Top up. Signed with our client secret. */
+export async function airaloWebhook(raw: string, signature: string | null): Promise<{ ok: boolean }> {
+  if (supplierMode("esim") === "live" && !verifyAiraloSignature(raw, signature)) throw new AppError("UNAUTHORIZED");
+  const body = (() => { try { return JSON.parse(raw) as { level?: string; iccid?: string; remaining_percentage?: number }; } catch { return null; } })();
+  if (!body?.iccid || !body.level) return { ok: true };
+  const [r] = await db.select().from(appEsims).where(eq(appEsims.iccid, body.iccid));
+  if (!r) return { ok: true };
+  const plan = r.plan as unknown as { coverage: Coverage };
+  const days = /^(\d+)days?$/.exec(body.level)?.[1];
+  await db.update(appEsims).set({ usageCheckedAt: null }).where(eq(appEsims.id, r.id));
+  await notify(r.ownerId, days
+    ? { kind: "other", level: "active", copy: "notify.esim.ends", vars: { where: whereRef(plan.coverage), days: Number(days) }, href: `/esim/${r.id}` }
+    : { kind: "other", level: "active", copy: "notify.esim.low", vars: { where: whereRef(plan.coverage), percent: Math.max(0, Math.round(body.remaining_percentage ?? (100 - Number(body.level.replace("%", "")) || 10))) }, href: `/esim/${r.id}` });
+  return { ok: true };
+}
+
+/* ───────────── the desk ───────────── */
+
+export type DeskEsim = Row & { ref: string | null; ownerName: string | null; total: number; orderStatus: string };
+
+export async function deskEsims(limit = 200): Promise<DeskEsim[]> {
+  const rows = await db.select({ e: appEsims, ref: appOrders.ref, total: appOrders.total, orderStatus: appOrders.status, name: appUsers.name })
+    .from(appEsims).innerJoin(appOrders, eq(appOrders.id, appEsims.orderId)).innerJoin(appUsers, eq(appUsers.id, appEsims.ownerId))
+    .orderBy(desc(appEsims.createdAt)).limit(limit);
+  return rows.map((x) => ({ ...x.e, ref: x.ref, ownerName: x.name, total: x.total, orderStatus: x.orderStatus }));
+}
+
+/** The install details again: a line in the traveller's inbox and a push that opens the install screen. */
+export async function resendEsim(id: string, actor: { name: string; opsUserId?: string | null }): Promise<void> {
+  const [r] = await db.select().from(appEsims).where(eq(appEsims.id, id));
+  if (!r) throw new AppError("NOT_FOUND");
+  if (!r.iccid || r.status === "refunded") throw new AppError("VALIDATION", { message: "This eSIM has no install codes to send." });
+  const plan = r.plan as unknown as { coverage: Coverage };
+  await notify(r.ownerId, { kind: "other", level: "active", copy: "notify.esim.resend", vars: { where: whereRef(plan.coverage) }, href: `/esim/${r.id}` });
+  await db.transaction(async (tx) => {
+    await orderEvent(tx, r.orderId, "esim_resent", { kind: "agent", name: actor.name }, { esimId: r.id });
+    await appAuditLog(tx, { actorKind: "agent", actorId: actor.opsUserId ?? actor.name, action: "esim.resent", entityType: "app_esim", entityId: r.id, summary: `${actor.name} sent the install details again (${r.iccid})` });
+  });
+}
+
+/** The desk refunds one eSIM: its share of the order back to the traveller; Airalo is asked for its money if never installed. */
+export async function deskRefundEsim(id: string, actor: { name: string; opsUserId?: string | null }, reason: "INSTALLATION_FAILURE" | "NO_COVERAGE" | "TRIP_CANCELLATION" | "WRONG_PURCHASE" | "INCOMPATIBLE_DEVICE" | "OTHERS" = "OTHERS"): Promise<void> {
+  const [r] = await db.select().from(appEsims).where(eq(appEsims.id, id));
+  if (!r) throw new AppError("NOT_FOUND");
+  if (r.status === "refunded") throw new AppError("VALIDATION", { message: "Already refunded." });
+  const [o] = await db.select().from(appOrders).where(eq(appOrders.id, r.orderId));
+  const s = o ? snapOf(o) : null;
+  if (!o || !s) throw new AppError("NOT_FOUND");
+  if (r.iccid) await sup().refund({ iccids: [r.iccid!], reason, notes: `Mada order ${o.ref ?? o.id}` }).catch((e) => console.warn("[esim] supplier refund not requested", e instanceof Error ? e.message : e));
+  const unit = s.unit || Math.round(o.total / Math.max(1, s.count));
+  await refundOrder(o, s, { why: `refunded by ${actor.name}`, actor: actor.name, rows: [r.id], amount: Math.min(unit, o.total) });
+}
+
+/** The desk tries a stuck order again: looks it up at the supplier first, so it never buys twice. */
+export async function deskRetryEsim(orderId: string, actor: { name: string }): Promise<void> {
+  await db.update(appEsims).set({ problem: null, status: "ordering" }).where(and(eq(appEsims.orderId, orderId), eq(appEsims.status, "stuck")));
+  await fulfilEsimOrder(orderId, { actor: actor.name });
+}

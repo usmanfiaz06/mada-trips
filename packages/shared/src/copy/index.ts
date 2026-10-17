@@ -114,7 +114,10 @@ export const BANNED: readonly string[] = [
  * Strings allowed to use a banned word, each with the reason. Keep this list short; every entry is reviewed.
  * "data" is the section name COPY.md §5.10 itself uses ("Your data").
  */
-export const BANNED_ALLOW: Readonly<Partial<Record<CopyKey, readonly string[]>>> = {};
+export const BANNED_ALLOW: Readonly<Partial<Record<CopyKey, readonly string[]>>> = {
+  // eSIM set-up names the phone's own settings, word for word ("Data Roaming", "Mobile Data"), so people find them.
+  'es.steps.ios1': ['data'], 'es.steps.ios2': ['data'], 'es.steps.android2': ['data'], 'es.tr.1': ['data'], 'es.tr.2': ['data'],
+};
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const norm = (s: string) => s.replace(/[’‘]/g, "'");

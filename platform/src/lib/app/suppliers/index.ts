@@ -23,6 +23,9 @@ import { liveSupabaseAdmin } from "./live/supabase-admin";
 import { taqnyatSms } from "./live/taqnyat";
 import { zohoWhatsApp } from "./live/zoho-cpaas";
 import { guarded } from "../resilience/breaker";
+import { mockEsim } from "./mock/esim";
+import { airaloEsim } from "./live/airalo";
+import type { EsimSupplier } from "./esim-types";
 
 export type * from "./types";
 export { outbox } from "./mock/outbox";
@@ -51,6 +54,8 @@ export const suppliers = {
   flightPositions: (): FlightPositionsSupplier => pick("flightPositions", mockFlightPositions, openAdsbPositions),
   ai: (): AiSupplier => pick("ai", mockAi, claudeAi),
   email: (): EmailSupplier => pick("email", mockEmail, sesEmail),
+  /** eSIMs: Airalo Partner API live (SUPPLIER_MODE_ESIM=live or airalo), the shared fixtures in mock. */
+  esim: (): EsimSupplier => pick("esim", mockEsim, airaloEsim),
   identity: (): IdentitySupplier => pick("identity", mockIdentity, providerIdentity),
   /** Supabase Auth access tokens. Not behind a breaker: a bad token is the caller's problem, not an outage. */
   supabase: (): SupabaseAuthSupplier => (supplierMode("supabase") === "live" ? liveSupabase : mockSupabase),

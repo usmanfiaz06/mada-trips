@@ -27,8 +27,11 @@ import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
 import { umrahCopy } from './umrah';
 import { nativeCopy } from './native';
+import { esimCopy } from './esim';
 
 export const en = {
+  // eSIMs through Airalo: the plan for the trip, installing, what's left, top-ups: packages/shared/src/copy/esim.ts
+  ...esimCopy,
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
   ...walletCopy,
   // Circles, Discover and people (M4): packages/shared/src/copy/en-circles.ts
