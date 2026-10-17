@@ -189,7 +189,7 @@ describe("boarding passes on the trip", () => {
     const added = ImportBoardingPassResponse.parse(one.json).added;
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ name: "ALHARBI/OMAR MR", seat: "14A", sequence: "21", pnr: "X7K2QD", flightNumber: "SV263", format: "pdf417", message: OMAR, source: "traveller" });
-    expect(added[0]!.svg).toMatch(/^<svg/);
+    expect(added[0]!.svg).toMatch(/^<svg viewBox="0 0 \d+ \d+"/);
     const two = await upload(tripId, A.token, await pdfWith(HESSA), "hessa.pdf");
     expect(two.status, JSON.stringify(two.json)).toBe(201);
 

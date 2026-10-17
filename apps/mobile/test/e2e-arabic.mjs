@@ -367,6 +367,10 @@ async function demo() {
   await see('المحفظة', 'wallet');
   await page.waitForTimeout(2500);
   await shot('wallet');
+  await scroll(500);
+  await see('التسجيل يفتح', 'check-in opens, in Arabic');
+  await see('ملف PDF، أو صورة الشاشة، أو ملف المحفظة من', 'what to add, in Arabic');
+  await shot('wallet-passes');
   await scroll(1200);
   await shot('wallet-money');
 

@@ -896,3 +896,10 @@ function track(s: State, f: { flightNumber: string; date: string; alerts: boolea
   s.tracked = [...s.tracked.filter((x) => x.id !== v.id), v].sort((a, b) => a.date.localeCompare(b.date));
   return v;
 }
+
+/** A trip as GET /trips/{id} shows it (with the demo clock in `path`), for the other mock areas (mock/boarding.ts). */
+export function mockTrip(user: MockUser, id: string, path: string): TripDetail | null {
+  const s = stateOf(user);
+  const base = s.trips.find((x) => x.id === id);
+  return base ? view(s, base, phaseOf(path)) : null;
+}

@@ -11,6 +11,7 @@ import { Landed } from '@/components/today/Landed';
 import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
 import { LowPowerEntry } from '@/components/today/LowPower';
+import { FollowLockScreen } from '@/components/today/FollowLockScreen';
 import { useSession } from '@/lib/session';
 import { clockOffset, serverNow } from '@/lib/net/clock';
 import { registerForPush, useCarryOverGuestFlights, useTrip, useTrips } from '@/lib/trips';
@@ -62,6 +63,7 @@ export default function Today() {
       <ScrollView ref={scroll} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140, paddingTop: top + 10, gap: 16 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" testID="today-scroll">
         <TodayHeader clock={clock} unread={trips.data?.unread ?? 0} />
         {status === 'signedIn' ? <LowPowerEntry /> : null}
+        {status === 'signedIn' && trip ? <FollowLockScreen trip={trip} now={now} /> : null}
         {body}
       </ScrollView>
       <BannerHost />

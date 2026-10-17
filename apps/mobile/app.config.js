@@ -9,6 +9,9 @@
 //   GOOGLE_MAPS_ANDROID_API_KEY
 //                       the hotel map on Android (react-native-maps draws Google Maps there; iOS uses Apple Maps with
 //                       no key). Without it Android shows the drawn map instead (src/components/maps).
+//   APPLE_TEAM_ID       the Apple Developer team id: signs the widget extension (targets/live) with the app.
+//   MADA_LIVE_ACTIVITY=off
+//                       builds without the lock-screen flight and the home-screen widget (docs/app/NATIVE.md).
 //   SENTRY_ORG, SENTRY_PROJECT (+ SENTRY_AUTH_TOKEN as an EAS secret)
 //                       uploads source maps so crash reports show real file names. Without them nothing is uploaded.
 //
@@ -43,6 +46,15 @@ module.exports = ({ config }) => {
   const mapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
   if (mapsKey) out.android = { ...(config.android ?? {}), config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } };
   out.extra.mapsAndroid = !!mapsKey;
+
+  // The lock-screen flight (Live Activity, Dynamic Island) and the next-trip widget: an App Group, Info.plist keys and
+  // the widget extension in targets/live (plugins/with-mada-live.js, docs/app/NATIVE.md).
+  if ((process.env.MADA_LIVE_ACTIVITY ?? 'on').toLowerCase() !== 'off') {
+    const teamId = process.env.APPLE_TEAM_ID || config.ios?.appleTeamId;
+    if (teamId) out.ios = { ...(out.ios ?? config.ios ?? {}), appleTeamId: teamId };
+    out.plugins.push(require('./plugins/with-mada-live'));
+    out.plugins.push('@bacons/apple-targets');
+  }
 
   // Directions from Things to do (src/lib/directions.ts): Android 11+ only lets canOpenURL see apps declared here.
   out.plugins.push(withRideAppQueries);

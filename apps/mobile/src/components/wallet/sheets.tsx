@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { checkUpload, dmyToIso, formatSar, type CardBrand, type DocumentKind, type FlightSegment, type Person, type WalletDocument } from '@mada/shared';
+import { checkUpload, dmyToIso, formatSar, type CardBrand, type DocumentKind, type Person, type WalletDocument } from '@mada/shared';
 import { ApiError } from '@/lib/api';
 import { API_MODE } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
@@ -13,8 +13,8 @@ import { toast } from '@/lib/toast';
 import { useCards, useCredit, walletApi, walletKeys, type PickedFile } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
 import { loadCopy, openCopyPdf } from '@/lib/passport-copy';
-import { fmtDate, fullDay, fullNameOf, useOnOpen } from '@/lib/wallet-model';
-import { colors, ff, radii, textEnd } from '@/theme';
+import { fmtDate, fullNameOf, useOnOpen } from '@/lib/wallet-model';
+import { colors, ff, textEnd } from '@/theme';
 import { Button } from '../Button';
 import { PermissionDenied } from '../states';
 import { Card } from '../Card';
@@ -219,48 +219,6 @@ export function DocSheet({ doc, ask, onClose, onAdd, onReplace, tripId, onChange
   );
 }
 
-/* ───────────── boarding pass ───────────── */
-
-const boards = (seg: FlightSegment) => { const [h, m] = seg.departLocal.slice(11, 16).split(':').map(Number) as [number, number]; const x = h * 60 + m - 45; return `${String(Math.floor(((x + 1440) % 1440) / 60)).padStart(2, '0')}:${String(((x % 60) + 60) % 60).padStart(2, '0')}`; };
-
-export function PassSheet({ visible, onClose, seg, people }: { visible: boolean; onClose: () => void; seg: FlightSegment | null; people: Person[] }) {
-  const [i, setI] = useState(0);
-  const cells = useMemo(() => Array.from({ length: 441 }, (_, x) => ((x * 7919) % 13 < 6 || [0, 1, 2, 20, 19, 18, 420, 421, 422].includes(x))), []);
-  if (!seg) return null;
-  const n = Math.max(1, people.length);
-  const k = Math.min(i, n - 1);
-  const p = people[k];
-  return (
-    <Sheet visible={visible} onClose={onClose} label={t('wallet.passes.title')}>
-      <View style={styles.spread}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={styles.airline}><T style={{ fontFamily: ff.ui600, color: colors.mist, fontSize: 12 }}>{seg.carrier}</T></View>
-          <View><T v="h3">{seg.flightNumber}</T><T v="tiny">{`${fullDay(seg.departLocal.slice(0, 10))} · ${seg.from} → ${seg.to}`}</T></View>
-        </View>
-        <View style={styles.pill}><T v="caption" style={{ fontFamily: ff.ui600 }}>{t('wallet.pass.seat', { seat: seg.seats[k] ?? '–' })}</T></View>
-      </View>
-      <T style={{ fontFamily: ff.display, fontSize: 30, lineHeight: 32, color: colors.green }}>{fullNameOf(p)}</T>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        {[[t('wallet.pass.terminal'), (seg.terminal ?? '').replace('Terminal ', '') || '–'], [t('wallet.pass.gate'), seg.gate ?? '–'], [t('wallet.pass.boards'), boards(seg)]].map(([kk, v]) => (
-          <View key={kk} style={styles.cell}><T v="caption" color={colors.ink3}>{kk}</T><T style={{ fontFamily: ff.ui600, fontSize: 20, lineHeight: 24, color: colors.green, fontVariant: ['tabular-nums'] }}>{v}</T></View>
-        ))}
-      </View>
-      {n > 1 ? (
-        <View style={styles.spread}>
-          <Button variant="secondary" style={well} size="small" block={false} label={t('wallet.pass.previous')} disabled={k === 0} onPress={() => setI(k - 1)} />
-          <T v="tiny">{t('wallet.pass.of', { n: k + 1, count: n })}</T>
-          <Button variant="secondary" style={well} size="small" block={false} label={t('wallet.pass.next')} disabled={k === n - 1} onPress={() => setI(k + 1)} />
-        </View>
-      ) : null}
-      <View style={styles.qr} accessibilityRole="image" accessibilityLabel={t('wallet.pass.code')}>
-        {cells.map((on, x) => <View key={x} style={{ width: 200 / 21, height: 200 / 21, backgroundColor: on ? '#0f1a16' : colors.white }} />)}
-      </View>
-      <T v="small" style={{ textAlign: 'center' }}>{t('wallet.pass.bright')}</T>
-      <Button variant="secondary" style={well} label={t('wallet.pass.appleWallet')} onPress={() => toast(t('error.notConfigured'))} />
-    </Sheet>
-  );
-}
-
 /* ───────────── Mada credit ───────────── */
 
 const KIND_NOTE = { refund: 'money.credit.refund', goodwill: 'money.credit.goodwill', spend: 'money.credit.spend', adjustment: 'money.credit.adjustment', expiry: 'money.credit.expiry' } as const;
@@ -416,8 +374,4 @@ const styles = StyleSheet.create({
   docFrame: { height: 200, borderRadius: 16, overflow: 'hidden', backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
   docHint: { position: 'absolute', bottom: 10, end: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: 'rgba(15,26,22,0.72)' },
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  airline: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
-  pill: { height: 26, borderRadius: 999, paddingHorizontal: 10, backgroundColor: colors.mist, justifyContent: 'center' },
-  cell: { flex: 1, borderRadius: 16, backgroundColor: colors.sand, paddingVertical: 10, paddingHorizontal: 12, gap: 2 },
-  qr: { alignSelf: 'center', width: 220, height: 220, padding: 10, borderRadius: radii.input, backgroundColor: colors.white, flexDirection: 'row', flexWrap: 'wrap' },
 });

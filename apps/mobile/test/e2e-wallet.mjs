@@ -13,7 +13,8 @@
 // account's order sheet asks for the passport right there, a photo uploaded from files is read on the phone, checked
 // beside its thumbnail with one detail edited, kept as an encrypted copy after the consent line, and the sheet comes
 // back exactly as it was; then the copy is viewed, deleted and added again as a PDF from the Wallet; and the demo
-// family's "Hessa's passport" opens from the booking and drops back to it. Screenshots every step at 390×844; fails
+// family's "Hessa's passport" opens from the booking and drops back to it. Boarding passes (ONLY=passes): when check-in
+// opens before any pass exists, a file with no barcode, the family's PDF from Saudia read into four passes. Screenshots every step at 390×844; fails
 // on any page error or missing text.
 import { createServer, request as httpRequest } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -64,6 +65,8 @@ writeFileSync(join(FIX, 'huge.jpg'), Buffer.concat([JPEG, Buffer.alloc(10.5 * 10
 // The prototype's passport photos (docs/app/prototype-app/test/fixtures): a misprinted birth date, an expired specimen, a receipt.
 const PROTO = resolve('../../docs/app/prototype-app/test/fixtures');
 for (const f of ['noura-baddigit.jpg', 'anna-photo.jpg', 'receipt.png']) writeFileSync(join(FIX, f), readFileSync(join(PROTO, f)));
+// The demo family's boarding passes from Saudia's check-in: a real PDF with four PDF417 barcodes (test/fixtures).
+writeFileSync(join(FIX, 'demo-boarding-passes.pdf'), readFileSync(resolve('test/fixtures/demo-boarding-passes.pdf')));
 
 async function newPage(demo = {}) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh' });
@@ -199,6 +202,44 @@ async function walletDemo() {
   await byTest('credit-move').click();
   await see('SAR 640 is on its way to your Visa ending 42. 5 to 10 working days.', 'credit moved');
   await shot('wallet-credit-moved');
+  await context.close();
+}
+
+/* ───────────── 1b. the airline's boarding passes ───────────── */
+async function walletPasses() {
+  const { page, context } = await newPage();
+  const { shot, see, gone, byTest, press, pickFile, closeSheet } = kit(page);
+  step('passes: before check-in, when it opens and never a made-up barcode');
+  await signIn(page, '500004127', { returning: true });
+  await byTest('dock-wallet').click();
+  await see('Locked with Face ID · works offline', 'unlocked');
+  await press(byTest('bp-checkin'));
+  await see('Check-in opens', 'check-in opens line');
+  await see('at 09:40', 'check-in time');
+  await see('The PDF, a screenshot or the Wallet file from Saudia.', 'what to add');
+  if (await page.locator('[data-testid="bp-code"]').count()) errors.push('passes: a barcode showed before any pass was added');
+  await shot('wallet-passes-before');
+  step('passes: a file with no boarding pass');
+  await pickFile(() => press(byTest('bp-add')), 'notes.txt');
+  await see('No boarding pass barcode in that file. Try a screenshot of the barcode itself.', 'unreadable');
+  await shot('wallet-passes-unreadable');
+  step('passes: the family PDF from check-in');
+  await pickFile(() => press(byTest('bp-add')), 'demo-boarding-passes.pdf');
+  await see('4 boarding passes added.', 'added');
+  await see('Omar Alharbi', 'first pass');
+  await see('Seat 14A', 'seat');
+  await see('Seq 21 · X7K2QD · Added by you', 'seq and pnr');
+  await see('Saved on this phone. It opens without signal.', 'offline line');
+  await byTest('bp-code').locator('svg').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => errors.push('passes: no barcode drawn'));
+  await shot('wallet-pass-omar');
+  await byTest('bp-next').click();
+  await see('Hessa Alharbi', 'second pass');
+  await see('Seat 14B', 'hessa seat');
+  await shot('wallet-pass-hessa');
+  await closeSheet();
+  await gone('Saved on this phone. It opens without signal.', 'sheet closed');
+  await see('SV263 · 4 boarding passes', 'passes row');
+  await shot('wallet-passes-row');
   await context.close();
 }
 
@@ -766,6 +807,7 @@ async function passportInBooking() {
 }
 try {
   if (want('demo')) await walletDemo();
+  if (want('passes')) await walletPasses();
   if (want('lock')) await walletLock();
   if (want('fresh')) await walletFresh();
   if (want('account')) await account();

@@ -1,6 +1,7 @@
 dist/
 .expo/
 expo-env.d.ts.bak
-ios/
-android/
+# Prebuild output only: a local module's own ios/ and android/ folders (modules/*) are source and are committed.
+/ios/
+/android/
 public/ocr/

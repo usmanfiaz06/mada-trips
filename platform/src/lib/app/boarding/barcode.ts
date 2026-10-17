@@ -44,7 +44,10 @@ export async function drawCode(format: BarcodeFormat, text: string): Promise<str
   try {
     const z = await zx();
     const w = await z.writeBarcode(text, { format: TO[format], scale: 2 });
-    return w.error ? null : w.svg.replace(/<\?xml[^>]*>\s*/, "").replace(/<!DOCTYPE[^>]*>\s*/, "").replace(/<desc>[^<]*<\/desc>\s*/, "");
+    if (w.error) return null;
+    // A viewBox, so the phone can draw it at any width.
+    return w.svg.replace(/<\?xml[^>]*>\s*/, "").replace(/<!DOCTYPE[^>]*>\s*/, "").replace(/<desc>[^<]*<\/desc>\s*/, "")
+      .replace(/<svg width="([\d.]+)" height="([\d.]+)"/, '<svg viewBox="0 0 $1 $2" width="$1" height="$2"');
   } catch { return null; }
 }
 

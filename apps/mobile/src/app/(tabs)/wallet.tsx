@@ -16,7 +16,8 @@ import { T } from '@/components/Text';
 import { LockScreen } from '@/components/wallet/LockScreen';
 import { PassportCard } from '@/components/wallet/PassportCard';
 import { PassportCopyRow } from '@/components/passport/PassportCopy';
-import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, PassSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
+import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
+import { BoardingPasses } from '@/components/wallet/BoardingPasses';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
@@ -24,7 +25,7 @@ import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useAccount, useCards, useCredit, useDocuments, useRefreshHousehold, useTrips, walletApi } from '@/lib/wallet';
 import { useWalletLock } from '@/lib/wallet-lock';
-import { useNow, fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
+import { fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
 import { colors, ff, shadow } from '@/theme';
 import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
 
@@ -68,13 +69,12 @@ function Unlocked() {
   const cards = useCards();
   const account = useAccount();
   const refresh = useRefreshHousehold();
-  const now = useNow();
   const list = people.data ?? [];
   const [whoId, setWho] = useState<string | null>(null);
   const who: Person | undefined = list.find((p) => p.id === whoId) ?? list[0];
   const trip = useMemo(() => nextTrip(trips.data), [trips.data]);
   const v = validity(who, trip);
-  const [sheet, setSheet] = useState<null | 'add' | 'credit' | 'cards' | 'pass'>(null);
+  const [sheet, setSheet] = useState<null | 'add' | 'credit' | 'cards'>(null);
   const [upload, setUpload] = useState<{ kind: Exclude<AddKind, 'passport'>; replaces?: WalletDocument | null } | null>(null);
   const [docOpen, setDocOpen] = useState<WalletDocument | null>(null);
   const [askOpen, setAskOpen] = useState<{ title: string; sub: string } | null>(null);
@@ -102,9 +102,6 @@ function Unlocked() {
   const myDocs = (docs.data ?? []).filter((d) => d.personId === who?.id && d.kind !== 'passport');
   const helper = who ? isHelper(who) : false;
   const asks = helper ? [[t('wallet.docs.iqama'), t('wallet.docs.notAdded')], [t('wallet.docs.exitVisa'), t('wallet.docs.exitNeeded')]].filter(([title]) => !myDocs.some((d) => d.title === title)) : [];
-  const outSeg = trip?.trip.segments.find((s) => s.direction === 'out') ?? null;
-  const departs = outSeg ? Date.parse(`${outSeg.departLocal}:00+03:00`) : 0;
-  const passesOpen = outSeg ? departs - now < 24 * 3_600_000 && departs > now - 6 * 3_600_000 : false;
   const travellers = trip ? list.filter((p) => trip.travellerIds.includes(p.id)) : [];
   const bal = credit.data?.balance.amount ?? 0;
   const savedCards = cards.data?.cards ?? [];
@@ -158,21 +155,7 @@ function Unlocked() {
         )}</QueryState>
 
         <T v="eyebrow">{t('wallet.passes.eyebrow')}</T>
-        {trip && outSeg && passesOpen ? (
-          <Card onPress={() => setSheet('pass')} accessibilityLabel={t('wallet.passes.title')} style={styles.rowCard}>
-            <View style={styles.airline}><T style={{ fontFamily: ff.ui600, color: colors.mist, fontSize: 12 }}>{outSeg.carrier}</T></View>
-            <View style={{ flex: 1 }}>
-              <T v="h3" style={{ fontSize: 15 }}>{travellers.length === 1 ? t('wallet.passes.rowOne', { flight: outSeg.flightNumber }) : t('wallet.passes.row', { flight: outSeg.flightNumber, count: travellers.length })}</T>
-              <T v="tiny">{t(travellers.length === 1 ? 'wallet.passes.rowSubOne' : 'wallet.passes.rowSub', { date: fullDay(outSeg.departLocal.slice(0, 10)), terminal: outSeg.terminal ?? '', seats: outSeg.seats.length > 1 ? `${outSeg.seats[0]}–${outSeg.seats[outSeg.seats.length - 1]}` : outSeg.seats[0] ?? '' })}</T>
-            </View>
-            <Icon name="chevron" />
-          </Card>
-        ) : trip ? (
-          <Card variant="well" style={{ gap: 4 }}>
-            <T v="h3" style={{ fontSize: 15 }}>{t('wallet.passes.title')}</T>
-            <T v="tiny">{outSeg ? t('wallet.passes.notYet', { flight: outSeg.flightNumber, date: fullDay(outSeg.departLocal.slice(0, 10)) }) : t('wallet.passes.noFlights')}</T>
-          </Card>
-        ) : (
+        {trip ? <BoardingPasses trip={trip.trip} people={travellers} nameOf={name} /> : (
           <EmptyState compact art={<ArtPass width={100} height={75} />} title={t('wallet.passes.emptyTitle')}
             action={<LinkButton label={t('wallet.passes.plan')} onPress={() => router.push('/ask')} />} />
         )}
@@ -216,7 +199,6 @@ function Unlocked() {
         onChanged={() => refresh()} />
       <CreditSheet visible={sheet === 'credit'} onClose={() => setSheet(null)} />
       <CardsSheet visible={sheet === 'cards'} onClose={() => setSheet(null)} onPicked={(label, changed) => toast(changed ? (label === t('cards.applePay') ? t('cards.default.applePay') : t('cards.default.updated')) : t('cards.default.same'))} />
-      <PassSheet visible={sheet === 'pass'} onClose={() => setSheet(null)} seg={outSeg} people={travellers} />
     </Screen>
   );
 }
