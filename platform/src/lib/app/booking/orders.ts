@@ -212,7 +212,8 @@ function outcomeOf(o: OrderRow): CreateOrderResponse {
   if (o.status === "payment_requested") return { outcome: "payment_requested", order: orderView(o) };
   if (o.status === "requires_action") return { outcome: "requires_action", order: orderView(o) };
   if (o.status === "declined") return { outcome: "declined", message: t("pay.declined.body") };
-  if (!AGENT_KINDS.has(o.kind) && o.status === "confirmed") return { outcome: "paid", order: orderView(o) };
+  // An eSIM the supplier couldn't give was paid and refunded: the same answer, with its outcome.
+  if (!AGENT_KINDS.has(o.kind) && (o.status === "confirmed" || (o.kind === "esim" && o.status === "cancelled"))) return { outcome: "paid", order: orderView(o) };
   return { outcome: "created", order: orderView(o) };
 }
 

@@ -137,9 +137,11 @@ async function traveller() {
 
 async function pay(token: string, draft: OrderDraft, cardId: string, query = "") {
   const p = PreviewResponse.parse((await post(previewPost, token, { draft, useCredit: false })).json).preview;
-  const r = await post(ordersPost, token, { draft, useCredit: false, payment: { method: "card", cardId }, plan: "full", expectedTotal: p.total.amount, idempotencyKey: `es-${Math.random().toString(36).slice(2)}` }, query);
+  const body = { draft, useCredit: false, payment: { method: "card", cardId }, plan: "full", expectedTotal: p.total.amount, idempotencyKey: `es-${Math.random().toString(36).slice(2)}` };
+  const r = await post(ordersPost, token, body, query);
   expect([200, 201], JSON.stringify(r.json)).toContain(r.status);
-  return { preview: p, out: CreateOrderResponse.parse(r.json) };
+  const again = async () => CreateOrderResponse.parse((await post(ordersPost, token, body, query)).json);
+  return { preview: p, out: CreateOrderResponse.parse(r.json), again };
 }
 
 describe("eSIMs through the Core API (mock supplier)", () => {
@@ -210,10 +212,13 @@ describe("eSIMs through the Core API (mock supplier)", () => {
 
   it("refunds at once, with the outcome, when the supplier can't give the eSIM", async () => {
     const f = await traveller();
-    const { out } = await pay(f.token, { kind: "esim", count: 1, packageId: "merhaba-7days-1gb", where: "TR", travellerIds: [f.me] }, f.cardId, "?demo=esimFails");
+    const { out, again } = await pay(f.token, { kind: "esim", count: 1, packageId: "merhaba-7days-1gb", where: "TR", travellerIds: [f.me] }, f.cardId, "?demo=esimFails");
     expect(out.outcome).toBe("paid");
     if (out.outcome !== "paid") return;
     expect(out.order.status).toBe("cancelled");
+    // The same order sent again (a retry) answers the same, and buys and charges nothing more.
+    const replay = await again();
+    expect(replay).toMatchObject({ outcome: "paid", order: { id: out.order.id, status: "cancelled" } });
     expect(out.order.result).toMatchObject({ kind: "refused", money: { kind: "refund", amount: { amount: out.order.total.amount } }, next: ["talk"] });
     const { esims } = EsimsResponse.parse((await get(esimsGet, f.token, {}, `?order=${out.order.id}`)).json);
     expect(esims[0]).toMatchObject({ status: "refunded", iccid: null, result: { money: { kind: "refund" } } });
