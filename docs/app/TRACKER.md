@@ -6,29 +6,38 @@ at most 3 run at once; a dependent unit starts only after the one before it is i
 
 Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critique (scorecard 5.1/10, 15 changes) → `scratchpad/CRITIQUE.md`.
 
-## In flight (16 Oct, resumed 18:55 UTC after the usage limit)
+## In flight (17 Oct)
 
 | Unit | What | Status |
 |---|---|---|
-| W · wiring | cancelled trips visible, booked stay → hotel page, document viewer, friend-request → profile, hello thread, hotel requests on pay, thanks counts, take-back for sent items, plural copy | **DONE** 5aa5bc6 (all 8 + plural). Open: English stored stay text on Arabic hotel page; refunds that moved money and pay-link splits can't be taken back; no "opened by agent" signal |
-| M · money | preferences applied + re-confirmed extras, loyalty numbers per traveller, FX display (SAR charged), trip Money view, ask someone to pay | **DONE** c57a3b4. Open: extras card parses airline from text; hand-made splits need tripId; hotel loyalty matched by name; instalments not on Money screen |
-| A · Arabic + moderation | spoken Riyadh Arabic across copy, reader-language notifications, ARABIC.md voice guide, moderation rules (ar/en lists, venue rule, spam, image hook, chat screening, desk queue) | **DONE** 1803a70: 2,561 ar lines rewritten, inbox renders in reader's language, moderation + desk queue, ARABIC.md (30 pairs for owner approval) |
-| F · family (unit 1 of Next) | stepper, age without passport, corrections in any flow, family ranking, per-person fare lines | started 16 Oct as a background session |
-| O · outcomes (unit 3 of Next) | every request ends issued/refused/partial/cancelled with reason, deadline, next step; hotel named everywhere | started 16 Oct as a background session |
-| N · now path and truth (unit 2 of Next) | car now, urgent <24 h → disruption card + call-back, honest disruption screen | started 16 Oct as a background session |
+| U · Umrah (Next 4) | permit-first Umrah, Makkah distance bands with named hotels, Madinah, Haramain, last-ten-nights warning; parser "taxi now" → car; bundle names the hotel; visible fare "Rules" link | started 17 Oct, session_012zVYc7M9ZXTLs4ymLNRe7o |
+| S · offline shell + 8% mode (Next 6) | service worker, cached trip offline, queued messages, low-battery screen | started 17 Oct, session_017G6Ew7RnxLE7Kii7UWv8nv |
+| P · polish | red platform tests (activities, places, auth flake), duplicate cards, real child/infant fares, hold-ended + price-down + 3DS branch, extras carrier, split tripId, waiting-screen made-up details | started 17 Oct, session_01NVAgKWJjayiCpo83VzFAwJ |
+
+## Done
+
+- W wiring 5aa5bc6. Open: English stay text on Arabic hotel page; refunds that moved money / pay-link splits can't be taken back; no "opened by agent" signal.
+- M money c57a3b4. Open: hotel loyalty matched by name; instalments not on Money screen.
+- A Arabic + moderation 1803a70. ARABIC.md awaits owner approval.
+- F family 0fc2c3f (critique 1, 2, 3, 11): party parsing en/ar, stepper, age not passport, correctAsk, night flights demoted with kids, per-person lines. Open: live model path doesn't extract party; stay per-person is total/guests/nights.
+- N now path 129de3a (critique 4, 10): car-now flow + /rides, urgent call-back (997 only for hurt/unsafe), urgent first on desk, honest disruption screen. Open: no live ride supplier (answers "none" → call-back); urgent stays top until an agent writes.
+- O outcomes 1bcc3cf, 22adfeb (critique 5, 6): outcome schema, desk close/progress forms, nudge, hotel named everywhere (demo hotel = Bereketzade Hotel). Open: refund outcome doesn't issue the refund; bookings can't be nudged.
 
 ## Next, in order (critique items; start as slots free)
 
-1. **Family**: never drop a traveller silently (stepper adults/children+ages/infants), age without passport, corrections in any flow ("we are 5", "December", "right now", "I have a permit"), family ranking and per-person fare lines. (critique 1, 2, 3, 11)
-2. **Now path and truth**: car now (driver, plate, meeting point, price), urgent + trip <24 h → disruption card and call-back (not 997), disruption screen honest when nothing is wrong. (critique 4, 10)
-3. **Outcomes**: every request ends issued / refused / partial / cancelled with reason, deadline, next step; "Mada is on it" always with what, when, cost. Hotel named everywhere. (critique 5, 6)
-4. **Umrah**: built around the permit slot, Makkah nights by distance band with named hotel, Madinah/Haramain, last-ten-nights warning. (critique 7)
+1. ~~**Family**~~ done: never drop a traveller silently (stepper adults/children+ages/infants), age without passport, corrections in any flow ("we are 5", "December", "right now", "I have a permit"), family ranking and per-person fare lines. (critique 1, 2, 3, 11)
+2. ~~**Now path and truth**~~ done: car now (driver, plate, meeting point, price), urgent + trip <24 h → disruption card and call-back (not 997), disruption screen honest when nothing is wrong. (critique 4, 10)
+3. ~~**Outcomes**~~ done: every request ends issued / refused / partial / cancelled with reason, deadline, next step; "Mada is on it" always with what, when, cost. Hotel named everywhere. (critique 5, 6)
+4. **Umrah** (U running): built around the permit slot, Makkah nights by distance band with named hotel, Madinah/Haramain, last-ten-nights warning. (critique 7)
 5. **Guests and language**: guests search and see prices, Discover with a real city, guest links render; language switch keeps the flow; replies in the traveller's language. (critique 8, 9) — after A.
-6. **Web shell and 8% mode**: service-worker app shell, one-screen low-battery mode. (critique 14)
+6. **Web shell and 8% mode** (S running): service-worker app shell, one-screen low-battery mode. (critique 14)
 7. **Native**: Live Activity, real boarding passes, Apple Wallet. (critique 15) — needs the Apple account and a build.
 8. **Social** (owner audit 10, 19, 21, 22, 24–27): public groups/trips/events, video and multi-attachments, badges, reviews, collections. After the beta.
 
 ## Integration notes
+
+- F+N+O integrated at 22adfeb: typecheck clean; platform 467 pass, 6 fail (activities/places pre-existing; auth + review-login only fail in the full run) → given to P.
+- Workers in cloud sessions can't read this container's scratchpad: put everything in the prompt.
 
 - W + M integrated (8f8bbcd): support.test fixed; platform support/trips/circles 52/52; e2e circles, trips, booking, wallet, arabic pass on a mock export (`EXPO_PUBLIC_API_MODE=mock` is required for e2e exports).
 - Owner to approve `docs/app/ARABIC.md` (30 before/after pairs).
