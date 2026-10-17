@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindowDimensions } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type BookingLoyalty, type BookingPrefs, type OrderPreview, type PayPlan } from '@mada/shared';
+import { CARRIERS, formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type BookingLoyalty, type BookingPrefs, type OrderPreview, type PayPlan } from '@mada/shared';
 import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -84,6 +84,8 @@ export default function Pay() {
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0); // remounts the slider so the sun goes home after a try that stays here
   const [holdSkip, setHoldSkip] = useState(0);
+  // After the hold ended and the price was checked again: what it was and what it is now, said once on the sheet.
+  const [moved, setMoved] = useState<{ was: number; now: number; key: string } | null>(null);
   const [acceptedState, setAcceptedState] = useState<{ key: string; preview: OrderPreview } | null>(null);
   const [blocked, setBlocked] = useState('');
   const [threeDs, setThreeDs] = useState<{ orderId: string; triesLeft: number; stopped: boolean; amount: number } | null>(null);
@@ -238,6 +240,7 @@ export default function Pay() {
     try {
       const r = offerId ? await bookingApi.reprice(offerId) : null;
       setHoldSkip(0); setAccepted(null);
+      setMoved(r?.changedBy ? { was: total, now: total + r.changedBy, key: `${travellers.join()}|${useCredit}|${plan}` } : null);
       await qc.invalidateQueries({ queryKey: ['booking', 'preview'] });
       toast(r?.changedBy ? t('pay.recheckMoved', { price: formatSar(Math.abs(r.changedBy)) }) : t('pay.recheckSame'));
     } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); }
@@ -285,7 +288,7 @@ export default function Pay() {
           {/* What Mada applies from the saved preferences, the loyalty number the booking earns on, and a paid extra the fare prices: each changeable here, for this booking only. */}
           {p?.applied ? <PrefsRow applied={p.applied} changed={!!prefs} onChange={() => setSheet('prefs')} /> : null}
           {p?.applied ? <LoyaltyRow applied={p.applied} onEdit={() => setSheet('loyalty')} /> : null}
-          {p?.applied?.extrasOffer ? <ExtrasCard offer={p.applied.extrasOffer} airline={p.lines[0]?.text.split(' · ')[1]?.replace(/,.*$/, '') ?? ''} onToggle={(on) => { setSeatsTogether(on); setAccepted(null); }} /> : null}
+          {p?.applied?.extrasOffer ? <ExtrasCard offer={p.applied.extrasOffer} airline={p.applied.extrasOffer.airline ?? CARRIERS[p.applied.extrasOffer.carrier ?? '']?.name ?? ''} onToggle={(on) => { setSeatsTogether(on); setAccepted(null); }} /> : null}
           {p?.promo?.status === 'applied' ? (
             <View style={styles.spread}>
               <View style={styles.row}><Icon name="star" size={20} /><T v="callout" color={colors.green} style={{ fontSize: 15 }}>{t('pay.promo.line', { code: p.promo.code })}</T><LinkButton label={t('pay.promo.remove')} size={13} onPress={() => { setPromo(null); setCode(''); }} /></View>
@@ -336,6 +339,11 @@ export default function Pay() {
           <View style={styles.divider} />
           <View style={{ gap: 2 }}>
             <T style={styles.total} testID="pay-total">{formatSar(total)}</T>
+            {moved && moved.key === `${travellers.join()}|${useCredit}|${plan}` ? (
+              <T v="small" color={moved.now < moved.was ? colors.ok : colors.goldInk} style={{ fontFamily: ff.ui600 }} testID="pay-price-moved">
+                {t(moved.now < moved.was ? 'pay.price.down' : 'pay.price.up', { price: formatSar(moved.now), was: formatSar(moved.was) })}
+              </T>
+            ) : null}
             <Approx amount={total} testID="pay-approx" />
             {/* A room: the same facts as on its card, said again before paying (nothing new at the last step). */}
             {share ? null : <T v="small" testID="pay-all-in">{p?.stay?.payAtHotel ? t('pay.plusTax', { amount: formatSar(p.stay.payAtHotel.amount, { bare: true }) }) : t('pay.allIn')}</T>}
@@ -373,7 +381,13 @@ export default function Pay() {
         </ScrollView>
       </Animated.View>
       <View style={[styles.act, { paddingBottom: 18 + bottom }]}>
-        {expired && pd.draft.kind === 'quote' ? <T v="small" color={colors.goldInk} style={{ textAlign: 'center' }} testID="pay-quote-ended">{t('beta.fq.ended', { agent: 'Mada' })}</T> : expired ? <Button label={t('pay.recheck')} onPress={recheck} testID="pay-recheck" /> : (
+        {expired && pd.draft.kind === 'quote' ? <T v="small" color={colors.goldInk} style={{ textAlign: 'center' }} testID="pay-quote-ended">{t('beta.fq.ended', { agent: 'Mada' })}</T> : expired ? (
+          <View style={styles.ended} testID="pay-hold-ended" accessibilityLiveRegion="polite">
+            <T v="h3" style={{ fontSize: 16 }}>{t('pay.hold.endedTitle')}</T>
+            <T v="small">{t('pay.hold.endedBody')}</T>
+            <Button label={t('pay.recheck')} onPress={recheck} testID="pay-recheck" />
+          </View>
+        ) : (
           <SlideToConfirm key={attempt} label={slideLabel} busy={busy} busyLabel={t('pay.busy')} disabled={!p || previewQ.isFetching && !p} onConfirm={confirm} />
         )}
         <T v="tiny" style={{ textAlign: 'center' }}>
@@ -423,7 +437,12 @@ export default function Pay() {
         onDone={async () => { setSheet(null); setBusy(true); try { await place({ method: 'applepay', token: `applepay_mock_${key.current}` }); } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setBusy(false); } }} /> : null}
       {threeDs && sheet === '3ds' ? (
         <ThreeDsSheet visible label={method?.label ?? ''} brand={method?.brand ?? 'card'} amount={threeDs.amount} triesLeft={threeDs.triesLeft} stopped={threeDs.stopped}
-          onCode={otp} onOther={() => setSheet('cards')} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }} />
+          onCode={otp} onOther={() => setSheet('cards')} onClose={() => { setSheet(null); toast(t('pay.cancelled')); }}
+          onResend={async () => {
+            try { await bookingApi.answer(threeDs.orderId, 'resend_code'); return true; }
+            catch (e) { if (e instanceof ApiError && e.code === 'RATE_LIMITED') return false; toast(e instanceof Error ? e.message : t('error.internal')); return true; }
+          }}
+          onTalk={() => { setSheet(null); router.push('/support?topic=other' as Href); }} />
       ) : null}
     </Screen>
   );
@@ -444,5 +463,6 @@ const styles = StyleSheet.create({
   switch: { width: 52, height: 32, borderRadius: 999, backgroundColor: colors.stage, padding: 3, justifyContent: 'center' },
   knob: { width: 26, height: 26, borderRadius: 999, backgroundColor: colors.paper },
   planChip: { height: 40, borderRadius: 999, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.mist },
+  ended: { gap: 8, padding: 16, borderRadius: 20, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
   act: { position: 'absolute', start: 20, end: 20, bottom: 0, gap: 10, zIndex: 6 },
 });

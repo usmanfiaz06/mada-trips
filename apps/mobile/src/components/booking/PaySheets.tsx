@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
-import { cardBrandOf, cardProblems, todayIn, type SavedCard } from '@mada/shared';
+import { cardBrandOf, cardLabel, cardProblems, todayIn, type SavedCard } from '@mada/shared';
 import { tokenizeCard, useDemo } from '@/lib/booking';
 import { SHOW_DEMO_HINTS } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
@@ -42,7 +42,7 @@ export function CardsSheet({ visible, current, credit, onPick, onClose }: { visi
     try {
       // The number goes to the payment provider and comes back as a token. Mada never sees it.
       const { token, last4 } = await tokenizeCard({ number: num, expiry: exp, cvv, name });
-      const label = t('pay.card.label', { brand: c.brand === 'visa' ? 'Visa' : c.brand === 'mastercard' ? 'Mastercard' : 'mada', last: last4.slice(-2) });
+      const label = cardLabel(c.brand, last4);
       if (save) {
         const out = await walletApi.addCard({ token, brand: c.brand, last4, exp, makeDefault: false });
         qc.setQueryData(walletKeys.cards, out);
@@ -131,11 +131,33 @@ export function ApplePaySheet({ visible, amount, what, onDone, onClose }: { visi
 }
 
 /** 3-D Secure: the bank's own code. Three wrong and the bank stops it. */
-export function ThreeDsSheet({ visible, label, brand, amount, triesLeft, stopped, onCode, onOther, onClose }: {
-  visible: boolean; label: string; brand: PayBrand; amount: number; triesLeft: number; stopped: boolean; onCode: (code: string) => Promise<void>; onOther: () => void; onClose: () => void;
+/** Seconds before the bank can be asked for another code. */
+const RESEND_WAIT = 30;
+
+export function ThreeDsSheet({ visible, label, brand, amount, triesLeft, stopped, onCode, onOther, onResend, onTalk, onClose }: {
+  visible: boolean; label: string; brand: PayBrand; amount: number; triesLeft: number; stopped: boolean; onCode: (code: string) => Promise<void>; onOther: () => void;
+  /** Asks the bank for a new code; false when no more can be asked for this payment. */
+  onResend: () => Promise<boolean>; onTalk: () => void; onClose: () => void;
 }) {
   const [otp, setOtp] = useState('');
   const [busy, setBusy] = useState(false);
+  // The code didn't come: send it again (after a short wait), another card, or Mada.
+  const [noCode, setNoCode] = useState(false);
+  const [wait, setWait] = useState(0);
+  const [resent, setResent] = useState(false);
+  const [noMore, setNoMore] = useState(false);
+  useEffect(() => {
+    if (!wait) return;
+    const id = setTimeout(() => setWait((w) => Math.max(0, w - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
+  const resend = async () => {
+    setBusy(true);
+    try {
+      const ok = await onResend();
+      if (ok) { setResent(true); setWait(RESEND_WAIT); buzz('success'); } else { setNoMore(true); buzz('warn'); }
+    } finally { setBusy(false); }
+  };
   const wrong = triesLeft < 3 && !stopped;
   return (
     <Sheet visible={visible} onClose={onClose} label={t('pay.3ds.title')}>
@@ -149,6 +171,19 @@ export function ThreeDsSheet({ visible, label, brand, amount, triesLeft, stopped
         }}
         error={stopped ? t('pay.3ds.stopped') : wrong ? tn('pay.3ds.wrong', triesLeft) : null} />
       {stopped ? <Button label={t('pay.declined.other')} onPress={onOther} /> : SHOW_DEMO_HINTS ? <T v="tiny">{t('pay.3ds.demo')}</T> : null}
+      {!stopped && !noCode ? (
+        <Pressable accessibilityRole="button" onPress={() => { buzz('tap'); setNoCode(true); }} hitSlop={8} testID="otp-nocode">
+          <T v="small" color={colors.green} style={{ textDecorationLine: 'underline' }}>{t('pay.3ds.noCode')}</T>
+        </Pressable>
+      ) : null}
+      {!stopped && noCode ? (
+        <View style={{ gap: 10 }} testID="otp-nocode-options">
+          <T v="small" accessibilityLiveRegion="polite">{noMore ? t('pay.3ds.resendDone') : resent ? t('pay.3ds.resent') : t('pay.3ds.noCodeBody')}</T>
+          {noMore ? null : <Button variant="secondary" label={wait ? t('pay.3ds.resendIn', { seconds: wait }) : t('pay.3ds.resend')} disabled={!!wait || busy} onPress={resend} testID="otp-resend" />}
+          <Button variant="secondary" label={t('pay.declined.other')} onPress={onOther} testID="otp-other-card" />
+          <Button variant="ghost" label={t('action.talk')} onPress={onTalk} testID="otp-talk" />
+        </View>
+      ) : null}
     </Sheet>
   );
 }

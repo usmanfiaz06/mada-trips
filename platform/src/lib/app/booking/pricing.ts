@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, sql } from "drizzle-orm";
 import {
-  DESK_PRICES, DESTINATIONS, PLANS, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
+  DESK_PRICES, DESTINATIONS, PLANS, childSeats, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
   BookingPrefs, airlineRequests, bookingPrefsOf, formatSar, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type BookingLoyalty, type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
 } from "@mada/shared";
@@ -41,6 +41,20 @@ export const creditBalance = (userId: string) => getBalance(userId);
 
 const line = (key: string, icon: OrderLine["icon"], text: string, amount: number): OrderLine => ({ key, icon, text, amount });
 
+/**
+ * The seats on a flight, priced as the airline prices them: one line for everyone when nobody is on a child fare,
+ * else the adults and the child fares on their own lines (FareBreakdown in the app shows the same amounts).
+ */
+function seatLines(f: FlightOption, n: number, how: string, suffix: string, bump: number): OrderLine[] {
+  const kids = Math.min(f.children ?? 0, n);
+  const child = (f.childPrice ?? f.pricePerPerson).amount;
+  if (!kids || kids === n) return [line("flight", "flight", `${tn("pay.line.flight", n, { airline: f.airline, how })}${suffix}`, (kids ? child : f.pricePerPerson.amount) * n + bump)];
+  return [
+    line("flight", "flight", `${tn("pay.line.adults", n - kids, { airline: f.airline, how })}${suffix}`, f.pricePerPerson.amount * (n - kids) + bump),
+    line("children", "flight", tn("pay.line.children", kids), child * kids),
+  ];
+}
+
 export async function priceDraft(ownerId: string, input: PreviewInput, opts: { bump?: number } = {}): Promise<Priced> {
   const body = PreviewBody.parse(input);
   const d = body.draft;
@@ -69,7 +83,9 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     [travellers, row] = await Promise.all([travellersOf(ownerId, d.travellerIds, household), ownOffer(ownerId, d.flightOfferId)]);
     if (row.kind !== "flight") throw new AppError("NOT_FOUND");
     const before = row.payload as unknown as FlightOption;
-    if (before.adults !== travellers.length) row = (await repriceOffer(ownerId, row.id, travellers.length)).row;
+    // Children 2 to 11 and babies with a seat on the child fare, by their age on the day out.
+    const kids = childSeats(travellers, before.out.date);
+    if (before.adults !== travellers.length || (before.children ?? 0) !== kids) row = (await repriceOffer(ownerId, row.id, travellers.length, kids)).row;
     const f = row.payload as unknown as FlightOption;
     const search = row.search as { destination: string; depart: string; return: string | null };
     const dest = DESTINATIONS[search.destination]!;
@@ -77,7 +93,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const oneway = !f.back;
     const how = f.stop ? t("pay.line.oneStop") : t("pay.line.direct");
     const suffix = `${f.cabin !== "economy" ? ` · ${t(`cal.cabin.${f.cabin}` as CopyKey)}` : ""}${oneway ? ` · ${t("pay.line.oneWay")}` : ""}`;
-    lines.push(line("flight", "flight", `${tn("pay.line.flight", n, { airline: f.airline, how })}${suffix}`, f.pricePerPerson.amount * n + (opts.bump ?? 0)));
+    lines.push(...seatLines(f, n, how, suffix, opts.bump ?? 0));
     if (f.infants) lines.push(line("infants", "flight", tn("pay.line.infants", f.infants), f.infantPrice.amount * f.infants));
     const bundle = d.bundle && dest.key === "istanbul" && !!f.back;
     if (bundle) {
@@ -149,11 +165,16 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
       travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds, household) : [];
       const search = det.search ?? { destination: null, destinationName: null, from: null, depart: null, return: null, cabin: null, carrier: null };
       const f = fareToFlightOption(o, (q.expiresAt ?? new Date(Date.now() + 3600_000)).toISOString(), q.id);
-      const n = o.prices.filter((p) => p.type !== "infant").length;
       const infants = o.prices.filter((p) => p.type === "infant");
       const how = f.stop ? t("pay.line.oneStop") : t("pay.line.direct");
       const suffix = `${o.cabin !== "economy" ? ` · ${t(`cal.cabin.${o.cabin}` as CopyKey)}` : ""}${f.back ? "" : ` · ${t("pay.line.oneWay")}`}`;
-      lines = [line("flight", "flight", `${tn("pay.line.flight", n, { airline: o.airline, how })}${suffix}`, o.prices.filter((p) => p.type !== "infant").reduce((a, p) => a + p.amount.amount, 0))];
+      // The desk's own price per passenger: adults and children each at what the airline quoted.
+      const sum = (type: string) => o.prices.filter((p) => p.type === type).reduce((a, p) => a + p.amount.amount, 0);
+      const kidsN = o.prices.filter((p) => p.type === "child").length;
+      const adultsN = o.prices.filter((p) => p.type === "adult").length;
+      lines = kidsN && adultsN
+        ? [line("flight", "flight", `${tn("pay.line.adults", adultsN, { airline: o.airline, how })}${suffix}`, sum("adult")), line("children", "flight", tn("pay.line.children", kidsN), sum("child"))]
+        : [line("flight", "flight", `${tn("pay.line.flight", adultsN + kidsN, { airline: o.airline, how })}${suffix}`, sum("adult") + sum("child"))];
       if (infants.length) lines.push(line("infants", "flight", tn("pay.line.infants", infants.length), infants.reduce((a, p) => a + p.amount.amount, 0)));
       rule = o.refundable ? t("pay.rule.refund", { fee: o.refundRule.replace(/^Refund minus /, "") }) : t("pay.rule.noRefund", { fee: o.changeRule });
       const dest = search.destination ? DESTINATIONS[search.destination] ?? null : null;
@@ -228,7 +249,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     const summary = prefsSummary(prefs, scope, n);
     applied = {
       prefs, summary, scope, programmes, loyalty: loyalty.map((l) => ({ ...l, programName: programmeName(l.program), masked: maskLoyalty(l.number) })),
-      extrasOffer: offer ? { key: "seatsTogether", perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
+      extrasOffer: offer ? { key: "seatsTogether", carrier: carrier ?? undefined, airline: f?.airline, perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
     };
     const air = scope !== "stay" ? airlineRequests(prefs, { carrier, travellers: n }) : { ssr: [], remarks: [] };
     const appliedSnap: AppliedSnapshot = {

@@ -103,10 +103,12 @@ export async function ensureCharges(trip: TripDetail): Promise<void> {
     for (const { b, o } of bookings) {
       const [pay] = o.paymentId ? await tx.select().from(appPayments).where(eq(appPayments.id, o.paymentId)) : [];
       for (const line of b.lines) {
-        const item: TripPaymentItem = line.key === "flight" || line.key === "stay" || line.key === "pickup" ? line.key : "extra";
+        // Child fares are flight seats too; the discount sits on the first flight line only.
+        const item: TripPaymentItem = line.key === "children" ? "flight" : line.key === "flight" || line.key === "stay" || line.key === "pickup" ? line.key : "extra";
+        const first = line.key === "flight";
         await createCharge(tx, trip, {
-          ownerId: ownerRow?.id ?? o.ownerId, tripId: trip.id, paymentId: o.paymentId, item, title: line.text, sub: line.text, amount: item === "flight" ? line.amount - (b.paid.discount ?? 0) : line.amount,
-          method: pay?.method ?? "card", label: b.paid.card, plan: (b.payPlan as "full" | "tabby" | "tamara") ?? "full", discount: item === "flight" ? b.paid.discount ?? 0 : 0,
+          ownerId: ownerRow?.id ?? o.ownerId, tripId: trip.id, paymentId: o.paymentId, item, title: line.text, sub: line.text, amount: first ? line.amount - (b.paid.discount ?? 0) : line.amount,
+          method: pay?.method ?? "card", label: b.paid.card, plan: (b.payPlan as "full" | "tabby" | "tamara") ?? "full", discount: first ? b.paid.discount ?? 0 : 0,
           paidAt: b.bookedAt, customer: customerOf(trip),
         });
       }

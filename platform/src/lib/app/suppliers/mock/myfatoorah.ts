@@ -32,6 +32,10 @@ export const mockMyFatoorah: BookingPaymentSupplier = {
     if (code === MOCK_3DS_CODE) return { status: "authorized", providerRef: ref };
     return { status: "requires_action", providerRef: ref };
   },
+  async resendCode(ref) {
+    // The mock bank's code never changes (MOCK_3DS_CODE); a new one is "sent" for any payment still waiting on it.
+    return { sent: readRef(ref)?.flag === "s" };
+  },
   async capture(ref) {
     return captureResult(ref);
   },

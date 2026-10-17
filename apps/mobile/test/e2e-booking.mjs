@@ -209,6 +209,15 @@ async function flights() {
   await k.byTest('otp-3ds').fill('000000');
   await k.see('That code doesn’t match. 2 tries left.', '3ds wrong');
   await k.shot('3ds-wrong');
+  step('pay: the bank’s code didn’t come');
+  await k.byTest('otp-nocode').click();
+  await k.see('It can take a minute. Still nothing?', 'no-code options');
+  await k.see('Use another card', 'another card offered');
+  await k.see('Talk to Mada', 'Mada offered');
+  await k.byTest('otp-resend').click();
+  await k.see('Your bank is sending a new code. Give it a minute.', 'code sent again');
+  await k.see('Send it again in', 'a wait before asking again');
+  await k.shot('3ds-no-code');
   await k.byTest('otp-3ds').fill('123456');
   step('with Mada');
   await k.see('Booking now', 'waiting', 10000);
@@ -316,7 +325,7 @@ async function pay() {
   await k.shot('background-confirmed', 200);
   step('pay: price rises, then the hold ends');
   await openAsk(page);
-  await k.demo('Card declines', 'Price rises at payment');
+  await k.demo('Card declines', 'Price rises at payment', 'Fare drops on a re-check');
   await toPay(page, { bundle: false });
   await k.slide();
   await k.see('The price went up SAR 140 while we checked.', 'price rose', 10000);
@@ -324,10 +333,13 @@ async function pay() {
   await k.closeSheet();
   await k.text('(demo: end the hold)').click();
   await k.see('Hold ended', 'hold ended');
+  await k.see('The price hold ended', 'hold ended: what happened');
+  await k.see('Check again and you’ll see the price before anything is charged.', 'hold ended: what next');
   await k.see('Check the price again', 'recheck');
   await k.shot('hold-ended');
   await k.byTest('pay-recheck').click();
   await k.see('Price checked again.', 'rechecked');
+  await k.see('down from', 'the price came down, said on the sheet');
   await k.shot('rechecked');
   step('pay: Tabby');
   await k.press(k.byTest('plan-tabby'));

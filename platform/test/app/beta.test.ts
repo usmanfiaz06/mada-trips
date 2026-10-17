@@ -161,7 +161,8 @@ describe("flights by request", () => {
     const draft: OrderDraft = { kind: "quote", requestId: r0.id, optionId: "opt1" };
     const pv = PreviewResponse.parse((await post(previewPost, token, { draft, useCredit: true })).json).preview;
     expect(pv).toMatchObject({ kind: "trip", agent: true, title: "Istanbul · 9–15 Mar", travellerIds: f.three });
-    expect(pv.lines[0]!.text, JSON.stringify(pv.lines)).toBe("3 travellers · Saudia, direct");
+    // The desk quoted a child fare: adults and the child on their own lines, each at what the airline quoted.
+    expect(pv.lines.map((l) => [l.key, l.text, l.amount])).toEqual([["flight", "2 adults · Saudia, direct", 432_000], ["children", "1 child fare (2 to 11, or a baby with a seat)", 162_000]]);
     expect(pv.total.amount).toBe(216_000 * 2 + 162_000);
     expect(pv.rule).toBe("If you cancel, the flights come back minus SAR 400 per person.");
     expect((await post(previewPost, token, { draft: { ...draft, optionId: "opt9" }, useCredit: true })).status).toBe(404);

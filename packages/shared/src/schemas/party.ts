@@ -164,15 +164,24 @@ export function fareBandOf(age: number | null): Exclude<FareBand, 'lapInfant'> {
 
 export type FareLine = { band: FareBand; count: number; each: number; total: number; ages: number[] };
 
+/** How many of the travellers fly on a child fare that day (2 to 11, or a baby with its own seat). */
+export const childSeats = (travellers: Pick<Person, 'dateOfBirth'>[], onDay: string) => travellers.filter((p) => fareBandOf(ageAt(p.dateOfBirth, onDay)) !== 'adult').length;
+
+/** What the seats and laps cost: adults at the adult fare, children at the child fare, babies on a lap at theirs. */
+export function flightTotal(o: { pricePerPerson: { amount: number }; childPrice?: { amount: number }; infantPrice: { amount: number } }, seats: number, children: number, lapInfants: number) {
+  const kids = Math.min(children, seats);
+  return o.pricePerPerson.amount * (seats - kids) + (o.childPrice ?? o.pricePerPerson).amount * kids + o.infantPrice.amount * lapInfants;
+}
+
 /**
  * The price per person, by band, for a flight option: adults, children, babies on their own seat (each priced as the
  * airline prices a seat), babies on a lap. The lines always add up to the option's total.
  */
-export function fareLines(o: { pricePerPerson: { amount: number }; infantPrice: { amount: number }; total: { amount: number }; infants: number }, travellers: Pick<Person, 'dateOfBirth'>[], onDay: string): FareLine[] {
+export function fareLines(o: { pricePerPerson: { amount: number }; childPrice?: { amount: number }; infantPrice: { amount: number }; total: { amount: number }; infants: number }, travellers: Pick<Person, 'dateOfBirth'>[], onDay: string): FareLine[] {
   const by: Record<Exclude<FareBand, 'lapInfant'>, number[]> = { adult: [], child: [], seatInfant: [] };
   for (const p of travellers) { const a = ageAt(p.dateOfBirth, onDay); by[fareBandOf(a)].push(a ?? -1); }
-  const pp = o.pricePerPerson.amount;
-  const lines: FareLine[] = (['adult', 'child', 'seatInfant'] as const).filter((b) => by[b].length).map((b) => ({ band: b, count: by[b].length, each: pp, total: pp * by[b].length, ages: by[b].filter((a) => a >= 0).sort((x, y) => y - x) }));
+  const each = (b: Exclude<FareBand, 'lapInfant'>) => (b === 'adult' ? o.pricePerPerson : o.childPrice ?? o.pricePerPerson).amount;
+  const lines: FareLine[] = (['adult', 'child', 'seatInfant'] as const).filter((b) => by[b].length).map((b) => ({ band: b, count: by[b].length, each: each(b), total: each(b) * by[b].length, ages: by[b].filter((a) => a >= 0).sort((x, y) => y - x) }));
   if (o.infants) lines.push({ band: 'lapInfant', count: o.infants, each: o.infantPrice.amount, total: o.infantPrice.amount * o.infants, ages: [] });
   // Whatever the supplier added on top (taxes it doesn't split) stays on the first line, so the sum is the total.
   const gap = o.total.amount - lines.reduce((a, l) => a + l.total, 0);

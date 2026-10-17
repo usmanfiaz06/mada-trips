@@ -366,7 +366,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
       await sp.insert(appTripFacts).values({ tripId: tripId!, agentName: agent.name, stays: stayFacts as never, pickups: pickupFacts as never, discount: o.discount, bookedAt: o.createdAt })
         .onConflictDoUpdate({ target: appTripFacts.tripId, set: { agentName: agent.name, stays: sql`${appTripFacts.stays} || ${JSON.stringify(stayFacts)}::jsonb`, pickups: sql`${appTripFacts.pickups} || ${JSON.stringify(pickupFacts)}::jsonb` } });
       const method = pay?.method ?? "credit";
-      for (const [item, keys] of [["flight", ["flight", "infants"]], ["stay", ["stay"]], ["pickup", ["pickup"]]] as const) {
+      for (const [item, keys] of [["flight", ["flight", "children", "infants"]], ["stay", ["stay"]], ["pickup", ["pickup"]]] as const) {
         const amount = amountOf([...keys]);
         if (!amount) continue;
         const plan = item === "flight" ? o.plan : o.plan;

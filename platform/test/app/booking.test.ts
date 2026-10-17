@@ -134,7 +134,9 @@ describe("search", () => {
     expect(s.options.map((o) => [o.carrier, o.label, o.out.flightNumber])).toEqual([["SV", "best", "SV263"], ["XY", "lowest", "XY125"], ["TK", "earliest", "TK141"]]);
     const sv = s.options[0]!;
     expect(sv).toMatchObject({ airline: "Saudia", brand: "#0b6b52", bags: "2 × 23 kg", refundable: true, pricePerPerson: { amount: 216_000 } });
-    expect(sv.total.amount).toBe(864_000);
+    // Ahmed is 10 on the day out: a child fare (three quarters); Sara is 13 and flies as an adult.
+    expect(sv).toMatchObject({ children: 1, childPrice: { amount: 162_000 } });
+    expect(sv.total.amount).toBe(810_000);
     expect(sv.back?.flightNumber).toBe("SV264");
     expect(Date.parse(sv.expiresAt) - Date.now()).toBeGreaterThan(19 * 60_000);
     expect(s.bundle).toMatchObject({ nights: 6, stay: { amount: 588_000 }, pickup: { amount: 44_000 } });
@@ -316,16 +318,16 @@ describe("the order sheet", () => {
     const draft: OrderDraft = { kind: "trip", flightOfferId: s.options[0]!.id, bundle: true, travellerIds: f.four };
     const p = await previewOf(f.token, draft);
     expect(p.lines.map((l) => [l.key, l.text, l.amount])).toEqual([
-      ["flight", "4 travellers · Saudia, direct", 864_000], ["stay", "Bereketzade Hotel · Connecting rooms · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
+      ["flight", "3 adults · Saudia, direct", 648_000], ["children", "1 child fare (2 to 11, or a baby with a seat)", 162_000], ["stay", "Bereketzade Hotel · Connecting rooms · 6 nights", 588_000], ["pickup", "Airport pickup both ways", 44_000],
     ]);
-    expect(p.total.amount).toBe(1_496_000);
+    expect(p.total.amount).toBe(1_442_000);
     expect(p.rule).toBe("If you cancel, the flights come back minus SAR 400 per person. Rooms and pickups are free to cancel until 2 Mar.");
-    expect(p.instalments).toEqual({ tabby: { amount: 374_000, currency: "SAR" }, tamara: { amount: 498_667, currency: "SAR" } });
+    expect(p.instalments).toEqual({ tabby: { amount: 360_500, currency: "SAR" }, tamara: { amount: 480_667, currency: "SAR" } });
     expect(p.missingPassports).toEqual([f.me]);
     expect(Date.parse(p.holdExpiresAt!)).toBeGreaterThan(Date.now());
     const eid = await previewOf(f.token, draft, { promo: "eid10" });
     expect(eid.promo).toMatchObject({ code: "EID10", status: "applied", discount: { amount: 30_000 } });
-    expect(eid.total.amount).toBe(1_496_000 - 30_000);
+    expect(eid.total.amount).toBe(1_442_000 - 30_000);
     expect((await previewOf(f.token, draft, { promo: "RAMADAN" })).promo).toMatchObject({ status: "ended", message: "That code ended on 30 March." });
     expect((await previewOf(f.token, draft, { promo: "NOPE" })).promo?.status).toBe("unknown");
     // Fewer travellers: the price follows.
@@ -337,7 +339,7 @@ describe("the order sheet", () => {
     await db.insert(appCreditLedger).values({ userId: ownerId, amount: 40_000, kind: "goodwill" });
     const withCredit = await previewOf(f.token, draft);
     expect(withCredit.credit).toEqual({ balance: { amount: 40_000, currency: "SAR" }, used: { amount: 40_000, currency: "SAR" } });
-    expect(withCredit.total.amount).toBe(1_456_000);
+    expect(withCredit.total.amount).toBe(1_402_000);
   });
 });
 
@@ -375,7 +377,7 @@ describe("orders and the desk", () => {
     const pickups = await db.select().from(appPickups).where(eq(appPickups.tripId, trip!.id));
     expect(pickups.map((x) => x.direction).sort()).toEqual(["from_airport", "to_airport"]);
     const [tb] = await db.select().from(appTripBookings).where(eq(appTripBookings.tripId, trip!.id));
-    expect(tb!.paid).toMatchObject({ charged: 1_496_000, card: "Visa ending 41" });
+    expect(tb!.paid).toMatchObject({ charged: 1_442_000, card: "Visa ending 41" });
     const active = OrdersResponse.parse((await get(ordersGet, f.token)).json).orders;
     expect(active.map((x) => x.id)).toContain(out.order.id);
     // Private.
@@ -413,6 +415,11 @@ describe("orders and the desk", () => {
     expect(out.order.action).toMatchObject({ kind: "otp", triesLeft: 3, label: "Visa ending 42" });
     const wrong = OrderResponse.parse((await post(order3ds, f.token, { code: "000000" }, "", { id: out.order.id })).json).order;
     expect(wrong.action?.triesLeft).toBe(2);
+    // The code didn't come: ask the bank again, three times at most; the tries left don't change.
+    for (let i = 0; i < 3; i++) expect(OrderResponse.parse((await post(orderAnswer, f.token, { answer: "resend_code" }, "", { id: out.order.id })).json).order.action?.triesLeft).toBe(2);
+    expect((await post(orderAnswer, f.token, { answer: "resend_code" }, "", { id: out.order.id })).status).toBe(429);
+    const events = await db.execute<{ n: number }>(rawSql`SELECT count(*)::int AS n FROM app_order_events WHERE order_id = ${out.order.id} AND kind = 'otp_resent'`);
+    expect(events[0]!.n).toBe(3);
     const ok = OrderResponse.parse((await post(order3ds, f.token, { code: "123456" }, "", { id: out.order.id })).json).order;
     expect(ok.status).toBe("pending_agent");
   });
@@ -465,7 +472,7 @@ describe("orders and the desk", () => {
     let o = await runDesk(out.order.id, f.token, 4);
     expect(o.status).toBe("fare_changed");
     let v = OrderResponse.parse((await get(orderGet, f.token, { id: o.id })).json).order;
-    expect(v.fareChange).toMatchObject({ perPerson: { amount: 12_000 }, total: { amount: 48_000 }, newTotal: { amount: 864_000 + 48_000 } });
+    expect(v.fareChange).toMatchObject({ perPerson: { amount: 12_000 }, total: { amount: 48_000 }, newTotal: { amount: 810_000 + 48_000 } });
     v = OrderResponse.parse((await post(orderAnswer, f.token, { answer: "accept_fare" }, "", { id: o.id })).json).order;
     expect(v.extra.amount).toBe(48_000);
     o = await runDesk(o.id, f.token, 6);

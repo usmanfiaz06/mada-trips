@@ -239,6 +239,21 @@ describe("saved cards", () => {
     expect(CardsResponse.parse((await callP(cardDelete, { id: mada.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay" });
   });
 
+  it("keeps one card when the same card is saved again, and removing it removes every copy", async () => {
+    const { token } = await signIn();
+    const first = CardsResponse.parse((await call(cardsPost, { token, body: { token: "tok_mock_a", brand: "visa", last4: "4111", exp: "08/30" } })).json);
+    for (const tok of ["tok_mock_b", "tok_mock_c"]) await call(cardsPost, { token, body: { token: tok, brand: "visa", last4: "4111", exp: "08/30", makeDefault: false } });
+    const list = CardsResponse.parse((await call(cardsGet, { method: "GET", token })).json);
+    expect(list.cards.map((c) => [c.id, c.label])).toEqual([[first.cards[0]!.id, "Visa ending 11"]]);
+    const [n] = await db.execute<{ n: number }>(rawSql`SELECT count(*)::int AS n FROM app_cards WHERE id = ${first.cards[0]!.id} AND deleted_at IS NULL`);
+    expect(n!.n).toBe(1);
+    // An older duplicate (saved before this was one card) never shows, and goes when the card is removed.
+    const [u] = await db.execute<{ user_id: string }>(rawSql`SELECT user_id FROM app_cards WHERE id = ${first.cards[0]!.id}`);
+    await db.execute(rawSql`INSERT INTO app_cards (user_id, brand, last4, exp, provider, token_enc) VALUES (${u!.user_id}, 'visa', '4111', '08/30', 'mock', 'legacy')`);
+    expect(CardsResponse.parse((await call(cardsGet, { method: "GET", token })).json).cards).toHaveLength(1);
+    expect(CardsResponse.parse((await callP(cardDelete, { id: first.cards[0]!.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay" });
+  });
+
   it("refuses expired cards, other people's cards, and no sign-in", async () => {
     const { token } = await signIn();
     const exp = await call(cardsPost, { token, body: { token: "tok_mock_1", brand: "visa", last4: "4141", exp: "01/20" } });

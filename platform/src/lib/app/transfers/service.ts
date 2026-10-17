@@ -143,7 +143,7 @@ export async function chooseTransfer(ownerId: string, trip: TripDetail, input: C
       ownerId, kind: "car", status: "sent", summary: title, travellerIds: trip.travellerIds, tripId: trip.id, agentName, promisedBy: new Date(Date.now() + 60 * 60_000),
       details: {
         // Read by Ask's request screen (booking/requests.ts) and Trips → Requests (trips/requests.ts).
-        source: "ask", askKind: "car", title, detail, summaryLine: detail, note: null, query: "", answers: {}, needs: {}, clientId: b.clientKey,
+        source: "ask", askKind: "car", title, detail, summaryLine: detail, note: null, query: "", answers: {}, needs: {}, clientId: b.clientKey, titleCopy: ["request.title.pickup", { city: trip.city }],
         short: "pickup", area: "other", quote: null, quoteText: null, withWhom: "faisal", transfer: tr,
       },
     }).returning();

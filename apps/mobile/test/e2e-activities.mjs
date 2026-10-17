@@ -240,7 +240,7 @@ async function run(lang) {
   await page.waitForTimeout(600);
   await scrollTo('thing-getting-there');
   await see(W('From Bereketzade Hotel', 'من فندق بركت زاده'), 'from the hotel');
-  await see(W('About', 'نحو'), 'about how long');
+  await see(W('About', 'حوالي'), 'about how long');
   await shot('trip-place-getting-there');
   await byTest('thing-directions').click();
   await page.waitForTimeout(900);
@@ -261,7 +261,7 @@ async function run(lang) {
   await shot('trip-ride-sheet');
   await byTest('ride-send').click();
   await page.waitForTimeout(1800);
-  await see(W('picking us up from Bereketzade Hotel', 'تأخذنا من فندق بركت زاده'), 'the request asks for a car from the hotel');
+  await see(W('picking us up from Bereketzade Hotel', 'تاخذنا من فندق بركت زاده'), 'the request asks for a car from the hotel');
   await shot('trip-ride-request');
 
   step(`${lang}: the idea is on the itinerary`);

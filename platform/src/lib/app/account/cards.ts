@@ -1,6 +1,6 @@
 import "server-only";
-import { and, asc, eq, isNull } from "drizzle-orm";
-import type { AddCardRequest, CardsResponse, SavedCard } from "@mada/shared";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { cardKey, cardLabel as labelOf, uniqueCards, type AddCardRequest, type CardsResponse, type SavedCard } from "@mada/shared";
 import { db } from "@/db";
 import { appAccounts, appCards } from "@/db/app-schema-wallet";
 import { appAuditLog } from "../audit";
@@ -16,10 +16,9 @@ import { accountRow } from "./index";
  */
 
 type CardRow = typeof appCards.$inferSelect;
-const BRAND_NAME = { visa: "Visa", mastercard: "Mastercard", mada: "mada" } as const;
 const tokenAad = (cardId: string) => `app_cards:${cardId}:token`;
 
-export const cardLabel = (c: Pick<CardRow, "brand" | "last4">) => `${BRAND_NAME[c.brand as keyof typeof BRAND_NAME] ?? "Card"} ending ${c.last4.slice(-2)}`;
+export const cardLabel = (c: Pick<CardRow, "brand" | "last4">) => labelOf(c.brand as SavedCard["brand"], c.last4);
 
 function toCard(c: CardRow): SavedCard {
   return { id: c.id, brand: c.brand as SavedCard["brand"], label: cardLabel(c), last4: c.last4, exp: c.exp, createdAt: c.createdAt.toISOString() };
@@ -32,7 +31,8 @@ async function liveCards(userId: string) {
 export async function listCards(userId: string): Promise<CardsResponse> {
   const [cards, acc] = await Promise.all([liveCards(userId), accountRow(userId)]);
   const defaultId = cards.some((c) => c.id === acc.defaultCard) ? acc.defaultCard : "applepay";
-  return { cards: cards.map(toCard), defaultId };
+  // A card saved twice before saving became idempotent still reads as one card.
+  return { cards: uniqueCards(cards, defaultId).map(toCard), defaultId };
 }
 
 export async function ownCard(userId: string, id: string): Promise<CardRow> {
@@ -53,6 +53,14 @@ export async function addCard(userId: string, input: AddCardRequest, ipHash: str
   if (supplierMode("payments") === "live" && /^tok_mock_/.test(input.token)) throw new AppError("VALIDATION", { fields: { token: "mock" } });
   await db.transaction(async (tx) => {
     await accountRow(userId, tx);
+    // The same card again (paid with it, "save" ticked): one card, with the newer token.
+    const same = (await tx.select().from(appCards).where(and(eq(appCards.userId, userId), isNull(appCards.deletedAt)))).find((c) => cardKey(c) === cardKey(input));
+    if (same) {
+      await tx.update(appCards).set({ tokenEnc: encryptField(input.token, tokenAad(same.id)) }).where(eq(appCards.id, same.id));
+      if (input.makeDefault !== false) await tx.update(appAccounts).set({ defaultCard: same.id, updatedAt: new Date() }).where(eq(appAccounts.userId, userId));
+      await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "card.renewed", entityType: "app_card", entityId: same.id, summary: `Saved ${cardLabel(same)} again`, ipHash });
+      return;
+    }
     const [c] = await tx.insert(appCards).values({ userId, brand: input.brand, last4: input.last4, exp: input.exp, provider: supplierMode("payments") === "live" ? "myfatoorah" : "mock", tokenEnc: "pending" }).returning();
     await tx.update(appCards).set({ tokenEnc: encryptField(input.token, tokenAad(c!.id)) }).where(eq(appCards.id, c!.id));
     if (input.makeDefault !== false) await tx.update(appAccounts).set({ defaultCard: c!.id, updatedAt: new Date() }).where(eq(appAccounts.userId, userId));
@@ -81,7 +89,9 @@ export async function removeCard(userId: string, id: string, newDefault: string 
     if (next === id || (next !== "applepay" && !others.some((x) => x.id === next))) throw new AppError("VALIDATION", { fields: { newDefault: "Not one of your cards" } });
   }
   await db.transaction(async (tx) => {
-    await tx.update(appCards).set({ deletedAt: new Date(), tokenEnc: "removed" }).where(eq(appCards.id, id));
+    // Every saved copy of this card goes with it, so an older duplicate never comes back.
+    const copies = (await liveCards(userId)).filter((x) => cardKey(x) === cardKey(c)).map((x) => x.id);
+    await tx.update(appCards).set({ deletedAt: new Date(), tokenEnc: "removed" }).where(and(eq(appCards.userId, userId), inArray(appCards.id, copies.length ? copies : [id])));
     if (next) await tx.update(appAccounts).set({ defaultCard: next, updatedAt: new Date() }).where(eq(appAccounts.userId, userId));
     await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "card.removed", entityType: "app_card", entityId: id, summary: `Removed ${cardLabel(c)}`, ipHash });
   });

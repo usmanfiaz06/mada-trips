@@ -281,6 +281,8 @@ export const CreateSplitRequest = z.object({
   between: z.array(Id).min(2).max(30),
   /** Custom mode: halalas per share key (a user id). Must add up to the total. */
   custom: z.record(z.string(), HalalasAmount).optional(),
+  /** The circle's trip, when it belongs to one: the split then shows on that trip's Money screen. */
+  tripId: Id.nullable().optional(),
 });
 export type CreateSplitRequest = z.infer<typeof CreateSplitRequest>;
 export const MarkPaidRequest = z.object({ key: z.string().max(64), via: z.enum(['cash', 'card']).default('cash'), paymentId: Id.optional() });

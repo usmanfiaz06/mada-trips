@@ -29,8 +29,11 @@ export const FlightOffer = z.object({
   out: z.array(FlightLeg).min(1),
   back: z.array(FlightLeg),
   cabin: Cabin,
-  /** Per traveller, all-in. */
+  /** Per adult, all-in. */
   pricePerPerson: Money,
+  /** Per passenger type, as Duffel prices them: a child 2 to 11 (or a baby with a seat), a baby on a lap. */
+  childPrice: Money.optional(),
+  infantPrice: Money.optional(),
   total: Money,
   baggage: z.string(),
   changeRule: z.string(),

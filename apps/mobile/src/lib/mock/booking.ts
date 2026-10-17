@@ -9,7 +9,7 @@ import {
   canNudge, progressFromStatus, resultFromLegacy, type OutcomeReason, type RequestResult,
   type HotelRequests,
   BookingPrefs, airlineRequests, bookingPrefsOf, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
-  type AppliedPrefs, type TravelPrefs,
+  type AppliedPrefs, type TravelPrefs, cardLabel, childSar, childSeats, flightTotal,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -33,7 +33,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
+type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -74,19 +74,23 @@ async function cardOf(w: Wire, ctx: Parameters<AreaMock>[1], id: string) {
 
 /* ───────────── search ───────────── */
 
-function flightOptions(destKey: string, from: string, depart: string, ret: string | null, cabin: FlightOption['cabin'], n: number, infants: number): FlightOption[] {
+/** `n` is every seat, `kids` the seats on a child fare among them (2 to 11, or a baby with a seat), `infants` babies on a lap. */
+function flightOptions(destKey: string, from: string, depart: string, ret: string | null, cabin: FlightOption['cabin'], n: number, infants: number, kids = 0): FlightOption[] {
   const dest = DESTINATIONS[destKey]!;
   return (CATALOGUE_FLIGHTS[destKey] ?? []).map((f) => {
     const to = f.to ?? dest.code;
-    const pp = sarToHalalas(fareSar(f.ppSar, cabin, !ret));
-    const inf = sarToHalalas(infantSar(pp / 100));
+    const fare = fareSar(f.ppSar, cabin, !ret);
+    const pp = sarToHalalas(fare);
+    const cp = sarToHalalas(childSar(fare));
+    const inf = sarToHalalas(infantSar(fare));
+    const children = Math.min(kids, n);
     const backArr = addMinutes('15:10', f.durationMin - (TZ_OFF[to] ?? 0));
     return {
       id: uuid(), label: f.label, carrier: f.carrier, airline: CARRIERS[f.carrier]!.name, brand: CARRIERS[f.carrier]!.brand,
       out: { flightNumber: f.number, from, to, date: depart, dep: f.dep, arr: f.arr, durationMin: f.durationMin },
       back: ret ? { flightNumber: f.backNumber, from: to, to: from, date: ret, dep: '15:10', arr: backArr, durationMin: f.durationMin } : null,
-      stop: f.stop ?? null, reason: f.reason, bags: f.bags, changeRule: f.change, refundRule: f.refund, refundable: f.refund !== 'Not refundable', cabin, adults: n, infants,
-      pricePerPerson: money(pp), infantPrice: money(inf), total: money(pp * n + inf * infants), expiresAt: new Date(Date.now() + HOLD).toISOString(),
+      stop: f.stop ?? null, reason: f.reason, bags: f.bags, changeRule: f.change, refundRule: f.refund, refundable: f.refund !== 'Not refundable', cabin, adults: n, infants, children,
+      pricePerPerson: money(pp), childPrice: money(cp), infantPrice: money(inf), total: money(flightTotal({ pricePerPerson: money(pp), childPrice: money(cp), infantPrice: money(inf) }, n, children, infants)), expiresAt: new Date(Date.now() + HOLD).toISOString(),
     };
   });
 }
@@ -121,14 +125,19 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     if (!o || o.owner !== user.id || o.kind !== 'flight') return err('NOT_FOUND');
     let f = o.option as FlightOption;
     const s = o.search as { destination: string; from: string; depart: string; return: string | null; infants: number; cabin: FlightOption['cabin'] };
-    if (f.adults !== travellers.length) {
-      f = { ...flightOptions(s.destination, f.out.from, f.out.date, f.back?.date ?? null, f.cabin, travellers.length, f.infants).find((x) => x.out.flightNumber === f.out.flightNumber)!, id: o.id };
+    const kids = childSeats(travellers, f.out.date);
+    if (f.adults !== travellers.length || (f.children ?? 0) !== kids) {
+      f = { ...flightOptions(s.destination, f.out.from, f.out.date, f.back?.date ?? null, f.cabin, travellers.length, f.infants, kids).find((x) => x.out.flightNumber === f.out.flightNumber)!, id: o.id };
       o.option = f;
     }
     const dest = DESTINATIONS[s.destination]!;
     const n = travellers.length;
     const suffix = `${f.cabin !== 'economy' ? ` · ${t(`cal.cabin.${f.cabin}` as CopyKey)}` : ''}${f.back ? '' : ` · ${t('pay.line.oneWay')}`}`;
-    lines.push(L('flight', 'flight', `${tn('pay.line.flight', n, { airline: f.airline, how: f.stop ? t('pay.line.oneStop') : t('pay.line.direct') })}${suffix}`, f.pricePerPerson.amount * n + bump));
+    // Adults and child fares on their own lines, as the server prices them (pricing.ts seatLines).
+    const how = f.stop ? t('pay.line.oneStop') : t('pay.line.direct');
+    const child = (f.childPrice ?? f.pricePerPerson).amount;
+    if (!kids || kids === n) lines.push(L('flight', 'flight', `${tn('pay.line.flight', n, { airline: f.airline, how })}${suffix}`, (kids ? child : f.pricePerPerson.amount) * n + bump));
+    else lines.push(L('flight', 'flight', `${tn('pay.line.adults', n - kids, { airline: f.airline, how })}${suffix}`, f.pricePerPerson.amount * (n - kids) + bump), L('children', 'flight', tn('pay.line.children', kids), child * kids));
     if (f.infants) lines.push(L('infants', 'flight', tn('pay.line.infants', f.infants), f.infantPrice.amount * f.infants));
     const bundle = d.bundle && dest.key === 'istanbul' && !!f.back;
     if (bundle) {
@@ -218,7 +227,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
     const loyalty = (body.loyalty ?? loyaltyToAttach(saved?.loyalty, programmes, selfId, ids)).filter((l) => ids.includes(l.personId) && programmes.includes(l.program));
     applied = {
       prefs, summary: prefsSummary(prefs, scope, n), scope, programmes, loyalty: loyalty.map((l) => ({ ...l, programName: programmeName(l.program), masked: maskLoyalty(l.number) })),
-      extrasOffer: offer ? { key: 'seatsTogether', perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
+      extrasOffer: offer ? { key: 'seatsTogether', carrier: carrier ?? undefined, airline: f?.airline, perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
     };
     out.ssr = scope !== 'stay' ? airlineRequests(prefs, { carrier, travellers: n }).ssr : [];
     out.hotelRemarks = scope !== 'flight' ? hotelRemarks(prefs) : [];
@@ -243,7 +252,7 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
 /* ───────────── the scripted desk ───────────── */
 
 const tickMs = (o: Order) => (o.demo.has('slowAgent') ? 4200 : 1200);
-const viewOf = ({ why, owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
+const viewOf = ({ why, owner: _o, nextAt: _n, demo: _d, done: _dn, key: _k, resume: _r, otpTries: _ot, resends: _rs, created, travellers: _tr, user: _u, snap: _s, ...v }: Order): OrderView =>
   ({ ...v, slow: !['confirmed', 'cancelled', 'declined', 'needs_answer', 'fare_changed', 'ticketing_failed', 'requires_action'].includes(v.status) && Date.now() - created > 8000, result: orderResult(v, why) });
 
 /** A booking that won't go ahead, as the server's booking desk records it (cancelResult): the traveller's own stop, nothing charged. */
@@ -403,7 +412,8 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       if (!q.return || later < q.return) depart = later;
     }
     const from = dest.code === q.from ? (q.from === 'RUH' ? 'JED' : 'RUH') : q.from;
-    let opts = flightOptions(dest.key, from, depart, q.return, q.cabin, q.travellerIds.length, q.infants);
+    const kids = childSeats(people.filter((p) => q.travellerIds.includes(p.id)), depart);
+    let opts = flightOptions(dest.key, from, depart, q.return, q.cabin, q.travellerIds.length, q.infants, kids);
     const unavailable: { carrier: string; airline: string }[] = [];
     if (demo.has('supplierDown') && opts.some((o) => o.carrier === 'SV')) { opts = opts.filter((o) => o.carrier !== 'SV'); unavailable.push({ carrier: 'SV', airline: 'Saudia' }); }
     for (const o of opts) offers.set(o.id, { id: o.id, owner: user.id, kind: 'flight', option: o, search: { destination: dest.key, from, depart, return: q.return, infants: q.infants, cabin: q.cabin, travellerIds: q.travellerIds }, expiresAt: Date.now() + HOLD });
@@ -460,7 +470,18 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const o = offers.get(r[1]!);
     if (!o || o.owner !== user.id) return err('NOT_FOUND');
     let changedBy: number | null = null;
-    if (r[2] && w.method === 'POST') { o.expiresAt = Date.now() + HOLD; o.option = { ...o.option, expiresAt: new Date(o.expiresAt).toISOString() }; changedBy = 0; }
+    if (r[2] && w.method === 'POST') {
+      o.expiresAt = Date.now() + HOLD; o.option = { ...o.option, expiresAt: new Date(o.expiresAt).toISOString() }; changedBy = 0;
+      // Demo: the fare comes back SAR 60 lower a seat (search.ts repriceOffer does the same).
+      if (demo.has('priceDown') && o.kind === 'flight') {
+        const f = o.option as FlightOption;
+        const less = (m: { amount: number }) => money(Math.max(0, m.amount - 6000));
+        const next = { ...f, pricePerPerson: less(f.pricePerPerson), childPrice: f.childPrice ? less(f.childPrice) : undefined };
+        next.total = money(flightTotal(next, f.adults, f.children ?? 0, f.infants));
+        changedBy = next.total.amount - f.total.amount;
+        o.option = next;
+      }
+    }
     return ok({ kind: o.kind, flight: o.kind === 'flight' ? o.option : null, stay: o.kind === 'stay' ? o.option : null, expired: o.expiresAt <= Date.now(), changedBy });
   }
   if (key === 'GET /plans' || m(/^\/plans\/([^/]+)$/)) {
@@ -629,7 +650,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     } else if (pv.total.amount > 0 && pay.method !== 'credit') {
       if (b.plan !== 'full' && pay.method !== 'applepay' && pv.total.amount >= 100_000) label = b.plan === 'tabby' ? 'Tabby' : 'Tamara';
       else if (pay.method === 'applepay') label = 'Apple Pay';
-      else if (pay.method === 'new_card') { label = t('pay.card.label', { brand: pay.brand === 'visa' ? 'Visa' : pay.brand === 'mastercard' ? 'Mastercard' : 'mada', last: pay.last4.slice(-2) }); requires3ds = true; }
+      else if (pay.method === 'new_card') { label = cardLabel(pay.brand, pay.last4); requires3ds = true; }
       else {
         const { card, first } = await cardOf(w, ctx, pay.cardId);
         if (!card) return err('NOT_FOUND');
@@ -702,6 +723,13 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       if (a === 'remind' && o.status === 'payment_requested' && o.payRequest) {
         const rr = await circlesMock({ method: 'POST', path: `/circles/${o.payRequest.circleId}/splits/${o.payRequest.messageId}/remind`, token: w.token, body: {} }, ctx);
         return rr && rr.status !== 200 ? rr : ok({ order: viewOf(o) });
+      }
+      if (a === 'resend_code') {
+        // The bank's code didn't come: a new one, three times at most (orders.ts resendCode).
+        if (o.status !== 'requires_action') return err('VALIDATION');
+        o.resends = (o.resends ?? 0) + 1;
+        if (o.resends > 3) return err('RATE_LIMITED');
+        return ok({ order: viewOf(o) });
       }
       if (a === 'yes' && o.status === 'needs_answer') { o.question = null; o.status = 'held'; o.nextAt = Date.now() + tickMs(o); }
       else if (a === 'call' && o.status === 'needs_answer') { o.question = { ...o.question!, calling: true }; o.status = 'held'; o.nextAt = Date.now() + 3000; }

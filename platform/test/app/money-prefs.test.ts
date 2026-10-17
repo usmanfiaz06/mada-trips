@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { CreateOrderResponse, FlightSearchResponse, OrderResponse, PreviewResponse, TripMoneyResponse, type OrderDraft } from "@mada/shared";
 import { db } from "@/db";
-import { appMessages, appPayments, appRequests } from "@/db/app-schema";
+import { appCircles, appMessages, appPayments, appRequests } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
 import { appCircleSplitShares } from "@/db/app-schema-circles";
 import { advance, ownOrder } from "@/lib/app/booking/orders";
@@ -15,6 +15,7 @@ import { GET as peopleGet, POST as peoplePost } from "@/app/api/app/v1/people/ro
 import { POST as cardsPost } from "@/app/api/app/v1/cards/route";
 import { PATCH as accountPatch } from "@/app/api/app/v1/account/route";
 import { POST as circlesPost } from "@/app/api/app/v1/circles/route";
+import { POST as splitsPost } from "@/app/api/app/v1/circles/[id]/splits/route";
 import { POST as inviteAccept } from "@/app/api/app/v1/invites/[ref]/accept/route";
 import { GET as moneyGet } from "@/app/api/app/v1/trips/[id]/money/route";
 import { GET as statementGet } from "@/app/api/app/v1/trips/[id]/money/statement/route";
@@ -110,7 +111,7 @@ describe("preferences and loyalty applied at booking", () => {
     const xy = s.options.find((o) => o.carrier === "XY")!;
     const draft: OrderDraft = { kind: "trip", flightOfferId: xy.id, bundle: false, travellerIds: [f.me, f.hessa] };
     const p = await preview(token, { draft });
-    expect(p.applied?.extrasOffer).toEqual({ key: "seatsTogether", perPerson: { amount: 3500, currency: "SAR" }, count: 2, legs: 2, total: { amount: 14_000, currency: "SAR" }, added: false });
+    expect(p.applied?.extrasOffer).toEqual({ key: "seatsTogether", carrier: "XY", airline: "flynas", perPerson: { amount: 3500, currency: "SAR" }, count: 2, legs: 2, total: { amount: 14_000, currency: "SAR" }, added: false });
     expect(p.lines.map((l) => l.key)).toEqual(["flight"]);
     expect(p.applied?.programmes).toEqual(["nasmiles"]);
     const added = await preview(token, { draft, extras: { seatsTogether: true } });
@@ -216,6 +217,13 @@ describe("someone else in the circle pays", () => {
     expect(money.items[0]?.paidBy).toBe("Hessa");
     expect(money.splits).toHaveLength(1);
     expect(money.splits[0]).toMatchObject({ circleId, settled: true, paidByName: "You" });
+    // A split made by hand in a circle that belongs to the trip shows there too; another trip's id is refused.
+    await db.update(appCircles).set({ tripId: done.tripId! }).where(eq(appCircles.id, circleId));
+    const dinner = { what: "Dinner", total: 40_000, paidBy: omar.id, mode: "equal", between: [omar.id, hessa.id] };
+    expect((await post(splitsPost, omar.token, { ...dinner, tripId: "00000000-0000-4000-8000-000000000009" }, { id: circleId })).status).toBe(400);
+    expect((await post(splitsPost, omar.token, { ...dinner, tripId: done.tripId! }, { id: circleId })).status).toBe(201);
+    const withDinner = TripMoneyResponse.parse((await get(moneyGet, omar.token, { id: done.tripId! })).json).money;
+    expect(withDinner.splits.map((x) => x.what)).toContain("Dinner");
     expect(money.statement).toContain("Trip statement · Istanbul");
     expect(money.statement).toContain("Hessa");
     const html = await statementGet(new Request("http://localhost/api/app/v1/x", { headers: { authorization: `Bearer ${omar.token}`, "x-forwarded-for": "10.9.0.1", "user-agent": "vitest" } }), { params: Promise.resolve({ id: done.tripId! }) });

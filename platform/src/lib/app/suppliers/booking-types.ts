@@ -12,7 +12,8 @@ export type BookingFlightOffer = FlightOffer & { meta?: OfferMeta };
 
 export interface BookingFlightSupplier extends FlightSupplier {
   search(q: Parameters<FlightSupplier["search"]>[0]): Promise<BookingFlightOffer[]>;
-  price(offerId: string, travellers: number): Promise<BookingFlightOffer>;
+  /** `travellers` is every seat; `children` the seats on a child fare among them. */
+  price(offerId: string, travellers: number, children?: number): Promise<BookingFlightOffer>;
 }
 
 export type BookingHotelOffer = HotelOffer & { meta?: {
@@ -33,6 +34,8 @@ export interface BookingHotelSupplier extends HotelSupplier {
 export interface BookingPaymentSupplier extends PaymentSupplier {
   /** The bank's one-time code for 3-D Secure. On the real gateway this happens in the bank's page; the mock takes the code. */
   completeAction(providerRef: string, code: string): Promise<PaymentResult & { triesLeft?: number }>;
+  /** Ask the bank for a new code. A gateway whose bank page has its own "send again" leaves it out. */
+  resendCode?(providerRef: string): Promise<{ sent: boolean }>;
 }
 
 export type AskParserContext = { today: string; people: Person[]; destinations: string[] };

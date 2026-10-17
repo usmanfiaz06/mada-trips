@@ -59,7 +59,7 @@ export async function rideToThing(ownerId: string, input: RideInput, ipHash: str
       promisedBy: new Date(Date.now() + PROMISE_MIN * 60_000),
       details: {
         // Read by Ask's request screen (booking/requests.ts) and Trips → Requests (trips/requests.ts), like a pickup.
-        source: "ask", askKind: "car", title, detail, summaryLine: detail, note: null, query: message, answers: {}, needs: {}, clientId: b.clientId,
+        source: "ask", askKind: "car", title, detail, summaryLine: detail, note: null, query: message, answers: {}, needs: {}, clientId: b.clientId, titleCopy: ["things.ride.requestTitle", { name: thing.title }],
         short: "ride", area: "other", quote: null, quoteText: null, withWhom: "faisal", message, ride,
       },
     }).returning();

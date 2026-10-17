@@ -90,7 +90,7 @@ export type AskParseResponse = z.infer<typeof AskParseResponse>;
 export const OptionLabel = z.enum(['best', 'lowest', 'earliest', 'fastest', 'bags', 'quiet', 'water']);
 
 /** Demo switches (FLOWS.md): honoured only when the supplier runs in mock mode. Sent as ?demo=a,b or X-Mada-Demo. */
-export const DemoFlag = z.enum(['offline', 'decline', 'priceUp', 'noResults', 'supplierDown', 'agentQuestion', 'passportProblem', 'needs3ds', 'fareGone', 'ticketingFails', 'slowAgent', 'faceIdFails']);
+export const DemoFlag = z.enum(['offline', 'decline', 'priceUp', 'noResults', 'supplierDown', 'agentQuestion', 'passportProblem', 'needs3ds', 'fareGone', 'ticketingFails', 'slowAgent', 'faceIdFails', 'priceDown']);
 export type DemoFlag = z.infer<typeof DemoFlag>;
 
 export const FlightSearchRequest = z.object({
@@ -134,9 +134,15 @@ export const FlightOption = z.object({
   refundRule: z.string(),
   refundable: z.boolean(),
   cabin: Cabin,
+  /** Every seat: adults and the children among them. Babies on a lap are `infants`. */
   adults: z.number().int(),
   infants: z.number().int(),
+  /** Of the seats, how many are a child 2 to 11 or a baby with its own seat (priced at `childPrice`). */
+  children: z.number().int().default(0),
+  /** The adult fare, each. */
   pricePerPerson: Money,
+  /** The child fare, each; when missing, the adult fare. */
+  childPrice: Money.optional(),
   infantPrice: Money,
   total: Money,
   expiresAt: IsoDateTime,
@@ -470,7 +476,8 @@ export const AppliedPrefs = z.object({
   /** Programmes this booking earns on, for adding a number on the sheet. */
   programmes: z.array(z.string()),
   /** A paid extra the fare prices, with its price: on the order only when `added`. */
-  extrasOffer: z.object({ key: z.literal('seatsTogether'), perPerson: Money, count: z.number().int(), legs: z.number().int(), total: Money, added: z.boolean() }).nullable(),
+  /** `carrier` is the airline's code and `airline` its name, from the flight itself (never read back from a line's words). */
+  extrasOffer: z.object({ key: z.literal('seatsTogether'), carrier: z.string().optional(), airline: z.string().optional(), perPerson: Money, count: z.number().int(), legs: z.number().int(), total: Money, added: z.boolean() }).nullable(),
 });
 export type AppliedPrefs = z.infer<typeof AppliedPrefs>;
 export type OrderLine = z.infer<typeof OrderLine>;
@@ -614,7 +621,8 @@ export const CreateOrderResponse = z.discriminatedUnion('outcome', [
 export type CreateOrderResponse = z.infer<typeof CreateOrderResponse>;
 
 export const ThreeDsBody = z.object({ code: z.string().regex(/^\d{6}$/) });
-export const OrderAnswerBody = z.object({ answer: z.enum(['yes', 'call', 'accept_fare', 'stop', 'retry_by_phone', 'cancel', 'remind']) });
+/** `resend_code`: the bank's 3-D Secure code didn't come; ask for another (at most three times). */
+export const OrderAnswerBody = z.object({ answer: z.enum(['yes', 'call', 'accept_fare', 'stop', 'retry_by_phone', 'cancel', 'remind', 'resend_code']) });
 
 /* ───────────── what a confirmed booking writes into Trips ───────────── */
 

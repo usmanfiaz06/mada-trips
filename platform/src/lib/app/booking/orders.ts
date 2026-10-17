@@ -6,7 +6,7 @@ import {
 } from "@mada/shared";
 import { db } from "@/db";
 import { appPayments, appQuotes, appRequests, appUsers } from "@/db/app-schema";
-import { appOrders } from "@/db/app-schema-booking";
+import { appOrderEvents, appOrders } from "@/db/app-schema-booking";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { randomInt, randomUUID } from "node:crypto";
@@ -231,10 +231,27 @@ export async function submitOtp(ownerId: string, id: string, code: string): Prom
   return orderView(await ownOrder(ownerId, id));
 }
 
-export async function answerOrder(ownerId: string, id: string, answer: "yes" | "call" | "accept_fare" | "stop" | "retry_by_phone" | "cancel" | "remind"): Promise<OrderView> {
+/** The bank's code didn't come: ask it for another, three times at most, with a record the desk can see. */
+const RESENDS = 3;
+async function resendCode(ownerId: string, o: OrderRow): Promise<OrderView> {
+  if (o.status !== "requires_action" || !o.paymentId) throw new AppError("VALIDATION");
+  const [{ n }] = (await db.select({ n: sql<number>`count(*)::int` }).from(appOrderEvents).where(and(eq(appOrderEvents.orderId, o.id), eq(appOrderEvents.kind, "otp_resent")))) as [{ n: number }];
+  if (n >= RESENDS) throw new AppError("RATE_LIMITED", { retryAfter: 600 });
+  const [p] = await db.select().from(appPayments).where(eq(appPayments.id, o.paymentId));
+  const pay = bookingSuppliers.payments();
+  const r = pay.resendCode ? await pay.resendCode(p!.providerRef!) : { sent: false };
+  await db.transaction(async (tx) => {
+    await orderEvent(tx, o.id, "otp_resent", { kind: "user" }, { sent: r.sent });
+    await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "payment.3ds_resend", entityType: "app_payment", entityId: p!.id, summary: "Asked the bank for a new code" });
+  });
+  return orderView(await ownOrder(ownerId, o.id));
+}
+
+export async function answerOrder(ownerId: string, id: string, answer: "yes" | "call" | "accept_fare" | "stop" | "retry_by_phone" | "cancel" | "remind" | "resend_code"): Promise<OrderView> {
   const o = await ownOrder(ownerId, id);
   let u: OrderRow;
   if (answer === "remind") return remindPayer(ownerId, id);
+  if (answer === "resend_code") return resendCode(ownerId, o);
   if (answer === "yes" || answer === "call") u = await answerQuestion(o.id, ownerId, answer);
   else if (answer === "accept_fare") u = await acceptFare(o.id, ownerId);
   else if (answer === "retry_by_phone") u = await retryByPhone(o.id, ownerId);

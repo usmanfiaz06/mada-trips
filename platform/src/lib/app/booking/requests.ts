@@ -53,7 +53,8 @@ function searchTitle(kind: string, s: NonNullable<CreateRequestInput["search"]>)
  */
 export function readTitle(d: Partial<AskDetails>): string | undefined {
   if (d.titleCopy) return t(d.titleCopy[0] as CopyKey, d.titleCopy[1]);
-  if ((d as { transfer?: unknown }).transfer) return undefined;
+  // A car, an outing or a destination asked from its own screen keeps the title it was sent with (older rows had no titleCopy).
+  if (["transfer", "ride", "activity", "place"].some((k) => (d as Record<string, unknown>)[k])) return undefined;
   if (d.search && d.askKind && !d.service) return searchTitle(d.askKind, d.search);
   if (d.source === "ask" && d.askKind && d.answers && typeof d.query === "string" && !d.service) return requestTitle(d.askKind, d.answers, d.query);
   return undefined;

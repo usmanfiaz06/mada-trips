@@ -32,7 +32,11 @@ const NUM = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight',
 const elapsedLabel = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const FROM: Record<string, string> = { RUH: 'Riyadh', JED: 'Jeddah', DMM: 'Dammam' };
 
-const hotelOf = (o: OrderView) => o.lines.find((l) => l.icon === 'stay')?.text.split(' · ')[0] ?? null;
+const stayParts = (o: OrderView) => o.lines.find((l) => l.icon === 'stay')?.text.split(' · ') ?? [];
+// A room on its own is titled with the hotel's name (pricing.ts); a flight with a bundle names it first on the stay line.
+const hotelOf = (o: OrderView) => (o.kind === 'stay' ? o.title.trim() || null : stayParts(o)[0] ?? null);
+/** "2 connecting rooms": the rooms as the order's own stay line says them ("{rooms} · {dates} · {count} nights"). */
+const roomsOf = (o: OrderView) => (o.kind === 'stay' || o.kind === 'package' ? stayParts(o)[0] ?? '' : '');
 
 function rowsOf(o: OrderView): [string, string, string][] {
   const n = Math.max(1, o.travellerIds.length);
@@ -40,9 +44,11 @@ function rowsOf(o: OrderView): [string, string, string][] {
   const seats = o.seats.join(listSep());
   const price = t('wait.row.priceDetail', { price: formatSar(o.total.amount + o.extra.amount) });
   // The hotel by name, from the order's stay line ("Bereketzade Hotel · Connecting rooms · 6 nights").
+  // Only what the order really says: without a hotel name or rooms on it, the step has no detail line.
   const hotel = hotelOf(o);
-  if (o.kind === 'stay') return [[hotel ? t('hn.wait.asking', { hotel }) : t('wait.row.hotel'), hotel ? t('hn.wait.said', { hotel }) : t('wait.row.hotelDone'), hotel ? t('hn.wait.detail', { hotel }) : t('wait.row.hotelDetail')], [t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.roomsDetail')]];
-  if (o.kind === 'package') return [[t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), t('wait.row.hotelDetail')], [t('wait.row.tours'), t('wait.row.toursDone'), t('wait.row.toursDetail')]];
+  const rooms = roomsOf(o);
+  if (o.kind === 'stay') return [[hotel ? t('hn.wait.asking', { hotel }) : t('wait.row.hotel'), hotel ? t('hn.wait.said', { hotel }) : t('wait.row.hotelDone'), hotel ? t('hn.wait.detail', { hotel }) : ''], [t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), rooms]];
+  if (o.kind === 'package') return [[t('wait.row.price'), t('wait.row.priceDone'), price], [t('wait.row.rooms'), t('wait.row.roomsDone'), rooms], [t('wait.row.tours'), t('wait.row.toursDone'), t('wait.row.toursDetail')]];
   return [
     [tn('wait.row.seats', n, { count: nWord }), tn('wait.row.seatsDone', n, { count: nWord }), `${tn('wait.row.seatsDetail', n, { seats })}${o.cabin && o.cabin !== 'economy' ? `, ${o.cabin}` : ''}`],
     [t('wait.row.price'), t('wait.row.priceDone'), price],
@@ -142,7 +148,7 @@ export default function Waiting() {
               </View>
               <View style={{ flex: 1, gap: 1 }}>
                 <T style={[font('h3', state === 'now' ? colors.gold : colors.paper), { fontSize: 15 }]}>{state === 'done' ? doneLabel : doing}</T>
-                {state === 'done' ? <Animated.View entering={enter(0)}><T style={styles.doneText}>{detail}</T></Animated.View> : null}
+                {state === 'done' && detail ? <Animated.View entering={enter(0)}><T style={styles.doneText}>{detail}</T></Animated.View> : null}
               </View>
             </View>
           );

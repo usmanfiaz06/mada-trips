@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ageAt, askIntentOfRules, correctAsk, dobFromAge, dobOfTyped, familyRank, fareLines, hasLittleOnes, matchParty, parseAskRules, parseParty, weekendDates, type AskIntent, type Person,
+  ageAt, askIntentOfRules, correctAsk, dobFromAge, dobOfTyped, childSeats, familyRank, fareLines, flightTotal, hasLittleOnes, matchParty, parseAskRules, parseParty, weekendDates, type AskIntent, type Person,
 } from '../src';
 
 const TODAY = '2026-10-16';
@@ -157,5 +157,15 @@ describe('fares and options for a family', () => {
     const lines = fareLines({ pricePerPerson: { amount: 216000 }, infantPrice: { amount: 21600 }, infants: 1, total: { amount: 216000 * 4 + 21600 } }, [OMAR, HESSA, SARA, two], '2027-03-09');
     expect(lines.map((l) => [l.band, l.count, l.each])).toEqual([['adult', 3, 216000], ['child', 1, 216000], ['lapInfant', 1, 21600]]);
     expect(lines.reduce((a, l) => a + l.total, 0)).toBe(216000 * 4 + 21600);
+  });
+  it('prices a child 2 to 11 and a baby with a seat at the child fare, a baby on a lap at the lap fare', () => {
+    const two = person('x', 'Noura', 'child', { dateOfBirth: dobFromAge(2, TODAY) });
+    const seatBaby = person('y', 'Reem', 'child', { dateOfBirth: dobFromAge(1, TODAY) });
+    const fares = { pricePerPerson: { amount: 216000 }, childPrice: { amount: 162000 }, infantPrice: { amount: 21600 } };
+    expect(childSeats([OMAR, HESSA, two, seatBaby], TODAY)).toBe(2);
+    const total = flightTotal(fares, 4, 2, 1);
+    expect(total).toBe(216000 * 2 + 162000 * 2 + 21600);
+    const lines = fareLines({ ...fares, infants: 1, total: { amount: total } }, [OMAR, HESSA, two, seatBaby], TODAY);
+    expect(lines.map((l) => [l.band, l.count, l.each, l.total])).toEqual([['adult', 2, 216000, 432000], ['child', 1, 162000, 162000], ['seatInfant', 1, 162000, 162000], ['lapInfant', 1, 21600, 21600]]);
   });
 });

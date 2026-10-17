@@ -11,7 +11,7 @@ import { ChipWrap, Toggle } from './parts';
 const SWITCHES: [DemoFlag, string][] = [
   ['offline', 'Offline'], ['decline', 'Card declines'], ['priceUp', 'Price rises at payment'], ['noResults', 'No flights found'], ['supplierDown', 'Airline not answering'],
   ['agentQuestion', 'Mada asks a question'], ['passportProblem', 'Passport problem'], ['needs3ds', 'Bank asks for a code'], ['fareGone', 'Fare sold out while booking'],
-  ['ticketingFails', 'Tickets fail to issue'], ['slowAgent', 'Airline is slow'], ['faceIdFails', 'Face ID fails'],
+  ['ticketingFails', 'Tickets fail to issue'], ['slowAgent', 'Airline is slow'], ['faceIdFails', 'Face ID fails'], ['priceDown', 'Fare drops on a re-check'],
 ];
 
 export function DemoSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {

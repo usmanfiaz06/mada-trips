@@ -92,7 +92,7 @@ export function VoteSheet({ visible, onClose, dest, busy, onPost }: { visible: b
   );
 }
 
-export function SplitSheet({ visible, onClose, me, members, busy, onPost }: { visible: boolean; onClose: () => void; me: string; members: CircleMemberView[]; busy: boolean; onPost: (s: CreateSplitRequest) => void }) {
+export function SplitSheet({ visible, onClose, me, members, tripId = null, busy, onPost }: { visible: boolean; onClose: () => void; me: string; members: CircleMemberView[]; tripId?: string | null; busy: boolean; onPost: (s: CreateSplitRequest) => void }) {
   const [what, setWhat] = useState('');
   const [total, setTotal] = useState('');
   const [payer, setPayer] = useState(me);
@@ -145,7 +145,7 @@ export function SplitSheet({ visible, onClose, me, members, busy, onPost }: { vi
           : <T v="small" color={colors.badInk} accessibilityRole="alert">{diff > 0 ? t('circles.splitSheet.left', { amount: money(diff) }) : t('circles.splitSheet.over', { amount: money(-diff) })}</T>) : null}
         {who.length < 2 ? <T v="tiny">{t('circles.splitSheet.pick2')}</T> : null}
         <Button label={ok ? t('circles.splitSheet.go', { amount: money(sum) }) : t('circles.splitSheet.idle')} disabled={!ok} busy={busy} haptic="success" testID="split-post"
-          onPress={() => onPost({ what: what.trim(), total: sum, paidBy, mode, between: who, custom: mode === 'custom' ? Object.fromEntries(units.map((u, i) => [u.key, amounts[i]!])) : undefined })} />
+          onPress={() => onPost({ what: what.trim(), total: sum, paidBy, mode, between: who, custom: mode === 'custom' ? Object.fromEntries(units.map((u, i) => [u.key, amounts[i]!])) : undefined, ...(tripId ? { tripId } : {}) })} />
       </SheetScroll>
     </Sheet>
   );

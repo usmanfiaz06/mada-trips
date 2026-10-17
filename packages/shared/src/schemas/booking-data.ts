@@ -115,6 +115,8 @@ export const CABIN_FACTOR = { economy: 1, premium: 1.7, business: 3.2, first: 3.
 export const ONE_WAY_FACTOR = 0.55;
 /** A baby on a lap pays a tenth of the adult fare. */
 export const INFANT_FACTOR = 0.1;
+/** A child 2 to 11, or a baby with its own seat: three quarters of the adult fare, as most carriers price it. */
+export const CHILD_FACTOR = 0.75;
 
 /** Seat rows by cabin, for the seats a booking carries (store.jsx seatsFor). */
 export const SEAT_ROW = { economy: 14, premium: 8, business: 3, first: 3 } as const;

@@ -14,7 +14,7 @@ import { matchParty, parseParty, type SaidParty } from './party';
 import type { Cabin } from './trips';
 import type { AskIntent } from './booking';
 import {
-  CABIN_FACTOR, CATALOGUE_HOTELS, DEMO_HELPER_IQAMA, DEMO_SHORT_PASSPORT, DESK_PRICES, DESTINATIONS, ENTRY_RULES, INFANT_FACTOR, MADA_BINS,
+  CABIN_FACTOR, CHILD_FACTOR, CATALOGUE_HOTELS, DEMO_HELPER_IQAMA, DEMO_SHORT_PASSPORT, DESK_PRICES, DESTINATIONS, ENTRY_RULES, INFANT_FACTOR, MADA_BINS,
   NATIONALITY_ADJECTIVE, NEED_LABELS, NEED_WORDS, ONE_WAY_FACTOR, PICKUP_SAR, PROMOS, REQUEST_FORMS, SEAT_ROW, SMALL_ROOM_FACTOR, STAY_NIGHTS_DEFAULT,
   type HomeAirportCode, type NeedKey, type RequestFormKind,
 } from './booking-data';
@@ -321,6 +321,7 @@ export function askIntentOfRules(r: RuleIntent, kind: AskKindValue = r.kind): As
 
 export const fareSar = (ppSar: number, cabin: Cabin, oneway: boolean) => Math.round(ppSar * CABIN_FACTOR[cabin] * (oneway ? ONE_WAY_FACTOR : 1));
 export const infantSar = (fare: number) => Math.round(fare * INFANT_FACTOR);
+export const childSar = (fare: number) => Math.round(fare * CHILD_FACTOR);
 
 /** Rooms for the party: one room for two or fewer, connecting rooms for more. */
 export function roomsFor(n: number) { return n > 2 ? 2 : 1; }

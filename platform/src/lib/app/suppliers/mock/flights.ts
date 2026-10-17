@@ -1,4 +1,4 @@
-import { addDays, sarToHalalas, times, zonedToInstant, type FlightOffer, type FlightSearch, FlightSearch as FlightSearchSchema } from "@mada/shared";
+import { addDays, childSar, infantSar, sarToHalalas, times, zonedToInstant, type FlightOffer, type FlightSearch, FlightSearch as FlightSearchSchema } from "@mada/shared";
 import type { FlightHold, FlightSupplier } from "../types";
 import { AIRLINES, AIRPORT_TZ, ISTANBUL_FLIGHTS, stableCode, type MockFlight } from "./data";
 
@@ -45,7 +45,10 @@ function leg(f: MockFlight, day: string, back = false) {
 
 function toOffer(f: MockFlight, q: FlightSearch & { adults: number }, now = new Date()): FlightOffer {
   const n = q.adults + (q.children ?? 0);
+  // Duffel-shaped: a fare per passenger type (adult, child 2 to 11, a baby on a lap).
   const pp = sarToHalalas(f.ppSar);
+  const cp = sarToHalalas(childSar(f.ppSar));
+  const ip = sarToHalalas(infantSar(f.ppSar));
   return {
     id: `mock-${f.key}-${q.depart}${q.return ? `-${q.return}` : ""}-${n}`,
     supplier: "mock",
@@ -54,8 +57,8 @@ function toOffer(f: MockFlight, q: FlightSearch & { adults: number }, now = new 
     out: [leg(f, q.depart)],
     back: q.return ? [leg(f, q.return, true)] : [],
     cabin: q.cabin ?? "economy",
-    pricePerPerson: { amount: pp, currency: "SAR" },
-    total: { amount: times(pp, Math.max(1, n)), currency: "SAR" },
+    pricePerPerson: { amount: pp, currency: "SAR" }, childPrice: { amount: cp, currency: "SAR" }, infantPrice: { amount: ip, currency: "SAR" },
+    total: { amount: times(pp, Math.max(1, q.adults)) + times(cp, q.children ?? 0) + times(ip, q.infants ?? 0), currency: "SAR" },
     baggage: f.bags, changeRule: f.change, refundRule: f.refund,
     seatsLeft: null,
     expiresAt: new Date(now.getTime() + OFFER_TTL_MIN * 60_000).toISOString(),

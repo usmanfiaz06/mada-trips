@@ -73,7 +73,7 @@ export const bookingApi = {
   // A guest has no orders: don't ask (the server answers 401, which only fills the console).
   activeOrders: () => (useSession.getState().status === 'signedIn' ? request({ method: 'GET', path: '/orders' }, OrdersResponse) : Promise.resolve({ orders: [] })),
   otp: (id: string, code: string) => call('POST', `/orders/${id}/3ds`, OrderResponse, { code }),
-  answer: (id: string, answer: 'yes' | 'call' | 'accept_fare' | 'stop' | 'retry_by_phone' | 'cancel' | 'remind') => call('POST', `/orders/${id}/answer`, OrderResponse, { answer }),
+  answer: (id: string, answer: 'yes' | 'call' | 'accept_fare' | 'stop' | 'retry_by_phone' | 'cancel' | 'remind' | 'resend_code') => call('POST', `/orders/${id}/answer`, OrderResponse, { answer }),
 };
 
 export const bookingKeys = {

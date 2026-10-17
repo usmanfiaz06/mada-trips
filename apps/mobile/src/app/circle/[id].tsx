@@ -279,7 +279,7 @@ export default function CircleChat() {
       <ToolsSheet visible={sheet === 'tools'} onClose={() => setSheet(null)} canSplit={others.length > 0} dest={dest}
         onPick={(tool) => { if (tool === 'ask') { setSheet(null); setDraft('@Mada '); setTimeout(() => input.current?.focus(), 80); } else setSheet(tool); }} />
       <VoteSheet key={`v${opens}`} visible={sheet === 'vote'} onClose={() => setSheet(null)} dest={dest} busy={vote.isPending} onPost={(v) => vote.mutate(v, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); }, onError: fail })} />
-      <SplitSheet key={`s${opens}`} visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); }, onError: fail })} />
+      <SplitSheet key={`s${opens}`} visible={sheet === 'split'} onClose={() => setSheet(null)} me={me} members={d.members} tripId={d.circle.tripId} busy={split.isPending} onPost={(s) => split.mutate(s, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); }, onError: fail })} />
       <ShareSheet visible={sheet === 'share'} onClose={() => setSheet(null)} onPick={(card, p) => send.mutate({ card, pin: p }, { onSuccess: (r) => { if (r) merge(r.items); setSheet(null); buzz('success'); }, onError: fail })} />
       <CircleSettings key={`c${opens}`} visible={sheet === 'settings'} onClose={() => setSheet(null)} d={d} onGone={() => { setSheet(null); router.back(); }} />
     </Screen>

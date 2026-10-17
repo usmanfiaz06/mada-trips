@@ -276,6 +276,10 @@ export async function createSplit(circleId: string, userId: string, raw: unknown
   await assertNotLimited(userId); // the desk paused Circles for this account (limits.ts)
   const s = CreateSplitRequest.parse(raw);
   await membership(circleId, userId);
+  // A split in a circle that belongs to a trip is tagged with it, so the trip's Money screen shows it (money-view.ts).
+  const [circle] = await db.select({ tripId: appCircles.tripId }).from(appCircles).where(eq(appCircles.id, circleId));
+  if (s.tripId && s.tripId !== circle?.tripId) throw new AppError("VALIDATION", { fields: { tripId: "Not this circle's trip" } });
+  const tripId = circle?.tripId ?? null;
   const members = await memberIds(circleId);
   const between = members.filter((m) => s.between.includes(m));
   if (between.length !== new Set(s.between).size || !between.includes(s.paidBy)) throw new AppError("VALIDATION", { fields: { between: "Pick people in this circle" } });
@@ -287,7 +291,7 @@ export async function createSplit(circleId: string, userId: string, raw: unknown
     if (amounts.some((a) => a < 0) || amounts.reduce((a, b) => a + b, 0) !== s.total) throw err("VALIDATION", "circles.err.splitSum", { custom: t("circles.err.splitSum") });
   } else amounts = splitAmounts(s.total, units.length);
   const row = await db.transaction(async (tx) => {
-    const r = await addMessage(tx, circleId, { author: "user", userId, body: s.what, card: { t: "split", what: s.what, total: s.total, paidBy: s.paidBy, mode: s.mode, reminded: false, order: units.map((u) => u.key), ...(opts.orderId ? { orderId: opts.orderId } : {}) } });
+    const r = await addMessage(tx, circleId, { author: "user", userId, body: s.what, card: { t: "split", what: s.what, total: s.total, paidBy: s.paidBy, mode: s.mode, reminded: false, order: units.map((u) => u.key), ...(opts.orderId ? { orderId: opts.orderId } : {}), ...(tripId ? { tripId } : {}) } });
     await tx.insert(appCircleSplitShares).values(units.map((u, i) => ({
       messageId: r.id, key: u.key, userIds: u.ids, amount: amounts[i]!, paidAt: u.ids.includes(s.paidBy) ? new Date() : null, paidVia: u.ids.includes(s.paidBy) ? "bill" : null,
     })));

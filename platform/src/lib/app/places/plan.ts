@@ -35,7 +35,7 @@ export async function planPlace(ownerId: string, idOrSlug: string, input: PlanIn
   const agentName = await agentFor(ownerId);
   const guideUrl = `https://en.wikivoyage.org/wiki/Special:Search?search=${encodeURIComponent(`${place.name}, ${place.country}`)}`;
   const details: AskDetails & Record<string, unknown> = {
-    source: "ask", askKind: "general", title, detail: `${where} · ${message}`, summaryLine: message, note: null, query: message, answers: {}, needs: {},
+    source: "ask", askKind: "general", title, detail: `${where} · ${message}`, summaryLine: message, note: null, query: message, answers: {}, needs: {}, titleCopy: ["places.request.title", { city: place.name }],
     search: null, service: null, serviceFor: null, clientId: b.clientId ?? null, short: "trip", quote: null, quoteText: null, withWhom: "faisal",
     // Read by the desk (destinationOf) and by Ops.
     place: { id: String(place.id), name: place.name, country: place.country, countryCode: place.country_code, airports: place.airports.map((a) => a.iata), guideUrl, served: place.served },

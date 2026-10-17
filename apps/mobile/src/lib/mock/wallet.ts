@@ -1,6 +1,6 @@
 import {
   CreateDocumentMeta, DESK_PHONE, FX_FALLBACK, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
-  UpdatePersonRequest, checkSaudiMobile, firstNameOf, isSafetyChoice, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn, tripIsNow, type SupportContext, type TripsResponse,
+  UpdatePersonRequest, cardKey, cardLabel, checkSaudiMobile, uniqueCards, firstNameOf, isSafetyChoice, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn, tripIsNow, type SupportContext, type TripsResponse,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
 } from '@mada/shared';
@@ -78,8 +78,8 @@ function seedDemo(u: MockUser, s: State) {
     doc(hessa.id, 'national_id', 'National ID', 'Valid until 2031'), doc(hessa.id, 'visa', 'Schengen visa', 'Multi-entry until Jun 2028'),
     doc(sara.id, 'other', 'Family card entry', 'Valid'), doc(ahmed.id, 'other', 'Family card entry', 'Valid'),
   );
-  const visa: SavedCard = { id: uuid(), brand: 'visa', label: 'Visa ending 41', last4: '4141', exp: '08/28', createdAt: now() };
-  const mada: SavedCard = { id: uuid(), brand: 'mada', label: 'mada ending 07', last4: '8807', exp: '02/27', createdAt: now() };
+  const visa: SavedCard = { id: uuid(), brand: 'visa', label: cardLabel('visa', '4141'), last4: '4141', exp: '08/28', createdAt: now() };
+  const mada: SavedCard = { id: uuid(), brand: 'mada', label: cardLabel('mada', '8807'), last4: '8807', exp: '02/27', createdAt: now() };
   s.cards = [visa, mada];
   s.defaultId = visa.id;
   u.email = 'k7x2m9q4pz@privaterelay.appleid.com';
@@ -106,7 +106,11 @@ export function walletSeed(u: MockUser) { stateOf(u); }
 /* ───────────── helpers ───────────── */
 
 const balance = (s: State) => s.credit.reduce((a, e) => a + e.amount, 0);
-const cardsJson = (s: State) => ({ cards: s.cards, defaultId: s.cards.some((c) => c.id === s.defaultId) ? s.defaultId : 'applepay' });
+// One card per card, named in the reader's language, the same way the server does (shared cards.ts).
+const cardsJson = (s: State) => {
+  const defaultId = s.cards.some((c) => c.id === s.defaultId) ? s.defaultId : 'applepay';
+  return { cards: uniqueCards(s.cards, defaultId).map((c) => ({ ...c, label: cardLabel(c.brand, c.last4) })), defaultId };
+};
 const creditJson = (s: State) => ({ balance: { amount: balance(s), currency: 'SAR' }, entries: [...s.credit].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 const threadJson = ({ messages: _m, readAt: _r, ...th }: Thread) => th;
 const unreadOf = (th: Thread) => th.messages.filter((m) => m.author.kind !== 'user' && Date.parse(m.createdAt) > th.readAt).length;
@@ -408,8 +412,9 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
     const [mm, yy] = exp.split('/').map(Number) as [number, number];
     const d = new Date();
     if (!/^\d{2}\/\d{2}$/.test(exp) || mm < 1 || mm > 12 || 2000 + yy < d.getFullYear() || (2000 + yy === d.getFullYear() && mm < d.getMonth() + 1)) return err('VALIDATION', { copy: 'cards.problem.expired', fields: { exp: 'expired' } });
-    const card: SavedCard = { id: uuid(), brand, last4, exp, label: t('cards.label', { brand: brand === 'visa' ? 'Visa' : brand === 'mastercard' ? 'Mastercard' : 'mada', last: last4.slice(-2) }), createdAt: now() };
-    s.cards.push(card);
+    // The same card again (paid with it, "save" ticked) stays one card.
+    const card: SavedCard = s.cards.find((c) => cardKey(c) === cardKey({ brand, last4, exp })) ?? { id: uuid(), brand, last4, exp, label: cardLabel(brand, last4), createdAt: now() };
+    if (!s.cards.includes(card)) s.cards.push(card);
     if (body.makeDefault !== false) s.defaultId = card.id;
     return ok(cardsJson(s), 201);
   }
@@ -423,7 +428,8 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
   if (r && w.method === 'DELETE') {
     const id = r[1]!;
     if (!s.cards.some((c) => c.id === id)) return err('NOT_FOUND');
-    const others = s.cards.filter((c) => c.id !== id);
+    const gone = cardKey(s.cards.find((c) => c.id === id)!);
+    const others = s.cards.filter((c) => cardKey(c) !== gone);
     if (cardsJson(s).defaultId === id) {
       const nd = q.get('newDefault');
       if (others.length && !nd) return err('VALIDATION', { copy: 'error.defaultCard', fields: { newDefault: 'required' } });

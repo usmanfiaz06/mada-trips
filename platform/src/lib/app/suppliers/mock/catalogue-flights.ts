@@ -1,5 +1,5 @@
 import {
-  CARRIERS, CATALOGUE_FLIGHTS, DESTINATIONS, FlightSearch as FlightSearchSchema, addDays, destinationByCode, fareSar, sarToHalalas, times, zonedToInstant,
+  CARRIERS, CATALOGUE_FLIGHTS, DESTINATIONS, FlightSearch as FlightSearchSchema, addDays, destinationByCode, childSar, fareSar, infantSar, sarToHalalas, times, zonedToInstant,
   type CatalogueFlight, type Cabin,
 } from "@mada/shared";
 import type { BookingFlightOffer, BookingFlightSupplier } from "../booking-types";
@@ -31,12 +31,13 @@ function arrivalLocal(depLocal: string, from: string, to: string, durationMin: n
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 
-type Decoded = { dest: string; key: string; from: string; depart: string; ret: string | null; cabin: Cabin; adults: number; infants: number };
-const encode = (d: Decoded) => `cat.${d.dest}.${d.key}.${d.from}.${d.depart}.${d.ret ?? "ow"}.${d.cabin}.${d.adults}.${d.infants}`;
+/** `adults` is every seat; `children` the seats on a child fare among them. */
+type Decoded = { dest: string; key: string; from: string; depart: string; ret: string | null; cabin: Cabin; adults: number; infants: number; children: number };
+const encode = (d: Decoded) => `cat.${d.dest}.${d.key}.${d.from}.${d.depart}.${d.ret ?? "ow"}.${d.cabin}.${d.adults}.${d.infants}${d.children ? `.${d.children}` : ""}`;
 function decode(id: string): Decoded | null {
-  const m = /^cat\.([a-z]+)\.([a-z0-9]+)\.([A-Z]{3})\.(\d{4}-\d{2}-\d{2})\.(\d{4}-\d{2}-\d{2}|ow)\.(economy|premium|business|first)\.(\d)\.(\d)$/.exec(id);
+  const m = /^cat\.([a-z]+)\.([a-z0-9]+)\.([A-Z]{3})\.(\d{4}-\d{2}-\d{2})\.(\d{4}-\d{2}-\d{2}|ow)\.(economy|premium|business|first)\.(\d)\.(\d)(?:\.(\d))?$/.exec(id);
   if (!m) return null;
-  return { dest: m[1]!, key: m[2]!, from: m[3]!, depart: m[4]!, ret: m[5] === "ow" ? null : m[5]!, cabin: m[6] as Cabin, adults: Number(m[7]), infants: Number(m[8]) };
+  return { dest: m[1]!, key: m[2]!, from: m[3]!, depart: m[4]!, ret: m[5] === "ow" ? null : m[5]!, cabin: m[6] as Cabin, adults: Number(m[7]), infants: Number(m[8]), children: Number(m[9] ?? 0) };
 }
 
 function offerOf(f: CatalogueFlight, d: Decoded, mainCode: string, now = new Date()): BookingFlightOffer {
@@ -51,11 +52,17 @@ function offerOf(f: CatalogueFlight, d: Decoded, mainCode: string, now = new Dat
       durationMin: f.durationMin,
     };
   };
-  const pp = sarToHalalas(fareSar(f.ppSar, d.cabin, !d.ret));
+  // Duffel-shaped: a fare per passenger type (adult, child 2 to 11 or a baby with a seat, a baby on a lap).
+  const fare = fareSar(f.ppSar, d.cabin, !d.ret);
+  const pp = sarToHalalas(fare);
+  const cp = sarToHalalas(childSar(fare));
+  const ip = sarToHalalas(infantSar(fare));
+  const kids = Math.min(d.children, d.adults);
   return {
     id: encode(d), supplier: "catalogue", label: f.label === "bags" ? "other" : f.label, reason: f.reason,
     out: [leg(false, d.depart)], back: d.ret ? [leg(true, d.ret)] : [], cabin: d.cabin,
-    pricePerPerson: { amount: pp, currency: "SAR" }, total: { amount: times(pp, d.adults), currency: "SAR" },
+    pricePerPerson: { amount: pp, currency: "SAR" }, childPrice: { amount: cp, currency: "SAR" }, infantPrice: { amount: ip, currency: "SAR" },
+    total: { amount: times(pp, d.adults - kids) + times(cp, kids) + times(ip, d.infants), currency: "SAR" },
     baggage: f.bags, changeRule: f.change, refundRule: f.refund, seatsLeft: null,
     expiresAt: new Date(now.getTime() + OFFER_TTL_MIN * 60_000).toISOString(),
     meta: { label: f.label === "quiet" || f.label === "water" ? "best" : f.label, stop: f.stop ?? null, refundable: f.refund !== "Not refundable" },
@@ -70,13 +77,13 @@ export const catalogueFlights: BookingFlightSupplier = {
     if (q.to === "XXX") return [];
     const dest = destinationByCode(q.to);
     const list = dest ? CATALOGUE_FLIGHTS[dest.key] ?? [] : [];
-    return list.map((f) => offerOf(f, { dest: dest!.key, key: f.key, from: q.from, depart: q.depart, ret: q.return, cabin: q.cabin, adults: q.adults + q.children, infants: q.infants }, dest!.code));
+    return list.map((f) => offerOf(f, { dest: dest!.key, key: f.key, from: q.from, depart: q.depart, ret: q.return, cabin: q.cabin, adults: q.adults + q.children, infants: q.infants, children: q.children }, dest!.code));
   },
-  async price(offerId, travellers) {
+  async price(offerId, travellers, children) {
     const d = decode(offerId);
     const f = d && CATALOGUE_FLIGHTS[d.dest]?.find((x) => x.key === d.key);
     if (!d || !f) throw new Error(`Unknown catalogue offer ${offerId}`);
-    return offerOf(f, { ...d, adults: travellers }, DESTINATIONS[d.dest]!.code);
+    return offerOf(f, { ...d, adults: travellers, children: children ?? Math.min(d.children, travellers) }, DESTINATIONS[d.dest]!.code);
   },
   async hold(offerId, travellers) {
     const offer = await this.price(offerId, travellers.length);

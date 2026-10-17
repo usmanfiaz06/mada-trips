@@ -232,7 +232,7 @@ export function recordBookedTrip(b: BookedTrip): string {
   const startDate = f ? f.out.date : b.stay!.checkIn;
   const endDate = f ? f.back?.date ?? null : addDays(b.stay!.checkIn, b.stay!.nights);
   const ref = b.pnr ?? b.ref;
-  const flights = amountOf(['flight', 'infants']);
+  const flights = amountOf(['flight', 'children', 'infants']);
   const stayAmt = amountOf(['stay']);
   const pickupAmt = amountOf(['pickup']);
   const tripId = uuid();
@@ -248,7 +248,7 @@ export function recordBookedTrip(b: BookedTrip): string {
   s.trips.unshift(trip);
   const paidAt = nowIso();
   const method = b.plan !== 'full' ? b.plan : /apple pay/i.test(b.paymentLabel) ? 'applepay' : flights + stayAmt + pickupAmt - b.discount - b.creditUsed <= 0 ? 'credit' : 'card';
-  for (const [item, keys] of [['flight', ['flight', 'infants']], ['stay', ['stay']], ['pickup', ['pickup']]] as const) {
+  for (const [item, keys] of [['flight', ['flight', 'children', 'infants']], ['stay', ['stay']], ['pickup', ['pickup']]] as const) {
     const amount = amountOf([...keys]);
     if (!amount) continue;
     const plan = b.plan === 'full' ? null : instalments(amount, b.plan === 'tabby' ? 4 : 3).map((a, i) => ({ seq: i + 1, dueOn: addDays(paidAt.slice(0, 10), i * 30), amount: SAR(a), paid: i < 1 }));

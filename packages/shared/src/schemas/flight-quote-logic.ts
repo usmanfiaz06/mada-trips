@@ -53,15 +53,18 @@ export function fareToFlightOption(o: FareOption, expiresAt: string, quoteId: st
     const span = legs.length === 1 ? legMinutes(a) : Math.max(1, Math.round((end - start) / 60_000));
     return { flightNumber: a.flightNumber, from: a.from, to: z.to, date: a.date, dep: a.dep, arr: z.arr, durationMin: span };
   };
-  const adults = o.prices.filter((p) => p.type !== 'infant');
+  const seats = o.prices.filter((p) => p.type !== 'infant');
+  const adults = seats.filter((p) => p.type !== 'child');
+  const kids = seats.filter((p) => p.type === 'child');
   const infants = o.prices.filter((p) => p.type === 'infant');
+  const avg = (ps: FarePrice[]) => (ps.length ? Math.round(ps.reduce((a, p) => a + p.amount.amount, 0) / ps.length) : 0);
   const stops = Math.max(0, out.length - 1);
   return {
     id: quoteId, label: 'best', carrier: o.carrier, airline: o.airline, brand: CARRIERS[o.carrier]?.brand ?? '#1e352d',
     out: way(out.length ? out : o.legs), back: back.length ? way(back) : null, stop: stops ? out.slice(0, -1).map((l) => l.to).join(', ') : null,
     reason: o.note ?? '', bags: o.baggage, changeRule: o.changeRule, refundRule: o.refundRule, refundable: o.refundable, cabin: o.cabin,
-    adults: adults.length, infants: infants.length,
-    pricePerPerson: money(adults.length ? Math.round(adults.reduce((a, p) => a + p.amount.amount, 0) / adults.length) : 0),
+    adults: seats.length, infants: infants.length, children: kids.length,
+    pricePerPerson: money(avg(adults.length ? adults : seats)), childPrice: kids.length ? money(avg(kids)) : undefined,
     infantPrice: money(infants[0]?.amount.amount ?? 0), total: money(o.prices.reduce((a, p) => a + p.amount.amount, 0)), expiresAt,
   };
 }

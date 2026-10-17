@@ -58,7 +58,7 @@ export async function bookThing(ownerId: string, input: BookInput, ipHash: strin
   };
   const agentName = await agentFor(ownerId);
   const details: AskDetails & Record<string, unknown> = {
-    source: "ask", askKind: "todo", title, detail: `${thing.place.name} · ${who} · ${when}`, summaryLine: `${who} · ${when}`, note: null, query: message, answers: {}, needs: {},
+    source: "ask", askKind: "todo", title, detail: `${thing.place.name} · ${who} · ${when}`, summaryLine: `${who} · ${when}`, note: null, query: message, answers: {}, needs: {}, titleCopy: ["things.request.title", { name: thing.title }],
     search: null, service: null, serviceFor: null, clientId: b.clientId, short: "plans", quote: null, quoteText: null, withWhom: "faisal", message, activity,
   };
   const row = await db.transaction(async (tx) => {

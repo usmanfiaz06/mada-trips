@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import {
-  CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
+  CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, childSar, childSeats, flightTotal, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
   type StayOption, type StaySearchRequest, type StaySearchResponse, EntryCheckRequest as EntrySchema, FlightSearchRequest as FlightSchema, StaySearchRequest as StaySchema,
 } from "@mada/shared";
@@ -48,13 +48,17 @@ async function storeOffers(rows: (typeof appOffers.$inferInsert)[]) {
   for (let i = 0; i < rows.length; i += 250) await db.insert(appOffers).values(rows.slice(i, i + 250));
 }
 
-export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number, infants: number): FlightOption {
+/** `adults` is every seat, `children` the seats on a child fare among them, `infants` the babies on a lap. */
+export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number, infants: number, children = 0): FlightOption {
   const out = o.out[0]!;
   const lastOut = o.out[o.out.length - 1]!;
   const back = o.back[0] ?? null;
   const carrier = CARRIERS[out.carrier];
   const pp = o.pricePerPerson.amount;
-  const infant = sarToHalalas(infantSar(pp / 100));
+  // The supplier's own fare per passenger type when it sends one (Duffel does), else the usual share of the adult fare.
+  const child = o.childPrice?.amount ?? sarToHalalas(childSar(pp / 100));
+  const infant = o.infantPrice?.amount ?? sarToHalalas(infantSar(pp / 100));
+  const kids = Math.min(children, adults);
   return {
     id, label: o.meta?.label ?? (o.label === "lowest" || o.label === "earliest" || o.label === "fastest" ? o.label : "best"),
     carrier: out.carrier, airline: out.carrierName, brand: carrier?.brand ?? "#1e352d",
@@ -62,7 +66,8 @@ export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number
     back: back ? { flightNumber: back.flightNumber, from: back.from, to: o.back[o.back.length - 1]!.to, date: back.departLocal.slice(0, 10), dep: hhmm(back.departLocal), arr: hhmm(o.back[o.back.length - 1]!.arriveLocal), durationMin: o.back.reduce((a, l) => a + l.durationMin, 0) } : null,
     stop: o.meta?.stop ?? (o.out.length > 1 ? `One stop in ${o.out[0]!.to}` : null),
     reason: o.reason, bags: o.baggage, changeRule: o.changeRule, refundRule: o.refundRule, refundable: o.meta?.refundable ?? o.refundRule !== "Not refundable",
-    cabin: o.cabin, adults, infants, pricePerPerson: money(pp), infantPrice: money(infant), total: money(pp * adults + infant * infants), expiresAt: o.expiresAt,
+    cabin: o.cabin, adults, infants, children: kids, pricePerPerson: money(pp), childPrice: money(child), infantPrice: money(infant),
+    total: money(flightTotal({ pricePerPerson: money(pp), childPrice: money(child), infantPrice: money(infant) }, adults, kids, infants)), expiresAt: o.expiresAt,
   };
 }
 
@@ -74,6 +79,8 @@ export async function searchFlights(ownerId: string, input: FlightSearchRequest,
   if (q.depart < today()) throw new AppError("VALIDATION", { fields: { depart: "That day has passed" } });
   const people = await travellersOf(ownerId, q.travellerIds);
   const n = people.length;
+  // Children 2 to 11 and babies with a seat fly on a child fare (their age on the day out).
+  const kids = childSeats(people, q.depart);
   const base = { destination: dest.key, destinationName: dest.name, from: q.from, depart: q.depart, return: q.return, cabin: q.cabin, unavailable: [] as { carrier: string; airline: string }[], bundle: null };
   const until = (at: number) => new Date(at + CACHE_MS).toISOString();
   if (dest.byHand) return { ...base, outcome: "by_hand", checked: 0, options: [], cachedUntil: until(Date.now()) };
@@ -85,11 +92,11 @@ export async function searchFlights(ownerId: string, input: FlightSearchRequest,
     if (!q.return || later < q.return) depart = later;
   }
   const from = dest.code === q.from ? (q.from === "RUH" ? "JED" : "RUH") : q.from;
-  const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, q.infants, q.cabin]);
+  const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, kids, q.infants, q.cabin]);
   let offers: BookingFlightOffer[];
   let at: number;
   try {
-    ({ value: offers, at } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: n, infants: q.infants, cabin: q.cabin })));
+    ({ value: offers, at } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin })));
   } catch (e) {
     if (e instanceof SupplierDown) return { ...base, depart, outcome: "partial", checked: 0, options: [], unavailable: [{ carrier: "*", airline: "The airline" }], cachedUntil: until(Date.now()) };
     throw e;
@@ -101,7 +108,7 @@ export async function searchFlights(ownerId: string, input: FlightSearchRequest,
   }
   const search = { kind: "flight", destination: dest.key, from, depart, return: q.return, travellerIds: people.map((p) => p.id), infants: q.infants, cabin: q.cabin };
   const expiresAt = holdEnds();
-  const options: FlightOption[] = offers.map((o) => ({ ...flightOptionOf(o, randomUUID(), n, q.infants), expiresAt: expiresAt.toISOString() }));
+  const options: FlightOption[] = offers.map((o) => ({ ...flightOptionOf(o, randomUUID(), n, q.infants, kids), expiresAt: expiresAt.toISOString() }));
   await storeOffers(offers.map((o, i) => ({
     id: options[i]!.id, ownerId, kind: "flight", supplier: o.supplier, supplierOfferId: o.id, search, payload: options[i] as unknown as Record<string, unknown>, total: options[i]!.total.amount, expiresAt,
   })));
@@ -196,7 +203,7 @@ export function offerView(row: OfferRow, changedBy: number | null = null): Offer
  * "Check the price again": the supplier prices the offer for this many travellers now, and the hold starts again.
  * Used by the order sheet when the hold ends and when the travellers change.
  */
-export async function repriceOffer(ownerId: string, id: string, travellerCount?: number): Promise<{ row: OfferRow; changedBy: number }> {
+export async function repriceOffer(ownerId: string, id: string, travellerCount?: number, children?: number, demo?: Set<DemoFlag>): Promise<{ row: OfferRow; changedBy: number }> {
   const row = await ownOffer(ownerId, id);
   const search = row.search as { travellerIds?: string[]; infants?: number; checkIn?: string };
   const n = travellerCount ?? search.travellerIds?.length ?? 1;
@@ -204,8 +211,12 @@ export async function repriceOffer(ownerId: string, id: string, travellerCount?:
   let total: number;
   let expiresAt: Date;
   if (row.kind === "flight") {
-    const o = await bookingSuppliers.flights().price(row.supplierOfferId, n);
-    const opt = flightOptionOf(o, row.id, n, search.infants ?? 0);
+    const kids = Math.min(children ?? (row.payload as { children?: number }).children ?? 0, n);
+    const o = await bookingSuppliers.flights().price(row.supplierOfferId, n, kids);
+    // Demo: the fare comes back SAR 60 lower a seat, to show "Now SAR X, down from Y" on the pay sheet.
+    const less = demo?.has("priceDown") ? 6000 : 0;
+    const priced = less ? { ...o, pricePerPerson: money(Math.max(0, o.pricePerPerson.amount - less)), childPrice: o.childPrice ? money(Math.max(0, o.childPrice.amount - less)) : undefined } : o;
+    const opt = flightOptionOf(priced, row.id, n, search.infants ?? 0, kids);
     payload = opt as unknown as Record<string, unknown>;
     total = opt.total.amount;
     expiresAt = holdEnds();

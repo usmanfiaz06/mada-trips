@@ -238,14 +238,15 @@ describe("Sign in with Apple (mock) then a mobile number", () => {
 
 describe("audit trail", () => {
   it("records sign-ins and can't be edited", async () => {
-    const { user } = await signUp();
+    const { user, phone } = await signUp();
     const rows = await db.execute<{ action: string }>(rawSql`SELECT action FROM app_audit WHERE actor_id = ${user.id} ORDER BY created_at`);
     expect(rows.map((r) => r.action)).toEqual(expect.arrayContaining(["account.created", "auth.signed_in"]));
     const why = (p: Promise<unknown>) => p.then(() => "no error", (e: { cause?: { message?: string } }) => String(e.cause?.message ?? e));
     expect(await why(db.execute(rawSql`UPDATE app_audit SET summary = 'x' WHERE actor_id = ${user.id}`))).toMatch(/app_audit is append-only/);
     expect(await why(db.execute(rawSql`DELETE FROM app_audit WHERE actor_id = ${user.id}`))).toMatch(/app_audit is append-only/);
     // No code or full number ever lands in the log.
-    const leaks = await db.execute<{ n: number }>(rawSql`SELECT count(*)::int AS n FROM app_audit WHERE summary LIKE '%123456%' OR entity_id LIKE '+9665%'`);
+    // Only this sign-in's rows: other files share the database and may log their own numbers on purpose.
+    const leaks = await db.execute<{ n: number }>(rawSql`SELECT count(*)::int AS n FROM app_audit WHERE (actor_id = ${user.id} OR entity_id = ${user.id} OR summary LIKE ${`%${phone.slice(-7)}%`} OR entity_id = ${phone}) AND (summary LIKE '%123456%' OR summary LIKE ${`%${phone.slice(-7)}%`} OR entity_id LIKE '+9665%')`);
     expect(leaks[0]!.n).toBe(0);
   });
 });
