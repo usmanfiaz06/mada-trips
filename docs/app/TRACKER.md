@@ -12,6 +12,7 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 |---|---|---|
 | U · Umrah (Next 4) | permit-first Umrah, Makkah distance bands with named hotels, Madinah, Haramain, last-ten-nights warning; parser "taxi now" → car; bundle names the hotel; visible fare "Rules" link | started 17 Oct, session_012zVYc7M9ZXTLs4ymLNRe7o |
 | S · offline shell + 8% mode (Next 6) | service worker, cached trip offline, queued messages, low-battery screen | started 17 Oct, session_017G6Ew7RnxLE7Kii7UWv8nv |
+| L · native (Next 7) | Live Activity + Dynamic Island, real boarding passes (BCBP import), Apple Wallet .pkpass, NATIVE.md owner steps | started 17 Oct on owner's request (4th slot), session_0171JzMP5syiTg9p3seyBrmn |
 | P · polish | red platform tests (activities, places, auth flake), duplicate cards, real child/infant fares, hold-ended + price-down + 3DS branch, extras carrier, split tripId, waiting-screen made-up details | started 17 Oct, session_01NVAgKWJjayiCpo83VzFAwJ |
 
 ## Done
@@ -43,6 +44,10 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 - Owner to approve `docs/app/ARABIC.md` (30 before/after pairs).
 
 ## Decisions on record
+
+- Owner asked (17 Oct): guests browsing prices — recommended for web AND mobile (Apple 5.1.1(v): don't force sign-in before account features); awaiting go-ahead.
+- Cars: Hotelbeds Transfers is already wired for pre-booked airport pickups (transfers/service.ts); car-now has no on-demand supplier (Careem/Uber have no open booking API) → call-back. Proposed: offer Hotelbeds transfer for any ride ≥ supplier lead time.
+- eSIM: today a fixed SAR 39 placeholder (EsimFlow), no supplier. Proposed: Airalo Partner API (or eSIM Go), one-tap iOS install link.
 
 - Background stays warm off-white; actionable surfaces a touch lighter (not pure white).
 - Design bar: serif for journey headlines, one warm line per screen, photos with room, no voids, labels over sentences.
