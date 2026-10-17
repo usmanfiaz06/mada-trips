@@ -6,11 +6,14 @@ import { onShift } from "@/lib/app/desk/routing";
 import { DeskNav } from "@/components/desk/live";
 import { StatusPill } from "@/components/desk/parts";
 import { statusPillAction } from "./actions";
+import { esimBalance } from "@/lib/app/esim/ops";
+import { Notice } from "@/components/ui";
+import Link from "next/link";
 
 export default async function DeskLayout({ children }: { children: React.ReactNode }) {
   const u = await requirePerm("desk.view");
   const t = await getT();
-  const [{ items, rota }, me] = await Promise.all([deskInbox(), agentForOps(u.id)]);
+  const [{ items, rota }, me, bal] = await Promise.all([deskInbox(), agentForOps(u.id), esimBalance().catch(() => null)]);
   const c = inboxCounts(items, me);
   const nav = [
     { href: "/adminwork/desk", label: t("Inbox"), count: c.breached || c.all, tone: c.breached ? "bad" as const : undefined },
@@ -31,6 +34,9 @@ export default async function DeskLayout({ children }: { children: React.ReactNo
         <div className="min-w-0 flex-1"><DeskNav items={nav} /></div>
         {me && <StatusPill agent={{ id: me.id, name: me.displayName, status: me.status }} onShift={onShift(me.id, rota.shifts, rota.now)} action={statusPillAction} />}
       </div>
+      {bal?.low ? (
+        <div className="mb-3"><Notice tone="bad" title={t("eSIM Access balance is low: ${usd}", { usd: (bal.usd ?? 0).toFixed(2) })}>{t("Top it up in the eSIM Access console, or paid eSIMs wait.")} <Link href="/adminwork/desk/esims" className="underline decoration-gold underline-offset-4">{t("eSIMs")}</Link></Notice></div>
+      ) : null}
       {children}
     </>
   );

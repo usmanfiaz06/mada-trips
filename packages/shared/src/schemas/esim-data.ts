@@ -20,6 +20,10 @@ export type EsimPackage = {
   /** The eSIM roams on a partner network (data roaming must be on). */
   roaming: boolean;
   topup: boolean;
+  /** The supplier's suggested retail price in USD, when it gives one (eSIM Access). */
+  retailUsd?: number | null;
+  /** A daily plan: `gb` a day and `netUsd` a day, bought for as many days as the trip (`days` is 1). */
+  daily?: boolean;
 };
 
 /** Eurolink's countries (ISO 3166-1 alpha-2). */

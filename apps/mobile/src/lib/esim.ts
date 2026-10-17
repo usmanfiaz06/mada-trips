@@ -56,6 +56,6 @@ export function useEsimTopups(id: string, enabled: boolean) {
   return useQuery({ queryKey: esimKeys.topups(id), queryFn: () => esimApi.topups(id), enabled: enabled && !!id && signedIn, staleTime: 10 * 60_000, retry: false });
 }
 
-/** "5 GB · 30 days" or "Unlimited · 7 days". */
-export const planLabel = (p: { gb: number | null; days: number }, t: (k: 'es.plan.gb' | 'es.plan.unlimited', v: Record<string, string | number>) => string) =>
-  p.gb === null ? t('es.plan.unlimited', { days: p.days }) : t('es.plan.gb', { gb: p.gb, days: p.days });
+/** "5 GB · 30 days", "Unlimited · 7 days" or, for a daily plan, "1 GB a day · 7 days". */
+export const planLabel = (p: { gb: number | null; days: number; daily?: boolean }, t: (k: 'es.plan.gb' | 'es.plan.unlimited' | 'es.plan.daily', v: Record<string, string | number>) => string) =>
+  p.gb === null ? t('es.plan.unlimited', { days: p.days }) : p.daily ? t('es.plan.daily', { gb: p.gb, days: p.days }) : t('es.plan.gb', { gb: p.gb, days: p.days });

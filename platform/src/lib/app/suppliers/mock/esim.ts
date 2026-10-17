@@ -15,7 +15,9 @@ const orders: Map<string, EsimSupplierOrder> = (g.__madaMockEsimOrders ??= new M
 const installed: Map<string, string> = (g.__madaMockEsimInstalled ??= new Map<string, string>());
 let seq = 1000;
 export const mockEsimCalls = { orders: 0, topups: 0, refunds: 0 };
-export function resetMockEsim() { orders.clear(); installed.clear(); mockEsimCalls.orders = 0; mockEsimCalls.topups = 0; mockEsimCalls.refunds = 0; }
+/** The mock's prepaid balance (USD), like eSIM Access's: an order costs its net price; below it, refused as low balance. */
+export const mockEsimBalance = { usd: 500 };
+export function resetMockEsim() { orders.clear(); installed.clear(); mockEsimCalls.orders = 0; mockEsimCalls.topups = 0; mockEsimCalls.refunds = 0; mockEsimBalance.usd = 500; }
 export const markMockEsimInstalled = (iccid: string, at = new Date().toISOString()) => { installed.set(iccid, at); };
 
 const simFor = (description: string, i: number, packageId: string): EsimSim => {
@@ -34,6 +36,13 @@ export const mockEsim: EsimSupplier = {
   async packages(q) {
     return "global" in q ? ESIM_FIXTURE_PACKAGES.filter((p) => p.coverage.kind !== "local") : ESIM_FIXTURE_PACKAGES.filter((p) => p.coverage.kind === "local" && p.coverage.code === q.country);
   },
+  async catalogue() {
+    // A suggested retail on each, as eSIM Access gives one, so the desk's "vs suggested retail" has something to show.
+    return ESIM_FIXTURE_PACKAGES.map((p) => ({ ...p, retailUsd: Math.round(p.netUsd * 18) / 10 }));
+  },
+  async balance() {
+    return { usd: mockEsimBalance.usd };
+  },
   async topupPackages(iccid) {
     const p = planOfIccid(iccid);
     if (!p) throw new EsimRefused(404, "not found");
@@ -42,9 +51,11 @@ export const mockEsim: EsimSupplier = {
   async order({ packageId, quantity, description, demoFail }) {
     if (demoFail || packageId.startsWith("test-out-of-stock")) throw new EsimRefused(33, "Insufficient stock", true);
     if (!ESIM_FIXTURE_PACKAGES.some((p) => p.id === packageId)) throw new EsimRefused(34, "The selected package is invalid.");
+    const p = ESIM_FIXTURE_PACKAGES.find((x) => x.id === packageId)!;
+    if (mockEsimBalance.usd < p.netUsd * quantity) throw new EsimRefused("200007", "Insufficient account balance", true, false, true);
+    mockEsimBalance.usd = Math.round((mockEsimBalance.usd - p.netUsd * quantity) * 100) / 100;
     mockEsimCalls.orders += 1;
     seq += 1;
-    const p = ESIM_FIXTURE_PACKAGES.find((x) => x.id === packageId)!;
     const o: EsimSupplierOrder = {
       id: String(seq), code: `20261017-${seq}`, packageId, quantity, description, netUsd: p.netUsd * quantity,
       sims: Array.from({ length: quantity }, (_, i) => simFor(description, i, packageId)),

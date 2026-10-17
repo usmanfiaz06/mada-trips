@@ -52,7 +52,7 @@ export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "f
 const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions", "weather", "openData", "events"]);
 export type SupplierMode = "mock" | "live";
 /** Vendor names that mean "live" in SUPPLIER_MODE_<NAME>. */
-const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware", "airalo"]);
+const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware", "airalo", "esimaccess"]);
 /** Any of these keys turns flight status live without SUPPLIER_MODE_FLIGHT_STATUS (the owner only adds the key). */
 export const FLIGHT_STATUS_KEYS = ["AERODATABOX_API_KEY", "AVIATIONSTACK_API_KEY", "FLIGHTAWARE_API_KEY"] as const;
 

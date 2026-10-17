@@ -7,7 +7,7 @@ import { Chip } from '@/components/Chip';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { Approx } from '@/components/wallet/Approx';
-import { Box, H3, PickCard, Rise, Small, Tiny } from '@/components/trips/ui';
+import { Box, H3, PickCard, Rise, Small, TextLink, Tiny } from '@/components/trips/ui';
 import { ChipWrap } from '@/components/booking/parts';
 import { ApiError } from '@/lib/api';
 import { usePayDraft } from '@/lib/booking';
@@ -48,9 +48,10 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn 
   const [who, setWho] = useState<string[] | null>(null);
   const [phone, setPhone] = useState<Phone | null>(null);
   const [check, setCheck] = useState(false);
+  const [all, setAll] = useState(false);
   const people = useMemo(() => data?.people ?? [], [data]);
   const chosen = who ?? people.filter((p) => !p.has).map((p) => p.id);
-  const plan: EsimPlan | undefined = data?.plans.find((p) => p.id === (pick ?? data.recommended)) ?? data?.plans[0];
+  const plan: EsimPlan | undefined = [...(data?.plans ?? []), ...(data?.more ?? [])].find((p) => p.id === (pick ?? data?.recommended)) ?? data?.plans[0];
   const count = chosen.length;
   const total = plan ? plan.price.amount * count : 0;
 
@@ -103,6 +104,14 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn 
             note={!p.fits ? t('es.plan.short', { days: p.days }) : undefined} testID={`esim-plan-${p.size}`} />
         ))}
       </View>
+      {data.more.length ? <TextLink testID="esim-see-all" label={all ? t('es.plans.fewer') : t('es.plans.all')} onPress={() => setAll(!all)} /> : null}
+      {all ? (
+        <View style={{ gap: 8 }} testID="esim-more">
+          {data.more.map((p) => (
+            <PickCard key={p.id} radio on={plan.id === p.id} onPress={() => setPick(p.id)} title={planLabel(p, t)} right={t('es.plan.each', { price: formatSar(p.price.amount) })} testID={`esim-more-${p.id}`} />
+          ))}
+        </View>
+      ) : null}
       {data.where && data.where.kind !== 'local' ? <Tiny>{t('es.plan.region', { where })}</Tiny> : null}
 
       {people.length > 1 ? (
@@ -131,7 +140,7 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn 
         <Button testID="esim-review" label={t('es.review', { price: formatSar(total) })} disabled={!count || !phoneOk}
           onPress={() => {
             buzz('tap');
-            usePayDraft.getState().set({ draft: { kind: 'esim', count, packageId: plan.id, where: data.where?.code ?? undefined, tripId: data.tripId, travellerIds: chosen }, title: t('pay.title.esimFor', { where }) });
+            usePayDraft.getState().set({ draft: { kind: 'esim', count, packageId: plan.id, where: data.where?.code ?? undefined, tripId: data.tripId, travellerIds: chosen, ...(plan.daily ? { days: plan.days } : {}) }, title: t('pay.title.esimFor', { where }) });
             router.push('/pay');
           }} />
         <View style={{ alignItems: 'center' }}><Approx amount={total} /></View>

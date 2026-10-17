@@ -457,6 +457,8 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('esim'), count: z.number().int().min(1).max(12), packageId: z.string().min(1).max(80).optional(), where: z.string().max(20).optional(),
     tripId: Id.nullish(), travellerIds: z.array(Id).max(12).optional(), topupOf: Id.optional(),
+    /** A daily plan: how many days. */
+    days: z.number().int().min(1).max(365).optional(),
   }),
   /** Your share of a split in a circle, paid by card. The amount comes from the circle, never from the app. */
   z.object({ kind: z.literal('share'), circleId: Id, messageId: Id, shareKey: z.string().min(1).max(64) }),

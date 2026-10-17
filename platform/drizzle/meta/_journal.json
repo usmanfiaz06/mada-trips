@@ -232,6 +232,13 @@
       "when": 1792257064959,
       "tag": "0032_search_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792278480116,
+      "tag": "0033_esim_access",
+      "breakpoints": true
     }
   ]
 }

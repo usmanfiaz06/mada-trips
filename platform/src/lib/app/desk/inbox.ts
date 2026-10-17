@@ -11,6 +11,7 @@ import { listModeration } from "./moderation";
 import { listRecovery } from "./recovery";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
 import { disruptedToday } from "./disruptions";
+import { esimsNeedingDesk } from "../esim/ops";
 import { routeFor, type Route } from "./routing";
 import { compareUrgency, DESK_KINDS, slaFor, type DeskKind, type Sla } from "./sla";
 
@@ -30,8 +31,9 @@ export type InboxFilter = "mine" | "team" | "unassigned" | "escalated";
 const cut = (s: string, n = 90) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 async function sources(now: Date) {
-  const [orders, requests, chats, refunds, disrupted, moderation, recovery] = await Promise.all([
+  const [orders, requests, chats, refunds, disrupted, moderation, recovery, esims] = await Promise.all([
     listOrders({ stage: "open" }), listRequests({ open: true }), listConversations(300), listRefunds("requested"), disruptedToday(now), listModeration("open"), listRecovery("open"),
+    esimsNeedingDesk().catch(() => []),
   ]);
   type Raw = Omit<InboxItem, "key" | "route" | "agentName" | "escalated" | "escalationNote">;
   const raw: Raw[] = [];
@@ -86,6 +88,13 @@ async function sources(now: Date) {
     const unsafe = m.kind === "report" && m.reason === "unsafe";
     raw.push({ kind: "moderation", id: m.id, title: m.kind === "tip" ? `${m.snapshot.place ?? ""}${m.snapshot.city ? ` · ${m.snapshot.city}` : ""}` : cut(m.snapshot.text ?? m.snapshot.name ?? m.targetKind, 70), note: m.kind === "tip" ? "Tip to review" : unsafe ? "Unsafe report" : "Report to review", sub: m.kind === "tip" ? `${m.authorName} · ${cut(m.snapshot.text ?? "", 60)}` : `${m.reporterName} → ${m.authorName}`,
       userId: m.authorUserId, userName: m.authorName, href: `/adminwork/desk/moderation?focus=${m.id}`, sla: slaFor("moderation", m.createdAt, now, { targetMinutes: unsafe ? 30 : undefined }), amount: null });
+  }
+  // A paid eSIM that didn't come: waiting on our supplier balance (urgent, a time was promised) or no answer.
+  for (const e of esims) {
+    const plan = e.plan as { coverage?: { name?: string } };
+    const low = e.problem === "low_balance";
+    raw.push({ kind: "ticketing", id: e.id, title: `eSIM · ${plan.coverage?.name ?? ""}`, note: low ? "Top up the eSIM balance" : "eSIM not delivered", sub: `${e.ref ?? ""} · ${e.name ?? ""}${low && e.dueAt ? ` · promised by ${e.dueAt.toISOString().slice(11, 16)} UTC` : e.problem ? ` · ${cut(e.problem, 50)}` : ""}`,
+      userId: e.ownerId, userName: e.name ?? "", href: `/adminwork/desk/esims/${e.id}`, sla: slaFor("ticketing", e.updatedAt, now, { due: low ? e.dueAt : undefined, targetMinutes: low ? undefined : 15 }), amount: e.total, tag: "eSIM", urgent: low || undefined });
   }
   for (const r of recovery) {
     raw.push({ kind: "recovery", id: r.id, title: r.name, note: r.account ? "Move an account" : "No account matches", sub: `${r.oldMasked} → ${r.newMasked}`,

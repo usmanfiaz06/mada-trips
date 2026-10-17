@@ -1,4 +1,4 @@
-// eSIMs on Airalo, end to end in headless Chromium against the web export (react-native-web, mock API), in English
+// eSIMs (eSIM Access or Airalo; the mock here), end to end in headless Chromium against the web export (react-native-web, mock API), in English
 // and in Arabic.
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
@@ -7,7 +7,7 @@
 // Signs in as the demo account, asks Ask for internet in Istanbul: the plan for Türkiye in three sizes priced in SAR,
 // who needs one, "does your phone take an eSIM?" (not sure → the steps to check), the order sheet, paying; then the
 // install screen (iPhone one-tap link, Android QR code and the codes to type, the steps for when you land), "I've
-// installed it", what's left, a top-up paid on the order sheet, "Not connecting?" and Talk to Mada; last, an eSIM the
+// installed it", what's left, a top-up paid on the order sheet, "Not connecting?" step by step and Talk to Mada; last, an eSIM the
 // supplier can't give: refunded at once, with the outcome. Screenshots each at 390×844. Fails on any page error or
 // missing text.
 import { createServer } from 'node:http';
@@ -163,6 +163,9 @@ async function run(lang) {
   await press('esim-trouble');
   await see(c.trouble, 'trouble sheet');
   await shot('trouble');
+  // One check at a time (roaming, the line for data, the APN when there is one, airplane mode, restart), then Mada.
+  for (let i = 0; i < 6 && (await byTest('esim-tr-next').count()); i += 1) await press('esim-tr-next');
+  await shot('trouble-last');
   await press('esim-talk');
   await page.waitForTimeout(1500);
   await shot('talk');

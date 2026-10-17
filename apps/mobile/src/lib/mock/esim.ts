@@ -133,8 +133,8 @@ export const esimMock: AreaMock = async (w, ctx) => {
     const has = new Set([...esims.values()].filter((e) => e.owner === user.id && tripId && e.tripId === tripId && e.status !== 'refunded').map((e) => e.travellerId));
     const base = { days, start, tripId, supplier: 'mock' as const, people: onTrip.map((p) => ({ id: p.id, name: personName(p) || t('es.list.forYou'), has: has.has(p.id) })) };
     const s = suggestEsimPlans(packagesFor(countries), { countries, days });
-    if (!s.coverage || !s.plans.length) return ok({ ...base, outcome: 'none', where: null, plans: [], recommended: null });
-    return ok({ ...base, outcome: 'ok', where: { countries, code: s.coverage.code, kind: s.coverage.kind }, plans: s.plans, recommended: s.recommended });
+    if (!s.coverage || !s.plans.length) return ok({ ...base, outcome: 'none', where: null, plans: [], recommended: null, more: [] });
+    return ok({ ...base, outcome: 'ok', where: { countries, code: s.coverage.code, kind: s.coverage.kind }, plans: s.plans, recommended: s.recommended, more: s.more });
   }
   if (w.method === 'GET' && path === '/esims') {
     const order = qs.get('order');

@@ -25,7 +25,8 @@ import { zohoWhatsApp } from "./live/zoho-cpaas";
 import { guarded } from "../resilience/breaker";
 import { mockEsim } from "./mock/esim";
 import { airaloEsim } from "./live/airalo";
-import type { EsimSupplier } from "./esim-types";
+import { esimAccess } from "./live/esimaccess";
+import type { EsimSupplier, EsimVendor } from "./esim-types";
 
 export type * from "./types";
 export { outbox } from "./mock/outbox";
@@ -54,8 +55,8 @@ export const suppliers = {
   flightPositions: (): FlightPositionsSupplier => pick("flightPositions", mockFlightPositions, openAdsbPositions),
   ai: (): AiSupplier => pick("ai", mockAi, claudeAi),
   email: (): EmailSupplier => pick("email", mockEmail, sesEmail),
-  /** eSIMs: Airalo Partner API live (SUPPLIER_MODE_ESIM=live or airalo), the shared fixtures in mock. */
-  esim: (): EsimSupplier => pick("esim", mockEsim, airaloEsim),
+  /** eSIMs: eSIM Access (SUPPLIER_MODE_ESIM=esimaccess) or Airalo (=airalo) live, the shared fixtures in mock (esimVendor). */
+  esim: (): EsimSupplier => { const v = esimVendor(); return v === "mock" ? mockEsim : guarded("esim", v === "esimaccess" ? esimAccess : airaloEsim); },
   identity: (): IdentitySupplier => pick("identity", mockIdentity, providerIdentity),
   /** Supabase Auth access tokens. Not behind a breaker: a bad token is the caller's problem, not an outage. */
   supabase: (): SupabaseAuthSupplier => (supplierMode("supabase") === "live" ? liveSupabase : mockSupabase),
@@ -68,6 +69,17 @@ export const suppliers = {
     return mockSupabaseAdmin;
   },
 };
+
+/**
+ * Which eSIM supplier: SUPPLIER_MODE_ESIM=esimaccess or airalo names it; plain "live" means eSIM Access when its keys
+ * are set, Airalo otherwise (the first adapter built). Mock unless live.
+ */
+export function esimVendor(): EsimVendor {
+  if (supplierMode("esim") === "mock") return "mock";
+  const raw = (process.env.SUPPLIER_MODE_ESIM ?? "").trim().toLowerCase();
+  if (raw === "esimaccess" || raw === "airalo") return raw;
+  return process.env.ESIMACCESS_ACCESS_CODE ? "esimaccess" : "airalo";
+}
 
 /** In mock SMS mode every sign-in code is this, so development and app review never need a real phone. */
 export const MOCK_OTP_CODE = "123456";

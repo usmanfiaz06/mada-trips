@@ -117,6 +117,7 @@ export const BANNED: readonly string[] = [
 export const BANNED_ALLOW: Readonly<Partial<Record<CopyKey, readonly string[]>>> = {
   // eSIM set-up names the phone's own settings, word for word ("Data Roaming", "Mobile Data"), so people find them.
   'es.steps.ios1': ['data'], 'es.steps.ios2': ['data'], 'es.steps.android2': ['data'], 'es.tr.1': ['data'], 'es.tr.2': ['data'],
+  'es.tr.1.ios': ['data'], 'es.tr.2.ios': ['data'], 'es.tr.2.android': ['data'], 'es.tr.apn.ios': ['data'],
 };
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

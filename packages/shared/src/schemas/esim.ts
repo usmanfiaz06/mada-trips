@@ -24,6 +24,8 @@ export const ESIM_ROUTES = {
   installed: (id: string) => `/esims/${id}/installed`,
   /** Airalo's webhook (low data, async orders). */
   webhook: '/esim/airalo/webhook',
+  /** eSIM Access's webhook (order, eSIM, data and validity notices). */
+  esimAccessWebhook: '/esim/esimaccess/webhook',
 } as const;
 
 export const EsimCoverageKind = z.enum(['local', 'regional', 'global']);
@@ -45,6 +47,8 @@ export const EsimPlan = z.object({
   fits: z.boolean(),
   operator: z.string(),
   topup: z.boolean(),
+  /** A daily plan: `gb` is each day's allowance, `days` the trip's. */
+  daily: z.boolean().optional(),
 });
 export type EsimPlan = z.infer<typeof EsimPlan>;
 
@@ -64,9 +68,11 @@ export const EsimPlansResponse = z.object({
   tripId: Id.nullable(),
   plans: z.array(EsimPlan).max(3),
   recommended: z.string().nullable(),
+  /** Every other plan for the same place, best value first ("See all plans"). */
+  more: z.array(EsimPlan).max(40).default([]),
   /** The trip's travellers (or the household), and whether each already has an eSIM for this trip. */
   people: z.array(z.object({ id: Id, name: z.string(), has: z.boolean() })),
-  supplier: z.enum(['airalo', 'mock']),
+  supplier: z.enum(['esimaccess', 'airalo', 'mock']),
 });
 export type EsimPlansResponse = z.infer<typeof EsimPlansResponse>;
 
@@ -114,6 +120,8 @@ export const EsimView = z.object({
   result: RequestResult.nullable(),
   installedAt: IsoDateTime.nullable(),
   createdAt: IsoDateTime,
+  /** Paid, and Mada is sorting it with the network: the time it's promised by. */
+  readyBy: IsoDateTime.nullable().optional(),
 });
 export type EsimView = z.infer<typeof EsimView>;
 
@@ -179,10 +187,35 @@ const GB_A_DAY = 0.7;
  * Two or three sizes for the trip: each the shortest plan that lasts the trip at that size; light below what a day
  * usually takes, regular at it (recommended), heavy above. When nothing lasts the trip, the longest there is.
  */
-export function suggestEsimPlans(packages: readonly EsimPackage[], q: { countries: readonly string[]; days: number; markupBps?: number }): { coverage: EsimPackage['coverage'] | null; plans: EsimPlan[]; recommended: string | null } {
+export function suggestEsimPlans(
+  packages: readonly EsimPackage[],
+  q: { countries: readonly string[]; days: number; markupBps?: number; price?: Pricer; picks?: readonly string[] },
+): { coverage: EsimPackage['coverage'] | null; plans: EsimPlan[]; recommended: string | null; more: EsimPlan[] } {
   const coverage = esimCoverageFor(packages, q.countries);
-  if (!coverage) return { coverage: null, plans: [], recommended: null };
-  const mine = packages.filter((p) => p.coverage.code === coverage.code && p.coverage.kind === coverage.kind);
+  if (!coverage) return { coverage: null, plans: [], recommended: null, more: [] };
+  const here = packages.filter((p) => p.coverage.code === coverage.code && p.coverage.kind === coverage.kind);
+  // A daily plan becomes one plan for the trip's days: the day's price times the days.
+  const daily = here.filter((p) => p.daily).map((p) => ({ ...p, days: q.days, netUsd: p.netUsd * q.days, retailUsd: p.retailUsd ? p.retailUsd * q.days : p.retailUsd }));
+  const mine = here.filter((p) => !p.daily);
+  const value = (p: EsimPlan) => (p.gb === null ? 0 : p.price.amount / (p.daily ? p.gb * p.days : p.gb));
+  const moreOf = (shown: readonly EsimPlan[]) => [...mine.filter((p) => p.days >= q.days), ...daily]
+    .filter((p) => !shown.some((s) => s.id === p.id))
+    .map((p) => planOf(p, 'regular', true, q.markupBps, q.price))
+    .sort((a, b) => value(a) - value(b) || a.price.amount - b.price.amount)
+    .slice(0, 40);
+  // The owner's picks for this place, when there are any: sizes by data, best value recommended.
+  const picked = (q.picks ?? []).map((id) => [...mine, ...daily].find((p) => p.id === id)).filter((p): p is EsimPackage => !!p).slice(0, 3);
+  if (picked.length) {
+    const sorted = [...picked].sort((a, b) => (a.gb === null ? 1e6 : a.daily ? a.gb * a.days : a.gb) - (b.gb === null ? 1e6 : b.daily ? b.gb * b.days : b.gb));
+    const sizes: EsimSize[] = sorted.length === 3 ? ['light', 'regular', 'heavy'] : sorted.length === 2 ? ['light', 'heavy'] : ['regular'];
+    const plans = sorted.map((p, i) => planOf(p, sizes[i]!, p.days >= q.days, q.markupBps, q.price));
+    const best = [...plans].sort((a, b) => value(a) - value(b))[0]!;
+    return { coverage, plans, recommended: best.id, more: moreOf(plans) };
+  }
+  if (!mine.length) {
+    const plans = daily.slice(0, 1).map((p) => planOf(p, 'regular', true, q.markupBps, q.price));
+    return { coverage, plans, recommended: plans[0]?.id ?? null, more: moreOf(plans) };
+  }
   const longEnough = mine.filter((p) => p.days >= q.days);
   const longest = Math.max(...mine.map((p) => p.days));
   const pool = longEnough.length ? longEnough : mine.filter((p) => p.days === longest);
@@ -201,23 +234,27 @@ export function suggestEsimPlans(packages: readonly EsimPackage[], q: { countrie
   picks.push([sized[mid]!, 'regular']);
   if (sized[mid + 1]) picks.push([sized[mid + 1]!, 'heavy']);
   if (picks.length < 3 && !sized[mid - 1] && sized[mid + 2]) picks.push([sized[mid + 2]!, 'heavy']);
-  const plans = picks.map(([p, size]) => planOf(p, size, p.days >= q.days, q.markupBps));
-  return { coverage, plans, recommended: plans.find((p) => p.size === 'regular')?.id ?? null };
+  const plans = picks.map(([p, size]) => planOf(p, size, p.days >= q.days, q.markupBps, q.price));
+  return { coverage, plans, recommended: plans.find((p) => p.size === 'regular')?.id ?? null, more: moreOf(plans) };
 }
 
-export const planOf = (p: EsimPackage, size: EsimSize, fits: boolean, markupBps?: number): EsimPlan => ({
-  id: p.id, coverage: p.coverage, gb: p.gb, days: p.days, price: { amount: esimPrice(p.netUsd, markupBps), currency: 'SAR' }, size, fits, operator: p.operator, topup: p.topup,
+/** A package's price in halalas (the owner's rules, schemas/esim-pricing.ts); the plain markup when none is given. */
+export type Pricer = (p: EsimPackage) => Halalas;
+
+export const planOf = (p: EsimPackage, size: EsimSize, fits: boolean, markupBps?: number, price?: Pricer): EsimPlan => ({
+  id: p.id, coverage: p.coverage, gb: p.gb, days: p.days, price: { amount: price ? price(p) : esimPrice(p.netUsd, markupBps), currency: 'SAR' }, size, fits, operator: p.operator, topup: p.topup,
+  ...(p.daily ? { daily: true } : {}),
 });
 
 /** Top-up sizes for an eSIM: up to three, smallest first. */
-export function topupPlans(packages: readonly EsimPackage[], markupBps?: number): EsimPlan[] {
+export function topupPlans(packages: readonly EsimPackage[], markupBps?: number, price?: Pricer): EsimPlan[] {
   const sorted = [...packages].sort((a, b) => (a.gb ?? 1e6) - (b.gb ?? 1e6) || a.days - b.days);
   const seen = new Set<string>();
   const out: EsimPackage[] = [];
   for (const p of sorted) { const k = `${p.gb}`; if (!seen.has(k)) { seen.add(k); out.push(p); } }
   const three = out.length > 3 ? [out[0]!, out[Math.floor(out.length / 2)]!, out[out.length - 1]!] : out;
   const sizes: EsimSize[] = three.length === 3 ? ['light', 'regular', 'heavy'] : three.length === 2 ? ['light', 'regular'] : ['regular'];
-  return three.map((p, i) => planOf(p, sizes[i]!, true, markupBps));
+  return three.map((p, i) => planOf(p, sizes[i]!, true, markupBps, price));
 }
 
 /** Whether a phone takes an eSIM, from its model name: yes, no, or not sure (then the steps to check). */

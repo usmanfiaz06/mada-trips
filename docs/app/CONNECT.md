@@ -102,7 +102,10 @@ TBO (TBO Holidays / TBO Air) can give real flight search, fares and ticketing, w
 ### 12. Flights today
 Nothing to do: flights go to the desk as requests until TBO (or another GDS) is connected.
 
-### 13. eSIM — Airalo (built, needs keys)
+### 13. eSIM — eSIM Access (built, needs keys); Airalo optional
+The owner registered with eSIM Access: keys, webhook, credit, margins and the support playbook are in **docs/app/ESIM.md**.
+Airalo stays as a second supplier (`SUPPLIER_MODE_ESIM=airalo`), set up as below.
+
 Built: plans for the trip's country and days in 2–3 sizes, one eSIM per traveller, the phone check, paid on the order
 sheet, bought from Airalo once the card is captured (never twice), iPhone one-tap install, Android QR and codes, what's
 left and top-ups on the trip, "Not connecting?", the desk's eSIM page, an automatic refund when Airalo can't give one.
