@@ -245,8 +245,94 @@ async function run(lang) {
   await context.close();
 }
 
+/*
+ * No endless "searching": the plans request routed (window.__madaMockHttp sends it over HTTP, so page.route applies)
+ * to no answer at all → after 12 s "This is taking too long." with Try again and Talk to Mada; then a 500 → the same
+ * honest card at once; then the mock answers → three plans, each its own size word; last a 401 the refresh can't fix
+ * → the sign-in-again sheet, never a spinner.
+ */
+async function trouble() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh', reducedMotion: 'reduce' });
+  await context.addInitScript(() => { window.__madaMockHttp = ['/esim/plans', '/auth/refresh']; });
+  const page = await context.newPage();
+  page.on('pageerror', (e) => { errors.push(`trouble pageerror: ${e.message}`); console.log('PAGEERROR', e.message); });
+  const shot = async (name) => { n += 1; await page.waitForTimeout(600); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-trouble-${name}.png`) }); };
+  const byTest = (id) => page.locator(`[data-testid="${id}"]`).filter({ visible: true }).last();
+  const visible = async (id, what, timeout = 9000) => {
+    try { await byTest(id).waitFor({ state: 'visible', timeout }); return true; } catch { errors.push(`trouble ${what}: no [${id}]`); console.log('MISSING trouble', what, id); return false; }
+  };
+  const see = async (text, what, timeout = 9000) => {
+    try { await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout }); return true; }
+    catch { errors.push(`trouble ${what}: expected "${text}"`); console.log('MISSING trouble', what, '→', text); return false; }
+  };
+  const PLANS = '**/api/app/v1/esim/plans**';
+  const envelope = (code) => JSON.stringify({ error: { code, message: code } });
+  let mode = 'hang';
+  let calls = 0;
+  await page.route(PLANS, async (route) => {
+    calls += 1;
+    if (mode === 'hang') return; // never answered
+    if (mode === '500') return route.fulfill({ status: 500, contentType: 'application/json', body: envelope('INTERNAL') });
+    if (mode === '401') return route.fulfill({ status: 401, contentType: 'application/json', body: envelope('TOKEN_EXPIRED') });
+    return route.fulfill({ status: 204, headers: { 'x-mada-mock': 'pass' }, body: '' });
+  });
+  await page.route('**/api/app/v1/auth/refresh', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: envelope('UNAUTHORIZED') }));
+
+  step('trouble: sign in, ask for internet in Istanbul; the plans never answer');
+  await page.goto(ORIGIN + '/');
+  await byTest('welcome-start').waitFor({ state: 'visible', timeout: 15000 });
+  await byTest('welcome-start').click();
+  await byTest('signin-phone').click();
+  await byTest('phone-input').fill('500004127');
+  await byTest('phone-send').click();
+  await byTest('otp-input').waitFor({ state: 'visible', timeout: 10000 });
+  await byTest('otp-input').fill('123456');
+  try { await byTest('welcome-back-open').waitFor({ state: 'visible', timeout: 6000 }); await byTest('welcome-back-open').click(); } catch { /* straight in */ }
+  await page.waitForTimeout(1500);
+  await byTest('dock-ask').click();
+  await page.waitForTimeout(600);
+  await byTest('ask-input').fill('Internet for Istanbul');
+  await byTest('ask-send').click();
+  await visible('esim-loading', 'spinner while waiting', 8000);
+  const t0 = Date.now();
+  await visible('esim-timeout', 'timeout state after ~12 s', 20000);
+  const waited = Date.now() - t0;
+  if (waited < 8000) errors.push(`trouble: gave up after only ${waited} ms`);
+  await see('This is taking too long.', 'timeout words');
+  await see('Try again', 'try again');
+  await see('Talk to Mada', 'talk to Mada');
+  await shot('timeout');
+
+  step('trouble: Try again → a 500 → the honest card at once, not a spinner');
+  mode = '500';
+  const before = calls;
+  await byTest('state-retry').click();
+  await visible('esim-error', 'error state on 500', 15000);
+  if (calls <= before) errors.push('trouble: Try again sent no new request');
+  await see('Try again', 'try again on 500');
+  await see('Talk to Mada', 'talk on 500');
+  await shot('error-500');
+
+  step('trouble: Try again → the plans, each card its own size');
+  mode = 'pass';
+  await byTest('state-retry').click();
+  await see('Internet in Türkiye, on when you land.', 'plans after Try again', 15000);
+  const sizes = await page.locator('[data-testid^="esim-plan-"]').filter({ visible: true }).evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+  if (new Set(sizes).size !== sizes.length || sizes.length < 2) errors.push(`trouble: plan size labels not distinct: ${sizes.join(', ')}`);
+  await shot('plans-after-retry');
+
+  step('trouble: the session ends (401, refresh refused) → sign in again, not a spinner');
+  mode = '401';
+  await byTest('esim-days-change').click();
+  await byTest('esim-days-14').click();
+  await visible('session-expired', 'sign-in-again sheet', 15000);
+  await shot('session-expired');
+  await context.close();
+}
+
 try {
   await run('en');
+  await trouble();
   await run('ar');
 } catch (e) {
   errors.push(String(e?.stack ?? e));

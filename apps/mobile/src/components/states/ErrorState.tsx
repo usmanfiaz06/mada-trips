@@ -13,8 +13,12 @@ import { StateView } from './StateView';
  * words, the drawing and the one action. Offline, timeouts, a busy or broken server, a supplier not answering, a
  * newer server, something removed. "Reference …" is shown for problems on our side, so Faisal can find the request.
  */
-export function ErrorState({ error, problem, onRetry, variant = 'full', supplierName, booking, gutter, testID }: {
+export function ErrorState({ error, problem, onRetry, onSignIn, variant = 'full', supplierName, booking, gutter, always, testID }: {
   gutter?: number; error?: unknown; problem?: Described | null; onRetry?: () => void; variant?: 'full' | 'card'; supplierName?: string; booking?: boolean; testID?: string;
+  /** Sign in again (a session that ran out): the sign-in sheet. */
+  onSignIn?: () => void;
+  /** A search: whatever went wrong, always a way on (Try again, Talk to Mada), never a dead end. */
+  always?: boolean;
 }) {
   const d = problem ?? describeError(error, { supplierName, booking });
   const art = {
@@ -32,7 +36,12 @@ export function ErrorState({ error, problem, onRetry, variant = 'full', supplier
   if (d.primary === 'home') { primary = home; secondary = talk; }
   else if (d.primary === 'talk') { primary = talkFirst; secondary = onRetry ? <Button variant="ghost" label={t('common.tryAgain')} onPress={onRetry} testID="state-retry" /> : null; }
   else if (d.kind === 'offline') primary = null; // it comes back by itself; the banner says so
+  else if (d.primary === 'signin' && onSignIn) { primary = <Button label={t('session.expired.action')} onPress={onSignIn} testID="state-signin" />; secondary = talk; }
   else if (d.primary === 'retry' || d.primary === 'wait') { primary = retry; secondary = d.kind === 'server' || d.kind === 'timeout' ? talk : null; }
+  if (always) {
+    if (!primary && !secondary) { primary = retry; secondary = talk; }
+    else if (!secondary) secondary = primary === talkFirst ? null : talk;
+  }
 
   return (
     <StateView variant={variant} gutter={gutter} art={art} title={d.title} body={d.kind === 'offline' ? `${d.body} ${t('net.offline.retryOnline')}` : d.body}

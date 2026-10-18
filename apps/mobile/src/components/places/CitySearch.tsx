@@ -7,6 +7,8 @@ import { Icon } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { ArtCompass } from '@/components/circles/art';
+import { WaitTrouble } from '@/components/states/WaitTrouble';
+import { useGiveUp } from '@/lib/net/give-up';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
@@ -58,6 +60,9 @@ export function CitySearch({ onPick, autoFocus, current }: { onPick: (p: PlaceHi
   const names = new Map<string, number>();
   (data?.results ?? []).forEach((r) => names.set(r.name, (names.get(r.name) ?? 0) + 1));
   const offline = search.error instanceof ApiError && search.error.code === 'OFFLINE';
+  // No endless spinner: a search that fails or takes too long says so, with Try again and Talk to Mada.
+  const wait = useGiveUp(search, { key: term, active: !!term });
+  const trouble = !offline && !data && (wait.view === 'error' || wait.view === 'timeout');
   const near = (popular.data ?? []).filter((p) => p.countryCode === 'SA');
   const away = (popular.data ?? []).filter((p) => p.countryCode !== 'SA');
 
@@ -67,13 +72,15 @@ export function CitySearch({ onPick, autoFocus, current }: { onPick: (p: PlaceHi
         <Icon name="globe" size={20} color={colors.muted} />
         <TextInput value={q} onChangeText={setQ} placeholder={t('places.search.placeholder')} placeholderTextColor={colors.muted} accessibilityLabel={t('places.search.label')}
           autoFocus={autoFocus} autoCorrect={false} autoCapitalize="words" returnKeyType="search" testID="place-search" style={[s.input, font('body', colors.green)]} />
-        {search.isFetching && term ? <ActivityIndicator size="small" color={colors.muted} /> : null}
+        {search.isFetching && term && wait.view === 'loading' ? <ActivityIndicator size="small" color={colors.muted} /> : null}
         {q ? <Pressable accessibilityRole="button" accessibilityLabel={t('places.search.clear')} hitSlop={10} onPress={() => setQ('')}><Icon name="close" size={18} color={colors.muted} /></Pressable> : null}
       </View>
 
       {term ? (
         offline ? (
           <EmptyState compact art={<ArtCompass />} title={t('places.search.offline')} action={<Pressable onPress={() => void search.refetch()}><T v="small" style={{ fontFamily: ff.ui600 }} color={colors.green}>{t('places.search.retry')}</T></Pressable>} />
+        ) : trouble ? (
+          <WaitTrouble wait={wait} testID={`place-${wait.view}`} />
         ) : data && data.results.length ? (
           <View style={{ gap: 8 }} testID="place-results">
             {data.results.map((p) => <CityRow key={p.id} p={p} onPick={pick} showRegion={(names.get(p.name) ?? 0) > 1} on={current ? p.name === current : undefined} />)}

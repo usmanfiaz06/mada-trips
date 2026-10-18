@@ -9,8 +9,8 @@
 // flight, the hotel in English and Arabic, Mada's number and a call-back, the suggestion when the battery reads 8%;
 // signing out leaves nothing of the account on the device; the screen in Arabic. Fails on any page error or missing text.
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
-import { extname, join, resolve } from 'node:path';
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join, resolve } from 'node:path';
 import { chromium } from 'playwright-core';
 
 const DIST = resolve(process.env.DIST ?? 'dist');
@@ -21,13 +21,35 @@ if (!existsSync(join(DIST, 'index.html'))) throw new Error(`No web export in ${D
 if (!existsSync(join(DIST, 'sw.js'))) throw new Error(`No sw.js in ${DIST}: public/ wasn't copied`);
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.ico': 'image/x-icon', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
-const server = createServer((req, res) => {
+// A deploy: `next` is a folder laid over the export (its own index.html naming a renamed entry bundle, so another
+// build id); `slowPage` holds the page back that long, like a weak connection.
+let next = null;
+let slowPage = 0;
+const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
-  let file = join(DIST, decodeURIComponent(url.pathname));
-  if (!file.startsWith(DIST) || !existsSync(file) || statSync(file).isDirectory()) file = join(DIST, 'index.html');
-  res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Content-Length': statSync(file).size });
+  const path = decodeURIComponent(url.pathname);
+  const from = next && existsSync(join(next, path)) && !statSync(join(next, path)).isDirectory() ? next : DIST;
+  let file = join(from, path);
+  if (!file.startsWith(from) || !existsSync(file) || statSync(file).isDirectory()) file = join(next ?? DIST, 'index.html');
+  if (file.endsWith('index.html') && slowPage) await new Promise((r) => setTimeout(r, slowPage));
+  res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream', 'Content-Length': statSync(file).size, ...(file.endsWith('sw.js') || file.endsWith('.html') ? { 'Cache-Control': 'no-cache' } : null) });
   createReadStream(file).pipe(res);
 });
+
+/** Another build of the same app: the entry bundle under a new name, and a page that names it. Returns its id. */
+function deploy(n) {
+  const html = readFileSync(join(DIST, 'index.html'), 'utf8');
+  const m = /\/_expo\/static\/js\/web\/entry-([A-Za-z0-9]+)\.js/.exec(html);
+  if (!m) throw new Error('no entry bundle in index.html');
+  const id = `${m[1]}n${n}`;
+  const dir = join(OUT, `deploy-${n}`);
+  const to = join(dir, `_expo/static/js/web/entry-${id}.js`);
+  mkdirSync(dirname(to), { recursive: true });
+  copyFileSync(join(DIST, m[0]), to);
+  writeFileSync(join(dir, 'index.html'), html.replace(m[0], `/_expo/static/js/web/entry-${id}.js`));
+  next = dir;
+  return id;
+}
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const ORIGIN = `http://127.0.0.1:${server.address().port}`;
 
@@ -74,9 +96,12 @@ async function signIn(p) {
 async function shellSaved(p) {
   await p.page.waitForFunction(async () => {
     if (!navigator.serviceWorker?.controller) return false;
-    const c = await caches.open('mada-shell-v1');
-    const keys = (await c.keys()).map((r) => new URL(r.url).pathname);
-    return keys.includes('/index.html') && keys.some((k) => k.includes('/entry-')) && keys.some((k) => k.includes('/mock-api-'));
+    const names = (await caches.keys()).filter((k) => k.startsWith('mada-shell-'));
+    for (const name of names) {
+      const keys = (await (await caches.open(name)).keys()).map((r) => new URL(r.url).pathname);
+      if (keys.includes('/index.html') && keys.some((k) => k.includes('/entry-')) && keys.some((k) => k.includes('/mock-api-'))) return true;
+    }
+    return false;
   }, null, { timeout: 20_000, polling: 500 });
 }
 
@@ -166,6 +191,65 @@ try {
     if (foreign.length) errors.push(`cached outside the app shell: ${foreign.slice(0, 5).join(', ')}`);
     if (!cached.length) errors.push('nothing cached at all');
     await p.shot('signed-out');
+    await p.context.close();
+  }
+
+  {
+    step('a new deploy while the app is open: "A new version is ready · Refresh", then the new build takes over');
+    const p = await newPage();
+    await signIn(p);
+    await shellSaved(p);
+    await p.see('Istanbul', 'trip before the deploy');
+    const running = () => p.page.evaluate(() => /entry-([A-Za-z0-9]+)\.js/.exec([...document.scripts].map((x) => x.src).join(' '))?.[1] ?? null);
+    const first = await running();
+    const second = deploy(2);
+    // The tab comes back to the front: the app looks for a newer build.
+    await p.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await p.byTest('update-bar').waitFor({ state: 'visible', timeout: 15_000 }).catch(() => errors.push('update bar did not show after a deploy'));
+    await p.see('A new version is ready', 'update bar words');
+    await p.see('Refresh', 'refresh button');
+    if ((await running()) !== first) errors.push('the open tab changed build by itself');
+    // Its worker installs, takes over and saves the new build; the old build's files stay for the open tab.
+    const tookOver = await p.page.waitForFunction(async (b) => {
+      const c = navigator.serviceWorker.controller;
+      if (!c || !c.scriptURL.includes(`build=${b}`)) return false;
+      const keys = await caches.keys();
+      return keys.includes(`mada-shell-${b}`) && !!(await (await caches.open(`mada-shell-${b}`)).match('/index.html'));
+    }, second, { timeout: 20_000, polling: 500 }).then(() => true).catch(() => false);
+    if (!tookOver) errors.push('the new worker did not take over with the new build saved');
+    const kept = await p.page.evaluate(async (b) => (await caches.keys()).includes(`mada-shell-${b}`), first);
+    if (!kept) errors.push('the open tab\'s build was dropped while it still runs');
+    await p.shot('update-bar');
+
+    await p.byTest('update-refresh').click();
+    await p.page.waitForLoadState('load');
+    await p.see('Istanbul', 'trip after Refresh', 15_000);
+    if ((await running()) !== second) errors.push(`after Refresh still on ${await running()}, not ${second}`);
+    if (await p.byTest('update-bar').isVisible().catch(() => false)) errors.push('update bar still showing on the new build');
+
+    step('a deploy on a slow connection: the saved app opens, then says a new one is ready; the next open is the new one');
+    const third = deploy(3);
+    slowPage = 6000;
+    await p.page.reload();
+    await p.see('Istanbul', 'trip from the saved app', 15_000);
+    if ((await running()) !== second) errors.push(`slow reload did not open the saved build (${await running()})`);
+    await p.byTest('update-bar').waitFor({ state: 'visible', timeout: 20_000 }).catch(() => errors.push('no update bar once the slow page arrived'));
+    await p.shot('update-bar-slow');
+    slowPage = 0;
+    await p.page.reload();
+    await p.see('Istanbul', 'trip on the newest build', 15_000);
+    if ((await running()) !== third) errors.push(`next open was ${await running()}, not ${third}`);
+    const builds = await p.page.evaluate(async () => (await caches.keys()).filter((k) => k.startsWith('mada-shell-')));
+    if (builds.length > 2) errors.push(`more than two builds kept: ${builds.join(', ')}`);
+    if (builds.includes(`mada-shell-${first}`)) errors.push('the oldest build was not dropped');
+
+    step('offline after the update: the saved trip still opens');
+    await p.page.waitForTimeout(2500);
+    await p.context.setOffline(true);
+    await p.page.reload();
+    await p.see('Istanbul', 'saved trip offline on the new build', 15_000);
+    await p.context.setOffline(false);
+    next = null;
     await p.context.close();
   }
 

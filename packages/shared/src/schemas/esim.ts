@@ -337,8 +337,7 @@ export function suggestEsimPlans(
   const picked = undominatedPlans((q.picks ?? []).map((id) => [...mine, ...daily].find((p) => p.id === id)).filter((p): p is EsimPackage => !!p).slice(0, 3), priceOf);
   if (picked.length) {
     const sorted = [...picked].sort((a, b) => totalGb(a) - totalGb(b));
-    const sizes: EsimSize[] = sorted.length === 3 ? ['light', 'regular', 'heavy'] : sorted.length === 2 ? ['light', 'heavy'] : ['regular'];
-    const plans = sorted.map((p, i) => planOf(p, sizes[i]!, p.days >= q.days, q.markupBps, q.price));
+    const plans = withSizes(sorted.map((p) => planOf(p, 'regular', p.days >= q.days, q.markupBps, q.price)), q.days);
     return { coverage, plans, recommended: recommendEsimPlan(plans, q.days)?.id ?? null, more: moreOf(plans) };
   }
   if (!mine.length) {
@@ -363,8 +362,34 @@ export function suggestEsimPlans(
   picks.push([sized[mid]!, 'regular']);
   if (sized[mid + 1]) picks.push([sized[mid + 1]!, 'heavy']);
   if (picks.length < 3 && !sized[mid - 1] && sized[mid + 2]) picks.push([sized[mid + 2]!, 'heavy']);
-  const plans = picks.map(([p, size]) => planOf(p, size, p.days >= q.days, q.markupBps, q.price));
+  // Sized next to each other, so no two share a word (10 GB and 20 GB were both "Heavy" when nothing was lighter).
+  const plans = withSizes(picks.map(([p, size]) => planOf(p, size, p.days >= q.days, q.markupBps, q.price)), q.days);
   return { coverage, plans, recommended: recommendEsimPlan(plans, q.days)?.id ?? null, more: moreOf(plans) };
+}
+
+/**
+ * The size words on the cards (Light · Most people · Heavy), by how big each plan is next to the others shown, so no
+ * two cards ever share one. Three plans: smallest Light, middle Most people, biggest Heavy. Two: Most people and Heavy
+ * when the smaller already covers the trip (about a day's data a day), else Light and Most people. One: Most people.
+ * Unlimited counts as the biggest. Keeps the plans' order.
+ */
+export function esimSizes(plans: readonly Pick<EsimPlan, 'gb' | 'days' | 'daily'>[], days?: number): EsimSize[] {
+  const n = plans.length;
+  if (!n) return [];
+  const order = plans.map((p, i) => ({ i, gb: totalGb(p) })).sort((a, b) => a.gb - b.gb || a.i - b.i);
+  let words: EsimSize[];
+  if (n === 1) words = ['regular'];
+  else if (n === 2) words = days !== undefined && order[0]!.gb >= days * GB_A_DAY ? ['regular', 'heavy'] : ['light', 'regular'];
+  else words = ['light', ...Array.from({ length: n - 2 }, () => 'regular' as const), 'heavy'];
+  const out: EsimSize[] = new Array(n);
+  order.forEach((x, rank) => { out[x.i] = words[rank]!; });
+  return out;
+}
+
+/** The plans with their sizes set by esimSizes. */
+export function withSizes<P extends Pick<EsimPlan, 'gb' | 'days' | 'daily' | 'size'>>(plans: readonly P[], days?: number): P[] {
+  const sizes = esimSizes(plans, days);
+  return plans.map((p, i) => (p.size === sizes[i] ? p : { ...p, size: sizes[i]! }));
 }
 
 /** A package's price in halalas (the owner's rules, schemas/esim-pricing.ts); the plain markup when none is given. */

@@ -9,6 +9,14 @@ export const offlineCopy = {
   'off.saved': 'Saved at {time}',
   'off.willSend': 'Will send when you’re online',
 
+  // ───────────── a new version of the web app ─────────────
+  'off.newVersion': 'A new version is ready',
+  'off.refresh': 'Refresh',
+
+  // ───────────── a search that took too long or needs a sign-in ─────────────
+  'wait.signin.title': 'Sign in to see this',
+  'wait.signin.body': 'Your session ended. Sign in and you’re back on this same screen.',
+
   // ───────────── low battery ─────────────
   'lp.entry': 'Low battery? Just the essentials',
   'lp.suggest': 'Battery at {percent}%. Switch to the low-battery screen?',

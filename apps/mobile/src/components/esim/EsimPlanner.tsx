@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { DESTINATIONS, ESIM_REGION_WORDS, addDays, esimCountriesOf, esimFlag, esimPlaceName, esimWhereKey, formatSar, nameIn, rangeLabel, type CopyKey, type EsimPlan, type EsimPlansResponse } from '@mada/shared';
+import { DESTINATIONS, ESIM_REGION_WORDS, addDays, withSizes, esimCountriesOf, esimFlag, esimPlaceName, esimWhereKey, formatSar, nameIn, rangeLabel, type CopyKey, type EsimPlan, type EsimPlansResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { VGradient } from '@/components/Gradient';
@@ -13,9 +13,11 @@ import { Box, H3, Num, PickCard, Rise, Row, Small, TextLink, Tiny } from '@/comp
 import { ChipWrap, Photo } from '@/components/booking/parts';
 import { EsimHero, PersonChip, PhoneArt, PlanCard, countryOf } from './look';
 import { DAY_CHOICES, EsimDays, EsimWhere, placeLabel, type WherePick } from './WherePicker';
-import { ApiError } from '@/lib/api';
+import { WaitTrouble } from '@/components/states/WaitTrouble';
 import { usePayDraft } from '@/lib/booking';
-import { planLabel, useEsimPlaces, useEsimPlans } from '@/lib/esim';
+import { esimKeys, planLabel, useEsimPlaces, useEsimPlans } from '@/lib/esim';
+import { useGiveUp } from '@/lib/net/give-up';
+import { useSession } from '@/lib/session';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { useTrips } from '@/lib/trips';
@@ -68,8 +70,14 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
   const places = useEsimPlaces(!!dest && askDays);
   const region = regionOf(dest);
   const step: 'trip' | 'where' | 'days' | 'plans' = tripId ? 'plans' : !dest ? ((upcoming.length || trips.isLoading) && !other ? 'trip' : 'where') : askDays && !days ? 'days' : 'plans';
-  const q = useEsimPlans({ tripId, destination: tripId || region ? null : dest, region: tripId ? null : region, days: tripId ? daysIn ?? null : days ?? 7 }, step === 'plans');
-  const data = q.data;
+  const plansFor = { tripId, destination: tripId || region ? null : dest, region: tripId ? null : region, days: tripId ? daysIn ?? null : days ?? 7 };
+  const q = useEsimPlans(plansFor, step === 'plans');
+  const signedIn = useSession((s) => !!s.tokens);
+  // No endless spinner: the plans answer, or after GIVE_UP_MS the card says so with Try again and Talk to Mada.
+  const plansKey = esimKeys.plans(plansFor);
+  const wait = useGiveUp(q, { key: plansKey, queryKey: plansKey, signedIn, active: step === 'plans' });
+  // Each card its own honest size, whatever server answered (an older one could call two of them "Heavy").
+  const data = useMemo(() => (q.data ? { ...q.data, plans: withSizes(q.data.plans, q.data.days) } : undefined), [q.data]);
   const [pick, setPick] = useState<string | null>(null);
   const [who, setWho] = useState<string[] | null>(null);
   const [phone, setPhone] = useState<Phone | null>(null);
@@ -126,11 +134,8 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
     );
   }
 
-  if (q.isPending) return wrap(<View style={{ paddingVertical: 40, alignItems: 'center', gap: 12 }}><ActivityIndicator color={colors.green} /></View>);
-  if (q.isError || !data) {
-    const offline = q.error instanceof ApiError && q.error.code === 'OFFLINE';
-    return wrap(<Box tone="cream"><Small>{offline ? t('es.offline') : q.error instanceof Error ? q.error.message : t('error.internal')}</Small></Box>);
-  }
+  if (!data && wait.view === 'loading') return wrap(<View style={{ paddingVertical: 40, alignItems: 'center', gap: 12 }} testID="esim-loading"><ActivityIndicator color={colors.green} /></View>);
+  if (!data) return wrap(<WaitTrouble wait={wait} testID={`esim-${wait.view}`} />);
   const where = whereOf(data);
   if (data.outcome === 'none' || !plan) {
     // Said plainly, with what's closest (a region around it, or the global plan), another place, or Mada.

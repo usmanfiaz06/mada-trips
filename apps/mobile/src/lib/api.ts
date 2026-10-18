@@ -130,7 +130,10 @@ async function mockWire(w: Wire): Promise<WireResponse> {
   if (isOffline()) throw new ApiError('OFFLINE', t('error.offline'), 0);
   // e2e only: EXPO_PUBLIC_MOCK_WIRE=http sends a real request first, so Playwright's network emulation (offline, slow
   // 3G, page.route answering 500/503/429/426) applies; the test server answers "x-mada-mock: pass" to let the mock reply.
-  if (process.env.EXPO_PUBLIC_MOCK_WIRE === 'http') {
+  // The same for a few paths only, switched on at runtime by an e2e (window.__madaMockHttp = ['/esim/plans']), so a
+  // plain mock export can still route one request to a slow or failing answer. Mock mode only: live never reads it.
+  const wired = (globalThis as { __madaMockHttp?: unknown }).__madaMockHttp;
+  if (process.env.EXPO_PUBLIC_MOCK_WIRE === 'http' || (Array.isArray(wired) && wired.some((p) => typeof p === 'string' && w.path.startsWith(p)))) {
     const r = await httpTransport(w);
     if (r.headers?.['x-mada-mock'] !== 'pass') return r;
   }

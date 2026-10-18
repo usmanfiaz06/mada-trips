@@ -74,6 +74,7 @@ with Send again / Remove) or the whole list with `<OutboxList kind="message" />`
 | `Skeleton`, `SkeletonLines`, `SkeletonCard`, `SkeletonList` | Placeholders in the shape of what's coming. Still under Reduce Motion. |
 | `SlowState` | "Still working…" with Stop waiting (QueryState does this for you). |
 | `InlineError` | A section that didn't load, with Try again. |
+| `WaitTrouble` | A search that gave up, failed or needs a sign-in (`useGiveUp` from `lib/net/give-up`): Try again (or Sign in) and Talk to Mada. No spinner waits more than `GIVE_UP_MS` (12 s; `SUPPLIER_GIVE_UP_MS`, 20 s, for live flight and hotel searches). `useApiQuery` gives up the same way. |
 | `ErrorState` | A whole screen that couldn't load. Pass `error` or `problem`; it picks words, drawing and the one action. `booking` for supplier-down during a booking. |
 | `OfflineState` | A screen that needs the network (search, a new booking). |
 | `SupplierDown` | "Saudia's system isn't answering." In results; `booking` shows "Faisal is booking this by hand" with his face. Check ahead with `useSupplierStatus().down('flights')`. |

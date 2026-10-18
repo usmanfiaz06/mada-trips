@@ -14,6 +14,10 @@ import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, useTrip } from '@/lib/trips';
+import { WaitTrouble } from '@/components/states/WaitTrouble';
+import { useGiveUp } from '@/lib/net/give-up';
+import { talkToMada } from '@/lib/net/talk';
+import { useSession } from '@/lib/session';
 import { transferKeys, transfersApi, useTransferOptions } from '@/lib/transfers';
 import { colors } from '@/theme';
 
@@ -28,6 +32,8 @@ export default function Pickup() {
   const qc = useQueryClient();
   const trip = useTrip(id).data?.trip;
   const q = useTransferOptions(id);
+  // No endless spinner: no answer in GIVE_UP_MS, a failure, or no session each get an honest screen.
+  const wait = useGiveUp(q, { key: id, queryKey: transferKeys.options(id), signedIn: useSession((s) => !!s.tokens) });
   const [pick, setPick] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,11 +56,12 @@ export default function Pickup() {
     } finally { setBusy(false); }
   }
 
-  if (q.isPending) return <TripScreen title={t('pickup.title')}><View style={{ paddingTop: 40 }}><ActivityIndicator color={colors.green} /></View></TripScreen>;
+  if (!d && wait.view === 'loading') return <TripScreen title={t('pickup.title')}><View style={{ paddingTop: 40 }} testID="pickup-loading"><ActivityIndicator color={colors.green} /></View></TripScreen>;
+  if (!d && (wait.view === 'timeout' || wait.view === 'signin')) return <TripScreen title={t('pickup.title')}><WaitTrouble wait={wait} testID={`pickup-${wait.view}`} /></TripScreen>;
   if (q.isError || !d) {
     return (
       <TripScreen title={t('pickup.title')}>
-        <EmptyState art={<ArtSuitcase />} title={t('pickup.down')} body="" action={<Button testID="pickup-retry" label={t('pickup.retry')} onPress={() => void q.refetch()} />} />
+        <EmptyState art={<ArtSuitcase />} title={t('pickup.down')} body="" action={<Button testID="pickup-retry" label={t('pickup.retry')} onPress={wait.retry} />} ideas={[[t('action.talk'), () => talkToMada()]]} />
       </TripScreen>
     );
   }

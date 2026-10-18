@@ -4,6 +4,7 @@ import { ApiError } from '../api';
 import { toast } from '../toast';
 import { t } from '../i18n';
 import { describeError, type Described } from './describe';
+import { GIVE_UP_MS } from './give-up';
 import { enqueue, type EnqueueInput } from './outbox';
 import { newIdempotencyKey } from './retry';
 import { isOffline, useNet } from './state';
@@ -42,8 +43,20 @@ export type ApiQueryResult<T> = UseQueryResult<T, Error> & {
   cancel: () => void;
 };
 
-export function useApiQuery<T, K extends QueryKey = QueryKey>(options: UseQueryOptions<T, Error, T, K> & { slowAfterMs?: number }): ApiQueryResult<T> {
-  const { slowAfterMs = 4000, ...rest } = options;
+/** True once `active` has been true for `afterMs` without a break (no shortcut on a weak connection). */
+function useOver(active: boolean, afterMs: number): [boolean, () => void] {
+  const [over, setOver] = useState(false);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const id = setTimeout(() => setOver(true), afterMs);
+    return () => { clearTimeout(id); setOver(false); };
+  }, [active, afterMs, round]);
+  return [active && over, useCallback(() => { setOver(false); setRound((n) => n + 1); }, [])];
+}
+
+export function useApiQuery<T, K extends QueryKey = QueryKey>(options: UseQueryOptions<T, Error, T, K> & { slowAfterMs?: number; giveUpMs?: number }): ApiQueryResult<T> {
+  const { slowAfterMs = 4000, giveUpMs = GIVE_UP_MS, ...rest } = options;
   const qc = useQueryClient();
   const q = useQuery(rest);
   const online = useNet((s) => s.online);
@@ -51,21 +64,25 @@ export function useApiQuery<T, K extends QueryKey = QueryKey>(options: UseQueryO
   const hasData = q.data !== undefined;
   const loading = !hasData && (q.fetchStatus === 'fetching' || (q.status === 'pending' && q.fetchStatus !== 'paused' && !cancelled));
   const slow = useSlow(loading && q.fetchStatus === 'fetching', slowAfterMs);
+  // No endless spinner: past the limit it stops waiting and says so (lib/net/give-up.ts).
+  const [gaveUp, restartClock] = useOver(loading, giveUpMs);
+  useEffect(() => { if (gaveUp) void qc.cancelQueries({ queryKey: rest.queryKey }); }, [gaveUp, qc, rest.queryKey]);
 
   const problem = useMemo(() => {
     if (q.error) return describeError(q.error);
     if (q.fetchStatus === 'paused' || (online === false && !hasData)) return describeError(new ApiError('OFFLINE', t('error.offline'), 0));
     if (cancelled && !hasData) return describeError(new ApiError('CANCELLED', t('slow.cancel'), 0));
+    if (gaveUp && !hasData) return describeError(new ApiError('TIMEOUT', t('error.timeout'), 0));
     return null;
-  }, [q.error, q.fetchStatus, online, hasData, cancelled]);
+  }, [q.error, q.fetchStatus, online, hasData, cancelled, gaveUp]);
 
   let view: QueryView;
   if (hasData) view = 'ready';
   else if (q.fetchStatus === 'paused' || problem?.kind === 'offline') view = 'offline';
-  else if (q.error || cancelled) view = 'error';
+  else if (q.error || cancelled || gaveUp) view = 'error';
   else view = slow ? 'slow' : 'loading';
 
-  const retry = useCallback(() => { setCancelled(false); void q.refetch(); }, [q]);
+  const retry = useCallback(() => { setCancelled(false); restartClock(); void q.refetch(); }, [q, restartClock]);
   const cancel = useCallback(() => { setCancelled(true); void qc.cancelQueries({ queryKey: rest.queryKey }); }, [qc, rest.queryKey]);
 
   return Object.assign(q, {

@@ -17,6 +17,8 @@ import { Icon } from '../Icon';
 import { Pill } from '../Pill';
 import { Sheet } from '../Sheet';
 import { SupplierDown } from '../states/SupplierDown';
+import { WaitTrouble } from '../states/WaitTrouble';
+import { SUPPLIER_GIVE_UP_MS, useGiveUp } from '@/lib/net/give-up';
 import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
@@ -137,6 +139,9 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
     queryFn: () => bookingApi.searchFlights(flightsBody(dest!.key, trip, who, mode === 'flex')),
   });
   const s: FlightSearchResponse | undefined = search.data;
+  // No endless "Checking…": a search that fails or takes too long says so, with Try again and Talk to Mada.
+  const searchKey = flightsKey(dest?.key, trip, who, mode === 'flex', runKey, flags);
+  const wait = useGiveUp(search, { key: searchKey, queryKey: searchKey, active: live, giveUpMs: SUPPLIER_GIVE_UP_MS });
   const step = useSequence(steps.length, 750, live ? `${runKey}` : null, !!s && !search.isFetching);
   // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
   const permit = !!intent.answers.permit?.length;
@@ -336,6 +341,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
       </View>
     );
   }
+  if (!s && wait.view !== 'loading' && wait.view !== 'ready') return <WaitTrouble wait={wait} testID={`flights-${wait.view}`} />;
   if (step < steps.length || search.isLoading || !s) return <Working lines={steps} step={Math.min(step, steps.length - 1)} />;
 
   if (s.outcome === 'partial' && mode === 'normal') {

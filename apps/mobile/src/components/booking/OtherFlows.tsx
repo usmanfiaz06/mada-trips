@@ -15,6 +15,8 @@ import { Chip } from '../Chip';
 import { Icon } from '../Icon';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../states/ErrorState';
+import { WaitTrouble } from '../states/WaitTrouble';
+import { SUPPLIER_GIVE_UP_MS, useGiveUp } from '@/lib/net/give-up';
 import { Pill } from '../Pill';
 import { T } from '../Text';
 import { VGradient } from '../Gradient';
@@ -109,6 +111,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   const staysFn = () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who });
   const search = useQuery({ queryKey: staysKey, enabled: searching, staleTime: 600_000, queryFn: staysFn });
   const step = useSequence(2, 700, searching ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null, !!search.data && !search.isFetching);
+  const wait = useGiveUp(search, { key: staysKey, queryKey: staysKey, active: searching, giveUpMs: SUPPLIER_GIVE_UP_MS });
   // Hotels take seconds to answer: the search starts while "who's going" is on screen, the likely next tap.
   const qc = useQueryClient();
   const signedIn = useSession((x) => x.status === 'signedIn');
@@ -243,7 +246,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
       </View>
     );
   }
-  if (!s && search.isError) return <View style={{ gap: 14 }}>{summary}<ErrorState variant="card" error={search.error} onRetry={() => { void search.refetch(); }} testID="stays-error" /></View>;
+  if (!s && search.isError && !search.isFetching) return <View style={{ gap: 14 }}>{summary}<ErrorState variant="card" error={search.error} onRetry={wait.retry} onSignIn={wait.signIn} always testID="stays-error" /></View>;
+  if (!s && wait.view === 'timeout') return <View style={{ gap: 14 }}>{summary}<WaitTrouble wait={wait} testID="stays-timeout" /></View>;
   if (step < 2 || !s) return <View style={{ gap: 18 }}>{summary}<Working lines={steps} step={Math.min(step, 1)} /></View>;
   if (s.outcome === 'none') {
     return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;

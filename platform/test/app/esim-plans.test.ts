@@ -69,7 +69,7 @@ describe("eSIM plans: no plan a bigger one beats", () => {
 
   it("the owner's picks lose a pick another pick beats, and the cheapest that covers the trip is recommended", () => {
     const s = suggestEsimPlans(LIVE_TR, { countries: ["TR"], days: 7, price, picks: ["TR_3_30", "TR_5_30", "TR_10_30"] });
-    expect(s.plans.map((p) => [p.size, p.id])).toEqual([["light", "TR_3_30"], ["heavy", "TR_10_30"]]);
+    expect(s.plans.map((p) => [p.size, p.id])).toEqual([["light", "TR_3_30"], ["regular", "TR_10_30"]]);
     expect(s.recommended).toBe("TR_10_30");
   });
 

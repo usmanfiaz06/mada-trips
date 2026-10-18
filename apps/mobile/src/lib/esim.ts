@@ -17,7 +17,7 @@ const qs = (o: Record<string, string | number | null | undefined>) => {
 };
 
 export const esimApi = {
-  plans: (f: PlansFor) => request({ method: 'GET', path: `${ESIM_ROUTES.plans}${qs({ tripId: f.tripId, destination: f.destination, countries: f.countries, region: f.region, days: f.days })}` }, EsimPlansResponse),
+  plans: (f: PlansFor, signal?: AbortSignal) => request({ method: 'GET', path: `${ESIM_ROUTES.plans}${qs({ tripId: f.tripId, destination: f.destination, countries: f.countries, region: f.region, days: f.days })}`, signal }, EsimPlansResponse),
   places: () => request({ method: 'GET', path: ESIM_ROUTES.places }, EsimPlacesResponse),
   list: (f: { order?: string | null; trip?: string | null }) => request({ method: 'GET', path: `${ESIM_ROUTES.esims}${qs(f)}` }, EsimsResponse),
   get: (id: string) => request({ method: 'GET', path: ESIM_ROUTES.esim(id) }, EsimResponse),
@@ -37,7 +37,7 @@ const useSignedIn = () => !!useSession((s) => s.tokens);
 
 export function useEsimPlans(f: PlansFor, enabled = true) {
   const signedIn = useSignedIn();
-  return useQuery({ queryKey: esimKeys.plans(f), queryFn: () => esimApi.plans(f), enabled: enabled && signedIn && !!(f.tripId || f.destination || f.countries || f.region), staleTime: 10 * 60_000, retry: false });
+  return useQuery({ queryKey: esimKeys.plans(f), queryFn: ({ signal }) => esimApi.plans(f, signal), enabled: enabled && signedIn && !!(f.tripId || f.destination || f.countries || f.region), staleTime: 10 * 60_000, retry: false });
 }
 /** Every country and region the supplier sells (GET /esim/places), for "Where to?". */
 export function useEsimPlaces(enabled = true) {

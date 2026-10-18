@@ -13,6 +13,7 @@ import { ErrorBoundary as AppErrorBoundary } from '@/components/states/ErrorBoun
 import { CrashState } from '@/components/states/ErrorState';
 import { NetChrome } from '@/components/states/NetChrome';
 import { SessionExpired } from '@/components/states/SessionExpired';
+import { UpdateBar } from '@/components/states/UpdateBar';
 import { AppLock } from '@/components/auth/AppLock';
 import { useOutboxPump } from '@/lib/net/outbox';
 import { restoreCache, startPersistence } from '@/lib/net/persist';
@@ -96,6 +97,7 @@ export default function RootLayout() {
           <SessionExpired />
           <SignInSheet />
           <AppLock />
+          <UpdateBar />
           <ToastHost />
         </QueryClientProvider>
       </SafeAreaProvider>

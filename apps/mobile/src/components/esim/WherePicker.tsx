@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { Box, Rise, Small, Tiny } from '@/components/trips/ui';
 import { ChipWrap } from '@/components/booking/parts';
+import { useGiveUp } from '@/lib/net/give-up';
 import { useEsimPlaces } from '@/lib/esim';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
@@ -60,6 +61,8 @@ export function matchPlaces(places: readonly EsimPlace[], q: string): EsimPlace[
 export function EsimWhere({ tripCountries, onPick, onUnknown }: { tripCountries: string[]; onPick: (p: WherePick) => void; onUnknown: (text: string) => void }) {
   const router = useRouter();
   const q = useEsimPlaces();
+  // The list is here already (FALLBACK); the small spinner for the full one stops after GIVE_UP_MS either way.
+  const wait = useGiveUp(q);
   const places = q.data?.length ? q.data : FALLBACK;
   const [text, setText] = useState('');
   const matches = useMemo(() => matchPlaces(places, text), [places, text]);
@@ -86,7 +89,7 @@ export function EsimWhere({ tripCountries, onPick, onUnknown }: { tripCountries:
             autoCorrect={false} autoCapitalize="words" returnKeyType="search"
             onSubmitEditing={() => { if (matches[0]) pick(matches[0]); else if (typed.length > 1) onUnknown(typed); }}
             style={[styles.input, webNoOutline]} testID="esim-where-input" />
-          {q.isLoading ? <ActivityIndicator size="small" color={colors.ink3} /> : null}
+          {q.isLoading && wait.view === 'loading' ? <ActivityIndicator size="small" color={colors.ink3} /> : null}
         </View>
       </Rise>
       {matches.length ? (

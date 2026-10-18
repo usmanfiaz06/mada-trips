@@ -9,6 +9,7 @@ export { StaleBadge } from './StaleBadge';
 export { SupplierDown } from './SupplierDown';
 export { PermissionDenied, type PermissionKind } from './PermissionDenied';
 export { QueryState } from './QueryState';
+export { WaitTrouble } from './WaitTrouble';
 export { SafeImage, toneFor, initialsOf } from './SafeImage';
 export { StateView } from './StateView';
 export { ErrorBoundary } from './ErrorBoundary';

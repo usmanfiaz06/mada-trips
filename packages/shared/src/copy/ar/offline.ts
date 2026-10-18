@@ -10,6 +10,12 @@ export const arOffline: ArSection<typeof offlineCopy> = {
   'off.saved': 'محفوظ الساعة {time}',
   'off.willSend': 'ينرسل أول ما يرجع النت',
 
+  'off.newVersion': 'فيه نسخة جديدة جاهزة',
+  'off.refresh': 'حدّث',
+
+  'wait.signin.title': 'سجّل دخولك عشان تشوفه',
+  'wait.signin.body': 'انتهت جلستك. سجّل دخولك وترجع لنفس الشاشة.',
+
   'lp.entry': 'البطارية قليلة؟ المهم بس',
   'lp.suggest': 'البطارية {percent}٪. تبي شاشة البطارية القليلة؟',
   'lp.suggestOpen': 'افتحها',
