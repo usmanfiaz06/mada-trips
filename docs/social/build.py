@@ -102,6 +102,7 @@ def sheet_start(wb):
             "Fill in Owner and Status for each post. The Status dropdown runs Idea → Scripted → Shot → Designed → Approved → Scheduled → Posted (or Paused).",
             "After posting, fill the yellow results columns (Reach … Saves). The engagement rate calculates itself, and 'KPIs & tracking' rolls it up by platform.",
             "Rows flagged in the Notes column (OFFER, APPROVAL, SENSITIVITY) can't be scheduled without that sign-off.",
+            "Scope column: Global, GCC, Saudi, Mixed, B2B or All. At least 55% of destination posts are abroad (see the mix below).",
             "Month view: the whole month at a glance. Guidelines, Keywords, Competitors and Moments hold the research behind every post.",
         ]),
     ]
@@ -125,11 +126,28 @@ def sheet_start(wb):
     c = ws.cell(row=r + 5, column=2, value=f"=SUM(B{r + 1}:B{r + 4})")
     c.font = Font(name=F, bold=True, size=10)
     c.alignment = Alignment(horizontal="left")
+    r += 7
+    ws.cell(row=r, column=1, value="Where the trips go").font = Font(name=F, bold=True, size=11, color=GREEN)
+    header(ws, r + 1, ["Scope", "Posts (counted from Calendar)"])
+    scopes = ["Global", "GCC", "Saudi", "Mixed", "B2B", "All"]
+    sc = col("Scope")
+    for i, name in enumerate(scopes, 1):
+        ws.cell(row=r + 1 + i, column=1, value=name).font = Font(name=F, size=10)
+        c = ws.cell(row=r + 1 + i, column=2, value=f'=COUNTIF(Calendar!${sc}:${sc},"{name}")')
+        c.font = Font(name=F, size=10)
+        c.alignment = Alignment(horizontal="left")
+    rr = r + 2 + len(scopes)
+    ws.cell(row=rr, column=1, value="Global + GCC share of destination posts").font = Font(name=F, bold=True, size=10)
+    c = ws.cell(row=rr, column=2, value=f"=IFERROR((B{r + 2}+B{r + 3})/(B{r + 2}+B{r + 3}+B{r + 4}+B{r + 5}),0)")
+    c.font = Font(name=F, bold=True, size=10)
+    c.number_format = "0%"
+    c.alignment = Alignment(horizontal="left")
+    ws.cell(row=rr + 1, column=1, value="Scope key: Global = abroad beyond the Gulf · GCC = Gulf neighbours · Saudi = at home · Mixed = home and abroad in one post · B2B = business services · All = brand, offers, service.").font = Font(name=F, italic=True, size=9, color="5D7A6E")
 
 
 CAL_COLS = [
     ("#", 5), ("Date", 11), ("Day", 6), ("Time (AST)", 8), ("Platform", 10), ("Format", 14),
-    ("Pillar", 15), ("Series", 16), ("Moment / trend", 22), ("Working title", 30),
+    ("Pillar", 15), ("Scope", 9), ("Series", 16), ("Moment / trend", 22), ("Working title", 30),
     ("Hook (first 1-3s / first line)", 34), ("On-poster / on-screen text (EN)", 30),
     ("On-poster / on-screen text (AR)", 30), ("Caption / copy (AR)", 55), ("Caption / copy (EN)", 55),
     ("Search keywords", 28), ("Hashtags (max 5)", 30), ("CTA", 20), ("Visual / audio / production direction", 55),
@@ -138,39 +156,48 @@ CAL_COLS = [
 ]
 
 
+def col(name):
+    """Column letter of a Calendar column, by header name."""
+    return get_column_letter([c for c, _ in CAL_COLS].index(name) + 1)
+
+
 def sheet_calendar(wb):
     ws = wb.create_sheet("Calendar")
     header(ws, 1, [c for c, _ in CAL_COLS], [w for _, w in CAL_COLS])
     ws.row_dimensions[1].height = 34
     yellow = PatternFill("solid", fgColor="FFF6D6")
+    R, L, C, SH, SV = col("Reach"), col("Likes"), col("Comments"), col("Shares"), col("Saves")
+    ci = {c: i + 1 for i, (c, _) in enumerate(CAL_COLS)}
+    rtl = {ci["Hook (first 1-3s / first line)"], ci["On-poster / on-screen text (AR)"], ci["Caption / copy (AR)"], ci["Hashtags (max 5)"]}
     for i, p in enumerate(sorted_posts(), 1):
         r = i + 1
         name, fill = PLATFORM[p["p"]]
         vals = [i, date_of(p["d"]), date_of(p["d"]).strftime("%a"), p["t"], name, p["f"],
-                PILLAR[p["pil"]], p["series"], p["moment"], p["title"], p["hook"], p["pen"], p["par"],
+                PILLAR[p["pil"]], p["sc"], p["series"], p["moment"], p["title"], p["hook"], p["pen"], p["par"],
                 p["car"], p["cen"], p["kw"], p["tags"], p["cta"], p["dir"], p["note"], "", "Scripted",
                 None, None, None, None, None, None,
-                f'=IF(OR(W{r}="",W{r}=0),"",(Y{r}+Z{r}+AA{r}+AB{r})/W{r})']
+                f'=IF(OR({R}{r}="",{R}{r}=0),"",({L}{r}+{C}{r}+{SH}{r}+{SV}{r})/{R}{r})']
         for c, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=c, value=v)
-            cell.font = Font(name=F, size=9, bold=(c == 10))
+            cell.font = Font(name=F, size=9, bold=(c == ci["Working title"]))
             cell.border = BORDER
-            cell.alignment = RTL if (isinstance(v, str) and c in (11, 13, 14, 16, 17) and is_arabic(v) and c != 16) else WRAP
+            cell.alignment = RTL if (isinstance(v, str) and c in rtl and is_arabic(v)) else WRAP
             if c <= 5:
                 cell.fill = PatternFill("solid", fgColor=fill)
-            if 23 <= c <= 28:
+            if ci["Reach"] <= c <= ci["Saves"]:
                 cell.fill = yellow
         ws.cell(row=r, column=2).number_format = "dd mmm"
-        ws.cell(row=r, column=29).number_format = "0.0%"
+        ws.cell(row=r, column=ci["Eng. rate"]).number_format = "0.0%"
         if p["note"] and any(k in p["note"] for k in ("OFFER", "APPROVAL", "SENSITIVITY", "SALES", "MANAGEMENT")):
-            ws.cell(row=r, column=20).font = Font(name=F, size=9, bold=True, color="A3342B")
+            ws.cell(row=r, column=ci["Notes · approvals · risks"]).font = Font(name=F, size=9, bold=True, color="A3342B")
     last = len(POSTS) + 1
     dv = DataValidation(type="list", formula1='"' + ",".join(STATUSES) + '"', allow_blank=True)
     ws.add_data_validation(dv)
-    dv.add(f"V2:V{last}")
-    ws.conditional_formatting.add(f"V2:V{last}", FormulaRule(formula=['$V2="Posted"'], fill=PatternFill("solid", fgColor="D6EAD8")))
-    ws.conditional_formatting.add(f"V2:V{last}", FormulaRule(formula=['$V2="Paused"'], fill=PatternFill("solid", fgColor="F4D6D2")))
-    ws.freeze_panes = "K2"
+    st = col("Status")
+    dv.add(f"{st}2:{st}{last}")
+    ws.conditional_formatting.add(f"{st}2:{st}{last}", FormulaRule(formula=[f'${st}2="Posted"'], fill=PatternFill("solid", fgColor="D6EAD8")))
+    ws.conditional_formatting.add(f"{st}2:{st}{last}", FormulaRule(formula=[f'${st}2="Paused"'], fill=PatternFill("solid", fgColor="F4D6D2")))
+    ws.freeze_panes = f"{col('Working title')}2"
     ws.auto_filter.ref = f"A1:{get_column_letter(len(CAL_COLS))}{last}"
     ws.cell(row=last + 2, column=1, value="Yellow columns = fill after posting. Eng. rate = (likes + comments + shares + saves) / reach. Use reach, not followers, so rates compare across a growing account.").font = Font(name=F, italic=True, size=9, color="5D7A6E")
 
@@ -237,10 +264,11 @@ def sheet_pillars(wb):
         ws.cell(row=rr, column=1, value=p["code"]).font = Font(name=F, size=10)
         ws.cell(row=rr, column=2, value=p["name"]).font = Font(name=F, size=10)
         ws.cell(row=rr, column=3, value=f'=COUNTIF(Calendar!$G:$G,B{rr})').font = Font(name=F, size=10)
-        c = ws.cell(row=rr, column=4, value=f"=IF(SUM($C${r + 2}:$C${r + 6})=0,0,C{rr}/SUM($C${r + 2}:$C${r + 6}))")
+        lo, hi = r + 2, r + 1 + len(S.PILLARS)
+        c = ws.cell(row=rr, column=4, value=f"=IF(SUM($C${lo}:$C${hi})=0,0,C{rr}/SUM($C${lo}:$C${hi}))")
         c.font = Font(name=F, size=10)
         c.number_format = "0%"
-    r = r + 9
+    r = r + 4 + len(S.PILLARS)
     ws.cell(row=r, column=1, value="Recurring series").font = Font(name=F, bold=True, color=GREEN)
     table(ws, r + 1, ["Series", "Where", "How often", "Format"], [list(s) for s in S.SERIES], [30, 26, 18, 80])
 
@@ -288,10 +316,18 @@ def sheet_competitors(wb):
 def sheet_moments(wb):
     ws = wb.create_sheet("Moments")
     title(ws, "Moments calendar: Nov 2026 with Dec-Feb teasers")
-    end = table(ws, 4, ["Date", "Moment", "Where", "How we use it", "Status"], [list(m) for m in S.MOMENTS], [16, 56, 22, 34, 22])
+    end = table(ws, 4, ["Date", "Moment", "Where", "How we use it", "Status", "Scope"], [list(m) for m in S.MOMENTS], [18, 56, 26, 36, 20, 9])
     ws.cell(row=end + 2, column=1, value="Cancelled / moved / unconfirmed: don't promote").font = Font(name=F, bold=True, color="A3342B")
     for i, line in enumerate(S.CANCELLED, 1):
         ws.cell(row=end + 2 + i, column=1, value="• " + line).font = Font(name=F, size=10)
+
+
+def sheet_destinations(wb):
+    ws = wb.create_sheet("Global destinations")
+    title(ws, "Where Saudis travel abroad this winter", "Ranked synthesis of Almosafer, Wego and winter seasonality (Oct 2026). Visa rules change: verify before every post.")
+    end = table(ws, 4, ["What we know", "Insight"], [list(x) for x in S.GLOBAL_INSIGHTS], [22, 120])
+    table(ws, end + 2, ["#", "Destination", "Why now", "Segment", "Visa for Saudis", "Flight from RUH", "Direct?", "Best months"],
+          [list(x) for x in S.TOP_DESTINATIONS], [5, 30, 48, 20, 24, 14, 16, 16])
 
 
 def sheet_kpis(wb):
@@ -307,17 +343,17 @@ def sheet_kpis(wb):
     r = 5 + len(S.KPIS) + 2
     ws.cell(row=r, column=1, value="Live results by platform (from Calendar)").font = Font(name=F, bold=True, color=GREEN)
     header(ws, r + 1, ["Platform", "Posts planned", "Posted", "Total reach", "Avg eng. rate (posted)", "Total saves", "Total shares"])
-    for col, w in zip("DEFG", (16, 22, 14, 14)):
-        ws.column_dimensions[col].width = w
+    for letter, w in zip("DEFG", (16, 22, 14, 14)):
+        ws.column_dimensions[letter].width = w
     for i, (code, (name, _)) in enumerate(PLATFORM.items()):
         rr = r + 2 + i
         cells = [name,
                  f'=COUNTIF(Calendar!$E:$E,A{rr})',
-                 f'=COUNTIFS(Calendar!$E:$E,A{rr},Calendar!$V:$V,"Posted")',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!$W:$W)',
-                 f'=IFERROR(AVERAGEIFS(Calendar!$AC:$AC,Calendar!$E:$E,A{rr},Calendar!$V:$V,"Posted"),"")',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!$AB:$AB)',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!$AA:$AA)']
+                 f'=COUNTIFS(Calendar!$E:$E,A{rr},Calendar!${col("Status")}:${col("Status")},"Posted")',
+                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Reach")}:${col("Reach")})',
+                 f'=IFERROR(AVERAGEIFS(Calendar!${col("Eng. rate")}:${col("Eng. rate")},Calendar!$E:$E,A{rr},Calendar!${col("Status")}:${col("Status")},"Posted"),"")',
+                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Saves")}:${col("Saves")})',
+                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Shares")}:${col("Shares")})']
         for c, v in enumerate(cells, 1):
             cell = ws.cell(row=rr, column=c, value=v)
             cell.font = Font(name=F, size=10)
@@ -360,6 +396,7 @@ def build_xlsx():
     sheet_keywords(wb)
     sheet_competitors(wb)
     sheet_moments(wb)
+    sheet_destinations(wb)
     sheet_kpis(wb)
     sheet_ops(wb)
     sheet_sources(wb)
@@ -370,7 +407,8 @@ def build_xlsx():
 def build_json(path):
     data = {k: getattr(S, k) for k in ("MONTH", "SITUATION", "OBJECTIVES", "PLATFORMS", "PILLARS", "SERIES", "STORIES",
                                        "VOICE", "DESIGN", "BIOS", "KEYWORDS", "KEYWORD_METHOD", "COMPETITORS", "WHITE_SPACE",
-                                       "MOMENTS", "CANCELLED", "KPIS", "WORKFLOW", "SENSITIVITY", "SOURCES")}
+                                       "MOMENTS", "CANCELLED", "KPIS", "WORKFLOW", "SENSITIVITY", "SOURCES",
+                                       "GLOBAL_INSIGHTS", "TOP_DESTINATIONS")}
     data["POSTS"] = sorted_posts()
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False)

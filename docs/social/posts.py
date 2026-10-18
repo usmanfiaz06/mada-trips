@@ -10,6 +10,7 @@ Fields
   p       IG | TT | X | LI
   f       format
   pil     pillar code (see strategy.PILLARS)
+  sc      scope: Saudi | GCC | Global | Mixed | B2B | All (brand, offers, service)
   series  recurring series name, if any
   title   working title for the team
   hook    first 1-3 seconds (video) or first line (static/text)
@@ -31,8 +32,8 @@ WA = "واتساب ‎+966 56 668 2662"
 POSTS = []
 
 
-def P(d, t, p, f, pil, title, hook, pen, par, car, cen, kw, tags, cta, dir, moment="", note="", series=""):
-    POSTS.append(dict(d=d, t=t, p=p, f=f, pil=pil, series=series, title=title, hook=hook,
+def P(d, t, p, f, pil, title, hook, pen, par, car, cen, kw, tags, cta, dir, moment="", note="", series="", sc=""):
+    POSTS.append(dict(d=d, t=t, p=p, f=f, pil=pil, sc=sc, series=series, title=title, hook=hook,
                       pen=pen, par=par, car=car, cen=cen, kw=kw, tags=tags, cta=cta,
                       dir=dir, moment=moment, note=note))
 
@@ -186,17 +187,6 @@ P(4, "21:00", "TT", "Video 40s", "HOR", "AlUla Skies Festival: what to do",
   "Countdown style: 3 beats (balloons at sunrise → balloon glow → stars over the rocks). Use our own AlUla stills/footage. 'Moonless 7-12 Nov' as a pop-up fact.",
   "AlUla Skies Festival 6-15 Nov", "Confirm the programme (incl. any concert) on Experience AlUla's channels before posting.")
 
-P(4, "18:00", "X", "Poll", "HOR", "AlUla: which one?",
-  "في العلا، وش تختار أول؟",
-  "", "",
-  "في العلا، وش تختار أول؟ 🏜️",
-  "In AlUla, what do you pick first?",
-  "العلا",
-  "#سماء_العلا",
-  "Vote",
-  "Poll options: 🎈 منطاد الشروق / 🔭 رصد النجوم / 🏛️ جولة الحِجر / 🍽️ عشاء بالصحراء",
-  "AlUla Skies Festival")
-
 P(5, "19:30", "IG", "Carousel 7", "HOR", "Weekend Radar #1",
   "Slide 1: This weekend in Riyadh & beyond · 5-7 Nov",
   "Weekend Radar · 5-7 Nov", "رادار الويكند · ٥–٧ نوفمبر",
@@ -209,17 +199,6 @@ P(5, "19:30", "IG", "Carousel 7", "HOR", "Weekend Radar #1",
   "Riyadh Season, AlUla Skies, WWE Crown Jewel (7 Nov)", "",
   series="Weekend Radar")
 
-P(5, "21:30", "IG", "Reel 25s", "HOR", "Pack with me: AlUla in November",
-  "Hands open a carry-on: 'AlUla nights are colder than you think'",
-  "AlUla in November: pack for two seasons", "العلا في نوفمبر: جهز لفصلين",
-  "العلا في نوفمبر: النهار دافي والليل بارد 🧥\nهذي شنطتنا لثلاث ليالي. وش الشي اللي دايم تنساه؟",
-  "AlUla in November: warm days, cold nights. Here's our bag for 3 nights. What do you always forget?",
-  "وش اخذ معي العلا, ملابس العلا, AlUla packing list",
-  "#العلا #شنطة_السفر #سفر #مادا #AlUla",
-  "Comment what you always forget",
-  "Top-down ASMR packing, no VO. Real sounds (zips, folding). On-screen labels: layers, scarf, walking shoes, power bank, headlamp for stargazing, sunscreen. Last frame: a ready card 'Transfer booked ✓'.",
-  "AlUla Skies weekend")
-
 P(5, "20:00", "TT", "Video 55s", "HOR", "Riyadh Season zones in 60 seconds",
   "VO: موسم الرياض بدقيقة. يلا 🏃",
   "Riyadh Season in 60s", "موسم الرياض بدقيقة",
@@ -230,17 +209,6 @@ P(5, "20:00", "TT", "Video 55s", "HOR", "Riyadh Season zones in 60 seconds",
   "Comment your first zone",
   "Walk-and-talk, one zone per 8s, a location pin pops for each. Keep the zone names on screen for search.",
   "Riyadh Season 2026")
-
-P(5, "22:00", "TT", "Photo carousel 6", "HOR", "Rate my itinerary: 3 days in AlUla",
-  "Slide 1: قيّم برنامجي: ٣ أيام في العلا من ١٠",
-  "Rate my itinerary: AlUla 3 days", "قيّم برنامجي: ٣ أيام بالعلا",
-  "قيّم برنامجنا من ١٠ 👇 وش تضيف؟ وش تشيل؟\nاليوم ١: وصول + غروب عند جبل الفيل\nاليوم ٢: الحِجر صباحاً + رصد النجوم\nاليوم ٣: منطاد الشروق + البلدة القديمة",
-  "Rate our itinerary out of 10. Day 1: arrival and sunset at Elephant Rock. Day 2: Hegra and stargazing. Day 3: sunrise balloon and the Old Town.",
-  "برنامج العلا ٣ ايام, جدول العلا, AlUla itinerary",
-  "#العلا #برنامج_سياحي #سفر #السعودية #مادا",
-  "Rate it in comments",
-  "TikTok Photo Mode: big readable Arabic text on each slide, one photo per day. Itinerary text on slides is indexed by search.",
-  "AlUla Skies")
 
 P(5, "13:00", "X", "Thread 4", "HOR", "Weekend Radar on X",
   "وش نسوي هالويكند؟ 📡",
@@ -263,17 +231,6 @@ P(6, "20:30", "IG", "Reel 20s", "HOR", "06:00 in AlUla (balloon ASMR)",
   "Share to someone who'd love this",
   "Pure ASMR: burner roar, wind, quiet gasps. Wide sunrise over the sandstone, then a detail of hands on the basket. No music. No text except the time stamp.",
   "AlUla Skies opening day", "Needs our own crew/creator in AlUla 6-8 Nov. Fallback: swap with the 'One Call #1' cut-down. Do not repost festival footage.")
-
-P(6, "21:00", "TT", "Video 15s", "HOR", "POV: 6am in AlUla",
-  "On-screen: POV: صحيت ٥ الفجر عشان هذا 👇",
-  "POV: woke up at 5am for this", "POV: صحيت ٥ الفجر عشان هذا",
-  "يستاهل ولا لا؟ 🎈 #سماء_العلا",
-  "Worth it or not?",
-  "منطاد العلا, POV العلا",
-  "#سماء_العلا #العلا #POV #السعودية #مادا",
-  "Comment 'worth it' or 'no'",
-  "Sleepy alarm at 05:00 (relatable) → cut to balloon lift-off on the beat. Short loopable edit.",
-  "AlUla Skies")
 
 P(6, "18:30", "X", "Post + image", "HOR", "AlUla Skies opens today",
   "اليوم يبدأ مهرجان سماء العلا 🎈",
@@ -367,28 +324,6 @@ P(8, "09:30", "LI", "Document 10 pages", "BIZ", "Field Notes #1: a 200-person de
   "PDF document, a Gantt-style timeline across pages in brand green and gold.",
   "Evergreen B2B", "", series="Field Notes")
 
-P(9, "20:30", "IG", "Carousel 8", "HOR", "The darkest nights of the year are this week",
-  "Slide 1: The darkest sky of November is this week. Here's where to see it.",
-  "Darkest skies: 7-12 Nov", "أظلم ليالي نوفمبر: ٧–١٢",
-  "هالأسبوع بدون قمر 🌑 يعني أوضح نجوم بالسنة تقريباً.\nوين تشوفها: العلا، صحراء الرياض بعيد عن الأنوار، وحافة العالم.\nونصيحة: الأحد ١٥ نوفمبر ذروة شهب الأسد 🌠",
-  "No moon this week means some of the clearest stars of the year. Where to see them: AlUla, the desert outside Riyadh away from city lights, Edge of the World. And on Sunday 15 Nov the Leonid meteor shower peaks.",
-  "رصد النجوم, نجوم العلا, شهب الاسد, stargazing Saudi",
-  "#رصد_النجوم #العلا #شهب_الأسد #السعودية #مادا",
-  "Save",
-  "Night photography slides, a moon-phase strip graphic on slide 2, map of 3 spots, tips (red light, 20 min for eyes to adjust, warm layers).",
-  "New moon 9 Nov · AlUla Skies")
-
-P(9, "21:00", "TT", "Video 30s", "HOR", "Why tonight is the darkest night",
-  "VO: الليلة ما فيه قمر… وهذا خبر حلو 🌑",
-  "No moon tonight. Good news.", "الليلة بدون قمر… وهذا خبر حلو",
-  "ليش الليالي اللي بدون قمر أحلى للنجوم؟ 🌑✨ وين تشوفها قريب منك؟",
-  "Why moonless nights are best for stars, and where to see them near you.",
-  "رصد النجوم الرياض, وين اشوف النجوم",
-  "#رصد_النجوم #الرياض #العلا #السعودية #مادا",
-  "Comment your city",
-  "Explainer with a simple animation of moon phases, then real stars timelapse.",
-  "New moon 9 Nov")
-
 P(9, "21:30", "X", "Post", "HOR", "Stargazing nudge",
   "الليلة بدون قمر 🌑",
   "", "",
@@ -411,17 +346,6 @@ P(10, "20:30", "IG", "Reel 30s", "BIZ", "Behind the Curtain #1: an event build i
   "Locked-off timelapse of a real build (stage, truss, lights, tables), then a 3-second real-time payoff of lights on. Crew in branded tees. A sound design build-up.",
   "Evergreen events", "Needs our own event footage. If no build this month, shoot a small activation or rehearsal.",
   series="Behind the Curtain")
-
-P(10, "21:00", "TT", "Photo carousel 7", "HOR", "What a weekend in AlUla actually costs",
-  "Slide 1: كم تكلف ويكند بالعلا فعلياً؟ 💸",
-  "AlUla weekend: the real cost", "ويكند العلا: التكلفة الحقيقية",
-  "كم تكلف ويكند بالعلا فعلياً؟ فصلناها لك بند بند 👇\nالأسعار تقريبية لشخصين، وتتغير حسب الموسم.",
-  "What does a weekend in AlUla actually cost? Line by line, for two people, approximate and seasonal.",
-  "كم تكلف رحلة العلا, اسعار العلا, AlUla trip cost",
-  "#العلا #ميزانية_السفر #سفر #السعودية #مادا",
-  "Comment 'تفاصيل' and we'll DM the plan",
-  "Photo Mode, one cost line per slide: flights, stay (2 nights), transfers, Hegra, balloon, dinner. Total on the last slide. Clean and transparent, no luxury flexing.",
-  "AlUla Skies", "SALES must fill in real SAR ranges before posting. Keep the tone as transparency, not luxury flexing (GAMR rules, Sep 2025).")
 
 P(10, "13:00", "X", "Post", "MOM", "11.11 teaser",
   "بكرة ١١.١١ 👀",
@@ -579,13 +503,13 @@ P(13, "17:30", "X", "Post", "MOM", "World Kindness Day question",
   "Text only. Quote-post the best replies through the day.",
   "World Kindness Day", "Post after Asr, not during Friday prayer.")
 
-P(14, "20:00", "IG", "Carousel 8", "HOR", "Autumn break: 6 short trips from Riyadh",
+P(14, "20:00", "IG", "Carousel 8", "HOR", "Autumn break: 6 trips without a long flight",
   "Slide 1: Autumn break starts 20 Nov. 6 trips that don't need a long flight.",
   "Autumn break · 6 short trips", "إجازة الخريف · ٦ رحلات قريبة",
-  "إجازة الخريف تبدأ ٢٠ نوفمبر 🍂\n٦ رحلات قريبة من الرياض:\nالعلا · أبها والسودة · جدة · مسقط · باكو · تبليسي\nاحفظ وأرسله لأهلك 📌",
-  "The autumn break starts 20 November. 6 short trips from Riyadh: AlUla, Abha & Soudah, Jeddah, Muscat, Baku, Tbilisi. Save and send to your family.",
+  "إجازة الخريف تبدأ ٢٠ نوفمبر 🍂\n٦ رحلات ما تحتاج طيران طويل:\nالعلا · دبي (القرية العالمية) · القاهرة · إسطنبول · باكو (بدون فيزا) · تبليسي\nاحفظ وأرسله لأهلك 📌",
+  "The autumn break starts 20 November. 6 trips without a long flight: AlUla, Dubai (Global Village), Cairo, Istanbul, Baku (visa-free), Tbilisi. Save and send to your family.",
   "اجازة الخريف, وين نسافر في الاجازة, رحلات قريبة من الرياض",
-  "#إجازة_الخريف #سفر_عائلي #العلا #أبها #مادا",
+  "#إجازة_الخريف #سفر_عائلي #إسطنبول #باكو #مادا",
   "Save + send to the family group",
   "One destination per slide: real photo, flight/drive time from Riyadh, 'best for' tag (families, couples, nature). Last slide: 'We still have dates. WhatsApp'.",
   "School autumn break 20-28 Nov", "Ops to confirm availability before posting.")
@@ -613,17 +537,6 @@ P(14, "13:00", "X", "Post", "HOR", "Autumn break countdown",
   "Autumn break")
 
 # ───────────────────────── WEEK 3 · 15–21 Nov · CITYSCAPE + BREAK BEGINS ─────────────────────────
-
-P(15, "20:30", "IG", "Reel 25s", "HOR", "Tonight: the Leonids",
-  "A meteor streaks across the frame in second 1",
-  "Tonight: Leonids peak", "الليلة: ذروة شهب الأسد",
-  "الليلة ذروة شهب الأسد 🌠 لين ٢٠ شهاب بالساعة في السماء الصافية.\nاطلع بعيد عن أنوار المدينة، وعطي عيونك ٢٠ دقيقة تتعود.",
-  "Tonight the Leonid meteor shower peaks, up to about 20 meteors an hour under clear skies. Get away from city lights and give your eyes 20 minutes.",
-  "شهب الاسد ٢٠٢٦, رصد الشهب الرياض, Leonids 2026",
-  "#شهب_الأسد #رصد_النجوم #الرياض #السعودية #مادا",
-  "Share with your stargazing friend",
-  "Night-sky timelapse (shot on 9-12 Nov) with a red-light campsite. On-screen tips. Quiet ambient sound.",
-  "Leonids peak 15 Nov · AlUla Skies closes", "Shoot the timelapse in the moonless window earlier in the week.")
 
 P(15, "21:00", "TT", "Video 20s", "HOR", "Where to see the meteors near Riyadh",
   "On-screen: الليلة الشهب 🌠 وين تشوفها قرب الرياض؟",
@@ -702,17 +615,6 @@ P(17, "20:30", "IG", "Reel 40s", "ONE", "One Call #2: a family of 7, 48 hours to
   "Same split-screen format as #1, with a checklist ticking on screen: 2 rooms connecting, child seats in the car, aisle seats together, halal-friendly restaurants. No children's faces.",
   "Autumn break", "No children on camera (GAMR guidance). Show hands, luggage, backs.",
   series="One Call")
-
-P(17, "21:00", "TT", "Photo carousel 8", "KNOW", "Autumn-break packing list for kids",
-  "Slide 1: شنطة الأطفال للإجازة: لا تنسى رقم ٦ 👀",
-  "Kids' travel bag: don't forget #6", "شنطة الأطفال: لا تنسى رقم ٦",
-  "شنطة الأطفال للإجازة 🧳 لا تنسى رقم ٦ 👀 احفظها.",
-  "Kids' bag for the break. Don't forget number 6. Save it.",
-  "شنطة السفر للاطفال, قائمة السفر مع الاطفال",
-  "#سفر_مع_الأطفال #إجازة_الخريف #شنطة_السفر #سفر #مادا",
-  "Save",
-  "Photo Mode checklist, flat-lay photos, one item per slide. #6 = a copy of the passports and the kids' birth certificates on your phone.",
-  "Autumn break")
 
 P(17, "18:00", "X", "Poll", "HOR", "Autumn break: where?",
   "إجازة الخريف وين؟",
@@ -883,28 +785,6 @@ P(21, "20:00", "IG", "Carousel 8", "HOR", "Kashta season: the desert camp checkl
   "Photo-led slides: the setup, gear flat-lay, coffee corner, fire. Safety slide: tell someone your location, carry water and a spare tyre, check the weather, take your rubbish home.",
   "Desert camping season · break weekend")
 
-P(21, "21:00", "TT", "Video 30s", "HOR", "Kashta setup ASMR",
-  "Sound first: the fire crackles, the dallah pours",
-  "Kashta setup · sound on", "تجهيز الكشتة · ارفع الصوت",
-  "كشتة أول الموسم 🔥 ارفع الصوت.",
-  "First kashta of the season. Sound on.",
-  "كشتة, جلسة بر, مخيم",
-  "#كشتة #البر #موسم_الكشتة #السعودية #مادا",
-  "Comment your kashta must-have",
-  "ASMR build: carpets unrolled, the tent up, the fire lit, coffee poured, stars come out (timelapse). No VO.",
-  "Kashta season")
-
-P(21, "16:30", "X", "Poll", "HOR", "Kashta must-have",
-  "وش أهم شي في الكشتة؟",
-  "", "",
-  "وش أهم شي في الكشتة؟ 🔥",
-  "What matters most at a kashta?",
-  "كشتة",
-  "#كشتة",
-  "Vote",
-  "Poll: ☕ القهوة / 🔥 الحطب / 🎶 الجلسة / 🍖 العشاء",
-  "Kashta season")
-
 # ───────────────────────── WEEK 4 · 22–30 Nov · BREAK, WHITE FRIDAY, DECEMBER ─────────────────────────
 
 P(22, "20:30", "IG", "Reel 40s", "ONE", "Concierge Confessions #2: the 2am rebooking",
@@ -918,28 +798,6 @@ P(22, "20:30", "IG", "Reel 40s", "ONE", "Concierge Confessions #2: the 2am reboo
   "Same storytime format. Calm, reassuring tone. Focus on the fix, not the problem.",
   "Evergreen", "SENSITIVITY: no reference to the October attacks. Keep the story generic (weather, technical).",
   series="Concierge Confessions")
-
-P(22, "21:00", "TT", "Video 50s", "HOR", "Riyadh Season with family: the 1-day plan",
-  "On-screen: يوم كامل بموسم الرياض مع العائلة… بدون تعب 👨‍👩‍👧",
-  "Riyadh Season with family: 1-day plan", "موسم الرياض مع العائلة: خطة يوم",
-  "يوم كامل بموسم الرياض مع العائلة بدون تعب 👨‍👩‍👧 احفظ الخطة.",
-  "A full day at Riyadh Season with the family, without the exhaustion. Save the plan.",
-  "موسم الرياض للعائلات, وش يناسب الاطفال في موسم الرياض",
-  "#موسم_الرياض #عائلة #إجازة_الخريف #الرياض #مادا",
-  "Save",
-  "Timeline video: 4pm Wonder Garden → 6pm early dinner → 7:30pm Boulevard World pavilions → 10pm home. Tips on strollers, breaks, meeting points.",
-  "Break week · Riyadh Season", "No children's faces.")
-
-P(22, "13:00", "X", "Thread 5", "HOR", "Riyadh Season with family thread",
-  "موسم الرياض مع العائلة: خطة يوم كامل 🧵",
-  "", "",
-  "١/ موسم الرياض مع العائلة: خطة يوم كامل بدون تعب 🧵\n٢/ ٤ العصر: ونستر غاردن قبل الزحمة\n٣/ ٦ المغرب: عشاء بدري\n٤/ ٧:٣٠: أجنحة بوليفارد وورلد\n٥/ ١٠ بالليل: الرجعة قبل ذروة الطلعة. وتبي تذاكر أو سيارة؟ كلمنا.",
-  "1/ Riyadh Season with family: a full-day plan. 2/ 4pm Wonder Garden before the crowds. 3/ 6pm early dinner. 4/ 7:30 Boulevard World pavilions. 5/ 10pm head home before the rush. Need tickets or a car? Talk to us.",
-  "موسم الرياض للعائلات",
-  "#موسم_الرياض",
-  "DM",
-  "Text thread.",
-  "Break week")
 
 P(22, "09:30", "LI", "Document 7 pages", "BIZ", "Field Notes #3: 5 travel-policy clauses that save money in 2027",
   "Page 1: Most travel policies were written for 2019.",
@@ -1138,7 +996,7 @@ P(27, "08:00", "IG", "Carousel 5", "MOM", "White Friday: the offer",
   "#الجمعة_البيضاء #عروض_سفر #مادا #MadaTrips #باقات_سياحية",
   "WhatsApp 🤍",
   "Hero design: white-on-green, gold accent. Slide 1 offer, slides 2-4 three destination options with what's included (no strike-through 'was/now' unless legally verified), slide 5 terms + CTA.",
-  "White Friday 27 Nov", "MANAGEMENT: final offer, terms and real prices. Follow Saudi consumer-protection rules on discount claims (Ministry of Commerce).")
+  "White Friday 27 Nov", "MANAGEMENT: final offer, terms and real prices. Lead with a global trip (e.g. Istanbul or Baku for the 8 Jan break), then a GCC hop (Dubai Shopping Festival) and one domestic option. Follow Saudi consumer-protection rules on discount claims (Ministry of Commerce).")
 
 P(27, "21:00", "IG", "Reel 15s", "MOM", "White Friday: final hours",
   "On-screen: Final hours 🤍",
@@ -1252,28 +1110,6 @@ P(29, "09:30", "LI", "Post", "ONE", "Our first month, in numbers",
   "One team photo.",
   "Month-end", "Fill in real numbers. Don't publish placeholders.")
 
-P(30, "20:30", "IG", "Reel 35s", "HOR", "December on the horizon",
-  "On-screen: Save December 👇 (calendar flips)",
-  "December on the horizon", "ديسمبر في الأفق",
-  "احفظ ديسمبر 📌\n٢–٣: اليوم الوطني الإماراتي\n٤–٦: الفورمولا ١ أبوظبي\n١٠: بداية رجب\n١٨–١٩: فورمولا إي جدة\n٢٧–٣٠: Six Kings Slam الرياض\nو٨ يناير: إجازة منتصف العام 🎒",
-  "Save December: UAE National Day (2-3), F1 Abu Dhabi (4-6), Rajab begins (10), Formula E Jeddah (18-19), Six Kings Slam Riyadh (27-30), and the mid-year school break from 8 January.",
-  "فعاليات ديسمبر السعودية, اجازة منتصف العام, Formula E Jeddah",
-  "#ديسمبر #فعاليات #إجازة_منتصف_العام #السعودية #مادا",
-  "Save",
-  "Calendar pages flipping, one event per beat with a small visual. Ends with 'Plan it once. We'll handle the rest.'",
-  "December preview", "Re-check every date the week of posting (several events were moved or cancelled this season).")
-
-P(30, "21:00", "TT", "Video 35s", "HOR", "December in Saudi & the Gulf: 5 dates",
-  "On-screen: ٥ مواعيد بديسمبر لازم تحفظها 📅",
-  "5 December dates to save", "٥ مواعيد بديسمبر",
-  "٥ مواعيد بديسمبر لازم تحفظها 📅 أيها رايح لها؟",
-  "5 December dates to save. Which are you going to?",
-  "فعاليات ديسمبر, فورمولا اي جدة, Six Kings Slam",
-  "#ديسمبر #فعاليات_السعودية #فورمولا_إي #الرياض #مادا",
-  "Comment which one",
-  "Fast list with a ticking calendar sound.",
-  "December preview")
-
 P(30, "13:00", "X", "Post", "MOM", "Cyber Monday + December",
   "آخر عروض نوفمبر اليوم 🤍",
   "", "",
@@ -1284,3 +1120,318 @@ P(30, "13:00", "X", "Post", "MOM", "Cyber Monday + December",
   "WhatsApp",
   "Text only.",
   "Cyber Monday / schools back", "Only if a Cyber Monday offer is approved; otherwise post the December line only.")
+
+
+# ───────────────────────── WORLD HORIZONS · global trips and events (all month) ─────────────────────────
+
+P(4, "18:00", "X", "Post", "WORLD", "Liverpool in Istanbul tonight",
+  "ليفربول الليلة في إسطنبول… ٤ ساعات من الرياض ⚽",
+  "", "",
+  "ليفربول الليلة في إسطنبول ضد فنربخشة ⚽ (٨:٤٥ بتوقيت الرياض)\nإسطنبول على بعد ٤ ساعات بس. المرة الجاية تبيها من المدرجات؟ نرتبها لك: تذكرة، طيران، فندق.",
+  "Liverpool play Fenerbahçe in Istanbul tonight (20:45 Riyadh time). Istanbul is only 4 hours away. Next time, want it from the stands? We arrange the ticket, flight and hotel.",
+  "دوري أبطال أوروبا, ليفربول, إسطنبول, Champions League travel",
+  "#دوري_أبطال_أوروبا",
+  "Reply / DM",
+  "Text + a clean graphic: RUH → IST, 4h. No UEFA or club logos.",
+  "UCL MD4 (4 Nov)", "Confirm the kick-off time on uefa.com the day of posting. No UEFA/club logos.",
+  series="Fly For It", sc="Global")
+
+P(5, "21:30", "IG", "Reel 35s", "WORLD", "Fly For It: Arsenal v Real Madrid, London, 9 Dec",
+  "Stadium roar in the first second, then text: 'Arsenal v Real Madrid. 9 December. You in?'",
+  "Arsenal v Real Madrid · London · 9 Dec", "أرسنال × ريال مدريد · لندن · ٩ ديسمبر",
+  "أكبر مباراة بدوري الأبطال قبل الكريسماس: أرسنال × ريال مدريد في لندن، ٩ ديسمبر ⚽\nخلّها أسبوع كرة: ديربي شمال لندن ٥ ديسمبر + المباراة + Winter Wonderland.\nنرتبها لك من الـETA للمدرج. أرسل «لندن» على الواتساب.",
+  "The biggest Champions League game before Christmas: Arsenal v Real Madrid in London, 9 December. Make it a week of football: the North London derby on 5 Dec + the match + Winter Wonderland. We arrange it from the ETA to your seat. Send 'London' on WhatsApp.",
+  "تذاكر ريال مدريد, رحلة مباراة لندن, دوري أبطال أوروبا تذاكر, Arsenal Real Madrid tickets",
+  "#ريال_مدريد #دوري_أبطال_أوروبا #لندن #سفر #مادا",
+  "WhatsApp 'لندن'",
+  "Fan-voyage edit: crowd sound, London streets at night, a ticket mock-up 'Gate · Row · Seat', Winter Wonderland lights. Fast cuts on the beat. No match broadcast footage or club crests.",
+  "UCL MD6 Arsenal v Real Madrid (9 Dec) · North London derby (5 Dec)", "Ticket availability through official/resale partners must be confirmed by ops before posting. No club logos or broadcast footage.",
+  series="Fly For It", sc="Global")
+
+P(5, "22:00", "TT", "Photo carousel 8", "WORLD", "Rate my itinerary: 7 days in Japan",
+  "Slide 1: قيّم برنامجنا: ٧ أيام في اليابان 🇯🇵 (طيران مباشر من الرياض قريب!)",
+  "Rate my itinerary: 7 days in Japan", "قيّم برنامجي: ٧ أيام في اليابان",
+  "قيّم برنامجنا من ١٠ 🇯🇵 وش تضيف؟\nطوكيو ٣ أيام · كيوتو ٢ (موسم أوراق الخريف) · أوساكا ١ · جبل فوجي ١\nومن ١٧ نوفمبر فيه طيران مباشر من الرياض لطوكيو ✈️",
+  "Rate our 7-day Japan itinerary: Tokyo 3, Kyoto 2 (autumn leaves season), Osaka 1, Mt Fuji 1. And from 17 November there's a nonstop from Riyadh to Tokyo.",
+  "برنامج اليابان ٧ ايام, السفر لليابان من السعودية, Japan itinerary 7 days",
+  "#اليابان #طوكيو #كيوتو #برنامج_سياحي #مادا",
+  "Rate it in comments",
+  "Photo Mode, one day per slide with big Arabic text, halal food tip on the Tokyo slide, prayer-room tip on the Kyoto slide.",
+  "Saudia RUH-NRT nonstop from 17 Nov · Kyoto foliage", "", sc="Global")
+
+P(6, "21:00", "TT", "Video 40s", "HOR", "Global Village: the 1h50 weekend",
+  "On-screen: ويكند كامل برا السعودية… وأنت راجع السبت 👀",
+  "Dubai weekend: Global Village", "ويكند دبي: القرية العالمية",
+  "ساعة و٥٠ دقيقة من الرياض… والقرية العالمية فتحت موسمها الجديد 🎡\nخطة ويكند كامل بدبي، وترجع السبت.",
+  "1h50 from Riyadh, and Global Village has opened its new season. A full Dubai weekend plan, home by Saturday.",
+  "القرية العالمية دبي, ويكند دبي, Global Village Dubai 2026",
+  "#القرية_العالمية #دبي #ويكند #سفر #مادا",
+  "Comment 'دبي' for the plan",
+  "Timeline: Thu night flight → Fri brunch → Global Village after Maghrib → Sat morning beach → home. Use our own or creator footage (Collab).",
+  "Global Village season 31 (from 14 Oct)", "Check the airline is operating that week (some carriers were suspended in October).", sc="GCC")
+
+P(8, "21:30", "IG", "Carousel 10", "WORLD", "World Radar #1: worth flying for, Nov-Dec",
+  "Slide 1: The world's calendar, from Riyadh. 9 events worth flying for before New Year.",
+  "World Radar · Nov-Dec", "رادار العالم · نوفمبر–ديسمبر",
+  "رادار العالم 🌍 ٩ أحداث تستاهل السفرة قبل نهاية السنة:\n• ٢١ نوفمبر: افتتاح موسم التزلج في الألب\n• أواخر نوفمبر: ذروة أوراق الخريف في كيوتو\n• ٢٧–٢٩: فورمولا ١ قطر (ساعة و٢٠ من الرياض)\n• ٢٨: شاكيرا عند الأهرامات\n• ٣–٦ ديسمبر: ختام الفورمولا ١ في أبوظبي\n• من ٤ ديسمبر: مهرجان دبي للتسوق\n• ٨ ديسمبر: برشلونة × مانشستر سيتي\n• ٩ ديسمبر: أرسنال × ريال مدريد\n• ٣١ ديسمبر: ليلة رأس السنة بدبي أو لندن\nاحفظه، وقلنا وين تبي تكون 👇",
+  "World Radar: 9 events worth flying for before New Year. Alps ski opening (21 Nov), Kyoto foliage peak (late Nov), F1 Qatar (27-29 Nov, 1h20 away), Shakira at the Pyramids (28 Nov), F1 Abu Dhabi finale (3-6 Dec), Dubai Shopping Festival (from 4 Dec), Barcelona v Man City (8 Dec), Arsenal v Real Madrid (9 Dec), New Year's Eve in Dubai or London. Save it and tell us where you want to be.",
+  "فعاليات عالمية ديسمبر, وين اسافر ديسمبر, events worth travelling for",
+  "#رادار_العالم #سفر #فعاليات_عالمية #دوري_أبطال_أوروبا #مادا",
+  "Save + comment where you want to be",
+  "Recurring template (every other Sunday): sand cover with a globe-sweep graphic. One event per slide: date, city, flight time from Riyadh, visa need (✓ / ETA / Schengen) and one tip. Last slide: 'One call. We'll get you there.'",
+  "Global events Nov-Dec", "Re-check each date the day before posting (several Gulf events moved this season).",
+  series="World Radar", sc="Global")
+
+P(8, "19:00", "X", "Thread 6", "WORLD", "World Radar #1 on X",
+  "رادار العالم 🌍 أحداث تستاهل السفرة قبل نهاية السنة 🧵",
+  "", "",
+  "١/ رادار العالم 🌍 أحداث تستاهل السفرة قبل نهاية السنة 🧵\n٢/ ٢٧–٢٩ نوفمبر: فورمولا ١ قطر. ساعة و٢٠ دقيقة من الرياض\n٣/ ٢٨ نوفمبر: شاكيرا عند أهرامات الجيزة. ساعتين ونص\n٤/ ٣–٦ ديسمبر: ختام الفورمولا ١ في أبوظبي + حفلات Yasalam\n٥/ ٨ و٩ ديسمبر: برشلونة × سيتي، وأرسنال × ريال مدريد\n٦/ من ٤ ديسمبر: مهرجان دبي للتسوق. أي وحدة تبي؟ نرتبها لك.",
+  "1/ World Radar: events worth flying for before year end. 2/ F1 Qatar 27-29 Nov, 1h20 from Riyadh. 3/ Shakira at the Pyramids 28 Nov, 2h30. 4/ F1 Abu Dhabi finale 3-6 Dec + Yasalam concerts. 5/ 8 & 9 Dec: Barcelona v City, Arsenal v Real Madrid. 6/ Dubai Shopping Festival from 4 Dec. Which one? We'll arrange it.",
+  "فعاليات عالمية",
+  "#رادار_العالم",
+  "Reply / DM",
+  "Text thread, World Radar cover image on tweet 1.",
+  "Global events", "", series="World Radar", sc="Global")
+
+P(9, "20:30", "IG", "Carousel 10", "KNOW", "No visa (or almost) for Saudi passports this winter",
+  "Slide 1: Your Saudi passport opens these doors this winter. No embassy visit needed.",
+  "No visa needed this winter", "بدون فيزا هالشتاء",
+  "جوازك السعودي يفتح لك هالدول هالشتاء بدون موعد سفارة 🇸🇦✈️\nتركيا · جورجيا · أذربيجان (لين ١٥ فبراير ٢٠٢٧) · روسيا · الصين (لين ٣١ ديسمبر) · ماليزيا · تايلند · المغرب · كازاخستان · المالديف (عند الوصول)\nاحفظها، وأرسلها لرفيق السفر 📌",
+  "Your Saudi passport opens these doors this winter with no embassy visit: Türkiye, Georgia, Azerbaijan (until 15 Feb 2027), Russia, China (until 31 Dec), Malaysia, Thailand, Morocco, Kazakhstan, Maldives (on arrival). Save it and send it to your travel buddy.",
+  "دول بدون فيزا للسعوديين, دول بدون تأشيرة للسعوديين ٢٠٢٦, visa free countries Saudi passport",
+  "#بدون_فيزا #جواز_سعودي #سفر #السفر_مع_العائلة #مادا",
+  "Save + share",
+  "One country per slide: a real photo, flight time from Riyadh, stay allowed (e.g. 30 / 60 / 90 days), best month. Small footer on every slide: 'Rules change. Check before you book.'",
+  "Evergreen + Azerbaijan (to 15 Feb 2027) and China (to 31 Dec) windows", "Ops to verify each country's rule the week of posting (sources: official MFA/embassy pages). High-share format ('دول بدون فيزا للسعوديين').",
+  series="Visa in 60", sc="Global")
+
+P(9, "21:00", "TT", "Video 45s", "WORLD", "Northern lights this winter: Lapland",
+  "On-screen + VO: الشفق القطبي… مو حلم، هذا موعده 🌌",
+  "Northern lights: when and where", "الشفق القطبي: متى ووين",
+  "تبي تشوف الشفق القطبي هالشتاء؟ 🌌 وين، ومتى، وكم ليلة تحتاج عشان تزيد فرصتك 👇",
+  "Want to see the northern lights this winter? Where, when, and how many nights you need to raise your chances.",
+  "الشفق القطبي, لابلاند, روفانيمي, northern lights Lapland",
+  "#الشفق_القطبي #لابلاند #فنلندا #شتاء #مادا",
+  "Save + tag who you'd take",
+  "Talking-head + aurora footage (licensed). Facts: season roughly Sep-Mar, best on clear dark nights, plan 3-4 nights, Rovaniemi has Santa Claus Village for kids. Schengen visa needed.",
+  "Lapland / aurora season", "Licensed footage only. Say 'chances', never 'guaranteed'.",
+  series="Winter Escapes", sc="Global")
+
+P(10, "21:00", "TT", "Photo carousel 8", "WORLD", "What 5 days in Baku & Shahdag actually cost",
+  "Slide 1: كم تكلف ٥ أيام في أذربيجان مع الثلج؟ 💸❄️",
+  "Baku + snow: the real cost", "باكو والثلج: التكلفة الحقيقية",
+  "كم تكلف ٥ أيام في أذربيجان مع الثلج؟ فصلناها لك 👇\nوأذربيجان بدون فيزا للسعوديين لين ١٥ فبراير ٢٠٢٧ ❄️\nالأسعار تقريبية لشخصين.",
+  "What do 5 days in Azerbaijan with snow cost? Broken down for you. Azerbaijan is visa-free for Saudis until 15 Feb 2027. Approximate prices for two.",
+  "تكلفة رحلة اذربيجان, باكو شاهداغ, اذربيجان بدون فيزا, Baku trip cost",
+  "#أذربيجان #باكو #ثلوج #ميزانية_السفر #مادا",
+  "Comment 'تفاصيل' for the plan in DM",
+  "Photo Mode, one cost line per slide: flights, hotel (3 nights Baku + 1 Shahdag), transfers, ski pass/lessons, food. Total on the last slide. Transparent, no flexing.",
+  "Azerbaijan visa-free window (to 15 Feb 2027)", "SALES must fill in real SAR ranges before posting.",
+  sc="Global")
+
+P(13, "13:00", "X", "Post", "WORLD", "Vienna's main winter market opens today",
+  "سوق الشتاء في ساحة بلدية فيينا يفتح اليوم ❄️",
+  "", "",
+  "سوق الشتاء في ساحة بلدية فيينا يفتح اليوم ❄️ وموسم أسواق أوروبا رسمياً بدأ.\nلو تفكر بإجازة منتصف العام (٨ يناير)، هذا وقت حجز الشنغن.",
+  "Vienna's Rathausplatz winter market opens today, and Europe's market season has officially begun. If you're thinking of the mid-year break (8 Jan), now is the time to book your Schengen appointment.",
+  "فيينا في الشتاء, اسواق الشتاء اوروبا",
+  "#شتاء_أوروبا",
+  "DM",
+  "One photo.",
+  "Vienna Rathausplatz market (~13 Nov)", "Some sources say 15 Nov. Confirm before posting.",
+  series="Europe in Winter", sc="Global")
+
+P(15, "20:30", "IG", "Reel 30s", "WORLD", "Japan is now 10 hours away",
+  "Text over a Kyoto maple-red frame: 'Riyadh → Tokyo. Nonstop. From 17 Nov.'",
+  "Riyadh → Tokyo · nonstop · from 17 Nov", "الرياض ← طوكيو · مباشر · من ١٧ نوفمبر",
+  "اليابان صارت على بعد ١٠ ساعات 🇯🇵\nمن ١٧ نوفمبر فيه طيران مباشر من الرياض لطوكيو، والموسم موسم أوراق الخريف في كيوتو 🍁\nأول برنامج لنا لليابان جاهز. أرسل «اليابان» على الواتساب.",
+  "Japan is now 10 hours away. From 17 November there's a nonstop from Riyadh to Tokyo, right in Kyoto's autumn-leaves season. Our first Japan itinerary is ready. Send 'Japan' on WhatsApp.",
+  "السفر لليابان من الرياض, طيران مباشر الرياض طوكيو, Japan from Riyadh",
+  "#اليابان #طوكيو #كيوتو #سفر #مادا",
+  "WhatsApp 'اليابان'",
+  "Cinematic: a boarding-pass close-up 'RUH → NRT', then Tokyo crossing at night, Kyoto temple in red leaves, a bullet train, ramen (halal sign), Fuji. Soft Japanese-inspired instrumental. Licensed or Collab footage only.",
+  "Saudia RUH-NRT nonstop from 17 Nov · Kyoto foliage peak late Nov", "Mention the route generically ('nonstop from Riyadh'). Confirm Saudia's schedule the week of posting.",
+  series="Winter Escapes", sc="Global")
+
+P(17, "21:00", "TT", "Video 50s", "KNOW", "Japan nonstop starts today: 5 things to know",
+  "VO + on-screen: من اليوم: الرياض لطوكيو مباشر ✈️ ٥ أشياء لازم تعرفها",
+  "Riyadh → Tokyo nonstop: 5 things to know", "الرياض لطوكيو مباشر: ٥ أشياء",
+  "من اليوم فيه طيران مباشر من الرياض لطوكيو 🇯🇵 ٥ أشياء لازم تعرفها قبل تحجز 👇",
+  "From today there's a nonstop from Riyadh to Tokyo. 5 things to know before you book.",
+  "فيزا اليابان للسعوديين, السفر لليابان, طيران الرياض طوكيو",
+  "#اليابان #فيزا_اليابان #طوكيو #سفر #مادا",
+  "Save + follow",
+  "Concierge explains: (1) the eVisa (apply online, before booking hotels) (2) 3 flights a week, so dates matter (3) Kyoto leaves peak late Nov-early Dec (4) halal food apps & prayer rooms (5) Sapporo Snow Festival 4-11 Feb for families.",
+  "Saudia RUH-NRT launch (17 Nov)", "Verify the Japan eVISA eligibility wording for Saudi nationals on the Japanese MOFA site.",
+  series="Visa in 60", sc="Global")
+
+P(17, "13:00", "X", "Post", "WORLD", "Japan route news",
+  "من اليوم: الرياض ← طوكيو مباشر 🇯🇵",
+  "", "",
+  "من اليوم: طيران مباشر من الرياض لطوكيو ٣ مرات بالأسبوع 🇯🇵\nأول مرة اليابان تصير بهالقرب. تبي برنامج؟ نرتبه لك من الفيزا للفندق.",
+  "From today: a nonstop from Riyadh to Tokyo, 3 times a week. Japan has never been this close. Want a plan? We'll arrange it from the visa to the hotel.",
+  "طيران مباشر الرياض طوكيو",
+  "#اليابان",
+  "DM",
+  "One photo of Kyoto in autumn.",
+  "Saudia RUH-NRT launch", "Confirm the first flight operated before posting.", sc="Global")
+
+P(21, "21:00", "TT", "Video 45s", "WORLD", "Ski season opens: Alps vs Gudauri vs Uludağ",
+  "On-screen: موسم التزلج فتح اليوم ⛷️ وين تروح؟",
+  "Ski season: 3 options from Riyadh", "موسم التزلج: ٣ خيارات من الرياض",
+  "موسم التزلج فتح اليوم في الألب ⛷️ بس عندك ٣ خيارات من الرياض حسب ميزانيتك 👇 أي واحد يناسبك؟",
+  "Ski season opened today in the Alps. You have 3 options from Riyadh depending on your budget. Which suits you?",
+  "التزلج في سويسرا, جورجيا ثلج, اولوداغ تركيا, ski holiday from Saudi",
+  "#تزلج #ثلوج #جورجيا #سويسرا #مادا",
+  "Comment your pick",
+  "Tier format: (1) The Alps: Val Thorens open now, Courchevel/Zell am See from early Dec (Schengen) (2) Gudauri, Georgia: ~3.5h, visa-free, opens ~late Dec (3) Uludağ, Türkiye: ~4h, visa-free, near Bursa. Beginner tips on screen.",
+  "Val Thorens opens 21 Nov", "Gudauri opening date is approximate. Say 'usually late December'.",
+  series="Winter Escapes", sc="Global")
+
+P(22, "21:30", "IG", "Carousel 10", "WORLD", "World Radar #2: Dec-Feb",
+  "Slide 1: Plan the winter now. 9 dates worth flying for, Dec-Feb.",
+  "World Radar · Dec-Feb", "رادار العالم · ديسمبر–فبراير",
+  "رادار العالم 🌍 احجز الشتاء من الحين:\n• ٨–٩ ديسمبر: برشلونة × سيتي، أرسنال × ريال مدريد\n• ٤ ديسمبر – ١٧ يناير: مهرجان دبي للتسوق\n• ٣١ ديسمبر: رأس السنة بدبي أو لندن\n• من ٦ يناير: تخفيضات باريس الشتوية\n• ٧ يناير: كأس آسيا عندنا في السعودية 🇸🇦\n• ١٤ يناير: NBA في باريس\n• ٢–٧ فبراير: السوبر الإسباني في إسطنبول (٤ ساعات!)\n• ٤–١١ فبراير: مهرجان الثلج في سابورو\nإجازة منتصف العام تبدأ ٨ يناير. خطط من الحين.",
+  "World Radar: book the winter now. Barcelona v City and Arsenal v Real Madrid (8-9 Dec), Dubai Shopping Festival (4 Dec-17 Jan), NYE in Dubai or London, Paris winter sales (from 6 Jan), the Asian Cup at home (from 7 Jan), NBA in Paris (14 Jan), the Spanish Super Cup in Istanbul (2-7 Feb, 4 hours away), Sapporo Snow Festival (4-11 Feb). The mid-year break starts 8 January.",
+  "وين اسافر اجازة منتصف العام, فعاليات يناير, السوبر الاسباني اسطنبول",
+  "#رادار_العالم #إجازة_منتصف_العام #سفر #السوبر_الإسباني #مادا",
+  "Save + comment where you want to be",
+  "World Radar template.",
+  "Global events Dec-Feb", "Note that the Super Cup is in Istanbul in 2027, not Saudi Arabia.",
+  series="World Radar", sc="Global")
+
+P(22, "13:00", "X", "Thread 5", "WORLD", "World Radar #2 on X",
+  "إجازة منتصف العام تبدأ ٨ يناير. هذي أحداث العالم اللي تستاهل 🧵",
+  "", "",
+  "١/ إجازة منتصف العام تبدأ ٨ يناير. هذي أحداث العالم اللي تستاهل السفرة 🧵\n٢/ ديسمبر: مهرجان دبي للتسوق من ٤ ديسمبر، وليلة رأس السنة\n٣/ يناير: تخفيضات باريس من ٦ يناير، وNBA في باريس ١٤ يناير\n٤/ فبراير: السوبر الإسباني في إسطنبول ٢–٧ فبراير، ٤ ساعات من الرياض\n٥/ ولكأس آسيا عندنا من ٧ يناير، خلك قريب 🇸🇦",
+  "1/ The mid-year break starts 8 Jan. Global events worth the trip. 2/ December: Dubai Shopping Festival from 4 Dec, New Year's Eve. 3/ January: Paris sales from 6 Jan, NBA in Paris 14 Jan. 4/ February: the Spanish Super Cup in Istanbul 2-7 Feb, 4 hours from Riyadh. 5/ And the Asian Cup is at home from 7 Jan.",
+  "اجازة منتصف العام",
+  "#إجازة_منتصف_العام",
+  "Bookmark",
+  "Text thread.",
+  "Global events Dec-Feb", "", series="World Radar", sc="Global")
+
+P(24, "19:00", "X", "Post", "WORLD", "UCL tonight, and the big one in 2 weeks",
+  "دوري الأبطال الليلة ⚽ والكبيرة بعد أسبوعين",
+  "", "",
+  "دوري الأبطال الليلة: ريال مدريد × آيندهوفن، أرسنال × دورتموند، سيتي × نابولي ⚽\nوالكبيرة بعد أسبوعين: أرسنال × ريال مدريد في لندن ٩ ديسمبر. باقي وقت تلحق.",
+  "Champions League tonight: Real Madrid v PSV, Arsenal v Dortmund, City v Napoli. And the big one in two weeks: Arsenal v Real Madrid in London, 9 December. There's still time.",
+  "دوري أبطال أوروبا, ريال مدريد",
+  "#دوري_أبطال_أوروبا",
+  "DM",
+  "Text only.",
+  "UCL MD5 (24 Nov)", "Ops to confirm match-trip availability.", series="Fly For It", sc="Global")
+
+P(25, "21:30", "IG", "Reel 30s", "WORLD", "Fly For It: Shakira at the Pyramids + Cairo in 48h",
+  "Pyramids at golden hour, a crowd roar, text: 'Saturday. The Pyramids. Shakira.'",
+  "Shakira · the Pyramids · 28 Nov", "شاكيرا · الأهرامات · ٢٨ نوفمبر",
+  "حفلة عند الأهرامات 🇪🇬 شاكيرا، السبت ٢٨ نوفمبر، والقاهرة على بعد ساعتين ونص.\nخلها ٤٨ ساعة: الحفلة + المتحف المصري الكبير + عشاء على النيل.\nأرسل «القاهرة» على الواتساب.",
+  "A concert at the Pyramids: Shakira, Saturday 28 November, and Cairo is 2.5 hours away. Make it 48 hours: the show + the Grand Egyptian Museum + dinner on the Nile. Send 'Cairo' on WhatsApp.",
+  "حفلة شاكيرا الاهرامات, القاهرة ويكند, المتحف المصري الكبير",
+  "#القاهرة #مصر #الأهرامات #ويكند #مادا",
+  "WhatsApp 'القاهرة'",
+  "48-hour itinerary reel: arrival, the Grand Egyptian Museum, Nile dinner, the Pyramids at night (stage lights from a distance). No artist imagery or concert footage (rights).",
+  "Shakira at the Pyramids (28 Nov)", "Confirm the concert is going ahead and ticket availability. No artist photos.",
+  series="Fly For It", sc="Global")
+
+P(25, "09:30", "LI", "Post + image", "BIZ", "GITEX Global at Expo City Dubai: team travel brief",
+  "GITEX moves to Expo City Dubai this year. Your team's travel plan should move with it.",
+  "GITEX Global 2026 · team brief", "",
+  "",
+  "GITEX Global runs 8-11 December, for the first time at Expo City Dubai.\n\nIf you're sending a team from Riyadh, our brief:\n• Expo City is far from Downtown and the Marina, so stay close or plan transfers by session\n• Book rooms now. GITEX week fills Dubai\n• Arrive the day before. Registration queues on day 1 are long\n• One WhatsApp line for the whole team, from flights to dinners\n\nWe're arranging delegations for GITEX now. Message us if you want yours handled.",
+  "GITEX Global 2026 travel, corporate travel Dubai, business delegation Dubai",
+  "#GITEX #Dubai #BusinessTravel #Tech",
+  "Message us",
+  "One image: a route graphic RUH → DXB → Expo City.",
+  "GITEX Global 8-11 Dec", "", sc="GCC")
+
+P(28, "22:00", "TT", "Video 35s", "WORLD", "The Super Cup moves to Istanbul",
+  "On-screen: السوبر الإسباني هالسنة… مو عندنا 👀",
+  "Spanish Super Cup · Istanbul · 2-7 Feb", "السوبر الإسباني · إسطنبول · ٢–٧ فبراير",
+  "السوبر الإسباني ٢٠٢٧ في إسطنبول مو الرياض 👀 (لأن كأس آسيا عندنا)\nريال مدريد، برشلونة، أتلتيكو، وريال سوسيداد. واحتمال كلاسيكو بالنهائي… ٤ ساعات من الرياض ⚽",
+  "The 2027 Spanish Super Cup is in Istanbul, not Riyadh (the Asian Cup is here). Real Madrid, Barcelona, Atlético and Real Sociedad, and a possible Clásico final 4 hours from Riyadh.",
+  "السوبر الاسباني ٢٠٢٧, السوبر الاسباني اسطنبول, كلاسيكو",
+  "#السوبر_الإسباني #ريال_مدريد #برشلونة #إسطنبول #مادا",
+  "Comment who wins",
+  "News-style green-screen over the RFEF announcement, a map RUH → IST, a bracket graphic. No club crests.",
+  "Spanish Super Cup 2-7 Feb 2027 (Istanbul)", "", series="Fly For It", sc="Global")
+
+P(29, "21:30", "IG", "Carousel 9", "WORLD", "Winter Escapes: snow, sun or city for the 8 Jan break",
+  "Slide 1: The mid-year break starts 8 Jan. Snow, sun or city?",
+  "Snow · Sun · City", "ثلج · شمس · مدينة",
+  "إجازة منتصف العام تبدأ ٨ يناير ❄️☀️🏙️ وأنت من أي فريق؟\nثلج: سويسرا · جورجيا · أذربيجان · سابورو\nشمس: المالديف · بوكيت · لنكاوي\nمدينة: لندن · باريس (التخفيضات) · إسطنبول\nالحجوزات تمتلي بدري. أرسل «إجازة» على الواتساب.",
+  "The mid-year break starts 8 January. Which team are you? Snow: Switzerland, Georgia, Azerbaijan, Sapporo. Sun: Maldives, Phuket, Langkawi. City: London, Paris (the sales), Istanbul. Bookings fill early. Send 'break' on WhatsApp.",
+  "وين نسافر اجازة منتصف العام, سفر الشتاء, ثلوج, المالديف",
+  "#إجازة_منتصف_العام #سفر_الشتاء #ثلوج #المالديف #مادا",
+  "Comment snow/sun/city",
+  "3 colour-coded sections (ice blue, sun gold, city green) on brand sand. Each slide: destination, flight time, visa, family/couple tag, private-pool or connecting-room note.",
+  "Mid-year break (8 Jan)", "", series="Winter Escapes", sc="Global")
+
+P(30, "20:30", "IG", "Reel 35s", "WORLD", "December on the horizon",
+  "On-screen: Save December 👇 (calendar flips)",
+  "December on the horizon", "ديسمبر في الأفق",
+  "احفظ ديسمبر 📌\n٣–٦: ختام الفورمولا ١ في أبوظبي\n٤: يبدأ مهرجان دبي للتسوق\n٨–٩: برشلونة × سيتي، وأرسنال × ريال مدريد\n١٠: بداية رجب\n١٨: اليوم الوطني القطري · ١٨–١٩: فورمولا إي جدة\n٢٧–٣٠: Six Kings Slam الرياض\n٣١: ليلة رأس السنة\nو٨ يناير: إجازة منتصف العام 🎒",
+  "Save December: F1 Abu Dhabi finale (3-6), Dubai Shopping Festival (from 4), Barcelona v City and Arsenal v Real Madrid (8-9), Rajab begins (10), Qatar National Day (18), Formula E Jeddah (18-19), Six Kings Slam Riyadh (27-30), New Year's Eve, and the mid-year break from 8 January.",
+  "فعاليات ديسمبر, اجازة منتصف العام, فعاليات عالمية ديسمبر",
+  "#ديسمبر #فعاليات #إجازة_منتصف_العام #سفر #مادا",
+  "Save",
+  "Calendar pages flipping, one event per beat, a city skyline per page (Abu Dhabi, Dubai, Barcelona, London, Jeddah, Riyadh). Ends with 'Plan it once. We'll handle the rest.'",
+  "December preview", "Re-check every date the week of posting.", sc="Global")
+
+P(30, "21:00", "TT", "Video 35s", "WORLD", "5 December dates abroad to save",
+  "On-screen: ٥ مواعيد بديسمبر برا السعودية تستاهل السفرة 📅",
+  "5 December dates worth flying for", "٥ مواعيد بديسمبر تستاهل السفرة",
+  "٥ مواعيد بديسمبر برا السعودية تستاهل السفرة 📅 أي وحدة رايح لها؟",
+  "5 December dates abroad worth the trip. Which one are you going to?",
+  "فعاليات ديسمبر, فورمولا ١ ابوظبي, مهرجان دبي للتسوق, ريال مدريد لندن",
+  "#ديسمبر #فورمولا1 #دبي #دوري_أبطال_أوروبا #مادا",
+  "Comment which one",
+  "Fast list with a ticking calendar sound: F1 Abu Dhabi, Dubai Shopping Festival, Arsenal v Real Madrid, Qatar National Day, NYE.",
+  "December preview", "", sc="Global")
+
+
+P(21, "16:30", "X", "Poll", "WORLD", "Winter sun: which one?",
+  "شمس الشتاء: وين؟",
+  "", "",
+  "إجازة منتصف العام، وتبي شمس ☀️ وين؟",
+  "Mid-year break and you want sun. Where?",
+  "المالديف, بوكيت, لنكاوي",
+  "#سفر_الشتاء",
+  "Vote",
+  "Poll: 🏝️ المالديف / 🌴 بوكيت / 🌺 لنكاوي / 🇪🇬 الغردقة",
+  "Winter-sun high season (Nov-Apr)", "", series="Winter Escapes", sc="Global")
+
+P(22, "21:00", "TT", "Video 50s", "WORLD", "Istanbul with family: 4 days that work",
+  "On-screen: إسطنبول مع العيال… بدون تعب 👨‍👩‍👧 (٤ أيام)",
+  "Istanbul with family: 4 days", "إسطنبول مع العائلة: ٤ أيام",
+  "إسطنبول مع العائلة ٤ أيام بدون تعب 🇹🇷 احفظ البرنامج، وبدون فيزا للسعوديين.",
+  "Istanbul with the family, 4 days without the exhaustion. Save the plan, and no visa needed for Saudis.",
+  "برنامج اسطنبول ٤ ايام, اسطنبول مع العائلة, سياحة تركيا",
+  "#إسطنبول #تركيا #السفر_مع_العائلة #برنامج_سياحي #مادا",
+  "Save",
+  "Timeline video: Day 1 Sultanahmet + Bosphorus cruise, Day 2 Princes' Islands, Day 3 Vialand/aquarium, Day 4 shopping + Çamlıca Mosque. Tips: connecting rooms on the Asian or European side, halal is everywhere, avoid bridge traffic at 5pm. No children's faces.",
+  "Türkiye: a top-two Saudi destination (Wego, Almosafer 2026)", "", sc="Global")
+
+# ───────────────────────── scope and pillar for posts written before the global pass ─────────────────────────
+
+_GLOBAL = ("Schengen", "UK ETA", "US visa", "Vienna", "Europe", "London", "dupes", "Dupes", "Visa-free", "visa-free",
+           "European", "Reply: how long does a Schengen", "Travel myths", "Booking myths")
+_GCC = ("Muscat", "F1 Qatar")
+_SAUDI = ("AlUla", "Riyadh", "Weekend Radar", "Kashta", "kashta", "Leonids", "meteors", "Stargazing", "Cityscape", "Crown Jewel",
+          "Rajab", "Umrah", "Ramadan", "Behind the Curtain", "delegates", "Event night", "Big night", "Autumn break: where",
+          "Autumn break countdown", "Hosting guests", "Saudi coffee", "Manpower", "crews", "Specialist", "Q1 2027", "travel-policy",
+          "delegation", "Delegates", "Last-minute break", "Break recap", "Saudi hospitality")
+_WORLD_PILLAR = ("Vienna", "Europe", "London in winter", "Destination dupes", "Dupes:", "F1 Qatar")
+
+for _p in POSTS:
+    if not _p["sc"] and _p["pil"] == "BIZ":
+        _p["sc"] = "B2B"
+    if not _p["sc"] and _p["title"].startswith(("Autumn break: 6", "Break recap", "Weekend Radar #3", "Weekend Radar #4")):
+        _p["sc"] = "Mixed"
+    if not _p["sc"]:
+        t = _p["title"]
+        _p["sc"] = ("Global" if any(k in t for k in _GLOBAL) else
+                    "GCC" if any(k in t for k in _GCC) else
+                    "Saudi" if any(k in t for k in _SAUDI) else "All")
+    if _p["pil"] == "HOR" and any(k in _p["title"] for k in _WORLD_PILLAR):
+        _p["pil"] = "WORLD"

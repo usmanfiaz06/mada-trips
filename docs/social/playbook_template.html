@@ -102,6 +102,9 @@ select{font:500 13px var(--f-sans);padding:6px 10px;border-radius:999px;border:1
 .poster .arp{font-family:var(--f-ar-d);font-size:19px;margin-top:6px;direction:rtl;text-align:right}
 .copy{border:1px solid var(--line);background:transparent;color:var(--muted);font:500 11px var(--f-sans);border-radius:6px;padding:1px 7px;cursor:pointer;text-transform:none;letter-spacing:0}
 .note{background:var(--gold-soft);border-radius:8px;padding:8px 10px}
+.sc{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.04em;padding:1px 6px;border-radius:5px;border:1px solid var(--line);color:var(--muted);margin-right:4px}
+.sc-Global{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.sc-GCC{background:var(--gold-soft);color:var(--fg)}
 .count{font-size:13px;color:var(--muted);margin-left:auto}
 
 /* reference tables */
@@ -128,7 +131,7 @@ footer{padding-block:28px 48px;color:var(--muted);font-size:12.5px;border-top:1p
   <div class="eyebrow">Mada Trips · Social plan · November 2026</div>
   <h1>Every post, <em>within reach.</em></h1>
   <div class="h1-ar" lang="ar">خطة المحتوى · نوفمبر ٢٠٢٦</div>
-  <p class="lede">A researched one-month plan for Instagram, TikTok, X and LinkedIn: every post with its hook, poster text, Arabic and English copy, keywords and production direction, plus the playbook, competitor read and moments behind it. Times are Riyadh (AST).</p>
+  <p class="lede">A researched one-month plan for Instagram, TikTok, X and LinkedIn, at home and abroad: every post with its hook, poster text, Arabic and English copy, keywords and production direction, plus the playbook, competitor read and moments behind it. Times are Riyadh (AST).</p>
   <div class="stats" id="stats"></div>
 </header>
 
@@ -180,6 +183,15 @@ footer{padding-block:28px 48px;color:var(--muted);font-size:12.5px;border-top:1p
     <div class="tbl" id="kw"></div>
   </section>
 
+  <section class="panel" id="world" data-label="Going global" hidden>
+    <h2>Going <em>global</em></h2>
+    <p class="sub">Saudis spend about US$35bn a year travelling abroad, and most of it goes beyond the Gulf. This is where they're heading this winter, and what makes them book.</p>
+    <div class="grid2" id="gins"></div>
+    <h3 style="margin-top:28px">Top 20 destinations for Saudis this winter</h3>
+    <div class="tbl" id="dest"></div>
+    <p class="sub" style="margin-top:10px">Ranked synthesis of Almosafer, Wego and winter seasonality (Oct 2026). Visa rules and routes change: verify before every post.</p>
+  </section>
+
   <section class="panel" id="competitors" data-label="Competitors" hidden>
     <h2>Competitor <em>read</em></h2>
     <p class="sub">Who's winning attention in Saudi travel and events, and the space nobody holds. Follower counts are approximate (Instagram and TikTok analytics are login-gated).</p>
@@ -229,7 +241,7 @@ const dayName = d => DOW[new Date(2026,10,d).getDay()];
 
 /* stats */
 const cnt = k => P.filter(p=>p.p===k).length;
-$('stats').innerHTML = [[P.length,'posts'],[cnt('IG'),'Instagram'],[cnt('TT'),'TikTok'],[cnt('X'),'X'],[cnt('LI'),'LinkedIn'],[D.SERIES.length,'recurring series']]
+$('stats').innerHTML = [[P.length,'posts'],[cnt('IG'),'Instagram'],[cnt('TT'),'TikTok'],[cnt('X'),'X'],[cnt('LI'),'LinkedIn'],[Math.round(100*P.filter(p=>p.sc==='Global'||p.sc==='GCC').length/Math.max(1,P.filter(p=>['Global','GCC','Saudi','Mixed'].includes(p.sc)).length))+'%','of trip posts go abroad'],[D.SERIES.length,'recurring series']]
   .map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
 
 /* rail + panels */
@@ -246,12 +258,13 @@ let start = (location.hash||'').slice(1); if(!start){try{start=localStorage.getI
 show(start||'calendar');
 
 /* filters */
-const state = {pl:new Set(['IG','TT','X','LI']), pil:'', ser:'', day:0, flag:false};
+const state = {pl:new Set(['IG','TT','X','LI']), pil:'', ser:'', sc:'', day:0, flag:false};
 const seriesList = [...new Set(P.map(p=>p.series).filter(Boolean))].sort();
 $('filters').innerHTML =
   Object.entries(PL).map(([k,v])=>`<button class="chip" data-pl="${k}" aria-pressed="true"><span class="dot d-${k}"></span>${v}</button>`).join('') +
   `<span class="sep"></span>
    <label class="sr" for="fpil" hidden>Pillar</label><select id="fpil"><option value="">All pillars</option>${D.PILLARS.map(p=>`<option value="${p.code}">${esc(p.name)}</option>`).join('')}</select>
+   <label for="fsc" hidden>Scope</label><select id="fsc"><option value="">Saudi + world</option><option value="Global">Global</option><option value="GCC">GCC</option><option value="Saudi">Saudi</option><option value="Mixed">Mixed</option><option value="B2B">B2B</option><option value="All">Brand &amp; offers</option></select>
    <label for="fser" hidden>Series</label><select id="fser"><option value="">All series</option>${seriesList.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
    <button class="chip" id="fflag" aria-pressed="false">Needs sign-off</button>
    <span class="count" id="count"></span>`;
@@ -260,11 +273,12 @@ $('filters').addEventListener('click',e=>{
 });
 $('fpil').onchange=e=>{state.pil=e.target.value;render()};
 $('fser').onchange=e=>{state.ser=e.target.value;render()};
+$('fsc').onchange=e=>{state.sc=e.target.value;render()};
 $('fflag').onclick=e=>{state.flag=!state.flag;e.currentTarget.setAttribute('aria-pressed',state.flag);render()};
 
 const FLAGRX=/(OFFER|APPROVAL|SENSITIVITY|SALES|MANAGEMENT)/;
 const flagOf = p => (p.note.match(FLAGRX)||[])[1]||'';
-const visible = () => P.filter(p=>state.pl.has(p.p) && (!state.pil||p.pil===state.pil) && (!state.ser||p.series===state.ser) && (!state.flag||flagOf(p)));
+const visible = () => P.filter(p=>state.pl.has(p.p) && (!state.pil||p.pil===state.pil) && (!state.ser||p.series===state.ser) && (!state.sc||p.sc===state.sc) && (!state.flag||flagOf(p)));
 
 function renderMonth(list){
   const momentOf={}; const weak=m=>!m||/^(Evergreen|Weekend)/.test(m); P.forEach(p=>{if(weak(momentOf[p.d])&&!weak(p.moment))momentOf[p.d]=p.moment; else if(!momentOf[p.d])momentOf[p.d]=p.moment});
@@ -299,7 +313,7 @@ function card(p){
     <span class="meta"><span class="dot d-${p.p}"></span> ${p.t} · ${PL[p.p]} · ${esc(p.f)}</span>
     <span class="ttl">${esc(p.title)}</span>
     ${f?`<span class="flag">${f}</span>`:'<span></span>'}
-    <span class="hook">${esc(PIL[p.pil])}${p.series?' · '+esc(p.series):''} — ${esc(p.hook)}</span>
+    <span class="hook"><span class="sc sc-${esc(p.sc)}">${esc(p.sc==='All'?'Brand':p.sc)}</span> ${esc(PIL[p.pil])}${p.series?' · '+esc(p.series):''} — ${esc(p.hook)}</span>
   </summary><div class="body">
     ${(p.pen||p.par)?`<div class="field"><div class="k"><span>On poster / on screen</span></div><div class="poster">${p.pen?`<div class="en">${esc(p.pen)}</div>`:''}${p.par?`<div class="arp" lang="ar">${esc(p.par)}</div>`:''}</div></div>`:''}
     ${field('Hook · first 1-3 seconds',p.hook)}
@@ -347,7 +361,9 @@ $('kwm').innerHTML = D.KEYWORD_METHOD.map(s=>`<li>${esc(s)}</li>`).join('');
 $('kw').innerHTML = tbl(['Cluster','Arabic','English'], D.KEYWORDS, [1]);
 $('comp').innerHTML = tbl(['Brand','Handles','Size (approx.)','Style','What wins','Gap for Mada'], D.COMPETITORS.map(c=>[c.name,c.handles,c.size,c.style,c.wins,c.gap]));
 $('white').innerHTML = D.WHITE_SPACE.map(([a,b])=>`<div class="box"><h3>${esc(a)}</h3><div>${esc(b)}</div></div>`).join('');
-$('mom').innerHTML = tbl(['Date','Moment','Where','How we use it','Status'], D.MOMENTS);
+$('mom').innerHTML = tbl(['Date','Moment','Where','How we use it','Status','Scope'], D.MOMENTS);
+$('gins').innerHTML = D.GLOBAL_INSIGHTS.map(([a,b])=>`<div class="box"><h3>${esc(a)}</h3><div>${esc(b)}</div></div>`).join('');
+$('dest').innerHTML = tbl(['#','Destination','Why now','Segment','Visa for Saudis','From RUH','Direct?','Best months'], D.TOP_DESTINATIONS);
 $('cancel').innerHTML = D.CANCELLED.map(s=>`<li>${esc(s)}</li>`).join('');
 $('kpi').innerHTML = tbl(['KPI','Month-1 target','Benchmark / why'], D.KPIS);
 $('wf').innerHTML = tbl(['When','What'], D.WORKFLOW);
