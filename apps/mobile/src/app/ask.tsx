@@ -65,6 +65,8 @@ export default function Ask() {
     onProblem: (p) => { buzz('soft'); toast(t(p === 'denied' ? 'ask.voice.denied' : p === 'none' ? 'ask.voice.none' : p === 'unsupported' ? 'ask.voice.unsupported' : 'ask.voice.failed')); },
   });
   const [cta, setCta] = useState<Cta>(null);
+  /** How tall the action at the bottom stands, so a stage (the stays map) ends above it. */
+  const [actH, setActH] = useState(0);
   const [parsing, setParsing] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   // A request sent from here: its thread takes the bottom box (one composer, never two). "Ask something else" gives it back.
@@ -211,6 +213,7 @@ export default function Ask() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kind = intent?.kind;
+  const stage = cta && !offline ? cta.stage ?? null : null;
   let body: React.ReactNode;
   if (!intent) body = parsing ? null : <Start onPick={(x) => submit(x)} onResume={() => { void restore(); }} people={household} today={today} />;
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
@@ -252,7 +255,8 @@ export default function Ask() {
             {SHOW_DEMO_SWITCHES ? <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable> : null}
           </View>
         )} />
-        <ScrollView ref={scroll} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={{ flex: 1 }}>
+        <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
@@ -261,8 +265,11 @@ export default function Ask() {
           {fixing && intent ? <FixPrompt text={fixing} kind={intent.kind} onPick={fix} /> : null}
           </View>
         </ScrollView>
-        <View style={[styles.act, { paddingBottom: 24 + bottom }]} pointerEvents="box-none">
-          {cta && !offline && cta.refine ? (
+        {/* The stays map: over the results, from the top bar down to the action (or to the bottom when its card is open), so nothing shows through. */}
+        {stage ? <View style={[styles.stage, { bottom: cta?.bare ? 0 : actH }]} testID="ask-stage">{stage}</View> : null}
+        </View>
+        <View style={[styles.act, { paddingBottom: 24 + bottom }, cta?.bare && !offline ? styles.actAway : stage ? { backgroundColor: colors.sand } : null]} pointerEvents="box-none" onLayout={(e) => { if (!cta?.bare) setActH(e.nativeEvent.layout.height); }}>
+          {cta?.bare && !offline ? null : cta && !offline && cta.refine ? (
             <>
               {/* Results: say what matters (typed or spoken) to refine them; the one action stays below. */}
               {composer(cta.refine.hint, (text) => {
@@ -364,6 +371,8 @@ function Start({ onPick, onResume, people, today }: { onPick: (x: string) => voi
 const styles = StyleSheet.create({
   scroll: { paddingHorizontal: 20, gap: 16, paddingTop: 8 },
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 28, paddingHorizontal: 20, gap: 6, backgroundColor: 'rgba(233,226,216,0.96)' },
+  actAway: { paddingTop: 0, paddingBottom: 0, height: 0, overflow: 'hidden' },
+  stage: { position: 'absolute', top: 0, start: 0, end: 0, backgroundColor: colors.sand },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },
   listening: { backgroundColor: colors.gold },

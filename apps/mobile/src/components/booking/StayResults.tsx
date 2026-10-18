@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { Image as ExpoImage } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import {
-  CITY_CENTRES, anchorName, anchorOfLandmark, distanceFrom, distanceLabel, formatSar, kmApart, landmarkById, landmarksIn, mergeWishes, parseStayWishes, reasonsLine, refineStays, sortByDistance, sortStays,
+  CATALOGUE_HOTELS, CITY_CENTRES, anchorName, anchorOfLandmark, distanceFrom, distanceLabel, formatSar, kmApart, landmarkById, landmarksIn, mergeWishes, parseStayWishes, reasonsLine, refineStays, sortByDistance, sortStays,
   tripShape, wishKey, wishLabel, type DistanceAnchor, type Person, type StayOption, type StaySearchResponse, type StaySort, type StayWish,
 } from '@mada/shared';
 import { agentName, useAgent } from '@/lib/agent';
@@ -20,7 +19,8 @@ import { StaysMap } from '../maps/StaysMap';
 import { DistanceSheet } from './DistanceSheet';
 import type { Cta } from './FlightFlow';
 import { StayCard } from './StayCard';
-import { MadaDot, Photo, enter } from './parts';
+import { StayMapCard } from './StayMapCard';
+import { MadaDot, enter } from './parts';
 import { noteAskPick, pendingPick, stayPickKey, usedPendingPick } from '@/lib/resume';
 
 /*
@@ -52,6 +52,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const [sort, setSort] = useState<Sort>('best');
   const [pick, setPick] = useState<string | null>(null);
   const [mapSel, setMapSel] = useState<string | null>(null);
+  const [cardH, setCardH] = useState(0);
   const [shown, setShown] = useState(PAGE);
   const [distOpen, setDistOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
@@ -129,16 +130,14 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   };
   const remove = (w: StayWish) => { buzz('select'); setUnread(null); setWishes((x) => x.filter((y) => wishKey(y) !== wishKey(w))); setPick(null); };
 
-  useEffect(() => {
-    if (!cur) { setCta(null); return; }
-    setCta({
-      label: block ?? t('search.review', { price: formatSar(cur.total.amount) }), disabled: !!block, testID: 'ask-review', onPress: () => onReview(cur),
-      refine: { hint: t('stays.ask.hint', { example: first ? t('stays.ask.example', { place: lang === 'ar' ? first.nameAr : first.name }) : t('stays.ask.exampleAny') }), onSubmit: addText, testID: 'stays-refine' },
-    });
-  }, [cur?.id, block, wishes, city]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const details = (h: StayOption) => (h.hotel ? () => router.push(`/hotel/${h.hotel!.code}?offer=${h.id}&guests=${guests}&city=${city}&who=${who.join(',')}` as Href) : undefined);
+  /** The hotel's page with this room and who is going; a hotel from Mada's own catalogue (mock mode) by its key. */
+  const hotelHref = (h: StayOption): Href | null => {
+    const q = `offer=${h.id}&guests=${guests}&city=${city}&who=${who.join(',')}`;
+    if (h.hotel) return `/hotel/${h.hotel.code}?${q}` as Href;
+    const key = CATALOGUE_HOTELS[city]?.find((x) => x.name === h.name)?.key;
+    return key ? (`/hotel/${key}?${q}` as Href) : null;
+  };
+  const details = (h: StayOption) => (h.hotel ? () => router.push(hotelHref(h)!) : undefined);
   const card = (h: StayOption, i: number, reason?: string) => (
     <Animated.View key={h.id} entering={enter(i < PAGE ? i + 1 : 0)}>
       <StayCard h={h} i={i} on={cur?.id === h.id} guests={guests} reason={reason} noBadge={!!reason} distance={distanceFrom(h, anchor, lang)?.text ?? null} evidence={evidence.get(h.id)}
@@ -161,11 +160,78 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const total = s.options.length;
 
   const mapPoints = list.filter((o) => o.facts?.lat != null && o.facts?.lng != null)
-    .map((o) => ({ id: o.id, lat: o.facts!.lat!, lng: o.facts!.lng!, label: formatSar(o.total.amount), selected: (mapSel ?? cur?.id) === o.id }));
+    .map((o) => ({ id: o.id, lat: o.facts!.lat!, lng: o.facts!.lng!, label: formatSar(o.total.amount), price: o.total.amount, a11y: t('stays.map.pin', { name: o.name, price: formatSar(o.total.amount) }), selected: (mapSel ?? cur?.id) === o.id }));
   const nearMarks = wishes.filter((w): w is Extract<StayWish, { k: 'near' }> => w.k === 'near').map((w) => landmarkById(w.id)).filter((l): l is NonNullable<typeof l> => !!l)
     .map((l) => ({ id: l.id, lat: l.lat, lng: l.lng, name: lang === 'ar' ? l.nameAr : l.name }));
   const marks = anchor && !nearMarks.some((m) => m.id === anchor.id) ? [...nearMarks, { id: anchor.id, lat: anchor.lat, lng: anchor.lng, name: anchorName(anchor, lang) }] : nearMarks;
   const sel = mapSel ? list.find((o) => o.id === mapSel) : null;
+  const onMap = mode === 'all' && view === 'map';
+  const controls = () => (
+    <View style={st.controls} testID="stays-controls">
+      <Pressable accessibilityRole="button" onPress={() => setSortOpen(true)} style={[st.control, { flexShrink: 1 }]} testID="stays-sort">
+        <T v="small" color={colors.green} style={{ fontFamily: ff.ui500, flexShrink: 1 }} numberOfLines={1}>{sort === 'near' && anchor ? t('stays.sort.nearTo', { place: anchorName(anchor, lang) }) : t('stays.sortValue', { sort: sortLabel })}</T><Icon name="chevron" size={14} />
+      </Pressable>
+      {quick.length || wishes.length ? (
+        <Pressable accessibilityRole="button" onPress={() => setFiltersOpen(true)} style={st.control} testID="stays-filters">
+          <Icon name="filter" size={14} /><T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }}>{wishes.length ? t('stays.filtersCount', { n: wishes.length }) : t('stays.filters')}</T>
+        </Pressable>
+      ) : null}
+      <Pressable accessibilityRole="button" accessibilityLabel={t(view === 'map' ? 'stays.view.list' : 'stays.view.map')} onPress={() => { buzz('select'); setView(view === 'map' ? 'list' : 'map'); setMapSel(null); }}
+        style={[st.round, view === 'map' ? st.roundOn : null]} testID={view === 'map' ? 'stays-view-list' : 'stays-view-map'}>
+        <Icon name={view === 'map' ? 'list' : 'map'} size={18} color={view === 'map' ? colors.mist : colors.green} />
+      </Pressable>
+    </View>
+  );
+  const chips = () => (
+    <View style={st.wrap} testID="stays-wishes">
+      {wishes.map((w) => (
+        <Pressable key={wishKey(w)} accessibilityRole="button" accessibilityLabel={t('stays.wishes.remove', { wish: wishLabel(w, lang) })} onPress={() => remove(w)} style={st.wish} testID={`wish-${wishKey(w)}`}>
+          <T v="small" color={colors.mist} style={{ fontFamily: ff.ui600 }}>{wishLabel(w, lang)}</T>
+          <Icon name="close" size={14} color={colors.mist} />
+        </Pressable>
+      ))}
+      {wishes.length > 1 ? <LinkButton label={t('stays.wishes.clear')} size={13} onPress={() => { setWishes([]); setUnread(null); }} /> : null}
+    </View>
+  );
+
+  // The map fills the screen between the top bar and the action, over the results; a pin opens the hotel's card at
+  // the bottom, and while it is open the Review button and the box step aside (the card's "Choose this" is the action).
+  const closeCard = () => {
+    const was = mapSel;
+    setMapSel(null);
+    // Keyboard: back to the pin the card came from.
+    if (Platform.OS === 'web' && was) setTimeout(() => (document.querySelector(`[data-testid="map-pin-${was}"]`) as HTMLElement | null)?.focus(), 0);
+  };
+  const stage = onMap ? (
+    <View style={{ flex: 1, gap: 8, paddingTop: 4 }} testID="stays-map-stage">
+      <View style={{ gap: 8, paddingHorizontal: 16 }}>
+      <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }} numberOfLines={1} accessibilityRole="header">{tn('stays.count', list.length, { city: cityName })}</T>
+      {controls()}
+      {wishes.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>{chips()}</ScrollView> : null}
+      {answer ? <T v="tiny" color={colors.green} numberOfLines={2} testID="stays-answer">{answer}</T> : null}
+      </View>
+      <View style={{ flex: 1, marginHorizontal: 12, marginBottom: sel ? 0 : 6 }}>
+        <StaysMap points={mapPoints} marks={marks} height={0} fill coverBottom={sel ? cardH : 0} onMapPress={sel ? closeCard : undefined}
+          onPick={(id) => { buzz('select'); setMapSel(id); setPick(id); }} testID="stays-map" />
+        {list.length > mapPoints.length && !sel ? <T v="tiny" style={st.noPlace}>{t('stays.map.noPlace', { count: list.length - mapPoints.length })}</T> : null}
+      </View>
+      {sel ? (
+        <StayMapCard key="card" o={sel} guests={guests} distance={distanceFrom(sel, anchor, lang)?.text ?? null} block={block} onClose={closeCard} onHeight={setCardH}
+          onSee={hotelHref(sel) ? () => { buzz('tap'); router.push(hotelHref(sel)!); } : undefined}
+          onChoose={() => { buzz('tap'); setPick(sel.id); onReview(sel); }} />
+      ) : null}
+    </View>
+  ) : null;
+
+  useEffect(() => {
+    if (!cur) { setCta(null); return; }
+    setCta({
+      label: block ?? t('search.review', { price: formatSar(cur.total.amount) }), disabled: !!block, testID: 'ask-review', onPress: () => onReview(cur),
+      refine: { hint: t('stays.ask.hint', { example: first ? t('stays.ask.example', { place: lang === 'ar' ? first.nameAr : first.name }) : t('stays.ask.exampleAny') }), onSubmit: addText, testID: 'stays-refine' },
+      stage, bare: !!sel,
+    });
+  }, [cur?.id, block, wishes, city, onMap, sel?.id, list, cardH, answer, sort, anchor?.id, filtersOpen, sortOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={{ gap: 12 }}>
@@ -179,18 +245,8 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
           : <T v="tiny">{t('stays.sub')}</T>}
       </Animated.View>
 
-      {wishes.length ? (
-        <View style={st.wrap} testID="stays-wishes">
-          {wishes.map((w) => (
-            <Pressable key={wishKey(w)} accessibilityRole="button" accessibilityLabel={t('stays.wishes.remove', { wish: wishLabel(w, lang) })} onPress={() => remove(w)} style={st.wish} testID={`wish-${wishKey(w)}`}>
-              <T v="small" color={colors.mist} style={{ fontFamily: ff.ui600 }}>{wishLabel(w, lang)}</T>
-              <Icon name="close" size={14} color={colors.mist} />
-            </Pressable>
-          ))}
-          {wishes.length > 1 ? <LinkButton label={t('stays.wishes.clear')} size={13} onPress={() => { setWishes([]); setUnread(null); }} /> : null}
-        </View>
-      ) : null}
-      {answer ? (
+      {wishes.length && !onMap ? chips() : null}
+      {answer && !onMap ? (
         <View style={st.answer} testID="stays-answer" accessibilityLiveRegion="polite">
           <MadaDot size={26} />
           <View style={{ flex: 1, gap: 8 }}>
@@ -199,48 +255,14 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
           </View>
         </View>
       ) : null}
-      {mode === 'all' ? (
-        <View style={st.controls} testID="stays-controls">
-          <Pressable accessibilityRole="button" onPress={() => setSortOpen(true)} style={[st.control, { flexShrink: 1 }]} testID="stays-sort">
-            <T v="small" color={colors.green} style={{ fontFamily: ff.ui500, flexShrink: 1 }} numberOfLines={1}>{sort === 'near' && anchor ? t('stays.sort.nearTo', { place: anchorName(anchor, lang) }) : t('stays.sortValue', { sort: sortLabel })}</T><Icon name="chevron" size={14} />
-          </Pressable>
-          {quick.length || wishes.length ? (
-            <Pressable accessibilityRole="button" onPress={() => setFiltersOpen(true)} style={st.control} testID="stays-filters">
-              <Icon name="filter" size={14} /><T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }}>{wishes.length ? t('stays.filtersCount', { n: wishes.length }) : t('stays.filters')}</T>
-            </Pressable>
-          ) : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={t(view === 'map' ? 'stays.view.list' : 'stays.view.map')} onPress={() => { buzz('select'); setView(view === 'map' ? 'list' : 'map'); setMapSel(null); }}
-            style={[st.round, view === 'map' ? st.roundOn : null]} testID={view === 'map' ? 'stays-view-list' : 'stays-view-map'}>
-            <Icon name={view === 'map' ? 'list' : 'map'} size={18} color={view === 'map' ? colors.mist : colors.green} />
-          </Pressable>
-        </View>
-      ) : null}
+      {mode === 'all' && !onMap ? controls() : null}
 
       {mode === 'picks' ? (
         <>
           {picks.map((x, i) => card(x.o, i, x.reason))}
           <Button variant="secondary" label={tn('stays.seeAll', total)} onPress={() => { buzz('tap'); setMode('all'); setShown(PAGE); }} testID="stays-see-all" />
         </>
-      ) : view === 'map' ? (
-        <View style={{ gap: 10 }}>
-          <View>
-            <StaysMap points={mapPoints} marks={marks} height={520} onPick={(id) => { buzz('select'); setMapSel(id); setPick(id); }} testID="stays-map" />
-            {sel ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={sel.name} onPress={details(sel) ?? (() => setPick(sel.id))} style={st.mapCard} testID="stays-map-card">
-                <View style={st.mapPhoto}>{sel.hotel?.imageUrl ? <ExpoImage source={{ uri: sel.hotel.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} /> : <Photo name={sel.photo} focal={sel.focal} />}</View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <T v="h3" style={{ fontSize: 15 }} numberOfLines={1}>{sel.name}</T>
-                  {sel.facts?.stars ? <T v="tiny">{`★ ${tn('stay.starsCount', sel.facts.stars, { n: sel.facts.stars })}`}</T> : null}
-                  <T style={st.mapPrice}>{formatSar(sel.total.amount)} <T v="tiny">{t('stays.priceFor', { guests: tn('ask.stay.guests', guests) })}</T></T>
-                  {distanceFrom(sel, anchor, lang) ? <T v="tiny" numberOfLines={1}>{distanceFrom(sel, anchor, lang)!.text}</T> : null}
-                  {sel.hotel ? <T v="tiny" color={colors.green} style={{ textDecorationLine: 'underline', fontFamily: ff.ui600 }}>{t('stays.map.open')}</T> : null}
-                </View>
-              </Pressable>
-            ) : null}
-          </View>
-          {list.length > mapPoints.length ? <T v="tiny">{t('stays.map.noPlace', { count: list.length - mapPoints.length })}</T> : null}
-        </View>
-      ) : (
+      ) : onMap ? null : (
         <>
           {!pool.length && refined.closest.length ? <T v="eyebrow">{t('stays.closestTitle')}</T> : null}
           {list.slice(0, shown).map((h, i) => card(h, i))}
@@ -309,7 +331,5 @@ const st = StyleSheet.create({
   distRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.line, marginTop: 6 },
   sortRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.mist },
   sortOn: { backgroundColor: colors.green },
-  mapCard: { position: 'absolute', start: 10, end: 10, bottom: 10, flexDirection: 'row', gap: 12, padding: 10, borderRadius: 18, backgroundColor: colors.paper, boxShadow: '0px 10px 30px -14px rgba(15,26,22,0.5)' },
-  mapPhoto: { width: 84, height: 84, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.stage },
-  mapPrice: { fontFamily: ff.ui600, fontSize: 15, color: colors.green, fontVariant: ['tabular-nums'] },
+  noPlace: { position: 'absolute', top: 8, start: 8, end: 8, alignSelf: 'center', textAlign: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, backgroundColor: 'rgba(255,253,249,0.92)' },
 });

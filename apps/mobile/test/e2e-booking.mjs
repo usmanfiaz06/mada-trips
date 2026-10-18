@@ -749,15 +749,86 @@ async function refineStays(page, k, ar = false) {
   await k.shot(`stay-distance${ar ? '-ar' : ''}`);
   await k.press(k.byTest('stays-view-map'));
   await page.waitForTimeout(2500);
-  await k.byTest('stays-map').evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  await page.waitForTimeout(600);
+  step(`stays map${ar ? ' (Arabic)' : ''}: the map fills the space above the box and Review, nothing shows through`);
+  const mapBox = await k.byTest('stays-map').boundingBox();
+  const boxTop = (await k.byTest('stays-refine').boundingBox())?.y ?? 844;
+  if (!mapBox || mapBox.height < 300) errors.push(`stays map: ${mapBox?.height ?? 0}px tall, want the screen's height`);
+  if (mapBox && mapBox.y + mapBox.height > boxTop) errors.push(`stays map: runs under the box (map ends ${Math.round(mapBox.y + mapBox.height)}, box starts ${Math.round(boxTop)})`);
+  const under = await page.evaluate(() => { const st = document.querySelector('[data-testid="ask-stage"]'); if (!st) return 'no stage'; const r = st.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height - 30); return st.contains(el) ? '' : (el?.textContent ?? '').slice(0, 40); });
+  if (under) errors.push(`stays map: something shows over or through the map (${under})`);
   const pins = await page.locator('[data-testid^="map-pin-"]').count();
   if (pins < 3) errors.push(`stays map: ${pins} pins, want 3`);
   await k.shot(`stay-map${ar ? '-ar' : ''}`, 1500);
+  const openCard = async () => {
+    await page.locator('[data-testid^="map-pin-"]').filter({ visible: true }).first().click({ force: true });
+    await page.waitForTimeout(500);
+    const card = page.locator('[data-testid="stays-map-card"]').filter({ visible: true });
+    if (!(await card.count())) { errors.push('map: a pin opens its card straight away'); return false; }
+    return true;
+  };
   if (pins) {
-    await page.locator('[data-testid^="map-pin-"]').first().click({ force: true });
-    if (!(await page.locator('[data-testid="stays-map-card"]').count())) errors.push('map: a pin opens its card');
-    await k.shot(`stay-map-card${ar ? '-ar' : ''}`);
+    step(`stays map${ar ? ' (Arabic)' : ''}: a price opens the hotel's card straight away`);
+    if (await openCard()) {
+      const name = (await k.byTest('stays-map-card-name').innerText()).trim();
+      const total = await k.byTest('stays-map-card-total').innerText();
+      if (!name) errors.push('map card: no hotel name');
+      if (!/·.*·/.test(total) || !/[0-9٠-٩]/.test(total)) errors.push(`map card: total without rooms · nights · price (${total})`);
+      if (!(await k.byTest('stays-map-card-night').innerText()).match(/[0-9٠-٩]/)) errors.push('map card: no price a night');
+      if (await page.locator('[data-testid="ask-review"]').filter({ visible: true }).count()) errors.push('map card: Review still showing under the card');
+      if (await page.locator('[data-testid="stays-refine"]').filter({ visible: true }).count()) errors.push('map card: the box still showing under the card');
+      const cardBox = await k.byTest('stays-map-card').boundingBox();
+      if (cardBox && cardBox.y + cardBox.height > 845) errors.push('map card: cut off at the bottom');
+      await k.shot(`stay-map-card${ar ? '-ar' : ''}`, 900);
+      step(`stays map${ar ? ' (Arabic)' : ''}: "See hotel" opens its page, back returns to the map`);
+      await k.byTest('stays-map-card-see').click();
+      await k.byTest('hotel-where').waitFor({ timeout: 10000 }).catch(() => errors.push('map card: See hotel did not open the hotel page'));
+      if (!(await page.getByText(name, { exact: false }).filter({ visible: true }).count())) errors.push(`map card: the hotel page isn't ${name}`);
+      await k.shot(`stay-map-hotel${ar ? '-ar' : ''}`);
+      await page.goBack();
+      await page.waitForTimeout(1500);
+      if (!(await page.locator('[data-testid="stays-map"]').filter({ visible: true }).count())) errors.push('map card: back from the hotel page lost the map');
+      step(`stays map${ar ? ' (Arabic)' : ''}: "Choose this" goes straight to review and pay`);
+      if (await openCard()) {
+        const chosen = (await k.byTest('stays-map-card-name').innerText()).trim();
+        await k.byTest('stays-map-card-choose').click();
+        await page.waitForURL(/\/pay/, { timeout: 10000 }).catch(() => errors.push('map card: Choose this did not reach review and pay'));
+        await page.waitForTimeout(1200);
+        if (!(await page.getByText(chosen, { exact: false }).filter({ visible: true }).count())) errors.push(`map card: review and pay isn't for ${chosen}`);
+        await k.shot(`stay-map-choose${ar ? '-ar' : ''}`);
+        await page.goBack();
+        await page.waitForTimeout(1500);
+      }
+    }
+    // The card closes on the map's close button (and Escape) and the box comes back.
+    if (await page.locator('[data-testid="stays-map-card"]').filter({ visible: true }).count()) {
+      await k.byTest('stays-map-card-close').click();
+      await page.waitForTimeout(500);
+    }
+    if (!(await page.locator('[data-testid="stays-refine"]').filter({ visible: true }).count())) errors.push('map: the box did not come back after the card closed');
+    step(`stays map${ar ? ' (Arabic)' : ''}: pins that would sit on each other group, and a group splits on tap`);
+    let groups = 0;
+    // Zoom out from the keyboard (the map's own "-" key), as someone without a trackpad would.
+    const canvas = page.locator('[data-testid="stays-map"] canvas').first();
+    for (let i = 0; i < 8 && !groups; i++) {
+      await canvas.focus();
+      await page.keyboard.press('Minus');
+      await page.waitForTimeout(900);
+      groups = await page.locator('[data-testid^="map-group-"]').filter({ visible: true }).count();
+    }
+    if (!groups) errors.push('map: zoomed out, overlapping pins never grouped');
+    else {
+      const label = await page.locator('[data-testid^="map-group-"]').filter({ visible: true }).first().innerText();
+      if (!/·/.test(label)) errors.push(`map: group pill says "${label}", want count · from price`);
+      await k.shot(`stay-map-group${ar ? '-ar' : ''}`, 300);
+      const before = await page.locator('[data-testid^="map-pin-"]').filter({ visible: true }).count();
+      for (let i = 0; i < 4 && (await page.locator('[data-testid^="map-group-"]').filter({ visible: true }).count()); i++) {
+        await page.locator('[data-testid^="map-group-"]').filter({ visible: true }).first().click();
+        await page.waitForTimeout(1100);
+      }
+      const after = await page.locator('[data-testid^="map-pin-"]').filter({ visible: true }).count();
+      if (after <= before) errors.push(`map: tapping the group didn't split it (${before} → ${after} pins)`);
+      await k.shot(`stay-map-split${ar ? '-ar' : ''}`, 300);
+    }
   }
   await k.press(k.byTest('stays-view-list'));
   await k.press(k.byTest('stays-back-picks'));

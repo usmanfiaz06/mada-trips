@@ -36,7 +36,13 @@ import { flightPickKey, noteAskPick, pendingPick, usedPendingPick } from '@/lib/
 /* Flights in Ask: one question at a time (where, when, back when, who), then Mada shows its work and three options. */
 
 /** The one action at the bottom of Ask; with refine, the box above it says what matters for these results. */
-export type Cta = { label: string; disabled?: boolean; onPress: () => void; testID?: string; refine?: { hint: string; onSubmit: (text: string) => boolean | void; testID?: string } } | null;
+export type Cta = {
+  label: string; disabled?: boolean; onPress: () => void; testID?: string; refine?: { hint: string; onSubmit: (text: string) => boolean | void; testID?: string };
+  /** A layer over the results that fills the space between the top bar and the action (the stays map): nothing scrolls under it. */
+  stage?: React.ReactNode;
+  /** The action and the box step aside (a hotel's card on the map does their job); the stage runs to the bottom. */
+  bare?: boolean;
+} | null;
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
