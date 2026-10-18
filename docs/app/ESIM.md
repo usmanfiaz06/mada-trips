@@ -113,9 +113,13 @@ difference from suggested retail, and which rule set the price.
 
 **Curating:**
 - **Hide** a plan: travellers never see it and it can't be paid for.
-- **Pick** up to three per place: the app shows these first. They are sized by data, and the best value is marked
-  recommended. Every other plan is under **See all plans**, best value first. Without picks, the app chooses light,
-  regular and heavy sizes for the trip.
+- **Pick** up to three per place: the app shows these first. They are sized by data. Every other plan is under **See
+  all plans**, best value first. Without picks, the app chooses light, regular and heavy sizes for the trip.
+- Whether picked or chosen, a plan another one beats is never offered: same coverage, no more data, no more days and
+  no lower price (5 GB · 30 days at SAR 29 next to 10 GB · 30 days at SAR 29 drops the 5 GB). The one marked
+  recommended is the cheapest that covers the trip (lasts its days, about 0.7 GB a day); ties go to more data. Prices
+  still come from the rules above, minimum profit and guard included (schemas/esim.ts `undominatedPlans`,
+  `recommendEsimPlan`).
 
 **Daily catalogue:** the cron job syncs every plan once a day. **Sync now** runs it at once. The pages say "Cost went up
 on N plans" and mark those plans. Sell prices follow the rules automatically, never below the guard.

@@ -183,9 +183,44 @@ export function esimCoverageFor(packages: readonly EsimPackage[], countries: rea
 /** About what a traveller uses a day: maps, messages, some photos and video. */
 const GB_A_DAY = 0.7;
 
+/** All the data a plan gives: a daily plan's GB times its days; unlimited is endless. */
+const totalGb = (p: { gb: number | null; days: number; daily?: boolean }) => (p.gb === null ? Infinity : p.daily ? p.gb * p.days : p.gb);
+
+/**
+ * Plans worth offering as a choice: a plan goes when another of the same coverage gives at least as much data for at
+ * least as many days at the same price or less (5 GB · 30 days at SAR 29 next to 10 GB · 30 days at SAR 29). Of plans
+ * that are the same to the traveller, the one that costs Mada least stays. `price` is what the traveller pays.
+ */
+export function undominatedPlans<T extends Pick<EsimPackage, 'coverage' | 'gb' | 'days' | 'daily' | 'netUsd' | 'id'>>(list: readonly T[], price: (p: T) => number): T[] {
+  const priced = list.map((p) => ({ p, price: price(p), gb: totalGb(p) }))
+    .sort((a, b) => a.price - b.price || b.gb - a.gb || b.p.days - a.p.days || a.p.netUsd - b.p.netUsd || a.p.id.localeCompare(b.p.id));
+  const kept: typeof priced = [];
+  for (const x of priced) {
+    const beaten = kept.some((k) => k.p.coverage.code === x.p.coverage.code && k.p.coverage.kind === x.p.coverage.kind && k.gb >= x.gb && k.p.days >= x.p.days && k.price <= x.price);
+    if (!beaten) kept.push(x);
+  }
+  return list.filter((p) => kept.some((k) => k.p === p));
+}
+
+/**
+ * The plan to recommend among those shown: the cheapest that covers the trip (lasts its days and has about a day's
+ * data for each of them), more data and more days breaking a tie. When none has the data, the biggest that lasts; when
+ * none lasts, the longest.
+ */
+export function recommendEsimPlan(plans: readonly EsimPlan[], days: number): EsimPlan | null {
+  const need = days * GB_A_DAY;
+  const covering = plans.filter((p) => p.fits && totalGb(p) >= need);
+  if (covering.length) return [...covering].sort((a, b) => a.price.amount - b.price.amount || totalGb(b) - totalGb(a) || b.days - a.days)[0]!;
+  const fitting = plans.filter((p) => p.fits);
+  if (fitting.length) return [...fitting].sort((a, b) => totalGb(b) - totalGb(a) || a.price.amount - b.price.amount)[0]!;
+  return [...plans].sort((a, b) => b.days - a.days || totalGb(b) - totalGb(a) || a.price.amount - b.price.amount)[0] ?? null;
+}
+
 /**
  * Two or three sizes for the trip: each the shortest plan that lasts the trip at that size; light below what a day
- * usually takes, regular at it (recommended), heavy above. When nothing lasts the trip, the longest there is.
+ * usually takes, regular at it, heavy above. When nothing lasts the trip, the longest there is. A plan another one
+ * beats on data, days and price is never one of them (undominatedPlans), and the one recommended is the cheapest that
+ * covers the trip (recommendEsimPlan).
  */
 export function suggestEsimPlans(
   packages: readonly EsimPackage[],
@@ -197,20 +232,20 @@ export function suggestEsimPlans(
   // A daily plan becomes one plan for the trip's days: the day's price times the days.
   const daily = here.filter((p) => p.daily).map((p) => ({ ...p, days: q.days, netUsd: p.netUsd * q.days, retailUsd: p.retailUsd ? p.retailUsd * q.days : p.retailUsd }));
   const mine = here.filter((p) => !p.daily);
+  const priceOf = (p: EsimPackage) => (q.price ? q.price(p) : esimPrice(p.netUsd, q.markupBps));
   const value = (p: EsimPlan) => (p.gb === null ? 0 : p.price.amount / (p.daily ? p.gb * p.days : p.gb));
   const moreOf = (shown: readonly EsimPlan[]) => [...mine.filter((p) => p.days >= q.days), ...daily]
     .filter((p) => !shown.some((s) => s.id === p.id))
     .map((p) => planOf(p, 'regular', true, q.markupBps, q.price))
     .sort((a, b) => value(a) - value(b) || a.price.amount - b.price.amount)
     .slice(0, 40);
-  // The owner's picks for this place, when there are any: sizes by data, best value recommended.
-  const picked = (q.picks ?? []).map((id) => [...mine, ...daily].find((p) => p.id === id)).filter((p): p is EsimPackage => !!p).slice(0, 3);
+  // The owner's picks for this place, when there are any: sizes by data, without a pick another pick beats.
+  const picked = undominatedPlans((q.picks ?? []).map((id) => [...mine, ...daily].find((p) => p.id === id)).filter((p): p is EsimPackage => !!p).slice(0, 3), priceOf);
   if (picked.length) {
-    const sorted = [...picked].sort((a, b) => (a.gb === null ? 1e6 : a.daily ? a.gb * a.days : a.gb) - (b.gb === null ? 1e6 : b.daily ? b.gb * b.days : b.gb));
+    const sorted = [...picked].sort((a, b) => totalGb(a) - totalGb(b));
     const sizes: EsimSize[] = sorted.length === 3 ? ['light', 'regular', 'heavy'] : sorted.length === 2 ? ['light', 'heavy'] : ['regular'];
     const plans = sorted.map((p, i) => planOf(p, sizes[i]!, p.days >= q.days, q.markupBps, q.price));
-    const best = [...plans].sort((a, b) => value(a) - value(b))[0]!;
-    return { coverage, plans, recommended: best.id, more: moreOf(plans) };
+    return { coverage, plans, recommended: recommendEsimPlan(plans, q.days)?.id ?? null, more: moreOf(plans) };
   }
   if (!mine.length) {
     const plans = daily.slice(0, 1).map((p) => planOf(p, 'regular', true, q.markupBps, q.price));
@@ -218,7 +253,7 @@ export function suggestEsimPlans(
   }
   const longEnough = mine.filter((p) => p.days >= q.days);
   const longest = Math.max(...mine.map((p) => p.days));
-  const pool = longEnough.length ? longEnough : mine.filter((p) => p.days === longest);
+  const pool = undominatedPlans(longEnough.length ? longEnough : mine.filter((p) => p.days === longest), priceOf);
   // One package per size: the shortest that lasts.
   const bySize = new Map<string, EsimPackage>();
   for (const p of [...pool].sort((a, b) => a.days - b.days || a.netUsd - b.netUsd)) {
@@ -235,7 +270,7 @@ export function suggestEsimPlans(
   if (sized[mid + 1]) picks.push([sized[mid + 1]!, 'heavy']);
   if (picks.length < 3 && !sized[mid - 1] && sized[mid + 2]) picks.push([sized[mid + 2]!, 'heavy']);
   const plans = picks.map(([p, size]) => planOf(p, size, p.days >= q.days, q.markupBps, q.price));
-  return { coverage, plans, recommended: plans.find((p) => p.size === 'regular')?.id ?? null, more: moreOf(plans) };
+  return { coverage, plans, recommended: recommendEsimPlan(plans, q.days)?.id ?? null, more: moreOf(plans) };
 }
 
 /** A package's price in halalas (the owner's rules, schemas/esim-pricing.ts); the plain markup when none is given. */
