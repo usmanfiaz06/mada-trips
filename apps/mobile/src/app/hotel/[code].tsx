@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { anchorName, anchorOfLandmark, nameIn, catalogueHotelByKey, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
+import { anchorName, anchorOfLandmark, nameIn, catalogueHotelByKey, catalogueStay, distanceFrom, formatSar, landmarksIn, roomTitle, shortDay, stayLines, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
+import { CatalogueStayFacts } from '@/components/booking/CatalogueStay';
+import { Photo as CatPhoto } from '@/components/booking/parts';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
@@ -39,7 +41,7 @@ const rank = (name: string) => { const i = FIRST.findIndex((re) => re.test(name)
 export default function HotelScreen() {
   const router = useRouter();
   const lang = getLocale();
-  const { code, offer, guests: g, city = '', who = '', trip: tripId = '', stay: stayId = '' } = useLocalSearchParams<{ code: string; offer?: string; guests?: string; city?: string; who?: string; trip?: string; stay?: string }>();
+  const { code, offer, guests: g, city = '', who = '', trip: tripId = '', stay: stayId = '', in: checkIn, out: checkOut, bundle } = useLocalSearchParams<{ code: string; offer?: string; guests?: string; city?: string; who?: string; trip?: string; stay?: string; in?: string; out?: string; bundle?: string }>();
   const guests = Math.max(1, Number(g) || 1);
   // A booked stay (opened from the trip): the room and dates come from the trip; the hotel's content when it has a code.
   const tripQ = useTrip(tripId || null);
@@ -60,6 +62,8 @@ export default function HotelScreen() {
   const cat = !hasCode && !tripId ? catalogueHotelByKey(code) : null;
   const h = details ?? (booked ? { code: 0, name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null, source: 'HBX Group' as const }
     : cat ? { code: 0, name: cat.name, category: cat.area, address: cat.address, phone: null, description: cat.note, images: [], facilities: [], latitude: cat.lat, longitude: cat.lng, source: 'HBX Group' as const } : undefined);
+  // A catalogue hotel for this party and these dates (the bundle's): photo, room × rooms, a night, board, rating, cancel date.
+  const cs = cat ? catalogueStay(cat.key, guests, checkIn ?? null, checkOut ?? null) : null;
   const stay = shown.data?.stay ?? null;
   const options: StayOption[] = rooms.data?.options ?? (stay ? [stay] : []);
   const cur = options.find((o) => o.id === chosen) ?? options[0] ?? null;
@@ -103,6 +107,8 @@ export default function HotelScreen() {
         <ScrollView testID="hotel-images" horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }}>
           {h.images.slice(0, 20).map((uri) => <Photo key={uri} uri={uri} style={{ width: 300, height: 224, borderRadius: 20 }} />)}
         </ScrollView>
+      ) : cs ? (
+        <View style={st.hero} testID="hotel-photo"><CatPhoto name={cs.photo} focal={cs.focal} /></View>
       ) : null}
       <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
       <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={nameIn(h.category, lang)} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>
@@ -118,6 +124,8 @@ export default function HotelScreen() {
           <HotelRequestsAsked requests={booked.requests} testID="hotel-asked" />
         </Box>
       ) : null}
+
+      {cs ? <Box testID="hotel-catalogue" gap={8}><CatalogueStayFacts s={cs} pickup={bundle === '1'} /></Box> : null}
 
       {/* Where it is. */}
       <Box testID="hotel-where" gap={10}>
@@ -190,6 +198,7 @@ export default function HotelScreen() {
 }
 
 const st = StyleSheet.create({
+  hero: { height: 224, marginHorizontal: -20, overflow: 'hidden' },
   room: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 18, backgroundColor: colors.paper, borderWidth: 1.5, borderColor: 'transparent' },
   roomOn: { borderColor: colors.green },
   radio: { width: 22, height: 22, borderRadius: 99, borderWidth: 1.5, borderColor: colors.ink3, alignItems: 'center', justifyContent: 'center', marginTop: 2 },

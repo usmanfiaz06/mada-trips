@@ -8,6 +8,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { T } from '@/components/Text';
 import { MoveNotice, MoveSheet } from '@/components/trips/MoveNotice';
+import { RulesCard } from '@/components/trips/RulesCard';
 import { AgentNote, AirlineMark, BigCheck, Box, Divider, Grow, H3, ListRow, Num, PickCard, Rise, Row, Small, Spread, Steps, TextLink, Tiny, TripScreen } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -141,6 +142,8 @@ export default function ChangeFlight() {
           ))}
         </Box>
         {tm.outUsed ? <Small>{t('cf.onlyHome', { city: trip.city })}</Small> : null}
+        {/* What the rules give you before choosing: GACA rights, the 24-hour window where it applies, the fare's fee. */}
+        <RulesCard trip={trip} mode="change" />
       </>) : <TextLink label={t('cf.else')} onPress={() => { setKind(null); setPick(null); setWho(null); }} />}
       {kind === 'one' ? (<>
         <T v="h2">{t('cf.whoHome')}</T>

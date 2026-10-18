@@ -12,11 +12,13 @@ import { T } from '@/components/Text';
 import { ArtCardSlot } from '@/components/art/Arts';
 import { ArtReceipt } from '@/components/trips/Arts';
 import { RefundTracker } from '@/components/trips/RefundTracker';
+import { RulesCard } from '@/components/trips/RulesCard';
 import { AgentNote, BigCheck, Box, H3, Num, PickCard, Rise, Row, Small, TripScreen } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, toTab, tripsApi, useRefundQuote, useTrip, useTripMutation, useTrips } from '@/lib/trips';
+import { usePayMethods } from '@/lib/wallet';
 import { colors } from '@/theme';
 
 const REASONS = RefundReason.options;
@@ -27,6 +29,8 @@ export default function Refund() {
   const router = useRouter();
   const trip = useTrip(id).data?.trip;
   const q = useRefundQuote(id);
+  // The card it goes back to, said the way Wallet and Profile say it (saved, or used on this trip).
+  const pm = usePayMethods();
     const list = useTrips();
   const [chosen, setChosen] = useState<string[]>(keys ? keys.split(',') : []);
   const [reason, setReason] = useState<RefundReason | null>(null);
@@ -107,7 +111,7 @@ export default function Refund() {
             </Box>
           ) : (
             <View style={{ gap: 10 }} accessibilityRole="radiogroup">
-              <PickCard radio testID="dest-card" on={dest === 'original'} onPress={() => setDest('original')} title={t('rf.toCard', { card })} sub={t('rf.toCardSub')} />
+              <PickCard radio testID="dest-card" on={dest === 'original'} onPress={() => setDest('original')} title={t('rf.toCard', { card })} sub={pm.isCard(card) ? `${t('rf.toCardSub')} · ${pm.isSaved(card) ? t('pm.saved') : t('pm.usedHere')}` : t('rf.toCardSub')} />
               <PickCard radio testID="dest-credit" on={dest === 'credit'} onPress={() => setDest('credit')} title={t('rf.toCredit')} sub={t('rf.toCreditSub')} />
               {instal.length ? <Small>{t('rf.mixed', { provider: instal[0]!.method === 'tamara' ? 'Tamara' : 'Tabby' })}</Small> : null}
             </View>
@@ -119,6 +123,8 @@ export default function Refund() {
           {!anyway && cancelledTotal > 0 ? <Small>{t('rf.sumInst', { left: formatSar(cancelledTotal), all: formatSar(credited) })}</Small> : null}
         </View>
       </>) : null}
+      {/* What the rules give you: GACA rights, the 24-hour window where it applies, and the fare's own rule. */}
+      {data.items.some((i) => i.item === 'flight') && !data.airlineCancelled ? <RulesCard trip={trip} mode="refund" /> : null}
     </TripScreen>
   );
 }

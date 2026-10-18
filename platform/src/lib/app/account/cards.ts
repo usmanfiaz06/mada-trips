@@ -1,7 +1,8 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import { cardKey, cardLabel as labelOf, uniqueCards, type AddCardRequest, type CardsResponse, type SavedCard } from "@mada/shared";
+import { and, asc, eq, inArray, isNull, notInArray } from "drizzle-orm";
+import { cardKey, cardLabel as labelOf, uniqueCards, usedCardsOf, type AddCardRequest, type CardsResponse, type SavedCard } from "@mada/shared";
 import { db } from "@/db";
+import { appPayments } from "@/db/app-schema";
 import { appAccounts, appCards } from "@/db/app-schema-wallet";
 import { appAuditLog } from "../audit";
 import { encryptField } from "../crypto";
@@ -28,11 +29,19 @@ async function liveCards(userId: string) {
   return db.select().from(appCards).where(and(eq(appCards.userId, userId), isNull(appCards.deletedAt))).orderBy(asc(appCards.createdAt));
 }
 
+/** Card payments that went through (or were refunded since), for the cards used but never saved. */
+async function cardPayments(userId: string) {
+  return db.select({ label: appPayments.label, at: appPayments.createdAt }).from(appPayments)
+    .where(and(eq(appPayments.ownerId, userId), inArray(appPayments.method, ["card", "new_card"]), notInArray(appPayments.status, ["initiated", "declined", "failed", "requires_action", "voided"])));
+}
+
 export async function listCards(userId: string): Promise<CardsResponse> {
-  const [cards, acc] = await Promise.all([liveCards(userId), accountRow(userId)]);
+  const [cards, acc, paid] = await Promise.all([liveCards(userId), accountRow(userId), cardPayments(userId)]);
   const defaultId = cards.some((c) => c.id === acc.defaultCard) ? acc.defaultCard : "applepay";
   // A card saved twice before saving became idempotent still reads as one card.
-  return { cards: uniqueCards(cards, defaultId).map(toCard), defaultId };
+  const saved = uniqueCards(cards, defaultId).map(toCard);
+  // One list of payment methods (Wallet, Profile, Money, Refund): a card paid with but not saved is "used", never "saved".
+  return { cards: saved, defaultId, used: usedCardsOf(paid.map((p) => ({ label: p.label, at: p.at.toISOString() })), saved) };
 }
 
 export async function ownCard(userId: string, id: string): Promise<CardRow> {

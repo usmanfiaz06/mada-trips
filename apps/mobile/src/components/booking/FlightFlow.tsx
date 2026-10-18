@@ -4,7 +4,7 @@ import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AIRPORT_NAMES, CATALOGUE_HOTELS, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
+  AIRPORT_NAMES, CATALOGUE_HOTELS, catalogueStay, DESTINATIONS, addDays, daysBetween, familyRank, formatSar, hasLittleOnes, householdOf, monthLongName, nameIn, permitAnswers, quickDates,
   type AskIntent, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type Household, type Person, flightWishKey, flightWishLabel, parseFlightWishes, refineFlights, type FlightWish } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -23,6 +23,7 @@ import { isOffline } from '@/lib/net/state';
 import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
+import { BundleStayLines } from './CatalogueStay';
 import { dayName, rangeName } from './format';
 import { ArtCalendar, Ask1, Leg, MadaDot, Working, useSequence, useWho, enter } from './parts';
 import { ByHand, RequestFlow, SentRequest } from './Requests';
@@ -475,10 +476,12 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
             <T v="h3">{t(who.some((id) => people.find((p) => p.id === id)?.relation === 'helper') ? 'search.bundle.helper' : who.length > 2 ? 'search.bundle.family' : who.length === 2 ? 'search.bundle.two' : 'search.bundle.one', { hotel: s.bundle!.hotelName })}</T>
             {bundleHotel ? (
               <Pressable accessibilityRole="link" accessibilityLabel={t('search.bundle.hotelA11y', { hotel: s.bundle!.hotelName })} hitSlop={6} testID="bundle-hotel"
-                onPress={() => { buzz('tap'); router.push(`/hotel/${bundleHotel.key}?city=${dest!.key}&guests=${who.length}` as Href); }}>
+                onPress={() => { buzz('tap'); router.push(`/hotel/${bundleHotel.key}?city=${dest!.key}&guests=${who.length}&in=${s.depart}${s.return ? `&out=${s.return}` : ''}&bundle=1` as Href); }}>
                 <T v="small" color={colors.green} style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }}>{s.bundle!.hotelName}</T>
               </Pressable>
             ) : null}
+            {/* The same facts as the hotel page (CatalogueStay.tsx): room × rooms, board, rating, a night, the cancel date. */}
+            {bundleHotel ? <BundleStayLines s={catalogueStay(bundleHotel.key, who.length, s.depart, s.return)!} /> : null}
             <T v="small">{tn('search.bundle.nights', nights, { price: formatSar(s.bundle!.total.amount) })}</T>
           </View>
           <Button size="small" block={false} variant={bundle ? 'primary' : 'secondary'} style={bundle ? undefined : { backgroundColor: colors.mist }} label={bundle ? t('search.bundle.added') : t('search.bundle.add')} haptic="select" onPress={() => setBundle(!bundle)} testID="bundle-add" />

@@ -2,6 +2,7 @@ import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { formatSar, statementHtml, type TripMoney } from '@mada/shared';
 import { Button } from '@/components/Button';
+import { T } from '@/components/Text';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon, type IconName } from '@/components/Icon';
 import { ArtReceipt } from '@/components/trips/Arts';
@@ -12,6 +13,7 @@ import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { useTripMoney } from '@/lib/trips';
+import { usePayMethods } from '@/lib/wallet';
 import { colors } from '@/theme';
 
 /*
@@ -28,6 +30,8 @@ export default function Money() {
   const router = useRouter();
   const q = useTripMoney(id);
   const m = q.data?.money;
+  // Who paid, said the way Wallet and Profile say it: a saved card, or one used on this trip and not saved.
+  const pm = usePayMethods();
   if (q.data && m && !m.items.length && !m.pending.length) {
     return (
       <TripScreen title={t('money.title')}>
@@ -95,7 +99,9 @@ export default function Money() {
             <Eyebrow>{t('money.perPayer')}</Eyebrow>
             {m.payers.map((p, i) => (
               <Spread key={p.name} style={i ? styles.line : null}>
-                <Row><Icon name={p.mine ? 'card' : 'user'} size={18} color={colors.ink3} /><H3 size={15}>{p.name}</H3></Row>
+                <Row style={{ flex: 1 }}><Icon name={p.mine ? 'card' : 'user'} size={18} color={colors.ink3} />
+                  <Grow><H3 size={15}>{p.name}</H3>{p.mine && pm.isCard(p.name) ? <T v="tiny" testID={`money-payer-src-${i}`}>{pm.isSaved(p.name) ? t('pm.saved') : t('pm.usedHere')}</T> : null}</Grow>
+                </Row>
                 <Num size={15}>{formatSar(p.amount.amount, { bare: true })}</Num>
               </Spread>
             ))}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { formatSar } from '@mada/shared';
+import { dayLabel, formatSar } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -20,7 +20,7 @@ import { listSep, t, tn } from '@/lib/i18n';
 import { usePeople, useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
-import { useAccount, useCards, useCredit, useDevices, useExport, useInbox, useTrips, walletApi, walletKeys } from '@/lib/wallet';
+import { usePayMethods, useAccount, useCards, useCredit, useDevices, useExport, useInbox, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { fullNameOf, nameOf, nextTrip, passportStatus, prettyPhone, useNow } from '@/lib/wallet-model';
 import { colors, ff } from '@/theme';
 import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
@@ -51,6 +51,7 @@ function SignedIn() {
   const account = useAccount();
   const people = usePeople();
   const cards = useCards();
+  const pm = usePayMethods();
   const credit = useCredit();
   const devices = useDevices();
   const exp = useExport();
@@ -132,6 +133,8 @@ function SignedIn() {
               <Pressable accessibilityRole="button" accessibilityLabel={t('cards.removeLabel', { label: c.label })} onPress={() => askRemove(c.id)} hitSlop={8}><T v="caption" color={colors.badInk} style={{ fontFamily: ff.ui600, fontSize: 13, textDecorationLine: 'underline' }}>{t('cards.remove')}</T></Pressable></View>} />
         ))}
         {!saved.length && (def !== 'applepay' || !HAS_APPLE_PAY) ? <Row icon="card" value={t('profile.noCards')} sub={t('profile.noCardsSub')} /> : null}
+        {/* Paid with but not saved: said as used, so Profile never says "no cards" next to a trip paid by card. */}
+        {pm.used.map((u) => <Row key={u.last2} icon="card" value={u.label} sub={t('pm.usedBefore', { date: dayLabel(u.usedAt.slice(0, 10)) })} testID={`profile-used-${u.last2}`} />)}
         {!saved.length && def === 'applepay' && HAS_APPLE_PAY ? <View style={{ padding: 16 }}><T v="tiny">{dt('profile.noCardsApplePay')}</T></View> : null}
         {bal > 0 ? <Row lead={<PayMark brand="credit" size={26} />} value={t('profile.credit', { amount: formatSar(bal) })} sub={t('profile.creditSub')} /> : null}
         <Row icon="card" value={saved.length ? t('profile.changeCard') : t('profile.addCard')} onPress={() => setSheet('cards')} testID="profile-cards" />

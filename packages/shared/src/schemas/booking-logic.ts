@@ -431,6 +431,27 @@ export const BRAND_NAMES = { visa: 'Visa', mastercard: 'Mastercard', mada: 'mada
 /** "Visa ending 41": the last two digits, as the prototype and most Saudi banks print it. */
 export const cardLabel = (brand: keyof typeof BRAND_NAMES, last4: string) => t('pay.card.label', { brand: BRAND_NAMES[brand], last: last4.slice(-2) });
 
+/** The last two digits a card label ends with ("Visa ending 41" → "41"), in any language's digits. */
+export function labelLast2(label: string | null | undefined): string | null {
+  const ascii = (label ?? '').replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+  return /(\d{2})\D*$/.exec(ascii)?.[1] ?? null;
+}
+
+/**
+ * Cards past payments were made with, not saved (CardsResponse.used): the latest use of each, newest first.
+ * A card that is saved (same last digits) is left out, so no card reads as both.
+ */
+export function usedCardsOf(payments: { label: string | null; at: string }[], saved: { last4: string }[]) {
+  const savedEnds = new Set(saved.map((c) => c.last4.slice(-2)));
+  const seen = new Map<string, { label: string; last2: string; usedAt: string }>();
+  for (const p of [...payments].sort((a, b) => b.at.localeCompare(a.at))) {
+    const last2 = labelLast2(p.label);
+    if (!p.label || !last2 || savedEnds.has(last2) || seen.has(last2)) continue;
+    seen.set(last2, { label: p.label, last2, usedAt: p.at });
+  }
+  return [...seen.values()];
+}
+
 /** Problems with a card being typed, in the order people hit them. Null when it's fine. */
 export function cardProblems(input: { number: string; expiry: string; cvv: string; name: string }, today: string, touched: { number?: boolean; expiry?: boolean } = {}) {
   const digits = input.number.replace(/\D/g, '');

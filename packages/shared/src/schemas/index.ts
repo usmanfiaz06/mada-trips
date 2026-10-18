@@ -44,3 +44,4 @@ export * from './bcbp';
 export * from './boarding';
 export * from './esim';
 export * from './esim-pricing';
+export * from './hotel-page';

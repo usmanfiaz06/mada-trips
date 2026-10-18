@@ -4,6 +4,7 @@ import { useApiQuery } from '@/lib/net/hooks';
 import { useDeviceOffline } from '@/lib/net/state';
 import { z } from 'zod';
 import {
+  labelLast2,
   API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse, FX_FALLBACK, FxResponse, type FxRates,
   DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, MoveCreditResponse, PeopleResponse,
   PersonDetailResponse, PresenceResponse, SendSupportMessageResponse, SupportThreadResponse, SupportUnreadResponse, walletPath, type TripDetail, type Notification,
@@ -165,6 +166,17 @@ export const useDevices = () => useApiQuery({ queryKey: walletKeys.devices, enab
 export const useConsents = () => useApiQuery({ queryKey: walletKeys.consents, enabled: useOn(), queryFn: () => walletApi.consents() });
 export const useExport = () => useApiQuery({ queryKey: walletKeys.export, enabled: useOn(), queryFn: async () => (await walletApi.exportStatus()).export });
 export const useCards = () => useApiQuery({ queryKey: walletKeys.cards, enabled: useOn(), queryFn: () => walletApi.cards() });
+/**
+ * One list of payment methods, read the same way by Wallet, Profile, a trip's Money and Refund: the saved cards, the
+ * default, and cards past payments used that aren't saved ("used on this trip", never "saved").
+ */
+export function usePayMethods() {
+  const query = useCards();
+  const saved = query.data?.cards ?? [];
+  const used = query.data?.used ?? [];
+  const isSaved = (label: string | null | undefined) => { const l2 = labelLast2(label); return !!l2 && saved.some((c) => c.last4.slice(-2) === l2); };
+  return { query, saved, used, defaultId: query.data?.defaultId ?? null, isSaved, isCard: (label: string | null | undefined) => !!labelLast2(label) };
+}
 export const useCredit = () => useApiQuery({ queryKey: walletKeys.credit, enabled: useOn(), queryFn: async () => (await walletApi.credit()).credit });
 export const useUnread = () => useApiQuery({ queryKey: walletKeys.unread, enabled: useOn(), refetchInterval: 60_000, queryFn: async () => (await walletApi.unread()).unread });
 export const useInbox = () => useApiQuery({ queryKey: walletKeys.notifications, enabled: useOn(), refetchOnMount: 'always', queryFn: () => walletApi.notifications() });

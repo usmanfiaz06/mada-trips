@@ -30,4 +30,37 @@ export const payFamilyCopy = {
   'pf.adultFare': '{name}, {age}: airlines charge 12 and over as adults.',
   'party.childrenHintFare': 'Up to 17, an age each. Airlines charge 12 and over as adults.',
   'party.adultAge': 'Airlines charge 12 and over as adults.',
+
+  // ───────────── one list of payment methods (#13) ─────────────
+  'pm.saved': 'Saved card',
+  'pm.usedHere': 'Used on this trip · not saved',
+  'pm.usedBefore': 'Used {date} · not saved',
+  'pm.walletUsed': 'None saved · {label} used before',
+
+  // ───────────── what the rules give you, on refunds and changes (#19) ─────────────
+  'gr.ifAirline': 'If {airline} cancels, or moves your flight by more than 3 hours:',
+  'gr.ifAirlineBody': 'the next flight or a full refund, your choice, even on a fare that says non-refundable.',
+  'gr.within24': 'Booked {hours} hours ago.',
+  'gr.within24Body': 'Some airlines cancel free within 24 hours of booking when the flight is a week or more away. Mada asks {airline} first, before any fee.',
+  'gr.yours': 'Cancelling because your plans changed:',
+  'gr.yoursBody': 'the {airline} fare rules above apply. Mada never adds a fee of its own.',
+  'gr.yoursChange': 'Changing because your plans changed:',
+  'gr.yoursChangeBody': 'the {airline} change fee above applies, plus any difference in fare. Mada never adds a fee of its own.',
+
+  // ───────────── the hotel page and the bundle card (#9) ─────────────
+  'hp.stay': 'This stay',
+  'hp.rooms.one': '{room} · 1 room',
+  'hp.rooms.other': '{room} × {count} rooms',
+  'hp.connecting': 'Connecting rooms, side by side',
+  'hp.roomPlain': 'A room',
+  'hp.perNight': '{price} a night, for all of you',
+  'hp.total.one': '1 night · {price} in all',
+  'hp.total.other': '{count} nights · {price} in all',
+  'hp.rating': 'Guests rate it {rating}',
+  'hp.cancelWeek': 'Free to cancel until a week before you arrive',
+  'hp.included': 'Included',
+  'hp.pickup': 'Airport pickup both ways',
+  'hp.line.room': '{room} · {board}',
+  'hp.line.price': '{price} a night · free to cancel until {date}',
+  'hp.line.priceNoDate': '{price} a night · free to cancel a week before',
 } as const;

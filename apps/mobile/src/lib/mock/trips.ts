@@ -53,6 +53,9 @@ function err(code: ErrorCode, message?: string, fields?: Record<string, string>)
   return { status: ERROR_CODES[code].status, json: { error: { code, message: message ?? t(ERROR_CODES[code].copy), ...(fields ? { fields } : {}) } } };
 }
 
+/** Card payments on this account's trips (mock/wallet.ts: the cards used but not saved). */
+export const cardChargesOf = (userId: string) => (states.get(userId)?.charges ?? []).filter((c) => c.method === 'card').map((c) => ({ label: c.label, at: c.paidAt }));
+
 function stateOf(user: MockUser): State {
   let s = states.get(user.id);
   if (!s) {

@@ -195,6 +195,8 @@ export type PickupDetail = z.infer<typeof PickupDetail>;
 
 /** What the fare allows, read from the airline's rules for the outbound flight. Amounts per person. */
 export const FareRules = z.object({
+  /** Whose fare this is: the airline that issued the ticket (it stays the same after a rebooking onto another airline). */
+  carrier: z.string().max(3).nullable().optional(),
   changeFee: HalalasAmount,
   refundable: z.boolean(),
   refundFee: HalalasAmount.nullable(),

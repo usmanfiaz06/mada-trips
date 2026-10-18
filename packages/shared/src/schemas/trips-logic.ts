@@ -191,7 +191,13 @@ export function sameTimeAsHome(s: Pick<SegmentDetail, 'departTz' | 'arriveTz' | 
 
 export function fareRulesFor(carrier: string | null | undefined): FareRules {
   const a = (carrier && AIRLINE_INFO[carrier]) || DEFAULT_AIRLINE;
-  return { changeFee: a.change, refundable: a.refundable, refundFee: a.refundFee, bagFee: a.bagFee, bagKg: a.bagKg, bags: a.bags, taxPerPerson: TAX_PER_PERSON };
+  return { carrier: carrier && AIRLINE_INFO[carrier] ? carrier : null, changeFee: a.change, refundable: a.refundable, refundFee: a.refundFee, bagFee: a.bagFee, bagKg: a.bagKg, bags: a.bags, taxPerPerson: TAX_PER_PERSON };
+}
+
+/** The airline whose fare rules apply: the fare's own carrier, else the first flight's airline. */
+export function fareAirline(trip: Pick<TripDetail, 'fare' | 'segments'>): string {
+  const c = trip.fare?.carrier;
+  return (c && AIRLINE_INFO[c]?.name) || trip.segments.find((s) => s.direction === 'out')?.carrierName || trip.segments[0]?.carrierName || '';
 }
 
 /* ═══════════ the trip clock ═══════════ */
@@ -383,7 +389,8 @@ export function refundRule(trip: TripDetail, p: Pick<TripPayment, 'item' | 'amou
     const back = backSegment(trip);
     const R = trip.fare ?? fareRulesFor(out.carrier);
     const oneway = !back;
-    const airline = out.carrierName;
+    // The rule is the fare's, so it names the airline that issued it (a rebooking onto flynas keeps a Saudia fare).
+    const airline = fareAirline(trip);
     if (tm.allUsed || (oneway && tm.outUsed)) return { back: 0, rule: tk(oneway ? 'trip.rule.flight.flown' : 'trip.rule.flights.flown'), why: tk('trip.rule.flight.nothingLeft'), askAnyway: false, law: false };
     if (tm.airlineCancelled) return { back: paid, rule: tk('trip.rule.airlineCancelled', { airline }), why: tk('trip.rule.gaca'), askAnyway: false, law: true };
     const part = tm.outUsed ? 0.5 : 1;

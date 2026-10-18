@@ -303,7 +303,10 @@ export const SavedCard = z.object({
 export type SavedCard = z.infer<typeof SavedCard>;
 /** The default is a saved card's id, or Apple Pay. */
 export const DefaultMethod = z.union([Id, z.literal('applepay')]);
-export const CardsResponse = z.object({ cards: z.array(SavedCard), defaultId: DefaultMethod });
+/** A card a past payment was made with that isn't saved: shown as used, never as saved (one list of payment methods). */
+export const UsedCard = z.object({ label: z.string(), last2: z.string().regex(/^\d{2}$/), usedAt: IsoDateTime });
+export type UsedCard = z.infer<typeof UsedCard>;
+export const CardsResponse = z.object({ cards: z.array(SavedCard), defaultId: DefaultMethod, used: z.array(UsedCard).optional() });
 export type CardsResponse = z.infer<typeof CardsResponse>;
 /** Card numbers never reach Mada: the app sends the payment provider's token and what's printed on the front. */
 export const AddCardRequest = z.object({

@@ -1,12 +1,12 @@
 import {
   CreateDocumentMeta, DESK_PHONE, FX_FALLBACK, passportCopyFields, ERROR_CODES, SavePassportRequest, SendSupportMessageRequest, TravelPrefs, UpdateAccountRequest,
-  UpdatePersonRequest, cardKey, cardLabel, checkSaudiMobile, uniqueCards, firstNameOf, isSafetyChoice, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn, tripIsNow, type SupportContext, type TripsResponse,
+  UpdatePersonRequest, cardKey, cardLabel, usedCardsOf, checkSaudiMobile, uniqueCards, firstNameOf, isSafetyChoice, monthName, maskPassportNumber, supportIntent, supportReplies, t, tn, tripIsNow, type SupportContext, type TripsResponse,
   type Account, type CopyKey, type Credit, type Device, type ErrorCode, type ExportStatus, type Person, type PersonDetails,
   type SavedCard, type SupportIntent, type SupportMessage, type SupportThread, type SupportTopic, type WalletDocument,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
-import { tripsMock } from './trips';
+import { cardChargesOf, tripsMock } from './trips';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for the Wallet area: documents, the household, passports, account, cards, credit,
@@ -107,9 +107,11 @@ export function walletSeed(u: MockUser) { stateOf(u); }
 
 const balance = (s: State) => s.credit.reduce((a, e) => a + e.amount, 0);
 // One card per card, named in the reader's language, the same way the server does (shared cards.ts).
-const cardsJson = (s: State) => {
+const cardsJson = (s: State, userId?: string) => {
   const defaultId = s.cards.some((c) => c.id === s.defaultId) ? s.defaultId : 'applepay';
-  return { cards: uniqueCards(s.cards, defaultId).map((c) => ({ ...c, label: cardLabel(c.brand, c.last4) })), defaultId };
+  const cards = uniqueCards(s.cards, defaultId).map((c) => ({ ...c, label: cardLabel(c.brand, c.last4) }));
+  // Cards paid with on a trip but not saved: "used", never "saved" (the server's listCards).
+  return { cards, defaultId, used: usedCardsOf(userId ? cardChargesOf(userId) : [], cards) };
 };
 const creditJson = (s: State) => ({ balance: { amount: balance(s), currency: 'SAR' }, entries: [...s.credit].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
 const threadJson = ({ messages: _m, readAt: _r, ...th }: Thread) => th;
@@ -407,7 +409,7 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
   }
 
   /* cards and credit */
-  if (key === 'GET /cards') return ok(cardsJson(s));
+  if (key === 'GET /cards') return ok(cardsJson(s, user.id));
   if (key === 'POST /cards') {
     const brand = String(body.brand ?? '') as SavedCard['brand'];
     const last4 = String(body.last4 ?? '');
@@ -419,13 +421,13 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
     const card: SavedCard = s.cards.find((c) => cardKey(c) === cardKey({ brand, last4, exp })) ?? { id: uuid(), brand, last4, exp, label: cardLabel(brand, last4), createdAt: now() };
     if (!s.cards.includes(card)) s.cards.push(card);
     if (body.makeDefault !== false) s.defaultId = card.id;
-    return ok(cardsJson(s), 201);
+    return ok(cardsJson(s, user.id), 201);
   }
   if (key === 'PUT /cards/default') {
     const id = String(body.id ?? '');
     if (id !== 'applepay' && !s.cards.some((c) => c.id === id)) return err('NOT_FOUND');
     s.defaultId = id;
-    return ok(cardsJson(s));
+    return ok(cardsJson(s, user.id));
   }
   r = m(/^\/cards\/([^/]+)$/);
   if (r && w.method === 'DELETE') {
@@ -433,13 +435,13 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
     if (!s.cards.some((c) => c.id === id)) return err('NOT_FOUND');
     const gone = cardKey(s.cards.find((c) => c.id === id)!);
     const others = s.cards.filter((c) => cardKey(c) !== gone);
-    if (cardsJson(s).defaultId === id) {
+    if (cardsJson(s, user.id).defaultId === id) {
       const nd = q.get('newDefault');
       if (others.length && !nd) return err('VALIDATION', { copy: 'error.defaultCard', fields: { newDefault: 'required' } });
       s.defaultId = nd ?? 'applepay';
     }
     s.cards = others;
-    return ok(cardsJson(s));
+    return ok(cardsJson(s, user.id));
   }
   if (key === 'GET /credit') return ok({ credit: creditJson(s) });
   if (key === 'POST /credit/move') {
