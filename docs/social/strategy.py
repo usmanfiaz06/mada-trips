@@ -6,6 +6,10 @@ Research date: 18 Oct 2026. Every external figure carries its source in SOURCES.
 
 MONTH = "November 2026"
 
+TEAM = ["Mehnaz", "Bilal", "Musa", "Abdul Rehman", "Usman"]
+STATUSES = ["Idea", "Scripted", "Shot", "Designed", "Approved", "Scheduled", "Posted", "Paused"]
+DEFAULT_STATUS = "Scripted"  # every post already has its copy written
+
 SITUATION = [
     "Mada is a new account on every platform. Month one sets up the profiles, the recurring series that make us recognisable, and the habit of posting daily.",
     "Riyadh's airport (RUH) was hit by Houthi missiles and drones several times in early-mid October 2026 and reopened on 18 Oct. Several foreign airlines are still suspended into November (Lufthansa to 18 Nov, KLM to 31 Oct, BA limited from 3 Nov). The plan leads with domestic and short-haul trips, Riyadh Season, practical help and calm reassurance. There are no airport jokes and no 'fly now' hype. See the sensitivity protocol.",

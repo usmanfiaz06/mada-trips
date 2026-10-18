@@ -30,7 +30,7 @@ PLATFORM = {
     "LI": ("LinkedIn", "DCE7F5"),
 }
 PILLAR = {p["code"]: p["name"] for p in S.PILLARS}
-STATUSES = ["Idea", "Scripted", "Shot", "Designed", "Approved", "Scheduled", "Posted", "Paused"]
+STATUSES = S.STATUSES
 
 F = "Arial"
 thin = Side(style="thin", color="D8CFC1")
@@ -43,9 +43,14 @@ def date_of(d):
     return dt.date(2026, 11, d)
 
 
+def post_id(p):
+    """Stable id for a post (day-platform-time). The playbook page keys shared status and owner on it."""
+    return f"{p['d']:02d}-{p['p']}-{p['t'].replace(':', '')}"
+
+
 def sorted_posts():
     order = {"IG": 0, "TT": 1, "X": 2, "LI": 3}
-    return sorted(POSTS, key=lambda p: (p["d"], order[p["p"]], p["t"]))
+    return [dict(p, id=post_id(p)) for p in sorted(POSTS, key=lambda p: (p["d"], order[p["p"]], p["t"]))]
 
 
 def header(ws, row, labels, widths=None, fill=GREEN):
@@ -99,7 +104,7 @@ def sheet_start(wb):
         ("Objectives", [f"{a}: {b}" for a, b in S.OBJECTIVES]),
         ("How to use this file", [
             "Calendar: every post with its hook, poster text (EN/AR), caption (AR/EN), keywords, hashtags, CTA and production direction. Filter by platform, week or pillar.",
-            "Fill in Owner and Status for each post. The Status dropdown runs Idea → Scripted → Shot → Designed → Approved → Scheduled → Posted (or Paused).",
+            "Assign each post with the Owner dropdown (Mehnaz, Bilal, Musa, Abdul Rehman, Usman) and move it along with Status: Idea → Scripted → Shot → Designed → Approved → Scheduled → Posted (or Paused). 'Team board' counts who has what at each stage.",
             "After posting, fill the yellow results columns (Reach … Saves). The engagement rate calculates itself, and 'KPIs & tracking' rolls it up by platform.",
             "Rows flagged in the Notes column (OFFER, APPROVAL, SENSITIVITY) can't be scheduled without that sign-off.",
             "Scope column: Global, GCC, Saudi, Mixed, B2B or All. At least 55% of destination posts are abroad (see the mix below).",
@@ -119,7 +124,7 @@ def sheet_start(wb):
     header(ws, r, ["Platform", "Posts (counted from Calendar)"])
     for i, (code, (name, _)) in enumerate(PLATFORM.items(), 1):
         ws.cell(row=r + i, column=1, value=name).font = Font(name=F, size=10)
-        c = ws.cell(row=r + i, column=2, value=f'=COUNTIF(Calendar!$E:$E,"{name}")')
+        c = ws.cell(row=r + i, column=2, value=f'=COUNTIF(Calendar!${col("Platform")}:${col("Platform")},"{name}")')
         c.font = Font(name=F, size=10)
         c.alignment = Alignment(horizontal="left")
     ws.cell(row=r + 5, column=1, value="Total").font = Font(name=F, bold=True, size=10)
@@ -146,7 +151,7 @@ def sheet_start(wb):
 
 
 CAL_COLS = [
-    ("#", 5), ("Date", 11), ("Day", 6), ("Time (AST)", 8), ("Platform", 10), ("Format", 14),
+    ("#", 5), ("Post ID", 13), ("Date", 11), ("Day", 6), ("Time (AST)", 8), ("Platform", 10), ("Format", 14),
     ("Pillar", 15), ("Scope", 9), ("Series", 16), ("Moment / trend", 22), ("Working title", 30),
     ("Hook (first 1-3s / first line)", 34), ("On-poster / on-screen text (EN)", 30),
     ("On-poster / on-screen text (AR)", 30), ("Caption / copy (AR)", 55), ("Caption / copy (EN)", 55),
@@ -172,9 +177,9 @@ def sheet_calendar(wb):
     for i, p in enumerate(sorted_posts(), 1):
         r = i + 1
         name, fill = PLATFORM[p["p"]]
-        vals = [i, date_of(p["d"]), date_of(p["d"]).strftime("%a"), p["t"], name, p["f"],
+        vals = [i, p["id"], date_of(p["d"]), date_of(p["d"]).strftime("%a"), p["t"], name, p["f"],
                 PILLAR[p["pil"]], p["sc"], p["series"], p["moment"], p["title"], p["hook"], p["pen"], p["par"],
-                p["car"], p["cen"], p["kw"], p["tags"], p["cta"], p["dir"], p["note"], "", "Scripted",
+                p["car"], p["cen"], p["kw"], p["tags"], p["cta"], p["dir"], p["note"], "", S.DEFAULT_STATUS,
                 None, None, None, None, None, None,
                 f'=IF(OR({R}{r}="",{R}{r}=0),"",({L}{r}+{C}{r}+{SH}{r}+{SV}{r})/{R}{r})']
         for c, v in enumerate(vals, 1):
@@ -182,11 +187,11 @@ def sheet_calendar(wb):
             cell.font = Font(name=F, size=9, bold=(c == ci["Working title"]))
             cell.border = BORDER
             cell.alignment = RTL if (isinstance(v, str) and c in rtl and is_arabic(v)) else WRAP
-            if c <= 5:
+            if c <= ci["Platform"]:
                 cell.fill = PatternFill("solid", fgColor=fill)
             if ci["Reach"] <= c <= ci["Saves"]:
                 cell.fill = yellow
-        ws.cell(row=r, column=2).number_format = "dd mmm"
+        ws.cell(row=r, column=ci["Date"]).number_format = "dd mmm"
         ws.cell(row=r, column=ci["Eng. rate"]).number_format = "0.0%"
         if p["note"] and any(k in p["note"] for k in ("OFFER", "APPROVAL", "SENSITIVITY", "SALES", "MANAGEMENT")):
             ws.cell(row=r, column=ci["Notes · approvals · risks"]).font = Font(name=F, size=9, bold=True, color="A3342B")
@@ -195,6 +200,10 @@ def sheet_calendar(wb):
     ws.add_data_validation(dv)
     st = col("Status")
     dv.add(f"{st}2:{st}{last}")
+    dvo = DataValidation(type="list", formula1='"' + ",".join(S.TEAM) + '"', allow_blank=True)
+    ws.add_data_validation(dvo)
+    ow = col("Owner")
+    dvo.add(f"{ow}2:{ow}{last}")
     ws.conditional_formatting.add(f"{st}2:{st}{last}", FormulaRule(formula=[f'${st}2="Posted"'], fill=PatternFill("solid", fgColor="D6EAD8")))
     ws.conditional_formatting.add(f"{st}2:{st}{last}", FormulaRule(formula=[f'${st}2="Paused"'], fill=PatternFill("solid", fgColor="F4D6D2")))
     ws.freeze_panes = f"{col('Working title')}2"
@@ -263,7 +272,7 @@ def sheet_pillars(wb):
         rr = r + 2 + i
         ws.cell(row=rr, column=1, value=p["code"]).font = Font(name=F, size=10)
         ws.cell(row=rr, column=2, value=p["name"]).font = Font(name=F, size=10)
-        ws.cell(row=rr, column=3, value=f'=COUNTIF(Calendar!$G:$G,B{rr})').font = Font(name=F, size=10)
+        ws.cell(row=rr, column=3, value=f'=COUNTIF(Calendar!${col("Pillar")}:${col("Pillar")},B{rr})').font = Font(name=F, size=10)
         lo, hi = r + 2, r + 1 + len(S.PILLARS)
         c = ws.cell(row=rr, column=4, value=f"=IF(SUM($C${lo}:$C${hi})=0,0,C{rr}/SUM($C${lo}:$C${hi}))")
         c.font = Font(name=F, size=10)
@@ -330,6 +339,43 @@ def sheet_destinations(wb):
           [list(x) for x in S.TOP_DESTINATIONS], [5, 30, 48, 20, 24, 14, 16, 16])
 
 
+def sheet_team(wb):
+    ws = wb.create_sheet("Team board")
+    title(ws, "Team board: who's on what", "Counts update from the Owner and Status columns in Calendar. Filter Calendar by Owner or Status to see each person's list.")
+    ow, st = col("Owner"), col("Status")
+    labels = ["Person"] + STATUSES + ["Total", "Posted %"]
+    header(ws, 4, labels, [18] + [11] * len(STATUSES) + [9, 10])
+    people = S.TEAM + ["Unassigned"]
+    for i, name in enumerate(people, 5):
+        ws.cell(row=i, column=1, value=name).font = Font(name=F, size=10, bold=True)
+        for j, s in enumerate(STATUSES, 2):
+            L = get_column_letter(j)
+            if name == "Unassigned":  # everything in this status not owned by a named person
+                f = f'=COUNTIF(Calendar!${st}:${st},"{s}")-SUM({L}5:{L}{i - 1})'
+            else:
+                f = f'=COUNTIFS(Calendar!${ow}:${ow},"{name}",Calendar!${st}:${st},"{s}")'
+            c = ws.cell(row=i, column=j, value=f)
+            c.font = Font(name=F, size=10)
+            c.border = BORDER
+        tot = get_column_letter(len(STATUSES) + 2)
+        first, lastc = get_column_letter(2), get_column_letter(len(STATUSES) + 1)
+        c = ws.cell(row=i, column=len(STATUSES) + 2, value=f"=SUM({first}{i}:{lastc}{i})")
+        c.font = Font(name=F, size=10, bold=True)
+        posted = get_column_letter(STATUSES.index("Posted") + 2)
+        c = ws.cell(row=i, column=len(STATUSES) + 3, value=f"=IF({tot}{i}=0,0,{posted}{i}/{tot}{i})")
+        c.font = Font(name=F, size=10)
+        c.number_format = "0%"
+    end = 4 + len(people)
+    ws.cell(row=end + 1, column=1, value="All posts").font = Font(name=F, size=10, bold=True)
+    for j in range(2, len(STATUSES) + 3):
+        L = get_column_letter(j)
+        c = ws.cell(row=end + 1, column=j, value=f"=SUM({L}5:{L}{end})")
+        c.font = Font(name=F, size=10, bold=True)
+    ws.conditional_formatting.add(f"B5:{get_column_letter(len(STATUSES) + 1)}{end}",
+                                  FormulaRule(formula=["B5>0"], fill=PatternFill("solid", fgColor="EFE9E0")))
+    ws.cell(row=end + 3, column=1, value="Team: " + ", ".join(S.TEAM) + ". Add a name to S.TEAM in strategy.py to extend the dropdowns and this board.").font = Font(name=F, italic=True, size=9, color="5D7A6E")
+
+
 def sheet_kpis(wb):
     ws = wb.create_sheet("KPIs & tracking")
     title(ws, "KPIs and tracking", "Targets for month one, set against published benchmarks. The live columns read the Calendar results.")
@@ -348,12 +394,12 @@ def sheet_kpis(wb):
     for i, (code, (name, _)) in enumerate(PLATFORM.items()):
         rr = r + 2 + i
         cells = [name,
-                 f'=COUNTIF(Calendar!$E:$E,A{rr})',
-                 f'=COUNTIFS(Calendar!$E:$E,A{rr},Calendar!${col("Status")}:${col("Status")},"Posted")',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Reach")}:${col("Reach")})',
-                 f'=IFERROR(AVERAGEIFS(Calendar!${col("Eng. rate")}:${col("Eng. rate")},Calendar!$E:$E,A{rr},Calendar!${col("Status")}:${col("Status")},"Posted"),"")',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Saves")}:${col("Saves")})',
-                 f'=SUMIF(Calendar!$E:$E,A{rr},Calendar!${col("Shares")}:${col("Shares")})']
+                 f'=COUNTIF(Calendar!${col("Platform")}:${col("Platform")},A{rr})',
+                 f'=COUNTIFS(Calendar!${col("Platform")}:${col("Platform")},A{rr},Calendar!${col("Status")}:${col("Status")},"Posted")',
+                 f'=SUMIF(Calendar!${col("Platform")}:${col("Platform")},A{rr},Calendar!${col("Reach")}:${col("Reach")})',
+                 f'=IFERROR(AVERAGEIFS(Calendar!${col("Eng. rate")}:${col("Eng. rate")},Calendar!${col("Platform")}:${col("Platform")},A{rr},Calendar!${col("Status")}:${col("Status")},"Posted"),"")',
+                 f'=SUMIF(Calendar!${col("Platform")}:${col("Platform")},A{rr},Calendar!${col("Saves")}:${col("Saves")})',
+                 f'=SUMIF(Calendar!${col("Platform")}:${col("Platform")},A{rr},Calendar!${col("Shares")}:${col("Shares")})']
         for c, v in enumerate(cells, 1):
             cell = ws.cell(row=rr, column=c, value=v)
             cell.font = Font(name=F, size=10)
@@ -389,6 +435,7 @@ def build_xlsx():
     wb = Workbook()
     sheet_start(wb)
     sheet_calendar(wb)
+    sheet_team(wb)
     sheet_month(wb)
     sheet_playbook(wb)
     sheet_pillars(wb)
@@ -408,7 +455,7 @@ def build_json(path):
     data = {k: getattr(S, k) for k in ("MONTH", "SITUATION", "OBJECTIVES", "PLATFORMS", "PILLARS", "SERIES", "STORIES",
                                        "VOICE", "DESIGN", "BIOS", "KEYWORDS", "KEYWORD_METHOD", "COMPETITORS", "WHITE_SPACE",
                                        "MOMENTS", "CANCELLED", "KPIS", "WORKFLOW", "SENSITIVITY", "SOURCES",
-                                       "GLOBAL_INSIGHTS", "TOP_DESTINATIONS")}
+                                       "GLOBAL_INSIGHTS", "TOP_DESTINATIONS", "TEAM", "STATUSES", "DEFAULT_STATUS")}
     data["POSTS"] = sorted_posts()
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False)

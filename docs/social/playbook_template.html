@@ -7,7 +7,7 @@
 :root{
   --bg:#f6f2ec; --surface:#fffdf9; --sunk:#efe9e0; --fg:#0f1a16; --muted:#5d6b64; --line:rgba(15,26,22,.12);
   --brand:#1e352d; --brand-fg:#e9e2d8; --gold:#b98f4a; --gold-soft:#f1e3c6; --alert:#a3342b; --alert-soft:#f6e1dd;
-  --ig:#b4407a; --tt:#127c86; --x:#2f3a36; --li:#2a62b0;
+  --ig:#b4407a; --tt:#127c86; --x:#2f3a36; --li:#2a62b0; --ok:#2f7d4f; --ok-soft:#dcefe2;
   --f-sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-serif:"Instrument Serif",Georgia,serif;
   --f-ar:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
@@ -17,11 +17,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0e1d17; --surface:#132620; --sunk:#0b1712; --fg:#ece6dc; --muted:#9fb0a7; --line:rgba(233,226,216,.13);
   --brand:#d9b77a; --brand-fg:#0e1d17; --gold:#d9b77a; --gold-soft:#3a3222; --alert:#f08a7e; --alert-soft:#3b1f1b;
-  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; color-scheme:dark}}
+  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; --ok:#7fcf9b; --ok-soft:#1d3a2a; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e1d17; --surface:#132620; --sunk:#0b1712; --fg:#ece6dc; --muted:#9fb0a7; --line:rgba(233,226,216,.13);
   --brand:#d9b77a; --brand-fg:#0e1d17; --gold:#d9b77a; --gold-soft:#3a3222; --alert:#f08a7e; --alert-soft:#3b1f1b;
-  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; color-scheme:dark}
+  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; --ok:#7fcf9b; --ok-soft:#1d3a2a; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-sans);font-size:15px;line-height:1.55}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
@@ -106,6 +106,28 @@ select{font:500 13px var(--f-sans);padding:6px 10px;border-radius:999px;border:1
 .sc-Global{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
 .sc-GCC{background:var(--gold-soft);color:var(--fg)}
 .count{font-size:13px;color:var(--muted);margin-left:auto}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:12px;scrollbar-width:thin}
+.tab{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font:500 13.5px var(--f-sans);padding:9px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:baseline}
+.tab b{font-variant-numeric:tabular-nums;font-weight:600;font-size:12px;color:var(--fg)}
+.tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--brand)}
+.people{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.people .lbl,.sync{font-size:12.5px;color:var(--muted)}
+.sync{margin-left:auto}
+.av{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font:600 10px var(--f-sans);background:var(--sunk);color:var(--fg);border:1px solid var(--line);flex:0 0 auto}
+.chip[aria-pressed="true"] .av{background:var(--brand-fg);color:var(--brand)}
+.pill{font:500 11px var(--f-sans);padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+.pill .av{width:16px;height:16px;font-size:8.5px}
+.st-Shot,.st-Designed{background:var(--gold-soft);color:var(--fg);border-color:transparent}
+.st-Approved,.st-Scheduled{background:var(--brand);color:var(--brand-fg);border-color:transparent}
+.st-Posted{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.st-Paused{background:var(--alert-soft);color:var(--alert);border-color:transparent}
+.right{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.track{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--sunk);border-radius:10px;padding:10px 12px}
+.track label{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+.track .hint{font-size:12px;color:var(--muted)}
+.bar{height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--ok)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 /* reference tables */
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
@@ -140,11 +162,21 @@ footer{padding-block:28px 48px;color:var(--muted);font-size:12.5px;border-top:1p
 <main class="wrap">
   <section class="panel" id="calendar" data-label="Calendar">
     <h2>The <em>calendar</em></h2>
-    <p class="sub">Tap a day to jump to it, or filter by platform, pillar and series. Open any post for the full brief. Flagged posts need a sign-off before scheduling.</p>
+    <p class="sub">Pick a status tab or a person, tap a day to jump to it, or filter by platform, pillar and series. Open any post for the full brief and to assign it or move it along. Flagged posts need a sign-off before scheduling.</p>
+    <div class="tabs" id="stabs" role="tablist" aria-label="Status"></div>
+    <div class="people" id="people"></div>
     <div class="filters" id="filters"></div>
     <div class="month" id="month"></div>
     <div class="legend"><span><span class="dot d-IG"></span> Instagram</span><span><span class="dot d-TT"></span> TikTok</span><span><span class="dot d-X"></span> X</span><span><span class="dot d-LI"></span> LinkedIn</span><span>Gold underline = school autumn break</span></div>
     <div class="list" id="list"></div>
+  </section>
+
+  <section class="panel" id="team" data-label="Team" hidden>
+    <h2>Who's on <em>what</em></h2>
+    <p class="sub">Every post's owner and stage, live for everyone who opens this page. Assign and move posts from the calendar: open a post, then pick a person and a status.</p>
+    <div class="tbl" id="teamtbl"></div>
+    <h3 style="margin-top:28px">Next 7 days, by person</h3>
+    <div class="grid2" id="teamweek" style="align-items:start"></div>
   </section>
 
   <section class="panel" id="overview" data-label="Strategy" hidden>
@@ -257,8 +289,20 @@ document.getElementById('rail').addEventListener('click',e=>{const a=e.target.cl
 let start = (location.hash||'').slice(1); if(!start){try{start=localStorage.getItem('mada-tab')||''}catch(e){}}
 show(start||'calendar');
 
+/* team tracking (shared through the page's db; read-only defaults without it) */
+const TEAM = D.TEAM;
+const STATUSES = D.STATUSES;
+const DEFAULT_STATUS = D.DEFAULT_STATUS;
+const track = {};            // post id -> {status, owner}
+const openIds = new Set();   // cards the viewer has open, kept across re-renders
+const pending = {};          // post id -> in-flight write
+let db = null, canWrite = false, syncMsg = 'Connecting to the shared board…';
+const stOf = p => (track[p.id] && STATUSES.includes(track[p.id].status)) ? track[p.id].status : DEFAULT_STATUS;
+const ownerOf = p => (track[p.id] && TEAM.includes(track[p.id].owner)) ? track[p.id].owner : '';
+const initials = n => n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
 /* filters */
-const state = {pl:new Set(['IG','TT','X','LI']), pil:'', ser:'', sc:'', day:0, flag:false};
+const state = {pl:new Set(['IG','TT','X','LI']), pil:'', ser:'', sc:'', day:0, flag:false, status:'', owner:''};
 const seriesList = [...new Set(P.map(p=>p.series).filter(Boolean))].sort();
 $('filters').innerHTML =
   Object.entries(PL).map(([k,v])=>`<button class="chip" data-pl="${k}" aria-pressed="true"><span class="dot d-${k}"></span>${v}</button>`).join('') +
@@ -278,7 +322,26 @@ $('fflag').onclick=e=>{state.flag=!state.flag;e.currentTarget.setAttribute('aria
 
 const FLAGRX=/(OFFER|APPROVAL|SENSITIVITY|SALES|MANAGEMENT)/;
 const flagOf = p => (p.note.match(FLAGRX)||[])[1]||'';
-const visible = () => P.filter(p=>state.pl.has(p.p) && (!state.pil||p.pil===state.pil) && (!state.ser||p.series===state.ser) && (!state.sc||p.sc===state.sc) && (!state.flag||flagOf(p)));
+const baseVisible = () => P.filter(p=>state.pl.has(p.p) && (!state.pil||p.pil===state.pil) && (!state.ser||p.series===state.ser) && (!state.sc||p.sc===state.sc) && (!state.flag||flagOf(p)));
+const ownerMatch = p => !state.owner || (state.owner==='_none' ? !ownerOf(p) : ownerOf(p)===state.owner);
+const visible = () => baseVisible().filter(p=>ownerMatch(p) && (!state.status||stOf(p)===state.status));
+
+function renderTabs(){
+  const base = baseVisible().filter(ownerMatch);
+  const n = s => base.filter(p=>stOf(p)===s).length;
+  $('stabs').innerHTML = [['','All',base.length],...STATUSES.map(s=>[s,s,n(s)])]
+    .map(([v,l,c])=>`<button class="tab" role="tab" data-status="${v}" aria-selected="${state.status===v}">${l}<b>${c}</b></button>`).join('');
+}
+function renderPeople(){
+  const base = baseVisible().filter(p=>!state.status||stOf(p)===state.status);
+  const n = o => base.filter(p=>o==='_none'?!ownerOf(p):ownerOf(p)===o).length;
+  $('people').innerHTML = `<span class="lbl">Assigned to</span>` +
+    [['','Everyone',base.length],...TEAM.map(m=>[m,m,n(m)]),['_none','Unassigned',n('_none')]]
+    .map(([v,l,c])=>`<button class="chip" data-owner="${esc(v)}" aria-pressed="${state.owner===v}">${v&&v!=='_none'?`<span class="av" aria-hidden="true">${initials(v)}</span>`:''}${esc(l)} <span style="opacity:.7">${c}</span></button>`).join('') +
+    `<span class="sync">${esc(syncMsg)}</span>`;
+}
+$('stabs').addEventListener('click',e=>{const b=e.target.closest('[data-status]'); if(!b)return; state.status=b.dataset.status; render();});
+$('people').addEventListener('click',e=>{const b=e.target.closest('[data-owner]'); if(!b)return; state.owner = state.owner===b.dataset.owner?'':b.dataset.owner; render();});
 
 function renderMonth(list){
   const momentOf={}; const weak=m=>!m||/^(Evergreen|Weekend)/.test(m); P.forEach(p=>{if(weak(momentOf[p.d])&&!weak(p.moment))momentOf[p.d]=p.moment; else if(!momentOf[p.d])momentOf[p.d]=p.moment});
@@ -309,12 +372,18 @@ function field(k,v,opts={}){
 }
 function card(p){
   const f=flagOf(p);
-  return `<details class="post p-${p.p}"><summary>
+  const st=stOf(p), ow=ownerOf(p), dis=canWrite?'':' disabled';
+  return `<details class="post p-${p.p}" data-id="${p.id}"${openIds.has(p.id)?' open':''}><summary>
     <span class="meta"><span class="dot d-${p.p}"></span> ${p.t} · ${PL[p.p]} · ${esc(p.f)}</span>
     <span class="ttl">${esc(p.title)}</span>
-    ${f?`<span class="flag">${f}</span>`:'<span></span>'}
+    <span class="right">${f?`<span class="flag">${f}</span>`:''}<span class="pill">${ow?`<span class="av" aria-hidden="true">${initials(ow)}</span>${esc(ow)}`:'Unassigned'}</span><span class="pill st-${st}">${st}</span></span>
     <span class="hook"><span class="sc sc-${esc(p.sc)}">${esc(p.sc==='All'?'Brand':p.sc)}</span> ${esc(PIL[p.pil])}${p.series?' · '+esc(p.series):''} — ${esc(p.hook)}</span>
   </summary><div class="body">
+    <div class="track">
+      <label for="ow-${p.id}">Assigned to <select id="ow-${p.id}" data-set="owner" data-id="${p.id}"${dis}><option value="">Unassigned</option>${TEAM.map(m=>`<option${m===ow?' selected':''}>${esc(m)}</option>`).join('')}</select></label>
+      <label for="st-${p.id}">Status <select id="st-${p.id}" data-set="status" data-id="${p.id}"${dis}>${STATUSES.map(s=>`<option${s===st?' selected':''}>${s}</option>`).join('')}</select></label>
+      ${canWrite?'':`<span class="hint">${db?'View only: you can see the board but not change it.':'Assigning works once the shared board connects (open this page signed in to claude.ai).'}</span>`}
+    </div>
     ${(p.pen||p.par)?`<div class="field"><div class="k"><span>On poster / on screen</span></div><div class="poster">${p.pen?`<div class="en">${esc(p.pen)}</div>`:''}${p.par?`<div class="arp" lang="ar">${esc(p.par)}</div>`:''}</div></div>`:''}
     ${field('Hook · first 1-3 seconds',p.hook)}
     ${field('Caption · Arabic',p.car,{copy:true,ar:true})}
@@ -328,6 +397,7 @@ function card(p){
   </div></details>`;
 }
 function render(){
+  renderTabs(); renderPeople(); renderTeam();
   const list=visible();
   renderMonth(list);
   $('count').textContent = `${list.length} of ${P.length} posts`;
@@ -341,7 +411,64 @@ $('list').addEventListener('click',e=>{
   const fallback=()=>{const r=document.createRange();r.selectNodeContents(v);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected';setTimeout(()=>b.textContent='Copy',1400)};
   try{navigator.clipboard.writeText(v.textContent).then(done,fallback)}catch(err){fallback()}
 });
+$('list').addEventListener('toggle',e=>{const d=e.target; if(!d.dataset||!d.dataset.id)return; d.open?openIds.add(d.dataset.id):openIds.delete(d.dataset.id);},true);
+
+function renderTeam(){
+  const rows=[...TEAM,''];
+  const head=`<tr><th>Person</th>${STATUSES.map(s=>`<th class="num">${s}</th>`).join('')}<th class="num">Total</th><th>Posted</th></tr>`;
+  const body=rows.map(o=>{
+    const mine=P.filter(p=>ownerOf(p)===o);
+    const done=mine.filter(p=>stOf(p)==='Posted').length;
+    const pct=mine.length?Math.round(100*done/mine.length):0;
+    return `<tr><td>${o?`<span class="av" aria-hidden="true">${initials(o)}</span> ${esc(o)}`:'Unassigned'}</td>${STATUSES.map(s=>`<td class="num">${mine.filter(p=>stOf(p)===s).length||'·'}</td>`).join('')}<td class="num"><b>${mine.length}</b></td><td><div class="bar" title="${pct}% posted"><i style="width:${pct}%"></i></div></td></tr>`;
+  }).join('');
+  $('teamtbl').innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  const now=new Date(), today=(now.getFullYear()===2026&&now.getMonth()===10)?now.getDate():1;
+  const wk=P.filter(p=>p.d>=today&&p.d<today+7&&stOf(p)!=='Posted');
+  $('teamweek').innerHTML=rows.map(o=>{
+    const mine=wk.filter(p=>ownerOf(p)===o);
+    return `<div class="box"><h3>${o?esc(o):'Unassigned'} <span style="color:var(--muted);font-weight:400">· ${mine.length} due</span></h3>${mine.length?`<ul class="clean">${mine.slice(0,8).map(p=>`<li>${dayName(p.d)} ${p.d} · ${PL[p.p]} · ${esc(p.title)} <span class="pill st-${stOf(p)}">${stOf(p)}</span></li>`).join('')}${mine.length>8?`<li>+${mine.length-8} more</li>`:''}</ul>`:'<div class="sub" style="margin:0">Nothing due.</div>'}</div>`;
+  }).join('');
+}
+
+/* writes: one per change, from the viewer's own action */
+$('list').addEventListener('change',async e=>{
+  const sel=e.target.closest('select[data-set]'); if(!sel||!db||!canWrite) return;
+  const id=sel.dataset.id, key=sel.dataset.set, prev=track[id];
+  const next={status: stOf({id}), owner: ownerOf({id}), [key]: sel.value};
+  track[id]=next; render();
+  if(pending[id]) await pending[id].catch(()=>{});
+  const w = db.collection('posts').doc(id).set({...next, updatedAt:new Date().toISOString()});
+  pending[id]=w;
+  try{ await w; syncMsg='Saved · live for the whole team'; }
+  catch(err){
+    if(prev) track[id]=prev; else delete track[id];
+    if(err&&err.code==='invalid_argument'){ canWrite=false; syncMsg='View only: your access lets you see the board but not change it.'; }
+    else if(err&&err.code==='quota_exceeded'){ syncMsg='The board is full: this change was not saved.'; }
+    else syncMsg='Not saved. Try again in a moment.';
+  }
+  if(pending[id]===w) delete pending[id];
+  render();
+});
+
 render();
+
+(async()=>{
+  try{
+    db = await claude.use('db');
+    if(!db){ syncMsg='Shared board unavailable here: showing default statuses.'; render(); return; }
+    const user = await claude.use('user');
+    const w = user ? await user.can('data.write') : null;
+    canWrite = w !== false;
+    syncMsg = canWrite ? 'Live · changes save for the whole team' : 'View only';
+    render();
+    db.collection('posts').onSnapshot(snap=>{
+      for(const k of Object.keys(track)) if(!pending[k]) delete track[k];
+      snap.docs.forEach(d=>{ if(!pending[d.id]) track[d.id]={...(d.data()||{})}; });
+      render();
+    }, err=>{ syncMsg = err&&err.code==='revoked' ? 'Board disconnected.' : 'Live updates paused. Reload to reconnect.'; render(); });
+  }catch(e){ syncMsg='Shared board unavailable here: showing default statuses.'; render(); }
+})();
 
 /* reference tables */
 const tbl=(heads,rows,arCols=[])=>`<table><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${arCols.includes(i)||isAr(c)&&!/[A-Za-z]{3,}/.test(c)?' class="ar" lang="ar"':''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;

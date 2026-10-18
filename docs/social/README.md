@@ -2,7 +2,7 @@
 
 The month-one plan for Instagram, TikTok, X and LinkedIn. Researched 18 Oct 2026.
 
-- `Mada_Social_Calendar_Nov2026.xlsx` is the working file for the team. It holds every post (hook, poster text EN/AR, captions AR/EN, keywords, hashtags, CTA, production direction) with Owner and Status columns and results tracking. It also has the month view, platform playbook, pillars and series, guidelines, keywords, competitors, moments, KPIs, the sensitivity protocol and sources.
+- `Mada_Social_Calendar_Nov2026.xlsx` is the working file for the team. It holds every post (hook, poster text EN/AR, captions AR/EN, keywords, hashtags, CTA, production direction) with Owner (Mehnaz, Bilal, Musa, Abdul Rehman, Usman) and Status dropdowns, a Team board and results tracking. The published playbook page has the same Owner and Status controls, stored live for the whole team and keyed on each post's Post ID. It also has the month view, platform playbook, pillars and series, guidelines, keywords, competitors, moments, KPIs, the sensitivity protocol and sources.
 - `posts.py` holds every post. `strategy.py` holds the guidelines and research tables.
 - `build.py` rebuilds the workbook from those two files: `python3 docs/social/build.py`. Add `--html <path>` to also write the shareable playbook page from `playbook_template.html`.
 
