@@ -7,7 +7,7 @@ export type SocialProvider = 'apple' | 'google';
 export type Identity = { accessToken: string; givenName?: string };
 
 export type AuthErrorCode = 'wrong' | 'expired' | 'wait' | 'tooMany' | 'cancelled' | 'unavailable' | 'offline' | 'taken' | 'noSession'
-  | 'wrongPassword' | 'weakPassword' | 'leakedPassword' | 'other';
+  | 'wrongPassword' | 'weakPassword' | 'leakedPassword' | 'notReady' | 'other';
 
 /** Supabase's failures, in our words (COPY.md). `seconds` for 'wait'. */
 export class AuthError extends Error {
@@ -21,7 +21,7 @@ export class AuthError extends Error {
       case 'wait': return t('auth.code.wait', { seconds: seconds ?? 60 });
       case 'tooMany': return t('auth.code.tooMany');
       case 'cancelled': return t('auth.signin.cancelled');
-      case 'unavailable': return t('auth.signin.unavailable');
+      case 'unavailable': case 'notReady': return t('auth.signin.unavailable');
       case 'offline': return t('error.offline');
       case 'taken': return t('auth.error.identityTaken');
       case 'noSession': return t('auth.methods.confirmFirst');

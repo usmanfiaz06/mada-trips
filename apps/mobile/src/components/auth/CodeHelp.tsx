@@ -5,7 +5,7 @@ import { AppleMark, GoogleMark, WhatsAppMark } from '@/components/BrandMarks';
 import { Icon, type IconName } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { AUTH_MODE, type PhoneChannel } from '@/lib/auth';
+import { AUTH_MODE, useWayShown, type PhoneChannel } from '@/lib/auth';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useOnboarding } from '@/lib/onboarding';
@@ -64,6 +64,7 @@ export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flo
   onSwitch?: () => void;
 }) {
   const router = useRouter();
+  const shown = useWayShown();
   const go = (fn: () => void) => { onLeave(); fn(); };
   const other = about === 'phone' ? 'email' : 'phone';
   return (
@@ -90,12 +91,12 @@ export function CodeHelpBody({ about, contact, resendIn, onResend, onChange, flo
       {flow === 'signin' ? (
         <>
           <T v="small" style={{ fontFamily: ff.ui600, marginTop: 6 }}>{t('auth.help.otherWay')}</T>
-          <HelpRow icon={glyph(other === 'email' ? 'mail' : 'phone')} title={other === 'email' ? t('auth.help.useEmail') : t('auth.help.usePhone')} testID="help-other-code"
-            onPress={() => go(() => { useOnboarding.getState().set({ via: other, social: null }); router.replace(other === 'email' ? '/email' : '/phone'); })} />
-          {SHOW_APPLE ? <HelpRow icon={<AppleMark size={18} color={colors.green} />} title={t('signin.apple')} testID="help-apple"
+          {shown(other) ? <HelpRow icon={glyph(other === 'email' ? 'mail' : 'phone')} title={other === 'email' ? t('auth.help.useEmail') : t('auth.help.usePhone')} testID="help-other-code"
+            onPress={() => go(() => { useOnboarding.getState().set({ via: other, social: null }); router.replace(other === 'email' ? '/email' : '/phone'); })} /> : null}
+          {SHOW_APPLE && shown('apple') ? <HelpRow icon={<AppleMark size={18} color={colors.green} />} title={t('signin.apple')} testID="help-apple"
             onPress={() => go(() => router.replace({ pathname: '/signin', params: { with: 'apple' } }))} /> : null}
-          <HelpRow icon={<GoogleMark size={18} />} title={t('signin.google')} testID="help-google"
-            onPress={() => go(() => router.replace({ pathname: '/signin', params: { with: 'google' } }))} />
+          {shown('google') ? <HelpRow icon={<GoogleMark size={18} />} title={t('signin.google')} testID="help-google"
+            onPress={() => go(() => router.replace({ pathname: '/signin', params: { with: 'google' } }))} /> : null}
         </>
       ) : null}
       <HelpRow icon={glyph('user')} title={t('auth.help.lost')} sub={t('auth.help.lostSub')} testID="help-lost"

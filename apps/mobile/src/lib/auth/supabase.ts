@@ -4,6 +4,7 @@ import { createClient, type Session, type SupabaseClient, type UserIdentity } fr
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { sendViaHook } from './channel';
 import { secureSessionStorage } from './session-storage';
+import { requireWay } from './providers';
 import { orReviewLogin } from './review';
 import { nativeCredential, nativeSocial, redirectUrl } from './social';
 import { AuthError, fromSupabase, type AuthBackend, type Identity, type SocialProvider } from './types';
@@ -62,6 +63,7 @@ export const supabaseAuth: AuthBackend = {
   kind: 'supabase',
 
   async sendPhoneCode(phone, channel) {
+    await requireWay('phone');
     // Supabase checks options.channel but doesn't pass it to the Send SMS hook; the hint (channel.ts) carries it.
     return sendViaHook(phone, channel, async () => {
       await run(supabase().auth.signInWithOtp({ phone: bare(phone), options: { channel: channel ?? 'sms', shouldCreateUser: true } }));
@@ -73,6 +75,7 @@ export const supabaseAuth: AuthBackend = {
   },
 
   async sendEmailCode(email) {
+    await requireWay('email');
     // The project's email template carries {{ .Token }} (a 6-digit code), not a link: AUTH.md step 3.
     await run(supabase().auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } }));
   },
@@ -82,6 +85,7 @@ export const supabaseAuth: AuthBackend = {
   },
 
   async signInWith(provider): Promise<Identity | null> {
+    await requireWay(provider); // never off to /authorize for a provider the project hasn't switched on
     if (!nativeSocial) {
       await run(supabase().auth.signInWithOAuth({ provider, options: { redirectTo: `${redirectUrl()}?via=${provider}` } }));
       return null; // the browser leaves for Apple or Google; /auth-callback picks it up
@@ -103,6 +107,7 @@ export const supabaseAuth: AuthBackend = {
   },
 
   async addPhone(phone, channel) {
+    await requireWay('phone');
     return sendViaHook(phone, channel, async () => { await run(supabase().auth.updateUser({ phone: bare(phone) })); });
   },
   async verifyAddedPhone(phone, code) {
@@ -119,6 +124,7 @@ export const supabaseAuth: AuthBackend = {
   },
 
   async link(provider) {
+    await requireWay(provider);
     if (!nativeSocial) {
       await run(supabase().auth.linkIdentity({ provider, options: { redirectTo: `${redirectUrl()}?link=1` } }));
       return null;

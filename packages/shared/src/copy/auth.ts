@@ -10,6 +10,9 @@ export const authCopy = {
   'auth.signin.busy': 'Signing you in',
   'auth.signin.cancelled': 'Sign-in cancelled. Nothing was shared.',
   'auth.signin.unavailable': 'That way in isn’t ready on this phone. Use your email or phone number instead.',
+  'auth.signin.notReady': '{name} sign-in isn’t ready yet. Use your phone number or email.',
+  'auth.signin.notReadyEmail': '{name} sign-in isn’t ready yet. Use your email.',
+  'auth.signin.phoneNotReady': 'Phone number sign-in isn’t ready yet. Use your email.',
 
   // ───────────── email code ─────────────
   'auth.email.title': 'Your email',

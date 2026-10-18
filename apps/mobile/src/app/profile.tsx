@@ -24,6 +24,7 @@ import { useAccount, useCards, useCredit, useDevices, useExport, useInbox, useTr
 import { fullNameOf, nameOf, nextTrip, passportStatus, prettyPhone, useNow } from '@/lib/wallet-model';
 import { colors, ff } from '@/theme';
 import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
+import { useWayShown } from '@/lib/auth';
 
 /** Profile (prototype Profile.jsx): you, your account, household, paying, alerts, the app, sign out. */
 export default function Profile() {
@@ -46,6 +47,7 @@ function SignedIn() {
   const router = useRouter();
   const qc = useQueryClient();
   const user = useSession((s) => s.user);
+  const wayOn = useWayShown();
   const account = useAccount();
   const people = usePeople();
   const cards = useCards();
@@ -107,7 +109,7 @@ function SignedIn() {
 
       <Group label={t('profile.account')}>
         <Row icon="user" value={t('profile.details')} sub={t('profile.detailsSub')} onPress={() => router.push('/account')} testID="profile-details" />
-        {user && !user.phone ? <Row icon="bell" value={t('auth.verifyPhone.row')} sub={t('auth.verifyPhone.rowSub')} onPress={() => router.push('/verify-phone?then=back')} testID="profile-verify-phone" /> : null}
+        {user && !user.phone && wayOn('phone') ? <Row icon="bell" value={t('auth.verifyPhone.row')} sub={t('auth.verifyPhone.rowSub')} onPress={() => router.push('/verify-phone?then=back')} testID="profile-verify-phone" /> : null}
         <Row icon="lock" value={t('profile.signin')} sub={methods || t('profile.signinNone')} onPress={() => router.push('/account/signin')} testID="profile-signin" />
         <Row icon="flight" value={t('profile.prefs')} sub={`${seat} · ${meal} · ${loyalty}`} onPress={() => router.push('/account/prefs')} testID="profile-prefs" />
         <Row icon="bell" value={t('profile.inbox')} sub={unread ? tn('profile.inboxSub', unread) : t('profile.inboxSub.zero')} onPress={() => router.push('/inbox')} testID="profile-inbox" />

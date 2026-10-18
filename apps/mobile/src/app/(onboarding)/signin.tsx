@@ -13,7 +13,7 @@ import { Pill } from '@/components/Pill';
 import { Sheet } from '@/components/Sheet';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
-import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, type LastSignIn, type SocialProvider } from '@/lib/auth';
+import { AUTH_MODE, AuthError, auth, finishSignIn, getLastSignIn, notReadyMessage, useAuthWays, useWayShown, wayReady, type LastSignIn, type SocialProvider } from '@/lib/auth';
 import { maskContact } from '@/lib/auth/recovery';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
@@ -43,6 +43,8 @@ export default function SignIn() {
   const [sheet, setSheet] = useState<SocialProvider | null>(null);
   const [hideEmail, setHideEmail] = useState(true);
   const [busy, setBusy] = useState<SocialProvider | null>(null);
+  // Only the ways the Supabase project has switched on (providers.ts); all of them while that's unknown.
+  const shown = useWayShown();
 
   const cancel = () => { setSheet(null); toast(t('auth.signin.cancelled')); };
 
@@ -64,7 +66,12 @@ export default function SignIn() {
     }
   };
   const tapProvider = (p: SocialProvider) => (AUTH_MODE === 'mock' ? setSheet(p) : continueWith(p));
-  const go = (path: '/email' | '/phone') => { useOnboarding.getState().set({ social: null, via: path === '/email' ? 'email' : 'phone' }); router.push(path); };
+  const go = async (path: '/email' | '/phone') => {
+    // Never a phone screen that can't send a code: say so here instead.
+    if (path === '/phone' && !(await wayReady('phone'))) { buzz('soft'); toast(notReadyMessage('phone', useAuthWays.getState().ways)); return; }
+    useOnboarding.getState().set({ social: null, via: path === '/email' ? 'email' : 'phone' });
+    router.push(path);
+  };
 
   const started = useRef(false);
   useEffect(() => {
@@ -79,7 +86,7 @@ export default function SignIn() {
   const continueLast = async () => {
     if (!last) return;
     if (last.via === 'apple' || last.via === 'google') { tapProvider(last.via); return; }
-    if (!last.contact) { go(last.via === 'email' ? '/email' : '/phone'); return; }
+    if (!last.contact) { void go(last.via === 'email' ? '/email' : '/phone'); return; }
     const isEmail = last.via === 'email';
     useOnboarding.getState().set(isEmail ? { email: last.contact, via: 'email', social: null } : { phone: last.contact, via: 'phone', social: null });
     setLastBusy(true);
@@ -96,7 +103,7 @@ export default function SignIn() {
     ? t('auth.signin.continueAs', { contact: maskContact(last.via === 'phone' ? 'phone' : 'email', last.contact) })
     : last.via === 'apple' ? t('signin.apple') : last.via === 'google' ? t('signin.google') : last.via === 'email' ? t('auth.signin.email') : t('auth.signin.phone');
   const lastIcon = last?.via === 'google' ? <GoogleMark size={19} /> : last?.via === 'apple' ? <AppleMark size={19} color={colors.mist} /> : undefined;
-  const showLast = !!last && !all && (last.via !== 'apple' || SHOW_APPLE);
+  const showLast = !!last && !all && (last.via !== 'apple' || SHOW_APPLE) && shown(last.via);
 
   return (
     <Screen>
@@ -125,12 +132,12 @@ export default function SignIn() {
             <Button variant="ghost" label={t('auth.signin.another')} onPress={() => setAll(true)} testID="signin-another" />
           </>
         ) : null}
-        {showLast ? null : SHOW_APPLE ? <AppleButton onPress={() => tapProvider('apple')} busy={busy === 'apple'} /> : null}
-        {showLast ? null : <Button variant="secondary" label={t('signin.google')} icon={<GoogleMark size={19} />} busy={busy === 'google' && !sheet} onPress={() => tapProvider('google')} testID="signin-google" />}
+        {showLast ? null : SHOW_APPLE && shown('apple') ? <AppleButton onPress={() => tapProvider('apple')} busy={busy === 'apple'} /> : null}
+        {showLast || !shown('google') ? null : <Button variant="secondary" label={t('signin.google')} icon={<GoogleMark size={19} />} busy={busy === 'google' && !sheet} onPress={() => tapProvider('google')} testID="signin-google" />}
         {showLast ? null : (
           <>
             <Button variant="secondary" label={t('auth.signin.email')} onPress={() => go('/email')} testID="signin-email" />
-            <Button variant="ghost" label={t('auth.signin.phone')} onPress={() => go('/phone')} testID="signin-phone" />
+            {shown('phone') ? <Button variant="ghost" label={t('auth.signin.phone')} onPress={() => go('/phone')} testID="signin-phone" /> : null}
           </>
         )}
       </Act>

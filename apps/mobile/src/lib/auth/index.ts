@@ -7,6 +7,7 @@ import { mockAuth } from './mock';
 import { supabaseAuth } from './supabase';
 import type { AuthBackend, Identity } from './types';
 import { saveLastSignIn } from './last';
+import { wayKnownOff } from './providers';
 
 /*
  * Sign-in, in two halves (docs/app/AUTH.md):
@@ -18,6 +19,7 @@ import { saveLastSignIn } from './last';
 export * from './types';
 export { phoneChannels, usePhoneChannels, usePhoneCodes, type PhoneChannel, type PhoneSend } from './channel';
 export { AUTH_MODE, CODE_RESEND_SECONDS } from './config';
+export { loadAuthWays, notReadyMessage, parseAuthSettings, useAuthWays, useWayShown, wayKnownOff, wayReady, wayShown, type Way, type Ways } from './providers';
 export { getLastSignIn, forgetLastSignIn, type LastSignIn } from './last';
 
 export const auth = (): AuthBackend => (AUTH_MODE === 'supabase' ? supabaseAuth : mockAuth);
@@ -57,7 +59,8 @@ export async function finishSignIn(id: Identity, via: Via): Promise<'/verify-pho
     returning: r.isNew ? null : { name: r.user.name },
     afterPhone: after,
   });
-  return r.user.phone ? after : '/verify-phone?then=onboarding';
+  // A project without phone sign-in yet can't add a number either: straight on, rather than a screen that can't work.
+  return r.user.phone || wayKnownOff('phone') ? after : '/verify-phone?then=onboarding';
 }
 
 /** Signed in already: copy what Supabase now knows (a phone, an email, a provider) onto the account. */

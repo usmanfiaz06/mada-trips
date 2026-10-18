@@ -15,7 +15,7 @@ import { CODE_RESEND_SECONDS } from '@/lib/auth';
 import { passwordMeetsRules } from '@mada/shared';
 import { AccountScreen } from '@/components/wallet/AccountScreen';
 import { Group, Notice, Row, StatusPill } from '@/components/wallet/ui';
-import { AUTH_MODE, AuthError, auth, syncIdentity, type SocialProvider } from '@/lib/auth';
+import { AUTH_MODE, AuthError, auth, syncIdentity, useWayShown, type SocialProvider } from '@/lib/auth';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
@@ -61,7 +61,9 @@ export default function SignInMethods() {
   // Password: what they chose (set, change, remove), then a code to check it's them, then the new one.
   const [pw, setPw] = useState<null | { action: 'set' | 'remove'; step: 'menu' | 'code' | 'new' | 'confirm'; code: string; value: string }>(null);
   const methods = { apple: false, google: false, phone: false, email: false, ...user?.methods };
-  const shown = METHODS.filter((m) => m.id !== 'apple' || APPLE_HERE || methods.apple);
+  // A way the Supabase project hasn't switched on isn't offered (it stays listed if already linked, to manage it).
+  const wayOn = useWayShown();
+  const shown = METHODS.filter((m) => (m.id !== 'apple' || APPLE_HERE || methods.apple) && (methods[m.id] || wayOn(m.id)));
   const count = METHODS.filter((m) => methods[m.id]).length;
   const m = sheet ? METHODS.find((x) => x.id === sheet.id)! : null;
   const name = m ? t(m.name) : '';
