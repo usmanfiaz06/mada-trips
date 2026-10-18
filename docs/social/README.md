@@ -17,4 +17,7 @@ The published playbook page on claude.ai is the team's live calendar. Everyone i
 - Assign posts and move them through the statuses on the card. The **Team** tab shows each person's posts by stage and what's due in the next 7 days, and lets you add or remove names.
 - **Export to Excel (CSV)** downloads the live calendar, including added and edited posts.
 
-What the page stores: `posts/<post id>` (status, owner and edits for the original plan), `custom/<id>` (posts the team added) and `config/team` (the team list). The Excel workbook in this folder is the original plan and doesn't sync with the page.
+- Tap a day to open its day sheet: give it a label, a sticker, a tile colour and a photo, assign its posts, change their status (confetti on Posted) or move them. On a computer you can also drag a post onto another day; a toast offers Undo.
+- Posts can carry a cover photo, shown as a polaroid on the calendar. Photos are resized in the browser before upload.
+
+What the page stores: `posts/<post id>` (status, owner and edits for the original plan), `custom/<id>` (posts the team added), `days/<yyyy-mm-dd>` (a day's label, sticker, tile colour, photo) and `config/team` (the team list). The starting decorations and their photos come from `DAY_NOTES` in `strategy.py`; `build.py` shrinks the photos from the website's `assets/` into the page. The Excel workbook in this folder is the original plan and doesn't sync with the page.

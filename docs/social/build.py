@@ -451,12 +451,39 @@ def build_xlsx():
     return OUT
 
 
+def day_notes():
+    """The default scrapbook decorations, with each photo shrunk to a small inline JPEG."""
+    import base64
+    import io
+    try:
+        from PIL import Image
+    except ImportError:  # photos are optional; labels and stickers still work
+        Image = None
+    root = os.path.dirname(os.path.dirname(HERE))
+    out = {}
+    for day, note in S.DAY_NOTES.items():
+        note = dict(note)
+        src = note.pop("photo", None)
+        if src and Image:
+            im = Image.open(os.path.join(root, src)).convert("RGB")
+            w, h = im.size
+            side = min(w, h)  # square crop from the centre, like a polaroid
+            im = im.crop(((w - side) // 2, (h - side) // 2, (w + side) // 2, (h + side) // 2)).resize((220, 220))
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=68, optimize=True, progressive=True)
+            note["photo"] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+        out[day] = note
+    return out
+
+
 def build_json(path):
     data = {k: getattr(S, k) for k in ("MONTH", "SITUATION", "OBJECTIVES", "PLATFORMS", "PILLARS", "SERIES", "STORIES",
                                        "VOICE", "DESIGN", "BIOS", "KEYWORDS", "KEYWORD_METHOD", "COMPETITORS", "WHITE_SPACE",
                                        "MOMENTS", "CANCELLED", "KPIS", "WORKFLOW", "SENSITIVITY", "SOURCES",
                                        "GLOBAL_INSIGHTS", "TOP_DESTINATIONS", "TEAM", "STATUSES", "DEFAULT_STATUS", "HOOKS", "CAPTION_FORMULAS", "POST_CHECKLIST")}
     data["POSTS"] = sorted_posts()
+    data["DAY_NOTES"] = day_notes()
+    data["TILE_COLORS"] = S.TILE_COLORS
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False)
     return path

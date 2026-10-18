@@ -464,3 +464,26 @@ POST_CHECKLIST = [
     "Sensitivity check: nothing about airports, safety or airline suspensions unless it's helpful and confirmed.",
     "Captions burned in, text clear of the top ~250px and bottom ~340px of a 9:16 frame.",
 ]
+
+# Scrapbook decorations for the live calendar: a label, a sticker, a tile colour and a photo from the website.
+# The team can change or clear any of them on the page; these are only the starting look.
+TILE_COLORS = ["sky", "lilac", "blush", "sand", "sage", "brand"]
+DAY_NOTES = {
+    "2026-11-01": dict(label="Launch day!", emoji="🚀", color="brand", photo="assets/media/hero-poster.jpg", circle=True),
+    "2026-11-02": dict(label="Visa week", emoji="🛂", color=""),
+    "2026-11-04": dict(label="Shoot day!", emoji="🎬", color=""),
+    "2026-11-06": dict(label="AlUla Skies", emoji="🎈", color="lilac", photo="assets/img/alula-rocks.jpg"),
+    "2026-11-09": dict(label="No visa list", emoji="", color="", photo="assets/img/passport.jpg"),
+    "2026-11-10": dict(label="BTS shoot", emoji="🎤", color="", photo="assets/img/events/stage-kit.jpg"),
+    "2026-11-11": dict(label="11.11", emoji="✨", color="blush", circle=True),
+    "2026-11-13": dict(label="Kindness day", emoji="🤍", color="", photo="assets/img/resort.jpg"),
+    "2026-11-15": dict(label="Japan, nonstop!", emoji="🗾", color="sky", photo="assets/img/wing.jpg"),
+    "2026-11-18": dict(label="Shoot day!", emoji="🎬", color=""),
+    "2026-11-20": dict(label="Break starts!", emoji="🍂", color="sand", photo="assets/img/terminal.jpg", circle=True),
+    "2026-11-21": dict(label="Kashta season", emoji="🔥", color="", photo="assets/img/alula-stars.jpg"),
+    "2026-11-24": dict(label="Gala BTS", emoji="", color="", photo="assets/img/events/gala.jpg"),
+    "2026-11-25": dict(label="Cairo 48h", emoji="🇪🇬", color=""),
+    "2026-11-27": dict(label="White Friday", emoji="🤍", color="brand", photo="assets/media/fireworks.jpg", circle=True),
+    "2026-11-29": dict(label="Rajab soon", emoji="🌙", color="sage"),
+    "2026-11-30": dict(label="Hello December", emoji="👋", color=""),
+}
