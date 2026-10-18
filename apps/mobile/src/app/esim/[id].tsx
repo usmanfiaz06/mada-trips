@@ -98,7 +98,7 @@ export default function EsimScreen() {
     <TripScreen title={t('es.card.title', { where: e.where })}>
       <Rise><EsimPass e={e} testID="esim-card" until={onTrip && u?.expiresAt ? shortDay(u.expiresAt.slice(0, 10), getLocale()) : null} onTopup={onTrip && e.plan.topup ? () => setTopup(true) : null} /></Rise>
 
-      {e.status === 'refunded' && e.result ? <><Box tone="cream"><H3>{t('es.refunded.title')}</H3></Box><OutcomeCard result={e.result} tripId={e.tripId} testID="esim-outcome" /></> : null}
+      {e.status === 'refunded' && e.result ? <><Box tone="cream"><H3>{t('es.refunded.title')}</H3></Box><OutcomeCard result={e.result} tripId={e.tripId} why={e.result.reason === 'sold_out' ? t('es.why.sold_out') : null} testID="esim-outcome" /></> : null}
       {e.status === 'ordering' ? <Box testID="esim-ordering"><Row><ActivityIndicator color={colors.green} /><Small>{t('es.ordering')}</Small></Row></Box> : null}
       {e.status === 'stuck' ? <Box tone="cream" testID="esim-stuck"><Small>{e.readyBy ? t('es.sorting', { time: timeLabel(e.readyBy, { locale: getLocale() }) }) : t('es.stuck')}</Small></Box> : null}
 

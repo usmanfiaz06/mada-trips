@@ -29,6 +29,7 @@ import { umrahCopy } from './umrah';
 import { nativeCopy } from './native';
 import { esimCopy } from './esim';
 import { guestCopy } from './guest';
+import { askHeardCopy } from './ask-heard';
 
 export const en = {
   // eSIMs through Airalo: the plan for the trip, installing, what's left, top-ups: packages/shared/src/copy/esim.ts
@@ -69,6 +70,8 @@ export const en = {
   ...staysCopy,
   // The now path: a car right now, urgent help, the honest disruption screen: packages/shared/src/copy/now.ts
   ...nowCopy,
+  // Ask understands, flows never re-ask: what was heard, what changed, visa rules first, a car's route: packages/shared/src/copy/ask-heard.ts
+  ...askHeardCopy,
   // How a request ends, and what Mada is doing until it does: packages/shared/src/copy/outcomes.ts
   ...outcomesCopy,
   // No signal, and almost no battery: packages/shared/src/copy/offline.ts

@@ -1,0 +1,71 @@
+/**
+ * Ask understands, and the flows never re-ask (critique 2, #2, #6, #14, #16, #17, #20): what Mada heard in the words,
+ * said back as chips; what a correction changed; the entry rules before a visa form; where a car right now goes and
+ * what it costs; the Umrah lines a pilgrim needs; an eSIM's own reason when it can't be done. Spread into the
+ * catalogue in en.ts, so the copy lint covers every line here.
+ */
+export const askHeardCopy = {
+  // ───────────── what was heard ─────────────
+  'heard.said': 'From what you said',
+  'heard.change': 'Change {what}',
+  'heard.you': 'You',
+  'heard.earlier': 'Earlier: {what}',
+  'heard.earlier.show': 'Show',
+  'heard.earlier.hide': 'Hide',
+  'heard.matching': 'Matching seats and meals',
+  // ───────────── what a correction changed ─────────────
+  'heard.now.party.one': 'Now 1 person: {parts}.',
+  'heard.now.party.other': 'Now {count} people: {parts}.',
+  'heard.adults.one': '1 adult',
+  'heard.adults.other': '{count} adults',
+  'heard.children.one': '1 child',
+  'heard.children.other': '{count} children',
+  'heard.childrenAged.one': '1 child ({ages})',
+  'heard.childrenAged.other': '{count} children ({ages})',
+  'heard.babies.one': '1 baby on a lap',
+  'heard.babies.other': '{count} babies on laps',
+  'heard.now.people.one': 'Now just 1 person.',
+  'heard.now.people.other': 'Now {count} people.',
+  'heard.now.names': 'Now {names}.',
+  'heard.now.dates': 'Now {dates}.',
+  'heard.now.month': 'Now {month}. Pick the days next.',
+  'heard.now.where': 'Now {city}.',
+  'heard.now.from': 'Now from {city}.',
+  'heard.now.cabin': 'Now {cabin}.',
+  // ───────────── a visa: the entry rules first ─────────────
+  'visa.title.eta': 'A UK ETA, not a visa',
+  'visa.title.none': 'No visa needed for {country}',
+  'visa.title.visa': 'A visa for {country}',
+  'visa.rule.eta': 'Saudi passports need a UK ETA, not a visa: online, GBP 16, about 3 days. No appointment.',
+  'visa.rule.saudiOk': 'Saudi passports: {ok}',
+  'visa.rule.personOk': '{name}: {ok}',
+  'visa.rule.otherPassport': '{names} needs a visa for {country}. Mada checks which one and replies here.',
+  'visa.rule.schengen': 'Saudi passports need a Schengen visa: an appointment at VFS in Riyadh, Jeddah or Khobar, then about 15 days.',
+  'visa.rule.us': 'Saudi passports need a US visit visa (B1/B2): an interview at the embassy in Riyadh or a consulate.',
+  'visa.place.schengen': 'the Schengen area',
+  'visa.place.us': 'the US',
+  'visa.eta.price': 'Mada applies for {names}: {price}.',
+  'visa.eta.priceBoth': 'Mada applies for both, {names}: {price}.',
+  'visa.eta.will': 'Mada fills in each ETA, sends it to you to check, and replies here when it’s granted, usually within 3 days.',
+  'visa.eta.send': 'Ask Mada to apply · {price}',
+  'visa.none.ask': 'Ask Mada anyway',
+  'visa.when.month': 'In {month}',
+  // ───────────── a car right now: where to ─────────────
+  'now.car.to': 'Where to?',
+  'now.car.toPlaceholder': 'A hotel, a place or an address',
+  'now.car.route': 'About {km} km · {min} min · {price}, fixed',
+  'now.car.routeLater': 'The driver says the fare before you get in.',
+  'now.car.dest': 'To',
+  'now.car.toChip': 'To {place}',
+  'now.car.km': '{km} km',
+  // ───────────── Umrah ─────────────
+  'umrah.ihram': 'Wear ihram before you board (miqat in the air).',
+  'umrah.transfer': 'Jeddah airport to Makkah',
+  'umrah.transfer.line': 'A car from the airport to your hotel, about 1h 15m.',
+  'umrah.fly.from': 'From {city}',
+  'umrah.fly.flight': '{airline} {flight} · {from} → {to} · {time}',
+  'umrah.cal.lastTen': 'Shaded: the last ten nights',
+  'dq.umrah.transfer': 'Car, Jeddah airport to Makkah',
+  // ───────────── eSIM ─────────────
+  'es.why.sold_out': 'The network had no eSIM left for this plan.',
+} as const;

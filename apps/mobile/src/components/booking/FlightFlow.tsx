@@ -19,6 +19,7 @@ import { Sheet } from '../Sheet';
 import { SupplierDown } from '../states/SupplierDown';
 import { WaitTrouble } from '../states/WaitTrouble';
 import { SUPPLIER_GIVE_UP_MS, useGiveUp } from '@/lib/net/give-up';
+import { isOffline } from '@/lib/net/state';
 import { T } from '../Text';
 import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
@@ -48,6 +49,21 @@ export type Cta = {
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const ASK_CITIES: [string, string][] = [['Istanbul', 'istanbul'], ['Dubai', 'dubai'], ['Cairo', 'cairo'], ['London', 'london']];
 
+/** The weeks of a month still ahead, Sunday to Saturday as Saudi weeks run, cut to the month: "1–5 Dec", "6–12 Dec"… */
+function monthWeeks(year: number, month: number, today: string): [string, string][] {
+  const first = `${year}-${String(month).padStart(2, '0')}-01`;
+  const last = addDays(`${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, '0')}-01`, -1);
+  const out: [string, string][] = [];
+  let a = first;
+  while (a <= last) {
+    const sat = addDays(a, 6 - new Date(`${a}T00:00:00Z`).getUTCDay());
+    const b = sat < last ? sat : last;
+    if (b > today) out.push([a < today ? addDays(today, 1) : a, b]);
+    a = addDays(b, 1);
+  }
+  return out.filter(([x, y]) => y > x).slice(0, 5);
+}
+
 /* The first search of a flow, built the same way here and in useFlightHeadStart, so a search started early is the one the flow shows. */
 const tripOf = (intent: AskIntent): TripSearch => ({ from: intent.from ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
 const whoOf = (intent: AskIntent, H: Household): string[] => (intent.travellerIds?.length ? intent.travellerIds : H.nonHelper.length ? H.nonHelper.map((p) => p.id) : H.me ? [H.me] : []);
@@ -66,7 +82,7 @@ export function useFlightHeadStart(people: Person[], today: string) {
   const byRequest = useFlightsByRequest();
   const phoneNeeded = usePhoneNeeded();
   return (intent: AskIntent) => {
-    if (byRequest || phoneNeeded || intent.kind !== 'flight' || intent.ask || !people.length) return;
+    if (byRequest || phoneNeeded || intent.kind !== 'flight' || intent.ask || !people.length || isOffline()) return;
     const dest = intent.destination ? DESTINATIONS[intent.destination] : undefined;
     const trip = tripOf(intent);
     if (!dest || dest.byHand || !trip.dep || (trip.type === 'return' && !trip.ret)) return;
@@ -130,7 +146,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const needRet = trip.type === 'return' && !!trip.dep && !trip.ret;
   const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && (whoDone || byRequest);
   const live = ready && !byHand && !!dest && !byRequest && !phoneNeeded;
-  const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), t('search.working.matching', { count: who.length })];
+  // Never "for 0": with nobody loaded yet (offline, or the household still on its way) the line names no count.
+  const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), who.length ? t('search.working.matching', { count: who.length }) : t('heard.matching')];
   const flags = [...demo].sort().join(',');
   const search = useQuery({
     queryKey: flightsKey(dest?.key, trip, who, mode === 'flex', runKey, flags),
@@ -263,14 +280,17 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
     const mo = intent.monthOnly;
     const quick = quickDates(today);
     const inMonth = mo ? quick.filter((q) => Number(q.dates[0].slice(5, 7)) === mo.month) : [];
+    // "December" said: its weeks as the answers (critique 2, #2), not just "I'll pick dates".
+    const weeks = mo && !mo.label ? monthWeeks(mo.year, mo.month, today) : [];
     const opts: [string, string][] = mo
-      ? [...inMonth.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']]
+      ? [...inMonth.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), ...weeks.map((w): [string, string] => [rangeName(w[0], w[1], today), `week:${w[0]}:${w[1]}`]), [t('ask.q.pickDates'), 'pick']]
       : [...quick.map((q): [string, string] => [`${q.name} · ${rangeName(q.dates[0], q.dates[1], today)}`, q.id]), [t('ask.q.pickDates'), 'pick']];
     return (
       <View style={{ gap: 18 }}>
         {whereRow}
         <Ask1 q={mo ? t('ask.q.whenIn', { month: mo.label ?? monthLongName(mo.month - 1) }) : t('ask.q.when')} options={opts} onPick={(v) => {
           if (v === 'pick') { setEditing({ month: mo }); return; }
+          if (v.startsWith('week:')) { const [, a, b] = v.split(':'); setTrip({ ...trip, dep: a!, ret: trip.type === 'oneway' ? null : b! }); return; }
           const q = quick.find((x) => x.id === v)!;
           setTrip({ ...trip, dep: q.dates[0], ret: trip.type === 'oneway' ? null : q.dates[1] });
         }} />

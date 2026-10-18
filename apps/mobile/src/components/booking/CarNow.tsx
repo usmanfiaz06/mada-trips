@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Linking, Platform, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
-import { RIDE_CITIES, formatSar, nameIn, rideCity, tripIsNow, type Ride, type RideWhen } from '@mada/shared';
+import { RIDE_CITIES, formatSar, nameIn, rideCity, rideRouteEstimate, rideSaid, sarToHalalas, tripIsNow, wantsNow, type Ride, type RideWhen } from '@mada/shared';
 import { ridesApi, rideKeys, askMadaForCar, useRide } from '@/lib/rides';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
@@ -15,6 +15,7 @@ import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { T } from '../Text';
 import { ChipWrap, MadaDot, Notice, enter } from './parts';
+import { HeardChips } from './Conversation';
 import { TypingDots } from '../wallet/ui';
 
 /*
@@ -31,26 +32,39 @@ export function CarNow({ query, city: cityHint }: { query: string; city?: string
   const trips = useTrips();
   const nt = nextTrip(trips.data);
   const [opened] = useState(() => Date.now());
+  const ar = getLocale() === 'ar';
   // A trip under way (or leaving within 24 hours): its city and hotel are the likely answers.
   const live = nt && tripIsNow({ startDate: nt.trip.startDate, endDate: nt.trip.endDate ?? nt.trip.startDate }, opened) ? nt : null;
   const hotel = live?.trip.stays[0]?.name ?? null;
-  const said = rideCity(query) ?? (cityHint ? rideCity(cityHint) ?? cityHint : null) ?? cityFromText(query);
-  const [when, setWhen] = useState<RideWhen | null>(/\bin 15|in fifteen|ربع ساعة/i.test(query) ? 'in15' : null);
+  // What the words already say (critique 2, #2 and #17): "right now", the city, the airport, "to Taksim". None of it is
+  // asked again; each shows as a chip, a tap away from changing.
+  const heard = useMemo(() => rideSaid(query), [query]);
+  const said = heard.city ?? rideCity(query) ?? (cityHint ? rideCity(cityHint) ?? cityHint : null) ?? cityFromText(query);
+  const saidWhen: RideWhen | null = /\bin 15|in fifteen|ربع ساعة|ربع ساعه/i.test(query) ? 'in15' : wantsNow(query) ? 'now' : null;
+  const placeName = (p: { name: string; nameAr: string | null } | null) => (p ? (ar && p.nameAr ? p.nameAr : p.name) : null);
+  const saidFrom = placeName(heard.from);
+  const saidTo = heard.to ? placeName(heard.to) : heard.toText;
+  const [when, setWhen] = useState<RideWhen | null>(saidWhen);
   // What was said or picked wins; until then the trip under way (which may load after the first paint) suggests.
   const [picked, setCity] = useState<string | null>(null);
-  const [typed, setPlace] = useState<string | null>(null);
+  const [typed, setPlace] = useState<string | null>(saidFrom);
+  const [dest, setDest] = useState<string>(saidTo ?? '');
+  // Questions shown open: those the words didn't answer, and any chip tapped to change.
+  const [reopened, setReopened] = useState<Set<string>>(() => new Set());
   const city = picked ?? said ?? live?.city ?? null;
   const place = typed ?? (hotel ? t('now.car.hotel', { hotel }) : '');
   const [rideId, setRideId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [key, setKey] = useState(newKey);
   const qc = useQueryClient();
+  const served = city ? rideCity(city) : null;
+  const est = served && dest.trim() ? rideRouteEstimate(served, place, dest, RIDE_CITIES[served]!) : null;
 
   const send = async () => {
     if (!when || !city || place.trim().length < 2) return;
     setBusy(true);
     try {
-      const r = await ridesApi.request({ when, city, meetingPoint: place.trim(), tripId: live?.id ?? null, clientKey: key });
+      const r = await ridesApi.request({ when, city, meetingPoint: place.trim(), destination: dest.trim().length >= 2 ? dest.trim() : null, tripId: live?.id ?? null, clientKey: key });
       qc.setQueryData(rideKeys.ride(r.ride.id), r);
       setRideId(r.ride.id);
       buzz('success');
@@ -62,17 +76,32 @@ export function CarNow({ query, city: cityHint }: { query: string; city?: string
 
   const cityLabel = (c: string) => nameIn(c, getLocale());
   const cities = [...new Set([...(live ? [live.city] : []), ...(city && !CITY_CHOICES.includes(city) ? [city] : []), ...CITY_CHOICES])];
+  const open = (k: string) => reopened.has(k);
+  const reopen = (k: string) => setReopened((x) => new Set(x).add(k));
+  const showWhen = !saidWhen || open('when');
+  const showCity = !!when && (!said || open('city'));
+  const showPlace = !!when && !!city && (!saidFrom || open('place'));
+  const showTo = !!when && !!city && (!saidTo || open('to'));
+  const chips = [
+    ...(saidWhen && !showWhen && when ? [{ label: t(when === 'now' ? 'now.car.now' : 'now.car.in15'), onPress: () => reopen('when'), testID: 'car-heard-when' }] : []),
+    ...(said && !open('city') && city ? [{ label: cityLabel(city), onPress: () => reopen('city'), testID: 'car-heard-city' }] : []),
+    ...(saidFrom && !open('place') ? [{ label: place, onPress: () => reopen('place'), testID: 'car-heard-place' }] : []),
+    ...(saidTo && !open('to') && dest ? [{ label: t('now.car.toChip', { place: dest }), onPress: () => reopen('to'), testID: 'car-heard-to' }] : []),
+  ];
   return (
     <View style={{ gap: 18 }} testID="car-now">
-      <Animated.View entering={enter(0)} style={{ gap: 10 }}>
-        <T v="h2" accessibilityRole="header">{t('now.car.when')}</T>
-        <ChipWrap>
-          {(['now', 'in15'] as const).map((w) => (
-            <Button key={w} size="small" block={false} variant={when === w ? 'primary' : 'secondary'} label={t(w === 'now' ? 'now.car.now' : 'now.car.in15')} onPress={() => setWhen(w)} testID={`car-now-when-${w}`} />
-          ))}
-        </ChipWrap>
-      </Animated.View>
-      {when ? (
+      <HeardChips items={chips} testID="car-heard" />
+      {showWhen ? (
+        <Animated.View entering={enter(0)} style={{ gap: 10 }}>
+          <T v="h2" accessibilityRole="header">{t('now.car.when')}</T>
+          <ChipWrap>
+            {(['now', 'in15'] as const).map((w) => (
+              <Button key={w} size="small" block={false} variant={when === w ? 'primary' : 'secondary'} label={t(w === 'now' ? 'now.car.now' : 'now.car.in15')} onPress={() => setWhen(w)} testID={`car-now-when-${w}`} />
+            ))}
+          </ChipWrap>
+        </Animated.View>
+      ) : null}
+      {showCity ? (
         <Animated.View entering={enter(0)} style={{ gap: 10 }}>
           <T v="h2" accessibilityRole="header">{t('now.car.city')}</T>
           <ChipWrap>
@@ -80,11 +109,28 @@ export function CarNow({ query, city: cityHint }: { query: string; city?: string
           </ChipWrap>
         </Animated.View>
       ) : null}
-      {when && city ? (
+      {showPlace ? (
         <Animated.View entering={enter(0)} style={{ gap: 10 }}>
           <T v="h2" accessibilityRole="header">{t('now.car.where')}</T>
           <TextInput accessibilityLabel={t('now.car.where')} value={place} onChangeText={setPlace} placeholder={t('now.car.wherePlaceholder')} placeholderTextColor={colors.muted}
-            style={[styles.input, font('body', colors.green), webNoOutline]} testID="car-now-place" returnKeyType="done" onSubmitEditing={send} />
+            style={[styles.input, font('body', colors.green), webNoOutline]} testID="car-now-place" returnKeyType="next" />
+        </Animated.View>
+      ) : null}
+      {showTo ? (
+        <Animated.View entering={enter(0)} style={{ gap: 10 }}>
+          <T v="h2" accessibilityRole="header">{t('now.car.to')}</T>
+          <TextInput accessibilityLabel={t('now.car.to')} value={dest} onChangeText={setDest} placeholder={t('now.car.toPlaceholder')} placeholderTextColor={colors.muted}
+            style={[styles.input, font('body', colors.green), webNoOutline]} testID="car-now-to" returnKeyType="done" onSubmitEditing={send} />
+        </Animated.View>
+      ) : null}
+      {when && city ? (
+        <Animated.View entering={enter(0)} style={{ gap: 10 }}>
+          {/* The ride itself, before asking for it: how far, how long, the fixed fare (or that the driver says it). */}
+          {dest.trim() ? (
+            <View style={styles.row}><Icon name="car" size={16} color={colors.goldInk} />
+              <T v="small" color={colors.green} style={{ flex: 1 }} testID="car-now-route">{est ? t('now.car.route', { km: est.km, min: est.min, price: formatSar(sarToHalalas(est.fareSar)) }) : t('now.car.routeLater')}</T>
+            </View>
+          ) : null}
           <Button label={t('now.car.send')} busy={busy} disabled={place.trim().length < 2} onPress={send} testID="car-now-send" />
         </Animated.View>
       ) : null}
@@ -165,6 +211,7 @@ function DriverCard({ r }: { r: Ride }) {
   const sms = () => Linking.openURL(`sms:${d.phone}${Platform.OS === 'ios' ? '&' : '?'}body=${encodeURIComponent(t('now.car.messageBody', { driver: d.name, place: r.meetingPoint }))}`).catch(() => toast(d.phone));
   const rows: [string, string, string][] = [
     [t('now.car.car'), d.car, 'ride-car'], [t('now.car.plate'), d.plate, 'ride-plate'], [t('now.car.meet'), r.meetingPoint, 'ride-meet'],
+    ...(r.destination ? [[t('now.car.dest'), r.km ? `${r.destination} · ${t('now.car.km', { km: r.km })}` : r.destination, 'ride-dest'] as [string, string, string]] : []),
     ...(r.price ? [[t('now.car.price'), formatSar(r.price.amount), 'ride-price'] as [string, string, string]] : []),
   ];
   return (

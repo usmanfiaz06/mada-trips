@@ -4,9 +4,12 @@
  * who, when or where on the answer in hand instead of starting over. Text that looks like a change but says nothing
  * the layer can read comes back "unclear", and the app asks which thing to change. Pure functions, no I/O.
  */
-import { addDays, daysBetween } from '../dates';
-import { DESTINATIONS } from './booking-data';
-import { parseDetails, parseKind, parseWho, weekendDates } from './booking-logic';
+import { t, tn, nameIn, type CopyKey } from '../copy';
+import { addDays, daysBetween, monthLongName, rangeLabel } from '../dates';
+import type { Lang } from '../locale';
+import { AIRPORT_NAMES, DESTINATIONS } from './booking-data';
+import { PERMIT_SAID, parseDetails, parseKind, parseWho, personName, weekendDates } from './booking-logic';
+import { commaList, listOf } from './booking-words';
 import { matchParty, normalizeAsk, parseParty, type SaidParty } from './party';
 import { esimDaysIn, findEsimPlace } from './esim-places';
 import { arabicForRules } from './ask-arabic';
@@ -21,7 +24,7 @@ const AR_PLACES: [RegExp, string][] = [
   [/العلا/, 'alula'], [/ابها/, 'abha'], [/تبليسي|جورجيا/, 'tbilisi'], [/باريس|فرنسا/, 'paris'], [/بالي/, 'bali'], [/المالديف/, 'maldives'],
 ];
 const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'ابريل', 'مايو', 'يونيو', 'يوليو', 'اغسطس', 'سبتمبر', 'اكتوبر', 'نوفمبر', 'ديسمبر'];
-const PERMIT = /\b(?:i|we)(?:'ve| have| got|'ve got| already have| already got)\s+(?:a |an |the |our |my )?(?:permits?|visas?|nusuk|eta)\b|\balready (?:have|got) (?:a |the |our )?(?:permits?|visas?)\b|\b(?:permits?|visas?) (?:is |are )?(?:done|sorted|ready)\b|(?:عندي|عندنا|معي|معنا) (?:ال)?(?:تصريح|تصاريح|فيزا|تاشير[هة])|(?:التصريح|الفيزا|التاشير[هة]) (?:جاهز|جاهز[هة]|طالع|طالع[هة])|طلعت التصريح|طلعنا التصريح/;
+const PERMIT = PERMIT_SAID;
 const TODAY_WORDS = /\b(?:right now|leave now|go now|asap|as soon as possible|immediately)\b|^\s*now\s*$|الحين|الان|حالا|اليوم|الليل[هة]/;
 const FIX_WORDS = /\b(?:change|actually|instead|wrong|not|no|fix|update|make it)\b|غير|غيّر|بدل|عدل|عدّل|لا |مو /;
 
@@ -158,4 +161,42 @@ export function permitAnswers(intent: Pick<AskIntent, 'answers'>, travellerIds: 
   const c = destination ? DESTINATIONS[destination]?.country : null;
   if (!intent.answers.permit?.length || !c) return {};
   return Object.fromEntries(travellerIds.flatMap((id) => [[`${id}:${c}:visa`, 'has'], [`${id}:reentry`, 'has']]));
+}
+
+/**
+ * What a correction changed, said back in one line under it ("Now 5 people: 2 adults, 3 children (2, 6, 13).",
+ * "Now 1–7 Dec.", "Now from Jeddah."), so a change never passes in silence. Null when nothing it can name changed.
+ */
+export function correctionLine(prev: Pick<AskIntent, 'destination' | 'from'>, c: { intent: AskIntent; changed: CorrectionField[] }, ctx: { people: Person[]; selfName?: string; locale?: Lang }): string | null {
+  const l = ctx.locale;
+  const i = c.intent;
+  const out: string[] = [];
+  if (c.changed.includes('who')) {
+    const p = i.party;
+    if (p && (p.adults != null || p.childAges.length || p.infants)) {
+      const ages = p.childAges.filter((x): x is number => x != null);
+      const parts = [
+        p.adults != null ? tn('heard.adults', p.adults, {}, l) : '',
+        p.childAges.length ? (ages.length ? tn('heard.childrenAged', p.childAges.length, { ages: commaList(ages.map(String), l) }, l) : tn('heard.children', p.childAges.length, {}, l)) : '',
+        p.infants ? tn('heard.babies', p.infants, {}, l) : '',
+      ].filter(Boolean);
+      const total = (p.adults ?? 0) + p.childAges.length + p.infants || p.total || 0;
+      out.push(tn('heard.now.party', total, { parts: commaList(parts, l) }, l));
+    } else if (i.travellerIds?.length) {
+      const names = i.travellerIds.map((id) => ctx.people.find((x) => x.id === id)).filter((x): x is Person => !!x).map((x) => personName(x, ctx.selfName));
+      out.push(names.length === i.travellerIds.length ? t('heard.now.names', { names: listOf(names, l) }, l) : tn('heard.now.people', i.travellerIds.length, {}, l));
+    } else if (i.travellerCount || p?.total) out.push(tn('heard.now.people', i.travellerCount ?? p!.total!, {}, l));
+  }
+  if (c.changed.includes('when')) {
+    if (i.depart) out.push(t('heard.now.dates', { dates: rangeLabel(i.depart, i.tripType === 'oneway' ? null : i.return, l) }, l));
+    else if (i.monthOnly) out.push(t('heard.now.month', { month: i.monthOnly.label === 'Ramadan' ? t('opt.ramadan', undefined, l) : monthLongName(i.monthOnly.month - 1, l) }, l));
+  }
+  if (c.changed.includes('where')) {
+    const city = i.destination && DESTINATIONS[i.destination] ? DESTINATIONS[i.destination]!.name : i.destinationName;
+    if (city && i.destination !== prev.destination) out.push(t('heard.now.where', { city: nameIn(city, l ?? 'en') }, l));
+    if (i.from && i.from !== prev.from) out.push(t('heard.now.from', { city: nameIn(AIRPORT_NAMES[i.from] ?? i.from, l ?? 'en') }, l));
+  }
+  if (c.changed.includes('cabin') && i.cabin) out.push(t('heard.now.cabin', { cabin: t(`cal.cabin.${i.cabin === 'first' ? 'business' : i.cabin}` as CopyKey, undefined, l) }, l));
+  if (c.changed.includes('permit')) out.push(t('fix.permit', undefined, l));
+  return out.length ? out.join(' ') : null;
 }

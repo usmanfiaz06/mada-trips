@@ -81,23 +81,35 @@ async function run(lang) {
   if (lang === 'ar') {
     step('ar: a car now, the opening');
     await go(`/ask?prefill=${encodeURIComponent('أبي سيارة الحين')}`);
-    await see('متى تبيها؟', 'when');
-    await see('بعد ربع ساعة', 'in 15');
+    // «الحين» is the answer to "when": a chip from what was said, never the question (critique 2, #2).
+    await see('من كلامك', 'heard chips');
+    await never('متى تبيها؟', 'when not asked again');
     await never('بكرة', 'no tomorrow');
+    await see('بأي مدينة؟', 'city still asked');
     await shot('car-now');
     await go(`/ask?prefill=${encodeURIComponent('تاكسي الحين في أبها')}`);
-    await see('متى تبيها؟', 'taxi now in Abha is a car');
+    await see('أبها', 'taxi now in Abha is a car, Abha heard');
+    await never('متى تبيها؟', 'when not asked');
     await shot('taxi-now-ar');
+    step('ar: landed at Istanbul airport, a car now to Taksim (critique 2, #17)');
+    await go(`/ask?prefill=${encodeURIComponent('وصلت مطار إسطنبول أبغى سيارة الحين لتقسيم')}`);
+    await see('مطار إسطنبول', 'meeting point from the words');
+    await see('إلى تقسيم', 'destination from the words');
+    await see('كم', 'distance shown');
+    await never('متى تبيها؟', 'when not asked');
+    await never('بأي مدينة؟', 'city not asked');
+    await shot('car-now-taksim-ar');
     await context.close();
     return;
   }
 
   step('car now: never tomorrow');
   await go(`/ask?prefill=${encodeURIComponent('I need a car now')}`);
-  await see('When should it come?', 'when');
+  // "now" answers when: a chip, never the question again (critique 2, #2).
+  await see('From what you said', 'heard chips');
+  await never('When should it come?', 'when not asked again');
   await never('Tomorrow', 'no tomorrow');
   await shot('car-now-when');
-  await byTest('car-now-when-now').click();
   await byTest('car-now-city-Riyadh').click();
   await byTest('car-now-place').fill('Rosewood lobby');
   await shot('car-now-where');
@@ -119,9 +131,9 @@ async function run(lang) {
   step('car now: "Get me a taxi now in Abha" is a car now, not a flight; none free');
   await home();
   await go(`/ask?prefill=${encodeURIComponent('Get me a taxi now in Abha')}`);
-  await see('When should it come?', 'taxi now is a car');
+  await see('Where should the driver meet you?', 'taxi now is a car');
+  await never('When should it come?', 'when not asked again');
   await never('Checking flights', 'not a flight search');
-  await byTest('car-now-when-now').click();
   await byTest('car-now-place').fill('Abha airport');
   await byTest('car-now-send').click();
   await see('No car is free near you right now.', 'no car', 15000);
@@ -130,6 +142,27 @@ async function run(lang) {
   await byTest('ride-ask-mada').click();
   await see('Mada has it. We call you by', 'call-back promise');
   await shot('car-now-asked');
+
+  step('car now: landed at Istanbul airport, to Taksim, nothing asked twice (critique 2, #2, #17)');
+  await home();
+  await go(`/ask?prefill=${encodeURIComponent('I just landed at Istanbul airport, I need a car right now to Taksim')}`);
+  await see('Istanbul Airport', 'meeting point from the words');
+  await see('To Taksim', 'destination from the words');
+  await see(' km · ', 'distance and time');
+  await never('When should it come?', 'when not asked');
+  await never('Which city?', 'city not asked');
+  await never('Where should the driver meet you?', 'meeting point not asked');
+  await shot('car-now-taksim');
+  await byTest('car-heard-to').click();
+  await see('Where to?', 'a chip opens its question');
+  await byTest('car-now-send').click();
+  await see('is on the way', 'driver assigned to Taksim', 15000);
+  await see('Taksim', 'destination on the driver card');
+  if (!(await page.locator('[data-testid="ride-dest"]').count())) errors.push('car now: destination row missing');
+  await never('SAR 44', 'the fare is for this ride, not the city minimum');
+  await shot('car-now-taksim-assigned');
+  await byTest('ride-cancel').click();
+  await see('Car cancelled. Nothing to pay.', 'cancelled');
 
   step('urgent on travel day: the disruption card, a call-back, no 997');
   await home();

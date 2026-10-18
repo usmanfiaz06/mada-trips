@@ -46,6 +46,7 @@ const COPY = {
     install: 'Install it now. It switches on when you land.', ios: 'Install on this iPhone', qr: 'Scan this with the phone it’s for.', codes: 'Activation code',
     land: 'When you land', installedToast: 'Installed. It switches on when you land.', left: 'left of', topupTitle: 'More GB for Türkiye', topLine: 'Top up ·', topupToast: 'The GB are on your eSIM.',
     trouble: 'Let’s get you online', talk: 'Talk to Mada', refunded: 'This eSIM didn’t come through.', ready: 'Ready to install',
+    why: 'The network had no eSIM left for this plan.', hotelWhy: 'Nothing was left for those dates',
     idea: 'Internet abroad', which: 'Which trip?', covers: 'Covers your 7 days', wallet: 'eSIMs', walletRow: 'Internet in Türkiye', ask2: 'data for Istanbul',
     ask3: 'Need an esim', where: 'Where to?', lahore: 'Lahore', pk: 'Pakistan', pkTitle: 'Internet in Pakistan, on when you land.', pkPay: 'An eSIM for Pakistan',
   },
@@ -55,6 +56,7 @@ const COPY = {
     install: 'نزّلها الحين، وتشتغل لما تهبط.', ios: 'نزّلها على هذا الآيفون', qr: 'صوّر هذا بالجوال اللي بتركبها فيه.', codes: 'رمز التفعيل',
     land: 'لما تهبط', installedToast: 'تمام. تشتغل لما تهبط.', left: 'باقي', topupTitle: 'جيجات زيادة لـ تركيا', topLine: 'شحن ·', topupToast: 'الجيجات صارت على شريحتك.',
     trouble: 'خلّنا نوصلك بالنت', talk: 'كلّم مادا', refunded: 'هذي الشريحة ما وصلت.', ready: 'جاهزة تنزّلها',
+    why: 'الشبكة ما عندها شريحة باقية لهذي الباقة.', hotelWhy: 'بهالتواريخ',
     idea: 'إنترنت برّا', which: 'لأي رحلة؟', covers: 'تغطي أيامك الـ7', wallet: 'شرائح النت', walletRow: 'النت في تركيا', ask2: 'نت لإسطنبول',
     ask3: 'أبي شريحة', where: 'وين رايح؟', lahore: 'لاهور', pk: 'باكستان', pkTitle: 'نت في باكستان، يشتغل أول ما تهبط.', pkPay: 'شريحة eSIM لـ باكستان',
   },
@@ -241,6 +243,12 @@ async function run(lang) {
   await page.waitForTimeout(800);
   await slide();
   await see(c.refunded, 'refunded', 15000);
+  // An eSIM's own reason, never hotel words; the headline on one or two lines, not a word a line (critique 2, #20).
+  await see(c.why, 'eSIM reason');
+  if (await page.getByText(c.hotelWhy, { exact: false }).locator('visible=true').count()) errors.push(`${lang} eSIM refusal: hotel wording "${c.hotelWhy}"`);
+  const head = page.locator('[data-testid^="esim-outcome-"] [role="heading"]').locator('visible=true').first();
+  const hb = await head.boundingBox().catch(() => null);
+  if (!hb || hb.height > 90 || hb.width < 120) errors.push(`${lang} eSIM refusal headline wraps (${hb ? `${Math.round(hb.width)}×${Math.round(hb.height)}` : 'missing'})`);
   await shot('refunded');
   await context.close();
 }

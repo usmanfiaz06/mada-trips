@@ -9,10 +9,10 @@ import { arabicForRules } from './ask-arabic';
 import { carNowAsk } from './now-path';
 import { umrahDeskQuote, umrahSummary } from './umrah';
 import { commaList, wordFor } from './booking-words';
-import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, shortDay, timeLabel } from '../dates';
+import { addDays, dayLabel, daysBetween, dayOfMonth, isIsoDay, monthOf, MONTHS, MONTHS_LONG, shortDay, timeLabel } from '../dates';
 import { formatSar, sarToHalalas } from '../money';
 import type { Person } from './people';
-import { matchParty, parseParty, type SaidParty } from './party';
+import { matchParty, normalizeAsk, parseParty, type SaidParty } from './party';
 import type { Cabin } from './trips';
 import type { AskIntent } from './booking';
 import {
@@ -172,6 +172,27 @@ export function parseWho(text: string, people: Person[], today: string): ParsedW
   return { ids, count: n, infants, party };
 }
 
+const WEEK_NTH: Record<string, number> = { first: 0, '1st': 0, second: 1, '2nd': 1, third: 2, '3rd': 2, fourth: 3, '4th': 3 };
+
+/** Seven days from a week said in words: "the first week of December" (1–7 Dec), "the last week of May", "next week" (Sunday to Saturday). */
+export function weekRange(s: string, today: string): [string, string] | null {
+  const m = s.match(new RegExp(`\\b(first|1st|second|2nd|third|3rd|fourth|4th|last) week (?:of|in) (${MRE})\\b`));
+  if (m) {
+    const m0 = mIdx(m[2]!);
+    const first = upcoming(today, 1, m0) ?? today;
+    const y = Number(first.slice(0, 4));
+    const daysIn = new Date(Date.UTC(y, m0 + 1, 0)).getUTCDate();
+    let start = m[1] === 'last' ? ymd(y, m0, daysIn - 6) : addDays(first, (WEEK_NTH[m[1]!] ?? 0) * 7);
+    // The week has already started this month: from today.
+    if (start < today) start = today;
+    return [start, addDays(start, 6) < start ? start : addDays(start, 6)];
+  }
+  // A Saudi week runs Sunday to Saturday.
+  if (/\bnext week\b/.test(s)) { const sun = addDays(today, ((7 - weekdayIdx(today)) % 7) || 7); return [sun, addDays(sun, 6)]; }
+  if (/\bthis week\b/.test(s)) { const sat = addDays(today, 6 - weekdayIdx(today)); return [today, sat > today ? sat : addDays(today, 1)]; }
+  return null;
+}
+
 export type ParsedDetails = {
   destination: string | null; destinationName: string | null; from: HomeAirportCode | null; depart: string | null; return: string | null;
   tripType: 'return' | 'oneway' | null; monthOnly: { month: number; year: number; label: string | null } | null; cabin: Cabin | null; cabinNote: string | null;
@@ -204,6 +225,11 @@ export function parseDetails(text: string, today: string): ParsedDetails {
     if (ds[1] && dep) { ret = ds[1]; if (ret <= dep) ret = ymd(Number(ret.slice(0, 4)) + 1, Number(ret.slice(5, 7)) - 1, Number(ret.slice(8, 10))); }
   }
   if (!dep) {
+    // A week said as a week ("the first week of December", "next week", «الأسبوع الجاي»): the seven days, to change if need be.
+    const wk = weekRange(s, today);
+    if (wk) [dep, ret] = wk;
+  }
+  if (!dep) {
     if (/next weekend/.test(s)) [dep, ret] = weekendDates(today, 1);
     else if (/this weekend|the weekend|\bweekend\b/.test(s)) [dep, ret] = weekendDates(today, 0);
     else if (/eid al[- ]?adha|\badha\b/.test(s)) { dep = '2027-05-15'; ret = '2027-05-20'; }
@@ -217,6 +243,7 @@ export function parseDetails(text: string, today: string): ParsedDetails {
     const thisMonth0 = Number(today.slice(5, 7)) - 1;
     const y = Number(today.slice(0, 4));
     if (mo) { const mi = mIdx(mo[1]!); out.monthOnly = { month: mi + 1, year: mi < thisMonth0 ? y + 1 : y, label: null }; }
+    else if (/\bnext month\b/.test(s)) { const mi = (thisMonth0 + 1) % 12; out.monthOnly = { month: mi + 1, year: mi < thisMonth0 ? y + 1 : y, label: null }; }
     else if (/ramadan/.test(s)) out.monthOnly = { month: 2, year: 2027, label: 'Ramadan' };
     else if (/summer/.test(s)) out.monthOnly = { month: 7, year: 2027, label: 'the summer' };
   }
@@ -297,6 +324,15 @@ export function prefillAnswers(kind: string, text: string): Record<string, strin
 
 export type RuleIntent = ParsedDetails & ParsedWho & { kind: AskKindValue; needs: Record<string, NeedKey[]>; needsMentioned: NeedKey[]; answers: Record<string, string[]>; ask: 'where' | 'when' | 'return' | 'who' | null };
 
+/** "I have a Nusuk permit", «عندي تصريح»: the permit (or visa) is in hand, so nobody asks for it again. */
+export const PERMIT_SAID = /\b(?:i|we)(?:'ve| have| got|'ve got| already have| already got)\s+(?:a |an |the |our |my )?(?:nusuk )?(?:permits?|visas?|nusuk|eta)\b|\balready (?:have|got) (?:a |the |our )?(?:nusuk )?(?:permits?|visas?)\b|\b(?:permits?|visas?) (?:is |are )?(?:done|sorted|ready|booked)\b|\bwith (?:a |my |our )?(?:nusuk )?permits?\b|(?:عندي|عندنا|معي|معنا|طلعت|طلعنا|حجزت|حجزنا) (?:ال)?(?:تصريح|تصاريح|فيزا|تاشير[هة])|(?:التصريح|الفيزا|التاشير[هة]) (?:جاهز|جاهز[هة]|طالع|طالع[هة])|طلعت التصريح|طلعنا التصريح/;
+
+/** A month said for a request that asks when ("a UK visa in December", "next month"): the month's English name, stored as the answer. */
+function monthAnswer(d: ParsedDetails): string | null {
+  if (d.monthOnly && !d.monthOnly.label) return MONTHS_LONG[d.monthOnly.month - 1] ?? null;
+  return null;
+}
+
 /** The deterministic parser: the whole of what Ask understands in mock mode. */
 export function parseAskRules(typed: string, ctx: { today: string; people: Person[] }): RuleIntent {
   // Arabic is read by the same rules: the words they need are put in English first (ask-arabic.ts).
@@ -313,7 +349,12 @@ export function parseAskRules(typed: string, ctx: { today: string; people: Perso
     else if (d.tripType !== 'oneway' && !d.return) ask = 'return';
     else if (!w.ids && (H.nonHelper.length > 1 || w.party)) ask = 'who';
   }
-  return { kind, ...d, ...w, needs: needsByPerson(text, ctx.people), needsMentioned: needsIn(text.toLowerCase()), answers: prefillAnswers(kind, text), ask };
+  const answers = prefillAnswers(kind, text);
+  // Said in the sentence, never asked again: the permit in hand, the month of a visa trip.
+  if (PERMIT_SAID.test(normalizeAsk(typed)) || PERMIT_SAID.test(text.toLowerCase())) answers.permit = ['has'];
+  const month = monthAnswer(d);
+  if (kind === 'visa' && !answers.when && (month || d.depart)) answers.when = [month ?? MONTHS_LONG[Number(d.depart!.slice(5, 7)) - 1]!];
+  return { kind, ...d, ...w, needs: needsByPerson(text, ctx.people), needsMentioned: needsIn(text.toLowerCase()), answers, ask };
 }
 
 /** The rules' reading as the intent the app receives (POST /ask/parse in mock mode, and offline in the app). */

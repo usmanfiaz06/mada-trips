@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, carNowAsk, listOf, wordFor, formatSar, householdOf, nameIn, personName, todayIn,
+  NEED_KEYS, NEED_LABELS, REQUEST_FORMS, carNowAsk, listOf, wordFor, formatSar, householdOf, nameIn, personName, sarToHalalas, todayIn, visaAdvice, visaPlaceOf,
   type AskIntent, type BookingRequestView, type CopyKey, type NeedKey, type Person, type RequestFormKind,
 } from '@mada/shared';
 import { bookingApi, bookingKeys, sendRequest, useBookingRequest, usePayDraft, useThread } from '@/lib/booking';
@@ -25,12 +25,15 @@ import { PartyStep } from './Party';
 import { TravellerPassports } from '../passport/TravellerPassports';
 import { AttachmentChip } from './Attachment';
 import { FlightFares } from './FlightRequest';
-import { Answered, ThreadBubble, TypingDots, clock } from './Conversation';
+import { Answered, HeardChips, ThreadBubble, TypingDots, clock } from './Conversation';
 import { PhoneSheet, usePhoneNeeded } from './PhoneSheet';
 import { CarNow } from './CarNow';
 import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
 
 /* Requests a person at Mada completes: one question at a time, per-person needs, a note, then the quote and the thread. */
+
+/** A guest with no household yet: the entry rules read as for one Saudi passport (the app's default nationality). */
+const GUEST_SELF: Person = { id: 'guest-self', isSelf: true, givenNames: '', surname: '', firstName: '', relation: 'self', dateOfBirth: null, sex: null, nationality: null, passport: null, createdAt: '2026-01-01T00:00:00Z' } as Person;
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const PROMPT_KEYS = ['ask.prompt.flight', 'ask.prompt.stay', 'ask.prompt.visa', 'ask.prompt.umrah', 'ask.prompt.car', 'ask.prompt.food', 'ask.prompt.todo', 'ask.prompt.esim'] as const;
@@ -87,8 +90,16 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
   const unassigned = (intent?.needsMentioned ?? []).filter((k) => !assigned.has(k));
   const nameOf = (id: string) => personName(people.find((p) => p.id === id), selfName);
   const answer = (k: string, v: string[] | true) => { setAnswers((a) => ({ ...a, [k]: v })); setEditing(null); };
-  // Only questions that were asked show as answered; one answered by the words typed isn't asked at all.
-  const [asked] = useState(() => new Set(form.filter((f) => !answers[f.k]).map((f) => f.k)));
+  // Only questions that were asked show as answered; one answered by the words typed isn't asked at all: it shows as a
+  // chip under "From what you said", a tap away from changing (critique 2, #2).
+  const [asked, setAsked] = useState(() => new Set(form.filter((f) => !answers[f.k]).map((f) => f.k)));
+  const reopen = (k: string) => { setAsked((a) => new Set(a).add(k)); setEditing(k); };
+  // A visa: the entry rules for these passports first (critique 2, #6). A Saudi passport to the UK needs an ETA, not a
+  // visa: online, GBP 16, about 3 days; Mada applies for it, and nobody is promised an appointment.
+  const travellers = who.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
+  const advice = kind === 'visa' ? visaAdvice(visaPlaceOf((answers.where as string[] | undefined)?.[0], query), travellers.length ? travellers : [GUEST_SELF], getLocale()) : null;
+  const [anyway, setAnyway] = useState(false);
+  const eta = advice?.kind === 'eta';
 
   const send = async () => {
     // Writing to Mada is an account action: asked here, and the request is still here after signing in.
@@ -98,7 +109,8 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
       const plain: Record<string, string[]> = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === true ? ['yes'] : v]));
       // "A table for 2" from someone whose household has only them: the party is 2, not who's in the profile.
       if (intent?.travellerCount && intent.travellerCount > who.length) plain.party = [String(intent.travellerCount)];
-      const r = await sendRequest({ kind: kind as never, query, answers: plain, travellerIds: who, needs, note: note.trim(), search: search ?? null });
+      const r = await sendRequest({ kind: kind as never, query, answers: plain, travellerIds: who, needs, note: note.trim(), search: search ?? null,
+        ...(eta ? { service: 'uk_eta' as const, serviceFor: { personId: null, need: 'UK ETA', destination: 'london' } } : null) });
       buzz('success');
       setSent({ id: r?.id ?? null });
       onSent?.(r?.id ?? null);
@@ -125,7 +137,18 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
       {sysNote ? <Notice icon="doc"><T v="small">{sysNote}</T></Notice> : null}
       {answers.permit ? <Notice icon="check"><T v="small" testID="request-permit">{t('fix.permit')}</T></Notice>
         : kind === 'umrah' ? <Notice icon="umrah" warn><T v="small">{t('request.umrahNusuk')}</T></Notice> : null}
-      {form.map((f, i) => {
+      <HeardChips testID="request-heard" items={form.filter((f) => !asked.has(f.k) && !isOpen(f.k, f)).map((f) => ({ label: answeredText(f), onPress: () => reopen(f.k), testID: `heard-${f.k}` }))} />
+      {advice ? (
+        <Animated.View entering={enter(0)} testID={`visa-advice-${advice.kind}`}>
+          <Card variant={advice.kind === 'none' ? 'well' : 'default'} style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Icon name={advice.kind === 'none' ? 'check' : 'visa'} size={18} color={advice.kind === 'none' ? colors.ok : colors.green} /><T v="h3" style={{ flex: 1 }}>{advice.title}</T></View>
+            {advice.lines.map((x) => <T key={x} v="small" color={colors.green}>{x}</T>)}
+            {advice.priceLine ? <T v="small" style={{ fontFamily: ff.ui600 }} color={colors.green} testID="visa-advice-price">{advice.priceLine}</T> : null}
+            {advice.kind === 'none' && !anyway ? <Button size="small" variant="secondary" block={false} style={{ alignSelf: 'flex-start' }} label={t('visa.none.ask')} onPress={() => setAnyway(true)} testID="visa-advice-anyway" /> : null}
+          </Card>
+        </Animated.View>
+      ) : null}
+      {advice?.kind === 'none' && !anyway ? null : form.map((f, i) => {
         if (i > (done ? form.length : firstOpen)) return null;
         if (!isOpen(f.k, f)) return asked.has(f.k) ? <Answered key={f.k} q={t(f.q as CopyKey)} a={answeredText(f)} onChange={() => setEditing(f.k)} testID={`answered-${f.k}`} /> : null;
         return (
@@ -162,7 +185,7 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
           </Animated.View>
         );
       })}
-      {done ? (
+      {done && (advice?.kind !== 'none' || anyway) ? (
         <Animated.View entering={enter(0)} style={{ gap: 10 }}>
           {form.length ? (
             <View style={{ gap: 6 }}>
@@ -173,9 +196,9 @@ function RequestForm({ kind, query, intent, people, selfName, sysNote, autoSend,
           ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <MadaDot size={28} />
-            <T v="small" style={{ flex: 1 }}>{kind === 'visa' ? t('request.willVisa') : t('request.willPrice')}</T>
+            <T v="small" style={{ flex: 1 }}>{eta ? t('visa.eta.will') : kind === 'visa' ? t('request.willVisa') : t('request.willPrice')}</T>
           </View>
-          <Button label={t('request.send')} busy={busy} onPress={send} testID="request-send" />
+          <Button label={eta && advice ? t('visa.eta.send', { price: formatSar(sarToHalalas(advice.priceSar)) }) : t('request.send')} busy={busy} onPress={send} testID="request-send" />
         </Animated.View>
       ) : null}
     </View>
@@ -318,7 +341,8 @@ export function requestSuggestions(r: BookingRequestView): string[] {
   if (r.quote?.flight) return [t('beta.fq.another'), t('beta.fq.checkAgain')];
   if (r.kind === 'umrah') return [t('request.suggest.closer'), t('request.suggest.later')];
   if (r.kind === 'flight') return [t('request.suggest.laterFlight'), t('request.suggest.less')];
-  if (r.kind === 'visa') return [t('ask.suggest.earlierAppt')];
+  // An ETA has no appointment to bring forward.
+  if (r.kind === 'visa') return /\bETA\b/.test(r.title) ? [] : [t('ask.suggest.earlierAppt')];
   if (r.kind === 'car') return [t('ask.suggest.biggerCar'), t('ask.suggest.childSeat')];
   if (r.kind === 'food') return [t('ask.suggest.later'), t('ask.suggest.view')];
   if (r.kind === 'stay') return [t('ask.suggest.cheaperStay'), t('ask.suggest.breakfast')];

@@ -31,7 +31,7 @@ export default function EsimsScreen() {
       {q.isPending ? <View style={{ paddingTop: 30 }}><ActivityIndicator color={colors.green} /></View> : null}
       {!q.isPending && !list.length ? <EmptyState art={<ArtSuitcase />} title={t('es.list.empty')} body="" /> : null}
       {list.some((e) => e.status === 'ready') ? <Rise step={1}><Small style={{ marginTop: -8 }}>{t('es.ins.title')}</Small></Rise> : null}
-      {refunded?.result ? <><Box tone="cream"><H3>{t('es.refunded.title')}</H3></Box><OutcomeCard result={refunded.result} tripId={refunded.tripId} testID="esim-outcome" /></> : null}
+      {refunded?.result ? <><Box tone="cream"><H3>{t('es.refunded.title')}</H3></Box><OutcomeCard result={refunded.result} tripId={refunded.tripId} why={refunded.result.reason === 'sold_out' ? t('es.why.sold_out') : null} testID="esim-outcome" /></> : null}
       {live.length > 1 ? (
         <>
           <Rise step={2}><EsimSummary e={live[0]!} who={t('es.count', { count: live.length })} /></Rise>

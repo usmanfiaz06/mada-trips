@@ -55,8 +55,8 @@ export async function requestRide(ownerId: string, input: RideInput, ipHash: str
   const id = crypto.randomUUID();
   const supplier = ridesMode() === "mock" ? "mock" : "none";
   const ride: StoredRide = {
-    id, when: b.when, city: b.city, meetingPoint: b.meetingPoint, tripId, requestedAt: new Date().toISOString(), cancelledAt: null, supplier,
-    match: supplier === "mock" ? mockRideMatch(id, b.city) : null,
+    id, when: b.when, city: b.city, meetingPoint: b.meetingPoint, destination: b.destination ?? null, tripId, requestedAt: new Date().toISOString(), cancelledAt: null, supplier,
+    match: supplier === "mock" ? mockRideMatch(id, b.city, b) : null,
   };
   const details: RideDetails = { source: "ride", ride, clientKey: b.clientKey };
   const row = await db.transaction(async (tx) => {

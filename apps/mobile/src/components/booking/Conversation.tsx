@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { localizeDigits } from '@mada/shared';
@@ -83,6 +83,59 @@ export function SummaryChips({ items }: { items: { label: string; onPress: () =>
   );
 }
 
+/**
+ * What Mada heard in the words, filled in before anything is asked: one chip per value ("UK", "December", "You and
+ * Hessa"). A tap opens that question again; nothing already said is asked a second time.
+ */
+export function HeardChips({ items, testID = 'heard' }: { items: { label: string; onPress?: () => void; testID?: string }[]; testID?: string }) {
+  if (!items.length) return null;
+  return (
+    <Animated.View entering={enter(0)} style={{ gap: 6 }} testID={testID}>
+      <T v="eyebrow">{t('heard.said')}</T>
+      <View style={styles.chips}>
+        {items.map((it) => (
+          <Pressable key={it.label} accessibilityRole="button" accessibilityLabel={t('heard.change', { what: it.label })} disabled={!it.onPress}
+            onPress={() => { buzz('select'); it.onPress?.(); }} style={({ pressed }) => [styles.chip, pressed ? { opacity: 0.6 } : null]} testID={it.testID}>
+            <Icon name="check" size={14} color={colors.ok} width={2.4} />
+            <T style={[font('small', colors.green), { flexShrink: 1 }]} numberOfLines={1}>{it.label}</T>
+            {it.onPress ? <Icon name="edit" size={13} color={colors.ink3} /> : null}
+          </Pressable>
+        ))}
+      </View>
+    </Animated.View>
+  );
+}
+
+/** One line from Mada under what was just said ("Now 5 people: 2 adults, 3 children (2, 6, 13)."). */
+export function MadaLine({ text, testID }: { text: string; testID?: string }) {
+  return (
+    <Animated.View entering={enter(0)} testID={testID}>
+      <MadaSays small><T v="small" color={colors.green} accessibilityLiveRegion="polite">{text}</T></MadaSays>
+    </Animated.View>
+  );
+}
+
+/** Earlier asks in this chat, folded to one line each above the new one; a tap shows what was said. */
+export function EarlierAsks({ items }: { items: { query: string; fixes: string[] }[] }) {
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  return (
+    <View style={{ gap: 8 }} testID="ask-earlier">
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => { buzz('select'); setOpen(!open); }} style={styles.earlier} testID="ask-earlier-toggle">
+        <Icon name="list" size={14} color={colors.ink3} />
+        <T v="tiny" style={{ flex: 1 }} numberOfLines={open ? undefined : 1}>{t('heard.earlier', { what: items.map((x) => x.query).join(' · ') })}</T>
+        <T v="tiny" color={colors.green}>{open ? t('heard.earlier.hide') : t('heard.earlier.show')}</T>
+      </Pressable>
+      {open ? items.map((x, i) => (
+        <View key={`${i}-${x.query}`} style={{ gap: 6, opacity: 0.7 }}>
+          <MeBubble text={x.query} />
+          {x.fixes.map((f, j) => <MeBubble key={`${j}-${f}`} text={f} />)}
+        </View>
+      )) : null}
+    </View>
+  );
+}
+
 /** Three dots that breathe while the agent writes. */
 export function TypingDots({ name }: { name: string }) {
   return (
@@ -129,6 +182,7 @@ const styles = StyleSheet.create({
   timeEnd: { paddingHorizontal: 6 },
   says: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  earlier: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14, backgroundColor: 'rgba(30,53,45,0.05)' },
   chip: { height: 38, maxWidth: '100%', borderRadius: 999, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
   theirRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', maxWidth: '88%' },
   mineRow: { alignSelf: 'flex-end' },

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Id, IsoDateTime, Money } from './common';
+import { rideRouteEstimate } from './ride-route';
 
 /*
  * The now path (critique 4 and 10): a car right now, urgent help at any hour, and a disruption screen that tells
@@ -37,6 +38,11 @@ export const Ride = z.object({
   status: RideStatus,
   city: z.string(),
   meetingPoint: z.string(),
+  /** Where to, as typed or filled from the words ("Taksim"); null when not said. */
+  destination: z.string().nullable().optional(),
+  /** By road, and minutes, when both ends are places Mada knows. */
+  km: z.number().nullable().optional(),
+  minutes: z.number().nullable().optional(),
   requestedAt: IsoDateTime,
   /** When the car is at the meeting point (null while requesting, or when none was found). */
   pickupAt: IsoDateTime.nullable(),
@@ -54,6 +60,7 @@ export const RequestRideBody = z.object({
   when: RideWhen,
   city: z.string().trim().min(2).max(60),
   meetingPoint: z.string().trim().min(2).max(160),
+  destination: z.string().trim().min(2).max(160).nullable().optional(),
   tripId: Id.nullable().optional(),
   clientKey: z.string().min(8).max(64),
 });
@@ -87,7 +94,7 @@ const DRIVERS: readonly RideDriver[] = [
 
 /** The stored side of a ride: what was asked and what the supplier said. Status is worked out when read. */
 export type StoredRide = {
-  id: string; when: RideWhen; city: string; meetingPoint: string; tripId: string | null;
+  id: string; when: RideWhen; city: string; meetingPoint: string; destination?: string | null; tripId: string | null;
   requestedAt: string; cancelledAt: string | null; supplier: 'mock' | 'none';
   match: { driver: RideDriver; priceSar: number } | null;
 };
@@ -100,19 +107,25 @@ export function rideCity(name: string): string | null {
   return Object.keys(RIDE_CITIES).find((c) => c.toLowerCase() === s || s.startsWith(c.toLowerCase())) ?? null;
 }
 
-/** The mock supplier: a driver from the ride id (the same id, the same driver), or null where it has no cars. */
-export function mockRideMatch(id: string, city: string): StoredRide['match'] {
+/**
+ * The mock supplier: a driver from the ride id (the same id, the same driver), or null where it has no cars. The fare
+ * is for this ride when both ends are places Mada knows (the meeting point and where to), else the city's minimum.
+ */
+export function mockRideMatch(id: string, city: string, route?: { meetingPoint?: string | null; destination?: string | null }): StoredRide['match'] {
   const served = rideCity(city);
   if (!served) return null;
   let h = 0;
   for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return { driver: DRIVERS[h % DRIVERS.length]!, priceSar: RIDE_CITIES[served]! };
+  const est = route ? rideRouteEstimate(served, route.meetingPoint, route.destination, RIDE_CITIES[served]!) : null;
+  return { driver: DRIVERS[h % DRIVERS.length]!, priceSar: est?.fareSar ?? RIDE_CITIES[served]! };
 }
 
 /** Where a ride stands at `now`: requesting for a few seconds, then a driver (or none), then the car is here. */
 export function rideView(s: StoredRide, now: number): Ride {
   const asked = Date.parse(s.requestedAt);
-  const base = { id: s.id, when: s.when, city: s.city, meetingPoint: s.meetingPoint, requestedAt: s.requestedAt, supplier: s.supplier, tripId: s.tripId };
+  const served = rideCity(s.city);
+  const est = served && s.destination ? rideRouteEstimate(served, s.meetingPoint, s.destination, RIDE_CITIES[served]!) : null;
+  const base = { id: s.id, when: s.when, city: s.city, meetingPoint: s.meetingPoint, destination: s.destination ?? null, km: est?.km ?? null, minutes: est?.min ?? null, requestedAt: s.requestedAt, supplier: s.supplier, tripId: s.tripId };
   const pickupMs = asked + (s.when === 'now' ? RIDE_NOW_MIN : RIDE_LATER_MIN) * 60_000;
   const found = s.supplier === 'mock' && !!s.match && now - asked >= RIDE_MATCH_MS;
   const price = found ? { amount: s.match!.priceSar * 100, currency: 'SAR' as const } : null;

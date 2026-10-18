@@ -33,7 +33,11 @@ export const OutcomePill = ({ r }: { r: Pick<RequestResult, 'kind'> }) => <Tag l
  * The outcome: the headline, why in plain words, what happens to the money, and the buttons on. `again` is what Ask
  * opens with for "Book another" and "Try other dates" ("Flights to Istanbul").
  */
-export function OutcomeCard({ result, tripId, again, compact, testID = 'outcome' }: { result: RequestResult; tripId?: string | null; again?: string | null; compact?: boolean; testID?: string }) {
+export function OutcomeCard({ result, tripId, again, compact, why, testID = 'outcome' }: {
+  result: RequestResult; tripId?: string | null; again?: string | null; compact?: boolean;
+  /** The reason in the product's own words, when the generic one would mislead (an eSIM is never "for those dates"). */
+  why?: string | null; testID?: string;
+}) {
   const router = useRouter();
   const go = (n: OutcomeNext) => {
     buzz('tap');
@@ -44,14 +48,15 @@ export function OutcomeCard({ result, tripId, again, compact, testID = 'outcome'
   const next = result.next.filter((n) => n !== 'see_trip' || !!tripId);
   return (
     <Box tone={result.kind === 'issued' ? 'paper' : 'well'} gap={10} testID={`${testID}-${result.kind}`}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <T style={font(compact ? 'h3' : 'displaySmall')} accessibilityRole="header">{say(outcomeHead(result))}</T>
+      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        {/* The headline takes the row's width, so it never breaks into one word a line beside the pill. */}
+        <T balance={false} style={[font(compact ? 'h3' : 'displaySmall'), { flex: 1, minWidth: 0 }]} accessibilityRole="header">{say(outcomeHead(result))}</T>
         {compact ? null : <OutcomePill r={result} />}
       </Row>
       {result.kind !== 'issued' || result.reason !== 'done' ? (
         <View style={{ gap: 2 }}>
           {compact ? null : <Eyebrow>{t('oc.label.why')}</Eyebrow>}
-          <Small color={colors.green}>{say(outcomeWhy(result))}</Small>
+          <Small color={colors.green}>{why ?? say(outcomeWhy(result))}</Small>
         </View>
       ) : null}
       {result.note ? (

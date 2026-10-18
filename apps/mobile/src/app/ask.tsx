@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, correctEsimAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
+import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, correctEsimAsk, correctionLine, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -15,10 +15,11 @@ import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
 import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
-import { MeBubble } from '@/components/booking/Conversation';
+import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversation';
 import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
+import { useNet } from '@/lib/net';
 import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo } from '@/lib/booking';
@@ -53,7 +54,14 @@ export default function Ask() {
   const status = useSession((s) => s.status);
   const user = useSession((s) => s.user);
   const people = usePeople();
-  const offline = useDemo((s) => s.on.has('offline'));
+  // Offline (the demo switch, or the phone really has no connection, as after a reload with no signal): searching
+  // waits, and nothing pretends to hold seats (critique 2, #3).
+  const demoOffline = useDemo((s) => s.on.has('offline'));
+  const netState = useNet((s) => s.online);
+  const netOffline = netState === false;
+  // The server couldn't be reached for the reading itself: offline until a connection is known again (then the search runs).
+  const [parseOffline, setParseOffline] = useState(false);
+  const offline = demoOffline || netOffline || (parseOffline && netState !== true);
   const today = todayIn();
   const [query, setQuery] = useState('');
   const [intent, setIntent] = useState<AskIntent | null>(null);
@@ -73,8 +81,10 @@ export default function Ask() {
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
   const scroll = useRef<ScrollView>(null);
-  // The corrections typed since the ask, shown as bubbles.
-  const [fixes, setFixes] = useState<string[]>([]);
+  // The corrections typed since the ask, shown as bubbles, each with Mada's line on what changed.
+  const [fixes, setFixes] = useState<{ text: string; line: string | null }[]>([]);
+  // Earlier asks in this chat (a new place starts a fresh thread): folded above the new one.
+  const [earlier, setEarlier] = useState<{ query: string; fixes: string[] }[]>([]);
   const [fixing, setFixing] = useState<string | null>(null);
   const onReply = useCallback((r: { id: string; agent: string } | null) => { setReplyTo(r); setAskNew(false); }, []);
   const selfName = user?.name ?? '';
@@ -84,12 +94,11 @@ export default function Ask() {
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
     if (!intent || askNew || replyTo) return 'new';
-    const apply = (next: AskIntent, note: string | null) => {
+    const apply = (next: AskIntent, line: string | null) => {
       buzz('tap');
       forgetSettled();
-      setFixes((f) => [...f, text]); setFixing(null); setDraft(''); setCta(null);
+      setFixes((f) => [...f, { text, line }]); setFixing(null); setDraft(''); setCta(null);
       setIntent(next); setRound((r) => r + 1);
-      if (note) toast(note);
       return 'done' as const;
     };
     // The eSIM planner: what's typed is the place ("Pakistan", "باكستان", "Lahore") and the days ("for 10 days").
@@ -101,9 +110,13 @@ export default function Ask() {
       if (e?.type === 'new') return 'new';
       return 'unclear';
     }
-    const c = correctAsk({ ...intent, ...settled }, text, { today, people: household });
+    const prev = { ...intent, ...settled };
+    const c = correctAsk(prev, text, { today, people: household });
     if (c.type !== 'apply') return c.type;
-    return apply(c.intent, c.changed.length === 1 && c.changed[0] === 'permit' ? t('fix.permit') : t('fix.done'));
+    // Another place is another trip: a fresh thread, the old one folded above (critique 2, #14).
+    if (prev.destination && c.intent.destination && c.intent.destination !== prev.destination) return 'new';
+    // What changed, said back in the words' language ("Now 5 people: 2 adults, 3 children (2, 6, 13).").
+    return apply(c.intent, correctionLine(prev, c, { people: household, selfName: user?.name ?? '', locale: languageOfText(text) ?? appLocale() }));
   };
   /** Mada couldn't tell what to change: ask again from that question, or start something new. */
   const fix = (what: 'who' | 'when' | 'where' | 'new') => {
@@ -132,11 +145,14 @@ export default function Ask() {
     forgetSettled();
     // Mada answers in the language this was written in, whatever the app is set to (per message).
     setVoice(languageOfText(v));
+    // The ask on screen folds into "Earlier" above the new one.
+    if (query) { const was = { query, fixes: fixes.map((f) => f.text) }; setEarlier((e) => [...e, was].slice(-5)); }
     setQuery(v); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
     // Anyone can ask and see prices; signing in waits for an account action (lib/signin-ask.ts).
     setParsing(true);
     // The flight search starts from the phone's own reading while the server reads the words (FlightFlow.tsx).
-    if (!kindHint || kindHint === 'flight') { const r = parseAskRules(v, { today, people: household }); headStart(askIntentOfRules(r, kindHint ?? r.kind)); }
+    setParseOffline(false);
+    if ((!kindHint || kindHint === 'flight') && !offline) { const r = parseAskRules(v, { today, people: household }); headStart(askIntentOfRules(r, kindHint ?? r.kind)); }
     try {
       const { intent: it } = await bookingApi.parse(v);
       const next = kindHint ? { ...it, kind: kindHint } : it;
@@ -145,8 +161,9 @@ export default function Ask() {
       setRound((r) => r + 1);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'OFFLINE') {
-        // Offline: requests can still be written and saved; searching waits for a connection.
-        // Offline: the same rules the server runs read it here, so requests can still be written and saved.
+        // Offline: the same rules the server runs read it here, so requests can still be written and saved; searching
+        // waits for a connection, and the offline card shows before any progress.
+        setParseOffline(true);
         const r = parseAskRules(v, { today, people: household });
         const next = askIntentOfRules(r, kindHint ?? r.kind);
         saveAsk(v, next);
@@ -258,9 +275,15 @@ export default function Ask() {
         <View style={{ flex: 1 }}>
         <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
+          <EarlierAsks items={earlier} />
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
-          {fixes.map((f, i) => <MeBubble key={`${i}-${f}`} text={f} testID="ask-fix" />)}
+          {fixes.map((f, i) => (
+            <View key={`${i}-${f.text}`} style={{ gap: 10 }}>
+              <MeBubble text={f.text} testID="ask-fix" />
+              {f.line ? <MadaLine text={f.line} testID="ask-fix-line" /> : null}
+            </View>
+          ))}
           <AskReplyContext.Provider value={onReply}>{body}</AskReplyContext.Provider>
           {fixing && intent ? <FixPrompt text={fixing} kind={intent.kind} onPick={fix} /> : null}
           </View>

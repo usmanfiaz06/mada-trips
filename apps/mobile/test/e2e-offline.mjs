@@ -146,6 +146,22 @@ try {
     if (!/Will send when you’re online|Calls still work/.test(cb)) errors.push(`offline call-back: "${cb}"`);
     await p.shot('offline-battery');
 
+    step('offline: Ask says so before any progress, never "Holding seats", never "for 0" (critique 2, #3)');
+    await p.page.goto(ORIGIN + `/ask?prefill=${encodeURIComponent('Flights to Dubai next weekend')}`);
+    await p.see("You're offline.", 'offline card in Ask', 15_000);
+    await p.see('Searching needs a connection.', 'offline card says why');
+    for (const bad of ['Holding seats', 'for 0', 'Checking flights to Dubai']) {
+      if (await p.page.getByText(bad, { exact: false }).filter({ visible: true }).count()) errors.push(`offline ask: "${bad}" shows with no connection`);
+    }
+    await p.shot('offline-ask');
+    step('offline: Ask in Arabic, the same card');
+    await p.page.goto(ORIGIN + `/ask?prefill=${encodeURIComponent('طيران لدبي الويكند الجاي')}`);
+    await p.see('ما عندك نت.', 'Arabic offline card in Ask', 15_000);
+    for (const bad of ['نحجز المقاعد', 'لـ 0', 'لـ ٠']) {
+      if (await p.page.getByText(bad, { exact: false }).filter({ visible: true }).count()) errors.push(`offline ask (ar): "${bad}" shows with no connection`);
+    }
+    await p.shot('offline-ask-ar');
+
     await p.context.setOffline(false);
     await p.context.close();
   }

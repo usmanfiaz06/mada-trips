@@ -466,6 +466,125 @@ async function umrah() {
   await context.close();
 }
 
+/* ───────────── Ask understands; flows never re-ask (critique 2, #2, #6, #14, #16) ───────────── */
+async function heard() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  const never = async (text, what) => { if (await page.getByText(text, { exact: false }).filter({ visible: true }).count()) { errors.push(`${what}: "${text}" should not show`); console.log('UNWANTED', what, '→', text); } };
+  await signIn(page);
+  await openAsk(page);
+  // After an ask in Arabic, Ask's close button speaks Arabic too: back to Today by the URL, then Ask.
+  const again = async () => { await page.evaluate(() => { window.history.pushState({}, '', '/today'); window.dispatchEvent(new PopStateEvent('popstate')); }); await page.waitForTimeout(1200); await openAsk(page); };
+
+  step('heard #2: "I have a Nusuk permit" is never asked; the calendar opens on Ramadan, the last ten nights shaded (#16)');
+  await k.ask('Umrah in Ramadan, I have a Nusuk permit');
+  await k.see('From what you said', 'heard chips');
+  await k.see('Has a permit', 'permit heard');
+  await k.see('Which day is your permit?', 'straight to the permit day');
+  await never('Do you have your Nusuk permit?', 'permit asked again');
+  await k.shot('heard-umrah-permit');
+  await k.press(k.byTest('umrah-day-pick'));
+  await k.see('Shaded: the last ten nights', 'last ten shaded');
+  await k.see('February 2027', 'calendar opens on Ramadan');
+  if ((await page.locator('[data-testid="cal-shaded"]').filter({ visible: true }).count()) < 2) errors.push('umrah calendar: the last ten nights are not shaded');
+  await k.shot('heard-umrah-calendar');
+  await page.getByRole('button', { name: /\b28\b/ }).filter({ visible: true }).first().click();
+  await k.press(k.byTest('search-go'));
+  await k.press(k.byTest('umrah-slot-evening'));
+  await k.press(k.byTest('umrah-who-done'));
+  await k.choose('umrah-hotel-hilton-suites-makkah');
+  await k.press(k.byTest('umrah-madinah-no'));
+  step('heard #16: flying from any Saudi airport, the named flight, ihram before boarding, the car to Makkah');
+  for (const c of ['Riyadh', 'Dammam', 'Abha', 'Tabuk', 'Qassim', 'Jazan', 'Hail']) await k.see(c, `fly from ${c}`);
+  await k.press(k.byTest('umrah-fly-AHB'));
+  await k.see('Saudia SV 1806 · Abha → Jeddah', 'the flight named');
+  await k.see('Wear ihram before you board (miqat in the air).', 'miqat line');
+  await k.see('Jeddah airport to Makkah', 'transfer line');
+  await k.see('A car from the airport to your hotel', 'transfer said');
+  await k.byTest('umrah-plan-flight').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await k.shot('heard-umrah-plan');
+
+  step('heard #2 (Arabic): «عمرة في رمضان عندي تصريح»');
+  await again();
+  await k.ask('عمرة في رمضان عندي تصريح');
+  await k.see('من كلامك', 'heard chips (ar)');
+  await k.see('عنده تصريح', 'permit heard (ar)');
+  await k.see('تصريحك أي يوم؟', 'straight to the permit day (ar)');
+  await never('عندك تصريح نسك؟', 'permit asked again (ar)');
+  await k.shot('heard-umrah-permit-ar');
+
+  step('heard #6: a UK visa for me and my wife in December: the ETA first, both of them, the month, no appointment');
+  await again();
+  await k.ask('I need a UK visa for me and my wife in December');
+  await k.see('A UK ETA, not a visa', 'ETA, not a visa');
+  await k.see('online, GBP 16, about 3 days', 'ETA facts');
+  await k.see('Mada applies for both, Omar and Hessa: SAR 120.', 'both, priced');
+  await k.see('From what you said', 'heard chips (visa)');
+  await k.see('December', 'month heard');
+  await k.see('Omar and Hessa', 'the wife kept');
+  await never('When do you travel?', 'month asked again');
+  await never('earliest appointment', 'an appointment promised for an ETA');
+  await k.see('Ask Mada to apply · SAR 120', 'ETA send');
+  await k.shot('heard-visa-eta');
+  await k.press(k.byTest('heard-who'));
+  await k.see('For who?', 'a chip opens its question');
+  await k.press(k.byTest('request-who-done'));
+  await k.press(k.byTest('request-send'));
+  await k.see('UK ETA', 'sent as an ETA', 10000);
+  await never('Is there an earlier appointment?', 'appointment chip on an ETA');
+  await k.shot('heard-visa-sent');
+
+  step('heard #6 (Arabic): «أبغى فيزا بريطانيا لي ولزوجتي في ديسمبر»');
+  await again();
+  await k.ask('أبغى فيزا بريطانيا لي ولزوجتي في ديسمبر');
+  await k.see('تصريح ETA البريطاني، مو تأشيرة', 'ETA (ar)');
+  await k.see('ديسمبر', 'month heard (ar)');
+  await never('متى تسافر؟', 'month asked again (ar)');
+  await never('أقرب موعد', 'appointment promised (ar)');
+  await k.shot('heard-visa-eta-ar');
+
+  step('heard #6: Türkiye needs nothing for Saudi passports');
+  await again();
+  await k.ask('A visa for Turkey');
+  await k.see('No visa needed for Türkiye', 'no visa');
+  await k.see('Ask Mada anyway', 'still a way on');
+  await k.shot('heard-visa-none');
+
+  step('heard #2: the first week of December is a range, not "When in December?"');
+  await again();
+  await k.ask('Flights to Istanbul the first week of December, just me');
+  await k.see('Three ways to get there.', 'searched straight away', 15000);
+  await k.see('1–7 Dec', 'the week as dates');
+  await never('When in December?', 'the month asked again');
+  await k.shot('heard-first-week');
+
+  step('heard #14: a correction says what changed; no "Changed it" toast');
+  await k.ask('we are 2 adults and 3 children, aged 2, 6 and 13');
+  await k.see('Now 5 people: 2 adults, 3 children (2, 6, 13).', 'what changed');
+  await never('Changed it. Looking again.', 'toast');
+  await k.shot('heard-correction-line');
+
+  step('heard #14: a new place is a fresh thread, the old one folded above');
+  await k.ask('Flights to Dubai next weekend, just me');
+  await k.see('Earlier: Flights to Istanbul the first week of December', 'old thread folded');
+  await never('Changed it. Looking again.', 'toast on a new search');
+  if ((await page.locator('[data-testid="ask-query"]').filter({ visible: true }).count()) !== 1) errors.push('thread: more than one ask on screen after a new place');
+  if (await page.locator('[data-testid="ask-fix"]').filter({ visible: true }).count()) errors.push('thread: the old correction still shows under the new ask');
+  await k.shot('heard-fresh-thread');
+
+  step('heard #2 (Arabic): «الأسبوع الجاي» is next week as dates');
+  await again();
+  await k.ask('طيران لدبي الأسبوع الجاي لي بس');
+  await k.see('توصلك.', 'searched straight away (ar)', 15000);
+  await k.shot('heard-next-week-ar');
+  step('heard #14 (Arabic): the correction line in Arabic');
+  await k.ask('احنا ٢ بالغين و٣ أطفال أعمارهم ٢ و٦ و١٣');
+  await k.see('أشخاص: بالغين،', 'what changed (ar)');
+  await never('غيّرناها، ونشوف من جديد.', 'toast (ar)');
+  await k.shot('heard-correction-line-ar');
+  await context.close();
+}
+
 /* ───────────── 5. requests, stays, plans, eSIM ───────────── */
 async function requests() {
   const { page, context } = await newPage();
@@ -1130,6 +1249,7 @@ try {
   if (want('money')) await money();
   if (want('money-ar')) await money('ar-SA');
   if (want('family')) await family();
+  if (want('heard')) await heard();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

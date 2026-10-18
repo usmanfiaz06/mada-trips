@@ -19,9 +19,11 @@ export type TripSearch = { from: 'RUH' | 'JED' | 'DMM'; type: 'return' | 'oneway
  * `stay`: the same calendar for a hotel: check-in and check-out only (no airport, cabin, babies or one way).
  * `day`: one day only (the Umrah permit's), with its own title; the day comes back as `dep`.
  */
-export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay: stayOnly, day }: {
+export function SearchSheet({ visible, value, today, month, adults, onClose, onDone, stay: stayOnly, day, shade }: {
   visible: boolean; value: TripSearch; today: string; month?: { month: number; year: number } | null; adults: number; onClose: () => void; onDone: (v: TripSearch) => void; stay?: boolean;
   day?: { title: string };
+  /** Days shaded with a note under the grid (the last ten nights of Ramadan, for an Umrah permit). */
+  shade?: { from: string; to: string; label: string } | null;
 }) {
   const stay = stayOnly || !!day;
   const { height } = useWindowDimensions();
@@ -84,8 +86,9 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
             const end = x === s.dep || (s.type === 'return' && !day && x === s.ret);
             const inRange = s.type === 'return' && !day && !!s.dep && !!s.ret && x > s.dep && x < s.ret;
             const flex = s.flex && !!s.dep && !end && Math.abs(daysBetween(s.dep, x)) <= 2;
+            const shaded = !!shade && x >= shade.from && x <= shade.to;
             return (
-              <View key={dn} style={[styles.cell, inRange ? { backgroundColor: '#f3ead8' } : flex ? { backgroundColor: '#f8f1e3' } : null]}>
+              <View key={dn} style={[styles.cell, inRange ? { backgroundColor: '#f3ead8' } : flex ? { backgroundColor: '#f8f1e3' } : shaded ? styles.shaded : null]} testID={shaded ? 'cal-shaded' : undefined}>
                 <Pressable accessibilityRole="button" accessibilityLabel={dayName(x, today)} accessibilityState={{ disabled: past, selected: end }} disabled={past} onPress={() => pickDay(x)}
                   style={[styles.day, end ? { backgroundColor: colors.green } : null, x === today && !end ? styles.today : null]}>
                   <T style={[styles.dayText, past ? styles.past : null, end ? { color: colors.mist, fontFamily: ff.ui700 } : null]}>{localizeDigits(String(dn))}</T>
@@ -94,6 +97,7 @@ export function SearchSheet({ visible, value, today, month, adults, onClose, onD
             );
           })}
         </View>
+        {shade ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} testID="cal-shade-note"><View style={[styles.swatch, styles.shaded]} /><T v="tiny">{shade.label}</T></View> : null}
         {stay ? null : (<>
         <Pressable accessibilityRole="switch" accessibilityState={{ checked: s.flex }} onPress={() => { buzz('select'); setS({ ...s, flex: !s.flex }); }} style={styles.rowBetween}>
           <T v="small" color={colors.green}>{t('cal.flexible')}</T>
@@ -130,5 +134,7 @@ const styles = StyleSheet.create({
   past: { color: '#b9c0bc', textDecorationLine: 'line-through' },
   today: { borderWidth: 1.5, borderColor: 'rgba(30,53,45,0.25)' },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  shaded: { backgroundColor: 'rgba(196,150,58,0.18)' },
+  swatch: { width: 14, height: 14, borderRadius: 4 },
   check: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.green, alignItems: 'center', justifyContent: 'center' },
 });

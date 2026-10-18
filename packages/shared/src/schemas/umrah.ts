@@ -41,7 +41,23 @@ export const umrahHotel = (key: string | null | undefined) => UMRAH_HOTELS.find(
 export const umrahHotelsIn = (city: UmrahCity, band: UmrahBand) => UMRAH_HOTELS.filter((h) => h.city === city && h.band === band);
 
 /** The rest of the plan, per person (riyals): the Haramain train one way, flights there and back; children under 12 at 75%, babies at 10%. */
-export const UMRAH_PRICES = { train: 250, flight: { RUH: 1100, DMM: 1250 } as Record<string, number> };
+/**
+ * Where a pilgrim can fly from: every Saudi airport with flights to Jeddah (or Madinah), with the return fare per person
+ * and the morning flight Mada books first (mock schedule; the desk confirms). From Jeddah, Makkah or Taif it's a drive.
+ */
+export const UMRAH_FROM: readonly { code: string; city: string; sar: number; airline: string; flight: string; dep: string }[] = [
+  { code: 'RUH', city: 'Riyadh', sar: 1100, airline: 'Saudia', flight: 'SV 1022', dep: '08:15' },
+  { code: 'DMM', city: 'Dammam', sar: 1250, airline: 'Saudia', flight: 'SV 1112', dep: '07:30' },
+  { code: 'AHB', city: 'Abha', sar: 690, airline: 'Saudia', flight: 'SV 1806', dep: '10:20' },
+  { code: 'TUU', city: 'Tabuk', sar: 780, airline: 'flynas', flight: 'XY 133', dep: '09:05' },
+  { code: 'ELQ', city: 'Qassim', sar: 820, airline: 'Saudia', flight: 'SV 1342', dep: '06:50' },
+  { code: 'GIZ', city: 'Jazan', sar: 650, airline: 'Saudia', flight: 'SV 1716', dep: '13:10' },
+  { code: 'HAS', city: 'Hail', sar: 760, airline: 'flynas', flight: 'XY 381', dep: '11:15' },
+];
+export const umrahFrom = (code: string | null | undefined) => UMRAH_FROM.find((f) => f.code === code) ?? null;
+/** A car between Jeddah airport and a Makkah hotel, one way (riyals), for the whole party. */
+export const UMRAH_TRANSFER_SAR = 280;
+export const UMRAH_PRICES = { train: 250, flight: Object.fromEntries(UMRAH_FROM.map((f) => [f.code, f.sar])) as Record<string, number> };
 export const UMRAH_TRAIN_MIN = 140;
 
 /** Ramadan by the Umm al-Qura calendar: the first day and the day of Eid al-Fitr. */
@@ -83,7 +99,7 @@ export type UmrahPlanInput = {
   checkIn: string; makkah: { key: string; nights: number }; madinah: { key: string; nights: number; order: 'before' | 'after' } | null;
   flyFrom: string | null; ages: number[];
 };
-export type UmrahPlanLine = { k: 'makkah' | 'madinah' | 'train' | 'flights'; sar: number };
+export type UmrahPlanLine = { k: 'makkah' | 'madinah' | 'train' | 'flights' | 'transfer'; sar: number };
 export type UmrahPlan = {
   lines: UmrahPlanLine[]; totalSar: number; perPerson: { train: number; flights: number }[];
   dates: { makkahIn: string; makkahOut: string; madinahIn: string | null; madinahOut: string | null; leave: string; home: string };
@@ -114,6 +130,9 @@ export function umrahPlan(p: UmrahPlanInput): UmrahPlan | null {
   if (md) lines.push({ k: 'madinah', sar: umrahStaySar(md, p.madinah!.nights, guests) });
   if (md) lines.push({ k: 'train', sar: perPerson.reduce((a, b) => a + b.train, 0) });
   if (fare) lines.push({ k: 'flights', sar: perPerson.reduce((a, b) => a + b.flights, 0) });
+  // Flying in or out of Jeddah means a car between the airport and Makkah: in, unless Madinah comes first; out, unless it ends in Madinah.
+  const legs = fare ? (p.madinah?.order === 'before' && md ? 0 : 1) + (p.madinah?.order === 'after' && md ? 0 : 1) : 0;
+  if (legs) lines.push({ k: 'transfer', sar: UMRAH_TRANSFER_SAR * legs });
   return { lines, totalSar: lines.reduce((a, b) => a + b.sar, 0), perPerson, dates: { makkahIn, makkahOut, madinahIn, madinahOut, leave, home } };
 }
 
@@ -161,7 +180,7 @@ export function umrahSummary(a: Record<string, string[]>, names: string, needSum
   const from = a.flyFrom?.[0];
   return [umrahPermitLine(a, l) ?? '', a.checkIn?.[0] ? t('umrah.sum.from', { day: dayLabel(a.checkIn[0], { locale: l, hijri: false }) }, l) : '',
     ...stays, md ? t('umrah.sum.train', undefined, l) : '',
-    from ? (from === 'none' ? t('umrah.sum.drive', undefined, l) : t('umrah.sum.fly', { city: t(from === 'DMM' ? 'umrah.fly.dmm' : 'umrah.fly.ruh', undefined, l) }, l)) : '',
+    from ? (from === 'none' ? t('umrah.sum.drive', undefined, l) : t('umrah.sum.fly', { city: umrahFrom(from)?.city ?? from }, l)) : '',
     names, needSummary].filter(Boolean).join(' · ');
 }
 
@@ -178,13 +197,15 @@ export function umrahDeskQuote(a: Record<string, string[]>, who: { id: string; n
     ...(plan.perPerson[i]?.flights ? [{ label: t('dq.umrah.flights', undefined, l), sar: plan.perPerson[i]!.flights }] : []),
     ...(plan.perPerson[i]?.train ? [{ label: t('dq.umrah.train', undefined, l), sar: plan.perPerson[i]!.train }] : []),
   ] })).filter((p) => p.lines.length);
+  const transfer = plan.lines.find((x) => x.k === 'transfer');
+  const car = transfer ? [{ personId: null, name: t('dq.umrah.transfer', undefined, l), lines: [{ label: t('umrah.transfer', undefined, l), sar: transfer.sar }] }] : [];
   const hotels = commaList([umrahHotel(a.makkahHotel?.[0])?.name, umrahHotel(a.madinahHotel?.[0])?.name].filter((x): x is string => !!x), l);
   const permit = a.permit?.[0] === 'has' && a.permitDay?.[0]
     ? t('dq.umrah.permitHeld', { day: dayLabel(a.permitDay[0], { locale: l, hijri: false }), slot: slotLabel(a.permitSlot?.[0], l) }, l)
     : t('dq.umrah.permitHelp', undefined, l);
   const n = Math.max(1, who.length);
   return {
-    totalSar: plan.totalSar, breakdown: [rooms, ...people],
+    totalSar: plan.totalSar, breakdown: [rooms, ...car, ...people],
     lead: `${t('dq.umrah.planLead', { hotels }, l)} ${permit}`, text: [tn('dq.umrah.planText', n, { price: sar(plan.totalSar, l) }, l), permit].join(' '),
   };
 }

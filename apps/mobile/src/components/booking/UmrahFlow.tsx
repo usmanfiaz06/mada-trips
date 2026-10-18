@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import {
-  UMRAH_BANDS, UMRAH_SLOTS, UMRAH_WHEN, ageOn, addDays, checkInFor, checkInForWhen, formatSar, householdOf, inLastTen, nameIn, personName, rangeLabel,
-  sarToHalalas, slotLabel, umrahAirports, umrahHotel, umrahHotelsIn, umrahPlan, umrahStaySar,
+  UMRAH_BANDS, UMRAH_FROM, UMRAH_SLOTS, UMRAH_WHEN, ageOn, addDays, checkInFor, checkInForWhen, formatSar, householdOf, inLastTen, lastTenOf, nameIn, nextRamadan, personName, rangeLabel,
+  sarToHalalas, slotLabel, umrahAirports, umrahFrom, umrahHotel, umrahHotelsIn, umrahPlan, umrahStaySar,
   type AskIntent, type CopyKey, type NeedKey, type Person, type UmrahBand, type UmrahCity,
 } from '@mada/shared';
 import { sendRequest } from '@/lib/booking';
@@ -16,7 +16,7 @@ import { Button } from '../Button';
 import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { T } from '../Text';
-import { Answered } from './Conversation';
+import { Answered, HeardChips } from './Conversation';
 import type { Cta } from './FlightFlow';
 import { PartyStep } from './Party';
 import { NeedsPicker, SentRequest } from './Requests';
@@ -72,6 +72,7 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   const v = (k: string) => a[k]?.[0] ?? null;
 
   const permit = v('permit');
+  const saidPermit = intent.answers.permit?.[0] === 'has';
   const checkIn = v('checkIn');
   const mkNights = Number(v('makkahNights')) || 3;
   const mdNights = Number(v('madinahNights')) || 2;
@@ -126,7 +127,10 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   const rows: ReactNode[] = [];
 
   // ── the permit ──
-  if (permit && permit !== 'no') {
+  // "I have a Nusuk permit" in the words: never asked, shown as what was heard (critique 2, #2).
+  if (permit === 'has' && saidPermit) {
+    rows.push(<HeardChips key="permit" testID="umrah-heard" items={[{ label: t('umrah.sum.permitHas'), onPress: () => set({}, ['permit', 'permitDay', 'permitSlot', 'checkIn', 'when']), testID: 'umrah-heard-permit' }]} />);
+  } else if (permit && permit !== 'no') {
     rows.push(<Answered key="permit" q={t('umrah.permit.q')} a={permit === 'has' ? t('umrah.permit.yes') : `${t('umrah.permit.no')} · ${t(permit === 'help' ? 'umrah.permit.help' : 'umrah.permit.self')}`}
       onChange={() => set({}, ['permit', 'permitDay', 'permitSlot', 'checkIn', 'when'])} testID="umrah-answered-permit" />);
     if (permit !== 'has') rows.push(<Notice key="permit-line" icon="umrah"><T v="small" testID="umrah-permit-line">{permit === 'help' ? t('umrah.permit.helpLine') : t('umrah.permit.selfLine')}</T></Notice>);
@@ -156,7 +160,7 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   }
   if (v('flyFrom') && step === 'plan') {
     const f = v('flyFrom');
-    rows.push(<Answered key="fly" q={t('umrah.fly.q')} a={f === 'none' ? t('umrah.fly.none') : t(f === 'DMM' ? 'umrah.fly.dmm' : 'umrah.fly.ruh')} onChange={() => set({}, ['flyFrom'])} testID="umrah-answered-fly" />);
+    rows.push(<Answered key="fly" q={t('umrah.fly.q')} a={f === 'none' ? t('umrah.fly.none') : t('umrah.fly.from', { city: nameIn(umrahFrom(f)?.city ?? f ?? '', lang) })} onChange={() => set({}, ['flyFrom'])} testID="umrah-answered-fly" />);
   }
 
   // ── the open question ──
@@ -264,8 +268,8 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
     open = (
       <Q q={t('umrah.fly.q')}>
         <ChipWrap>
-          <Toggle label={t('umrah.fly.ruh')} on={false} onPress={() => set({ flyFrom: ['RUH'] })} testID="umrah-fly-RUH" />
-          <Toggle label={t('umrah.fly.dmm')} on={false} onPress={() => set({ flyFrom: ['DMM'] })} testID="umrah-fly-DMM" />
+          {/* Any Saudi airport with flights to Jeddah; from Jeddah, Makkah or Taif it's a drive. */}
+          {UMRAH_FROM.map((f) => <Toggle key={f.code} label={nameIn(f.city, lang)} on={false} onPress={() => set({ flyFrom: [f.code] })} testID={`umrah-fly-${f.code}`} />)}
           <Toggle label={t('umrah.fly.none')} on={false} onPress={() => set({ flyFrom: ['none'] })} testID="umrah-fly-none" />
         </ChipWrap>
       </Q>
@@ -275,6 +279,10 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
   }
 
   const airports = umrahAirports(order === 'before' || order === 'after' ? order : null);
+  // The calendar's first month: Ramadan's last ten nights when it was said (or nothing was), else Ramadan's start.
+  const ramadan = nextRamadan(today);
+  const calStart = v('when') === 'Early Ramadan' ? ramadan.start : lastTenOf(ramadan).from;
+  const calMonth = { month: Number(calStart.slice(5, 7)), year: Number(calStart.slice(0, 4)) };
   return (
     <View style={{ gap: 18 }}>
       {rows}
@@ -294,7 +302,9 @@ export function UmrahFlow({ intent, query, people, selfName, today, setCta, onSy
           {v('flyFrom') && v('flyFrom') !== 'none' ? <T v="tiny">{t('umrah.fly.line', { into: nameIn(airports.into === 'MED' ? 'Madinah' : 'Jeddah', lang), home: nameIn(airports.home === 'MED' ? 'Madinah' : 'Jeddah', lang) })}</T> : null}
         </View>
       ) : null}
+      {/* Opens on Ramadan, the last ten nights shaded (critique 2, #16): no paging from this month. */}
       <SearchSheet visible={dayOpen} day={{ title: step === 'day' ? t('umrah.permit.day') : t('umrah.when.pick') }} value={{ from: 'RUH', type: 'oneway', dep: v('permitDay') ?? checkIn, ret: null, cabin: 'economy', infants: 0, flex: false }}
+        month={calMonth} shade={{ ...lastTenOf(ramadan), label: t('umrah.cal.lastTen') }}
         today={today} adults={1} onClose={() => setDayOpen(false)}
         onDone={(x) => { setDayOpen(false); if (!x.dep) return; if (step === 'day') set({ permitDay: [x.dep] }); else set({ checkIn: [x.dep] }, ['when']); }} />
     </View>
@@ -334,6 +344,8 @@ function Plan({ a, plan, count, lang, openHotel }: { a: A; plan: NonNullable<Ret
     );
   };
   const first = a.madinah?.[0] === 'before' ? ['madinah', 'makkah'] : ['makkah', 'madinah'];
+  const fly = umrahFrom(a.flyFrom?.[0]);
+  const intoMed = a.madinah?.[0] === 'before';
   return (
     <Animated.View entering={enter(0)} testID="umrah-plan">
       <Card style={{ gap: 12 }}>
@@ -342,7 +354,15 @@ function Plan({ a, plan, count, lang, openHotel }: { a: A; plan: NonNullable<Ret
         {stay(first[0] as UmrahCity)}
         {line('train') ? <Row label={t('umrah.plan.train')} price={price(line('train'))}><T v="small" color={colors.green}>{t(a.madinah?.[0] === 'before' ? 'umrah.train.toMakkah' : 'umrah.train.toMadinah')}</T></Row> : null}
         {stay(first[1] as UmrahCity)}
-        {line('flights') ? <Row label={t('umrah.plan.flights')} price={price(line('flights'))}><T v="small" color={colors.green}>{t(a.flyFrom?.[0] === 'DMM' ? 'umrah.fly.dmm' : 'umrah.fly.ruh')} · {rangeLabel(d.leave, d.home, lang)}</T></Row> : null}
+        {line('flights') && fly ? (
+          <Row label={t('umrah.plan.flights')} price={price(line('flights'))}>
+            <T v="small" color={colors.green} testID="umrah-plan-flight">{t('umrah.fly.flight', { airline: fly.airline, flight: fly.flight, from: nameIn(fly.city, lang), to: nameIn(intoMed ? 'Madinah' : 'Jeddah', lang), time: fly.dep })}</T>
+            <T v="tiny">{rangeLabel(d.leave, d.home, lang)}</T>
+            {/* Flying over the miqat into Jeddah: ihram on before boarding. Into Madinah first, the miqat is on the road to Makkah. */}
+            {intoMed ? null : <T v="tiny" color={colors.goldInk} testID="umrah-ihram">{t('umrah.ihram')}</T>}
+          </Row>
+        ) : null}
+        {line('transfer') ? <Row label={t('umrah.transfer')} price={price(line('transfer'))}><T v="small" color={colors.green} testID="umrah-transfer">{t('umrah.transfer.line')}</T></Row> : null}
         <View style={styles.total}>
           <Icon name="umrah" size={18} color={colors.green} />
           <T v="h3" style={{ flex: 1, fontSize: 15 }} testID="umrah-total">{tn('umrah.plan.total', count, { price: price(plan.totalSar) })}</T>

@@ -71,7 +71,9 @@ describe('Umrah around the permit', () => {
     const after = umrahPlan({ checkIn: '2027-01-10', makkah: { key: 'swissotel-makkah', nights: 3 }, madinah: { key: 'anwar-movenpick', nights: 2, order: 'after' }, flyFrom: null, ages: [41] })!;
     expect(after.dates).toMatchObject({ makkahIn: '2027-01-10', madinahIn: '2027-01-13', home: '2027-01-15' });
     expect(after.lines.map((l) => l.k)).toEqual(['makkah', 'madinah', 'train']);
-    expect(p.lines.map((l) => l.k)).toEqual(['makkah', 'madinah', 'train', 'flights']);
+    // Into Madinah, home from Jeddah after Makkah: one car from Makkah to the airport.
+    expect(p.lines.map((l) => l.k)).toEqual(['makkah', 'madinah', 'train', 'flights', 'transfer']);
+    expect(p.lines[4]!.sar).toBe(280);
     expect(p.lines[0]!.sar).toBe(1650 * 3);
     expect(p.lines[2]!.sar).toBe(250 + 250 + Math.round(250 * 0.75));
     expect(p.totalSar).toBe(p.lines.reduce((a, b) => a + b.sar, 0));

@@ -5,6 +5,7 @@
  */
 import { t, type CopyKey } from '../copy';
 import type { Lang } from '../locale';
+import { MONTHS_LONG, monthLongName } from '../dates';
 
 const WORDS: Readonly<Record<string, CopyKey>> = {
   Schengen: 'opt.schengen', UK: 'opt.uk', 'United States': 'opt.us', 'Somewhere else': 'opt.elsewhere',
@@ -34,7 +35,10 @@ const WORDS: Readonly<Record<string, CopyKey>> = {
 /** A stored English value in the display language: "Standard car" → "سيارة عادية". */
 export function wordFor(value: string, locale?: Lang): string {
   const k = WORDS[value];
-  return k ? t(k, undefined, locale) : value;
+  if (k) return t(k, undefined, locale);
+  // A month taken from the words ("a UK visa in December"): stored by its English name.
+  const m = (MONTHS_LONG as readonly string[]).indexOf(value);
+  return m >= 0 ? monthLongName(m, locale) : value;
 }
 
 /** "A, B, C" / "A، B، C". */

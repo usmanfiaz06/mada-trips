@@ -30,7 +30,7 @@ export const ridesMock: AreaMock = async (w, ctx) => {
     const seen = [...rides.values()].find((r) => r.ownerId === owner && r.clientKey === b.clientKey);
     if (seen) return ok({ ride: rideView(seen, now) }, 201);
     const id = uuid();
-    const r = { id, ownerId: owner, clientKey: b.clientKey, when: b.when, city: b.city, meetingPoint: b.meetingPoint, tripId: b.tripId ?? null, requestedAt: new Date(now).toISOString(), cancelledAt: null, supplier: 'mock' as const, match: mockRideMatch(id, b.city) };
+    const r = { id, ownerId: owner, clientKey: b.clientKey, when: b.when, city: b.city, meetingPoint: b.meetingPoint, destination: b.destination ?? null, tripId: b.tripId ?? null, requestedAt: new Date(now).toISOString(), cancelledAt: null, supplier: 'mock' as const, match: mockRideMatch(id, b.city, b) };
     rides.set(id, r);
     return ok({ ride: rideView(r, now) }, 201);
   }

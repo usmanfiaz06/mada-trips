@@ -35,6 +35,8 @@ export * from './stay-wishes';
 export * from './stay-fit';
 export * from './passport-ready';
 export * from './now-path';
+export * from './ride-route';
+export * from './visa-rules';
 export * from './outcomes';
 export * from './cards';
 export * from './umrah';
