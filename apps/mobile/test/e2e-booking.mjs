@@ -1104,6 +1104,8 @@ async function renew() {
   await k.byTest('pay-recheck').click();
   await k.see('Price checked again.', 'rechecked');
   step('renew: book now; Mada asks for the renewal with the booking');
+  // The footer swaps the hold-ended card for the slider and resizes: let it settle before the thumb goes down.
+  await page.waitForTimeout(1200);
   await k.slide();
   await k.see('Booking now', 'booked with the renewal', 15000);
   await k.shot('booked-with-renewal');
