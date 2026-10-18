@@ -12,7 +12,7 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 |---|---|---|
 | E · eSIM on Airalo | supplier adapter + mock, plan suggestion per trip, pay, install (iOS link / Android QR), data left, top-up, desk | started, session_019PTxzsmbZA74N6so2w188q |
 | G · guests + language (Next 5) | guests search/see prices/open links, sign-in sheet at account actions returning to the same place; language switch keeps state; reply in input language; Arabic leak sweep | started, session_01Sk1iYRJ91x9cQXdekzSK7f |
-| EA · eSIM Access + pricing desk | owner registered with eSIM Access (not Airalo): live adapter, margin rules/rounding/guard on the desk, catalogue sync, balance alerts, support actions, ESIM.md | started 17 Oct, session_01SoXoJxBgEB4nDLC2gbpTc2 |
+| EA · eSIM Access + pricing desk | owner registered with eSIM Access (not Airalo): live adapter, margin rules/rounding/guard on the desk, catalogue sync, balance alerts, support actions, ESIM.md | **DONE** c753521, 1121524 (+ entry points: Ask chip, trip row, after-booking line, Wallet section). Staging: owner added keys; still needs ESIMACCESS_ALLOW_OUTSIDE_PRODUCTION=yes, ESIMACCESS_WEBHOOK_SECRET, APP_OPS_EMAIL, then a real test order. Migration 0033 runs on deploy. Open: activities.test "What's on" red |
 | V · speed | baseline → parallel/streamed search, caches, /trips < 800 ms, Lighthouse ≥ 90, before/after table | started, session_01TUBJcpn9XT9ZDAD5KMGYaY |
 
 Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh eyes, read-only) → fix every dimension < 9 → rerun until all ≥ 9.
