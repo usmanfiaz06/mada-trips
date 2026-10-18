@@ -219,7 +219,7 @@ describe("Mada credit", () => {
 describe("saved cards", () => {
   it("adds cards by token, keeps a default, asks for a new default before removing it", async () => {
     const { token } = await signIn();
-    expect(CardsResponse.parse((await call(cardsGet, { method: "GET", token })).json)).toEqual({ cards: [], defaultId: "applepay" });
+    expect(CardsResponse.parse((await call(cardsGet, { method: "GET", token })).json)).toEqual({ cards: [], defaultId: "applepay", used: [] });
     const one = CardsResponse.parse((await call(cardsPost, { token, body: { token: "tok_mock_1", brand: "visa", last4: "4141", exp: "08/30" } })).json);
     const two = CardsResponse.parse((await call(cardsPost, { token, body: { token: "tok_mock_2", brand: "mada", last4: "8807", exp: "02/31", makeDefault: false } })).json);
     const [visa, mada] = [one.cards[0]!, two.cards[1]!];
@@ -236,7 +236,7 @@ describe("saved cards", () => {
     expect(swapped).toMatchObject({ defaultId: mada.id });
     expect(swapped.cards.map((c) => c.id)).toEqual([mada.id]);
     // The only card: Apple Pay takes over.
-    expect(CardsResponse.parse((await callP(cardDelete, { id: mada.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay" });
+    expect(CardsResponse.parse((await callP(cardDelete, { id: mada.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay", used: [] });
   });
 
   it("keeps one card when the same card is saved again, and removing it removes every copy", async () => {
@@ -251,7 +251,7 @@ describe("saved cards", () => {
     const [u] = await db.execute<{ user_id: string }>(rawSql`SELECT user_id FROM app_cards WHERE id = ${first.cards[0]!.id}`);
     await db.execute(rawSql`INSERT INTO app_cards (user_id, brand, last4, exp, provider, token_enc) VALUES (${u!.user_id}, 'visa', '4111', '08/30', 'mock', 'legacy')`);
     expect(CardsResponse.parse((await call(cardsGet, { method: "GET", token })).json).cards).toHaveLength(1);
-    expect(CardsResponse.parse((await callP(cardDelete, { id: first.cards[0]!.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay" });
+    expect(CardsResponse.parse((await callP(cardDelete, { id: first.cards[0]!.id }, { method: "DELETE", token })).json)).toEqual({ cards: [], defaultId: "applepay", used: [] });
   });
 
   it("refuses expired cards, other people's cards, and no sign-in", async () => {
