@@ -47,6 +47,8 @@ const GLYPHS = {
   phone: [{ rect: [7, 2.5, 10, 19, 2.5] }, { d: 'M11 18.5h2' }],
   edit: [{ d: 'M4 20h4L19 9l-4-4L4 16z' }, { d: 'M13.5 6.5l4 4' }],
   user: [{ circle: [12, 8, 4] }, { d: 'M4 21c1-4 4-6 8-6s7 2 8 6' }],
+  wifi: [{ d: 'M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 14 0M2 9.5a15 15 0 0 1 20 0M12 20h.01' }],
+  sim: [{ d: 'M6 4.5A1.5 1.5 0 0 1 7.5 3H14l4 4v12.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 19.5z' }, { rect: [9, 11, 6, 6, 1] }, { d: 'M12 11v6M9 14h6' }],
 } satisfies Record<string, Shape[]>;
 
 export type IconName = keyof typeof GLYPHS;

@@ -327,7 +327,7 @@ function Start({ onPick, onResume, people, today }: { onPick: (x: string) => voi
       <ChipWrap>
         {ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}
         {/* Internet abroad: the eSIM plans straight away (the trip, or where, is asked there). */}
-        <Chip label={t('es.idea')} background={colors.paper} onPress={() => router.push('/esim/plans' as Href)} testID="ask-idea-esim" />
+        <Chip label={t('es.idea')} icon={(c) => <Icon name="globe" size={17} color={c} />} background={colors.paper} onPress={() => router.push('/esim/plans' as Href)} testID="ask-idea-esim" />
       </ChipWrap>
       <IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={onPick} testID="ask-ideas" />
       {busy ? (

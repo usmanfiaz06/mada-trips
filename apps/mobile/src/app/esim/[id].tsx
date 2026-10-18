@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatSar, shortDay, timeLabel, type CopyKey } from '@mada/shared';
-import { EsimStatusTag, usageLine } from '@/components/esim/parts';
+import { usageLine } from '@/components/esim/parts';
+import { EsimPass, FlagDisc, FlowSteps, SetMoment, countryOf } from '@/components/esim/look';
+import { Icon } from '@/components/Icon';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Sheet } from '@/components/Sheet';
@@ -12,7 +14,7 @@ import { T } from '@/components/Text';
 import { QrCode } from '@/components/circles/QrCode';
 import { OutcomeCard } from '@/components/outcome/Outcome';
 import { ArtSuitcase } from '@/components/trips/Arts';
-import { Box, Divider, H3, PickCard, Ring, Rise, Row, Small, SmallButton, Spread, Steps, TextLink, Tiny, TripScreen } from '@/components/trips/ui';
+import { Box, Divider, H3, IconTile, PickCard, Rise, Row, Small, SmallButton, Steps, Tag, TextLink, Tiny, TripScreen } from '@/components/trips/ui';
 import { usePayDraft } from '@/lib/booking';
 import { DEVICE } from '@/lib/device';
 import { esimApi, esimKeys, planLabel, useEsim, useEsimTopups } from '@/lib/esim';
@@ -20,7 +22,7 @@ import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { walletApi } from '@/lib/wallet';
-import { colors } from '@/theme';
+import { colors, ff, font, radii, shadow } from '@/theme';
 
 /*
  * One eSIM: install it now (iPhone: one tap; Android: the QR code and the codes to type), "it switches on when you
@@ -43,6 +45,9 @@ export default function EsimScreen() {
   const [online, setOnline] = useState(false);
   const [topup, setTopup] = useState(open === 'topup');
   const [busy, setBusy] = useState(false);
+  const [justSet, setJustSet] = useState(false);
+  // Once installed, how it was installed folds away behind "Install details".
+  const [details, setDetails] = useState(false);
   const tops = useEsimTopups(id, topup);
 
   if (!e) {
@@ -60,6 +65,7 @@ export default function EsimScreen() {
       qc.setQueryData(esimKeys.one(id), r);
       void qc.invalidateQueries({ queryKey: ['esim', 'list'] });
       buzz('success');
+      setJustSet(true);
       toast(t('es.ins.doneToast'));
     } catch (err) { toast(err instanceof Error ? err.message : t('error.internal')); } finally { setBusy(false); }
   }
@@ -86,65 +92,79 @@ export default function EsimScreen() {
 
   const usage = usageLine(e);
   const u = e.usage;
+  const ringable = !!u && u.state !== 'not_active' && (u.unlimited || !!u.totalMb);
+  const flowNow = !e.installedAt ? 0 : e.status === 'active' || e.status === 'used_up' || e.status === 'expired' ? 3 : 1;
   return (
     <TripScreen title={t('es.card.title', { where: e.where })}>
-      <Rise>
-        <Spread><T v="h1" accessibilityRole="header" style={{ flex: 1 }}>{t('es.card.title', { where: e.where })}</T><EsimStatusTag e={e} /></Spread>
-      </Rise>
-      <Rise step={1}><Small style={{ marginTop: -8 }}>{[e.travellerName ? t('es.list.for', { name: e.travellerName }) : t('es.list.forYou'), planLabel(e.plan, t)].join(' · ')}</Small></Rise>
+      <Rise><EsimPass e={e} testID="esim-card" until={onTrip && u?.expiresAt ? shortDay(u.expiresAt.slice(0, 10), getLocale()) : null} onTopup={onTrip && e.plan.topup ? () => setTopup(true) : null} /></Rise>
 
       {e.status === 'refunded' && e.result ? <><Box tone="cream"><H3>{t('es.refunded.title')}</H3></Box><OutcomeCard result={e.result} tripId={e.tripId} testID="esim-outcome" /></> : null}
       {e.status === 'ordering' ? <Box testID="esim-ordering"><Row><ActivityIndicator color={colors.green} /><Small>{t('es.ordering')}</Small></Row></Box> : null}
       {e.status === 'stuck' ? <Box tone="cream" testID="esim-stuck"><Small>{e.readyBy ? t('es.sorting', { time: timeLabel(e.readyBy, { locale: getLocale() }) }) : t('es.stuck')}</Small></Box> : null}
 
+      {justSet ? <SetMoment where={e.where} /> : null}
+
       {onTrip ? (
-        <Box testID="esim-usage">
-          <Spread align="center">
-            <View style={{ flex: 1, gap: 4 }}>
-              {usage ? <H3 size={17}>{usage}</H3> : null}
-              {u?.expiresAt ? <Tiny>{t('es.ends', { date: shortDay(u.expiresAt.slice(0, 10), getLocale()) })}</Tiny> : null}
-              {e.topups.length ? <Tiny>{e.topups.map((x) => planLabel(x, t)).join(' · ')}</Tiny> : null}
-            </View>
-            {u && !u.unlimited && u.totalMb ? <Ring done={u.leftMb ?? 0} total={u.totalMb} label={`${Math.round(((u.leftMb ?? 0) / u.totalMb) * 100)}%`} /> : null}
-          </Spread>
-          <Row gap={8}>
-            {e.plan.topup ? <SmallButton testID="esim-topup" label={t('es.topup')} tone="primary" onPress={() => setTopup(true)} grow /> : null}
-            <SmallButton testID="esim-trouble" label={t('es.trouble')} onPress={openTrouble} grow />
-          </Row>
-        </Box>
+        <Rise step={1}>
+          <View testID="esim-usage" style={{ gap: 10 }}>
+            {!ringable && usage ? <H3 size={17}>{usage}</H3> : null}
+            {e.topups.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{e.topups.map((x) => <Tag key={x.at} tone="ok" label={`+ ${planLabel(x, t)}`} />)}</Row> : null}
+            <Button testID="esim-trouble" variant="secondary" label={t('es.trouble')} icon={<Icon name="wifi" size={20} />} onPress={openTrouble} />
+          </View>
+        </Rise>
       ) : null}
 
-      {delivered && ins ? (
+      {delivered && ins && e.installedAt && !details ? <TextLink testID="esim-details" label={t('es.ins.show')} onPress={() => setDetails(true)} /> : null}
+      {delivered && ins && (!e.installedAt || details) ? (
         <>
-          {!e.installedAt ? <Rise step={2}><H3 size={17}>{t('es.ins.title')}</H3></Rise> : null}
-          <Row gap={8}>
-            <SmallButton testID="esim-tab-ios" label={t('es.ins.iphoneTab')} tone={tab === 'ios' ? 'primary' : 'secondary'} onPress={() => setTab('ios')} grow />
-            <SmallButton testID="esim-tab-android" label={t('es.ins.androidTab')} tone={tab === 'android' ? 'primary' : 'secondary'} onPress={() => setTab('android')} grow />
-          </Row>
+          {flowNow < 3 ? <Rise step={2}><FlowSteps now={flowNow} /></Rise> : null}
+          {!e.installedAt ? <Rise step={2}><T style={[font('displaySmall'), { fontSize: 26, lineHeight: 30 }]} accessibilityRole="header">{t('es.ins.title')}</T></Rise> : null}
+          <View style={styles.seg} accessibilityRole="tablist">
+            {(['ios', 'android'] as const).map((k) => (
+              <Pressable key={k} testID={`esim-tab-${k}`} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} onPress={() => { buzz('select'); setTab(k); }}
+                style={[styles.segBtn, tab === k ? styles.segOn : null]}>
+                <T style={[font('h3', colors.green), { fontSize: 14 }]}>{t(k === 'ios' ? 'es.ins.iphoneTab' : 'es.ins.androidTab')}</T>
+              </Pressable>
+            ))}
+          </View>
           {tab === 'ios' ? (
-            <Box testID="esim-ios" gap={10}>
-              <Button testID="esim-ios-install" label={t('es.ins.ios')} onPress={() => { buzz('tap'); void Linking.openURL(ins.iosLink); }} />
-              <Tiny>{t('es.ins.iosNote')}</Tiny>
+            <Box testID="esim-ios" gap={14} padding={18}>
+              <Row gap={12}>
+                <IconTile name="phone" tone="gold" size={44} icon={22} />
+                <Tiny style={{ flex: 1 }}>{t('es.ins.iosNote')}</Tiny>
+              </Row>
+              <Button testID="esim-ios-install" label={t('es.ins.ios')} icon={<Icon name="sim" size={20} color={colors.mist} />} onPress={() => { buzz('tap'); void Linking.openURL(ins.iosLink); }} />
             </Box>
           ) : (
-            <Box testID="esim-android" gap={10}>
-              <View style={{ alignItems: 'center' }}><QrCode value={ins.lpa} size={200} label={t('es.ins.qrA11y')} testID="esim-qr" /></View>
-              <Small>{t('es.ins.qr')}</Small>
-              <Tiny>{t('es.ins.qrHow')}</Tiny>
-            </Box>
+            <View testID="esim-android" style={[styles.pass, shadow('card')]}>
+              <Row style={{ justifyContent: 'space-between', padding: 16, paddingBottom: 0 }}>
+                <Row gap={8}><FlagDisc country={countryOf(e.plan.coverage.countries)} size={28} /><H3 size={15}>{e.where}</H3></Row>
+                <T v="eyebrow">QR</T>
+              </Row>
+              <View style={{ alignItems: 'center', paddingVertical: 14 }}><QrCode value={ins.lpa} size={196} label={t('es.ins.qrA11y')} testID="esim-qr" /></View>
+              <View style={styles.perf}>
+                <View style={[styles.notch, { start: -11 }]} />
+                <View style={styles.dash} />
+                <View style={[styles.notch, { end: -11 }]} />
+              </View>
+              <View style={{ padding: 16, paddingTop: 12, gap: 4 }}>
+                <Small color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('es.ins.qr')}</Small>
+                <Tiny>{t('es.ins.qrHow')}</Tiny>
+              </View>
+            </View>
           )}
           {manual ? (
-            <Box testID="esim-codes" gap={10}>
+            <Box testID="esim-codes" gap={12}>
               <H3 size={15}>{t('es.ins.manual')}</H3>
               {[[t('es.ins.smdp'), ins.smdp, 'esim-smdp'], [t('es.ins.code'), ins.matchingId, 'esim-code']].map(([k, v, tid]) => (
-                <Spread key={tid}>
-                  <View style={{ flex: 1, gap: 2 }}><Tiny>{k}</Tiny><T selectable style={[{ fontSize: 15, color: colors.green, fontVariant: ['tabular-nums'] }, LTR]} testID={tid}>{v}</T></View>
-                  <SmallButton label={t('es.ins.copy')} onPress={() => void copy(v!)} />
-                </Spread>
+                <View key={tid} style={styles.code}>
+                  <View style={{ flex: 1, gap: 2 }}><Tiny>{k}</Tiny><T selectable style={[{ fontSize: 15, color: colors.green, fontFamily: ff.ui500, fontVariant: ['tabular-nums'] }, LTR]} testID={tid}>{v}</T></View>
+                  <SmallButton label={t('es.ins.copy')} tone="paper" onPress={() => void copy(v!)} />
+                </View>
               ))}
             </Box>
           ) : <TextLink testID="esim-manual" label={t('es.ins.manual')} onPress={() => setManual(true)} />}
-          <Tiny>{t('es.ins.wifi')}</Tiny>
+          <Row gap={10} align="flex-start"><Icon name="wifi" size={18} color={colors.ink3} /><Tiny style={{ flex: 1 }}>{t('es.ins.wifi')}</Tiny></Row>
           <Box testID="esim-steps">
             <H3 size={15}>{t('es.steps.title')}</H3>
             <Steps items={(tab === 'ios' ? ['es.steps.ios1', 'es.steps.ios2'] : ['es.steps.android1', 'es.steps.android2']).map((k) => ({ text: t(k as CopyKey), state: 'todo' as const }))} />
@@ -201,3 +221,14 @@ export default function EsimScreen() {
     </TripScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  seg: { flexDirection: 'row', backgroundColor: colors.grab, borderRadius: 999, padding: 4, gap: 4 },
+  segBtn: { flex: 1, height: 38, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  segOn: { backgroundColor: colors.paper, boxShadow: '0px 4px 10px -6px rgba(30,53,45,0.4)' },
+  pass: { backgroundColor: colors.paper, borderRadius: radii.card },
+  perf: { height: 22, justifyContent: 'center' },
+  notch: { position: 'absolute', width: 22, height: 22, borderRadius: 99, backgroundColor: colors.sand },
+  dash: { marginHorizontal: 18, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.grab },
+  code: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.mist, borderRadius: 16, paddingVertical: 10, paddingStart: 14, paddingEnd: 8 },
+});
