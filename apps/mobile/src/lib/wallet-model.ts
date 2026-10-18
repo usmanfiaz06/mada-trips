@@ -73,6 +73,9 @@ export function validity(p: Person | undefined, trip: NextTrip | null): Validity
   return { kind: 'ready', trip, need, until, left };
 }
 
+/** Under a year left: "Expiring" wherever a passport shows (Wallet, household, Profile), one rule (CRITIQUE-2 #8). */
+export const expiresSoon = (expiry: string) => daysBetween(todayIso(), expiry) < 365;
+
 export type PassportStatus = { key: 'none' | 'problem' | 'expired' | 'soon' | 'ok'; label: string; tone: 'muted' | 'warn' | 'gold' | 'ok'; text?: string };
 
 /** The household pill: Not scanned, Needs renewing, Expired, Expiring, Scanned. */
@@ -81,8 +84,7 @@ export function passportStatus(p: Person | undefined, trip: NextTrip | null): Pa
   const v = validity(p, trip);
   if (v.kind === 'blocked') return { key: 'problem', label: t('household.status.problem'), tone: 'warn', text: t('wallet.validity.blockedBody', { name: p.firstName || t('household.youPlain'), date: fullDay(v.expiry), country: v.trip.country, need: v.need, until: shortDay(v.until) }) };
   if (v.kind === 'expired') return { key: 'expired', label: t('household.status.expired'), tone: 'warn', text: t('household.status.expiredText', { date: fullDay(v.expiry) }) };
-  const left = daysBetween(todayIso(), p.passport.expiry);
-  if (left < 365) return { key: 'soon', label: t('household.status.soon'), tone: 'gold', text: t('household.status.soonText', { date: fullDay(p.passport.expiry) }) };
+  if (expiresSoon(p.passport.expiry)) return { key: 'soon', label: t('household.status.soon'), tone: 'gold', text: t('household.status.soonText', { date: fullDay(p.passport.expiry) }) };
   return { key: 'ok', label: t('household.status.ok'), tone: 'ok' };
 }
 

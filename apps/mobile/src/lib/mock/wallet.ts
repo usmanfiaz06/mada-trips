@@ -155,8 +155,11 @@ async function supportTrip(w: Wire, ctx: Parameters<AreaMock>[1], tripId: string
   const card = d.upcoming.find((x) => x.id === (tripId ?? d.currentId)) ?? d.upcoming[0];
   if (!card) return null;
   const live = ['daybefore', 'travelday', 'delayed', 'cancelled', 'inair', 'landed'].includes(card.phase) || tripIsNow({ startDate: card.startDate, endDate: card.endDate ?? card.startDate }, Date.parse(d.clock.now));
-  // Only a trip happening now is passed: the other mock answers (seats, a missed flight) stay as they were.
-  return live ? { id: card.id, bookingRef: null, airline: null, travellers: [], city: card.city, now: true } : null;
+  const flight = card.flight ? { code: card.flight.code, day: card.flight.date } : null;
+  // A trip happening now, or one with a flight to ask about ("Which flight?"); the other mock answers (seats, a
+  // missed flight) stay as they were, with no airline.
+  return live ? { id: card.id, bookingRef: null, airline: null, travellers: [], city: card.city, now: true, flight }
+    : flight ? { id: card.id, bookingRef: null, airline: null, travellers: [], city: card.city, now: false, flight } : null;
 }
 
 export const walletMock: AreaMock = async (w: Wire, mctx) => {

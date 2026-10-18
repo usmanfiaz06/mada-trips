@@ -31,7 +31,7 @@ async function context(userId: string, tripId: string | null): Promise<SupportCo
     : await db.select().from(appTrips).where(and(eq(appTrips.ownerId, userId), or(gte(appTrips.startDate, today), gte(appTrips.endDate, today)))).orderBy(asc(appTrips.startDate)).limit(1);
   let tripCtx: SupportContext["trip"] = null;
   if (trip) {
-    const [seg] = await db.select({ carrierName: appSegments.carrierName, departLocal: appSegments.departLocal, departTz: appSegments.departTz }).from(appSegments).where(eq(appSegments.tripId, trip.id)).orderBy(asc(appSegments.sort)).limit(1);
+    const [seg] = await db.select({ carrierName: appSegments.carrierName, flightNumber: appSegments.flightNumber, departLocal: appSegments.departLocal, departTz: appSegments.departTz }).from(appSegments).where(eq(appSegments.tripId, trip.id)).orderBy(asc(appSegments.sort)).limit(1);
     const people = trip.travellerIds.length
       ? await db.select({ givenNames: appPeople.givenNames, isSelf: appPeople.isSelf }).from(appPeople).where(inArray(appPeople.id, trip.travellerIds))
       : [];
@@ -41,6 +41,7 @@ async function context(userId: string, tripId: string | null): Promise<SupportCo
     tripCtx = {
       id: trip.id, bookingRef: trip.bookingRef, airline: seg?.carrierName ?? null, travellers: people.map((p) => ({ name: firstNameOf(p.givenNames), self: p.isSelf })),
       city: trip.city, now: tripIsNow({ startDate: trip.startDate, endDate: trip.endDate ?? trip.startDate, firstDepartUtc }, Date.now()),
+      flight: seg ? { code: seg.flightNumber, day: seg.departLocal.slice(0, 10) } : null,
     };
   }
   const [r] = await db.select({ amount: appRefunds.amount, stage: appRefunds.stage, reason: appRefunds.reason, label: appPayments.label })

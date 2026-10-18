@@ -79,7 +79,7 @@ export function householdOf(people: Person[], today: string): Household {
 }
 
 /** The name the interface uses: "You" for the account holder without a name. */
-export const personName = (p: Pick<Person, 'firstName' | 'isSelf'> | undefined | null, selfName = '') => (p ? p.firstName || (p.isSelf ? selfName || 'You' : 'Guest') : 'Guest');
+export const personName = (p: Pick<Person, 'firstName' | 'isSelf'> | undefined | null, selfName = '') => (p ? p.firstName || (p.isSelf ? selfName || t('wallet.you') : 'Guest') : 'Guest');
 
 /* ───────────── reading what people type ───────────── */
 
@@ -525,7 +525,7 @@ export function entryChecks(input: {
       ? { ...base, personId: null, name: null, key: 'eta', blocking: false, done: true, removable: false, text: t('entry.eta.asked') }
       : { ...base, personId: null, name: null, key: 'eta', blocking: false, info: true, removable: false, service: 'uk_eta', text: t('entry.eta.text'), answerKey: k });
   }
-  const nats = [...new Set(input.travellers.map(nationalityOf).filter((x): x is string => !!x))].map((n) => NATIONALITY_ADJECTIVE[n] ?? n);
+  const nats = [...new Set(input.travellers.map(nationalityOf).filter((x): x is string => !!x))].map((n) => (n in NATIONALITY_ADJECTIVE ? t(`nat.${n}` as CopyKey) : n));
   return {
     countryName: rule.name || dest?.name || '', domestic: !!rule.domestic, nationalities: nats,
     okText: !out.length && !rule.domestic ? rule.SAU?.ok ?? null : null,

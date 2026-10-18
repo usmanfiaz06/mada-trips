@@ -8,7 +8,7 @@ import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, Rise, Row, Small, Steps, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { isRTL, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { ApiError } from '@/lib/api';
 import { useDeviceOffline } from '@/lib/net/state';
@@ -30,6 +30,12 @@ function CallLink() {
 type Stage = 'choose' | 'working' | 'queued' | 'done';
 
 /** A delay, a cancellation, or a cancellation late at night (prototype Disruption). Offline choices wait in the outbox. */
+/** A person's words in the right quotes, once: whatever quotes came with them (older servers sent their own) go first. */
+const quoted = (line: string) => {
+  const bare = line.trim().replace(/^["“”«»]+|["“”«»]+$/g, '').trim();
+  return isRTL() ? `«${bare}»` : `“${bare}”`;
+};
+
 export default function Disruption() {
   const { id, kind: kindParam } = useLocalSearchParams<{ id: string; kind?: string }>();
   const router = useRouter();
@@ -122,7 +128,7 @@ export default function Disruption() {
           <Rise><BigCheck /></Rise>
           <Rise step={1}><T v="h1" accessibilityRole="header" testID="dz-done">{result?.headline ?? t('dz.sentTitle')}</T></Rise>
           <Rise step={2}><T v="body">{result?.body ?? t('dz.sentBody')}</T></Rise>
-          {result ? <Rise step={3}><Row align="flex-start"><AgentFace initial={d.agent.initial} /><T v="body" color={colors.green} style={{ flex: 1 }}>{`“${result.agentLine}”`}</T></Row></Rise> : null}
+          {result ? <Rise step={3}><Row align="flex-start"><AgentFace initial={d.agent.initial} /><T v="body" color={colors.green} style={{ flex: 1 }}>{quoted(result.agentLine)}</T></Row></Rise> : null}
         </Scroll>
         <Act><Button testID="dz-home" label={t('dz.backToday')} onPress={home} /></Act>
       </Screen>

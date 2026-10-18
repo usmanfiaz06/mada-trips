@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import {
-  DEMO_PHASE_HEADER, HotelRequests, TripPhase, derivePhase, demoNow, demoView, fareRulesFor, firstNameOf, outSegment, todayIn, TZ, AIRLINE_INFO,
+  DEMO_PHASE_HEADER, HotelRequests, TripPhase, derivePhase, demoNow, demoView, settledDemoPhase, fareRulesFor, firstNameOf, outSegment, todayIn, TZ, AIRLINE_INFO,
   type TripDetail, type TripPhase as Phase, type SegmentDetail, type StayDetail, type PickupDetail, type TripTraveller, type FlightStatus,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -176,7 +176,8 @@ function buildBase(trip: TripRow, { segs, stays, pickups, facts, charges, people
 }
 
 /** The clock for one trip: a demo moment (mock mode), or the phase from the real dates. */
-export function withClock(base: Omit<TripDetail, "clock">, override: Phase | null, now = new Date()): TripDetail {
+export function withClock(base: Omit<TripDetail, "clock">, asked: Phase | null, now = new Date()): TripDetail {
+  const override = asked ? settledDemoPhase(base, asked) : null;
   if (override) {
     const at = demoNow(base, override, now);
     const viewed = demoView(base, override);

@@ -46,7 +46,8 @@ export function TodayHeader({ clock, unread }: { clock: TripDetail['clock'] | nu
     <Spread>
       <Pressable onLongPress={() => DEMO_ALLOWED && open(true)} delayLongPress={500} accessibilityRole="text" testID="today-date">
         <T v="small" style={{ fontFamily: ff.ui500 }}>{dateLine(clock)}</T>
-        {demo ? <Tiny color={colors.goldInk}>{t('td.demo.showing', { phase: t(`td.demo.phase.${demo}`) })}</Tiny> : null}
+        {/* The moment the server is showing: after a rebook a "delay" demo has become a plain travel day. */}
+        {demo ? <Tiny color={colors.goldInk}>{t('td.demo.showing', { phase: t(`td.demo.phase.${clock?.demo ? clock.phase : demo}`) })}</Tiny> : null}
       </Pressable>
       <Row gap={8}>
         {!guest ? (

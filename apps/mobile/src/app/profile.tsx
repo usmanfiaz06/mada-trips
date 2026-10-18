@@ -65,7 +65,9 @@ function SignedIn() {
   const trip = nextTrip(trips.data);
   const list = people.data ?? [];
   const needs = list.filter((p) => ['none', 'soon', 'problem', 'expired'].includes(passportStatus(p, trip).key)).length;
-  const methods = [user?.methods.apple && t('signinMethods.apple'), user?.methods.google && t('signinMethods.google'), user?.methods.email && t('auth.methods.email'), user?.methods.phone && t('signinMethods.phone').split(' ')[0]].filter(Boolean).join(' · ');
+  // The ways in, as short words in either language ("Phone" / «الجوال»); a verified number is always a way in, so a
+  // session saved before the methods were known never reads "none" (CRITIQUE-2 #8).
+  const methods = [user?.methods.apple && t('signinMethods.apple'), user?.methods.google && t('signinMethods.google'), user?.methods.email && t('auth.methods.email'), (user?.methods.phone || !!user?.phone) && t('profile.signinPhone')].filter(Boolean).join(' · ');
   const prefs = a?.prefs;
   const seat = prefs ? t(prefs.seat === 'any' ? 'prefs.seat.anyShort' : prefs.seat === 'window' ? 'prefs.seat.window' : 'prefs.seat.aisle') : '';
   const meal = prefs ? t(`prefs.meal.${prefs.meal}` as 'prefs.meal.halal') : '';

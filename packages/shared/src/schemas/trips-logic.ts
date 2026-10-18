@@ -150,6 +150,8 @@ export const dayPart = (local: string) => local.slice(0, 10);
 export const moneyOf = (amount: Halalas) => ({ amount, currency: 'SAR' as const });
 export const seatText = (seats: readonly string[]) => (seats.length > 1 ? `${seats[0]}–${seats[seats.length - 1]}` : seats[0] ?? '');
 export const termShort = (terminal: string | null) => String(terminal ?? '').replace('Terminal ', 'T');
+/** "3" from "Terminal 3", "T3" or "3": the number alone, so a label that says "Terminal {n}" never says it twice. */
+export const terminalNo = (terminal: string | null | undefined) => String(terminal ?? '').trim().replace(/^(terminal\s*|t(?=\d))/i, '');
 export const NUM_WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 /** "you", "you two", "the four of you". */
 export const ofYou = (n: number) => (n <= 1 ? tk('trip.ofYou.one') : n === 2 ? tk('trip.ofYou.two') : tk('trip.ofYou.many', { n: NUM_WORD[n] ?? n }));
@@ -268,6 +270,17 @@ export function demoNow(trip: Pick<TripDetail, 'segments' | 'stays' | 'pickups' 
     case 'home': return back ? new Date(arriveInstant(back).getTime() + 2 * 3_600_000) : new Date(arr + 6 * 86_400_000);
     default: return realNow;
   }
+}
+
+/**
+ * The demo moment once the traveller has acted on it: after a rebook, a "delayed" or "cancelled" demo is over and the
+ * new flight is a plain travel day, so the old flight's prediction never sticks to the new one (CRITIQUE-2 #15).
+ */
+export function settledDemoPhase(trip: { rebooked?: boolean | null; disruption?: { kind: string; decided: string | null } | null }, phase: TripPhase): TripPhase {
+  const d = trip.disruption;
+  if (!trip.rebooked || !d?.decided) return phase;
+  const same = (phase === 'delayed' && d.kind === 'delay') || (phase === 'cancelled' && (d.kind === 'cancel' || d.kind === 'night'));
+  return same ? 'travelday' : phase;
 }
 
 /** Under a demo override, show what the airline would be saying at that moment (the stored trip is not changed). */
@@ -735,7 +748,11 @@ export function buildItinerary({ trip, requests, picks, planned = [] }: Itinerar
           : dest.freeDays.length ? [dest.freeDays[k++ % dest.freeDays.length]!] : [];
       const label = dayLabel(day.date, { today: day.date });
       const list = ideas.map((x) => ({ title: x.title, sub: x.title === 'Basilica Cistern' && kids ? `${x.sub} ${tk('itin.kidsFish')}` : x.sub, ask: x.ask ? x.ask.replace('{day}', label) : null }));
-      if (day.date === lastFull) list.push({ title: tk('itin.packTonight'), sub: back && arr ? tk('itin.packTonightPickup', { driver: arr.driverName ?? tk('trip.yourDriver'), time: addMinutes(hhmm(back.departLocal), -210) }) : tk('itin.packTonightCheckout'), ask: null });
+      // Only what's booked: the driver, the hotel's check-out, or the flight home; never a check-out with no hotel.
+      const packSub = back && arr ? tk('itin.packTonightPickup', { driver: arr.driverName ?? tk('trip.yourDriver'), time: addMinutes(hhmm(back.departLocal), -210) })
+        : st ? tk('itin.packTonightCheckout', { hotel: st.name })
+          : back ? tk('itin.packTonightFlight', { time: hhmm(back.departLocal) }) : null;
+      if (day.date === lastFull && packSub) list.push({ title: tk('itin.packTonight'), sub: packSub, ask: null });
       list.forEach((x, i) => day.items.push(item({ id: `idea-${day.date}-${i}`, icon: 'pin', kind: 'idea', title: x.title, sub: x.sub, ask: x.ask })));
     }
     day.items.sort((a, b) => ((a.time ?? '99') < (b.time ?? '99') ? -1 : (a.time ?? '99') > (b.time ?? '99') ? 1 : 0));
@@ -744,7 +761,7 @@ export function buildItinerary({ trip, requests, picks, planned = [] }: Itinerar
     day.title = day.date === outDay && out ? tk('itin.day.fly', { city: trip.city }) : day.date === backDay ? tk('itin.day.home') : day.free ? tk('itin.day.free') : tk('itin.day.in', { city: trip.city });
     day.docs = hasFlight
       ? [tk(n === 1 ? 'itin.docs.passport.one' : 'itin.docs.passport.other', { n }), tk('itin.docs.passes'), ...(day.date === outDay && st ? [tk('itin.docs.hotel')] : [])]
-      : [tk('itin.docs.copies')];
+      : [tk(st ? 'itin.docs.copies' : 'itin.docs.copiesNoStay')];
   }
   void home;
   return [...days.values()];

@@ -300,6 +300,7 @@ export const walletCopy = {
   'profile.detailsSub': 'Name, email, phone, home airport',
   'profile.account': 'Account',
   'profile.signin': 'Sign-in methods',
+  'profile.signinPhone': 'Phone',
   'profile.signinNone': 'None',
   'profile.prefs': 'Travel preferences',
   'profile.prefsNoLoyalty': 'no loyalty numbers yet',

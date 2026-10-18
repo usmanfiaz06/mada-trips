@@ -65,6 +65,22 @@ async function run(lang) {
     await page.waitForTimeout(1500);
   }
 
+  async function whichFlight() {
+    // CRITIQUE-2 #15: a flight problem typed weeks before the booked flight is never assumed to be it. Mada asks which
+    // flight, names the booked one, and still promises the call.
+    step(`${lang}: urgent far from the flight: which flight?`);
+    await home();
+    await go('/support');
+    await byTest('support-input').fill(lang === 'ar' ? 'رحلتي بكرة الساعة 6 الصبح انلغت، عاجل' : 'My flight tomorrow 6am got cancelled, what do I do? Urgent');
+    await byTest('support-send').click();
+    await see(lang === 'ar' ? 'أي رحلة:' : 'Which flight: SV263 on', 'which flight');
+    if (!(await page.locator('[data-testid="callback-by"]').count())) errors.push(`${lang} which flight: call-back time missing`);
+    await shot('urgent-which-flight');
+    await page.getByRole('button', { name: /SV263 · / }).locator('visible=true').first().click();
+    await see(lang === 'ar' ? 'تمام:' : 'Got it: SV263.', 'which flight answered');
+    await shot('urgent-which-flight-picked');
+  }
+
   step(`${lang}: sign in as the demo account`);
   await page.goto(ORIGIN + '/');
   await page.evaluate(() => document.fonts.ready);
@@ -99,6 +115,7 @@ async function run(lang) {
     await never('متى تبيها؟', 'when not asked');
     await never('بأي مدينة؟', 'city not asked');
     await shot('car-now-taksim-ar');
+    await whichFlight();
     await context.close();
     return;
   }
@@ -197,6 +214,8 @@ async function run(lang) {
   await never('No signal', 'never no signal while online');
   await never('offline', 'no offline wording while online');
   await shot('disruption-all-well');
+
+  await whichFlight();
   await context.close();
 }
 

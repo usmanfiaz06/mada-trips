@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useQueryClient } from '@tanstack/react-query';
-import { dobFromAge, fareLines, formatSar, localizeDigits, matchParty, partyOfPeople, personName, type Person, type SaidParty } from '@mada/shared';
+import { commaList, dobFromAge, fareLines, formatSar, localizeDigits, matchParty, partyOfPeople, personName, type Person, type SaidParty } from '@mada/shared';
 import { api, ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t, tn } from '@/lib/i18n';
@@ -185,7 +185,7 @@ export function FareBreakdown({ option, travellers, onDay, testID }: { option: P
         <View key={l.band} style={[styles.row, { justifyContent: 'space-between' }]}>
           <View style={{ flex: 1, gap: 1 }}>
             <T v="small">{t(`fare.band.${l.band}`)}</T>
-            {l.band === 'child' && l.ages.length ? <T v="tiny">{t('fare.ages', { ages: digits(l.ages.join(', ')) })}</T> : null}
+            {l.band === 'child' && l.ages.length ? <T v="tiny">{t('fare.ages', { ages: digits(commaList(l.ages.map(String))) })}</T> : null}
           </View>
           <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('fare.each', { count: digits(l.count), price: formatSar(l.each) })}</T>
         </View>

@@ -28,6 +28,8 @@ export type AskDetails = {
   answers: Record<string, string[]>; needs: Record<string, NeedKey[]>; search?: CreateRequestInput["search"] | null;
   service?: string | null; serviceFor?: { personId: string | null; need: string | null; destination: string | null } | null; clientId?: string | null;
   flightRequest?: boolean;
+  /** Who an entry service is for, so "UK ETA issued for you and Hessa" reads in the reader's language when it's done. */
+  serviceWho?: { name: string; self: boolean }[];
   // Read by Trips → Requests (lib/app/trips/requests.ts): one line, and the quote once there is one.
   short?: string; quote?: number | null; quoteText?: string | null; withWhom?: "faisal";
   // A service title as its copy key and parameters, so it reads in the reader's language (readTitle).
@@ -142,6 +144,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: words.note, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
     short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal", titleCopy,
+    ...(b.service ? { serviceWho: (b.serviceFor?.personId ? travellers.filter((p) => p.id === b.serviceFor!.personId) : travellers).map((p) => ({ name: personName(p), self: !!p.isSelf })) } : {}),
   };
   const r = await db.transaction(async (tx) => {
     const [row] = await tx.insert(appRequests).values({

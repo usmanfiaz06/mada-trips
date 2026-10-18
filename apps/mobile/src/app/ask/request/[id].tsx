@@ -54,7 +54,7 @@ export default function RequestScreen() {
           {passportsOpen ? <View style={{ marginBottom: 14 }}><TravellerPassports kind={r!.kind} people={people.data ?? []} travellerIds={r!.travellerIds} selfName={selfName} travelEnds={travelEnds(qc, { kind: 'quote', requestId: rid }, r)} testID="request-passports" /></View> : null}
           <SentRequest id={rid} screen />
           {/* How it ended, or while it's open what Mada is doing, by when and the cost (schemas/outcomes.ts). */}
-          {r?.result ? <View style={{ marginTop: 14 }}><OutcomeCard result={r.result} again={r.title} testID="request-outcome" /></View>
+          {r?.result ? <View style={{ marginTop: 14 }}><OutcomeCard result={r.result} again={r.title} title={r.title} testID="request-outcome" /></View>
             : r?.progress ? <View style={{ marginTop: 14 }}><OnItCard progress={r.progress} requestId={rid} testID="request-on-it" /></View> : null}
         </ScrollView>
         {r && r.status !== 'cancelled' ? <View style={[styles.bar, { paddingBottom: 16 + bottom }]}><ReplyBar requestId={rid} agent={agent} /></View> : null}

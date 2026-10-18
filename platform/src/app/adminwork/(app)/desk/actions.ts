@@ -230,6 +230,7 @@ export async function outcomeAction(_: ActionState, fd: FormData): Promise<Actio
     await inRequestOwnerLocale(id, () => setOutcome(u, {
       requestId: id, kind: kind.data, reason: reason.data, with: str(fd, "with") || null, note: str(fd, "note") || null, money: money.data,
       amount: amountOrNull(fd), by: /^\d{4}-\d{2}-\d{2}$/.test(by) ? by : null, next: [...new Set(next)].slice(0, 3),
+      what: str(fd, "what") || null, appealBy: /^\d{4}-\d{2}-\d{2}$/.test(str(fd, "appealBy")) ? str(fd, "appealBy") : null,
     }));
     return done("Closed. The traveller has the outcome");
   } catch (e) { return toState(e); }

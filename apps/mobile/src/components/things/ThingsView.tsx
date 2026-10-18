@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { dayLabel, liveStay, localizeDigits, parseThingWishes, thingWishLabel, type ThingWish, type ThingsQuery, type ThingsResponse } from '@mada/shared';
+import { dayLabel, daysBetween, liveStay, localizeDigits, parseThingWishes, thingWishLabel, type ThingWish, type ThingsQuery, type ThingsResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
@@ -47,7 +47,12 @@ function Heading({ title, action, onAction, testID }: { title: string; action?: 
   );
 }
 
-function TodayCard({ data }: { data: ThingsResponse }) {
+/** Weather is a fact only near the trip: more than this many days before it starts, today's sky says nothing about it. */
+const WEATHER_WITHIN_DAYS = 5;
+
+function TodayCard({ data, days }: { data: ThingsResponse; days: string[] }) {
+  // A trip weeks away hears nothing of today's rain there (CRITIQUE-2 #12).
+  if (days[0] && daysBetween(data.day, days[0]) > WEATHER_WITHIN_DAYS) return null;
   const w = data.weather;
   const why = data.today?.why;
   if (!w && !why && !data.today?.prayer) return null;
@@ -150,7 +155,7 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
     );
     return (
       <View style={{ gap: 14 }}>
-        <TodayCard data={data} />
+        <TodayCard data={data} days={days} />
         {data.status === 'none' && !data.experiences.length && !data.events.length ? (
           <View style={[st.note, shadow('card')]} testID="things-none">
             <T v="small" color={colors.green} style={{ textAlign: 'center' }}>{t('things.none', { city: ctx.city })}</T>

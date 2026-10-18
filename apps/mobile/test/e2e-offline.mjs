@@ -176,6 +176,12 @@ try {
     await p.byTest('battery-screen').waitFor({ state: 'visible', timeout: 8000 });
     await p.see('Just the essentials', 'battery title');
     await p.see('Next flight', 'battery flight');
+    // CRITIQUE-2 #11: the terminal said once, the day of the flight, and when to leave.
+    const fl = await p.byTest('battery-flight').innerText().catch(() => '');
+    if (/Terminal\s+Terminal/.test(fl)) errors.push('battery: "Terminal Terminal"');
+    if (!/Terminal 3/.test(fl)) errors.push(`battery: no terminal in "${fl}"`);
+    if (!/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} [A-Z][a-z]{2}/.test(fl)) errors.push(`battery: no day on the flight in "${fl}"`);
+    await p.see('Leave for the airport', 'battery leave line');
     await p.see('Bereketzade', 'battery hotel');
     await p.see('فندق بيريكت زاده', 'battery hotel in Arabic');
     await p.see('+966 56 668 2662', 'Mada number');
@@ -277,6 +283,12 @@ try {
     await p.byTest('battery-screen').waitFor({ state: 'visible', timeout: 8000 });
     await p.see('المهم بس', 'battery title ar');
     await p.see('رحلتك الجاية', 'battery flight ar');
+    // The route stays left to right inside the Arabic line ("RUH → IST", never "IST → RUH").
+    const line = await p.byTest('battery-flight-line').innerText().catch(() => '');
+    if (!line.includes('\u2066RUH → IST\u2069')) errors.push(`battery ar: route not isolated in "${line}"`);
+    const fla = await p.byTest('battery-flight').innerText().catch(() => '');
+    if (/الصالة\s+(الصالة|Terminal)/.test(fla)) errors.push('battery ar: terminal said twice');
+    await p.see('اطلع للمطار', 'battery leave line ar');
     await p.see('اتصل على مادا', 'call Mada ar');
     await p.shot('battery-screen-ar');
     await p.context.close();

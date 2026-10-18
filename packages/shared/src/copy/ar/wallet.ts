@@ -299,6 +299,7 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'profile.detailsSub': 'الاسم، البريد، الجوال، مطارك الأساسي',
   'profile.account': 'الحساب',
   'profile.signin': 'طرق تسجيل الدخول',
+  'profile.signinPhone': 'الجوال',
   'profile.signinNone': 'ولا شي',
   'profile.prefs': 'تفضيلات السفر',
   'profile.prefsNoLoyalty': 'ما فيه أرقام عضوية بعد',

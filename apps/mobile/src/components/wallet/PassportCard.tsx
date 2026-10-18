@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { fontFamilies, makeTd3, type Person } from '@mada/shared';
 import { t } from '@/lib/i18n';
-import { fullDay, fullNameOf, monthYear, type Validity } from '@/lib/wallet-model';
+import { expiresSoon, fullDay, fullNameOf, monthYear, type Validity } from '@/lib/wallet-model';
 import { colors, font, shadow, textLeft } from '@/theme';
 import { Button } from '../Button';
 import { Icon } from '../Icon';
@@ -27,7 +27,8 @@ export function chipFor(p: Person | undefined, v: Validity): Chip {
     case 'expired': return { text: t('wallet.chip.expired'), bg: 'rgba(217,183,122,0.22)', fg: '#e6c88f' };
     case 'spare': return { text: t('wallet.chip.spare', { days: v.left - v.need }), bg: 'rgba(217,183,122,0.18)', fg: '#e6c88f' };
     case 'ready': return { text: t('wallet.chip.ready', { city: v.trip.city }), bg: 'rgba(63,154,99,0.22)', fg: '#9fd5b2' };
-    default: return { text: t('wallet.chip.valid'), bg: 'rgba(63,154,99,0.22)', fg: '#9fd5b2' };
+    // The household's word for the same passport: "Expiring" under a year, never "valid" beside it.
+    default: return expiresSoon(p.passport.expiry) ? { text: t('household.status.soon'), bg: 'rgba(217,183,122,0.18)', fg: '#e6c88f' } : { text: t('wallet.chip.valid'), bg: 'rgba(63,154,99,0.22)', fg: '#9fd5b2' };
   }
 }
 

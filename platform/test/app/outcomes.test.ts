@@ -6,7 +6,7 @@ import { appDeskItems } from "@/db/app-schema-desk";
 import { appOrders } from "@/db/app-schema-booking";
 import { createSession } from "@/lib/app/tokens";
 import type { DeskActor } from "@/lib/app/desk/core";
-import { nudgeRequest, progressOfRequest, resultOfRequest, setOutcome, setPromise } from "@/lib/app/outcomes";
+import { nudgeRequest, pastDatesJob, progressOfRequest, resultOfRequest, setOutcome, setPromise } from "@/lib/app/outcomes";
 import { renderNotification } from "@/lib/app/notify-copy";
 import { toRequestView } from "@/lib/app/trips/requests";
 import { cancelOrder } from "@/lib/app/booking/desk";
@@ -53,7 +53,7 @@ describe("request outcomes (critique 5)", () => {
     expect(n.title).toBe("Mada couldn’t get this one");
     // The traveller switched to Arabic since: the reason is worded in Arabic when the inbox is read.
     expect(renderNotification(n, "ar").body).toMatch(/ما عندهم شي متاح/);
-    await expect(setOutcome(me, { requestId: r.id, kind: "issued", reason: "done", with: null, note: null, money: "none", amount: null, by: null, next: [] })).rejects.toThrow(/already has its outcome/);
+    await expect(setOutcome(me, { requestId: r.id, kind: "issued", reason: "done", with: null, note: null, money: "none", amount: null, by: null, next: [], what: "Rooms booked" })).rejects.toThrow(/already has its outcome/);
   });
 
   it("partial: says what was done, keeps the money for that part, and needs the agent's line", async () => {
@@ -116,5 +116,60 @@ describe("Mada is on it (critique 6)", () => {
     await nudgeRequest(u.id, fresh.id, null);
     const [f] = await db.select().from(appRequests).where(eq(appRequests.id, fresh.id));
     expect((f!.details as { nudgedAt?: string }).nudgedAt).toBeUndefined();
+  });
+});
+
+describe("outcomes that say what (CRITIQUE-2 #7)", () => {
+  it("issued needs the line of what was done, and the traveller reads it first", async () => {
+    const me = await opsUser("Noura");
+    const u = await traveller();
+    const r = await request(u.id, { kind: "visa", summary: "UK ETA", details: { source: "ask", askKind: "visa", service: "uk_eta" } });
+    await expect(setOutcome(me, { requestId: r.id, kind: "issued", reason: "done", with: null, note: null, money: "charged", amount: 45000, by: null, next: [] })).rejects.toThrow(/Say what was done/);
+    const res = await setOutcome(me, { requestId: r.id, kind: "issued", reason: "done", with: null, note: null, money: "charged", amount: 45000, by: null, next: [], what: "UK ETA issued for you and Hessa" });
+    expect(res.what).toBe("UK ETA issued for you and Hessa");
+    const [msg] = await db.select().from(appMessages).where(eq(appMessages.threadId, r.id));
+    expect(msg!.body).toMatch(/^UK ETA issued for you and Hessa\. .*SAR 450 paid\./);
+  });
+
+  it("a refused visa: the appeal deadline, applying again, and the flights and hotel", async () => {
+    const me = await opsUser("Noura");
+    const u = await traveller();
+    const r = await request(u.id, { kind: "visa", summary: "Visa: Schengen", details: { source: "ask", askKind: "visa" } });
+    const res = await setOutcome(me, { requestId: r.id, kind: "refused", reason: "visa_refused", with: "The French embassy", note: null, money: "none", amount: null, by: null, next: [], appealBy: "2026-11-20" });
+    expect(res).toMatchObject({ kind: "refused", reason: "visa_refused", appealBy: "2026-11-20", next: ["appeal", "reapply", "trip_options"] });
+    const [msg] = await db.select().from(appMessages).where(eq(appMessages.threadId, r.id));
+    expect(msg!.body).toMatch(/The French embassy refused the visa\. You can appeal until .*20 Nov.* Or apply again.* Your flights and hotel: change the dates, or get your money back\./);
+  });
+
+  it("a passport renewal shows its own step, never the visa rules", async () => {
+    const u = await traveller();
+    const r = await request(u.id, { kind: "visa", summary: "Renew Noura's passport", details: { source: "ask", askKind: "visa", service: "passport_renewal" } });
+    expect(progressOfRequest(r)?.step).toBe("renewing");
+  });
+
+  it("past its dates: unpaid closes, nothing charged, said in the thread; paid or travelling tomorrow goes to the desk", async () => {
+    const u = await traveller();
+    const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+    const stale = await request(u.id, { kind: "stay", status: "quoted", summary: "Stays in Istanbul", details: { source: "ask", askKind: "stay", search: { depart: day(-3), return: day(-1) } } });
+    const paid = await request(u.id, { kind: "flight", status: "with_agent", summary: "Flights to Dubai", details: { source: "ask", askKind: "flight", search: { depart: day(-2) } } });
+    const soon = await request(u.id, { kind: "flight", status: "reviewing", summary: "Flights to Cairo", details: { source: "ask", askKind: "flight", search: { depart: day(1) } } });
+    const later = await request(u.id, { kind: "flight", status: "reviewing", summary: "Flights to Baku", details: { source: "ask", askKind: "flight", search: { depart: day(20) } } });
+    const first = await pastDatesJob();
+    expect(first.closed).toBeGreaterThanOrEqual(1);
+    const [s] = await db.select().from(appRequests).where(eq(appRequests.id, stale.id));
+    expect(s!.status).toBe("cancelled");
+    expect(resultOfRequest(s!)).toMatchObject({ kind: "cancelled", reason: "dates_passed", money: { kind: "none" } });
+    const [msg] = await db.select().from(appMessages).where(eq(appMessages.threadId, stale.id));
+    expect(msg!.body).toMatch(/The dates passed before Mada could arrange it\. .*Nothing was charged\./);
+    for (const id of [paid.id, soon.id]) {
+      const [item] = await db.select().from(appDeskItems).where(eq(appDeskItems.itemId, id));
+      expect(item?.escalatedAt).toBeTruthy();
+    }
+    const [p] = await db.select().from(appRequests).where(eq(appRequests.id, paid.id));
+    expect(p!.status).toBe("with_agent");
+    expect(await db.select().from(appDeskItems).where(eq(appDeskItems.itemId, later.id))).toHaveLength(0);
+    // Twice is the same as once.
+    await pastDatesJob();
+    expect(await db.select().from(appMessages).where(eq(appMessages.threadId, stale.id))).toHaveLength(1);
   });
 });

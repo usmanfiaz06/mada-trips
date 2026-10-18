@@ -33,30 +33,40 @@ export const OutcomePill = ({ r }: { r: Pick<RequestResult, 'kind'> }) => <Tag l
  * The outcome: the headline, why in plain words, what happens to the money, and the buttons on. `again` is what Ask
  * opens with for "Book another" and "Try other dates" ("Flights to Istanbul").
  */
-export function OutcomeCard({ result, tripId, again, compact, why, testID = 'outcome' }: {
-  result: RequestResult; tripId?: string | null; again?: string | null; compact?: boolean;
+export function OutcomeCard({ result, tripId, again, title, compact, why, testID = 'outcome' }: {
+  result: RequestResult; tripId?: string | null; again?: string | null; title?: string | null; compact?: boolean;
   /** The reason in the product's own words, when the generic one would mislead (an eSIM is never "for those dates"). */
   why?: string | null; testID?: string;
 }) {
   const router = useRouter();
   const go = (n: OutcomeNext) => {
     buzz('tap');
-    if (n === 'talk') router.push('/support' as Href);
+    if (n === 'talk' || n === 'appeal') router.push((n === 'appeal' ? '/support?topic=docs' : '/support') as Href);
     else if (n === 'see_trip' && tripId) router.push({ pathname: '/trip/[id]', params: { id: tripId } });
+    // A refused visa's flights and hotel: the trip's change and refund choices, or the trips list to pick it.
+    else if (n === 'trip_options') router.push((tripId ? `/trip/${tripId}/change` : '/trips') as Href);
     else router.push((again ? { pathname: '/ask', params: { prefill: again } } : '/ask') as Href);
   };
   const next = result.next.filter((n) => n !== 'see_trip' || !!tripId);
+  const visa = result.kind === 'refused' && result.reason === 'visa_refused';
   return (
     <Box tone={result.kind === 'issued' ? 'paper' : 'well'} gap={10} testID={`${testID}-${result.kind}`}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         {/* The headline takes the row's width, so it never breaks into one word a line beside the pill. */}
-        <T balance={false} style={[font(compact ? 'h3' : 'displaySmall'), { flex: 1, minWidth: 0 }]} accessibilityRole="header">{say(outcomeHead(result))}</T>
+        <T balance={false} style={[font(compact ? 'h3' : 'displaySmall'), { flex: 1, minWidth: 0 }]} accessibilityRole="header">{say(outcomeHead(result, title))}</T>
         {compact ? null : <OutcomePill r={result} />}
       </Row>
       {result.kind !== 'issued' || result.reason !== 'done' ? (
         <View style={{ gap: 2 }}>
           {compact ? null : <Eyebrow>{t('oc.label.why')}</Eyebrow>}
           <Small color={colors.green}>{why ?? say(outcomeWhy(result))}</Small>
+        </View>
+      ) : null}
+      {visa ? (
+        <View style={{ gap: 4 }} testID={`${testID}-visa`}>
+          <Small color={colors.green}>{result.appealBy ? t('oc.visa.appealBy', { day: dayLabel(result.appealBy) }) : t('oc.visa.appealAsk')}</Small>
+          <Small color={colors.green}>{t('oc.visa.reapply')}</Small>
+          <Small color={colors.green}>{t('oc.visa.trip')}</Small>
         </View>
       ) : null}
       {result.note ? (

@@ -26,7 +26,7 @@ import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useAccount, useCards, useCredit, useDocuments, useRefreshHousehold, useTrips, walletApi } from '@/lib/wallet';
 import { useWalletLock } from '@/lib/wallet-lock';
-import { fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
+import { expiresSoon, fullDay, isHelper, nextTrip, shortDay, validity, type NextTrip, type Validity } from '@/lib/wallet-model';
 import { colors, ff, shadow } from '@/theme';
 import { dt, HAS_APPLE_PAY, HAS_BIOMETRICS } from '@/lib/device';
 import { requireAccount } from '@/lib/signin-ask';
@@ -122,7 +122,7 @@ function Unlocked() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -20 }} contentContainerStyle={{ gap: 8, paddingHorizontal: 20 }} accessibilityLabel={t('wallet.whose')}>
           {list.map((p) => {
             const pv = validity(p, trip);
-            const dot = !p.passport ? DOT.none : pv.kind === 'blocked' || pv.kind === 'expired' || pv.kind === 'spare' ? DOT.warn : DOT.ok;
+            const dot = !p.passport ? DOT.none : pv.kind === 'blocked' || pv.kind === 'expired' || pv.kind === 'spare' || expiresSoon(p.passport.expiry) ? DOT.warn : DOT.ok;
             return <Chip key={p.id} on={who?.id === p.id} label={name(p)} onPress={() => setWho(p.id)} icon={() => <View style={[styles.dot, { backgroundColor: dot }]} />} />;
           })}
         </ScrollView>

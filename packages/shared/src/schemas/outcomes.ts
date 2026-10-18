@@ -22,11 +22,14 @@ export type OutcomeKind = z.infer<typeof OutcomeKind>;
 /** Why it ended. The desk picks one; the traveller reads it in plain words (oc.why.*). */
 export const OutcomeReason = z.enum([
   'done', 'sold_out', 'rules', 'price', 'documents', 'no_reply', 'too_late', 'payment', 'part', 'you_asked', 'mada', 'other',
+  // The embassy said no (an appeal deadline, apply again, and the flights and hotel to change or refund); the
+  // request's dates passed before it could be done (closed by the job, nothing charged).
+  'visa_refused', 'dates_passed',
 ]);
 export type OutcomeReason = z.infer<typeof OutcomeReason>;
 
 /** The buttons under an outcome. */
-export const OutcomeNext = z.enum(['book_again', 'other_dates', 'talk', 'see_trip']);
+export const OutcomeNext = z.enum(['book_again', 'other_dates', 'talk', 'see_trip', 'appeal', 'reapply', 'trip_options']);
 export type OutcomeNext = z.infer<typeof OutcomeNext>;
 
 /**
@@ -43,6 +46,13 @@ export type OutcomeMoney = z.infer<typeof OutcomeMoney>;
 export const RequestResult = z.object({
   kind: OutcomeKind,
   reason: OutcomeReason,
+  /**
+   * What was done, in a line the traveller can't misread: "UK ETA issued for you and Hessa". The desk must write it to
+   * close a request as issued (CRITIQUE-2 #7); older results have none, and the app falls back to the request's title.
+   */
+  what: z.string().max(160).nullable().optional(),
+  /** A refused visa: the last day to appeal, when the embassy gave one. */
+  appealBy: IsoDay.nullable().optional(),
   /** Who said yes or no: an airline, a hotel ("Swissôtel Makkah"), an embassy. */
   with: z.string().nullable(),
   /** The agent's own words, shown as theirs. */
@@ -56,7 +66,7 @@ export const RequestResult = z.object({
 export type RequestResult = z.infer<typeof RequestResult>;
 
 /** What Mada is doing right now, in one step. */
-export const OnItStep = z.enum(['reading', 'asking_airline', 'asking_hotel', 'asking_embassy', 'searching', 'pricing', 'booking', 'issuing', 'refunding']);
+export const OnItStep = z.enum(['reading', 'asking_airline', 'asking_hotel', 'asking_embassy', 'searching', 'pricing', 'booking', 'issuing', 'refunding', 'applying', 'renewing']);
 export type OnItStep = z.infer<typeof OnItStep>;
 
 /**
@@ -87,6 +97,10 @@ export const DeskOutcomeInput = z.object({
   amount: z.number().int().min(0).max(100_000_000).nullable(),
   by: IsoDay.nullable(),
   next: z.array(OutcomeNext).max(3),
+  /** What was done, for an issued outcome (required there): "UK ETA issued for you and Hessa". */
+  what: z.string().trim().max(160).nullable().optional(),
+  /** A refused visa: the last day to appeal. */
+  appealBy: IsoDay.nullable().optional(),
 });
 export type DeskOutcomeInput = z.infer<typeof DeskOutcomeInput>;
 
@@ -113,8 +127,11 @@ export const canNudge = (p: Pick<RequestProgress, 'dueAt' | 'nudgedAt'>, now = D
   isLate(p, now) && (!p.nudgedAt || now - Date.parse(p.nudgedAt) >= NUDGE_EVERY_MS);
 
 /** The buttons an outcome gets when the desk didn't choose: always a way on, and Mada for anything else. */
-export function defaultNext(kind: OutcomeKind, o: { booking?: boolean; trip?: boolean } = {}): OutcomeNext[] {
+export function defaultNext(kind: OutcomeKind, o: { booking?: boolean; trip?: boolean; reason?: OutcomeReason } = {}): OutcomeNext[] {
   if (kind === 'issued') return o.trip ? ['see_trip'] : [];
+  // A refused visa: appeal, apply again, and what to do about the flights and hotel.
+  if (kind === 'refused' && o.reason === 'visa_refused') return ['appeal', 'reapply', 'trip_options'];
+  if (o.reason === 'dates_passed') return o.booking ? ['other_dates', 'talk'] : ['talk'];
   if (kind === 'withdrawn') return o.booking ? ['book_again'] : [];
   if (kind === 'partial') return o.trip ? ['see_trip', 'talk'] : ['talk'];
   return o.booking ? ['other_dates', 'talk'] : ['talk'];
@@ -133,6 +150,8 @@ const nothing: OutcomeMoney = { kind: 'none', amount: null, by: null };
 export function resultFromLegacy(r: {
   status: string; outcome?: 'yes' | 'no' | null; alt?: string | null; yesText?: string | null; withdrawn?: boolean; withName?: string | null;
   quote?: { amount: number; currency: 'SAR' } | null; updatedAt: string; agent?: string | null; booking?: boolean; tripId?: string | null;
+  /** What was done, when the caller can say (a service the scripted desk issued). */
+  what?: string | null;
 }): RequestResult | null {
   const base = { with: r.withName ?? null, by: null, at: r.updatedAt };
   const ctx = { booking: !!r.booking, trip: !!r.tripId };
@@ -140,7 +159,7 @@ export function resultFromLegacy(r: {
   if (r.outcome === 'no') return { ...base, kind: 'refused', reason: 'rules', note: r.alt ?? null, money: nothing, next: defaultNext('refused', ctx) };
   if (r.status === 'done' || r.status === 'confirmed' || r.status === 'paid') {
     const paid = r.quote && r.quote.amount > 0 ? { kind: 'charged' as const, amount: r.quote, by: null } : nothing;
-    return { ...base, kind: 'issued', reason: 'done', note: r.yesText ?? null, money: paid, next: defaultNext('issued', ctx) };
+    return { ...base, kind: 'issued', reason: 'done', what: r.what ?? null, note: r.yesText ?? null, money: paid, next: defaultNext('issued', ctx) };
   }
   if (r.status === 'cancelled') return { ...base, kind: 'cancelled', reason: 'mada', note: null, money: nothing, next: defaultNext('cancelled', ctx) };
   return null;
@@ -172,15 +191,30 @@ export function partialResult(o: { with: string | null; note: string; quote?: { 
   };
 }
 
+/** The step for an entry service: a renewal is booked with the passport office, the rest are applications. */
+export const serviceStep = (service: string): OnItStep => (service === 'passport_renewal' ? 'renewing' : 'applying');
+
+/** What an issued entry service did, as words the reader's language picks: "UK ETA issued for you and Hessa". */
+export function serviceWhat(service: string | null | undefined, o: { names: string; need?: string | null }): CopyRef | null {
+  if (!service) return null;
+  if (service === 'uk_eta') return ['oc.what.uk_eta', { names: o.names }];
+  if (service === 'evisa') return ['oc.what.evisa', { names: o.names, need: o.need || 'Visa' }];
+  if (service === 'reentry') return ['oc.what.reentry', { names: o.names }];
+  if (service === 'passport_renewal') return ['oc.what.passport_renewal', { names: o.names }];
+  return null;
+}
+
 /** Where an open request stands when the desk hasn't said: who Mada is asking, Mada's usual time, the cost so far. */
 export function progressFromStatus(r: {
   status: string; withWhom?: 'airline' | 'hotel' | 'faisal' | null; withName?: string | null; kind?: string | null; area?: string | null;
   quote?: { amount: number; currency: 'SAR' } | null; createdAt: string; promisedBy?: string | null;
+  /** The entry service asked for (a passport renewal, a UK ETA): its own step, never "Checking the visa rules". */
+  service?: string | null;
 }): RequestProgress | null {
   if (!['queued', 'sent', 'reviewing', 'with_agent'].includes(r.status)) return null;
   const supplier = r.withWhom === 'airline' || r.withWhom === 'hotel';
   const refund = r.area === 'refund' || r.kind === 'refund';
-  const step: OnItStep = refund ? 'refunding' : r.withWhom === 'airline' ? 'asking_airline' : r.withWhom === 'hotel' ? 'asking_hotel'
+  const step: OnItStep = refund ? 'refunding' : r.service ? serviceStep(r.service) : r.withWhom === 'airline' ? 'asking_airline' : r.withWhom === 'hotel' ? 'asking_hotel'
     : r.kind === 'visa' ? 'asking_embassy' : r.status === 'sent' || r.status === 'queued' ? 'reading' : r.kind === 'flight' || r.kind === 'stay' || r.kind === 'package' ? 'searching' : 'pricing';
   const minutes = refund ? ON_IT_MINUTES.refund : supplier ? ON_IT_MINUTES.supplier : ON_IT_MINUTES.request;
   const dueAt = r.promisedBy ?? new Date(Date.parse(r.createdAt) + minutes * 60_000).toISOString();
@@ -191,10 +225,16 @@ export function progressFromStatus(r: {
 /* ───────── words (copy keys; the reader's language picks them) ───────── */
 
 export type CopyRef = [CopyKey, Vars?];
-const WITH_REASONS: OutcomeReason[] = ['sold_out', 'rules', 'no_reply'];
+const WITH_REASONS: OutcomeReason[] = ['sold_out', 'rules', 'no_reply', 'visa_refused'];
 
 /** The headline: "It's done." · "Not this time." · "Some of it is done." */
-export const outcomeHead = (r: Pick<RequestResult, 'kind'>): CopyRef => [`oc.head.${r.kind}` as CopyKey];
+export const outcomeHead = (r: Pick<RequestResult, 'kind' | 'what'>, title?: string | null): CopyRef => {
+  const what = r.what?.trim().replace(/[.。]+$/, '');
+  if (what && (r.kind === 'issued' || r.kind === 'partial')) return ['oc.head.what', { what }];
+  // An older issued result with no line: at least name the thing that was done, never a bare "It's done."
+  if (r.kind === 'issued' && title) return ['oc.head.issuedTitle', { title }];
+  return [`oc.head.${r.kind}` as CopyKey];
+};
 
 /** The reason in plain words, naming who said no when we know. */
 export const outcomeWhy = (r: Pick<RequestResult, 'reason' | 'with'>): CopyRef =>

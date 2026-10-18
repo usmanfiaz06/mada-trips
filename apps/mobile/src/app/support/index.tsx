@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { DESK_PHONE, DESK_SMS, DESK_TEL, DESK_WHATSAPP, SUPPORT_TOPICS, checkUpload, formatSar, rangeLabel, wordFor, type SupportMessage, type SupportTopic } from '@mada/shared';
+import { DESK_PHONE, DESK_SMS, DESK_TEL, DESK_WHATSAPP, SUPPORT_TOPICS, checkUpload, formatSar, rangeLabel, tripIsNow, wordFor, zonedToInstant, type SupportMessage, type SupportTopic } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Field } from '@/components/Field';
@@ -69,9 +69,13 @@ function SupportChat() {
   const user = useSession((s) => s.user);
   const trips = useTrips();
   const trip = nextTrip(trips.data);
-  const tripId = tripParam ?? undefined;
+  // A trip under way or flying within 24 hours: help is about that trip, so its conversation opens, not the account's
+  // (CRITIQUE-2 #15). Asked for a thread or a trip by name: that one.
+  const out = trip?.trip.segments.find((x) => x.direction === 'out');
+  const live = !tripParam && !threadParam && !!trip && tripIsNow({ startDate: trip.trip.startDate, endDate: trip.trip.endDate ?? trip.trip.startDate, firstDepartUtc: out ? zonedToInstant(out.departLocal, out.departTz).toISOString() : null }, Date.now());
+  const tripId = tripParam ?? (live ? trip!.id : undefined);
   const key = threadParam ?? (tripId ? `trip:${tripId}` : 'account');
-  const q = useApiQuery({ queryKey: walletKeys.thread(key), refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
+  const q = useApiQuery({ queryKey: walletKeys.thread(key), enabled: !!threadParam || !!tripParam || trips.data !== undefined || trips.fetchStatus !== 'fetching', refetchOnMount: 'always', refetchInterval: 10_000, queryFn: () => (threadParam ? walletApi.thread(threadParam) : walletApi.openThread(tripId ? { tripId } : {})) });
   const th = q.data?.thread;
   const phoneOffline = useDeviceOffline();
   const presence = usePresence(th?.id && q.data?.messages.some((m) => m.author.kind === 'user') ? th.id : undefined);

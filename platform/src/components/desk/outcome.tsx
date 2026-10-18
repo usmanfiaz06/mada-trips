@@ -16,11 +16,12 @@ export const OUTCOME_KINDS = [["issued", "Issued: all done"], ["partial", "Parti
 export const OUTCOME_REASONS = [
   ["done", "Done as asked"], ["part", "Part of it could be done"], ["sold_out", "Sold out for those dates"], ["rules", "Airline or hotel rules"], ["price", "The price went up"],
   ["documents", "Documents or entry rules"], ["no_reply", "No answer in time"], ["too_late", "Too close to the date"], ["payment", "Payment didn't go through"],
-  ["you_asked", "The traveller asked to stop"], ["mada", "We stopped it"], ["other", "Something else (say in the note)"],
+  ["you_asked", "The traveller asked to stop"], ["mada", "We stopped it"], ["visa_refused", "The embassy refused the visa"], ["dates_passed", "The dates passed"],
+  ["other", "Something else (say in the note)"],
 ] as const;
-const STEPS = [["reading", "Reading the request"], ["asking_airline", "Asking the airline"], ["asking_hotel", "Asking the hotel"], ["asking_embassy", "Checking visa rules"], ["searching", "Finding options"], ["pricing", "Pricing it"], ["booking", "Booking it"], ["issuing", "Issuing tickets"], ["refunding", "Sorting the refund"]] as const;
+const STEPS = [["reading", "Reading the request"], ["asking_airline", "Asking the airline"], ["asking_hotel", "Asking the hotel"], ["asking_embassy", "Checking visa rules"], ["applying", "Filling in the application"], ["renewing", "Booking the passport renewal"], ["searching", "Finding options"], ["pricing", "Pricing it"], ["booking", "Booking it"], ["issuing", "Issuing tickets"], ["refunding", "Sorting the refund"]] as const;
 const MONEY = [["none", "Nothing charged"], ["refund", "Refund to the card"], ["credit", "Back as Mada credit"], ["kept", "Kept for the part done"], ["charged", "Paid in full"]] as const;
-const NEXT = [["other_dates", "Try other dates"], ["book_again", "Book another"], ["talk", "Talk to Mada"], ["see_trip", "See the trip"]] as const;
+const NEXT = [["other_dates", "Try other dates"], ["book_again", "Book another"], ["talk", "Talk to Mada"], ["see_trip", "See the trip"], ["appeal", "Appeal"], ["reapply", "Apply again"], ["trip_options", "Change or refund the trip"]] as const;
 const COST = [["later", "Price comes with the answer"], ["free", "No cost"], ["quoted", "Quoted"], ["paid", "Paid"]] as const;
 
 const opts = (t: T, xs: readonly (readonly [string, string])[]) => xs.map(([value, label]) => ({ value, label: t(label) }));
@@ -35,6 +36,8 @@ export function OutcomeCard({ requestId, act, open, result, progress, t }: { req
         <dl className="space-y-1.5 text-[13.5px]">
           <div className="flex justify-between gap-3"><dt className="text-ink-3">{t("Reason")}</dt><dd>{t(OUTCOME_REASONS.find(([k]) => k === result.reason)?.[1] ?? result.reason)}{result.with ? ` · ${result.with}` : ""}</dd></div>
           <div className="flex justify-between gap-3"><dt className="text-ink-3">{t("Money")}</dt><dd>{t(MONEY.find(([k]) => k === result.money.kind)?.[1] ?? result.money.kind)}{result.money.amount ? ` · ${formatSar(result.money.amount.amount)}` : ""}{result.money.by ? ` · ${result.money.by}` : ""}</dd></div>
+          {result.what && <div className="flex justify-between gap-3"><dt className="text-ink-3">{t("What was done")}</dt><dd>{result.what}</dd></div>}
+          {result.appealBy && <div className="flex justify-between gap-3"><dt className="text-ink-3">{t("Appeal by")}</dt><dd>{result.appealBy}</dd></div>}
           {result.note && <p className="rounded-2xl bg-surface-2 px-3.5 py-2 text-ink-2">“{result.note}”</p>}
           <div className="text-[12.5px] text-ink-3">{result.by ?? "Mada"} · {fmtDate(new Date(result.at), L, true)}</div>
         </dl>
@@ -69,7 +72,9 @@ export function OutcomeCard({ requestId, act, open, result, progress, t }: { req
             <Select name="money" defaultValue="none" options={opts(t, MONEY)} aria-label={t("Money")} />
             <Input name="amount" inputMode="decimal" placeholder={t("Amount, SAR")} />
             <Input type="date" name="by" aria-label={t("Refund lands by")} />
+            <Input type="date" name="appealBy" aria-label={t("A refused visa: appeal by")} />
           </div>
+          <Input name="what" maxLength={160} placeholder={t("What was done (needed for Issued): UK ETA issued for you and Hessa")} />
           <Textarea name="note" rows={2} maxLength={300} placeholder={t("A line for the traveller: what was and wasn't done")} />
           <fieldset className="flex flex-wrap gap-3 text-[13px] text-ink-2">
             <legend className="mb-1 text-[12.5px] text-ink-3">{t("Next step buttons (none ticked: Mada picks)")}</legend>

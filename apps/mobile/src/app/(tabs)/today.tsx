@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, ScrollView, View } from 'react-native';
 import { useScrollToTop } from 'expo-router';
+import { outSegment } from '@mada/shared';
 import { Screen, useTopInset } from '@/components/Layout';
 import { BannerHost, DemoSheet, TodayHeader, Wash, todayHour } from '@/components/today/common';
 import { Booked } from '@/components/today/Booked';
@@ -49,7 +50,8 @@ export default function Today() {
       case 'booked': body = <Booked trip={trip} />; break;
       case 'daybefore': body = <DayBefore trip={trip} scrollTo={(y) => scroll.current?.scrollTo({ y: y - 8, animated: true })} />; break;
       case 'travelday': body = <TravelDay trip={trip} now={now} updatedAt={tripQ.dataUpdatedAt} />; break;
-      case 'delayed': body = <TravelDay trip={trip} predicted now={now} updatedAt={tripQ.dataUpdatedAt} />; break;
+      // "May leave late" only while the delay is our prediction; an announced delay (or a new flight) says its own facts.
+      case 'delayed': body = <TravelDay trip={trip} predicted={!!outSegment(trip)?.predictedDelay} now={now} updatedAt={tripQ.dataUpdatedAt} />; break;
       case 'cancelled': body = <Cancelled trip={trip} />; break;
       case 'inair': body = <InAir trip={trip} now={now} />; break;
       case 'landed': body = <Landed trip={trip} />; break;

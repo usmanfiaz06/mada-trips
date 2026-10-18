@@ -196,6 +196,8 @@ export const bookingCopy = {
   'entry.domestic': 'a flight inside Saudi Arabia',
   'entry.for': '{country}, for {nationalities} passports',
   'entry.forYour': '{country}, for your passports',
+  'nat.SAU': 'Saudi',
+  'nat.PHL': 'Philippine',
   'entry.passport.title': '{name} can’t travel on this passport.',
   'entry.passport.days': '{name}’s passport expires on {date}. {country} needs {days} days after you land, so it must be valid until {until}.',
   'entry.passport.trip': '{name}’s passport expires on {date}, before you’re back. It must be valid for the whole trip.',

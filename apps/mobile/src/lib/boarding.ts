@@ -81,3 +81,10 @@ export function passesFor(passes: BoardingPassView[], segmentId: string, travell
   const rank = (p: BoardingPassView) => { const i = p.travellerId ? travellerIds.indexOf(p.travellerId) : -1; return i < 0 ? 99 : i; };
   return [...mine].sort((a, b) => rank(a) - rank(b));
 }
+
+/** The server's barcode SVG, made to scale (a viewBox from its width and height) with its aspect, to draw at any width. */
+export function passSvg(svg: string): { xml: string; w: number; h: number } {
+  const xml = /viewBox=/.test(svg) ? svg : svg.replace(/<svg([^>]*?)\swidth="(\d+(?:\.\d+)?)"\s+height="(\d+(?:\.\d+)?)"/, '<svg$1 viewBox="0 0 $2 $3" width="$2" height="$3"');
+  const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(xml) ?? /width="([\d.]+)"\s+height="([\d.]+)"/.exec(xml);
+  return { xml, w: m ? Number(m[1]) : 3, h: m ? Number(m[2]) : 1 };
+}

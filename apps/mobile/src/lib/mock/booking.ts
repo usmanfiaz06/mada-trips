@@ -6,7 +6,7 @@ import {
   fareToFlightOption, flightRequestCity, flightRequestSummary, flightRequestTitle, mockFareOptions, normalizeContactPhone, type FareOption,
   type BookingRequestView, type CopyKey, type ErrorCode, type FlightOption, type OrderLine, type OrderPreview, type OrderView, type Person,
   type RequestQuote, type StayOption, type ThreadMessage, type TripRequestView,
-  canNudge, progressFromStatus, resultFromLegacy, type OutcomeReason, type RequestResult,
+  canNudge, defaultNext, listOf, progressFromStatus, resultFromLegacy, serviceWhat, type OutcomeReason, type RequestResult,
   type HotelRequests,
   BookingPrefs, airlineRequests, bookingPrefsOf, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type TravelPrefs, cardLabel, childSar, childSeats, flightTotal,
@@ -34,7 +34,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 /** owner '' is a guest's search: the first account to book it takes it (as search.ts ownOffer does). */
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
-type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
+type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; result?: RequestResult; whoNames?: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
 type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
 
 const offers = new Map<string, Offer>();
@@ -278,8 +278,10 @@ function orderResult(o: OrderView, why?: OutcomeReason): RequestResult | null {
 function outReq(x: Req): BookingRequestView {
   const v = x.view;
   const quote = v.quote && v.quote.status !== 'withdrawn' ? v.quote.total : null;
-  const result = resultFromLegacy({ status: v.status, withdrawn: x.withdrawn, updatedAt: v.updatedAt, quote: v.status === 'paid' || v.status === 'done' ? quote : null, booking: ['flight', 'stay', 'package'].includes(v.kind) });
-  const p = x.withdrawn ? null : progressFromStatus({ status: v.status, kind: v.kind, createdAt: v.createdAt, promisedBy: v.promisedBy, quote });
+  // A service the scripted desk issued says what it did ("UK ETA issued for you and Hessa"), never a bare "It's done".
+  const what = serviceWhat(x.details.service, { names: x.whoNames ?? '', need: x.details.serviceNeed });
+  const result = x.result ?? resultFromLegacy({ status: v.status, withdrawn: x.withdrawn, updatedAt: v.updatedAt, quote: v.status === 'paid' || v.status === 'done' ? quote : null, booking: ['flight', 'stay', 'package'].includes(v.kind), what: what ? t(what[0], what[1]) : null });
+  const p = x.withdrawn || x.result ? null : progressFromStatus({ status: v.status, kind: v.kind, createdAt: v.createdAt, promisedBy: v.promisedBy, quote, service: x.details.service });
   return { ...v, result, progress: p ? { ...p, nudgedAt: x.nudgedAt ?? null } : null };
 }
 
@@ -352,6 +354,15 @@ function advance(o: Order, now = Date.now()) {
 
 function progressRequest(r: Req, people: Person[], now = Date.now()) {
   const age = now - r.created;
+  // Its dates passed with nothing booked: closed, nothing charged, and said plainly (the server's pastDatesJob).
+  const depart = (r.details.search as { depart?: string | null } | null | undefined)?.depart;
+  if (depart && depart < today() && !r.result && !r.withdrawn && ['sent', 'reviewing', 'quoted'].includes(r.view.status)) {
+    r.view.status = 'cancelled'; r.view.updatedAt = nowIso();
+    if (r.view.quote) r.view.quote = { ...r.view.quote, status: 'withdrawn' };
+    r.result = { kind: 'cancelled', reason: 'dates_passed', with: null, note: null, by: null, at: r.view.updatedAt, money: { kind: 'none', amount: null, by: null }, next: defaultNext('cancelled', { reason: 'dates_passed', booking: ['flight', 'stay', 'package'].includes(r.view.kind) }) };
+    r.messages.push({ id: uuid(), from: 'mada', authorName: null, text: [t('oc.why.dates_passed'), t('oc.money.none')].join(' '), offer: null, createdAt: nowIso() });
+    return;
+  }
   if (r.view.status === 'sent' && age > 4000) r.view.status = 'reviewing';
   if (r.view.status === 'reviewing' && age > 9000 && r.details.flightRequest) {
     const travellers = r.view.travellerIds.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
@@ -560,8 +571,9 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     }
     const id = uuid();
     const fr = b.kind === 'flight' && !!b.search && (mockBeta().flightsByRequest || b.search.flexDays !== undefined || !!b.search.bags || !!b.search.prefs?.length);
+    const whoFor = b.serviceFor?.personId ? travellers.filter((x) => x.id === b.serviceFor!.personId) : travellers;
     const req: Req = {
-      id, owner: user.id, created: Date.now(), messages: [],
+      id, owner: user.id, created: Date.now(), messages: [], whoNames: listOf(whoFor.map((x) => (x.isSelf ? t('oc.you') : personName(x)))),
       details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, clientId: b.clientId ?? null, flightRequest: fr },
       view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: words.note, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
     };

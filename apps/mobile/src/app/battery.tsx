@@ -3,8 +3,10 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { DESK_PHONE, DESK_TEL, hhmm as localTime, type Ride, type SupportThreadResponse } from '@mada/shared';
+import { SvgXml } from 'react-native-svg';
+import { DESK_PHONE, DESK_TEL, dayLabel, hhmm as localTime, leaveFor, relativeOrClock, terminalNo, zonedToInstant, zonedParts, type Ride, type SegmentDetail, type SupportThreadResponse, type TripDetail } from '@mada/shared';
 import { T } from '@/components/Text';
+import { passesFor, passSvg, useBoardingPasses } from '@/lib/boarding';
 import { t } from '@/lib/i18n';
 import { essentials, savedAt } from '@/lib/low-power';
 import { isOffline } from '@/lib/net/state';
@@ -19,6 +21,7 @@ import { ff } from '@/theme';
  * Low battery (critique item 14): one dark screen, large type, no images, no animation. Only the next flight (the
  * boarding details), the driver if a car is booked or on its way, the hotel in Arabic and English to show a driver,
  * and Mada: the number and a call-back. Everything comes from what's saved on this phone, so it works with no signal.
+ * The flight says its day and when to leave, and carries the airline's barcode when a pass was added (CRITIQUE-2 #11).
  */
 
 const BG = '#000000';
@@ -66,7 +69,14 @@ export default function Battery() {
     }
   };
 
+  const passes = useBoardingPasses(trip?.id);
+  const [passAt, setPassAt] = useState(0);
+  const [codeW, setCodeW] = useState(300);
   const f = e.flight;
+  const myPasses = f && trip ? passesFor(passes.data?.passes ?? [], f.id, trip.travellerIds) : [];
+  const pass = myPasses[Math.min(passAt, myPasses.length - 1)] ?? null;
+  const code = pass?.svg ? passSvg(pass.svg) : null;
+  const leave = f && trip ? leaveLine(trip, f, now) : null;
   const d = e.driver;
   const st = e.stay;
   return (
@@ -83,9 +93,20 @@ export default function Battery() {
           <View style={styles.block} testID="battery-flight">
             <T style={styles.label}>{t('lp.flight')}</T>
             <T style={styles.big}>{f.flightNumber}</T>
-            <T style={styles.mid}>{t('lp.flightLine', { from: f.from, to: f.to, time: localTime(f.departLocal) })}</T>
-            <T style={styles.mid}>{[f.terminal ? t('lp.terminal', { terminal: f.terminal }) : null, f.gate ? t('lp.gate', { gate: f.gate }) : null, f.seats.length ? t('lp.seat', { seat: f.seats.join(', ') }) : null].filter(Boolean).join(' · ')}</T>
+            <T style={styles.mid} testID="battery-flight-line">{t('lp.flightLine', { day: dayLabel(f.departLocal.slice(0, 10), { today: zonedParts(now, f.departTz).date }), route: `\u2066${f.from} → ${f.to}\u2069`, time: localTime(f.departLocal) })}</T>
+            {leave ? <T style={[styles.mid, { color: GOLD }]} testID="battery-leave">{leave}</T> : null}
+            <T style={styles.mid}>{[terminalNo(f.terminal) ? t('lp.terminal', { terminal: terminalNo(f.terminal) }) : null, f.gate ? t('lp.gate', { gate: f.gate }) : null, f.seats.length ? t('lp.seat', { seat: f.seats.join(', ') }) : null].filter(Boolean).join(' · ')}</T>
             {f.pnr ? <T style={styles.mid} selectable>{t('lp.ref', { ref: f.pnr })}</T> : null}
+            {pass && code ? (
+              <View style={{ gap: 8, paddingTop: 8 }} testID="battery-pass">
+                <T style={styles.label}>{t('lp.pass', { name: trip?.travellers.find((x) => x.id === pass.travellerId)?.firstName ?? pass.name })}</T>
+                {/* The airline's own barcode, black on white so a gate scanner reads it on this dark screen. */}
+                <View style={styles.code} accessibilityRole="image" accessibilityLabel={t('wallet.pass.code')} onLayout={(ev) => setCodeW(ev.nativeEvent.layout.width - 24)}>
+                  <SvgXml xml={code.xml} width={codeW} height={Math.round((codeW * code.h) / code.w)} />
+                </View>
+                {myPasses.length > 1 ? <Btn label={t('lp.passNext', { n: ((passAt + 1) % myPasses.length) + 1, count: myPasses.length })} onPress={() => setPassAt((passAt + 1) % myPasses.length)} testID="battery-pass-next" /> : null}
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -132,6 +153,15 @@ export default function Battery() {
   );
 }
 
+/** "Leave in 42 min" within two hours, "Leave at 07:05" before that; nothing once the time has gone. */
+function leaveLine(trip: TripDetail, f: SegmentDetail, now: number): string | null {
+  const at = leaveFor(trip, f);
+  if (!at) return null;
+  const when = relativeOrClock(zonedToInstant(`${f.departLocal.slice(0, 10)}T${at}`, f.departTz), new Date(now), f.departTz);
+  if (when.kind === 'past') return null;
+  return when.kind === 'in' ? t('lp.leaveIn', { minutes: when.minutes }) : t('lp.leaveAt', { time: at });
+}
+
 function Btn({ label, onPress, testID, primary }: { label: string; onPress: () => void; testID: string; primary?: boolean }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} testID={testID} style={[styles.btn, primary ? styles.btnPrimary : null]}>
@@ -151,6 +181,7 @@ const styles = StyleSheet.create({
   ar: { gap: 4, paddingTop: 8 },
   rtl: { writingDirection: 'rtl', textAlign: 'right' },
   ltr: { writingDirection: 'ltr', textAlign: 'left' },
+  code: { padding: 12, borderRadius: 16, backgroundColor: '#ffffff', alignItems: 'center' },
   btn: { marginTop: 8, minHeight: 60, borderRadius: 16, borderWidth: 2, borderColor: FG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
   btnPrimary: { backgroundColor: FG },
   btnText: { color: FG, fontFamily: ff.ui700, fontSize: 20, lineHeight: 26 },

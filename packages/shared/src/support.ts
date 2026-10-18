@@ -1,4 +1,5 @@
 import { t, type CopyKey } from './copy';
+import { shortDay } from './dates';
 import type { SupportCard, SupportIntent } from './schemas/wallet';
 import { callbackBy, carNowAsk, problemIn, problemKey, problemOf, type DisruptionProblem } from './schemas/now-path';
 
@@ -22,6 +23,8 @@ export type SupportContext = {
     city?: string;
     /** Within 24 hours of the first flight, or under way (tripIsNow): urgent help opens the trip's disruption card. */
     now?: boolean;
+    /** The trip's first flight, so a flight problem said far from it is asked about ("Which flight: SV263 on 12 Nov?"). */
+    flight?: { code: string; day: string } | null;
   };
   refund: null | { amount: number; title: string; stage: string; card: string };
   deskPhone: string;
@@ -38,7 +41,16 @@ export type SupportAsk =
 /** Who answers on their own: urgent, emergency and airport help are fixed templates and always sent. */
 export const isSafetyIntent = (i: SupportIntent) => i === 'urgent' || i === 'emergency' || i === 'airport';
 /** A choice on the disruption card: always answered, like the urgent message that opened it. */
-export const isSafetyChoice = (choice: string) => problemOf(choice) !== null;
+export const isSafetyChoice = (choice: string) => problemOf(choice) !== null || whichOf(choice) !== null;
+
+/** "Which flight?" after a flight problem said days before the booked one: this trip's flight, or another. */
+const FLIGHT_PROBLEMS: readonly DisruptionProblem[] = ['delayed', 'cancelled', 'connection'];
+const whichKey = (mine: boolean, p: DisruptionProblem) => `which-${mine ? 'trip' : 'other'}-${p}`;
+function whichOf(choice: string): { mine: boolean; problem: DisruptionProblem } | null {
+  const m = /^which-(trip|other)-(\w+)$/.exec(choice);
+  const p = m ? problemOf(`dx-${m[2]}`) : null;
+  return m && p ? { mine: m[1] === 'trip', problem: p } : null;
+}
 
 const PROBLEMS: readonly DisruptionProblem[] = ['delayed', 'cancelled', 'connection', 'hotel', 'docs', 'emergency', 'other'];
 const NEXT: Partial<Record<DisruptionProblem, CopyKey>> = {
@@ -69,6 +81,12 @@ export function supportReplies(ask: SupportAsk, ctx: SupportContext): SupportRep
     }];
   }
   if (ask.kind === 'pick') {
+    const which = whichOf(ask.choice);
+    if (which) {
+      // The call-back is already promised on the card; this only says what Mada now knows.
+      const next = which.mine ? NEXT[which.problem] : undefined;
+      return [{ body: which.mine ? [t('support.reply.whichTrip', { flight: ask.label.split(' · ')[0] ?? ask.label }), next ? t(next) : ''].filter(Boolean).join(' ') : t('support.reply.whichOther'), card: { urgent: true, intent: 'urgent' } }];
+    }
     const problem = problemOf(ask.choice);
     if (problem === 'emergency') return [emergency(ctx)];
     if (problem) return [callback(problem, ctx)];
@@ -88,6 +106,15 @@ export function supportReplies(ask: SupportAsk, ctx: SupportContext): SupportRep
       if (named === 'emergency') return [emergency(ctx)];
       // A car nobody could find in the app: Mada finds one by hand and calls.
       if (/\bcar\b|\btaxi\b|سيارة|تاكسي/i.test(ask.text)) return [callback(null, ctx)];
+      // A flight problem with the trip's own flight days away: never assume. Ask which flight, and still call back.
+      if (named && FLIGHT_PROBLEMS.includes(named) && trip?.flight && !trip.now) {
+        const cb = callback(null, ctx);
+        const f = trip.flight;
+        return [{
+          body: t('support.reply.whichFlight', { flight: f.code, day: shortDay(f.day) }),
+          card: { ...cb.card, choices: [{ key: whichKey(true, named), label: `${f.code} · ${shortDay(f.day)}` }, { key: whichKey(false, named), label: t('support.which.other') }] },
+        }];
+      }
       if (named) return [callback(named, ctx)];
       if (trip?.now) {
         return [{

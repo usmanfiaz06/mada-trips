@@ -213,7 +213,7 @@ function RequestCard({ r }: { r: TripRequestView }) {
       ) : null}
       {/* Open: what Mada is doing, by when and the cost. Closed: the outcome, its reason, the money, the next step. */}
       {r.progress && !stuck ? <OnItCard progress={r.progress} requestId={r.id} testID={`on-it-${r.kind}`} /> : <RequestTracker r={r} />}
-      {r.result && !r.withdrawn ? <OutcomeCard compact result={r.result} tripId={r.tripId} again={r.title} testID={`outcome-${r.kind}`} /> : null}
+      {r.result && !r.withdrawn ? <OutcomeCard compact result={r.result} tripId={r.tripId} again={r.title} title={r.title} testID={`outcome-${r.kind}`} /> : null}
       {!r.result && r.outcome === 'yes' && (r.status === 'confirmed' || r.status === 'done') ? <Row gap={6}><Icon name="check" size={14} color={colors.ok} width={2.4} /><Tiny>{r.yesText ?? t('tr.req.confirmedToday')}</Tiny></Row> : null}
       {!r.result && r.outcome === 'no' ? (
         <Box tone="well" gap={8}>

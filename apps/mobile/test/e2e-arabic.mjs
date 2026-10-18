@@ -227,6 +227,10 @@ async function firstRun() {
   step('tabs');
   await byTest('dock-trips').click();
   await see('اسمك ما طلع على اللوحة بعد.', 'trips empty');
+  // CRITIQUE-2 #8: the flaps read left to right in Arabic too ("DUBAI", never "IABUD").
+  await page.waitForTimeout(600);
+  const flaps = await page.locator('[data-testid="board-flaps"]').first().evaluate((el) => [...el.children].map((c) => ({ x: c.getBoundingClientRect().x, ch: c.textContent }))).catch(() => []);
+  if (flaps.length < 2 || !(flaps[0].x < flaps[1].x)) errors.push(`departures board runs right to left: ${JSON.stringify(flaps.slice(0, 3))}`);
   await shot('trips-empty');
   await byTest('dock-circles').click();
   await see('هذا الأسبوع في', 'discover');
@@ -291,6 +295,10 @@ async function demo() {
   await byTest('ask-input').fill('إسطنبول في العيد مع العائلة');
   await byTest('ask-send').click();
   await see('ثلاث طرق توصلك.', 'results', 15000);
+  // CRITIQUE-2 #8: no English inside the Arabic results (the nationality, "You", a Latin comma between ages).
+  await page.waitForTimeout(1500);
+  const body = await page.evaluate(() => document.body.innerText.replace(/[⁦-⁩]/g, ''));
+  for (const [re, what] of [[/Saudi/, 'nationality in English'], [/\bYou\b/, '"You" in English'], [/\d, \d/, 'Latin comma between numbers']]) if (re.test(body)) errors.push(`results ar: ${what}`);
   await shot('results');
   await byTest('ask-review').first().click();
   await see('كل شي مشمول. ولا رسوم بعدين.', 'pay sheet', 12000);
@@ -384,6 +392,9 @@ async function demo() {
   await page.waitForTimeout(600);
   await byTest('today-avatar').click();
   await page.waitForURL(/\/profile/, { timeout: 8000 });
+  // CRITIQUE-2 #8: the ways in, never "none" for an account with a phone.
+  const signin = await byTest('profile-signin').innerText().catch(() => '');
+  if (/ولا شي/.test(signin) || !/الجوال/.test(signin)) errors.push(`profile ar sign-in methods: "${signin}"`);
   await shot('profile-demo');
   await byTest('profile-help').click();
   await see('أسئلة متكررة', 'help');

@@ -2,7 +2,7 @@ import {
   type HotelRequests,
   ChangeFlightRequest, CompanyInvoiceRequest, CreateRefundRequest, CreateTripAskRequest, DisruptionChoiceRequest, ERROR_CODES, ImportTrackedRequest, MoveRequest,
   PatchTripRequest, SELLER, FLIGHT_POSITION_ATTRIBUTION, TrackFlightRequest, TripPhase, AIRLINE_INFO, SWITCH_OFFERS, CARRIERS, CATALOGUE_HOTELS, seatsFor,
-  addDays, legMinutes, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, derivePhase, deskStatus,
+  addDays, legMinutes, applyChange, arrivalPickup, askSpec, buildItinerary, calendarEvents, changeOptions, creditLines, dayLabel, demoNow, demoView, settledDemoPhase, derivePhase, deskStatus,
   disruptionOptions, fareRulesFor, formatSar, homePickup, instalments, invoiceHtml, invoiceLinesFor, invoiceNumber, liveStay, moveNeeded, nameDistance, nightPrice,
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
@@ -268,7 +268,8 @@ function phaseOf(path: string): Phase | null {
   const p = TripPhase.safeParse(new URLSearchParams(q).get('demoPhase'));
   return p.success ? p.data : null;
 }
-function clockFor(base: Omit<TripDetail, 'clock'>, demo: Phase | null): TripDetail['clock'] {
+function clockFor(base: Omit<TripDetail, 'clock'>, asked: Phase | null): TripDetail['clock'] {
+  const demo = asked ? settledDemoPhase(base, asked) : null;
   if (demo) {
     const at = demoNow(base, demo, new Date());
     return { phase: demo, now: at.toISOString(), today: todayIn(outSegment(base)?.departTz, at), demo: true };
@@ -278,7 +279,7 @@ function clockFor(base: Omit<TripDetail, 'clock'>, demo: Phase | null): TripDeta
 }
 function view(s: State, base: Omit<TripDetail, 'clock'>, demo: Phase | null): TripDetail {
   progressDesk(s);
-  const v = demo ? demoView(base, demo) : base;
+  const v = demo ? demoView(base, settledDemoPhase(base, demo)) : base;
   const open = s.requests.filter((r) => r.tripId === base.id && !['done', 'confirmed', 'cancelled'].includes(r.status)).length;
   const mine = s.charges.filter((c) => c.tripId === base.id);
   const sum = (items: string[]) => mine.filter((c) => items.includes(c.item)).reduce((a, c) => a + c.amount.amount, 0);

@@ -48,6 +48,7 @@ const see = async (text, what, timeout = 8000) => {
   catch { errors.push(`${what}: expected "${text}"`); console.log('MISSING', what, '→', text); return false; }
 };
 const byTest = (id) => page.locator(`[data-testid="${id}"]`);
+const notSee = async (text, what) => { if (await page.getByText(text, { exact: false }).filter({ visible: true }).count()) { errors.push(`${what}: did not expect "${text}"`); console.log('UNEXPECTED', what, '→', text); } };
 const tapText = async (text) => { await page.getByText(text, { exact: false }).first().click(); await page.waitForTimeout(500); };
 const scroll = async (px = 700) => { await page.mouse.move(195, 420); await page.mouse.wheel(0, px); await page.waitForTimeout(500); };
 const back = async () => { await page.getByRole('button', { name: /^(Back|Close)$/ }).first().click(); await page.waitForTimeout(600); };
@@ -114,9 +115,17 @@ try {
   await page.waitForTimeout(500);
   await shot('disruption-working');
   await see('Back to today', 'disruption done', 10000);
+  // CRITIQUE-2 #15: the agent's words in one pair of quotes.
+  await see('“I’ve moved everything. Have a good trip.”', 'agent line quoted once');
+  await notSee('““', 'agent line doubled quotes');
   await shot('disruption-done');
   await byTest('dz-home').click();
   await page.waitForTimeout(3000);
+  // CRITIQUE-2 #15: the new flight is a travel day; the old flight's prediction doesn't follow it.
+  await see('All set on the new flight', 'after the rebook: the new flight');
+  await see('XY125', 'after the rebook: XY125');
+  await notSee('May leave late', 'after the rebook: old prediction');
+  await notSee('plane coming from Cairo', 'after the rebook: old inbound plane');
   await shot('today-after-rebook');
 
   /* ── Trips tab and trip management (booked: everything still changeable) ── */
@@ -151,12 +160,19 @@ try {
   await see('Passport numbers', 'share hides passports');
   await shot('itinerary-share');
   await closeSheet();
+  // CRITIQUE-2 #12: no check-out time the hotel never gave.
+  await notSee('Check-out is at 12:00', 'itinerary invents a check-out');
   await back();
 
   step('trip detail');
   await byTest('trip-card-Istanbul').first().click();
   await page.waitForTimeout(1200);
   await shot('trip-detail');
+  // CRITIQUE-2 #12: three weeks out, today's weather there says nothing about the trip.
+  await scroll(1600);
+  if (await byTest('things-today').filter({ visible: true }).count()) errors.push('trip weeks away shows today\'s weather');
+  await shot('trip-detail-no-weather');
+  await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollTop > 0) el.scrollTop = 0; });
   step('the stay opens its hotel page');
   await byTest('stay-open').click();
   await page.waitForTimeout(1200);
