@@ -6,16 +6,19 @@ at most 3 run at once; a dependent unit starts only after the one before it is i
 
 Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critique (scorecard 5.1/10, 15 changes) → `scratchpad/CRITIQUE.md`.
 
-## In flight (17 Oct, round 2: target ≥ 9/10 on every critique dimension)
+## In flight (18 Oct)
 
 | Unit | What | Status |
 |---|---|---|
-| E · eSIM on Airalo | supplier adapter + mock, plan suggestion per trip, pay, install (iOS link / Android QR), data left, top-up, desk | started, session_019PTxzsmbZA74N6so2w188q |
-| G · guests + language (Next 5) | guests search/see prices/open links, sign-in sheet at account actions returning to the same place; language switch keeps state; reply in input language; Arabic leak sweep | started, session_01Sk1iYRJ91x9cQXdekzSK7f |
-| EA · eSIM Access + pricing desk | owner registered with eSIM Access (not Airalo): live adapter, margin rules/rounding/guard on the desk, catalogue sync, balance alerts, support actions, ESIM.md | **DONE** c753521, 1121524 (+ entry points: Ask chip, trip row, after-booking line, Wallet section). Staging: owner added keys; still needs ESIMACCESS_ALLOW_OUTSIDE_PRODUCTION=yes, ESIMACCESS_WEBHOOK_SECRET, APP_OPS_EMAIL, then a real test order. Migration 0033 runs on deploy. Open: activities.test "What's on" red |
-| V · speed | baseline → parallel/streamed search, caches, /trips < 800 ms, Lighthouse ≥ 90, before/after table | started, session_01TUBJcpn9XT9ZDAD5KMGYaY |
+| R · retest | outside-in critique rerun on staging + mock build, same 12 scenarios / 8 dimensions, target ≥ 9 each | started 18 Oct |
 
-Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh eyes, read-only) → fix every dimension < 9 → rerun until all ≥ 9.
+## Done (17–18 Oct)
+
+- E eSIM Airalo adapter ddb7fe0 · EA eSIM Access + pricing desk + entry points c753521, 1121524 · pricing dominance fix 056de8d · ED eSIM design c537e0e · destination any-country + no dead ends 29abe14 · ring fix 54916ac.
+- G guests + language b93a4a0, 1b08696 · V speed b7d890b, 6a2eb2f · sign-in shows only enabled providers 9f640ef.
+- Staging eSIM Access live (real balance). First real order refused for low balance (order 5581fe1c…, auto-refund at readyBy). Owner to top up ≥ $50.
+- Decisions pending: fonts (recommend keep English Instrument Serif + Inter Tight, Arabic → Readex Pro with riyal-sign icon); staging region (server iad1 vs DB Singapore → set sin1) and Haiku 5.5 + streaming + spoken replies — owner said "let it be for now" (18 Oct).
+- Found, not yet fixed: pay sheet "A person at Mada confirms it…" overlaps passport rows; activities.test "What's on" red.
 
 ## Done
 
@@ -33,10 +36,10 @@ Then: rerun the outside-in critique (same 12 scenarios, same 8 dimensions, fresh
 1. ~~**Family**~~ done: never drop a traveller silently (stepper adults/children+ages/infants), age without passport, corrections in any flow ("we are 5", "December", "right now", "I have a permit"), family ranking and per-person fare lines. (critique 1, 2, 3, 11)
 2. ~~**Now path and truth**~~ done: car now (driver, plate, meeting point, price), urgent + trip <24 h → disruption card and call-back (not 997), disruption screen honest when nothing is wrong. (critique 4, 10)
 3. ~~**Outcomes**~~ done: every request ends issued / refused / partial / cancelled with reason, deadline, next step; "Mada is on it" always with what, when, cost. Hotel named everywhere. (critique 5, 6)
-4. **Umrah** (U running): built around the permit slot, Makkah nights by distance band with named hotel, Madinah/Haramain, last-ten-nights warning. (critique 7)
-5. **Guests and language**: guests search and see prices, Discover with a real city, guest links render; language switch keeps the flow; replies in the traveller's language. (critique 8, 9) — after A.
-6. **Web shell and 8% mode** (S running): service-worker app shell, one-screen low-battery mode. (critique 14)
-7. **Native**: Live Activity, real boarding passes, Apple Wallet. (critique 15) — needs the Apple account and a build.
+4. ~~**Umrah**~~ done: built around the permit slot, Makkah nights by distance band with named hotel, Madinah/Haramain, last-ten-nights warning. (critique 7)
+5. ~~**Guests and language**~~ done: guests search and see prices, Discover with a real city, guest links render; language switch keeps the flow; replies in the traveller's language. (critique 8, 9) — after A.
+6. ~~**Web shell and 8% mode**~~ done: service-worker app shell, one-screen low-battery mode. (critique 14)
+7. **Native** (code done, needs Apple account to test): Live Activity, real boarding passes, Apple Wallet. (critique 15) — needs the Apple account and a build.
 8. **Social** (owner audit 10, 19, 21, 22, 24–27): public groups/trips/events, video and multi-attachments, badges, reviews, collections. After the beta.
 
 ## Integration notes
