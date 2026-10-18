@@ -1,0 +1,357 @@
+<title>Mada Social Playbook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a sticky section rail over a sand page; the calendar is the working surface, everything else is reference. */
+:root{
+  --bg:#f6f2ec; --surface:#fffdf9; --sunk:#efe9e0; --fg:#0f1a16; --muted:#5d6b64; --line:rgba(15,26,22,.12);
+  --brand:#1e352d; --brand-fg:#e9e2d8; --gold:#b98f4a; --gold-soft:#f1e3c6; --alert:#a3342b; --alert-soft:#f6e1dd;
+  --ig:#b4407a; --tt:#127c86; --x:#2f3a36; --li:#2a62b0;
+  --f-sans:"Inter Tight",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-serif:"Instrument Serif",Georgia,serif;
+  --f-ar:"IBM Plex Sans Arabic","Segoe UI",Tahoma,sans-serif;
+  --f-ar-d:"Reem Kufi","IBM Plex Sans Arabic",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1d17; --surface:#132620; --sunk:#0b1712; --fg:#ece6dc; --muted:#9fb0a7; --line:rgba(233,226,216,.13);
+  --brand:#d9b77a; --brand-fg:#0e1d17; --gold:#d9b77a; --gold-soft:#3a3222; --alert:#f08a7e; --alert-soft:#3b1f1b;
+  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1d17; --surface:#132620; --sunk:#0b1712; --fg:#ece6dc; --muted:#9fb0a7; --line:rgba(233,226,216,.13);
+  --brand:#d9b77a; --brand-fg:#0e1d17; --gold:#d9b77a; --gold-soft:#3a3222; --alert:#f08a7e; --alert-soft:#3b1f1b;
+  --ig:#e47fb0; --tt:#4fc1cb; --x:#c9d2ce; --li:#7fa8e6; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-sans);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+[lang="ar"],.ar{font-family:var(--f-ar);direction:rtl;text-align:right}
+h1,h2,h3{text-wrap:balance;margin:0}
+a{color:var(--brand)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+header.top{padding-block:40px 24px}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+h1{font-family:var(--f-sans);font-weight:600;font-size:clamp(34px,5.4vw,60px);letter-spacing:-.03em;line-height:1.02;margin-top:12px}
+h1 em{font-family:var(--f-serif);font-weight:400;font-style:italic;letter-spacing:-.01em}
+.h1-ar{text-align:left;font-family:var(--f-ar-d);font-size:clamp(20px,2.6vw,28px);color:var(--muted);margin-top:8px}
+.lede{max-width:68ch;color:var(--muted);margin-top:16px}
+.stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin-top:22px;font-variant-numeric:tabular-nums}
+.stat b{font-size:26px;font-weight:600;letter-spacing:-.02em;display:block}
+.stat span{font-size:12.5px;color:var(--muted)}
+
+nav.rail{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav.rail .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:10px;scrollbar-width:none}
+nav.rail a{flex:0 0 auto;text-decoration:none;color:var(--muted);font-size:13.5px;font-weight:500;padding:7px 12px;border-radius:999px}
+nav.rail a[aria-current="true"]{background:var(--brand);color:var(--brand-fg)}
+
+section.panel{padding-block:32px 56px}
+section.panel[hidden]{display:none}
+h2{font-size:clamp(24px,3vw,32px);font-weight:600;letter-spacing:-.02em}
+h2 em{font-family:var(--f-serif);font-weight:400}
+.sub{color:var(--muted);max-width:72ch;margin:8px 0 22px}
+h3{font-size:16px;font-weight:600;margin-bottom:8px}
+
+.alert{border:1px solid var(--alert);background:var(--alert-soft);border-radius:12px;padding:14px 16px;margin:0 0 22px}
+.alert b{color:var(--alert)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
+ul.clean{margin:0;padding-left:18px}
+ul.clean li{margin:4px 0}
+
+/* calendar */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13px var(--f-sans);padding:6px 12px;border-radius:999px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip[aria-pressed="true"]{background:var(--brand);color:var(--brand-fg);border-color:var(--brand)}
+.chip .dot{box-shadow:0 0 0 1.5px var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.d-IG{background:var(--ig)} .d-TT{background:var(--tt)} .d-X{background:var(--x)} .d-LI{background:var(--li)}
+select{font:500 13px var(--f-sans);padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-bottom:26px}
+.dow{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 4px}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px;min-height:92px;cursor:pointer;text-align:left;font:inherit;color:inherit;display:flex;flex-direction:column;gap:5px;min-width:0}
+.day.wknd{background:var(--sunk)}
+.day.brk{box-shadow:inset 0 -3px 0 var(--gold)}
+.day.sel{outline:2px solid var(--brand);outline-offset:-1px}
+.day .n{font-weight:600;font-variant-numeric:tabular-nums;font-size:14px}
+.day .m{font-size:11px;color:var(--muted);line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.day .dots{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto}
+.empty{background:transparent;border:0;cursor:default}
+.legend{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;margin:-14px 0 22px}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.dayhead{font-family:var(--f-mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin:18px 0 2px}
+.post{background:var(--surface);border:1px solid var(--line);border-radius:12px;border-left:4px solid var(--x)}
+.post.p-IG{border-left-color:var(--ig)} .post.p-TT{border-left-color:var(--tt)} .post.p-LI{border-left-color:var(--li)}
+.post summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:baseline}
+.post summary::-webkit-details-marker{display:none}
+.meta{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.ttl{font-weight:600;min-width:0}
+.hook{grid-column:2/4;font-size:13.5px;color:var(--muted);min-width:0}
+.flag{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.06em;color:var(--alert);background:var(--alert-soft);padding:2px 7px;border-radius:6px;white-space:nowrap}
+.body{padding:0 14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.field{min-width:0}
+.field .k{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.field .v{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.field.wide{grid-column:1/-1}
+.poster{background:var(--brand);color:var(--brand-fg);border-radius:10px;padding:14px 16px}
+.poster .en{font-weight:600;font-size:17px;letter-spacing:-.01em}
+.poster .arp{font-family:var(--f-ar-d);font-size:19px;margin-top:6px;direction:rtl;text-align:right}
+.copy{border:1px solid var(--line);background:transparent;color:var(--muted);font:500 11px var(--f-sans);border-radius:6px;padding:1px 7px;cursor:pointer;text-transform:none;letter-spacing:0}
+.note{background:var(--gold-soft);border-radius:8px;padding:8px 10px}
+.count{font-size:13px;color:var(--muted);margin-left:auto}
+
+/* reference tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+td.ar{font-family:var(--f-ar)}
+.pl-card{display:grid;gap:10px}
+.pl-card .tag{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;min-width:0}
+@media (max-width:640px){
+  .month{gap:3px}.day{min-height:58px;padding:5px}.day .m{display:none}.dow{font-size:9px;padding:0}
+  .kv{grid-template-columns:1fr}.kv dt{margin-top:6px}
+  .post summary{grid-template-columns:1fr auto}.post summary .meta{grid-column:1/-1}.hook{grid-column:1/-1}
+}
+footer{padding-block:28px 48px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line)}
+@media (prefers-reduced-motion:no-preference){.post[open] .body{animation:fade .18s ease-out}@keyframes fade{from{opacity:.4}to{opacity:1}}}
+</style>
+
+<header class="top wrap">
+  <div class="eyebrow">Mada Trips · Social plan · November 2026</div>
+  <h1>Every post, <em>within reach.</em></h1>
+  <div class="h1-ar" lang="ar">خطة المحتوى · نوفمبر ٢٠٢٦</div>
+  <p class="lede">A researched one-month plan for Instagram, TikTok, X and LinkedIn: every post with its hook, poster text, Arabic and English copy, keywords and production direction, plus the playbook, competitor read and moments behind it. Times are Riyadh (AST).</p>
+  <div class="stats" id="stats"></div>
+</header>
+
+<nav class="rail" aria-label="Sections"><div class="wrap" id="rail"></div></nav>
+
+<main class="wrap">
+  <section class="panel" id="calendar" data-label="Calendar">
+    <h2>The <em>calendar</em></h2>
+    <p class="sub">Tap a day to jump to it, or filter by platform, pillar and series. Open any post for the full brief. Flagged posts need a sign-off before scheduling.</p>
+    <div class="filters" id="filters"></div>
+    <div class="month" id="month"></div>
+    <div class="legend"><span><span class="dot d-IG"></span> Instagram</span><span><span class="dot d-TT"></span> TikTok</span><span><span class="dot d-X"></span> X</span><span><span class="dot d-LI"></span> LinkedIn</span><span>Gold underline = school autumn break</span></div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section class="panel" id="overview" data-label="Strategy" hidden>
+    <h2>Strategy <em>on one page</em></h2>
+    <p class="sub">What month one has to achieve, and what the research changed.</p>
+    <div id="situation"></div>
+    <div class="grid2" id="objectives"></div>
+    <h3 style="margin-top:28px">Content pillars</h3>
+    <div class="tbl" id="pillars"></div>
+    <h3 style="margin-top:28px">Recurring series</h3>
+    <div class="tbl" id="series"></div>
+  </section>
+
+  <section class="panel" id="platforms" data-label="Platforms" hidden>
+    <h2>Platform <em>playbook</em></h2>
+    <p class="sub">Each platform has a different job. Same idea, native execution, never a cross-post.</p>
+    <div class="grid2" id="pl"></div>
+  </section>
+
+  <section class="panel" id="guidelines" data-label="Guidelines" hidden>
+    <h2>Voice, design <em>&amp; profiles</em></h2>
+    <p class="sub">The rules that keep 110 posts looking and sounding like one brand.</p>
+    <div class="tbl" id="voice"></div>
+    <h3 style="margin-top:28px">Design</h3>
+    <div class="tbl" id="design"></div>
+    <h3 style="margin-top:28px">Daily Instagram Stories</h3>
+    <div class="tbl" id="stories"></div>
+    <h3 style="margin-top:28px">Profile names &amp; bios</h3>
+    <div class="tbl" id="bios"></div>
+  </section>
+
+  <section class="panel" id="keywords" data-label="Keywords" hidden>
+    <h2>Keyword <em>bank</em></h2>
+    <p class="sub">TikTok and Instagram are search engines now. Say it, show it, write it.</p>
+    <div class="box" style="margin-bottom:16px"><ul class="clean" id="kwm"></ul></div>
+    <div class="tbl" id="kw"></div>
+  </section>
+
+  <section class="panel" id="competitors" data-label="Competitors" hidden>
+    <h2>Competitor <em>read</em></h2>
+    <p class="sub">Who's winning attention in Saudi travel and events, and the space nobody holds. Follower counts are approximate (Instagram and TikTok analytics are login-gated).</p>
+    <div class="tbl" id="comp"></div>
+    <h3 style="margin-top:28px">White space for Mada</h3>
+    <div class="grid2" id="white"></div>
+  </section>
+
+  <section class="panel" id="moments" data-label="Moments" hidden>
+    <h2>Moments <em>calendar</em></h2>
+    <p class="sub">Dated hooks for November with December-February teasers. Re-check status the week of posting.</p>
+    <div class="tbl" id="mom"></div>
+    <div class="alert" style="margin-top:18px"><b>Don't promote these:</b> cancelled, moved or unconfirmed this season.<ul class="clean" id="cancel"></ul></div>
+  </section>
+
+  <section class="panel" id="kpis" data-label="KPIs & ops" hidden>
+    <h2>KPIs, workflow <em>&amp; protocol</em></h2>
+    <p class="sub">Targets set against published benchmarks, the weekly rhythm, and the rules that protect the brand.</p>
+    <div class="tbl" id="kpi"></div>
+    <h3 style="margin-top:28px">Weekly workflow</h3>
+    <div class="tbl" id="wf"></div>
+    <h3 style="margin-top:28px">Sensitivity protocol</h3>
+    <div class="box"><ol class="clean" id="sens"></ol></div>
+  </section>
+
+  <section class="panel" id="sources" data-label="Sources" hidden>
+    <h2>Sources</h2>
+    <p class="sub">Research compiled 18 October 2026. Vendor benchmarks use different methods, so only compare figures from the same source.</p>
+    <div class="tbl" id="src"></div>
+  </section>
+</main>
+
+<footer class="wrap">Mada Trips · Every horizon, within reach · كل أفق، في متناولك. The full calendar with status and results tracking is in <code>docs/social/Mada_Social_Calendar_Nov2026.xlsx</code>.</footer>
+
+<script type="application/json" id="data">/*DATA*/</script>
+<script>
+(function(){
+const D = JSON.parse(document.getElementById('data').textContent);
+const P = D.POSTS;
+const PL = {IG:'Instagram',TT:'TikTok',X:'X',LI:'LinkedIn'};
+const PIL = Object.fromEntries(D.PILLARS.map(p=>[p.code,p.name]));
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isAr = s => /[؀-ۿ]/.test(s||'');
+const $ = id => document.getElementById(id);
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const dayName = d => DOW[new Date(2026,10,d).getDay()];
+
+/* stats */
+const cnt = k => P.filter(p=>p.p===k).length;
+$('stats').innerHTML = [[P.length,'posts'],[cnt('IG'),'Instagram'],[cnt('TT'),'TikTok'],[cnt('X'),'X'],[cnt('LI'),'LinkedIn'],[D.SERIES.length,'recurring series']]
+  .map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+
+/* rail + panels */
+const panels = [...document.querySelectorAll('section.panel')];
+$('rail').innerHTML = panels.map(s=>`<a href="#${s.id}" data-id="${s.id}">${esc(s.dataset.label)}</a>`).join('');
+function show(id){
+  if(!panels.some(s=>s.id===id)) id='calendar';
+  panels.forEach(s=>s.hidden = s.id!==id);
+  document.querySelectorAll('#rail a').forEach(a=>a.setAttribute('aria-current', a.dataset.id===id?'true':'false'));
+  try{localStorage.setItem('mada-tab',id)}catch(e){}
+}
+document.getElementById('rail').addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();show(a.dataset.id);history.replaceState(null,'','#'+a.dataset.id);});
+let start = (location.hash||'').slice(1); if(!start){try{start=localStorage.getItem('mada-tab')||''}catch(e){}}
+show(start||'calendar');
+
+/* filters */
+const state = {pl:new Set(['IG','TT','X','LI']), pil:'', ser:'', day:0, flag:false};
+const seriesList = [...new Set(P.map(p=>p.series).filter(Boolean))].sort();
+$('filters').innerHTML =
+  Object.entries(PL).map(([k,v])=>`<button class="chip" data-pl="${k}" aria-pressed="true"><span class="dot d-${k}"></span>${v}</button>`).join('') +
+  `<span class="sep"></span>
+   <label class="sr" for="fpil" hidden>Pillar</label><select id="fpil"><option value="">All pillars</option>${D.PILLARS.map(p=>`<option value="${p.code}">${esc(p.name)}</option>`).join('')}</select>
+   <label for="fser" hidden>Series</label><select id="fser"><option value="">All series</option>${seriesList.map(s=>`<option>${esc(s)}</option>`).join('')}</select>
+   <button class="chip" id="fflag" aria-pressed="false">Needs sign-off</button>
+   <span class="count" id="count"></span>`;
+$('filters').addEventListener('click',e=>{
+  const b=e.target.closest('[data-pl]'); if(b){const k=b.dataset.pl; state.pl.has(k)?state.pl.delete(k):state.pl.add(k); b.setAttribute('aria-pressed',state.pl.has(k)); render();}
+});
+$('fpil').onchange=e=>{state.pil=e.target.value;render()};
+$('fser').onchange=e=>{state.ser=e.target.value;render()};
+$('fflag').onclick=e=>{state.flag=!state.flag;e.currentTarget.setAttribute('aria-pressed',state.flag);render()};
+
+const FLAGRX=/(OFFER|APPROVAL|SENSITIVITY|SALES|MANAGEMENT)/;
+const flagOf = p => (p.note.match(FLAGRX)||[])[1]||'';
+const visible = () => P.filter(p=>state.pl.has(p.p) && (!state.pil||p.pil===state.pil) && (!state.ser||p.series===state.ser) && (!state.flag||flagOf(p)));
+
+function renderMonth(list){
+  const momentOf={}; const weak=m=>!m||/^(Evergreen|Weekend)/.test(m); P.forEach(p=>{if(weak(momentOf[p.d])&&!weak(p.moment))momentOf[p.d]=p.moment; else if(!momentOf[p.d])momentOf[p.d]=p.moment});
+  const byDay={}; list.forEach(p=>(byDay[p.d]=byDay[p.d]||[]).push(p));
+  let html = DOW.map(d=>`<div class="dow">${d}</div>`).join('');
+  const first = new Date(2026,10,1).getDay();
+  for(let i=0;i<first;i++) html+='<div class="day empty" aria-hidden="true"></div>';
+  for(let d=1; d<=30; d++){
+    const wd=new Date(2026,10,d).getDay();
+    const items=byDay[d]||[];
+    html+=`<button class="day${wd>=5?' wknd':''}${d>=20&&d<=28?' brk':''}${state.day===d?' sel':''}" data-day="${d}" aria-label="${d} November, ${items.length} posts">
+      <span class="n">${d}</span><span class="m">${esc(momentOf[d]||'')}</span>
+      <span class="dots">${items.map(p=>`<span class="dot d-${p.p}" title="${esc(PL[p.p]+': '+p.title)}"></span>`).join('')}</span></button>`;
+  }
+  $('month').innerHTML=html;
+}
+$('month').addEventListener('click',e=>{
+  const b=e.target.closest('[data-day]'); if(!b)return;
+  const d=+b.dataset.day; state.day = state.day===d?0:d; render();
+  if(state.day){const h=document.getElementById('d'+d); if(h) h.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});}
+});
+
+function field(k,v,opts={}){
+  if(!v) return '';
+  const ar = isAr(v) && !/[A-Za-z]{4,}/.test(v.replace(/#\S+/g,'').replace(/\[.*?\]/g,'')) ;
+  const cp = opts.copy?`<button class="copy" data-copy>Copy</button>`:'';
+  return `<div class="field${opts.wide?' wide':''}"><div class="k"><span>${k}</span>${cp}</div><div class="v${ar||opts.ar?' ar':''}"${ar||opts.ar?' lang="ar"':''}>${esc(v)}</div></div>`;
+}
+function card(p){
+  const f=flagOf(p);
+  return `<details class="post p-${p.p}"><summary>
+    <span class="meta"><span class="dot d-${p.p}"></span> ${p.t} · ${PL[p.p]} · ${esc(p.f)}</span>
+    <span class="ttl">${esc(p.title)}</span>
+    ${f?`<span class="flag">${f}</span>`:'<span></span>'}
+    <span class="hook">${esc(PIL[p.pil])}${p.series?' · '+esc(p.series):''} — ${esc(p.hook)}</span>
+  </summary><div class="body">
+    ${(p.pen||p.par)?`<div class="field"><div class="k"><span>On poster / on screen</span></div><div class="poster">${p.pen?`<div class="en">${esc(p.pen)}</div>`:''}${p.par?`<div class="arp" lang="ar">${esc(p.par)}</div>`:''}</div></div>`:''}
+    ${field('Hook · first 1-3 seconds',p.hook)}
+    ${field('Caption · Arabic',p.car,{copy:true,ar:true})}
+    ${field('Caption · English',p.cen,{copy:true})}
+    ${field('Search keywords',p.kw)}
+    ${field('Hashtags',p.tags,{copy:true})}
+    ${field('Call to action',p.cta)}
+    ${field('Moment / trend',p.moment)}
+    ${field('Visual · audio · production',p.dir,{wide:true})}
+    ${p.note?`<div class="field wide"><div class="k"><span>Notes · approvals · risks</span></div><div class="v note">${esc(p.note)}</div></div>`:''}
+  </div></details>`;
+}
+function render(){
+  const list=visible();
+  renderMonth(list);
+  $('count').textContent = `${list.length} of ${P.length} posts`;
+  const days=[...new Set(list.map(p=>p.d))];
+  $('list').innerHTML = days.length? days.map(d=>`<div class="dayhead" id="d${d}">${dayName(d)} ${d} Nov</div>`+list.filter(p=>p.d===d).map(card).join('')).join('') : '<p class="sub">No posts match these filters.</p>';
+}
+$('list').addEventListener('click',e=>{
+  const b=e.target.closest('[data-copy]'); if(!b)return; e.preventDefault();
+  const v=b.closest('.field').querySelector('.v');
+  const done=()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1400)};
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents(v);const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected';setTimeout(()=>b.textContent='Copy',1400)};
+  try{navigator.clipboard.writeText(v.textContent).then(done,fallback)}catch(err){fallback()}
+});
+render();
+
+/* reference tables */
+const tbl=(heads,rows,arCols=[])=>`<table><thead><tr>${heads.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${arCols.includes(i)||isAr(c)&&!/[A-Za-z]{3,}/.test(c)?' class="ar" lang="ar"':''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+$('situation').innerHTML = `<div class="alert"><b>Read first.</b><ul class="clean">${D.SITUATION.map(s=>`<li>${esc(s)}</li>`).join('')}</ul></div>`;
+$('objectives').innerHTML = D.OBJECTIVES.map(([a,b])=>`<div class="box"><h3>${esc(a)}</h3><div>${esc(b)}</div></div>`).join('');
+$('pillars').innerHTML = tbl(['Pillar','Share','What goes here','Series'], D.PILLARS.map(p=>[p.name,p.share,p.what,p.series]));
+$('series').innerHTML = tbl(['Series','Where','How often','Format'], D.SERIES);
+$('pl').innerHTML = D.PLATFORMS.map(p=>`<div class="box pl-card"><div><span class="dot d-${p.code}"></span> <span class="tag">${esc(p.code)}</span><h3 style="margin-top:4px">${esc(p.name)}</h3><div>${esc(p.role)}</div></div>
+  <dl class="kv"><dt>Cadence</dt><dd>${esc(p.cadence)}</dd><dt>Language</dt><dd>${esc(p.language)}</dd><dt>Best times</dt><dd>${esc(p.times)}</dd></dl>
+  <div><h3>Formats that work</h3><ul class="clean">${p.formats.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+  <div><h3>Rules</h3><ul class="clean">${p.rules.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></div>`).join('');
+$('voice').innerHTML = tbl(['Voice & copy','Guideline'], D.VOICE);
+$('design').innerHTML = tbl(['Design','Guideline'], D.DESIGN);
+$('stories').innerHTML = tbl(['Day','Stories'], D.STORIES);
+$('bios').innerHTML = tbl(['Profile','Display name','Bio','Note'], D.BIOS);
+$('kwm').innerHTML = D.KEYWORD_METHOD.map(s=>`<li>${esc(s)}</li>`).join('');
+$('kw').innerHTML = tbl(['Cluster','Arabic','English'], D.KEYWORDS, [1]);
+$('comp').innerHTML = tbl(['Brand','Handles','Size (approx.)','Style','What wins','Gap for Mada'], D.COMPETITORS.map(c=>[c.name,c.handles,c.size,c.style,c.wins,c.gap]));
+$('white').innerHTML = D.WHITE_SPACE.map(([a,b])=>`<div class="box"><h3>${esc(a)}</h3><div>${esc(b)}</div></div>`).join('');
+$('mom').innerHTML = tbl(['Date','Moment','Where','How we use it','Status'], D.MOMENTS);
+$('cancel').innerHTML = D.CANCELLED.map(s=>`<li>${esc(s)}</li>`).join('');
+$('kpi').innerHTML = tbl(['KPI','Month-1 target','Benchmark / why'], D.KPIS);
+$('wf').innerHTML = tbl(['When','What'], D.WORKFLOW);
+$('sens').innerHTML = D.SENSITIVITY.map(s=>`<li>${esc(s)}</li>`).join('');
+$('src').innerHTML = `<table><thead><tr><th>Source</th><th>Link</th></tr></thead><tbody>${D.SOURCES.map(([n,u])=>`<tr><td>${esc(n)}</td><td><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\/(www\.)?/,'').slice(0,60))}</a></td></tr>`).join('')}</tbody></table>`;
+})();
+</script>
