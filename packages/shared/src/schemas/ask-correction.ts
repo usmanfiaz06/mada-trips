@@ -8,6 +8,8 @@ import { addDays, daysBetween } from '../dates';
 import { DESTINATIONS } from './booking-data';
 import { parseDetails, parseKind, parseWho, weekendDates } from './booking-logic';
 import { matchParty, normalizeAsk, parseParty, type SaidParty } from './party';
+import { esimDaysIn, findEsimPlace } from './esim-places';
+import { arabicForRules } from './ask-arabic';
 import type { AskIntent } from './booking';
 import type { Person } from './people';
 
@@ -125,6 +127,30 @@ export function correctAsk(prev: AskIntent, text: string, ctx: { today: string; 
   }
   next.ask = askOf(next, ctx.people);
   return { type: 'apply', intent: next, changed: [...new Set(changed)] };
+}
+
+/**
+ * While the eSIM planner is open, what's typed is where and for how long: "Pakistan", "باكستان", "pakistan for 10 days",
+ * "Lahore", "Europe", "10 days", "اسبوعين". "apply" with the place (an ISO code or a region word, in `destination`) and
+ * the days (in answers.days); "place" when it reads as a place Mada can't name (the planner says plainly there's no
+ * eSIM for it); "new" for a different request ("a hotel in Dubai"); null when it says neither (ask which to change).
+ */
+export function correctEsimAsk(prev: AskIntent, text: string): Correction | { type: 'place'; intent: AskIntent } | null {
+  const kind = parseKind(arabicForRules(text));
+  const hit = findEsimPlace(text);
+  const days = esimDaysIn(text);
+  if (kind !== 'general' && kind !== 'esim' && !(kind === 'flight' && (hit || days))) return { type: 'new' };
+  const next: AskIntent = { ...prev, answers: { ...prev.answers }, ask: null };
+  const changed: CorrectionField[] = [];
+  if (hit) { Object.assign(next, { destination: hit.code, destinationName: null }); changed.push('where'); }
+  if (days) { next.answers.days = [String(days)]; changed.push('when'); }
+  if (changed.length) return { type: 'apply', intent: next, changed };
+  // A short name Mada doesn't know ("Narnia", "Tuvalu island"): a place all the same, never a dead end.
+  const words = text.trim().split(/\s+/);
+  if (words.length <= 3 && !/\d/.test(text) && !FIX_WORDS.test(normalizeAsk(text)) && text.trim().length <= 40) {
+    return { type: 'place', intent: { ...next, destination: text.trim(), destinationName: text.trim() } };
+  }
+  return null;
 }
 
 /** "I have a permit": the entry-check answers that mark each traveller's visa and re-entry permit as in hand. */

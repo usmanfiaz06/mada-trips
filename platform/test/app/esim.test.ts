@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { CreateOrderResponse, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse, PreviewResponse, esimPhoneFit, esimPrice, suggestEsimPlans, ESIM_FIXTURE_PACKAGES, type OrderDraft } from "@mada/shared";
+import { CreateOrderResponse, EsimPlacesResponse, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse, PreviewResponse, esimPhoneFit, esimPrice, suggestEsimPlans, ESIM_FIXTURE_PACKAGES, type OrderDraft } from "@mada/shared";
 import { db } from "@/db";
 import { appNotifications, appPayments, appRefunds } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
@@ -10,6 +10,7 @@ import { airaloEsim, airaloToken, packagesFrom, resetAiraloCache, simFrom, verif
 import { mockEsimCalls, resetMockEsim } from "@/lib/app/suppliers/mock/esim";
 import { deskRefundEsim, deskRetryEsim, fulfilEsimOrder } from "@/lib/app/esim/service";
 import { GET as plansGet } from "@/app/api/app/v1/esim/plans/route";
+import { GET as placesGet } from "@/app/api/app/v1/esim/places/route";
 import { GET as esimsGet } from "@/app/api/app/v1/esims/route";
 import { GET as esimGet } from "@/app/api/app/v1/esims/[id]/route";
 import { GET as topupsGet } from "@/app/api/app/v1/esims/[id]/topups/route";
@@ -209,6 +210,25 @@ describe("eSIMs through the Core API (mock supplier)", () => {
     expect(EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?countries=AQ")).json).outcome).toBe("none");
     // A price is always the server's: an unknown package can't be paid.
     expect((await post(previewPost, f.token, { draft: { kind: "esim", count: 1, packageId: "made-up-1gb", where: "TR" } })).status).toBe(404);
+  });
+
+  it("lists every place the supplier sells and finds any country, city or region by name", async () => {
+    const f = await traveller();
+    const { places } = EsimPlacesResponse.parse((await get(placesGet, f.token, {})).json);
+    const pk = places.find((p) => p.code === "PK");
+    expect(pk).toMatchObject({ kind: "country", en: "Pakistan", ar: "باكستان", flag: "🇵🇰" });
+    expect(places.find((p) => p.code === "europe")).toMatchObject({ kind: "region", ar: "أوروبا" });
+    expect(places.filter((p) => p.kind === "country").length).toBeGreaterThan(50);
+    for (const q of ["?destination=Pakistan&days=10", "?destination=%D8%A8%D8%A7%D9%83%D8%B3%D8%AA%D8%A7%D9%86", "?destination=Lahore", "?destination=PK"]) {
+      const r = EsimPlansResponse.parse((await get(plansGet, f.token, {}, q)).json);
+      expect(r, q).toMatchObject({ outcome: "ok", where: { code: "PK", kind: "local" } });
+    }
+    expect(EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?region=europe&days=7")).json).where).toMatchObject({ code: "europe", kind: "regional" });
+    expect(EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=Europe")).json).where?.code).toBe("europe");
+    // Not sold there: said plainly, with the closest plan to offer instead.
+    const mn = EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=Mongolia")).json);
+    expect(mn).toMatchObject({ outcome: "none", alt: { code: "world", kind: "global" } });
+    expect(EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=Narnia")).json)).toMatchObject({ outcome: "none", where: null });
   });
 
   it("refunds at once, with the outcome, when the supplier can't give the eSIM", async () => {

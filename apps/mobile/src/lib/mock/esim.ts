@@ -1,5 +1,5 @@
 import {
-  DESTINATIONS, ERROR_CODES, ESIM_FIXTURE_PACKAGES, EsimPlansQuery, addDays, esimCountriesOf, esimDays, esimPrice, esimStatusOf, esimWhereKey, iosInstallLink,
+  ERROR_CODES, ESIM_FIXTURE_PACKAGES, EsimPlansQuery, addDays, esimCountriesOf, esimDays, esimDestinationOf, esimNearest, esimPlaceName, esimPlacesOf, esimPrice, esimRegionCoverage, localeOr, esimStatusOf, esimWhereKey, iosInstallLink,
   mockEsimSim, mockEsimUsage, money, personName, suggestEsimPlans, t, tn, todayIn, topupPlans,
   type CopyKey, type EsimPackage, type EsimView, type ErrorCode, type OrderLine, type Person, type RequestResult,
 } from '@mada/shared';
@@ -24,7 +24,7 @@ const esims = new Map<string, Stored>();
 const ok = (json: unknown, status = 200): WireResponse => ({ status, json });
 const err = (code: ErrorCode, message?: string): WireResponse => ({ status: ERROR_CODES[code].status, json: { error: { code, message: message ?? t(ERROR_CODES[code].copy) } } });
 const uuid = () => '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
-const whereName = (c: { code: string; name: string }) => { const k = esimWhereKey(c.code); return k ? t(k as CopyKey) : c.name; };
+const whereName = (c: { code: string; name: string }) => { const k = esimWhereKey(c.code); return k ? t(k as CopyKey) : (/^[A-Z]{2}$/.test(c.code) ? esimPlaceName(c.code, localeOr()) : null) ?? c.name; };
 const sizeText = (gb: number | null, days: number) => (gb === null ? t('es.size.unlimited', { days }) : t('es.size.gb', { gb, days }));
 const packagesFor = (countries: string[]) => ESIM_FIXTURE_PACKAGES.filter((p) => p.coverage.kind !== 'local' || (countries.length === 1 && p.coverage.code === countries[0]));
 const topupsOf = (s: Stored): EsimPackage[] =>
@@ -129,13 +129,25 @@ export const esimMock: AreaMock = async (w, ctx) => {
       onTrip = people.filter((p) => ids.includes(p.id));
       if (!onTrip.length) onTrip = people;
     } else if (q.data.countries) countries = q.data.countries.split(',');
-    else if (q.data.destination) { const d = DESTINATIONS[q.data.destination.toLowerCase()]; countries = d ? [d.country] : /^[A-Z]{2}$/.test(q.data.destination) ? [q.data.destination] : []; }
+    let region = q.data.tripId || q.data.countries ? null : q.data.region ?? null;
+    if (!q.data.tripId && !q.data.countries && !region && q.data.destination) { const d = esimDestinationOf(q.data.destination); countries = d.countries; region = d.region; }
     const has = new Set([...esims.values()].filter((e) => e.owner === user.id && tripId && e.tripId === tripId && e.status !== 'refunded').map((e) => e.travellerId));
     const base = { days, start, tripId, supplier: 'mock' as const, people: onTrip.map((p) => ({ id: p.id, name: personName(p) || t('es.list.forYou'), has: has.has(p.id) })) };
-    const s = suggestEsimPlans(packagesFor(countries), { countries, days });
-    if (!s.coverage || !s.plans.length) return ok({ ...base, outcome: 'none', where: null, plans: [], recommended: null, more: [] });
+    let list = packagesFor(countries);
+    if (region) {
+      const rc = esimRegionCoverage(list, region);
+      if (!rc) return ok({ ...base, outcome: 'none', where: null, plans: [], recommended: null, more: [], alt: null });
+      list = list.filter((p) => p.coverage.code === rc.code && p.coverage.kind === rc.kind);
+      countries = [...rc.countries];
+    }
+    const s = suggestEsimPlans(list, { countries, days });
+    if (!s.coverage || !s.plans.length) {
+      const near = countries.length === 1 ? esimNearest(list, countries[0]!) : null;
+      return ok({ ...base, outcome: 'none', where: countries.length ? { countries, code: countries[0]!, kind: 'local' } : null, plans: [], recommended: null, more: [], alt: near ? { code: near.code, kind: near.kind, name: near.name } : null });
+    }
     return ok({ ...base, outcome: 'ok', where: { countries, code: s.coverage.code, kind: s.coverage.kind }, plans: s.plans, recommended: s.recommended, more: s.more });
   }
+  if (w.method === 'GET' && path === '/esim/places') return ok({ places: esimPlacesOf(ESIM_FIXTURE_PACKAGES) });
   if (w.method === 'GET' && path === '/esims') {
     const order = qs.get('order');
     const trip = qs.get('trip');

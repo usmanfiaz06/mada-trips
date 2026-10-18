@@ -18,10 +18,10 @@ export const esimCopy = {
   // ───────────── the plan ─────────────
   'es.title': 'Internet in {where}, on when you land.',
   'es.sub': 'For {days} days. Your Saudi line stays on for calls and texts.',
-  'es.which': 'Which trip is it for?',
+  'es.which': 'Which trip?',
   'es.which.other': 'Somewhere else',
-  'es.which.where': 'Where are you going?',
-  'es.which.days': 'For how many days?',
+  'es.which.where': 'Where to?',
+  'es.which.days': 'How many days?',
   'es.days.n': '{n} days',
   'es.size.light': 'Light',
   'es.size.light.sub': 'Maps and messages',
@@ -204,4 +204,18 @@ export const esimCopy = {
   'es.count': '{count} eSIMs',
   'es.ring.short': 'of {total}',
   'es.until': 'Until',
+
+  // ───────────── where to, any country or region ─────────────
+  'es.where.search': 'Country or city',
+  'es.where.searchA11y': 'Search for a country or city',
+  'es.where.noMatch': 'No eSIM for “{q}” yet.',
+  'es.where.noMatchBody': 'Try the country’s name, or tell Mada where you’re going and we sort the internet out.',
+  'es.where.region.one': 'Covers 1 country',
+  'es.where.region.other': 'Covers {count} countries',
+  'es.where.loading': 'Looking up places',
+  'es.days.typed': 'Or type the days',
+  'es.days.go': 'Show plans',
+  'es.none.alt': '{alt} covers the countries nearby, not {where} itself.',
+  'es.none.altCta': 'See plans for {alt}',
+  'es.none.other': 'Choose another place',
 } as const;

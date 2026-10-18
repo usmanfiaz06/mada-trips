@@ -1,13 +1,13 @@
 import "server-only";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import {
-  DESTINATIONS, ESIM_MARKUP_BPS, EsimPlansQuery, addDays, esimCountriesOf, esimCoverageFor, esimDays, esimStatusOf, esimWhereKey, formatSar, money, personName, suggestEsimPlans,
-  t, tn, todayIn, topupPlans, type CopyKey, type EsimPackage, type EsimPlan, type EsimPlansResponse, type EsimUsage, type EsimView, type OrderLine, type RequestResult,
+  ESIM_MARKUP_BPS, EsimPlansQuery, addDays, esimCountriesOf, esimCoverageFor, esimDays, esimDestinationOf, esimNearest, esimPlaceName, esimPlacesOf, esimRegionCoverage, type EsimPlace, esimStatusOf, esimWhereKey, formatSar, money, personName, suggestEsimPlans,
+  localeOr, t, tn, todayIn, topupPlans, type CopyKey, type EsimPackage, type EsimPlan, type EsimPlansResponse, type EsimUsage, type EsimView, type OrderLine, type RequestResult,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appPayments, appRefunds, appTrips, appUsers } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
-import { appEsimWebhooks, appEsims } from "@/db/app-schema-esim";
+import { appEsimCatalogue, appEsimWebhooks, appEsims } from "@/db/app-schema-esim";
 import { appAuditLog } from "../audit";
 import { isProductionDeploy, supplierMode } from "../config";
 import { addCredit } from "../credit";
@@ -81,7 +81,7 @@ export function esimOrderingAllowed(): { ok: true } | { ok: false; why: string }
 }
 
 /** "Türkiye", "Europe", in the reader's language when Mada writes the name; the supplier's title otherwise. */
-export const whereName = (c: Pick<Coverage, "code" | "name">, locale?: "en" | "ar") => { const k = esimWhereKey(c.code); return k ? t(k as CopyKey, undefined, locale) : c.name; };
+export const whereName = (c: Pick<Coverage, "code" | "name">, locale?: "en" | "ar") => { const k = esimWhereKey(c.code); return k ? t(k as CopyKey, undefined, locale) : (/^[A-Z]{2}$/.test(c.code) ? esimPlaceName(c.code, localeOr(locale)) : null) ?? c.name; };
 const whereRef = (c: Pick<Coverage, "code" | "name">) => { const k = esimWhereKey(c.code); return k ? { k: k as CopyKey } : c.name; };
 const sizeText = (gb: number | null, days: number, daily?: boolean) => (gb === null ? t("es.size.unlimited", { days }) : daily ? t("es.size.daily", { gb, days }) : t("es.size.gb", { gb, days }));
 
@@ -112,9 +112,12 @@ export async function esimPlans(ownerId: string, raw: Record<string, string | un
     tripId = trip.id;
     travellerIds = trip.travellerIds;
   } else if (q.countries) countries = q.countries.split(",");
-  else if (q.destination) {
-    const d = DESTINATIONS[q.destination.toLowerCase()];
-    countries = d ? [d.country] : /^[A-Z]{2}$/.test(q.destination) ? [q.destination] : [];
+  let region = q.tripId || q.countries ? null : q.region ?? null;
+  if (!q.tripId && !q.countries && !region && q.destination) {
+    // A DESTINATIONS key, an ISO code, or any country, city or region by name ("Pakistan", "لاهور", "Europe").
+    const d = esimDestinationOf(q.destination);
+    countries = d.countries;
+    region = d.region;
   }
   const household = await householdOf(ownerId);
   const onTrip = travellerIds?.length ? household.filter((p) => travellerIds!.includes(p.id)) : household;
@@ -123,12 +126,22 @@ export async function esimPlans(ownerId: string, raw: Record<string, string | un
     : new Set<string | null>();
   const people = (onTrip.length ? onTrip : household).map((p) => ({ id: p.id, name: personName(p) || t("es.list.forYou"), has: has.has(p.id) }));
   const base = { days, start, tripId, people, supplier: supplierName(), more: [] };
-  if (!countries.length) return { ...base, outcome: "none", where: null, plans: [], recommended: null };
+  if (!countries.length && !region) return { ...base, outcome: "none", where: null, plans: [], recommended: null, alt: null };
   const pricing = await esimPricing();
-  const list = visible(pricing.rules, await packagesFor(countries));
+  let list = visible(pricing.rules, await packagesFor(countries));
+  if (region) {
+    // One region, as its own choice: only its plans.
+    const rc = esimRegionCoverage(list, region);
+    if (!rc) return { ...base, outcome: "none", where: null, plans: [], recommended: null, alt: null };
+    list = list.filter((p) => p.coverage.code === rc.code && p.coverage.kind === rc.kind);
+    countries = [...rc.countries];
+  }
   const cov = esimCoverageFor(list, countries);
   const s = suggestEsimPlans(list, { countries, days, price: pricing.price, picks: cov ? pricing.rules.recommended[cov.code] : undefined });
-  if (!s.coverage || !s.plans.length) return { ...base, outcome: "none", where: { countries, code: countries[0]!, kind: "local" }, plans: [], recommended: null };
+  if (!s.coverage || !s.plans.length) {
+    const near = countries.length === 1 ? esimNearest(list, countries[0]!) : null;
+    return { ...base, outcome: "none", where: { countries, code: countries[0]!, kind: "local" }, plans: [], recommended: null, alt: near ? { code: near.code, kind: near.kind, name: near.name } : null };
+  }
   // The prices shown are the traveller's for the hold window; a lower one already held stands.
   const shown = [...s.plans, ...s.more];
   await holdPrices(ownerId, shown.map((p) => ({ packageId: holdKey(p.id, p.daily, p.days), price: p.price.amount })), pricing.rules.holdMinutes).catch((e) => console.warn("[esim] price hold not kept", e instanceof Error ? e.message : e));
@@ -136,6 +149,34 @@ export async function esimPlans(ownerId: string, raw: Record<string, string | un
   const withHeld = shown.map((p, i) => (held[i] !== null && held[i]! < p.price.amount ? { ...p, price: { ...p.price, amount: held[i]! } } : p));
   return { ...base, outcome: "ok", where: { countries, code: s.coverage.code, kind: s.coverage.kind }, plans: withHeld.slice(0, s.plans.length), recommended: s.recommended, more: withHeld.slice(s.plans.length) };
 }
+
+/* ───────────── places ───────────── */
+
+const PLACES_TTL_MS = 60 * 60_000;
+let placesCache: { at: number; vendor: string; places: EsimPlace[] } | null = null;
+
+/**
+ * GET /esim/places: every country and region the supplier sells, from the catalogue synced each day (esim/catalogue.ts);
+ * before the first sync, from the supplier's own full list. Kept for an hour.
+ */
+export async function esimPlaces(): Promise<EsimPlace[]> {
+  const vendor = supplierName();
+  if (placesCache && placesCache.vendor === vendor && Date.now() - placesCache.at < PLACES_TTL_MS) return placesCache.places;
+  const pricing = await esimPricing();
+  let pkgs: EsimPackage[] = [];
+  try {
+    const rows = await db.select({ pkg: appEsimCatalogue.pkg }).from(appEsimCatalogue).where(and(eq(appEsimCatalogue.supplier, vendor), isNull(appEsimCatalogue.goneAt)));
+    pkgs = rows.map((r) => r.pkg as unknown as EsimPackage);
+  } catch (e) { console.warn("[esim] catalogue not read for places", e instanceof Error ? e.message : e); }
+  if (!pkgs.length) {
+    const s = sup();
+    pkgs = s.catalogue ? await s.catalogue() : await s.packages({ global: true });
+  }
+  const places = esimPlacesOf(visible(pricing.rules, pkgs));
+  placesCache = { at: Date.now(), vendor, places };
+  return places;
+}
+export const resetEsimPlacesCache = () => { placesCache = null; };
 
 /* ───────────── the order sheet ───────────── */
 

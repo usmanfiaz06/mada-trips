@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
+import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, correctEsimAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -82,14 +82,26 @@ export default function Ask() {
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
     if (!intent || askNew || replyTo) return 'new';
+    const apply = (next: AskIntent, note: string | null) => {
+      buzz('tap');
+      forgetSettled();
+      setFixes((f) => [...f, text]); setFixing(null); setDraft(''); setCta(null);
+      setIntent(next); setRound((r) => r + 1);
+      if (note) toast(note);
+      return 'done' as const;
+    };
+    // The eSIM planner: what's typed is the place ("Pakistan", "باكستان", "Lahore") and the days ("for 10 days").
+    // A name Mada can't place is still taken as the place (the planner says plainly when there's no eSIM for it).
+    if (intent.kind === 'esim') {
+      const e = correctEsimAsk({ ...intent, ...settled }, text);
+      if (e?.type === 'apply') return apply(e.intent, null);
+      if (e?.type === 'place') return apply(e.intent, null);
+      if (e?.type === 'new') return 'new';
+      return 'unclear';
+    }
     const c = correctAsk({ ...intent, ...settled }, text, { today, people: household });
     if (c.type !== 'apply') return c.type;
-    buzz('tap');
-    forgetSettled();
-    setFixes((f) => [...f, text]); setFixing(null); setDraft(''); setCta(null);
-    setIntent(c.intent); setRound((r) => r + 1);
-    toast(c.changed.length === 1 && c.changed[0] === 'permit' ? t('fix.permit') : t('fix.done'));
-    return 'done';
+    return apply(c.intent, c.changed.length === 1 && c.changed[0] === 'permit' ? t('fix.permit') : t('fix.done'));
   };
   /** Mada couldn't tell what to change: ask again from that question, or start something new. */
   const fix = (what: 'who' | 'when' | 'where' | 'new') => {
@@ -99,7 +111,7 @@ export default function Ask() {
     if (!intent) return;
     const base: AskIntent = { ...intent, ...settled, answers: { ...intent.answers } };
     if (what === 'who') Object.assign(base, { travellerIds: null, party: base.party ?? partyOfPeople(household, base.travellerIds ?? [], today, base.infants) });
-    if (what === 'when') { Object.assign(base, { depart: null, return: null, monthOnly: null }); delete base.answers.when; }
+    if (what === 'when') { Object.assign(base, { depart: null, return: null, monthOnly: null }); delete base.answers.when; delete base.answers.days; }
     if (what === 'where') { Object.assign(base, { destination: null, destinationName: null }); delete base.answers.where; }
     buzz('tap');
     forgetSettled();
@@ -205,7 +217,7 @@ export default function Ask() {
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
-  else if (kind === 'esim') body = <EsimFlow key={round} intent={intent} />;
+  else if (kind === 'esim') body = <EsimFlow key={round} intent={intent} query={query} onSync={onSync} />;
   else if (kind === 'umrah') body = <UmrahFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
 
@@ -280,19 +292,29 @@ export default function Ask() {
   );
 }
 
-/** "What should Mada change?": who, the dates or the place, asked again from that question; or a new ask. */
-function FixPrompt({ text, kind, onPick }: { text: string; kind: AskKind; onPick: (w: 'who' | 'when' | 'where' | 'new') => void }) {
+/**
+ * "What should Mada change?": who, the dates or the place, asked again from that question; or a new ask. Always more
+ * than one way on: a flow whose form names none of them (an eSIM, a plan) still offers where and when.
+ */
+function fixOptions(kind: AskKind): ('who' | 'when' | 'where')[] {
+  const all = ['who', 'when', 'where'] as const;
+  // An eSIM is a place and a number of days; who gets one is picked on the plans.
+  if (kind === 'esim') return ['where', 'when'];
+  if (kind === 'flight' || kind === 'stay') return [...all];
   const form = REQUEST_FORMS[kind as RequestFormKind] ?? [];
-  const searchable = kind === 'flight' || kind === 'stay';
-  const opts = ([['who', 'fix.who'], ['when', 'fix.when'], ['where', 'fix.where']] as const)
-    .filter(([w]) => searchable || form.some((f) => (w === 'who' ? f.people : f.k === w)));
+  const named = all.filter((w) => form.some((f) => (w === 'who' ? f.people : f.k === w)));
+  return named.length ? named : [...all];
+}
+function FixPrompt({ text, kind, onPick }: { text: string; kind: AskKind; onPick: (w: 'who' | 'when' | 'where' | 'new') => void }) {
+  const KEYS = { who: 'fix.who', when: 'fix.when', where: 'fix.where' } as const;
+  const opts = fixOptions(kind).map((w) => [w, KEYS[w]] as const);
   return (
     <Animated.View entering={enter(0)} style={{ gap: 10 }} testID="ask-fix-prompt">
       <MeBubble text={text} />
       <T v="h3">{t('fix.title')}</T>
       <ChipWrap>
-        {opts.map(([w, k]) => <Chip key={w} label={t(k)} background={colors.paper} onPress={() => onPick(w)} />)}
-        <Chip label={t('fix.new')} background={colors.paper} onPress={() => onPick('new')} />
+        {opts.map(([w, k]) => <Chip key={w} label={t(k)} background={colors.paper} onPress={() => onPick(w)} testID={`ask-fix-${w}`} />)}
+        <Chip label={t('fix.new')} background={colors.paper} onPress={() => onPick('new')} testID="ask-fix-new" />
       </ChipWrap>
     </Animated.View>
   );

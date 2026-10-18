@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ESIM_ROUTES, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse } from '@mada/shared';
+import { ESIM_ROUTES, EsimPlacesResponse, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse } from '@mada/shared';
 import { request } from './api';
 import { useSession } from './session';
 
@@ -9,7 +9,7 @@ import { useSession } from './session';
  * An eSIM still being ordered is read again every couple of seconds; one on a trip every few minutes.
  */
 
-export type PlansFor = { tripId?: string | null; destination?: string | null; countries?: string | null; days?: number | null };
+export type PlansFor = { tripId?: string | null; destination?: string | null; countries?: string | null; region?: string | null; days?: number | null };
 
 const qs = (o: Record<string, string | number | null | undefined>) => {
   const p = Object.entries(o).filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
@@ -17,7 +17,8 @@ const qs = (o: Record<string, string | number | null | undefined>) => {
 };
 
 export const esimApi = {
-  plans: (f: PlansFor) => request({ method: 'GET', path: `${ESIM_ROUTES.plans}${qs({ tripId: f.tripId, destination: f.destination, countries: f.countries, days: f.days })}` }, EsimPlansResponse),
+  plans: (f: PlansFor) => request({ method: 'GET', path: `${ESIM_ROUTES.plans}${qs({ tripId: f.tripId, destination: f.destination, countries: f.countries, region: f.region, days: f.days })}` }, EsimPlansResponse),
+  places: () => request({ method: 'GET', path: ESIM_ROUTES.places }, EsimPlacesResponse),
   list: (f: { order?: string | null; trip?: string | null }) => request({ method: 'GET', path: `${ESIM_ROUTES.esims}${qs(f)}` }, EsimsResponse),
   get: (id: string) => request({ method: 'GET', path: ESIM_ROUTES.esim(id) }, EsimResponse),
   topups: (id: string) => request({ method: 'GET', path: ESIM_ROUTES.topups(id) }, EsimTopupsResponse),
@@ -25,7 +26,8 @@ export const esimApi = {
 };
 
 export const esimKeys = {
-  plans: (f: PlansFor) => ['esim', 'plans', f.tripId ?? '', f.destination ?? '', f.countries ?? '', f.days ?? 0] as const,
+  plans: (f: PlansFor) => ['esim', 'plans', f.tripId ?? '', f.destination ?? '', f.countries ?? '', f.region ?? '', f.days ?? 0] as const,
+  places: ['esim', 'places'] as const,
   list: (f: { order?: string | null; trip?: string | null }) => ['esim', 'list', f.order ?? '', f.trip ?? ''] as const,
   one: (id: string) => ['esim', 'one', id] as const,
   topups: (id: string) => ['esim', 'topups', id] as const,
@@ -35,7 +37,12 @@ const useSignedIn = () => !!useSession((s) => s.tokens);
 
 export function useEsimPlans(f: PlansFor, enabled = true) {
   const signedIn = useSignedIn();
-  return useQuery({ queryKey: esimKeys.plans(f), queryFn: () => esimApi.plans(f), enabled: enabled && signedIn && !!(f.tripId || f.destination || f.countries), staleTime: 10 * 60_000, retry: false });
+  return useQuery({ queryKey: esimKeys.plans(f), queryFn: () => esimApi.plans(f), enabled: enabled && signedIn && !!(f.tripId || f.destination || f.countries || f.region), staleTime: 10 * 60_000, retry: false });
+}
+/** Every country and region the supplier sells (GET /esim/places), for "Where to?". */
+export function useEsimPlaces(enabled = true) {
+  const signedIn = useSignedIn();
+  return useQuery({ queryKey: esimKeys.places, queryFn: async () => (await esimApi.places()).places, enabled: enabled && signedIn, staleTime: 60 * 60_000, retry: 1 });
 }
 export function useEsims(f: { order?: string | null; trip?: string | null }, enabled = true) {
   const signedIn = useSignedIn();

@@ -46,7 +46,8 @@ const COPY = {
     install: 'Install it now. It switches on when you land.', ios: 'Install on this iPhone', qr: 'Scan this with the phone it’s for.', codes: 'Activation code',
     land: 'When you land', installedToast: 'Installed. It switches on when you land.', left: 'left of', topupTitle: 'More GB for Türkiye', topLine: 'Top up ·', topupToast: 'The GB are on your eSIM.',
     trouble: 'Let’s get you online', talk: 'Talk to Mada', refunded: 'This eSIM didn’t come through.', ready: 'Ready to install',
-    idea: 'Internet abroad', which: 'Which trip is it for?', covers: 'Covers your 7 days', wallet: 'eSIMs', walletRow: 'Internet in Türkiye', ask2: 'data for Istanbul',
+    idea: 'Internet abroad', which: 'Which trip?', covers: 'Covers your 7 days', wallet: 'eSIMs', walletRow: 'Internet in Türkiye', ask2: 'data for Istanbul',
+    ask3: 'Need an esim', where: 'Where to?', lahore: 'Lahore', pk: 'Pakistan', pkTitle: 'Internet in Pakistan, on when you land.', pkPay: 'An eSIM for Pakistan',
   },
   ar: {
     ask: 'شريحة انترنت لإسطنبول', title: 'نت في تركيا، يشتغل أول ما تهبط.', each: 'للواحد', light: 'خفيف', regular: 'الأغلب ياخذونه', heavy: 'ثقيل',
@@ -55,6 +56,7 @@ const COPY = {
     land: 'لما تهبط', installedToast: 'تمام. تشتغل لما تهبط.', left: 'باقي', topupTitle: 'جيجات زيادة لـ تركيا', topLine: 'شحن ·', topupToast: 'الجيجات صارت على شريحتك.',
     trouble: 'خلّنا نوصلك بالنت', talk: 'كلّم مادا', refunded: 'هذي الشريحة ما وصلت.', ready: 'جاهزة تنزّلها',
     idea: 'إنترنت برّا', which: 'لأي رحلة؟', covers: 'تغطي أيامك الـ7', wallet: 'شرائح النت', walletRow: 'النت في تركيا', ask2: 'نت لإسطنبول',
+    ask3: 'أبي شريحة', where: 'وين رايح؟', lahore: 'لاهور', pk: 'باكستان', pkTitle: 'نت في باكستان، يشتغل أول ما تهبط.', pkPay: 'شريحة eSIM لـ باكستان',
   },
 };
 
@@ -106,6 +108,32 @@ async function run(lang) {
   await shot('entry-ask-chip');
   await page.goBack();
   await page.waitForTimeout(1000);
+
+  step(`${lang}: "${c.ask3}" → one question (which trip), then any country: "${c.pk}" typed in Ask → Pakistan's plans`);
+  if (!(await byTest('ask-input').count())) await openAsk();
+  await byTest('ask-input').fill(c.ask3);
+  await byTest('ask-send').click();
+  await see(c.which, 'which trip (one question)', 12000);
+  const visibleText = async (text) => page.getByText(text, { exact: true }).filter({ visible: true }).count();
+  if (await visibleText(c.where)) errors.push(`${lang} double heading: "${c.which}" and "${c.where}" both on screen`);
+  await shot('dest-which-trip');
+  await press('esim-other');
+  await see(c.where, 'where to');
+  if (await visibleText(c.which)) errors.push(`${lang} "${c.which}" still on screen with "${c.where}"`);
+  // A city gives its country: an eSIM is sold per country.
+  await byTest('esim-where-input').fill(c.lahore);
+  await byTest('esim-match-PK').waitFor({ state: 'visible', timeout: 8000 }).catch(() => errors.push(`${lang} "${c.lahore}" didn't offer Pakistan`));
+  await shot('dest-where-search');
+  await byTest('esim-where-input').fill('');
+  // Typed in the Ask box while the planner is open: the place, never "What should Mada change?".
+  await byTest('ask-input').fill(c.pk);
+  await byTest('ask-send').click();
+  await see(c.pkTitle, 'Pakistan plans', 12000);
+  if (await byTest('ask-fix-prompt').count()) errors.push(`${lang} "${c.pk}" fell to "What should Mada change?"`);
+  await see(c.light, 'Pakistan light size');
+  await shot('dest-pakistan-plans');
+  await page.evaluate(() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await page.waitForTimeout(1500);
 
   step(`${lang}: Ask for internet in Istanbul → the plan for Türkiye`);
   // Back lands on Ask's start again (or on Today, depending on how Ask was opened).

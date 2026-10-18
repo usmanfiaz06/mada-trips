@@ -3,6 +3,7 @@ import { Id, IsoDateTime, IsoDay, Money } from './common';
 import { RequestResult } from './outcomes';
 import { COUNTRY_CODES, ESIM_NAMED, ESIM_PHONES, NO_ESIM_PHONES, type EsimPackage } from './esim-data';
 import { DESTINATIONS } from './booking-data';
+import { ESIM_REGION_WORDS, esimCountry, esimFlag, findEsimPlace } from './esim-places';
 import { sarToHalalas, type Halalas } from '../money';
 
 /*
@@ -15,9 +16,12 @@ import { sarToHalalas, type Halalas } from '../money';
  */
 
 export * from './esim-data';
+export * from './esim-places';
 
 export const ESIM_ROUTES = {
   plans: '/esim/plans',
+  /** Every country and region the supplier sells, named in English and Arabic, for the planner's search. */
+  places: '/esim/places',
   esims: '/esims',
   esim: (id: string) => `/esims/${id}`,
   topups: (id: string) => `/esims/${id}/topups`,
@@ -57,6 +61,8 @@ export const EsimPlansQuery = z.object({
   /** A DESTINATIONS key ("istanbul") or ISO country codes ("TR,GR"). */
   destination: z.string().max(40).optional(),
   countries: z.string().regex(/^[A-Z]{2}(,[A-Z]{2}){0,9}$/).optional(),
+  /** A region the supplier sells, by its coverage code ("europe", "EU-42") or Mada's word for it ("europe", "world"). */
+  region: z.string().max(40).optional(),
   days: z.coerce.number().int().min(1).max(90).optional(),
 });
 
@@ -73,8 +79,28 @@ export const EsimPlansResponse = z.object({
   /** The trip's travellers (or the household), and whether each already has an eSIM for this trip. */
   people: z.array(z.object({ id: Id, name: z.string(), has: z.boolean() })),
   supplier: z.enum(['esimaccess', 'airalo', 'mock']),
+  /**
+   * No plan for the place asked: what's closest instead, a region sold for the countries around it (or the global
+   * plan), offered as its own choice; null when there is nothing near. `name` is the supplier's title.
+   */
+  alt: z.object({ code: z.string(), kind: EsimCoverageKind, name: z.string() }).nullable().optional(),
 });
 export type EsimPlansResponse = z.infer<typeof EsimPlansResponse>;
+
+/** A country or region the supplier sells: `code` is the ISO code, or the region's coverage code for `region=`. */
+export const EsimPlace = z.object({
+  code: z.string().min(2).max(40),
+  kind: z.enum(['country', 'region']),
+  en: z.string(),
+  ar: z.string(),
+  /** The flag emoji (countries); null for a region. */
+  flag: z.string().nullable(),
+  /** A region's countries. */
+  countries: z.array(z.string()).optional(),
+});
+export type EsimPlace = z.infer<typeof EsimPlace>;
+export const EsimPlacesResponse = z.object({ places: z.array(EsimPlace).max(600) });
+export type EsimPlacesResponse = z.infer<typeof EsimPlacesResponse>;
 
 export const EsimStatus = z.enum(['ordering', 'ready', 'installed', 'active', 'used_up', 'expired', 'refunded', 'stuck']);
 export type EsimStatus = z.infer<typeof EsimStatus>;
@@ -157,7 +183,10 @@ export function esimCountriesOf(trip: { city: string; country: string | null }):
   const byCity = Object.values(DESTINATIONS).find((d) => d.name.toLowerCase() === trip.city.toLowerCase());
   if (byCity) return [byCity.country];
   const c = trip.country ? COUNTRY_CODES[trip.country.toLowerCase()] ?? (/^[A-Z]{2}$/.test(trip.country) ? trip.country : null) : null;
-  return c ? [c] : [];
+  if (c) return [c];
+  // Any other country or city Mada can name ("Pakistan", "Lahore").
+  const hit = findEsimPlace(trip.country ?? '') ?? findEsimPlace(trip.city);
+  return hit?.kind === 'country' ? [hit.code] : [];
 }
 
 /** Days on the ground, counting the day you land and the day you leave. At least 1. */
@@ -178,6 +207,71 @@ export function esimCoverageFor(packages: readonly EsimPackage[], countries: rea
   const regional = packages.filter((p) => p.coverage.kind === 'regional' && covers(p)).sort((a, b) => a.coverage.countries.length - b.coverage.countries.length)[0];
   if (regional) return regional.coverage;
   return packages.find((p) => p.coverage.kind === 'global' && covers(p))?.coverage ?? null;
+}
+
+/**
+ * Every place the supplier sells, from its packages: each country any plan covers (named in English and Arabic, with its
+ * flag) and each region as its own choice. Countries A–Z, then regions, then the global plan.
+ */
+export function esimPlacesOf(packages: readonly EsimPackage[]): EsimPlace[] {
+  const countries = new Set<string>();
+  const regions = new Map<string, EsimPackage['coverage']>();
+  for (const p of packages) {
+    for (const c of p.coverage.countries) countries.add(c);
+    if (p.coverage.kind !== 'local' && !regions.has(p.coverage.code)) regions.set(p.coverage.code, p.coverage);
+  }
+  const out: EsimPlace[] = [];
+  for (const code of countries) {
+    const c = esimCountry(code);
+    if (c) out.push({ code, kind: 'country', en: c.en, ar: c.ar, flag: esimFlag(code) });
+    else {
+      const local = packages.find((p) => p.coverage.kind === 'local' && p.coverage.code === code);
+      if (local) out.push({ code, kind: 'country', en: local.coverage.name, ar: local.coverage.name, flag: esimFlag(code) });
+    }
+  }
+  out.sort((a, b) => a.en.localeCompare(b.en));
+  const regionOut = [...regions.values()].map((r): EsimPlace => {
+    const w = r.kind === 'global' ? ESIM_REGION_WORDS.find((x) => x.key === 'world') : ESIM_REGION_WORDS.find((x) => x.key !== 'world' && (x.match.test(r.code) || x.match.test(r.name)));
+    return { code: r.code, kind: 'region', en: r.kind === 'global' ? w!.en : r.name, ar: w?.ar ?? r.name, flag: null, countries: [...r.countries] };
+  }).sort((a, b) => (a.code === 'world' || /^gl/i.test(a.code) ? 1 : 0) - (b.code === 'world' || /^gl/i.test(b.code) ? 1 : 0) || (a.countries?.length ?? 0) - (b.countries?.length ?? 0));
+  return [...out, ...regionOut].slice(0, 600);
+}
+
+/** A region asked for (`region=`): the supplier's coverage with that code, else the one Mada's word names (the largest). */
+export function esimRegionCoverage(packages: readonly EsimPackage[], region: string): EsimPackage['coverage'] | null {
+  const own = packages.find((p) => p.coverage.kind !== 'local' && p.coverage.code.toLowerCase() === region.toLowerCase());
+  if (own) return own.coverage;
+  const w = ESIM_REGION_WORDS.find((x) => x.key === region.toLowerCase());
+  if (!w) return null;
+  const fits = packages.filter((p) => (w.key === 'world' ? p.coverage.kind === 'global' : p.coverage.kind === 'regional' && (w.match.test(p.coverage.code) || w.match.test(p.coverage.name))));
+  return fits.sort((a, b) => b.coverage.countries.length - a.coverage.countries.length)[0]?.coverage ?? null;
+}
+
+/**
+ * Nothing sold for this country: the closest thing that is, a region covering the most countries on the same continent
+ * (honestly not this one), else the global plan; null when there's none.
+ */
+export function esimNearest(packages: readonly EsimPackage[], code: string): EsimPackage['coverage'] | null {
+  const c = esimCountry(code);
+  if (!c) return null;
+  const regional = new Map<string, { cov: EsimPackage['coverage']; near: number }>();
+  for (const p of packages) {
+    if (p.coverage.kind !== 'regional' || regional.has(p.coverage.code)) continue;
+    const near = p.coverage.countries.filter((x) => esimCountry(x)?.cont === c.cont).length;
+    if (near > 0) regional.set(p.coverage.code, { cov: p.coverage, near });
+  }
+  const best = [...regional.values()].sort((a, b) => b.near - a.near)[0];
+  return best?.cov ?? packages.find((p) => p.coverage.kind === 'global')?.coverage ?? null;
+}
+
+/** What a place asked for (`destination=`) is: a DESTINATIONS key, an ISO code, a region word, or a country or city by name. */
+export function esimDestinationOf(destination: string): { countries: string[]; region: string | null } {
+  const d = DESTINATIONS[destination.toLowerCase()];
+  if (d) return { countries: [d.country], region: null };
+  if (/^[A-Z]{2}$/.test(destination)) return { countries: [destination], region: null };
+  const hit = findEsimPlace(destination);
+  if (!hit) return { countries: [], region: null };
+  return hit.kind === 'country' ? { countries: [hit.code], region: null } : { countries: [], region: hit.code };
 }
 
 /** About what a traveller uses a day: maps, messages, some photos and video. */

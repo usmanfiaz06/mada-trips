@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/lib/session';
-import { DESTINATIONS, esimDays, permitAnswers, addDays, ageOn, daysBetween, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
+import { DESTINATIONS, esimDays, esimDaysIn, findEsimPlace, permitAnswers, addDays, ageOn, daysBetween, householdOf, nameIn, personName, quickDates, weekendDates, type AskIntent, type Person, type StayOption } from '@mada/shared';
 import { bookingApi, useDemo, usePayDraft, usePlans } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t, tn } from '@/lib/i18n';
@@ -339,11 +339,30 @@ export function PlanFlow({ query, people, today }: { query: string; people: Pers
   );
 }
 
-/** Ask "data for Istanbul": the eSIM planner for that place and those days (components/esim/EsimPlanner.tsx). */
-export function EsimFlow({ intent }: { intent?: AskIntent | null }) {
-  const days = intent?.depart && intent?.return ? esimDays(intent.depart, intent.return) : null;
-  const dest = intent?.destination && intent.destination !== 'other' ? intent.destination : null;
-  return <Animated.View entering={enter(0)}><EsimPlanner destination={dest} days={days} /></Animated.View>;
+/**
+ * Ask "data for Istanbul", "Need an esim", "أبي شريحة": the eSIM planner (components/esim/EsimPlanner.tsx) for the
+ * place and days said, if any. The place is any country, city or region ("Pakistan", "لاهور"), from the reading or the
+ * words themselves; the days from "for 10 days" (answers.days, set by a correction) or the dates. What the planner
+ * settles goes to Ask (onSync), so "for 10 days" typed after a place keeps the place.
+ */
+export function EsimFlow({ intent, query, onSync }: { intent?: AskIntent | null; query?: string; onSync?: (p: Partial<AskIntent>) => void }) {
+  const askWhere = intent?.ask === 'where';
+  const askWhen = intent?.ask === 'when';
+  const said = Number(intent?.answers?.days?.[0]);
+  const days = askWhen ? null : Number.isInteger(said) && said > 0 ? said : intent?.depart && intent?.return ? esimDays(intent.depart, intent.return) : query ? esimDaysIn(query) : null;
+  let dest = intent?.destination && intent.destination !== 'other' ? intent.destination : null;
+  if (!dest && !askWhere && query) dest = findEsimPlace(query)?.code ?? null;
+  if (!dest && !askWhere && intent?.destinationName) dest = intent.destinationName;
+  return (
+    <Animated.View entering={enter(0)}>
+      <EsimPlanner destination={askWhere ? null : dest} days={days} askDays={askWhen}
+        onChange={(p) => {
+          const answers = { ...(intent?.answers ?? {}) };
+          if (p.days) answers.days = [String(p.days)]; else delete answers.days;
+          onSync?.({ destination: p.destination, destinationName: null, answers });
+        }} />
+    </Animated.View>
+  );
 }
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;

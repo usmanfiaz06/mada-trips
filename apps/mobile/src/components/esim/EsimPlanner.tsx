@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { DESTINATIONS, addDays, esimWhereKey, formatSar, nameIn, rangeLabel, type CopyKey, type EsimPlan, type EsimPlansResponse } from '@mada/shared';
+import { DESTINATIONS, ESIM_REGION_WORDS, addDays, esimCountriesOf, esimFlag, esimPlaceName, esimWhereKey, formatSar, nameIn, rangeLabel, type CopyKey, type EsimPlan, type EsimPlansResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { VGradient } from '@/components/Gradient';
@@ -12,33 +12,49 @@ import { Approx } from '@/components/wallet/Approx';
 import { Box, H3, Num, PickCard, Rise, Row, Small, TextLink, Tiny } from '@/components/trips/ui';
 import { ChipWrap, Photo } from '@/components/booking/parts';
 import { EsimHero, PersonChip, PhoneArt, PlanCard, countryOf } from './look';
+import { DAY_CHOICES, EsimDays, EsimWhere, placeLabel, type WherePick } from './WherePicker';
 import { ApiError } from '@/lib/api';
 import { usePayDraft } from '@/lib/booking';
-import { planLabel, useEsimPlans } from '@/lib/esim';
+import { planLabel, useEsimPlaces, useEsimPlans } from '@/lib/esim';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { useTrips } from '@/lib/trips';
 import { colors, ff, font, radii } from '@/theme';
 
 /*
- * An eSIM for the trip (Ask "data for Istanbul", or Today's readiness): the trip's country and days, 2–3 sizes priced
+ * An eSIM for the trip (Ask "data for Istanbul", or Today's readiness). One question at a time: "Which trip?" when there
+ * are trips coming (each with its dates, and "Somewhere else"), otherwise "Where to?" straight away: any country or
+ * region the supplier sells (WherePicker.tsx); then "How many days?" unless the trip says; then the plans. eSIMs are
+ * sold per country, so a city counts as its country. Then: the country and days, 2–3 sizes priced
  * in SAR (≈ the display currency), one eSIM per traveller who wants it, and "does your phone take one?" with the steps
  * to check when they're not sure. Review opens the order sheet; the eSIM is bought once the payment goes through.
  * `layout` places the total and Review: in a bar pinned to the bottom of its own screen; inline (in Ask) at the end.
  */
 
-const PLACES = ['istanbul', 'dubai', 'london', 'cairo', 'baku', 'tbilisi', 'paris'] as const;
-const DAYS = [3, 5, 7, 10, 14, 30];
+const DAYS = DAY_CHOICES;
 type Phone = 'iphone' | 'samsung' | 'pixel' | 'unsure' | 'no';
 
 export const whereOf = (p: Pick<EsimPlansResponse, 'where' | 'plans'>) => {
   const code = p.where?.code ?? '';
   const k = esimWhereKey(code);
-  return k ? t(k as CopyKey) : nameIn(p.plans[0]?.coverage.name ?? code, getLocale());
+  if (k) return t(k as CopyKey);
+  const named = /^[A-Z]{2}$/.test(code) ? esimPlaceName(code, getLocale()) : null;
+  if (named) return named;
+  const title = p.plans[0]?.coverage.name ?? code;
+  // A supplier's region ("Europe (30+ areas)") in Arabic: Mada's word for it.
+  const w = p.where && p.where.kind !== 'local' && getLocale() === 'ar' ? ESIM_REGION_WORDS.find((x) => (p.where!.kind === 'global' ? x.key === 'world' : x.key !== 'world' && (x.match.test(code) || x.match.test(title)))) : null;
+  return w ? w.ar : nameIn(title, getLocale());
 };
 
-export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn, layout }: {
+/** `destination` as the planner keeps it: a region picked from the list is "region:<code>"; anything else the server reads. */
+const regionOf = (d: string | null) => (d?.startsWith('region:') ? d.slice(7) : null);
+
+export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn, layout, onChange, askDays: askDaysIn }: {
   tripId?: string | null; destination?: string | null; days?: number | null; layout?: (body: ReactNode, bar: ReactNode | null) => ReactElement;
+  /** Ask "How many days?" before the plans (Ask's "change the dates"). */
+  askDays?: boolean;
+  /** What was settled here (a place picked, the days), so Ask can carry it into a correction typed after. */
+  onChange?: (p: { destination: string | null; days: number | null }) => void;
 }) {
   const router = useRouter();
   const trips = useTrips();
@@ -47,8 +63,12 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
   const [dest, setDest] = useState<string | null>(destIn ?? null);
   const [days, setDays] = useState<number | null>(daysIn ?? null);
   const [other, setOther] = useState(false);
-  const asking = !tripId && !dest;
-  const q = useEsimPlans({ tripId, destination: tripId ? null : dest, days: tripId ? daysIn ?? null : days ?? 7 });
+  // A place picked here asks the days next; one typed in Ask goes straight to the plans (7 days, "Change" beside them).
+  const [askDays, setAskDays] = useState(!!askDaysIn);
+  const places = useEsimPlaces(!!dest && askDays);
+  const region = regionOf(dest);
+  const step: 'trip' | 'where' | 'days' | 'plans' = tripId ? 'plans' : !dest ? ((upcoming.length || trips.isLoading) && !other ? 'trip' : 'where') : askDays && !days ? 'days' : 'plans';
+  const q = useEsimPlans({ tripId, destination: tripId || region ? null : dest, region: tripId ? null : region, days: tripId ? daysIn ?? null : days ?? 7 }, step === 'plans');
   const data = q.data;
   const [pick, setPick] = useState<string | null>(null);
   const [who, setWho] = useState<string[] | null>(null);
@@ -64,9 +84,26 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
   const total = plan ? plan.price.amount * count : 0;
 
   const wrap = (body: ReactNode) => (layout ? layout(body, null) : <>{body}</>);
-  if (asking) {
+  const pickWhere = (p: WherePick) => {
+    const d = p.kind === 'region' ? `region:${p.code}` : p.code;
+    setDest(d); setAskDays(!days); setPick(null);
+    onChange?.({ destination: d, days });
+  };
+  const toWhere = () => { buzz('tap'); setDest(null); setTripId(null); setOther(true); setPick(null); };
+  if (step === 'where') {
+    const tripCountries = [...new Set(upcoming.flatMap((x) => esimCountriesOf({ city: x.city, country: x.country ?? null })))];
+    return wrap(<EsimWhere tripCountries={tripCountries} onPick={pickWhere} onUnknown={(text) => { setDest(text); setAskDays(false); onChange?.({ destination: text, days }); }} />);
+  }
+  if (step === 'days') {
+    const place = places.data?.find((p) => p.code === (region ?? dest));
+    const name = place ? placeLabel(place) : esimPlaceName(region ?? dest ?? '', getLocale()) ?? (region ?? dest ?? '');
+    return wrap(<EsimDays where={name} flag={region ? null : esimFlag(dest)} onChangePlace={toWhere}
+      onDays={(n) => { buzz('select'); setDays(n); onChange?.({ destination: dest, days: n }); }} />);
+  }
+  if (step === 'trip') {
+    if (trips.isLoading) return wrap(<View style={{ paddingVertical: 40, alignItems: 'center' }}><ActivityIndicator color={colors.green} /></View>);
     return wrap(
-      <View style={{ gap: 16 }} testID="esim-where">
+      <View style={{ gap: 16 }} testID="esim-which">
         <Rise><T style={font('displaySmall')} accessibilityRole="header">{t('es.which')}</T></Rise>
         {upcoming.map((x, i) => (
           <Rise key={x.id} step={1 + i}>
@@ -84,13 +121,7 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
             </Pressable>
           </Rise>
         ))}
-        {!other && upcoming.length ? <Button variant="secondary" label={t('es.which.other')} onPress={() => setOther(true)} testID="esim-other" /> : null}
-        {other || !upcoming.length ? (
-          <View style={{ gap: 10 }}>
-            <H3>{t('es.which.where')}</H3>
-            <ChipWrap>{PLACES.map((k) => <Chip key={k} label={nameIn(DESTINATIONS[k]!.name, getLocale())} background={colors.paper} on={false} onPress={() => { buzz('select'); setDest(k); }} testID={`esim-place-${k}`} />)}</ChipWrap>
-          </View>
-        ) : null}
+        <Button variant="secondary" label={t('es.which.other')} onPress={() => { buzz('tap'); setOther(true); }} testID="esim-other" />
       </View>,
     );
   }
@@ -102,11 +133,17 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
   }
   const where = whereOf(data);
   if (data.outcome === 'none' || !plan) {
+    // Said plainly, with what's closest (a region around it, or the global plan), another place, or Mada.
+    const asked = (data.where ? where : '') || esimPlaceName(dest ?? '', getLocale()) || nameIn(dest ?? '', getLocale());
+    const alt = data.alt ?? null;
+    const altName = alt ? whereOf({ where: { countries: [], code: alt.code, kind: alt.kind }, plans: [{ coverage: { name: alt.name } } as EsimPlan] }) : '';
     return wrap(
       <View style={{ gap: 12 }} testID="esim-none">
-        <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('es.none.title', { where: where || nameIn(dest ?? '', getLocale()) })}</T>
-        <Small>{t('es.none.body')}</Small>
-        <Button label={t('es.none.cta')} variant="secondary" onPress={() => router.push('/support?topic=other' as Href)} />
+        <T v="h2" style={{ fontSize: 24, lineHeight: 30 }}>{t('es.none.title', { where: asked })}</T>
+        <Small>{alt ? t('es.none.alt', { alt: altName, where: asked }) : t('es.none.body')}</Small>
+        {alt ? <Button label={t('es.none.altCta', { alt: altName })} onPress={() => { buzz('tap'); setDest(`region:${alt.code}`); setPick(null); onChange?.({ destination: `region:${alt.code}`, days }); }} testID="esim-none-alt" /> : null}
+        {!tripIn ? <Button label={t('es.none.other')} variant="secondary" onPress={toWhere} testID="esim-none-other" /> : null}
+        <Button label={t('es.tr.talk')} variant="secondary" onPress={() => router.push('/support?topic=other' as Href)} testID="esim-none-talk" />
       </View>,
     );
   }
