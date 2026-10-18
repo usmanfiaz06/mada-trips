@@ -242,9 +242,13 @@ async function flights() {
   await k.see("You're going to Istanbul.", 'confirmed', 15000);
   await k.see('Confirmed by', 'actor');
   await k.see('Paid with Visa ending 42', 'paid with');
+  // One quiet line for internet there, never chosen for them.
+  await k.see('Internet when you land? From SAR', 'eSIM line after booking', 12000);
   await k.shot('confirmed', 1200);
   await k.byTest('see-trip').click();
   await page.waitForTimeout(1200);
+  await k.see('Internet in Türkiye', 'eSIM row on the trip', 12000);
+  await k.see('Get an eSIM · from SAR', 'eSIM from price on the trip');
   await k.shot('after-see-trip');
   await context.close();
 }

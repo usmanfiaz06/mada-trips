@@ -164,4 +164,12 @@ export const arEsim: ArSection<typeof esimCopy> = {
   'notify.esim.topped.body': '{where}: مادا زادت {size}.',
   'notify.esim.note.title': 'عن شريحتك',
   'notify.esim.note.body': '{name}: {note}',
+  'es.plan.covers': 'تغطي أيامك الـ{days}',
+  'es.idea': 'إنترنت برّا',
+  'es.trip.row': 'نت في {where}',
+  'es.trip.from': 'خذ شريحة eSIM · من {price}',
+  'es.cross': 'تبي نت أول ما توصل؟ من {price}',
+  'es.wallet.title': 'شرائح النت',
+  'es.wallet.empty': 'نت برّا، يشتغل أول ما توصل.',
+  'es.wallet.get': 'خذ وحدة',
 };

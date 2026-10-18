@@ -44,6 +44,11 @@ export function useEsims(f: { order?: string | null; trip?: string | null }, ena
     refetchInterval: (q) => (q.state.data?.esims.some((e) => e.status === 'ordering') ? 2000 : false),
   });
 }
+/** All my eSIMs (the wallet), newest first. */
+export function useMyEsims() {
+  const signedIn = useSignedIn();
+  return useQuery({ queryKey: ['esim', 'list', 'all'] as const, queryFn: () => esimApi.list({}), enabled: signedIn, staleTime: 60_000 });
+}
 export function useEsim(id: string) {
   const signedIn = useSignedIn();
   return useQuery({

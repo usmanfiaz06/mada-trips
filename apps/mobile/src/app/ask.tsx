@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -324,7 +324,11 @@ function Start({ onPick, onResume, people, today }: { onPick: (x: string) => voi
           <Notice icon="calendar"><T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('resume.pickUp')}</T><T v="small" numberOfLines={1}>{last}</T></Notice>
         </Pressable>
       ) : null}
-      <ChipWrap>{ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}</ChipWrap>
+      <ChipWrap>
+        {ideas.map((i) => <Chip key={i} label={i} background={colors.paper} onPress={() => onPick(i)} />)}
+        {/* Internet abroad: the eSIM plans straight away (the trip, or where, is asked there). */}
+        <Chip label={t('es.idea')} background={colors.paper} onPress={() => router.push('/esim/plans' as Href)} testID="ask-idea-esim" />
+      </ChipWrap>
       <IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={onPick} testID="ask-ideas" />
       {busy ? (
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/waiting/[id]', params: { id: busy.id } })}>

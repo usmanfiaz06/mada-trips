@@ -39,6 +39,9 @@ describe('Ask: Arabic is read by the same rules', () => {
     ['بوليفارد وورلد الليلة', { kind: 'todo', depart: today, answers: { pick: ['Boulevard World'], when: ['Today'] } }],
     ['أبغى شي أسويه في الرياض', { kind: 'todo', answers: { where: ['Riyadh'] } }],
     ['شريحة انترنت', { kind: 'esim' }],
+    ['نت في إسطنبول', { kind: 'esim' }],
+    ['باقة لتركيا', { kind: 'esim' }],
+    ['شريحة لدبي', { kind: 'esim' }],
   ] as const)('%s', (text, want) => {
     expect(parse(text)).toMatchObject(want);
   });
@@ -46,6 +49,12 @@ describe('Ask: Arabic is read by the same rules', () => {
     expect(arabicForRules('طيران لدبي')).toBe('flights to dubai');
     expect(arabicForRules('فندق بدبي')).toBe('hotel in dubai');
     expect(arabicForRules('سيارة للرياض')).toBe('car to riyadh');
+  });
+  it.each(['internet for Istanbul', 'data in London', 'a SIM for Dubai', 'sims for the family'])('English: %s is an eSIM', (text) => {
+    expect(parse(text).kind).toBe('esim');
+  });
+  it('a holiday package is not an eSIM', () => {
+    expect(arabicForRules('باقة سياحية لتركيا')).not.toContain('esim');
   });
   it('English comes back unchanged', () => {
     expect(arabicForRules('Hotel in Dubai')).toBe('Hotel in Dubai');

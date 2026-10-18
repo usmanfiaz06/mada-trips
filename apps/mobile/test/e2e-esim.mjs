@@ -8,7 +8,9 @@
 // who needs one, "does your phone take an eSIM?" (not sure → the steps to check), the order sheet, paying; then the
 // install screen (iPhone one-tap link, Android QR code and the codes to type, the steps for when you land), "I've
 // installed it", what's left, a top-up paid on the order sheet, "Not connecting?" step by step and Talk to Mada; last, an eSIM the
-// supplier can't give: refunded at once, with the outcome. Screenshots each at 390×844. Fails on any page error or
+// supplier can't give: refunded at once, with the outcome. Entry points: Ask's "Internet abroad" chip, "Covers your 7
+// days" on each plan, the Wallet's eSIMs, other words in Ask ("data", "نت"). After booking and on the trip page:
+// e2e-booking. Screenshots each at 390×844. Fails on any page error or
 // missing text.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -44,6 +46,7 @@ const COPY = {
     install: 'Install it now. It switches on when you land.', ios: 'Install on this iPhone', qr: 'Scan this with the phone it’s for.', codes: 'Activation code',
     land: 'When you land', installedToast: 'Installed. It switches on when you land.', left: 'left of', topupTitle: 'More GB for Türkiye', topLine: 'Top up ·', topupToast: 'The GB are on your eSIM.',
     trouble: 'Let’s get you online', talk: 'Talk to Mada', refunded: 'This eSIM didn’t come through.', ready: 'Ready to install',
+    idea: 'Internet abroad', which: 'Which trip is it for?', covers: 'Covers your 7 days', wallet: 'eSIMs', walletRow: 'Internet in Türkiye', ask2: 'data for Istanbul',
   },
   ar: {
     ask: 'شريحة انترنت لإسطنبول', title: 'نت في تركيا، يشتغل أول ما تهبط.', each: 'للواحد', light: 'خفيف', regular: 'الأغلب ياخذونه', heavy: 'ثقيل',
@@ -51,6 +54,7 @@ const COPY = {
     install: 'نزّلها الحين، وتشتغل لما تهبط.', ios: 'نزّلها على هذا الآيفون', qr: 'صوّر هذا بالجوال اللي بتركبها فيه.', codes: 'رمز التفعيل',
     land: 'لما تهبط', installedToast: 'تمام. تشتغل لما تهبط.', left: 'باقي', topupTitle: 'جيجات زيادة لـ تركيا', topLine: 'شحن ·', topupToast: 'الجيجات صارت على شريحتك.',
     trouble: 'خلّنا نوصلك بالنت', talk: 'كلّم مادا', refunded: 'هذي الشريحة ما وصلت.', ready: 'جاهزة تنزّلها',
+    idea: 'إنترنت برّا', which: 'لأي رحلة؟', covers: 'تغطي أيامك الـ7', wallet: 'شرائح النت', walletRow: 'النت في تركيا', ask2: 'نت لإسطنبول',
   },
 };
 
@@ -94,8 +98,18 @@ async function run(lang) {
   try { await byTest('welcome-back-open').waitFor({ state: 'visible', timeout: 6000 }); await byTest('welcome-back-open').click(); } catch { /* straight in */ }
   await page.waitForTimeout(1500);
 
-  step(`${lang}: Ask for internet in Istanbul → the plan for Türkiye`);
+  step(`${lang}: Ask's start has "Internet abroad" → the plans ask which trip`);
   await openAsk();
+  await see(c.idea, 'internet abroad chip');
+  await press('ask-idea-esim');
+  await see(c.which, 'which trip', 12000);
+  await shot('entry-ask-chip');
+  await page.goBack();
+  await page.waitForTimeout(1000);
+
+  step(`${lang}: Ask for internet in Istanbul → the plan for Türkiye`);
+  // Back lands on Ask's start again (or on Today, depending on how Ask was opened).
+  if (!(await byTest('ask-input').count())) await openAsk();
   await byTest('ask-input').fill(c.ask);
   await byTest('ask-send').click();
   await see(c.title, 'plan title', 12000);
@@ -103,6 +117,7 @@ async function run(lang) {
   await see(c.regular, 'regular size');
   await see(c.heavy, 'heavy size');
   await see(c.each, 'price each');
+  await see(c.covers, 'covers your days');
   const reviewBefore = await byTest('esim-review').getAttribute('aria-disabled');
   if (reviewBefore !== 'true') errors.push(`${lang} review allowed before the phone check`);
   await shot('plans');
@@ -170,6 +185,15 @@ async function run(lang) {
   await page.waitForTimeout(1500);
   await shot('talk');
 
+  step(`${lang}: the Wallet lists the eSIM`);
+  await page.evaluate(() => { window.history.pushState({}, '', '/wallet'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await page.waitForTimeout(1500);
+  await byTest('wallet-esims').waitFor({ state: 'visible', timeout: 12000 }).catch(() => errors.push(`${lang} wallet eSIMs section missing`));
+  await byTest('wallet-esims').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
+  await see(c.wallet, 'wallet eSIMs title');
+  await see(c.walletRow, 'wallet eSIM row');
+  await shot('entry-wallet');
+
   step(`${lang}: the supplier can't give it → refunded, with the outcome`);
   // In the app (a reload would start the in-memory mock afresh): back to Today, then Ask.
   await page.evaluate(() => { window.history.pushState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate')); });
@@ -178,7 +202,8 @@ async function run(lang) {
   await press('ask-demo');
   await page.getByRole('button', { name: 'eSIM not available', exact: true }).last().click();
   await closeSheet();
-  await byTest('ask-input').fill(c.ask);
+  // Other words for the same thing: "data", "نت".
+  await byTest('ask-input').fill(c.ask2);
   await byTest('ask-send').click();
   await see(c.title, 'plan title (again)', 12000);
   await press('esim-phone-iphone');

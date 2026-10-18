@@ -106,8 +106,9 @@ describe("the plan for a trip (shared rules)", () => {
   it("picks the country's own plans, a region or global, in 2–3 sizes that last the trip", () => {
     const tr = suggestEsimPlans(ESIM_FIXTURE_PACKAGES, { countries: ["TR"], days: 7 });
     expect(tr.coverage?.code).toBe("TR");
-    expect(tr.plans.map((p) => [p.size, p.gb, p.days])).toEqual([["light", 3, 15], ["regular", 5, 30], ["heavy", 10, 30]]);
-    expect(tr.recommended).toBe("merhaba-30days-5gb");
+    // A 7-day trip gets 7-day plans where there are any: the shortest that covers it, at each size.
+    expect(tr.plans.map((p) => [p.size, p.gb, p.days])).toEqual([["light", 3, 7], ["regular", 5, 7], ["heavy", 10, 30]]);
+    expect(tr.recommended).toBe("merhaba-7days-5gb");
     expect(suggestEsimPlans(ESIM_FIXTURE_PACKAGES, { countries: ["FR", "DE"], days: 10 }).coverage?.code).toBe("europe");
     expect(suggestEsimPlans(ESIM_FIXTURE_PACKAGES, { countries: ["JP"], days: 5 }).coverage?.code).toBe("world");
     expect(suggestEsimPlans(ESIM_FIXTURE_PACKAGES, { countries: ["AQ"], days: 5 }).plans).toEqual([]);
@@ -150,7 +151,7 @@ describe("eSIMs through the Core API (mock supplier)", () => {
   it("suggests, sells, orders after capture, installs, reads what's left and tops up", async () => {
     const f = await traveller();
     const plans = EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=istanbul&days=7")).json);
-    expect(plans).toMatchObject({ outcome: "ok", where: { code: "TR", kind: "local" }, recommended: "merhaba-30days-5gb", supplier: "mock" });
+    expect(plans).toMatchObject({ outcome: "ok", where: { code: "TR", kind: "local" }, recommended: "merhaba-7days-5gb", supplier: "mock" });
     expect(plans.plans).toHaveLength(3);
     expect(plans.people.map((p) => p.id).sort()).toEqual([f.me, f.hessa].sort());
     const plan = plans.plans.find((p) => p.id === plans.recommended)!;
@@ -169,7 +170,7 @@ describe("eSIMs through the Core API (mock supplier)", () => {
     expect(esims).toHaveLength(2);
     expect(esims.map((e) => e.travellerId).sort()).toEqual([f.me, f.hessa].sort());
     const e = esims[0]!;
-    expect(e).toMatchObject({ status: "ready", where: "Türkiye", plan: { gb: 5, days: 30 } });
+    expect(e).toMatchObject({ status: "ready", where: "Türkiye", plan: { gb: 5, days: 7 } });
     expect(e.install?.iosLink).toMatch(/^https:\/\/esimsetup\.apple\.com\/esim_qrcode_provisioning\?carddata=LPA:1\$/);
     expect(e.iccid).toMatch(/^89\d{18}$/);
 

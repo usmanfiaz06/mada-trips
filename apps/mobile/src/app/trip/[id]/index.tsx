@@ -17,6 +17,7 @@ import { toast } from '@/lib/toast';
 import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
 import { colors } from '@/theme';
 import { TripHotelbeds } from '@/components/trips/Hotelbeds';
+import { EsimTripRow } from '@/components/esim/parts';
 import { ThingsView } from '@/components/things/ThingsView';
 import { ErrorState, GoneState } from '@/components/states';
 import { describeError } from '@/lib/net/describe';
@@ -124,6 +125,7 @@ export default function TripDetail() {
             </Box>
           ) : null}
           <TripHotelbeds trip={trip} hasArrivalPickup={!!arrive} />
+          {trip.status !== 'cancelled' ? <EsimTripRow tripId={trip.id} /> : null}
           {q.isError ? <StaleBadge testID="trip-fresh" updatedAt={q.dataUpdatedAt || null} stale /> : null}
           <Eyebrow style={{ marginTop: 8 }}>{t('tm.detail.manage')}</Eyebrow>
           <Box padding={6} gap={0}>

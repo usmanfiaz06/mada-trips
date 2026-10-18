@@ -101,14 +101,14 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn 
       <View style={{ gap: 8 }} accessibilityRole="radiogroup">
         {data.plans.map((p) => (
           <PickCard key={p.id} radio on={plan.id === p.id} onPress={() => setPick(p.id)} title={sizeTitle(p)} sub={t(`es.size.${p.size}.sub` as CopyKey)} right={t('es.plan.each', { price: formatSar(p.price.amount) })}
-            note={!p.fits ? t('es.plan.short', { days: p.days }) : undefined} testID={`esim-plan-${p.size}`} />
+            note={p.fits ? t('es.plan.covers', { days: data.days }) : t('es.plan.short', { days: p.days })} testID={`esim-plan-${p.size}`} />
         ))}
       </View>
       {data.more.length ? <TextLink testID="esim-see-all" label={all ? t('es.plans.fewer') : t('es.plans.all')} onPress={() => setAll(!all)} /> : null}
       {all ? (
         <View style={{ gap: 8 }} testID="esim-more">
           {data.more.map((p) => (
-            <PickCard key={p.id} radio on={plan.id === p.id} onPress={() => setPick(p.id)} title={planLabel(p, t)} right={t('es.plan.each', { price: formatSar(p.price.amount) })} testID={`esim-more-${p.id}`} />
+            <PickCard key={p.id} radio on={plan.id === p.id} onPress={() => setPick(p.id)} title={planLabel(p, t)} sub={t('es.plan.covers', { days: data.days })} right={t('es.plan.each', { price: formatSar(p.price.amount) })} testID={`esim-more-${p.id}`} />
           ))}
         </View>
       ) : null}

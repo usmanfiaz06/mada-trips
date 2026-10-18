@@ -6,6 +6,7 @@ import Svg, { G, Line } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
 import { dayLabel, dueLabel, formatSar, ON_IT_MINUTES, todayIn, DESK_PHONE, type OrderView } from '@mada/shared';
 import { OutcomeCard } from '@/components/outcome/Outcome';
+import { EsimCrossSell } from '@/components/esim/parts';
 import { Button } from '@/components/Button';
 import { VGradient } from '@/components/Gradient';
 import { Icon } from '@/components/Icon';
@@ -311,6 +312,7 @@ function Confirmed({ o }: { o: OrderView }) {
             </View>
           </View>
         ) : alerts === 'allowed' ? <T v="small" color={colors.ok} style={{ fontFamily: ff.ui600 }}>{t('done.alerts.on')}</T> : null}
+        {o.tripId && (o.kind === 'trip' || o.kind === 'stay' || o.kind === 'package') ? <EsimCrossSell tripId={o.tripId} /> : null}
       </View>
       <View style={{ position: 'absolute', start: 20, end: 20, bottom: 28 + bottom }}>
         <Button label={o.kind === 'trip' || o.kind === 'stay' ? t('done.seeTrip') : t('done.done')} testID="see-trip"

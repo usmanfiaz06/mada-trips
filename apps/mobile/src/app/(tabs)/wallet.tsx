@@ -18,6 +18,7 @@ import { PassportCard } from '@/components/wallet/PassportCard';
 import { PassportCopyRow } from '@/components/passport/PassportCopy';
 import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
 import { BoardingPasses } from '@/components/wallet/BoardingPasses';
+import { WalletEsims } from '@/components/esim/parts';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
@@ -159,6 +160,8 @@ function Unlocked() {
           <EmptyState compact art={<ArtPass width={100} height={75} />} title={t('wallet.passes.emptyTitle')}
             action={<LinkButton label={t('wallet.passes.plan')} onPress={() => router.push('/ask')} />} />
         )}
+
+        <WalletEsims />
 
         {trip?.trip.vouchers.length ? (
           <>
