@@ -337,7 +337,7 @@ export default function Pay() {
               <T v="eyebrow">{t('rn.eyebrow')}</T>
               <T v="h3" style={{ fontSize: 15 }}>{t('rn.step', { name: r.name })}</T>
               <T v="small" color={r.inTime ? colors.green : colors.goldInk}>{r.inTime ? t('rn.by', { date: shortDay(r.by) }) : t('rn.late', { days: RENEWAL_DAYS, date: shortDay(r.by) })}</T>
-              {r.inTime ? <T v="tiny">{t('rn.cost', { price: formatSar(r.fee) })} {t('rn.payNote', { price: formatSar(r.fee) })}</T> : <T v="tiny">{t('rn.lateNext', { name: r.name })}</T>}
+              {r.inTime ? <T v="tiny">{t('rn.cost', { price: formatSar(r.fee) })} {t('rn.payNote')}</T> : <T v="tiny">{t('rn.lateNext', { name: r.name })}</T>}
               {r.inTime ? <T v="tiny">{t('rn.alongside')}</T> : null}
               {hasPeople && travellers.length > 1 ? <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('rn.without', { name: r.name })} onPress={() => { buzz('select'); setTravellers((x) => x.filter((id) => id !== r.personId)); }} testID={`pay-without-${r.personId}`} /></View> : null}
             </View>

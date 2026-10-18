@@ -276,6 +276,7 @@ async function demo() {
   await tapText('مين دفع وش');
   await see('صرفتها على هذي الرحلة', 'money screen');
   await see('لكل شخص', 'money per person');
+  await see('بطاقة محفوظة', 'money: the payer card said the way Wallet says it');
   await shot('money');
   await back();
   await tapText('برنامج الرحلة كامل');
@@ -284,7 +285,10 @@ async function demo() {
   await back();
   await tapText('غيّر الرحلة');
   await see('وش تبي تغيّر؟', 'change flight');
+  await see('وش تعطيك الأنظمة', 'change: what the rules give you');
   await shot('change-flight');
+  await scroll(900);
+  await shot('change-rules');
   await back();
   await back();
 
@@ -300,10 +304,21 @@ async function demo() {
   const body = await page.evaluate(() => document.body.innerText.replace(/[⁦-⁩]/g, ''));
   for (const [re, what] of [[/Saudi/, 'nationality in English'], [/\bYou\b/, '"You" in English'], [/\d, \d/, 'Latin comma between numbers']]) if (re.test(body)) errors.push(`results ar: ${what}`);
   await shot('results');
+  // The bundle hotel's page, in Arabic (CRITIQUE-2 #9): this stay, room × rooms, a night, rating, the cancel date.
+  if (await page.locator('[data-testid="bundle-hotel"]').filter({ visible: true }).count()) {
+    await byTest('bundle-hotel').click();
+    await see('هذي الإقامة', 'hotel page: this stay');
+    await see('الليلة، لكم كلكم', 'hotel page: a night');
+    await shot('hotel-page');
+    await back();
+    await see('ثلاث طرق توصلك.', 'back to results', 8000);
+  } else errors.push('arabic: no bundle hotel link on the results');
   await byTest('ask-review').first().click();
   await see('كل شي مشمول. ولا رسوم بعدين.', 'pay sheet', 12000);
   await see('تفضيلاتك', 'pay sheet: preferences row');
   await see('بالريال السعودي', 'pay sheet: charged in SAR');
+  await see('الشنط', 'pay sheet: bags each');
+  await see('الطيران يحسب من', 'pay sheet: why the 13-year-old is an adult fare');
   await shot('pay-sheet');
   await scroll(500);
   await shot('pay-sheet-slider');

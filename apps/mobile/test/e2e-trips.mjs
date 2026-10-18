@@ -190,6 +190,8 @@ try {
   await see('spent on this trip', 'money screen');
   await see('shared between everyone', 'money per person');
   await see('Statement as PDF', 'money statement');
+  // One money truth (CRITIQUE-2 #13): who paid says whether the card is saved, the way Wallet and Profile do.
+  await see('Saved card', 'money: the payer card is the saved one');
   await shot('money');
   await page.mouse.move(195, 420); await page.mouse.wheel(0, 900); await page.waitForTimeout(400);
   await shot('money-lower');
@@ -216,20 +218,34 @@ try {
   await tapText('Ask for a refund');
   await page.waitForTimeout(1000);
   await see('What should we refund?', 'refund');
+  // The fare rule names the airline whose fare it is (CRITIQUE-2 #13), and the rules card says what's owed (#19).
+  await see('Saudia fare: refund minus SAR 400 per person', 'refund: the fare is Saudia’s');
+  if (await page.getByText('flynas fare').filter({ visible: true }).count()) errors.push('refund: a Saudia fare named flynas');
+  await see('What the rules give you', 'refund: rules card');
+  await see('If Saudia cancels, or moves your flight by more than 3 hours:', 'refund: GACA line');
+  await see('Cancelling because your plans changed:', 'refund: your own choice');
   await shot('refund');
   await page.locator('[data-testid^="refund-"]').filter({ hasNotText: 'Nothing back' }).first().click().catch(() => {});
   await page.waitForTimeout(400);
   await tapText('Plans changed');
+  await see('Visa ending 41', 'refund: back to the card the trip was paid with');
+  await see('Saved card', 'refund: the card said the same way as Wallet');
   await byTest('dest-credit').click().catch(() => {});
   await scroll(600);
   await shot('refund-picked');
+  await scroll(900);
+  await shot('refund-rules');
   await back();
 
   step('change flight');
   await tapText('Change flight');
   await page.waitForTimeout(1000);
   await see('What would you like to change?', 'change kinds');
+  await see('What the rules give you', 'change: rules card');
+  await see('Changing because your plans changed:', 'change: your own choice');
   await shot('change-flight');
+  await scroll(900);
+  await shot('change-rules');
   await tapText('Another day');
   await page.waitForTimeout(1000);
   await shot('change-flight-days');

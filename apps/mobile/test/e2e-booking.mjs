@@ -1,7 +1,7 @@
 // Booking (M2), end to end in headless Chromium against the web export in mock-API mode:
 //
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
-//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,umrah,circles,stays,stays-ar,asks,phone,money,money-ar to pick)
+//   DIST=dist node test/e2e-booking.mjs [shot-dir]            (ONLY=flights,edges,pay,desk,requests,umrah,circles,stays,stays-ar,asks,phone,money,money-ar,family,renew to pick)
 //
 // Signs in as the demo account (50 000 4127, Omar's family) and walks every booking flow and edge case in FLOWS.md §2–4:
 // Ask (typed details, one question at a time, the calendar), search (results, fare rules, sort, the bundle, entry
@@ -295,7 +295,11 @@ async function edges() {
   await k.demo('Airline not answering', 'Passport problem');
   await k.ask('Istanbul for Eid, all of us');
   await k.see('Ahmed can’t travel on this passport.', 'passport blocks', 12000);
-  await k.see('Sort out Ahmed’s passport first', 'blocked cta');
+  // Never a dead end (CRITIQUE-2 #1): what Mada does, by when, the cost; the review button stays live.
+  await k.see('Renew Ahmed’s passport', 'renewal step');
+  await k.see('SAR 150 for Mada to do it', 'renewal cost');
+  await k.see('Review · SAR', 'review stays live with a short passport');
+  if (await page.getByText('Sort out Ahmed’s passport first').filter({ visible: true }).count()) errors.push('passport: the primary button is still a dead "Sort out"');
   await k.press(k.text('Ahmed can’t travel on this passport.'));
   await k.shot('passport-problem');
   await k.tap('Book without Ahmed');
@@ -969,6 +973,9 @@ async function family() {
   await k.see('A child, 6', 'the 6-year-old asked');
   await k.see('A child, 2', 'the 2-year-old asked');
   await k.see('Continue · 5 going', 'continue with five');
+  // 12+ fly as adults: said where the 13-year-old's age is (CRITIQUE-2 #10), not a contradiction.
+  await k.see('Airlines charge 12 and over as adults.', 'the 13-year-old is an adult fare, said why');
+  if (await page.getByText('2 to 17, an age each').filter({ visible: true }).count()) errors.push('family: children hint still says 2 to 17 with no word on adult fares');
   await k.shot('family-stepper');
   await k.byTest('party-name-child-1').fill('Yousef');
   await k.byTest('party-name-child-2').fill('Noura');
@@ -1009,6 +1016,106 @@ async function family() {
   await k.see('5 guests', 'stays corrected to five', 10000);
   if (await page.getByText('Try a place, a view, a pool').filter({ visible: true }).count()) errors.push('stays: hotel-only error on "we are 5"');
   await k.shot('stays-corrected-five');
+  await context.close();
+}
+
+/* ───────────── CRITIQUE-2 R3b: a short passport, the pay footer, the hotel page, the family on the sheet ───────────── */
+/** The pay sheet's last row sits above the solid footer, with nothing printed over it. */
+async function footerClear(page, what) {
+  const k = kit(page);
+  const foot = await k.byTest('pay-footer').boundingBox();
+  if (!foot) { errors.push(`${what}: no pay footer`); return; }
+  // Scroll the sheet to its end and check the last thing on it ends above the footer.
+  await page.evaluate(() => { for (const el of document.querySelectorAll('div')) if (el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== 'visible') el.scrollTop = el.scrollHeight; });
+  await page.waitForTimeout(400);
+  const last = await page.evaluate(() => {
+    const ids = ['plan-full', 'pay-ask-someone', 'pay-charged', 'pay-total'];
+    for (const id of ids) { const el = [...document.querySelectorAll(`[data-testid="${id}"]`)].find((x) => x.getBoundingClientRect().height > 0); if (el) { const r = el.getBoundingClientRect(); return { id, bottom: r.bottom }; } }
+    return null;
+  });
+  const foot2 = await k.byTest('pay-footer').boundingBox();
+  if (last && foot2 && last.bottom > foot2.y + 1) errors.push(`${what}: ${last.id} (bottom ${Math.round(last.bottom)}) runs under the footer (top ${Math.round(foot2.y)})`);
+  const bg = await page.evaluate(() => getComputedStyle(document.querySelector('[data-testid="pay-footer"]')).backgroundColor);
+  if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') errors.push(`${what}: the pay footer has no solid background`);
+}
+
+async function renew() {
+  const { page, context } = await newPage();
+  const k = kit(page);
+  await signIn(page);
+  await openAsk(page);
+  step('renew: Ahmed’s passport is too short for Türkiye: what Mada does, by when, the cost');
+  await k.demo('Passport problem');
+  await k.ask('Istanbul for Eid, all of us');
+  await k.see('Ahmed can’t travel on this passport.', 'passport blocks', 12000);
+  await k.see('Renew Ahmed’s passport', 'renewal step');
+  await k.see('Ready by', 'renewal by');
+  await k.see('Book now, Mada renews it by', 'book-now-and-renew');
+  await k.see('Book without Ahmed', 'book without');
+  await k.see('Review · SAR', 'review stays live');
+  await k.press(k.text('Renew Ahmed’s passport'));
+  await k.shot('renew-card');
+  step('renew: the bundle hotel says what it is before SAR 6,000 is added (CRITIQUE-2 #9)');
+  await k.see('Deluxe double × 2 rooms · Breakfast included', 'bundle card room line');
+  await k.see('a night · free to cancel until 2 Mar', 'bundle card price and cancel');
+  await k.press(k.byTest('bundle-stay'));
+  await k.shot('bundle-card');
+  await k.press(k.byTest('bundle-hotel'));
+  await k.see('This stay', 'hotel page: this stay');
+  await k.see('Deluxe double × 2 rooms', 'hotel page: room × rooms');
+  await k.see('a night, for all of you', 'hotel page: a night');
+  await k.see('6 nights · SAR 5,880 in all', 'hotel page: in all');
+  await k.see('Guests rate it 9.1', 'hotel page: rating');
+  await k.see('Free cancellation until 2 Mar', 'hotel page: cancel date');
+  await k.see('Breakfast included · Connecting rooms, side by side', 'hotel page: included');
+  await k.see('Airport pickup both ways', 'hotel page: pickup included');
+  if (!(await page.locator('[data-testid="hotel-photo"]').filter({ visible: true }).count())) errors.push('hotel page: no photo');
+  await k.shot('hotel-page');
+  await page.getByRole('button', { name: 'Back' }).filter({ visible: true }).last().click();
+  await k.see('Three ways to get there.', 'back to results', 8000);
+  step('renew: the order sheet carries the renewal and the family lines (CRITIQUE-2 #1, #10)');
+  await k.press(k.byTest('bundle-add'));
+  await k.press(k.byTest('ask-review'));
+  await k.see('Everything included. No fees later.', 'pay sheet', 12000);
+  await k.see('Bags 2 × 23 kg each · child meals × 1', 'bags and child meals');
+  await k.see('Sara, 13: airlines charge 12 and over as adults.', 'why the 13-year-old is an adult fare');
+  await k.see('Renew Ahmed’s passport', 'renewal on the sheet');
+  await k.see('Your seats are booked now. The renewal runs alongside', 'renewal runs alongside');
+  await k.shot('pay-family-renewal');
+  step('renew: the footer is solid, at 390 and 360 wide (CRITIQUE-2 #4)');
+  await footerClear(page, 'pay 390');
+  await k.shot('pay-bottom-390');
+  await page.setViewportSize({ width: 360, height: 760 });
+  await page.waitForTimeout(500);
+  await footerClear(page, 'pay 360');
+  await k.shot('pay-bottom-360');
+  await k.press(k.byTest('plan-tabby'));
+  await footerClear(page, 'pay 360 tabby');
+  await k.shot('pay-tabby-360');
+  await k.press(k.byTest('plan-full'));
+  await k.text('(demo: end the hold)').click();
+  await k.see('The price hold ended', 'hold ended');
+  await footerClear(page, 'hold ended 360');
+  await k.shot('pay-hold-ended-360');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(400);
+  await footerClear(page, 'hold ended 390');
+  await k.shot('pay-hold-ended-390');
+  await k.byTest('pay-recheck').click();
+  await k.see('Price checked again.', 'rechecked');
+  step('renew: book now; Mada asks for the renewal with the booking');
+  await k.slide();
+  await k.see('Booking now', 'booked with the renewal', 15000);
+  await k.shot('booked-with-renewal');
+  await page.waitForTimeout(500);
+  await k.byTest('wait-close').click();
+  await page.waitForTimeout(800);
+  await openAsk(page);
+  await k.ask('Istanbul for Eid, all of us');
+  await k.see('Mada is renewing it', 'the next search knows the renewal is running', 12000);
+  if (await page.getByText('Ahmed can’t travel on this passport.').filter({ visible: true }).count()) errors.push('renew: still blocked after the renewal was asked');
+  await k.press(k.text('Mada is renewing it'));
+  await k.shot('renewing-known');
   await context.close();
 }
 
@@ -1250,6 +1357,7 @@ try {
   if (want('money-ar')) await money('ar-SA');
   if (want('family')) await family();
   if (want('heard')) await heard();
+  if (want('renew')) await renew();
 } catch (e) {
   errors.push(String(e?.stack ?? e));
   console.log(e);

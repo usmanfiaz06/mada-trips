@@ -19,7 +19,7 @@ export const arPayFamily: ArSection<typeof payFamilyCopy> = {
   'rn.pill': 'يتجدّد',
   'entry.passport.renewing': 'مادا تجدّد جواز {name}. جاهز قبل {date}.',
   'rn.without': 'احجز بدون {name}',
-  'rn.payNote': 'مادا تطلب التجديد مع هذا الحجز. والـ {price} تندفع لحالها، بعد ما تاخذ مادا الموعد.',
+  'rn.payNote': 'تندفع لحالها، بعد ما تاخذ مادا الموعد.',
   'pf.title': 'للعائلة',
   'pf.bags': 'الشنط {bags} لكل واحد',
   'pf.bassinet.one': 'طلبنا سرير طفل',

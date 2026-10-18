@@ -19,7 +19,7 @@ export const payFamilyCopy = {
   'rn.pill': 'Renewing',
   'entry.passport.renewing': 'Mada is renewing {name}’s passport. Ready by {date}.',
   'rn.without': 'Book without {name}',
-  'rn.payNote': 'Mada asks for the renewal with this booking. The {price} is paid on its own, once Mada has the appointment.',
+  'rn.payNote': 'Paid on its own, once Mada has the appointment.',
 
   // ───────────── the family on the order sheet (#10) ─────────────
   'pf.title': 'For the family',

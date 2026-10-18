@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { RENEWAL_DAYS, addDays, formatSar, nameIn, shortDay, type EntryCheck, type EntryCheckResponse } from '@mada/shared';
 import { sendRequest } from '@/lib/booking';
@@ -86,15 +86,18 @@ export function EntryChecks({ result, destination, travellerIds, depart, ret, an
             <Notice icon="visa" warn title={c.title ?? undefined}>
               <T v="small">{c.text}</T>
               {c.key === 'passport' && c.renewal ? <RenewalCard c={c} testID={`renewal-${c.personId}`} /> : null}
+              {c.key === 'passport' && c.renewal?.inTime ? (
+                // The way on, in full words: it wraps rather than cut "· SAR 150" off on a small phone.
+                <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!asked[k], busy: !!asked[k] }} disabled={asked[k]} onPress={() => { buzz('tap'); void ask(k, 'passport_renewal', c.personId, null, c.answerKey); }}
+                  style={({ pressed }) => [styles.go, pressed || asked[k] ? { opacity: 0.8 } : null]} testID={`renew-book-${c.personId}`}>
+                  <T v="h3" color={colors.mist} style={{ fontSize: 14, lineHeight: 19, textAlign: 'center' }}>{asked[k] ? t('rn.asking') : t('rn.book', { date: shortDay(c.renewal.by), price: formatSar(c.renewal.fee) })}</T>
+                </Pressable>
+              ) : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                 {c.key === 'visa' ? <Button size="small" block={false} label={t('entry.visa.ask')} disabled={asked[k]} onPress={() => ask(k, 'evisa', c.personId, c.need, c.answerKey)} /> : null}
                 {c.key === 'reentry' ? <Button size="small" block={false} label={t('entry.reentry.ask')} disabled={asked[k]} onPress={() => ask(k, 'reentry', c.personId, null, c.answerKey)} /> : null}
                 {c.key === 'reentry' && c.answerKey ? <Button size="small" block={false} variant="secondary" label={t('entry.reentry.hasOne', { name: c.name ?? '' })} onPress={() => answer(c.answerKey!, 'has')} /> : null}
                 {c.key === 'iqama' && c.answerKey ? <Button size="small" block={false} variant="secondary" label={t('entry.iqama.renewed')} onPress={() => answer(c.answerKey!, addDays(ret ?? depart, 365))} /> : null}
-                {c.key === 'passport' && c.renewal?.inTime ? (
-                  <Button size="small" label={asked[k] ? t('rn.asking') : t('rn.book', { date: shortDay(c.renewal.by), price: formatSar(c.renewal.fee) })} busy={asked[k]} disabled={asked[k]}
-                    onPress={() => ask(k, 'passport_renewal', c.personId, null, c.answerKey)} testID={`renew-book-${c.personId}`} />
-                ) : null}
                 {c.key === 'passport' && !c.renewal ? <Button size="small" block={false} variant="secondary" label={asked[k] ? t('entry.passport.onIt') : t('entry.passport.renew')} disabled={asked[k]} onPress={() => ask(k, 'passport_renewal', c.personId, null, null)} /> : null}
                 {c.removable && c.personId ? <Button size="small" block={false} variant={c.key === 'passport' && !c.renewal?.inTime ? 'primary' : 'secondary'} label={t('entry.without', { name: c.name ?? '' })} onPress={() => { buzz('select'); remove(c.personId!); }} testID={`without-${c.personId}`} /> : null}
               </View>
@@ -117,3 +120,7 @@ export const blockLabel = (r: EntryCheckResponse | undefined) => {
   const thing = t(b.key === 'passport' ? 'entry.thing.passport' : b.key === 'visa' ? 'entry.thing.visa' : b.key === 'iqama' ? 'entry.thing.iqama' : 'entry.thing.reentry');
   return t('search.sortOut', { name: b.name ?? '', thing });
 };
+
+const styles = StyleSheet.create({
+  go: { marginTop: 6, minHeight: 44, borderRadius: 22, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
+});

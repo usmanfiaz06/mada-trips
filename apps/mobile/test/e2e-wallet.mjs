@@ -456,6 +456,10 @@ async function account() {
   await shot('profile-remove-default');
   await byTest('remove-default-applepay').click();
   await see('Card removed. Apple Pay is your default.', 'removed default');
+  // One list of payment methods (CRITIQUE-2 #13): the trip was paid with it, so it reads as used, never "no cards".
+  await see('· not saved', 'profile: a card paid with but not saved reads as used');
+  if (!(await page.locator('[data-testid="profile-used-41"]').count())) errors.push('profile: Visa ending 41 not listed as used after removing it');
+  await shot('profile-used-card');
 
   step('details: name, email, phone, home, currency');
   await press(byTest('profile-details'));
