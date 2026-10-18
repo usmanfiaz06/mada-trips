@@ -6,13 +6,19 @@ at most 3 run at once; a dependent unit starts only after the one before it is i
 
 Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critique (scorecard 5.1/10, 15 changes) → `scratchpad/CRITIQUE.md`.
 
-## In flight (18 Oct)
+## In flight (18 Oct, round 3 — CRITIQUE-2 scored 6.8/10; target ≥ 9 every dimension)
 
-| Unit | What | Status |
+| Unit | CRITIQUE-2 issues | Session |
 |---|---|---|
-| R · retest | outside-in critique rerun on staging + mock build, same 12 scenarios / 8 dimensions, target ≥ 9 each | started 18 Oct |
+| R3a · Ask understands | #2 slot-fill, #6 UK ETA/visa + who, #3 offline Ask, #14 thread hygiene, #16 Umrah polish, #17 car-now "To", #20 eSIM wording | session_01WryyLrjtNxpoUmdfcG36B7 |
+| R3b · booking/pay/money | #1 passport unblock, #4 footer overlap, #9 hotel page + bundle card, #10 family polish, #13 one money truth, #19 GACA card | session_01YKWDyHsA6CyxjkXCHsivhx |
+| R3c · trip/outcomes/Arabic | #7 outcomes what + visa refusal + auto-close, #8 Arabic fixes, #11 low battery, #12 no invented facts, #15 recovery aftercare | session_01A4PrSXoVynLC3FGZDyhVNc |
+
+Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touches build config — run alone), #18 credentials line (needs owner's licence/IATA numbers), then retest (CRITIQUE-3).
 
 ## Done (17–18 Oct)
+
+- Map pin → hotel card, grouped pins, map layout 1b3b0f6 · SW updates per build + refresh bar, no endless spinners (12 s; live flight/stay 20 s), eSIM size words 3cfc4f5 · CRITIQUE-2 37687ab (6.8/10). Combined e2e green at 3cfc4f5.
 
 - E eSIM Airalo adapter ddb7fe0 · EA eSIM Access + pricing desk + entry points c753521, 1121524 · pricing dominance fix 056de8d · ED eSIM design c537e0e · destination any-country + no dead ends 29abe14 · ring fix 54916ac.
 - G guests + language b93a4a0, 1b08696 · V speed b7d890b, 6a2eb2f · sign-in shows only enabled providers 9f640ef.
