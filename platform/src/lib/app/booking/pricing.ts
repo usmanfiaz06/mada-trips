@@ -4,6 +4,7 @@ import {
   DESK_PRICES, DESTINATIONS, PLANS, childSeats, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
   BookingPrefs, airlineRequests, bookingPrefsOf, formatSar, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type BookingLoyalty, type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
+  type DemoFlag, demoPassportTarget, entryChecks, familyLines, renewalsOf,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appMessages, appQuotes, appRequests } from "@/db/app-schema";
@@ -11,7 +12,7 @@ import { appCircleSplitShares } from "@/db/app-schema-circles";
 import { membership } from "../circles/circles";
 import { getBalance } from "../credit";
 import { AppError } from "../http";
-import { householdOf, isUuid, today, travellersOf } from "./common";
+import { householdOf, isUuid, renewalsAsked, today, travellersOf } from "./common";
 import { getAccount } from "../account";
 import { ownOffer, repriceOffer, type OfferRow } from "./search";
 import { hotelbedsRule, withHotelbedsEssentials } from "./hotelbeds-stays";
@@ -42,6 +43,18 @@ export const creditBalance = (userId: string) => getBalance(userId);
 
 const line = (key: string, icon: OrderLine["icon"], text: string, amount: number): OrderLine => ({ key, icon, text, amount });
 
+/** The short passports on this booking, as the order sheet shows them (OrderPreview.renewals). */
+export async function renewalsFor(ownerId: string, search: unknown, travellers: Person[], demo?: Set<DemoFlag>, household?: Promise<Person[]>) {
+  const s = search as { destination?: string; depart?: string; checkIn?: string; return?: string | null } | undefined;
+  if (!s?.destination || !DESTINATIONS[s.destination] || !travellers.length) return { renewals: [], checks: null };
+  const [asked, people] = await Promise.all([renewalsAsked(ownerId), demo?.has("passportProblem") ? household ?? householdOf(ownerId) : Promise.resolve(null)]);
+  const checks = entryChecks({
+    destination: s.destination, travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: asked, today: today(),
+    demo: { passportProblemFor: people ? demoPassportTarget(people) : null },
+  });
+  return { renewals: renewalsOf(checks), checks };
+}
+
 /**
  * The seats on a flight, priced as the airline prices them: one line for everyone when nobody is on a child fare,
  * else the adults and the child fares on their own lines (FareBreakdown in the app shows the same amounts).
@@ -56,7 +69,7 @@ function seatLines(f: FlightOption, n: number, how: string, suffix: string, bump
   ];
 }
 
-export async function priceDraft(ownerId: string, input: PreviewInput, opts: { bump?: number } = {}): Promise<Priced> {
+export async function priceDraft(ownerId: string, input: PreviewInput, opts: { bump?: number; demo?: Set<DemoFlag> } = {}): Promise<Priced> {
   const body = PreviewBody.parse(input);
   const d = body.draft;
   // Read up front, alongside whatever the draft needs (each query is a round trip): the household and the credit.
@@ -264,6 +277,12 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
       extrasOffer: offer ? { key: "seatsTogether", carrier: carrier ?? undefined, airline: f?.airline, perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
     };
     const air = scope !== "stay" ? airlineRequests(prefs, { carrier, travellers: n }) : { ssr: [], remarks: [] };
+    // A bassinet for each baby on a lap and a child meal for each child: asked of the airline with the booking.
+    if (f && scope !== "stay") {
+      const fam = familyLines(f, travellers, f.out.date);
+      if (fam.bassinets) air.ssr.push("BSCT");
+      if (fam.childMeals) air.ssr.push("CHML");
+    }
     const appliedSnap: AppliedSnapshot = {
       prefs, loyalty, ssr: air.ssr, remarks: air.remarks, hotelRemarks: scope !== "flight" ? hotelRemarks(prefs) : [], summary,
       extras: { seatsTogether: offer?.added ? { count: offer.count, legs: offer.legs, perPerson: offer.perPerson.amount, total: offer.total.amount } : null },
@@ -281,6 +300,9 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
   const total = subtotal - discount - creditUsed;
   const people = travellers.length ? await household : [];
   const missing = travellers.filter((p) => !people.find((h) => h.id === p.id)?.passport).map((p) => p.id);
+  const flight = snapshot.flight as FlightOption | undefined;
+  const { renewals } = kind === "trip" || kind === "stay" ? await renewalsFor(ownerId, snapshot.search, travellers, opts.demo, household) : { renewals: [] };
+  const fam = flight && (kind === "trip" || snapshot.quotedFlight) ? familyLines(flight, travellers, flight.out.date) : null;
   const preview: OrderPreview = {
     kind, title, photo, lines, subtotal: money(subtotal),
     promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
@@ -291,6 +313,8 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     missingPassports: kind === "trip" || kind === "package" ? missing : [],
     stay: stayFacts,
     applied,
+    renewals,
+    family: fam ? { bags: fam.bags, bassinets: fam.bassinets, childMeals: fam.childMeals, adultFares: fam.adultFares } : null,
   };
   return { preview, snapshot, travellers, offerRows, place };
 }

@@ -455,7 +455,32 @@ export function cardProblems(input: { number: string; expiry: string; cvv: strin
 export type EntryCheckValue = {
   personId: string | null; name: string | null; key: 'passport' | 'visa' | 'iqama' | 'reentry' | 'manual' | 'eta'; blocking: boolean; done: boolean; info: boolean;
   title: string | null; text: string; need: string | null; answerKey: string | null; removable: boolean; service: 'uk_eta' | 'evisa' | 'reentry' | 'passport_renewal' | null;
+  renewal?: EntryRenewal | null;
 };
+
+/** A passport Mada can renew before the trip: ready by when, Mada's fee (halalas), whether it's in time, whether it's asked. */
+export type EntryRenewal = { by: string; fee: number; inTime: boolean; asked: boolean };
+
+/** How long a Saudi passport renewal takes, from asking to the new passport in hand (Absher, then the post). */
+export const RENEWAL_DAYS = 14;
+/** Days to spare before the flight: a renewal ready later than this isn't promised. */
+const RENEWAL_SPARE = 3;
+
+/** When Mada can have a passport renewed by, and whether that's before the trip. */
+export function renewalPlan(today: string, depart: string, asked = false): EntryRenewal {
+  const by = addDays(today, RENEWAL_DAYS);
+  return { by, fee: sarToHalalas(DESK_PRICES.passportRenewal), inTime: by <= addDays(depart, -RENEWAL_SPARE), asked };
+}
+
+/** The order sheet's view of short passports (OrderPreview.renewals), from the entry checks. */
+export function renewalsOf(checks: { checks: EntryCheckValue[] }) {
+  return checks.checks.filter((c) => c.key === 'passport' && c.renewal && c.personId)
+    .map((c) => ({ personId: c.personId!, name: c.name ?? '', by: c.renewal!.by, fee: c.renewal!.fee, inTime: c.renewal!.inTime, asked: c.renewal!.asked }));
+}
+
+/** Answers from passport renewals already asked for: `{personId}:passport` → 'asked' (the server reads open requests). */
+export const renewalAnswers = (personIds: (string | null | undefined)[]) =>
+  Object.fromEntries(personIds.filter((x): x is string => !!x).map((id) => [`${id}:passport`, 'asked']));
 
 /** The passport country we go by: the passport's, else the person's, else Saudi (a helper with no passport: unknown). */
 export function nationalityOf(p: Person): string | null {
@@ -481,17 +506,26 @@ export function entryChecks(input: {
   const base = { done: false, info: false, title: null, need: null, answerKey: null, service: null } as const;
   for (const p of input.travellers) {
     const name = personName(p);
-    const removable = !p.isSelf;
+    // Anyone can be left off, the account holder too (booking for the family), as long as someone is still going.
+    const removable = !p.isSelf || input.travellers.length > 1;
     const nat = nationalityOf(p);
     // Passport validity after landing (Türkiye: 150 days), or simply valid for the whole trip.
     const expiry = input.demo?.passportProblemFor === p.id ? DEMO_SHORT_PASSPORT : p.passport?.expiry ?? null;
     if (dest && !rule.domestic && expiry) {
       const need = rule.passportDays ? addDays(input.depart, rule.passportDays) : until;
       if (expiry < need) {
-        out.push({ ...base, personId: p.id, name, key: 'passport', blocking: true, removable, service: 'passport_renewal', title: t('entry.passport.title', { name }),
-          text: rule.passportDays
-            ? t('entry.passport.days', { name, date: `${dayOfMonth(expiry)} ${monthOf(expiry)} ${expiry.slice(0, 4)}`, country: rule.name, days: rule.passportDays, until: shortDay(need) })
-            : t('entry.passport.trip', { name, date: `${dayOfMonth(expiry)} ${monthOf(expiry)} ${expiry.slice(0, 4)}` }) });
+        // Renewed in time, Mada books now and the renewal runs alongside; too late, it still holds the booking.
+        const k = `${p.id}:passport`;
+        const renewal = renewalPlan(input.today, input.depart, ans[k] === 'asked');
+        if (renewal.asked && renewal.inTime) {
+          out.push({ ...base, personId: p.id, name, key: 'passport', blocking: false, done: true, removable, answerKey: k, renewal,
+            text: t('entry.passport.renewing', { name, date: shortDay(renewal.by) }) });
+        } else {
+          out.push({ ...base, personId: p.id, name, key: 'passport', blocking: true, removable, service: 'passport_renewal', title: t('entry.passport.title', { name }), answerKey: k, renewal,
+            text: rule.passportDays
+              ? t('entry.passport.days', { name, date: `${dayOfMonth(expiry)} ${monthOf(expiry)} ${expiry.slice(0, 4)}`, country: rule.name, days: rule.passportDays, until: shortDay(need) })
+              : t('entry.passport.trip', { name, date: `${dayOfMonth(expiry)} ${monthOf(expiry)} ${expiry.slice(0, 4)}` }) });
+        }
       }
     }
     if (dest && !rule.domestic) {

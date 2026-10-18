@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View, Platform, useWindow
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CARRIERS, formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type BookingLoyalty, type BookingPrefs, type OrderPreview, type PayPlan } from '@mada/shared';
+import { CARRIERS, RENEWAL_DAYS, formatSar, householdOf, normalizeContactPhone, personName, shortDay, todayIn, type BookingLoyalty, type BookingPrefs, type OrderPreview, type PayPlan } from '@mada/shared';
 import { circlesApi } from '@/lib/circles';
 import { Button, LinkButton } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
@@ -26,7 +26,7 @@ import { bookingApi, bookingKeys, demoOn, newIdempotencyKey, useBookingRequest, 
 import { HAS_APPLE_PAY } from '@/lib/device';
 import { SHOW_DEMO_HINTS, SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
-import { listSep, t } from '@/lib/i18n';
+import { listSep, t, tn } from '@/lib/i18n';
 import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
@@ -105,7 +105,8 @@ export default function Pay() {
   // said up front, verified in a sheet over the order, and the slide carries on after it.
   const phoneNeeded = usePhoneNeeded();
   const [phoneOpen, setPhoneOpen] = useState(false);
-
+  // The footer (slide or hold-ended card, and the note under it) is solid and measured: the list scrolls clear of it.
+  const [footH, setFootH] = useState(170);
 
   const draft = useMemo(() => {
     if (!pd) return null;
@@ -189,7 +190,9 @@ export default function Pay() {
 
   const place = async (payment: Parameters<typeof bookingApi.createOrder>[0]['payment'], expected = total) => {
     const sent = draft.kind === 'stay' ? { ...draft, requests: hotelAsks } : draft;
-    const out = await bookingApi.createOrder({ draft: sent, promo, useCredit, ...applied, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null) });
+    // Short passports Mada renews in time, not asked yet: asked with this order, so the booking goes ahead.
+    const renew = (p?.renewals ?? []).filter((r) => r.inTime && !r.asked).map((r) => r.personId);
+    const out = await bookingApi.createOrder({ draft: sent, promo, useCredit, ...applied, payment, plan: effPlan, expectedTotal: expected, idempotencyKey: key.current, ...(askContact ? { contactPhone: contact.trim() } : null), ...(renew.length ? { renewals: renew } : null) });
     key.current = newIdempotencyKey();
     // A friend was asked to pay: nothing charged; the booking waits on the With Mada screen, and Trips shows it.
     if (out.outcome === 'payment_requested') { buzz('success'); await invalidate(); qc.setQueryData(bookingKeys.order(out.order.id), out.order); toast(t('mp.sent', { name: out.order.payRequest?.name ?? '' })); router.replace({ pathname: '/waiting/[id]', params: { id: out.order.id } }); return; }
@@ -275,7 +278,7 @@ export default function Pay() {
       <TopBar onBack={() => router.back()} dark backLabel={t('pay.back')} />
       <Animated.View entering={FadeInDown.duration(500)} style={[styles.sheet, { top: 150, height: height - 150 }]}>
         <View style={styles.grab} />
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 170 + bottom, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: footH + 24, gap: 14 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.spread}>
             <T style={[font('displaySmall'), { flex: 1 }]} accessibilityRole="header">{p?.title ?? pd.title}</T>
             {holdText ? <View style={[styles.pill, expired ? null : styles.pillOk]} accessibilityLiveRegion="polite"><T v="caption" color={expired ? colors.green : colors.ok} style={{ fontFamily: ff.ui600, fontVariant: ['tabular-nums'] }}>{holdText}</T></View> : null}
@@ -286,6 +289,8 @@ export default function Pay() {
               <T v="small" color={colors.green} style={{ fontVariant: ['tabular-nums'] }}>{formatSar(l.amount, { bare: true })}</T>
             </View>
           ))}
+          {/* The family, said again before paying: bags each, a bassinet, child meals, and why a 13-year-old is an adult fare. */}
+          {p?.family ? <FamilyLines f={p.family} /> : null}
           {hasPeople ? (
             <View style={styles.well}>
               <T v="small" style={{ flex: 1 }}>{travellers.length === 1 && travellers[0] === H.me ? t('pay.justYou') : names.join(listSep())}</T>
@@ -325,7 +330,18 @@ export default function Pay() {
           ) : <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('pay.promo.open')} onPress={() => setPromoOpen(true)} /></View>) : null}
           {/* Passports inside the booking (flights, packages, visas, Umrah): each traveller's, added or checked right here. */}
           <TravellerPassports kind={pd.draft.kind === 'quote' ? qr?.kind : pd.draft.kind} people={household} travellerIds={p?.travellerIds ?? (hasPeople ? travellers : qr?.travellerIds ?? [])}
-            travelEnds={travelEnds(qc, pd.draft, qr)} selfName={selfName} note={missing.length ? t('pay.passports.body') : null} />
+            travelEnds={travelEnds(qc, pd.draft, qr)} selfName={selfName} note={missing.length ? t('pay.passports.body') : null} renewals={p?.renewals} />
+          {/* A passport too short for the trip: Mada renews it alongside, or that person stays home. Never a dead end. */}
+          {(p?.renewals ?? []).filter((r) => !r.asked || !r.inTime).map((r) => (
+            <View key={r.personId} style={styles.renew} testID={`pay-renewal-${r.personId}`}>
+              <T v="eyebrow">{t('rn.eyebrow')}</T>
+              <T v="h3" style={{ fontSize: 15 }}>{t('rn.step', { name: r.name })}</T>
+              <T v="small" color={r.inTime ? colors.green : colors.goldInk}>{r.inTime ? t('rn.by', { date: shortDay(r.by) }) : t('rn.late', { days: RENEWAL_DAYS, date: shortDay(r.by) })}</T>
+              {r.inTime ? <T v="tiny">{t('rn.cost', { price: formatSar(r.fee) })} {t('rn.payNote', { price: formatSar(r.fee) })}</T> : <T v="tiny">{t('rn.lateNext', { name: r.name })}</T>}
+              {r.inTime ? <T v="tiny">{t('rn.alongside')}</T> : null}
+              {hasPeople && travellers.length > 1 ? <View style={{ alignSelf: 'flex-start' }}><LinkButton label={t('rn.without', { name: r.name })} onPress={() => { buzz('select'); setTravellers((x) => x.filter((id) => id !== r.personId)); }} testID={`pay-without-${r.personId}`} /></View> : null}
+            </View>
+          ))}
           {phoneNeeded ? (
             <Notice icon="phone" title={t('ask.phone.payTitle')}>
               <T v="small">{t('ask.phone.payBody')}</T>
@@ -387,7 +403,7 @@ export default function Pay() {
           ) : null}
         </ScrollView>
       </Animated.View>
-      <View style={[styles.act, { paddingBottom: 18 + bottom }]}>
+      <View style={[styles.act, { paddingBottom: 18 + bottom }]} onLayout={(e) => setFootH(Math.ceil(e.nativeEvent.layout.height))} testID="pay-footer">
         {expired && pd.draft.kind === 'quote' ? <T v="small" color={colors.goldInk} style={{ textAlign: 'center' }} testID="pay-quote-ended">{t('beta.fq.ended', { agent: 'Mada' })}</T> : expired ? (
           <View style={styles.ended} testID="pay-hold-ended" accessibilityLiveRegion="polite">
             <T v="h3" style={{ fontSize: 16 }}>{t('pay.hold.endedTitle')}</T>
@@ -455,7 +471,20 @@ export default function Pay() {
   );
 }
 
+/** "Bags 2 × 23 kg each · bassinet requested · child meals × 2", and who 12 to 17 pays as an adult, and why. */
+function FamilyLines({ f }: { f: NonNullable<OrderPreview['family']> }) {
+  const bits = [f.bags ? t('pf.bags', { bags: f.bags }) : null, f.bassinets ? tn('pf.bassinet', f.bassinets) : null, f.childMeals ? t('pf.meals', { count: f.childMeals }) : null].filter(Boolean);
+  if (!bits.length && !f.adultFares.length) return null;
+  return (
+    <View style={{ gap: 4 }} testID="pay-family">
+      {bits.length ? <View style={styles.row}><Icon name="bag" size={20} /><T v="small" color={colors.green} style={{ flex: 1 }} testID="pay-family-line">{bits.join(' · ')}</T></View> : null}
+      {f.adultFares.map((a) => <T key={a.personId} v="tiny" style={{ paddingStart: 30 }} testID={`pay-adult-fare-${a.personId}`}>{t('pf.adultFare', { name: a.name, age: a.age })}</T>)}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  renew: { gap: 4, padding: 14, borderRadius: 18, backgroundColor: colors.warnWash },
   hero: { position: 'absolute', start: 0, end: 0, top: 0, height: 240 },
   sheet: { position: 'absolute', start: 0, end: 0, backgroundColor: colors.paper, borderTopLeftRadius: radii.sheet, borderTopRightRadius: radii.sheet, zIndex: 5 },
   grab: { alignSelf: 'center', width: 40, height: 5, borderRadius: 999, backgroundColor: colors.grab, marginTop: 10, marginBottom: 4 },
@@ -471,5 +500,5 @@ const styles = StyleSheet.create({
   knob: { width: 26, height: 26, borderRadius: 999, backgroundColor: colors.paper },
   planChip: { height: 40, borderRadius: 999, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.mist },
   ended: { gap: 8, padding: 16, borderRadius: 20, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line },
-  act: { position: 'absolute', start: 20, end: 20, bottom: 0, gap: 10, zIndex: 6 },
+  act: { position: 'absolute', start: 0, end: 0, bottom: 0, gap: 10, zIndex: 6, paddingTop: 12, paddingHorizontal: 20, backgroundColor: colors.paper, borderTopWidth: 1, borderTopColor: colors.line },
 });

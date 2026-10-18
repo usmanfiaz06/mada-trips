@@ -12,7 +12,7 @@ import { supplierMode } from "../config";
 import { AppError } from "../http";
 import type { BookingFlightOffer, BookingHotelOffer } from "../suppliers/booking-types";
 import { SupplierDown } from "../suppliers/mock/flights";
-import { bookingSuppliers, householdOf, isUuid, today, travellersOf } from "./common";
+import { bookingSuppliers, householdOf, isUuid, renewalsAsked, today, travellersOf } from "./common";
 import { guestPeople } from "../guest";
 
 /*
@@ -281,10 +281,11 @@ export async function repriceOffer(ownerId: string | null, id: string, traveller
 export async function checkEntry(ownerId: string | null, input: EntryCheckRequest, demo: Set<DemoFlag>): Promise<EntryCheckResponse> {
   const q = EntrySchema.parse(input);
   if (!DESTINATIONS[q.destination]) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
-  const travellers = await partyOf(ownerId, q.travellerIds, q.guests);
+  // Renewals already asked for count as answered (pricing.ts renewalsAsked): the passport card says Mada is on it.
+  const [travellers, asked] = await Promise.all([partyOf(ownerId, q.travellerIds, q.guests), ownerId ? renewalsAsked(ownerId) : Promise.resolve({})]);
   const mock = supplierMode("flights") === "mock";
   return entryChecks({
-    destination: q.destination, travellers, depart: q.depart, return: q.return, answers: q.answers, today: today(),
+    destination: q.destination, travellers, depart: q.depart, return: q.return, answers: { ...asked, ...q.answers }, today: today(),
     demo: { passportProblemFor: demo.has("passportProblem") && ownerId ? demoPassportTarget(await householdOf(ownerId)) : null }, iqamaOf: mock ? demoIqama : undefined,
   });
 }

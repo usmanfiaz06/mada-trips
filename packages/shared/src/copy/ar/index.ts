@@ -29,9 +29,11 @@ import { arNative } from './native';
 import { arEsim } from './esim';
 import { arGuest } from './guest';
 import { arAskHeard } from './askHeard';
+import { arPayFamily } from './payFamily';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
+  ...arPayFamily,
   ...arCircles,
   ...arBooking,
   ...arDesk,

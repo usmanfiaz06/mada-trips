@@ -37,7 +37,8 @@ export default function Household() {
       <Group>
         {list.map((p) => {
           const st = passportStatus(p, trip);
-          const band = p.passport ? ageBand(p.dateOfBirth) : null;
+          // The age shows as soon as it's known (said in a search, or from the passport): a family is counted by age.
+          const band = ageBand(p.dateOfBirth);
           const d = detailOf(p.id);
           const rel = relationOf(p, d);
           return (

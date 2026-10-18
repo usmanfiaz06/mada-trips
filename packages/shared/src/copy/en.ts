@@ -30,6 +30,7 @@ import { nativeCopy } from './native';
 import { esimCopy } from './esim';
 import { guestCopy } from './guest';
 import { askHeardCopy } from './ask-heard';
+import { payFamilyCopy } from './pay-family';
 
 export const en = {
   // eSIMs through Airalo: the plan for the trip, installing, what's left, top-ups: packages/shared/src/copy/esim.ts
@@ -38,6 +39,8 @@ export const en = {
   ...guestCopy,
   // Wallet, passports, account, Help and support (M1): packages/shared/src/copy/wallet.ts
   ...walletCopy,
+  // Booking, pay, hotel, money and family (CRITIQUE-2 R3b): packages/shared/src/copy/pay-family.ts
+  ...payFamilyCopy,
   // Circles, Discover and people (M4): packages/shared/src/copy/en-circles.ts
   ...enCircles,
   // Booking: Ask, search, requests, plans, the order sheet, payment and the wait (M2): packages/shared/src/copy/booking.ts

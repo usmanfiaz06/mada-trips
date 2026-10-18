@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  CreateOrderBody, DESTINATIONS, rangeLabel, demoPassportTarget, normalizeContactPhone, entryChecks, money, seatsFor, t,
+  CreateOrderBody, rangeLabel, normalizeContactPhone, money, seatsFor, t,
   RequestResult, type CreateOrderResponse, type DemoFlag, type FlightOption, type OrderView, type CreateOrderBody as CreateOrderInput,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -17,7 +17,8 @@ import {
 } from "./desk";
 import { authorize, chargeFor } from "./payments";
 import { spendCredit } from "../credit";
-import { priceDraft, type AppliedSnapshot } from "./pricing";
+import { priceDraft, renewalsFor, type AppliedSnapshot } from "./pricing";
+import { createRequest } from "./requests";
 import { autoBookStay } from "../suppliers/hotelbeds/bookings";
 import { bookingRequiresPhone } from "../switches";
 import { memberIds, membership } from "../circles/circles";
@@ -100,7 +101,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   // Independent reads side by side (each is a round trip): a replay, the account's phone, the desk agent and the price.
   const bump = demo.has("priceUp") && body.draft.kind === "trip" ? 14_000 : 0;
   // A stay is priced after the checks: pricing a Hotelbeds room asks Hotelbeds (checkrates), never for a replay.
-  const early = body.draft.kind !== "stay" ? priceDraft(ownerId, body, { bump }) : null;
+  const early = body.draft.kind !== "stay" ? priceDraft(ownerId, body, { bump, demo }) : null;
   const agentP = agentFor(ownerId);
   early?.catch(() => {});
   agentP.catch(() => {});
@@ -121,20 +122,24 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   }
 
   // The fare moved at the airline while the traveller looked (demo: once, SAR 140; bump above).
-  const priced = await (early ?? priceDraft(ownerId, body, { bump }));
+  const priced = await (early ?? priceDraft(ownerId, body, { bump, demo }));
   const { preview } = priced;
   if (preview.holdExpiresAt && Date.parse(preview.holdExpiresAt) <= Date.now()) return { outcome: "hold_ended", preview };
   if (body.expectedTotal !== preview.total.amount) {
     return { outcome: "price_changed", previousTotal: money(body.expectedTotal), preview, changedBy: money(preview.total.amount - body.expectedTotal) };
   }
-  // A passport that can't make the trip blocks the booking; everything else was answered in Ask.
-  if ((body.draft.kind === "trip" || body.draft.kind === "stay" || priced.snapshot.quotedFlight) && DESTINATIONS[(priced.snapshot.search as { destination?: string } | undefined)?.destination ?? ""]) {
-    const search = priced.snapshot.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
-    const depart = search.depart ?? search.checkIn ?? today();
-    const checks = entryChecks({ destination: search.destination, travellers: priced.travellers, depart, return: search.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has("passportProblem") ? demoPassportTarget(await householdOf(ownerId)) : null } });
-    const blocked = checks.checks.find((c) => c.key === "passport" && c.blocking);
-    if (blocked) return { outcome: "blocked", message: blocked.text };
+  // A passport that can't make the trip blocks the booking, unless Mada is renewing it in time: already asked, or
+  // agreed on the order sheet (body.renewals, asked below once the order is in). Everything else was answered in Ask.
+  let renew: string[] = [];
+  if (body.draft.kind === "trip" || body.draft.kind === "stay" || priced.snapshot.quotedFlight) {
+    const { checks } = await renewalsFor(ownerId, priced.snapshot.search, priced.travellers, demo);
+    const blocked = checks?.checks.filter((c) => c.key === "passport" && c.blocking) ?? [];
+    const agreed = new Set(body.renewals ?? []);
+    const stuck = blocked.find((c) => !(c.renewal?.inTime && c.personId && agreed.has(c.personId)));
+    if (stuck) return { outcome: "blocked", message: stuck.text };
+    renew = blocked.map((c) => c.personId!);
   }
+  const destination = (priced.snapshot.search as { destination?: string } | undefined)?.destination ?? null;
 
   // A share between friends is paid in full by card or Apple Pay: no instalments, no Mada credit.
   if (body.draft.kind === "share" && (body.plan !== "full" || body.payment.method === "credit")) throw new AppError("VALIDATION");
@@ -143,7 +148,9 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   // Someone in a circle pays: nothing is charged here; the order waits for them (requestPayment).
   if (body.payment.method === "someone_else") {
     if (!agentKind) throw new AppError("VALIDATION", { message: t("error.validation") });
-    return requestPayment(ownerId, body, priced, body.payment, contact, demo, ipHash, await agentP);
+    const asked = await requestPayment(ownerId, body, priced, body.payment, contact, demo, ipHash, await agentP);
+    await fileRenewals(ownerId, renew, destination, ipHash);
+    return asked;
   }
   const [charge, agentName] = await Promise.all([chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo), agentP]);
   const requestId = body.draft.kind === "quote" ? body.draft.requestId : null;
@@ -191,6 +198,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     return { outcome: "ok" as const, order: o!, paidNow: status === "paid_now" };
   });
   if (res.outcome === "declined") return { outcome: "declined", message: t("pay.declined.body") };
+  await fileRenewals(ownerId, renew, destination, ipHash);
   // Charged now: nothing for an agent to confirm (requests, eSIMs).
   if (res.paidNow) {
     const done = await confirmOrder(res.order.id, { name: agentName });
@@ -201,6 +209,13 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   // Stays in live mode (APP_STAYS_MODE=live) are booked on Hotelbeds now; in request mode the desk books them.
   if (res.order.kind === "stay") await autoBookStay(res.order.id);
   return outcomeOf(res.order);
+}
+
+/** "Book now, Mada renews it": each agreed renewal becomes its own request with the desk (priced and paid there). */
+async function fileRenewals(ownerId: string, personIds: string[], destination: string | null, ipHash: string | null) {
+  for (const personId of personIds) {
+    await createRequest(ownerId, { kind: "visa", travellerIds: [personId], service: "passport_renewal", serviceFor: { personId, need: null, destination }, answers: {}, needs: {}, note: "", query: "" }, ipHash);
+  }
 }
 
 async function afterEsim(o: OrderRow, demo: Set<DemoFlag>): Promise<OrderRow> {

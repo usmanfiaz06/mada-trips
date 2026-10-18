@@ -189,6 +189,20 @@ export function fareLines(o: { pricePerPerson: { amount: number }; childPrice?: 
   return lines;
 }
 
+/**
+ * The family facts the order sheet repeats before paying (OrderPreview.family): bags each, a bassinet for each baby on
+ * a lap, a child meal for each child 2 to 11, and who 12 to 17 the airline prices as an adult (with their age, so the
+ * sheet can say why). Null when nobody under 18 is going and nothing needs saying beyond the bags.
+ */
+export function familyLines(f: { bags?: string | null; infants?: number }, travellers: Pick<Person, 'id' | 'dateOfBirth' | 'firstName' | 'givenNames'>[], onDay: string) {
+  const ages = travellers.map((p) => ({ p, age: ageAt(p.dateOfBirth, onDay) }));
+  const childMeals = ages.filter((x) => x.age != null && x.age >= 2 && x.age < 12).length;
+  const adultFares = ages.filter((x) => x.age != null && x.age >= 12 && x.age < 18).map((x) => ({ personId: x.p.id, name: x.p.firstName || x.p.givenNames.split(/\s+/)[0] || '', age: x.age! }));
+  const bassinets = f.infants ?? 0;
+  const kids = childMeals + adultFares.length + bassinets + ages.filter((x) => x.age != null && x.age < 2).length;
+  return { bags: f.bags ?? null, bassinets, childMeals, adultFares, kids };
+}
+
 /** Leaves between 23:00 and 04:59: a hard start with a small child. */
 export const isNightDeparture = (hhmm: string) => { const h = Number(hhmm.slice(0, 2)); return h < 5 || h >= 23; };
 

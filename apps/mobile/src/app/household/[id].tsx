@@ -46,7 +46,7 @@ export default function HouseholdPerson() {
   const me = p.isSelf;
   const trip = nextTrip(trips.data);
   const st = passportStatus(p, trip);
-  const band = p.passport ? ageBand(p.dateOfBirth) : null;
+  const band = ageBand(p.dateOfBirth);
   const display = me ? account.data?.preferredName || user?.name || t('household.youPlain') : p.firstName;
   const meal = d.meal ?? (band?.short === 'Child' ? 'child' : 'halal');
   const helper = isHelper(p, d);
@@ -85,7 +85,7 @@ export default function HouseholdPerson() {
 
       <Group label={t('household.details')}>
         {!me ? <Row label={t('household.relation')} value={relationOf(p, d)} onPress={() => setSheet('relation')} src={<Source kind={d.relationLabel ? 'typed' : 'added'} />} testID="person-relation" /> : null}
-        <Row label={t('account.dob')} value={p.dateOfBirth && p.passport ? fullDay(p.dateOfBirth) : t('account.notScanned')} locked src={<Source kind={p.passport ? 'passport' : 'none'} />} />
+        <Row label={t('account.dob')} value={p.dateOfBirth ? fullDay(p.dateOfBirth) : t('account.notScanned')} locked src={<Source kind={p.passport ? 'passport' : p.dateOfBirth ? 'added' : 'none'} />} />
         {band?.note ? <View style={{ padding: 16 }}><T v="tiny">{band.note}</T></View> : null}
         {!me ? (
           <View style={{ padding: 16, gap: 8 }}>

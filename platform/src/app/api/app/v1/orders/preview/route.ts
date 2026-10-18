@@ -7,7 +7,7 @@ import { bookingRoute } from "@/lib/app/booking/route";
 // the cancellation rule, the hold and passports still missing.
 export const dynamic = "force-dynamic";
 
-export const POST = bookingRoute(async (req, { userId }) => {
+export const POST = bookingRoute(async (req, { userId, demo }) => {
   const b = await body(req, PreviewBody);
-  return json(PreviewResponse.parse({ preview: (await priceDraft(userId, b)).preview }));
+  return json(PreviewResponse.parse({ preview: (await priceDraft(userId, b, { demo })).preview }));
 });

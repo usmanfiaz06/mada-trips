@@ -1,9 +1,9 @@
 import "server-only";
 import { randomInt } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
-import { DemoFlag, todayIn, type Person } from "@mada/shared";
+import { and, eq, ne, sql } from "drizzle-orm";
+import { DemoFlag, renewalAnswers, todayIn, type Person } from "@mada/shared";
 import { db, type Tx } from "@/db";
-import { appUsers } from "@/db/app-schema";
+import { appRequests, appUsers } from "@/db/app-schema";
 import { isProductionDeploy, supplierMode } from "../config";
 import { AppError } from "../http";
 import { listPeople } from "../people";
@@ -102,3 +102,10 @@ const REF_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export const newRef = () => Array.from({ length: 6 }, () => REF_CHARS[randomInt(REF_CHARS.length)]).join("");
 
 export const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+/** Passport renewals this account already asked Mada for (and hasn't taken back): the entry checks' `{id}:passport` answers. */
+export async function renewalsAsked(ownerId: string): Promise<Record<string, string>> {
+  const rows = await db.select({ details: appRequests.details }).from(appRequests)
+    .where(and(eq(appRequests.ownerId, ownerId), ne(appRequests.status, "cancelled"), sql`${appRequests.details}->>'service' = 'passport_renewal'`));
+  return renewalAnswers(rows.map((r) => (r.details as { serviceFor?: { personId?: string | null } | null }).serviceFor?.personId));
+}

@@ -310,10 +310,12 @@ export const EntryCheck = z.object({
   need: z.string().nullable(),
   /** The answer key to send back when the traveller answers. */
   answerKey: z.string().nullable(),
-  /** Everyone but the account holder can be left off the booking. */
+  /** Who can be left off the booking: anyone, the account holder too, while someone else is still going. */
   removable: z.boolean(),
   /** What the "Mada gets it" button asks for. */
   service: z.enum(['uk_eta', 'evisa', 'reentry', 'passport_renewal']).nullable(),
+  /** A passport too short for the trip: when Mada can have it renewed by, the fee, whether that's in time, and whether it's asked. */
+  renewal: z.object({ by: IsoDay, fee: HalalasAmount, inTime: z.boolean(), asked: z.boolean() }).nullable().optional(),
 });
 export type EntryCheck = z.infer<typeof EntryCheck>;
 
@@ -500,6 +502,21 @@ export const AppliedPrefs = z.object({
 export type AppliedPrefs = z.infer<typeof AppliedPrefs>;
 export type OrderLine = z.infer<typeof OrderLine>;
 
+export const OrderRenewal = z.object({ personId: Id, name: z.string(), by: IsoDay, fee: HalalasAmount, inTime: z.boolean(), asked: z.boolean() });
+export type OrderRenewal = z.infer<typeof OrderRenewal>;
+
+export const OrderFamily = z.object({
+  /** "2 × 23 kg", as the fare gives it, for each person with a seat. */
+  bags: z.string().nullable(),
+  /** Babies on a lap: a bassinet is asked for each. */
+  bassinets: z.number().int(),
+  /** Children 2 to 11: a child meal is asked for each. */
+  childMeals: z.number().int(),
+  /** Travellers 12 to 17: airlines price them as adults. */
+  adultFares: z.array(z.object({ personId: Id, name: z.string(), age: z.number().int() })),
+});
+export type OrderFamily = z.infer<typeof OrderFamily>;
+
 export const OrderPreview = z.object({
   kind: OrderKind,
   title: z.string(),
@@ -530,6 +547,13 @@ export const OrderPreview = z.object({
   }).nullable().optional(),
   /** Preferences, loyalty and paid extras as applied to this booking (null for shares and eSIMs). */
   applied: AppliedPrefs.nullable().optional(),
+  /**
+   * Passports too short for this trip: when Mada can have each renewed by, its fee, whether that's before the flight,
+   * and whether it's already asked. One in time and not yet asked is asked with the order (CreateOrderBody.renewals).
+   */
+  renewals: z.array(OrderRenewal).optional(),
+  /** A flight with a family: the bags each, a bassinet asked for each baby on a lap, child meals, and who 12 to 17 pays as an adult. */
+  family: OrderFamily.nullable().optional(),
 });
 export type OrderPreview = z.infer<typeof OrderPreview>;
 export const PreviewResponse = z.object({ preview: OrderPreview });
@@ -555,6 +579,8 @@ export const CreateOrderBody = PreviewBody.extend({
   idempotencyKey: z.string().min(8).max(80),
   /** Accounts without a verified phone, while booking allows it (GET /config features.bookingNeedsPhone off): a number to call. */
   contactPhone: ContactPhone.optional(),
+  /** Short passports the traveller agreed Mada renews (OrderPreview.renewals): asked with the order, the booking goes ahead. */
+  renewals: z.array(Id).max(12).optional(),
 });
 export type CreateOrderBody = z.input<typeof CreateOrderBody>;
 

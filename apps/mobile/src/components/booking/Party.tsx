@@ -123,11 +123,15 @@ export function PartyStep({ party, people, today, selfName, onDone, title }: {
       <T v="small" testID="party-said">{party.adults != null || party.childAges.length || party.infants || party.total ? t('party.said', { said: partySummary(party) }) : t('party.check')}</T>
       <Card variant="well" style={{ gap: 12 }}>
         <Stepper label={t('party.adults')} hint={t('party.adultsHint')} value={adults} min={1} max={9} onChange={(v) => { setAdults(v); setAssign({}); }} testID="party-adults" />
-        <Stepper label={t('party.children')} hint={t('party.childrenHint')} value={ages.length} min={0} max={8}
+        <Stepper label={t('party.children')} hint={t('party.childrenHintFare')} value={ages.length} min={0} max={8}
           onChange={(v) => { setAges((a) => (v > a.length ? [...a, null] : a.slice(0, v))); setAssign({}); }} testID="party-children" />
         {ages.map((a, i) => (
           <View key={i} style={[styles.row, { paddingStart: 14 }]}>
-            <T v="small" style={{ flex: 1 }}>{a == null ? t('party.slot.childNoAge') : t('party.age', { age: digits(a) })}</T>
+            <View style={{ flex: 1, gap: 1 }}>
+              <T v="small">{a == null ? t('party.slot.childNoAge') : t('party.age', { age: digits(a) })}</T>
+              {/* Children are counted to 17, but airlines price 12 and over as adults: said where the age is set. */}
+              {a != null && a >= 12 ? <T v="tiny" testID={`party-age-${i}-adult`}>{t('party.adultAge')}</T> : null}
+            </View>
             <Pressable accessibilityRole="button" accessibilityLabel={t('party.a11y.younger', { n: i + 1 })} disabled={a != null && a <= 2} onPress={() => { buzz('select'); setAges((x) => x.map((y, j) => (j === i ? Math.max(2, (y ?? 7) - 1) : y))); setAssign({}); }} style={[styles.step, styles.stepSmall]} testID={`party-age-${i}-less`}>
               <T style={[font('h3'), { fontSize: 18 }]}>−</T>
             </Pressable>

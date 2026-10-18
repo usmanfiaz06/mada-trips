@@ -10,6 +10,7 @@ import {
   type HotelRequests,
   BookingPrefs, airlineRequests, bookingPrefsOf, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type TravelPrefs, cardLabel, childSar, childSeats, flightTotal,
+  familyLines, renewalAnswers, renewalsOf, type DemoFlag as DemoFlagT,
 } from '@mada/shared';
 import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
@@ -34,7 +35,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 
 /** owner '' is a guest's search: the first account to book it takes it (as search.ts ownOffer does). */
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
-type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; result?: RequestResult; whoNames?: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
+type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; result?: RequestResult; whoNames?: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; servicePerson?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
 type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
 
 const offers = new Map<string, Offer>();
@@ -54,6 +55,17 @@ const newRef = () => Array.from({ length: 6 }, () => REF[Math.floor(Math.random(
 const agentName = () => { const h = (new Date().getUTCHours() + 3) % 24; return h >= 22 || h < 8 ? 'Noura' : 'Faisal'; };
 /** Riyadh offsets of the airports the catalogue flies to, for times on the way back. */
 const TZ_OFF: Record<string, number> = { DXB: 60, CAI: -60, LHR: -180, GYD: 60 };
+
+/** Passport renewals this account asked for and didn't take back (the server's renewalsAsked). */
+const renewalsAsked = (owner: string) => renewalAnswers([...requests.values()].filter((r) => r.owner === owner && !r.withdrawn && r.details.service === 'passport_renewal').map((r) => r.details.servicePerson));
+
+/** The short passports on a booking, as the order sheet shows them (pricing.ts renewalsFor). */
+function renewalsFor(owner: string, search: Record<string, unknown> | undefined, travellers: Person[], people: Person[], demo?: Set<DemoFlagT>) {
+  const s = search as { destination?: string; depart?: string; checkIn?: string; return?: string | null } | undefined;
+  if (!s?.destination || !DESTINATIONS[s.destination] || !travellers.length) return { renewals: [], checks: null };
+  const checks = entryChecks({ destination: s.destination, travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: renewalsAsked(owner), today: today(), demo: { passportProblemFor: demo?.has('passportProblem') ? demoPassportTarget(people) : null } });
+  return { renewals: renewalsOf(checks), checks };
+}
 
 async function household(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1]): Promise<Person[]> {
   await walletMock({ method: 'GET', path: '/cards', token: w.token }, ctx); // the demo family arrives on first use
@@ -110,7 +122,7 @@ function stayOptions(destKey: string, checkIn: string, nights: number, n: number
 
 type Priced = { preview: OrderPreview; place: string; esim?: EsimSnap; flight?: FlightOption; stay?: StayOption; quoted?: FareOption; travellers: Person[]; search?: Record<string, unknown>; ssr?: string[]; hotelRemarks?: string[] };
 
-async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body: ReturnType<typeof PreviewBody.parse>, bump = 0): Promise<Priced | WireResponse> {
+async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body: ReturnType<typeof PreviewBody.parse>, bump = 0, demo?: Set<DemoFlagT>): Promise<Priced | WireResponse> {
   const d = body.draft;
   const people = await household(w, user, ctx);
   const pick = (ids: string[]) => ids.map((id) => people.find((p) => p.id === id)).filter((p): p is Person => !!p);
@@ -238,6 +250,8 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
       extrasOffer: offer ? { key: 'seatsTogether', carrier: carrier ?? undefined, airline: f?.airline, perPerson: offer.perPerson, count: offer.count, legs: offer.legs, total: offer.total, added: offer.added } : null,
     };
     out.ssr = scope !== 'stay' ? airlineRequests(prefs, { carrier, travellers: n }).ssr : [];
+    // A bassinet for each baby on a lap, a child meal for each child (pricing.ts).
+    if (f && scope !== 'stay') { const fam = familyLines(f, travellers, f.out.date); if (fam.bassinets) out.ssr.push('BSCT'); if (fam.childMeals) out.ssr.push('CHML'); }
     out.hotelRemarks = scope !== 'flight' ? hotelRemarks(prefs) : [];
   }
   const subtotal = lines.reduce((a, l) => a + l.amount, 0);
@@ -247,12 +261,15 @@ async function price(w: Wire, user: MockUser, ctx: Parameters<AreaMock>[1], body
   const balance = await creditBalance(w, user, ctx);
   const used = travel && body.useCredit ? Math.max(0, Math.min(balance, subtotal - discount)) : 0;
   const total = subtotal - discount - used;
+  const { renewals } = kind === 'trip' || kind === 'stay' ? renewalsFor(user.id, out.search, travellers, people, demo) : { renewals: [] };
+  const fam = out.flight && kind === 'trip' ? familyLines(out.flight, travellers, out.flight.out.date) : null;
   const preview: OrderPreview = {
     kind, title, photo, lines, subtotal: money(subtotal), promo: promo ? { code: promo.code, status: promo.status, message: promo.message, discount: money(discount) } : null,
     credit: { balance: money(balance), used: money(used) }, total: money(total), rule, agent, holdExpiresAt: hold ? new Date(hold).toISOString() : null,
     instalments: travel && total >= 100_000 ? { tabby: money(instalments(total, 4)[0]!), tamara: money(instalments(total, 3)[0]!) } : null,
     travellerIds: travellers.map((p) => p.id), missingPassports: kind === 'trip' || kind === 'package' ? travellers.filter((p) => !p.passport).map((p) => p.id) : [],
-    applied,
+    applied, renewals,
+    family: fam ? { bags: fam.bags, bassinets: fam.bassinets, childMeals: fam.childMeals, adultFares: fam.adultFares } : null,
   };
   return { preview, place, travellers, ...out };
 }
@@ -487,7 +504,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (!DESTINATIONS[p.data.destination]) return err('VALIDATION');
     const travellers = p.data.travellerIds.map((id) => people.find((x) => x.id === id)).filter((x): x is Person => !!x);
     if (travellers.length !== p.data.travellerIds.length) return err('NOT_FOUND');
-    return ok(entryChecks({ destination: p.data.destination, travellers, depart: p.data.depart, return: p.data.return, answers: p.data.answers, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null }, iqamaOf: demoIqama }));
+    return ok(entryChecks({ destination: p.data.destination, travellers, depart: p.data.depart, return: p.data.return, answers: { ...(user ? renewalsAsked(user.id) : {}), ...p.data.answers }, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null }, iqamaOf: demoIqama }));
   }
   if (key === 'GET /geocode') return ok({ point: null });
   const rooms = m(/^\/offers\/([^/]+)\/rooms$/);
@@ -574,7 +591,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const whoFor = b.serviceFor?.personId ? travellers.filter((x) => x.id === b.serviceFor!.personId) : travellers;
     const req: Req = {
       id, owner: user.id, created: Date.now(), messages: [], whoNames: listOf(whoFor.map((x) => (x.isSelf ? t('oc.you') : personName(x)))),
-      details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, clientId: b.clientId ?? null, flightRequest: fr },
+      details: { kind: b.kind, answers: b.answers, needs: b.needs, note: b.note, search: b.search ?? null, service: b.service ?? null, serviceNeed: b.serviceFor?.need ?? null, servicePerson: b.serviceFor?.personId ?? null, clientId: b.clientId ?? null, flightRequest: fr },
       view: { id, kind: b.kind, status: 'sent', title, summary: fr ? flightRequestSummary(b.search!, b.travellerIds.length) : summary, detail, note: words.note, travellerIds: b.travellerIds, agent: { name: agentName() }, quote: null, promisedBy: new Date(Date.now() + 7_200_000).toISOString(), createdAt: nowIso(), updatedAt: nowIso() },
     };
     requests.set(id, req);
@@ -648,7 +665,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
   if (key === 'POST /orders/preview') {
     const p = PreviewBody.safeParse(body);
     if (!p.success) return bad(p.error.issues);
-    const priced = await price(w, user, ctx, p.data);
+    const priced = await price(w, user, ctx, p.data, 0, demo);
     return 'status' in priced ? priced : ok({ preview: priced.preview });
   }
   if (key === 'POST /orders') {
@@ -664,17 +681,26 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       if (!b.contactPhone || !normalizeContactPhone(b.contactPhone)) return err('VALIDATION', t('beta.contact.needed'), { contactPhone: b.contactPhone ? 'invalid' : 'missing' });
     }
     await new Promise((res) => setTimeout(res, 600));
-    const priced = await price(w, user, ctx, b, demo.has('priceUp') && b.draft.kind === 'trip' ? 14_000 : 0);
+    const priced = await price(w, user, ctx, b, demo.has('priceUp') && b.draft.kind === 'trip' ? 14_000 : 0, demo);
     if ('status' in priced) return priced;
     const pv = priced.preview;
     if (pv.holdExpiresAt && Date.parse(pv.holdExpiresAt) <= Date.now()) return ok({ outcome: 'hold_ended', preview: pv });
     if (b.expectedTotal !== pv.total.amount) return ok({ outcome: 'price_changed', previousTotal: money(b.expectedTotal), preview: pv, changedBy: money(pv.total.amount - b.expectedTotal) });
+    // A short passport holds the booking unless Mada renews it in time: already asked, or agreed on the sheet (orders.ts).
+    let renew: string[] = [];
     if ((b.draft.kind === 'trip' || b.draft.kind === 'stay') && !priced.quoted) {
-      const s = priced.search as { destination: string; depart?: string; return?: string | null; checkIn?: string };
-      const checks = entryChecks({ destination: s.destination, travellers: priced.travellers, depart: s.depart ?? s.checkIn ?? today(), return: s.return ?? null, answers: {}, today: today(), demo: { passportProblemFor: demo.has('passportProblem') ? demoPassportTarget(people) : null } });
-      const blocked = checks.checks.find((c) => c.key === 'passport' && c.blocking);
-      if (blocked) return ok({ outcome: 'blocked', message: blocked.text });
+      const { checks } = renewalsFor(user.id, priced.search, priced.travellers, people, demo);
+      const blocked = checks?.checks.filter((c) => c.key === 'passport' && c.blocking) ?? [];
+      const agreed = new Set(b.renewals ?? []);
+      const stuck = blocked.find((c) => !(c.renewal?.inTime && c.personId && agreed.has(c.personId)));
+      if (stuck) return ok({ outcome: 'blocked', message: stuck.text });
+      renew = blocked.map((c) => c.personId!);
     }
+    // "Book now, Mada renews it": each agreed renewal becomes its own request with the desk.
+    const fileRenewals = async () => {
+      const dest = (priced.search as { destination?: string } | undefined)?.destination ?? null;
+      for (const personId of renew) await bookingMock({ method: 'POST', path: '/requests', token: w.token, body: { kind: 'visa', travellerIds: [personId], service: 'passport_renewal', serviceFor: { personId, need: null, destination: dest } } }, ctx);
+    };
     const pay = b.payment;
     if (b.draft.kind === 'share' && (b.plan !== 'full' || pay.method === 'credit')) return err('VALIDATION');
     let label = t('pay.paidCredit');
@@ -725,6 +751,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     if (demo.has('slowAgent')) o.nextAt = Date.now() + 4200;
     orders.set(o.id, o);
     if (pv.credit.used.amount) creditSpent.set(user.id, (creditSpent.get(user.id) ?? 0) + pv.credit.used.amount);
+    await fileRenewals();
     if (payRequest) return ok({ outcome: 'payment_requested', order: viewOf(o) }, 200);
     if (requires3ds) return ok({ outcome: 'requires_action', order: viewOf(o) }, 201);
     if (!agentKind) { confirm(o); return ok({ outcome: 'paid', order: viewOf(o) }, 201); }

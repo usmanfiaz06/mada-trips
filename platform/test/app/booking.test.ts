@@ -478,6 +478,22 @@ describe("orders and the desk", () => {
     expect(re.json).toMatchObject({ expired: false, changedBy: 0 });
     const blocked = await book(f.token, draft, { method: "card", cardId }, { query: "?demo=passportProblem" });
     expect(blocked.out.outcome).toBe("blocked");
+    // Never a dead end: Mada renews Ahmed's passport in time, the sheet says when and what it costs, and the booking
+    // goes ahead with the renewal asked alongside it.
+    const q = "?demo=passportProblem";
+    const pv = PreviewResponse.parse((await post(previewPost, f.token, { draft, useCredit: true }, q)).json).preview;
+    expect(pv.renewals).toEqual([expect.objectContaining({ personId: f.ahmed, inTime: true, asked: false, fee: 15_000 })]);
+    // The family, said again: bags each, a child meal for Ahmed (10), and Sara (13) on an adult fare, with why.
+    expect(pv.family).toMatchObject({ childMeals: 1, bassinets: 0, adultFares: [expect.objectContaining({ personId: f.sara, name: "Sara", age: 13 })] });
+    expect(pv.family?.bags).toBeTruthy();
+    const go = await post(ordersPost, f.token, { draft, useCredit: true, payment: { method: "card", cardId }, plan: "full", expectedTotal: pv.total.amount, idempotencyKey: `k-${Math.random().toString(36).slice(2)}`, renewals: [f.ahmed] }, q);
+    expect(CreateOrderResponse.parse(go.json).outcome).toBe("created");
+    const asked = RequestsResponse.parse((await get(requestsGet, f.token)).json).requests.filter((x) => x.kind === "visa" && x.travellerIds.includes(f.ahmed));
+    expect(asked).toHaveLength(1);
+    const again = PreviewResponse.parse((await post(previewPost, f.token, { draft, useCredit: true }, q)).json).preview;
+    expect(again.renewals?.[0]).toMatchObject({ personId: f.ahmed, asked: true });
+    const entry = EntryCheckResponse.parse((await post(searchEntry, f.token, { destination: "istanbul", travellerIds: f.four, depart: EID_OUT, return: EID_BACK }, q)).json);
+    expect(entry.checks.find((c) => c.key === "passport")).toMatchObject({ blocking: false, done: true, renewal: { asked: true, inTime: true } });
   });
 
   it("the fare goes while booking, Faisal asks a question, tickets fail and Mada tries by phone", async () => {

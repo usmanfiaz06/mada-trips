@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { needsPassports, passportReady, personName, type Person, type PassportReady } from '@mada/shared';
+import { needsPassports, passportReady, personName, shortDay, type OrderRenewal, type Person, type PassportReady } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { fullDay, fullNameOf, todayIso } from '@/lib/wallet-model';
@@ -29,12 +29,14 @@ export function readinessLine(r: PassportReady, travelEnds: string | null | unde
   return travelEnds && travelEnds > todayIso() ? t('pp.book.short', { date: fullDay(r.expiry), until: fullDay(r.needUntil) }) : t('pp.book.shortNow', { date: fullDay(r.expiry) });
 }
 
-export function TravellerPassports({ kind, people, travellerIds, travelEnds, selfName = '', note, testID = 'booking-passports' }: {
+export function TravellerPassports({ kind, people, travellerIds, travelEnds, selfName = '', note, renewals, testID = 'booking-passports' }: {
   /** What's being booked (trip, package, flight, visa, umrah…): nothing shows for one that doesn't need passports. */
   kind: string | null | undefined;
   people: Person[]; travellerIds: string[]; travelEnds?: string | null; selfName?: string;
   /** A line under the list while a passport is missing (the order sheet's "book now, add them within 48 hours"). */
   note?: string | null; testID?: string;
+  /** Passports Mada is renewing for this trip (or will, with the order): the row says so instead of "Needs a look". */
+  renewals?: OrderRenewal[];
 }) {
   const router = useRouter();
   const today = todayIso();
@@ -52,8 +54,9 @@ export function TravellerPassports({ kind, people, travellerIds, travelEnds, sel
       <T v="small">{allReady ? t('pp.book.allReady') : t('pp.book.body')}</T>
       {rows.map(({ p, r }) => {
         const name = p.passport ? fullNameOf(p) : personName(p, selfName);
-        const status = r.state === 'missing' ? t('pp.book.add') : r.state === 'expiring' ? t('pp.book.look') : t('pp.book.ready');
-        const line = readinessLine(r, travelEnds);
+        const rn = r.state !== 'ready' ? renewals?.find((x) => x.personId === p.id && x.asked && x.inTime) : undefined;
+        const status = rn ? t('rn.pill') : r.state === 'missing' ? t('pp.book.add') : r.state === 'expiring' ? t('pp.book.look') : t('pp.book.ready');
+        const line = rn ? t('rn.renewingLine', { date: shortDay(rn.by) }) : readinessLine(r, travelEnds);
         return (
           <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${t('pp.book.status', { name, status })}. ${line}`} onPress={() => openPassport(router, p)}
             style={({ pressed }) => [styles.row, pressed ? { opacity: 0.85 } : null]} testID={`pp-row-${p.id}`}>
