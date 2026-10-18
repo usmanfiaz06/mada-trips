@@ -421,3 +421,46 @@ SOURCES += [
     ("Les 3 Vallées: lift opening dates", "https://www.les3vallees.com/en/live/lifts-and-trails-opening"),
     ("Gulf News: F1 2027 calendar", "https://gulfnews.com/sport/abu-dhabi-qatar-saudi-arabia-2027-formula-one-calendar-announced-1.500676639"),
 ]
+
+# The post kit: what the team needs when they add a post through the form.
+HOOKS = [
+    # (formula, Arabic example, English example, best for)
+    ("Number + promise", "٥ أشياء محد يقولها لك عن…", "5 things nobody tells you about…", "TikTok, Reels, X threads"),
+    ("The question they already have", "فيزا شنغن ٥ سنوات؟ حتى من أول مرة!", "A 5-year Schengen visa? Even on your first try.", "Visa in 60, search-led explainers"),
+    ("POV", "POV: صحيت ٥ الفجر عشان هذا", "POV: you woke up at 5am for this", "Destination moments, ASMR"),
+    ("Distance as the hook", "٤ ساعات من الرياض… وأنت بالمدرج", "4 hours from Riyadh, and you're in the stands", "Fly For It, GCC hops"),
+    ("Price honesty", "كم تكلف ٥ أيام في… فعلياً؟", "What 5 days in … actually cost", "Photo carousels, budget trips"),
+    ("Relatable moment", "آخر يوم دوام قبل الإجازة 😮‍💨", "Last workday before the break", "Trend videos, team content"),
+    ("Sound first", "(no text: the burner roars, then sunrise)", "(no text: sound, then the reveal)", "ASMR Reels, kashta, balloons"),
+    ("Rank it / rate it", "رتبنا ٥ مدن… توافقنا؟", "We ranked 5 cities. Agree?", "Tier lists, itineraries"),
+    ("Myth vs fact", "الحجز يوم الثلاثاء أرخص؟ حقيقة ولا خرافة", "Is Tuesday cheaper? Myth or fact", "Green-screen myth-busting"),
+    ("Deadline / window", "بدون فيزا لين ١٥ فبراير بس", "Visa-free only until 15 February", "Visa windows, offers"),
+    ("Story time", "الساعة ٣:١٢ الفجر… جانا اتصال", "3:12 a.m. The phone rang.", "Concierge Confessions"),
+    ("This or that", "ثلج ولا شمس؟", "Snow or sun?", "Polls, Winter Escapes"),
+]
+
+CAPTION_FORMULAS = [
+    ("Search-led (TikTok/IG)", "Line 1: keyword + hook. Lines 2-3: the payoff in one or two short lines. Line 4: one CTA. Then max 5 hashtags (2-3 topic + #مادا).",
+     "فيزا شنغن للسعوديين ٥ سنوات ✅\nبس فيه ٣ أشياء لازم تعرفها قبل الموعد 👇\nاحفظ الفيديو وأرسله لرفيق السفر."),
+    ("Fly For It (event trip)", "What + where + when, then distance from Riyadh, then what we bundle, then a WhatsApp keyword.",
+     "أرسنال × ريال مدريد في لندن، ٩ ديسمبر ⚽\nلندن على بعد ٦ ساعات ونص.\nنرتبها لك: التذكرة، الطيران، الفندق.\nأرسل «لندن» على الواتساب."),
+    ("Save-worthy list", "Promise in line 1, the list, then 'Save it' or 'Send it to…'.",
+     "دول بدون فيزا للسعوديين هالشتاء 🇸🇦\nتركيا · جورجيا · أذربيجان · روسيا…\nاحفظها، وأرسلها لرفيق السفر 📌"),
+    ("X post", "One idea, under 280 characters, no link in the main post, end with a question or a reason to reply.",
+     "إجازة منتصف العام تبدأ ٨ يناير. ثلج ولا شمس؟ 👇"),
+    ("LinkedIn", "A first line that makes them click 'more', 4-6 short lines or bullets that teach one thing, one question at the end. English.",
+     "The keynote gets the applause. The timeline gets everyone into the room.\n• Week -12: brief, budget, room block\n• Week -8: flights in waves\n…\nWhat would you add?"),
+]
+
+POST_CHECKLIST = [
+    "Hook works in the first 1-3 seconds, with the text on screen AND spoken (TikTok search reads both).",
+    "One keyword, used in 4 places: spoken, on screen, caption line 1, and 1-2 hashtags.",
+    "Max 5 hashtags. One CTA.",
+    "Arabic proofread by a native speaker. English underneath on Instagram.",
+    "Own footage or a Collab post. No reposted clips, no club, UEFA, F1 or artist logos, no broadcast footage.",
+    "No children's faces or domestic workers, modest dress, no flaunting wealth (GAMR rules).",
+    "Facts checked this week: event dates, visa rules, airline routes, prices (sales fills in real SAR).",
+    "Offers have management sign-off and real terms. Paid creators hold a Mawthooq licence and are marked #إعلان.",
+    "Sensitivity check: nothing about airports, safety or airline suspensions unless it's helpful and confirmed.",
+    "Captions burned in, text clear of the top ~250px and bottom ~340px of a 9:16 frame.",
+]

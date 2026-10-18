@@ -455,7 +455,7 @@ def build_json(path):
     data = {k: getattr(S, k) for k in ("MONTH", "SITUATION", "OBJECTIVES", "PLATFORMS", "PILLARS", "SERIES", "STORIES",
                                        "VOICE", "DESIGN", "BIOS", "KEYWORDS", "KEYWORD_METHOD", "COMPETITORS", "WHITE_SPACE",
                                        "MOMENTS", "CANCELLED", "KPIS", "WORKFLOW", "SENSITIVITY", "SOURCES",
-                                       "GLOBAL_INSIGHTS", "TOP_DESTINATIONS", "TEAM", "STATUSES", "DEFAULT_STATUS")}
+                                       "GLOBAL_INSIGHTS", "TOP_DESTINATIONS", "TEAM", "STATUSES", "DEFAULT_STATUS", "HOOKS", "CAPTION_FORMULAS", "POST_CHECKLIST")}
     data["POSTS"] = sorted_posts()
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, ensure_ascii=False)

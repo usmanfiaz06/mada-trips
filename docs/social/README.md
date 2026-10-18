@@ -7,3 +7,14 @@ The month-one plan for Instagram, TikTok, X and LinkedIn. Researched 18 Oct 2026
 - `build.py` rebuilds the workbook from those two files: `python3 docs/social/build.py`. Add `--html <path>` to also write the shareable playbook page from `playbook_template.html`.
 
 Edit the `.py` files and rebuild rather than editing the workbook's structure by hand. Fill in Owner, Status and results in the workbook itself.
+
+## The live calendar (for the team)
+
+The published playbook page on claude.ai is the team's live calendar. Everyone it's shared with sees the same board:
+
+- **Add post** opens a form (title, date and platform are required). Posts can go into any month from November 2026 on.
+- **Edit post** on any card changes it for everyone. Edits to the original plan are kept separately, so the plan in `posts.py` stays intact.
+- Assign posts and move them through the statuses on the card. The **Team** tab shows each person's posts by stage and what's due in the next 7 days, and lets you add or remove names.
+- **Export to Excel (CSV)** downloads the live calendar, including added and edited posts.
+
+What the page stores: `posts/<post id>` (status, owner and edits for the original plan), `custom/<id>` (posts the team added) and `config/team` (the team list). The Excel workbook in this folder is the original plan and doesn't sync with the page.
