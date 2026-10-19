@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CITY_CENTRES, distanceFrom, landmarkById, anchorOfLandmark, mergeWishes, parseFlightWishes, parseStayWishes, parseThingWishes, refineStays, roomTitle, sortByDistance, sortStays, stayLines, t, wishLabel,
+  CITY_CENTRES, distanceFrom, landmarkById, anchorOfLandmark, mergeWishes, parseFlightWishes, parseStayWishes, parseThingWishes, refineStays, roomTitle, sortByDistance, sortStays, stayLines, t, visibleStays, wishLabel,
   type StayFacts, type StayOption,
 } from '../src';
 
@@ -125,5 +125,23 @@ describe('flights and things to do', () => {
   it('things to do wishes', () => {
     expect(parseThingWishes("indoors, it's hot, for kids, tonight").wishes.map((w) => w.k)).toEqual(['indoor', 'kids', 'tonight']);
     expect(parseThingWishes('مكان مكيف للأطفال الليلة').wishes.map((w) => w.k)).toEqual(['indoor', 'kids', 'tonight']);
+  });
+});
+
+describe('shared rooms: a filter, off by default', () => {
+  const withDorm = [...list, stay('5', 150, { stars: 2, shared: true, room: '8-bed mixed dorm' }, { score: 99 })];
+  it('a dorm is out of the list until the traveller asks for shared rooms', () => {
+    expect(visibleStays(withDorm, []).map((o) => o.name)).not.toContain('Hotel 5');
+    expect(refineStays(withDorm, [{ k: 'has', what: 'pool' }]).matches.map((m) => m.option.name)).not.toContain('Hotel 5');
+    const on = refineStays(withDorm, [{ k: 'shared' }]);
+    expect(on.matches[0]!.option.name).toBe('Hotel 5');
+    expect(on.answer).toMatch(/Shared rooms and hostels are in the list too: 1/);
+  });
+  it('heard in English and Arabic; a city with only shared rooms still shows them', () => {
+    expect(parseStayWishes('a hostel, the cheapest bed').wishes).toContainEqual({ k: 'shared' });
+    expect(parseStayWishes('أبي هوستل رخيص').wishes).toContainEqual({ k: 'shared' });
+    expect(wishLabel({ k: 'shared' })).toBe('Shared rooms');
+    const onlyDorms = [stay('6', 100, { shared: true })];
+    expect(visibleStays(onlyDorms, [])).toHaveLength(1);
   });
 });

@@ -128,6 +128,7 @@ export const staysCopy = {
   'wish.vibe.family': 'Good for children',
   'wish.vibe.luxury': 'Luxury',
   'wish.vibe.budget': 'Good value',
+  'wish.shared': 'Shared rooms',
   'ev.near': '{distance} to {place}',
   'ev.m': '{n} m',
   'ev.km': '{n} km',
@@ -146,6 +147,8 @@ export const staysCopy = {
   'refine.closest': 'The closest matches are below.',
   'refine.notRead': 'Mada didn’t catch what to change. Try a place, a view, a pool, breakfast or a price.',
   'refine.cleared': 'Back to all {count} places.',
+  'refine.shared': 'Shared rooms and hostels are in the list too: {n} of them, cheapest first.',
+  'stay.noPhoto': 'No photo from the hotel yet',
 
   // ───────────── distance from, the map ─────────────
   'dist.line': 'About {distance} from {place} · {time}',

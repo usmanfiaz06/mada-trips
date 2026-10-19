@@ -145,6 +145,7 @@ export const arStays: ArSection<typeof staysCopy> = {
   'wish.vibe.family': 'مناسب للأطفال',
   'wish.vibe.luxury': 'فاخر',
   'wish.vibe.budget': 'سعر مناسب',
+  'wish.shared': 'غرف مشتركة',
   'ev.near': '{distance} عن {place}',
   'ev.m': '{n} م',
   'ev.km': '{n} كم',
@@ -166,6 +167,8 @@ export const arStays: ArSection<typeof staysCopy> = {
   'refine.closest': 'الأقرب لطلبك تحت.',
   'refine.notRead': 'ما فهمت مادا وش تبي تغيّر. جرّب مكان، إطلالة، مسبح، فطور أو سعر.',
   'refine.cleared': 'رجعنا لكل الأماكن ({count}).',
+  'refine.shared': 'حطّينا لك الغرف المشتركة والهوستلات بعد: {n}، الأرخص أول.',
+  'stay.noPhoto': 'الفندق ما أرسل صور للحين',
 
   'dist.line': 'حوالي {distance} من {place} · {time}',
   'dist.walk': '{n} دقيقة مشي',

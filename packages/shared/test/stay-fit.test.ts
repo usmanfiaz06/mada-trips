@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankByFit, reasonsLine, stayFit, tripShape, type Person, type StayFacts } from '../src';
+import { rankByFit, rankStays, reasonsLine, sharedStay, stayFit, tripShape, type Person, type StayFacts } from '../src';
 
 const on = '2026-12-01';
 const p = (relation: Person['relation'], dateOfBirth: string | null, isSelf = false) => ({ relation, dateOfBirth, isSelf });
@@ -50,5 +50,31 @@ describe('stayFit: the same hotels, ranked for who is going', () => {
     const twin = [{ name: 'B', total: { amount: 2 }, fit: { shape: 'solo' as const, score: 50, reasons: [] } }, { name: 'A', total: { amount: 1 }, fit: { shape: 'solo' as const, score: 50, reasons: [] } }];
     expect(rankByFit(twin).map((x) => x.name)).toEqual(['A', 'B']);
     expect(rankByFit(twin)).toEqual(rankByFit([...twin].reverse()));
+  });
+});
+
+describe('shared rooms and hostels: never a pick, out of the list until asked for', () => {
+  it('reads dorm beds, shared bathrooms and hostels, and leaves private rooms alone', () => {
+    expect(sharedStay({ room: '8-bed mixed with external shared bathroom', hotelName: "St Christopher's London Bridge the Inn" })).toBe(true);
+    expect(sharedStay({ room: 'Bed in 6-bed female dormitory' })).toBe(true);
+    expect(sharedStay({ room: 'Double room with shared bathroom' })).toBe(true);
+    expect(sharedStay({ room: 'Standard double', roomCode: 'DOR.ST' })).toBe(true);
+    expect(sharedStay({ room: 'Private twin', categoryCode: 'HS' })).toBe(true);
+    expect(sharedStay({ room: 'Private twin', hotelName: 'Generator London Hostel' })).toBe(true);
+    for (const room of ['Deluxe double', 'Family room with bunk beds', 'Twin room 2 single beds', '1-bed apartment', 'Suite 2 bedrooms', 'Double room with private bathroom']) {
+      expect(sharedStay({ room, roomCode: 'DBL.ST', categoryCode: '4EST', hotelName: 'The Strand Palace' })).toBe(false);
+    }
+  });
+  it('a dorm bed never takes "Best for you" or "Lowest price", and comes after every private room', () => {
+    const list = [
+      { name: 'Dorm inn', total: { amount: 30000 }, facts: facts({ stars: 3, shared: true, refundable: true, lat: 51.505, lng: -0.09 }) },
+      { name: 'Budget hotel', total: { amount: 90000 }, facts: facts({ stars: 2 }) },
+      { name: 'Good hotel', total: { amount: 120000 }, facts: facts({ stars: 4 }) },
+    ];
+    const r = rankStays(list, { shape: 'solo', city: 'london', radiusKm: 8 });
+    expect(r.map((x) => x.name).at(-1)).toBe('Dorm inn');
+    expect(r.find((x) => x.badge === 'best')?.name).toBe('Good hotel');
+    expect(r.find((x) => x.badge === 'lowest')?.name).toBe('Budget hotel');
+    expect(r.find((x) => x.name === 'Dorm inn')?.badge).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { anchorName, anchorOfLandmark, nameIn, catalogueHotelByKey, catalogueSta
 import { Button } from '@/components/Button';
 import { HotelRequestsAsked } from '@/components/booking/HotelRequests';
 import { CatalogueStayFacts } from '@/components/booking/CatalogueStay';
+import { HotelPhoto } from '@/components/booking/HotelPhoto';
 import { Photo as CatPhoto } from '@/components/booking/parts';
 import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
@@ -109,6 +110,8 @@ export default function HotelScreen() {
         </ScrollView>
       ) : cs ? (
         <View style={st.hero} testID="hotel-photo"><CatPhoto name={cs.photo} focal={cs.focal} /></View>
+      ) : details || stay?.hotel ? (
+        <View style={st.hero} testID="hotel-photo"><HotelPhoto uri={stay?.hotel?.imageUrl} name={h.name} seed={details?.code ?? stay?.hotel?.code} testID="hotel-photo" /></View>
       ) : null}
       <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
       <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={nameIn(h.category, lang)} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>

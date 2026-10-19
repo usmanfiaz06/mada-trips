@@ -41,8 +41,35 @@ A hotel whose content we don't hold yet gets nothing for amenities (and we never
 3 km from a place the traveller asked for and from the Haram.
 
 **Best for you** is the highest score at 3 stars and up. **Lowest price** is the cheapest. Every other stay has no
-badge. The first screen shows three picks: the best fit, the lowest price that is still 3 stars and up, and the
+badge.
+
+**Shared rooms and hostels are never a pick.** Mada's travellers are Saudi families, couples and business people: a
+bed in a dorm is not a room for them. A stay counts as shared (`sharedStay` in `stay-fit.ts`, `facts.shared` on the
+offer) when the room is a bed among strangers or a bathroom down the hall ("8-bed mixed with external shared
+bathroom", "bed in dormitory", "female only", "shared bathroom", room codes `DOR`/`BED`), or the place is a hostel
+(Hotelbeds hostel categories `HS…`, the accommodation type, or "hostel" in the name). Then:
+
+- From each hotel we sell its cheapest *private* room; a room with a shared bathroom only when the hotel has nothing
+  else (so a 2-star with an ensuite double shows the ensuite, not the cheaper room down the hall).
+- When there are more hotels than we list, private rooms are kept first (dorm beds are the cheapest thing in any city
+  and would otherwise push real rooms out).
+- Shared stays are scored among themselves and listed after every private room. They never get **Best for you** or
+  **Lowest price**, and they don't count towards the prices value is judged against.
+- The app leaves them out of the picks and the list until the traveller asks: the **Shared rooms** filter (off by
+  default, offered only when the answer has some), or a wish like "a hostel", "the cheapest bed", "هوستل". With it on,
+  they join the list, cheapest first. If a city has nothing but shared rooms on those dates, they are shown rather
+  than an empty list.
+
+For a family the rooms always fit the party (the search asks Hotelbeds for the number of rooms the party needs, and a
+rate for another number of rooms is never sold), so a family is never split into dorm beds. The first screen shows three picks: the best fit, the lowest price that is still 3 stars and up, and the
 closest to the landmark the traveller measures from, each with one line of reasons.
+
+**Photos.** Each hotel shows its own photo from Hotelbeds: the hotel itself first (image type GEN), then a room (HAB),
+then the lobby and common areas (COM), each by Hotelbeds' visual order, at the `bigger` size on cards and `xl` on the
+hotel's page. Hotels we don't hold content for yet are fetched by code from the Content API when they first appear in
+a search and stored (the hourly job catches anything that didn't arrive in time). A hotel Hotelbeds has no photo for,
+or a photo that doesn't load, shows a plain tile with the hotel's initial and name and "No photo from the hotel yet",
+never a stock photo standing in for the hotel.
 
 ## 3. Reasons are the facts that scored
 

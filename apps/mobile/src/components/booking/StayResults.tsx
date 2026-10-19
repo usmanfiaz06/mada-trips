@@ -4,7 +4,7 @@ import { useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import {
   CATALOGUE_HOTELS, CITY_CENTRES, anchorName, anchorOfLandmark, distanceFrom, distanceLabel, formatSar, kmApart, landmarkById, landmarksIn, mergeWishes, parseStayWishes, reasonsLine, refineStays, sortByDistance, sortStays,
-  tripShape, wishKey, wishLabel, type DistanceAnchor, type Person, type StayOption, type StaySearchResponse, type StaySort, type StayWish,
+  tripShape, visibleStays, wishKey, wishLabel, type DistanceAnchor, type Person, type StayOption, type StaySearchResponse, type StaySort, type StayWish,
 } from '@mada/shared';
 import { agentName, useAgent } from '@/lib/agent';
 import { useStayAnchor } from '@/lib/booking';
@@ -66,7 +66,10 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
 
   const refined = useMemo(() => refineStays(s.options, wishes, lang), [s.options, wishes, lang]);
   const evidence = useMemo(() => new Map([...refined.matches, ...refined.closest].map((m) => [m.option.id, m.ev])), [refined]);
-  const pool = wishes.length ? refined.matches.map((m) => m.option) : s.options;
+  // Shared rooms and hostels stay out until asked for (the "Shared rooms" filter, "a hostel"): RANKING.md §2.
+  const shown0 = useMemo(() => visibleStays(s.options, wishes), [s.options, wishes]);
+  const anyShared = useMemo(() => s.options.some((o) => o.facts?.shared), [s.options]);
+  const pool = wishes.length ? refined.matches.map((m) => m.option) : shown0;
   const list = useMemo(() => {
     const base = pool.length ? pool : refined.closest.map((m) => m.option);
     if (sort === 'near' && anchor) return sortByDistance(base, anchor);
@@ -152,12 +155,14 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
     { k: 'freeCancel' }, { k: 'board', board: 'BB' }, ...(shape.shape !== 'family' ? [{ k: 'has', what: 'pool' } as const] : []), { k: 'stars', min: 4 },
     ...(first && shape.shape !== 'pilgrimage' ? [{ k: 'near', id: first.id, walk: false } as const] : []),
   ].filter((w) => !wishes.some((x) => wishKey(x) === wishKey(w as StayWish))) as StayWish[];
+  // Off by default, and only offered when the answer has any: "Shared rooms" brings dorm beds and hostels into the list.
+  const sharedChip: StayWish[] = anyShared && !wishes.some((w) => w.k === 'shared') ? [{ k: 'shared' }] : [];
 
   const answer = unread ? t('fix.notRead') : wishes.length ? refined.answer : null;
   const offerDesk = !!unread || (wishes.length > 0 && (!refined.matches.length || refined.unknown.length > 0));
   const deskNote = [...wishes.map((w) => wishLabel(w, lang)), unread].filter(Boolean).join(' · ');
   const sortLabel = t(sort === 'near' ? 'stays.sort.near' : `stays.sort.${sort}`);
-  const total = s.options.length;
+  const total = shown0.length;
 
   const mapPoints = list.filter((o) => o.facts?.lat != null && o.facts?.lng != null)
     .map((o) => ({ id: o.id, lat: o.facts!.lat!, lng: o.facts!.lng!, label: formatSar(o.total.amount), price: o.total.amount, a11y: t('stays.map.pin', { name: o.name, price: formatSar(o.total.amount) }), selected: (mapSel ?? cur?.id) === o.id }));
@@ -171,7 +176,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
       <Pressable accessibilityRole="button" onPress={() => setSortOpen(true)} style={[st.control, { flexShrink: 1 }]} testID="stays-sort">
         <T v="small" color={colors.green} style={{ fontFamily: ff.ui500, flexShrink: 1 }} numberOfLines={1}>{sort === 'near' && anchor ? t('stays.sort.nearTo', { place: anchorName(anchor, lang) }) : t('stays.sortValue', { sort: sortLabel })}</T><Icon name="chevron" size={14} />
       </Pressable>
-      {quick.length || wishes.length ? (
+      {quick.length || wishes.length || sharedChip.length ? (
         <Pressable accessibilityRole="button" onPress={() => setFiltersOpen(true)} style={st.control} testID="stays-filters">
           <Icon name="filter" size={14} /><T v="small" color={colors.green} style={{ fontFamily: ff.ui500 }}>{wishes.length ? t('stays.filtersCount', { n: wishes.length }) : t('stays.filters')}</T>
         </Pressable>
@@ -295,7 +300,7 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
       <Sheet visible={filtersOpen} label={t('stays.filters')} onClose={() => setFiltersOpen(false)}>
         <T v="h2">{t('stays.filters')}</T>
         <T v="small">{t('stays.filtersHint')}</T>
-        {[...wishes, ...quick.slice(0, 6)].map((w) => {
+        {[...wishes, ...quick.slice(0, 6), ...sharedChip].map((w) => {
           const on = wishes.some((x) => wishKey(x) === wishKey(w));
           return (
             <Pressable key={wishKey(w)} accessibilityRole="checkbox" accessibilityState={{ checked: on }} style={[st.sortRow, on ? st.sortOn : null]} testID={`quick-${wishKey(w)}`}

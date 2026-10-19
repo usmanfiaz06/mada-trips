@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Image as ExpoImage } from 'expo-image';
 import { formatSar, stayLines, type StayOption } from '@mada/shared';
 import { t, tn } from '@/lib/i18n';
 import { colors, ff } from '@/theme';
@@ -7,6 +6,7 @@ import { Card } from '../Card';
 import { Icon } from '../Icon';
 import { Pill } from '../Pill';
 import { T } from '../Text';
+import { HotelPhoto } from './HotelPhoto';
 import { Photo } from './parts';
 
 /*
@@ -18,13 +18,13 @@ export function StayCard({ h, i, on, guests, reason, distance, evidence, onPress
   h: StayOption; i: number; on: boolean; guests: number; reason?: string | null; noBadge?: boolean; distance?: string | null; evidence?: string[]; onPress: () => void; onDetails?: () => void; compact?: boolean;
 }) {
   const l = stayLines(h);
-  const img = h.hotel?.imageUrl ?? null;
   // At most one badge per list: "Our pick" and "Lowest price" (older answers without badges keep their label).
   const badge = noBadge ? null : h.badge !== undefined ? (h.badge ? t(h.badge === 'best' ? 'stays.badge.best' : 'search.label.lowest') : null) : t(`search.label.${h.label}`);
   return (
     <Card padding={0} selected={on} onPress={onPress} accessibilityLabel={`${h.name}, ${formatSar(h.total.amount)}`} style={{ overflow: 'hidden', gap: 0 }}>
       <View style={[s.photo, compact ? { height: 96 } : null]} testID={`stay-photo-${i}`}>
-        {img ? <ExpoImage source={{ uri: img }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} recyclingKey={h.id} accessible={false} /> : <Photo name={h.photo} focal={h.focal} />}
+        {/* A Hotelbeds hotel shows its own photo or says it has none; only Mada's own catalogue uses its stock photos. */}
+        {h.hotel ? <HotelPhoto uri={h.hotel.imageUrl} name={h.name} seed={h.hotel.code} compact={compact} recyclingKey={h.id} testID={`stay-photo-${i}`} /> : <Photo name={h.photo} focal={h.focal} />}
         {badge ? <Pill label={badge} variant={on ? 'gold' : 'default'} style={[s.tl, on ? null : s.glass]} /> : null}
       </View>
       <View style={s.body}>

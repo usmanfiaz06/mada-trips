@@ -103,6 +103,35 @@ export async function refreshHotelContent(opts: { api?: HotelbedsHotels; maxCall
   return { missing, changed, calls, since };
 }
 
+/*
+ * Hotels seen in a search that the store doesn't hold yet. The hourly job (missingCodes) catches them within the hour,
+ * but the first traveller to search would see them without a photo, a street address or amenities (on staging, 39 of
+ * 200 London hotels). So they are fetched by code right then, in batches of 100 like the job does, stored, and used
+ * for that same answer: one Content API call per 100 new hotels, never the same hotel twice in 6 hours per server
+ * instance (a hotel Hotelbeds holds no content for isn't asked again and again), and within a short budget so the
+ * traveller isn't kept waiting (what doesn't arrive in time is stored when it does, or by the job).
+ */
+const askedAt = new Map<number, number>();
+const ASK_AGAIN_MS = 6 * 3600_000;
+
+export async function fillContentNow(codes: number[], opts: { api?: HotelbedsHotels; budgetMs?: number; maxCodes?: number } = {}): Promise<number> {
+  const now = Date.now();
+  const todo = [...new Set(codes)].filter((c) => now - (askedAt.get(c) ?? 0) > ASK_AGAIN_MS).slice(0, opts.maxCodes ?? 300);
+  if (!todo.length) return 0;
+  for (const c of todo) askedAt.set(c, now);
+  if (askedAt.size > 20_000) for (const [c, at] of askedAt) if (now - at > ASK_AGAIN_MS) askedAt.delete(c);
+  const api = opts.api ?? hotelbedsHotels();
+  const budget = { timeoutMs: opts.budgetMs ?? 3_500, retries: 0 };
+  const batches: number[][] = [];
+  for (let i = 0; i < todo.length; i += 100) batches.push(todo.slice(i, i + 100));
+  const [, ...answers] = await Promise.all([
+    loadFacilityNames(api),
+    ...batches.map((batch) => api.content({ codes: batch, from: 1, to: batch.length }, budget).then((r) => r.hotels ?? [], () => [] as HbContentHotel[])),
+  ]);
+  try { return await store(answers.flat()); } catch { return 0; }
+}
+export const forgetContentAsks = () => askedAt.clear();
+
 /** One hotel's stored content for the app's hotel details (never a live call). */
 export async function hotelContent(code: number) {
   const [h] = await db.select().from(appHotelbedsHotels).where(eq(appHotelbedsHotels.code, code));

@@ -23,7 +23,9 @@ export type StayWish =
   | { k: 'freeCancel' }
   | { k: 'stars'; min: number }
   | { k: 'price'; max: number; per: 'night' | 'stay' }
-  | { k: 'vibe'; vibe: 'quiet' | 'family' | 'luxury' | 'budget' };
+  | { k: 'vibe'; vibe: 'quiet' | 'family' | 'luxury' | 'budget' }
+  /** "A hostel", "the cheapest bed", the "Shared rooms" filter: shared rooms and hostels join the list (off by default). */
+  | { k: 'shared' };
 
 /** One key per wish, so the same wish said twice is one chip, and a newer price or star level replaces the older. */
 export const wishKey = (w: StayWish): string =>
@@ -58,6 +60,7 @@ const VIBES: ['quiet' | 'family' | 'luxury' | 'budget', Words][] = [
   ['luxury', [/luxury|luxurious|upscale|fancy|high[- ]end|lavish/, /فخم|فاخر|راقي|فخامه/]],
   ['budget', [/cheap|budget|affordable|good value|not expensive|inexpensive|value for money/, /رخيص|اقتصادي|بسعر معقول|ارخص|سعر مناسب|ميزانيه محدوده/]],
 ];
+const SHARED: Words = [/hostels?|\bdorm|shared rooms?|cheapest bed|a bed in|bunk ?beds?|backpacker/, /هوستل|سكن مشترك|غرفه مشتركه|غرف مشتركه|سرير في غرفه|ارخص سرير|سكن شبابي|نزل شبابي/];
 const WALK: Words = [/walk|walking|on foot|steps from/, /مشي|مشيا|علي الاقدام|خطوات/];
 const NEAR: Words = [/near|close|closer|next to|by\b|around|walk|walking|steps from|minutes? (?:from|to)/, /قريب|قرب|جنب|جمب|بجانب|حول|عند|مشي|مشيا|خطوات/];
 
@@ -101,6 +104,7 @@ export function parseStayWishes(text: string, city?: string | null): ParsedWishe
     if (max > 0) add({ k: 'price', max: max * 100, per: stay ? 'stay' : 'night' });
   }
   for (const [vibe, words] of VIBES) if (hit(words, en, ar)) add({ k: 'vibe', vibe });
+  if (hit(SHARED, en, ar)) add({ k: 'shared' });
   // A newer price or star level replaces the one before (handled by wishKey in mergeWishes).
   return { wishes: out, rest: out.length ? null : text.trim() || null };
 }
@@ -125,7 +129,19 @@ export function wishLabel(w: StayWish, lang: 'en' | 'ar' = 'en'): string {
     case 'stars': return w.min >= 5 ? t('wish.stars5') : t('wish.stars', { n: w.min });
     case 'price': return t(w.per === 'night' ? 'wish.priceNight' : 'wish.priceStay', { amount: formatSar(w.max, { bare: true }) });
     case 'vibe': return t(`wish.vibe.${w.vibe}` as CopyKey);
+    case 'shared': return t('wish.shared');
   }
+}
+
+/**
+ * The stays the traveller sees: shared rooms and hostels (facts.shared) only once they asked for them (the "Shared
+ * rooms" filter, "a hostel", "the cheapest bed"), or when there is nothing else. RANKING.md §2.
+ */
+export function visibleStays<T extends Pick<StayOption, 'facts'>>(options: T[], wishes: StayWish[]): T[] {
+  if (wishes.some((w) => w.k === 'shared')) return options;
+  const own = options.filter((o) => !o.facts?.shared);
+  // A city with nothing but shared rooms on these dates: show them rather than an empty list.
+  return own.length ? own : options;
 }
 
 /** "400 m", "1.2 km". */
@@ -181,6 +197,7 @@ export function judge(o: StayOption, w: StayWish, lang: 'en' | 'ar' = 'en', medi
       const v = w.per === 'night' ? nightly(o) : o.total.amount;
       return { ok: v <= w.max, ev: v <= w.max ? t('stay.perNight', { price: formatSar(nightly(o)) }) : null };
     }
+    case 'shared': return { ok: true, ev: null };
     case 'vibe': {
       if (w.vibe === 'luxury') { const s = f?.stars ?? null; return s == null ? { ok: null, ev: null } : { ok: s >= 5, ev: s >= 5 ? t('stay.stars', { n: s }) : null }; }
       if (w.vibe === 'budget') { const ok = median == null ? null : nightly(o) <= median; return { ok, ev: ok ? t('stay.perNight', { price: formatSar(nightly(o)) }) : null }; }
@@ -203,8 +220,17 @@ export type Refined = {
 };
 
 /** Re-rank and filter a list by the wishes, and say what changed. */
-export function refineStays(options: StayOption[], wishes: StayWish[], lang: 'en' | 'ar' = 'en'): Refined {
-  if (!wishes.length) return { matches: options.map((option) => ({ option, ev: [] })), closest: [], answer: '', unknown: [] };
+export function refineStays(all0: StayOption[], wishes0: StayWish[], lang: 'en' | 'ar' = 'en'): Refined {
+  // Shared rooms join the list when asked for; they are a filter, not a wish a place can fit or miss.
+  const options = visibleStays(all0, wishes0);
+  const sharedOn = wishes0.some((w) => w.k === 'shared');
+  const wishes = wishes0.filter((w) => w.k !== 'shared');
+  if (!wishes.length) {
+    const n = sharedOn ? options.filter((o) => o.facts?.shared).length : 0;
+    // Asked for shared rooms alone: cheapest first, as someone after a bed would want.
+    const list = sharedOn ? [...options].sort((a, b) => a.total.amount - b.total.amount) : options;
+    return { matches: list.map((option) => ({ option, ev: [] })), closest: [], answer: sharedOn ? t('refine.shared', { n }) : '', unknown: [] };
+  }
   const prices = options.map(nightly).sort((a, b) => a - b);
   const median = prices.length ? prices[Math.floor(prices.length / 2)] : undefined;
   const rows = options.map((option, i) => {

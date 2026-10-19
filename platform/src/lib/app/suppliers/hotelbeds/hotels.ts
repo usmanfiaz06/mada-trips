@@ -1,4 +1,4 @@
-import { DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, rankStays, roomsFor, shortDay, t, type HotelSearch, type StayAmenity, type StayFacts, type StayView, type TripShape } from "@mada/shared";
+import { DESTINATIONS, HotelSearch as HotelSearchSchema, addDays, rankStays, sharedStay, roomsFor, shortDay, t, type HotelSearch, type StayAmenity, type StayFacts, type StayView, type TripShape } from "@mada/shared";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 import { HotelbedsClient, HotelbedsError, type HotelbedsClientOptions } from "./client";
 import { costHalalas, feeHalalas, pricingRules, sellHalalas, type PricingRules } from "./money";
@@ -49,7 +49,7 @@ export type HbBookingResponse = { auditData?: { token?: string }; booking: HbBoo
 export type HbContentHotel = {
   code: number; name?: { content?: string }; description?: { content?: string }; categoryCode?: string; destinationCode?: string; zoneCode?: number;
   coordinates?: { latitude?: number; longitude?: number }; address?: { content?: string }; postalCode?: string; city?: { content?: string };
-  phones?: { phoneNumber?: string; phoneType?: string }[]; images?: { path: string; imageTypeCode?: string; order?: number; visualOrder?: number }[];
+  accommodationTypeCode?: string; phones?: { phoneNumber?: string; phoneType?: string }[]; images?: { path: string; imageTypeCode?: string; order?: number; visualOrder?: number }[];
   facilities?: { facilityCode: number; facilityGroupCode: number; indLogic?: boolean; indYesOrNo?: boolean; number?: number }[]; lastUpdate?: string; web?: string;
 };
 export type HbContentResponse = { auditData?: unknown; from?: number; to?: number; total?: number; hotels?: HbContentHotel[] };
@@ -59,6 +59,8 @@ export type HotelFacts = {
   code: number; name: string; address: string | null; imageUrl: string | null; phone: string | null; latitude: number | null; longitude: number | null;
   /** From the stored content: what the facilities and description show (amenitiesOf). Absent when we hold no content. */
   amenities?: StayAmenity[]; views?: StayView[]; quiet?: boolean;
+  /** The Content API says it's a hostel (accommodationTypeCode HOSTEL, or a hostel category). */
+  hostel?: boolean;
 };
 
 /* ───────────── what the content shows ───────────── */
@@ -255,20 +257,42 @@ function payAtHotel(r: HbRate, rules: PricingRules): number {
   return sum;
 }
 
-const photoUrl = (path: string, size: "bigger" | "xl" = "bigger") => `https://photos.hotelbeds.com/giata/${size}/${path.replace(/^\//, "")}`;
+/**
+ * A Hotelbeds photo: `bigger` (about 800 px wide) for cards and the map card, `xl` (about 1024 px) for the hotel's page.
+ * The plain path (no size) is a 74 px thumbnail and too small for either.
+ */
+export const photoUrl = (path: string, size: "bigger" | "xl" = "bigger") => `https://photos.hotelbeds.com/giata/${size}/${path.replace(/^\//, "")}`;
+
+/** Which photo leads: the hotel itself (GEN), then a room (HAB), then the lobby and common areas (COM), then anything; each by visualOrder. */
+const IMAGE_TYPE_RANK: Record<string, number> = { GEN: 0, HAB: 1, COM: 2, PIS: 3, RES: 4, TER: 5, BAR: 6, DEP: 7, PLA: 8 };
+export function bestImage<T extends { path: string; type?: string | null; imageTypeCode?: string | null; visualOrder?: number; order?: number }>(images: readonly T[] | null | undefined): T | null {
+  const usable = (images ?? []).filter((i) => typeof i.path === "string" && /\.(?:jpe?g|png|webp)$/i.test(i.path.trim()));
+  if (!usable.length) return null;
+  const rank = (i: T) => IMAGE_TYPE_RANK[(i.type ?? i.imageTypeCode ?? "").toUpperCase()] ?? 9;
+  return usable.map((img, n) => ({ img, n })).sort((a, b) => rank(a.img) - rank(b.img) || (a.img.visualOrder ?? a.img.order ?? 99) - (b.img.visualOrder ?? b.img.order ?? 99) || a.n - b.n)[0]!.img;
+}
+
+/** A room among strangers or in a hostel (stay-fit.ts sharedStay): never a pick, out of the list unless asked for. */
+export const isSharedRoom = (h: Pick<HbHotel, "name" | "categoryCode" | "categoryName">, room: Pick<HbRoom, "code" | "name">) =>
+  sharedStay({ room: room.name, roomCode: room.code, hotelName: h.name, categoryCode: h.categoryCode, categoryName: h.categoryName });
 
 export type MapOptions = { nights: number; party: number; rooms: number; checkIn: string; facts?: Map<number, HotelFacts>; rules?: PricingRules; now?: Date; expiresInMs?: number };
 
-/** The rate we'd sell for one hotel: AT_WEB, the requested number of rooms, the cheapest. */
+/**
+ * The rate we'd sell for one hotel: AT_WEB, the requested number of rooms, the cheapest private room (a dorm bed or a
+ * room with a shared bathroom only when the hotel has nothing else).
+ */
 export function bestRate(h: HbHotel, rooms: number): { room: HbRoom; rate: HbRate } | null {
   let best: { room: HbRoom; rate: HbRate } | null = null;
+  let bestShared = true;
   for (const room of h.rooms ?? []) {
+    const shared = isSharedRoom(h, room);
     for (const rate of room.rates ?? []) {
       if (rate.paymentType && rate.paymentType !== "AT_WEB") continue;
       // Opaque (packaging) rates only inside a package with flights or transfers (cert. 3.5): never on their own.
       if (rate.packaging) continue;
       if (rate.rooms && rate.rooms !== rooms) continue;
-      if (!best || Number(rate.net) < Number(best.rate.net)) best = { room, rate };
+      if (!best || (bestShared && !shared) || (shared === bestShared && Number(rate.net) < Number(best.rate.net))) { best = { room, rate }; bestShared = shared; }
     }
   }
   return best;
@@ -312,6 +336,7 @@ export function offerOf(h: HbHotel, room: HbRoom, rate: HbRate, o: MapOptions): 
     stars: stars || null, apartment: /apart|key/i.test(h.categoryName ?? ""), board: boardOf(rate), room: roomName || null, refundable: rule.refundable,
     payAtHotel: cityTax || null, zone: h.zoneName ? tidy(h.zoneName) : null, lat: Number.isFinite(lat) ? lat : null, lng: Number.isFinite(lng) ? lng : null,
     content: !!f?.amenities, amenities: f?.amenities ?? [], views, quiet: !!f?.quiet, deal,
+    shared: isSharedRoom(h, room) || !!f?.hostel,
   };
   return {
     id: encodeOfferId(rate.rateKey, rate.rateType, o.party), supplier: "hotelbeds", label: "best",
@@ -339,8 +364,9 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
     try { picked.push(offerOf(h, b.room, b.rate, o)); } catch { /* a currency we can't price: skip that hotel rather than guess */ }
   }
   // The cheapest are kept when there are more than we show, then ranked by fit (shared stay-fit.ts, the same rules
-  // the search service runs for the traveller's own trip shape).
-  picked.sort((a, b) => a.total.amount - b.total.amount);
+  // the search service runs for the traveller's own trip shape). Private rooms first: dorm beds are the cheapest
+  // thing in a city and would otherwise take the places of real rooms.
+  picked.sort((a, b) => Number(!!a.meta!.facts?.shared) - Number(!!b.meta!.facts?.shared) || a.total.amount - b.total.amount);
   const list = picked.slice(0, o.limit ?? maxResults());
   const ranked = rankStays(list.map((x) => ({ x, name: x.name, total: x.total, facts: x.meta!.facts ?? null })), { shape: o.shape ?? "couple", city: o.city ?? null, radiusKm: (o.city ? HB_PLACES[o.city]?.radiusKm : undefined) ?? 8 });
   return ranked.map((r) => {
@@ -417,10 +443,11 @@ export class HotelbedsHotels implements BookingHotelSupplier {
   }
 
   /** Content API, in pages of up to 1000. Batch only (content.ts); never on a traveller's request. */
-  content(q: { codes?: number[]; from?: number; to?: number; lastUpdateTime?: string; language?: string }) {
+  content(q: { codes?: number[]; from?: number; to?: number; lastUpdateTime?: string; language?: string }, budget: { timeoutMs?: number; retries?: number } = {}) {
     return this.client.request<HbContentResponse>({
       method: "GET", path: "/hotel-content-api/1.0/hotels",
       query: { fields: "all", language: q.language ?? "ENG", from: q.from ?? 1, to: q.to ?? 100, codes: q.codes?.join(","), lastUpdateTime: q.lastUpdateTime, useSecondaryLanguage: false },
+      ...budget,
     });
   }
 

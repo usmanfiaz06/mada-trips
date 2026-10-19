@@ -1,7 +1,7 @@
 import "server-only";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { StayOption } from "@mada/shared";
-import { t } from "@mada/shared";
+import { sharedStay, t } from "@mada/shared";
 import { db } from "@/db";
 import { appHotelbedsHotels } from "@/db/app-schema-hotelbeds";
 import { appOffers } from "@/db/app-schema-booking";
@@ -10,7 +10,7 @@ import { AppError } from "../../http";
 import { callSupplier, supplierDown } from "../../resilience/breaker";
 import type { BookingHotelOffer, BookingHotelSupplier } from "../booking-types";
 import { HotelbedsClient, HotelbedsError, hotelbedsCredentials, hotelbedsEnv, type HotelbedsProduct } from "./client";
-import { HotelbedsHotels, amenitiesOf, type FactsLookup, type HotelFacts } from "./hotels";
+import { HotelbedsHotels, amenitiesOf, bestImage, photoUrl, type FactsLookup, type HotelFacts } from "./hotels";
 import { HotelbedsTransfers } from "./transfers";
 import { mockHotelbedsHotels, mockHotelbedsTransfers } from "./mock";
 
@@ -99,23 +99,47 @@ export function toAppError(e: unknown, product: HotelbedsProduct = "hotels"): un
 
 /* ───────────── our content cache ───────────── */
 
-const imageUrl = (path: string) => `https://photos.hotelbeds.com/giata/bigger/${path.replace(/^\//, "")}`;
+type HotelRow = typeof appHotelbedsHotels.$inferSelect;
 
-/** Facts for the offers, from app_hotelbeds_hotels (filled by the content job). Missing hotels just use the availability names. */
+/** One stored hotel as the offers use it: the best photo (bestImage: the hotel, then a room, then the lobby), its address and what its content shows. */
+export function factsOfRow(r: Pick<HotelRow, "code" | "name" | "address" | "city" | "images" | "phone" | "latitude" | "longitude" | "facilities" | "description" | "category">): HotelFacts {
+  const img = bestImage(r.images);
+  return {
+    code: r.code, name: r.name, address: [r.address, r.city ? r.city.charAt(0) + r.city.slice(1).toLowerCase() : null].filter(Boolean).join(", ") || null,
+    imageUrl: img ? photoUrl(img.path, "bigger") : null, phone: r.phone, latitude: r.latitude, longitude: r.longitude,
+    ...(sharedStay({ categoryCode: r.category }) ? { hostel: true } : {}),
+    // What the facilities and the description show; a hotel with neither stored says nothing ("can't tell").
+    ...(r.facilities.length || r.description ? amenitiesOf(r.facilities.map((x) => x.name ?? "").filter(Boolean), r.description) : {}),
+  };
+}
+
+async function storedFacts(codes: number[], out: Map<number, HotelFacts>) {
+  // Every hotel in the answer (up to 2000), in chunks: it was the first 200 codes only, in Hotelbeds' order, while the
+  // list shows the cheapest 200, so many of the hotels shown had no stored facts looked up at all (no photo).
+  for (let i = 0; i < codes.length; i += 500) {
+    const rows = await db.select().from(appHotelbedsHotels).where(inArray(appHotelbedsHotels.code, codes.slice(i, i + 500)));
+    for (const r of rows) out.set(r.code, factsOfRow(r));
+  }
+}
+
+/**
+ * Facts for the offers, from app_hotelbeds_hotels (filled by the content job). Hotels the store doesn't hold yet are
+ * fetched by code from the Content API right away (content.ts fillContentNow, live keys only) and used for this same
+ * answer; anything still missing just uses the availability names, and the app shows its "no photo yet" tile.
+ */
 export const dbFacts: FactsLookup = async (codes) => {
   const out = new Map<number, HotelFacts>();
   if (!codes.length) return out;
-  try {
-    const rows = await db.select().from(appHotelbedsHotels).where(inArray(appHotelbedsHotels.code, codes.slice(0, 200)));
-    for (const r of rows) {
-      out.set(r.code, {
-        code: r.code, name: r.name, address: [r.address, r.city ? r.city.charAt(0) + r.city.slice(1).toLowerCase() : null].filter(Boolean).join(", ") || null,
-        imageUrl: r.images[0] ? imageUrl(r.images[0].path) : null, phone: r.phone, latitude: r.latitude, longitude: r.longitude,
-        // What the facilities and the description show; a hotel with neither stored says nothing ("can't tell").
-        ...(r.facilities.length || r.description ? amenitiesOf(r.facilities.map((x) => x.name ?? "").filter(Boolean), r.description) : {}),
-      });
-    }
-  } catch { /* the content table isn't there yet: names from availability */ }
+  const unique = [...new Set(codes)].slice(0, 2000);
+  try { await storedFacts(unique, out); } catch { return out; /* the content table isn't there yet: names from availability */ }
+  const missing = unique.filter((c) => !out.has(c));
+  // HOTELBEDS_CONTENT_ON_SEARCH=no keeps the Content API to the batch job only (docs/app/HOTELBEDS.md, certification §8).
+  if (missing.length && hotelVendor() === "hotelbeds" && process.env.HOTELBEDS_CONTENT_ON_SEARCH !== "no") {
+    try {
+      const { fillContentNow } = await import("./content");
+      if (await fillContentNow(missing)) await storedFacts(missing, out);
+    } catch { /* the job fills them within the hour */ }
+  }
   return out;
 };
 

@@ -218,6 +218,11 @@ export const StayFacts = z.object({
   views: z.array(StayView),
   quiet: z.boolean(),
   deal: z.boolean(),
+  /**
+   * A shared room or a hostel (a bed in a dorm, a shared bathroom, a hostel's rooms): never a pick, and out of the list
+   * until the traveller asks for shared rooms (sharedStay in stay-fit.ts says how it's read). Absent on older offers.
+   */
+  shared: z.boolean().optional(),
 });
 export type StayFacts = z.infer<typeof StayFacts>;
 

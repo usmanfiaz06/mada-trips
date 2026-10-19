@@ -142,6 +142,29 @@ export function stayFit(o: { facts: StayFacts | null | undefined; total: number 
   return { shape: ctx.shape, score: Math.round(score * 1000) / 10, reasons };
 }
 
+/* ───────────── shared rooms and hostels ───────────── */
+
+/** Room names that mean a bed among strangers or a bathroom down the hall ("8-bed mixed with external shared bathroom"). */
+const SHARED_ROOM = /\bdorm(?:itory|itories|s)?\b|\bbed in (?:a |an )?(?:\d+[- ]?bed )?(?:mixed|male|female|shared|dorm)|\b\d+[- ]bed\b(?!\s*(?:apartment|flat|villa|house|suite|room|bedroom))|\bmixed (?:room|ward)\b|\b(?:mixed|female|male)[- ]only\b|\bshared (?:bath(?:room)?s?|toilets?|showers?|facilities|room|w\.?c)\b|\b(?:external|communal|common) (?:bath(?:room)?s?|toilets?|showers?)\b|\bcapsule\b|\bpod\b/i;
+/** Hotelbeds room type codes (the part before the dot) for a dorm or a bed: "DOR.ST", "BED.MX". */
+const SHARED_ROOM_CODE = /^(?:DOR|BED|SHR|DRM)\b/i;
+/** Hostels by category code ("HS", "HSR1", Hotelbeds' hostel classes), category name or accommodation type. */
+const HOSTEL_CATEGORY = /^HS(?:R\d?|\d)?$|^ALBER/i;
+const HOSTEL_WORDS = /\bhostels?\b|\bbackpackers?\b|\byouth hostel\b|\bauberge de jeunesse\b/i;
+
+/**
+ * Whether a stay is a shared room or a hostel: a dorm bed, a room with a shared bathroom, or any room in a hostel (by
+ * Hotelbeds category or accommodation type, or a name that says hostel). Mada's travellers are families, couples and
+ * business people: these are never a pick and stay out of the list until someone asks for shared rooms.
+ */
+export function sharedStay(x: { room?: string | null; roomCode?: string | null; hotelName?: string | null; categoryCode?: string | null; categoryName?: string | null; accommodationType?: string | null }): boolean {
+  if (x.room && SHARED_ROOM.test(x.room)) return true;
+  if (x.roomCode && SHARED_ROOM_CODE.test(x.roomCode)) return true;
+  if (x.categoryCode && HOSTEL_CATEGORY.test(x.categoryCode.trim())) return true;
+  if (x.accommodationType && /hostel/i.test(x.accommodationType)) return true;
+  return HOSTEL_WORDS.test(`${x.categoryName ?? ''} | ${x.hotelName ?? ''}`);
+}
+
 /** Rank: higher score first, a tie to the cheaper stay, then by name so the order never wobbles. */
 export function rankByFit<T extends { total: { amount: number }; name: string; fit?: StayFit | null }>(list: T[]): T[] {
   return [...list].sort((a, b) => (b.fit?.score ?? 0) - (a.fit?.score ?? 0) || a.total.amount - b.total.amount || a.name.localeCompare(b.name));
@@ -176,13 +199,24 @@ export function reasonsLine(reasons: StayReason[], lang: 'en' | 'ar' = 'en', max
 /**
  * A whole list ranked for this trip: each stay's fit, the order, and exactly one "Best for you" (the best fit at 3
  * stars and up) and one "Lowest price" (the cheapest). The server runs it on every search, for every supplier.
+ * Shared rooms and hostels (facts.shared) are scored on their own and come after every private room: they never carry
+ * a badge, and they don't set the prices value is judged against (a dorm bed would make every hotel look dear).
  */
 export function rankStays<T extends { total: { amount: number }; name: string; facts?: StayFacts | null }>(list: T[], ctx: Omit<FitContext, 'prices'>): (T & { fit: StayFit; score: number; badge: 'best' | 'lowest' | null })[] {
   if (!list.length) return [];
-  const totals = list.map((x) => x.total.amount).sort((a, b) => a - b);
-  const prices = { min: totals[0]!, median: totals[Math.floor(totals.length / 2)]! };
-  const ranked = rankByFit(list.map((x) => ({ ...x, fit: stayFit({ facts: x.facts, total: x.total.amount }, { ...ctx, prices }) })));
-  const lowest = ranked.reduce((m, y) => (y.total.amount < m.total.amount ? y : m));
+  const privateOnes = list.filter((x) => !x.facts?.shared);
+  const sharedOnes = list.filter((x) => !!x.facts?.shared);
+  const rank = (xs: T[]) => {
+    if (!xs.length) return [];
+    const totals = xs.map((x) => x.total.amount).sort((a, b) => a - b);
+    const prices = { min: totals[0]!, median: totals[Math.floor(totals.length / 2)]! };
+    return rankByFit(xs.map((x) => ({ ...x, fit: stayFit({ facts: x.facts, total: x.total.amount }, { ...ctx, prices }) })));
+  };
+  const ranked = rank(privateOnes);
+  const lowest = ranked.length ? ranked.reduce((m, y) => (y.total.amount < m.total.amount ? y : m)) : null;
   const best = ranked.find((y) => (y.facts?.stars ?? 0) >= 3 && y !== lowest) ?? ranked.find((y) => y !== lowest) ?? null;
-  return ranked.map((y) => ({ ...y, score: y.fit.score, badge: y === best ? 'best' : y === lowest ? 'lowest' : null }));
+  return [
+    ...ranked.map((y) => ({ ...y, score: y.fit.score, badge: y === best ? 'best' as const : y === lowest ? 'lowest' as const : null })),
+    ...rank(sharedOnes).map((y) => ({ ...y, score: y.fit.score, badge: null })),
+  ];
 }

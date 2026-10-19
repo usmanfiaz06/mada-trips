@@ -90,7 +90,10 @@ Never put keys in the app or in the repo. `npm run hotelbeds:smoke` refuses `HOT
   `cancellationFlag=SIMULATION` first (fee), then `CANCELLATION`.
 - Content (`content.ts`): daily job, stores hotels in `app_hotelbeds_hotels` (name, category, address, phone,
   description, every image path, facilities with names and paid flag). Hotels in our offers but not stored are fetched
-  by code; changes since the last run with `lastUpdateTime`. Never called on a traveller's request (their rule).
+  by code; changes since the last run with `lastUpdateTime`. Hotels that show up in a search and aren't stored yet are
+  also fetched by code right then (`fillContentNow`: batches of 100, a 3.5 s budget, each hotel at most once in 6 h per
+  instance), so the first traveller sees their photos; `HOTELBEDS_CONTENT_ON_SEARCH=no` turns that off and leaves it to
+  the job, which is what certification answer §8 below describes. Photo picked: GEN, then HAB, then COM, by visualOrder.
   Images: `https://photos.hotelbeds.com/giata/{bigger|xl}/{path}`. App: `GET /api/app/v1/hotels/{code}`.
 
 ### Money (`money.ts`)

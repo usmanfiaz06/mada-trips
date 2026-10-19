@@ -13,6 +13,7 @@ import { buzz } from '@/lib/haptics';
 import { t, tn } from '@/lib/i18n';
 import { useHotelDetails } from '@/lib/transfers';
 import { colors, ff, font } from '@/theme';
+import { HotelPhoto } from './HotelPhoto';
 import { Photo } from './parts';
 
 /*
@@ -78,7 +79,7 @@ export function StayMapCard({ o, guests, distance, block, onClose, onSee, onChoo
                 onScroll={Platform.OS === 'web' ? (e) => setPage(Math.round(Math.abs(e.nativeEvent.contentOffset.x) / w)) : undefined} scrollEventThrottle={64}>
                 {photos.map((uri, i) => <ExpoImage key={uri} source={{ uri }} style={{ width: w, height: 112 }} contentFit="cover" accessibilityLabel={t('stays.card.photo', { n: i + 1, count: photos.length })} />)}
               </ScrollView>
-            ) : photos[0] ? <ExpoImage source={{ uri: photos[0] }} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} />
+            ) : o.hotel ? <HotelPhoto uri={photos[0]} name={o.name} seed={o.hotel.code} compact recyclingKey={o.id} testID="stays-map-card-photo" />
               : <Photo name={o.photo} focal={o.focal} />}
             {photos.length > 1 ? <View style={s.dots} pointerEvents="none">{photos.map((uri, i) => <View key={uri} style={[s.dot, i === page ? s.dotOn : null]} />)}</View> : null}
           </View>
