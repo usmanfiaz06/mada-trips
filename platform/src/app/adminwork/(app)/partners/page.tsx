@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
@@ -22,9 +22,20 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
   const balances = (await partnerBalances()).filter((b) => all || b.id === u.partnerId);
   const sp = await searchParams;
   const selected = sp.p && balances.some((b) => b.id === sp.p) ? sp.p : all ? "all" : u.partnerId!;
-  const entries = await db.select({ e: schema.ledgerEntries, partner: schema.partners.name, by: schema.users.name }).from(schema.ledgerEntries)
+  const ledgerRows = await db.select({ e: schema.ledgerEntries, partner: schema.partners.name, by: schema.users.name }).from(schema.ledgerEntries)
     .innerJoin(schema.partners, eq(schema.partners.id, schema.ledgerEntries.partnerId)).innerJoin(schema.users, eq(schema.users.id, schema.ledgerEntries.createdBy))
     .where(selected === "all" ? undefined : eq(schema.ledgerEntries.partnerId, selected)).orderBy(desc(schema.ledgerEntries.entryDate), desc(schema.ledgerEntries.createdAt)).limit(200);
+  // Cash a partner moved through a company bank account shows alongside their ledger: a deposit is money
+  // they put in (owed back), a withdrawal is money they took out. Transfers between company accounts aren't theirs.
+  const cashRows = await db.select({ x: schema.bankTransactions, partner: schema.partners.name, by: schema.users.name }).from(schema.bankTransactions)
+    .innerJoin(schema.partners, eq(schema.partners.id, schema.bankTransactions.partnerId)).innerJoin(schema.users, eq(schema.users.id, schema.bankTransactions.recordedBy))
+    .where(and(isNotNull(schema.bankTransactions.partnerId), ne(schema.bankTransactions.kind, "transfer"), selected === "all" ? undefined : eq(schema.bankTransactions.partnerId, selected)))
+    .orderBy(desc(schema.bankTransactions.txnDate), desc(schema.bankTransactions.createdAt)).limit(200);
+  type Row = { id: string; date: string; createdAt: Date; partner: string; description: string; by: string; type: string; amount: number };
+  const entries: Row[] = [
+    ...ledgerRows.map(({ e, partner, by }) => ({ id: e.id, date: e.entryDate, createdAt: e.createdAt, partner, description: e.description, by, type: e.type, amount: e.amount })),
+    ...cashRows.map(({ x, partner, by }) => ({ id: x.id, date: x.txnDate, createdAt: x.createdAt, partner, description: x.note || t(x.direction === "in" ? "Cash deposited" : "Cash withdrawn"), by, type: x.direction === "in" ? "deposit" : "withdrawal", amount: x.amount })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.createdAt < b.createdAt ? 1 : -1)).slice(0, 200);
   const totalOwed = balances.reduce((s, b) => s + b.outstanding, 0);
 
   return (
@@ -64,14 +75,15 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
             <Table>
               <thead><tr><Th>{t("Date")}</Th><Th>{t("Partner")}</Th><Th>{t("Entry")}</Th><Th>{t("Type")}</Th><Th align="end">{t("Owed back")}</Th><Th align="end">{t("Paid out")}</Th></tr></thead>
               <tbody>
-                {entries.map(({ e, partner, by }) => {
-                  const plus = e.type === "advance" || e.type === "expense";
+                {entries.map((e) => {
+                  const plus = e.type === "advance" || e.type === "expense" || e.type === "deposit";
+                  const reduces = e.type === "repayment" || e.type === "withdrawal";
                   return (
                     <tr key={e.id}>
-                      <Td>{fmtDate(e.entryDate, L)}</Td><Td>{partner}</Td>
-                      <Td><span className="block text-ink">{e.description}</span><span className="block text-[12px] text-ink-3">{t("by {name}", { name: by })}</span></Td>
-                      <Td><Badge tone={plus ? "info" : e.type === "repayment" ? "ok" : "gold"}>{t(LEDGER_TYPE[e.type])}</Badge></Td>
-                      <Td align="end"><span className={cx("num", plus ? "text-ink" : e.type === "repayment" ? "text-ok" : "text-ink-4")} dir="ltr">{plus ? sar(e.amount, { sign: true }) : e.type === "repayment" ? sar(-e.amount) : "—"}</span></Td>
+                      <Td>{fmtDate(e.date, L)}</Td><Td>{e.partner}</Td>
+                      <Td><span className="block text-ink">{e.description}</span><span className="block text-[12px] text-ink-3">{t("by {name}", { name: e.by })}</span></Td>
+                      <Td><Badge tone={plus ? "info" : reduces ? "ok" : "gold"}>{t(LEDGER_TYPE[e.type] ?? e.type)}</Badge></Td>
+                      <Td align="end"><span className={cx("num", plus ? "text-ink" : reduces ? "text-ok" : "text-ink-4")} dir="ltr">{plus ? sar(e.amount, { sign: true }) : reduces ? sar(-e.amount) : "—"}</span></Td>
                       <Td align="end"><span className="num" dir="ltr">{plus ? "—" : sar(e.amount)}</span></Td>
                     </tr>
                   );
