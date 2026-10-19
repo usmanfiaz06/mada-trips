@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull, type SQL } from "drizzle-orm";
 import {
-  DEMO_PHASE_HEADER, HotelRequests, TripPhase, derivePhase, demoNow, demoView, settledDemoPhase, fareRulesFor, firstNameOf, outSegment, todayIn, TZ, AIRLINE_INFO,
+  DEMO_PHASE_HEADER, FareRules, HotelRequests, TripPhase, derivePhase, demoNow, demoView, settledDemoPhase, fareRulesFor, firstNameOf, outSegment, todayIn, TZ, AIRLINE_INFO,
   type TripDetail, type TripPhase as Phase, type SegmentDetail, type StayDetail, type PickupDetail, type TripTraveller, type FlightStatus,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
@@ -119,6 +119,14 @@ type BaseRows = {
   charges: { item: string; amount: number }[]; people: (typeof appPeople.$inferSelect)[]; owner: { name: string | null } | undefined; bookings: { details: unknown }[];
 };
 
+function bookedRules(bookings: BaseRows["bookings"]): FareRules | null {
+  for (const b of bookings) {
+    const p = FareRules.safeParse((b.details as { fareRules?: unknown }).fareRules);
+    if (p.success) return p.data;
+  }
+  return null;
+}
+
 function buildBase(trip: TripRow, { segs, stays, pickups, facts, charges, people, owner, bookings }: BaseRows): Omit<TripDetail, "clock"> {
   const segments: SegmentDetail[] = segs.map((s) => {
     const f = facts.segments[s.id] ?? {};
@@ -162,7 +170,8 @@ function buildBase(trip: TripRow, { segs, stays, pickups, facts, charges, people
     travellerIds: trip.travellerIds, segments, stays: stayList, pickups: pickupList, status: trip.status as TripDetail["status"],
     bookingRef: trip.bookingRef, confirmedBy: trip.confirmedByName ? { id: trip.confirmedByOpsUserId ?? "agent", name: trip.confirmedByName, photoUrl: null } : null,
     imported: trip.imported, createdAt: trip.createdAt.toISOString(),
-    travellers, fare: out ? fareRulesFor(out.carrier) : null,
+    // The airline's own rules when a supplier gave them with the booking (TBO), else the carrier's usual ones.
+    travellers, fare: out ? bookedRules(bookings) ?? fareRulesFor(out.carrier) : null,
     prices: {
       flights: { amount: flights, currency: "SAR" }, stays: { amount: staysSum, currency: "SAR" }, pickups: { amount: pickupsSum, currency: "SAR" },
       discount: { amount: facts.discount, currency: "SAR" }, total: { amount: total, currency: "SAR" },

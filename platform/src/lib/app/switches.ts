@@ -7,9 +7,12 @@ import { isProductionDeploy, supplierMode } from "./config";
  *
  *   APP_FLIGHTS_MODE            request | live. "request": Ask turns a flight search into a request to the desk
  *                               ("Tell us where and when"), the desk quotes fares it booked in Mada's own system,
- *                               the traveller pays in the app. "live": search the flights supplier. Default: live
- *                               when a GDS adapter is configured (GDS_API_URL), or outside production on the mock
- *                               catalogue; request everywhere else (production without a GDS).
+ *                               the traveller pays in the app. "live": search the flights supplier (TBO Air with
+ *                               SUPPLIER_MODE_FLIGHTS=tbo; the desk holds and tickets from the order page, and any
+ *                               route TBO can't answer goes to the desk as a request). Default: live when a GDS
+ *                               adapter is configured (GDS_API_URL), or outside production on the mock catalogue;
+ *                               request everywhere else. TBO keys alone never switch it: set "live" once TBO has
+ *                               certified us (docs/app/TBO.md).
  *   APP_BOOKING_REQUIRES_PHONE  yes | no (default yes). "no" lets accounts without a verified phone book (email only,
  *                               until WhatsApp codes are live); they type a contact number at payment, stored on the
  *                               order as not verified, and the desk calls to confirm.

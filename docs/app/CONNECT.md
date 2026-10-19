@@ -19,7 +19,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 8 | Hotelbeds Hotels | hotel search, prices, booking, vouchers | Ready (test keys work) | Owner (live keys) |
 | 9 | Hotelbeds Transfers | airport and pre-booked cars | Ready | Owner (live keys) |
 | 10 | Hotelbeds Activities / Viator / GetYourGuide | things to do | Ready | Owner |
-| 11 | TBO | flights (and a second hotel source) | To build | Owner + code |
+| 11 | TBO | flights (and a second hotel source) | Built (flights); needs working keys + IP whitelist | Owner |
 | 12 | Flights today | desk books by request (`APP_FLIGHTS_MODE=request`) | Ready | — |
 | 13 | eSIM (Airalo) | data on landing | Built, needs Airalo keys | Owner |
 | 14 | Car right now (on demand) | instant car | No open supplier | Decision |
@@ -90,14 +90,12 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
    traveller via MyFatoorah and books on your Hotelbeds account.
 4. Viator / GetYourGuide (optional extra activities): partner sign-up → `VIATOR_API_KEY`, `GYG_PARTNER_TOKEN`.
 
-### 11. TBO — to build
-TBO (TBO Holidays / TBO Air) can give real flight search, fares and ticketing, which today goes to the desk.
-1. Send: which TBO products your contract covers (Air API? Hotel API?), the API documentation they gave you, and
-   sandbox credentials (into Vercel as `TBO_*`, never in chat).
-2. Code: a `flights` live adapter on TBO (search, fare rules, price check, hold/book, ticket, cancel), child/infant
-   fares, seat/meal SSRs, then `APP_FLIGHTS_MODE=live`. If their hotel API is in the contract, it can be a second hotel
-   source ranked alongside Hotelbeds.
-3. TBO certification on their sandbox, then live keys. Payment to TBO is by your agency deposit/credit line.
+### 11. TBO — built, needs working keys
+TBO Air (search, fare rules, price check, hold, ticket, booking details, cancel; child and infant fares; the desk's
+TBO card with "Confirm and hold with TBO" and "Ticket now") is built and tested against a fake TBO. Everything the
+owner must get from TBO (API access for the API user, ClientId, **IP whitelisting: Vercel has no fixed outbound IP**),
+the settings, TBO's certification and how to switch staging to live search: **[TBO.md](TBO.md)**.
+If their hotel API is in the contract, it can be a second hotel source ranked alongside Hotelbeds.
 
 ### 12. Flights today
 Nothing to do: flights go to the desk as requests until TBO (or another GDS) is connected.

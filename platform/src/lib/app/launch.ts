@@ -1,5 +1,6 @@
 import "server-only";
-import { SUPPLIERS, isProductionDeploy, legacyAuthEnabled, supplierEnvName, supplierMode } from "./config";
+import { SUPPLIERS, flightsVendor, isProductionDeploy, legacyAuthEnabled, supplierEnvName, supplierMode } from "./config";
+import { tboAirConfigured } from "./suppliers/live/tbo-air";
 import { autopilotOn } from "./booking/common";
 import { bookingRequiresPhone, flightsMode } from "./switches";
 
@@ -47,6 +48,10 @@ export function launchChecks(production = isProductionDeploy()): Check[] {
   if (production && legacyAuthEnabled()) out.push({ level: "block", area: "auth", text: "APP_LEGACY_AUTH is on: the direct /auth/otp, /auth/apple and /auth/google routes are open. Supabase Auth replaces them; unset it." });
   else out.push({ level: "ok", area: "auth", text: legacyAuthEnabled() ? "Legacy sign-in routes are on (fine outside production)." : "Legacy sign-in routes are off." });
   out.push({ level: "ok", area: "flights", text: `Flights: ${flightsMode() === "request" ? "by request to the desk (APP_FLIGHTS_MODE=request)" : "live search"}.` });
+  // TBO Air (docs/app/TBO.md): keys present but live booking still off, or live booking on test keys.
+  const tbo = (() => { try { return flightsVendor() === "tbo"; } catch { return false; } })();
+  if (tbo && !tboAirConfigured()) out.push({ level: "warn", area: "flights", text: "SUPPLIER_MODE_FLIGHTS=tbo but TBO_AIR_BASE_URL, TBO_CLIENT_ID, TBO_USERNAME or TBO_PASSWORD is missing: searches go to the desk." });
+  if (tbo && production && (process.env.TBO_ENV ?? "test").toLowerCase() !== "live") out.push({ level: flightsMode() === "live" ? "block" : "warn", area: "flights", text: "TBO is on its test environment: tickets wouldn't be real. Set TBO_ENV=live with live keys." });
   if (!bookingRequiresPhone()) out.push({ level: production ? "warn" : "ok", area: "booking", text: "APP_BOOKING_REQUIRES_PHONE=no: accounts without a verified phone can book; the desk calls the contact number to confirm." });
   else out.push({ level: "ok", area: "booking", text: "Booking needs a verified phone." });
   if (autopilotOn()) out.push({ level: production ? "block" : "ok", area: "desk", text: "The mock desk autopilot is on: orders confirm themselves without a person." });

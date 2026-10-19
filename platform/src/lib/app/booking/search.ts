@@ -131,6 +131,11 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
     ({ value: offers, at, saved } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin }), supplierMode("flights") === "live"));
   } catch (e) {
     if (e instanceof SupplierDown) return { ...base, depart, outcome: "partial", checked: 0, options: [], unavailable: [{ carrier: "*", airline: "The airline" }], cachedUntil: until(Date.now()) };
+    // A live supplier (TBO) that can't answer this route: the desk books it by hand, as a request (never an error screen).
+    if (supplierMode("flights") === "live" && !(e instanceof AppError && e.code === "VALIDATION")) {
+      console.warn("[search] live flights didn't answer; this route goes to the desk", e instanceof AppError ? e.code : e instanceof Error ? e.message.slice(0, 120) : "");
+      return { ...base, depart, outcome: "by_hand", checked: 0, options: [], cachedUntil: until(Date.now()) };
+    }
     throw e;
   }
   const unavailable: { carrier: string; airline: string }[] = [];

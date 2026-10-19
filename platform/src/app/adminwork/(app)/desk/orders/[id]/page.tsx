@@ -16,6 +16,7 @@ import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, CardHead, Field, Input, Money, Select, Textarea } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
+import { FlightSupplierCard } from "@/components/desk/flight-supplier";
 import { BoardingPassesCard } from "@/components/desk/boarding";
 import { HotelRequestsCard } from "@/components/desk/hotel-requests";
 import { AssignCard } from "@/components/desk/assign";
@@ -34,6 +35,7 @@ const hm = (local: string) => local.slice(11, 16);
 const EVENT: Record<string, string> = {
   created: "Order placed", authorised: "Card authorised", held: "Seats held", pnr: "PNR recorded", price_locked: "Fare confirmed", question: "Question sent", answered: "Traveller answered",
   fare_changed: "New fare sent", issuing: "Issuing", tickets: "Ticket numbers entered", captured: "Card captured", confirmed: "Confirmed", ticketing_failed: "Ticketing failed", voided: "Card hold released", cancelled: "Cancelled",
+  supplier_fare_confirmed: "Fare confirmed at TBO", hold_pending: "Hold sent to TBO", hold_failed: "TBO didn't hold it", ticketing_pending: "Tickets requested at TBO", schedule_changed: "Airline changed the times", supplier_checked: "Checked with TBO",
 };
 
 export default async function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -202,6 +204,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               {!prefs.summary.length && !prefs.loyalty.length && <p className="text-[13px] text-ink-3">{t("Nothing asked for on this booking.")}</p>}
             </Card>
           )}
+          <FlightSupplierCard order={o.order ?? null} requestId={r.id} act={act} issue={issue} names={ticketNames} t={t} />
           <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}
           {o.stage === "issued" && (

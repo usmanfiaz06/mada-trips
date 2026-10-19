@@ -1,5 +1,5 @@
 import "server-only";
-import { isProductionDeploy, supplierMode, type SupplierName } from "../config";
+import { flightsVendor, isProductionDeploy, supplierMode, type SupplierName } from "../config";
 import type {
   AiSupplier, EmailSupplier, FlightPositionsSupplier, FlightStatusSupplier, FlightSupplier, HotelSupplier, IdentitySupplier, PaymentSupplier, SmsSupplier, SupabaseAdminSupplier, SupabaseAuthSupplier, WhatsAppSupplier,
 } from "./types";
@@ -22,6 +22,7 @@ import { liveSupabase } from "./live/supabase";
 import { liveSupabaseAdmin } from "./live/supabase-admin";
 import { taqnyatSms } from "./live/taqnyat";
 import { zohoWhatsApp } from "./live/zoho-cpaas";
+import { tboAir } from "./live/tbo-air";
 import { guarded } from "../resilience/breaker";
 import { mockEsim } from "./mock/esim";
 import { airaloEsim } from "./live/airalo";
@@ -41,7 +42,8 @@ export { flightStatusVendor } from "./flight-status-vendor";
 const pick = <T extends object>(name: SupplierName, mock: T, live: T): T => (supplierMode(name) === "live" ? guarded(name, live) : mock);
 
 export const suppliers = {
-  flights: (): FlightSupplier => pick("flights", mockFlights, gdsFlights),
+  /** Live: TBO Air (SUPPLIER_MODE_FLIGHTS=tbo, or live with TBO_CLIENT_ID), else the GDS stub (not built). */
+  flights: (): FlightSupplier => pick("flights", mockFlights, flightsVendor() === "tbo" ? tboAir : gdsFlights),
   hotels: (): HotelSupplier => pick("hotels", mockHotels, rateHawkHotels),
   payments: (): PaymentSupplier => pick("payments", mockPayments, myFatoorah),
   /** Live: Unifonic, or Taqnyat with SMS_PROVIDER=taqnyat. Also sends Supabase Auth's codes (auth/sms-hook). */

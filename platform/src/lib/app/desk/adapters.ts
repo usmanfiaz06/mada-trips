@@ -14,6 +14,7 @@ import * as supportDesk from "@/lib/app/support/desk";
 import { decryptField, passportAad } from "@/lib/app/crypto";
 import { supplierMode } from "@/lib/app/config";
 import { bookingSuppliers } from "@/lib/app/booking/common";
+import { checkWithSupplier, flightBookingOf, holdWithSupplier, supplierFlightOf, ticketWithSupplier, type SupplierStep } from "@/lib/app/booking/supplier-flights";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type DeskActor } from "./core";
 import { isFlightAsk } from "@/lib/app/booking/flight-requests";
 import { contactOf } from "./flight-quotes";
@@ -250,6 +251,46 @@ async function confirmHoldHere(actor: DeskActor, id: string, v: { pnr?: string |
     await agentMessage(tx, "request", id, actor, copy("desk.order.held"), { stage: "held" });
     await deskAudit(tx, actor, { action: "desk.order.held", entityType: "request", entityId: id, ref: shortRef(id, "O"), summary: `Confirmed and held ${shortRef(id, "O")}${pnr ? ` · PNR ${pnr}` : ""}` });
   });
+}
+
+/**
+ * A flight from a supplier that books by itself (TBO): hold it there with the passengers' details, issue the tickets,
+ * or ask how it stands (booking/supplier-flights.ts). What the supplier says lands on the order as the usual outcome
+ * (new price, sold out, tickets didn't issue); the step's message says what happened, for the desk.
+ */
+async function supplierFlightHere(actor: DeskActor, id: string, v: { step: "hold" | "ticket" | "check" }): Promise<SupplierStep> {
+  assertCap(actor, v.step === "ticket" ? "desk.issue" : "desk.act");
+  const o = await linkedOrder(id);
+  if (!o) throw new DeskError("Order not found", "NOT_FOUND");
+  if (!supplierFlightOf(o)) throw new DeskError("This flight isn't booked through a supplier: hold and issue it in Mada's system");
+  const agent = await engineAgent(actor);
+  const viaSupplier = async (fn: () => Promise<SupplierStep>) => {
+    try { return await engine(fn); } catch (e) {
+      const code = (e as { code?: string }).code;
+      if (code === "NOT_CONFIGURED") throw new DeskError("TBO isn't connected (check the TBO keys and the whitelisted IP), so hold and issue this one by hand", "CONFLICT");
+      if (code === "SUPPLIER_DOWN") throw new DeskError("TBO isn't answering right now. Try again in a minute, or hold it by hand", "CONFLICT");
+      throw e;
+    }
+  };
+  let step: SupplierStep;
+  if (v.step === "hold") {
+    if (o.status === "pending_agent") await engine(() => booking.acceptOrder(o.id, agent));
+    else if (o.status !== "held") throw new DeskError("This order isn't waiting for a hold", "CONFLICT");
+    step = await viaSupplier(() => holdWithSupplier(o.id, agent));
+  } else if (v.step === "ticket") {
+    step = await viaSupplier(() => ticketWithSupplier(o.id, agent));
+  } else {
+    step = await viaSupplier(() => checkWithSupplier(o.id, agent));
+  }
+  const after = await linkedOrder(id);
+  const fb = after ? flightBookingOf(after) : null;
+  const pnr = fb?.parts.map((p) => p.pnr).find(Boolean) ?? null;
+  await db.transaction(async (tx) => {
+    if (step.outcome === "held" || step.outcome === "ticket_now") await setDesk(tx, id, { heldAt: new Date().toISOString(), heldBy: actor.id, heldPnr: pnr });
+    if (step.outcome === "ticketed" && after?.status === "confirmed") await setDesk(tx, id, { issuedAt: new Date().toISOString(), issuedBy: actor.id, pnr: pnr ?? undefined, tickets: (after.snapshot as { tickets?: string[] }).tickets ?? [] });
+    await deskAudit(tx, actor, { action: `desk.order.supplier_${v.step}`, entityType: "request", entityId: id, ref: o.ref ?? shortRef(id, "O"), summary: `TBO ${v.step}: ${clip(step.message, 160)}`, data: { orderId: o.id, outcome: step.outcome, pnr } }, { app: false });
+  });
+  return step;
 }
 
 /** Ask the traveller something before booking. It shows on the app's waiting screen with one-tap answers. */
@@ -761,6 +802,7 @@ export const askTraveller = forOwner(askTravellerHere);
 export const priceChanged = forOwner(priceChangedHere);
 export const issueTickets = forOwner(issueTicketsHere);
 export const failTicketing = forOwner(failTicketingHere);
+export const supplierFlight = forOwner(supplierFlightHere);
 export const sendQuote = forOwner(sendQuoteHere);
 export const markDone = (actor: DeskActor, id: string) => inRequestOwnerLocale(id, () => markDoneHere(actor, id));
 export const sendAgentReply: typeof sendAgentReplyHere = async (actor, kind, id, v) =>

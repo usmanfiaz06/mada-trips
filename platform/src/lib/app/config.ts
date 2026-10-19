@@ -52,7 +52,7 @@ export const SUPPLIERS = ["flights", "hotels", "payments", "sms", "whatsapp", "f
 const LIVE_BY_DEFAULT: ReadonlySet<SupplierName> = new Set(["flightPositions", "weather", "openData", "events"]);
 export type SupplierMode = "mock" | "live";
 /** Vendor names that mean "live" in SUPPLIER_MODE_<NAME>. */
-const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware", "airalo", "esimaccess"]);
+const LIVE_VENDORS: ReadonlySet<string> = new Set(["hotelbeds", "aerodatabox", "aviationstack", "flightaware", "airalo", "esimaccess", "tbo"]);
 /** Any of these keys turns flight status live without SUPPLIER_MODE_FLIGHT_STATUS (the owner only adds the key). */
 export const FLIGHT_STATUS_KEYS = ["AERODATABOX_API_KEY", "AVIATIONSTACK_API_KEY", "FLIGHTAWARE_API_KEY"] as const;
 
@@ -70,6 +70,17 @@ export function supplierMode(name: SupplierName): SupplierMode {
     throw new Error(`Supplier ${name} is in mock mode on a production deployment. Set ${envName(name)}=live, or APP_ALLOW_MOCKS=yes for a staging copy.`);
   }
   return mode;
+}
+
+/**
+ * Which live flights supplier: SUPPLIER_MODE_FLIGHTS=tbo, or plain "live" with TBO's keys set → TBO Air
+ * (suppliers/live/tbo-air.ts); otherwise the GDS stub, which isn't built (NOT_CONFIGURED). Mock unless live.
+ */
+export function flightsVendor(): "mock" | "tbo" | "gds" {
+  if (supplierMode("flights") === "mock") return "mock";
+  const raw = (process.env.SUPPLIER_MODE_FLIGHTS ?? "").trim().toLowerCase();
+  if (raw === "tbo" || process.env.TBO_CLIENT_ID) return "tbo";
+  return "gds";
 }
 
 export const supplierEnvName = envName;

@@ -16,7 +16,7 @@ Every outside system sits behind an interface in [`types.ts`](types.ts). Route h
 
 | Supplier | Interface | Live adapter | Live env vars | Mock behaviour |
 |---|---|---|---|---|
-| `flights` | `FlightSupplier` (search, price, hold) | **Not built**: Mada's GDS Enterprise API (decision D15) + Travelfusion for flynas/flyadeal | `GDS_API_URL`, `GDS_CLIENT_ID`, `GDS_CLIENT_SECRET` | RUH→IST returns the prototype's three options: **Saudia SV263** 09:40→13:55 (best, SAR 2,160 pp), flynas XY125 to SAW (lowest, SAR 1,745), Turkish TK141 02:10 (earliest, SAR 2,328). Other routes: one direct per airline that flies it. `to: "XXX"` → no flights; `to: "ERR"` → supplier not answering; an offer id ending `-up` re-prices SAR 140 higher. Holds return PNR `X7K2QD` for SV263. |
+| `flights` | `FlightSupplier` (search, price, hold); with TBO also `TicketingFlightSupplier` (`flight-ticketing.ts`: fare rules, book, ticket, booking details, cancel) | **TBO Air** (`live/tbo-air.ts`, `SUPPLIER_MODE_FLIGHTS=tbo`; docs/app/TBO.md). Mada's GDS Enterprise API (decision D15) not built | `TBO_AIR_BASE_URL`, `TBO_CLIENT_ID`, `TBO_USERNAME`, `TBO_PASSWORD`, `TBO_END_USER_IP`, `TBO_ENV=test\|live`, optional `TBO_AUTH_URL`, `TBO_AIR_BOOKING_URL`, `TBO_AIR_MARKUP_BPS`; `APP_FLIGHTS_MODE=live` to sell (default `request`) | RUH→IST returns the prototype's three options: **Saudia SV263** 09:40→13:55 (best, SAR 2,160 pp), flynas XY125 to SAW (lowest, SAR 1,745), Turkish TK141 02:10 (earliest, SAR 2,328). Other routes: one direct per airline that flies it. `to: "XXX"` → no flights; `to: "ERR"` → supplier not answering; an offer id ending `-up` re-prices SAR 140 higher. Holds return PNR `X7K2QD` for SV263. Tests: a fake TBO (`test/app/fixtures/tbo-air.ts`). |
 | `hotels` | `HotelSupplier` (search, price) | **Hotelbeds** (`hotelbeds/`, `SUPPLIER_MODE_HOTELS=hotelbeds`; `hotelbeds-mock` serves its fixtures). RateHawk/WebBeds not built. See docs/app/HOTELBEDS.md | `HOTELBEDS_ENV`, `HOTELBEDS_HOTEL_API_KEY`, `HOTELBEDS_HOTEL_SECRET`, `APP_STAYS_MODE`, `APP_FX_RATES`, `APP_STAY_MARKUP_BPS` | Istanbul: rooms near Galata Tower (SAR 980/night), Sultanahmet garden hotel, Bosphorus rooms. Free cancellation until 6 days before, then SAR 400. Other cities: none. |
 | `transfers` | `HotelbedsTransfers` (availability, book, detail, cancel; `hotelbeds/transfers.ts`) | **Hotelbeds Transfers** (`SUPPLIER_MODE_TRANSFERS=hotelbeds`) | `HOTELBEDS_TRANSFERS_API_KEY`, `HOTELBEDS_TRANSFERS_SECRET`, `APP_TRANSFER_MARKUP_BPS` | Fixtures (`hotelbeds/fixtures/transfers-availability.json`): from IST, a car (3), a minivan (7) and a shuttle, free to cancel until the day before. Other airports: nothing. |
 | `payments` | `PaymentSupplier` (authorize, capture, void, refund; idempotent by key) | **Not built**: MyFatoorah | `MYFATOORAH_API_KEY`, `MYFATOORAH_BASE_URL` | In-memory gateway. Token `tok_decline` → declined; `tok_3ds` → `requires_action` with a redirect; `tok_fail_capture` → capture fails (then void). Anything else authorises. Same idempotency key → same result. |
@@ -115,6 +115,29 @@ production (`https://partners-api.airalo.com/v2`), form-encoded token (3 a minut
 on `GET /orders`, usage fields and statuses, top-up and refund endpoints, the webhook signature. Assumed until the first
 sandbox call: `validity`/`quantity` types (read either way), page 2+ of `/packages` as an object (read either way), the
 async-order webhook (not used).
+
+## Flights: TBO Air
+
+**Flow.** Search (`live/tbo-air.ts`) maps TBO's results to our offers: per-passenger-type fares from `FareBreakdown`
+(adult, child, baby on a lap) at TBO's `PublishedFare`, bags, seats left, best / lowest / earliest / fastest. The offer
+id carries the TraceId, the ResultIndex and the search, so `price()` (the order sheet's price check) runs FareQuote and
+FareRule on it, or searches again and finds the same flights by number and time once the 15-minute TraceId has gone.
+A route TBO can't answer goes to the desk as a request (`by_hand`). On the desk's order page (`components/desk/flight-
+supplier.tsx`) **Confirm and hold with TBO** books full-service airlines (a PNR, a last day to ticket) and confirms the
+fare on low-cost ones (nothing to hold); **Ticket now** issues, puts the PNR and every ticket number on the order, then
+captures the card and writes the trip with the airline's fare rules; **Check with TBO** looks up a booking whose answer
+was lost or is still in progress (`booking/supplier-flights.ts`).
+
+**Never twice.** The booking at TBO lives on the order (`snapshot.flightBooking`) and is written before every Book and
+Ticket; a part with a hold or ticket request already sent is looked up (GetBookingDetails), never sent again. A second
+click on the same server joins the first call.
+
+**Outcomes.** A fare above what the card holds → the new-price flow (`priceChanged`); sold out → the order closes with
+`sold_out`, nothing charged; tickets refused → `ticketing_failed`, the card hold released; schedule change, a lost
+answer or a failed hold stay with the desk, written on the card. SSRs TBO doesn't carry (a bassinet; meals and seats on
+low-cost airlines, which are paid) are listed for the desk to add.
+
+**Confirmed vs assumed:** the header of `live/tbo-air.ts` and docs/app/TBO.md.
 
 ## Adding a supplier
 

@@ -14,6 +14,7 @@ import { addCredit } from "../credit";
 import { AppError } from "../http";
 import { AIRPORT_TZ } from "../suppliers/mock/data";
 import { bookingSuppliers, newRef } from "./common";
+import { canTicket } from "../suppliers/flight-ticketing";
 import { reauthorize } from "./payments";
 import { markPaid } from "../circles/messages";
 
@@ -90,7 +91,8 @@ export const acceptOrder = (orderId: string, agent: DeskAgent) => move(orderId, 
   let supplierRef = o.supplierRef;
   const f = (o.snapshot as { flight?: FlightOption; flightSupplierId?: string }).flight;
   const sid = (o.snapshot as { flightSupplierId?: string }).flightSupplierId;
-  if (f && sid) {
+  // A supplier that books by itself (TBO) is held from the desk's order page with the passengers' details (supplier-flights.ts).
+  if (f && sid && !(canTicket(bookingSuppliers.flights()) && sid.startsWith(`${bookingSuppliers.flights().name}.`))) {
     try { supplierRef = (await bookingSuppliers.flights().hold(sid, o.travellerIds.map(() => ({ givenNames: "", surname: "" })))).pnr; } catch { /* the agent holds by hand */ }
   }
   await orderEvent(tx, o.id, "held", { kind: "agent", name: agent.name }, { supplierRef });
@@ -109,7 +111,8 @@ export const askQuestion = (orderId: string, agent: DeskAgent, text: string) => 
 });
 
 /** The fare moved while the desk held the seats: per person, in halalas. */
-export const priceChanged = (orderId: string, agent: DeskAgent, perPerson: number) => move(orderId, ["pending_agent", "held", "price_locked"], async (tx, o) => {
+/** Also while issuing: a supplier that tickets by itself (TBO) can say the fare moved at the ticket request. */
+export const priceChanged = (orderId: string, agent: DeskAgent, perPerson: number) => move(orderId, ["pending_agent", "held", "price_locked", "issuing"], async (tx, o) => {
   const total = perPerson * Math.max(1, o.travellerIds.length);
   await orderEvent(tx, o.id, "fare_changed", { kind: "agent", name: agent.name }, { perPerson, total });
   await audit(tx, o, agent, "order.fare_changed", `${agent.name} reported a fare change of ${total} halalas`, { perPerson, total });
@@ -278,7 +281,7 @@ async function capture(tx: Tx, o: OrderRow): Promise<boolean> {
 const SV_DRIVER = { home: { driver: "Khalid", phone: "+966 55 014 2287", waits: "10 min" }, arrive: { driver: "Ahmet", car: "Grey Mercedes Vito", plate: "34 MDA 21", door: "Door 3", phone: "+90 532 418 6610", waits: "60 min" } };
 
 async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent, now: Date): Promise<string> {
-  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[] };
+  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown> };
   if (snap.quotedFlight) return writeQuotedTrip(tx, o, snap.quotedFlight, agent, now);
   const n = Math.max(1, o.travellerIds.length);
   const dest = DESTINATIONS[snap.search?.destination ?? ""] ?? null;
@@ -358,7 +361,12 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     tripId, orderId: o.id, ref: o.ref, lines,
     paid: { subtotal: o.subtotal + o.extra, discount: o.discount, promo: o.promo, creditUsed: o.creditUsed, charged: o.total + o.extra, card: o.paymentLabel },
     payPlan: o.plan, bookedAt: o.createdAt,
-    details: { segments: segmentIds, fare: f ? { bags: f.bags, change: f.changeRule, refund: f.refundRule, refundable: f.refundable } : null, stays: stayFacts, pickups: pickupFacts },
+    details: {
+      segments: segmentIds, fare: f ? { bags: f.bags, change: f.changeRule, refund: f.refundRule, refundable: f.refundable } : null, stays: stayFacts, pickups: pickupFacts,
+      // Ticketed by a supplier (TBO): each traveller's ticket number, and the airline's own rules for the fare sheet.
+      ...(snap.tickets?.length ? { tickets: Object.fromEntries(o.travellerIds.map((id, i) => [id, snap.tickets![i] ?? ""]).filter(([, tk]) => tk)) } : {}),
+      ...(snap.flightRules ? { fareRules: snap.flightRules } : {}),
+    },
   });
   // The trip screens' own tables (M3): the agent, per-row facts and the charges, so GET /trips/{id} shows them.
   try {

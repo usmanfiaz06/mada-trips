@@ -27,7 +27,7 @@ export const BREAKER = { FAILURES: 5, WINDOW_MS: 60_000, COOLDOWN_MS: 30_000, MA
 
 /** How long each supplier may take before we stop waiting (ms). Payments wait longest: a bank's 3-D Secure is slow. */
 export const SUPPLIER_TIMEOUTS: Record<string, number> = {
-  flights: 15_000, hotels: 15_000, payments: 25_000, sms: 8_000, whatsapp: 8_000, email: 8_000,
+  flights: 45_000, hotels: 15_000, payments: 25_000, sms: 8_000, whatsapp: 8_000, email: 8_000,
   flightStatus: 6_000, flightPositions: 6_000, ai: 20_000, identity: 8_000, esim: 25_000,
 };
 

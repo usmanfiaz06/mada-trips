@@ -4,7 +4,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { DemoFlag, renewalAnswers, todayIn, type Person } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appRequests, appUsers } from "@/db/app-schema";
-import { isProductionDeploy, supplierMode } from "../config";
+import { flightsVendor, isProductionDeploy, supplierMode } from "../config";
 import { AppError } from "../http";
 import { listPeople } from "../people";
 import { catalogueFlights } from "../suppliers/mock/catalogue-flights";
@@ -13,6 +13,8 @@ import { mockMyFatoorah } from "../suppliers/mock/myfatoorah";
 import { liveMyFatoorah } from "../suppliers/live/myfatoorah";
 import { claudeAsk } from "../suppliers/live/ask-claude";
 import { gdsFlights, rateHawkHotels } from "../suppliers/live/commerce";
+import { tboAir } from "../suppliers/live/tbo-air";
+import { guarded } from "../resilience/breaker";
 import { bookingHotelbeds, hotelVendor } from "../suppliers/hotelbeds/app";
 import type { AskParser, BookingFlightSupplier, BookingHotelSupplier, BookingPaymentSupplier } from "../suppliers/booking-types";
 
@@ -27,7 +29,11 @@ const notConfiguredAsk: AskParser = { name: "rules-only", async parse() { return
 
 /** Picked on every call, so an env change or a test takes effect at once. */
 export const bookingSuppliers = {
-  flights: (): BookingFlightSupplier => (supplierMode("flights") === "live" ? (gdsFlights as BookingFlightSupplier) : catalogueFlights),
+  /** Catalogue (mock), TBO Air (SUPPLIER_MODE_FLIGHTS=tbo; behind the breaker) or the GDS stub (not built). */
+  flights: (): BookingFlightSupplier => {
+    const v = flightsVendor();
+    return v === "mock" ? catalogueFlights : v === "tbo" ? guarded("flights", tboAir) : (gdsFlights as BookingFlightSupplier);
+  },
   /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock for its fixtures) or RateHawk (not built). */
   hotels: (): BookingHotelSupplier => {
     const v = hotelVendor();
