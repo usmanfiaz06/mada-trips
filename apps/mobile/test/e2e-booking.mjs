@@ -1203,6 +1203,9 @@ async function phone() {
   if (await page.locator('[data-testid="name-input"]').count()) { await k.byTest('name-input').fill('Noor'); await page.getByRole('button', { name: /Continue|Let/ }).filter({ visible: true }).first().click(); await page.waitForTimeout(600); }
   for (let i = 0; i < 3 && !(await page.locator('[data-testid="dock-ask"]').filter({ visible: true }).count()); i++) {
     const b = page.getByRole('button', { name: /^(Not now|Skip|Allow|Continue)$/ }).filter({ visible: true }).first();
+    // The next screen may still be fetching its file (the web loads screens on first use): wait for it or the tabs.
+    const dock = page.locator('[data-testid="dock-ask"]').filter({ visible: true }).first();
+    await Promise.any([b.waitFor({ timeout: 8000 }), dock.waitFor({ timeout: 8000 })]).catch(() => {});
     if (!(await b.count())) break;
     await b.click(); await page.waitForTimeout(700);
   }

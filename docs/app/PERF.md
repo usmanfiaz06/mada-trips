@@ -33,12 +33,13 @@ that much shorter than below.
 |---|---|---|
 | Entry JS, raw / brotli | 7.30 MB / 1.49 MB | 2.06 MB / 0.47 MB |
 | First paint (guest and signed in) | 37.1 s | 0.5 s (the page's own sun, then the app) |
-| Guest: Welcome on screen, buttons working | 37.5 s | 11.4 s |
-| Guest: "Look around" answered (Today drawn) | 37.7 s | 22.9 s |
-| Signed in: trip on Today | 37.3 s | 22.6 s |
-| Signed in: bytes on the wire to the trip | 1656 KB | 828 KB (of which the mock API 160 KB) |
+| Guest: Welcome on screen, buttons working | 37.5 s | 11.0 s |
+| Guest: "Look around" answered (Today drawn) | 37.7 s | 23.1 s |
+| Signed in: trip on Today | 37.3 s | 22.9 s |
+| Signed in: bytes on the wire to the trip | 1656 KB | 830 KB (of which the mock API 160 KB) |
 
-Unthrottled and on a warm start (service worker) nothing got slower; the full e2e suite runs against this export.
+The full e2e suite passes against this export. Screens now arrive on first use, so e2e-beta and e2e-booking wait
+for the next onboarding screen instead of a fixed 700 ms.
 
 Still short of the goal (interactive in under 8 s on Slow 3G): see "What's left".
 
