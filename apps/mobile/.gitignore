@@ -5,3 +5,10 @@ expo-env.d.ts.bak
 /ios/
 /android/
 public/ocr/
+# Store keys and Firebase config: EAS holds them (docs/app/ANDROID.md); never in git.
+google-services.json
+GoogleService-Info.plist
+*.jks
+*.keystore
+credentials.json
+play-service-account*.json

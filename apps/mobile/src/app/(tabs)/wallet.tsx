@@ -187,7 +187,7 @@ function Unlocked() {
           </Pressable>
         </View>
         <Card onPress={() => setSheet('cards')} accessibilityLabel={dt('money.cards')} style={styles.rowCard}>
-          <View style={{ flexDirection: 'row' }}>{(savedCards.length ? savedCards.slice(0, 3) : [{ id: 'applepay', brand: 'applepay' as const }]).map((c, i) => <View key={c.id} style={{ marginStart: i ? -8 : 0 }}><PayMark brand={c.brand} size={24} /></View>)}</View>
+          <View style={{ flexDirection: 'row' }}>{(savedCards.length ? savedCards.slice(0, 3) : [HAS_APPLE_PAY ? { id: 'applepay', brand: 'applepay' as const } : { id: 'card', brand: 'mada' as const }]).map((c, i) => <View key={c.id} style={{ marginStart: i ? -8 : 0 }}><PayMark brand={c.brand} size={24} /></View>)}</View>
           <View style={{ flex: 1, marginStart: 8 }}>
             <T v="h3" style={{ fontSize: 15 }}>{dt('money.cards')}</T>
             <T v="tiny" testID="wallet-cards-sub">{savedCards.length ? t(savedCards.length === 1 ? 'money.cards.subOne' : 'money.cards.sub', { count: savedCards.length, label: defaultLabel }) : pm.used.length ? t('pm.walletUsed', { label: pm.used[0]!.label }) : dt('money.cards.none')}</T>

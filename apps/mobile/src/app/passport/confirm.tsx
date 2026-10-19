@@ -19,6 +19,7 @@ import { keepPassportCopy } from '@/lib/passport-copy';
 import { isPdf, usePassportScan, type PassportFields } from '@/lib/passport-scan';
 import { chooseFile } from '@/lib/pick';
 import { toast } from '@/lib/toast';
+import { useBookingBack } from '@/lib/hardware-back';
 import { useRefreshHousehold, walletApi } from '@/lib/wallet';
 import { usePeople } from '@/lib/queries';
 import { colors, ff } from '@/theme';
@@ -45,6 +46,8 @@ export default function PassportConfirm() {
   const people = usePeople();
   const refresh = useRefreshHousehold();
   const [busy, setBusy] = useState(false);
+  // Android back while the passport is being saved: stay, so a booking underneath never misses it.
+  useBookingBack({ busy, busyText: 'back.saving', canGoBack: () => true, onLeave: () => router.back() });
   const [zoom, setZoom] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const self = people.data?.find((p) => p.isSelf);

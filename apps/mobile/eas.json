@@ -57,6 +57,10 @@
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_MODE": "live",
+        "EXPO_PUBLIC_API_URL": "https://madatrips.sa"
       }
     }
   },

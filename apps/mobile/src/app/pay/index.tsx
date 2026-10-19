@@ -31,6 +31,7 @@ import { usePeople } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { useCards } from '@/lib/wallet';
+import { useBookingBack } from '@/lib/hardware-back';
 import { travelEnds } from '@/lib/travel-ends';
 import { colors, font, radii, ff } from '@/theme';
 
@@ -82,6 +83,8 @@ export default function Pay() {
   const [plan, setPlan] = useState<PayPlan>('full');
   const [sheet, setSheet] = useState<SheetName>(null);
   const [busy, setBusy] = useState(false);
+  // Android back: never mid-payment, and never out of the app from a booking opened by a link (lib/hardware-back.ts).
+  useBookingBack({ busy, canGoBack: router.canGoBack, onLeave: () => leave() });
   const [attempt, setAttempt] = useState(0); // remounts the slider so the sun goes home after a try that stays here
   const [holdSkip, setHoldSkip] = useState(0);
   // After the hold ended and the price was checked again: what it was and what it is now, said once on the sheet.

@@ -28,6 +28,7 @@ import { colors } from '@/theme';
 import { fontsFor } from '@/theme/fonts';
 import { appLocale, bootLocale, getLocale, isRTL } from '@/lib/i18n';
 import { SignInSheet } from '@/components/auth/SignInSheet';
+import { setUpNotificationChannels } from '@/lib/notification-channels';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 // When things go wrong (FLOWS.md §12): crash reports (Sentry, only with a DSN), the connection, the offline copy.
@@ -70,6 +71,8 @@ export default function RootLayout() {
 
   const ready = (fontsLoaded || !!fontError) && status !== 'loading' && restored && localeReady;
   useEffect(() => { if (ready) SplashScreen.hideAsync().catch(() => {}); }, [ready]);
+  // Android: the channels pushes land in, named in the app's language (lib/notification-channels.ts).
+  useEffect(() => { if (localeReady) void setUpNotificationChannels(); }, [localeReady]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.green }} />;
 
   return (

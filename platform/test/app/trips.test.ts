@@ -383,7 +383,7 @@ describe("travel day: status refresh, disruption, notifications and devices", ()
     const again = TripRefreshResponse.parse((await callP(withP(refreshPost, { id: tid }), { token: C.token, phase: "travelday" })).json);
     expect(again.changes).toHaveLength(0);
     await new Promise((res) => setTimeout(res, 50));
-    expect(pushOutbox.some((p) => p.to.includes(C.userId.slice(0, 12)) && p.title === "Gate changed to C4")).toBe(true);
+    expect(pushOutbox.some((p) => p.to.includes(C.userId.slice(0, 12)) && p.title === "Gate changed to C4" && p.channel === "trip-updates")).toBe(true);
     const inbox = (await call(notesGet, { method: "GET", token: C.token })).json;
     expect(inbox.unread).toBe(1);
     expect(inbox.items[0]).toMatchObject({ kind: "gate_change", title: "Gate changed to C4" });

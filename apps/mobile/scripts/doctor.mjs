@@ -59,8 +59,12 @@ if (cfg) {
   const plist = ios.infoPlist ?? {};
   const needed = ['NSCameraUsageDescription', 'NSPhotoLibraryUsageDescription', 'NSFaceIDUsageDescription', 'NSContactsUsageDescription'];
   for (const k of needed) check(typeof plist[k] === 'string' && plist[k].length > 20 && !/\$\(PRODUCT_NAME\)/.test(plist[k]), `iOS ${k} says why, in our words`);
-  check(!plist.NSMicrophoneUsageDescription, 'no microphone permission (nothing records sound)');
-  check(!plist.NSLocationWhenInUseUsageDescription && !plist.NSLocationAlwaysAndWhenInUseUsageDescription, 'no location permission (nothing reads GPS yet)');
+  // Voice (lib/voice.ts) and "Distance from: where I am now" (lib/where-am-i.ts): the plugins write the iOS strings.
+  const plugin = (name) => (cfg.plugins ?? []).find((p) => Array.isArray(p) && p[0] === name)?.[1] ?? {};
+  const loc = plugin('expo-location');
+  check(typeof loc.locationWhenInUsePermission === 'string' && !loc.locationAlwaysPermission && !loc.isAndroidBackgroundLocationEnabled, 'location only while in use, never in the background');
+  check(typeof plugin('expo-speech-recognition').microphonePermission === 'string', 'microphone says why (voice to Mada, nothing kept)');
+  check(!plist.NSLocationAlwaysAndWhenInUseUsageDescription, 'no "always" location permission');
   check((plist.CFBundleLocalizations ?? []).includes('ar'), 'iOS knows the app speaks Arabic (CFBundleLocalizations)');
 
   for (const lang of ['en', 'ar']) {
@@ -74,11 +78,19 @@ if (cfg) {
 
   const perms = new Set(android.permissions ?? []);
   const blocked = new Set(android.blockedPermissions ?? []);
-  for (const p of ['RECORD_AUDIO', 'WRITE_CONTACTS', 'READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'SYSTEM_ALERT_WINDOW'])
+  for (const p of ['WRITE_CONTACTS', 'READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'ACCESS_FINE_LOCATION', 'ACCESS_BACKGROUND_LOCATION', 'SYSTEM_ALERT_WINDOW', 'WRITE_SETTINGS'])
     check(blocked.has(`android.permission.${p}`), `Android ${p} blocked (not used; Play asks about each one)`);
-  for (const p of ['CAMERA', 'READ_CONTACTS', 'USE_BIOMETRIC', 'POST_NOTIFICATIONS'])
+  for (const p of ['CAMERA', 'RECORD_AUDIO', 'ACCESS_COARSE_LOCATION', 'READ_CONTACTS', 'USE_BIOMETRIC', 'POST_NOTIFICATIONS'])
     check(perms.has(`android.permission.${p}`), `Android ${p} declared`);
   check(Number.isInteger(android.versionCode), 'Android versionCode set (EAS increments it remotely)');
+  // App links: every shared path has a verified https filter for madatrips.sa (assetlinks.json serves the other half).
+  const shared = readFileSync(join(repo, 'packages/shared/src/schemas/circles.ts'), 'utf8').match(/APP_LINK_PATHS = \[([^\]]+)\]/)?.[1] ?? '';
+  const linkPaths = [...shared.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  const verified = (android.intentFilters ?? []).filter((f) => f.autoVerify).flatMap((f) => f.data ?? []).filter((d) => d.scheme === 'https' && d.host === 'madatrips.sa').map((d) => d.pathPrefix);
+  check(linkPaths.length > 0 && linkPaths.every((p) => verified.includes(p)), `Android app links verified for ${linkPaths.join(' ')}`);
+  const channel = (cfg.plugins ?? []).find((p) => Array.isArray(p) && p[0] === 'expo-notifications')?.[1]?.defaultChannel;
+  check(channel === 'trip-updates', 'Android pushes default to the "Trip updates" channel (platform push.ts names it)');
+  if (!android.googleServicesFile) warnings.push('No google-services.json here: fine locally; EAS builds need the GOOGLE_SERVICES_JSON file variable or Android gets no push (ANDROID.md §3).');
 
   const file = (p) => p && existsSync(join(root, p));
   check(file(cfg.icon), 'app icon exists');
@@ -105,6 +117,8 @@ try {
   check(b.production?.autoIncrement === true && eas.cli?.appVersionSource === 'remote', 'eas.json: production build numbers increment remotely');
   const prodEnv = { ...(b.base?.env ?? {}), ...(b.production?.env ?? {}) };
   check(prodEnv.EXPO_PUBLIC_API_MODE !== 'mock' && prodEnv.EXPO_PUBLIC_DEMO_HINTS !== 'yes', 'eas.json: production is never mock and shows no demo hints');
+  check(b.preview?.android?.buildType === 'apk' && b.production?.android?.buildType === 'app-bundle', 'eas.json: preview is an APK for testers, production an AAB for Play');
+  check(eas.submit?.production?.android?.track === 'internal', 'eas.json: Android submits go to the internal track first');
   const submit = eas.submit?.production?.ios ?? {};
   if (/REPLACE/.test(`${submit.ascAppId}${submit.appleTeamId}`)) warnings.push('eas.json: submit.production.ios ascAppId and appleTeamId are still placeholders (LAUNCH.md step 6).');
 } catch (e) {

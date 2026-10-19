@@ -10,12 +10,19 @@ import { isProductionDeploy } from "./config";
  *   EXPO_ACCESS_TOKEN optional; required when the Expo project has enhanced push security on.
  * Mock mode records what would have been sent (pushOutbox) and logs one line, never the body.
  * Tickets that come back DeviceNotRegistered disable that device so we stop sending to it.
+ * On Android every push names its notification channel; the app creates the same three on launch (apps/mobile
+ * src/lib/notification-channels.ts), so people can mute offers without losing gate changes.
  */
 
-export type PushMessage = { title: string; body: string; data?: Record<string, unknown>; timeSensitive?: boolean };
+export type PushChannel = "trip-updates" | "messages" | "offers";
+export type PushMessage = { title: string; body: string; data?: Record<string, unknown>; timeSensitive?: boolean; channel?: PushChannel };
+
+/** Which Android channel a trip notification belongs to: someone answering you, an offer, or the trip itself. */
+export const channelForKind = (kind: string): PushChannel =>
+  kind === "agent_reply" || kind === "agent_needs_answer" || kind === "circle" ? "messages" : kind.startsWith("offer") ? "offers" : "trip-updates";
 export type PushResult = { sent: number; failed: number; mode: "mock" | "live" };
 
-const g = globalThis as unknown as { __madaPushOutbox?: { to: string; title: string; body: string; at: string }[] };
+const g = globalThis as unknown as { __madaPushOutbox?: { to: string; title: string; body: string; channel: PushChannel; at: string }[] };
 /** What the mock push sender "sent", newest first, for tests and the dev console. */
 export const pushOutbox = (g.__madaPushOutbox ??= []);
 
@@ -34,7 +41,7 @@ export async function pushToUser(userId: string, msg: PushMessage): Promise<Push
   if (!tokens.length) return { sent: 0, failed: 0, mode: pushMode() };
   if (pushMode() === "mock") {
     for (const d of tokens) {
-      pushOutbox.unshift({ to: d.token, title: msg.title, body: msg.body, at: new Date().toISOString() });
+      pushOutbox.unshift({ to: d.token, title: msg.title, body: msg.body, channel: msg.channel ?? "trip-updates", at: new Date().toISOString() });
       if (pushOutbox.length > 200) pushOutbox.length = 200;
     }
     if (process.env.NODE_ENV !== "test" && !process.env.VITEST) console.info(`[mock push] ${tokens.length} device(s): ${msg.title}`);
@@ -45,7 +52,7 @@ export async function pushToUser(userId: string, msg: PushMessage): Promise<Push
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
       body: JSON.stringify(tokens.map((d) => ({
-        to: d.token, title: msg.title, body: msg.body, data: msg.data ?? {}, sound: "default",
+        to: d.token, title: msg.title, body: msg.body, data: msg.data ?? {}, sound: "default", channelId: msg.channel ?? "trip-updates",
         priority: msg.timeSensitive ? "high" : "default", interruptionLevel: msg.timeSensitive ? "time-sensitive" : "active",
       }))),
       signal: AbortSignal.timeout(8000),

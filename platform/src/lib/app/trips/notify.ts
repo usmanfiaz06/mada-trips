@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { t, type CopyKey } from "@mada/shared";
 import { db } from "@/db";
 import { appNotifications } from "@/db/app-schema";
-import { pushToUser } from "../push";
+import { channelForKind, pushToUser } from "../push";
 import { localeOfUser } from "../locale";
 import { resolveVars, withCopy, type NotifyVars } from "../notify-copy";
 import type { Exec } from "./core";
@@ -27,7 +27,7 @@ export async function notify(userId: string, n: { kind: NotifyKind; level: "time
   const [row] = await tx.insert(appNotifications).values({ userId, kind: n.kind, level: n.level, title, body, href: n.href ?? null, data: withCopy(n.data, copy) }).returning({ id: appNotifications.id });
   // Quiet hours and the notification budget are applied by the sender later (SCOPE.md §7); passive ones never push.
   if (n.level !== "passive") {
-    void pushToUser(userId, { title, body, data: { href: n.href ?? null, id: row!.id }, timeSensitive: n.level === "time_sensitive" })
+    void pushToUser(userId, { title, body, data: { href: n.href ?? null, id: row!.id }, timeSensitive: n.level === "time_sensitive", channel: channelForKind(n.kind) })
       .then(async (r) => { if (r.sent) await db.update(appNotifications).set({ pushedAt: new Date() }).where(eq(appNotifications.id, row!.id)); })
       .catch(() => {});
   }

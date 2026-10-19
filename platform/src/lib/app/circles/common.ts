@@ -183,7 +183,7 @@ export function notifyWrite(tx: Db, userId: string, kind: string, title: [CopyKe
     push: async () => {
       if (!opts.push) return;
       try {
-        const r = await pushToUser(userId, { title: tt, body: bb, data: { href, id } });
+        const r = await pushToUser(userId, { title: tt, body: bb, data: { href, id }, channel: "messages" });
         if (r.sent) await db.update(appNotifications).set({ pushedAt: new Date() }).where(eq(appNotifications.id, id));
       } catch { /* the inbox has it */ }
     },

@@ -6,6 +6,11 @@
 //   EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
 //                       Google Sign-In's native SDK needs the iOS client id's reversed form as a URL scheme, known
 //                       only once the Google Cloud project exists (docs/app/AUTH.md).
+//   GOOGLE_SERVICES_JSON
+//                       the path to google-services.json (Firebase): Android push goes through FCM, which needs it.
+//                       On EAS it is a file environment variable (docs/app/ANDROID.md); locally a google-services.json
+//                       next to this file works too (git-ignored). Without either the build still works, just
+//                       without push on Android (registerForPush quietly gives up).
 //   GOOGLE_MAPS_ANDROID_API_KEY
 //                       the hotel map on Android (react-native-maps draws Google Maps there; iOS uses Apple Maps with
 //                       no key). Without it Android shows the drawn map instead (src/components/maps).
@@ -43,8 +48,12 @@ module.exports = ({ config }) => {
     out.plugins.push(['@sentry/react-native/expo', { organization: process.env.SENTRY_ORG, project: process.env.SENTRY_PROJECT, url: 'https://sentry.io/' }]);
   }
 
+  const googleServices = googleServicesFile();
+  if (googleServices) out.android = { ...(out.android ?? config.android ?? {}), googleServicesFile: googleServices };
+  out.extra.pushAndroid = !!googleServices;
+
   const mapsKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY;
-  if (mapsKey) out.android = { ...(config.android ?? {}), config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } };
+  if (mapsKey) out.android = { ...(out.android ?? config.android ?? {}), config: { ...(config.android?.config ?? {}), googleMaps: { apiKey: mapsKey } } };
   out.extra.mapsAndroid = !!mapsKey;
 
   // The lock-screen flight (Live Activity, Dynamic Island) and the next-trip widget: an App Group, Info.plist keys and
@@ -61,6 +70,19 @@ module.exports = ({ config }) => {
 
   return out;
 };
+
+/** google-services.json from the EAS file variable, else one next to this file, else none (a build without FCM). */
+/* global __dirname */
+function googleServicesFile() {
+  const fs = require('fs');
+  const path = require('path');
+  for (const p of [process.env.GOOGLE_SERVICES_JSON, './google-services.json']) {
+    if (!p) continue;
+    const abs = path.resolve(__dirname, p);
+    try { if (fs.statSync(abs).isFile()) return abs; } catch { /* not there */ }
+  }
+  return undefined;
+}
 
 /** <queries> for the maps and ride apps we offer (Waze, Uber, Careem by their URL schemes). */
 function withRideAppQueries(config) {
