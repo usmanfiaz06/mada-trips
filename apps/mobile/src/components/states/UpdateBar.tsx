@@ -1,9 +1,9 @@
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { t } from '@/lib/i18n';
 import { refreshToNew, useShellUpdate } from '@/lib/net/shell';
 import { colors, ff, radii, shadow } from '@/theme';
+import { Appear } from '../Appear';
 import { T } from '../Text';
 
 /*
@@ -17,12 +17,12 @@ export function UpdateBar() {
   if (Platform.OS !== 'web' || !ready) return null;
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 100 }]}>
-      <Animated.View entering={FadeIn.duration(300)} style={[styles.bar, shadow('card')]} accessibilityRole="alert" accessibilityLiveRegion="polite" testID="update-bar">
+      <Appear enter="fade" ms={300} style={[styles.bar, shadow('card')]} accessibilityRole="alert" accessibilityLiveRegion="polite" testID="update-bar">
         <T v="small" style={{ flex: 1, color: colors.paper }}>{t('off.newVersion')}</T>
         <Pressable accessibilityRole="button" onPress={refreshToNew} hitSlop={8} style={styles.go} testID="update-refresh">
           <T v="caption" style={{ color: colors.green, fontFamily: ff.ui600 }}>{t('off.refresh')}</T>
         </Pressable>
-      </Animated.View>
+      </Appear>
     </View>
   );
 }

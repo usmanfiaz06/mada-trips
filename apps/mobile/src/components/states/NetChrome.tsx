@@ -1,21 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { SafeAreaInsetsContext, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { router, usePathname, type Href } from 'expo-router';
 import { t, tn } from '@/lib/i18n';
-import { useReduceMotion } from '@/lib/motion';
 import { useGates } from '@/lib/net/gates';
 import { useStorageHealth } from '@/lib/net/kv';
 import { flushOutbox, useOutboxStore } from '@/lib/net/outbox';
 import { useNet } from '@/lib/net/state';
 import { useSession } from '@/lib/session';
-import { buzz } from '@/lib/haptics';
 import { toast } from '@/lib/toast';
-import { colors, ff } from '@/theme';
-import { Icon } from '../Icon';
-import { T } from '../Text';
-import { OutboxSheet } from './OutboxSheet';
+import { later } from '../Later';
+import { STRIP, type PillMode } from './net-pill-mode';
+
+// The pill and the Outbox wait in their own files until they first show (components/Later.tsx).
+const NetPill = later(() => import('./NetPill').then((m) => m.NetPill));
+const OutboxSheet = later(() => import('./OutboxSheet').then((m) => m.OutboxSheet));
+/** Fetch both ahead of time, so they're on the device for when the connection goes. */
+export const preloadNetChrome = () => Promise.all([NetPill.preload(), OutboxSheet.preload()]);
 
 /*
  * The app-wide layer for when things go wrong, around the whole navigator (prototype ui.jsx NetPill):
@@ -29,13 +30,8 @@ import { OutboxSheet } from './OutboxSheet';
  *   - the update and maintenance screens when the server says so.
  */
 
-const STRIP = 40; // the strip under the status bar that holds the pill
-
-type PillMode = 'offline' | 'down' | 'held' | 'sending' | 'weak' | 'maint';
-
 export function NetChrome({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const still = useReduceMotion();
   const status = useSession((s) => s.status);
   const inApp = status === 'signedIn' || status === 'guest';
   const online = useNet((s) => s.online);
@@ -75,38 +71,15 @@ export function NetChrome({ children }: { children: ReactNode }) {
   // never sits over a back button, a title or a banner.
   const statusTop = Math.max(insets.top, Platform.OS === 'web' ? 44 : 20);
   const shifted = mode ? { ...insets, top: statusTop + STRIP } : insets;
-  const tone = PILL[mode ?? 'offline'];
 
   return (
     <View style={{ flex: 1 }}>
       <SafeAreaInsetsContext.Provider value={shifted}>{children}</SafeAreaInsetsContext.Provider>
-      {mode ? (
-        <Animated.View entering={still ? FadeIn.duration(150) : SlideInUp.duration(380)} exiting={still ? FadeOut.duration(150) : FadeOut.duration(200)}
-          style={[styles.strip, { top: statusTop }]} pointerEvents="box-none">
-          <Pressable
-            onPress={() => { buzz('tap'); if (mode === 'maint') { useGates.setState({ maintenanceDismissed: false }); } else setOutboxOpen(true); }}
-            accessibilityRole="button" accessibilityLiveRegion="polite" accessibilityLabel={t('pill.a11y', { text })}
-            style={({ pressed }) => [styles.pill, { backgroundColor: tone.bg }, mode === 'weak' ? styles.pillWeak : null, pressed ? { transform: [{ scale: 0.97 }] } : null]}
-            testID={mode === 'offline' ? 'offline-banner' : mode === 'maint' ? 'maintenance-banner' : `net-pill-${mode}`}>
-            {mode === 'sending' ? <ActivityIndicator size="small" color={tone.fg} style={{ transform: [{ scale: 0.7 }] }} /> : <View style={[styles.dot, { backgroundColor: tone.dot }]} />}
-            <T v="caption" numberOfLines={1} style={[styles.text, { color: tone.fg }]}>{text}</T>
-            {mode !== 'sending' ? <Icon name="chevron" size={14} color={tone.fg} /> : null}
-          </Pressable>
-        </Animated.View>
-      ) : null}
-      <OutboxSheet visible={outboxOpen} onClose={() => setOutboxOpen(false)} />
+      <NetPill when={!!mode} mode={mode} text={text} top={statusTop} onOpen={() => setOutboxOpen(true)} />
+      <OutboxSheet when={outboxOpen} visible={outboxOpen} onClose={() => setOutboxOpen(false)} />
     </View>
   );
 }
-
-const PILL: Record<PillMode, { bg: string; fg: string; dot: string }> = {
-  offline: { bg: colors.green, fg: colors.mist, dot: colors.gold },
-  held: { bg: colors.green, fg: colors.mist, dot: colors.gold },
-  sending: { bg: colors.green, fg: colors.mist, dot: colors.gold },
-  down: { bg: '#3a3324', fg: '#f6eedd', dot: colors.gold },
-  weak: { bg: 'rgba(255,253,249,0.94)', fg: colors.green, dot: colors.goldDeep },
-  maint: { bg: colors.goldWash, fg: colors.green, dot: colors.goldDeep },
-};
 
 /** When the connection returns: "Back online.", or once the outbox has gone, "Back online. Sent 2 things you did offline." */
 function useReconnectToast(inApp: boolean) {
@@ -161,11 +134,3 @@ function useQuietToasts(inApp: boolean) {
     if (updateReady && inApp && !told.current.update) { told.current.update = true; toast(t('update.soft')); }
   }, [updateReady, inApp]);
 }
-
-const styles = StyleSheet.create({
-  strip: { position: 'absolute', start: 0, end: 0, height: STRIP, zIndex: 80, alignItems: 'center', justifyContent: 'center' },
-  pill: { height: 30, maxWidth: '86%', paddingStart: 10, paddingEnd: 10, borderRadius: 999, flexDirection: 'row', alignItems: 'center', gap: 7, boxShadow: '0px 10px 24px -14px rgba(15,26,22,0.8)' },
-  pillWeak: { borderWidth: 1, borderColor: 'rgba(30,53,45,0.08)' },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  text: { fontFamily: ff.ui600, fontSize: 12.5, flexShrink: 1 },
-});

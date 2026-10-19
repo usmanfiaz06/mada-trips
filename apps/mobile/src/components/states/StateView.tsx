@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { colors, font, radii, shadow } from '@/theme';
 import { ArtStage } from '../EmptyState';
+import { Appear } from '../Appear';
 import { T } from '../Text';
 
 /*
@@ -21,7 +21,7 @@ export function StateView({ art, eyebrow, title, body, works, note, primary, sec
   art?: ReactNode; title: string; body?: string; note?: string | null; primary?: ReactNode; secondary?: ReactNode; variant?: 'full' | 'card'; testID?: string;
 }) {
   const inner = (
-    <Animated.View entering={FadeIn.duration(300)} style={[styles.card, shadow('card')]} accessibilityRole="summary" testID={testID}>
+    <Appear enter="fade" ms={300} style={[styles.card, shadow('card')]} accessibilityRole="summary" testID={testID}>
       {art ? <ArtStage height={variant === 'full' ? 156 : 124}>{art}</ArtStage> : null}
       {eyebrow ? <T v="eyebrow" color={colors.goldInk} style={[styles.inset, { marginBottom: -6 }]}>{eyebrow}</T> : null}
       <T style={[font('displaySmall'), styles.inset]} accessibilityRole="header">{title}</T>
@@ -34,7 +34,7 @@ export function StateView({ art, eyebrow, title, body, works, note, primary, sec
       ) : null}
       {primary || secondary ? <View style={[styles.inset, { gap: 10, marginTop: 4 }]}>{primary}{secondary}</View> : null}
       {note ? <T v="tiny" style={[styles.inset, { textAlign: 'center' }]} selectable>{note}</T> : null}
-    </Animated.View>
+    </Appear>
   );
   if (variant === 'card') return inner;
   return (

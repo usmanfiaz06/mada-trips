@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useToast } from '@/lib/toast';
 import { colors, shadow, ff } from '@/theme';
 import { useBottomInset } from './Layout';
+import { Appear } from './Appear';
 import { T } from './Text';
 
 /** One quiet line at the bottom: "New code sent.", "Sign-in cancelled. Nothing was shared." */
@@ -13,9 +13,9 @@ export function ToastHost() {
   useEffect(() => {}, [id]);
   if (!text) return null;
   return (
-    <Animated.View key={id} entering={FadeInDown.duration(300)} exiting={FadeOutDown.duration(200)} style={[styles.toast, shadow('focal'), { bottom: 104 + bottom }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
+    <Appear key={id} enter="fadeDown" ms={300} exit="fadeDown" exitMs={200} style={[styles.toast, shadow('focal'), { bottom: 104 + bottom }]} accessibilityLiveRegion="polite" accessibilityRole="alert">
       <T v="callout" color={colors.mist} style={{ fontFamily: ff.ui500 }}>{text}</T>
-    </Animated.View>
+    </Appear>
   );
 }
 

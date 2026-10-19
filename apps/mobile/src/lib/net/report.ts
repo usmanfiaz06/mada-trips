@@ -15,38 +15,40 @@ type SentryLike = {
 
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
 let sentry: SentryLike | null = null;
+let starting = false;
 
 const SECRET = /(\+?9665\d{8}|\b5\d{8}\b|Bearer\s+\S+|"(?:accessToken|refreshToken|token|passport\w*|number|phone|email|name|givenNames|surname)"\s*:\s*"[^"]*")/gi;
 export const scrub = (s: string) => s.replace(SECRET, '[kept on the phone]');
 
 export function initReporting(release?: string) {
-  if (!DSN || sentry) return;
-  // The env name is written out here (not DSN) so a build without a DSN folds this branch away and leaves the SDK
-  // out of the bundle (about a fifth of the web download); a build with one keeps it.
+  if (!DSN || sentry || starting) return;
+  // The env name is written out here (not DSN) so a build without a DSN never asks for the SDK. A build with one
+  // fetches it after the first screen (import(): on the web its own file, about a sixth of the old download).
   if (!process.env.EXPO_PUBLIC_SENTRY_DSN) return;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const S = require('@sentry/react-native') as SentryLike;
-    S.init({
-      dsn: DSN,
-      release,
-      sendDefaultPii: false,
-      tracesSampleRate: 0.1,
-      beforeSend(event: { message?: string; exception?: { values?: { value?: string }[] } }) {
-        if (event.message) event.message = scrub(event.message);
-        for (const v of event.exception?.values ?? []) if (v.value) v.value = scrub(v.value);
-        return event;
-      },
-      beforeBreadcrumb(b: { message?: string; data?: unknown }) {
-        if (b.message) b.message = scrub(b.message);
-        if (b.data) b.data = JSON.parse(scrub(JSON.stringify(b.data)));
-        return b;
-      },
-    });
-    sentry = S;
-  } catch {
-    sentry = null; // the SDK isn't in this build: nothing to do
-  }
+  starting = true;
+  import('@sentry/react-native')
+    .then((mod) => {
+      const S = mod as unknown as SentryLike;
+      S.init({
+        dsn: DSN,
+        release,
+        sendDefaultPii: false,
+        tracesSampleRate: 0.1,
+        beforeSend(event: { message?: string; exception?: { values?: { value?: string }[] } }) {
+          if (event.message) event.message = scrub(event.message);
+          for (const v of event.exception?.values ?? []) if (v.value) v.value = scrub(v.value);
+          return event;
+        },
+        beforeBreadcrumb(b: { message?: string; data?: unknown }) {
+          if (b.message) b.message = scrub(b.message);
+          if (b.data) b.data = JSON.parse(scrub(JSON.stringify(b.data)));
+          return b;
+        },
+      });
+      sentry = S;
+    })
+    .catch(() => { sentry = null; }) // the SDK isn't in this build, or couldn't be fetched: nothing to do
+    .finally(() => { starting = false; });
 }
 
 export const reportingOn = () => !!sentry;

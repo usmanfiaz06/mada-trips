@@ -3,7 +3,7 @@ import * as Localization from 'expo-localization';
 import { DevSettings, I18nManager, Platform } from 'react-native';
 import { create } from 'zustand';
 import {
-  getDisplayPrefs, pickLocale, setDisplayPrefs, t as tShared, tn as tnShared,
+  getDisplayPrefs, hasCatalogue, installCatalogue, pickLocale, setDisplayPrefs, t as tShared, tn as tnShared,
   type CopyKey, type CopyLocale, type Digits, type Vars,
 } from '@mada/shared';
 
@@ -90,10 +90,14 @@ if (web && typeof document !== 'undefined') {
  * closes. The layout's direction and the fonts stay the launch's; only the words follow the message.
  */
 let voice: CopyLocale | null = null;
+let wantedVoice: CopyLocale | null = null;
 type VoiceState = { voice: CopyLocale | null };
 export const useVoiceLocale = create<VoiceState>(() => ({ voice: null }));
 export function setVoice(next: CopyLocale | null) {
   const v = next && next !== locale ? next : null;
+  wantedVoice = v;
+  // The web fetches Arabic's words the first time they're needed: the answer turns Arabic once they're here.
+  if (v && !hasCatalogue(v)) { void loadCatalogue(v).then(() => { if (wantedVoice === v) setVoice(v); }); return; }
   if (v === voice) return;
   voice = v;
   // Prices, dates and names written by the shared formatters follow the answer's language too.
@@ -149,11 +153,27 @@ export const useDisplay = create<DisplayState>((set) => ({
 export async function bootLocale(): Promise<boolean> {
   const saved = await readSaved();
   if (saved.digits || saved.hijri !== undefined) useDisplay.getState().set({ digits: saved.digits ?? 'latn', hijri: saved.hijri ?? false });
-  if (web) return true;
+  if (web) {
+    await loadCatalogue(locale);
+    return true;
+  }
   const wanted = saved.locale ?? deviceLocale();
   if (wanted === locale) return true;
   I18nManager.forceRTL(wanted === 'ar');
   return !(await restart());
+}
+
+/*
+ * The web leaves Arabic's words out of the first download (metro.config.js): an Arabic launch fetches them before the
+ * first screen, an English one only if Ask answers in Arabic. Phones have every word already, so this is a no-op there.
+ */
+let arabic: Promise<void> | null = null;
+export function loadCatalogue(l: CopyLocale): Promise<void> {
+  if (hasCatalogue(l)) return Promise.resolve();
+  arabic ??= import('@mada/shared/copy/ar-catalogue')
+    .then((m) => installCatalogue('ar', m.arCatalogue))
+    .catch(() => { arabic = null; });
+  return arabic;
 }
 
 /** Restart the app. Web reloads the page; native reloads the JS bundle. False when this build can't. */

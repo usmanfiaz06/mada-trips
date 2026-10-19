@@ -3,11 +3,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, type StyleP
 import { Image, type ImageSource } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import Svg, { Circle, Path, Text as SvgText } from 'react-native-svg';
-import Animated from 'react-native-reanimated';
 import { durationLabel } from '@mada/shared';
 import { Icon, type IconName } from '@/components/Icon';
 import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
+import { Entering } from '@/components/Entering';
 import { VGradient } from '@/components/Gradient';
 import { Sun } from '@/components/Sun';
 import { buzz } from '@/lib/haptics';
@@ -388,7 +388,7 @@ export function IdeaTiles({ keys, onAsk, testID }: { keys: IdeaKey[]; onAsk: (as
 export const riseOn = rise;
 /** The web's CSS rise, or nothing on phones. */
 export const riseStyle = (step = 0): ViewStyle | null => webSafeRiseStyle(step);
-export const Rise = ({ step = 0, children, style }: { step?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) => <Animated.View entering={riseOn(step)} style={[riseStyle(step), style]}>{children}</Animated.View>;
+export const Rise = ({ step = 0, children, style }: { step?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) => <Entering step={step} style={[riseStyle(step), style]}>{children}</Entering>;
 
 /** Re-renders every `ms`, for countdowns and live labels. */
 export function useTicker(ms = 1000) {

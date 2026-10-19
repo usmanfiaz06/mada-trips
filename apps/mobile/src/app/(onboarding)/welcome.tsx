@@ -1,15 +1,16 @@
-import { StyleSheet, View } from 'react-native';
-import { Image } from 'expo-image';
+import { useState } from 'react';
+import { Image, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import Animated from 'react-native-reanimated';
 import { Button, LinkButton } from '@/components/Button';
+import { Entering } from '@/components/Entering';
 import { VGradient } from '@/components/Gradient';
 import { useBottomInset, useTopInset } from '@/components/Layout';
 import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { t } from '@/lib/i18n';
-import { rise, riseStyle, useReduceMotion } from '@/lib/motion';
+import { riseStyle, useReduceMotion } from '@/lib/motion';
+import { slowLink } from '@/lib/net/slow-link';
 import { useOnboarding } from '@/lib/onboarding';
 import { useSession } from '@/lib/session';
 import { colors, font } from '@/theme';
@@ -26,7 +27,9 @@ export default function Welcome() {
   const top = useTopInset();
   const bottom = useBottomInset();
   const still = useReduceMotion();
-  const player = useVideoPlayer(VIDEO, (p) => { p.loop = true; p.muted = true; p.play(); });
+  // On a slow or metered connection the photo stays and the film (1 MB) isn't fetched: the first screen's files come first.
+  const [film] = useState(() => !slowLink());
+  const player = useVideoPlayer(film ? VIDEO : null, (p) => { p.loop = true; p.muted = true; p.play(); });
   // Both buttons open the same sign-in (the same code flow); only its headline differs. The account decides the rest.
   const signIn = (intent: 'new' | 'back') => {
     useOnboarding.getState().reset();
@@ -40,19 +43,20 @@ export default function Welcome() {
 
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.night }]}>
-      <Image source={POSTER} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} />
-      {!still && <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} accessible={false} pointerEvents="none" />}
+      {/* React Native's own Image: the first screen doesn't carry expo-image (docs/app/PERF.md). */}
+      <Image source={POSTER} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />
+      {!still && film && <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} accessible={false} pointerEvents="none" />}
       <VGradient id="welcome" stops={[[0, 'rgba(15,26,22,0.45)'], [0.22, 'rgba(15,26,22,0)'], [0.38, 'rgba(15,26,22,0)'], [0.6, 'rgba(30,53,45,0.82)'], [0.8, '#1e352d'], [1, '#1e352d']]} />
       <View style={[styles.content, { paddingTop: top + 20, paddingBottom: bottom + 32 }]}>
         <Sun width={64} />
         <View style={{ gap: 26 }}>
           <View style={{ gap: 14, paddingHorizontal: 4 }}>
-            <Animated.View entering={rise(0)} style={riseStyle(0)}>
+            <Entering step={0} style={riseStyle(0)}>
               <T style={[font('displayXL', colors.mist)]} accessibilityRole="header">{t('welcome.title')}</T>
-            </Animated.View>
-            <Animated.View entering={rise(2)} style={riseStyle(2)}>
+            </Entering>
+            <Entering step={2} style={riseStyle(2)}>
               <T v="body" color="#e1dacd" style={{ fontSize: 18, lineHeight: 26 }}>{t('welcome.body')}</T>
-            </Animated.View>
+            </Entering>
           </View>
           <View style={{ gap: 12 }}>
             <Button variant="gold" label={t('welcome.start')} onPress={() => signIn('new')} testID="welcome-start" />

@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { create } from 'zustand';
 import { headerDay, hijriLabel, outSegment, rangeLong, todayIn, zonedToInstant, type TripDetail, type TripPhase } from '@mada/shared';
 import { Avatar } from '@/components/Avatar';
@@ -19,6 +18,7 @@ import { t } from '@/lib/i18n';
 import { useSession } from '@/lib/session';
 import { DEMO_ALLOWED, useDemo, useTrips } from '@/lib/trips';
 import { colors, ff, radii, shadow } from '@/theme';
+import { Appear } from '../Appear';
 
 /* Pieces Today shares across its moments: the header, the morning wash, the trip hero, banners and the demo panel. */
 
@@ -142,7 +142,7 @@ export function BannerHost() {
   const { msg, hide } = useBanner();
   if (!msg) return null;
   return (
-    <Animated.View key={msg.id} entering={FadeInUp.duration(450)} exiting={FadeOutUp.duration(250)} style={[styles.banner, shadow('focal'), { top: top + 4 }]}>
+    <Appear key={msg.id} enter="fadeUp" ms={450} exit="fadeUp" exitMs={250} style={[styles.banner, shadow('focal'), { top: top + 4 }]}>
       <Pressable testID="banner" accessibilityRole="alert" onPress={() => { hide(); if (msg.href) router.push(msg.href as Href); }} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
         <View style={styles.appIc}><Sun width={22} /></View>
         <Grow>
@@ -150,7 +150,7 @@ export function BannerHost() {
           <Small color={colors.inkSoft}>{msg.body}</Small>
         </Grow>
       </Pressable>
-    </Animated.View>
+    </Appear>
   );
 }
 

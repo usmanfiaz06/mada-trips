@@ -4,7 +4,6 @@ import { useOnboarding } from '../onboarding';
 import { useSession } from '../session';
 import { AUTH_MODE } from './config';
 import { mockAuth } from './mock';
-import { supabaseAuth } from './supabase';
 import type { AuthBackend, Identity } from './types';
 import { saveLastSignIn } from './last';
 import { wayKnownOff } from './providers';
@@ -21,6 +20,18 @@ export { phoneChannels, usePhoneChannels, usePhoneCodes, type PhoneChannel, type
 export { AUTH_MODE, CODE_RESEND_SECONDS } from './config';
 export { loadAuthWays, notReadyMessage, parseAuthSettings, useAuthWays, useWayShown, wayKnownOff, wayReady, wayShown, type Way, type Ways } from './providers';
 export { getLastSignIn, forgetLastSignIn, type LastSignIn } from './last';
+
+/**
+ * The real backend, fetched the first time sign-in uses it: Supabase's SDK is about 240 KB, and the first screen
+ * (Welcome, Today) never needs it (docs/app/PERF.md). Every method is async already, so callers can't tell.
+ */
+const supabaseAuth = new Proxy({ kind: 'supabase' } as AuthBackend, {
+  get(target, prop) {
+    if (prop === 'kind') return target.kind;
+    if (typeof prop !== 'string' || prop === 'then') return undefined;
+    return (...args: unknown[]) => import('./supabase').then((m) => (m.supabaseAuth[prop as keyof AuthBackend] as (...a: unknown[]) => unknown)(...args));
+  },
+});
 
 export const auth = (): AuthBackend => (AUTH_MODE === 'supabase' ? supabaseAuth : mockAuth);
 

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="theme-color" content="#1e352d" />
+    <title>%WEB_TITLE%</title>
+    <!-- react-native-web's reset (https://necolas.github.io/react-native-web/docs/setup/#root-element). -->
+    <style id="expo-reset">
+      html, body { height: 100%; }
+      body { overflow: hidden; margin: 0; background: #e9e2d8; }
+      #root { display: flex; height: 100%; flex: 1; }
+    </style>
+    <!--
+      The first thing on screen, before any script has arrived (docs/app/PERF.md): the sun on the brand green, drawn by
+      the page itself in the first few kilobytes. The app removes it when its first screen is ready (src/app/_layout.tsx).
+    -->
+    <style>
+      #mada-boot { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; background: #1e352d; }
+      #mada-boot svg { width: 96px; height: 64px; fill: #d9b77a; }
+      #mada-boot i { display: block; width: 120px; height: 2px; border-radius: 1px; background: rgba(217, 183, 122, 0.22); overflow: hidden; }
+      #mada-boot i::after { content: ""; display: block; width: 40%; height: 100%; background: #d9b77a; animation: mada-boot 1.4s ease-in-out infinite; }
+      @keyframes mada-boot { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+      @media (prefers-reduced-motion: reduce) { #mada-boot i::after { animation: none; width: 100%; opacity: 0.5; } }
+    </style>
+  </head>
+
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="mada-boot" role="progressbar" aria-label="Mada"><svg viewBox="0 0 132.31 88.61" aria-hidden="true"><path d="M47.95,59.75c0,.14,0,.28,0,.42L0,69.45l4.77-11.37,43.22.48c-.03.39-.04.79-.04,1.19Z"/><path d="M84.36,59.75c0,.14,0,.28,0,.42l47.96,9.28-4.77-11.37-43.22.48c.03.39.04.79.04,1.19Z"/><path d="M73.28,0l-4.89,41.68c-.73-.09-1.48-.14-2.23-.14s-1.5.05-2.23.14L59.03,0h14.25Z"/><path d="M58.2,43.37c-1.53.74-2.95,1.7-4.2,2.83l-25.36-23.54,10.22-8.47,19.34,29.19Z"/><path d="M18.07,35.39l32.47,15.02c-.64,1.07-1.17,2.21-1.59,3.4l-37.72-6.41,6.84-12.01Z"/><path d="M74.11,43.37c1.53.74,2.95,1.7,4.2,2.83l25.36-23.54-10.22-8.47-19.34,29.19Z"/><path d="M114.25,35.39l-32.47,15.02c.64,1.07,1.17,2.21,1.59,3.4l37.72-6.41-6.84-12.01Z"/><path d="M63.33,61.18h-2.23c-.71,0-1.39.32-1.84.88l-21.48,26.55h18.76l6.79-27.43Z"/><path d="M68.98,61.18h2.23c.71,0,1.39.32,1.84.88l21.48,26.55h-18.76s-6.79-27.43-6.79-27.43Z"/></svg><i></i></div>
+    <div id="root"></div>
+  </body>
+</html>

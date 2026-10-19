@@ -65,6 +65,10 @@ module.exports = ({ config }) => {
     out.plugins.push('@bacons/apple-targets');
   }
 
+  // The web export loads each screen when it is first opened (critique #5, docs/app/PERF.md): the first download is
+  // the shell and the screen that opens, not all ninety. Phones ship every screen in the app, so they stay as they are.
+  out.extra.router = { ...(config.extra?.router ?? {}), asyncRoutes: { web: 'production', default: false } };
+
   // Directions from Things to do (src/lib/directions.ts): Android 11+ only lets canOpenURL see apps declared here.
   out.plugins.push(withRideAppQueries);
 

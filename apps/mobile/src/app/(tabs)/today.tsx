@@ -7,12 +7,13 @@ import { BannerHost, DemoSheet, TodayHeader, Wash, todayHour } from '@/component
 import { Booked } from '@/components/today/Booked';
 import { DayBefore } from '@/components/today/DayBefore';
 import { Home } from '@/components/today/Home';
-import { InAir } from '@/components/today/InAir';
+import { InAir, preloadInAir } from '@/components/today/InAir';
 import { Landed } from '@/components/today/Landed';
 import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
 import { LowPowerEntry } from '@/components/today/LowPower';
 import { FollowLockScreen } from '@/components/today/FollowLockScreen';
+import { slowLink } from '@/lib/net/slow-link';
 import { useSession } from '@/lib/session';
 import { clockOffset, serverNow } from '@/lib/net/clock';
 import { registerForPush, useCarryOverGuestFlights, useTrip, useTrips } from '@/lib/trips';
@@ -31,6 +32,8 @@ export default function Today() {
   useScrollToTop(scroll);
   useCarryOverGuestFlights();
   useEffect(() => { void registerForPush(); }, [status]);
+  // The in-flight swipe deck's file comes down once Today is up, so it's there in the air (InAir.tsx).
+  useEffect(() => { const warm = setTimeout(() => { void preloadInAir(); }, slowLink() ? 25000 : 5000); return () => clearTimeout(warm); }, []);
   const trips = useTrips();
   const currentId = trips.data?.currentId ?? null;
   const tripQ = useTrip(currentId);

@@ -2,7 +2,11 @@
  * The web app's shell, kept for a reload with no signal (an airport, a lift, a plane on the ground).
  *
  * What is kept: the page itself (index.html), the hashed bundles it names (/_expo/static/…), and the app's own files
- * (/assets/…: fonts, icons, the bundled photos). That is all. Nothing from /api is ever touched here: trips, Wallet
+ * (/assets/…: fonts, icons, the bundled photos). That is all. At install only the shell is saved: the page and the
+ * two scripts it names (the runtime and the entry, which draws the first screen). Every other screen's file is saved
+ * the first time the app fetches it (and what the first visit fetched before this worker was in charge, the page
+ * lists in a 'keep' message), so a first visit on a slow connection isn't spent downloading screens nobody opened
+ * (docs/app/PERF.md). Nothing from /api is ever touched here: trips, Wallet
  * and messages are saved by the app itself (lib/net/persist.ts, lib/net/outbox.ts), per account, and dropped on
  * sign-out. So this cache holds nothing that belongs to a traveller: no tokens, no passports, no trips. An API answer,
  * good or bad, always comes straight from the network: an error is never hidden behind an old copy.
@@ -44,13 +48,6 @@ function namedIn(html) {
   return [...out];
 }
 
-/** The chunks a bundle loads later (other screens, the mock API): their paths are written in the entry bundle. */
-function chunksIn(js) {
-  const out = new Set();
-  for (const m of js.matchAll(/_expo\/static\/js\/[A-Za-z0-9_./-]+\.js/g)) out.add(`/${m[0]}`);
-  return [...out];
-}
-
 /** The saved builds, newest first: each cache's page carries when it was saved. */
 async function savedBuilds() {
   const out = [];
@@ -76,7 +73,7 @@ async function tellClients(build) {
   for (const c of await self.clients.matchAll({ type: 'window', includeUncontrolled: true })) c.postMessage({ type: 'build', build });
 }
 
-/** Save a page and everything it needs, in its own build's cache. */
+/** Save a page and the scripts it names (the shell), in its own build's cache. */
 async function keepPage(res) {
   const html = await res.clone().text();
   const build = buildOf(html);
@@ -94,11 +91,8 @@ async function keepPage(res) {
     return hit;
   };
   // Bundles first: a saved page whose bundles aren't saved would open blank offline.
-  await Promise.all([...wanted].map(async (path) => {
-    const r = await save(path);
-    if (r && path.endsWith('.js')) for (const c of chunksIn(await r.clone().text())) wanted.add(c);
-  }));
-  await Promise.all([...wanted].map((path) => save(path).catch(() => null)));
+  const saved = await Promise.all([...wanted].map((path) => save(path).catch(() => null)));
+  if (saved.some((r) => !r)) return null;
   const headers = new Headers(res.headers);
   headers.set('x-mada-saved', String(Date.now()));
   await cache.put(PAGE, new Response(html, { status: 200, headers }));

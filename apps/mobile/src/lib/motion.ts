@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Platform, type ViewStyle } from 'react-native';
-import { FadeInDown } from 'react-native-reanimated';
+import { rise } from './rise';
+
+export { rise };
 
 /** Reduce Motion replaces movement with stillness (EXPERIENCE.md §4.5). */
 export function useReduceMotion() {
@@ -12,15 +14,6 @@ export function useReduceMotion() {
   }, []);
   return on;
 }
-
-/**
- * The prototype's `.rise` entrance (12 points up, 500 ms, its ease), staggered by `step` × 60 ms, for `entering=`.
- *
- * Phones only: on the web, Reanimated's entering animations can stall and leave the view absolutely positioned
- * (top: -120px, over the next view), so there `rise()` is nothing and the view sits in its normal place. Pair it with
- * `style={riseStyle(step)}` to get the same movement on the web as a plain CSS animation.
- */
-export const rise = (step = 0) => (Platform.OS === 'web' ? undefined : FadeInDown.duration(500).delay(step * 60).withInitialValues({ opacity: 0, transform: [{ translateY: 12 }] }));
 
 /**
  * The web's rise as a CSS animation (nothing on phones). `fadeOnly` for views that carry their own transform

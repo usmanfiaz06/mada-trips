@@ -1,12 +1,18 @@
 import { router, type Href } from 'expo-router';
 import { describeError, type Described } from '@/lib/net/describe';
 import { reportingOn } from '@/lib/net/report';
-import { talkToMada } from '@/lib/net/talk';
 import { t } from '@/lib/i18n';
 import { Button } from '../Button';
 import { ArtMissing, ArtNoSignal, ArtRouteGap, ArtSign, ArtUpdate, ArtWaiting } from './art';
-import { ArtHolding } from './holding';
+import { later } from '../Later';
 import { StateView } from './StateView';
+
+/*
+ * These states are drawn by the root layout's crash screen too, so they stay light: the moving holding pattern and
+ * the "talk to Mada" helper (which reads the desk's number from the Wallet's schemas) come in their own files.
+ */
+const ArtHolding = later(() => import('./holding').then((m) => m.ArtHolding));
+const talkToMada = () => { void import('@/lib/net/talk').then((m) => m.talkToMada()); };
 
 /**
  * A whole screen (or section) that couldn't load, for any reason: pass the error (or a Described) and it picks the
@@ -57,7 +63,7 @@ export function OfflineState({ variant = 'full', body }: { variant?: 'full' | 'c
 /** The app crashed or a screen threw: the frayed cable. Used by the ErrorBoundary. */
 export function CrashState({ onRestart, reference }: { onRestart: () => void; reference?: string | null }) {
   return (
-    <StateView art={<ArtHolding />} eyebrow={t('crash.eyebrow')} title={t('crash.title')} body={t('crash.body')}
+    <StateView art={<ArtHolding when />} eyebrow={t('crash.eyebrow')} title={t('crash.title')} body={t('crash.body')}
       primary={<Button label={t('crash.restart')} onPress={onRestart} testID="crash-restart" />}
       secondary={<Button variant="ghost" label={t('action.talk')} onPress={() => talkToMada()} testID="crash-talk" />}
       note={reportingOn() ? `${t('crash.note')}${reference ? ` ${t('problem.ref', { ref: reference })}` : ''}` : null} testID="state-crash" />

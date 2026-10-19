@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { AcceptInviteResponse } from '@mada/shared';
 import { request } from './api';
 import { useSession } from './session';
 import { deleteSecret, getSecret, setSecret } from './storage';
@@ -23,6 +22,8 @@ async function resume() {
   busy = true;
   try {
     await deleteSecret(KEY);
+    // The schema comes with the join itself: this file is registered at launch, before the first screen.
+    const { AcceptInviteResponse } = await import('@mada/shared/schemas/circles');
     const r = await request({ method: 'POST', path: `/invites/${encodeURIComponent(code)}/accept` }, AcceptInviteResponse);
     // Onboarding finishes by opening Today; arrive in the circle on top of it.
     setTimeout(() => {

@@ -1,6 +1,5 @@
 import { useEffect, useId } from 'react';
 import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
-import Animated, { ZoomIn } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { DESTINATIONS, formatSar, type CopyKey, type EsimPlan, type EsimView } from '@mada/shared';
 import { Photo } from '@/components/booking/parts';
@@ -12,6 +11,7 @@ import { buzz } from '@/lib/haptics';
 import { t } from '@/lib/i18n';
 import { useReduceMotion } from '@/lib/motion';
 import { colors, ff, font, radii, shadow } from '@/theme';
+import { PopIn } from '../PopIn';
 
 /*
  * How an eSIM looks: the place it's for as a photo, each plan as a size you can see, the eSIM itself as a card in Mada
@@ -336,7 +336,7 @@ export function SetMoment({ where }: { where: string }) {
   return (
     <Rise>
       <View style={styles.set} testID="esim-set" accessibilityRole="alert">
-        <Animated.View entering={Platform.OS === 'web' || still ? undefined : ZoomIn.springify().damping(12)} style={pop}><BigCheck size={52} /></Animated.View>
+        <PopIn still={still} style={pop}><BigCheck size={52} /></PopIn>
         <View style={{ flex: 1 }}><T style={[font('displaySmall'), { fontSize: 26, lineHeight: 30 }]}>{t('es.set', { where })}</T></View>
       </View>
     </Rise>

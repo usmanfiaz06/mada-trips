@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
-import Animated from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { durationLabel, formatSar } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
@@ -13,6 +12,7 @@ import { VGradient } from '../Gradient';
 import { Icon, type IconName } from '../Icon';
 import { Sun } from '../Sun';
 import { T } from '../Text';
+import { Entering } from '../Entering';
 
 /* Pieces the booking screens share: photos, the working steps, one-question chips, notices, the route row. */
 
@@ -61,7 +61,7 @@ export function useNow(ms = 1000) {
 /** Mada shows its work: the sun thinks, the steps tick off one by one. */
 export function Working({ lines, step }: { lines: string[]; step: number }) {
   return (
-    <Animated.View entering={enter(0)} style={styles.working}>
+    <Entering step={0} style={styles.working}>
       <View style={{ marginTop: 2 }}><Sun width={34} color={colors.goldDeep} /></View>
       <View style={{ flex: 1, gap: 14 }}>
         {lines.map((text, i) => (i > step ? null : (
@@ -73,7 +73,7 @@ export function Working({ lines, step }: { lines: string[]; step: number }) {
           </View>
         )))}
       </View>
-    </Animated.View>
+    </Entering>
   );
 }
 
@@ -113,12 +113,12 @@ export function ChipWrap({ children, style }: { children: ReactNode; style?: Sty
  */
 export function Ask1({ q, options, onPick, line, children }: { q: string; options: [string, string][]; onPick: (v: string) => void; line?: string; children?: ReactNode }) {
   return (
-    <Animated.View entering={enter(0)} style={{ gap: 14 }}>
+    <Entering step={0} style={{ gap: 14 }}>
       <T style={font('displaySmall')} accessibilityRole="header">{q}</T>
       <ChipWrap>{options.map(([label, v]) => <Chip key={label} label={label} background={colors.paper} onPress={() => onPick(v)} />)}</ChipWrap>
       {line ? <T v="small">{line}</T> : null}
       {children}
-    </Animated.View>
+    </Entering>
   );
 }
 

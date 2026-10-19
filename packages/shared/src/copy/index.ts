@@ -1,6 +1,5 @@
 import { en, type CopyKey } from './en';
-import { authCopyAr } from './auth.ar';
-import { arSections } from './ar';
+import { arCatalogue } from './ar-catalogue';
 import { nameIn } from './names-ar';
 import { isLatinRun, localeOr, localizeDigits, LRI, PDI, pluralKeys, type Lang } from '../locale';
 
@@ -15,11 +14,22 @@ export type Vars = Record<string, string | number>;
  * (`.two`, `.few`, `.many`, `.zero`). Sections live in ./ar; sign-in keeps its own file (auth.ar.ts).
  * A key Arabic lacks falls back to English rather than showing nothing.
  */
-export const ar: Readonly<Record<string, string>> = { ...arSections, ...authCopyAr };
+export const ar: Readonly<Record<string, string>> = arCatalogue;
 const catalogues: Record<CopyLocale, Readonly<Record<string, string>>> = { en, ar };
 
 /** The whole catalogue for a locale. */
 export const catalogueFor = (locale: CopyLocale): Readonly<Record<string, string>> => catalogues[locale];
+
+/**
+ * The web app leaves Arabic out of its first download (apps/mobile/metro.config.js resolves ./ar-catalogue to an
+ * empty one there) and puts it in place here once fetched, before any Arabic screen draws. Until then an Arabic
+ * lookup falls back to English, as for any key Arabic lacks. Everywhere else Arabic is here from the start.
+ */
+export function installCatalogue(locale: CopyLocale, table: Readonly<Record<string, string>>): void {
+  catalogues[locale] = table;
+}
+/** Whether a locale's words are here (always, except Arabic on the web before it is fetched). */
+export const hasCatalogue = (locale: CopyLocale): boolean => locale === 'en' || Object.keys(catalogues[locale]).length > 0;
 
 /** A string that was never written looks obviously unfinished (COPY.md §9), so it can't ship by accident. */
 export const placeholderFor = (key: string) => `⟦${key}⟧`;
