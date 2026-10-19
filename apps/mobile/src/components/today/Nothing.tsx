@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { addDays, dayLabel, durationLabel, FlightNumber, AIRPORT_CITY, todayIn, type TrackedFlightView } from '@mada/shared';
 import { ArtFriends, ArtPass } from '@/components/art/Arts';
 import { AirlineMark } from '@/components/booking/AirlineMark';
@@ -171,7 +171,7 @@ export function TrackedFlights({ flights, title, onStop }: { flights: Shown[]; t
 }
 
 /** Number, then the day, then (once) whether to alert. */
-export function TrackFlight({ guest }: { guest: boolean }) {
+export function TrackFlight({ guest, autoFocus }: { guest: boolean; autoFocus?: boolean }) {
   const [q, setQ] = useState('');
   const [touched, setTouched] = useState(false);
   const [when, setWhen] = useState<'today' | 'tomorrow' | 'pick' | null>(null);
@@ -220,7 +220,7 @@ export function TrackFlight({ guest }: { guest: boolean }) {
       <Box gap={14}>
         <View style={{ gap: 6 }}>
           <T style={styles.label}>{t('td.track.label')}</T>
-          <TextInput testID="track-input" value={q} onChangeText={(v) => setQ(v.toUpperCase())} onBlur={() => setTouched(true)} placeholder="SV263" placeholderTextColor={colors.muted} autoCapitalize="characters" autoCorrect={false}
+          <TextInput testID="track-input" autoFocus={autoFocus} value={q} onChangeText={(v) => setQ(v.toUpperCase())} onBlur={() => setTouched(true)} placeholder="SV263" placeholderTextColor={colors.muted} autoCapitalize="characters" autoCorrect={false}
             style={[styles.input, touched && err ? { borderColor: colors.bad } : null]} accessibilityLabel={t('td.track.label')} />
           {(touched || code.length > 3) && err ? <T v="small" color={colors.bad} accessibilityRole="alert">{err}</T> : null}
         </View>
@@ -245,8 +245,11 @@ export function TrackFlight({ guest }: { guest: boolean }) {
   );
 }
 
-export function Guest() {
+export function Guest({ scrollTo }: { scrollTo?: (y: number) => void }) {
   const router = useRouter();
+  // "Track a flight" on the welcome: straight to the number field.
+  const { track } = useLocalSearchParams<{ track?: string }>();
+  const scrolled = useRef(false);
   const flights = useGuestFlights((s) => s.flights);
   const remove = useGuestFlights((s) => s.remove);
   return (
@@ -256,7 +259,9 @@ export function Guest() {
       <Rise step={1}><IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={(x) => router.push({ pathname: '/ask', params: { prefill: x } })} testID="guest-ideas" /></Rise>
       <Rise step={1}><Button label={t('ask.composer')} variant="secondary" onPress={() => router.push('/ask')} testID="guest-ask" /></Rise>
       <Rise step={2}><H3>{t('td.guest.title')}</H3></Rise>
-      <Rise step={2}><TrackFlight guest /></Rise>
+      <View onLayout={(e) => { if (track && !scrolled.current) { scrolled.current = true; scrollTo?.(e.nativeEvent.layout.y); } }}>
+        <Rise step={2}><TrackFlight guest autoFocus={!!track} /></Rise>
+      </View>
       <TrackedFlights flights={flights.map((f) => ({ ...f, status: 'scheduled' as const }))} onStop={(f) => remove(f.id)} />
       {!flights.length ? <EmptyState compact art={<ArtPass width={80} height={60} />} title={t('td.guest.emptyTitle')} body={t('td.guest.emptyBody')} /> : null}
       <Rise step={2}>

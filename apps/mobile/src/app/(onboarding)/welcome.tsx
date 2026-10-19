@@ -17,20 +17,33 @@ import { colors, font } from '@/theme';
 const VIDEO = require('../../../assets/video/welcome.mp4');
 const POSTER = require('../../../assets/images/welcome.jpg');
 
-/** "We'll take it from here." over the film: look around first (no account), or sign in on one line (FLOWS.md §1). */
+/**
+ * "We'll take it from here." over the film (FLOWS.md §1). Get started (a new account) is the one gold button,
+ * I have an account sits under it, and looking around or tracking a flight (no account) are quiet links below.
+ */
 export default function Welcome() {
   const router = useRouter();
   const top = useTopInset();
   const bottom = useBottomInset();
   const still = useReduceMotion();
   const player = useVideoPlayer(VIDEO, (p) => { p.loop = true; p.muted = true; p.play(); });
+  // Both buttons open the same sign-in (the same code flow); only its headline differs. The account decides the rest.
+  const signIn = (intent: 'new' | 'back') => {
+    useOnboarding.getState().reset();
+    useOnboarding.getState().set({ intent });
+    router.push(intent === 'new' ? '/signin?mode=new' : '/signin');
+  };
+  const guest = (track?: boolean) => {
+    useSession.getState().becomeGuest();
+    router.replace(track ? '/today?track=1' : '/today');
+  };
 
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.night }]}>
       <Image source={POSTER} style={StyleSheet.absoluteFill} contentFit="cover" accessible={false} />
       {!still && <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} accessible={false} pointerEvents="none" />}
-      <VGradient id="welcome" stops={[[0, 'rgba(15,26,22,0.45)'], [0.22, 'rgba(15,26,22,0)'], [0.42, 'rgba(15,26,22,0)'], [0.66, 'rgba(30,53,45,0.82)'], [0.84, '#1e352d'], [1, '#1e352d']]} />
-      <View style={[styles.content, { paddingTop: top + 20, paddingBottom: bottom + 40 }]}>
+      <VGradient id="welcome" stops={[[0, 'rgba(15,26,22,0.45)'], [0.22, 'rgba(15,26,22,0)'], [0.38, 'rgba(15,26,22,0)'], [0.6, 'rgba(30,53,45,0.82)'], [0.8, '#1e352d'], [1, '#1e352d']]} />
+      <View style={[styles.content, { paddingTop: top + 20, paddingBottom: bottom + 32 }]}>
         <Sun width={64} />
         <View style={{ gap: 26 }}>
           <View style={{ gap: 14, paddingHorizontal: 4 }}>
@@ -41,12 +54,13 @@ export default function Welcome() {
               <T v="body" color="#e1dacd" style={{ fontSize: 18, lineHeight: 26 }}>{t('welcome.body')}</T>
             </Animated.View>
           </View>
-          <View style={{ gap: 18 }}>
-            {/* The app first: search, prices, hotels, Discover and tracking a flight need no account. Sign-in is asked at
-                booking (components/auth/SignInSheet), and here on one line for someone who already has one. */}
-            <Button variant="gold" label={t('welcome.browse')} onPress={() => { useSession.getState().becomeGuest(); router.replace('/today'); }} testID="welcome-browse" />
-            <View style={styles.links}>
-              <LinkButton label={t('welcome.signin')} color="#e1dacd" size={15} onPress={() => { useOnboarding.getState().reset(); router.push('/signin'); }} testID="welcome-start" />
+          <View style={{ gap: 12 }}>
+            <Button variant="gold" label={t('welcome.start')} onPress={() => signIn('new')} testID="welcome-start" />
+            <Button variant="glass" label={t('welcome.signin')} onPress={() => signIn('back')} testID="welcome-signin" />
+            {/* Search, prices, hotels, Discover and a flight's status need no account; booking asks then (SignInSheet). */}
+            <View style={[styles.links, { paddingTop: 8 }]}>
+              <LinkButton label={t('welcome.browse')} color="#e1dacd" size={15} onPress={() => guest()} testID="welcome-browse" />
+              <LinkButton label={t('welcome.track')} color="#e1dacd" size={15} onPress={() => guest(true)} testID="welcome-track" />
             </View>
             <View style={styles.links}>
               <LinkButton label={t('circles.code.welcome')} color="#e1dacd" size={13} onPress={() => router.push('/invite-code')} testID="welcome-invite-code" />
@@ -60,5 +74,5 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
-  links: { flexDirection: 'row', justifyContent: 'center', gap: 28, paddingTop: 2 },
+  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', columnGap: 28, rowGap: 10, paddingTop: 2 },
 });

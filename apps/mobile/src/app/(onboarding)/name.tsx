@@ -10,11 +10,14 @@ import { AUTO_FOCUS } from '@/lib/config';
 import { useOnboarding } from '@/lib/onboarding';
 import { useUpdateMe } from '@/lib/queries';
 import { toast } from '@/lib/toast';
+import { colors } from '@/theme';
 
 /** "What should we call you?" Skip is fine. Apple and Google prefill it (FLOWS.md §1). */
 export default function Name() {
   const router = useRouter();
   const suggested = useOnboarding((s) => s.suggestedName);
+  // Came in by "I have an account" but there wasn't one: never a dead end, just a new account and a warm word.
+  const newHere = useOnboarding((s) => s.intent === 'back');
   const [nick, setNick] = useState(suggested);
   const update = useUpdateMe();
   const first = nick.trim().split(/\s+/)[0] ?? '';
@@ -31,6 +34,7 @@ export default function Name() {
       <TopBar onBack={() => router.back()} right={<View style={{ paddingHorizontal: 4 }}><LinkButton label={t('common.skip')} size={15} onPress={() => go(true)} /></View>} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <View style={{ paddingHorizontal: 24, paddingTop: 24, gap: 16 }}>
+          {newHere ? <T v="small" color={colors.green} testID="name-new-here">{t('name.newHere')}</T> : null}
           <T v="h1" accessibilityRole="header">{t('name.title')}</T>
           <T v="body">{t('name.body')}</T>
           <Field label={t('name.label')} value={nick} onChangeText={setNick} autoCapitalize="words" autoComplete="given-name" textContentType="givenName"

@@ -88,7 +88,7 @@ try {
     const k = kit(page);
     await page.goto(ORIGIN + '/');
     await k.see("We'll take it from here.", 'welcome');
-    await k.see('Already with Mada? Sign in', 'welcome sign-in line');
+    await k.see('I have an account', 'welcome sign-in button');
     await k.shot('welcome');
     await k.byTest('welcome-browse').click();
     await k.see('Where to?', 'guest today');

@@ -10,9 +10,10 @@
 //   2. Google → Verify your phone (a wrong code, then the right one) → name → alerts → Today
 //   3. Email (an incomplete address, a wrong code) → Verify your phone → name
 //   4. Phone → code → name → alerts → Today → Profile › Sign-in methods: add email (code in the sheet), add Google
-//   5. The demo number again on a new phone: Welcome back
+//   5. The demo number again on a new phone (by Get started): Welcome back
 //   … 12. Phone codes on WhatsApp: the WhatsApp line and mark, "Send by SMS instead" after the minute (the clock is
 //      fast-forwarded), the sheet's WhatsApp rows; 13. a number not on WhatsApp gets it by SMS, and says so
+//   14. I have an account with an address that has none → name, with "New here? Welcome."; 15. the welcome's four ways
 // Fails on any page error or missing text.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
@@ -51,7 +52,7 @@ let n = 0;
 const step = (s) => console.log('·', s);
 const randomPhone = () => `5${String(Math.floor(10_000_000 + Math.random() * 89_999_999))}`;
 
-async function fresh(name, { locale = 'en-GB', last = null, clock = false } = {}) {
+async function fresh(name, { locale = 'en-GB', last = null, clock = false, door = 'welcome-start' } = {}) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale, timezoneId: 'Asia/Riyadh' });
   // A clock the test can move on (the minute between codes), still running by itself.
   if (clock) await context.clock.install();
@@ -74,8 +75,9 @@ async function fresh(name, { locale = 'en-GB', last = null, clock = false } = {}
 
   await page.goto(ORIGIN + '/');
   await page.evaluate(() => document.fonts.ready);
-  await byTest('welcome-start').click();
-  if (locale === 'en-GB') await see('Sign in to Mada.', 'signin');
+  // "Get started" (welcome-start) opens it as a new account; "I have an account" (welcome-signin) as welcome back.
+  await byTest(door).click();
+  if (locale === 'en-GB') await see(door === 'welcome-start' ? 'Create your Mada account.' : 'Sign in to Mada.', 'signin');
   else await page.waitForTimeout(1200);
   return { context, page, shot, see, gone, byTest, tap };
 }
@@ -197,6 +199,7 @@ try {
     await p.shot('verify-phone');
     await verifyPhone(p);
     await p.see('What should we call you?', 'name');
+    await p.gone('New here? Welcome.', 'came by Get started');
     await p.shot('name');
     await p.context.close();
   }
@@ -498,6 +501,39 @@ try {
     if (await p.page.getByText('Send on WhatsApp in').count()) errors.push('not-whatsapp: a second countdown for WhatsApp');
     await p.shot('code');
     await p.context.close();
+  }
+
+  {
+    step('14. "I have an account" with an address that has none: a new account all the same, warmly');
+    const p = await fresh('have-account', { door: 'welcome-signin' });
+    await p.see('Your trips, your people, one place.', 'welcome back line');
+    await p.shot('signin-back');
+    await p.byTest('signin-email').click();
+    await p.byTest('email-input').fill(`noor.${Date.now()}@example.com`);
+    await p.byTest('email-send').click();
+    await p.byTest('email-code-input').fill('123456');
+    await verifyPhone(p);
+    await p.see('New here? Welcome.', 'new here line');
+    await p.see('What should we call you?', 'name');
+    await p.shot('name-new-here');
+    await p.context.close();
+  }
+
+  {
+    step('15. The welcome: Get started first, then I have an account, Look around first and Track a flight');
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'en-GB', timezoneId: 'Asia/Riyadh' });
+    const page = await context.newPage();
+    await page.goto(ORIGIN + '/');
+    for (const text of ['Get started', 'I have an account', 'Look around first', 'Track a flight']) {
+      await page.getByText(text, { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10000 }).catch(() => errors.push(`welcome: "${text}" missing`));
+    }
+    n += 1; await page.waitForTimeout(700); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-welcome.png`) });
+    await page.locator('[data-testid="welcome-track"]').click();
+    await page.locator('[data-testid="track-input"]').filter({ visible: true }).first().waitFor({ timeout: 10000 });
+    const focused = await page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+    if (focused !== 'track-input') errors.push(`welcome-track: the flight number field should have focus (had ${focused})`);
+    n += 1; await page.waitForTimeout(700); await page.screenshot({ path: join(OUT, `${String(n).padStart(2, '0')}-welcome-track.png`) });
+    await context.close();
   }
 } catch (e) {
   errors.push(String(e?.stack ?? e));

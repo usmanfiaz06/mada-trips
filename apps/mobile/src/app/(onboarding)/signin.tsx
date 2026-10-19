@@ -33,7 +33,11 @@ const PHOTOS = [
 export default function SignIn() {
   const router = useRouter();
   // ?with=apple|google: "Try another way" on a code screen goes straight to that provider.
-  const { with: withProvider } = useLocalSearchParams<{ with?: SocialProvider }>();
+  // ?mode=new: "Get started" on the welcome. Only the words change; the same ways and codes, and the account decides
+  // what comes after (a new one names itself, a known one is welcomed back), whichever button was tapped.
+  const { with: withProvider, mode } = useLocalSearchParams<{ with?: SocialProvider; mode?: 'new' }>();
+  const isNew = mode === 'new';
+  useEffect(() => { useOnboarding.getState().set({ intent: isNew ? 'new' : 'back' }); }, [isNew]);
   // The way in this phone used last time goes first; the rest wait behind "Use another way".
   const [last, setLast] = useState<LastSignIn | null>(null);
   const [all, setAll] = useState(false);
@@ -121,8 +125,8 @@ export default function SignIn() {
         </View>
       </View>
       <View style={{ paddingHorizontal: 24, paddingTop: 26, gap: 8 }}>
-        <T style={font('display')} accessibilityRole="header">{t('signin.title')}</T>
-        <T v="body" color={colors.ink2}>{t('signin.body')}</T>
+        <T style={font('display')} accessibilityRole="header">{t(isNew ? 'signin.titleNew' : 'signin.title')}</T>
+        <T v="body" color={colors.ink2}>{t(isNew ? 'signin.bodyNew' : 'signin.body')}</T>
       </View>
       <Act>
         {showLast ? (

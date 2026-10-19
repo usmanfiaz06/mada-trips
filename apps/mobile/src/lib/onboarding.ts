@@ -11,13 +11,15 @@ type Onboarding = {
   /** Prefilled from Apple/Google. */
   suggestedName: string;
   returning: { name: string } | null;
+  /** Which welcome button brought them: "Get started" (new) or "I have an account" (back). Only the words change. */
+  intent: 'new' | 'back' | null;
   /** Where Verify your phone goes when it's done (or skipped) during onboarding. */
   afterPhone: '/name' | '/welcome-back';
   set: (p: Partial<Omit<Onboarding, 'set' | 'reset'>>) => void;
   reset: () => void;
 };
 
-const initial = { phone: '', email: '', social: null, via: null, suggestedName: '', returning: null, afterPhone: '/name' as const };
+const initial = { phone: '', email: '', social: null, via: null, suggestedName: '', returning: null, intent: null, afterPhone: '/name' as const };
 
 export const useOnboarding = create<Onboarding>((set) => ({
   ...initial,

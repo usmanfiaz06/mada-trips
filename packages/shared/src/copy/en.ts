@@ -122,7 +122,7 @@ export const en = {
   // ───────────── onboarding: welcome ─────────────
   'welcome.title': "We'll take it from here.",
   'welcome.body': "Say where. We book it and stay with you until you're home.",
-  'welcome.start': 'Start',
+  'welcome.start': 'Get started',
   'welcome.track': 'Track a flight',
   'welcomeBack.titleNamed': 'Welcome back, {name}.',
   'welcomeBack.title': 'Welcome back.',

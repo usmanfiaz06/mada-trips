@@ -80,8 +80,8 @@ async function run({ page, phone, returning }) {
   if (!returning) await shot('welcome');
 
   step('sign in');
-  await byTest('welcome-start').click();
-  await see('Sign in to Mada.', 'signin');
+  await byTest(returning ? 'welcome-signin' : 'welcome-start').click();
+  await see(returning ? 'Sign in to Mada.' : 'Create your Mada account.', 'signin');
   if (!returning) {
     await shot('signin');
     await byTest('signin-apple').click();

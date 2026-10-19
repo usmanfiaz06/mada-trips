@@ -7,7 +7,10 @@ import type { ArSection } from './types';
 
 export const arGuest: ArSection<typeof guestCopy> = {
   'welcome.browse': 'تفرّج أول',
-  'welcome.signin': 'عندك حساب في مادا؟ سجّل الدخول',
+  'welcome.signin': 'عندي حساب',
+  'signin.titleNew': 'سوّ حسابك في مادا.',
+  'signin.bodyNew': 'بدون كلمة مرور، وما ياخذ إلا دقيقة.',
+  'name.newHere': 'أول مرة معنا؟ أهلًا فيك.',
 
   'signin.ask.book': 'سجّل دخولك عشان تحجزه',
   'signin.ask.save': 'سجّل دخولك عشان تحفظه',

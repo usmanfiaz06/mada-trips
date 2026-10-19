@@ -5,8 +5,11 @@
  * desk wrote in the other language. Spread into en.ts; Arabic in ar/guest.ts.
  */
 export const guestCopy = {
-  'welcome.browse': 'Look around',
-  'welcome.signin': 'Already with Mada? Sign in',
+  'welcome.browse': 'Look around first',
+  'welcome.signin': 'I have an account',
+  'signin.titleNew': 'Create your Mada account.',
+  'signin.bodyNew': 'No password needed. It takes a minute.',
+  'name.newHere': 'New here? Welcome.',
 
   'signin.ask.book': 'Sign in to book this',
   'signin.ask.save': 'Sign in to save this',

@@ -42,7 +42,7 @@ export default function Today() {
   const now = () => (trip ? Date.parse(trip.clock.now) + (serverNow() - (tripQ.dataUpdatedAt + clockOffset())) : serverNow());
 
   let body: React.ReactNode;
-  if (status === 'guest') body = <Guest />;
+  if (status === 'guest') body = <Guest scrollTo={(y) => scroll.current?.scrollTo({ y: Math.max(0, y - 60), animated: true })} />;
   else if (!trips.data && trips.isPending) body = <View style={{ paddingTop: 80, alignItems: 'center' }}><ActivityIndicator color={colors.green} /></View>;
   else if (!trip || trip.clock.phase === 'none') body = currentId && tripQ.isPending ? <View style={{ paddingTop: 80, alignItems: 'center' }}><ActivityIndicator color={colors.green} /></View> : <Nothing pastLine={lastLine} />;
   else {

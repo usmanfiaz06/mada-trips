@@ -41,7 +41,7 @@ export const arCommon: ArSection<typeof en> = {
   'tabs.wallet': 'المحفظة',
   'welcome.title': 'علينا الباقي.',
   'welcome.body': 'قل لنا وين. نحجزها ونبقى معك لين ترجع.',
-  'welcome.start': 'ابدأ',
+  'welcome.start': 'يلا نبدأ',
   'welcome.track': 'تابع رحلة طيران',
   'welcomeBack.titleNamed': 'حيّاك الله يا {name}.',
   'welcomeBack.title': 'حيّاك الله.',

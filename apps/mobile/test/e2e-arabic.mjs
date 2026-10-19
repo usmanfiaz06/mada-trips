@@ -140,7 +140,8 @@ async function signInDemo(page) {
   await page.goto(ORIGIN + '/');
   await see('علينا الباقي.', 'welcome');
   await page.evaluate(() => document.fonts.ready);
-  await byTest('welcome-start').click();
+  await byTest('welcome-signin').click();
+  await see('سجّل دخولك في مادا.', 'signin');
   await byTest('signin-phone').click();
   await byTest('phone-input').fill('500004127');
   await byTest('phone-send').click();
@@ -161,10 +162,13 @@ async function firstRun() {
   await page.evaluate(() => document.fonts.ready);
   const font = await page.evaluate(() => [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family).join(','));
   if (!/InterTight_400Regular/.test(font)) errors.push(`fonts: ${font}`);
+  await see('يلا نبدأ', 'get started');
+  await see('عندي حساب', 'have an account');
   await shot('welcome');
 
-  step('sign in, phone, code');
+  step('get started: phone, code');
   await byTest('welcome-start').click();
+  await see('سوّ حسابك في مادا.', 'create account headline');
   await page.waitForTimeout(800);
   await shot('signin');
   await byTest('signin-phone').click();
