@@ -17,7 +17,8 @@
 | Purchase history | Yes | orders, payments, invoices, refunds | |
 | Payment card | Brand and last 4 only | MyFatoorah embedded session (`lib/booking.ts`) | The full number goes straight to the provider |
 | Contacts | **Hashed on the phone, matched, not stored** | `people/index.tsx` → `POST /friends/contacts` | Only with permission; only hashes leave |
-| Precise or coarse location | **No** | no location library in the app; Android location permissions blocked | Who's around uses trip cities, not GPS |
+| Approximate location | **Once, when asked; not stored** | `lib/where-am-i.ts` (“Distance from: where I am now” on a hotel search) | Coarse only on Android (precise and background blocked); Who's around uses trip cities, not GPS |
+| Voice | **No audio collected** | `lib/voice.ts` | The phone's own speech service hears it; the app gets the words only |
 | Device ID / advertising ID | **No** | | No IDFA, no AppTrackingTransparency |
 | Push token, device model, app version | Yes | `registerForPush`, `deviceInfo()` | For notifications and signed-in devices |
 | Crash data | Yes, when `EXPO_PUBLIC_SENTRY_DSN` is set | `lib/net/report.ts` | `sendDefaultPii: false`; names, numbers, tokens scrubbed on the phone |
@@ -48,7 +49,7 @@ For every type below: **Linked to the user: Yes** (except Diagnostics), **Used f
 | Identifiers › Device ID | No | |
 | Sensitive Info | No (passports are declared under Other Data) | |
 | Contacts | **No**: processed on the phone and in real time only, nothing retained (Apple's definition of "collect" excludes this). Keep it this way or change the answer. | |
-| Location | No | |
+| Location | No (one-off approximate position for a distance, not stored or linked; Apple's “collect” excludes it). Change to *Coarse Location · App Functionality* if it is ever kept | |
 | Usage Data › Product Interaction | No (until analytics ships) | |
 | Diagnostics › Crash Data | Yes · **Not linked** | App Functionality |
 | Diagnostics › Performance Data | Yes · **Not linked** | App Functionality |
@@ -77,11 +78,11 @@ For every type below: **Linked to the user: Yes** (except Diagnostics), **Used f
 | App info and performance › Crash logs | Yes | No | No | Required when enabled | Analytics (crash diagnosis) |
 | App info and performance › Diagnostics | Yes | No | No | Required when enabled | Analytics |
 | Device or other IDs | Yes (push token) | No | No | Optional | App functionality (notifications) |
-| Location | No | | | | |
+| Location › Approximate location | Yes | No | **Yes** (used once for a distance, not stored) | Optional | App functionality |
 | Web browsing, Audio, Calendar, Health, Files and docs | No (documents are photos/PDFs: declared under Photos) | | | | |
 
 ## Before each release
 
-- [ ] `grep -r "expo-location\|posthog\|@react-native-voice" apps/mobile/src` still finds nothing, or the forms above were updated.
-- [ ] `npm run mobile:doctor` (location and microphone permissions stay blocked).
+- [ ] `grep -r "expo-location\|posthog\|@react-native-voice" apps/mobile/src` finds only `lib/where-am-i.ts` (one-off distance), or the forms above were updated.
+- [ ] `npm run mobile:doctor` (precise and background location stay blocked; microphone only for voice).
 - [ ] The privacy page lists every processor in `platform/src/lib/app/suppliers/live/`.
