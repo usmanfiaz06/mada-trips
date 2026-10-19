@@ -82,6 +82,8 @@ export const AR: Record<string, string> = {
   "By channel": "حسب القناة",
   "Cancel": "إلغاء",
   "Capital advance": "سلفة رأسمالية",
+  "Cash deposited": "إيداع نقدي",
+  "Cash withdrawn": "سحب نقدي",
   "Capital advance (startup)": "سلفة رأسمالية (تأسيس)",
   "Cash": "نقدًا",
   "Cash a partner injected directly, e.g. IATA working capital. Personal expenses go through Expenses instead.": "نقد ضخّه الشريك مباشرة، مثل رأس المال العامل لـ IATA. أما المصاريف الشخصية فتُسجَّل في المصروفات.",

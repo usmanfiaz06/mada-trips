@@ -16,10 +16,20 @@ export async function partnerBalances(q: Q = db) {
     partnerId: schema.ledgerEntries.partnerId, type: schema.ledgerEntries.type,
     total: sql<number>`coalesce(sum(${schema.ledgerEntries.amount}),0)::bigint`.mapWith(Number),
   }).from(schema.ledgerEntries).where(liveLedger).groupBy(schema.ledgerEntries.partnerId, schema.ledgerEntries.type);
+  // Cash a partner moved through a company bank account counts toward their balance too: a deposit is money
+  // they put in (owed back), a withdrawal is money they took back out. Transfers between the company's own
+  // accounts aren't a partner's money, so they don't count.
+  const cash = await q.select({
+    partnerId: schema.bankTransactions.partnerId, direction: schema.bankTransactions.direction,
+    total: sql<number>`coalesce(sum(${schema.bankTransactions.amount}),0)::bigint`.mapWith(Number),
+  }).from(schema.bankTransactions).where(and(isNotNull(schema.bankTransactions.partnerId), ne(schema.bankTransactions.kind, "transfer")))
+    .groupBy(schema.bankTransactions.partnerId, schema.bankTransactions.direction);
   return partners.map((p) => {
     const get = (t: string) => rows.find((r) => r.partnerId === p.id && r.type === t)?.total ?? 0;
-    const lent = get("advance") + get("expense");
-    const repaid = get("repayment");
+    const cashIn = cash.find((c) => c.partnerId === p.id && c.direction === "in")?.total ?? 0;
+    const cashOut = cash.find((c) => c.partnerId === p.id && c.direction === "out")?.total ?? 0;
+    const lent = get("advance") + get("expense") + cashIn;
+    const repaid = get("repayment") + cashOut;
     return { ...p, lent, repaid, outstanding: lent - repaid, dividends: get("dividend") };
   });
 }
