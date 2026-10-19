@@ -127,14 +127,20 @@ async function storedFacts(codes: number[], out: Map<number, HotelFacts>) {
  * fetched by code from the Content API right away (content.ts fillContentNow, live keys only) and used for this same
  * answer; anything still missing just uses the availability names, and the app shows its "no photo yet" tile.
  */
+const contentOnSearch = () => {
+  const v = process.env.HOTELBEDS_CONTENT_ON_SEARCH?.trim().toLowerCase();
+  return v ? v === "yes" : !isProductionDeploy();
+};
+
 export const dbFacts: FactsLookup = async (codes) => {
   const out = new Map<number, HotelFacts>();
   if (!codes.length) return out;
   const unique = [...new Set(codes)].slice(0, 2000);
   try { await storedFacts(unique, out); } catch { return out; /* the content table isn't there yet: names from availability */ }
   const missing = unique.filter((c) => !out.has(c));
-  // HOTELBEDS_CONTENT_ON_SEARCH=no keeps the Content API to the batch job only (docs/app/HOTELBEDS.md, certification §8).
-  if (missing.length && hotelVendor() === "hotelbeds" && process.env.HOTELBEDS_CONTENT_ON_SEARCH !== "no") {
+  // Certification §8 (docs/app/HOTELBEDS.md): production keeps the Content API to the batch job unless
+  // HOTELBEDS_CONTENT_ON_SEARCH=yes; elsewhere it is on unless set to "no".
+  if (missing.length && hotelVendor() === "hotelbeds" && contentOnSearch()) {
     try {
       const { fillContentNow } = await import("./content");
       if (await fillContentNow(missing)) await storedFacts(missing, out);

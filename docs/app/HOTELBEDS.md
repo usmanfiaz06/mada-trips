@@ -92,8 +92,9 @@ Never put keys in the app or in the repo. `npm run hotelbeds:smoke` refuses `HOT
   description, every image path, facilities with names and paid flag). Hotels in our offers but not stored are fetched
   by code; changes since the last run with `lastUpdateTime`. Hotels that show up in a search and aren't stored yet are
   also fetched by code right then (`fillContentNow`: batches of 100, a 3.5 s budget, each hotel at most once in 6 h per
-  instance), so the first traveller sees their photos; `HOTELBEDS_CONTENT_ON_SEARCH=no` turns that off and leaves it to
-  the job, which is what certification answer §8 below describes. Photo picked: GEN, then HAB, then COM, by visualOrder.
+  instance), so the first traveller sees their photos. This runs on staging and development only: on a production
+  deployment it is off unless `HOTELBEDS_CONTENT_ON_SEARCH=yes` (Hotelbeds agrees to it first), so production keeps to
+  the job, which is what certification answer §8 below describes. `HOTELBEDS_CONTENT_ON_SEARCH=no` turns it off anywhere. Photo picked: GEN, then HAB, then COM, by visualOrder.
   Images: `https://photos.hotelbeds.com/giata/{bigger|xl}/{path}`. App: `GET /api/app/v1/hotels/{code}`.
 
 ### Money (`money.ts`)
