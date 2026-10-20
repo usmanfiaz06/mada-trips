@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Anthropic from "@anthropic-ai/sdk";
 import { readSseFrames, type AskChatEvent } from "@mada/shared";
 import { POST as chatPost } from "@/app/api/app/v1/ask/chat/route";
@@ -217,5 +217,69 @@ describe("the eval harness", () => {
     const bad = fakeApi(() => ({ blocks: [{ type: "text", text: "Usually about SAR 50. Which country? For how long?" }] }));
     const [no] = await runEvals(bad, { only: ["esim-pakistan"] });
     expect(no!.problems.join(" | ")).toMatch(/prices: .*one: 2 questions.*tools: wanted one of esim_plans/);
+  });
+});
+
+describe("another provider (openai-compatible)", () => {
+  const chunk = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
+  const sseOf = (parts: string[]) => new Response(new ReadableStream({ start(c) { for (const p of parts) c.enqueue(new TextEncoder().encode(p)); c.close(); } }), { headers: { "content-type": "text/event-stream" } });
+  afterEach(() => { vi.unstubAllGlobals(); for (const k of ["ASK_CHAT_PROVIDER", "ASK_CHAT_BASE_URL", "ASK_CHAT_API_KEY", "ASK_CHAT_MODEL", "ASK_CHAT_PRICE"]) delete process.env[k]; });
+
+  it("translates the conversation: system, words, tool calls and results; thinking and Claude-only fields dropped", async () => {
+    const { toChatCompletion } = await import("@/lib/app/ask-chat/providers-openai");
+    const req = toChatCompletion({
+      model: "deepseek-chat", max_tokens: 100, system: [{ type: "text", text: "Be Mada." }], tools: TOOLS,
+      messages: [
+        { role: "user", content: [{ type: "text", text: "[Context]" }, { type: "text", text: "Dubai" }] },
+        { role: "assistant", content: [{ type: "thinking", thinking: "", signature: "x" }, { type: "text", text: "Checking." }, { type: "tool_use", id: "t1", name: "get_trips", input: {} }] },
+        { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "none", is_error: true }] },
+      ],
+    } as never, true);
+    expect(req.messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "tool"]);
+    expect(req.messages[2]).toMatchObject({ content: "Checking.", tool_calls: [{ id: "t1", function: { name: "get_trips", arguments: "{}" } }] });
+    expect(req.messages[3]).toMatchObject({ tool_call_id: "t1", content: "[error] none" });
+    expect(req.tools!.length).toBe(TOOLS.length);
+    expect(JSON.stringify(req)).not.toMatch(/betas|fallbacks|cache_control|thinking/);
+  });
+
+  it("runs a whole turn through the route: tool call streamed in pieces, then words, priced from ASK_CHAT_PRICE", async () => {
+    const { token } = await signIn();
+    Object.assign(process.env, { ASK_CHAT_PROVIDER: "openai-compatible", ASK_CHAT_BASE_URL: "https://llm.example.test/v1", ASK_CHAT_API_KEY: "k", ASK_CHAT_MODEL: "open-model", ASK_CHAT_PRICE: "0.3,1.2,0.03" });
+    delete process.env.ANTHROPIC_API_KEY;
+    expect((await call(configGet, { method: "GET" })).json.features.askChat).toBe(true);
+    const sent: { url: string; body: { model: string; messages: { role: string; content: string | null }[] } }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      sent.push({ url, body });
+      if (!body.stream) return new Response(JSON.stringify({ choices: [{ message: { content: "" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 1 } }), { headers: { "content-type": "application/json" } });
+      if (body.messages.some((m: { role: string }) => m.role === "tool")) {
+        return sseOf([chunk({ choices: [{ delta: { content: "You have " } }] }), chunk({ choices: [{ delta: { content: "no trips yet." }, finish_reason: "stop" }] }), chunk({ choices: [], usage: { prompt_tokens: 900, completion_tokens: 8, prompt_tokens_details: { cached_tokens: 600 } } }), "data: [DONE]\n\n"]);
+      }
+      return sseOf([chunk({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "get_trips", arguments: "" } }] } }] }), chunk({ choices: [{ delta: { tool_calls: [{ index: 0, function: { arguments: "{}" } }] }, finish_reason: "tool_calls" }] }), "data: [DONE]\n\n"]);
+    }));
+    const r = await chat(token, { text: "What trips do I have?" });
+    expect(said(r.events).final).toBe("You have no trips yet.");
+    expect(sent.filter((s) => s.url === "https://llm.example.test/v1/chat/completions").length).toBeGreaterThanOrEqual(2);
+    expect(sent.every((s) => s.body.model === "open-model")).toBe(true);
+    // The household line is first names only, whoever the provider is.
+    expect(JSON.stringify(sent.map((s) => s.body.messages))).not.toMatch(/Alharbi|surname/);
+  });
+
+  it("counts an HTTP failure as a stop the app falls back on", async () => {
+    const { token } = await signIn();
+    Object.assign(process.env, { ASK_CHAT_PROVIDER: "openai-compatible", ASK_CHAT_BASE_URL: "https://llm.example.test/v1", ASK_CHAT_API_KEY: "k", ASK_CHAT_MODEL: "open-model" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("busy", { status: 429 })));
+    const r = await chat(token, { text: "Istanbul for Eid" });
+    expect(r.events.at(-1)).toEqual({ type: "error", code: "RATE_LIMITED", fallback: true });
+  });
+
+  it("summarises a run for the comparison table, Arabic dialect markers included", async () => {
+    const { dialectOf, summarise } = await import("@/lib/app/ask-chat/evals");
+    expect(dialectOf(["وش تبي الحين؟", "ماذا تريد الآن؟"])).toEqual({ spoken: 3, msa: 3 });
+    const s = summarise([
+      { case: "a", lang: "ar", turn: 1, user: "", reply: "أبشر", tools: [], problems: [], costMicros: 2000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 900 },
+      { case: "b", lang: "en", turn: 1, user: "", reply: "x", tools: [], problems: ["one: 2 questions"], costMicros: 4000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 1500 },
+    ]);
+    expect(s).toMatchObject({ turns: 2, passed: 1, byCheck: { one: 1 }, medianMs: 1500, costPerConversation: 0.003, dialect: { spoken: 1, msa: 0 } });
   });
 });

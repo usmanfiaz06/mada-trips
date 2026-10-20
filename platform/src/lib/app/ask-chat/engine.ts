@@ -1,5 +1,6 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatApi, StreamParams } from "./providers";
 import { t, type AskChatEvent, type AskIntent, type ChatCard, type Person } from "@mada/shared";
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { outgoingProblems, tidy, unbacked } from "./guard";
@@ -22,29 +23,8 @@ import { runTool, statusFor, type ToolCtx } from "./tools";
 
 export const MAX_STEPS = 6;
 
-type StreamParams = Anthropic.Beta.MessageCreateParamsNonStreaming;
-type ReqOpts = { signal?: AbortSignal; timeout?: number; maxRetries?: number };
-/** The two calls the conversation makes, so tests and evals can stand in for the API. */
-export interface ChatApi {
-  stream(params: StreamParams, opts?: ReqOpts): AsyncIterable<Anthropic.Beta.BetaRawMessageStreamEvent> & { finalMessage(): Promise<Anthropic.Beta.BetaMessage> };
-  create(params: StreamParams, opts?: ReqOpts): Promise<Anthropic.Beta.BetaMessage>;
-}
-
-let override: ChatApi | null = null;
-let real: ChatApi | null = null;
-/** Tests and evals: put a stand-in in front of the API (null puts the real one back). */
-export function setChatApi(api: ChatApi | null) { override = api; }
-export function chatApi(): ChatApi {
-  if (override) return override;
-  if (!real) {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 2 });
-    real = {
-      stream: (p, o) => client.beta.messages.stream(p, o),
-      create: (p, o) => client.beta.messages.create(p, o) as Promise<Anthropic.Beta.BetaMessage>,
-    };
-  }
-  return real;
-}
+// Who answers is behind one interface (providers.ts): Claude by default, another provider for comparing.
+export { chatApi, setChatApi, type ChatApi } from "./providers";
 
 /** Holds sentences with digits until they end, so an unbacked price never reaches the screen. */
 export class SentenceGate {
@@ -106,6 +86,8 @@ export type TurnInput = {
   signal?: AbortSignal;
   /** The evals put fixtures here; the app always runs the real tools. */
   runTool?: typeof runTool;
+  /** The evals compare models; the app uses ASK_CHAT_MODEL. */
+  model?: string;
 };
 
 export type TurnResult = {
@@ -132,8 +114,8 @@ const addUsage = (u: Usage, x: Anthropic.Beta.BetaUsage) => {
 };
 
 /** Run one turn. API errors are thrown (typed SDK errors); the route turns them into an `error` event and the app falls back. */
-export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void, api: ChatApi = chatApi()): Promise<TurnResult> {
-  const model = askChatModel();
+export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void, api: ChatApi): Promise<TurnResult> {
+  const model = input.model ?? askChatModel();
   const user: Anthropic.Beta.BetaMessageParam = {
     role: "user",
     // Context first, then the traveller's words, each its own block: Mada's systems speak in one, the traveller in the other.

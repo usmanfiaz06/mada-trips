@@ -8,6 +8,7 @@ import { overview } from "../trips/overview";
 import { askChatLimits, askChatModel, askChatOn, askFastModel, costMicros, noUsage } from "./config";
 import { chatApi, runTurn, turnContext, type ChatApi } from "./engine";
 import { redact, screen } from "./guard";
+import { ProviderHttpError } from "./providers-openai";
 import { readSlots, slotsLine } from "./slots";
 import { appendTurn, addSpend, loadThread, newThread, spentToday } from "./store";
 import { personLine } from "./tools";
@@ -31,7 +32,8 @@ export async function preflight(auth: ChatAuth): Promise<void> {
   if (spent.mine >= lim.userDailyMicros || spent.all >= lim.dailyMicros) throw new AppError("RATE_LIMITED", { retryAfter: 3600, details: { budget: true } });
 }
 
-export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: AskChatEvent) => void, signal?: AbortSignal, api: ChatApi = chatApi()): Promise<void> {
+export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: AskChatEvent) => void, signal?: AbortSignal, given?: ChatApi): Promise<void> {
+  const api = given ?? (await chatApi());
   const typed = String(req.text ?? "").trim();
   const lang = languageOfText(typed) ?? "en";
   const today = todayIn();
@@ -87,6 +89,7 @@ export function errorCode(e: unknown): string {
   if (e instanceof Anthropic.InternalServerError) return "SUPPLIER_DOWN";
   if (e instanceof Anthropic.BadRequestError) return "INTERNAL";
   if (e instanceof Anthropic.APIError) return "SUPPLIER_UNAVAILABLE";
+  if (e instanceof ProviderHttpError) return e.status === 429 ? "RATE_LIMITED" : e.status === 401 || e.status === 403 ? "NOT_CONFIGURED" : "SUPPLIER_UNAVAILABLE";
   if (e instanceof AppError) return e.code;
   return "INTERNAL";
 }

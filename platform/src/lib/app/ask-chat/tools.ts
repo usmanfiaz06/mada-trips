@@ -51,7 +51,8 @@ const planLine = (p: EsimPlan, i: number) => `${i + 1}. id=${p.id} · ${p.gb == 
 
 /** Any object as short, private-free JSON: no photos, links, passport or eSIM codes, then redacted again. */
 function compact(v: unknown, max = 2500): string {
-  const drop = /photo|image|url|focal|brand|passport|iccid|activation|lpa|qr|smdp|matching|document|file|token|secret/i;
+  // First names only reach any provider: surnames, full names, birthdays, contacts and documents never do.
+  const drop = /photo|image|url|focal|brand|passport|iccid|activation|lpa|qr|smdp|matching|document|file|token|secret|surname|givenNames|lastName|familyName|fullName|legalName|dateOfBirth|dob|email|phone|mobile|card|iban|nationalId|iqama/i;
   const s = JSON.stringify(v, (k, x) => (drop.test(k) || x === null || (Array.isArray(x) && !x.length) ? undefined : x));
   return redact(s.length > max ? `${s.slice(0, max)}…` : s).text;
 }

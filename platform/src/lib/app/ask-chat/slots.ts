@@ -14,12 +14,12 @@ import { personLine } from "./tools";
  * it if the conversation stops). Structure only: nothing here is ever a price.
  */
 
-export async function readSlots(api: ChatApi | null, text: string, people: Person[], today: string): Promise<{ intent: AskIntent; usage: Anthropic.Beta.BetaUsage | null }> {
+export async function readSlots(api: ChatApi | null, text: string, people: Person[], today: string, model = askFastModel()): Promise<{ intent: AskIntent; usage: Anthropic.Beta.BetaUsage | null }> {
   const fromRules = AskIntent.parse(askIntentOfRules(parseAskRules(text, { today, people })));
   if (!api || rulesComplete(fromRules)) return { intent: fromRules, usage: null };
   try {
     const res = await api.create({
-      model: askFastModel(),
+      model,
       max_tokens: 1024,
       output_config: { effort: "low" },
       system: [

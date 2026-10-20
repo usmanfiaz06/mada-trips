@@ -31,7 +31,9 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 | `platform/src/app/api/app/v1/ask/chat/route.ts` | The SSE endpoint. It checks everything that can fail before it opens a stream, so the app gets an ordinary error. Once the stream is open, any failure arrives as `error {code, fallback: true}`. |
 | `ask-chat/config.ts` | Switches, models, limits, prices and cost in micro-dollars. |
 | `ask-chat/prompt.ts` | The **frozen** system prompt and the strict tool list. They are the same for everyone and in a fixed order, so they cache. |
-| `ask-chat/engine.ts` | One turn: `client.beta.messages.stream` in a manual tool loop, the sentence gate, refusal and `max_tokens` handling. |
+| `ask-chat/engine.ts` | One turn: a streamed message in a manual tool loop, the sentence gate, refusal and `max_tokens` handling. |
+| `ask-chat/providers.ts` | Who answers, behind one interface (§6). Claude through the official SDK (`client.beta.messages.stream`) by default. |
+| `ask-chat/providers-openai.ts` | A thin adapter for any OpenAI-compatible `/chat/completions` endpoint, for comparing cheaper models. |
 | `ask-chat/slots.ts` | Reads the sentence into slots. The deterministic rules run first. Haiku runs only when the rules leave something open, with a 4 s timeout. |
 | `ask-chat/tools.ts` | The tools. Each one returns a short text for the model and the cards, pay sheet or handoff for the app. |
 | `ask-chat/store.ts` | Threads (`app_ask_threads`) and daily spend (`app_ask_spend`). Migration: `drizzle/0034_ask_chat.sql`. |
@@ -157,7 +159,7 @@ Totals at these rates:
   - the eval checker itself
 - `apps/mobile/test/unit/ask-chat.test.ts` covers frames split mid-way, the turn reducer, the thread id carried across turns, and every fallback path.
 
-**Live (needs a key, costs about $0.10 for the set):**
+**Live (needs a key, costs about $0.10 for the set on Claude):**
 
 ```
 ANTHROPIC_API_KEY=… npm run ask:eval              # all 30
@@ -191,4 +193,68 @@ Each one runs through the real engine, with fixture tool results and no database
 
 The script exits 1 on any failure and prints the tokens and cost of each turn.
 
+**Comparing providers.** The same 30 conversations, fixtures and checks run against any number of profiles in one go, followed by a table:
+
+```
+ASK_EVAL_PROFILES=profiles.json ANTHROPIC_API_KEY=… DEEPSEEK_API_KEY=… npm run ask:eval
+```
+
+`profiles.json` (or the same JSON inline in the variable):
+
+```json
+[
+  { "label": "claude", "provider": "anthropic", "model": "claude-sonnet-5-5", "fastModel": "claude-haiku-5-5" },
+  { "label": "deepseek", "provider": "openai-compatible", "model": "deepseek-chat", "baseUrl": "https://api.deepseek.com/v1", "apiKeyEnv": "DEEPSEEK_API_KEY", "price": [0.27, 1.10, 0.07] }
+]
+```
+
+Keys are read only from the environment variable each profile names, never from the file. `price` is US dollars per million tokens, as input, output and cache read; Claude models are priced from `config.ts`. The table has one row per profile:
+
+| Column | What it shows |
+|---|---|
+| Pass | Turns that pass every check |
+| Failures by check | One count each for prices, one question, language, tools (including asking again what was already said) and words |
+| Arabic: spoken / MSA markers | A first read of the dialect: spoken words («وش، الحين، تبي، أبشر») against MSA words («ماذا، الآن، تريد، سوف») |
+| Median latency | Per turn, slots included |
+| Tokens / conv | Tokens per conversation |
+| $ / conv | Cost per conversation |
+
+Three Arabic replies from each profile are printed under the table for a native reader. The dialect markers only flag what to read; the native reader's judgement is the one that counts. ARABIC.md is the bar.
+
 **Not yet run live.** No key exists in this environment yet. The first run on staging should come before switching it on for testers.
+
+## 6. Providers: comparing cheaper models
+
+The conversation talks to its model through one small interface, `ChatApi` in `ask-chat/providers.ts`:
+- `stream(params)` yields stream events and a final message.
+- `create(params)` is used for the slots.
+
+It speaks the Messages API's shapes, so the engine, the sentence gate, the tools, the threads, the redaction and the evals are the same whichever model answers. **Claude stays the default and the production path.**
+
+| `ASK_CHAT_PROVIDER` | Status | Settings |
+|---|---|---|
+| `anthropic` (default) | Done: the official SDK, with caching, refusal fallbacks and adaptive thinking | `ANTHROPIC_API_KEY`, `ASK_CHAT_MODEL`, `ASK_FAST_MODEL` |
+| `openai-compatible` | Done: a thin adapter (`providers-openai.ts`) for DeepSeek, Qwen, Kimi, GLM, vLLM or Ollama, or anything that serves `/chat/completions` with streaming and function tools | `ASK_CHAT_BASE_URL`, `ASK_CHAT_API_KEY`, `ASK_CHAT_MODEL` (required), `ASK_FAST_MODEL` (default: the chat model), `ASK_CHAT_PRICE` (`in,out,cacheRead` USD per MTok, for the spend cap and the log) |
+| `bedrock` | Not wired: it needs the `@anthropic-ai/bedrock-sdk` dependency, and the betas used here (server-side fallbacks) aren't on Bedrock. Adding it is one more `ChatApi` that leaves out `betas` and `fallbacks`. | — |
+| anything else | Off: `askChat` is false and the app runs its flows | — |
+
+**What the adapter does.** It translates in both directions:
+- **Into `/chat/completions`:**
+  - The system blocks become one system message.
+  - Text blocks become content, `tool_use` becomes `tool_calls`, and `tool_result` becomes `role: "tool"`.
+  - Thinking blocks and Claude-only fields (`betas`, `fallbacks`, `thinking`, `output_config`, `cache_control`) are dropped.
+  - Tools become function tools with the same JSON schemas.
+- **Back to the engine's shapes:**
+  - Streamed content becomes text deltas, and a new tool call becomes a tool-use start.
+  - `finish_reason` maps to the stop reason: `tool_calls` → `tool_use`, `length` → `max_tokens`, `content_filter` → `refusal`.
+  - Cached prompt tokens count as cache reads.
+
+These providers don't promise strict schemas, so every tool checks its own fields. An HTTP failure becomes an `error` event with `fallback: true`, so the app runs its own flows as with Claude.
+
+**Privacy is the same for every provider.** Moderation and redaction run in `chat.ts` before any provider is called. Passport numbers, MRZ lines, cards, CVVs and IBANs are removed. Household lines carry first name, relation, age and nationality. Tool results drop surnames, full names, birthdays, contacts, documents, eSIM codes and links before the model reads them.
+
+Before a provider other than Claude carries real travellers, two things need checking:
+- **Data residency.** Several of the cheaper hosted models process data outside the region. A self-hosted open model through vLLM avoids that.
+- **The Arabic register.** The comparison's samples and a native reader decide this.
+
+To compare, run the evals with a profiles file (§5). To try one live on staging, set `ASK_CHAT_PROVIDER=openai-compatible` and its three settings in place of the Claude key.

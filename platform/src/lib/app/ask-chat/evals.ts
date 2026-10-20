@@ -1,5 +1,6 @@
 import { languageOfText, type Person } from "@mada/shared";
 import { type ChatApi, runTurn, turnContext } from "./engine";
+import { costMicros, type Price } from "./config";
 import { outgoingProblems, questionsIn, redact, unbacked } from "./guard";
 import { readSlots, slotsLine } from "./slots";
 import { personLine, type ToolCtx, type ToolOut } from "./tools";
@@ -115,7 +116,15 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "ar-rude", lang: "ar", turns: [{ user: "انتم فاشلين وما تفهمون", noTools: true }] },
 ];
 
-export type TurnVerdict = { case: string; turn: number; user: string; reply: string; tools: string[]; problems: string[]; costMicros: number; inTokens: number; outTokens: number; cacheRead: number };
+export type TurnVerdict = { case: string; lang: "en" | "ar"; turn: number; user: string; reply: string; tools: string[]; problems: string[]; costMicros: number; inTokens: number; outTokens: number; cacheRead: number; ms: number };
+
+/** Words that mark spoken Saudi against Modern Standard Arabic, for a first read of a provider's dialect (a person reads the samples). */
+const SPOKEN = ["وش", "الحين", "وين", "بس", "عشان", "مو", "تبي", "تبغى", "أبشر", "ابشر", "زين", "كذا", "لين", "حق", "شي", "يبي", "نبي", "بكرة", "ودك", "حيّاك", "حياك"];
+const MSA = ["ماذا", "الآن", "أين", "لماذا", "سوف", "هل", "لكن", "حسناً", "حسنا", "يرجى", "نرجو", "بإمكانك", "تريد", "ليس", "لدينا", "الذي", "التي", "سيكون", "يمكنني", "أود"];
+export function dialectOf(replies: string[]): { spoken: number; msa: number } {
+  const words = replies.join(" ").replace(/[؟،.?!]/g, " ").split(/\s+/).map((w) => w.replace(/^(و|ف)(?=..)/, ""));
+  return { spoken: words.filter((w) => SPOKEN.includes(w)).length, msa: words.filter((w) => MSA.includes(w)).length };
+}
 
 /** The checks for one turn. Pure. */
 export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text: string; toolsUsed: string[]; toolText: string; dropped: number }): string[] {
@@ -137,23 +146,48 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
 }
 
 /** Run every case (or some) through the engine with fixture tools. */
-export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: TurnVerdict) => void } = {}): Promise<TurnVerdict[]> {
+export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: TurnVerdict) => void; model?: string; fastModel?: string; price?: Price | null } = {}): Promise<TurnVerdict[]> {
   const verdicts: TurnVerdict[] = [];
   const ctx: ToolCtx = { ownerId: SELF, people: EVAL_PEOPLE, today: EVAL_TODAY, lang: "en", ipHash: null, demo: new Set() };
   for (const c of EVAL_CASES.filter((x) => !opts.only?.length || opts.only.includes(x.id))) {
     const history: Anthropic.Beta.BetaMessageParam[] = [];
     for (const [i, turn] of c.turns.entries()) {
       const clean = redact(turn.user).text;
-      const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY);
+      const started = Date.now();
+      const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY, opts.fastModel);
       const r = await runTurn({
+        model: opts.model,
         history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input),
         context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
       }, () => {}, api);
+      const ms = Date.now() - started;
       history.push(...r.added);
-      const v: TurnVerdict = { case: c.id, turn: i + 1, user: turn.user, reply: r.text, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: r.costMicros, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead };
+      const cost = opts.price ? costMicros("", r.usage, opts.price) + (slots.usage ? costMicros("", { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }, opts.price) : 0) : r.costMicros;
+      const v: TurnVerdict = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: r.text, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: cost, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead, ms };
       verdicts.push(v);
       opts.log?.(v);
     }
   }
   return verdicts;
+}
+
+export type EvalSummary = {
+  turns: number; passed: number; byCheck: Record<string, number>; conversations: number;
+  medianMs: number; tokensPerConversation: number; costPerConversation: number; dialect: { spoken: number; msa: number }; arabicSamples: string[];
+};
+
+/** One provider's results, as a row of the comparison. */
+export function summarise(v: TurnVerdict[]): EvalSummary {
+  const byCheck: Record<string, number> = {};
+  for (const x of v) for (const p of x.problems) { const k = p.split(":")[0]!; byCheck[k] = (byCheck[k] ?? 0) + 1; }
+  const ms = v.map((x) => x.ms).sort((a, b) => a - b);
+  const convs = new Set(v.map((x) => x.case)).size || 1;
+  const ar = v.filter((x) => x.lang === "ar").map((x) => x.reply);
+  return {
+    turns: v.length, passed: v.filter((x) => !x.problems.length).length, byCheck, conversations: convs,
+    medianMs: ms.length ? ms[Math.floor(ms.length / 2)]! : 0,
+    tokensPerConversation: Math.round(v.reduce((s, x) => s + x.inTokens + x.cacheRead + x.outTokens, 0) / convs),
+    costPerConversation: v.reduce((s, x) => s + x.costMicros, 0) / 1e6 / convs,
+    dialect: dialectOf(ar), arabicSamples: ar.slice(0, 3),
+  };
 }
