@@ -3,6 +3,7 @@ import { json, route } from "@/lib/app/http";
 import { phoneChannels } from "@/lib/app/phone-channel";
 import { runtimeConfig } from "@/lib/app/resilience/runtime";
 import { bookingRequiresPhone, flightsMode } from "@/lib/app/switches";
+import { askChatOn } from "@/lib/app/ask-chat/config";
 import { liveActivityPushEnabled, walletEnabled } from "@/lib/app/wallet-pass/config";
 
 // GET /api/app/v1/config → { minVersion, latestVersion, maintenance: { on, message, until }, features, serverTime, storeUrls,
@@ -13,8 +14,9 @@ export const dynamic = "force-dynamic";
 export const GET = route(async () => {
   const c = await runtimeConfig();
   // The beta's switches ride in features: flights by request, and whether booking needs a verified phone (switches.ts).
-  // appleWallet and liveActivityPush say whether the Apple credentials are set (docs/app/NATIVE.md).
-  const features = { ...c.features, flightsByRequest: flightsMode() === "request", bookingNeedsPhone: bookingRequiresPhone(), appleWallet: walletEnabled(), liveActivityPush: liveActivityPushEnabled() };
+  // appleWallet and liveActivityPush say whether the Apple credentials are set (docs/app/NATIVE.md). askChat: Ask as a
+  // conversation, only when ASK_CHAT=on and the Claude key is there (docs/app/ASK-CHAT.md).
+  const features = { ...c.features, flightsByRequest: flightsMode() === "request", bookingNeedsPhone: bookingRequiresPhone(), appleWallet: walletEnabled(), liveActivityPush: liveActivityPushEnabled(), askChat: askChatOn() };
   const body: ConfigResponse = { ...c, features, phoneChannels: phoneChannels(), serverTime: new Date().toISOString() };
   return json(body, 200, { "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=120" });
 }, { ungated: true });

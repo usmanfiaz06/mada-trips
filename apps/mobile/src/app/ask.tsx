@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import Animated from 'react-native-reanimated';
-import { REQUEST_FORMS, languageOfText, t as tShared, askIntentOfRules, correctAsk, correctEsimAsk, correctionLine, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
+import { REQUEST_FORMS, addDays, languageOfText, t as tShared, askIntentOfRules, correctAsk, correctEsimAsk, correctionLine, householdOf, parseAskRules, partyOfPeople, todayIn, type AskIntent, type AskKind, type CopyKey, type Person, type RequestFormKind } from '@mada/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, LinkButton } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -16,13 +16,15 @@ import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversation';
+import { ChatThread, type ChatOpen } from '@/components/booking/ChatThread';
 import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
 import { useNet } from '@/lib/net';
 import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
-import { bookingApi, useDemo } from '@/lib/booking';
+import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
+import { sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
@@ -36,6 +38,9 @@ import { colors, font, ff } from '@/theme';
  * Ask: one composer for flights, stays, plans and anything a person at Mada does by hand (FLOWS.md §2–4). What was typed
  * is read on the server (POST /ask/parse), then one question at a time, then the results with the one action at the
  * bottom. Opened by the sun orb, Today's shortcuts, or with ?prefill= / ?intent= from anywhere.
+ * With the conversation on (GET /config askChat, signed in, online: docs/app/ASK-CHAT.md), a new ask goes to Mada's
+ * conversation instead, which talks back as it works and shows the same cards; a card opens the flow for that search.
+ * If the conversation stops for any reason, the flows answer exactly as they always have.
  */
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
@@ -90,6 +95,10 @@ export default function Ask() {
   const selfName = user?.name ?? '';
   const household = people.data ?? [];
   const headStart = useFlightHeadStart(household, today);
+  const chatOn = useAskChatOn() && !offline;
+  const chatTurns = useAskChat((s) => s.turns);
+  // Each Ask opens on a fresh conversation (the server keeps the thread while this screen is open).
+  useEffect(() => { useAskChat.getState().reset(); return () => { stopAskChat(); useAskChat.getState().reset(); }; }, []);
 
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
@@ -141,7 +150,47 @@ export default function Ask() {
       if (r === 'done') return;
       if (r === 'unclear') { buzz('soft'); setDraft(''); setFixing(v); return; }
     }
+    if (chatOn && !kindHint) { await talk(v); return; }
+    await runFlows(v, kindHint);
+  };
+
+  /** The conversation (docs/app/ASK-CHAT.md). If it stops, the flows answer with what the server read, or read it again. */
+  const talk = async (v: string) => {
     buzz('tap');
+    forgetSettled();
+    setVoice(languageOfText(v));
+    if (query) { const was = { query, fixes: fixes.map((f) => f.text) }; setEarlier((e) => [...e, was].slice(-5)); }
+    setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
+    const turn = await sendAskChat(v);
+    if (turn.state !== 'stopped') return; // done, or a newer message took over
+    // Nothing said yet: as if the conversation had never been there.
+    if (!turn.text && !turn.cards.length) useAskChat.setState((s) => ({ turns: s.turns.filter((x) => x.id !== turn.id) }));
+    if (turn.intent) { saveAsk(v, turn.intent); setQuery(v); setIntent(turn.intent); setRound((r) => r + 1); return; }
+    await runFlows(v, undefined, true);
+  };
+
+  /** A card in the conversation: the flow for the same search, the pay sheet, the desk. */
+  const openChat = (o: ChatOpen) => {
+    if (o.kind === 'pay') { usePayDraft.getState().set({ draft: o.pay.draft, title: o.pay.title }); router.push('/pay'); return; }
+    if (o.kind === 'handoff') { router.push('/support' as Href); return; }
+    if (o.kind === 'request') { router.push({ pathname: '/ask/request/[id]', params: { id: o.id } }); return; }
+    if (o.kind === 'trip') { router.push({ pathname: '/trip/[id]', params: { id: o.id } }); return; }
+    const c = o.card;
+    const base: AskIntent = o.turn.intent ?? askIntentOfRules(parseAskRules(o.turn.me, { today, people: household }));
+    let next: AskIntent;
+    if (c.type === 'flights' || c.type === 'stays') {
+      const back = c.type === 'stays' ? addDays(c.search.depart, c.nights) : c.search.return;
+      next = { ...base, kind: c.type === 'flights' ? 'flight' : 'stay', destination: c.search.destination, destinationName: null, from: c.search.from ?? base.from, depart: c.search.depart, return: back, tripType: back ? 'return' : 'oneway', monthOnly: null, travellerIds: c.search.travellerIds, travellerCount: null, party: null, ask: null };
+    } else next = { ...base, kind: c.type === 'esim' ? 'esim' : c.type === 'entry' ? 'visa' : 'car' };
+    forgetSettled();
+    setQuery(o.turn.me); setCta(null); setFixes([]); setFixing(null);
+    saveAsk(o.turn.me, next);
+    setIntent(next); setRound((r) => r + 1);
+  };
+
+  /** Ask's own flows: the words read on the server (POST /ask/parse), then the flow for what was asked. */
+  const runFlows = async (v: string, kindHint?: AskKind, quiet = false) => {
+    if (!quiet) buzz('tap');
     forgetSettled();
     // Mada answers in the language this was written in, whatever the app is set to (per message).
     setVoice(languageOfText(v));
@@ -232,7 +281,7 @@ export default function Ask() {
   const kind = intent?.kind;
   const stage = cta && !offline ? cta.stage ?? null : null;
   let body: React.ReactNode;
-  if (!intent) body = parsing ? null : <Start onPick={(x) => submit(x)} onResume={() => { void restore(); }} people={household} today={today} />;
+  if (!intent) body = parsing || chatTurns.length ? null : <Start onPick={(x) => submit(x)} onResume={() => { void restore(); }} people={household} today={today} />;
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
@@ -273,9 +322,10 @@ export default function Ask() {
           </View>
         )} />
         <View style={{ flex: 1 }}>
-        <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo || (chatTurns.length && !intent)) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
           <EarlierAsks items={earlier} />
+          <ChatThread turns={chatTurns} onOpen={openChat} />
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
           {fixes.map((f, i) => (

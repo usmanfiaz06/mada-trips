@@ -35,7 +35,7 @@ const AR_LETTERS = '\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF
 const HAS_ARABIC = new RegExp(`[${AR_LETTERS}]`);
 
 /** A banned Arabic word, with Arabic letter boundaries and the usual attached prefixes (و ف ب ل ال). */
-function arBannedIn(text: string): string[] {
+export function arBannedIn(text: string): string[] {
   return AR_BANNED.filter((w) => {
     const re = new RegExp(`(^|[^${AR_LETTERS}])(و|ف|ب|ل|وال|فال|بال|لل|ال)?${w}($|[^${AR_LETTERS}])`);
     return re.test(text);

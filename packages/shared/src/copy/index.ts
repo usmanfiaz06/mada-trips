@@ -144,7 +144,7 @@ export function bannedIn(text: string, allow: readonly string[] = []): string[] 
 }
 
 export type CopyProblem = { key: string; problem: string };
-export { lintArabic, missingArabic, AR_BANNED } from './lint-ar';
+export { lintArabic, missingArabic, AR_BANNED, arBannedIn } from './lint-ar';
 
 /** Every rule CI enforces on the catalogue (COPY.md §4, §9). */
 export function lintCatalogue(cat: Record<string, string> = en): CopyProblem[] {

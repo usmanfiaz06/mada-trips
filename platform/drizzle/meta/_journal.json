@@ -239,6 +239,13 @@
       "when": 1792278480116,
       "tag": "0033_esim_access",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792458963144,
+      "tag": "0034_ask_chat",
+      "breakpoints": true
     }
   ]
 }

@@ -18,7 +18,8 @@
     "test": "vitest run",
     "app:preflight": "tsx --conditions=react-server scripts/app-preflight.ts",
     "app:jobs": "tsx --conditions=react-server scripts/app-jobs.ts",
-    "hotelbeds:smoke": "tsx scripts/hotelbeds-smoke.ts"
+    "hotelbeds:smoke": "tsx scripts/hotelbeds-smoke.ts",
+    "ask:eval": "tsx --conditions=react-server scripts/ask-chat-eval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.132.1",

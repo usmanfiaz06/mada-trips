@@ -23,6 +23,7 @@
     "app:preflight": "npm --prefix platform run app:preflight",
     "app:jobs": "npm --prefix platform run app:jobs --",
     "hotelbeds:smoke": "npm --prefix platform run hotelbeds:smoke --",
+    "ask:eval": "npm --prefix platform run ask:eval --",
     "adsb:coverage": "node platform/scripts/check-adsb-coverage.mjs"
   },
   "devDependencies": {

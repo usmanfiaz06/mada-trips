@@ -23,6 +23,7 @@ import { wordsCopy } from './words';
 import { askFlowCopy } from './ask-flow';
 import { staysCopy } from './stays';
 import { nowCopy } from './now';
+import { askChatCopy } from './ask-chat';
 import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
 import { umrahCopy } from './umrah';
@@ -73,6 +74,8 @@ export const en = {
   ...staysCopy,
   // The now path: a car right now, urgent help, the honest disruption screen: packages/shared/src/copy/now.ts
   ...nowCopy,
+  // Ask as a conversation: the fixed lines around what Mada writes: packages/shared/src/copy/ask-chat.ts
+  ...askChatCopy,
   // Ask understands, flows never re-ask: what was heard, what changed, visa rules first, a car's route: packages/shared/src/copy/ask-heard.ts
   ...askHeardCopy,
   // How a request ends, and what Mada is doing until it does: packages/shared/src/copy/outcomes.ts
