@@ -56,6 +56,24 @@
     $$('.svc-block').forEach(b => gsap.from(b, { y: 70, opacity: 0, duration: 1.1, ease: 'power3.out', scrollTrigger: { trigger: b, start: 'top 88%' } }));
   }
 
+  /* ---------------- Manpower: find a role ----------------
+     Matches the visible name and the English name (data-en), so either
+     language works on either page. Arabic letters are normalised. */
+  const find = $('.js-role-find');
+  if (find) {
+    const fold = t => String(t).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْ]/g, '').trim();
+    const roles = $$('.mp-roles li'), groups = $$('.mp-group'), none = $('.mp-none');
+    roles.forEach(li => (li._k = fold(li.textContent + ' ' + (li.dataset.en || ''))));
+    const run = () => {
+      const q = fold(find.value);
+      let hits = 0;
+      roles.forEach(li => { const on = !q || li._k.includes(q); li.classList.toggle('is-hit', !!q && on); li.classList.toggle('is-out', !on); if (on && q) hits++; });
+      groups.forEach(g => g.classList.toggle('is-out', !!q && !g.querySelector('.is-hit')));
+      none.hidden = !q || hits > 0;
+    };
+    find.addEventListener('input', run);
+  }
+
   /* ---------------- About: sun turns with scroll ---------------- */
   if ($('.ab-hero__sun')) gsap.to('.ab-hero__sun', { rotate: 30, yPercent: 20, ease: 'none', scrollTrigger: { trigger: '.ab-hero', start: 'top top', end: 'bottom top', scrub: true } });
   $$('.value').forEach((v, i) => gsap.from(v, { y: 60, opacity: 0, duration: 1.1, delay: i * .1, ease: 'power3.out', scrollTrigger: { trigger: v, start: 'top 90%' } }));

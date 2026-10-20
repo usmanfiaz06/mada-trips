@@ -383,7 +383,7 @@
 
   const waLink = () => {
     const x = t(), lines = [x.hello2, ''];
-    if (S.flow) lines.push(`${x.helpWith} ${flowName(S.flow)}`);
+    if (S.flow) lines.push(`${x.helpWith} ${S.tag ? (S.lang === 'ar' ? 'خدمات المواقع' : S.tag) : flowName(S.flow)}`);
     Object.entries(S.answers).forEach(([k, v]) => lines.push(`${keyName(k)}: ${showVal(k, v)}`));
     if (S.also) lines.push(`${x.also}: ${S.also}`);
     if (S.note) lines.push(`${x.details}: ${S.note}`);
@@ -407,7 +407,7 @@
     const f = S.flow && KB.flows[S.flow];
     const details = Object.assign({}, S.answers);
     if (S.also) details['Also interested in'] = S.also;
-    const payload = { source: 'chat', sessionKey: S.key, name: S.name, phone: S.phone, services: f && S.flow !== 'Other' ? [S.flow] : [], details, message: (S.note || '').slice(0, 3000), questions: (S.questions || []).slice(-10), lang: S.lang, page: location.pathname };
+    const payload = { source: 'chat', sessionKey: S.key, name: S.name, phone: S.phone, services: f && S.flow !== 'Other' ? [S.flow] : S.tag ? [S.tag] : [], details, message: (S.note || '').slice(0, 3000), questions: (S.questions || []).slice(-10), lang: S.lang, page: location.pathname };
     const body = JSON.stringify(payload);
     if (body === lastLead) return Promise.resolve();
     lastLead = body;
@@ -438,7 +438,7 @@
     chipsAfter(menuChips());
   }
 
-  function resetRequest() { Object.assign(S, { questions: [], flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0, key: '', leadSent: false }); }
+  function resetRequest() { Object.assign(S, { questions: [], flow: null, step: 0, answers: {}, note: '', also: '', awaiting: null, editing: false, phoneTries: 0, nameTries: 0, key: '', leadSent: false, tag: '' }); }
 
   function startFlow(id, P, preset) {
     resetRequest();
@@ -755,6 +755,8 @@
         return;
       }
       if (top.it.then) { answerIntent(top.it, P, true); return startFlow(top.it.then, P); }
+      // a request we take as written (site services): keep their words, then name and number
+      if (top.it.lead) { answerIntent(top.it, P, true); resetRequest(); Object.assign(S, { flow: 'Other', note: text, tag: top.it.lead }); return toLead(); }
       answerIntent(top.it, P, !!second || !!ranked.find(r => r.it.flow && r.s >= 2));
       // an info question that also names a service, e.g. "how much is a hotel in Riyadh"
       const svc = ranked.find(r => r.it.flow && r.s >= 2);

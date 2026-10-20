@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 from i18n_ar import HEADLINES, TEXT, KEEP
 
 URL = 'https://www.madatrips.sa'
-PAGES = {'index.html': '/', 'events.html': '/events', 'services.html': '/services', 'about.html': '/about', 'contact.html': '/contact'}
+PAGES = {'index.html': '/', 'events.html': '/events', 'services.html': '/services', 'about.html': '/about', 'contact.html': '/contact', 'manpower.html': '/manpower'}
 NON_PAGE = ('/assets', '/css', '/js', '/og-image', '/site.webmanifest', '/favicon', '/robots', '/sitemap')
 ARABIC_FONTS = '&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Aref+Ruqaa:wght@400;700'
 ARROWS = {'→': '←', '↗': '↖', '›': '‹', '↓': '↓'}
@@ -101,7 +101,7 @@ def build(name, en_path):
     if canon: canon['href'] = URL + ar_url
 
     # arrows point the other way in RTL
-    for el in soup.select('.btn__arrow, .svc__go, .type-row__go, .ev-list i, .btn--light i, .topbar svg + *, .chip-link'):
+    for el in soup.select('.btn__arrow, .svc__go, .type-row__go, .ev-list i, .btn--light i, .topbar svg + *, .chip-link, .mp-card__go i'):
         for t in el.find_all(string=True):
             t.replace_with(''.join(ARROWS.get(c, c) for c in str(t)))
     for el in soup.select('.btn--light i'):

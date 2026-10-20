@@ -259,3 +259,76 @@ TEXT = {
 # Brand, codes and names that stay as written
 KEEP = {'RUH', 'CDG', 'ULH', 'A7', '2A', 'PM', 'MADA', 'html', 'M', 'A', 'D', 'T', 'R', 'I', 'P', 'S', 'K', 'Bader Al Sulaiman',
         'ARIA-LABEL::X', 'ARIA-LABEL::Instagram', 'ARIA-LABEL::LinkedIn'}
+
+# ---------- Manpower page ----------
+HEADLINES.update({
+    'Skilled hands, at any scale.': 'أيادٍ ماهرة،<br><span class="accent">مهما كان حجم مشروعك.</span>',
+    'Where our people work.': 'أين يعمل <em>فريقنا.</em>',
+    'Every trade a project needs.': 'كل تخصص <em>يحتاجه مشروعك.</em>',
+    'Crews and site services, one partner.': 'الطواقم وخدمات المواقع،<br><em>شريك واحد.</em>',
+    'From request to on site.': 'من الطلب <em>إلى الموقع.</em>',
+    'Need a crew by Sunday?': 'تحتاج فريقاً<br><em>قبل الأحد؟</em>',
+})
+TEXT.update({
+    # hero and sections
+    'Manpower and site services': 'القوى العاملة وخدمات المواقع',
+    'Engineers, supervisors, operators and crews for the projects shaping the Kingdom. Vetted, mobilised and on site when the work starts, with the site services that keep it running.':
+        'مهندسون ومشرفون ومشغّلون وطواقم للمشاريع التي تصنع مستقبل المملكة. نتحقق من كفاءتهم ونجهّزهم ليكونوا في الموقع مع بداية العمل، مع خدمات المواقع التي تُبقيه في حركة دائمة.',
+    'Trades we supply': 'تخصصات نوفرها', 'Disciplines': 'مجالات', 'Industries': 'القطاعات',
+    'Trades': 'التخصصات', 'Site services': 'خدمات المواقع', 'How we mobilise': 'كيف نُجهّز الفرق',
+    'Industries we serve': 'القطاعات التي نخدمها',
+    'Oil & Gas': 'النفط والغاز', 'Construction & Infrastructure': 'البناء والبنية التحتية', 'Industrial & Manufacturing': 'الصناعة والتصنيع',
+    'Logistics': 'الخدمات اللوجستية', 'Transportation': 'النقل', 'Waste Management': 'إدارة النفايات',
+    'PLACEHOLDER::Find a role, like welder': 'ابحث عن تخصص، مثل: لحّام', 'ARIA-LABEL::Find a role': 'ابحث عن تخصص',
+    'Not listed? We source rare trades too.': 'لم تجده؟ نوفر التخصصات النادرة أيضاً.', 'Tell us who you need →': 'أخبرنا بمن تحتاج ←',
+    '40 welders mobilised': '40 لحّاماً جاهزون', 'On site Sunday, 6 a.m.': 'في الموقع الأحد، 6 صباحاً',
+    'Request a crew': 'اطلب فريقاً', 'Ask Mada': 'اسأل مادا', 'All services': 'كل الخدمات', 'See every trade': 'كل التخصصات',
+    'Tell us the roles, numbers and site. We’ll come back with a plan the same day.': 'أخبرنا بالتخصصات والأعداد والموقع، ونعود إليك بخطة في اليوم نفسه.',
+    # groups
+    'Engineers': 'المهندسون', 'Supervisors': 'المشرفون', 'Electromechanical Workforce': 'الكوادر الكهروميكانيكية', 'Civil Workforce': 'كوادر الأعمال المدنية',
+    'Operators': 'المشغّلون', 'Riggers': 'فنيو الرفع والتعليق', 'Administrative Staff': 'الكوادر الإدارية',
+    # roles
+    'Mechanical Engineer': 'مهندس ميكانيكا', 'Civil Engineer': 'مهندس مدني', 'Electrical Engineer': 'مهندس كهرباء', 'Piping Engineer': 'مهندس أنابيب',
+    'Instrumentation Engineer': 'مهندس أجهزة دقيقة', 'Material Engineer': 'مهندس مواد', 'QA/QC Engineer': 'مهندس ضبط وتوكيد الجودة', 'Safety Engineer': 'مهندس سلامة',
+    'HVAC Engineer': 'مهندس تكييف وتهوية', 'Planning Engineer': 'مهندس تخطيط',
+    'Steel Structure Supervisor': 'مشرف هياكل حديدية', 'Piping Supervisor & Foreman': 'مشرف ومراقب أنابيب', 'Civil Supervisor & Foreman': 'مشرف ومراقب أعمال مدنية',
+    'HVAC Supervisor & Foreman': 'مشرف ومراقب تكييف', 'Instrumentation Supervisor & Foreman': 'مشرف ومراقب أجهزة دقيقة',
+    'Welding Inspector': 'مفتش لحام', 'QA/QC Inspector': 'مفتش جودة', '6G Welder': 'لحّام 6G', 'TIG Welder (SS/CS)': 'لحّام TIG (ستانلس وكربون)', 'MIG Welder': 'لحّام MIG',
+    'Structural Fabricator': 'مصنّع هياكل معدنية', 'Piping Fabricator': 'مصنّع أنابيب', 'Millwright Technician': 'فني تركيب وصيانة معدات', 'Instrument Technician': 'فني أجهزة دقيقة',
+    'Mason': 'بنّاء', 'Carpenter': 'نجّار', 'Steel Fixer': 'حدّاد مسلّح', 'Scaffolder': 'فني سقالات', 'Electrician': 'كهربائي', 'Plumber': 'سبّاك', 'Painter': 'دهّان',
+    'Draftsman': 'رسّام هندسي', 'General Labourer': 'عامل',
+    'Crane Operator': 'مشغّل رافعة', 'Boom Truck Operator': 'مشغّل شاحنة رافعة', 'Excavator Operator': 'مشغّل حفّارة', 'Forklift Operator': 'مشغّل رافعة شوكية',
+    'Manlift Operator': 'مشغّل منصة رفع أفراد', 'Bobcat Operator': 'مشغّل بوبكات', 'Heavy Vehicle Driver': 'سائق معدات ثقيلة',
+    'Level 1 Rigger': 'فني رفع مستوى 1', 'Level 2 Rigger': 'فني رفع مستوى 2', 'Level 3 Rigger': 'فني رفع مستوى 3',
+    'Executive Secretary': 'سكرتير تنفيذي', 'Administrative Assistant': 'مساعد إداري', 'Document Controller': 'مراقب وثائق', 'AutoCAD Operator': 'مشغّل أوتوكاد',
+    'Computer Operator': 'مشغّل حاسب', 'Data Entry Clerk': 'مدخل بيانات', 'Time Keeper': 'مراقب دوام', 'Permit Receiver': 'مستلم تصاريح',
+    'Telephone Operator': 'موظف سنترال', 'Office Assistant': 'مراسل', 'Office Driver': 'سائق مكتب', 'Janitor': 'عامل نظافة',
+    # site services
+    'Material Trading': 'تجارة المواد', 'Equipment Rental': 'تأجير المعدات', 'Scaffolding Services': 'خدمات السقالات', 'Fabrication Work': 'أعمال التصنيع',
+    'Vehicle Transportation': 'خدمات النقل', 'Scrap Material Handling': 'مناولة الخردة', 'Enquire': 'استفسر',
+    'Steel, pipe, fittings and site consumables, sourced to spec and delivered on schedule.': 'حديد وأنابيب ووصلات ومستلزمات مواقع، مطابقة للمواصفات وتصل في موعدها.',
+    'Cranes, excavators, manlifts and forklifts, with certified operators when you need them.': 'رافعات وحفّارات ومنصات رفع ورافعات شوكية، مع مشغّلين معتمدين عند الحاجة.',
+    'Certified scaffolding for every kind of project. Supplied, erected, inspected and dismantled safely.': 'سقالات معتمدة لكل أنواع المشاريع، نوردها ونركّبها ونفحصها ونفكّها بأمان.',
+    'Steel structures, piping spools and supports, fabricated and welded by certified hands.': 'هياكل حديدية ووصلات أنابيب ودعامات، يصنّعها ويلحمها فنيون معتمدون.',
+    'Crew buses, heavy haulage and site logistics that keep people and materials moving.': 'حافلات للفرق ونقل ثقيل ولوجستيات مواقع تُبقي الناس والمواد في حركة.',
+    'Collection, segregation and disposal that keep sites clean and compliant.': 'جمع وفرز وتخلّص آمن يُبقي المواقع نظيفة ومطابقة للأنظمة.',
+    'Scrap collected, sorted and sent for recycling, so more of every project is recovered.': 'نجمع الخردة ونفرزها ونرسلها لإعادة التدوير، ليُستعاد أكثر من كل مشروع.',
+    'ALT::Steel pipes stacked in a warehouse': 'أنابيب حديد مرصوصة في مستودع', 'ALT::Mobile crane parked on desert sand': 'رافعة متحركة على رمال الصحراء',
+    'ALT::Construction worker in a safety harness on a steel frame': 'فني بحزام أمان على هيكل حديدي', 'ALT::Welder at work with sparks flying': 'لحّام يعمل وسط الشرر',
+    'ALT::Truck on a desert highway between mountains': 'شاحنة على طريق صحراوي بين الجبال', 'ALT::Compost, waste and recycling bins side by side': 'حاويات للنفايات وإعادة التدوير متجاورة',
+    'ALT::Excavator sorting a pile of scrap metal': 'حفّارة تفرز كومة من الخردة',
+    # mobilisation
+    'Brief': 'الموجز', 'Roles, numbers, site and start date.': 'التخصصات والأعداد والموقع وموعد البدء.',
+    'Source and vet': 'الاختيار والتحقق', 'Trade tests, certificates and references checked.': 'اختبارات مهنية وتحقق من الشهادات والمراجع.',
+    'Mobilise': 'التجهيز', 'Visas, flights, housing and transport arranged.': 'التأشيرات والطيران والسكن والنقل، مرتبة بالكامل.',
+    'On site': 'في الموقع', 'A supervisor on call, and replacements when needed.': 'مشرف متاح دائماً، وبدائل عند الحاجة.',
+    # services page manpower block
+    'Engineers, supervisors and skilled crews': 'مهندسون ومشرفون وطواقم ماهرة', 'Equipment, scaffolding and site services': 'المعدات والسقالات وخدمات المواقع',
+    'Visas, housing and transport for teams': 'التأشيرات والسكن والنقل للفرق',
+    # meta
+    'TITLE::Manpower and Site Services | Mada Trips': 'القوى العاملة وخدمات المواقع | مادا تربس',
+    'META::Manpower and Site Services | Mada Trips': 'القوى العاملة وخدمات المواقع | مادا تربس',
+    'META::Engineers, supervisors, welders, operators, riggers, civil crews and admin staff for projects across Saudi Arabia, plus material trading, scaffolding, waste management and scrap handling.':
+        'مهندسون ومشرفون ولحّامون ومشغّلون وفنيو رفع وكوادر مدنية وإدارية للمشاريع في أنحاء المملكة، إضافة إلى تجارة المواد والسقالات وإدارة النفايات ومناولة الخردة.',
+    'META::Mada Trips manpower: skilled crews and site services across Saudi Arabia.': 'القوى العاملة لدى مادا تربس: طواقم ماهرة وخدمات مواقع في أنحاء المملكة.',
+})

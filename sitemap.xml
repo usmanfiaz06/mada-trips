@@ -90,4 +90,22 @@
     <priority>0.7</priority>
     <image:image><image:loc>https://www.madatrips.sa/assets/og/ar-contact.jpg</image:loc></image:image>
   </url>
+  <url>
+    <loc>https://www.madatrips.sa/manpower</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/manpower"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/manpower"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/manpower"/>
+    <lastmod>2026-10-20</lastmod>
+    <priority>0.8</priority>
+    <image:image><image:loc>https://www.madatrips.sa/assets/img/scaffolding.jpg</image:loc></image:image>
+  </url>
+  <url>
+    <loc>https://www.madatrips.sa/ar/manpower</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.madatrips.sa/manpower"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://www.madatrips.sa/ar/manpower"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.madatrips.sa/manpower"/>
+    <lastmod>2026-10-20</lastmod>
+    <priority>0.8</priority>
+    <image:image><image:loc>https://www.madatrips.sa/assets/img/scaffolding.jpg</image:loc></image:image>
+  </url>
 </urlset>
