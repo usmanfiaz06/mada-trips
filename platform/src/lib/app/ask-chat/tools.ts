@@ -177,6 +177,14 @@ const RUN: Record<string, Run> = {
   async create_request(ctx, a) {
     const kind = String(a.kind) as "visa" | "umrah" | "car" | "food" | "todo" | "flight" | "stay" | "general";
     const summary = redact(String(a.summary ?? "")).text.slice(0, 500);
+    // The team gets only complete requests: where and when for anything that happens somewhere, and how to reach them.
+    const where = typeof a.destination_name === "string" && a.destination_name.trim() ? a.destination_name.trim() : "";
+    const missing = [
+      !where && kind !== "visa" && kind !== "general" ? "where (the city or area)" : null,
+      !iso(a.depart) && kind !== "visa" && kind !== "general" ? "when (the date)" : null,
+      a.contact_preference !== "call" && a.contact_preference !== "whatsapp" && a.contact_preference !== "in_app" ? "how to reach them" : null,
+    ].filter(Boolean);
+    if (missing.length) return { text: `Not sent yet. Still needed: ${missing.join(", ")}. Ask for the first missing one in one short question with choices in <next>, then call create_request again with everything.${missing.includes("how to reach them") && missing.length === 1 ? " <next>WhatsApp | Call me | Here in the app</next>" : ""}`, isError: true };
     const isSearch = kind === "flight" || kind === "stay";
     const r = await createRequest(ctx.ownerId, {
       kind, query: summary, travellerIds: whoOf(ctx, a.traveller_ids), note: "",
