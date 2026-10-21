@@ -11,7 +11,7 @@ import { T } from '@/components/Text';
 import { ApiError } from '@/lib/api';
 import { buzz } from '@/lib/haptics';
 import { getLocale, isRTL, t } from '@/lib/i18n';
-import { durationLine, openLine, priceLine, SUPPLIER_NAME, thingId, thingsApi, thingTitle, useIdeaMutations, useTripIdeas, type Thing } from '@/lib/things';
+import { durationLine, openLine, priceLine, thingId, thingsApi, thingTitle, useIdeaMutations, useTripIdeas, type Thing } from '@/lib/things';
 import { toast } from '@/lib/toast';
 import { usePresence } from '@/lib/wallet';
 import { colors, ff, font } from '@/theme';
@@ -68,7 +68,7 @@ export function ThingSheet({ x, ctx, onClose, onBook, onDirections, onRide }: {
           </Pressable>
         ) : null}
         <View style={{ gap: 4 }}>
-          <T v="eyebrow" color={colors.goldInk}>{x.kind === 'activity' ? t(`things.kind.${x.a.kind}`) : x.kind === 'experience' ? t('things.via', { supplier: SUPPLIER_NAME[x.e.supplier] }) : x.w.source === 'desk' ? t('things.event.fromDesk') : 'Ticketmaster'}</T>
+          <T v="eyebrow" color={colors.goldInk}>{x.kind === 'activity' ? t(`things.kind.${x.a.kind}`) : x.kind === 'experience' ? t('things.via') : x.w.source === 'desk' ? t('things.event.fromDesk') : 'Ticketmaster'}</T>
           <T v="h2">{title}</T>
           {x.kind === 'activity' && ar && x.a.nameAr && x.a.name !== x.a.nameAr ? <T v="small">{x.a.name}</T> : null}
         </View>

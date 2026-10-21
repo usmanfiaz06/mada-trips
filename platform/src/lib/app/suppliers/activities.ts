@@ -1,5 +1,5 @@
 import "server-only";
-import type { Experience } from "@mada/shared";
+import type { SupplierExperience as Experience } from "./activities-types";
 import { keyedExplicit, keyedMode, supplierMode } from "../config";
 import { guarded } from "../resilience/breaker";
 import type { ActivitiesSupplier } from "./activities-types";

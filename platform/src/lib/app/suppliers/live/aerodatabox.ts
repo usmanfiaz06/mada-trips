@@ -117,7 +117,7 @@ export function mapAdb(flightNumber: string, date: string, f: AdbFlight): Flight
     arriveLocal: wall(a.revisedTime?.local) ?? wall(a.predictedTime?.local) ?? wall(a.scheduledTime?.local),
     status: statusOf(f, delay, live),
     gate: clean(d.gate), terminal: clean(d.terminal) ? (/^\d+$/.test(clean(d.terminal)!) ? `Terminal ${clean(d.terminal)}` : clean(d.terminal)) : null,
-    source: live ? "Live · AeroDataBox" : "Schedule · AeroDataBox",
+    source: live ? "Live" : "Schedule", // never the vendor's name: the app shows it
     departUtc: depart, arriveUtc: arrive, scheduledDepartUtc: schedDep, scheduledArriveUtc: iso(a.scheduledTime?.utc),
     actualDepartUtc: takeoff ?? (f.status === "Departed" || f.status === "EnRoute" || f.status === "Approaching" || f.status === "Arrived" ? revDep : null),
     delayMin: delay !== null ? Math.max(0, delay) : null,

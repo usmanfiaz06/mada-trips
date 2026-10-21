@@ -90,7 +90,7 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.rating': '{rating} · {count} تقييم',
   'things.freeCancel': 'إلغاء مجاني',
   'things.minAge': 'من عمر {age} وفوق',
-  'things.via': 'عبر {supplier}',
+  'things.via': 'تحجزها مادا',
 
   'things.event.dates': 'من {from} إلى {to}',
   'things.event.until': 'لين',
@@ -125,7 +125,7 @@ export const arThings: ArSection<typeof thingsCopy> = {
   'things.source.openmeteo': 'الطقس: Open-Meteo.com، CC BY 4.0.',
   'things.source.ticketmaster': 'الفعاليات خارج السعودية: Ticketmaster.',
   'things.source.geonames': 'المدن والمناطق الزمنية: GeoNames، CC BY 4.0.',
-  'things.source.partners': 'الجولات والتذاكر: Hotelbeds وGetYourGuide وViator، وتحجزها مادا.',
+  'things.source.partners': 'الجولات والتذاكر: من شركاء مادا، وتحجزها مادا.',
   'things.source.desk': 'الفعاليات السعودية: يختارها فريق مادا.',
 
   'things.go.directions': 'الاتجاهات',

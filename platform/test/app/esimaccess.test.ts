@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { CreateOrderResponse, EsimPlansResponse, EsimResponse, EsimsResponse, PreviewResponse, ESIM_PRICING_DEFAULTS, EsimPricingRules, esimCostChanges, esimSellPrice, roundFriendly, usdSarOf, FX_FALLBACK, type OrderDraft } from "@mada/shared";
+import { CreateOrderResponse, EsimPlansResponse, EsimResponse, EsimsResponse, PreviewResponse, FX_FALLBACK, type OrderDraft } from "@mada/shared";
+import { ESIM_PRICING_DEFAULTS, EsimPricingRules, esimCostChanges, esimSellPrice, roundFriendly, usdSarOf } from "@mada/shared/internal";
 import { db } from "@/db";
 import { appAudit, appNotifications, appPayments } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
@@ -26,6 +27,7 @@ import { GET as peopleGet } from "@/app/api/app/v1/people/route";
 import { POST as cardsPost } from "@/app/api/app/v1/cards/route";
 import { callP, signIn } from "./wallet-helpers";
 import * as F from "./fixtures/esimaccess";
+import { seal } from "@/lib/app/shield";
 
 /* eSIM Access: signing, units, never buying twice, eSIMs that come a little later, its webhook, our balance running out after a traveller paid, and the owner's pricing rules. */
 
@@ -235,10 +237,11 @@ describe("eSIM Access through the Core API", () => {
     const fake = fakeEsimAccess();
     const f = await traveller();
     const plans = EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=istanbul&days=7")).json);
-    expect(plans).toMatchObject({ outcome: "ok", supplier: "esimaccess", where: { code: "TR" } });
-    const five = [...plans.plans, ...plans.more].find((p) => p.id === "TR_5_30")!;
+    expect(plans).toMatchObject({ outcome: "ok", where: { code: "TR" } });
+    expect(plans).not.toHaveProperty("supplier");
+    const five = [...plans.plans, ...plans.more].find((p) => p.id === seal("esim", "TR_5_30"))!;
     expect(five.price.amount).toBe(2900);
-    expect(plans.more.some((p) => p.id === "TR_1_Daily" && p.daily && p.days === 7)).toBe(true);
+    expect(plans.more.some((p) => p.id === seal("esim", "TR_1_Daily") && p.daily && p.days === 7)).toBe(true);
 
     // The owner doubles the margin: what the traveller was just shown still stands for the hold window.
     await db.insert(appRuntime).values({ key: "esim.pricing", value: EsimPricingRules.parse({ marginPct: 200 }) }).onConflictDoUpdate({ target: appRuntime.key, set: { value: EsimPricingRules.parse({ marginPct: 200 }) } });
@@ -331,9 +334,9 @@ describe("our supplier balance runs out after the traveller paid (mock supplier)
     await db.insert(appRuntime).values({ key: "esim.pricing", value: rules }).onConflictDoUpdate({ target: appRuntime.key, set: { value: rules } });
     try {
       const plans = EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=istanbul&days=7")).json);
-      expect(plans.plans.map((p) => p.id)).toEqual(["merhaba-15days-3gb", "merhaba-30days-10gb"]);
-      expect(plans.recommended).toBe("merhaba-30days-10gb");
-      expect([...plans.plans, ...plans.more].some((p) => p.id === "merhaba-30days-5gb")).toBe(false);
+      expect(plans.plans.map((p) => p.id)).toEqual([seal("esim", "merhaba-15days-3gb"), seal("esim", "merhaba-30days-10gb")]);
+      expect(plans.recommended).toBe(seal("esim", "merhaba-30days-10gb"));
+      expect([...plans.plans, ...plans.more].some((p) => p.id === seal("esim", "merhaba-30days-5gb"))).toBe(false);
       expect(plans.more.length).toBeGreaterThan(0);
       expect((await post(previewPost, f.token, { draft: { kind: "esim", count: 1, packageId: "merhaba-30days-5gb", where: "TR" } })).status).toBe(404);
     } finally { await db.delete(appRuntime).where(eq(appRuntime.key, "esim.pricing")); }

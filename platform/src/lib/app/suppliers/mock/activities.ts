@@ -1,11 +1,19 @@
 import { createHash } from "node:crypto";
-import { MOCK_EXPERIENCES, type Experience } from "@mada/shared";
+import { MOCK_EXPERIENCES } from "@mada/shared";
+import type { SupplierExperience as Experience } from "../activities-types";
 import type { ActivitiesSupplier } from "../activities-types";
 
 /*
  * Mock bookable experiences (SUPPLIER_MODE_ACTIVITIES=mock): the shared sample for the cities the prototype features,
  * and a guided walk anywhere else. Rates and bookings behave like Hotelbeds' (a rate key per day, a reference back).
  */
+
+/** The shared sample ("x:<slug>") as the mock supplier's own: Hotelbeds-shaped, the slug as its code. */
+const asSupplier = (e: (typeof MOCK_EXPERIENCES)[string][number]): Experience => {
+  const code = e.id.replace(/^x:/, "");
+  return { ...e, id: `hotelbeds:${code}`, supplier: "hotelbeds", code, modality: "STD" };
+};
+const SAMPLE: Readonly<Record<string, Experience[]>> = Object.fromEntries(Object.entries(MOCK_EXPERIENCES).map(([k, v]) => [k, v.map(asSupplier)]));
 
 const generic = (placeId: string, city: string): Experience[] => [{
   id: `hotelbeds:E-MOCK-${placeId}-WALK`, supplier: "hotelbeds", code: `E-MOCK-${placeId}-WALK`, modality: "STD", title: `${city} old town walk with a guide`,
@@ -18,12 +26,12 @@ export const bookedMock = new Map<string, { code: string; from: string; status: 
 export const mockActivities: ActivitiesSupplier = {
   name: "hotelbeds",
   async search(q) {
-    const list = MOCK_EXPERIENCES[q.placeId] ?? generic(q.placeId, q.city);
+    const list = SAMPLE[q.placeId] ?? generic(q.placeId, q.city);
     const youngest = q.ages.length ? Math.min(...q.ages) : 30;
     return list.filter((e) => e.minAge === null || youngest >= e.minAge).slice(0, q.limit);
   },
   async offers(code, q) {
-    const e = Object.values(MOCK_EXPERIENCES).flat().find((x) => x.code === code);
+    const e = Object.values(SAMPLE).flat().find((x) => x.code === code);
     const people = Math.max(1, q.ages.length || 2);
     const each = e?.priceFrom.amount ?? 9500;
     return [{ code, modality: q.modality ?? "STD", modalityName: "Standard", rateKey: `mock-${code}-${q.from}`, from: q.from, to: q.to, sell: each * people, net: { amount: Math.round((each * people) / 100 / 4.5), currency: "EUR" }, freeCancelUntil: q.from }];

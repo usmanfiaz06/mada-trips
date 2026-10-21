@@ -11,6 +11,7 @@ import { AppError } from "../http";
 import { findPlace, type PlaceRowSql } from "../places/search";
 import { attributionFor, type Fetch } from "../places/wiki";
 import { activitySuppliers, rankExperiences } from "../suppliers/activities";
+import type { SupplierExperience } from "../suppliers/activities-types";
 import { claimCity, refreshCity } from "./ingest";
 import { fetchTicketmaster } from "./ticketmaster";
 import { fetchWeather, mockWeather } from "./weather";
@@ -96,9 +97,9 @@ async function eventsFor(place: PlaceRowSql, c: Awaited<ReturnType<typeof cityRo
   return [...desk, ...(tm ?? []).filter((e) => e.endsOn >= from && e.startsOn <= to)];
 }
 
-async function experiencesFor(place: PlaceRowSql, c: Awaited<ReturnType<typeof cityRow>>, day: string, ages: number[], now: Date): Promise<Experience[]> {
+async function experiencesFor(place: PlaceRowSql, c: Awaited<ReturnType<typeof cityRow>>, day: string, ages: number[], now: Date): Promise<SupplierExperience[]> {
   const live = supplierMode("activities") === "live";
-  let list: Experience[] | null = live && c?.experiences && c.experiencesAt && now.getTime() - c.experiencesAt.getTime() < EXPERIENCES_TTL ? c.experiences as unknown as Experience[] : null;
+  let list: SupplierExperience[] | null = live && c?.experiences && c.experiencesAt && now.getTime() - c.experiencesAt.getTime() < EXPERIENCES_TTL ? c.experiences as unknown as SupplierExperience[] : null;
   if (!list) {
     const q = { placeId: String(place.id), city: place.name, countryCode: place.country_code, lat: place.lat, lon: place.lon, from: day, to: addDays(day, 6), ages: [30, 30], language: "en" as const, limit: 10 };
     const got = await Promise.allSettled(activitySuppliers().map((s) => s.search(q)));
@@ -155,7 +156,8 @@ export async function thingsFor(idOrSlug: string, rawQuery: Record<string, strin
   const [weather, events, experiences] = await Promise.all([
     isToday ? weatherFor(place, c, f, now).catch(() => null) : Promise.resolve(null),
     eventsFor(place, c, day, q.day ? day : addDays(day, 14), f, now, locale).catch(() => [] as WhatsOn[]),
-    experiencesFor(place, c, day, ages, now).catch(() => [] as Experience[]),
+    // The partner, its code and modality ride along for findThing; the app's answer is scrubbed of them (http.ts).
+    experiencesFor(place, c, day, ages, now).catch(() => [] as SupplierExperience[]),
   ]);
   const family = q.family ?? false;
   const shown = filterActivities(acts, { open: isToday && q.open, family, ages, kind: q.kind }).slice(0, q.limit);
@@ -186,7 +188,7 @@ export async function findThing(placeId: number, ref: { kind: "activity" | "expe
     return a ? { place: things.place, title: a.name, sub: a.summary, activity: a, experience: null, event: null } : null;
   }
   if (ref.kind === "experience") {
-    const e = things.experiences.find((x) => x.id === ref.id) ?? null;
+    const e = (things.experiences as SupplierExperience[]).find((x) => x.id === ref.id) ?? null;
     return e ? { place: things.place, title: e.title, sub: e.summary, activity: null, experience: e, event: null } : null;
   }
   const from = now.toISOString().slice(0, 10);

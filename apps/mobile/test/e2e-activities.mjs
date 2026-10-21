@@ -164,7 +164,7 @@ async function run(lang) {
 
   step(`${lang}: experiences: no meeting point yet → the voucher`);
   await scrollTo('things-book');
-  await tapTest('exp-hotelbeds:E-E10-RUH-CAMP');
+  await tapTest('exp-x:ruh-camp');
   await scrollTo('thing-meeting');
   await see(W('Meeting point is in your voucher', 'نقطة اللقاء مذكورة في القسيمة'), 'meeting point on the voucher');
   await shot('experience-voucher');
@@ -172,7 +172,7 @@ async function run(lang) {
 
   step(`${lang}: book an experience with Mada`);
   await scrollTo('things-book');
-  await tapTest('exp-hotelbeds:E-E10-RUH-DIRIYAH');
+  await tapTest('exp-x:ruh-diriyah');
   await see(W('Book with Mada', 'احجز مع مادا'), 'book button');
   await shot('experience-sheet');
   await scrollTo('thing-meeting');

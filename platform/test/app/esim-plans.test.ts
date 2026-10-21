@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ESIM_PRICING_DEFAULTS, esimPricer, esimSellPrice, recommendEsimPlan, suggestEsimPlans, undominatedPlans, type EsimPackage } from "@mada/shared";
+import { recommendEsimPlan, type EsimPackage } from "@mada/shared";
+import { ESIM_PRICING_DEFAULTS, esimPricer, esimSellPrice, suggestEsimPlans, undominatedPlans } from "@mada/shared/internal";
 
 /*
  * The plans a traveller is offered: never a smaller plan at the same or a higher price than a bigger one that lasts as

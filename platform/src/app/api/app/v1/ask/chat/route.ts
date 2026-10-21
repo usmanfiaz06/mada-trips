@@ -4,6 +4,7 @@ import { requestContext } from "@/lib/app/context";
 import { authenticate } from "@/lib/app/tokens";
 import { isProductionDeploy } from "@/lib/app/config";
 import { chatTurn, errorCode, preflight } from "@/lib/app/ask-chat/chat";
+import { scrubResponse } from "@/lib/app/shield";
 
 // POST /ask/chat { text, threadId?, tripId? } → text/event-stream of AskChatEvent (schemas/ask-chat.ts): thread, status,
 // text (deltas), cards, intent, pay, handoff, replace, done; error { code, fallback: true } when the app should answer
@@ -14,7 +15,8 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const enc = new TextEncoder();
-const frame = (e: AskChatEvent) => enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
+// Each event as the app may see it (shield.ts): cards carry stays, plans and photos like any JSON answer does.
+const frame = (e: AskChatEvent, origin: string) => enc.encode(`event: ${e.type}\ndata: ${JSON.stringify(scrubResponse(e, origin))}\n\n`);
 
 export const POST = route(async (req) => {
   const { userId } = await authenticate(req);
@@ -22,12 +24,13 @@ export const POST = route(async (req) => {
   const { ipHash } = requestContext(req);
   await preflight({ userId, ipHash });
 
+  const origin = new URL(req.url).origin;
   const abort = new AbortController();
   req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let open = true;
-      const emit = (e: AskChatEvent) => { if (open) { try { controller.enqueue(frame(e)); } catch { open = false; } } };
+      const emit = (e: AskChatEvent) => { if (open) { try { controller.enqueue(frame(e, origin)); } catch { open = false; } } };
       try {
         await chatTurn({ userId, ipHash }, input, emit, abort.signal);
       } catch (e) {

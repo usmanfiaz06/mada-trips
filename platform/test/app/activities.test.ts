@@ -325,7 +325,10 @@ describe("GET /places/:id/things", () => {
     expect(hegra.openNow).toBe(clock.minutes >= 8 * 60 && clock.minutes < 17 * 60);
     expect(t.weather?.mood).toBe("hot"); // mock weather: the Gulf
     expect(t.experiences.length).toBeGreaterThan(0);
-    expect(t.experiences[0]!.supplier).toBe("hotelbeds");
+    // The partner, its code and modality stay on the server; the app gets an opaque id (lib/app/shield.ts).
+    expect(t.experiences[0]!.id).toMatch(/^m_/);
+    expect(r.json).not.toHaveProperty("experiences.0.supplier");
+    expect(JSON.stringify(r.json)).not.toMatch(/hotelbeds|modality/i);
     expect(t.events.some((e) => e.source === "desk")).toBe(true);
     expect(t.attributions.map((a) => a.source)).toEqual(expect.arrayContaining(["openstreetmap", "wikidata", "wikipedia", "geonames"]));
     expect(t.today?.prayer === null || /^\d\d:\d\d$/.test(t.today!.prayer.at)).toBe(true);
@@ -382,7 +385,7 @@ describe("Book with Mada", () => {
     expect(v.message).toContain("2 adults and children aged 8");
     const [row] = await db.select().from(appRequests).where(eq(appRequests.id, requestId));
     expect(row!.kind).toBe("activity");
-    expect((row!.details as { activity: Record<string, unknown> }).activity).toMatchObject({ supplier: "hotelbeds", code: e.code, modality: e.modality, day: "2026-10-20", ages: [8, 30, 30], travellers: 3 });
+    expect((row!.details as { activity: Record<string, unknown> }).activity).toMatchObject({ supplier: "hotelbeds", code: expect.stringMatching(/^ulh-/), modality: "STD", day: "2026-10-20", ages: [8, 30, 30], travellers: 3 });
     const thread = MessagesResponse.parse((await callP(messagesGet, { id: requestId }, { token })).json);
     expect(thread.messages[0]!.text).toBe(v.message);
     const audit = await db.execute<{ action: string }>(q`SELECT action FROM app_audit WHERE entity_id = ${requestId}`);

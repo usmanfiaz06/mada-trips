@@ -25,6 +25,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 };
 
 /*
+ * The in-app mock API (lib/mock-api.ts, EXPO_PUBLIC_API_MODE=mock) and its fixtures only ship in a mock build: a live
+ * build resolves it to an empty stub (lib/mock-api.live.ts), so no sample data reaches the store app or the web.
+ */
+const mockStub = path.join(projectRoot, 'src/lib/mock-api.live.ts');
+const apiModule = /[\\/]src[\\/]lib[\\/]api\.ts$/;
+const resolveMock = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (process.env.EXPO_PUBLIC_API_MODE !== 'mock' && moduleName === './mock-api' && apiModule.test(context.originModulePath)) return { type: 'sourceFile', filePath: mockStub };
+  return resolveMock(context, moduleName, platform);
+};
+
+/*
  * Arabic's words (about 500 KB of the web download) wait until they are needed: on the web, the shared catalogue's
  * import of ./ar-catalogue resolves to an empty one (src/lib/copy-ar-stub.ts), and lib/i18n.ts fetches the real file
  * with import() before an Arabic screen draws. Phones keep every word in the app.

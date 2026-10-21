@@ -165,7 +165,10 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
   };
 }
 
-export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkIn: string): StayOption {
+/** A stay option as stored on the offer: the app's shape plus which essential information to fetch (never sent). */
+export type StoredStay = StayOption & { hotel?: (NonNullable<StayOption["hotel"]> & { rateCommentsId?: string | null }) | null };
+
+export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkIn: string): StoredStay {
   return {
     id, label: h.meta?.label ?? "best", name: h.name, area: h.area, address: h.address,
     note: n > 2 ? h.note : n === 2 ? h.meta?.noteTwo ?? h.note : h.meta?.noteOne ?? h.note,
@@ -173,7 +176,7 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
     checkIn, nights: h.nights, rooms: roomsFor(n), roomsLabel: roomsLabel(n), total: money(h.total.amount), cancellation: h.cancellation,
     freeCancelUntil: h.freeCancelUntil, expiresAt: h.expiresAt,
     ...(h.meta?.facts ? { facts: h.meta.facts, badge: h.meta.badge ?? null, score: h.meta.score ?? 0 } : {}),
-    ...(h.meta?.hotelCode ? { hotel: { code: h.meta.hotelCode, category: h.meta.category ?? null, imageUrl: h.meta.imageUrl ?? null, room: h.meta.room ?? null, board: h.meta.board ?? null, rateComments: h.meta.rateComments ?? null, rateCommentsId: h.meta.rateCommentsId ?? null, supplier: "hotelbeds" as const } } : {}),
+    ...(h.meta?.hotelCode ? { hotel: { code: String(h.meta.hotelCode), category: h.meta.category ?? null, imageUrl: h.meta.imageUrl ?? null, room: h.meta.room ?? null, board: h.meta.board ?? null, rateComments: h.meta.rateComments ?? null, rateCommentsId: h.meta.rateCommentsId ?? null } } : {}),
   };
 }
 

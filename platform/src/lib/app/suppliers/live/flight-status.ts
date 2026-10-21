@@ -37,7 +37,7 @@ export const flightAware: FlightStatusSupplier = {
       flightNumber, carrierName: f.operator ?? null, date, from: f.origin?.code_iata ?? null, to: f.destination?.code_iata ?? null,
       // AeroAPI returns UTC instants; local wall-clock conversion happens with the airport zone when stored.
       departLocal: (f.estimated_out ?? f.scheduled_out)?.slice(0, 16) ?? null, arriveLocal: (f.estimated_in ?? f.scheduled_in)?.slice(0, 16) ?? null,
-      status: statusOf(f), gate: f.gate_origin ?? null, terminal: f.terminal_origin ?? null, source: "FlightAware",
+      status: statusOf(f), gate: f.gate_origin ?? null, terminal: f.terminal_origin ?? null, source: "Live",
     };
   },
   async watch() { return notConfigured("flightaware alerts", ["webhook endpoint (M3)"]); },

@@ -16,6 +16,7 @@ import { Badge, Card, CardHead, Input, KV, Money, PageHeader, Textarea, btn, cx 
 import { Journey, type JourneyStep } from "@/components/journey";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
+import { canDeskFinance } from "@/lib/app/finance/access";
 import { AssignCard } from "@/components/desk/assign";
 import { TicketsCard } from "@/components/desk/tickets";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
@@ -186,7 +187,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             </Card>
           )}
           <OutcomeCard requestId={r.id} act={act} open={!closed} result={closed ? resultOfRequest(r) : null} progress={progressOfRequest(r)} t={t} />
-          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} finance={canDeskFinance(u)} t={t} />
           <AssignCard kind="request" id={r.id} userId={r.ownerId} canAct={act} />
           <TicketsCard about={{ kind: "request", id: r.id }} customerId={r.ownerId} subject={r.summary} canAct={act} />
         </aside>

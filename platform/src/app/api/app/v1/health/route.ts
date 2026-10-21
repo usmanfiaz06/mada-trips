@@ -1,4 +1,5 @@
 import { sql } from "@/db";
+import { publicSlot, publicSlots } from "@/lib/app/shield";
 import type { HealthResponse } from "@mada/shared";
 import { KEYED_SUPPLIERS, SUPPLIERS, keyedModes, supplierModes } from "@/lib/app/config";
 import { hasDataKey } from "@/lib/app/crypto";
@@ -10,6 +11,7 @@ import { runtimeConfig } from "@/lib/app/resilience/runtime";
 // suppliers' circuit breakers are open on this instance, whether maintenance is on, is the data key set.
 export const dynamic = "force-dynamic";
 
+// Partner-named slots (klook, duffel…) answer as the kind of service (shield.ts publicSlots).
 export const GET = route(async () => {
   let db: HealthResponse["db"] = "ok";
   const t0 = Date.now();
@@ -22,10 +24,10 @@ export const GET = route(async () => {
   const breakers: NonNullable<HealthResponse["breakers"]> = {};
   for (const s of [...SUPPLIERS, ...Object.keys(KEYED_SUPPLIERS)]) {
     const h = healthOf(s);
-    if (h !== "up") breakers[s] = h;
+    if (h !== "up") breakers[publicSlot(s)] = h;
   }
   const body: HealthResponse = {
-    ok: db === "ok", service: "mada-core", apiVersion: "v1", db, suppliers: { ...supplierModes(), ...keyedModes() },
+    ok: db === "ok", service: "mada-core", apiVersion: "v1", db, suppliers: publicSlots({ ...supplierModes(), ...keyedModes() }),
     dataKey: hasDataKey() ? "ok" : "missing", time: new Date().toISOString(), breakers,
     maintenance: (await runtimeConfig()).maintenance.on, dbMs,
   };

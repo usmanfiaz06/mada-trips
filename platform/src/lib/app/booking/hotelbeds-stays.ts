@@ -1,4 +1,5 @@
 import "server-only";
+import type { StoredStay } from "./search";
 import { eq } from "drizzle-orm";
 import { t, type StayOption } from "@mada/shared";
 import { db } from "@/db";
@@ -19,14 +20,14 @@ const comments = new Map<string, { at: number; text: string | null }>();
 const DAY = 24 * 3_600_000;
 
 export async function withHotelbedsEssentials(ownerId: string, row: OfferRow): Promise<OfferRow> {
-  const s = row.payload as unknown as StayOption;
+  const s = row.payload as unknown as StoredStay;
   if (!s.hotel || s.hotel.rateComments !== null) return row;
   const d = decodeOfferId(row.supplierOfferId);
   if (!d) return row;
   if (d.recheck) {
     // checkrates answers with the price and the full rateComments; repriceOffer keeps both on the offer.
     const { row: updated } = await repriceOffer(ownerId, row.id);
-    const after = updated.payload as unknown as StayOption;
+    const after = updated.payload as unknown as StoredStay;
     if (after.hotel && after.hotel.rateComments === null) await setComments(updated, "");
     return (await reload(row.id)) ?? updated;
   }
@@ -51,7 +52,7 @@ export async function withHotelbedsEssentials(ownerId: string, row: OfferRow): P
 }
 
 async function setComments(row: OfferRow, text: string) {
-  const s = row.payload as unknown as StayOption;
+  const s = row.payload as unknown as StoredStay;
   await db.update(appOffers).set({ payload: { ...s, hotel: { ...s.hotel!, rateComments: text } } as unknown as Record<string, unknown> }).where(eq(appOffers.id, row.id));
 }
 

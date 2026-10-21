@@ -73,18 +73,10 @@ export const MeetingPoint = z.object({
 });
 export type MeetingPoint = z.infer<typeof MeetingPoint>;
 
-export const ExperienceSupplier = z.enum(['hotelbeds', 'getyourguide', 'viator', 'klook']);
-export type ExperienceSupplier = z.infer<typeof ExperienceSupplier>;
-
 /** Something bookable from a partner: a tour, a ticket, a class. Priced by the partner, booked by the desk. */
 export const Experience = z.object({
-  /** "hotelbeds:E-E10-PF2SHOW" */
-  id: z.string().regex(/^(hotelbeds|getyourguide|viator|klook):[\w.~-]{1,80}$/),
-  supplier: ExperienceSupplier,
-  /** The supplier's own code for the product (Hotelbeds activity code, GYG tour id, Viator product code). */
-  code: z.string(),
-  /** Hotelbeds: the modality we'd book (cheapest that fits), so the desk can book it in one step. */
-  modality: z.string().nullable(),
+  /** Mada's opaque id for it (the partner and its product code stay on the server). */
+  id: z.string().regex(/^[\w.~:-]{1,400}$/),
   title: z.string(),
   summary: z.string().nullable(),
   image: z.object({ url: z.url(), credit: z.string() }).nullable(),

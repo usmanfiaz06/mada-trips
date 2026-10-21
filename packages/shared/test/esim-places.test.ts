@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ESIM_COUNTRIES, ESIM_FIXTURE_PACKAGES, correctEsimAsk, esimCountriesOf, esimDaysIn, esimDestinationOf, esimFlag, esimNearest, esimPlacesOf, esimRegionCoverage, findEsimPlace, type AskIntent } from '../src';
+import { ESIM_COUNTRIES, correctEsimAsk, esimCountriesOf, esimDaysIn, esimDestinationOf, esimFlag, esimNearest, esimPlacesOf, esimRegionCoverage, findEsimPlace, type AskIntent } from '../src';
+import { ESIM_FIXTURE_PACKAGES } from '../src/internal';
 
 const base: AskIntent = {
   kind: 'esim', destination: null, destinationName: null, from: null, depart: null, return: null, tripType: null, monthOnly: null, cabin: null, cabinNote: null,

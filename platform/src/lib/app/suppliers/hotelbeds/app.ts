@@ -1,4 +1,5 @@
 import "server-only";
+import type { StoredStay } from "../../booking/search";
 import { desc, eq, inArray } from "drizzle-orm";
 import type { StayOption } from "@mada/shared";
 import { sharedStay, t } from "@mada/shared";
@@ -174,14 +175,14 @@ export function hotelbedsMode(product: HotelbedsProduct): "mock" | "live" { retu
 async function storedOffer(supplierOfferId: string): Promise<BookingHotelOffer | null> {
   const [row] = await db.select({ payload: appOffers.payload, supplier: appOffers.supplier }).from(appOffers).where(eq(appOffers.supplierOfferId, supplierOfferId)).orderBy(desc(appOffers.createdAt)).limit(1);
   if (!row || row.supplier !== "hotelbeds") return null;
-  const s = row.payload as unknown as StayOption;
+  const s = row.payload as unknown as StoredStay;
   if (!s?.total) return null;
   const label = s.label === "lowest" ? "lowest" : "best";
   return {
     id: supplierOfferId, supplier: "hotelbeds", label, name: s.name, area: s.area, address: s.address, note: s.note, rating: null,
     nightly: { amount: Math.round(s.total.amount / Math.max(1, s.nights)), currency: "SAR" }, total: s.total, nights: s.nights, rooms: s.rooms,
     cancellation: s.cancellation, freeCancelUntil: s.freeCancelUntil, cancelFee: null, imageUrl: s.hotel?.imageUrl ?? null, expiresAt: s.expiresAt,
-    meta: { photo: s.photo, focal: s.focal, noteOne: s.note, noteTwo: s.note, label, hotelCode: s.hotel?.code, imageUrl: s.hotel?.imageUrl ?? null, category: s.hotel?.category ?? null,
+    meta: { photo: s.photo, focal: s.focal, noteOne: s.note, noteTwo: s.note, label, hotelCode: s.hotel?.code ? Number(s.hotel.code) : undefined, imageUrl: s.hotel?.imageUrl ?? null, category: s.hotel?.category ?? null,
       rateCommentsId: s.hotel?.rateCommentsId ?? null, rateComments: s.hotel?.rateComments ?? null, room: s.hotel?.room ?? null, board: s.hotel?.board ?? null,
       facts: s.facts ?? null, score: s.score, badge: s.badge ?? null },
   };

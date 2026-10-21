@@ -14,7 +14,8 @@ import { hbBookStayAction, hbBookTransferAction, hbCancelAction } from "@/app/ad
 
 const TONE: Record<string, "ok" | "warn" | "bad" | "info"> = { confirmed: "ok", booking: "info", unknown: "warn", failed: "bad", cancelled: "bad" };
 
-export async function HotelbedsCard({ requestId, details, act, t }: { requestId: string; details: Record<string, unknown>; act: boolean; t: T }) {
+/** `finance`: the viewer may see what Mada pays (finance.view or desk.finance, DESK-PLAN §4.3); support agents don't. */
+export async function HotelbedsCard({ requestId, details, act, finance = false, t }: { requestId: string; details: Record<string, unknown>; act: boolean; finance?: boolean; t: T }) {
   const transfer = (details as { transfer?: TransferDetails }).transfer ?? null;
   const order = transfer ? null : await orderForRequest(requestId);
   const rate = order ? await stayRateOf(order) : null;
@@ -33,7 +34,7 @@ export async function HotelbedsCard({ requestId, details, act, t }: { requestId:
         <KV items={[
           [t("Route"), <span key="r" dir="ltr">{transfer.airport} → {transfer.hotel ?? "—"}</span>],
           [t("Lands"), <span key="l" className="num" dir="ltr">{transfer.arrival.replace("T", " ")}{transfer.flightNumber ? ` · ${transfer.flightNumber}` : ""}</span>],
-          [t("Supplier price"), <span key="n" className="num" dir="ltr">{transfer.net.toFixed(2)} {transfer.currency}</span>],
+          ...(finance ? [[t("Supplier price"), <span key="n" className="num" dir="ltr">{transfer.net.toFixed(2)} {transfer.currency}</span>] as [string, React.ReactNode]] : []),
           [t("Free to cancel until"), transfer.freeCancelUntil ?? t("Not refundable")],
         ]} />
       )}

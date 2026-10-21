@@ -1,4 +1,4 @@
-import type { Experience } from "@mada/shared";
+import type { SupplierExperience as Experience } from "../activities-types";
 import type { ActivitiesSupplier, ActivityBooking, ActivityOffer, ActivitySearch } from "../activities-types";
 import { HotelbedsClient, HotelbedsError, type HotelbedsClientOptions } from "./client";
 import { costHalalas, pricingRules, type PricingRules } from "./money";

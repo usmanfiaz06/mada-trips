@@ -80,7 +80,7 @@ describe("mapping recorded answers", () => {
     expect(f.codeshareStatus).toBe("IsOperator");
     expect(mapAdb("SV263", "2027-05-10", f)).toMatchObject({
       flightNumber: "SV263", carrierName: "Saudia", from: "RUH", to: "IST", departLocal: "2027-05-10T10:25", arriveLocal: "2027-05-10T14:40",
-      status: "delayed", gate: "C4", terminal: "Terminal 3", source: "Live · AeroDataBox", delayMin: 45,
+      status: "delayed", gate: "C4", terminal: "Terminal 3", source: "Live", delayMin: 45,
       departUtc: "2027-05-10T07:25:00.000Z", scheduledDepartUtc: "2027-05-10T06:40:00.000Z", arriveUtc: "2027-05-10T11:40:00.000Z", actualDepartUtc: null,
       arrivalTerminal: "I", baggageBelt: "12", aircraft: { reg: "HZ-AK11", hex: "710101", model: "Boeing 777-300ER" },
     });
@@ -156,7 +156,7 @@ describe("which vendor answers", () => {
     process.env.AERODATABOX_API_KEY = "adb";
     delete process.env.SUPPLIER_MODE_FLIGHT_STATUS;
     const r = StatusResponse.parse((await call(statusGet, { method: "GET", path: "/api/app/v1/status" })).json);
-    expect(r.flightStatusSource).toBe("aerodatabox");
+    expect(r.flightStatusSource).toBe("live"); // the vendor stays on the server
   });
 });
 

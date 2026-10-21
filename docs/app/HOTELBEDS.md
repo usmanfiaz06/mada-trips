@@ -147,7 +147,8 @@ Web app: the mobile web export pointed at staging (`EXPO_PUBLIC_API_URL=<staging
   is the mock; nothing is charged). The desk's mock autopilot confirms the order after a few seconds.
 - **Only HBX Group product:** with `SUPPLIER_MODE_HOTELS=hotelbeds` every room in Stays comes from Hotelbeds (the
   catalogue is off; RateHawk/WebBeds aren't connected). Hotelbeds rooms carry a "Hotel details" link and their own
-  cancellation rule; the hotel page and voucher are marked "HBX Group".
+  cancellation rule. The voucher names HBX Group in its payment statement only (docs/app/SUPPLIER-PRIVACY.md: no
+  other mark in the app).
 
 Tester's path: Ask → "A hotel in Istanbul" (or Dubai, Cairo, London, Paris) → pick travellers (add a child with a date
 of birth to test ages) → see every hotel → Review → the order sheet shows the cancellation rule in hotel time and the
@@ -196,10 +197,10 @@ Pickups: the trip → Airport pickup → choose → sent to the desk; the desk b
 > cancellation).
 >
 > **7. HBX Group products only:** on this environment every room shown comes from HBX Group (no other hotel supplier
-> is connected); Hotelbeds hotels are marked "HBX Group" on the hotel page and the voucher.
+> is connected); the voucher carries the HBX Group payment statement and reference.
 >
 > **8. Other:** content is loaded from the Content API daily (updates with `lastUpdateTime`) into our database and never
-> requested in real time; images from photos.hotelbeds.com. Our smoke test report from the test environment is attached.
+> requested in real time; images from photos.hotelbeds.com, served to the app through our own image route. Our smoke test report from the test environment is attached.
 >
 > Thank you,
 > [Name], Mada Trips · [phone] · [email]

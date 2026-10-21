@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
-import { DESTINATIONS, esimCostChanges, type EsimPackage } from "@mada/shared";
+import { DESTINATIONS, type EsimPackage } from "@mada/shared";
+import { esimCostChanges } from "@mada/shared/internal";
 import { db } from "@/db";
 import { appRuntime } from "@/db/app-schema-resilience";
 import { appEsimCatalogue } from "@/db/app-schema-esim";
