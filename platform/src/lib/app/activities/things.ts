@@ -10,7 +10,7 @@ import { supplierMode } from "../config";
 import { AppError } from "../http";
 import { findPlace, type PlaceRowSql } from "../places/search";
 import { attributionFor, type Fetch } from "../places/wiki";
-import { activitySuppliers } from "../suppliers/activities";
+import { activitySuppliers, rankExperiences } from "../suppliers/activities";
 import { claimCity, refreshCity } from "./ingest";
 import { fetchTicketmaster } from "./ticketmaster";
 import { fetchWeather, mockWeather } from "./weather";
@@ -102,7 +102,10 @@ async function experiencesFor(place: PlaceRowSql, c: Awaited<ReturnType<typeof c
   if (!list) {
     const q = { placeId: String(place.id), city: place.name, countryCode: place.country_code, lat: place.lat, lon: place.lon, from: day, to: addDays(day, 6), ages: [30, 30], language: "en" as const, limit: 10 };
     const got = await Promise.allSettled(activitySuppliers().map((s) => s.search(q)));
+    // More than one supplier answered: one list, the same product once, best first (suppliers/activities.ts).
+    const answered = got.filter((g) => g.status === "fulfilled" && g.value.length).length;
     list = got.flatMap((g) => (g.status === "fulfilled" ? g.value : []));
+    if (answered > 1) list = rankExperiences(list);
     got.forEach((g) => { if (g.status === "rejected") console.warn("[activities] experiences", g.reason instanceof Error ? g.reason.message : g.reason); });
     if (live && got.some((g) => g.status === "fulfilled")) await cache(place.id, { experiences: list as unknown as Record<string, unknown>[], experiencesAt: now });
   }

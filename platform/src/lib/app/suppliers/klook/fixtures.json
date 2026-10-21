@@ -1,0 +1,31 @@
+{
+  "_comment": "Mock Klook search answers by city (Klook's strength is Asia; Dubai and Istanbul overlap the other suppliers on purpose, for ranking and de-duplication). Prices in USD, net.",
+  "cities": {
+    "tokyo": [
+      { "activity_id": 1416, "title": "Tokyo Skytree admission ticket", "sub_title": "Skip the ticket line to the Tembo Deck at 350 m.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/skytree.jpg", "review_score": 4.7, "review_count": 41200, "from_price": "18.50", "currency": "USD", "duration_minutes": 90, "free_cancellation": true, "min_age": 0 },
+      { "activity_id": 2337, "title": "Mt Fuji, Lake Kawaguchi and Oshino Hakkai day tour", "sub_title": "A day out of Tokyo by coach with an English-speaking guide.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/fuji.jpg", "review_score": 4.6, "review_count": 18800, "from_price": "52.00", "currency": "USD", "duration_minutes": 660, "free_cancellation": true, "min_age": 3 },
+      { "activity_id": 9921, "title": "teamLab Planets TOKYO ticket", "sub_title": "Walk through water and light at Toyosu.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/teamlab.jpg", "review_score": 4.8, "review_count": 25300, "from_price": "26.00", "currency": "USD", "duration_minutes": 120, "free_cancellation": false, "min_age": 0 }
+    ],
+    "bangkok": [
+      { "activity_id": 3110, "title": "Damnoen Saduak floating market and Maeklong railway market tour", "sub_title": "Morning tour by long-tail boat, hotel pickup included.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/floating.jpg", "review_score": 4.5, "review_count": 22100, "from_price": "24.00", "currency": "USD", "duration_minutes": 360, "free_cancellation": true, "min_age": 0 },
+      { "activity_id": 5502, "title": "Chao Phraya Princess dinner cruise", "sub_title": "Buffet dinner on the river, halal options on request.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/chaophraya.jpg", "review_score": 4.4, "review_count": 13600, "from_price": "33.00", "currency": "USD", "duration_minutes": 120, "free_cancellation": true, "min_age": 0 }
+    ],
+    "singapore": [
+      { "activity_id": 1221, "title": "Gardens by the Bay: Flower Dome and Cloud Forest", "sub_title": "Both conservatories on one ticket.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/gardens.jpg", "review_score": 4.8, "review_count": 60200, "from_price": "36.00", "currency": "USD", "duration_minutes": 180, "free_cancellation": false, "min_age": 0 },
+      { "activity_id": 1308, "title": "Universal Studios Singapore ticket", "sub_title": "One-day entry on Sentosa.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/uss.jpg", "review_score": 4.7, "review_count": 89000, "from_price": "61.00", "currency": "USD", "duration_minutes": null, "free_cancellation": false, "min_age": 0 }
+    ],
+    "bali": [
+      { "activity_id": 4410, "title": "Ubud monkey forest, rice terraces and waterfall tour", "sub_title": "A private car and driver for the day.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/ubud.jpg", "review_score": 4.8, "review_count": 9700, "from_price": "35.00", "currency": "USD", "duration_minutes": 600, "free_cancellation": true, "min_age": 0 }
+    ],
+    "kuala lumpur": [
+      { "activity_id": 1876, "title": "Petronas Twin Towers admission ticket", "sub_title": "The Skybridge and the observation deck on level 86.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/petronas.jpg", "review_score": 4.6, "review_count": 14300, "from_price": "21.00", "currency": "USD", "duration_minutes": 45, "free_cancellation": false, "min_age": 0 }
+    ],
+    "dubai": [
+      { "activity_id": 2001, "title": "Burj Khalifa At the Top tickets: levels 124 and 125", "sub_title": "Timed entry to the observation decks.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/burj.jpg", "review_score": 4.6, "review_count": 31800, "from_price": "48.00", "currency": "USD", "duration_minutes": 90, "free_cancellation": false, "min_age": 0 },
+      { "activity_id": 2054, "title": "Dubai Frame admission ticket", "sub_title": "Old Dubai on one side, the new city on the other.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/frame.jpg", "review_score": 4.5, "review_count": 7200, "from_price": "14.00", "currency": "USD", "duration_minutes": 60, "free_cancellation": true, "min_age": 0 }
+    ],
+    "istanbul": [
+      { "activity_id": 7781, "title": "Bosphorus sunset cruise", "sub_title": "Two hours on a yacht from Kuruçeşme.", "cover_image_url": "https://res.klook.com/image/upload/fixtures/bosphorus.jpg", "review_score": 4.3, "review_count": 1900, "from_price": "39.00", "currency": "USD", "duration_minutes": 120, "free_cancellation": true, "min_age": 0 }
+    ]
+  }
+}

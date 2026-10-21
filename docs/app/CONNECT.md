@@ -34,6 +34,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 23 | Free/open (FX, weather, places, ADS-B) | rates, weather, places, aircraft position | Working | — (OpenSky needs a licence for commercial use) |
 | 24 | Google Routes API | daily drives in plans: km, hours, border crossings | Ready (mock until key) | Owner |
 | 25 | CarTrawler (car hire) | self-drive cars: search, deposit, insurance, book, cancel | Ready (mock until key) | Owner |
+| 26 | Klook | things to do in Asia, ranked with Hotelbeds/GYG/Viator | Ready (search; desk books) | Owner |
 
 ## Processes
 
@@ -220,3 +221,30 @@ and pays Mada a commission (typically 6–12% of the rental); with Mada as merch
 **Licence/commercial notes.** Show the supplier's rental terms (deposit, excess, fuel, mileage, cross-border) before
 payment — CarTrawler requires it. A driver usually needs a credit card in their own name for the deposit and, for
 visitors, an International Driving Permit; the app says so on the card.
+
+### 26. Klook — activities (Asia)
+**What it does.** A fourth source of bookable experiences next to Hotelbeds Activities, GetYourGuide and Viator, strongest
+in Japan, Thailand, Singapore, Malaysia, Indonesia and Korea (also Dubai). All sources are **ranked together**: the
+same product from two suppliers is shown once (the cheaper), then best first by a review-weighted rating (a 4.6 with
+thousands of reviews beats a 5.0 with three). Prices in SAR with `APP_KLOOK_MARKUP_BPS` (default 1500 = 15%). As with
+the others in the beta, "Book with Mada" makes a request and the desk books it (on Klook's agent portal).
+
+**Apply.** Klook has two partner routes: the **Affiliate Partner Programme** (affiliate.klook.com: links and
+commission; no booking API) and the **Klook Agent / Distribution API** (partner.klook.com → "Become an agent", for
+travel agencies that resell). Apply for the **Agent API** as a Saudi travel agency (CR, tourism licence, website,
+expected volume); ask for sandbox access, the API documentation, and whether booking by API is open to us or only
+search + agent portal at first.
+
+**Keys in Vercel.** `KLOOK_API_KEY`, `KLOOK_ENV` (`sandbox` / `live`), `APP_KLOOK_MARKUP_BPS`;
+`SUPPLIER_MODE_KLOOK=live|mock|off` (`mock` shows the fixture activities on staging).
+
+**Certification.** Klook reviews the integration on sandbox (search and content display; with booking, a test order
+and a cancellation) before live keys.
+
+**Cost model.** Agent API: **net rates** (Mada adds its margin) and a prepaid deposit or credit line with Klook.
+Affiliate: commission (about 2–5%) and the traveller pays Klook — not used here, because the app keeps the traveller
+in Mada.
+
+**Licence notes.** Klook's content (photos, descriptions) may be shown only for selling Klook products and must keep
+"Klook" credit on the image (the app does). Check whether the agreement allows showing Klook next to competitors'
+products (ranking together); some agent agreements restrict price comparison.
