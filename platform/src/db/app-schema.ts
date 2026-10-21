@@ -242,9 +242,11 @@ export const appRequests = pgTable("app_requests", {
   // What the traveller asked for and the offer they saw, for the agent in the Ops inbox.
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
   opsBookingId: uuid("ops_booking_id").references(() => opsBookings.id, { onDelete: "set null" }),
+  // The plan item this request fulfils (ASK-INTEGRATED §7.3); the FK to app_plan_items is in 0047 (that table imports this file).
+  planItemId: uuid("plan_item_id"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index("app_requests_owner_idx").on(t.ownerId, t.createdAt), index("app_requests_status_idx").on(t.status, t.promisedBy)]);
+}, (t) => [index("app_requests_owner_idx").on(t.ownerId, t.createdAt), index("app_requests_status_idx").on(t.status, t.promisedBy), index("app_requests_plan_item_idx").on(t.planItemId)]);
 
 export const appQuotes = pgTable("app_quotes", {
   id: id(),

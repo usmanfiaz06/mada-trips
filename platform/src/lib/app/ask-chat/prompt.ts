@@ -184,7 +184,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     description: "Hand something to the team at Mada to arrange by hand and quote in the app: flights while they go by request, a visa, Umrah, a city not sold live, a cruise, a train, a group, a restaurant, anything a tool can't answer. Only after the traveller has said how to reach them. Returns the time the team answers by.",
     strict: true,
     input_schema: obj({
-      kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general"] },
+      kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general", "car_rental", "driver"] },
       summary: { type: "string", description: "What they want, in one or two plain sentences, in their language." },
       traveller_ids: ids,
       destination_name: nullable("string"),
@@ -192,6 +192,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       return: nullable("string", { description: "YYYY-MM-DD or null." }),
       contact_preference: { type: ["string", "null"], enum: ["call", "whatsapp", "in_app", null], description: "How they asked to be reached." },
       contact_window: nullable("string", { description: "With a call: the best time, in their words; else null." }),
+      item_id: nullable("string", { description: "Plan item [id]." }),
     }),
   },
   {
@@ -203,6 +204,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       offer_id: nullable("string", { description: "The flight or stay option id from a search result this conversation." }),
       package_id: nullable("string", { description: "The eSIM plan id." }),
       traveller_ids: ids,
+      item_ids: nullable("string", { description: "Plan item [ids] it books, space-separated." }),
     }),
   },
   {
@@ -300,8 +302,8 @@ const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   get_trip: { d: "One trip in full: flights, stay, travellers, documents needed." },
   get_household: { d: "The people they book for." },
   entry_rules: { d: "Visa, ETA and passport rules for these people.", p: { depart: "Arriving.", return: "Leaving." } },
-  create_request: { d: "To the team at Mada to arrange by hand, only after they said how to reach them. Returns when the team answers.", p: { summary: "One or two sentences, their language.", contact_window: "With a call: the best time." } },
-  price_quote_for_pay: { d: "Book a flight, stay or eSIM from a card: prices it again and opens the app's pay sheet. Never charges.", p: { offer_id: "Option id from a search.", package_id: "eSIM plan id." } },
+  create_request: { d: "For the Mada team to arrange by hand, once they said how to reach them; gives the reply time.", p: { summary: "A sentence or two, their language.", contact_window: "A call's best time." } },
+  price_quote_for_pay: { d: "Book a flight, stay or eSIM card: reprices it, opens the pay sheet; never charges.", p: { offer_id: "Option id from a search.", package_id: "eSIM plan id." } },
   talk_to_human: { d: "Pass the conversation to a person at the Mada desk.", p: { summary: "What they need and what was done, their language." } },
   remember: { d: "Keep a lasting preference or need for next time; not trip details, numbers or documents.", p: { sensitive: "Health, mobility or religion: true, kept only after a yes." } },
   ...PLAN_LEAN,

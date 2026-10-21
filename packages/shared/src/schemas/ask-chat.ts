@@ -101,6 +101,8 @@ export const ChatCard = z.discriminatedUnion('type', [
     more: z.number().int(),
     /** What's left to do (the checks that aren't fine), at most 3. */
     todo: z.array(z.object({ key: z.string(), state: z.string(), days: z.array(z.number().int()).default([]) })).max(3),
+    /** Prices from tools and bookings only (plans.ts PlanTotals): "Ready to book · SAR 2,480" with [Book what's ready]. */
+    totals: z.object({ priced: z.number().int(), booked: z.number().int(), demo: z.boolean(), ready: z.number().int() }).nullable().optional(),
   }),
   /** What a later turn changed in the plan, instead of the whole plan again (§3.3). */
   z.object({

@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { and, eq } from "drizzle-orm";
 import {
-  DESTINATIONS, addDays, isIsoDay, nameIn, planTitle, rangeLabel,
+  DESTINATIONS, addDays, formatSar, isIsoDay, nameIn, planTitle, rangeLabel,
   type ChatCard, type ChatPlanRow, type Person, type Plan, type PlanChangeResponse, type PlanItem, type PlaceInput, type PlanOp,
 } from "@mada/shared";
 import { db } from "@/db";
@@ -38,7 +38,9 @@ function itemWords(it: PlanItem): string {
   const at = it.startsAt ? ` ${it.startsAt.slice(11, 16)}` : "";
   // The drive interface's own line is the only km or time Mada may say (U4); an estimate never has a time.
   const d = it.drive?.line ? ` (${it.drive.line})` : it.drive && it.drive.km != null ? ` ${Math.round(it.drive.km)} km${it.drive.minutes != null && !it.drive.estimate ? ` ${hm(it.drive.minutes)}` : " (estimate, no time)"}` : "";
-  const st = STATUS_WORD[it.status] ? ` (${STATUS_WORD[it.status]}${it.booking?.name ? `: ${it.booking.name}` : ""})` : "";
+  // A price only as a tool, a quote or a booking gave it (U7); a price that ran out is checked again, never quoted.
+  const price = it.status === "priced" && it.price ? `: ${formatSar(it.price.amount)}${it.price.demo ? " sample fare" : ""}` : it.quote ? `: quote ready ${formatSar(it.quote.amount)}` : "";
+  const st = STATUS_WORD[it.status] ? ` (${STATUS_WORD[it.status]}${it.booking?.name ? `: ${it.booking.name}` : price})` : it.priceExpired ? " (price expired: offer to check it again)" : "";
   return `[${ref(it.id)}] ${what}${at}${d}${st}`;
 }
 const hm = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}m`;
@@ -61,6 +63,7 @@ export function planGist(p: Plan, people: Person[]): string {
   const timed = drives.every((i) => i.drive?.minutes != null && !i.drive.estimate);
   const tail = [
     todo.length ? `To do: ${todo.slice(0, 3).join("; ")}.` : null,
+    p.totals?.ready ? `Ready to book: ${p.totals.ready}, ${formatSar(p.totals.priced)} in all${p.totals.demo ? " (sample fares, not bookable)" : ""}; the card's Book what's ready opens the pay sheet.` : null,
     drives.length && !timed ? "Drive km and times only as written here; none written: never say one." : null,
   ].filter(Boolean).join(" ");
   let body = days.join("\n");
@@ -94,6 +97,7 @@ export function planCard(p: Plan, people: Person[]): ChatCard {
     travellers: p.travellerIds.map((id) => people.find((x) => x.id === id)).filter((x): x is Person => !!x).map((x) => ({ name: x.firstName, self: !!x.isSelf })),
     days, more: Math.max(0, p.days - 7),
     todo: p.checks.filter((c) => c.state === "todo" || c.state === "warn").slice(0, 3).map((c) => ({ key: c.key, state: c.state, days: c.days.length ? c.days : c.nights })),
+    totals: p.totals ? { priced: p.totals.priced, booked: p.totals.booked, demo: p.totals.demo, ready: p.totals.ready } : null,
   };
 }
 

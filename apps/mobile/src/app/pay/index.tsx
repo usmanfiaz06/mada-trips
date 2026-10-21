@@ -34,6 +34,7 @@ import { useCards } from '@/lib/wallet';
 import { useBookingBack } from '@/lib/hardware-back';
 import { travelEnds } from '@/lib/travel-ends';
 import { DemoFare } from '@/components/booking/DemoFare';
+import { BookReady } from '@/components/booking/BookReady';
 import { colors, font, radii, ff } from '@/theme';
 
 /*
@@ -45,7 +46,13 @@ import { colors, font, radii, ff } from '@/theme';
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 type SheetName = null | 'people' | 'cards' | 'offline' | 'declined' | 'price' | 'blocked' | '3ds' | 'applepay' | 'prefs' | 'loyalty' | 'payer';
 
-export default function Pay() {
+/** /pay?plan=<tripId>: "Book what's ready" on that trip's plan (ASK-INTEGRATED §7.2); otherwise the order sheet. */
+export default function PayRoute() {
+  const { plan } = useLocalSearchParams<{ plan?: string }>();
+  return plan ? <BookReady tripId={plan} /> : <Pay />;
+}
+
+function Pay() {
   const router = useRouter();
   const qc = useQueryClient();
   const invalidate = useInvalidateBooking();

@@ -45,14 +45,16 @@ export type AskDetails = {
   contactPreference?: "call" | "whatsapp" | "in_app" | null; contactWindow?: string | null;
   /** Who an entry service is for, so "UK ETA issued for you and Hessa" reads in the reader's language when it's done. */
   serviceWho?: { name: string; self: boolean }[];
+  /** A car rental or a driver (found by hand until a car-hire supplier is live), and the plan item it fulfils (U7). */
+  car?: CreateRequestInput["car"] | null; planItemId?: string | null;
   // Read by Trips → Requests (lib/app/trips/requests.ts): one line, and the quote once there is one.
   short?: string; quote?: number | null; quoteText?: string | null; withWhom?: "faisal";
   // A service title as its copy key and parameters, so it reads in the reader's language (readTitle).
   titleCopy?: [string, Record<string, string>] | null;
 };
 
-const M0_KIND: Record<string, string> = { visa: "visa", umrah: "umrah", car: "car", food: "restaurant", todo: "activity", flight: "flight", stay: "stay", general: "general" };
-const SHORT: Record<string, string> = { visa: "visa", umrah: "Umrah trip", car: "car", food: "table", todo: "plans", flight: "flights", stay: "rooms", general: "request" };
+const M0_KIND: Record<string, string> = { visa: "visa", umrah: "umrah", car: "car", food: "restaurant", todo: "activity", flight: "flight", stay: "stay", general: "general", car_rental: "car_rental", driver: "driver" };
+const SHORT: Record<string, string> = { visa: "visa", umrah: "Umrah trip", car: "car", food: "table", todo: "plans", flight: "flights", stay: "rooms", general: "request", car_rental: "car", driver: "car" };
 // "your table", "your flights": the thing the desk replied about, as a copy key so it reads in the reader's language.
 const WHAT: Record<string, string> = { visa: "visa", umrah: "umrah", car: "car", food: "table", todo: "plans", flight: "flights", stay: "rooms", general: "request" };
 export const whatKey = (kind: string | undefined) => `td.req.what.${WHAT[kind ?? "general"] ?? "request"}` as CopyKey;
@@ -145,6 +147,17 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     titleCopy = ref;
     title = t(ref[0], ref[1]);
     detail = [dest ? dest.name : "", names(travellers)].filter(Boolean).join(" · ");
+  } else if (b.kind === "car_rental" || b.kind === "driver") {
+    // Self-drive and a driver are request-only (ASK-INTEGRATED §13.6): where and when, the desk quotes it.
+    const c = b.car ?? null;
+    const where = c?.pickup || b.search?.destinationName || (b.answers.where ?? [])[0] || "";
+    const rental = b.kind === "car_rental";
+    titleCopy = where ? [rental ? "request.title.carRental" : "request.title.driver", { where }] : [rental ? "request.title.carRentalAny" : "request.title.driverAny", {}];
+    title = t(titleCopy[0] as CopyKey, titleCopy[1]);
+    const from = c?.from ?? b.search?.depart ?? null, to = c?.to ?? b.search?.return ?? null;
+    const dates = from ? (to && to !== from ? rangeLabel(from, to) : rangeLabel(from)) : t("request.datesLater");
+    // Return place, car size and the driver's age go to the desk with the request (details.car), not into the line.
+    detail = [dates, names(travellers)].filter(Boolean).join(" · ");
   } else if (b.search) {
     const s = b.search;
     const dates = s.depart ? (s.return ? rangeLabel(s.depart, s.return) : t("beta.fr.oneWay", { date: rangeLabel(s.depart) })) : t("request.datesLater");
@@ -159,6 +172,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
     ...(b.contactPreference ? { contactPreference: b.contactPreference, contactWindow: b.contactPreference === "call" ? b.contactWindow ?? null : null } : {}),
     short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal", titleCopy,
+    ...(b.car ? { car: b.car } : {}), ...(b.planItemId ? { planItemId: b.planItemId } : {}),
     ...(b.service ? { serviceWho: (b.serviceFor?.personId ? travellers.filter((p) => p.id === b.serviceFor!.personId) : travellers).map((p) => ({ name: personName(p), self: !!p.isSelf })) } : {}),
   };
   const r = await db.transaction(async (tx) => {
@@ -169,6 +183,16 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
     await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "request.created", entityType: "app_request", entityId: row!.id, summary: `Sent a request: ${title}`, data: { kind: b.kind }, ipHash });
     return row!;
   });
+  // For a plan item: the item reads "With the team · back by 18:40" and the request carries its item and trip (U7).
+  if (b.planItemId) {
+    const { linkRequest } = await import("../plans/booking");
+    const linked = await linkRequest(ownerId, b.planItemId, r.id);
+    if (linked) return requestView({ ...r, tripId: linked.tripId, planItemId: b.planItemId });
+  }
+  if (b.tripId && isUuid(b.tripId)) {
+    const [own] = await db.update(appRequests).set({ tripId: b.tripId }).where(and(eq(appRequests.id, r.id), sql`exists (select 1 from app_trips t where t.id = ${b.tripId} and t.owner_id = ${ownerId})`)).returning();
+    if (own) return requestView(own);
+  }
   return requestView(r);
 }
 

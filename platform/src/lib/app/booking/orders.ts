@@ -26,6 +26,7 @@ import { peopleByIds } from "../circles/common";
 import { createSplit, remindSplit } from "../circles/messages";
 import { notify } from "../trips/notify";
 import { fulfilEsimOrder } from "../esim/service";
+import { emit as emitPlanEvent } from "../plans/events";
 
 /*
  * Orders: POST /orders authorises the payment and hands the booking to the desk ('pending_agent'); GET /orders/:id is
@@ -149,6 +150,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   if (body.payment.method === "someone_else") {
     if (!agentKind) throw new AppError("VALIDATION", { message: t("error.validation") });
     const asked = await requestPayment(ownerId, body, priced, body.payment, contact, demo, ipHash, await agentP);
+    if ("order" in asked && asked.order) await planItemsBooked(ownerId, asked.order.id, body.draft);
     await fileRenewals(ownerId, renew, destination, ipHash);
     return asked;
   }
@@ -198,6 +200,8 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     return { outcome: "ok" as const, order: o!, paidNow: status === "paid_now" };
   });
   if (res.outcome === "declined") return { outcome: "declined", message: t("pay.declined.body") };
+  // Before anything confirms it (an eSIM is confirmed just below): the plan's items point at the order first.
+  await planItemsBooked(ownerId, res.order.id, body.draft);
   await fileRenewals(ownerId, renew, destination, ipHash);
   // Charged now: nothing for an agent to confirm (requests, eSIMs).
   if (res.paidNow) {
@@ -209,6 +213,13 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   // Stays in live mode (APP_STAYS_MODE=live) are booked on Hotelbeds now; in request mode the desk books them.
   if (res.order.kind === "stay") await autoBookStay(res.order.id);
   return outcomeOf(res.order);
+}
+
+/** The living plan's items this order books (its draft's planItemIds, or a quote's request): linked by the plan's listener. */
+async function planItemsBooked(ownerId: string, orderId: string, draft: CreateOrderInput["draft"]) {
+  const planItemIds = ("planItemIds" in draft ? draft.planItemIds : undefined) ?? [];
+  const requestId = draft.kind === "quote" ? draft.requestId : null;
+  await emitPlanEvent({ kind: "order.created", orderId, ownerId, planItemIds, requestId });
 }
 
 /** "Book now, Mada renews it": each agreed renewal becomes its own request with the desk (priced and paid there). */

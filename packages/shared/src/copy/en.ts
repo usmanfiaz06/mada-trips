@@ -26,6 +26,7 @@ import { nowCopy } from './now';
 import { askChatCopy } from './ask-chat';
 import { askMemoryCopy } from './ask-memory';
 import { askPlanCopy } from './ask-plan';
+import { bookReadyCopy } from './book-ready';
 import { todayIdeasCopy } from './today-ideas';
 import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
@@ -85,6 +86,8 @@ export const en = {
   // What Mada remembers across chats, and a new chat: packages/shared/src/copy/ask-memory.ts
   ...askMemoryCopy,
   ...askPlanCopy,
+  // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
+  ...bookReadyCopy,
   // Today's living bento with nothing planned: packages/shared/src/copy/today-ideas.ts
   ...todayIdeasCopy,
   // Ask understands, flows never re-ask: what was heard, what changed, visa rules first, a car's route: packages/shared/src/copy/ask-heard.ts

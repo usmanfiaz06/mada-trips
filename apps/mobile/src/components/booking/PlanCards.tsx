@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { nameIn, rangeLabel, type ChatCard, type ChatPlanRow } from '@mada/shared';
+import { useRouter } from 'expo-router';
+import { formatSar, nameIn, rangeLabel, type ChatCard, type ChatPlanRow } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
 import { Pill } from '@/components/Pill';
@@ -10,6 +11,7 @@ import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { colors, ff, radii } from '@/theme';
 import { enter } from './parts';
+import { DemoFare } from './DemoFare';
 
 /*
  * The living plan in a conversation (docs/app/ASK-INTEGRATED.md §3.3): "Here's your plan, review it" as one card with a
@@ -92,6 +94,8 @@ export function PlanCard({ card, onReview, onSay }: { card: PlanChatCard; onRevi
   const locale = getLocale();
   const dates = rangeLabel(card.start, card.end, locale);
   const people = who(card.travellers);
+  const router = useRouter();
+  const totals = card.totals ?? null;
   return (
     <Animated.View entering={enter(0)} style={s.box} testID="chat-plan-card" accessible={false}>
       <View style={[s.row, { alignItems: 'flex-start' }]}>
@@ -140,7 +144,18 @@ export function PlanCard({ card, onReview, onSay }: { card: PlanChatCard; onRevi
           ))}
         </View>
       ) : null}
-      <Button size="small" label={t('chat.plan.review')} onPress={() => { buzz('tap'); onReview(); }} style={s.button} testID="chat-plan-review" />
+      {totals ? (
+        // Only prices a tool, a quote or a booking gave (U7); a sample fare says so on the total too.
+        <View style={{ gap: 6 }} testID="chat-plan-totals">
+          {totals.ready ? <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t('chat.plan.ready', { amount: formatSar(totals.priced) })}</T> : null}
+          {totals.booked ? <T v="small" color={colors.ink2}>{t('chat.plan.bookedTotal', { amount: formatSar(totals.booked) })}</T> : null}
+          {totals.demo ? <DemoFare testID="chat-plan-demo-fare" /> : null}
+        </View>
+      ) : null}
+      {totals?.ready ? (
+        <Button size="small" label={t('chat.plan.bookReady')} onPress={() => { buzz('tap'); router.push({ pathname: '/pay', params: { plan: card.tripId } }); }} style={s.button} testID="chat-plan-book-ready" />
+      ) : null}
+      <Button size="small" variant={totals?.ready ? 'secondary' : 'primary'} label={t('chat.plan.review')} onPress={() => { buzz('tap'); onReview(); }} style={totals?.ready ? [s.button, s.soft] : s.button} testID="chat-plan-review" />
     </Animated.View>
   );
 }

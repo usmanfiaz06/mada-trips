@@ -17,6 +17,7 @@ import { presenceFor } from "../desk/agents";
 import { redact } from "./guard";
 import { isSensitive, saveFact, unkeepable } from "./memory";
 import { PLAN_RUN, PLAN_STATUS } from "./tools-plan";
+import { esimOffer, priceItems, resolveItemIds } from "../plans/booking";
 
 /*
  * The tools, run on the server as the signed-in traveller, through the same functions the app's own routes call (so
@@ -184,7 +185,7 @@ const RUN: Record<string, Run> = {
   },
 
   async create_request(ctx, a) {
-    const kind = String(a.kind) as "visa" | "umrah" | "car" | "food" | "todo" | "flight" | "stay" | "general";
+    const kind = String(a.kind) as "visa" | "umrah" | "car" | "food" | "todo" | "flight" | "stay" | "general" | "car_rental" | "driver";
     const summary = redact(String(a.summary ?? "")).text.slice(0, 500);
     // The team gets only complete requests: where and when for anything that happens somewhere, and how to reach them.
     const where = typeof a.destination_name === "string" && a.destination_name.trim() ? a.destination_name.trim() : "";
@@ -196,11 +197,17 @@ const RUN: Record<string, Run> = {
     if (missing.length) return { text: `Not sent yet. Still needed: ${missing.join(", ")}. Ask for the first missing one in one short question with choices in <next>, then call create_request again with everything.${missing.includes("how to reach them") && missing.length === 1 ? " <next>WhatsApp | Call me | Here in the app</next>" : ""}`, isError: true };
     const isSearch = kind === "flight" || kind === "stay";
     const travellerIds = whoOf(ctx, a.traveller_ids);
+    // For an item on the plan (U7): the item reads "With the team · back by …"; a car or a driver carries where and when.
+    const [planItemId] = await resolveItemIds(ctx.ownerId, ctx.tripId ?? null, a.item_id);
+    const car = kind === "car_rental" || kind === "driver"
+      ? { pickup: where.slice(0, 80) || null, dropoff: null, from: iso(a.depart), to: iso(a.return), driverAge: null, size: null }
+      : null;
     const r = await createRequest(ctx.ownerId, {
       kind, query: summary, travellerIds, note: "",
       contactPreference: a.contact_preference === "call" || a.contact_preference === "whatsapp" || a.contact_preference === "in_app" ? a.contact_preference : null,
       contactWindow: typeof a.contact_window === "string" && a.contact_window.trim() ? redact(a.contact_window).text.slice(0, 60) : null,
       ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
+      ...(planItemId ? { planItemId } : ctx.tripId ? { tripId: ctx.tripId } : {}), ...(car ? { car } : {}),
     } as Parameters<typeof createRequest>[1], ctx.ipHash);
     const by = r.promisedBy ? riyadhClock(r.promisedBy, ctx.today) : null;
     const how = r.contact ? ({ call: `by a call${r.contact.window ? ` (${r.contact.window})` : ""}`, whatsapp: "on WhatsApp", in_app: "here in the app" } as const)[r.contact.preference] : "here in the app";
@@ -216,6 +223,15 @@ const RUN: Record<string, Run> = {
     else if (a.kind === "esim" && typeof a.package_id === "string") draft = { kind: "esim", count: Math.max(1, travellerIds.length), packageId: a.package_id, travellerIds };
     else return { text: "Need the option id from a search this conversation (or the eSIM plan id).", isError: true };
     const { preview } = await priceDraft(ctx.ownerId, { draft, useCredit: true }, { demo: ctx.demo });
+    // For items on the plan (U7): the choice prices them, and the order books them onto the plan's trip.
+    const itemIds = await resolveItemIds(ctx.ownerId, ctx.tripId ?? null, a.item_ids);
+    if (itemIds.length) {
+      const offer = draft.kind === "esim"
+        ? await esimOffer(ctx.ownerId, { packageId: draft.packageId!, count: draft.count, where: null, tripId: ctx.tripId ?? null, travellerIds, total: preview.subtotal.amount, demo: !!preview.demoFare })
+        : id!;
+      const priced = await priceItems(ctx.ownerId, itemIds, offer);
+      if (priced.itemIds.length) draft = { ...draft, planItemIds: priced.itemIds, ...(priced.tripId ? { tripId: priced.tripId } : {}) } as ChatPay["draft"];
+    }
     return {
       text: `${preview.demoFare ? `${DEMO}. Say this is a sample fare for testing. ` : ""}Pay sheet opened in the app: ${preview.title}, ${sar(preview.total.amount)} all in${preview.credit.used.amount ? ` after ${sar(preview.credit.used.amount)} Mada credit` : ""}. ${preview.rule}. Nothing is charged until the traveller slides to pay.`,
       pay: { draft, title: preview.title },
