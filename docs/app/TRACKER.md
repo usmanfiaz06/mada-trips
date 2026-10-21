@@ -17,10 +17,10 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touches build config — run alone), #18 credentials line (needs owner's licence/IATA numbers), then retest (CRITIQUE-3).
 
 ## 21 Oct
-- Running: loading states (Waiting), Today living cards, Ask memory + context (local subagents); Desk U1 shell (cloud session_01UTmvme5PUDfaEJui2QECWr).
+- Running: loading states (Waiting), Today living cards, Ask memory + context (local subagents); Desk U1 done 920001c. Cloud: U2 tickets session_017zJ6cND4bz58JU8YoDSLgM, U3 customers session_01Jk7WhrhZbnGySgap2g8MSG, U4 board/drop-offs session_018873xp3uR7bepvrhQsdQjH.
 - Desk plan docs/app/DESK-PLAN.md f1517f5 (defaults §7). Order: U1 → U2 tickets → (U3 customers ∥ U4 board/drop-offs ∥ U5 Ask on desk) → (U6 finance ∥ U7 agents) → U8 dashboard. U5 waits for the Ask memory worker (ask-chat files).
 - Queued after the loading worker (shares ChatThread.tsx): Ask card redesign — request card (real button, no "You · You", what/when/where/who, status pill, contact icon), every chat card type to the same quality.
-- Done: bubbles 0aac18b/5992166 · build fix 601d744 · Gemini auto-model 95ef945, 0102780 (works: gemini-3.6-flash; 3.8/3.7 hang on free key) · staging /ask/providers check · no second eSIM flow 6df3516 · follow-ups read with context, mobility rule a587f45 · complete requests only a6c6dd5.
+- Done: Ask memory 5589a1d · Gemini fixes: index-less tool calls e665e80, thought signatures 05c548e, best model fc8913b · bubbles 0aac18b/5992166 · build fix 601d744 · Gemini auto-model 95ef945, 0102780 (works: gemini-3.6-flash; 3.8/3.7 hang on free key) · staging /ask/providers check · no second eSIM flow 6df3516 · follow-ups read with context, mobility rule a587f45 · complete requests only a6c6dd5.
 
 ## Done (17–18 Oct)
 
