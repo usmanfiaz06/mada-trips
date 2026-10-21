@@ -36,7 +36,8 @@ function itemWords(it: PlanItem): string {
     : it.kind === "stay" ? `stay ${nm(it.place) ?? it.title}${it.nights ? ` ${it.nights}n` : ""}`
     : `${it.kind} ${it.title}`;
   const at = it.startsAt ? ` ${it.startsAt.slice(11, 16)}` : "";
-  const d = it.drive && it.drive.km != null ? ` ${Math.round(it.drive.km)} km${it.drive.minutes != null && !it.drive.estimate ? ` ${hm(it.drive.minutes)}` : ""}${it.drive.estimate ? " (straight-line estimate)" : ""}${it.drive.borders.length ? ` border ${it.drive.borders.join("/")}` : ""}` : "";
+  // The drive interface's own line is the only km or time Mada may say (U4); an estimate never has a time.
+  const d = it.drive?.line ? ` (${it.drive.line})` : it.drive && it.drive.km != null ? ` ${Math.round(it.drive.km)} km${it.drive.minutes != null && !it.drive.estimate ? ` ${hm(it.drive.minutes)}` : " (estimate, no time)"}` : "";
   const st = STATUS_WORD[it.status] ? ` (${STATUS_WORD[it.status]}${it.booking?.name ? `: ${it.booking.name}` : ""})` : "";
   return `[${ref(it.id)}] ${what}${at}${d}${st}`;
 }
@@ -57,10 +58,10 @@ export function planGist(p: Plan, people: Person[]): string {
   }
   const todo = p.checks.filter((c) => c.state === "todo" || c.state === "warn").map((c) => c.text);
   const drives = p.items.filter((i) => i.kind === "leg" && i.mode === "drive");
-  const measured = drives.some((i) => i.drive?.km != null);
+  const timed = drives.every((i) => i.drive?.minutes != null && !i.drive.estimate);
   const tail = [
     todo.length ? `To do: ${todo.slice(0, 3).join("; ")}.` : null,
-    drives.length && !measured ? "No drive km or times yet: never say one." : null,
+    drives.length && !timed ? "Drive km and times only as written here; none written: never say one." : null,
   ].filter(Boolean).join(" ");
   let body = days.join("\n");
   const budget = 760 - head.length - start.length - tail.length;
@@ -77,7 +78,7 @@ export function planRow(it: Pick<PlanItem, "kind" | "mode" | "title" | "place" |
     km: it.drive?.km != null ? Math.round(it.drive.km) : null,
     // A straight-line estimate has a distance and never a time (§4.4).
     minutes: it.drive?.minutes != null && !it.drive.estimate ? it.drive.minutes : null,
-    borders: (it.drive?.borders ?? []).slice(0, 4), booking: it.booking?.name ?? null,
+    borders: (it.drive?.crossings?.length ? it.drive.crossings.map((c) => c.name ?? c.to ?? "").filter(Boolean) : []).slice(0, 4), booking: it.booking?.name ?? null,
   };
 }
 

@@ -71,20 +71,22 @@ describe("a road trip made in a chat", () => {
     const rows = card.days.flatMap((d) => d.items);
     const drives = rows.filter((x) => x.kind === "leg" && x.mode === "drive");
     expect(drives.length).toBeGreaterThanOrEqual(3);
-    // Nobody measured the drives: no km, no minutes, no time on any leg.
-    for (const x of drives) expect(x).toMatchObject({ km: null, minutes: null, at: null });
+    // No router in the tests: a straight-line distance at most, never a drive time, no time of day on any leg.
+    for (const x of drives) expect(x).toMatchObject({ minutes: null, at: null });
     expect(rows.find((x) => x.mode === "flight")).toMatchObject({ from: "Riyadh", to: "Singapore", at: null });
 
     // The model read the gist, with the rule about drive times, and the plan's own words are what it said.
     const gist = JSON.stringify(api.requests.at(-1)!.messages.at(-1)!.content);
-    expect(gist).toContain("No drive km or times yet");
+    expect(gist).toContain("Drive km and times only as written here");
     expect(gist).toMatch(/\[[0-9a-f]{8}\] drive Singapore→Melaka/);
+    expect(gist).not.toMatch(/\d+ ?h\b|\d+h\d\dm/);
     expect(r.text).toContain("Review it");
 
     // The plan is real: a planning trip, the legs in the database without times.
     const plan = await readPlan(me.user.id, card.tripId);
     expect(plan.items.filter((i) => i.kind === "leg" && i.mode === "drive")).toHaveLength(3);
-    expect(plan.items.filter((i) => i.kind === "leg").every((i) => i.startsAt === null && i.drive === null)).toBe(true);
+    expect(plan.items.filter((i) => i.kind === "leg").every((i) => i.startsAt === null)).toBe(true);
+    expect(plan.items.filter((i) => i.mode === "drive").every((i) => i.drive === null || (i.drive.estimate === true && i.drive.minutes === null))).toBe(true);
 
     // The chat is now this trip's chat, titled by its route.
     const t = await callP(threadGet, { id: r.threadId! }, { token: me.token });
