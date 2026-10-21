@@ -52,6 +52,14 @@ describe('the stream', () => {
     expect(JSON.parse(seen[1]!)).toMatchObject({ text: 'make it 5 of us', threadId: TID });
   });
 
+  it('stamps each turn with when it was sent, and keeps it Mada\'s own (no person named)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => sse([{ type: 'thread', threadId: TID, lang: 'en' }, { type: 'done', text: 'Hello.' }])));
+    const before = Date.now();
+    const turn = await sendAskChat('hi');
+    expect(Date.parse(turn.at!)).toBeGreaterThanOrEqual(before - 1);
+    expect(turn.by ?? null).toBeNull();
+  });
+
   it('falls back to the flows on an error event, a plain error, no network or a broken line', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => sse([{ type: 'thread', threadId: TID, lang: 'en' }, { type: 'error', code: 'SUPPLIER_UNAVAILABLE', fallback: true }])));
     expect(await streamAskChat({ text: 'hi' }, () => {})).toBe('fallback');

@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { API_PREFIX, ASK_CHAT_FEATURE, ASK_CHAT_ROUTE, HEADERS, readSseFrames, type AskChatEvent, type AskIntent, type ChatCard, type ChatPay } from '@mada/shared';
 import { refreshSession } from './api';
-import { API_MODE, API_ORIGIN } from './config';
+import { API_MODE, API_ORIGIN, SHOW_DEMO_HINTS } from './config';
 import { getLocale } from './i18n';
 import { getAppVersion, useFeature } from './net/gates';
 import { isOffline } from './net/state';
@@ -17,6 +17,13 @@ import { useSession } from './session';
 export type ChatTurn = {
   id: number;
   me: string;
+  /** When the traveller sent it (ISO), for the time shown after a quiet gap. */
+  at?: string;
+  /**
+   * A person on the desk who wrote this reply themselves, by name. Missing or null: Mada wrote it (always, today: the
+   * conversation never puts words in a person's mouth).
+   */
+  by?: string | null;
   /** What Mada has said so far (token by token while streaming). */
   text: string;
   /** What is being done right now ("Checking flights to Istanbul"). */
@@ -36,7 +43,13 @@ export type ChatTurn = {
 export function useAskChatOn(): boolean {
   const on = useFeature(ASK_CHAT_FEATURE, false);
   const signedIn = useSession((s) => s.status === 'signedIn');
-  return on && signedIn && API_MODE === 'live';
+  return signedIn && ((on && API_MODE === 'live') || demoChatOn());
+}
+
+/** Mock builds only, for the web e2e and screenshots: `window.__MADA_DEMO__ = { askChat: true }` (ask-chat-demo.ts). */
+export function demoChatOn(): boolean {
+  if (API_MODE !== 'mock' || !SHOW_DEMO_HINTS) return false;
+  return !!(globalThis as { __MADA_DEMO__?: { askChat?: boolean } }).__MADA_DEMO__?.askChat;
 }
 
 type Result = 'done' | 'fallback';
@@ -44,6 +57,7 @@ type Result = 'done' | 'fallback';
 /** One message to the conversation. Every event goes to onEvent as it arrives; resolves when the server is done. */
 export async function streamAskChat(body: { text: string; threadId?: string | null; tripId?: string | null }, onEvent: (e: AskChatEvent) => void, signal?: AbortSignal, retried = false): Promise<Result> {
   if (isOffline()) return 'fallback';
+  if (demoChatOn()) return (await import('./ask-chat-demo')).demoAskChat(body, onEvent, signal);
   const token = useSession.getState().tokens?.accessToken;
   if (!token) return 'fallback';
   const f: typeof fetch = Platform.OS === 'web' ? fetch : ((await import('expo/fetch')).fetch as unknown as typeof fetch);
@@ -131,7 +145,7 @@ export async function sendAskChat(text: string, opts: { tripId?: string | null }
   const abort = new AbortController();
   current = abort;
   const id = ++seq;
-  const blank: ChatTurn = { id, me: text, text: '', status: null, cards: [], pay: null, handoff: null, intent: null, lang: 'en', state: 'streaming' };
+  const blank: ChatTurn = { id, me: text, text: '', status: null, cards: [], pay: null, handoff: null, intent: null, lang: 'en', state: 'streaming', at: new Date().toISOString() };
   useAskChat.setState((s) => ({ turns: [...s.turns, blank].slice(-12), busy: true }));
   const update = (fn: (t: ChatTurn) => ChatTurn) => useAskChat.setState((s) => ({ turns: s.turns.map((t) => (t.id === id ? fn(t) : t)) }));
   const r = await streamAskChat({ text, threadId: useAskChat.getState().threadId, tripId: opts.tripId ?? null }, (e) => {

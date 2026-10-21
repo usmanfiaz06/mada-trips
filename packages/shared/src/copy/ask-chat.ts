@@ -24,6 +24,10 @@ export const askChatCopy = {
   'chat.entryGo': 'See what’s needed',
   'chat.stopped': 'We lost the thread there. Here it is the usual way.',
   'chat.working': 'Mada is writing',
+  /** Who said each message in the thread, for screen readers ("Mada: Three good ways…"). {agent}: a person on the desk. */
+  'chat.a11y.mada': 'Mada: {text}',
+  'chat.a11y.you': 'You: {text}',
+  'chat.a11y.agent': '{agent}: {text}',
   /** Next-step chips the server adds when Mada's reply left none (docs/app/ASSISTANT.md §3). */
   'chat.next.bookFlight': 'Book the {airline} at {time}',
   'chat.next.bookStay': 'Book {hotel}',

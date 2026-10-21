@@ -8,7 +8,7 @@ import { T } from './Text';
 export function Chip({ label, icon, on, onPress, background, testID }: { label: string; icon?: (color: string) => ReactNode; on?: boolean; onPress?: () => void; background?: string; testID?: string }) {
   const fg = on ? colors.mist : colors.green;
   return (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ selected: !!on }} onPress={() => { buzz('select'); onPress?.(); }}
+    <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ selected: !!on }} hitSlop={{ top: 4, bottom: 4 }} onPress={() => { buzz('select'); onPress?.(); }}
       style={({ pressed }) => [styles.chip, { backgroundColor: on ? colors.green : background ?? colors.mist }, pressed ? { transform: [{ scale: 0.97 }] } : null]}>
       <View style={styles.row}>
         {icon?.(fg)}

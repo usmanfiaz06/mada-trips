@@ -26,6 +26,9 @@ export const arAskChat: ArSection<typeof askChatCopy> = {
   'chat.entryGo': 'شوف وش المطلوب',
   'chat.stopped': 'انقطع علينا الكلام. هذا هو بالطريقة المعتادة.',
   'chat.working': 'مادا تكتب',
+  'chat.a11y.mada': 'مادا: {text}',
+  'chat.a11y.you': 'أنت: {text}',
+  'chat.a11y.agent': '{agent}: {text}',
   /** Next-step chips the server adds when Mada's reply left none (docs/app/ASSISTANT.md §3). */
   'chat.next.bookFlight': 'احجز {airline} {time}',
   'chat.next.bookStay': 'احجز {hotel}',
