@@ -66,7 +66,7 @@ export async function chatApi(): Promise<ChatApi> {
     const key = `chain|${chain.map((l) => `${l.name}:${l.model}:${l.fastModel}:${l.apiKey.slice(-6)}`).join(",")}`;
     if (real?.key !== key) real = { key, api: chainApi(await Promise.all(chain.map(async (l) => {
       const api = await apiFor(linkConfig(l));
-      return { name: l.name, model: l.model, fastModel: l.fastModel, api: l.auto ? autoModelApi(api, await flashModels(l)) : api };
+      return { name: l.name, model: l.model, fastModel: l.fastModel, api: l.auto ? autoModelApi(api, await flashModels(l), { warm: true }) : api };
     }))) };
     return real.api;
   }
@@ -114,8 +114,20 @@ export async function flashModels(l: ChainLink): Promise<string[]> {
 const wrongModel = (e: unknown): boolean => statusOf(e) === 404 || (!!e && typeof e === "object" && (e as { noModel?: unknown }).noModel === true);
 
 /** Calls go to the first model that works; one the key can't use is skipped for good on this instance. */
-export function autoModelApi(api: ChatApi, models: string[]): ChatApi {
+export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: boolean } = {}): ChatApi {
   let i = 0;
+  // Some listed models never answer on a free key (they hang): one tiny call to each, in the background at start, moves
+  // to the first that answers, so a traveller never waits on one.
+  if (opts.warm && models.length > 1) void (async () => {
+    for (let k = 0; k < models.length; k++) {
+      try {
+        await api.create({ model: models[k], max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 9_000, maxRetries: 0 });
+        if (k !== i) console.info(`[ask-chat] model=${models[k]} answers; using it`);
+        i = k;
+        return;
+      } catch { /* the next one */ }
+    }
+  })();
   const pick = () => models[Math.min(i, models.length - 1)];
   const skip = (e: unknown) => {
     if (!wrongModel(e) || i >= models.length - 1) return false;
