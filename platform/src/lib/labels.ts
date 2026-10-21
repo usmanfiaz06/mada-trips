@@ -96,3 +96,11 @@ export const ESIM_STATUS: Record<string, { label: string; tone: Tone }> = {
 export const AGENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   online: { label: "Online", tone: "ok" }, away: { label: "Away", tone: "warn" }, offline: { label: "Signed off", tone: "neutral" },
 };
+// Desk tickets (lib/app/desk/tickets.ts, DESK-PLAN.md §4.4).
+export const TICKET_STATUS: Record<string, { label: string; tone: Tone }> = {
+  new: { label: "New", tone: "gold" }, open: { label: "Open", tone: "info" }, waiting_customer: { label: "Waiting on customer", tone: "neutral" },
+  waiting_supplier: { label: "Waiting on supplier", tone: "neutral" }, resolved: { label: "Resolved", tone: "ok" }, closed: { label: "Closed", tone: "neutral" },
+};
+export const TICKET_PRIORITY: Record<string, { label: string; tone: Tone }> = {
+  urgent: { label: "Urgent", tone: "bad" }, high: { label: "High", tone: "warn" }, normal: { label: "Normal", tone: "neutral" }, low: { label: "Low", tone: "neutral" },
+};

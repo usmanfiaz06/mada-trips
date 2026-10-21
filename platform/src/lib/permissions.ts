@@ -31,6 +31,7 @@ export const PERMISSIONS = {
   "desk.refund":         { group: "desk",      en: "Approve app refunds & vouchers",     ar: "اعتماد استردادات التطبيق والقسائم" },
   "desk.moderate":       { group: "desk",      en: "Moderate tips, reports & blocks",    ar: "مراجعة النصائح والبلاغات والحظر" },
   "desk.admin":          { group: "desk",      en: "Run the rota & assign agents",       ar: "إدارة المناوبات وإسناد الموظفين" },
+  "desk.tickets.manage": { group: "desk",      en: "Reassign anyone's tickets & merge them", ar: "إعادة إسناد تذاكر الجميع ودمجها" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

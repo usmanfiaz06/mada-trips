@@ -13,6 +13,7 @@ import { shortRef } from "@/lib/app/desk/core";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Avatar, Card, Empty, PageHeader, cx } from "@/components/ui";
 import { AssignCard } from "@/components/desk/assign";
+import { TicketsCard } from "@/components/desk/tickets";
 import { EsimCard } from "@/components/desk/esim-card";
 import { Composer } from "@/components/desk/forms";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
@@ -121,6 +122,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
         {thread && (
           <div className="hidden min-h-0 space-y-4 overflow-y-auto xl:block">
             <AssignCard kind="chat" id={`${thread.kind}:${thread.id}`} userId={thread.user?.id ?? null} canAct={can(u, "desk.act")} />
+            <TicketsCard about={{ kind: "chat", id: `${thread.kind}:${thread.id}` }} customerId={thread.user?.id ?? null} subject={thread.summary ?? undefined} canAct={can(u, "desk.act")} />
             <EsimCard userId={thread.user?.id ?? null} />
           </div>
         )}

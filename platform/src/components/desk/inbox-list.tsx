@@ -12,7 +12,11 @@ import { useT } from "@/lib/i18n/client";
 export type InboxRow = {
   key: string; kind: string; id: string; title: string; note: string; sub: string; href: string; due: string; opened: string;
   agentName: string | null; reason: string; tag?: string | null; reach?: { label: string; window: string | null } | null; link?: { label: string; href: string } | null; escalated: boolean; escalationNote: string | null; amount: string | null; mine: boolean;
+  /** The row's ticket (lib/app/desk/tickets.ts): its ref links to the ticket page; "Take it" takes the ticket. */
+  ticket?: { id: string; ref: string; href: string; priority: string; status: string } | null;
 };
+
+const PRIORITY_TONE: Record<string, string> = { urgent: "bg-bad-soft text-bad", high: "bg-warn-soft text-warn" };
 
 
 const FILTER_KEYS = ["mine", "team", "unassigned", "escalated"];
@@ -61,10 +65,12 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
               <span className={cx("grid size-10 place-items-center rounded-2xl", M.tone)}><Icon className="size-[18px]" strokeWidth={1.8} /></span>
               <Link href={r.href} className="min-w-0">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {r.ticket && <span className="num text-[11.5px] font-medium text-ink-4" dir="ltr">{r.ticket.ref}</span>}
                   <span className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">{t(M.label)}</span>
                   <span className="text-[12.5px] font-medium text-ink-2">· {t(r.note)}</span>
                   {r.tag && <span className="inline-flex h-5 items-center rounded-full bg-info-soft px-1.5 text-[11px] font-medium text-info">{t(r.tag)}</span>}
                   {r.reach && <span className="inline-flex h-5 items-center rounded-full bg-surface-2 px-1.5 text-[11px] font-medium text-ink-2" data-testid="inbox-reach">{t(r.reach.label)}{r.reach.window ? <> · <bdi>{r.reach.window}</bdi></> : null}</span>}
+                  {r.ticket && PRIORITY_TONE[r.ticket.priority] && <span className={cx("inline-flex h-5 items-center rounded-full px-1.5 text-[11px] font-medium", PRIORITY_TONE[r.ticket.priority])}>{t(r.ticket.priority === "urgent" ? "Urgent" : "High")}</span>}
                   {r.escalated && <span className="inline-flex h-5 items-center gap-1 rounded-full bg-bad-soft px-1.5 text-[11px] font-medium text-bad" title={r.escalationNote ?? ""}><Flag className="size-3" />{t("Escalated")}</span>}
                 </span>
                 <span className="mt-0.5 block truncate text-[14.5px] text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4"><bdi>{r.title}</bdi></span>
@@ -91,10 +97,12 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
                 )}
               </div>
               <div className="ms-auto flex items-center gap-1.5 lg:ms-0">
+                {r.ticket && r.ticket.href !== r.href && <Link href={r.ticket.href} className="hidden h-8 items-center rounded-full px-2.5 text-[12.5px] text-ink-3 underline decoration-gold decoration-2 underline-offset-4 hover:text-ink sm:inline-flex">{t("Ticket")}</Link>}
                 {r.link && <a href={r.link.href} target="_blank" rel="noopener noreferrer" className="hidden h-8 items-center rounded-full px-2.5 text-[12.5px] text-ink-3 underline decoration-gold decoration-2 underline-offset-4 hover:text-ink sm:inline-flex">{t(r.link.label)}</a>}
                 {myAgentId && !r.mine && (
                   <form action={take} ref={(el) => { takeRefs.current[r.key] = el; }}>
                     <input type="hidden" name="kind" value={r.kind} /><input type="hidden" name="itemId" value={r.id} /><input type="hidden" name="agentId" value={myAgentId} />
+                    {r.ticket && <input type="hidden" name="ticketId" value={r.ticket.id} />}
                     <SubmitButton variant="outline" size="sm"><Hand className="size-3.5" />{t("Take it")}</SubmitButton>
                   </form>
                 )}

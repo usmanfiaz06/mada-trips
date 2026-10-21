@@ -84,10 +84,15 @@ ids.umrah = await firstHref(lead.page, /\/desk\/requests\/[0-9a-f-]{36}$/, 'Umra
 await go(lead.page, '/adminwork/desk/chats');
 ids.chat = await firstHref(lead.page, /\/desk\/chats\?t=support:/, 'Sultan');
 
+// The queue makes a ticket for each open item on its first visit (lib/app/desk/tickets.ts).
+await go(lead.page, '/adminwork/desk?f=team');
+await go(lead.page, '/adminwork/desk/tickets?q=Istanbul');
+ids.ticket = await firstHref(lead.page, /\/desk\/tickets\/T-\d+$/);
 const PAGES = [
   ['inbox', '/adminwork/desk'], ['inbox-team', '/adminwork/desk?f=team'], ['orders', '/adminwork/desk/orders'], ['order-awaiting', ids.awaiting], ['order-held', ids.held],
   ['order-issued', ids.issued], ['requests', '/adminwork/desk/requests'], ['request-visa', ids.visa], ['request-umrah', ids.umrah], ['chats', '/adminwork/desk/chats'], ['chat-thread', ids.chat],
   ['refunds', '/adminwork/desk/refunds'], ['disruptions', '/adminwork/desk/disruptions'], ['moderation', '/adminwork/desk/moderation'], ['moderation-blocked', '/adminwork/desk/moderation?s=blocked'], ['team', '/adminwork/desk/team'],
+  ['tickets', '/adminwork/desk/tickets'], ['ticket', ids.ticket], ['ticket-new', '/adminwork/desk/tickets/new'],
 ];
 await lead.ctx.close();
 
@@ -137,6 +142,27 @@ if (ONLY !== 'pages') {
   await submitIn('form:has(input[name=ticket])', 'Issue tickets and capture');
   await expectText(page, 'Confirmed by Bader at Mada');
   await shot(page, 'flow-order-issued');
+
+  // Its ticket resolved itself; then a ticket by hand from the same order: a note, wait on the airline, resolve.
+  await go(page, ids.ticket);
+  await expectText(page, 'Resolved. It reopens');
+  await go(page, ids.awaiting);
+  await page.locator('[data-testid=create-ticket] summary').click();
+  const create = page.locator('[data-testid=create-ticket] form');
+  await create.locator('input[name=subject]').fill('Wheelchair at Istanbul arrivals');
+  await create.locator('select[name=priority]').selectOption('high');
+  await create.locator('textarea[name=note]').fill('Saudia special assistance desk: asked by email.');
+  await create.getByRole('button', { name: 'Create ticket' }).click();
+  await page.waitForURL(/\/desk\/tickets\/T-\d+$/, { timeout: 60_000 });
+  await page.waitForLoadState('networkidle');
+  await expectText(page, 'Wheelchair at Istanbul arrivals');
+  await expectText(page, 'Saudia special assistance desk');
+  await submitIn('[data-testid=next-action] form:has(input[name=id])', 'Wait on supplier');
+  await expectText(page, 'Waiting on supplier');
+  await submitIn('[data-testid=next-action] form:has(input[name=id])', 'Supplier answered');
+  await submitIn('[data-testid=next-action] form:has(input[name=id])', 'Resolve');
+  await expectText(page, 'Resolved. It reopens');
+  await shot(page, 'flow-ticket-resolved');
 
   // Ask the traveller on the Tabby order.
   await go(page, ids.tabby);

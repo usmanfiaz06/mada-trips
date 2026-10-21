@@ -15,7 +15,7 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
   const sections: { label: string; items: Item[] }[] = [
     { label: t("Support"), items: [
       { href: D, label: t("My queue"), icon: "Headset", count: c.queue },
-      { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck", soon: true },
+      { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck" },
       { href: `${D}/chats`, label: t("Chats"), icon: "MessagesSquare", count: c.chats },
       { href: `${D}/ask`, label: t("Ask threads"), icon: "Bot", soon: true },
       { href: `${D}/customers`, label: t("Customers"), icon: "Contact", soon: true },
