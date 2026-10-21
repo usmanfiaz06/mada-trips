@@ -39,6 +39,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 28 | Cover Genius XCover | travel insurance: quote, buy, cancel | Ready in code; **needs Saudi licensing** | Owner + legal |
 | 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
 | 30 | Duffel | second flight source next to TBO (NDC airlines, low-cost) | Ready (mock until key) | Owner |
+| 31 | RateHawk (ETG / WorldOTA) | second hotel source next to Hotelbeds, cheapest per hotel | Ready (mock until keys) | Owner |
 
 ## Processes
 
@@ -383,3 +384,51 @@ for test mode.
 
 **Licence notes.** Mada is the seller of record to the traveller: fare rules and baggage must be shown before payment
 (the card does). Duffel's terms forbid scraping/redistributing their content outside the booking flow.
+
+### 31. RateHawk (Emerging Travel Group / WorldOTA) — second hotel source
+**What it does.** Searched together with Hotelbeds (or the catalogue in mock): the **same hotel** from both is shown
+**once, at the cheaper price**. The same hotel means names that agree (most of their words, accents and "hotel"
+aside) **and** within 300 m when both give coordinates (a source without coordinates needs the exact same name), so
+two Hiltons in one city never merge. Prices go through the same stay markup as Hotelbeds (`APP_STAY_MARKUP_BPS`) so
+the comparison is fair; RateHawk asks for **Saudi-resident** prices in SAR. Then the shared ranking (who is going,
+"Best for you", "Lowest price") runs as before. Price on the order sheet uses RateHawk's hotel page + **prebook**
+(the final price); the adapter also has **book** (paid from Mada's RateHawk deposit, our order id as
+`partner_order_id`), **status** and **cancel** for the desk. If either source fails the other answers alone.
+Still to do: a "Book on RateHawk" button on the desk (today a RateHawk stay goes to the desk as a request, like
+Hotelbeds in `APP_STAYS_MODE=request`). `HOTELS_VENDOR=ratehawk` makes RateHawk the only source.
+
+**Apply.** ratehawk.com → "Become a partner" → **API access** (B2B, travel agency). ETG checks the company (CR,
+tourism licence, website) and issues **sandbox keys** (key id + API key; test hotel `test_hotel`). Ask for: Saudi
+residency pricing, the deposit/credit line terms, the Arabic content, and whether they whitelist IPs (Vercel has no
+fixed outbound IP).
+
+**Keys in Vercel.** `RATEHAWK_KEY_ID`, `RATEHAWK_API_KEY`, optional `RATEHAWK_BASE_URL` (if they give a sandbox host),
+`RATEHAWK_MAX_HOTELS` (default 30 cheapest looked up per search); `SUPPLIER_MODE_RATEHAWK=live|mock|off`.
+
+**Certification.** ETG certifies on sandbox before live keys: search → hotel page → prebook → book → status →
+cancel on `test_hotel`, with screenshots showing taxes/fees "paid at the hotel", cancellation policy and meal type.
+
+**Cost model.** **Net rates** (Mada sets the sell price) paid by **deposit or credit line**; no API fee. Commissionable
+"gross" rates are also possible — ask which. Look-to-book limits apply (ask the ratio; searches are cached 10 min).
+
+**Licence notes.** Hotel content (photos, descriptions) is licensed for selling RateHawk rates; when a merged hotel
+shows RateHawk's price, show RateHawk's room/meal/cancellation for that rate (the offer carries them). Rates for Saudi
+residents may only be sold to Saudi residents (residency must match the guest).
+
+## Not available as an API (how Mada handles them)
+
+| Service | Why there's no integration | What Mada does |
+|---|---|---|
+| **Nusuk** (Umrah permits, Rawdah slots) | The Ministry of Hajj and Umrah's platform; programmatic access is only for its licensed **Umrah companies/agents partner programme** (Nusuk Masar), not general travel apps. | "Ask Mada" request: the team books the permit or the package through a licensed Umrah partner (or tells the traveller to book the free permit in the Nusuk app themselves). Apply to Nusuk Masar only if Mada becomes a licensed Umrah agent. |
+| **Haramain High Speed Railway** (Makkah–Jeddah–Madinah) | No public or partner booking API; tickets are sold on hhr.sa, its app and agent desks. | Request to the team, who book on hhr.sa with the traveller's details and send the e-ticket to the trip. The Routes adapter (§24) can still show the drive as an alternative. |
+| **Saudi Arabia Railways (SAR)** (Riyadh–Dammam, North line to Qurayyat/Hail) | No booking API for third parties; sold on sar.com.sa and its app. | Request to the team, booked by hand. |
+| **Careem / Uber** (on-demand cars) | No open booking API for agencies (Uber's Guest Rides / Careem Business are business accounts, not an API we can resell). | "Car right now" stays a request ("Mada calls you back"); pre-booked cars go through Hotelbeds Transfers (§9) or self-drive via car hire (§25). See §14. |
+
+**IATA — accreditation vs Timatic.** Two different things: (1) **IATA accreditation / BSP** lets an agency issue
+airline tickets on its own stock and settle through the Billing and Settlement Plan; Mada doesn't need it while TBO
+and Duffel ticket for us (they are the accredited issuers). Get it later only to ticket directly with a GDS (needs
+a bank guarantee, an accredited office and staff qualifications). (2) **Timatic** is IATA's database of entry,
+visa and health rules that airlines use at check-in. It is licensed (Timatic Web/API, AutoCheck) at a price meant for
+airlines and large agencies, and its terms restrict how its text is shown. Mada uses **Sherpa** (§27) for entry rules
+instead — built for consumer apps, with Arabic text and a per-request price — and keeps its own built-in rules as the
+fallback. Revisit Timatic only if an airline partner requires Timatic-exact answers.

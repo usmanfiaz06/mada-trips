@@ -12,7 +12,9 @@ import { catalogueHotels } from "../suppliers/mock/catalogue-hotels";
 import { mockMyFatoorah } from "../suppliers/mock/myfatoorah";
 import { liveMyFatoorah } from "../suppliers/live/myfatoorah";
 import { claudeAsk } from "../suppliers/live/ask-claude";
-import { gdsFlights, rateHawkHotels } from "../suppliers/live/commerce";
+import { gdsFlights } from "../suppliers/live/commerce";
+import { rateHawk } from "../suppliers/ratehawk/ratehawk";
+import { rateHawkSource, withSecondHotelSource } from "../suppliers/ratehawk";
 import { tboAir } from "../suppliers/live/tbo-air";
 import { guarded } from "../resilience/breaker";
 import { duffelSource, withSecondSource } from "../suppliers/duffel";
@@ -38,10 +40,14 @@ export const bookingSuppliers = {
     const second = duffelSource();
     return second ? withSecondSource(first, second) : first;
   },
-  /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock for its fixtures) or RateHawk (not built). */
+  /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock), or RateHawk alone (HOTELS_VENDOR=ratehawk); plus RateHawk when on. */
   hotels: (): BookingHotelSupplier => {
     const v = hotelVendor();
-    return v === "catalogue" ? catalogueHotels : v === "ratehawk" ? (rateHawkHotels as BookingHotelSupplier) : bookingHotelbeds();
+    const second = rateHawkSource();
+    if (v === "ratehawk") return second ?? guarded("ratehawk", rateHawk);
+    const first = v === "catalogue" ? catalogueHotels : bookingHotelbeds();
+    // RateHawk (SUPPLIER_MODE_RATEHAWK / its keys) joins as a second source: the same hotel once, the cheaper.
+    return second ? withSecondHotelSource(first, second) : first;
   },
   payments: (): BookingPaymentSupplier => (supplierMode("payments") === "live" ? liveMyFatoorah : mockMyFatoorah),
   /** Live: Claude with a strict tool schema. Mock: none, the deterministic rules answer. */
