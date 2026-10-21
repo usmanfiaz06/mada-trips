@@ -308,10 +308,11 @@ export async function openAskThread(threadId: string): Promise<boolean> {
 
 /* The chats list (ASK-INTEGRATED.md §2.4). */
 export const askThreadsApi = {
-  list: (o: { q?: string; archived?: boolean; tripId?: string } = {}) => {
+  list: (o: { q?: string; archived?: boolean; tripId?: string; filter?: 'trips' | 'upcoming' | 'past' } = {}) => {
     const qs = new URLSearchParams();
     if (o.q) qs.set('q', o.q);
     if (o.archived) qs.set('archived', '1');
+    if (o.filter) qs.set('filter', o.filter);
     if (o.tripId) qs.set('tripId', o.tripId);
     const tail = qs.toString();
     return request({ method: 'GET', path: `${ASK_THREADS_ROUTE}${tail ? `?${tail}` : ''}`, retries: 0 }, AskThreadsResponse);

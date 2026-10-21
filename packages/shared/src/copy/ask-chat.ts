@@ -109,6 +109,16 @@ export const askChatCopy = {
   'chat.trip.booked': 'Booked',
   'chat.trip.today': 'Today',
   'chat.trip.done': 'Done',
+  /** U1+ (owner, 21 Oct): filters and date groups on the list; the day over a conversation's messages. */
+  'chat.list.filter.all': 'All',
+  'chat.list.filter.trips': 'Trips',
+  'chat.list.filter.upcoming': 'Upcoming',
+  'chat.list.filter.past': 'Past',
+  'chat.list.group.today': 'Today',
+  'chat.list.group.yesterday': 'Yesterday',
+  'chat.list.group.week': 'This week',
+  'chat.list.group.month': 'This month',
+  'chat.list.group.earlier': 'Earlier',
   /** On the trip page: opens this trip's own chat, or starts one about it. */
   'chat.askTrip': 'Ask about this trip',
 } as const;

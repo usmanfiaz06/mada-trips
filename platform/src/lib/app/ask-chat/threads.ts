@@ -8,8 +8,10 @@ import { appAgents } from "@/db/app-schema-desk";
 import { joinedText, nameIn, type AskLine } from "./takeover";
 
 /*
- * The conversations list (docs/app/ASK-INTEGRATED.md §2.4): the traveller's own chats, newest first, 30 to a page.
- * Search reads the title, the preview and the trip's place, never the words inside a chat. A chat with nothing said in
+ * The conversations list (docs/app/ASK-INTEGRATED.md §2.4 and the U1+ row of §11): the traveller's own chats, newest
+ * first, 30 to a page. Search reads the title, the trip's place and every line said in the chat (the traveller's own
+ * chats only; lines were redacted before they were kept), and says which line matched so the app opens the chat at it.
+ * Filters: trips (about a trip), upcoming (a trip still to come or on now), past (a trip that's over). A chat with nothing said in
  * it (a turn that stopped before anything was kept) isn't listed. Archiving keeps everything; deleting a chat never
  * touches its trip, plan or bookings.
  */
@@ -52,25 +54,48 @@ const base = () => db.select(cols).from(appAskThreads)
   .leftJoin(appAgents, eq(appAgents.opsUserId, appAskThreads.takenBy));
 
 /** `before`: the cursor from the page before ("<lastAt ISO>|<id>"). */
-export async function listThreads(ownerId: string, o: { q?: string | null; archived?: boolean; tripId?: string | null; before?: string | null; limit?: number } = {}) {
+export const THREAD_FILTERS = ["trips", "upcoming", "past"] as const;
+export type ThreadFilter = (typeof THREAD_FILTERS)[number];
+
+/** The last line said in the chat that has the words: the list shows it, and the app opens the chat there. */
+const matchOf = (like: string) => sql<string | null>`(
+  SELECT x.e->>'text' FROM jsonb_array_elements(${appAskThreads.transcript}) WITH ORDINALITY AS x(e, n)
+  WHERE x.e->>'who' IN ('me', 'mada', 'agent') AND x.e->>'text' ILIKE ${like} ORDER BY x.n DESC LIMIT 1)`;
+
+/** A few words either side of the match, on one line. */
+export function snippetOf(text: string, q: string, width = 90): string {
+  const one = text.replace(/\s+/g, " ").trim();
+  const at = one.toLowerCase().indexOf(q.toLowerCase());
+  if (at < 0 || one.length <= width) return one.slice(0, width);
+  const from = Math.max(0, Math.min(at - Math.floor((width - q.length) / 2), one.length - width));
+  return `${from > 0 ? "…" : ""}${one.slice(from, from + width).trim()}${from + width < one.length ? "…" : ""}`;
+}
+
+export async function listThreads(ownerId: string, o: { q?: string | null; archived?: boolean; tripId?: string | null; filter?: ThreadFilter | null; before?: string | null; limit?: number } = {}) {
   const q = (o.q ?? "").trim().slice(0, 80);
   const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  const search: SQL | undefined = q ? sql`(${appAskThreads.title} ILIKE ${like} OR ${appAskThreads.preview} ILIKE ${like} OR ${appTrips.city} ILIKE ${like})` : undefined;
+  const search: SQL | undefined = q ? sql`(${appAskThreads.title} ILIKE ${like} OR ${appTrips.city} ILIKE ${like} OR ${matchOf(like)} IS NOT NULL)` : undefined;
+  const today = todayIn();
+  const over = sql`(${appTrips.status} IN ('cancelled', 'completed') OR coalesce(${appTrips.endDate}, ${appTrips.startDate}) < ${today})`;
+  const filter: SQL | undefined = o.filter === "trips" ? isNotNull(appAskThreads.tripId)
+    : o.filter === "upcoming" ? and(isNotNull(appAskThreads.tripId), sql`NOT ${over}`)
+    : o.filter === "past" ? and(isNotNull(appAskThreads.tripId), over) : undefined;
   const [at, id] = (o.before ?? "").split("|");
   const cursor = at && id && !Number.isNaN(Date.parse(at)) && /^[0-9a-f-]{36}$/i.test(id)
     ? sql`(${appAskThreads.lastAt}, ${appAskThreads.id}) < (${new Date(at).toISOString()}::timestamptz, ${id}::uuid)` : undefined;
   const mine = and(eq(appAskThreads.ownerId, ownerId), SAID);
   const limit = Math.min(Math.max(o.limit ?? PAGE, 1), PAGE);
   const [rows, [arch]] = await Promise.all([
-    base().where(and(mine, o.archived ? isNotNull(appAskThreads.archivedAt) : isNull(appAskThreads.archivedAt), o.tripId ? eq(appAskThreads.tripId, o.tripId) : undefined, search, cursor))
+    (q ? db.select({ ...cols, match: matchOf(like) }) : db.select(cols)).from(appAskThreads)
+      .leftJoin(appTrips, eq(appTrips.id, appAskThreads.tripId)).leftJoin(appAgents, eq(appAgents.opsUserId, appAskThreads.takenBy))
+      .where(and(mine, o.archived ? isNotNull(appAskThreads.archivedAt) : isNull(appAskThreads.archivedAt), o.tripId ? eq(appAskThreads.tripId, o.tripId) : undefined, filter, search, cursor))
       .orderBy(desc(appAskThreads.lastAt), desc(appAskThreads.id)).limit(limit + 1),
     db.select({ n: sql<number>`count(*)::int` }).from(appAskThreads).where(and(mine, isNotNull(appAskThreads.archivedAt))),
   ]);
-  const today = todayIn();
-  const page = (rows as Raw[]).slice(0, limit);
+  const page = (rows as (Raw & { match?: string | null })[]).slice(0, limit);
   const last = page.at(-1);
   return {
-    threads: page.map((r) => rowOf(r, today)),
+    threads: page.map((r) => ({ ...rowOf(r, today), ...(q ? { match: r.match ? snippetOf(r.match, q) : null } : {}) })),
     next: rows.length > limit && last ? `${last.lastAt.toISOString()}|${last.id}` : null,
     archivedCount: arch?.n ?? 0,
   };

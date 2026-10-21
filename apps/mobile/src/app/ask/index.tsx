@@ -49,7 +49,7 @@ function Home({ tripId, orb }: { tripId: string | null; orb: boolean }) {
     })();
     return () => { live = false; };
   }, [tripId, orb]); // eslint-disable-line react-hooks/exhaustive-deps
-  const first = useQuery({ queryKey: threadsKey('', false), queryFn: () => askThreadsApi.list(), enabled: decided });
+  const first = useQuery({ queryKey: threadsKey('', 'all'), queryFn: () => askThreadsApi.list(), enabled: decided });
   const back = () => (router.canGoBack() ? router.back() : router.replace('/today'));
   if (!decided) return <Screen><View /></Screen>;
   // Nobody to list yet: straight into a new chat with the usual suggestions.

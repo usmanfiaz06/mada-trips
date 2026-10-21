@@ -4,8 +4,8 @@
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir dist
 //   DIST=dist node test/e2e-ask-chats.mjs [shot-dir]          (default docs/app/screens)
 //
-// The orb opens the list (nothing kept on the phone yet); the chat about the upcoming trip sits under Upcoming trips;
-// search finds by title; archive and unarchive; two new chats about two places keep their own turns; a chat the phone
+// The orb opens the list (nothing kept on the phone yet), grouped by day; search finds by title and by a word said in a
+// chat (opening it at that line); the Upcoming and Past filters; archive and unarchive; two new chats about two places keep their own turns; a chat the phone
 // never kept opens from the server; the orb within 24 hours goes straight into the last chat; the list in Arabic reads
 // right to left with the RTL arrow in titles.
 import { createServer } from 'node:http';
@@ -68,8 +68,7 @@ async function english() {
   await s.visible('ask-thread-row');
   let t = await s.titles();
   check(t.length >= 3, `the list has the chats (${t.length})`);
-  const upcoming = await byTest('ask-list-upcoming').innerText().catch(() => '');
-  check(/Riyadh → Istanbul/.test(upcoming), 'the chat about the upcoming trip is under Upcoming trips, titled with the route');
+  check(await s.visible('ask-list-week'), 'chats are grouped by day (This week)');
   check(await s.visible('ask-list-archived'), 'archived chats sit behind a row');
   await page.waitForTimeout(600);
   await s.shot('ai-u1-chats-en');
@@ -79,8 +78,27 @@ async function english() {
   await page.waitForTimeout(700);
   t = await s.titles();
   check(t.length === 1 && t[0] === 'eSIM for Pakistan', `search finds by title (${t.join(' | ')})`);
+  // A word only said inside a chat: found, the line shown, and the chat opens at it (U1+).
+  await byTest('ask-list-search').fill('taksim');
+  t = await s.titlesWhen((x) => x.length === 1 && /Istanbul/.test(x[0] ?? ''));
+  check(t.length === 1 && /Riyadh → Istanbul/.test(t[0] ?? ''), `search finds a word from a message (${t.join(' | ')})`);
+  check(/Taksim/.test(await byTest('ask-thread-match').innerText().catch(() => '')), 'the row shows the line that matched');
+  await byTest('ask-thread-title').click();
+  check(await s.visible('chat-found'), 'the chat opens at the matching line, marked');
+  await byTest('topbar-back').click();
+  await page.waitForTimeout(600);
   await byTest('ask-list-search').fill('');
   await page.waitForTimeout(700);
+
+  // Filters: Upcoming holds the chat about the upcoming trip, in trip order.
+  await byTest('ask-filter-upcoming').click();
+  t = await s.titlesWhen((x) => x.length === 1 && /Istanbul/.test(x[0] ?? ''));
+  check(t.length === 1 && /Riyadh → Istanbul/.test(t[0] ?? ''), `Upcoming: the trip's chat, titled with the route (${t.join(' | ')})`);
+  await byTest('ask-filter-past').click();
+  t = await s.titlesWhen((x) => x.length === 0);
+  check(t.length === 0, 'Past: none yet');
+  await byTest('ask-filter-all').click();
+  await s.titlesWhen((x) => x.length >= 3);
 
   // Archive and unarchive.
   const row = s.all('ask-thread-row').filter({ hasText: 'eSIM for Pakistan' });
@@ -109,6 +127,7 @@ async function english() {
   await byTest('ask-input').fill('Istanbul next month');
   await byTest('ask-send').click();
   check(await s.visible('chat-flights', 15000), 'a new chat from the list composer answers');
+  check(/^Today/.test(await byTest('chat-time').innerText().catch(() => '')), 'the first message carries its day');
   await page.waitForTimeout(800);
   await s.shot('ai-u1-thread-en');
   await byTest('topbar-back').click();

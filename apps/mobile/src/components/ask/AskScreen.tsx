@@ -56,8 +56,9 @@ const PROMPT: Partial<Record<AskKind, CopyKey>> = { flight: 'ask.prompt.flight',
 /**
  * thread: a chat's id (opened from the server, the phone's copy first), 'new', or 'last' (the conversation from the
  * last 24 hours, as Ask always opened). tripId: the trip this chat is about (from the trip page). onBack: to the list.
+ * find: the words searched in the list; the chat opens at the line that has them, marked.
  */
-export function AskScreen({ thread = 'last', tripId = null, onBack }: { thread?: string; tripId?: string | null; onBack?: () => void }) {
+export function AskScreen({ thread = 'last', tripId = null, onBack, find = null }: { thread?: string; tripId?: string | null; onBack?: () => void; find?: string | null }) {
   const router = useRouter();
   const params = useLocalSearchParams<{ prefill?: string; intent?: string; resume?: string }>();
   const qc = useQueryClient();
@@ -92,6 +93,10 @@ export function AskScreen({ thread = 'last', tripId = null, onBack }: { thread?:
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
   const scroll = useRef<ScrollView>(null);
+  // Opened at a search match: the thread stays there (not at its end) until something new is said.
+  const [finding, setFinding] = useState(find);
+  const [pinned, setPinned] = useState(false);
+  const foundY = useRef<number | null>(null);
   // The corrections typed since the ask, shown as bubbles, each with Mada's line on what changed.
   const [fixes, setFixes] = useState<{ text: string; line: string | null }[]>([]);
   // Earlier asks in this chat (a new place starts a fresh thread): folded above the new one.
@@ -178,6 +183,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack }: { thread?:
     setVoice(languageOfText(v));
     if (query) { const was = { query, fixes: fixes.map((f) => f.text) }; setEarlier((e) => [...e, was].slice(-5)); }
     setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
+    setFinding(null); setPinned(false);
     const turn = await sendAskChat(v, { tripId });
     if (turn.state !== 'stopped') return; // done, or a newer message took over
     // Nothing said yet: as if the conversation had never been there.
@@ -359,10 +365,11 @@ export function AskScreen({ thread = 'last', tripId = null, onBack }: { thread?:
           </View>
         )} />
         <View style={{ flex: 1 }}>
-        <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo || (chatTurns.length && !intent)) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (!pinned && (replyTo || (chatTurns.length && !intent))) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
           <EarlierAsks items={earlier} />
-          <ChatThread turns={chatTurns} onOpen={openChat} onSay={(x) => { void submit(x, undefined, true); }} />
+          <ChatThread turns={chatTurns} onOpen={openChat} onSay={(x) => { void submit(x, undefined, true); }} find={finding}
+            onFound={(y) => { if (foundY.current === y) return; foundY.current = y; setPinned(true); setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, y - 24), animated: false }), 60); }} />
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
           {fixes.map((f, i) => (

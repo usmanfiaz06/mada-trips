@@ -9,7 +9,7 @@ import { GET as listGet } from "@/app/api/app/v1/ask/threads/route";
 import { DELETE as threadDelete, GET as threadGet, PATCH as threadPatch } from "@/app/api/app/v1/ask/threads/[id]/route";
 import { setChatApi } from "@/lib/app/ask-chat/engine";
 import { nextTitle, titleFrom } from "@/lib/app/ask-chat/titles";
-import { tripStatusOf } from "@/lib/app/ask-chat/threads";
+import { snippetOf, tripStatusOf } from "@/lib/app/ask-chat/threads";
 import { fakeApi } from "./ask-chat-fake";
 import { freshIp } from "./helpers";
 import { callP, signIn } from "./wallet-helpers";
@@ -69,14 +69,17 @@ describe("two chats, two places", () => {
     expect(ob.json.lines.map((x: { text: string }) => x.text)).toEqual(["A hotel in London", "Happy to help with that."]);
   });
 
-  it("search finds by title, never by the words inside; another account sees none of it", async () => {
+  it("search finds by title and by a word from an old message, saying which line; another account sees none of it", async () => {
     const me = await signIn();
     const a = await chat(me.token, { text: "Flights to Istanbul in December" });
     await chat(me.token, { text: "A hotel in London" });
     await chat(me.token, { text: "Its morning departure please", threadId: a.threadId });
     const hit = await list(me.token, "?q=istanbul");
     expect(hit.json.threads.map((t: { id: string }) => t.id)).toEqual([a.threadId]);
-    expect((await list(me.token, "?q=departure")).json.threads).toHaveLength(0);
+    const word = await list(me.token, "?q=departure");
+    expect(word.json.threads.map((t: { id: string }) => t.id)).toEqual([a.threadId]);
+    expect(word.json.threads[0].match).toBe("Its morning departure please");
+    expect((await list(me.token, "?q=nowhere-said")).json.threads).toHaveLength(0);
 
     const other = await signIn();
     expect((await list(other.token)).json.threads).toHaveLength(0);
@@ -125,6 +128,22 @@ describe("two chats, two places", () => {
     expect(d.status).toBe(200);
     expect((await open(me.token, a.threadId!)).status).toBe(404);
     expect(await db.select().from(appTrips).where(eq(appTrips.id, trip.id))).toHaveLength(1);
+  });
+});
+
+describe("filters (U1+)", () => {
+  it("trips, upcoming and past", async () => {
+    const me = await signIn();
+    const soon = await tripFor(me.user.id, "Dubai", addDays(todayIn(), 20), addDays(todayIn(), 24));
+    const gone = await tripFor(me.user.id, "Baku", addDays(todayIn(), -40), addDays(todayIn(), -35), "completed");
+    const a = await chat(me.token, { text: "What should we pack?", tripId: soon.id });
+    const b = await chat(me.token, { text: "Can I get the receipt?", tripId: gone.id });
+    const c = await chat(me.token, { text: "A hotel in London" });
+    const ids = async (f: string) => (await list(me.token, `?filter=${f}`)).json.threads.map((t: { id: string }) => t.id);
+    expect(await ids("trips")).toEqual([b.threadId, a.threadId]);
+    expect(await ids("upcoming")).toEqual([a.threadId]);
+    expect(await ids("past")).toEqual([b.threadId]);
+    expect((await list(me.token)).json.threads.map((t: { id: string }) => t.id)).toEqual([c.threadId, b.threadId, a.threadId]);
   });
 });
 
@@ -198,6 +217,13 @@ describe("titles", () => {
     expect(nextTitle({ title: "eSIM for Pakistan", by: "place" }, { title: "Flights to Dubai", by: "place" })).toBeNull();
     expect(nextTitle({ title: "how much", by: "words" }, { title: "Flights to Dubai", by: "place" })).toEqual({ title: "Flights to Dubai", by: "place" });
     expect(nextTitle({ title: "Mine", by: "traveller" }, { title: "Dubai · 1–3 Dec", by: "trip" })).toBeNull();
+  });
+  it("a search match shows a few words either side", () => {
+    const long = "We looked at three hotels near the old town and the one with the rooftop pool is the quietest of them all at night";
+    const snip = snippetOf(long, "rooftop", 40);
+    expect(snip).toContain("rooftop");
+    expect(snip.startsWith("…") && snip.endsWith("…")).toBe(true);
+    expect(snippetOf("Short line", "line")).toBe("Short line");
   });
   it("trip status for the chip", () => {
     expect(tripStatusOf("planning", "2026-11-20", "2026-11-22", "2026-10-21")).toBe("planning");

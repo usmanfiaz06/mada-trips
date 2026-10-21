@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { shortDay, timeLabel, todayIn, weekdayName, type AskThreadRow } from '@mada/shared';
+import { shortDay, timeLabel, todayIn, weekdayName, type AskThreadRow, type CopyKey } from '@mada/shared';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { Screen, TopBar, useBottomInset } from '@/components/Layout';
@@ -15,13 +15,30 @@ import { toast } from '@/lib/toast';
 import { colors, ff } from '@/theme';
 
 /*
- * Ask's home: the chats (docs/app/ASK-INTEGRATED.md §2.4, §9.1). Upcoming trips first (by the trip's first day), then
- * the rest by their last line, archived behind a row at the bottom. Search reads titles, previews and trip places on the
- * server. The composer stays at the bottom: typing there starts a new chat, so the list is never a wall in front of
- * asking. Archive and delete sit behind each row's "⋯"; deleting a chat never touches its trip.
+ * Ask's home: the chats (docs/app/ASK-INTEGRATED.md §2.4, §9.1, and the owner's U1+ row in §11): grouped Today /
+ * Yesterday / This week / This month / Earlier by their last line, with filters All · Trips · Upcoming · Past · Archived
+ * (Upcoming in trip order). Search reads titles, trip places and every line said, on the server; a row found by a line
+ * shows that line, and opens the chat at it. The composer stays at the bottom: typing there starts a new chat, so the
+ * list is never a wall in front of asking. Archive, rename and delete sit behind each row's "⋯"; deleting a chat never
+ * touches its trip.
  */
 
-export const threadsKey = (q: string, archived: boolean) => ['ask', 'threads', archived ? 'archived' : 'live', q] as const;
+export type ChatFilter = 'all' | 'trips' | 'upcoming' | 'past' | 'archived';
+export const threadsKey = (q: string, filter: ChatFilter) => ['ask', 'threads', filter, q] as const;
+const FILTERS: [ChatFilter, CopyKey][] = [['all', 'chat.list.filter.all'], ['trips', 'chat.list.filter.trips'], ['upcoming', 'chat.list.filter.upcoming'], ['past', 'chat.list.filter.past'], ['archived', 'chat.list.archivedTitle']];
+
+/** Today, Yesterday, This week (the last 7 days), This month, Earlier: by the chat's last line, on the phone's calendar. */
+export function groupOf(iso: string, now = new Date()): 'today' | 'yesterday' | 'week' | 'month' | 'earlier' {
+  const d = new Date(iso);
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const at = d.getTime();
+  if (at >= start) return 'today';
+  if (at >= start - DAY) return 'yesterday';
+  if (at >= start - 6 * DAY) return 'week';
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return 'month';
+  return 'earlier';
+}
+const GROUPS = [['today', 'chat.list.group.today'], ['yesterday', 'chat.list.group.yesterday'], ['week', 'chat.list.group.week'], ['month', 'chat.list.group.month'], ['earlier', 'chat.list.group.earlier']] as const;
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
 const DAY = 86_400_000;
@@ -45,22 +62,29 @@ export function ChatList({ onBack }: { onBack: () => void }) {
   const qc = useQueryClient();
   const bottom = useBottomInset();
   const [q, setQ] = useState('');
-  const [archived, setArchived] = useState(false);
+  const [filter, setFilter] = useState<ChatFilter>('all');
+  const archived = filter === 'archived';
   const [draft, setDraft] = useState('');
   const [menu, setMenu] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
   const term = q.trim();
-  const list = useQuery({ queryKey: threadsKey(term, archived), queryFn: () => askThreadsApi.list({ q: term || undefined, archived }), placeholderData: (prev) => prev });
+  const list = useQuery({
+    queryKey: threadsKey(term, filter),
+    queryFn: () => askThreadsApi.list({ q: term || undefined, archived, filter: filter === 'all' || archived ? undefined : filter }),
+    placeholderData: (prev) => prev,
+  });
   // Back from a chat: its new line and title show at once.
   const { refetch } = list;
   useFocusEffect(useCallback(() => { void refetch(); }, [refetch]));
   const rows = list.data?.threads ?? [];
-  const upcoming = archived ? [] : rows.filter((r) => r.tripId && r.tripStatus && r.tripStatus !== 'done').sort((a, b) => (a.tripStart ?? '').localeCompare(b.tripStart ?? ''));
-  const recent = rows.filter((r) => !upcoming.includes(r));
+  // Upcoming trips read in trip order; everything else in groups by the last line.
+  const upcoming = filter === 'upcoming' ? [...rows].sort((a, b) => (a.tripStart ?? '').localeCompare(b.tripStart ?? '')) : [];
+  const groups = filter === 'upcoming' ? [] : GROUPS.map(([g, key]) => ({ g, key, items: rows.filter((r) => groupOf(r.lastAt) === g) })).filter((x) => x.items.length);
   const refresh = () => qc.invalidateQueries({ queryKey: ['ask', 'threads'] });
 
-  const open = (r: AskThreadRow) => { buzz('tap'); setMenu(null); router.push({ pathname: '/ask/[threadId]', params: { threadId: r.id, from: 'list' } }); };
+  // Found by a line said in it: the chat opens at that line.
+  const open = (r: AskThreadRow) => { buzz('tap'); setMenu(null); router.push({ pathname: '/ask/[threadId]', params: { threadId: r.id, from: 'list', ...(term && r.match ? { find: term } : {}) } }); };
   const start = (text?: string) => {
     buzz('tap');
     router.push({ pathname: '/ask/[threadId]', params: { threadId: 'new', from: 'list', ...(text ? { prefill: text } : {}) } });
@@ -75,7 +99,7 @@ export function ChatList({ onBack }: { onBack: () => void }) {
   const row = (r: AskThreadRow) => {
     const title = r.title ?? t('chat.list.untitled');
     const when = whenOf(r.lastAt);
-    const line = r.mode === 'agent' && r.agent ? t('chat.list.agentHere', { agent: r.agent }) : r.ended ? t('chat.list.ended') : r.preview;
+    const line = r.match ? r.match : r.mode === 'agent' && r.agent ? t('chat.list.agentHere', { agent: r.agent }) : r.ended ? t('chat.list.ended') : r.preview;
     return (
       <View key={r.id} style={styles.rowWrap} testID="ask-thread-row">
         <Pressable accessibilityRole="button" accessibilityLabel={t('chat.list.a11y.row', { title, when }) + (r.unread ? `. ${t('chat.list.a11y.unread')}` : '')}
@@ -84,7 +108,7 @@ export function ChatList({ onBack }: { onBack: () => void }) {
             <T v="body" numberOfLines={1} style={{ fontFamily: ff.ui600, color: colors.green }} testID="ask-thread-title">{title}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {r.tripStatus ? <View style={[styles.chip, r.tripStatus === 'planning' ? styles.chipPlan : null]}><T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t(STATUS_KEY[r.tripStatus])}</T></View> : null}
-              {line ? <T v="small" color={r.mode === 'agent' ? colors.goldInk : colors.ink2} numberOfLines={1} style={{ flex: 1 }}>{line}</T> : null}
+              {line ? <T v="small" color={r.mode === 'agent' && !r.match ? colors.goldInk : colors.ink2} numberOfLines={1} style={{ flex: 1 }} testID={r.match ? 'ask-thread-match' : undefined}>{line}</T> : null}
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: 6 }}>
@@ -126,7 +150,7 @@ export function ChatList({ onBack }: { onBack: () => void }) {
   };
 
   const section = (label: string, items: AskThreadRow[], testID: string) => items.length ? (
-    <View style={{ gap: 2 }} testID={testID}>
+    <View key={testID} style={{ gap: 2 }} testID={testID}>
       <T v="tiny" color={colors.muted} style={styles.section} accessibilityRole="header">{label}</T>
       {items.map(row)}
     </View>
@@ -135,7 +159,7 @@ export function ChatList({ onBack }: { onBack: () => void }) {
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TopBar onBack={archived ? () => setArchived(false) : onBack} backLabel={archived ? t('chat.list.back') : t('ask.close')} home={false}
+        <TopBar onBack={archived ? () => setFilter('all') : onBack} backLabel={archived ? t('chat.list.back') : t('ask.close')} home={false}
           title={archived ? t('chat.list.archivedTitle') : t('chat.list.title')} right={(
             <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={() => start()} style={styles.plus} testID="ask-list-new">
               <Icon name="plus" size={20} color={colors.green} />
@@ -152,10 +176,16 @@ export function ChatList({ onBack }: { onBack: () => void }) {
           {list.isError ? <T v="small" color={colors.ink2} testID="ask-list-error">{t('chat.list.error')}</T> : null}
           {list.isPending ? [0, 1, 2].map((i) => <View key={i} style={styles.skeleton} />) : null}
           {list.data && !rows.length && term ? <T v="small" color={colors.ink2} testID="ask-list-none">{t('chat.list.none', { q: term })}</T> : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }} testID="ask-list-filters">
+            {FILTERS.map(([f, key]) => (
+              <Chip key={f} label={t(key)} on={filter === f} background={filter === f ? undefined : colors.paper}
+                onPress={() => { buzz('tap'); setMenu(null); setFilter(f); }} testID={`ask-filter-${f}`} />
+            ))}
+          </ScrollView>
           {section(t('chat.list.upcoming'), upcoming, 'ask-list-upcoming')}
-          {section(archived ? t('chat.list.archivedTitle') : t('chat.list.recent'), recent, 'ask-list-recent')}
-          {!archived && !term && (list.data?.archivedCount ?? 0) > 0 ? (
-            <Pressable accessibilityRole="button" onPress={() => { buzz('tap'); setMenu(null); setArchived(true); }} style={styles.archivedRow} testID="ask-list-archived">
+          {groups.map((x) => section(t(x.key), x.items, `ask-list-${x.g}`))}
+          {filter === 'all' && !term && (list.data?.archivedCount ?? 0) > 0 ? (
+            <Pressable accessibilityRole="button" onPress={() => { buzz('tap'); setMenu(null); setFilter('archived'); }} style={styles.archivedRow} testID="ask-list-archived">
               <T v="body" color={colors.green}>{t('chat.list.archived', { count: list.data!.archivedCount })}</T>
               <Icon name="chevron" size={18} color={colors.muted} />
             </Pressable>

@@ -1,7 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { formatSar, nameIn, rangeLabel, timeLabel, type ChatCard, type ChatPay, type CopyKey } from '@mada/shared';
+import { dayLabel, formatSar, nameIn, rangeLabel, timeLabel, type ChatCard, type ChatPay, type CopyKey } from '@mada/shared';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
 import { Appear } from '@/components/Appear';
@@ -40,49 +40,72 @@ export type ChatOpen =
   /** "About your AlUla trip?": into that trip's chat, or a chat of its own (ASK-INTEGRATED.md §2.2). */
   | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn };
 
-export function ChatThread({ turns, onOpen, onSay }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
+/**
+ * find: words searched in the chats list (ASK-INTEGRATED.md §11 U1+): the last turn that has them is marked, and
+ * onFound gets where it sits in the thread so the screen can scroll to it.
+ */
+export function ChatThread({ turns, onOpen, onSay, find, onFound }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; find?: string | null; onFound?: (y: number) => void }) {
   const still = useReduceMotion();
+  const top = useRef(0);
+  const q = (find ?? '').trim().toLowerCase();
+  const found = q ? [...turns].reverse().find((x) => x.me.toLowerCase().includes(q) || x.text.toLowerCase().includes(q))?.id ?? null : null;
   if (!turns.length) return null;
   return (
-    <View style={{ gap: 14 }} testID="chat-thread">
+    <View style={{ gap: 14 }} testID="chat-thread" onLayout={(e) => { top.current = e.nativeEvent.layout.y; }}>
       <T v="tiny" color={colors.muted} testID="chat-disclosure">{t('chat.disclosure')}</T>
       {turns.map((turn, i) => (
-        <Turn key={turn.id} turn={turn} stamp={stampFor(turn, turns[i - 1])} still={still} onOpen={onOpen} onSay={i === turns.length - 1 ? onSay : undefined} />
+        <Turn key={turn.id} turn={turn} stamp={stampFor(turn, turns[i - 1])} still={still} onOpen={onOpen} onSay={i === turns.length - 1 ? onSay : undefined}
+          found={turn.id === found} onFoundAt={turn.id === found && onFound ? (y) => onFound(top.current + y) : undefined} />
       ))}
     </View>
   );
 }
 
-/** The time, only on the first message and after a quiet gap (more than 10 minutes), as in any messenger. */
+/**
+ * The time, only on the first message and after a quiet gap (more than 10 minutes), as in any messenger; with the day
+ * ("Yesterday · 14:05", "Mon 19 Oct · 09:10") when the day changed since the message before (ASK-INTEGRATED.md U1+).
+ */
 const GAP_MS = 10 * 60_000;
+const localDay = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+export function dayWord(day: string, today = localDay(new Date().toISOString())): string {
+  const yesterday = localDay(new Date(Date.parse(`${today}T12:00:00`) - 86_400_000).toISOString());
+  return day === today ? t('chat.list.group.today') : day === yesterday ? t('chat.list.group.yesterday') : dayLabel(day, { locale: getLocale() });
+}
 function stampFor(turn: ChatTurn, prev?: ChatTurn): string | null {
   if (!turn.at) return null;
   const at = Date.parse(turn.at);
   const before = prev?.at ? Date.parse(prev.at) : NaN;
-  if (prev && !(at - before > GAP_MS)) return null;
-  return clock(turn.at) || null;
+  const newDay = !prev?.at || localDay(prev.at) !== localDay(turn.at);
+  if (prev && !newDay && !(at - before > GAP_MS)) return null;
+  const time = clock(turn.at);
+  return newDay ? [dayWord(localDay(turn.at)), time].filter(Boolean).join(' · ') : time || null;
 }
 
 /** The thread's gentle arrival: a short rise, nothing at all with Reduce Motion (native entering, web CSS). */
 const appear = (still: boolean) => ({ entering: still ? undefined : enter(0), style: still ? null : riseStyle(0) });
 
-function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: string | null; still: boolean; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
+function Turn({ turn, stamp, still, onOpen, onSay, found, onFoundAt }: { turn: ChatTurn; stamp: string | null; still: boolean; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; found?: boolean; onFoundAt?: (y: number) => void }) {
   const writing = turn.state === 'streaming';
   const waitKind = SKELETON_FOR[turn.statusTool ?? ''];
   const me = appear(still);
   const mada = appear(still);
+  // Long-press a message for its time (U1+).
+  const [showAt, setShowAt] = useState(false);
   return (
-    <View style={{ gap: 10 }} testID={`chat-turn-${turn.id}`}>
+    <View style={{ gap: 10 }} testID={found ? 'chat-found' : `chat-turn-${turn.id}`} onLayout={onFoundAt ? (e) => onFoundAt(e.nativeEvent.layout.y) : undefined}>
       {stamp ? <T v="tiny" color={colors.muted} style={s.stamp} testID="chat-time">{stamp}</T> : null}
       {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
-        <View style={s.me}><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T></View>
+        <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350} style={[s.me, found ? s.found : null]}>
+          <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>
+        </Pressable>
+        {showAt && turn.at ? <T v="tiny" color={colors.muted} testID="chat-me-time">{clock(turn.at)}</T> : null}
       </Animated.View> : null}
       {turn.text || writing ? (
         <Animated.View entering={mada.entering} style={[s.madaRow, mada.style]}>
           {turn.by ? <AgentDot name={turn.by} size={AVATAR} /> : <MadaDot size={AVATAR} />}
           <View style={s.madaCol}>
             {turn.by ? <T v="tiny" color={colors.ink3} style={{ paddingHorizontal: 4 }} testID="chat-by">{turn.by}</T> : null}
-            <View style={s.bubble} accessible
+            <View style={[s.bubble, found && !turn.me ? s.found : null]} accessible
               accessibilityLabel={turn.text ? (turn.by ? t('chat.a11y.agent', { agent: turn.by, text: turn.text }) : t('chat.a11y.mada', { text: turn.text })) : (turn.status ?? t('chat.working'))}>
               {turn.text ? <T v="body" color={colors.green} style={{ lineHeight: 22 }} testID="chat-text" accessibilityLiveRegion="polite">{turn.text}</T> : <Dots still={still} />}
             </View>
@@ -338,6 +361,7 @@ const AVATAR = 28;
 const AVATAR_GAP = 8;
 
 const s = StyleSheet.create({
+  found: { borderWidth: 2, borderColor: colors.gold },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stamp: { textAlign: 'center', alignSelf: 'center', paddingTop: 4 },
   meWrap: { alignSelf: 'flex-end', maxWidth: '82%', alignItems: 'flex-end' },

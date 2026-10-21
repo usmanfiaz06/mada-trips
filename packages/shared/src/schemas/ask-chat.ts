@@ -161,10 +161,16 @@ export const AskThreadRow = z.object({
   /** Full (60 turns): the list offers "Continue in a new chat", which carries the trip over. */
   ended: z.boolean(),
   lang: z.enum(['en', 'ar']),
+  /** With a search: the line said in the chat that has the words (a few words either side), or null when the title matched. */
+  match: z.string().nullable().optional(),
 });
 export type AskThreadRow = z.infer<typeof AskThreadRow>;
 
-/** GET /ask/threads?q=&archived=1&tripId=&before= → 30 a page, newest first; next is the cursor for the page after. */
+/**
+ * GET /ask/threads?q=&archived=1&filter=&tripId=&before= → 30 a page, newest first; next is the cursor for the page after.
+ * q searches titles, trip places and every line said (the traveller's own chats). filter: trips, upcoming or past.
+ */
+export const ASK_THREAD_FILTERS = ['trips', 'upcoming', 'past'] as const;
 export const AskThreadsResponse = z.object({ threads: z.array(AskThreadRow), next: z.string().nullable(), archivedCount: z.number().int() });
 export type AskThreadsResponse = z.infer<typeof AskThreadsResponse>;
 

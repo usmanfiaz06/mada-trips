@@ -123,11 +123,17 @@ export const askThreadsMock: AreaMock = async (w, ctx) => {
     const q = (u.get('q') ?? '').trim().toLowerCase();
     const archived = u.get('archived') === '1';
     const tripId = u.get('tripId');
+    const filter = u.get('filter');
+    const has = (x: string | null | undefined) => !!q && !!x && x.toLowerCase().includes(q);
+    const city = (x: MockThread) => (x.tripId ? mockTripsOf(user).find((tr) => tr.id === x.tripId)?.city ?? '' : '');
     const rows = list
       .filter((x) => x.lines.length && x.archived === archived && (!tripId || x.tripId === tripId))
-      .filter((x) => !q || [x.title ?? '', rowOf(user, x).preview ?? '', x.tripId ? mockTripsOf(user).find((tr) => tr.id === x.tripId)?.city ?? '' : ''].some((s) => s.toLowerCase().includes(q)))
-      .sort((a, b) => b.lastAt - a.lastAt)
-      .map((x) => rowOf(user, x));
+      .map((x) => ({ x, row: rowOf(user, x) }))
+      .filter(({ row }) => filter === 'trips' ? !!row.tripId : filter === 'upcoming' ? !!row.tripStatus && row.tripStatus !== 'done' : filter === 'past' ? row.tripStatus === 'done' : true)
+      .map(({ x, row }) => ({ x, row, line: q ? [...x.lines].reverse().find((l) => l.who !== 'joined' && has(l.text)) : undefined }))
+      .filter(({ x, line }) => !q || has(x.title) || has(city(x)) || !!line)
+      .sort((a, b) => b.x.lastAt - a.x.lastAt)
+      .map(({ row, line }) => (q ? { ...row, match: line ? line.text.slice(0, 90) : null } : row));
     return ok({ threads: rows, next: null, archivedCount: list.filter((x) => x.archived && x.lines.length).length });
   }
   const id = path.slice('/ask/threads/'.length);
