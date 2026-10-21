@@ -1,4 +1,4 @@
-import { addDays, languageOfText, todayIn, type AskChatEvent, type ChatCard } from '@mada/shared';
+import { addDays, languageOfText, rangeLabel, t, todayIn, type AskChatEvent, type ChatCard } from '@mada/shared';
 import { api } from './api';
 import { bookingApi } from './booking';
 import { getLocale } from './i18n';
@@ -49,6 +49,10 @@ const demoWait = () => {
 };
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
+/** Companions (ASK-INTEGRATED.md §5): two Abdullahs, someone not in the circle, a change asked by a companion. */
+const WHICH_WORDS = /abdullah|abdallah|عبدالله|عبد الله/i;
+const INVITE_WORDS = /faisal|فيصل/i;
+const CHANGE_WORDS = /two nights|ليلتين/i;
 
 export async function demoAskChat(body: { text: string; threadId?: string | null }, onEvent: (e: AskChatEvent) => void, signal?: AbortSignal): Promise<'done' | 'fallback'> {
   const lang = languageOfText(body.text) ?? (getLocale() === 'ar' ? 'ar' : 'en');
@@ -65,6 +69,8 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
     onEvent({ type: 'thread', threadId, lang });
     await wait(700, signal);
     let cards: ChatCard[] = [];
+    const people = await demoPeople(body.text, lang, user, signal, onEvent);
+    if (people) { keep(people); return 'done'; }
     if (REQUEST_WORDS.test(body.text)) {
       onEvent({ type: 'status', text: L.requestStatus, tool: 'create_request' });
       const people = (await api.people()).people;
@@ -104,4 +110,44 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
   } catch {
     return 'fallback';
   }
+}
+
+/** The companion cards, scripted: the mock's own trip and people (mock/trip-people.ts). Null when the words aren't about people. */
+async function demoPeople(text: string, lang: 'en' | 'ar', user: import('./mock-api').MockUser | null, signal: AbortSignal | undefined, onEvent: (e: AskChatEvent) => void): Promise<string | null> {
+  const which = WHICH_WORDS.test(text);
+  const invite = !which && INVITE_WORDS.test(text);
+  const change = !which && !invite && CHANGE_WORDS.test(text);
+  if (!user || (!which && !invite && !change)) return null;
+  const [{ mockTripsOf }, { DEMO_ABDULLAH, mockAskChange, mockTripTitle }] = await Promise.all([import('./mock/trips'), import('./mock/trip-people')]);
+  const trip = mockTripsOf(user).find((x) => x.status !== 'cancelled' && x.status !== 'completed');
+  if (!trip && !change) return null;
+  const name = which ? (lang === 'ar' ? 'عبدالله' : 'Abdullah') : lang === 'ar' ? 'فيصل' : 'Faisal';
+  onEvent({ type: 'status', text: change ? t('people.status.suggest', undefined, lang) : t('people.status.find', { name }, lang), tool: change ? 'request_change' : 'add_traveller' });
+  await wait(800, signal);
+  let card: ChatCard;
+  let reply: string;
+  let next: string[];
+  if (which) {
+    card = { type: 'people', tripId: trip!.id, name, options: [
+      { ref: { kind: 'person', id: DEMO_ABDULLAH.person }, name, initial: lang === 'ar' ? 'ع' : 'A', how: t('people.how.household', { relation: t('person.rel.family', undefined, lang) }, lang) },
+      { ref: { kind: 'user', id: DEMO_ABDULLAH.user }, name, initial: lang === 'ar' ? 'ع' : 'A', how: t('people.how.circle', { circle: lang === 'ar' ? 'رحلات الرياض' : 'Riyadh Hiking' }, lang) },
+    ] };
+    reply = t('people.which', { name }, lang);
+    next = lang === 'ar' ? ['أخوي عبدالله', 'عبدالله من رحلات الرياض'] : ['My brother Abdullah', 'Abdullah from hiking'];
+  } else if (invite) {
+    const title = mockTripTitle(user, trip!.id);
+    card = { type: 'invite', tripId: trip!.id, name, tripTitle: title, when: rangeLabel(trip!.startDate, trip!.endDate, lang) };
+    reply = t('people.invite.lead', { name, trip: title }, lang);
+    next = lang === 'ar' ? ['أضف الاسم بس', 'خلها بعدين'] : ['Just add the name', 'Leave it for now'];
+  } else {
+    const c = mockAskChange(user, lang === 'ar' ? 'ليلتين في العلا بدل ليلة' : 'Two nights in AlUla instead of one');
+    card = { type: 'change', change: c };
+    reply = t('people.line.waiting', { owner: c.ownerName }, lang);
+    next = lang === 'ar' ? ['وش في اليوم الثاني؟', 'مين رايح؟'] : ['What’s on day 2?', 'Who else is going?'];
+  }
+  for (const word of reply.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
+  onEvent({ type: 'cards', cards: [card] });
+  onEvent({ type: 'next', choices: next });
+  onEvent({ type: 'done', text: reply });
+  return reply;
 }

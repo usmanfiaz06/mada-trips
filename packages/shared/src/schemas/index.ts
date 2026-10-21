@@ -47,3 +47,4 @@ export * from './hotel-page';
 export * from './ask-chat';
 export * from './ask-memory';
 export * from './plans';
+export * from './trip-travellers';

@@ -116,10 +116,44 @@ export async function inviteByPhone(userId: string, input: Extract<CreateInviteR
   return { invite: toSent(row, new Map()), onMada: null };
 }
 
-async function send(channel: string, phone: string, name: string, code: string, key: "sms.circles.invite" | "sms.circles.remind") {
+/**
+ * Invite someone to a trip (ASK-INTEGRATED §5.1, kind 'trip'): a number not on Mada gets the usual invite by SMS or
+ * WhatsApp, its words naming the trip ("for Riyadh → AlUla · 20–22 Nov"); a number already on Mada comes back as that
+ * person, for an invite in their app. Accepting makes you friends, as a Mada invite does, and puts them on the trip
+ * (trips/travellers.ts joinFromInvite). Only ever sent from the invite card's tap.
+ */
+export async function inviteToTripByPhone(userId: string, input: { phone: string; channel: "sms" | "whatsapp"; trip: string }, ipHash: string | null): Promise<{ inviteId: string | null; onMada: string | null; masked: string }> {
+  await assertNotLimited(userId);
+  const masked = maskPhone(input.phone);
+  const [u] = await db.select({ id: appUsers.id }).from(appUsers).where(and(eq(appUsers.phone, input.phone), sql`${appUsers.deletedAt} IS NULL`));
+  if (u) {
+    if (u.id === userId) throw err("VALIDATION", "circles.err.self");
+    if (await isBlocked(userId, u.id)) return { inviteId: null, onMada: null, masked };
+    return { inviteId: null, onMada: u.id, masked };
+  }
+  assertUnder(await invitesLastHour(userId), LIMITS.invitesPerHour, 3600);
+  const lookup = rand(8);
+  const me = (await peopleByIds([userId])).get(userId)!;
+  const row = await db.transaction(async (tx) => {
+    const [r] = await tx.insert(appCircleInvites).values({ kind: "trip", inviterId: userId, channel: input.channel, lookup, phoneHash: phoneHash(input.phone), phoneMasked: masked, expiresAt: expiry() }).returning();
+    if (hasDataKey()) await tx.update(appCircleInvites).set({ phoneEnc: encryptField(input.phone, phoneAad(r!.id)) }).where(eq(appCircleInvites.id, r!.id));
+    await appAuditLog(tx, { actorKind: "user", actorId: userId, action: "invite.sent", entityType: "invite", entityId: r!.id, summary: `Invited a number to a trip by ${input.channel}`, ipHash });
+    return r!;
+  });
+  await send(input.channel, input.phone, me.short, codeFor(lookup), "sms.trip.invite", input.trip);
+  return { inviteId: row.id, onMada: null, masked };
+}
+
+/** A trip invite to someone on Mada, waiting in their app (they say yes on the Trips tab). */
+export async function inviteToTripInApp(tx: Db, inviterId: string, inviteeUserId: string): Promise<string> {
+  const [r] = await tx.insert(appCircleInvites).values({ kind: "trip", inviterId, inviteeUserId, channel: "app", expiresAt: expiry() }).returning({ id: appCircleInvites.id });
+  return r!.id;
+}
+
+async function send(channel: string, phone: string, name: string, code: string, key: "sms.circles.invite" | "sms.circles.remind" | "sms.trip.invite", trip?: string) {
   try {
     if (channel === "whatsapp") await suppliers.whatsapp().sendTemplate(phone, "mada_invite", [name, inviteUrl(code, publicLinkBase())], currentLocale());
-    else await suppliers.sms().send(phone, t(key, { name, url: inviteUrl(code, publicLinkBase()) }));
+    else await suppliers.sms().send(phone, t(key, { name, url: inviteUrl(code, publicLinkBase()), trip: trip ?? "" }));
   } catch (e) {
     console.error("[circles] invite message not sent", (e as Error).message);
   }
@@ -293,6 +327,8 @@ export async function accept(ref: string, userId: string, isId: boolean, ipHash:
   });
   // The inviter's phone hears after the response has gone (their inbox already has it).
   if (after.length) await afterResponse(async () => { for (const f of after) await f(); });
+  // An invite to a trip also puts them on it (ASK-INTEGRATED §5.3): the trip shows in their Trips, without prices.
+  if (r.kind === "trip") await (await import("../trips/travellers")).joinFromInvite(r.id, userId);
   return out;
 }
 

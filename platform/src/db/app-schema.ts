@@ -127,11 +127,15 @@ export const appPeople = pgTable("app_people", {
   passportExpiry: date("passport_expiry"),
   passportSource: text("passport_source"),
   passportUpdatedAt: timestamp("passport_updated_at", { withTimezone: true }),
+  // A household row that stands for a circle member travelling with you (ASK-INTEGRATED §5.4, 0045): his passport can
+  // sit here with his consent, and the plan counts him.
+  linkedUserId: uuid("linked_user_id").references(() => appUsers.id, { onDelete: "set null" }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("app_people_owner_idx").on(t.ownerId),
+  index("app_people_linked_idx").on(t.ownerId, t.linkedUserId).where(sql`${t.linkedUserId} IS NOT NULL`),
   uniqueIndex("app_people_one_self").on(t.ownerId).where(sql`${t.isSelf} AND ${t.deletedAt} IS NULL`),
 ]);
 
