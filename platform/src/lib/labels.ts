@@ -44,3 +44,55 @@ export const CLOSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   submitted: { label: "Waiting for verification", tone: "gold" }, verified: { label: "Verified", tone: "ok" }, flagged: { label: "Flagged", tone: "bad" },
 };
 export const LEDGER_TYPE: Record<string, string> = { advance: "Capital advance", expense: "Expense paid personally", repayment: "Repayment", dividend: "Dividend" };
+
+/* ───────── App desk ───────── */
+
+// Where an app order is on the desk: the booking engine's states plus the desk's own (lib/app/desk/adapters.ts orderStage).
+export const ORDER_STAGE: Record<string, { label: string; tone: Tone }> = {
+  awaiting_payment: { label: "Waiting for a friend to pay", tone: "info" },
+  awaiting: { label: "Waiting to confirm", tone: "gold" },
+  held: { label: "Held · issue tickets", tone: "info" },
+  needs_answer: { label: "Waiting on traveller", tone: "neutral" },
+  price_changed: { label: "New price sent", tone: "warn" },
+  issued: { label: "Issued", tone: "ok" },
+  failed: { label: "Ticketing failed", tone: "bad" },
+  not_issued: { label: "Not issued", tone: "bad" },
+  other: { label: "In progress", tone: "neutral" },
+};
+export const REQUEST_STATUS: Record<string, { label: string; tone: Tone }> = {
+  queued: { label: "Queued", tone: "neutral" },
+  sent: { label: "New", tone: "gold" },
+  reviewing: { label: "Reviewing", tone: "gold" },
+  needs_answer: { label: "Waiting on traveller", tone: "neutral" },
+  quoted: { label: "Quote sent", tone: "info" },
+  awaiting_payment: { label: "Waiting for payment", tone: "info" },
+  with_agent: { label: "Paid · with us", tone: "warn" },
+  confirmed: { label: "Confirmed", tone: "ok" },
+  done: { label: "Done", tone: "ok" },
+  cancelled: { label: "Cancelled", tone: "bad" },
+};
+export const REQUEST_KIND: Record<string, string> = {
+  destination: "Destination", visa: "Visa", umrah: "Umrah", car: "Car", restaurant: "Restaurant", activity: "Things to do", change: "Change", cancel: "Cancel", refund: "Refund", general: "General", flight: "Flights",
+};
+export const PAY_STATUS: Record<string, { label: string; tone: Tone }> = {
+  initiated: { label: "Started", tone: "neutral" },
+  requires_action: { label: "Bank check pending", tone: "warn" },
+  authorized: { label: "Authorised · not captured", tone: "info" },
+  captured: { label: "Captured", tone: "ok" },
+  voided: { label: "Hold released", tone: "neutral" },
+  declined: { label: "Declined", tone: "bad" },
+  failed: { label: "Capture didn't go through", tone: "bad" },
+  refunded: { label: "Refunded", tone: "neutral" },
+  partially_refunded: { label: "Partly refunded", tone: "neutral" },
+};
+export const REFUND_STAGE: Record<string, { label: string; tone: Tone }> = {
+  requested: { label: "To decide", tone: "gold" }, approved: { label: "Approved · on its way", tone: "info" }, sent: { label: "Sent", tone: "ok" }, rejected: { label: "Declined", tone: "bad" },
+  withdrawn: { label: "Withdrawn by the traveller", tone: "neutral" },
+};
+export const ESIM_STATUS: Record<string, { label: string; tone: Tone }> = {
+  ordering: { label: "Ordering", tone: "info" }, ready: { label: "Ready to install", tone: "info" }, installed: { label: "Installed", tone: "ok" }, active: { label: "On", tone: "ok" },
+  used_up: { label: "All used", tone: "neutral" }, expired: { label: "Ended", tone: "neutral" }, refunded: { label: "Refunded", tone: "warn" }, stuck: { label: "With Mada", tone: "bad" },
+};
+export const AGENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  online: { label: "Online", tone: "ok" }, away: { label: "Away", tone: "warn" }, offline: { label: "Signed off", tone: "neutral" },
+};

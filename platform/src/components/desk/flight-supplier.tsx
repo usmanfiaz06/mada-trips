@@ -1,7 +1,6 @@
 import { PlaneTakeoff, RefreshCw, Ticket } from "lucide-react";
-import { Badge, Card, CardHead } from "@/components/ui";
+import { Badge, Card, CardHead, KV } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
-import { Facts } from "@/components/desk/parts";
 import type { T } from "@/lib/i18n";
 import { fmtDate } from "@/lib/dates";
 import { flightBookingOf, supplierFlightOf } from "@/lib/app/booking/supplier-flights";
@@ -35,14 +34,14 @@ export function FlightSupplierCard({ order, requestId, act, issue, names, t }: {
       <CardHead title={t("TBO")} hint={t("Booked and ticketed through TBO Air with the travellers' passport details.")}
         action={fb ? <Badge tone={TONE[fb.state] ?? "info"}>{t(LABEL[fb.state] ?? fb.state)}</Badge> : <Badge>{t("Not held yet")}</Badge>} />
       {fb && fb.parts.map((p, i) => (
-        <Facts key={p.resultIndex + i} rows={[
+        <div key={p.resultIndex + i} className={i ? "mt-4 border-t border-line pt-4" : undefined}><KV items={[
           ...(fb.parts.length > 1 ? [[t("Booking"), t(i === 0 ? "Outbound" : "Return")] as [string, React.ReactNode]] : []),
           [t("Airline type"), t(p.lcc ? "Low-cost (no hold, ticket straight away)" : "Full-service (held, then ticketed)")],
           [t("TBO booking id"), <span key="b" className="num" dir="ltr">{p.bookingId ?? "—"}</span>],
           [t("PNR"), <span key="p" className="num" dir="ltr">{p.pnr ?? "—"}</span>],
           ...(p.lastTicketDate ? [[t("Ticket by"), fmtDate(p.lastTicketDate, t.locale, true)] as [string, React.ReactNode]] : []),
           ...p.tickets.map((tk, j) => [names[j] ?? t("Ticket"), <span key={`t${j}`} className="num" dir="ltr">{tk}</span>] as [string, React.ReactNode]),
-        ]} />
+        ]} /></div>
       ))}
       {fb?.note && <p className="mt-3 rounded-2xl bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">{fb.note}</p>}
       {!!fb?.ssrForDesk.length && <p className="mt-3 text-[12.5px] text-ink-3">{t("Not sent through TBO, add with the airline:")} <span className="num" dir="ltr">{fb.ssrForDesk.join(" ")}</span></p>}

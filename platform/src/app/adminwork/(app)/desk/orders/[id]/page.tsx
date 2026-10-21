@@ -6,14 +6,15 @@ import { db } from "@/db";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { can, requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
-import { fmtDate, timeAgo } from "@/lib/dates";
+import { fmtDate, riyadhDate, timeAgo } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { isUuid } from "@/lib/security";
 import { agentForOps } from "@/lib/app/desk/agents";
 import { getRequestFull } from "@/lib/app/desk/adapters";
 import { copyWindowOpen, travellersWithCopy } from "@/lib/app/desk/passport-copy";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Badge, Card, CardHead, Field, Input, Money, Select, Textarea } from "@/components/ui";
+import { Badge, Card, CardHead, Field, Input, KV, Money, PageHeader, Select, Table, Td, Textarea, Th } from "@/components/ui";
+import { Journey, type JourneyStep } from "@/components/journey";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { FlightSupplierCard } from "@/components/desk/flight-supplier";
@@ -22,7 +23,8 @@ import { HotelRequestsCard } from "@/components/desk/hotel-requests";
 import { AssignCard } from "@/components/desk/assign";
 import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
-import { DeskTimeline, Facts, ORDER_STAGE, PAY_STATUS, StatusBadge, Thread } from "@/components/desk/parts";
+import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
+import { ORDER_STAGE, PAY_STATUS } from "@/lib/labels";
 import { askAction, confirmCallAction, failAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
 import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts";
 import { FareOption } from "@mada/shared";
@@ -67,28 +69,40 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   const prefs = o.order ? deskPrefs(o.order.snapshot as Record<string, unknown>) : null;
   const payRequest = o.order ? payRequestOf(o.order) : null;
 
+  // Where the order is: placed, paid, confirmed and held, issued, captured, travelled.
+  const st = o.stage, today = riyadhDate();
+  const paid = !!pay && ["authorized", "captured", "refunded", "partially_refunded", "failed"].includes(pay.status);
+  const captured = !!pay && ["captured", "refunded", "partially_refunded"].includes(pay.status);
+  const held = st === "held" || st === "issued" || !!d.heldAt;
+  const steps: JourneyStep[] = [
+    { label: t("Ordered"), state: "done", meta: fmtDate(r.createdAt, L, true) },
+    { label: payRequest && !payRequest.paidAt ? t("Friend pays") : t("Card authorised"), state: paid ? "done" : pay?.status === "declined" ? "failed" : st === "not_issued" ? "skipped" : "current", meta: pay ? pay.label ?? pay.method : undefined },
+    { label: t("Confirmed and held"), state: held ? "done" : st === "not_issued" ? "failed" : st === "awaiting_payment" ? "todo" : "current", meta: d.heldPnr ? `PNR ${d.heldPnr}` : st === "needs_answer" ? t("Waiting on traveller") : st === "price_changed" ? t("New price sent") : undefined },
+    { label: t("Issued"), state: st === "issued" ? "done" : st === "failed" || st === "not_issued" ? "failed" : st === "held" ? "current" : "todo", meta: d.issuedAt ? fmtDate(d.issuedAt, L, true) : st === "failed" ? t("Ticketing failed") : undefined },
+    { label: t("Card captured"), state: captured ? "done" : st === "not_issued" ? "skipped" : pay?.status === "failed" ? "failed" : "todo" },
+    { label: t("Travelled"), state: st !== "issued" ? (st === "not_issued" ? "skipped" : "todo") : tripEnd && tripEnd < today ? "done" : o.trip && o.trip.startDate <= today ? "current" : "todo",
+      meta: o.trip ? fmtDate(o.trip.startDate, L) : undefined },
+  ];
+
   return (
     <>
       <Link href="/adminwork/desk/orders" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("Orders")}</Link>
-      <header className="mb-6 animate-rise">
-        <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
-          <span className="num">{o.ref}</span>
+      <PageHeader eyebrow={<><span className="num">{o.ref}</span> · {t(r.kind === "stay" ? "Stay" : r.kind === "trip" ? "Trip" : "Flight")}</>} title={r.summary}>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
           <StatusBadge map={ORDER_STAGE} value={o.stage} />
           {pay && <StatusBadge map={PAY_STATUS} value={pay.status} />}
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
-          <span>· {timeAgo(r.createdAt, L)}</span>
-        </div>
-        <h1 className="mt-2 text-[32px] font-[380] leading-tight tracking-[-0.03em]">{r.summary}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13.5px] text-ink-3">
-          <span className="text-ink">{o.user.name || t("Traveller")}</span>
+          <span>{timeAgo(r.createdAt, L)}</span>
+          <span className="text-ink">· {o.user.name || t("Traveller")}</span>
           {o.user.phone && <a href={`tel:${o.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{o.user.phone}</a>}
           {r.agentName && <span>{t("Named agent: {name}", { name: r.agentName })}</span>}
           {o.contact && <ContactBadge contact={o.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
-      </header>
+      </PageHeader>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
+          <Card><Journey steps={steps} /></Card>
           <Card>
             <CardHead title={t("Trip")} hint={o.trip ? `${o.trip.city}${o.trip.country ? `, ${o.trip.country}` : ""} · ${fmtDate(o.trip.startDate, L)}${o.trip.endDate ? ` → ${fmtDate(o.trip.endDate, L)}` : ""}` : undefined} />
             {o.segments.length > 0 ? (
@@ -109,32 +123,31 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
                 <FlightQuoteSummary quote={{ options: [quoted] }} locale={L} />
                 <p className="text-[12.5px] text-ink-3">{t("The fare they paid for. Book or confirm it in Mada's system, then issue: the trip is written with the PNR and ticket numbers you enter.")}</p>
               </div>
-            ) : offer ? <Facts rows={Object.entries(offer).slice(0, 8).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13px] text-ink-3">{t("No flight details on this order")}</p>}
+            ) : offer ? <KV cols={3} items={Object.entries(offer).slice(0, 9).map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13px] text-ink-3">{t("No flight details on this order")}</p>}
           </Card>
+          <HotelRequestsCard draft={o.order?.draft as Record<string, unknown> | undefined} t={t} />
 
           <Card pad={false}>
             <div className="px-6 pt-6"><CardHead title={t("Travellers")} hint={`${issue ? t("Full passport numbers open for 30 seconds, and every look is logged.") : t("Passport numbers are masked. Issuing rights show them in full.")}${copies.size ? ` ${t("Passport copies open while this booking needs them, and every look is logged.")}` : ""}`} /></div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13.5px]">
-                <thead><tr className="text-[12px] text-ink-3">{[t("Name"), t("Born"), t("Nationality"), t("Passport"), t("Expires")].map((h) => <th key={h} className="whitespace-nowrap border-b border-line px-4 py-2.5 text-start font-normal first:ps-6 last:pe-6">{h}</th>)}</tr></thead>
-                <tbody>
-                  {o.travellers.map((p) => {
-                    const short = !!p.passportExpiry && !!tripEnd && new Date(p.passportExpiry).getTime() - new Date(tripEnd).getTime() < 182 * 86400_000;
-                    return (
-                      <tr key={p.id} className="[&>td]:border-b [&>td]:border-line last:[&>td]:border-0">
-                        <td className="px-4 py-3 ps-6"><span className="block text-ink">{p.name}</span><span className="block text-[12px] text-ink-3">{t(p.relation === "self" ? "Account holder" : p.relation[0]!.toUpperCase() + p.relation.slice(1))}</span></td>
-                        <td className="num whitespace-nowrap px-4 py-3 text-ink-2">{p.dateOfBirth ? fmtDate(p.dateOfBirth, L) : "—"}</td>
-                        <td className="px-4 py-3 text-ink-2">{p.nationality ?? "—"}</td>
-                        <td className="whitespace-nowrap px-4 py-3">{p.passportMasked ? <PassportReveal masked={p.passportMasked} can={issue && p.hasPassport} reveal={revealAction.bind(null, p.id, r.id)} /> : <span className="text-warn">{t("Missing")}</span>}
-                          {copies.has(p.id) && act && copyOpen ? <a href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" className="ms-2 text-[12px] text-info underline-offset-2 hover:underline">{t("Passport copy")}</a> : null}</td>
-                        <td className="whitespace-nowrap px-4 py-3 pe-6">{p.passportExpiry ? <span className={short ? "text-bad" : "text-ink-2"}>{fmtDate(p.passportExpiry, L)}{short ? ` · ${t("under 6 months")}` : ""}</span> : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                  {o.travellers.length === 0 && <tr><td colSpan={5} className="px-6 py-4 text-ink-3">{t("No travellers on this order")}</td></tr>}
-                </tbody>
-              </table>
-            </div>
+            <Table>
+              <thead><tr><Th>{t("Name")}</Th><Th>{t("Born")}</Th><Th>{t("Nationality")}</Th><Th>{t("Passport")}</Th><Th>{t("Expires")}</Th></tr></thead>
+              <tbody>
+                {o.travellers.map((p) => {
+                  const short = !!p.passportExpiry && !!tripEnd && new Date(p.passportExpiry).getTime() - new Date(tripEnd).getTime() < 182 * 86400_000;
+                  return (
+                    <tr key={p.id}>
+                      <Td><span className="block text-ink">{p.name}</span><span className="block text-[12px] text-ink-3">{t(p.relation === "self" ? "Account holder" : p.relation[0]!.toUpperCase() + p.relation.slice(1))}</span></Td>
+                      <Td className="num whitespace-nowrap">{p.dateOfBirth ? fmtDate(p.dateOfBirth, L) : "—"}</Td>
+                      <Td>{p.nationality ?? "—"}</Td>
+                      <Td className="whitespace-nowrap">{p.passportMasked ? <PassportReveal masked={p.passportMasked} can={issue && p.hasPassport} reveal={revealAction.bind(null, p.id, r.id)} /> : <span className="text-warn">{t("Missing")}</span>}
+                        {copies.has(p.id) && act && copyOpen ? <a href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" className="ms-2 text-[12px] text-info underline-offset-2 hover:underline">{t("Passport copy")}</a> : null}</Td>
+                      <Td className="whitespace-nowrap">{p.passportExpiry ? <span className={short ? "text-bad" : "text-ink-2"}>{fmtDate(p.passportExpiry, L)}{short ? ` · ${t("under 6 months")}` : ""}</span> : "—"}</Td>
+                    </tr>
+                  );
+                })}
+                {o.travellers.length === 0 && <tr><Td className="text-ink-3">{t("No travellers on this order")}</Td></tr>}
+              </tbody>
+            </Table>
           </Card>
 
           <Card>
@@ -182,58 +195,12 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <aside className="space-y-4">
-          {payRequest && (
-            <Card className={payRequest.paidAt ? "bg-ok-soft/40" : "bg-info-soft/40"}>
-              <CardHead title={payRequest.paidAt ? t("Paid by {name}", { name: payRequest.name }) : t("Waiting for {name} to pay", { name: payRequest.name })}
-                hint={payRequest.paidAt ? t("A friend in the traveller's circle paid the whole amount by card. Book as usual.") : t("The traveller asked a friend in their circle to pay. Nothing is charged until they do; the price holds as usual.")} />
-              <Facts rows={[[t("Asked"), fmtDate(payRequest.requestedAt, L, true)], ...(payRequest.paidAt ? [[t("Paid"), fmtDate(payRequest.paidAt, L, true)] as [string, React.ReactNode]] : [])]} />
-            </Card>
-          )}
-          {prefs && (
-            <Card>
-              <CardHead title={t("Preferences and loyalty")} hint={t("Applied from the traveller's saved preferences, as they saw them on the order sheet. Type the codes into the PNR; the hotel gets the remarks with the booking.")} />
-              <Facts rows={[
-                ...(prefs.summary.length ? [[t("Asked for"), prefs.summary.join(" · ")] as [string, React.ReactNode]] : []),
-                ...(prefs.ssr.length ? [[t("SSR"), <span key="ssr" className="num" dir="ltr">{prefs.ssr.join(" ")}</span>] as [string, React.ReactNode]] : []),
-                ...(prefs.remarks.length ? [[t("Seat remarks"), <span key="rm" className="num" dir="ltr">{prefs.remarks.join(" / ")}</span>] as [string, React.ReactNode]] : []),
-                ...(prefs.hotelRemarks.length ? [[t("Hotel remarks"), prefs.hotelRemarks.join(", ")] as [string, React.ReactNode]] : []),
-                ...(prefs.extras.seatsTogether ? [[t("Paid extra"), t("Seats together · {n} × SAR {each}", { n: prefs.extras.seatsTogether.count * prefs.extras.seatsTogether.legs, each: sar(prefs.extras.seatsTogether.perPerson) })] as [string, React.ReactNode]] : []),
-                ...prefs.loyalty.map((l) => [o.travellers.find((p) => p.id === l.personId)?.name ?? t("Traveller"), <span key={l.personId + l.program} dir="ltr"><span className="num">{l.number}</span> · {l.program}</span>] as [string, React.ReactNode]),
-                ...(prefs.notes ? [[t("Note"), prefs.notes] as [string, React.ReactNode]] : []),
-              ]} />
-              {!prefs.summary.length && !prefs.loyalty.length && <p className="text-[13px] text-ink-3">{t("Nothing asked for on this booking.")}</p>}
-            </Card>
-          )}
-          <FlightSupplierCard order={o.order ?? null} requestId={r.id} act={act} issue={issue} names={ticketNames} t={t} />
-          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
-          {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}
-          {o.stage === "issued" && (
-            <Card className="bg-ok-soft/40">
-              <div className="mb-3 flex items-center gap-2 text-ok"><BadgeCheck className="size-5" /><span className="text-[15px] font-medium">{t("Confirmed by {name} at Mada", { name: r.agentName ?? "—" })}</span></div>
-              <Facts rows={[[t("PNR"), <span key="p" className="num" dir="ltr">{d.pnr}</span>], ...(d.tickets ?? []).map((tk, i) => [ticketNames[i] ?? t("Ticket"), <span key={i} className="num" dir="ltr">{tk}</span>] as [string, React.ReactNode]), [t("Issued"), d.issuedAt ? fmtDate(d.issuedAt, L, true) : "—"]]} />
-            </Card>
-          )}
-          {o.stage === "not_issued" && (
-            <Card className="bg-bad-soft/40">
-              <div className="mb-2 flex items-center gap-2 text-bad"><XCircle className="size-5" /><span className="text-[15px] font-medium">{t("Not issued · card hold released")}</span></div>
-              <p className="text-[13.5px] text-ink-2">{d.failReason}</p>
-            </Card>
-          )}
-          {o.stage === "needs_answer" && question && (
-            <Card>
-              <CardHead title={t("Waiting on the traveller")} hint={t("Asked {ago}", { ago: timeAgo(question.askedAt, L) })} />
-              <p className="text-[14px] text-ink">{question.text}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">{question.choices.map((c) => <Badge key={c}>{t(c)}</Badge>)}</div>
-            </Card>
-          )}
-
           {open && act && (
-            <Card>
+            <Card className="ring-2 ring-gold/40">
               <CardHead title={t("Next step")} hint={o.stage === "awaiting" ? t("Check names against passports, then hold the seats.") : o.stage === "held" ? t("Seats are held. Issue to capture the card.") : t("Waiting on the traveller. You can still act.")} />
               <div className="space-y-4">
                 {o.stage === "awaiting" && (
                   <ActionForm action={holdAction} className="space-y-2">
-          <HotelRequestsCard draft={o.order?.draft as Record<string, unknown> | undefined} t={t} />
                     <input type="hidden" name="id" value={r.id} />
                     <Field label={t("PNR from the GDS (optional)")}><Input name="pnr" maxLength={8} className="num uppercase" dir="ltr" placeholder="X7K2QD" /></Field>
                     <SubmitButton variant="gold" className="w-full"><BadgeCheck className="size-4" />{t("Confirm and hold")}</SubmitButton>
@@ -285,16 +252,57 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
               </div>
             </Card>
           )}
-
+          {o.stage === "needs_answer" && question && (
+            <Card>
+              <CardHead title={t("Waiting on the traveller")} hint={t("Asked {ago}", { ago: timeAgo(question.askedAt, L) })} />
+              <p className="text-[14px] text-ink">{question.text}</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">{question.choices.map((c) => <Badge key={c}>{t(c)}</Badge>)}</div>
+            </Card>
+          )}
+          {o.stage === "issued" && (
+            <Card className="bg-ok-soft/40">
+              <div className="mb-3 flex items-center gap-2 text-ok"><BadgeCheck className="size-5" /><span className="text-[15px] font-medium">{t("Confirmed by {name} at Mada", { name: r.agentName ?? "—" })}</span></div>
+              <KV items={[[t("PNR"), <span key="p" className="num" dir="ltr">{d.pnr}</span>], ...(d.tickets ?? []).map((tk, i) => [ticketNames[i] ?? t("Ticket"), <span key={i} className="num" dir="ltr">{tk}</span>] as [string, React.ReactNode]), [t("Issued"), d.issuedAt ? fmtDate(d.issuedAt, L, true) : "—"]]} />
+            </Card>
+          )}
+          {o.stage === "not_issued" && (
+            <Card className="bg-bad-soft/40">
+              <div className="mb-2 flex items-center gap-2 text-bad"><XCircle className="size-5" /><span className="text-[15px] font-medium">{t("Not issued · card hold released")}</span></div>
+              <p className="text-[13.5px] text-ink-2">{d.failReason}</p>
+            </Card>
+          )}
+          {payRequest && (
+            <Card className={payRequest.paidAt ? "bg-ok-soft/40" : "bg-info-soft/40"}>
+              <CardHead title={payRequest.paidAt ? t("Paid by {name}", { name: payRequest.name }) : t("Waiting for {name} to pay", { name: payRequest.name })}
+                hint={payRequest.paidAt ? t("A friend in the traveller's circle paid the whole amount by card. Book as usual.") : t("The traveller asked a friend in their circle to pay. Nothing is charged until they do; the price holds as usual.")} />
+              <KV items={[[t("Asked"), fmtDate(payRequest.requestedAt, L, true)], ...(payRequest.paidAt ? [[t("Paid"), fmtDate(payRequest.paidAt, L, true)] as [string, React.ReactNode]] : [])]} />
+            </Card>
+          )}
           {open && <AssignCard kind={o.stage === "held" ? "ticketing" : "order"} id={r.id} userId={r.ownerId} canAct={act} />}
-
+          <FlightSupplierCard order={o.order ?? null} requestId={r.id} act={act} issue={issue} names={ticketNames} t={t} />
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
+          {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}
+          {prefs && (
+            <Card>
+              <CardHead title={t("Preferences and loyalty")} hint={t("Applied from the traveller's saved preferences, as they saw them on the order sheet. Type the codes into the PNR; the hotel gets the remarks with the booking.")} />
+              <KV items={[
+                ...(prefs.summary.length ? [[t("Asked for"), prefs.summary.join(" · ")] as [string, React.ReactNode]] : []),
+                ...(prefs.ssr.length ? [[t("SSR"), <span key="ssr" className="num" dir="ltr">{prefs.ssr.join(" ")}</span>] as [string, React.ReactNode]] : []),
+                ...(prefs.remarks.length ? [[t("Seat remarks"), <span key="rm" className="num" dir="ltr">{prefs.remarks.join(" / ")}</span>] as [string, React.ReactNode]] : []),
+                ...(prefs.hotelRemarks.length ? [[t("Hotel remarks"), prefs.hotelRemarks.join(", ")] as [string, React.ReactNode]] : []),
+                ...(prefs.extras.seatsTogether ? [[t("Paid extra"), t("Seats together · {n} × SAR {each}", { n: prefs.extras.seatsTogether.count * prefs.extras.seatsTogether.legs, each: sar(prefs.extras.seatsTogether.perPerson) })] as [string, React.ReactNode]] : []),
+                ...prefs.loyalty.map((l) => [o.travellers.find((p) => p.id === l.personId)?.name ?? t("Traveller"), <span key={l.personId + l.program} dir="ltr"><span className="num">{l.number}</span> · {l.program}</span>] as [string, React.ReactNode]),
+                ...(prefs.notes ? [[t("Note"), prefs.notes] as [string, React.ReactNode]] : []),
+              ]} />
+              {!prefs.summary.length && !prefs.loyalty.length && <p className="text-[13px] text-ink-3">{t("Nothing asked for on this booking.")}</p>}
+            </Card>
+          )}
           {pay && (
             <Card>
-              <CardHead title={t("Card hold")} />
-              <Facts rows={[
+              <CardHead title={t("Card hold")} action={<StatusBadge map={PAY_STATUS} value={pay.status} />} />
+              <KV items={[
                 [t("Method"), pay.method === "tabby" ? "Tabby" : pay.method === "tamara" ? "Tamara" : pay.label ?? pay.method],
                 [t("Amount"), <Money key="a" v={pay.amount} />],
-                [t("Status"), <StatusBadge key="s" map={PAY_STATUS} value={pay.status} />],
                 [t("Provider ref"), <span key="r" className="num text-[12px]" dir="ltr">{pay.providerRef ?? "—"}</span>],
                 [t("Authorised"), fmtDate(pay.createdAt, L, true)],
               ]} />

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { desc } from "drizzle-orm";
-import { ArrowLeft, MessagesSquare } from "lucide-react";
+import { ArrowLeft, MessagesSquare, Search } from "lucide-react";
 import { db } from "@/db";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { can, requirePerm } from "@/lib/auth";
@@ -11,7 +11,7 @@ import { agentForOps, presenceFor } from "@/lib/app/desk/agents";
 import { getThread, listConversations } from "@/lib/app/desk/adapters";
 import { shortRef } from "@/lib/app/desk/core";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Avatar, Card, Empty, cx } from "@/components/ui";
+import { Avatar, Card, Empty, PageHeader, cx } from "@/components/ui";
 import { AssignCard } from "@/components/desk/assign";
 import { EsimCard } from "@/components/desk/esim-card";
 import { Composer } from "@/components/desk/forms";
@@ -21,7 +21,7 @@ import { replyAction, typingAction } from "../actions";
 
 export const metadata = { title: "Chats · Desk" };
 
-export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ t?: string; f?: string }> }) {
+export default async function ChatsPage({ searchParams }: { searchParams: Promise<{ t?: string; f?: string; q?: string; n?: string }> }) {
   const u = await requirePerm("desk.view");
   const t = await getT();
   const L = t.locale;
@@ -29,27 +29,24 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
   const [kindRaw, idRaw] = (sp.t ?? "").split(":");
   const sel = (kindRaw === "support" || kindRaw === "request") && isUuid(idRaw) ? { kind: kindRaw as "support" | "request", id: idRaw } : null;
   const waitingOnly = sp.f === "waiting";
+  // Pages of 200 conversations: "Older conversations" reads the next 200 on top.
+  const pages = Math.min(Math.max(Math.floor(Number(sp.n)) || 1, 1), 10);
   const [all, me, canned, thread] = await Promise.all([
-    listConversations(200), agentForOps(u.id), db.select().from(appDeskCanned).orderBy(appDeskCanned.sort, desc(appDeskCanned.createdAt)),
+    listConversations(200 * pages), agentForOps(u.id), db.select().from(appDeskCanned).orderBy(appDeskCanned.sort, desc(appDeskCanned.createdAt)),
     sel ? getThread(sel.kind, sel.id) : Promise.resolve(null),
   ]);
-  const list = waitingOnly ? all.filter((c) => c.waitingSince) : all;
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const list = all.filter((c) => (!waitingOnly || c.waitingSince) && (!q || `${c.userName} ${c.summary ?? ""} ${c.lastBody}`.toLowerCase().includes(q)));
   const waiting = all.filter((c) => c.waitingSince).length;
   const presence = thread?.user ? await presenceFor(thread.user.id) : null;
   const travellerName = thread?.user?.name || t("Traveller");
-  const href = (c: { kind: string; id: string }) => `/adminwork/desk/chats?t=${c.kind}:${c.id}${waitingOnly ? "&f=waiting" : ""}`;
+  const href = (c: { kind: string; id: string }) => `/adminwork/desk/chats?t=${c.kind}:${c.id}${waitingOnly ? "&f=waiting" : ""}${sp.q ? `&q=${encodeURIComponent(sp.q)}` : ""}`;
 
   return (
     <>
       <AutoRefresh every={10} />
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3 animate-rise">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-3"><span className="size-1.5 rounded-full bg-gold" />{t("App desk")}</div>
-          <h1 className="text-[34px] font-[380] leading-[1.05] tracking-[-0.035em] text-ink">{t("Chats")}</h1>
-        </div>
-        <p className="max-w-md text-[13.5px] text-ink-3">{t("Travellers write to Mada. You answer as yourself, by first name. First reply within 10 minutes, any hour.")}</p>
-      </div>
-      <div className="grid gap-4 lg:h-[calc(100dvh-230px)] lg:min-h-[560px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_300px]">
+      <PageHeader eyebrow={t("Support")} title={t("Chats")} subtitle={t("Travellers write to Mada. You answer as yourself, by first name. First reply within 10 minutes, any hour.")} />
+      <div className="grid gap-4 lg:h-[calc(100dvh-270px)] lg:min-h-[560px] lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[340px_minmax(0,1fr)_300px]">
         <Card pad={false} className={cx("flex min-h-0 flex-col overflow-hidden", sel && "hidden lg:flex")}>
           <div className="flex gap-1.5 border-b border-line p-3">
             {[["", t("All"), all.length], ["waiting", t("Waiting"), waiting]].map(([f, l, n]) => (
@@ -59,7 +56,15 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
               </Link>
             ))}
           </div>
-          {list.length === 0 ? <Empty icon={<MessagesSquare className="size-5" />} title={t("No conversations")} hint={t("When a traveller writes to Mada, it shows up here.")} /> : (
+          <form action="/adminwork/desk/chats" role="search" className="border-b border-line p-3">
+            {waitingOnly && <input type="hidden" name="f" value="waiting" />}
+            {sel && <input type="hidden" name="t" value={`${sel.kind}:${sel.id}`} />}
+            <div className="relative">
+              <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-3" />
+              <input name="q" type="search" defaultValue={sp.q} placeholder={t("Traveller or message…")} className="field h-9 ps-10 text-[13px]" aria-label={t("Search")} />
+            </div>
+          </form>
+          {list.length === 0 ? <Empty icon={<MessagesSquare className="size-5" />} title={q ? t("No conversations match") : t("No conversations")} hint={q ? t("Try a different filter or search.") : t("When a traveller writes to Mada, it shows up here.")} /> : (
             <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
               {list.map((c) => {
                 const on = sel?.kind === c.kind && sel.id === c.id;
@@ -79,6 +84,9 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
                   </li>
                 );
               })}
+              {all.length >= 200 * pages && pages < 10 && (
+                <li className="p-3 text-center"><Link href={`/adminwork/desk/chats?${new URLSearchParams(Object.entries({ f: sp.f, q: sp.q, t: sp.t, n: String(pages + 1) }).filter(([, v]) => v) as [string, string][])}`} className="text-[13px] text-ink-3 underline decoration-gold underline-offset-4 hover:text-ink">{t("Older conversations")}</Link></li>
+              )}
             </ul>
           )}
         </Card>

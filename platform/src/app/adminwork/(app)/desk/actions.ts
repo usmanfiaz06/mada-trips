@@ -354,13 +354,13 @@ export async function unblockAction(fd: FormData) {
   revalidatePath("/adminwork/desk", "layout");
 }
 
-/** The status pill in the desk bar: a plain form post, no message. */
+/** The presence switch in the header pill (on every Ops page): a plain form post, no message. */
 export async function statusPillAction(fd: FormData) {
   const u = await requirePerm("desk.view");
   const status = str(fd, "status");
   if (status !== "online" && status !== "away" && status !== "offline") return;
   await setAgentStatus(u, uuid(fd, "agentId"), status).catch(() => {});
-  revalidatePath("/adminwork/desk", "layout");
+  revalidatePath("/adminwork", "layout");
 }
 
 /* ───────────── account recovery ───────────── */

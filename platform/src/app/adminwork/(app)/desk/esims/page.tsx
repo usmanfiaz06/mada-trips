@@ -3,7 +3,9 @@ import { Smartphone } from "lucide-react";
 import { can, requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { fmtDate } from "@/lib/dates";
-import { deskEsims, esimOrderingAllowed } from "@/lib/app/esim/service";
+import { esimOrderingAllowed } from "@/lib/app/esim/service";
+import { ESIM_TABS, pageEsims, PAGE_SIZE } from "@/lib/app/desk/adapters";
+import { ESIM_STATUS } from "@/lib/labels";
 import { esimBalance } from "@/lib/app/esim/ops";
 import { catalogueStatus } from "@/lib/app/esim/catalogue";
 import { pricingRules } from "@/lib/app/esim/pricing";
@@ -12,32 +14,29 @@ import { airaloConfigured, airaloEnv } from "@/lib/app/suppliers/live/airalo";
 import { esimAccessConfigured } from "@/lib/app/suppliers/live/esimaccess";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Badge, Card, Empty, LinkButton, Money, Notice, PageHeader, Table, Tabs, Td, Th } from "@/components/ui";
+import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { esimBalanceAction, esimResendAction, esimRefundAction, esimRetryAction } from "../esim-actions";
 
 export const metadata = { title: "eSIMs · Desk" };
 
-const TONE: Record<string, "ok" | "warn" | "bad" | "neutral" | "info"> = {
-  ordering: "info", ready: "info", installed: "ok", active: "ok", used_up: "neutral", expired: "neutral", refunded: "warn", stuck: "bad",
-};
-const LABEL: Record<string, string> = {
-  ordering: "Ordering", ready: "Ready to install", installed: "Installed", active: "On", used_up: "All used", expired: "Ended", refunded: "Refunded", stuck: "With Mada",
-};
-const TABS = ["open", "stuck", "refunded", "all"] as const;
+const TABS = Object.keys(ESIM_TABS);
 
-export default async function EsimsPage({ searchParams }: { searchParams: Promise<{ s?: string }> }) {
+export default async function EsimsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await requirePerm("desk.view");
   const t = await getT();
   const sp = await searchParams;
-  const tab = (TABS as readonly string[]).includes(sp.s ?? "") ? (sp.s as (typeof TABS)[number]) : "open";
-  const all = await deskEsims();
-  const rows = tab === "all" ? all : tab === "open" ? all.filter((e) => !["refunded", "expired", "used_up"].includes(e.status)) : all.filter((e) => e.status === tab);
+  const tab = TABS.includes(sp.s ?? "") ? sp.s! : "open";
+  const { page, offset } = pageParam(sp, PAGE_SIZE);
+  const data = await pageEsims({ tab, q: sp.q, offset });
+  const rows = data.rows;
+  const href = listHref("/adminwork/desk/esims", { s: sp.s, q: sp.q });
   const vendor = esimVendor();
   const allowed = esimOrderingAllowed();
   const [bal, cat, rules] = await Promise.all([esimBalance(), catalogueStatus(), pricingRules()]);
   const keysMissing = (vendor === "esimaccess" && !esimAccessConfigured()) || (vendor === "airalo" && !airaloConfigured());
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={t("eSIMs")} subtitle={t("Bought from the supplier once the card is captured. One row per eSIM: open it for usage, top-ups and notes, send the install details again, refund, or order a stuck one again (the supplier is checked first, so nothing is bought twice).")}
+      <PageHeader eyebrow={t("App bookings")} title={t("eSIMs")} subtitle={t("Bought from the supplier once the card is captured. One row per eSIM: open it for usage, top-ups and notes, send the install details again, refund, or order a stuck one again (the supplier is checked first, so nothing is bought twice).")}
         actions={can(u, "settings.manage") ? <LinkButton href="/adminwork/desk/esims/pricing" variant="outline" size="sm">{t("eSIM pricing")}</LinkButton> : null} />
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
         <Badge tone={vendor !== "mock" ? "ok" : "neutral"}>{vendor === "esimaccess" ? t("eSIM Access") : vendor === "airalo" ? t("Airalo {env}", { env: airaloEnv() }) : t("Mock supplier")}</Badge>
@@ -66,9 +65,14 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
           {cat.down.length ? <div className="mt-1"><Badge tone="ok">{t("Cost went down on {n} plans", { n: cat.down.length })}</Badge></div> : null}
         </Card>
       </div>
-      <Tabs active={tab} items={TABS.map((s) => ({ key: s, label: t({ open: "Open", stuck: "Stuck", refunded: "Refunded", all: "All" }[s]), href: `/adminwork/desk/esims?s=${s}`, count: s === "all" ? undefined : s === "open" ? all.filter((e) => !["refunded", "expired", "used_up"].includes(e.status)).length : all.filter((e) => e.status === s).length }))} />
+      <Tabs active={tab} items={TABS.map((s) => ({ key: s, label: t({ open: "Open", stuck: "Stuck", refunded: "Refunded", all: "All" }[s] ?? s), href: href({ s: s === "open" ? undefined : s, page: undefined }), count: s === "all" ? undefined : data.counts[s] ?? 0 }))} />
       <Card pad={false}>
-        {rows.length === 0 ? <Empty icon={<Smartphone className="size-5" />} title={t("No eSIMs here")} hint={t("eSIMs bought in the app appear here the moment they're paid.")} /> : (
+        <ListFilter action="/adminwork/desk/esims" q={sp.q} keep={{ s: sp.s }} placeholder={t("Traveller, ICCID, country, order ref…")} clear={sp.q ? href({ q: undefined, page: undefined }) : null} />
+        <SummaryStrip>
+          <span>{t("{n} eSIMs", { n: data.total })}</span>
+          <span>{t("Stuck")} <span className="num text-ink">{data.counts.stuck ?? 0}</span></span>
+        </SummaryStrip>
+        {rows.length === 0 ? <Empty icon={<Smartphone className="size-5" />} title={sp.q ? t("No eSIMs match") : t("No eSIMs here")} hint={sp.q ? t("Try a different filter or search.") : t("eSIMs bought in the app appear here the moment they're paid.")} /> : (
           <Table>
             <thead><tr><Th>{t("eSIM")}</Th><Th>{t("Traveller")}</Th><Th>{t("ICCID")}</Th><Th>{t("Status")}</Th><Th>{t("Order")}</Th><Th align="end">{t("Actions")}</Th></tr></thead>
             <tbody>
@@ -84,7 +88,7 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
                     </Td>
                     <Td className="whitespace-nowrap">{e.ownerName ?? "—"}</Td>
                     <Td><span className="num text-[12.5px]">{e.iccid ?? "—"}</span>{usage?.totalMb ? <span className="block text-[12px] text-ink-3">{t("{left} of {total} MB left", { left: usage.leftMb ?? 0, total: usage.totalMb })}</span> : null}</Td>
-                    <Td><Badge tone={TONE[e.status] ?? "neutral"}>{t(LABEL[e.status] ?? e.status)}</Badge>{e.problem === "low_balance" ? <span className="mt-1 block max-w-[220px] text-[12px] text-bad">{t("Waiting on our supplier balance. Promised by {when}", { when: e.dueAt ? fmtDate(e.dueAt, t.locale, true) : "—" })}</span> : e.problem && e.problem !== "ordering" ? <span className="mt-1 block max-w-[220px] text-[12px] text-ink-3">{e.problem}</span> : null}</Td>
+                    <Td><Badge tone={ESIM_STATUS[e.status]?.tone ?? "neutral"}>{t(ESIM_STATUS[e.status]?.label ?? e.status)}</Badge>{e.problem === "low_balance" ? <span className="mt-1 block max-w-[220px] text-[12px] text-bad">{t("Waiting on our supplier balance. Promised by {when}", { when: e.dueAt ? fmtDate(e.dueAt, t.locale, true) : "—" })}</span> : e.problem && e.problem !== "ordering" ? <span className="mt-1 block max-w-[220px] text-[12px] text-ink-3">{e.problem}</span> : null}</Td>
                     <Td className="whitespace-nowrap"><Link href={`/adminwork/desk/orders/${e.orderId}`} className="num underline decoration-gold underline-offset-4">{e.ref ?? e.orderId.slice(0, 8)}</Link><span className="block"><Money v={e.total} /></span></Td>
                     <Td align="end">
                       <div className="flex flex-col items-end gap-1.5">
@@ -107,6 +111,7 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
             </tbody>
           </Table>
         )}
+        <Pager page={page} total={data.total} size={PAGE_SIZE} href={href} />
       </Card>
     </>
   );

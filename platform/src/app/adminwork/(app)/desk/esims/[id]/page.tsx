@@ -37,7 +37,7 @@ export default async function EsimPage({ params }: { params: Promise<{ id: strin
   return (
     <>
       <Link href="/adminwork/desk/esims" className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("eSIMs")}</Link>
-      <PageHeader eyebrow={t("App desk")} title={`${plan.coverage?.name ?? ""} · ${plan.gb === null ? t("Unlimited") : `${plan.gb} GB${plan.daily ? ` ${t("a day")}` : ""}`} · ${t("{n} days", { n: plan.days ?? 0 })}`}
+      <PageHeader eyebrow={t("App bookings")} title={`${plan.coverage?.name ?? ""} · ${plan.gb === null ? t("Unlimited") : `${plan.gb} GB${plan.daily ? ` ${t("a day")}` : ""}`} · ${t("{n} days", { n: plan.days ?? 0 })}`}
         subtitle={<>{e.ownerName ?? "—"} · <Link href={`/adminwork/desk/orders/${e.orderId}`} className="num underline decoration-gold underline-offset-4">{e.ref ?? e.orderId.slice(0, 8)}</Link> · <Money v={e.total} /></>} />
       {e.status === "stuck" && e.problem === "low_balance" ? <div className="mb-3"><Notice tone="bad" title={t("Paid, waiting on our supplier balance")}>{t("Promised to the traveller by {when}. Top up the balance: it is ordered again within 15 minutes, or refunded at that time.", { when: e.dueAt ? fmtDate(e.dueAt, t.locale, true) : "—" })}</Notice></div> : null}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">

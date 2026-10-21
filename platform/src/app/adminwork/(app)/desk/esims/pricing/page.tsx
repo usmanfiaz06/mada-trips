@@ -47,7 +47,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <Link href="/adminwork/desk/esims" className="mb-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("eSIMs")}</Link>
-      <PageHeader eyebrow={t("App desk")} title={t("eSIM pricing")} subtitle={t("Supplier cost in USD, at today's dollar rate ({rate} SAR), becomes the sell price by these rules. Never below cost plus the card fee.", { rate: pricing.usdSar })}
+      <PageHeader eyebrow={t("App finance")} title={t("eSIM pricing")} subtitle={t("Supplier cost in USD, at today's dollar rate ({rate} SAR), becomes the sell price by these rules. Never below cost plus the card fee.", { rate: pricing.usdSar })}
         actions={<ActionForm action={esimSyncAction}><SubmitButton variant="outline" size="sm">{t("Sync now")}</SubmitButton></ActionForm>} />
       <div className="mb-3 flex flex-wrap gap-2 text-[12.5px] text-ink-3">
         {cat.at ? <span>{t("Catalogue synced {when}", { when: fmtDate(cat.at, t.locale, true) })}</span> : null}

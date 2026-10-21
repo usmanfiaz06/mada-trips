@@ -7,6 +7,7 @@ import { slaFor } from "@/lib/app/desk/sla";
 import { Badge, Card, Empty, Input, PageHeader, Tabs, cx, type Tone } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SlaClock } from "@/components/desk/live";
+import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { recoveryAction } from "../actions";
 
 export const metadata = { title: "Account recovery · Desk" };
@@ -17,7 +18,7 @@ const DECISION: Record<string, { label: string; tone: Tone }> = { approved: { la
  * (passport details, the last booking: ask, don't tell), then move the account or decline. Both tell them on the new
  * contact; approving also ends every session on the account.
  */
-export default async function RecoveryPage({ searchParams }: { searchParams: Promise<{ s?: string; focus?: string }> }) {
+export default async function RecoveryPage({ searchParams }: { searchParams: Promise<{ s?: string; focus?: string; q?: string; page?: string }> }) {
   const u = await requirePerm("desk.view");
   const t = await getT();
   const L = t.locale;
@@ -25,15 +26,23 @@ export default async function RecoveryPage({ searchParams }: { searchParams: Pro
   const tab = sp.s === "decided" ? "decided" : "open";
   const act = can(u, "desk.act");
   const [open, decided] = await Promise.all([listRecovery("open"), tab === "decided" ? listRecovery("closed") : Promise.resolve([])]);
-  const rows = tab === "open" ? open : decided;
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const matched = (tab === "open" ? open : decided).filter((m) => !q || `${m.name} ${m.oldValue} ${m.newValue} ${m.note ?? ""}`.toLowerCase().includes(q));
+  const { page, offset, size } = pageParam(sp);
+  const rows = matched.slice(offset, offset + size);
+  const href = listHref("/adminwork/desk/recovery", { s: sp.s, q: sp.q });
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={t("Account recovery")}
+      <PageHeader eyebrow={t("Support admin")} title={t("Account recovery")}
         subtitle={t("People who can't use their old number or email. Check it's them: ask for their passport details and their last booking, and compare with what's on file. Never read the details out to them.")} />
       <Tabs active={tab} items={[
         { key: "open", label: t("To check"), count: open.length, href: "/adminwork/desk/recovery" },
         { key: "decided", label: t("Decided"), href: "/adminwork/desk/recovery?s=decided" },
       ]} />
+      <Card pad={false} className="mb-4">
+          <ListFilter action="/adminwork/desk/recovery" q={sp.q} keep={{ s: sp.s }} placeholder={t("Name, old or new number or email…")} clear={sp.q ? listHref("/adminwork/desk/recovery", { s: sp.s })() : null} />
+          <SummaryStrip><span>{t("{n} shown", { n: matched.length })}</span></SummaryStrip>
+        </Card>
       {rows.length === 0 ? <Card><Empty icon={<KeyRound className="size-5" />} title={tab === "open" ? t("Nothing to check") : t("Nothing decided yet")} hint={t("Requests from the app's \"Didn't get the code?\" sheet land here.")} /></Card> : (
         <div className="grid gap-4 lg:grid-cols-2">
           {rows.map((r) => {
@@ -91,6 +100,7 @@ export default async function RecoveryPage({ searchParams }: { searchParams: Pro
           })}
         </div>
       )}
+      {matched.length > size && <Card pad={false} className="mt-4"><Pager page={page} total={matched.length} size={size} href={href} /></Card>}
     </>
   );
 }

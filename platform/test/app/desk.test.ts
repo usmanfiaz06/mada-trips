@@ -18,11 +18,12 @@ import type { DeskActor } from "@/lib/app/desk/core";
 import { addShift, assignPrimary, firstReplySamples, pingTyping, presenceFor, saveAgent, setAgentStatus } from "@/lib/app/desk/agents";
 import {
   addNote, approveRefund, askTraveller, blockTraveller, confirmHold, failTicketing, getRequestFull, issueTickets, listConversations,
-  destinationOf, listOrders, markDone, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
+  destinationOf, listOrders, listRequests, markDone, pageOrders, pageRefunds, pageRequests, priceChanged, rejectRefund, revealPassport, sendAgentReply, sendQuote,
 } from "@/lib/app/desk/adapters";
+import { shortRef as shortRefOf } from "@/lib/app/desk/core";
 import { pushPlan, zonedToUtc } from "@/lib/app/desk/disruptions";
 import { decideModeration, listModeration } from "@/lib/app/desk/moderation";
-import { deskInbox, escalate, filterInbox, reassign } from "@/lib/app/desk/inbox";
+import { deskInbox, deskNavCounts, escalate, filterInbox, reassign } from "@/lib/app/desk/inbox";
 import { routeFor } from "@/lib/app/desk/routing";
 import { compareUrgency, slaFor, typicalReplyMinutes } from "@/lib/app/desk/sla";
 import { call } from "./helpers";
@@ -547,5 +548,50 @@ describe("disruptions", () => {
     const credit = await db.select().from(appCreditLedger).where(eq(appCreditLedger.userId, one.user.id));
     expect(credit).toMatchObject([{ amount: 15000, kind: "goodwill" }]);
     await expect(pushPlan(lead, { flightNumber: "XY999", date, status: "delayed", plan: "Nobody is on this flight.", options: [], voucher: 0 })).rejects.toThrow(/Nobody/);
+  });
+});
+
+describe("paged desk lists and the sidebar counts", () => {
+  it("the SQL stage behind each Orders tab matches orderStage(), and the counts add up", async () => {
+    const all = await listOrders({ stage: "all", limit: 1000 });
+    expect(all.length).toBeGreaterThan(3);
+    const paged = await pageOrders({ tab: "all", limit: 200 });
+    expect(paged.total).toBe(all.length);
+    for (const st of new Set(all.map((o) => o.stage))) expect(paged.counts[st]).toBe(all.filter((o) => o.stage === st).length);
+    for (const o of all) expect((await pageOrders({ tab: o.stage, q: o.ref, limit: 200 })).rows.map((x) => x.id)).toContain(o.id);
+    const open = await pageOrders({ tab: "open", limit: 2 });
+    expect(open.rows.length).toBeLessThanOrEqual(2);
+    expect(open.total).toBe(all.filter((o) => ["awaiting", "held", "needs_answer", "price_changed", "failed"].includes(o.stage)).length);
+    const next = await pageOrders({ tab: "open", limit: 2, offset: 2 });
+    expect(next.rows.map((x) => x.id).some((id) => open.rows.some((y) => y.id === id))).toBe(false);
+  });
+
+  it("searches orders by summary, traveller and short ref", async () => {
+    const hits = await pageOrders({ tab: "all", q: "istanbul" });
+    expect(hits.total).toBeGreaterThan(0);
+    expect(hits.rows.every((o) => /istanbul/i.test(o.summary) || /istanbul/i.test(o.userName))).toBe(true);
+    const one = hits.rows[0]!;
+    expect((await pageOrders({ tab: "all", q: shortRefOf(one.id) })).rows.map((x) => x.id)).toContain(one.id);
+    expect((await pageOrders({ tab: "all", q: "nothing-matches-this" })).total).toBe(0);
+  });
+
+  it("pages requests and refunds with the count behind every tab", async () => {
+    const reqs = await listRequests({ limit: 1000 });
+    const p = await pageRequests({ tab: "all", limit: 200 });
+    expect(p.total).toBe(reqs.length);
+    expect(p.counts.quote).toBe(reqs.filter((r) => ["sent", "reviewing"].includes(r.status)).length);
+    const refunds = await pageRefunds({ limit: 200 });
+    expect(refunds.total).toBe(Object.values(refunds.counts).reduce((a, n) => a + n, 0));
+    expect((await pageRefunds({ stage: "requested" })).rows.every((f) => f.stage === "requested")).toBe(true);
+  });
+
+  it("the sidebar counts come from count queries and agree with the queue", async () => {
+    const [c, { items }] = await Promise.all([deskNavCounts(), deskInbox()]);
+    const by = (k: string) => items.filter((i) => i.kind === k).length;
+    expect(c.chats).toBe(by("chat"));
+    expect(c.refunds).toBe(by("refund"));
+    expect(c.requests).toBe(by("request"));
+    expect(c.orders + c.esims).toBe(by("order") + by("ticketing"));
+    expect(c.recovery).toBe(by("recovery"));
   });
 });
