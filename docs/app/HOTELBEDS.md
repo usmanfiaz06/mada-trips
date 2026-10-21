@@ -142,7 +142,7 @@ APP_STAYS_MODE=live            HOTELBEDS_MAX_RESULTS=200
 APP_BOOKING_REQUIRES_PHONE=no  (or use the test phone below)
 ```
 Web app: the mobile web export pointed at staging (`EXPO_PUBLIC_API_URL=<staging>`, live API mode).
-- **Login:** phone +966 50 000 4127, code **123456** (mock sign-in codes on staging).
+- **Login:** phone +966 50 000 0103, code **123456** (mock sign-in codes on staging).
 - **Payment:** any card number, e.g. **4111 1111 1111 1111**, any future expiry, any CVV (the staging payment provider
   is the mock; nothing is charged). The desk's mock autopilot confirms the order after a few seconds.
 - **Only HBX Group product:** with `SUPPLIER_MODE_HOTELS=hotelbeds` every room in Stays comes from Hotelbeds (the
@@ -185,9 +185,9 @@ Pickups: the trip → Airport pickup → choose → sent to the desk; the desk b
 > Maldives; no room-type, board or hotel exclusions. Prices are shown in SAR (converted from the contract currency
 > with our margin), never below `sellingRate` when `hotelMandatory` is true.
 >
-> **3. Certification URL:** https://STAGING-URL (web app) – desk: https://STAGING-URL/adminwork/desk
+> **3. Certification URL:** https://mada-app-staging.vercel.app (web app) – desk: https://mada-staging.vercel.app/adminwork/desk
 >
-> **4. Login:** app: phone +966 50 000 4127, code 123456. Desk: user `hbx-cert@madatrips.com`, password sent separately.
+> **4. Login:** app: phone +966 50 000 0103, code 123456. Desk: user `hbx-cert@madatrips.com`, password sent separately.
 >
 > **5. Payment:** test card 4111 1111 1111 1111, any future expiry, any CVV (test payment provider; nothing is charged).
 >
