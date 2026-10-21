@@ -328,3 +328,27 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
   }));
   return rows.flat();
 }
+
+/**
+ * Staging check, deep (GET /ask/providers?deep=1): one real hotel turn through each provider in the chain with the
+ * real system prompt and tools, reporting how it ended, which blocks came back and the start of any text.
+ */
+export async function probeTurn(): Promise<{ name: string; model: string; ok: boolean; ms: number; stop: string | null; blocks: string[]; text: string; error: string | null }[]> {
+  const { SYSTEM_PROMPT, TOOLS } = await import("./prompt");
+  const chain = providerChain() ?? [];
+  return Promise.all(chain.map(async (l) => {
+    const t0 = Date.now();
+    const models = l.auto ? await flashModels(l) : [l.model];
+    const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models, { warm: true }) : await apiFor(linkConfig(l));
+    try {
+      const s = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [{ role: "user", content: "Hotel in Baku 2 nights from 20 November 2026, 2 adults" }] }, { timeout: 40_000, maxRetries: 0 });
+      for await (const _ of s) { void _; }
+      const m = await s.finalMessage();
+      const text = m.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join(" ");
+      return { name: l.name, model: m.model ?? l.model, ok: true, ms: Date.now() - t0, stop: m.stop_reason ?? null, blocks: m.content.map((b) => b.type === "tool_use" ? `tool_use:${(b as { name: string }).name}` : b.type), text: text.slice(0, 300), error: null };
+    } catch (e) {
+      const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail: unknown }).detail) : "";
+      return { name: l.name, model: l.model, ok: false, ms: Date.now() - t0, stop: null, blocks: [], text: "", error: `${e instanceof Error ? e.message : "error"}${detail ? ` · ${detail}` : ""}`.slice(0, 400) };
+    }
+  }));
+}

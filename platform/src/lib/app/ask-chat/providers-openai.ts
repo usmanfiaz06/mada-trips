@@ -81,7 +81,7 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
   };
 }
 
-type Delta = { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] };
+type Delta = { content?: string | null; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[] };
 type Chunk = { model?: string; x_groq?: { usage?: Chunk["usage"] }; choices?: { delta?: Delta; message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; prompt_cache_hit_tokens?: number } };
 
 const stopOf = (r: string | null | undefined): Anthropic.Beta.BetaStopReason => (r === "tool_calls" ? "tool_use" : r === "length" ? "max_tokens" : r === "content_filter" ? "refusal" : "end_turn");
@@ -169,10 +169,15 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
                 yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: d.content } } as Anthropic.Beta.BetaRawMessageStreamEvent;
               }
               for (const tc of d.tool_calls ?? []) {
-                let call = calls[tc.index];
+                // Gemini sends each call whole and without an index: place it by its id, else as a new call (a piece
+                // with no name and no id continues the last one).
+                const at = typeof tc.index === "number" ? tc.index
+                  : tc.id ? (calls.findIndex((x) => x?.id === tc.id) + 1 || calls.length + 1) - 1
+                  : !tc.function?.name && calls.length ? calls.length - 1 : calls.length;
+                let call = calls[at];
                 if (!call) {
-                  call = calls[tc.index] = { id: tc.id ?? `call_${tc.index}_${Date.now().toString(36)}`, name: tc.function?.name ?? "", args: "" };
-                  yield { type: "content_block_start", index: tc.index + 1, content_block: { type: "tool_use", id: call.id, name: call.name, input: {} } } as unknown as Anthropic.Beta.BetaRawMessageStreamEvent;
+                  call = calls[at] = { id: tc.id ?? `call_${at}_${Date.now().toString(36)}`, name: tc.function?.name ?? "", args: "" };
+                  yield { type: "content_block_start", index: at + 1, content_block: { type: "tool_use", id: call.id, name: call.name, input: {} } } as unknown as Anthropic.Beta.BetaRawMessageStreamEvent;
                 }
                 if (tc.function?.name && !call.name) call.name = tc.function.name;
                 if (tc.function?.arguments) call.args += tc.function.arguments;
