@@ -291,17 +291,28 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
   const resting = cooldowns();
   // Nothing usable: say why, by name only (unset, or listed providers without keys).
   if (!chain.length) return [{ name: set ? `ASK_CHAT_PROVIDERS="${set.slice(0, 60)}" has no provider with a key` : `ASK_CHAT_PROVIDERS not set; one provider: ${process.env.ASK_CHAT_PROVIDER?.trim() || "none"}`, model: "", ok: false, ms: 0, status: null, error: null, restingFor: null }];
-  return Promise.all(chain.map(async (l) => {
+  const one = async (l: ChainLink, model: string, timeout: number) => {
     const t0 = Date.now();
     try {
-      const models = l.auto ? await flashModels(l) : [l.fastModel];
-      const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models) : await apiFor(linkConfig(l));
-      await api.create({ model: l.fastModel, max_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 40_000, maxRetries: 0 });
-      return { name: l.name, model: l.auto ? models.join(" > ") : l.fastModel, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
+      const api = await apiFor(linkConfig(l));
+      await api.create({ model, max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout, maxRetries: 0 });
+      return { name: l.name, model, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
     } catch (e) {
       const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail: unknown }).detail) : "";
       const msg = `${e instanceof Error ? e.message : "error"}${detail ? ` · ${detail}` : ""}`.replace(/\s+/g, " ").slice(0, 400);
-      return { name: l.name, model: l.auto ? (await flashModels(l)).join(" > ") : l.fastModel, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
+      return { name: l.name, model, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
     }
+  };
+  // A provider that finds its own model: each candidate in turn, a few seconds each, so the answer names the one that works.
+  const rows = await Promise.all(chain.map(async (l) => {
+    if (!l.auto) return [await one(l, l.fastModel, 20_000)];
+    const out = [];
+    for (const m of (await flashModels(l)).slice(0, 5)) {
+      const r = await one(l, m, 9_000);
+      out.push(r);
+      if (r.ok) break;
+    }
+    return out;
   }));
+  return rows.flat();
 }
