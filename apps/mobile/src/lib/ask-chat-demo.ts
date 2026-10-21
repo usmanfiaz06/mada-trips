@@ -2,8 +2,6 @@ import { addDays, languageOfText, todayIn, type AskChatEvent, type ChatCard } fr
 import { api } from './api';
 import { bookingApi } from './booking';
 import { getLocale } from './i18n';
-import { mockUserById } from './mock-api';
-import { demoThread, recordDemoTurn } from './mock/ask-threads';
 import { useSession } from './session';
 
 /*
@@ -58,6 +56,8 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
   // A new chat starts with the flights; a chat that goes on answers about the area (or a request).
   const first = !body.threadId;
   // Kept as the server keeps it, so the chat opens again from the list (mock/ask-threads.ts).
+  // Loaded on demand, so the mock's code stays in its own chunk (tools/leak-scan allows sample prices there only).
+  const [{ mockUserById }, { demoThread, recordDemoTurn }] = await Promise.all([import('./mock-api'), import('./mock/ask-threads')]);
   const user = mockUserById(useSession.getState().user?.id);
   const threadId = demoThread(user, body.threadId ?? null, lang);
   const keep = (reply: string) => recordDemoTurn(user, threadId, body.text, reply, lang);

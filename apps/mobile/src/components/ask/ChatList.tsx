@@ -55,6 +55,22 @@ function whenOf(iso: string, now = Date.now()): string {
   return shortDay(day, locale);
 }
 
+/** The words searched, marked inside the line that matched. */
+export function marked(line: string, words: string): { text: string; on: boolean }[] {
+  const q = words.trim();
+  if (!q) return [{ text: line, on: false }];
+  const out: { text: string; on: boolean }[] = [];
+  const low = line.toLowerCase();
+  let from = 0;
+  for (let at = low.indexOf(q.toLowerCase()); at >= 0; at = low.indexOf(q.toLowerCase(), from)) {
+    if (at > from) out.push({ text: line.slice(from, at), on: false });
+    out.push({ text: line.slice(at, at + q.length), on: true });
+    from = at + q.length;
+  }
+  if (from < line.length) out.push({ text: line.slice(from), on: false });
+  return out;
+}
+
 const STATUS_KEY = { planning: 'chat.trip.planning', booked: 'chat.trip.booked', today: 'chat.trip.today', done: 'chat.trip.done' } as const;
 
 export function ChatList({ onBack }: { onBack: () => void }) {
@@ -108,7 +124,9 @@ export function ChatList({ onBack }: { onBack: () => void }) {
             <T v="body" numberOfLines={1} style={{ fontFamily: ff.ui600, color: colors.green }} testID="ask-thread-title">{title}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {r.tripStatus ? <View style={[styles.chip, r.tripStatus === 'planning' ? styles.chipPlan : null]}><T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t(STATUS_KEY[r.tripStatus])}</T></View> : null}
-              {line ? <T v="small" color={r.mode === 'agent' && !r.match ? colors.goldInk : colors.ink2} numberOfLines={1} style={{ flex: 1 }} testID={r.match ? 'ask-thread-match' : undefined}>{line}</T> : null}
+              {line ? <T v="small" color={r.mode === 'agent' && !r.match ? colors.goldInk : colors.ink2} numberOfLines={1} style={{ flex: 1 }} testID={r.match ? 'ask-thread-match' : undefined}>
+                {r.match ? marked(line, term).map((p, i) => (p.on ? <T key={i} v="small" style={{ fontFamily: ff.ui600, color: colors.green, backgroundColor: colors.goldWash }}>{p.text}</T> : p.text)) : line}
+              </T> : null}
             </View>
           </View>
           <View style={{ alignItems: 'flex-end', gap: 6 }}>
@@ -168,6 +186,7 @@ export function ChatList({ onBack }: { onBack: () => void }) {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 120 + bottom }]} keyboardShouldPersistTaps="handled"
           refreshControl={<RefreshControl refreshing={list.isRefetching} onRefresh={() => { void list.refetch(); }} />} testID="ask-list">
           <View style={styles.search}>
+            <Icon name="search" size={18} color={colors.muted} />
             <TextInput value={q} onChangeText={setQ} placeholder={t('chat.list.search')} placeholderTextColor={colors.muted} accessibilityLabel={t('chat.list.search')}
               returnKeyType="search" style={[styles.searchInput, webNoOutline]} testID="ask-list-search" />
             {q ? <Pressable accessibilityRole="button" accessibilityLabel={t('common.cancel')} onPress={() => setQ('')} hitSlop={8}><Icon name="close" size={16} color={colors.muted} /></Pressable> : null}
