@@ -9,7 +9,7 @@ import { appUsers } from "./app-schema";
  * canned replies, typing, moderation, blocks, disruption plans). Everything else the desk shows lives in the
  * app_ tables it reads (requests, quotes, payments, refunds, messages, trips).
  *
- * Migrations: drizzle/0017_app_features.sql; tickets in drizzle/0036_desk_tickets.sql.
+ * Migrations: drizzle/0017_app_features.sql; tickets in drizzle/0037_desk_tickets.sql.
  */
 
 const id = () => uuid("id").primaryKey().defaultRandom();
@@ -78,7 +78,7 @@ export const appDeskNotes = pgTable("app_desk_notes", {
   id: id(),
   threadKind: text("thread_kind").notNull(), // request | support | ticket (a note on a ticket with no thread of its own)
   threadId: uuid("thread_id").notNull(),
-  // The ticket the note was written on (drizzle/0036): merging moves it with the ticket's other notes.
+  // The ticket the note was written on (drizzle/0037): merging moves it with the ticket's other notes.
   ticketId: uuid("ticket_id").references((): AnyPgColumn => deskTickets.id, { onDelete: "set null" }),
   opsUserId: uuid("ops_user_id").notNull().references(() => opsUsers.id, { onDelete: "cascade" }),
   body: text("body").notNull(),
@@ -155,7 +155,7 @@ export const appDeskDisruptions = pgTable("app_desk_disruptions", {
 }, (t) => [index("app_desk_disruptions_flight_idx").on(t.flightNumber, t.date)]);
 
 /*
- * Tickets (DESK-PLAN.md §4.4, drizzle/0036_desk_tickets.sql). Every open thing the desk works on has exactly one ticket:
+ * Tickets (DESK-PLAN.md §4.4, drizzle/0037_desk_tickets.sql). Every open thing the desk works on has exactly one ticket:
  * the queue upserts one per live source (an order to confirm, a chat waiting, a refund to decide…), and agents open
  * them by hand from anything. The ticket carries what the sources can't: an owner over time, a priority, the SLA
  * clock with its pauses, escalations, a resolution, reopens, merges and CSAT.

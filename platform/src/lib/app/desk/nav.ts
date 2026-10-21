@@ -21,10 +21,10 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
       { href: `${D}/customers`, label: t("Customers"), icon: "Contact", soon: true },
     ] },
     { label: t("App bookings"), items: [
-      // The live board (U4) replaces Orders: until then Orders is the bookings list.
-      { href: `${D}/bookings`, label: t("Live board"), icon: "ShoppingBag", soon: true },
+      // The live board shows every booking by lifecycle; Orders stays as the desk's work list for flights and stays.
+      { href: `${D}/bookings`, label: t("Live board"), icon: "ShoppingBag" },
       { href: `${D}/orders`, label: t("Orders"), icon: "ShoppingBag", count: c.orders },
-      { href: `${D}/drop-offs`, label: t("Drop-offs"), icon: "TrendingDown", soon: true },
+      { href: `${D}/drop-offs`, label: t("Drop-offs"), icon: "TrendingDown" },
       { href: `${D}/requests`, label: t("Requests"), icon: "Receipt", count: c.requests },
       { href: `${D}/refunds`, label: t("Refunds & credits"), icon: "Undo2", count: c.refunds },
       { href: `${D}/esims`, label: t("eSIMs"), icon: "Smartphone", count: c.esims, tone: "bad" },

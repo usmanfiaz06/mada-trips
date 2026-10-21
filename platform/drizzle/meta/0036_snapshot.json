@@ -1,5 +1,5 @@
 {
-  "id": "5acdc91c-a726-4e86-8377-c9dee3bea097",
+  "id": "c7fde35f-25d5-4aba-8f7b-02d3462c6225",
   "prevId": "75e52c03-9cbe-4cb1-9747-9c62fa6e139e",
   "version": "7",
   "dialect": "postgresql",
@@ -8199,12 +8199,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "ticket_id": {
-          "name": "ticket_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "ops_user_id": {
           "name": "ops_user_id",
           "type": "uuid",
@@ -8252,43 +8246,9 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "app_desk_notes_ticket_idx": {
-          "name": "app_desk_notes_ticket_idx",
-          "columns": [
-            {
-              "expression": "ticket_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "app_desk_notes_ticket_id_desk_tickets_id_fk": {
-          "name": "app_desk_notes_ticket_id_desk_tickets_id_fk",
-          "tableFrom": "app_desk_notes",
-          "tableTo": "desk_tickets",
-          "columnsFrom": [
-            "ticket_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
         "app_desk_notes_ops_user_id_users_id_fk": {
           "name": "app_desk_notes_ops_user_id_users_id_fk",
           "tableFrom": "app_desk_notes",
@@ -8382,8 +8342,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.desk_ticket_events": {
-      "name": "desk_ticket_events",
+    "public.app_dropoff_marks": {
+      "name": "app_dropoff_marks",
       "schema": "",
       "columns": {
         "id": {
@@ -8393,45 +8353,33 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "ticket_id": {
-          "name": "ticket_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "kind": {
-          "name": "kind",
+        "key": {
+          "name": "key",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "from": {
-          "name": "from",
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "name": "note",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "to": {
-          "name": "to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "data": {
-          "name": "data",
-          "type": "jsonb",
+        "by_ops_user_id": {
+          "name": "by_ops_user_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -8444,11 +8392,11 @@
         }
       },
       "indexes": {
-        "desk_ticket_events_ticket_idx": {
-          "name": "desk_ticket_events_ticket_idx",
+        "app_dropoff_marks_key_idx": {
+          "name": "app_dropoff_marks_key_idx",
           "columns": [
             {
-              "expression": "ticket_id",
+              "expression": "key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -8464,15 +8412,30 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "app_dropoff_marks_user_idx": {
+          "name": "app_dropoff_marks_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "desk_ticket_events_ticket_id_desk_tickets_id_fk": {
-          "name": "desk_ticket_events_ticket_id_desk_tickets_id_fk",
-          "tableFrom": "desk_ticket_events",
-          "tableTo": "desk_tickets",
+        "app_dropoff_marks_user_id_app_users_id_fk": {
+          "name": "app_dropoff_marks_user_id_app_users_id_fk",
+          "tableFrom": "app_dropoff_marks",
+          "tableTo": "app_users",
           "columnsFrom": [
-            "ticket_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -8480,12 +8443,12 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "desk_ticket_events_actor_id_users_id_fk": {
-          "name": "desk_ticket_events_actor_id_users_id_fk",
-          "tableFrom": "desk_ticket_events",
+        "app_dropoff_marks_by_ops_user_id_users_id_fk": {
+          "name": "app_dropoff_marks_by_ops_user_id_users_id_fk",
+          "tableFrom": "app_dropoff_marks",
           "tableTo": "users",
           "columnsFrom": [
-            "actor_id"
+            "by_ops_user_id"
           ],
           "columnsTo": [
             "id"
@@ -8500,116 +8463,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.desk_ticket_links": {
-      "name": "desk_ticket_links",
-      "schema": "",
-      "columns": {
-        "ticket_id": {
-          "name": "ticket_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entity_kind": {
-          "name": "entity_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entity_id": {
-          "name": "entity_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "desk_ticket_links_entity_idx": {
-          "name": "desk_ticket_links_entity_idx",
-          "columns": [
-            {
-              "expression": "entity_kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "entity_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "desk_ticket_links_ticket_id_desk_tickets_id_fk": {
-          "name": "desk_ticket_links_ticket_id_desk_tickets_id_fk",
-          "tableFrom": "desk_ticket_links",
-          "tableTo": "desk_tickets",
-          "columnsFrom": [
-            "ticket_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "desk_ticket_links_created_by_users_id_fk": {
-          "name": "desk_ticket_links_created_by_users_id_fk",
-          "tableFrom": "desk_ticket_links",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "desk_ticket_links_ticket_id_entity_kind_entity_id_pk": {
-          "name": "desk_ticket_links_ticket_id_entity_kind_entity_id_pk",
-          "columns": [
-            "ticket_id",
-            "entity_kind",
-            "entity_id"
-          ]
-        }
-      },
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.desk_tickets": {
-      "name": "desk_tickets",
+    "public.app_search_log": {
+      "name": "app_search_log",
       "schema": "",
       "columns": {
         "id": {
@@ -8619,9 +8474,9 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "number": {
-          "name": "number",
-          "type": "serial",
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
@@ -8631,219 +8486,26 @@
           "primaryKey": false,
           "notNull": true
         },
-        "source_kind": {
-          "name": "source_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subject": {
-          "name": "subject",
+        "summary": {
+          "name": "summary",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "detail": {
-          "name": "detail",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "need": {
-          "name": "need",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "href": {
-          "name": "href",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "amount": {
-          "name": "amount",
+        "value": {
+          "name": "value",
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
         },
-        "meta": {
-          "name": "meta",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'new'"
-        },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'normal'"
-        },
-        "category": {
-          "name": "category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tags": {
-          "name": "tags",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "owner_agent_id": {
-          "name": "owner_agent_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "owner_reason": {
-          "name": "owner_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'queue'"
-        },
-        "opened_at": {
-          "name": "opened_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "first_response_at": {
-          "name": "first_response_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "sla_started_at": {
-          "name": "sla_started_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "sla_minutes": {
-          "name": "sla_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "due_at": {
-          "name": "due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paused_at": {
-          "name": "paused_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "escalation_level": {
-          "name": "escalation_level",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "escalated_at": {
-          "name": "escalated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "escalation_note": {
-          "name": "escalation_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resolved_at": {
-          "name": "resolved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "closed_at": {
-          "name": "closed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reopened_count": {
-          "name": "reopened_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "merged_into_id": {
-          "name": "merged_into_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "csat": {
-          "name": "csat",
+        "results": {
+          "name": "results",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "csat_comment": {
-          "name": "csat_comment",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_activity_at": {
-          "name": "last_activity_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
+        "at": {
+          "name": "at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
@@ -8851,54 +8513,17 @@
         }
       },
       "indexes": {
-        "desk_tickets_number_key": {
-          "name": "desk_tickets_number_key",
+        "app_search_log_user_idx": {
+          "name": "app_search_log_user_idx",
           "columns": [
             {
-              "expression": "number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "desk_tickets_source_open_key": {
-          "name": "desk_tickets_source_open_key",
-          "columns": [
-            {
-              "expression": "source_kind",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "source_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"desk_tickets\".\"status\" <> 'closed' AND \"desk_tickets\".\"source_id\" IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "desk_tickets_queue_idx": {
-          "name": "desk_tickets_queue_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "due_at",
+              "expression": "at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -8909,38 +8534,11 @@
           "method": "btree",
           "with": {}
         },
-        "desk_tickets_owner_idx": {
-          "name": "desk_tickets_owner_idx",
+        "app_search_log_at_idx": {
+          "name": "app_search_log_at_idx",
           "columns": [
             {
-              "expression": "owner_agent_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "desk_tickets_customer_idx": {
-          "name": "desk_tickets_customer_idx",
-          "columns": [
-            {
-              "expression": "customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "opened_at",
+              "expression": "at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -8953,68 +8551,24 @@
         }
       },
       "foreignKeys": {
-        "desk_tickets_customer_id_app_users_id_fk": {
-          "name": "desk_tickets_customer_id_app_users_id_fk",
-          "tableFrom": "desk_tickets",
+        "app_search_log_user_id_app_users_id_fk": {
+          "name": "app_search_log_user_id_app_users_id_fk",
+          "tableFrom": "app_search_log",
           "tableTo": "app_users",
           "columnsFrom": [
-            "customer_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "desk_tickets_owner_agent_id_app_agents_id_fk": {
-          "name": "desk_tickets_owner_agent_id_app_agents_id_fk",
-          "tableFrom": "desk_tickets",
-          "tableTo": "app_agents",
-          "columnsFrom": [
-            "owner_agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "desk_tickets_merged_into_id_desk_tickets_id_fk": {
-          "name": "desk_tickets_merged_into_id_desk_tickets_id_fk",
-          "tableFrom": "desk_tickets",
-          "tableTo": "desk_tickets",
-          "columnsFrom": [
-            "merged_into_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "desk_tickets_created_by_users_id_fk": {
-          "name": "desk_tickets_created_by_users_id_fk",
-          "tableFrom": "desk_tickets",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "desk_tickets_csat": {
-          "name": "desk_tickets_csat",
-          "value": "\"desk_tickets\".\"csat\" IS NULL OR \"desk_tickets\".\"csat\" BETWEEN 1 AND 5"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.app_esim_catalogue": {
