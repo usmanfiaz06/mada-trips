@@ -21,6 +21,7 @@ import { FlightSupplierCard } from "@/components/desk/flight-supplier";
 import { BoardingPassesCard } from "@/components/desk/boarding";
 import { HotelRequestsCard } from "@/components/desk/hotel-requests";
 import { AssignCard } from "@/components/desk/assign";
+import { TicketsCard } from "@/components/desk/tickets";
 import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
 import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
@@ -30,6 +31,7 @@ import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts
 import { FareOption } from "@mada/shared";
 import { deskPrefs, payRequestOf } from "@/lib/app/booking/orders";
 import { OUTCOME_REASONS } from "@/components/desk/outcome";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Order · Desk" };
 
@@ -93,7 +95,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {pay && <StatusBadge map={PAY_STATUS} value={pay.status} />}
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
           <span>{timeAgo(r.createdAt, L)}</span>
-          <span className="text-ink">· {o.user.name || t("Traveller")}</span>
+          <span className="text-ink">· <CustomerLink id={o.user.id}>{o.user.name || t("Traveller")}</CustomerLink></span>
           {o.user.phone && <a href={`tel:${o.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{o.user.phone}</a>}
           {r.agentName && <span>{t("Named agent: {name}", { name: r.agentName })}</span>}
           {o.contact && <ContactBadge contact={o.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
@@ -279,6 +281,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
             </Card>
           )}
           {open && <AssignCard kind={o.stage === "held" ? "ticketing" : "order"} id={r.id} userId={r.ownerId} canAct={act} />}
+          <TicketsCard about={{ kind: "order", id: r.id }} customerId={r.ownerId} subject={r.summary} canAct={act} />
           <FlightSupplierCard order={o.order ?? null} requestId={r.id} act={act} issue={issue} names={ticketNames} t={t} />
           <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}

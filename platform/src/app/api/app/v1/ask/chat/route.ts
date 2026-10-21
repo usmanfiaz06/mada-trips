@@ -36,7 +36,7 @@ export const POST = route(async (req) => {
         // Staging only: the provider's own words, to find why a turn stopped (never on production).
         if (!isProductionDeploy() && e instanceof Error) {
           const detail = "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
-          controller.enqueue(enc.encode(`event: debug\ndata: ${JSON.stringify({ type: "debug", name: e.name, message: e.message.slice(0, 200), detail: detail.slice(0, 400) })}\n\n`));
+          controller.enqueue(enc.encode(`event: debug\ndata: ${JSON.stringify({ type: "debug", name: e.name, message: e.message.slice(0, 200), detail: detail.slice(0, 1500) })}\n\n`));
         }
       } finally {
         open = false;

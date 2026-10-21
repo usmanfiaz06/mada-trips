@@ -29,6 +29,9 @@ export type ChatTurn = {
   text: string;
   /** What is being done right now ("Checking flights to Istanbul"). */
   status: string | null;
+  /** The tool behind the status (search_stays, search_flights…) and when it began, for the line that moves on. */
+  statusTool?: string | null;
+  statusAt?: number;
   cards: ChatCard[];
   pay: ChatPay | null;
   handoff: { threadId: string; agent: string | null } | null;
@@ -109,7 +112,7 @@ export async function streamAskChat(body: { text: string; threadId?: string | nu
 export function applyChatEvent(turn: ChatTurn, e: AskChatEvent): ChatTurn {
   switch (e.type) {
     case 'thread': return { ...turn, lang: e.lang };
-    case 'status': return { ...turn, status: e.text };
+    case 'status': return { ...turn, status: e.text, statusTool: e.tool ?? null, statusAt: Date.now() };
     case 'text': return { ...turn, text: turn.text + e.delta, status: null };
     case 'replace': return { ...turn, text: e.text };
     case 'cards': return { ...turn, cards: [...turn.cards, ...e.cards] };

@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CornerDownLeft, Search, FileText, User, Receipt, Ticket, ListChecks } from "lucide-react";
+import { ArrowRight, CornerDownLeft, Search, FileText, User, Receipt, Ticket, ListChecks, Contact, ShoppingBag, Smartphone, Inbox } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-type Item = { id: string; label: string; hint?: string; href: string; kind: "page" | "booking" | "client" | "expense" | "approval" | "task" };
-const KIND_ICON = { page: ArrowRight, booking: Ticket, client: User, expense: Receipt, approval: FileText, task: ListChecks };
+type Item = { id: string; label: string; hint?: string; href: string; kind: "page" | "booking" | "client" | "expense" | "approval" | "task" | "customer" | "order" | "request" | "esim" };
+const KIND_ICON = { page: ArrowRight, booking: Ticket, client: User, expense: Receipt, approval: FileText, task: ListChecks, customer: Contact, order: ShoppingBag, request: Inbox, esim: Smartphone };
 
 export function CommandPalette({ pages }: { pages: { label: string; href: string; section: string }[] }) {
   const t = useT();
@@ -63,7 +63,7 @@ export function CommandPalette({ pages }: { pages: { label: string; href: string
               if (e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => Math.max(i - 1, 0)); }
               if (e.key === "Enter") go(items[idx]);
             }}
-            placeholder={t("Search sales, PNRs, clients, expenses or jump to a page…")}
+            placeholder={pages.some((p) => p.href === "/adminwork/desk/customers") ? t("Search travellers, phones, PNRs, refs, ICCIDs, sales or jump to a page…") : t("Search sales, PNRs, clients, expenses or jump to a page…")}
             className="h-14 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-ink-4" />
           <kbd className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-ink-3">Esc</kbd>
         </div>

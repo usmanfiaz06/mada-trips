@@ -10,6 +10,7 @@ import { Badge, Card, Empty, PageHeader, Table, Tabs, Td, Th } from "@/component
 import { StatusBadge } from "@/components/desk/parts";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Requests · Desk" };
 const TABS = Object.keys(REQUEST_TABS);
@@ -54,7 +55,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                       <span className="block max-w-[360px] truncate text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{r.summary}</span>
                       <span className="block text-[12px] text-ink-3"><span className="num">{r.ref}</span> · {timeAgo(r.createdAt, t.locale)}</span></Link></Td>
                     <Td className="whitespace-nowrap">{t(REQUEST_KIND[r.kind] ?? r.kind)}</Td>
-                    <Td className="whitespace-nowrap"><bdi>{r.userName}</bdi></Td>
+                    <Td className="whitespace-nowrap"><CustomerLink id={r.ownerId}>{r.userName}</CustomerLink></Td>
                     <Td>{(r.details as { withdrawn?: boolean } | null)?.withdrawn ? <Badge tone="neutral" dot>{t("Withdrawn by the traveller")}</Badge> : <StatusBadge map={REQUEST_STATUS} value={r.status} />}</Td>
                     <Td className="whitespace-nowrap">{sla ? <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} /> : <span className="text-[12.5px] text-ink-3">{fmtDate(r.updatedAt, t.locale, true)}</span>}</Td>
                     <Td className="whitespace-nowrap">{r.agentName ?? <span className="text-ink-4">—</span>}</Td>

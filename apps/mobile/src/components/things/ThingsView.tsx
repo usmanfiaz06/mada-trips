@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
-import { dayLabel, daysBetween, liveStay, localizeDigits, parseThingWishes, thingWishLabel, type ThingWish, type ThingsQuery, type ThingsResponse } from '@mada/shared';
+import { dayLabel, nameIn, daysBetween, liveStay, localizeDigits, parseThingWishes, thingWishLabel, type ThingWish, type ThingsQuery, type ThingsResponse } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { Icon } from '@/components/Icon';
 import { T } from '@/components/Text';
-import { SkeletonCard } from '@/components/states/Skeleton';
+import { STAGES_SHORT, Waiting, useStagedLine } from '@/components/states/Waiting';
 import { StaleBadge } from '@/components/states/StaleBadge';
 import { ArtCompass } from '@/components/circles/art';
 import { buzz } from '@/lib/haptics';
-import { isRTL, t } from '@/lib/i18n';
+import { getLocale, isRTL, t } from '@/lib/i18n';
 import { thingId, useThings, type Thing } from '@/lib/things';
 import { useTrip } from '@/lib/trips';
 import { colors, ff, shadow } from '@/theme';
@@ -114,6 +114,9 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
     hotel: stay?.name ?? null, travellers: trip?.travellers.length ?? 0,
   };
   const hotelPoint = data?.near?.label === 'hotel' ? data.near : null;
+  // While the places come: the tiles to come, and a line that says what is being done.
+  const thingsLines = [t('waiting.things.0', { city: nameIn(ctx.city, getLocale()) }), t('waiting.things.1'), t('waiting.things.2')];
+  const waitLine = useStagedLine(thingsLines, STAGES_SHORT, !data && !q.isError ? `${placeId}|${JSON.stringify(query)}` : null);
   const toggle = (f: Filter) => {
     setFilters((prev) => {
       const next = new Set(prev);
@@ -145,7 +148,7 @@ export function ThingsView({ placeId, city, tripId = null, days = [], mode, init
           <Button label={t('things.retry')} variant="secondary" size="small" block={false} onPress={() => void q.refetch()} />
         </View>
       );
-      return <View style={{ flexDirection: 'row', gap: 12 }}><SkeletonCard photo style={{ flex: 1 }} /><SkeletonCard photo style={{ flex: 1 }} /></View>;
+      return <Waiting kind="things" line={waitLine} testID="things-waiting" />;
     }
     if (data.status === 'gathering') return (
       <View style={[st.note, shadow('card')]} testID="things-gathering">

@@ -16,6 +16,7 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { Badge, Card, Empty, LinkButton, Money, Notice, PageHeader, Table, Tabs, Td, Th } from "@/components/ui";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { esimBalanceAction, esimResendAction, esimRefundAction, esimRetryAction } from "../esim-actions";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "eSIMs · Desk" };
 
@@ -86,7 +87,7 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
                       <span className="block text-[12px] text-ink-3"><span className="num">{e.packageId}</span> · {fmtDate(e.createdAt, t.locale, true)}</span>
                       {e.topups.length ? <span className="block text-[12px] text-ink-3">{t("{n} top-ups", { n: e.topups.length })}</span> : null}
                     </Td>
-                    <Td className="whitespace-nowrap">{e.ownerName ?? "—"}</Td>
+                    <Td className="whitespace-nowrap"><CustomerLink id={e.ownerId}>{e.ownerName ?? "—"}</CustomerLink></Td>
                     <Td><span className="num text-[12.5px]">{e.iccid ?? "—"}</span>{usage?.totalMb ? <span className="block text-[12px] text-ink-3">{t("{left} of {total} MB left", { left: usage.leftMb ?? 0, total: usage.totalMb })}</span> : null}</Td>
                     <Td><Badge tone={ESIM_STATUS[e.status]?.tone ?? "neutral"}>{t(ESIM_STATUS[e.status]?.label ?? e.status)}</Badge>{e.problem === "low_balance" ? <span className="mt-1 block max-w-[220px] text-[12px] text-bad">{t("Waiting on our supplier balance. Promised by {when}", { when: e.dueAt ? fmtDate(e.dueAt, t.locale, true) : "—" })}</span> : e.problem && e.problem !== "ordering" ? <span className="mt-1 block max-w-[220px] text-[12px] text-ink-3">{e.problem}</span> : null}</Td>
                     <Td className="whitespace-nowrap"><Link href={`/adminwork/desk/orders/${e.orderId}`} className="num underline decoration-gold underline-offset-4">{e.ref ?? e.orderId.slice(0, 8)}</Link><span className="block"><Money v={e.total} /></span></Td>

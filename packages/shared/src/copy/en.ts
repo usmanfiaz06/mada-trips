@@ -34,8 +34,11 @@ import { esimCopy } from './esim';
 import { guestCopy } from './guest';
 import { askHeardCopy } from './ask-heard';
 import { payFamilyCopy } from './pay-family';
+import { waitingCopy } from './waiting';
 
 export const en = {
+  // Waiting on a search, said as it happens; the Ask chat's cards: packages/shared/src/copy/waiting.ts
+  ...waitingCopy,
   // eSIMs through Airalo: the plan for the trip, installing, what's left, top-ups: packages/shared/src/copy/esim.ts
   ...esimCopy,
   // Guests, keeping your place, answering in your language, Translate: packages/shared/src/copy/guest.ts

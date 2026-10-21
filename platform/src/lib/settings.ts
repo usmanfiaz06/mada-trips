@@ -15,6 +15,9 @@ export const DEFAULT_SETTINGS = {
   bspGraceDays: 1,                  // one grace day the partners may use before a BSP payment counts as overdue
   cashMoveLimit: 2_000_000,         // SAR 20,000: a bank deposit/withdrawal/transfer under this needs 1 director, at or above it all directors
   refundApprovals: 1,
+  // App desk (DESK-PLAN §7 default 2): goodwill one agent with desk.refund gives alone, per credit and per day; above, a lead approves.
+  deskGoodwillLimit: 20_000,        // SAR 200
+  deskAgentDailyLimit: 200_000,     // SAR 2,000
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

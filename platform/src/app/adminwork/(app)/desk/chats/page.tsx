@@ -13,11 +13,13 @@ import { shortRef } from "@/lib/app/desk/core";
 import { slaFor } from "@/lib/app/desk/sla";
 import { Avatar, Card, Empty, PageHeader, cx } from "@/components/ui";
 import { AssignCard } from "@/components/desk/assign";
+import { TicketsCard } from "@/components/desk/tickets";
 import { EsimCard } from "@/components/desk/esim-card";
 import { Composer } from "@/components/desk/forms";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 import { Thread } from "@/components/desk/parts";
 import { replyAction, typingAction } from "../actions";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Chats · Desk" };
 
@@ -97,7 +99,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
               <Link href={`/adminwork/desk/chats${waitingOnly ? "?f=waiting" : ""}`} className="grid size-8 place-items-center rounded-full text-ink-3 hover:bg-sunken lg:hidden" aria-label={t("Back")}><ArrowLeft className="size-4 rtl:rotate-180" /></Link>
               <Avatar name={travellerName} size={36} />
               <div className="min-w-0 flex-1 leading-tight">
-                <div className="truncate text-[15px] text-ink">{travellerName}</div>
+                <div className="truncate text-[15px] text-ink"><CustomerLink id={thread.user?.id}>{travellerName}</CustomerLink></div>
                 <div className="truncate text-[12px] text-ink-3">{thread.kind === "request" ? <Link href={`/adminwork/desk/requests/${thread.id}`} className="underline decoration-gold decoration-2 underline-offset-2">{thread.summary ?? shortRef(thread.id)}</Link> : t("Support chat")}{thread.user?.phone ? <> · <span className="num" dir="ltr">{thread.user.phone}</span></> : null}</div>
               </div>
               {presence && (
@@ -121,6 +123,7 @@ export default async function ChatsPage({ searchParams }: { searchParams: Promis
         {thread && (
           <div className="hidden min-h-0 space-y-4 overflow-y-auto xl:block">
             <AssignCard kind="chat" id={`${thread.kind}:${thread.id}`} userId={thread.user?.id ?? null} canAct={can(u, "desk.act")} />
+            <TicketsCard about={{ kind: "chat", id: `${thread.kind}:${thread.id}` }} customerId={thread.user?.id ?? null} subject={thread.summary ?? undefined} canAct={can(u, "desk.act")} />
             <EsimCard userId={thread.user?.id ?? null} />
           </div>
         )}
