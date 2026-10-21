@@ -19,7 +19,7 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
      │                         lib/app/ask-chat/chat.ts   moderation (screen) → redaction → thread → context
      │                                                    → slots (rules, then Haiku) → engine → append + spend + log
      │                         lib/app/ask-chat/engine.ts streaming tool loop (≤ 6 steps) + SentenceGate
-     │                         lib/app/ask-chat/tools.ts  12 tools over the same functions the app's routes call
+     │                         lib/app/ask-chat/tools.ts  13 tools over the same functions the app's routes call (remember: §7)
      │                         lib/app/ask-chat/guard.ts  redact · screen · unbacked · banned words · tidy
      └── on error / off / no key / offline / guest: the app's own flows (POST /ask/parse), as before
 ```
@@ -37,7 +37,9 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 | `ask-chat/providers-openai.ts` | A thin adapter for any OpenAI-compatible `/chat/completions` endpoint, for comparing cheaper models. |
 | `ask-chat/slots.ts` | Reads the sentence into slots. The deterministic rules run first. Haiku runs only when the rules leave something open, with a 4 s timeout. |
 | `ask-chat/tools.ts` | The tools. Each one returns a short text for the model and the cards, pay sheet or handoff for the app. |
-| `ask-chat/store.ts` | Threads (`app_ask_threads`) and daily spend (`app_ask_spend`). Migration: `drizzle/0034_ask_chat.sql`. |
+| `ask-chat/store.ts` | Threads (`app_ask_threads`, with the folded `summary`) and daily spend (`app_ask_spend`). Migrations: `drizzle/0034_ask_chat.sql`, `0035_ask_memory.sql`. |
+| `ask-chat/memory.ts` | What Mada remembers across conversations (`app_ask_memory`), consent for sensitive facts, and the "What Mada knows" block (§7). |
+| `ask-chat/fold.ts` | Long threads folded into a rolling summary (§7). |
 | `ask-chat/evals.ts` + `platform/scripts/ask-chat-eval.ts` | The eval set and its runner. |
 
 ### How a turn runs
@@ -54,6 +56,7 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
    - the household, with ages
    - upcoming trips
    - the trip on screen
+   - what Mada knows from before (§7), once per thread
    - the slots read from the sentence
 
    Because the context sits inside the turn, the cached prefix (tools and system) never changes. The thread is append-only: every assistant message is stored exactly as the API returned it, thinking blocks included, so preserved thinking stays valid.
@@ -81,6 +84,7 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 | `entry_rules` | `checkEntry` (visa, ETA, passport, from each person's nationality) | `entry` card |
 | `create_request` | `createRequest` (the desk), once the traveller has said how to reach them; stores `contactPreference` (call, whatsapp, in_app) and `contactWindow` (a call's best time) on the request | `request` card: what, when and who, "The team gets back to you by 18:40", and how |
 | `price_quote_for_pay` | `priceDraft`: prices the offer again, **never charges** | `pay` event with an `OrderDraft`; the app opens its own pay sheet |
+| `remember` | `saveFact` (memory.ts): a lasting preference or need; sensitive ones only after a yes (§7) | — (the reply ends with "We'll remember that for next time.") |
 | `talk_to_human` | `openThread` + `sendMessage` (summary, redacted) + `presenceFor` | `handoff` event. The app says the duty person's name ("Noura at Mada can take it from here") only when the desk names someone online; otherwise "The team at Mada…" (COPY.md §1) |
 
 What the model reads is kept short, because free tiers count tokens per minute: at most 3 options, each with only what a reply says (a flight is id, label, airline and number, times, duration, stops, refundable and the total; dates and who are in the header). The cards carry the rest.
@@ -332,3 +336,52 @@ To compare, run the evals (§5).
 To try one live on a staging test account:
 - **A preset:** set `ASK_CHAT_PROVIDER=groq`, `zai` or `gemini` and its key (plus `ASK_CHAT_MODEL` for Gemini), in place of the Claude key.
 - **Any other provider:** set `ASK_CHAT_PROVIDER=openai-compatible` and its three settings.
+
+## 7. Memory and long conversations
+
+**What the owner asked for:** "we need to add context in chats, and for models to have memory".
+
+### What Mada remembers (across conversations)
+
+| | |
+|---|---|
+| **Store** | `app_ask_memory` (migration `0035_ask_memory`): per account, `kind` (home_airport, airline, cabin, seat, budget, food, mobility, health, family, contact, other), `text` (≤ 120 characters), `source` (chat or booking), `created_at`, `last_used_at`. At most 30 per account; the oldest go. A kind with one value (home airport, cabin, seat, budget, contact) replaces the old one; the same words again only refresh it. |
+| **The `remember` tool** | The model calls it only when the traveller states something lasting about themselves or their family (persona rules, [ASSISTANT.md](ASSISTANT.md) §1 "Memory"). Not for one-off details of a trip. |
+| **Consent** | Health, mobility and religion (the kind, the model's `sensitive` flag, or the words: wheelchair, diabetic, pregnant, «كرسي متحرك»…) are saved only when Mada's last reply asked about remembering ("Shall we remember that for next time?", «نتذكرها للمرة الجاية؟») and the traveller's message now says yes. The server reads both from the thread (`consentOf`), so a model that skips the question saves nothing: the tool tells it to use the fact for this trip and ask. |
+| **Never kept** | Anything redaction removes (passport, MRZ, card, CVV, IBAN), a long number (a phone, a booking code), an email or a link, abuse. |
+| **Said once** | The turn that saves something ends with "We'll remember that for next time." («بنتذكر هذا للمرة الجاية.», `chat.remembered`), added by the server unless the model already said it. |
+| **Derived, not stored** | The last 3 searches (`app_offers` grouped by search, last 60 days), up to 3 saved places (`app_saved`), trips taken (the overview the turn already reads). |
+
+**In the context.** A new thread (and a thread right after a fold) gets one compact block in the turn's context, at most 600 characters, whole lines only, most relevant first: needs first (mobility, health), then what fits this kind of ask (a flight puts the home airport, seat and cabin up), then the recent ones, then the derived signals. The facts that made it in get `last_used_at`. Later turns of the same thread don't repeat it: the history already has it. Every provider in the chain reads the same thread, so every model gets it. Example:
+
+```
+What Mada knows about this traveller (from earlier chats and bookings; use it when it fits, say it back naturally, never list it):
+- home airport: Flies from Jeddah
+- mobility: Mother uses a wheelchair
+- seat: Aisle seat
+- food: Halal food only
+- Recent searches: flight Istanbul 03-09 to 03-15, 4 people; stay Makkah 03-20, 3 nights, 3 people
+- Saved places: Tbilisi
+- Trips taken: Dubai 2026-03
+```
+
+**Visible and deletable.** GET `/ask/memory` → `{facts}`; DELETE `/ask/memory/{id}` (only the owner's; anything else is 404); DELETE `/ask/memory` forgets everything (audited as `ask.memory_forgotten`). In the app: Account → What Mada remembers (`app/account/memory.tsx`, also from Privacy → What we keep), each item with Remove, and Forget everything behind a sheet. Deleting the account (`anonymiseAccount`) removes the memory and every Ask thread; the copy of everything (`buildExport`) includes the memory.
+
+### Long conversations stay cheap
+
+- Every turn replays the thread. Once the thread passes `ASK_CHAT_HISTORY_TOKENS` (default **6,000** estimated tokens, characters ÷ 4) and has more than **6 turns**, the turns before the last 6 are folded, at the start of the next turn (`fold.ts`).
+- The fast model (`ASK_FAST_MODEL`, 4 s, at most 90 words) writes the summary from the folded turns' gists, on top of the summary so far. If it doesn't answer, the gists themselves become the summary (≤ 900 characters): a fold never fails a turn.
+- The summary is stored on the thread (`summary`, `folded_turns`) and read in front of the first kept message as `[Earlier in this conversation, summarised by Mada's systems: …]`.
+- Of the 6 kept turns, all but the last 2 are lightened once, at the fold: tool results become their gist (≤ 200 characters), thinking and the old context block go. Tool call ids stay paired. Between folds the history doesn't change, so the prompt cache holds.
+- A thread now ends at 60 turns (was 30).
+
+### On the phone
+
+- The thread id and the last 8 finished turns are kept on the device (`lib/net/kv`, key `mada.ask.chat.v1`, per account). Opening Ask within 24 hours of the last turn continues the same conversation (`restoreAskChat`); after that it starts fresh.
+- "New chat" in Ask's top bar (`chat.newChat`) starts fresh and clears what was kept.
+- When the conversation can't answer, the app's own flows still get the earlier messages of this thread as context (`ask.tsx` runFlows), restored turns included.
+
+### Tests
+
+- `platform/test/app/ask-chat-memory.test.ts`: the tool saves and says so once; a sensitive fact is not saved without the question and a yes (even when the model says it isn't sensitive); passports, cards, phones and emails are never kept; the block in a new thread (needs and fit first, searches after, ≤ 600 characters, not repeated in the same thread); folding (thresholds, gists, the fast model's summary, the fallback, a real thread through the route); delete one, delete all, only the owner's; account deletion.
+- `apps/mobile/test/unit/ask-chat-continuity.test.ts`: kept for 24 hours per account, restored, cleared by New chat.
