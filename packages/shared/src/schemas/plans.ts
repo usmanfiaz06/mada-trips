@@ -54,7 +54,7 @@ export const PlaceInput = z.object({
 });
 export type PlaceInput = z.infer<typeof PlaceInput>;
 
-/** A drive leg's numbers, filled only by the drive interface (U4). Empty until then: never estimated by us. */
+/** A drive leg's numbers, filled only by the drive interface (U4): source "map" with a time, or "estimate" (straight line) without one. */
 export const PlanDrive = z.object({
   km: z.number().nullable(),
   minutes: z.number().int().nullable(),
@@ -63,6 +63,14 @@ export const PlanDrive = z.object({
   source: z.string().nullable(),
   asOf: z.string().nullable(),
   estimate: z.boolean().optional(),
+  ferries: z.boolean().nullable().optional(),
+  /** Border crossings in order: ISO country codes and the crossing's name when known ("Woodlands Causeway"). */
+  crossings: z.array(z.object({ from: z.string().nullable(), to: z.string().nullable(), name: z.string().nullable() })).optional(),
+  /** No road between the two places: offer a flight or a ferry. */
+  noRoute: z.boolean().optional(),
+  expiresAt: z.string().nullable().optional(),
+  /** The line to show and the only km/time the agent may quote ("1,076 km · about 10 h 20 min"). */
+  line: z.string().optional(),
 });
 export type PlanDrive = z.infer<typeof PlanDrive>;
 

@@ -16,6 +16,8 @@ import {
   defaultStart, type By, type ItemRow, type Origin, type PlanRow,
 } from "./plans";
 import { templateOf } from "./templates";
+import { driveStale, getDrive, toPlanDrive } from "../drive/drive";
+import { pointOf } from "../drive/places";
 
 /*
  * Writes to a living plan (ASK-INTEGRATED §3.5, §3.8): create, item ops and the origin. Every write takes the plan's
@@ -27,16 +29,30 @@ import { templateOf } from "./templates";
 /* ───────────── drives (U4) ───────────── */
 
 /**
- * The one call site for drive numbers: after a write, the drive legs that have none yet. U4 puts the drive interface
- * (lib/app/drive) behind this and writes km, minutes, tolls and borders onto each leg. Until then it does nothing:
- * a drive leg shows no distance or time rather than one nobody measured.
+ * The one call site for drive numbers: after a write, the drive legs that need them (lib/app/drive). Each gets km and
+ * time from a router (cached), or a straight-line estimate labelled as one with no time when the router is down or
+ * today's budget is spent; an estimate or an expired figure is asked again on the next write. A leg whose places we
+ * can't locate keeps no drive: no distance or time rather than one nobody measured.
  */
-export async function fillDrives(_planId: string, _legs: Pick<ItemRow, "id" | "fromPlace" | "toPlace" | "day" | "startsAt">[]): Promise<Map<string, PlanDriveJson>> {
-  return new Map();
+export async function fillDrives(planId: string, legs: Pick<ItemRow, "id" | "fromPlace" | "toPlace" | "day" | "startsAt">[]): Promise<Map<string, PlanDriveJson>> {
+  const out = new Map<string, PlanDriveJson>();
+  if (!legs.length) return out;
+  const [plan] = await db.select({ startDate: appPlans.startDate }).from(appPlans).where(eq(appPlans.id, planId));
+  for (const leg of legs) {
+    const from = pointOf(leg.fromPlace), to = pointOf(leg.toPlace);
+    if (!from || !to) continue;
+    const date = plan && leg.day != null ? addDays(plan.startDate, leg.day) : null;
+    try {
+      out.set(leg.id, toPlanDrive(await getDrive({ from, to, date, at: leg.startsAt?.slice(11, 16) ?? null })));
+    } catch (e) {
+      console.warn("[plans] drive not filled", e instanceof Error ? e.message.slice(0, 120) : "");
+    }
+  }
+  return out;
 }
 
 async function driveLegs(planId: string, ids?: string[]) {
-  const legs = (await liveItems(planId)).filter((i) => i.kind === "leg" && i.mode === "drive" && !i.drive && (!ids || ids.includes(i.id)));
+  const legs = (await liveItems(planId)).filter((i) => i.kind === "leg" && i.mode === "drive" && driveStale(i.drive) && (!ids || !!i.drive || ids.includes(i.id)));
   if (!legs.length) return;
   const found = await fillDrives(planId, legs);
   for (const [id, drive] of found) await db.update(appPlanItems).set({ drive, updatedAt: new Date() }).where(and(eq(appPlanItems.id, id), eq(appPlanItems.planId, planId)));
