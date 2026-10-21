@@ -123,7 +123,7 @@ export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: bool
   let ready: Promise<void> | null = null;
   const warmUp = () => (ready ??= opts.warm && models.length > 1 ? new Promise<void>((resolve) => {
     // The best-ranked model that answers wins; after the first answer, better-ranked ones get 2 s more to answer.
-    const top = models.slice(0, 6);
+    const top = models.slice(0, 3); // free tiers count requests per minute; three is enough to step past a hanging one
     const answered = new Set<number>();
     let left = top.length;
     let grace: ReturnType<typeof setTimeout> | null = null;
