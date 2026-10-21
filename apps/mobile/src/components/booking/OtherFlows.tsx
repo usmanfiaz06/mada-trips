@@ -317,12 +317,16 @@ function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => v
   );
 }
 
+/** The ready-made plan for what was asked, if there is one: only AlUla and Istanbul have one today. */
+export const planIdFor = (query: string): string | null =>
+  /istanbul|إسطنبول|اسطنبول/i.test(query) ? 'istanbul3' : /al ?ula|العلا|العُلا/i.test(query) ? 'alula2' : null;
+
 export function PlanFlow({ query, people, today }: { query: string; people: Person[]; today: string }) {
   const router = useRouter();
   const plans = usePlans();
   const kids = householdOf(people, today).kids.length > 0;
   const step = useSequence(3, 650, 'go');
-  const id = /istanbul/i.test(query) ? 'istanbul3' : 'alula2';
+  const id = planIdFor(query) ?? 'alula2';
   const plan = plans.data?.find((p) => p.id === id);
   const steps = [t('plan.working.open'), kids ? t('plan.working.prayerKids') : t('plan.working.prayer'), t('plan.working.tables')];
   if (step < 3 || !plan) return <Working lines={steps} step={Math.min(step, 2)} />;

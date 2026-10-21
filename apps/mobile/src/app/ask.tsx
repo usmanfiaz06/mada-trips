@@ -11,7 +11,7 @@ import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, useFlightHeadStart, type Cta } from '@/components/booking/FlightFlow';
-import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
+import { EsimFlow, PlanFlow, StayFlow, planIdFor } from '@/components/booking/OtherFlows';
 import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
@@ -175,7 +175,7 @@ export default function Ask() {
     if (turn.cards.length) return;
     if (turn.intent) { saveAsk(v, turn.intent); setQuery(v); setIntent(turn.intent); setRound((r) => r + 1); return; }
     // The conversation's earlier messages (this turn's thread) so the app's own flows keep its thread.
-    const before = useAskChat.getState().turns.filter((x) => x.id !== turn.id).slice(-3).map((x) => x.me).filter(Boolean).join('. ');
+    const before = useAskChat.getState().turns.filter((x) => x.id !== turn.id).map((x) => x.me).filter(Boolean).join('. ').slice(-600);
     await runFlows(v, undefined, true, before);
   };
 
@@ -297,7 +297,9 @@ export default function Ask() {
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
-  else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
+  // Ready-made plans exist only for AlUla and Istanbul; a plan anywhere else is put together by the team.
+  else if (kind === 'plan' && planIdFor(query)) body = <PlanFlow key={round} query={query} people={household} today={today} />;
+  else if (kind === 'plan') body = <RequestFlow key={round} kind="todo" query={query} intent={intent} people={household} selfName={selfName} />;
   else if (kind === 'esim') body = <EsimFlow key={round} intent={intent} query={query} onSync={onSync} />;
   else if (kind === 'umrah') body = <UmrahFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
