@@ -36,6 +36,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 25 | CarTrawler (car hire) | self-drive cars: search, deposit, insurance, book, cancel | Ready (mock until key) | Owner |
 | 26 | Klook | things to do in Asia, ranked with Hotelbeds/GYG/Viator | Ready (search; desk books) | Owner |
 | 27 | Sherpa | visa / entry rules for every passport, behind the entry check | Ready (built-in rules until key) | Owner |
+| 28 | Cover Genius XCover | travel insurance: quote, buy, cancel | Ready in code; **needs Saudi licensing** | Owner + legal |
 
 ## Processes
 
@@ -275,3 +276,40 @@ tier). Our cache keeps calls to about one per nationality/country/month per serv
 **Licence notes.** Content is licensed for display to our own travellers, not for resale or bulk storage; keep the
 "Powered by Sherpa°" credit where the rules show and the disclaimer that the embassy has the final word. Sherpa is
 already built on Timatic-grade sources; see "IATA" below for why Timatic itself isn't used directly.
+
+### 28. Travel insurance — Cover Genius XCover
+**What it does.** `insurance()` (`suppliers/insurance`): **quote** for the trip (countries, dates, trip cost, each
+traveller's age and residence) → options (medical and baggage, comprehensive with cancellation, cancellation only)
+with the premium in SAR, the main limits, the excess, the policy wording link and whether it meets the Schengen visa
+minimum (EUR 30,000 medical); **bind** (buy the chosen option, idempotent on our order id); **status** (policy
+numbers and certificates); **cancel** (full refund in the cooling-off period, then the insurer's terms). Premiums are
+the insurer's price, with no markup (Mada earns the partner commission). Not yet on the order sheet: the app needs an
+"Add insurance" line there (mobile + order lines) once licensing is settled.
+
+**Saudi licensing — read first.** In Saudi Arabia only an insurer or an intermediary licensed by the **Insurance
+Authority** (IA, which took over insurance supervision from SAMA) may sell or arrange insurance, and policies for
+Saudi residents generally must be issued by an IA-licensed insurer. Before switching this on for Saudi travellers:
+(1) ask Cover Genius which **licensed Saudi insurer/fronting partner** issues their policies in KSA (they work
+through local partners in regulated markets); (2) take legal advice on whether Mada must be registered as an
+insurance **agent/aggregator** or can sell embedded under the insurer's licence (an "embedded"/referral model); (3)
+get the Arabic policy wording and the IA-required disclosures. Outbound travel insurance bought for a Schengen visa
+must also be accepted by the embassy. Until (1)–(3) are done, keep `SUPPLIER_MODE_INSURANCE=off` on production.
+
+**Apply.** covergenius.com → Partners → "Get in touch"; ask for **XCover API** partner onboarding for travel
+insurance in KSA and the GCC, staging keys, the travel `policy_type` names for our markets, and their KSA licensing
+answer above.
+
+**Keys in Vercel.** `XCOVER_API_KEY`, `XCOVER_API_SECRET`, `XCOVER_PARTNER_CODE`, `XCOVER_ENV` (`staging`/`live`),
+optional `XCOVER_POLICY_TYPES` (e.g. `travel_medical:basic,travel_comprehensive:comprehensive,travel_cancellation:cancellation`
+— the names Cover Genius gives us); `SUPPLIER_MODE_INSURANCE=live|mock|off`.
+
+**Certification.** Cover Genius reviews the purchase flow (screenshots: options, wording links, disclosures, the
+confirmation email) and runs test quotes, a bind and a cancellation on staging before live keys.
+
+**Cost model.** No fee to Mada; Cover Genius pays **commission** on each premium (typically 20–35% of net premium,
+negotiated). Premiums are collected either by Mada (merchant of record, remitted monthly) or by XCover directly — ask
+which they support with a Saudi insurer.
+
+**Licence notes.** The traveller must see the policy wording and key exclusions before buying (the option carries
+`wordingUrl`); Mada must not describe cover beyond what the wording says. Keep claims with Cover Genius (their
+claims link goes in the confirmation).
