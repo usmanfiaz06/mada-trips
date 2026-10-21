@@ -123,7 +123,12 @@ async function httpTransport(w: Wire): Promise<WireResponse> {
  * (the bundled city list alone is about 240 KB) sit in their own chunk that live mode never fetches.
  */
 let mockModule: Promise<typeof import('./mock-api')> | null = null;
-const mockTransport = (w: Wire) => (mockModule ??= import('./mock-api')).then((m) => m.mockTransport(w));
+// The literal env check is folded at build time, so a live build drops the import and never ships the mock's chunk
+// (its sample supplier data included).
+const mockTransport = (w: Wire) => {
+  if (process.env.EXPO_PUBLIC_API_MODE !== 'mock') return Promise.reject(new ApiError('SUPPLIER_UNAVAILABLE', t('error.offline'), 0));
+  return (mockModule ??= import('./mock-api')).then((m) => m.mockTransport(w));
+};
 
 /** The in-app mock, with the same timeouts and the same offline rule, so mock mode behaves like the real thing. */
 async function mockWire(w: Wire): Promise<WireResponse> {

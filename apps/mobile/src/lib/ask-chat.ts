@@ -66,7 +66,8 @@ type Result = 'done' | 'fallback';
 /** One message to the conversation. Every event goes to onEvent as it arrives; resolves when the server is done. */
 export async function streamAskChat(body: { text: string; threadId?: string | null; tripId?: string | null; attach?: 'trip' | 'new' }, onEvent: (e: AskChatEvent) => void, signal?: AbortSignal, retried = false): Promise<Result> {
   if (isOffline()) return 'fallback';
-  if (demoChatOn()) return (await import('./ask-chat-demo')).demoAskChat(body, onEvent, signal);
+  // Mock builds only: the literal env check lets a live build drop the demo (and the mock it reads) entirely.
+  if (process.env.EXPO_PUBLIC_API_MODE === 'mock' && demoChatOn()) return (await import('./ask-chat-demo')).demoAskChat(body, onEvent, signal);
   const token = useSession.getState().tokens?.accessToken;
   if (!token) return 'fallback';
   const f: typeof fetch = Platform.OS === 'web' ? fetch : ((await import('expo/fetch')).fetch as unknown as typeof fetch);

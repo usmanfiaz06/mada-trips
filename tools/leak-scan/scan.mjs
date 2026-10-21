@@ -24,7 +24,7 @@ export function scanFolder(root, opts = {}) {
       if (statSync(p).isDirectory()) { walk(p); continue; }
       const rel = relative(root, p);
       if (!TEXT.test(name) || SKIP.test(rel) || name.endsWith('.map')) continue;
-      const mockChunk = /(?:^|[\\/])mock-api-[0-9a-f]+\.js$/.test(rel);
+      const mockChunk = /(?:^|[\\/])(?:mock-api|ask-chat-demo)-[0-9a-f]+\.js$/.test(rel); // mock-only code: a live build never loads either, and the env checks in api.ts and ask-chat.ts drop the demo
       for (const h of scanText(readFileSync(p, 'utf8'), { costFields: !(opts.allowMock && mockChunk) })) out.push({ file: rel, ...h });
     }
   };
