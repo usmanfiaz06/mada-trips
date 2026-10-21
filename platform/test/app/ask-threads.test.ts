@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
-import { MONTHS_LONG, addDays, readSseFrames, todayIn, type AskChatEvent } from "@mada/shared";
+import { MONTHS_LONG, addDays, readSseFrames, todayIn, type AskChatEvent, type AskIntent } from "@mada/shared";
 import { db } from "@/db";
 import { appTrips } from "@/db/app-schema";
 import { appAskThreads } from "@/db/app-schema-ask";
@@ -184,7 +184,7 @@ describe("new chat or continue (§2.2)", () => {
 });
 
 describe("titles", () => {
-  const base = { kind: "flight", destination: null, destinationName: null, from: null, depart: null, return: null, tripType: null, monthOnly: null, cabin: null, cabinNote: null, travellerIds: null, travellerCount: null, infants: 0, needs: {}, needsMentioned: [], answers: {}, ask: null, source: "rules" } as const;
+  const base: AskIntent = { kind: "flight", destination: null, destinationName: null, from: null, depart: null, return: null, tripType: null, monthOnly: null, cabin: null, cabinNote: null, travellerIds: null, travellerCount: null, infants: 0, needs: {}, needsMentioned: [], answers: {}, ask: null, source: "rules" };
   it("a route with dates in English and Arabic, else the kind and place, else the first words", () => {
     const i = { ...base, kind: "plan" as const, destination: "alula", from: "RUH" as const, depart: "2026-11-20", return: "2026-11-22" };
     expect(titleFrom({ intent: i, trip: null, words: "", lang: "en" })).toEqual({ title: "Riyadh → AlUla · 20–22 Nov", by: "route" });
