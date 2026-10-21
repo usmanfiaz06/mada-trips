@@ -48,8 +48,10 @@ function Copyable({ label, value, icon }: { label: string; value: string; icon?:
   const [done, setDone] = useState(false);
   return (
     <div className="flex items-center gap-2 rounded-xl bg-surface px-3 py-2">
-      <span className="shrink-0 text-[12px] text-ink-3">{label}</span>
-      <code className="num min-w-0 flex-1 truncate text-[13px]" dir="ltr">{value}</code>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] text-ink-3">{label}</span>
+        <code className="num block break-all text-[13px]" dir="ltr">{value}</code>
+      </span>
       <button type="button" className={btn("ghost", "sm")} onClick={() => { navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }).catch(() => {}); }}>
         {icon ?? <Copy className="size-3.5" />}{done ? t("Copied") : t("Copy")}
       </button>
