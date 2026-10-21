@@ -17,7 +17,7 @@ import { Icon } from '../Icon';
 import { Pill } from '../Pill';
 import { Sheet } from '../Sheet';
 import { SupplierDown } from '../states/SupplierDown';
-import { WaitTrouble } from '../states/WaitTrouble';
+import { GaveUp, STAGES_SUPPLIER, Waiting, localTimeFact, useStagedLine } from '../states/Waiting';
 import { SUPPLIER_GIVE_UP_MS, useGiveUp } from '@/lib/net/give-up';
 import { isOffline } from '@/lib/net/state';
 import { T } from '../Text';
@@ -25,7 +25,7 @@ import { AirlineMark } from './AirlineMark';
 import { EntryChecks, blockLabel } from './EntryChecks';
 import { BundleStayLines } from './CatalogueStay';
 import { dayName, rangeName } from './format';
-import { ArtCalendar, Ask1, Leg, MadaDot, Working, useSequence, useWho, enter } from './parts';
+import { ArtCalendar, Ask1, Leg, MadaDot, useWho, enter } from './parts';
 import { ByHand, RequestFlow, SentRequest } from './Requests';
 import { Answered } from './Conversation';
 import { PhoneGate, usePhoneNeeded } from './PhoneSheet';
@@ -144,12 +144,13 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const [sentId, setSentId] = useState<string | null | undefined>(undefined);
 
   const dest = where.key ? DESTINATIONS[where.key] ?? null : null;
-  const byHand = !!where.other || !!dest?.byHand;
+  // The airlines too slow to answer, and "Ask Mada to find it for you" tapped: the desk finds the flights by hand.
+  const [deskFind, setDeskFind] = useState(false);
+  const byHand = !!where.other || !!dest?.byHand || deskFind;
   const needRet = trip.type === 'return' && !!trip.dep && !trip.ret;
   const ready = (!!dest || !!where.other) && !!trip.dep && !needRet && (whoDone || byRequest);
   const live = ready && !byHand && !!dest && !byRequest && !phoneNeeded;
   // Never "for 0": with nobody loaded yet (offline, or the household still on its way) the line names no count.
-  const steps = [t('search.working.checking', { city: dest?.name ?? '' }), t('search.working.holding'), who.length ? t('search.working.matching', { count: who.length }) : t('heard.matching')];
   const flags = [...demo].sort().join(',');
   const search = useQuery({
     queryKey: flightsKey(dest?.key, trip, who, mode === 'flex', runKey, flags),
@@ -161,7 +162,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   // No endless "Checking…": a search that fails or takes too long says so, with Try again and Talk to Mada.
   const searchKey = flightsKey(dest?.key, trip, who, mode === 'flex', runKey, flags);
   const wait = useGiveUp(search, { key: searchKey, queryKey: searchKey, active: live, giveUpMs: SUPPLIER_GIVE_UP_MS });
-  const step = useSequence(steps.length, 750, live ? `${runKey}` : null, !!s && !search.isFetching);
+  // While the airlines answer: the options to come, and a line that says what is being done as the seconds pass.
+  const flightDates = trip.dep ? (trip.type === 'oneway' || !trip.ret ? rangeName(trip.dep, null, today) : rangeName(trip.dep, trip.ret, today)) : '';
+  const flightLines = [t('waiting.flights.0', { city: dest?.name ?? '', dates: flightDates }), t('waiting.flights.1'), t('waiting.flights.2'), t('waiting.flights.3')];
+  const waitLine = useStagedLine(flightLines, STAGES_SUPPLIER, live && !s ? JSON.stringify(searchKey) : null);
   // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
   const permit = !!intent.answers.permit?.length;
   // Checked alongside the search, for the days asked; again only if the search moved the days (a day either side).
@@ -196,7 +200,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const showBundle = !!s?.bundle && trip.type === 'return';
   const total = (current?.total.amount ?? 0) + (bundle && showBundle ? s!.bundle!.total.amount : 0);
   const blocking = entry.data?.checks.filter((c) => c.blocking) ?? [];
-  const results = live && step >= steps.length && !!s && !(s.outcome === 'partial' && mode === 'normal') && s.outcome !== 'none' && options.length > 0;
+  const results = live && !!s && !(s.outcome === 'partial' && mode === 'normal') && s.outcome !== 'none' && options.length > 0;
   // Back after signing in, a language switch or a reload: the flight that was picked, picked again (lib/resume.ts).
   useEffect(() => {
     const want = results ? pendingPick('flight') : null;
@@ -363,8 +367,8 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
       </View>
     );
   }
-  if (!s && wait.view !== 'loading' && wait.view !== 'ready') return <WaitTrouble wait={wait} testID={`flights-${wait.view}`} />;
-  if (step < steps.length || search.isLoading || !s) return <Working lines={steps} step={Math.min(step, steps.length - 1)} />;
+  if (!s && wait.view !== 'loading' && wait.view !== 'ready') return <GaveUp wait={wait} kind="flights" onFind={() => { buzz('tap'); setDeskFind(true); }} testID={`flights-${wait.view}`} />;
+  if (search.isLoading || !s) return <Waiting kind="flights" line={waitLine} fact={localTimeFact(dest?.key)} testID="flights-waiting" />;
 
   if (s.outcome === 'partial' && mode === 'normal') {
     const airline = s.unavailable[0]?.airline ?? '';

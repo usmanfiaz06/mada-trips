@@ -1,7 +1,7 @@
 # App finance on the desk (DESK-PLAN U6)
 
 Refunds after the decision, what each app sale cost us, and where app money lands in Ops. Code: `platform/src/lib/app/finance/`,
-pages under `/adminwork/desk/refunds` and `/adminwork/desk/finance`. Migration `drizzle/0038_app_finance.sql`.
+pages under `/adminwork/desk/refunds` and `/adminwork/desk/finance`. Migration `drizzle/0040_app_finance.sql`.
 
 ## Refunds and credits (`/desk/refunds`)
 

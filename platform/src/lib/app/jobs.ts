@@ -20,6 +20,7 @@ import { esimJob } from "./esim/ops";
 import { pastDatesJob } from "./outcomes";
 import { deskTicketsJob } from "./desk/tickets";
 import { financeJob } from "./finance/job";
+import { nightCover } from "./desk/oncall";
 
 /*
  * Scheduled jobs (Vercel Cron → GET /api/cron/{job} with CRON_SECRET; locally `npm run app:jobs -- all`). Each is
@@ -141,7 +142,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: () => deskTicketsJob(), finance: () => financeJob() };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); return { ...r, paged: n.paged }; }, finance: () => financeJob() };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

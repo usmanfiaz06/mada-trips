@@ -14,6 +14,7 @@ import { ChipWrap, Photo } from '@/components/booking/parts';
 import { EsimHero, PersonChip, PhoneArt, PlanCard, countryOf } from './look';
 import { DAY_CHOICES, EsimDays, EsimWhere, placeLabel, type WherePick } from './WherePicker';
 import { WaitTrouble } from '@/components/states/WaitTrouble';
+import { STAGES_SHORT, Waiting, useStagedLine } from '@/components/states/Waiting';
 import { usePayDraft } from '@/lib/booking';
 import { esimKeys, planLabel, useEsimPlaces, useEsimPlans } from '@/lib/esim';
 import { useGiveUp } from '@/lib/net/give-up';
@@ -76,6 +77,11 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
   // No endless spinner: the plans answer, or after GIVE_UP_MS the card says so with Try again and Talk to Mada.
   const plansKey = esimKeys.plans(plansFor);
   const wait = useGiveUp(q, { key: plansKey, queryKey: plansKey, signedIn, active: step === 'plans' });
+  // While the plans come: the tiles to come, and a line that says what is being done.
+  const waitTrip = tripId ? upcoming.find((x) => x.id === tripId) : null;
+  const waitWhere = waitTrip ? nameIn(waitTrip.city, getLocale()) : esimPlaceName(region ?? dest ?? '', getLocale()) ?? nameIn(dest ?? '', getLocale());
+  const esimLines = [t('waiting.esim.0', { where: waitWhere }), t('waiting.esim.1', { days: t('es.days.n', { n: plansFor.days ?? 7 }) }), t('waiting.esim.2')];
+  const waitLine = useStagedLine(esimLines, STAGES_SHORT, step === 'plans' && !q.data ? JSON.stringify(plansKey) : null);
   // Each card its own honest size, whatever server answered (an older one could call two of them "Heavy").
   const data = useMemo(() => (q.data ? { ...q.data, plans: withSizes(q.data.plans, q.data.days) } : undefined), [q.data]);
   const [pick, setPick] = useState<string | null>(null);
@@ -134,7 +140,7 @@ export function EsimPlanner({ tripId: tripIn, destination: destIn, days: daysIn,
     );
   }
 
-  if (!data && wait.view === 'loading') return wrap(<View style={{ paddingVertical: 40, alignItems: 'center', gap: 12 }} testID="esim-loading"><ActivityIndicator color={colors.green} /></View>);
+  if (!data && wait.view === 'loading') return wrap(<Waiting kind="esim" line={waitLine} count={3} testID="esim-loading" />);
   if (!data) return wrap(<WaitTrouble wait={wait} testID={`esim-${wait.view}`} />);
   const where = whereOf(data);
   if (data.outcome === 'none' || !plan) {

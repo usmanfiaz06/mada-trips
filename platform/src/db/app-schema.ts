@@ -287,7 +287,7 @@ export const appRefunds = pgTable("app_refunds", {
   reason: text("reason"),
   expectedBy: timestamp("expected_by", { withTimezone: true }),
   providerRef: text("provider_ref"),
-  // App finance (DESK-PLAN U6, drizzle/0038_app_finance.sql): what the traveller asked for when the desk approved less
+  // App finance (DESK-PLAN U6, drizzle/0040_app_finance.sql): what the traveller asked for when the desk approved less
   // (amount is always what moves), who decided and when, the provider's confirmation (sent) and the settlement match
   // (settled), the lead's approval above the agent's limit, and the refund's line in Ops payments.
   requestedAmount: money("requested_amount"),

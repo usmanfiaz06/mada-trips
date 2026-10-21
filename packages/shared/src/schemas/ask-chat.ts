@@ -49,6 +49,11 @@ export const ChatCard = z.discriminatedUnion('type', [
     type: z.literal('request'), requestId: Id, kind: z.string(), title: z.string(),
     detail: z.string().optional(), promisedBy: IsoDateTime.nullable().optional(),
     contact: z.enum(['call', 'whatsapp', 'in_app']).nullable().optional(),
+    /** Written out on the card: where, the days, and who (each traveller's name, the account holder marked). */
+    where: z.string().max(80).nullable().optional(),
+    depart: IsoDay.nullable().optional(),
+    return: IsoDay.nullable().optional(),
+    who: z.array(z.object({ name: z.string(), self: z.boolean() })).max(12).optional(),
   }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
@@ -61,7 +66,7 @@ export type ChatPay = z.infer<typeof ChatPay>;
 export const AskChatEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('thread'), threadId: Id, lang: z.enum(['en', 'ar']) }),
   /** What is being done right now ("Checking flights to Istanbul"), for the typing line. */
-  z.object({ type: z.literal('status'), text: z.string() }),
+  z.object({ type: z.literal('status'), text: z.string(), tool: z.string().max(40).optional() }),
   z.object({ type: z.literal('text'), delta: z.string() }),
   /** The words so far are replaced (a check failed, or a fixed line answers): show this instead. */
   z.object({ type: z.literal('replace'), text: z.string() }),
@@ -72,6 +77,11 @@ export const AskChatEvent = z.discriminatedUnion('type', [
   /** A person takes it from here, in this support thread. agent: who is on duty, only when the desk names someone. */
   z.object({ type: z.literal('handoff'), threadId: Id, agent: z.string().nullable() }),
   /**
+   * A person on the desk has taken this conversation over (desk/ask): the message was kept for them and Mada doesn't
+   * answer it. Their replies come from GET /ask/chat/desk. name: their first name, as the app shows people.
+   */
+  z.object({ type: z.literal('agent'), name: z.string() }),
+  /**
    * What the traveller can do next, as 2 or 3 chips that send their words when tapped (docs/app/ASSISTANT.md: every
    * reply ends with a next step). Mada's own when it wrote them; otherwise the server fills them from the turn.
    */
@@ -81,6 +91,29 @@ export const AskChatEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), code: z.string(), fallback: z.boolean() }),
 ]);
 export type AskChatEvent = z.infer<typeof AskChatEvent>;
+
+/** GET /ask/chat/desk?threadId=…&after=n: what a person on the desk said in this thread since line n (the desk's take-over). */
+export const ASK_CHAT_DESK_ROUTE = '/ask/chat/desk';
+export const AskDeskLine = z.object({
+  /** Its place in the thread: pass the last one back as `after`. */
+  n: z.number().int(),
+  /** agent: a reply from a person on the desk (`by`). joined: the line "Noura from Mada joined", shown once. */
+  kind: z.enum(['agent', 'joined']),
+  by: z.string(),
+  text: z.string(),
+  at: IsoDateTime,
+});
+export type AskDeskLine = z.infer<typeof AskDeskLine>;
+export const AskDeskResponse = z.object({
+  /** agent: a person has the conversation (Mada doesn't answer); ai: Mada answers. */
+  mode: z.enum(['ai', 'agent']),
+  /** Who has it, while a person does. */
+  agent: z.string().nullable(),
+  lines: z.array(AskDeskLine),
+  /** The last line in the thread: the next `after`. */
+  last: z.number().int(),
+});
+export type AskDeskResponse = z.infer<typeof AskDeskResponse>;
 
 /** Read an SSE body as it arrives: complete `data:` frames out, the rest kept for the next chunk. */
 export function readSseFrames(buffer: string): { events: AskChatEvent[]; rest: string } {

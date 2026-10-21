@@ -5,7 +5,7 @@ import { appOrders } from "./app-schema-booking";
 
 /*
  * App finance on the desk (DESK-PLAN.md U6): what each sold line cost us and at what rate, and the payment provider's
- * settlement files matched against our captures and refunds. Migration: drizzle/0038_app_finance.sql.
+ * settlement files matched against our captures and refunds. Migration: drizzle/0040_app_finance.sql.
  */
 
 const id = () => uuid("id").primaryKey().defaultRandom();

@@ -33,6 +33,7 @@ export const PERMISSIONS = {
   "desk.admin":          { group: "desk",      en: "Run the rota & assign agents",       ar: "إدارة المناوبات وإسناد الموظفين" },
   "desk.ask.read":       { group: "desk",      en: "Read Ask Mada chats handed to the desk", ar: "قراءة محادثات اسأل مادا المحوّلة للمكتب" },
   "desk.tickets.manage": { group: "desk",      en: "Reassign anyone's tickets & merge them", ar: "إعادة إسناد تذاكر الجميع ودمجها" },
+  "desk.reports":        { group: "desk",      en: "See the desk's performance & everyone's stats", ar: "عرض أداء المكتب وإحصاءات الجميع" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -55,9 +56,17 @@ export const PERMISSION_GROUPS = {
 // governance document requires; it can be delegated to staff from the Issuance page.
 export const PARTNER_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== "issue.unlimited" && p !== "issue.delegate");
 
+const SUPPORT_AGENT: Permission[] = ["desk.view", "desk.act", "desk.ask.read"];
+const SUPPORT_LEAD: Permission[] = [...SUPPORT_AGENT, "desk.issue", "desk.refund", "desk.moderate", "desk.admin", "desk.tickets.manage", "desk.reports"];
+/** The roles the desk's Add agent hands out (Support admin → Agents & roles). */
+export const SUPPORT_ROLE_KEYS = ["support_agent", "support_lead"] as const;
+
 export const SYSTEM_ROLES: { key: string; name: string; nameAr: string; description: string; permissions: Permission[] }[] = [
   { key: "partner", name: "Partner", nameAr: "شريك", description: "Full access: team, roles, approvals, finance, settlement and settings.", permissions: PARTNER_PERMISSIONS },
   { key: "partner_issuer", name: "Partner · Issuing authority", nameAr: "شريك · صلاحية الإصدار", description: "Full partner access, plus ticket issuing (TTP) and delegating it to staff.", permissions: ALL_PERMISSIONS },
   { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit", "desk.view", "desk.act", "desk.ask.read"] },
+  // The app desk (DESK-PLAN.md §4.3, §7 default 1). drizzle/0038_desk_agents.sql adds both to existing databases.
+  { key: "support_agent", name: "Support agent", nameAr: "موظف دعم", description: "Works the app desk: queue, chats, tickets and requests. Passports stay masked; no ticket issuing or refunds.", permissions: SUPPORT_AGENT },
+  { key: "support_lead", name: "Support lead", nameAr: "قائد فريق الدعم", description: "Runs the app desk: agents, rota, saved replies and performance; issues tickets, approves refunds, reassigns and merges. Full passports behind an audited reveal.", permissions: SUPPORT_LEAD },
   { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit", "desk.view", "desk.act", "desk.ask.read"] },
 ];
