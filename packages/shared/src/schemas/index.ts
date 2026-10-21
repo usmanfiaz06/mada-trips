@@ -46,3 +46,4 @@ export * from './esim';
 export * from './esim-pricing';
 export * from './hotel-page';
 export * from './ask-chat';
+export * from './ask-memory';

@@ -287,9 +287,23 @@ export const appRefunds = pgTable("app_refunds", {
   reason: text("reason"),
   expectedBy: timestamp("expected_by", { withTimezone: true }),
   providerRef: text("provider_ref"),
+  // App finance (DESK-PLAN U6, drizzle/0040_app_finance.sql): what the traveller asked for when the desk approved less
+  // (amount is always what moves), who decided and when, the provider's confirmation (sent) and the settlement match
+  // (settled), the lead's approval above the agent's limit, and the refund's line in Ops payments.
+  requestedAmount: money("requested_amount"),
+  origin: text("origin").notNull().default("traveller"), // traveller | desk (a desk-started cancel and refund)
+  note: text("note"),
+  decidedBy: uuid("decided_by").references(() => opsUsers.id, { onDelete: "set null" }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  approvalId: uuid("approval_id"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }),
+  checks: integer("checks").notNull().default(0),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  settledAt: timestamp("settled_at", { withTimezone: true }),
+  opsPaymentId: uuid("ops_payment_id").references(() => opsPayments.id, { onDelete: "set null" }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index("app_refunds_payment_idx").on(t.paymentId)]);
+}, (t) => [index("app_refunds_payment_idx").on(t.paymentId), index("app_refunds_stage_idx").on(t.stage, t.updatedAt)]);
 
 export const appInvoices = pgTable("app_invoices", {
   id: id(),

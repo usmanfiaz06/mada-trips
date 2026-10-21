@@ -8,7 +8,7 @@ supplier balance, and the owner's pricing.
 Code: `platform/src/lib/app/suppliers/live/esimaccess.ts` (the adapter), `lib/app/esim/service.ts` (plans, order sheet,
 buying, webhooks), `esim/pricing.ts` + `packages/shared/src/schemas/esim-pricing.ts` (the price rules),
 `esim/ops.ts` (balance, low-balance orders, the cron job), `esim/catalogue.ts` (the daily sync).
-Desk: `/adminwork/desk/esims`, `/adminwork/desk/esims/<id>`, `/adminwork/desk/esims/pricing`.
+Desk: `/adminwork/desk/esims`, `/adminwork/desk/esims/<id>`; pricing under App finance at `/adminwork/desk/finance/esim-pricing` (the old path redirects).
 
 Until the keys are in, everything runs on mock fixtures: plans, orders, the balance ($500), the catalogue, usage.
 

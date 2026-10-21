@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { t as copy, type CopyKey, type OutcomeReason, type RequestResult, type Vars } from "@mada/shared";
 import { db, schema, type Tx } from "@/db";
 import {
@@ -7,6 +7,7 @@ import {
 } from "@/db/app-schema";
 import { appAgents, appDeskBlocks, appDeskModeration, appDeskNotes } from "@/db/app-schema-desk";
 import { appOrderEvents, appOrders } from "@/db/app-schema-booking";
+import { appEsims } from "@/db/app-schema-esim";
 import * as booking from "@/lib/app/booking/desk";
 import { addCredit } from "@/lib/app/credit";
 import { appSupportThreads } from "@/db/app-schema-wallet";
@@ -20,6 +21,7 @@ import { isFlightAsk } from "@/lib/app/booking/flight-requests";
 import { contactOf } from "./flight-quotes";
 import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
 import { withCopy } from "@/lib/app/notify-copy";
+import { getSettings } from "@/lib/settings";
 
 /*
  * Thin adapters for the desk. They read and write the M0 app_ tables directly, so the desk works today.
@@ -129,11 +131,28 @@ export function orderStage(r: { status: string; details: unknown }, payStatus?: 
   return "other";
 }
 
+/**
+ * A flight request from Ask that hasn't been paid yet (flights by request): the desk quotes it from Requests. Once the
+ * traveller pays, its order moves it to Orders, where the tickets are issued.
+ */
+const PRE_PAYMENT_FLIGHT_ASK = sql`(${appRequests.kind} = 'flight' AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing','needs_answer','quoted','cancelled'))`;
+
+const OPEN_STAGES: OrderStage[] = ["awaiting", "held", "needs_answer", "price_changed", "failed"];
+const ORDER_WHERE = sql`${appRequests.kind} IN ('flight','stay','trip') AND ${appRequests.status} <> 'queued' AND NOT (${PRE_PAYMENT_FLIGHT_ASK})`;
+
 export async function listOrders(opts: { stage?: OrderStage | "open" | "all"; limit?: number } = {}) {
   const rows = await db.select({ r: appRequests, userName: appUsers.name, phone: appUsers.phone }).from(appRequests)
     .innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId))
-    .where(and(inArray(appRequests.kind, [...ORDER_KINDS]), ne(appRequests.status, "queued"), sql`NOT (${PRE_PAYMENT_FLIGHT_ASK})`))
+    .where(ORDER_WHERE)
     .orderBy(desc(appRequests.createdAt)).limit(opts.limit ?? 300);
+  const out = await hydrateOrders(rows);
+  const st = opts.stage ?? "all";
+  if (st === "all") return out;
+  if (st === "open") return out.filter((o) => OPEN_STAGES.includes(o.stage));
+  return out.filter((o) => o.stage === st);
+}
+
+async function hydrateOrders(rows: { r: typeof appRequests.$inferSelect; userName: string; phone: string | null }[]) {
   const ids = rows.map((x) => x.r.id);
   const [pays, quotes, orders] = ids.length ? await Promise.all([
     db.select().from(appPayments).where(inArray(appPayments.requestId, ids)).orderBy(desc(appPayments.createdAt)),
@@ -141,7 +160,7 @@ export async function listOrders(opts: { stage?: OrderStage | "open" | "all"; li
     db.select().from(appOrders).where(inArray(appOrders.requestId, ids)).orderBy(desc(appOrders.createdAt)),
   ]) : [[], [], []];
   const orderPays = orders.some((o) => o.paymentId) ? await db.select().from(appPayments).where(inArray(appPayments.id, orders.map((o) => o.paymentId).filter((x): x is string => !!x))) : [];
-  const out = rows.map(({ r, userName, phone }) => {
+  return rows.map(({ r, userName, phone }) => {
     const order = orders.find((o) => o.requestId === r.id) ?? null;
     const pay = (order?.paymentId ? orderPays.find((p) => p.id === order.paymentId) : null) ?? pays.find((p) => p.requestId === r.id) ?? null;
     const quote = quotes.find((q) => q.requestId === r.id && q.status !== "withdrawn") ?? quotes.find((q) => q.requestId === r.id) ?? null;
@@ -150,10 +169,77 @@ export async function listOrders(opts: { stage?: OrderStage | "open" | "all"; li
     if (order?.supplierRef && !desk.heldPnr) desk.heldPnr = order.supplierRef;
     return { ...r, ref: order?.ref ?? shortRef(r.id, "O"), userName: travellerName(userName), phone, payment: pay, total, stage: orderStage(r, pay?.status, order), desk, order };
   });
-  const st = opts.stage ?? "all";
-  if (st === "all") return out;
-  if (st === "open") return out.filter((o) => ["awaiting", "held", "needs_answer", "price_changed", "failed"].includes(o.stage));
-  return out.filter((o) => o.stage === st);
+}
+export type DeskOrderRow = Awaited<ReturnType<typeof hydrateOrders>>[number];
+
+/* Paged lists for the desk pages: the filters run in SQL, so a page reads 50 rows, not every booking. */
+
+export const PAGE_SIZE = 50;
+export type Paged<T> = { rows: T[]; total: number; counts: Record<string, number> };
+const pageOf = (o: { limit?: number; offset?: number }) => ({ limit: Math.min(Math.max(o.limit ?? PAGE_SIZE, 1), 200), offset: Math.max(o.offset ?? 0, 0) });
+
+/** A search box term: a name, phone, summary, PNR or a short ref like O-1A2B3C (its prefix dropped, matched on the id). */
+function term(q?: string) {
+  const v = (q ?? "").trim().slice(0, 80);
+  if (!v) return null;
+  const ref = v.replace(/^[a-z]-/i, "").replace(/[^0-9a-f]/gi, "").toLowerCase();
+  return { like: `%${v.replace(/[%_\\]/g, (c) => `\\${c}`)}%`, ref: ref.length >= 4 && /^[0-9a-f]+$/.test(ref) ? `${ref}%` : null };
+}
+const idPrefix = (col: unknown, ref: string | null) => (ref ? sql`replace(${col}::text, '-', '') LIKE ${ref}` : sql`false`);
+
+/** orderStage() in SQL, over the latest app_order and payment of each request (keep the two in step). */
+const STAGE_SQL = sql`CASE
+  WHEN o.status IS NOT NULL THEN CASE
+    WHEN o.status = 'payment_requested' THEN 'awaiting_payment' WHEN o.status = 'pending_agent' THEN 'awaiting'
+    WHEN o.status IN ('held','price_locked','issuing') THEN 'held' WHEN o.status = 'needs_answer' THEN 'needs_answer'
+    WHEN o.status = 'fare_changed' THEN 'price_changed' WHEN o.status = 'confirmed' THEN 'issued'
+    WHEN o.status = 'ticketing_failed' THEN 'failed' WHEN o.status IN ('cancelled','declined') THEN 'not_issued' ELSE 'other' END
+  WHEN ${appRequests.status} IN ('confirmed','done') OR ${appRequests.details}->'desk'->>'issuedAt' IS NOT NULL THEN 'issued'
+  WHEN ${appRequests.status} = 'cancelled' AND ${appRequests.details}->'desk'->>'failedAt' IS NOT NULL THEN 'not_issued'
+  WHEN ${appRequests.status} = 'needs_answer' THEN 'needs_answer'
+  WHEN ${appRequests.status} = 'quoted' AND ${appRequests.details}->'desk'->'priceChange' IS NOT NULL THEN 'price_changed'
+  WHEN ${appRequests.status} = 'with_agent' THEN CASE WHEN ${appRequests.details}->'desk'->>'heldAt' IS NOT NULL OR p.status = 'failed' THEN 'held' ELSE 'awaiting' END
+  ELSE 'other' END`;
+
+/** How many orders sit at each stage, for the sidebar (no rows read). */
+export async function orderStageCounts(): Promise<Record<string, number>> {
+  const res = await db.execute(sql`
+    SELECT ${STAGE_SQL} AS stage, count(*)::int AS n FROM ${appRequests}
+    LEFT JOIN LATERAL (SELECT status FROM ${appOrders} WHERE request_id = ${appRequests.id} ORDER BY created_at DESC LIMIT 1) o ON true
+    LEFT JOIN LATERAL (SELECT status FROM ${appPayments} WHERE request_id = ${appRequests.id} ORDER BY created_at DESC LIMIT 1) p ON true
+    WHERE ${ORDER_WHERE} GROUP BY 1`);
+  return Object.fromEntries((res as unknown as { stage: string; n: number }[]).map((x) => [x.stage, x.n]));
+}
+
+/** Orders for one tab (open, a stage, or all), searched, 50 at a time, with the count behind every tab. */
+export async function pageOrders(opts: { tab?: string; q?: string; limit?: number; offset?: number } = {}): Promise<Paged<DeskOrderRow> & { value: number }> {
+  const { limit, offset } = pageOf(opts);
+  const q = term(opts.q);
+  const search = q ? sql`AND (${appRequests.summary} ILIKE ${q.like} OR u.name ILIKE ${q.like} OR u.phone ILIKE ${q.like} OR o.ref ILIKE ${q.like} OR o.supplier_ref ILIKE ${q.like}
+    OR ${appRequests.details}->'desk'->>'heldPnr' ILIKE ${q.like} OR ${appRequests.details}->'desk'->>'pnr' ILIKE ${q.like} OR ${idPrefix(appRequests.id, q.ref)})` : sql``;
+  const tab = opts.tab ?? "open";
+  const want = tab === "all" ? null : tab === "open" ? OPEN_STAGES : [tab];
+  const res = await db.execute(sql`
+    WITH base AS (
+      SELECT ${appRequests.id} AS id, ${appRequests.createdAt} AS created_at, ${STAGE_SQL} AS stage, coalesce(o.total + o.extra, p.amount, qt.total, 0) AS value
+      FROM ${appRequests} JOIN ${appUsers} u ON u.id = ${appRequests.ownerId}
+      LEFT JOIN LATERAL (SELECT status, total, extra, ref, supplier_ref FROM ${appOrders} WHERE request_id = ${appRequests.id} ORDER BY created_at DESC LIMIT 1) o ON true
+      LEFT JOIN LATERAL (SELECT status, amount FROM ${appPayments} WHERE request_id = ${appRequests.id} ORDER BY created_at DESC LIMIT 1) p ON true
+      LEFT JOIN LATERAL (SELECT total FROM ${appQuotes} WHERE request_id = ${appRequests.id} ORDER BY (status = 'withdrawn'), created_at DESC LIMIT 1) qt ON true
+      WHERE ${ORDER_WHERE} ${search}
+    ), shown AS (SELECT * FROM base WHERE ${want ? sql`stage IN ${want}` : sql`true`})
+    SELECT 'c' AS t, stage AS id, count(*)::int AS n, 0::bigint AS v FROM base GROUP BY stage
+    UNION ALL SELECT 's', '', count(*)::int, coalesce(sum(value), 0)::bigint FROM shown
+    UNION ALL (SELECT 'r', id::text, 0, 0 FROM shown ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset})`);
+  const all = res as unknown as { t: string; id: string; n: number; v: string | number }[];
+  const counts: Record<string, number> = Object.fromEntries(all.filter((x) => x.t === "c").map((x) => [x.id, x.n]));
+  counts.open = OPEN_STAGES.reduce((s, k) => s + (counts[k] ?? 0), 0);
+  counts.all = all.filter((x) => x.t === "c").reduce((s, x) => s + x.n, 0);
+  const sum = all.find((x) => x.t === "s");
+  const ids = all.filter((x) => x.t === "r").map((x) => x.id);
+  const rows = ids.length ? await db.select({ r: appRequests, userName: appUsers.name, phone: appUsers.phone }).from(appRequests)
+    .innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId)).where(inArray(appRequests.id, ids)).orderBy(desc(appRequests.createdAt)) : [];
+  return { rows: await hydrateOrders(rows), total: sum?.n ?? 0, value: Number(sum?.v ?? 0), counts };
 }
 
 export async function getRequestFull(id: string) {
@@ -504,11 +590,6 @@ export function destinationOf(details: unknown) {
   return { id: p.id ? String(p.id) : p.placeId ? String(p.placeId) : null, name, country, airports, guideUrl: guide, message: typeof d.message === "string" ? d.message : null };
 }
 
-/**
- * A flight request from Ask that hasn't been paid yet (flights by request): the desk quotes it from Requests. Once the
- * traveller pays, its order moves it to Orders, where the tickets are issued.
- */
-const PRE_PAYMENT_FLIGHT_ASK = sql`(${appRequests.kind} = 'flight' AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing','needs_answer','quoted','cancelled'))`;
 
 export const QUOTE_LINE_KINDS = ["flight", "stay", "pickup", "visa", "service", "discount", "credit", "other"] as const;
 
@@ -518,6 +599,32 @@ export async function listRequests(opts: { open?: boolean; limit?: number } = {}
       opts.open ? inArray(appRequests.status, ["sent", "reviewing", "needs_answer", "quoted", "awaiting_payment", "with_agent"]) : undefined))
     .orderBy(desc(appRequests.createdAt)).limit(opts.limit ?? 300);
   return rows.map(({ r, userName }) => ({ ...r, ref: shortRef(r.id), userName: travellerName(userName), desk: deskState(r.details) }));
+}
+
+const REQUEST_WHERE = sql`(${appRequests.kind} NOT IN ('flight','stay','trip') OR ${PRE_PAYMENT_FLIGHT_ASK}) AND ${appRequests.status} <> 'queued'`;
+/** The Requests tabs, as the statuses behind each. */
+export const REQUEST_TABS: Record<string, string[] | null> = {
+  open: ["sent", "reviewing", "needs_answer", "quoted", "awaiting_payment", "with_agent"], quote: ["sent", "reviewing"], quoted: ["quoted", "awaiting_payment"],
+  done: ["done", "confirmed", "cancelled"], all: null,
+};
+
+/** Requests for one tab and kind, searched, 50 at a time, with the count behind every tab and kind. */
+export async function pageRequests(opts: { tab?: string; kind?: string; q?: string; limit?: number; offset?: number } = {}): Promise<Paged<Awaited<ReturnType<typeof listRequests>>[number]> & { kinds: Record<string, number> }> {
+  const { limit, offset } = pageOf(opts);
+  const q = term(opts.q);
+  const statuses = REQUEST_TABS[opts.tab ?? "open"] ?? null;
+  const search = q ? or(ilike(appRequests.summary, q.like), ilike(appUsers.name, q.like), ilike(appUsers.phone, q.like), idPrefix(appRequests.id, q.ref)) : undefined;
+  const base = and(REQUEST_WHERE, search);
+  const shown = and(base, statuses ? inArray(appRequests.status, statuses) : undefined, opts.kind ? eq(appRequests.kind, opts.kind) : undefined);
+  const [byStatus, byKind, rows] = await Promise.all([
+    db.select({ k: appRequests.status, n: sql<number>`count(*)::int` }).from(appRequests).innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId)).where(and(base, opts.kind ? eq(appRequests.kind, opts.kind) : undefined)).groupBy(appRequests.status),
+    db.select({ k: appRequests.kind, n: sql<number>`count(*)::int` }).from(appRequests).innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId)).where(and(base, statuses ? inArray(appRequests.status, statuses) : undefined)).groupBy(appRequests.kind),
+    db.select({ r: appRequests, userName: appUsers.name }).from(appRequests).innerJoin(appUsers, eq(appUsers.id, appRequests.ownerId)).where(shown)
+      .orderBy(desc(appRequests.createdAt)).limit(limit).offset(offset),
+  ]);
+  const counts = Object.fromEntries(Object.entries(REQUEST_TABS).map(([k, st]) => [k, byStatus.filter((x) => !st || st.includes(x.k)).reduce((a, x) => a + x.n, 0)]));
+  const kinds = Object.fromEntries(byKind.map((x) => [x.k, x.n]));
+  return { rows: rows.map(({ r, userName }) => ({ ...r, ref: shortRef(r.id), userName: travellerName(userName), desk: deskState(r.details) })), total: opts.kind ? kinds[opts.kind] ?? 0 : counts[opts.tab ?? "open"] ?? 0, counts, kinds };
 }
 
 /** A price for each person, sent to the traveller as a card they can pay from. */
@@ -705,40 +812,163 @@ export async function listRefunds(stage?: string) {
   return rows.map((x) => ({ ...x.f, payment: x.p, userId: x.userId, userName: travellerName(x.userName), summary: x.summary, requestId: x.requestId, ref: shortRef(x.f.id, "F") }));
 }
 
+/** Refunds at one stage (or a group of stages), searched, 50 at a time, with the count at every stage and the amount at this one. */
+export async function pageRefunds(opts: { stage?: string | string[]; q?: string; limit?: number; offset?: number } = {}) {
+  const { limit, offset } = pageOf(opts);
+  const q = term(opts.q);
+  const stages = opts.stage ? (Array.isArray(opts.stage) ? opts.stage : [opts.stage]) : null;
+  const search = q ? or(ilike(appUsers.name, q.like), ilike(appRequests.summary, q.like), ilike(appPayments.label, q.like), ilike(appOrders.ref, q.like), idPrefix(appRefunds.id, q.ref), idPrefix(appRequests.id, q.ref)) : undefined;
+  const from = () => db.select({ f: appRefunds, p: appPayments, userName: appUsers.name, userId: appUsers.id, summary: appRequests.summary, requestId: appRequests.id, orderRef: appOrders.ref, orderId: appOrders.id })
+    .from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).innerJoin(appUsers, eq(appUsers.id, appPayments.ownerId)).leftJoin(appRequests, eq(appRequests.id, appPayments.requestId))
+    .leftJoin(appOrders, eq(appOrders.paymentId, appPayments.id));
+  const [byStage, rows] = await Promise.all([
+    db.select({ k: appRefunds.stage, n: sql<number>`count(*)::int`, v: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds)
+      .innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).innerJoin(appUsers, eq(appUsers.id, appPayments.ownerId)).leftJoin(appRequests, eq(appRequests.id, appPayments.requestId))
+      .leftJoin(appOrders, eq(appOrders.paymentId, appPayments.id))
+      .where(search).groupBy(appRefunds.stage),
+    from().where(and(search, stages ? inArray(appRefunds.stage, stages) : undefined)).orderBy(desc(appRefunds.createdAt)).limit(limit).offset(offset),
+  ]);
+  const counts = Object.fromEntries(byStage.map((x) => [x.k, x.n]));
+  const here = byStage.filter((x) => !stages || stages.includes(x.k));
+  return {
+    rows: rows.map((x) => ({ ...x.f, payment: x.p, userId: x.userId, userName: travellerName(x.userName), summary: x.summary, requestId: x.requestId, orderRef: x.orderRef, orderId: x.orderId, ref: shortRef(x.f.id, "F") })),
+    total: here.reduce((a, x) => a + x.n, 0), amount: here.reduce((a, x) => a + Number(x.v), 0), counts,
+  };
+}
+
+/** One refund with its payment, for the decision card. */
+export async function getRefund(id: string) {
+  const [x] = await db.select({ f: appRefunds, p: appPayments, userName: appUsers.name, userId: appUsers.id, summary: appRequests.summary, requestId: appRequests.id, orderRef: appOrders.ref, orderId: appOrders.id })
+    .from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).innerJoin(appUsers, eq(appUsers.id, appPayments.ownerId)).leftJoin(appRequests, eq(appRequests.id, appPayments.requestId))
+    .leftJoin(appOrders, eq(appOrders.paymentId, appPayments.id))
+    .where(eq(appRefunds.id, id)).limit(1);
+  return x ? { ...x.f, payment: x.p, userId: x.userId, userName: travellerName(x.userName), summary: x.summary, requestId: x.requestId, orderRef: x.orderRef, orderId: x.orderId, ref: shortRef(x.f.id, "F") } : null;
+}
+
+/* ═════════════ eSIMs ═════════════ */
+
+export const ESIM_TABS: Record<string, { in?: string[]; notIn?: string[] }> = { open: { notIn: ["refunded", "expired", "used_up"] }, stuck: { in: ["stuck"] }, refunded: { in: ["refunded"] }, all: {} };
+
+/** eSIMs for one tab, searched by traveller, ICCID, plan or order ref, 50 at a time. */
+export async function pageEsims(opts: { tab?: string; q?: string; limit?: number; offset?: number } = {}) {
+  const { limit, offset } = pageOf(opts);
+  const q = term(opts.q);
+  const search = q ? or(ilike(appUsers.name, q.like), ilike(appEsims.iccid, q.like), ilike(appOrders.ref, q.like), ilike(appEsims.packageId, q.like), sql`${appEsims.plan}->'coverage'->>'name' ILIKE ${q.like}`) : undefined;
+  const tab = ESIM_TABS[opts.tab ?? "open"] ?? {};
+  const [byStatus, rows] = await Promise.all([
+    db.select({ k: appEsims.status, n: sql<number>`count(*)::int` }).from(appEsims).innerJoin(appOrders, eq(appOrders.id, appEsims.orderId)).innerJoin(appUsers, eq(appUsers.id, appEsims.ownerId)).where(search).groupBy(appEsims.status),
+    db.select({ e: appEsims, ref: appOrders.ref, total: appOrders.total, orderStatus: appOrders.status, name: appUsers.name })
+      .from(appEsims).innerJoin(appOrders, eq(appOrders.id, appEsims.orderId)).innerJoin(appUsers, eq(appUsers.id, appEsims.ownerId))
+      .where(and(search, tab.in ? inArray(appEsims.status, tab.in) : undefined, tab.notIn ? notInArray(appEsims.status, tab.notIn) : undefined))
+      .orderBy(desc(appEsims.createdAt)).limit(limit).offset(offset),
+  ]);
+  const counts = Object.fromEntries(Object.entries(ESIM_TABS).map(([k, v]) => [k, byStatus.filter((x) => (!v.in || v.in.includes(x.k)) && (!v.notIn || !v.notIn.includes(x.k))).reduce((a, x) => a + x.n, 0)]));
+  return { rows: rows.map((x) => ({ ...x.e, ref: x.ref, ownerName: x.name, total: x.total, orderStatus: x.orderStatus })), total: counts[opts.tab ?? "open"] ?? 0, counts };
+}
+
 const instalmentProvider = (m: string) => (m === "tabby" ? "Tabby" : m === "tamara" ? "Tamara" : null);
 
-/** Approve a refund to the card it came from, or to Mada credit (instant). Credit goes in as a ledger entry. */
-async function approveRefundHere(actor: DeskActor, id: string, v: { destination: "original" | "credit"; note?: string | null }) {
-  assertCap(actor, "desk.refund");
+export type RefundDecision = { status: "approved" | "sent" } | { status: "awaiting_lead"; approvalRef: string; reason: RefundLimitReason };
+
+/**
+ * Approve a refund to the card it came from, or to Mada credit (instant). Credit goes in as a ledger entry.
+ * `amount` approves part of what was asked (amount then becomes what moves; requested_amount keeps the ask). Above the
+ * agent's limits (Rules & limits: per refund and per day, DESK-PLAN §7 default 2) the refund waits for a support lead
+ * in Ops Approvals instead (stage awaiting_lead); `viaApproval` is the lead's yes coming back (finance/refunds.ts).
+ * A card refund is "approved" until the provider confirms it went to the card (finance/refunds.ts refundsSentJob).
+ */
+async function approveRefundHere(actor: DeskActor, id: string, v: { destination: "original" | "credit"; amount?: number | null; note?: string | null; viaApproval?: string | null }): Promise<RefundDecision> {
+  if (!v.viaApproval) assertCap(actor, "desk.refund");
   const [pre] = await db.select({ f: appRefunds, p: appPayments }).from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId)).where(eq(appRefunds.id, id));
   if (!pre) throw new DeskError("Refund not found", "NOT_FOUND");
-  if (pre.f.stage !== "requested") throw new DeskError("This refund has already been decided", "CONFLICT");
+  const open = v.viaApproval ? ["lead_approved"] : ["requested"];
+  if (!open.includes(pre.f.stage)) throw new DeskError("This refund has already been decided", "CONFLICT");
+  const amount = v.amount ?? pre.f.amount;
+  if (!Number.isInteger(amount) || amount <= 0) throw new DeskError("Enter the amount to refund");
+  if (amount > pre.f.amount) throw new DeskError(`That is more than was asked (${sarText(pre.f.amount)})`);
+  const left = await refundableLeft(db, pre.p, id);
+  if (amount > left) throw new DeskError(`Only ${sarText(left)} of this payment is left to refund`);
+
+  if (!v.viaApproval) {
+    const reason = await refundLimitReason(db, actor, amount);
+    if (reason) {
+      // Loaded here: lib/approvals pulls in the Ops request helpers, which the cron jobs never need.
+      const { createApproval } = await import("@/lib/approvals");
+      return db.transaction(async (tx) => {
+        const [f] = await tx.select().from(appRefunds).where(eq(appRefunds.id, id)).for("update");
+        if (!f || f.stage !== "requested") throw new DeskError("This refund has already been decided", "CONFLICT");
+        const note = v.note?.trim() || null;
+        let req;
+        try {
+          req = await createApproval(tx, { kind: "app_refund", entityType: "app_refund", entityId: id, title: `App refund of ${sarText(amount)} to ${v.destination === "credit" ? "Mada credit" : pre.p.label ?? "the card"} (${shortRef(id, "F")})`,
+            amount, reason: note, requestedBy: actor.id, payload: { refundId: id, destination: v.destination, amount, note } });
+        } catch (e) { throw new DeskError(e instanceof Error ? e.message : "No lead is available to approve this", "CONFLICT"); }
+        await tx.update(appRefunds).set({ stage: "awaiting_lead", approvalId: req.id, note, updatedAt: new Date() }).where(eq(appRefunds.id, id));
+        await deskAudit(tx, actor, { action: "desk.refund.escalated", entityType: "refund", entityId: id, ref: req.ref,
+          summary: `Asked a lead to approve a refund of ${sarText(amount)} (${req.ref}): ${reason === "over_daily" ? "over the agent's daily limit" : "over the agent's limit per refund"}`, data: { amount, destination: v.destination, approvalId: req.id, reason } });
+        return { status: "awaiting_lead" as const, approvalRef: req.ref, reason };
+      });
+    }
+  }
+
   let providerRef: string | null = null;
   if (v.destination === "original" && pre.p.providerRef && pre.p.method !== "credit") {
     if (!(supplierMode("payments") === "mock" && SEEDED.test(pre.p.providerRef))) {
-      const res = await bookingSuppliers.payments().refund(pre.p.providerRef, pre.f.amount, `refund:${id}`).catch(() => null);
+      const res = await bookingSuppliers.payments().refund(pre.p.providerRef, amount, `refund:${id}`).catch(() => null);
       if (!res || (res.status !== "refunded" && res.status !== "partially_refunded")) throw new DeskError("The card refund didn't go through. Try again, or refund to Mada credit", "CONFLICT");
       providerRef = res.providerRef;
-    } else providerRef = `${pre.p.providerRef}_rf`;
+    } else providerRef = `${pre.p.providerRef}_rf${id.slice(0, 6)}`;
   }
   return db.transaction(async (tx) => {
     const [f] = await tx.select().from(appRefunds).where(eq(appRefunds.id, id)).for("update");
-    if (!f || f.stage !== "requested") throw new DeskError("This refund has already been decided", "CONFLICT");
+    if (!f || !open.includes(f.stage)) throw new DeskError("This refund has already been decided", "CONFLICT");
     const toCredit = v.destination === "credit";
-    const expected = toCredit ? new Date() : new Date(Date.now() + 10 * 86400_000);
-    await tx.update(appRefunds).set({ stage: toCredit ? "sent" : "approved", destination: v.destination, expectedBy: expected, providerRef, updatedAt: new Date() }).where(eq(appRefunds.id, id));
-    if (toCredit) await creditEntry(tx, actor, { userId: pre.p.ownerId, amount: f.amount, kind: "refund", note: v.note?.trim() || "Refund to Mada credit", refundId: id });
-    const total = (await tx.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds).where(and(eq(appRefunds.paymentId, f.paymentId), inArray(appRefunds.stage, ["approved", "sent"]))))[0]!.s;
+    const now = new Date();
+    const expected = toCredit ? now : new Date(now.getTime() + 10 * 86400_000);
+    await tx.update(appRefunds).set({
+      stage: toCredit ? "sent" : "approved", destination: v.destination, expectedBy: expected, providerRef, amount,
+      requestedAmount: amount !== f.amount ? (f.requestedAmount ?? f.amount) : f.requestedAmount, note: v.note?.trim() || f.note,
+      decidedBy: actor.id, decidedAt: now, sentAt: toCredit ? now : null, updatedAt: now,
+    }).where(eq(appRefunds.id, id));
+    if (toCredit) await creditEntry(tx, actor, { userId: pre.p.ownerId, amount, kind: "refund", note: v.note?.trim() || "Refund to Mada credit", refundId: id });
+    const total = (await tx.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds).where(and(eq(appRefunds.paymentId, f.paymentId), inArray(appRefunds.stage, ["approved", "sent", "settled"]))))[0]!.s;
     await tx.update(appPayments).set({ status: Number(total) >= pre.p.amount ? "refunded" : "partially_refunded", updatedAt: new Date() }).where(eq(appPayments.id, f.paymentId));
-    const amount = sarText(f.amount);
+    const money = sarText(amount);
     const provider = instalmentProvider(pre.p.method);
-    const line = toCredit ? copy("desk.refund.approved.credit", { amount }) : copy("desk.refund.approved.card", { amount, card: pre.p.label ?? "card" });
+    const line = toCredit ? copy("desk.refund.approved.credit", { amount: money }) : copy("desk.refund.approved.card", { amount: money, card: pre.p.label ?? "card" });
     const body = provider && !toCredit ? `${line} ${copy("desk.refund.instalments", { provider })}` : line;
-    if (pre.p.requestId) await agentMessage(tx, "request", pre.p.requestId, actor, body, { refund: { amount: f.amount, stage: toCredit ? "sent" : "approved", destination: v.destination } });
-    await notify(tx, pre.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refund.title", body: "notify.desk.refund.body", vars: { amount }, href: pre.p.requestId ? `/requests/${pre.p.requestId}` : null });
+    if (pre.p.requestId) await agentMessage(tx, "request", pre.p.requestId, actor, body, { refund: { amount, stage: toCredit ? "sent" : "approved", destination: v.destination } });
+    await notify(tx, pre.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refund.title", body: "notify.desk.refund.body", vars: { amount: money }, href: pre.p.requestId ? `/requests/${pre.p.requestId}` : null });
+    const part = amount !== f.amount ? ` (${sarText(f.amount)} asked)` : "";
     await deskAudit(tx, actor, { action: "desk.refund.approved", entityType: "refund", entityId: id, ref: shortRef(id, "F"),
-      summary: `Approved a refund of ${amount} to ${toCredit ? "Mada credit" : pre.p.label ?? "the card"}${provider ? ` (${provider} instalments cancelled)` : ""}`, data: { amount: f.amount, destination: v.destination, providerRef } });
+      summary: `Approved a refund of ${money}${part} to ${toCredit ? "Mada credit" : pre.p.label ?? "the card"}${provider ? ` (${provider} instalments cancelled)` : ""}${v.viaApproval ? " after a lead's approval" : ""}`,
+      data: { amount, asked: f.amount, destination: v.destination, providerRef, approvalId: v.viaApproval ?? null } });
+    return { status: toCredit ? "sent" as const : "approved" as const };
   });
+}
+
+/** What is left to refund on a payment: what was paid less refunds already decided (not counting `except`), and those still to decide with `withRequested`. */
+export async function refundableLeft(q: Tx | typeof db, p: { id: string; amount: number }, except?: string | null, opts: { withRequested?: boolean } = {}): Promise<number> {
+  const stages = ["approved", "sent", "settled", "awaiting_lead", "lead_approved", ...(opts.withRequested ? ["requested"] : [])];
+  const [r] = await q.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds)
+    .where(and(eq(appRefunds.paymentId, p.id), inArray(appRefunds.stage, stages), except ? ne(appRefunds.id, except) : undefined));
+  return Math.max(0, p.amount - Number(r?.s ?? 0));
+}
+
+export type RefundLimitReason = "over_limit" | "over_daily";
+
+/**
+ * Why this person may not approve this refund alone, or null: a lead (desk.admin) has no limit; anyone else up to the
+ * per-refund limit and, with what they approved today (Riyadh), the daily limit. Both are settings (Rules & limits).
+ */
+export async function refundLimitReason(q: Tx | typeof db, actor: DeskActor, amount: number): Promise<RefundLimitReason | null> {
+  if (actor.permissions.has("desk.admin")) return null;
+  const s = await getSettings(q);
+  if (amount > s.deskRefundLimit) return "over_limit";
+  const [r] = await q.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds)
+    .where(and(eq(appRefunds.decidedBy, actor.id), inArray(appRefunds.stage, ["approved", "sent", "settled"]), isNull(appRefunds.approvalId),
+      sql`(${appRefunds.decidedAt} AT TIME ZONE 'Asia/Riyadh')::date = (now() AT TIME ZONE 'Asia/Riyadh')::date`));
+  return Number(r?.s ?? 0) + amount > s.deskRefundDailyLimit ? "over_daily" : null;
 }
 
 /** Say no, with the reason the traveller will read in the app. */

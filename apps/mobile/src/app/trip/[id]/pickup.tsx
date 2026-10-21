@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { dayLabel, formatSar, shortDay, type TransferOption } from '@mada/shared';
+import { dayLabel, formatSar, nameIn, shortDay, type TransferOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { Sheet } from '@/components/Sheet';
@@ -11,15 +11,15 @@ import { ArtSuitcase } from '@/components/trips/Arts';
 import { AgentNote, Box, H3, IconTile, PickCard, Rise, Row, Small, Spread, Tag, Tiny, TripScreen } from '@/components/trips/ui';
 import { agentName } from '@/lib/agent';
 import { buzz } from '@/lib/haptics';
-import { t, tn } from '@/lib/i18n';
+import { getLocale, t, tn } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, useTrip } from '@/lib/trips';
 import { WaitTrouble } from '@/components/states/WaitTrouble';
+import { STAGES_SHORT, Waiting, useStagedLine } from '@/components/states/Waiting';
 import { useGiveUp } from '@/lib/net/give-up';
 import { talkToMada } from '@/lib/net/talk';
 import { useSession } from '@/lib/session';
 import { transferKeys, transfersApi, useTransferOptions } from '@/lib/transfers';
-import { colors } from '@/theme';
 
 /*
  * Airport pickup: what Hotelbeds has for the trip's landing, private and shared, each with its all-in price and rule.
@@ -34,6 +34,9 @@ export default function Pickup() {
   const q = useTransferOptions(id);
   // No endless spinner: no answer in GIVE_UP_MS, a failure, or no session each get an honest screen.
   const wait = useGiveUp(q, { key: id, queryKey: transferKeys.options(id), signedIn: useSession((s) => !!s.tokens) });
+  // While the companies answer: the cars to come, and a line that says what is being done.
+  const pickupLines = [t('waiting.pickup.0', { city: trip?.city ? nameIn(trip.city, getLocale()) : '' }), t('waiting.pickup.1'), t('waiting.pickup.2')];
+  const waitLine = useStagedLine(pickupLines, STAGES_SHORT, !q.data ? `pickup-${id}` : null);
   const [pick, setPick] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,7 +59,7 @@ export default function Pickup() {
     } finally { setBusy(false); }
   }
 
-  if (!d && wait.view === 'loading') return <TripScreen title={t('pickup.title')}><View style={{ paddingTop: 40 }} testID="pickup-loading"><ActivityIndicator color={colors.green} /></View></TripScreen>;
+  if (!d && wait.view === 'loading') return <TripScreen title={t('pickup.title')}><View style={{ paddingTop: 8 }}><Waiting kind="pickup" line={waitLine} count={2} testID="pickup-loading" /></View></TripScreen>;
   if (!d && (wait.view === 'timeout' || wait.view === 'signin')) return <TripScreen title={t('pickup.title')}><WaitTrouble wait={wait} testID={`pickup-${wait.view}`} /></TripScreen>;
   if (q.isError || !d) {
     return (

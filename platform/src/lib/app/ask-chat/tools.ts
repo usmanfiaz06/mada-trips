@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  DESTINATIONS, ageOn, formatSar, landmarkById, nameIn, parseStayWishes, refineStays, isIsoDay,
+  DESTINATIONS, MemoryKind, ageOn, formatSar, landmarkById, nameIn, parseStayWishes, refineStays, isIsoDay,
   type ChatCard, type ChatPay, type DemoFlag, type EsimPlan, type FlightOption, type Person, type StayOption,
 } from "@mada/shared";
 import { AppError } from "../http";
@@ -15,6 +15,7 @@ import { tripDetail } from "../trips/core";
 import { openThread, sendMessage } from "../support/threads";
 import { presenceFor } from "../desk/agents";
 import { redact } from "./guard";
+import { isSensitive, saveFact, unkeepable } from "./memory";
 
 /*
  * The tools, run on the server as the signed-in traveller, through the same functions the app's own routes call (so
@@ -26,8 +27,12 @@ import { redact } from "./guard";
  * (APP_FLIGHTS_MODE=request) return `{"mode":"request"}` and no prices at all.
  */
 
-export type ToolCtx = { ownerId: string; people: Person[]; today: string; lang: "en" | "ar"; ipHash: string | null; demo: Set<DemoFlag> };
-export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean; mode?: "request" };
+export type ToolCtx = {
+  ownerId: string; people: Person[]; today: string; lang: "en" | "ar"; ipHash: string | null; demo: Set<DemoFlag>;
+  /** For `remember`: Mada's last reply asked to remember something, and this message says yes (memory.ts consentOf). */
+  consent?: { asked: boolean; yes: boolean };
+};
+export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean; mode?: "request"; /** A fact was saved (the reply says so once). */ remembered?: string };
 
 const sar = (h: number) => formatSar(h);
 const hm = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}m`;
@@ -186,15 +191,16 @@ const RUN: Record<string, Run> = {
     ].filter(Boolean);
     if (missing.length) return { text: `Not sent yet. Still needed: ${missing.join(", ")}. Ask for the first missing one in one short question with choices in <next>, then call create_request again with everything.${missing.includes("how to reach them") && missing.length === 1 ? " <next>WhatsApp | Call me | Here in the app</next>" : ""}`, isError: true };
     const isSearch = kind === "flight" || kind === "stay";
+    const travellerIds = whoOf(ctx, a.traveller_ids);
     const r = await createRequest(ctx.ownerId, {
-      kind, query: summary, travellerIds: whoOf(ctx, a.traveller_ids), note: "",
+      kind, query: summary, travellerIds, note: "",
       contactPreference: a.contact_preference === "call" || a.contact_preference === "whatsapp" || a.contact_preference === "in_app" ? a.contact_preference : null,
       contactWindow: typeof a.contact_window === "string" && a.contact_window.trim() ? redact(a.contact_window).text.slice(0, 60) : null,
       ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
     } as Parameters<typeof createRequest>[1], ctx.ipHash);
     const by = r.promisedBy ? riyadhClock(r.promisedBy, ctx.today) : null;
     const how = r.contact ? ({ call: `by a call${r.contact.window ? ` (${r.contact.window})` : ""}`, whatsapp: "on WhatsApp", in_app: "here in the app" } as const)[r.contact.preference] : "here in the app";
-    return { text: `Request ${r.id} noted for the team at Mada: ${r.title}${r.summary ? ` (${r.summary})` : ""}. The team gets back to the traveller ${how}${by ? ` by ${by}` : ""}. Say it in one line: "We've noted it and the team will get back to you by ${by ?? "then"}".`, cards: [{ type: "request", requestId: r.id, kind: r.kind, title: r.title, detail: [r.summary, r.detail].filter(Boolean).join(" · "), promisedBy: r.promisedBy, contact: r.contact?.preference ?? null }] };
+    return { text: `Request ${r.id} noted for the team at Mada: ${r.title}${r.summary ? ` (${r.summary})` : ""}. The team gets back to the traveller ${how}${by ? ` by ${by}` : ""}. Say it in one line: "We've noted it and the team will get back to you by ${by ?? "then"}".`, cards: [requestCard(ctx, r, travellerIds, { where: where || null, depart: iso(a.depart), return: iso(a.return) })] };
   },
 
   async price_quote_for_pay(ctx, a) {
@@ -221,6 +227,20 @@ const RUN: Record<string, Run> = {
     const agent = p?.online && p.agent ? p.agent.name : null;
     return { text: `Handed to the desk${agent ? `: ${agent} is on duty and has the summary` : ": the team has the summary"}. Say that ${agent ? `${agent} at Mada` : "the team at Mada"} can take it from here, in one sentence.`, handoff: { threadId: th.id, agent } };
   },
+
+  // A lasting preference or need, kept for next time (memory.ts). Sensitive ones only after a yes in this message.
+  async remember(ctx, a) {
+    const kind = MemoryKind.safeParse(a.kind).data ?? "other";
+    const text = String(a.text ?? "").replace(/\s+/g, " ").trim();
+    if (!text) return { text: "Not saved: there was nothing to remember.", isError: true };
+    const why = unkeepable(text);
+    if (why) return { text: `Not saved: ${why}. Never remember passport, card, phone or document details. Carry on without it.` };
+    if ((a.sensitive === true || isSensitive(kind, text)) && !ctx.consent?.yes) {
+      return { text: "Not saved yet: this is about health, mobility or religion. Use it for this trip, and ask in one short question whether to remember it for next time (in English \"Shall we remember that for next time?\", in Arabic «نتذكرها للمرة الجاية؟»). Call remember again only after they say yes." };
+    }
+    const f = await saveFact(ctx.ownerId, kind, text, "chat");
+    return { text: `Saved for next time: ${f.text}. The app tells them it is remembered; don't say it again.`, remembered: f.text };
+  },
 };
 
 export function personLine(p: Person, today: string): string {
@@ -235,17 +255,36 @@ const placeName = (raw: string, lang: "en" | "ar") => {
 };
 
 /** The status line while a tool runs ("Checking flights to Istanbul"), in the traveller's language. */
+/**
+ * The request as a card: what (each part said once, and never only the travellers' names, which the card writes out
+ * as "who"), where, the days, who, when the team gets back and how.
+ */
+export function requestCard(ctx: ToolCtx, r: { id: string; kind: string; title: string; summary: string; detail: string; promisedBy: string | null; contact?: { preference: "call" | "whatsapp" | "in_app" } | null },
+  travellerIds: string[], at: { where: string | null; depart: string | null; return: string | null }): ChatCard {
+  const who = travellerIds.map((id) => ctx.people.find((p) => p.id === id)).filter((p): p is Person => !!p).map((p) => ({ name: p.firstName, self: !!p.isSelf }));
+  const names = new Set(["you", "me", ...who.map((w) => w.name.toLowerCase())]);
+  const onlyNames = (part: string) => part.split(/,|\band\b|&|\+/i).map((x) => x.trim().toLowerCase()).filter(Boolean).every((x) => names.has(x));
+  const parts = [r.summary, r.detail].flatMap((x) => (x ?? "").split(" · ")).map((x) => x.trim()).filter(Boolean);
+  const what = [...new Set(parts)].filter((x) => !onlyNames(x) && x !== r.title && x !== at.where);
+  return {
+    type: "request", requestId: r.id, kind: r.kind, title: r.title, detail: what.join(" · "), promisedBy: r.promisedBy, contact: r.contact?.preference ?? null,
+    where: at.where, depart: at.depart, return: at.return, who,
+  };
+}
+
 export function statusFor(name: string, input: Record<string, unknown>, lang: "en" | "ar"): string {
   const city = placeName(typeof input.destination === "string" ? input.destination : typeof input.where === "string" ? input.where : "", lang);
   const en: Record<string, string> = {
     search_flights: `Checking flights to ${city}`, search_stays: `Checking places to stay in ${city}`, esim_plans: `Checking internet plans for ${city}`,
     entry_rules: `Checking entry rules for ${city}`, get_trips: "Looking at your trips", get_trip: "Looking at your trip", price_quote_for_pay: "Checking the price again",
     create_request: "Sending it to the desk", talk_to_human: "Passing it to the desk", plan_car_now: "Setting up the car", get_hotel: "Reading about the hotel", get_household: "Looking at who travels",
+    remember: "Noting that for next time",
   };
   const ar: Record<string, string> = {
     search_flights: `نشوف الرحلات لـ${city}`, search_stays: `نشوف السكن في ${city}`, esim_plans: `نشوف باقات النت لـ${city}`,
     entry_rules: `نشوف شروط الدخول لـ${city}`, get_trips: "نشوف رحلاتك", get_trip: "نشوف رحلتك", price_quote_for_pay: "نتأكد من السعر",
     create_request: "نرسلها للفريق", talk_to_human: "نحوّلها للفريق", plan_car_now: "نجهّز السيارة", get_hotel: "نقرأ عن الفندق", get_household: "نشوف مين مسافر",
+    remember: "نسجّلها للمرة الجاية",
   };
   return (lang === "ar" ? ar : en)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
 }

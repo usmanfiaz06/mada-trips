@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import { create } from 'zustand';
-import { SendSupportMessageResponse, walletPath, type SendSupportMessageRequest, type SupportMessage, type SupportThreadResponse } from '@mada/shared';
+import { SendSupportMessageResponse, SupportCsatResponse, walletPath, type SendSupportMessageRequest, type SupportMessage, type SupportThreadResponse } from '@mada/shared';
+import { z } from 'zod';
 import { request } from './api';
-import { useApiMutation } from './net/hooks';
+import { useApiMutation, useApiQuery } from './net/hooks';
 import { enqueue, registerOutboxKind, type EnqueueInput, type OutboxItem } from './net/outbox';
 import { queryClient } from './queries';
 import { walletKeys } from './wallet';
@@ -89,4 +90,20 @@ export function useSendToMada(key: string, threadId: string | undefined, label: 
   /** What's on its way right now (shown as a "Sending…" bubble until it lands). */
   const sending = m.isPending ? m.variables : undefined;
   return { send, sending };
+}
+
+/*
+ * The one-tap rating after the desk resolves something a person answered (DESK-PLAN.md §7 default 4): asked once,
+ * skippable. The server says which conversation is waiting; answering or skipping clears it for good.
+ */
+const csatKey = ['support', 'csat'] as const;
+const Ok = z.object({ ok: z.literal(true) });
+
+export function useCsat(enabled: boolean) {
+  const q = useApiQuery({ queryKey: csatKey, enabled, refetchInterval: 30_000, retry: false, queryFn: () => request({ method: 'GET', path: withPhase(walletPath('supportCsat')) }, SupportCsatResponse) });
+  const answer = useCallback(async (ticketId: string, score: number | null) => {
+    queryClient.setQueryData(csatKey, { pending: null });
+    try { await request({ method: 'POST', path: withPhase(walletPath('supportCsat')), body: { ticketId, score } }, Ok); } catch { /* asked once: never shown again on this phone either way */ }
+  }, []);
+  return { pending: q.data?.pending ?? null, answer };
 }

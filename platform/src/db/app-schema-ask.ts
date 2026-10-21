@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey } from "drizzle-orm/pg-core";
 import { appUsers } from "./app-schema";
+import { users as opsUsers } from "./schema";
 
 /*
  * Ask Mada as a conversation (lib/app/ask-chat, docs/app/ASK-CHAT.md). One row per thread: the model-facing history,
@@ -25,9 +26,29 @@ export const appAskThreads = pgTable("app_ask_threads", {
   cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
   /** US dollars × 1,000,000. */
   costMicros: integer("cost_micros").notNull().default(0),
+  /**
+   * Older turns folded into a few lines by the fast model once the thread passed its token budget (ask-chat/fold.ts):
+   * `messages` then holds only the recent turns, and this summary is read in front of them. Migration 0035.
+   */
+  summary: text("summary"),
+  /** How many turns the summary stands for (turns - folded_turns are still in `messages` word for word). */
+  foldedTurns: integer("folded_turns").notNull().default(0),
+  /**
+   * Who answers (desk/ask, DESK-PLAN.md U5): "ai", or "agent" while a person on the desk has taken the thread over.
+   * While taken over the model never runs: the traveller's messages are kept in the transcript and the agent replies
+   * from the desk. Migration 0038.
+   */
+  mode: text("mode").notNull().default("ai"),
+  /** The Ops user who took it over (null in "ai" mode). */
+  takenBy: uuid("taken_by").references(() => opsUsers.id, { onDelete: "set null" }),
+  takenAt: timestamp("taken_at", { withTimezone: true }),
+  /** When the model handed it to the desk (talk_to_human). */
+  handedOffAt: timestamp("handed_off_at", { withTimezone: true }),
+  /** What happened while a person had it, for the model's next turn after Hand back; cleared once read. */
+  deskNote: text("desk_note"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt)]);
+}, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt), index("app_ask_threads_updated_idx").on(t.updatedAt)]);
 
 /** Spend per day, per person and for everyone (owner_key "all"), for ASK_CHAT_DAILY_USD and ASK_CHAT_USER_DAILY_USD. */
 export const appAskSpend = pgTable("app_ask_spend", {
@@ -36,3 +57,22 @@ export const appAskSpend = pgTable("app_ask_spend", {
   costMicros: integer("cost_micros").notNull().default(0),
   turns: integer("turns").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.day, t.ownerKey] })]);
+
+/**
+ * What Mada remembers about a traveller across conversations (ask-chat/memory.ts, docs/app/ASK-CHAT.md §7): small
+ * lasting facts the traveller said ("aisle seat", "flies from Jeddah", "mother uses a wheelchair"), saved by the
+ * `remember` tool, sensitive ones only after a yes. Never a passport, card or anything redaction removes. Shown and
+ * deletable in Account → What Mada remembers; removed with the account. Migration: drizzle/0035_ask_memory.sql.
+ */
+export const appAskMemory = pgTable("app_ask_memory", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  /** home_airport | airline | cabin | seat | budget | food | mobility | health | family | contact | other */
+  kind: text("kind").notNull(),
+  text: text("text").notNull(),
+  /** chat (said in a conversation) | booking (read from a booking) */
+  source: text("source").notNull().default("chat"),
+  createdAt: createdAt(),
+  /** The last turn it was put in front of the model (for "most relevant first"). */
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (t) => [index("app_ask_memory_owner_idx").on(t.ownerId, t.createdAt)]);

@@ -8,6 +8,7 @@ import { ArcGauge, CycleBarcode, DotColumns, SunGauge, SplitBar } from "@/compon
 import { addDays, daysBetween, fmtDate, riyadhDate, timeAgo } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { APPROVAL_KIND } from "@/lib/labels";
+import { deskBriefing } from "@/lib/app/desk/overview";
 
 export const metadata = { title: "Dashboard" };
 
@@ -28,7 +29,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const u = await requireUser();
   const t = await getT();
   const { denied, cycle: view } = await searchParams;
-  const d = await dashboardData(u, view === "prev" ? "prev" : "current");
+  // Desk leads get a line about the desk (DESK-PLAN U8) under the greeting.
+  const deskLead = can(u, "desk.tickets.manage") || can(u, "desk.reports");
+  const [d, desk] = await Promise.all([dashboardData(u, view === "prev" ? "prev" : "current"), deskLead ? deskBriefing().catch(() => null) : Promise.resolve(null)]);
   const L = t.locale;
 
   const sell = d.cycleBookings.reduce((s, b) => s + b.sell, 0);
@@ -41,6 +44,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const currentIdx = daysBetween(d.current.start, d.today);
   const dotUnit = niceUnit(Math.max(...d.last14.map((x) => x.margin)), 10);
   const retailSell = d.cycleBookings.filter((b) => b.channel === "retail").reduce((s, b) => s + b.sell, 0);
+  // App sales post here as their own channel (DESK-PLAN §7 default 3), shown beside retail and corporate.
+  const appSell = d.cycleBookings.filter((b) => b.channel === "app").reduce((s, b) => s + b.sell, 0);
 
   const barcodeItems = d.cycleBookings.map((b) => ({
     id: b.id, ref: b.ref, day: daysBetween(d.cycle.start, b.businessDate), sell: b.sell,
@@ -74,6 +79,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div>
           <div className="text-[13px] text-ink-3">{fmtDate(new Date(), L)} · {t("Cycle")} {fmtDate(d.current.start, L)} → {fmtDate(d.current.end, L)}</div>
           <h1 className="mt-1 text-[38px] font-[350] leading-none tracking-[-0.04em]">{greeting(t)}, {u.name.split(" ")[0]}</h1>
+          {desk && (
+            <Link href="/adminwork/desk/overview" className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink" data-testid="desk-briefing" aria-label={t("Open the desk overview")}>
+              <span className={cx("size-1.5 rounded-full", desk.late || desk.urgent ? "bg-bad" : "bg-ok")} />
+              {t("Desk now: {open} waiting, {urgent} urgent, {late} past their promise", { open: desk.open, urgent: desk.urgent, late: desk.late })}
+              <ArrowUpRight className="size-3.5 rtl:-scale-x-100" />
+            </Link>
+          )}
         </div>
         <div className="flex gap-2">
           {can(u, "expenses.create") && <LinkButton href="/adminwork/expenses/new" variant="outline"><Wallet className="size-4" />{t("Add expense")}</LinkButton>}
@@ -241,8 +253,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <CardHead title={t("By channel")} hint={d.view === "prev" ? t("Sold last cycle") : t("Sold this cycle")} />
           <SplitBar parts={[
             { label: t("Retail"), value: retailSell, color: "var(--chart-1)", display: sar(retailSell, { compact: true }) },
-            { label: t("Corporate"), value: sell - retailSell, color: "var(--chart-2)", display: sar(sell - retailSell, { compact: true }) },
+            { label: t("Corporate"), value: sell - retailSell - appSell, color: "var(--chart-2)", display: sar(sell - retailSell - appSell, { compact: true }) },
+            ...(appSell > 0 ? [{ label: t("App"), value: appSell, color: "var(--info)", display: sar(appSell, { compact: true }) }] : []),
           ]} />
+          {appSell > 0 && <Link href="/adminwork/desk/finance" className="mt-3 block text-[12px] text-ink-3 hover:text-ink">{t("App sales this cycle")} <span className="num text-ink" dir="ltr">{sar(appSell)}</span> · {t("App revenue & margin")} →</Link>}
           {f && f.rec.length > 0 && (
             <div className="mt-auto pt-6">
               <div className="mb-2 flex items-center justify-between text-[12px] text-ink-3"><span>{t("Owed by clients")}</span>

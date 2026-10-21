@@ -5,82 +5,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getT } from "@/lib/i18n";
 import { fmtDate, timeAgo } from "@/lib/dates";
-import { Avatar, Badge, cx, type Tone } from "../ui";
+import { Avatar, Badge, Card, CardHead, cx, type Tone } from "../ui";
 
 /* Presentational pieces shared by the desk pages (server components). */
-
-const STATUS: Record<string, { label: string; dot: string }> = {
-  online: { label: "Online", dot: "bg-ok" },
-  away: { label: "Away", dot: "bg-warn" },
-  offline: { label: "Signed off", dot: "bg-ink-4" },
-};
-
-/** "You're Faisal to travellers · Online / Away / Off": the agent's own switch, on every desk page. */
-export async function StatusPill({ agent, onShift, action }: { agent: { id: string; name: string; status: string }; onShift: boolean; action: (fd: FormData) => Promise<void> }) {
-  const t = await getT();
-  return (
-    <div className="flex shrink-0 items-center gap-2 self-start rounded-full bg-surface p-1 ps-1.5 shadow-card">
-      <span className="relative">
-        <Avatar name={agent.name} size={30} />
-        <span className={cx("absolute -bottom-0.5 -end-0.5 size-3 rounded-full ring-2 ring-surface", STATUS[agent.status]?.dot ?? "bg-ink-4")} />
-      </span>
-      <span className="hidden pe-1 text-[12.5px] leading-tight 2xl:block">
-        <span className="block text-ink">{t("You're {name} to travellers", { name: agent.name })}</span>
-        <span className="block text-ink-3">{onShift ? t("On shift") : t("Not on shift")}</span>
-      </span>
-      <span className="pe-1 text-[12.5px] leading-tight 2xl:hidden" title={t("You're {name} to travellers", { name: agent.name })}>
-        <span className="block text-ink">{agent.name}</span>
-        <span className="block text-[11.5px] text-ink-3">{onShift ? t("On shift") : t("Not on shift")}</span>
-      </span>
-      <form action={action} className="flex rounded-full bg-sunken p-0.5">
-        <input type="hidden" name="agentId" value={agent.id} />
-        {(["online", "away", "offline"] as const).map((s) => (
-          <button key={s} name="status" value={s} aria-pressed={agent.status === s}
-            className={cx("h-7 rounded-full px-2.5 text-[12px] transition", agent.status === s ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>
-            {t(s === "offline" ? "Off" : STATUS[s]!.label)}
-          </button>
-        ))}
-      </form>
-    </div>
-  );
-}
-
-export const ORDER_STAGE: Record<string, { label: string; tone: Tone }> = {
-  awaiting_payment: { label: "Waiting for a friend to pay", tone: "info" },
-  awaiting: { label: "Waiting to confirm", tone: "gold" },
-  held: { label: "Held · issue tickets", tone: "info" },
-  needs_answer: { label: "Waiting on traveller", tone: "neutral" },
-  price_changed: { label: "New price sent", tone: "warn" },
-  issued: { label: "Issued", tone: "ok" },
-  failed: { label: "Ticketing failed", tone: "bad" },
-  not_issued: { label: "Not issued", tone: "bad" },
-  other: { label: "In progress", tone: "neutral" },
-};
-
-export const REQUEST_STATUS: Record<string, { label: string; tone: Tone }> = {
-  queued: { label: "Queued", tone: "neutral" },
-  sent: { label: "New", tone: "gold" },
-  reviewing: { label: "Reviewing", tone: "gold" },
-  needs_answer: { label: "Waiting on traveller", tone: "neutral" },
-  quoted: { label: "Quote sent", tone: "info" },
-  awaiting_payment: { label: "Waiting for payment", tone: "info" },
-  with_agent: { label: "Paid · with us", tone: "warn" },
-  confirmed: { label: "Confirmed", tone: "ok" },
-  done: { label: "Done", tone: "ok" },
-  cancelled: { label: "Cancelled", tone: "bad" },
-};
-
-export const PAY_STATUS: Record<string, { label: string; tone: Tone }> = {
-  initiated: { label: "Started", tone: "neutral" },
-  requires_action: { label: "Bank check pending", tone: "warn" },
-  authorized: { label: "Authorised · not captured", tone: "info" },
-  captured: { label: "Captured", tone: "ok" },
-  voided: { label: "Hold released", tone: "neutral" },
-  declined: { label: "Declined", tone: "bad" },
-  failed: { label: "Capture didn't go through", tone: "bad" },
-  refunded: { label: "Refunded", tone: "neutral" },
-  partially_refunded: { label: "Partly refunded", tone: "neutral" },
-};
 
 export async function StatusBadge({ map, value }: { map: Record<string, { label: string; tone: Tone }>; value: string }) {
   const t = await getT();
@@ -152,20 +79,6 @@ async function Bubble({ m, traveller }: { m: Msg; traveller: string }) {
   );
 }
 
-/** A labelled row of facts, for the side cards. */
-export function Facts({ rows }: { rows: [ReactNode, ReactNode][] }) {
-  return (
-    <dl className="divide-y divide-line">
-      {rows.map(([k, v], i) => (
-        <div key={i} className="flex items-baseline justify-between gap-4 py-2.5 first:pt-0 last:pb-0">
-          <dt className="shrink-0 text-[12.5px] text-ink-3">{k}</dt>
-          <dd className="min-w-0 truncate text-end text-[13.5px] text-ink">{v ?? "—"}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 /** What the team did on this record, newest first, from the Ops activity log. */
 export async function DeskTimeline({ entityId }: { entityId: string }) {
   const t = await getT();
@@ -173,8 +86,8 @@ export async function DeskTimeline({ entityId }: { entityId: string }) {
     .leftJoin(schema.users, eq(schema.users.id, schema.auditEvents.actorId))
     .where(and(eq(schema.auditEvents.entityType, "desk"), eq(schema.auditEvents.entityId, entityId))).orderBy(desc(schema.auditEvents.at)).limit(40);
   return (
-    <section className="rounded-card bg-surface p-6 shadow-card">
-      <div className="mb-4 flex items-center justify-between"><h2 className="text-[17px] font-[450] tracking-[-0.02em]">{t("Desk log")}</h2><span className="text-[12px] text-ink-3">{t("{n} entries", { n: rows.length })}</span></div>
+    <Card>
+      <CardHead title={t("Desk log")} action={<span className="text-[12px] text-ink-3">{t("{n} entries", { n: rows.length })}</span>} />
       {rows.length === 0 ? <p className="text-[13px] text-ink-3">{t("Nothing yet")}</p> : (
         <ol className="relative space-y-4 before:absolute before:inset-y-2 before:start-[13px] before:w-px before:bg-line">
           {rows.map(({ e, name }) => (
@@ -188,6 +101,6 @@ export async function DeskTimeline({ entityId }: { entityId: string }) {
           ))}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }

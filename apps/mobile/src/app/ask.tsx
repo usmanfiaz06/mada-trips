@@ -11,7 +11,7 @@ import { Screen, TopBar, useBottomInset } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { DemoSheet } from '@/components/booking/DemoSheet';
 import { FlightFlow, useFlightHeadStart, type Cta } from '@/components/booking/FlightFlow';
-import { EsimFlow, PlanFlow, StayFlow } from '@/components/booking/OtherFlows';
+import { EsimFlow, PlanFlow, StayFlow, planIdFor } from '@/components/booking/OtherFlows';
 import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
@@ -24,7 +24,7 @@ import { useNet } from '@/lib/net';
 import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
-import { sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
+import { newAskChat, restoreAskChat, sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
@@ -97,8 +97,14 @@ export default function Ask() {
   const headStart = useFlightHeadStart(household, today);
   const chatOn = useAskChatOn() && !offline;
   const chatTurns = useAskChat((s) => s.turns);
-  // Each Ask opens on a fresh conversation (the server keeps the thread while this screen is open).
-  useEffect(() => { useAskChat.getState().reset(); return () => { stopAskChat(); useAskChat.getState().reset(); }; }, []);
+  // Ask opens on the conversation from the last 24 hours, kept on the phone (lib/ask-chat.ts); "New chat" starts fresh.
+  useEffect(() => { void restoreAskChat(); return () => { stopAskChat(); }; }, []);
+  const startNewChat = () => {
+    buzz('tap');
+    newAskChat();
+    forgetSettled();
+    setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null); setEarlier([]);
+  };
 
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
@@ -169,7 +175,7 @@ export default function Ask() {
     if (turn.cards.length) return;
     if (turn.intent) { saveAsk(v, turn.intent); setQuery(v); setIntent(turn.intent); setRound((r) => r + 1); return; }
     // The conversation's earlier messages (this turn's thread) so the app's own flows keep its thread.
-    const before = useAskChat.getState().turns.filter((x) => x.id !== turn.id).slice(-3).map((x) => x.me).filter(Boolean).join('. ');
+    const before = useAskChat.getState().turns.filter((x) => x.id !== turn.id).map((x) => x.me).filter(Boolean).join('. ').slice(-600);
     await runFlows(v, undefined, true, before);
   };
 
@@ -291,7 +297,9 @@ export default function Ask() {
   else if (offline && (kind === 'flight' || kind === 'stay')) body = <Notice icon="wifiOff" title={t('ask.offline.title')}><T v="small">{t('ask.offline.body')}</T></Notice>;
   else if (kind === 'flight') body = <FlightFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else if (kind === 'stay') body = <StayFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
-  else if (kind === 'plan') body = <PlanFlow key={round} query={query} people={household} today={today} />;
+  // Ready-made plans exist only for AlUla and Istanbul; a plan anywhere else is put together by the team.
+  else if (kind === 'plan' && planIdFor(query)) body = <PlanFlow key={round} query={query} people={household} today={today} />;
+  else if (kind === 'plan') body = <RequestFlow key={round} kind="todo" query={query} intent={intent} people={household} selfName={selfName} />;
   else if (kind === 'esim') body = <EsimFlow key={round} intent={intent} query={query} onSync={onSync} />;
   else if (kind === 'umrah') body = <UmrahFlow key={round} intent={intent} query={query} people={household} selfName={selfName} today={today} setCta={setCta} onSync={onSync} />;
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
@@ -320,6 +328,11 @@ export default function Ask() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={(
           <View style={{ flexDirection: 'row', gap: 8 }}>
+            {chatTurns.length ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={startNewChat} style={styles.demo} testID="ask-new-chat">
+                <T v="caption" color={colors.green}>{t('chat.newChat')}</T>
+              </Pressable>
+            ) : null}
             {/* The other language, without losing this search (lib/resume.ts). */}
             <Pressable accessibilityRole="button" accessibilityLabel={tShared('ask.lang.a11y', undefined, appLocale())} onPress={() => { void switchTo(); }} style={styles.demo} testID="ask-lang">
               <T v="caption" color={colors.green}>{appLocale() === 'ar' ? tShared('ask.lang.toEnglish', undefined, 'en') : tShared('ask.lang.toArabic', undefined, 'ar')}</T>

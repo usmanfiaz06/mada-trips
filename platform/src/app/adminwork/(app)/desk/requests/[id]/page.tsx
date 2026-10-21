@@ -12,13 +12,16 @@ import { agentForOps } from "@/lib/app/desk/agents";
 import { CHECKLISTS, destinationOf, getRequestFull } from "@/lib/app/desk/adapters";
 import { copyWindowOpen, travellersWithCopy } from "@/lib/app/desk/passport-copy";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Badge, Card, CardHead, Input, Money, Textarea, btn, cx } from "@/components/ui";
+import { Badge, Card, CardHead, Input, KV, Money, PageHeader, Textarea, btn, cx } from "@/components/ui";
+import { Journey, type JourneyStep } from "@/components/journey";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { AssignCard } from "@/components/desk/assign";
+import { TicketsCard } from "@/components/desk/tickets";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
-import { DeskTimeline, Facts, REQUEST_STATUS, StatusBadge, Thread } from "@/components/desk/parts";
+import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
+import { REQUEST_KIND, REQUEST_STATUS } from "@/lib/labels";
 import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, quoteAction, replyAction, typingAction } from "../../actions";
 import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
 import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
@@ -27,6 +30,7 @@ import { CONTACT_LABEL, contactPreferenceOf } from "@/lib/app/booking/requests";
 import { ActivityCard } from "@/components/desk/activity";
 import { OutcomeCard } from "@/components/desk/outcome";
 import { progressOfRequest, resultOfRequest } from "@/lib/app/outcomes";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Request · Desk" };
 
@@ -56,29 +60,39 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const [copies, copyOpen] = await Promise.all([travellersWithCopy(x.travellers.map((p) => p.id)), copyWindowOpen(r)]);
   const copyLinks = act && copyOpen ? x.travellers.filter((p) => copies.has(p.id)) : [];
 
+  // Where the request is: asked, quoted, paid, done (or cancelled).
+  const st = r.status;
+  const paidUp = ["with_agent", "confirmed", "done"].includes(st);
+  const steps: JourneyStep[] = [
+    { label: t("Asked"), state: "done", meta: fmtDate(r.createdAt, L, true) },
+    { label: t(fr ? "Fares sent" : "Quoted"), state: quote || paidUp ? "done" : st === "cancelled" ? "skipped" : "current", meta: quote ? fmtDate(quote.createdAt, L, true) : st === "needs_answer" ? t("Waiting on traveller") : undefined },
+    { label: t("Paid"), state: paidUp ? "done" : st === "cancelled" ? "skipped" : quote ? "current" : "todo", meta: st === "awaiting_payment" ? t("Waiting for payment") : undefined },
+    { label: t("Done"), state: st === "done" || st === "confirmed" ? "done" : st === "cancelled" ? "failed" : st === "with_agent" ? "current" : "todo", meta: d.doneAt ? fmtDate(d.doneAt, L, true) : st === "cancelled" ? t("Cancelled") : undefined },
+  ];
+
   return (
     <>
       <Link href="/adminwork/desk/requests" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("Requests")}</Link>
-      <header className="mb-6 animate-rise">
-        <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
-          <span className="num">{x.ref}</span><StatusBadge map={REQUEST_STATUS} value={r.status} />
+      <PageHeader eyebrow={<><span className="num">{x.ref}</span> · {t(REQUEST_KIND[r.kind] ?? r.kind)}</>} title={r.summary}>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-3">
+          <StatusBadge map={REQUEST_STATUS} value={r.status} />
           {(r.details as { withdrawn?: boolean; withdrawnAt?: string }).withdrawn && <Badge tone="neutral" dot>{t("Withdrawn by the traveller")} · {timeAgo(new Date(String((r.details as { withdrawnAt?: string }).withdrawnAt ?? r.updatedAt)), L)}</Badge>}
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
-          <span>· {timeAgo(r.createdAt, L)}</span>
+          <span>{timeAgo(r.createdAt, L)}</span>
           {reach && <Badge tone="info" dot><span data-testid="request-reach">{t(CONTACT_LABEL[reach.preference])}{reach.window ? <> · <bdi>{reach.window}</bdi></> : null}</span></Badge>}
           {x.contact && <ContactBadge contact={x.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
-        <h1 className="mt-2 text-[32px] font-[380] leading-tight tracking-[-0.03em]">{r.summary}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 text-[13.5px] text-ink-3">
-          <span className="text-ink">{x.user.name || t("Traveller")}</span>
+          <CustomerLink id={x.user.id} className="text-ink">{x.user.name || t("Traveller")}</CustomerLink>
           {x.user.phone && <a href={`tel:${x.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{x.user.phone}</a>}
           {x.travellers.length > 0 && <span>{x.travellers.map((p) => p.name.split(" ")[0]).join(", ")}</span>}
           {copyLinks.map((p) => <a key={p.id} href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" title={t("Passport copies open while this booking needs them, and every look is logged.")} className="text-info underline-offset-2 hover:underline">{t("Passport copy")} · {p.name.split(" ")[0]}</a>)}
         </div>
-      </header>
+      </PageHeader>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
+          <Card><Journey steps={steps} /></Card>
           {place && (
             <Card className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0">
@@ -94,13 +108,13 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           {fr ? (
             <Card>
               <CardHead title={t("What they asked for")} hint={t("Book it in Mada's system, then send the fares from here.")} />
-              <Facts rows={fr.rows} />
+              <KV cols={3} items={fr.rows} />
               {fr.note && <p className="mt-3 rounded-2xl bg-surface-2 px-3.5 py-2 text-[13.5px] text-ink-2">“{fr.note}”</p>}
             </Card>
           ) : (
           <Card>
             <CardHead title={t("What they asked for")} />
-            {asked.length ? <Facts rows={asked.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13.5px] text-ink-2">{r.summary}</p>}
+            {asked.length ? <KV cols={3} items={asked.map(([k, v]) => [k, typeof v === "object" ? JSON.stringify(v) : String(v)])} /> : <p className="text-[13.5px] text-ink-2">{r.summary}</p>}
             {r.kind === "umrah" && <p className="mt-3 rounded-2xl bg-info-soft px-3.5 py-2.5 text-[13px] text-info">{t("Every traveller needs their own Nusuk permit.")}</p>}
           </Card>
           )}
@@ -120,7 +134,31 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         </div>
 
         <aside className="space-y-4">
-          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
+          {act && !closed && (
+            <Card className="ring-2 ring-gold/40">
+              <CardHead title={t("Next step")} hint={fr ? (quote ? t("Fares sent. Answer questions, then finish it once it's booked.") : t("Send the fares from the builder on the left.")) : !quote ? t("A line for each person, so everyone sees their share.") : r.status === "with_agent" ? t("Paid. Book it, then mark it done.") : t("Quote sent. Answer questions, or send a new quote.")} />
+              {!fr && !quote && <div className="mb-4"><QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} /></div>}
+              {!fr && quote && (
+                <details className="mb-3 rounded-2xl bg-surface-2 px-4 py-3 [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="cursor-pointer text-[13.5px] text-ink">{t("Send a new quote")}</summary>
+                  <div className="mt-3"><QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} /></div>
+                </details>
+              )}
+              <details className="mb-3 rounded-2xl bg-surface-2 px-4 py-3 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer items-center gap-2 text-[13.5px] text-ink"><CircleHelp className="size-4 text-ink-3" />{t("Ask the traveller")}</summary>
+                <ActionForm action={askAction} className="mt-3 space-y-2">
+                  <input type="hidden" name="id" value={r.id} />
+                  <Textarea name="question" rows={2} required maxLength={300} placeholder={t("Which date suits you for the VFS appointment?")} />
+                  <div className="grid grid-cols-2 gap-2"><Input name="choice" maxLength={40} placeholder={t("Answer 1")} /><Input name="choice" maxLength={40} placeholder={t("Answer 2")} /></div>
+                  <SubmitButton variant="outline" className="w-full">{t("Send the question")}</SubmitButton>
+                </ActionForm>
+              </details>
+              <ActionForm action={doneAction}>
+                <input type="hidden" name="id" value={r.id} />
+                <SubmitButton className="w-full" confirm={t("Mark this request done? The traveller is told.")}><Check className="size-4" />{t("Mark done")}</SubmitButton>
+              </ActionForm>
+            </Card>
+          )}
           {quote && (
             <Card>
               <CardHead title={t("Quote sent")} hint={`${fmtDate(quote.createdAt, L, true)}${quote.expiresAt ? ` · ${t("held until {time}", { time: fmtDate(quote.expiresAt, L, true) })}` : ""}`} action={<Badge tone={quote.status === "accepted" ? "ok" : "info"}>{t(quote.status === "accepted" ? "Accepted" : quote.status === "expired" ? "Expired" : "Open")}</Badge>} />
@@ -128,12 +166,6 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
               {!flightQuote && <dl className="divide-y divide-line">{quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-3 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}</dl>}
               <div className="mt-2 flex justify-between border-t border-line-strong pt-2.5"><span className="text-[13px] text-ink-3">{t(flightQuote ? "From" : "Total")}</span><Money v={quote.total} className="text-[18px]" /></div>
               {quote.cancellation && <p className="mt-2 text-[12.5px] text-ink-3">{quote.cancellation}</p>}
-            </Card>
-          )}
-          {act && !closed && !fr && (
-            <Card>
-              <CardHead title={quote ? t("Send a new quote") : t("Build the quote")} hint={t("A line for each person, so everyone sees their share.")} />
-              <QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} />
             </Card>
           )}
           {checklist.length > 0 && (
@@ -154,25 +186,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             </Card>
           )}
           <OutcomeCard requestId={r.id} act={act} open={!closed} result={closed ? resultOfRequest(r) : null} progress={progressOfRequest(r)} t={t} />
-          {act && !closed && (
-            <Card>
-              <CardHead title={t("Ask or finish")} />
-              <details className="mb-3 rounded-2xl bg-surface-2 px-4 py-3 [&_summary::-webkit-details-marker]:hidden">
-                <summary className="flex cursor-pointer items-center gap-2 text-[13.5px] text-ink"><CircleHelp className="size-4 text-ink-3" />{t("Ask the traveller")}</summary>
-                <ActionForm action={askAction} className="mt-3 space-y-2">
-                  <input type="hidden" name="id" value={r.id} />
-                  <Textarea name="question" rows={2} required maxLength={300} placeholder={t("Which date suits you for the VFS appointment?")} />
-                  <div className="grid grid-cols-2 gap-2"><Input name="choice" maxLength={40} placeholder={t("Answer 1")} /><Input name="choice" maxLength={40} placeholder={t("Answer 2")} /></div>
-                  <SubmitButton variant="outline" className="w-full">{t("Send the question")}</SubmitButton>
-                </ActionForm>
-              </details>
-              <ActionForm action={doneAction}>
-                <input type="hidden" name="id" value={r.id} />
-                <SubmitButton className="w-full" confirm={t("Mark this request done? The traveller is told.")}><Check className="size-4" />{t("Mark done")}</SubmitButton>
-              </ActionForm>
-            </Card>
-          )}
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           <AssignCard kind="request" id={r.id} userId={r.ownerId} canAct={act} />
+          <TicketsCard about={{ kind: "request", id: r.id }} customerId={r.ownerId} subject={r.summary} canAct={act} />
         </aside>
       </div>
     </>

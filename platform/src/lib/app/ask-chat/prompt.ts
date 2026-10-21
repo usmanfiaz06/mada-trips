@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { DESTINATIONS, type AskKind } from "@mada/shared";
-import { PERSONA } from "./persona";
+import { PERSONA, PERSONA_COMPACT } from "./persona";
+import { looseSchema } from "./schema";
 
 /*
  * The conversation's frozen prefix: the system prompt and the tool list never change between requests or people, so
@@ -36,6 +37,7 @@ Truth
 Found by hand
 - Flights when search_flights answers {"mode":"request"}, and anything no tool sells (a cruise, a train, a visa we don't handle, a group or company trip, a city not sold live): get only what the team needs (where, when, who, must-haves), one question at a time, defaults where you can.
 - Confirm it back in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time given: ask the best time once.
+- Promise only what a tool does this turn. No tool invites friends, adds people to a trip, maps drives or builds a multi-city route: say how they do it ("Invite Abdullah from Circles in the app"), or send the route to the team with create_request. A trip across several cities: search_stays for the first city with the dates, and offer the next city as a choice.
 - A restaurant, a table, an activity, a gift: first say what you can (a short idea of the kind of place, no names no tool gave), then ask the city and the night. Never send it to the team on the first message.
 - Then call create_request with the details (destination_name and depart included) and contact_preference, and say "We've noted it and the team will get back to you by" the time it returns.
 
@@ -49,6 +51,35 @@ Acting
 - A person at Mada: call talk_to_human only when they ask for a person, when it is urgent (hurt, stranded, a flight today going wrong), or when the tools cannot do what they need. Never offer it otherwise.
 
 Once you have answered something, treat that answer as done. On later turns your thinking goes to what the traveller is asking now; do not go back over an earlier answer unless they ask about it or point out a problem with it.`;
+
+/*
+ * The same rules in fewer words, for openai-compatible providers (free tiers count tokens per minute, and this block is
+ * re-read on every call of every turn): the compact persona (docs/app/ASSISTANT.md §1a), then how this app works,
+ * without the repeats. Claude reads SYSTEM_PROMPT, cached. Change both together.
+ */
+export const COMPACT_SYSTEM_PROMPT = `${PERSONA_COMPACT}
+
+How you write here
+- The traveller's language. No lists, markdown, emoji or em dashes. Dates "Thu 14 Mar", money "SAR 8,640" (Arabic "8,640 ر.س"), times "09:40". Dates in tool calls: YYYY-MM-DD.
+- Never write: AI, assistant, bot, smart, magic, "I'd be happy to", "Certainly", journey, adventure, seamless, tailored, curated, unforgettable, hassle-free, kindly, dear customer, "something went wrong", error, failed, invalid, user, soon, shortly.
+- Last line, always: 2 or 3 choices the traveller would say next, at most 6 words each, specific to this reply (prices and times only from tools); the app shows them as buttons:
+<next>Book the Saudia at 09:40 | Hotels near Taksim | Change dates</next>
+- You cannot charge, book, ticket or cancel: to pay, call price_quote_for_pay and the app's pay sheet opens.
+- A tool result that starts with "demo: true" holds sample fares for testing: say so in your first sentence ("These are sample fares for testing"), never real or live.
+
+Found by hand: search_flights answers {"mode":"request"}, or no tool sells it (a cruise, a train, a visa we don't handle, a group, a city not live)
+- Ask only what the team needs (where, when, who, must-haves), one question at a time. Confirm in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time: ask the best time once.
+- Promise only what a tool does this turn; no tool invites friends, adds people, maps drives or builds a multi-city route: say how they do it in the app (Circles → Invite) or send the route to the team. Several cities: search_stays for the first city, offer the next as a choice.
+- A restaurant, table, activity or gift: first a short idea of the kind of place (no names), then ask the city and night; never to the team on the first message.
+- Then create_request with the details (destination_name, depart) and contact_preference; say "We've noted it and the team will get back to you by" its time.
+
+Acting
+- One search with defaults (from Riyadh, the household, economy) beats a question. Call independent tools together.
+- Live destination keys: ${KEYS.join(", ")}. Anywhere else goes by hand.
+- Umrah: Makkah stays by distance to the Haram; a Nusuk permit is needed (one mentioned counts); create_request kind umrah for the team. Car now: plan_car_now, never promise a driver.
+- Corrections change only what they name: search again with the rest kept, say what changed.
+- talk_to_human only when they ask for a person, it is urgent, or no tool can do it; never offer it.
+- An earlier answer is done: answer what they ask now.`;
 
 const nullable = (type: string, extra: Record<string, unknown> = {}) => ({ type: [type, "null"], ...extra });
 const ids = { type: "array", items: { type: "string" }, description: "Person ids from the household list in the context. The account holder when unsaid." };
@@ -174,6 +205,16 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       urgent: { type: "boolean" },
     }),
   },
+  {
+    name: "remember",
+    description: "Keep a lasting preference or need for next time (home airport, airline, cabin, seat, budget, food, mobility, health, family, how to reach them). Not for one-off trip details. Never numbers or documents.",
+    strict: true,
+    input_schema: obj({
+      kind: { type: "string", enum: ["home_airport", "airline", "cabin", "seat", "budget", "food", "mobility", "health", "family", "contact", "other"] },
+      text: { type: "string", description: "The fact in a few words, e.g. 'Aisle seat', 'Mother (Hessa) uses a wheelchair'." },
+      sensitive: { type: "boolean", description: "Health, mobility or religion: true. Saved only after the traveller said yes to remembering it." },
+    }),
+  },
 ];
 
 /**
@@ -183,15 +224,64 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
  * cached, so the list never changes there.
  */
 const BY_KIND: Partial<Record<AskKind, string[]>> = {
-  flight: ["search_flights", "search_stays", "entry_rules", "create_request", "price_quote_for_pay", "get_trips", "get_trip", "talk_to_human"],
-  stay: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "get_household", "talk_to_human"],
-  esim: ["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human"],
-  visa: ["entry_rules", "get_household", "create_request", "talk_to_human"],
-  umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human"],
-  car: ["plan_car_now", "create_request", "get_trips", "talk_to_human"],
-  food: ["create_request", "get_trips", "talk_to_human"],
+  flight: ["search_flights", "search_stays", "entry_rules", "create_request", "price_quote_for_pay", "get_trips", "get_trip", "talk_to_human", "remember"],
+  stay: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "get_household", "talk_to_human", "remember"],
+  esim: ["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human", "remember"],
+  visa: ["entry_rules", "get_household", "create_request", "talk_to_human", "remember"],
+  umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human", "remember"],
+  car: ["plan_car_now", "create_request", "get_trips", "talk_to_human", "remember"],
+  food: ["create_request", "get_trips", "talk_to_human", "remember"],
 };
+/** An open or unknown kind: the everyday tools (a turn that needs another reads its kind, or used it before). */
+const DEFAULT_TOOLS = ["search_flights", "search_stays", "esim_plans", "get_trips", "get_trip", "create_request", "talk_to_human", "remember"];
 export function toolsFor(kind: AskKind | null): string[] | null {
   const want = kind ? BY_KIND[kind] : undefined;
   return want ? TOOLS.map((t) => t.name).filter((n) => want.includes(n)) : null;
 }
+
+/**
+ * The tools an openai-compatible provider is sent this turn: the kind's, or the everyday set when the kind is open,
+ * plus every tool used earlier in the thread. The pay sheet and hotel facts only once a search has run in the thread
+ * (a booking or a hotel question follows a card, never comes before one). Always a list, in the fixed order of TOOLS.
+ */
+const AFTER_SEARCH = ["price_quote_for_pay", "get_hotel"];
+export function leanToolsFor(kind: AskKind | null, usedBefore: Iterable<string> = []): string[] {
+  const used = new Set(usedBefore);
+  const want = new Set([...(toolsFor(kind) ?? DEFAULT_TOOLS).filter((n) => !AFTER_SEARCH.includes(n) && !(kind === "flight" && n === "get_trip")), ...used]);
+  if (used.has("search_flights") || used.has("search_stays") || used.has("esim_plans")) want.add("price_quote_for_pay");
+  if (used.has("search_stays")) want.add("get_hotel");
+  return TOOLS.map((t) => t.name).filter((n) => want.has(n));
+}
+
+/*
+ * The tools as openai-compatible providers read them: the same names and fields (the engine checks every call against
+ * TOOLS), shorter words. A field whose meaning is plain from its name loses its description.
+ */
+const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
+  search_flights: { d: "Live flights, all-in prices, up to 3 (shown as cards).", p: { from: "Null: Riyadh.", return: "Null: one way.", infants: "Under 2, on a lap." } },
+  search_stays: { d: "Live hotels, up to 3 (shown as cards). Wishes (pool, sea view, near a landmark, breakfast, free cancellation) filter them.", p: { wishes: "Their words." } },
+  get_hotel: { d: "One hotel from a stay card: address, facilities." },
+  esim_plans: { d: "eSIM data plans for a place and days.", p: { where: "Key, country or city, in English.", days: "Null: 7." } },
+  plan_car_now: { d: "A car now or in 15 minutes; the app confirms the meeting point. Books nothing." },
+  get_trips: { d: "Their upcoming and past trips." },
+  get_trip: { d: "One trip in full: flights, stay, travellers, documents needed." },
+  get_household: { d: "The people they book for." },
+  entry_rules: { d: "Visa, ETA and passport rules for these people.", p: { depart: "Arriving.", return: "Leaving." } },
+  create_request: { d: "To the team at Mada to arrange by hand, only after they said how to reach them. Returns when the team answers.", p: { summary: "One or two sentences, their language.", contact_window: "With a call: the best time." } },
+  price_quote_for_pay: { d: "Book a flight, stay or eSIM from a card: prices it again and opens the app's pay sheet. Never charges.", p: { offer_id: "Option id from a search.", package_id: "eSIM plan id." } },
+  talk_to_human: { d: "Pass the conversation to a person at the Mada desk.", p: { summary: "What they need and what was done, their language." } },
+  remember: { d: "Keep a lasting preference or need for next time; not trip details, numbers or documents.", p: { sensitive: "Health, mobility or religion: true, kept only after a yes." } },
+};
+const LEAN_IDS = "Household ids; unsaid: the account holder.";
+/** Dates are YYYY-MM-DD everywhere: said once, in the compact prompt. */
+export const LEAN_TOOLS: Anthropic.Beta.BetaTool[] = TOOLS.map((t) => {
+  const lean = LEAN[t.name];
+  const schema = t.input_schema as { properties?: Record<string, Record<string, unknown>> };
+  const properties = Object.fromEntries(Object.entries(schema.properties ?? {}).map(([k, v]) => {
+    const { description: _d, ...rest } = v;
+    void _d;
+    const say = k === "traveller_ids" ? LEAN_IDS : lean?.p?.[k];
+    return [k, say ? { ...rest, description: say } : rest];
+  }));
+  return { ...t, description: lean?.d ?? t.description, input_schema: looseSchema({ ...t.input_schema, properties } as never) } as Anthropic.Beta.BetaTool;
+});

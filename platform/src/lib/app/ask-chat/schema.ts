@@ -32,6 +32,26 @@ export function schemaProblems(schema: Schema, value: unknown, path = "input"): 
   return out.slice(0, 6);
 }
 
+/** An object input with every left-out field that may be null set to null. Anything else comes back as it was. */
+export function withNulls(schema: Schema, value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value) || !schema.properties) return value;
+  const out = { ...(value as Record<string, unknown>) };
+  for (const [k, s] of Object.entries(schema.properties)) if (!(k in out) && Array.isArray(s.type) && s.type.includes("null")) out[k] = null;
+  return out;
+}
+
+/**
+ * A strict schema as providers without strict mode read it, in fewer tokens: only the fields that can't be null are
+ * required, and no additionalProperties (the engine still checks every call against the strict schema, withNulls first).
+ */
+export function looseSchema(s: Schema): Schema {
+  if (!s.properties) return s;
+  const { additionalProperties: _a, required: _r, ...rest } = s;
+  void _a; void _r;
+  const required = Object.entries(s.properties).filter(([, v]) => !(Array.isArray(v.type) && v.type.includes("null"))).map(([k]) => k);
+  return { ...rest, ...(required.length ? { required } : {}) };
+}
+
 /** The declared name a call meant: exact, or the one name that matches ignoring case and separators. */
 export function toolNameFor(name: string, names: readonly string[]): string | null {
   if (names.includes(name)) return name;

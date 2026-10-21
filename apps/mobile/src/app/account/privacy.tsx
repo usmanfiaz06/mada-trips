@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -27,6 +28,7 @@ const KEEP: [IconName, Parameters<typeof t>[0], Parameters<typeof t>[0]][] = [
 /** Privacy (Account.jsx Privacy): a copy of everything, what we keep and why, consents, delete with 30 days. */
 export default function Privacy() {
   const qc = useQueryClient();
+  const router = useRouter();
   const user = useSession((s) => s.user);
   const account = useAccount();
   const consents = useConsents();
@@ -64,6 +66,7 @@ export default function Privacy() {
       </Group>
       <Group label={t('privacy.keep')}>
         {KEEP.map(([icon, title, why]) => <Row key={title} icon={icon} value={t(title)} sub={t(why)} />)}
+        <Row icon="star" value={t('privacy.keep.memory')} sub={t('privacy.keep.memoryWhy')} onPress={() => router.push('/account/memory')} testID="privacy-memory" />
       </Group>
       <Group label={t('privacy.choose')}>
         <Row value={t('privacy.marketing')} sub={t('privacy.marketingSub')} right={<Toggle label={t('privacy.marketing')} value={c.marketing} onChange={(v) => setConsent('marketing', v)} testID="consent-marketing" />} />

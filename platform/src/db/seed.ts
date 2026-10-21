@@ -47,7 +47,9 @@ async function main() {
   if (existing.length) { console.log("Already set up. Nothing to do."); return; }
   if (!PASSWORD) { console.log("Skipping first-time setup: set SEED_PASSWORD (the partners' first password) and redeploy."); return; }
 
-  const roleRows = await db.insert(schema.roles).values(SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }))).returning();
+  // Migrations already add some system roles (the support roles, 0038); the rest are created here.
+  await db.insert(schema.roles).values(SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }))).onConflictDoNothing({ target: schema.roles.key });
+  const roleRows = await db.select().from(schema.roles);
   const role = (k: string) => roleRows.find((r) => r.key === k)!.id;
 
   const [abdulaziz, bader, haneef] = await db.insert(schema.partners).values([

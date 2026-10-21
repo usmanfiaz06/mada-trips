@@ -15,6 +15,17 @@ export const DEFAULT_SETTINGS = {
   bspGraceDays: 1,                  // one grace day the partners may use before a BSP payment counts as overdue
   cashMoveLimit: 2_000_000,         // SAR 20,000: a bank deposit/withdrawal/transfer under this needs 1 director, at or above it all directors
   refundApprovals: 1,
+  // App desk (DESK-PLAN §7 default 2): goodwill one agent with desk.refund gives alone, per credit and per day; above, a lead approves.
+  deskGoodwillLimit: 20_000,        // SAR 200
+  deskAgentDailyLimit: 200_000,     // SAR 2,000
+  // App refunds (DESK-PLAN §7 default 2): what an agent with desk.refund approves alone, per refund and per day; above, a lead in Approvals.
+  deskRefundLimit: 50_000,          // SAR 500
+  deskRefundDailyLimit: 200_000,    // SAR 2,000
+  // App supplier credit lines (Supplier balances): 0 = not set up. Hotelbeds and TBO bill us on credit; eSIM Access is prepaid.
+  appHotelbedsCreditLine: 0,
+  appTboCreditLine: 0,
+  // Desk overview (DESK-PLAN U8): the share of tickets the desk aims to answer within their promise.
+  deskSlaTargetBps: 9000,           // 90%
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

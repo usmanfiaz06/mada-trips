@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PERSONA } from "@/lib/app/ask-chat/persona";
+import { PERSONA, PERSONA_COMPACT } from "@/lib/app/ask-chat/persona";
 import { personaFile, personaFromDoc } from "@/lib/app/ask-chat/persona-doc";
 import { SYSTEM_PROMPT } from "@/lib/app/ask-chat/prompt";
 import { nextFromState, parseNext } from "@/lib/app/ask-chat/next";
@@ -15,7 +15,8 @@ const DOC = readFileSync(join(__dirname, "..", "..", "..", "docs", "app", "ASSIS
 describe("the persona", () => {
   it("is docs/app/ASSISTANT.md §1 word for word (run npm run ask:persona after editing the doc)", () => {
     expect(PERSONA).toBe(personaFromDoc(DOC));
-    expect(readFileSync(join(__dirname, "..", "..", "src", "lib", "app", "ask-chat", "persona.ts"), "utf8")).toBe(personaFile(personaFromDoc(DOC)));
+    expect(readFileSync(join(__dirname, "..", "..", "src", "lib", "app", "ask-chat", "persona.ts"), "utf8")).toBe(personaFile(personaFromDoc(DOC), personaFromDoc(DOC, "persona-compact")));
+    expect(PERSONA_COMPACT).toBe(personaFromDoc(DOC, "persona-compact"));
   });
   it("opens the frozen system prompt, which holds nothing that changes per person or turn", () => {
     expect(SYSTEM_PROMPT.startsWith(PERSONA)).toBe(true);

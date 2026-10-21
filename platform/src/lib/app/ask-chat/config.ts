@@ -101,6 +101,17 @@ export const askFastModel = () => {
   return env("ASK_FAST_MODEL") || (chatProvider() === "anthropic" ? "claude-haiku-5-5" : askChatModel());
 };
 
+/**
+ * The first provider to answer is openai-compatible (a free tier, counted in tokens per minute): long threads fold
+ * sooner (fold.ts). Each call still gets the words its provider reads (engine.ts `lean`).
+ */
+export function answersLean(): boolean {
+  const chain = providerChain();
+  if (chain) return !!chain[0] && chain[0].name !== "anthropic";
+  const p = chatProvider();
+  return !!p && p !== "anthropic";
+}
+
 /** On, and the provider has what it needs. */
 export function askChatOn(): boolean {
   if (env("ASK_CHAT").toLowerCase() !== "on") return false;

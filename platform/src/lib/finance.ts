@@ -181,8 +181,11 @@ export function repayByEquity(pool: number, partners: { id: string; name: string
 }
 
 export async function computeSettlement(q: Q, start: string, end: string, inputs: Partial<SettlementInputs>, reserveHeld: number, defaultRepaymentBps: number, iataBuffer: number, excludeCycleId?: string, cycleOnly = false): Promise<SettlementFigures> {
-  // Voided/refunded sales' money never counts as cleared cash for the settlement.
-  const liveReceipt = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
+  // Voided/refunded sales' money never counts as cleared cash for the settlement. App sales (channel "app") stay out
+  // until the owner says yes (APP_SALES_IN_SETTLEMENT=yes, DESK-PLAN §7 default 3; lib/app/finance/ops-posting.ts).
+  const withApp = (process.env.APP_SALES_IN_SETTLEMENT ?? "no").trim().toLowerCase() === "yes";
+  const appOut = withApp ? sql`` : sql` OR bx.channel = 'app'`;
+  const liveReceipt = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND (bx.status IN ('void','refunded')${appOut})))`;
   const cleared = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.payments).where(and(gte(schema.payments.clearedOn, start), lte(schema.payments.clearedOn, end), liveReceipt)).groupBy(schema.payments.account);
   const rolled = await q.select({ total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
@@ -195,7 +198,7 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
     SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, b.prepared_by, b.commission_bps, u.name AS preparer FROM bookings b
     JOIN users u ON u.id = b.prepared_by
     JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL AND cleared_on <= ${end} GROUP BY booking_id) p ON p.booking_id = b.id
-    WHERE b.status = 'issued' AND p.paid >= b.sell_price AND (b.recognized_cycle_id IS NULL ${mine})`);
+    WHERE b.status = 'issued' AND p.paid >= b.sell_price AND (b.recognized_cycle_id IS NULL ${mine}) ${withApp ? sql`` : sql`AND b.channel <> 'app'`}`);
   void cycleOnly;
   const revenue = settled.reduce((s, b) => s + Number(b.sell_price), 0);
   const directCost = settled.reduce((s, b) => s + Number(b.net_cost), 0);

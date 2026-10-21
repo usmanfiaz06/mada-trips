@@ -30,3 +30,54 @@ describe("Gemini model from the key", () => {
     await expect(autoModelApi(api, ["a", "b"]).create({ model: "x", max_tokens: 1, messages: [] })).rejects.toThrow("429");
   });
 });
+
+describe("Gemini warm-up", () => {
+  it("uses the first model that answers when a newer one hangs", async () => {
+    const asked: string[] = [];
+    const api: ChatApi = {
+      async create(p, o) {
+        asked.push(p.model);
+        if (p.model === "new") return new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("timeout"), { name: "TimeoutError" })), o?.timeout === 9_000 ? 50 : 10_000));
+        return { model: p.model } as never;
+      },
+      stream: () => { throw new Error("unused"); },
+    };
+    const auto = autoModelApi(api, ["new", "old"], { warm: true });
+    const r = await auto.create({ model: "x", max_tokens: 1, messages: [] });
+    expect((r as { model: string }).model).toBe("old");
+  });
+});
+
+describe("Gemini's stream", () => {
+  it("keeps tool calls that come without an index", async () => {
+    const { openAiCompatibleApi } = await import("@/lib/app/ask-chat/providers-openai");
+    const sse = [
+      { choices: [{ delta: { role: "assistant", tool_calls: [{ id: "a1", type: "function", function: { name: "search_stays", arguments: "{\"city\":\"Baku\"}" } }, { id: "a2", type: "function", function: { name: "entry_rules", arguments: "{}" } }] } }] },
+      { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 5 } },
+    ].map((c) => `data: ${JSON.stringify(c)}\n\n`).join("") + "data: [DONE]\n\n";
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(sse, { status: 200, headers: { "content-type": "text/event-stream" } })) as typeof fetch;
+    try {
+      const s = openAiCompatibleApi({ baseUrl: "https://x", apiKey: "k", openapi: true }).stream({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "hi" }] });
+      for await (const _ of s) { void _; }
+      const m = await s.finalMessage();
+      expect(m.content.filter((b) => b.type === "tool_use").map((b) => (b as { name: string }).name)).toEqual(["search_stays", "entry_rules"]);
+    } finally { globalThis.fetch = realFetch; }
+  });
+});
+
+describe("Gemini's tool-call signatures", () => {
+  it("sends each call's extra_content back on the next request", async () => {
+    const { openAiCompatibleApi, toChatCompletion } = await import("@/lib/app/ask-chat/providers-openai");
+    const sig = { google: { thought_signature: "abc" } };
+    const sse = `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ id: "a1", type: "function", function: { name: "search_stays", arguments: "{}" }, extra_content: sig }] }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(sse, { status: 200 })) as typeof fetch;
+    try {
+      const s = openAiCompatibleApi({ baseUrl: "https://x", apiKey: "k", openapi: true }).stream({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "hi" }] });
+      const m = await s.finalMessage();
+      const body = toChatCompletion({ model: "m", max_tokens: 10, messages: [{ role: "user", content: "hi" }, { role: "assistant", content: m.content as never }, { role: "user", content: [{ type: "tool_result", tool_use_id: "a1", content: "ok" }] }] }, false, true) as { messages: { tool_calls?: { extra_content?: unknown }[] }[] };
+      expect(body.messages.find((x) => x.tool_calls)?.tool_calls?.[0].extra_content).toEqual(sig);
+    } finally { globalThis.fetch = realFetch; }
+  });
+});

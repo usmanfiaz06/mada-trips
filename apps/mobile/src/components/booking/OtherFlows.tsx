@@ -15,7 +15,7 @@ import { Chip } from '../Chip';
 import { Icon } from '../Icon';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../states/ErrorState';
-import { WaitTrouble } from '../states/WaitTrouble';
+import { GaveUp, STAGES_SUPPLIER, Waiting, localTimeFact, useStagedLine } from '../states/Waiting';
 import { SUPPLIER_GIVE_UP_MS, useGiveUp } from '@/lib/net/give-up';
 import { Pill } from '../Pill';
 import { T } from '../Text';
@@ -106,11 +106,12 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
 
   const flags = [...demo].sort().join(',');
   const searching = phase === 'results' && live && !byHand;
-  const steps = [t('search.working.stays'), n > 2 ? t('search.working.together') : t('search.working.quiet')];
   const staysKey = ['booking', 'stays', dest?.key, checkIn, nights, who.join(), flags];
   const staysFn = () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who });
   const search = useQuery({ queryKey: staysKey, enabled: searching, staleTime: 600_000, queryFn: staysFn });
-  const step = useSequence(2, 700, searching ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null, !!search.data && !search.isFetching);
+  // While the hotels answer: the cards to come, and a line that says what is being done as the seconds pass.
+  const stayLines = [t('waiting.stays.0', { city: city ? cityLabel(city) : '', dates: checkIn && checkOut ? rangeName(checkIn, checkOut, today) : '' }), t('waiting.stays.1'), t('waiting.stays.2'), t('waiting.stays.3')];
+  const waitLine = useStagedLine(stayLines, STAGES_SUPPLIER, searching && !search.data ? `${city?.key}${checkIn}${checkOut}${who.join()}` : null);
   const wait = useGiveUp(search, { key: staysKey, queryKey: staysKey, active: searching, giveUpMs: SUPPLIER_GIVE_UP_MS });
   // Hotels take seconds to answer: the search starts while "who's going" is on screen, the likely next tap.
   const qc = useQueryClient();
@@ -125,7 +126,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   // A city can answer with a couple of hundred hotels: draw a page at a time, cheapest first.
   const s = search.data;
   const cur = s?.options.find((o) => o.id === pick) ?? s?.options[0];
-  const ready = searching && step >= 2 && s?.outcome === 'ok' && !!cur;
+  const ready = searching && s?.outcome === 'ok' && !!cur;
   const start = () => { if (phoneNeeded) { setPhoneOpen(true); return; } buzz('tap'); if (city) recent.add(city); setGo(true); };
 
   useEffect(() => {
@@ -247,8 +248,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
     );
   }
   if (!s && search.isError && !search.isFetching) return <View style={{ gap: 14 }}>{summary}<ErrorState variant="card" error={search.error} onRetry={wait.retry} onSignIn={wait.signIn} always testID="stays-error" /></View>;
-  if (!s && wait.view === 'timeout') return <View style={{ gap: 14 }}>{summary}<WaitTrouble wait={wait} testID="stays-timeout" /></View>;
-  if (step < 2 || !s) return <View style={{ gap: 18 }}>{summary}<Working lines={steps} step={Math.min(step, 1)} /></View>;
+  if (!s && wait.view === 'timeout') return <View style={{ gap: 14 }}>{summary}<GaveUp wait={wait} kind="stays" onFind={() => { buzz('tap'); setByHand(true); }} testID="stays-timeout" /></View>;
+  if (!s) return <View style={{ gap: 18 }}>{summary}<Waiting kind="stays" line={waitLine} fact={localTimeFact(dest?.key)} testID="stays-waiting" /></View>;
   if (s.outcome === 'none') {
     return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
   }
@@ -316,12 +317,16 @@ function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => v
   );
 }
 
+/** The ready-made plan for what was asked, if there is one: only AlUla and Istanbul have one today. */
+export const planIdFor = (query: string): string | null =>
+  /istanbul|إسطنبول|اسطنبول/i.test(query) ? 'istanbul3' : /al ?ula|العلا|العُلا/i.test(query) ? 'alula2' : null;
+
 export function PlanFlow({ query, people, today }: { query: string; people: Person[]; today: string }) {
   const router = useRouter();
   const plans = usePlans();
   const kids = householdOf(people, today).kids.length > 0;
   const step = useSequence(3, 650, 'go');
-  const id = /istanbul/i.test(query) ? 'istanbul3' : 'alula2';
+  const id = planIdFor(query) ?? 'alula2';
   const plan = plans.data?.find((p) => p.id === id);
   const steps = [t('plan.working.open'), kids ? t('plan.working.prayerKids') : t('plan.working.prayer'), t('plan.working.tables')];
   if (step < 3 || !plan) return <Working lines={steps} step={Math.min(step, 2)} />;

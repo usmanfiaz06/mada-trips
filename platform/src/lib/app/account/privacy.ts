@@ -4,6 +4,7 @@ import { t, type ExportStatus } from "@mada/shared";
 import { db } from "@/db";
 import { appCreditLedger, appMessages, appNotifications, appPeople, appRequests, appSessions, appTrackedFlights, appTrips, appUsers } from "@/db/app-schema";
 import { appAccounts, appCards, appDataExports, appDocuments, appEmailCodes, appFiles, appPersonDetails, appSupportThreads } from "@/db/app-schema-wallet";
+import { appAskMemory, appAskThreads } from "@/db/app-schema-ask";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { listPeople } from "../people";
@@ -61,6 +62,9 @@ export async function anonymiseAccount(userId: string, actor: { kind: "user" | "
     await tx.delete(appDataExports).where(eq(appDataExports.userId, userId));
     await tx.delete(appNotifications).where(eq(appNotifications.userId, userId));
     await tx.delete(appTrackedFlights).where(eq(appTrackedFlights.userId, userId));
+    // Ask Mada: what it remembers and every conversation (docs/app/ASK-CHAT.md §7).
+    await tx.delete(appAskMemory).where(eq(appAskMemory.ownerId, userId));
+    await tx.delete(appAskThreads).where(eq(appAskThreads.ownerId, userId));
     // Trips and requests go (bookings stay with the airline and hotel); payments and invoices stay as receipts.
     await tx.delete(appRequests).where(eq(appRequests.ownerId, userId));
     await tx.delete(appTrips).where(eq(appTrips.ownerId, userId));
@@ -123,6 +127,7 @@ export async function buildExport(userId: string): Promise<Record<string, unknow
     credit: await getCredit(userId),
     support: threads.map((th) => ({ about: th.about, createdAt: th.createdAt, messages: messages.filter((m) => m.threadId === th.id).map((m) => ({ from: m.authorKind, name: m.authorName, body: m.body, at: m.createdAt })) })),
     notifications: await db.select({ title: appNotifications.title, body: appNotifications.body, at: appNotifications.createdAt }).from(appNotifications).where(eq(appNotifications.userId, userId)),
+    askMadaRemembers: await db.select({ kind: appAskMemory.kind, text: appAskMemory.text, source: appAskMemory.source, at: appAskMemory.createdAt }).from(appAskMemory).where(eq(appAskMemory.ownerId, userId)),
     creditLedgerRows: (await db.select({ n: sql<number>`count(*)::int` }).from(appCreditLedger).where(eq(appCreditLedger.userId, userId)))[0]?.n ?? 0,
   };
 }

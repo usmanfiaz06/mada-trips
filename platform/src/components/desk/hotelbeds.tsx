@@ -1,7 +1,6 @@
 import { BedDouble, Car, FileText } from "lucide-react";
-import { Badge, Card, CardHead } from "@/components/ui";
+import { Badge, Card, CardHead, KV } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
-import { Facts } from "@/components/desk/parts";
 import type { T } from "@/lib/i18n";
 import { orderForRequest, stayRateOf, supplierBookingsFor, type SupplierBookingRow, type TransferDetails } from "@/lib/app/suppliers/hotelbeds/bookings";
 import { hotelbedsBookingAllowed, hotelbedsMode, staysMode } from "@/lib/app/suppliers/hotelbeds/app";
@@ -31,7 +30,7 @@ export async function HotelbedsCard({ requestId, details, act, t }: { requestId:
       <CardHead title={t("Hotelbeds")} hint={transfer ? t("Airport pickup · {vehicle}", { vehicle: transfer.vehicle }) : t("Stays: {mode} mode", { mode: t(staysMode() === "live" ? "live" : "request") })}
         action={<Badge tone={env === "live" ? "ok" : "warn"}>{env}</Badge>} />
       {transfer && (
-        <Facts rows={[
+        <KV items={[
           [t("Route"), <span key="r" dir="ltr">{transfer.airport} → {transfer.hotel ?? "—"}</span>],
           [t("Lands"), <span key="l" className="num" dir="ltr">{transfer.arrival.replace("T", " ")}{transfer.flightNumber ? ` · ${transfer.flightNumber}` : ""}</span>],
           [t("Supplier price"), <span key="n" className="num" dir="ltr">{transfer.net.toFixed(2)} {transfer.currency}</span>],

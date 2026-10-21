@@ -8,6 +8,8 @@
     { "path": "/api/cron/hotelbeds", "schedule": "41 * * * *" },
     { "path": "/api/cron/flights", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/live", "schedule": "*/5 * * * *" },
-    { "path": "/api/cron/esim", "schedule": "7,22,37,52 * * * *" }
+    { "path": "/api/cron/esim", "schedule": "7,22,37,52 * * * *" },
+    { "path": "/api/cron/desk", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/finance", "schedule": "3-58/5 * * * *" }
   ]
 }
