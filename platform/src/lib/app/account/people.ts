@@ -11,6 +11,7 @@ import { encryptField, passportAad } from "../crypto";
 import { AppError } from "../http";
 import { toPerson } from "../people";
 import { deleteFile, getFile } from "../documents/storage";
+import { passportFingerprint } from "../documents/fingerprint";
 
 /*
  * The household beyond M0's list and add: one person with their details, a passport from a scan (or typed),
@@ -97,6 +98,7 @@ export async function savePassport(ownerId: string, personId: string, input: Sav
       passportNumberEnc: encryptField(pp.number, passportAad(personId)), passportNumberMasked: maskPassportNumber(pp.number),
       passportIssuingCountry: pp.issuingCountry, passportNationality: pp.nationality, passportExpiry: pp.expiry,
       passportSource: pp.source, passportUpdatedAt: new Date(), updatedAt: new Date(),
+      passportFingerprint: passportFingerprint({ issuer: pp.issuingCountry, number: pp.number, dob: input.dateOfBirth }),
     }).where(eq(appPeople.id, personId));
     // The account holder's first name fills in what Mada calls them, if they skipped it.
     if (p.isSelf) {
@@ -118,7 +120,7 @@ export async function removePerson(ownerId: string, personId: string, ipHash: st
   const files = await db.select({ fileId: appDocuments.fileId }).from(appDocuments).where(and(eq(appDocuments.personId, personId), isNull(appDocuments.deletedAt)));
   await db.transaction(async (tx) => {
     await tx.update(appPeople).set({
-      deletedAt: new Date(), passportNumberEnc: null, passportNumberMasked: null, passportExpiry: null, passportIssuingCountry: null,
+      deletedAt: new Date(), passportNumberEnc: null, passportNumberMasked: null, passportExpiry: null, passportIssuingCountry: null, passportFingerprint: null,
       passportNationality: null, dateOfBirth: null, updatedAt: new Date(),
     }).where(eq(appPeople.id, personId));
     await tx.delete(appPersonDetails).where(eq(appPersonDetails.personId, personId));

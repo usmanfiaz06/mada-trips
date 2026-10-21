@@ -106,7 +106,7 @@ export function linesOf(transcript: unknown[], lang: "en" | "ar"): AskThreadLine
   const out: AskThreadLine[] = [];
   for (const raw of transcript as AskLine[]) {
     if (!raw || typeof raw !== "object") continue;
-    if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null });
+    if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null, ...(raw.attachment?.label ? { attachment: { kind: String(raw.attachment.kind ?? "other"), label: String(raw.attachment.label) } } : {}) });
     else if (raw.who === "mada" && typeof raw.text === "string") out.push({ who: "mada", text: raw.text, cards: (raw.cards ?? []).filter((c) => typeof c === "string").slice(0, 6), next: (raw.next ?? []).filter((c) => typeof c === "string").slice(0, 3) });
     else if (raw.who === "agent") out.push({ who: "agent", text: raw.text, by: nameIn(raw, lang), at: raw.at });
     else if (raw.who === "system" && raw.event === "joined") out.push({ who: "joined", text: joinedText(nameIn(raw, lang), raw.pronoun, lang), by: nameIn(raw, lang), at: raw.at });

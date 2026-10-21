@@ -45,5 +45,6 @@ export * from './boarding';
 export * from './esim';
 export * from './hotel-page';
 export * from './ask-chat';
+export * from './ask-docs';
 export * from './ask-memory';
 export * from './plans';

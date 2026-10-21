@@ -22,6 +22,8 @@ import { deskTicketsJob } from "./desk/tickets";
 import { financeJob } from "./finance/job";
 import { nightCover } from "./desk/oncall";
 import { evaluateAlerts } from "./desk/alerts";
+import { documentsJob } from "./ask-chat/attachments";
+import { expireShares } from "./ask-chat/doc-shares";
 
 /*
  * Scheduled jobs (Vercel Cron → GET /api/cron/{job} with CRON_SECRET; locally `npm run app:jobs -- all`). Each is
@@ -47,9 +49,12 @@ import { evaluateAlerts } from "./desk/alerts";
  *               once each in the lead's bell, and urgent work with nobody on duty pages the on-call lead
  *   finance     app finance (finance/job.ts): cost lines for new captures, refunds a lead approved sent, card refunds
  *               checked with the provider (approved → sent), captured sales and finished refunds posted to Ops
+ *   documents   documents sent in Ask (ask-chat/attachments.ts): photos and read fields deleted after 24 hours, untapped
+ *               cards become "not kept", "this booking only" numbers wiped when due, passports saved before
+ *               fingerprints get one (each number decrypted once), passport-share requests past their trip expired
  */
 
-export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights", "live", "esim", "desk", "finance"] as const;
+export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights", "live", "esim", "desk", "finance", "documents"] as const;
 export type JobName = (typeof JOBS)[number];
 export type JobResult = Record<string, number>;
 
@@ -144,7 +149,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob() };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob(), documents: async () => ({ ...await documentsJob(), sharesExpired: await expireShares() }) };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

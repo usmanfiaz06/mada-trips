@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey } from "drizzle-orm/pg-core";
-import { appTrips, appUsers } from "./app-schema";
+import { appPeople, appTrips, appUsers } from "./app-schema";
+import { appDocuments, appFiles } from "./app-schema-wallet";
 import { users as opsUsers } from "./schema";
 
 /*
@@ -96,3 +97,53 @@ export const appAskMemory = pgTable("app_ask_memory", {
   /** The last turn it was put in front of the model (for "most relevant first"). */
   lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 }, (t) => [index("app_ask_memory_owner_idx").on(t.ownerId, t.createdAt)]);
+
+/**
+ * Documents sent in a chat (ask-chat/attachments.ts, docs/app/ASK-INTEGRATED.md §6, migration 0046). One row per photo
+ * or file: what its lines were read as, kept redacted in `result` for the transcript (first name, the last two
+ * characters, the expiry), and the full fields sealed in `fields_enc` only until the traveller taps the card (then
+ * saved where they belong, or dropped). The file, when the phone sent one, is deleted on the tap or after 24 hours
+ * (the documents job), whichever comes first.
+ */
+export const appAskAttachments = pgTable("app_ask_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  threadId: uuid("thread_id").references(() => appAskThreads.id, { onDelete: "set null" }),
+  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  fileId: uuid("file_id").references(() => appFiles.id, { onDelete: "set null" }),
+  /** passport | visa | id | ticket | booking | photo | other */
+  kindGuess: text("kind_guess").notNull(),
+  /** The card's case and what it may say (ChatDocCard without the people list). Never the number. */
+  result: jsonb("result").$type<Record<string, unknown>>().notNull().default({}),
+  /** The read fields (names, number, dates), AES-GCM under APP_DATA_KEY, bound to this row. Cleared on the tap. */
+  fieldsEnc: text("fields_enc"),
+  fingerprint: text("fingerprint"),
+  personId: uuid("person_id").references(() => appPeople.id, { onDelete: "set null" }),
+  documentId: uuid("document_id").references(() => appDocuments.id, { onDelete: "set null" }),
+  /** read (waiting for the tap) | confirmed | booking_only | discarded | wiped */
+  status: text("status").notNull().default("read"),
+  /** "This booking only": when the full number is wiped from the person (the last two characters and expiry stay). */
+  wipeAt: timestamp("wipe_at", { withTimezone: true }),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("app_ask_attachments_owner_idx").on(t.ownerId, t.createdAt), index("app_ask_attachments_thread_idx").on(t.threadId), index("app_ask_attachments_status_idx").on(t.status, t.createdAt)]);
+
+/**
+ * "Share your passport for this trip?" (ASK-INTEGRATED.md §5.4): the trip owner asks a companion with their own account;
+ * the companion answers with a tap in their app. Shared, the owner reads the passport only as its mask and expiry,
+ * until the trip ends + 7 days. draft (the card, before the owner's tap) | sent | shared | declined | expired.
+ */
+export const appDocShareRequests = pgTable("app_doc_share_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  toUserId: uuid("to_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  tripId: uuid("trip_id").references(() => appTrips.id, { onDelete: "cascade" }),
+  threadId: uuid("thread_id").references(() => appAskThreads.id, { onDelete: "set null" }),
+  kind: text("kind").notNull().default("passport"),
+  status: text("status").notNull().default("draft"),
+  /** The companion's own household row that holds the passport (theirs, never copied to the owner). */
+  personId: uuid("person_id").references(() => appPeople.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  answeredAt: timestamp("answered_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("app_doc_share_owner_idx").on(t.ownerId, t.tripId), index("app_doc_share_to_idx").on(t.toUserId, t.status)]);

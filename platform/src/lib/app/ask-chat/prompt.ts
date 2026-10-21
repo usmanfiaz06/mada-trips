@@ -3,6 +3,7 @@ import { DESTINATIONS, type AskKind } from "@mada/shared";
 import { PERSONA, PERSONA_COMPACT } from "./persona";
 import { looseSchema } from "./schema";
 import { PLAN_LEAN, PLAN_TOOLS } from "./tools-plan";
+import { DOC_TOOLS } from "./tools-docs";
 
 /*
  * The conversation's frozen prefix: the system prompt and the tool list never change between requests or people, so
@@ -48,6 +49,7 @@ Acting
 - Umrah: Makkah stays go by distance to the Haram; a Nusuk permit is needed, and a permit already mentioned counts as yes. Use create_request kind umrah when it needs the team.
 - A car right now: call plan_car_now with what they said; the app confirms the meeting point. Never promise a driver.
 - Visas: entry_rules with the destination and who goes. eSIM: esim_plans with the place and the days.
+- Passports and documents: documents_on_file says what Mada holds (never ask for a number or a photo of one already on file). A document sent in the chat is read by the app, which shows its own card; the traveller decides there with a tap, so you never save, use or share one yourself (use_document only says where it stands). A companion's passport comes only from them: request_document_share.
 - Corrections ("we are 5", "make it December", "no, Dubai") change only what they name: search again with the rest kept, and say what changed in a few words.
 - A person at Mada: call talk_to_human only when they ask for a person, when it is urgent (hurt, stranded, a flight today going wrong), or when the tools cannot do what they need. Never offer it otherwise.
 
@@ -228,6 +230,8 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   // The living plan (tools-plan.ts): last, so the cached prefix of the tools above stays as it was.
   ...PLAN_TOOLS,
+  // Documents in chat (tools-docs.ts): read-only, or a card the traveller taps.
+  ...DOC_TOOLS,
 ];
 
 /**

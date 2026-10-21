@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { appPeople, appUsers } from "@/db/app-schema";
 import { appAuditLog } from "./audit";
 import { encryptField, passportAad } from "./crypto";
+import { passportFingerprint } from "./documents/fingerprint";
 
 type PersonRow = typeof appPeople.$inferSelect;
 
@@ -42,6 +43,7 @@ export async function createPerson(ownerId: string, input: CreatePersonRequest, 
         passportNumberMasked: maskPassportNumber(passport.number),
         passportIssuingCountry: passport.issuingCountry, passportNationality: passport.nationality, passportExpiry: passport.expiry,
         passportSource: passport.source, passportUpdatedAt: new Date(),
+        passportFingerprint: passportFingerprint({ issuer: passport.issuingCountry, number: passport.number, dob: input.dateOfBirth }),
       } : {}),
     }).returning();
     const name = firstNameOf(input.givenNames);

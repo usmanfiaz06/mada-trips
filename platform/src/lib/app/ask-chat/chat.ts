@@ -20,6 +20,7 @@ import { personLine, type ToolCtx } from "./tools";
 import { markPlanSeen, planContext, planTitleFor } from "./tools-plan";
 import { kindFor } from "./prompt";
 import { keepForAgent } from "./takeover";
+import { attachmentsContext } from "./attachments";
 
 /*
  * POST /ask/chat, before and after the model: the switch, limits and the daily spend cap (all checked before a
@@ -113,7 +114,8 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     history,
     text: clean,
     // After the desk's Hand back, what was said meanwhile rides in this turn's context once (takeover.ts handBackNote).
-    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), ...planned.lines, thread.deskNote].filter(Boolean).join("\n"),
+    // Documents sent in this chat, as their cards say them (attachments.ts): never a number or a line of the MRZ.
+    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
     lang,
     tool,
     intent: kindFor(clean, slots.intent.kind, planned.lines.length > 0),

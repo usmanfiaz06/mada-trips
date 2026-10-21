@@ -22,6 +22,7 @@ import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { DemoFare } from './DemoFare';
 import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
+import { DocumentCard, ShareCard } from './DocCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
 import { colors, ff, font, radii } from '@/theme';
 
@@ -112,7 +113,9 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
       {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
         <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350}
           onHoverIn={turn.at ? () => setShowAt(true) : undefined} onHoverOut={turn.at ? () => setShowAt(false) : undefined} style={[s.me, found ? s.found : null]}>
-          <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>
+          {turn.attachment ? (
+            <View style={s.attached} testID="chat-me-attachment"><Icon name="doc" size={16} color={colors.mist} /><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T></View>
+          ) : <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>}
         </Pressable>
         {showAt && turn.at ? <T v="tiny" color={colors.muted} testID="chat-me-time">{clock(turn.at)}</T> : null}
       </Animated.View> : null}
@@ -300,6 +303,11 @@ function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn
       return <PlanDiffCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} />;
     case 'link':
       return <LinkCard card={card} onOpen={() => onOpen({ kind: 'link', screen: card.screen, id: card.id })} />;
+    // A passport, visa or ID sent in the chat, and asking a companion for theirs (ASK-INTEGRATED.md §6, §5.4).
+    case 'document':
+      return <DocumentCard card={card} turnId={turn.id} />;
+    case 'doc_share':
+      return <ShareCard card={card} turnId={turn.id} />;
     default:
       return null;
   }
@@ -385,6 +393,7 @@ const AVATAR_GAP = 8;
 
 const s = StyleSheet.create({
   found: { borderWidth: 2, borderColor: colors.gold },
+  attached: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stamp: { textAlign: 'center', alignSelf: 'center', paddingTop: 4 },
   meWrap: { alignSelf: 'flex-end', maxWidth: '82%', alignItems: 'flex-end' },

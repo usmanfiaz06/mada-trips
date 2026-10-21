@@ -18,6 +18,7 @@ import { redact } from "./guard";
 import { isSensitive, saveFact, unkeepable } from "./memory";
 import { PLAN_RUN, PLAN_STATUS } from "./tools-plan";
 import { esimOffer, priceItems, resolveItemIds } from "../plans/booking";
+import { DOC_RUN } from "./tools-docs";
 
 /*
  * The tools, run on the server as the signed-in traveller, through the same functions the app's own routes call (so
@@ -264,6 +265,8 @@ const RUN: Record<string, Run> = {
 
   // The living plan (tools-plan.ts).
   ...PLAN_RUN,
+  // Documents in chat (ASK-INTEGRATED.md §6): read-only, or a card that waits for the traveller's tap.
+  ...DOC_RUN,
 };
 
 export function personLine(p: Person, today: string): string {
@@ -302,12 +305,14 @@ export function statusFor(name: string, input: Record<string, unknown>, lang: "e
     entry_rules: `Checking entry rules for ${city}`, get_trips: "Looking at your trips", get_trip: "Looking at your trip", price_quote_for_pay: "Checking the price again",
     create_request: "Sending it to the desk", talk_to_human: "Passing it to the desk", plan_car_now: "Setting up the car", get_hotel: "Reading about the hotel", get_household: "Looking at who travels",
     remember: "Noting that for next time",
+    documents_on_file: "Looking at your documents", use_document: "Looking at your documents", request_document_share: "Setting up the request",
   };
   const ar: Record<string, string> = {
     search_flights: `نشوف الرحلات لـ${city}`, search_stays: `نشوف السكن في ${city}`, esim_plans: `نشوف باقات النت لـ${city}`,
     entry_rules: `نشوف شروط الدخول لـ${city}`, get_trips: "نشوف رحلاتك", get_trip: "نشوف رحلتك", price_quote_for_pay: "نتأكد من السعر",
     create_request: "نرسلها للفريق", talk_to_human: "نحوّلها للفريق", plan_car_now: "نجهّز السيارة", get_hotel: "نقرأ عن الفندق", get_household: "نشوف مين مسافر",
     remember: "نسجّلها للمرة الجاية",
+    documents_on_file: "نشوف مستنداتك", use_document: "نشوف مستنداتك", request_document_share: "نجهّز الطلب",
   };
   return (lang === "ar" ? ar : en)[name] ?? (PLAN_STATUS[lang] as Record<string, string>)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
 }

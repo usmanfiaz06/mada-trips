@@ -27,6 +27,7 @@ import { askChatCopy } from './ask-chat';
 import { askMemoryCopy } from './ask-memory';
 import { askPlanCopy } from './ask-plan';
 import { bookReadyCopy } from './book-ready';
+import { askDocsCopy } from './ask-docs';
 import { todayIdeasCopy } from './today-ideas';
 import { outcomesCopy } from './outcomes';
 import { offlineCopy } from './offline';
@@ -88,6 +89,8 @@ export const en = {
   ...askPlanCopy,
   // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
   ...bookReadyCopy,
+  // Documents in chat: packages/shared/src/copy/ask-docs.ts
+  ...askDocsCopy,
   // Today's living bento with nothing planned: packages/shared/src/copy/today-ideas.ts
   ...todayIdeasCopy,
   // Ask understands, flows never re-ask: what was heard, what changed, visa rules first, a car's route: packages/shared/src/copy/ask-heard.ts
