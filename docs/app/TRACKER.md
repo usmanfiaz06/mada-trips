@@ -16,6 +16,12 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 
 Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touches build config — run alone), #18 credentials line (needs owner's licence/IATA numbers), then retest (CRITIQUE-3).
 
+## 21 Oct (afternoon) — Ask integrated (docs/app/ASK-INTEGRATED.md)
+- Done: U1 chats list + search/dates 28c104c…8606d45 · U2 living plan core 2e7f59c · supplier adapters (Routes, car hire, Klook, Sherpa, XCover, Tabby/Tamara, Duffel, RateHawk) c7f04e3…8634276 · supplier privacy f70c9ed + live-build fix 740077d (docs/app/SUPPLIER-PRIVACY.md).
+- Running (cloud): U3 plan tools session_016yJq5f5oHv6Rws4W8PhJPV · U4 drives session_01JfpbadgWdqmreUgWX6RF5A · U5 companions/roles/approvals session_01JnQAGLMp99aGMxkd2yzKJV · U6 documents in chat session_01BdYjfbVuaTCUZEVWF1DRNu. Next: U7 booking from plan → U8 plan screen + trip page + shared trip chat → U9 Today/polish.
+- Carry into U8/U9 (from U1): attach a chat to the trip a booking creates; "Start a chat for X?" on destination switch; rename/archive/delete inside a conversation; e2e-booking flaked once on the "Checking flights to Istanbul" line — recheck.
+- Owner: confirm voucher "Payable through" line + drop of "HBX Group" mark with Hotelbeds certification; eSIM network names OK to show?
+
 ## 21 Oct
 - Done overnight: desk U1 920001c, U2 tickets 3464c31, U3 customers 80d3a52, U4 board/drop-offs da6f2ec, U5 Ask on desk fb43b79, U7 agents/rota/performance/CSAT a02a7d6 · app: waiting states + Ask cards 934f8e5, living Today cards 3cbc2a0 · Ask memory 5589a1d. Merged tree at 05:30: platform build + tsc clean, 163 desk/ask tests, 185 mobile tests, copy lint, root typecheck all pass.
 - Also done: U6 refunds/credits/app finance 27c2de9 (owner items in docs/app/APP-FINANCE.md), Ask token trim −42% a928afa. Merged tree 06:20: build/tsc clean, 188 desk+ask, 185 mobile, copy lint, root typecheck pass.
