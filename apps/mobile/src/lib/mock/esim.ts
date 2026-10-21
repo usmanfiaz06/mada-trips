@@ -1,8 +1,5 @@
-import {
-  ERROR_CODES, ESIM_FIXTURE_PACKAGES, EsimPlansQuery, addDays, esimCountriesOf, esimDays, esimDestinationOf, esimNearest, esimPlaceName, esimPlacesOf, esimPrice, esimRegionCoverage, localeOr, esimStatusOf, esimWhereKey, iosInstallLink,
-  mockEsimSim, mockEsimUsage, money, personName, suggestEsimPlans, t, tn, todayIn, topupPlans,
-  type CopyKey, type EsimPackage, type EsimView, type ErrorCode, type OrderLine, type Person, type RequestResult,
-} from '@mada/shared';
+import { ERROR_CODES, EsimPlansQuery, addDays, esimCountriesOf, esimDays, esimDestinationOf, esimNearest, esimPlaceName, esimPlacesOf, esimRegionCoverage, localeOr, esimStatusOf, esimWhereKey, iosInstallLink, mockEsimSim, mockEsimUsage, money, personName, t, tn, todayIn, type CopyKey, type EsimPackage, type EsimView, type ErrorCode, type OrderLine, type Person, type RequestResult } from '@mada/shared';
+import { ESIM_FIXTURE_PACKAGES, esimPrice, suggestEsimPlans, topupPlans } from '@mada/shared/internal';
 import type { WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { mockTrip } from './trips';
@@ -132,7 +129,7 @@ export const esimMock: AreaMock = async (w, ctx) => {
     let region = q.data.tripId || q.data.countries ? null : q.data.region ?? null;
     if (!q.data.tripId && !q.data.countries && !region && q.data.destination) { const d = esimDestinationOf(q.data.destination); countries = d.countries; region = d.region; }
     const has = new Set([...esims.values()].filter((e) => e.owner === user.id && tripId && e.tripId === tripId && e.status !== 'refunded').map((e) => e.travellerId));
-    const base = { days, start, tripId, supplier: 'mock' as const, people: onTrip.map((p) => ({ id: p.id, name: personName(p) || t('es.list.forYou'), has: has.has(p.id) })) };
+    const base = { days, start, tripId, people: onTrip.map((p) => ({ id: p.id, name: personName(p) || t('es.list.forYou'), has: has.has(p.id) })) };
     let list = packagesFor(countries);
     if (region) {
       const rc = esimRegionCoverage(list, region);

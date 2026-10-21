@@ -142,7 +142,7 @@ try {
     step('guest: links (hotel, plan, Discover, Mada)');
     const { page, context } = await newPage();
     const k = kit(page);
-    await page.goto(ORIGIN + '/hotel/99701');
+    await page.goto(ORIGIN + '/hotel/m_mockhotel99701');
     await k.see('Galata Tower Suites', 'hotel page');
     await k.see('Rooms on a quiet lane', 'hotel description');
     await k.shot('guest-hotel');
@@ -206,7 +206,7 @@ try {
     step('Arabic hotel page: Translate');
     const { page, context } = await newPage('ar-SA');
     const k = kit(page);
-    await page.goto(ORIGIN + '/hotel/99701');
+    await page.goto(ORIGIN + '/hotel/m_mockhotel99701');
     await k.see('Galata Tower Suites', 'hotel name');
     await k.see('الفندق كاتب هذا بالإنجليزي.', 'says who wrote it');
     await k.shot('ar-hotel-original');

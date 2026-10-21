@@ -337,7 +337,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     // A Hotelbeds room keeps the hotel's code (the stay opens its hotel page) and the room as booked.
     stayFacts[st!.id] = {
       addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel ? null : "+90 212 000 0000", fromAirport: "45 min",
-      roomType: hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ?? null,
+      roomType: hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ? Number(hotel.hotel.code) : null,
       // What the traveller asked the hotel for on the order sheet (the stay repeats it; the desk and the supplier got it).
       requests: (o.draft as { requests?: StayFacts["requests"] }).requests ?? null,
     };

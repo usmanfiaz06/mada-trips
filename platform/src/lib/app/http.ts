@@ -6,6 +6,7 @@ import { isProductionDeploy, pepper } from "./config";
 import { idempotencyKeyOf, idempotent } from "./resilience/idempotency";
 import { currentRequest, logRequest, withRequest } from "./resilience/request";
 import { maintenanceRetryAfter, mustUpdate, runtimeConfig } from "./resilience/runtime";
+import { scrubResponse, unsealDeep } from "./shield";
 
 /** An expected failure with a code from the shared catalogue. Anything else becomes INTERNAL. */
 export class AppError extends Error {
@@ -126,9 +127,26 @@ export function resilient(req: Request, run: () => Promise<Response>, opts: Rout
     } catch (e) {
       res = errorResponse(e);
     }
+    res = await shielded(req, res);
     logRequest(info, res.status, res.headers.get(HEADERS.replayed) ? "replayed" : undefined);
     return stamp(res, info.id);
   });
+}
+
+const APP_BASE = "/api/app/v1";
+
+/**
+ * The app's view of every JSON answer from the Core API (shield.ts): partner photos through our image route, cost and
+ * partner fields dropped, partner names out of free text. Anything that isn't JSON passes as it is.
+ */
+export async function shielded(req: Request, res: Response): Promise<Response> {
+  const url = new URL(req.url);
+  if (!url.pathname.startsWith(APP_BASE) || !res.body || !(res.headers.get("content-type") ?? "").includes("application/json")) return res;
+  let data: unknown;
+  try { data = JSON.parse(await res.clone().text()); } catch { return res; }
+  const headers = new Headers(res.headers);
+  headers.delete("content-length");
+  return new Response(JSON.stringify(scrubResponse(data, url.origin, APP_BASE)), { status: res.status, statusText: res.statusText, headers });
 }
 
 /** Parse a JSON body against a shared schema. Field problems come back as { fields: { path: message } }. */
@@ -137,7 +155,8 @@ export async function body<S extends z.ZodType>(req: Request, schema: S): Promis
   try {
     const text = await req.text();
     if (text.length > 64_000) throw new AppError("VALIDATION");
-    raw = text ? JSON.parse(text) : {};
+    // Opaque ids the app was given (shield.ts) go back to the partner's own before anything reads them.
+    raw = unsealDeep(text ? JSON.parse(text) : {});
   } catch (e) {
     if (e instanceof AppError) throw e;
     throw new AppError("VALIDATION");

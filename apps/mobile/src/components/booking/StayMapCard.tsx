@@ -30,7 +30,7 @@ export function StayMapCard({ o, guests, distance, block, onClose, onSee, onChoo
   const bottom = useBottomInset();
   const l = stayLines(o);
   const f = o.facts;
-  const code = o.hotel?.code ?? 0;
+  const code = o.hotel?.code ?? '';
   const details = useHotelDetails(code);
   const photos = [...new Set([o.hotel?.imageUrl, ...(details.data?.hotel.images ?? [])].filter((x): x is string => !!x))].slice(0, 8);
   const [w, setW] = useState(0);

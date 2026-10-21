@@ -11,6 +11,7 @@ export default defineConfig({
     alias: [
       { find: /^@\/(.*)$/, replacement: resolve(here, 'src/$1') },
       { find: /^@mada\/shared$/, replacement: resolve(here, '../../packages/shared/src/index.ts') },
+      { find: /^@mada\/shared\/(.+)$/, replacement: resolve(here, '../../packages/shared/src/$1.ts') },
       { find: /^react-native$/, replacement: stub('react-native.ts') },
       { find: /^expo-constants$/, replacement: stub('expo-constants.ts') },
       { find: /^expo-secure-store$/, replacement: stub('secure-store.ts') },

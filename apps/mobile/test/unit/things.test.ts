@@ -37,7 +37,7 @@ describe('things to do (mock)', () => {
     expect(t.weather?.mood).toBe('hot');
     expect(t.today?.why).toBe('hot');
     expect(t.today?.ids.every((id) => t.activities.find((a) => a.id === id)?.indoor !== false)).toBe(true);
-    expect(t.experiences.map((e) => e.supplier)).toContain('hotelbeds');
+    expect(t.experiences.every((e) => !('supplier' in e) && e.id.startsWith('x:'))).toBe(true);
     expect(t.events.some((e) => e.source === 'desk')).toBe(true);
     expect(t.attributions.map((a) => a.source)).toContain('openstreetmap');
     const fam = ThingsResponse.parse((await as('GET', '/places/108410/things?family=1')).json);

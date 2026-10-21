@@ -23,7 +23,7 @@ export function StayCard({ h, i, on, guests, reason, distance, evidence, onPress
   return (
     <Card padding={0} selected={on} onPress={onPress} accessibilityLabel={`${h.name}, ${formatSar(h.total.amount)}`} style={{ overflow: 'hidden', gap: 0 }}>
       <View style={[s.photo, compact ? { height: 96 } : null]} testID={`stay-photo-${i}`}>
-        {/* A Hotelbeds hotel shows its own photo or says it has none; only Mada's own catalogue uses its stock photos. */}
+        {/* A partner hotel shows its own photo or says it has none; only Mada's own catalogue uses its stock photos. */}
         {h.hotel ? <HotelPhoto uri={h.hotel.imageUrl} name={h.name} seed={h.hotel.code} compact={compact} recyclingKey={h.id} testID={`stay-photo-${i}`} /> : <Photo name={h.photo} focal={h.focal} />}
         {badge ? <Pill label={badge} variant={on ? 'gold' : 'default'} style={[s.tl, on ? null : s.glass]} /> : null}
       </View>

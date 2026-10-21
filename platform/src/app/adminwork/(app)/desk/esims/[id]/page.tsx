@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { canDeskFinance } from "@/lib/app/finance/access";
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -91,7 +92,7 @@ export default async function EsimPage({ params }: { params: Promise<{ id: strin
                 <input type="hidden" name="ask" value={randomUUID()} />
                 <select name="packageId" className="field h-9 w-full text-[13px]" defaultValue="">
                   <option value="" disabled>{t("Pick a top-up")}</option>
-                  {e.topupPlans.slice(0, 20).map((p) => <option key={p.id} value={p.id}>{p.gb === null ? t("Unlimited") : `${p.gb} GB`} · {t("{n} days", { n: p.days })} · ${p.netUsd.toFixed(2)}</option>)}
+                  {e.topupPlans.slice(0, 20).map((p) => <option key={p.id} value={p.id}>{p.gb === null ? t("Unlimited") : `${p.gb} GB`} · {t("{n} days", { n: p.days })}{canDeskFinance(u) ? ` · $${p.netUsd.toFixed(2)}` : ""}</option>)}
                 </select>
                 <SubmitButton size="sm" confirm={t("Top this eSIM up on Mada?")}>{t("Top up")}</SubmitButton>
               </ActionForm>

@@ -89,4 +89,3 @@ export function durationLine(min: number | null): string {
 }
 
 export const priceLine = (e: Experience) => t('things.from', { price: formatSar(e.priceFrom.amount) });
-export const SUPPLIER_NAME: Record<Experience['supplier'], string> = { hotelbeds: 'Hotelbeds', getyourguide: 'GetYourGuide', viator: 'Viator' };

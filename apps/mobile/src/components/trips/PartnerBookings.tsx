@@ -11,7 +11,7 @@ import { useTripVouchers } from '@/lib/transfers';
  * On a trip: "Airport pickup" when the trip lands somewhere and no pickup is booked yet (Hotelbeds transfers, sent to
  * the desk in the beta), and the trip's Hotelbeds vouchers (hotel, pickup) to show at check-in.
  */
-export function TripHotelbeds({ trip, hasArrivalPickup }: { trip: TripDetail; hasArrivalPickup: boolean }) {
+export function TripPartnerBookings({ trip, hasArrivalPickup }: { trip: TripDetail; hasArrivalPickup: boolean }) {
   const router = useRouter();
   const vouchers = useTripVouchers(trip.id).data?.vouchers ?? [];
   const outs = trip.segments.filter((s) => s.direction === 'out');

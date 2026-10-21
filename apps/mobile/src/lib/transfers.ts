@@ -18,19 +18,22 @@ export const transfersApi = {
   vouchers: (tripId: string) => request({ method: 'GET', path: SUPPLIER_VOUCHER_ROUTES.tripVouchers(tripId) }, SupplierVouchersResponse),
   voucher: (id: string) => request({ method: 'GET', path: SUPPLIER_VOUCHER_ROUTES.voucher(id) }, SupplierVoucherResponse),
   cancel: (id: string, confirm: boolean) => request({ method: 'POST', path: SUPPLIER_VOUCHER_ROUTES.cancel(id), body: { confirm } }, CancelSupplierVoucherResponse),
-  hotel: (code: number) => request({ method: 'GET', path: HOTEL_ROUTES.hotel(code) }, HotelDetailsResponse),
+  hotel: (code: string) => request({ method: 'GET', path: HOTEL_ROUTES.hotel(code) }, HotelDetailsResponse),
   /** The hotel's own words in the reader's language, translated once on the server ("Translate"). */
-  hotelTranslation: (code: number, to: 'en' | 'ar') => request({ method: 'GET', path: HOTEL_ROUTES.translation(code, to) }, HotelTranslationResponse),
+  hotelTranslation: (code: string, to: 'en' | 'ar') => request({ method: 'GET', path: HOTEL_ROUTES.translation(code, to) }, HotelTranslationResponse),
 };
 
 const signedIn = () => !!useSession.getState().tokens;
+
+/** A partner hotel's id as the server gives it (opaque; the partner's own code never reaches the app). */
+export const isHotelId = (code: string | null | undefined): code is string => !!code && /^m_[\w-]{8,}$/.test(code);
 
 export const transferKeys = {
   options: (tripId: string) => ['trips', 'transfers', tripId] as const,
   vouchers: (tripId: string) => ['trips', 'vouchers', tripId] as const,
   voucher: (id: string) => ['vouchers', id] as const,
-  hotel: (code: number) => ['hotels', code] as const,
-  translation: (code: number, to: string) => ['hotels', code, 'translation', to] as const,
+  hotel: (code: string) => ['hotels', code] as const,
+  translation: (code: string, to: string) => ['hotels', code, 'translation', to] as const,
 };
 
 export function useTransferOptions(tripId: string) {
@@ -42,9 +45,9 @@ export function useTripVouchers(tripId: string) {
 export function useVoucher(id: string) {
   return useQuery({ queryKey: transferKeys.voucher(id), queryFn: () => transfersApi.voucher(id), enabled: !!id && signedIn() });
 }
-export function useHotelDetails(code: number) {
+export function useHotelDetails(code: string) {
   // Open to anyone: a hotel page (shared or found while looking around) needs no account.
-  return useQuery({ queryKey: transferKeys.hotel(code), queryFn: () => transfersApi.hotel(code), enabled: code > 0, staleTime: 24 * 3_600_000 });
+  return useQuery({ queryKey: transferKeys.hotel(code), queryFn: () => transfersApi.hotel(code), enabled: isHotelId(code), staleTime: 24 * 3_600_000 });
 }
 
 /**

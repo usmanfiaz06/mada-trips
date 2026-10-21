@@ -171,8 +171,8 @@ export const StayDetail = Stay.extend({
   roomType: z.string().nullable(),
   /** How the stay was paid: in full, or in instalments. */
   plan: z.enum(['full', 'tabby', 'tamara']),
-  /** The hotel's code with the supplier (Hotelbeds), so the stay opens its hotel page. Null for a catalogue stay. Older servers send none. */
-  hotelCode: z.number().int().nullable().optional(),
+  /** The hotel's opaque id, so the stay opens its hotel page. Null for a catalogue stay. Older servers send none. */
+  hotelCode: z.string().nullable().optional(),
   /** What the traveller asked the hotel for on the order sheet. Older servers send none. */
   requests: HotelRequests.nullable().optional(),
   /** The hotel's name and address in Arabic, to show a driver who reads Arabic. Older servers send none. */

@@ -7,7 +7,7 @@ import { useTrip } from '@/lib/trips';
 import { colors } from '@/theme';
 
 /** Where a booked stay's hotel page lives (the same link Today and the trip screen use). */
-export const hotelHref = (st: { id: string; hotelCode?: number | null }, trip: { id: string; city: string }) =>
+export const hotelHref = (st: { id: string; hotelCode?: string | null }, trip: { id: string; city: string }) =>
   `/hotel/${st.hotelCode ?? 'stay'}?trip=${trip.id}&stay=${st.id}&city=${encodeURIComponent(trip.city)}` as Href;
 
 /**

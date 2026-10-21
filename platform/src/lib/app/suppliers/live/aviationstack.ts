@@ -70,7 +70,7 @@ export function mapAvs(flightNumber: string, date: string, f: AvsFlight): Flight
     flightNumber, carrierName: f.airline?.name ?? null, date, from: d.iata ?? null, to: a.iata ?? null,
     departLocal: wall(d.actual ?? d.estimated ?? d.scheduled), arriveLocal: wall(a.actual ?? a.estimated ?? a.scheduled),
     status: statusOf(f, delay), gate: clean(d.gate), terminal: terminal ? (/^\d+$/.test(terminal) ? `Terminal ${terminal}` : terminal) : null,
-    source: "Live · aviationstack",
+    source: "Live",
     departUtc: utc(best(d), d.timezone), arriveUtc: utc(best(a), a.timezone),
     scheduledDepartUtc: utc(d.scheduled, d.timezone), scheduledArriveUtc: utc(a.scheduled, a.timezone),
     actualDepartUtc: utc(d.actual_runway ?? d.actual, d.timezone),

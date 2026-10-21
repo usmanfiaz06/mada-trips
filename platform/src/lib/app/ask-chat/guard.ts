@@ -1,4 +1,5 @@
 import { arBannedIn, bannedIn, normalizeDigits, screenText } from "@mada/shared";
+import { PARTNER_NAMES } from "../shield";
 
 /*
  * What stands between the traveller, the model and the phone (docs/app/ASK-CHAT.md §Safety). Pure, so the evals and
@@ -106,8 +107,15 @@ export function unbacked(reply: string, toolText: string): string[] {
   return out;
 }
 
-/** Banned words (English and Arabic) in a reply. */
-export const outgoingProblems = (reply: string): string[] => [...bannedIn(reply), ...arBannedIn(reply)];
+/**
+ * Mada's partners by name (shield.ts PARTNER_NAMES, plus TBO and HBG as words): a tool result may carry them for the
+ * model, a traveller never reads them (docs/app/SUPPLIER-PRIVACY.md).
+ */
+const PARTNERS = new RegExp(String.raw`${PARTNER_NAMES.source}|\b(?:TBO|HBG|tbo)\b|\b(?:flight ?aware|aviation ?stack|cover ?genius|my ?fatoorah)\b|هوتيل ?بيدز|إيرالو|ايرالو`, "gi");
+export const partnersIn = (reply: string): string[] => [...reply.matchAll(PARTNERS)].map((m) => m[0]);
+
+/** Banned words (English and Arabic) and partners' names in a reply. */
+export const outgoingProblems = (reply: string): string[] => [...bannedIn(reply), ...arBannedIn(reply), ...partnersIn(reply)];
 
 /** The mechanics COPY.md §4 fixes without asking: no exclamation marks, no em dashes, no emoji. */
 export const tidy = (delta: string) => delta.replace(/[!！]/g, ".").replace(/\s?—\s?/g, ", ").replace(/\p{Extended_Pictographic}️?/gu, "");

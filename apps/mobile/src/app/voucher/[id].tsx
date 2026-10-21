@@ -16,7 +16,7 @@ import { saveVoucher, transferKeys, transfersApi, useVoucher } from '@/lib/trans
 import { colors } from '@/theme';
 
 /*
- * A Hotelbeds voucher (certification §4): hotel name and address, the HBX Group reference, our reference, the lead
+ * A partner hotel's voucher (certification §4): hotel name and address, the booking reference, our reference, the lead
  * guest and a name per room with children's ages, dates, room, board, the hotel's essential information in full, the
  * cancellation rule, and the payment statement (no price). Download it (the same page the server prints), or cancel:
  * Hotelbeds says what it costs first, then the traveller confirms.
@@ -58,7 +58,7 @@ export default function VoucherScreen() {
       <Rise><T v="h1" accessibilityRole="header">{v.hotel?.name ?? v.transfer?.vehicle ?? ''}</T></Rise>
       <Rise step={1}><Small style={{ marginTop: -8 }}>{v.status === 'cancelled' ? t('voucher.cancelled') : t('voucher.show')}</Small></Rise>
       <Box testID="voucher-ref">
-        <Spread><Tiny>{t('voucher.reference')}</Tiny>{v.status === 'cancelled' ? <Tag tone="bad" label={t('voucher.cancelled')} /> : <Tag tone="ok" label="HBX Group" />}</Spread>
+        <Spread><Tiny>{t('voucher.reference')}</Tiny>{v.status === 'cancelled' ? <Tag tone="bad" label={t('voucher.cancelled')} /> : <Tag tone="ok" label={t('hotel.booked.tag')} />}</Spread>
         <T style={{ fontSize: 24, fontWeight: '600', letterSpacing: 0.6, color: colors.green, writingDirection: 'ltr' }} selectable>{v.reference}</T>
         {v.agencyReference ? <Tiny>{t('voucher.agency')}: {v.agencyReference}</Tiny> : null}
       </Box>

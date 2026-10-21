@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { canDeskFinance } from "@/lib/app/finance/access";
 import { Smartphone } from "lucide-react";
 import { can, requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -24,6 +25,7 @@ const TABS = Object.keys(ESIM_TABS);
 
 export default async function EsimsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const u = await requirePerm("desk.view");
+  const finance = canDeskFinance(u);
   const t = await getT();
   const sp = await searchParams;
   const tab = TABS.includes(sp.s ?? "") ? sp.s! : "open";
@@ -41,11 +43,13 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
         actions={can(u, "settings.manage") ? <LinkButton href="/adminwork/desk/finance/esim-pricing" variant="outline" size="sm">{t("eSIM pricing")}</LinkButton> : null} />
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
         <Badge tone={vendor !== "mock" ? "ok" : "neutral"}>{vendor === "esimaccess" ? t("eSIM Access") : vendor === "airalo" ? t("Airalo {env}", { env: airaloEnv() }) : t("Mock supplier")}</Badge>
-        <span>{t("Margin {pct}%, at least SAR {min} a plan", { pct: rules.marginPct, min: rules.minProfitSar })}</span>
+        {finance ? <span>{t("Margin {pct}%, at least SAR {min} a plan", { pct: rules.marginPct, min: rules.minProfitSar })}</span> : null}
         {keysMissing ? <Badge tone="bad">{vendor === "esimaccess" ? t("ESIMACCESS_ACCESS_CODE and ESIMACCESS_SECRET_KEY are not set") : t("AIRALO_CLIENT_ID and AIRALO_CLIENT_SECRET are not set")}</Badge> : null}
       </div>
       {!allowed.ok ? <div className="mb-3"><Notice tone="warn" title={t("eSIMs can't be sold here")}>{allowed.why}</Notice></div> : null}
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      {/* The supplier's balance and cost moves are App finance (DESK-PLAN §4.3): support agents see only the warning. */}
+      {!finance && bal.low ? <div className="mb-3"><Notice tone="bad" title={t("Top up the eSIM Access balance")}>{t("Below what the next orders need. Paid eSIMs wait and are ordered again within 15 minutes of the top-up; past the time promised, they are refunded.")}</Notice></div> : null}
+      {finance ? <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -65,7 +69,7 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
           {cat.up.length ? <div className="mt-2"><Badge tone="warn">{t("Cost went up on {n} plans", { n: cat.up.length })}</Badge> <span className="text-[12px] text-ink-3">{t("Sell prices follow the rules, never below the guard.")}</span></div> : null}
           {cat.down.length ? <div className="mt-1"><Badge tone="ok">{t("Cost went down on {n} plans", { n: cat.down.length })}</Badge></div> : null}
         </Card>
-      </div>
+      </div> : null}
       <Tabs active={tab} items={TABS.map((s) => ({ key: s, label: t({ open: "Open", stuck: "Stuck", refunded: "Refunded", all: "All" }[s] ?? s), href: href({ s: s === "open" ? undefined : s, page: undefined }), count: s === "all" ? undefined : data.counts[s] ?? 0 }))} />
       <Card pad={false}>
         <ListFilter action="/adminwork/desk/esims" q={sp.q} keep={{ s: sp.s }} placeholder={t("Traveller, ICCID, country, order ref…")} clear={sp.q ? href({ q: undefined, page: undefined }) : null} />

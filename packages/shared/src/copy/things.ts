@@ -91,7 +91,7 @@ export const thingsCopy = {
   'things.rating': '{rating} · {count} reviews',
   'things.freeCancel': 'Free to cancel',
   'things.minAge': 'Ages {age} and up',
-  'things.via': 'Through {supplier}',
+  'things.via': 'Booked by Mada',
 
   // ───────────── an event ─────────────
   'things.event.dates': '{from} to {to}',
@@ -129,7 +129,7 @@ export const thingsCopy = {
   'things.source.openmeteo': 'Weather: Open-Meteo.com, CC BY 4.0.',
   'things.source.ticketmaster': 'Events outside Saudi Arabia: Ticketmaster.',
   'things.source.geonames': 'Cities and time zones: GeoNames, CC BY 4.0.',
-  'things.source.partners': 'Tours and tickets: Hotelbeds, GetYourGuide and Viator, booked by Mada.',
+  'things.source.partners': 'Tours and tickets: from Mada’s partners, booked by Mada.',
   'things.source.desk': 'Saudi events: picked by the Mada team.',
 
   // ───────────── getting there ─────────────

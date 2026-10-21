@@ -59,7 +59,7 @@ export const SupplierVoucher = z.object({
   id: Id,
   kind: z.enum(['stay', 'transfer']),
   status: z.enum(['confirmed', 'cancelled', 'pending']),
-  /** HBX Group's booking reference (mandatory on the voucher). */
+  /** The hotel's booking reference with the partner (the voucher needs it at check-in). */
   reference: z.string(),
   /** Ours, for the traveller and the desk. */
   agencyReference: z.string().nullable(),
@@ -85,9 +85,8 @@ export const SupplierVouchersResponse = z.object({ vouchers: z.array(SupplierVou
 export const CancelSupplierVoucherBody = z.object({ confirm: z.boolean() });
 export const CancelSupplierVoucherResponse = z.object({
   simulated: z.boolean(),
-  /** What cancelling costs (or cost), in riyals at our rate, and as Hotelbeds states it. */
+  /** What cancelling costs (or cost), in riyals. */
   fee: Money,
-  supplierFee: z.object({ amount: z.number(), currency: z.string().nullable() }),
   voucher: SupplierVoucher,
 });
 export type CancelSupplierVoucherResponse = z.infer<typeof CancelSupplierVoucherResponse>;
@@ -102,19 +101,19 @@ export const SUPPLIER_VOUCHER_ROUTES = {
 /* ───────────── hotel details (Content API, from our store) ───────────── */
 
 export const HotelDetails = z.object({
-  code: z.number().int(),
+  /** Mada's opaque id for the hotel. */
+  code: z.string(),
   name: z.string(),
   /** "4 stars", "3 keys", as the category says. */
   category: z.string().nullable(),
   address: z.string().nullable(),
   phone: z.string().nullable(),
   description: z.string().nullable(),
-  /** Every image Hotelbeds has, in their order (photos.hotelbeds.com, 1024 px). */
+  /** Every photo, in order, through Mada's image links. */
   images: z.array(z.string()),
   facilities: z.array(z.object({ name: z.string(), paid: z.boolean() })),
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
-  source: z.literal('HBX Group'),
 });
 export type HotelDetails = z.infer<typeof HotelDetails>;
 export const HotelDetailsResponse = z.object({ hotel: HotelDetails });
@@ -134,6 +133,6 @@ export const MessageTranslationResponse = z.object({ lang: z.enum(['en', 'ar']),
 export type MessageTranslationResponse = z.infer<typeof MessageTranslationResponse>;
 export const messageTranslationPath = (id: string, to: 'en' | 'ar') => `/messages/${id}/translation?to=${to}`;
 
-export const HOTEL_ROUTES = { hotel: (code: number) => `/hotels/${code}`, translation: (code: number, to: 'en' | 'ar') => `/hotels/${code}/translation?to=${to}` } as const;
+export const HOTEL_ROUTES = { hotel: (code: string) => `/hotels/${encodeURIComponent(code)}`, translation: (code: string, to: 'en' | 'ar') => `/hotels/${encodeURIComponent(code)}/translation?to=${to}` } as const;
 
 export { voucherHtml } from './voucher-html';

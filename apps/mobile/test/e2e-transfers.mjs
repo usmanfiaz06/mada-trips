@@ -112,7 +112,7 @@ async function run(lang) {
   await shot('pickup-requested');
 
   step(`${lang}: hotel details`);
-  await go('/hotel/99701');
+  await go('/hotel/m_mockhotel99701');
   await see('Galata Tower Suites', 'hotel name');
   await see(c.facilities, 'facilities');
   await shot('hotel-details');

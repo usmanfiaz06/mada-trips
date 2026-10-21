@@ -1,4 +1,4 @@
-import type { Experience } from "@mada/shared";
+import type { SupplierExperience as Experience } from "../activities-types";
 import type { ActivitiesSupplier } from "../activities-types";
 import { markedUp } from "../sell";
 

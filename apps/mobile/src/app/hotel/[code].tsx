@@ -19,7 +19,7 @@ import { useTrip } from '@/lib/trips';
 import { rangeLabel, stayEnd } from '@mada/shared';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t, tn } from '@/lib/i18n';
-import { transferKeys, transfersApi, useHotelDetails } from '@/lib/transfers';
+import { isHotelId, transferKeys, transfersApi, useHotelDetails } from '@/lib/transfers';
 import { api } from '@/lib/api';
 import { accountIds } from '@/lib/guest';
 import { herePath, requireAccount } from '@/lib/signin-ask';
@@ -27,7 +27,7 @@ import { TranslateToggle, WrittenInEnglish, useTranslated } from '@/components/b
 import { colors, ff, font } from '@/theme';
 
 /*
- * A hotel before booking (certification §5 for the content: HBX Group, from our store, never fetched live): every
+ * A hotel before booking (certification §5 for the content: the partner's, from our store, never fetched live): every
  * photo, where it is on a map and how far from where the traveller measures, the rooms for this stay with the total
  * and per night, what each includes and its cancellation in plain words, what the hotel has (the useful things
  * first), and one action: review this room.
@@ -47,8 +47,8 @@ export default function HotelScreen() {
   // A booked stay (opened from the trip): the room and dates come from the trip; the hotel's content when it has a code.
   const tripQ = useTrip(tripId || null);
   const booked = tripId ? tripQ.data?.trip.stays.find((x) => x.id === stayId) ?? null : null;
-  const hasCode = Number.isInteger(Number(code)) && Number(code) > 0;
-  const q = useHotelDetails(hasCode ? Number(code) : 0);
+  const hasCode = isHotelId(code);
+  const q = useHotelDetails(hasCode ? code : '');
   const shown = useQuery({ queryKey: ['booking', 'offer', offer], enabled: !!offer, queryFn: () => bookingApi.offer(offer!) });
   const rooms = useQuery({ queryKey: ['booking', 'rooms', offer], enabled: !!offer, staleTime: 300_000, queryFn: () => bookingApi.rooms(offer!) });
   const cityKey = city || catalogueHotelByKey(code)?.city || '';
@@ -61,15 +61,15 @@ export default function HotelScreen() {
   // A catalogue stay has no supplier content: the page is the stay itself (name, address, phone, the walk).
   // A hotel from Mada's own catalogue (the Istanbul bundle's, an Umrah hotel near the Haram), opened by its key before booking.
   const cat = !hasCode && !tripId ? catalogueHotelByKey(code) : null;
-  const h = details ?? (booked ? { code: 0, name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null, source: 'HBX Group' as const }
-    : cat ? { code: 0, name: cat.name, category: cat.area, address: cat.address, phone: null, description: cat.note, images: [], facilities: [], latitude: cat.lat, longitude: cat.lng, source: 'HBX Group' as const } : undefined);
+  const h = details ?? (booked ? { code: '', name: booked.name, category: null, address: booked.address, phone: booked.phone, description: null, images: [], facilities: [], latitude: null, longitude: null }
+    : cat ? { code: '', name: cat.name, category: cat.area, address: cat.address, phone: null, description: cat.note, images: [], facilities: [], latitude: cat.lat, longitude: cat.lng } : undefined);
   // A catalogue hotel for this party and these dates (the bundle's): photo, room × rooms, a night, board, rating, cancel date.
   const cs = cat ? catalogueStay(cat.key, guests, checkIn ?? null, checkOut ?? null) : null;
   const stay = shown.data?.stay ?? null;
   const options: StayOption[] = rooms.data?.options ?? (stay ? [stay] : []);
   const cur = options.find((o) => o.id === chosen) ?? options[0] ?? null;
   // The hotel wrote its words in English: on an Arabic page they show as written, with "Translate" (translated once, kept).
-  const tr = useTranslated(transferKeys.translation(Number(code), lang), () => transfersApi.hotelTranslation(Number(code), lang));
+  const tr = useTranslated(transferKeys.translation(code, lang), () => transfersApi.hotelTranslation(code, lang));
   const canTranslate = lang === 'ar' && !!details && (!!details.description || details.facilities.length > 0);
   const trNames = useMemo(() => new Map((details?.facilities ?? []).filter((f) => f.name).map((f, i) => [f.name, tr.data?.facilities[i] ?? null])), [details?.facilities, tr.data]);
   const facilities = useMemo(() => (details?.facilities ?? []).filter((f) => !NOISE.test(f.name)).sort((a, b) => rank(a.name) - rank(b.name)), [details?.facilities]);
@@ -114,7 +114,7 @@ export default function HotelScreen() {
         <View style={st.hero} testID="hotel-photo"><HotelPhoto uri={stay?.hotel?.imageUrl} name={h.name} seed={details?.code ?? stay?.hotel?.code} testID="hotel-photo" /></View>
       ) : null}
       <Rise><T style={font('displaySmall')} accessibilityRole="header">{h.name}</T></Rise>
-      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={nameIn(h.category, lang)} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}{details ? <Tag label="HBX Group" /> : null}</Row></Rise>
+      <Rise step={1}><Row gap={8} style={{ flexWrap: 'wrap' }}>{booked ? <Tag tone="ok" label={booked.status === 'cancelled' ? t('tm.detail.cancelled') : t('hotel.booked.tag')} /> : null}{h.category ? <Tag tone="gold" label={nameIn(h.category, lang)} /> : null}{stay?.facts?.zone ? <Tag label={stay.facts.zone} /> : null}</Row></Rise>
 
       {/* Your booking: the room and dates as booked, the confirmation, the cancellation rule, the walk and the drive. */}
       {booked ? (

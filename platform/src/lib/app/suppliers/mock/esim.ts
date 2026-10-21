@@ -1,5 +1,6 @@
 import "server-only";
-import { ESIM_FIXTURE_PACKAGES, iosInstallLink, mockEsimSim, mockEsimUsage } from "@mada/shared";
+import { iosInstallLink, mockEsimSim, mockEsimUsage } from "@mada/shared";
+import { ESIM_FIXTURE_PACKAGES } from "@mada/shared/internal";
 import { EsimRefused, type EsimSim, type EsimSupplier, type EsimSupplierOrder } from "../esim-types";
 
 /*

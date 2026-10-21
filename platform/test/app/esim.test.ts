@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { CreateOrderResponse, EsimPlacesResponse, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse, PreviewResponse, esimPhoneFit, esimPrice, suggestEsimPlans, ESIM_FIXTURE_PACKAGES, type OrderDraft } from "@mada/shared";
+import { CreateOrderResponse, EsimPlacesResponse, EsimPlansResponse, EsimResponse, EsimsResponse, EsimTopupsResponse, PreviewResponse, esimPhoneFit, type OrderDraft } from "@mada/shared";
+import { esimPrice, suggestEsimPlans, ESIM_FIXTURE_PACKAGES } from "@mada/shared/internal";
 import { db } from "@/db";
 import { appNotifications, appPayments, appRefunds } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
@@ -21,6 +22,7 @@ import { POST as ordersPost } from "@/app/api/app/v1/orders/route";
 import { GET as peopleGet, POST as peoplePost } from "@/app/api/app/v1/people/route";
 import { POST as cardsPost } from "@/app/api/app/v1/cards/route";
 import { callP, signIn } from "./wallet-helpers";
+import { seal } from "@/lib/app/shield";
 
 /* eSIMs on Airalo: the live adapter against Airalo's documented shapes, then plans → pay → order after capture → install → usage → top-up, the refund when the supplier says no, and never buying twice. */
 
@@ -152,7 +154,8 @@ describe("eSIMs through the Core API (mock supplier)", () => {
   it("suggests, sells, orders after capture, installs, reads what's left and tops up", async () => {
     const f = await traveller();
     const plans = EsimPlansResponse.parse((await get(plansGet, f.token, {}, "?destination=istanbul&days=7")).json);
-    expect(plans).toMatchObject({ outcome: "ok", where: { code: "TR", kind: "local" }, recommended: "merhaba-7days-5gb", supplier: "mock" });
+    expect(plans).toMatchObject({ outcome: "ok", where: { code: "TR", kind: "local" }, recommended: seal("esim", "merhaba-7days-5gb") });
+    expect(plans).not.toHaveProperty("supplier");
     expect(plans.plans).toHaveLength(3);
     expect(plans.people.map((p) => p.id).sort()).toEqual([f.me, f.hessa].sort());
     const plan = plans.plans.find((p) => p.id === plans.recommended)!;

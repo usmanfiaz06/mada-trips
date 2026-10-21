@@ -19,24 +19,24 @@ type State = { seen: Map<string, string>; requested: Map<string, { id: string; v
 const states = new Map<string, State>();
 const stateOf = (userId: string) => { let s = states.get(userId); if (!s) { s = { seen: new Map(), requested: new Map(), options: new Map(), cancelled: new Set(), clientKeys: new Map() }; states.set(userId, s); } return s; };
 
-const HOTELS: Record<number, HotelDetails> = {
-  99701: {
-    code: 99701, name: 'Galata Tower Suites', category: '4 stars', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 14, Beyoglu, 34421, Istanbul', phone: '+902120000001',
+const HOTELS: Record<string, HotelDetails> = {
+  m_mockhotel99701: {
+    code: 'm_mockhotel99701', name: 'Galata Tower Suites', category: '4 stars', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 14, Beyoglu, 34421, Istanbul', phone: '+902120000001',
     description: 'Rooms on a quiet lane three minutes from Galata Tower, with breakfast on the roof.', images: [], facilities: [{ name: 'Wi-fi', paid: false }, { name: 'Car park', paid: true }, { name: 'Airport shuttle', paid: true }],
-    latitude: 41.0258, longitude: 28.974, source: 'HBX Group',
+    latitude: 41.0258, longitude: 28.974,
   },
   // The demo trip's stay (trips.ts seed), so its stay card opens a hotel page.
-  99702: {
-    code: 99702, name: 'Bereketzade Hotel', category: '4 stars', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', phone: '+90 212 000 0000',
+  m_mockhotel99702: {
+    code: 'm_mockhotel99702', name: 'Bereketzade Hotel', category: '4 stars', address: 'Bereketzade Mah., Galata Kulesi Sk. No: 12, 34421 Beyoğlu/İstanbul', phone: '+90 212 000 0000',
     description: 'Quiet rooms on a lane three minutes from Galata Tower. Connecting rooms on request, breakfast on the roof.', images: [], facilities: [{ name: 'Wi-fi', paid: false }, { name: 'Breakfast', paid: false }, { name: 'Connecting rooms', paid: false }, { name: 'Airport shuttle', paid: true }],
-    latitude: 41.0262, longitude: 28.9727, source: 'HBX Group',
+    latitude: 41.0262, longitude: 28.9727,
   },
 };
 
 /** The demo hotels' words in Arabic, as GET /hotels/{code}/translation answers once the translator has run. */
-const HOTELS_AR: Record<number, { description: string; facilities: Record<string, string> }> = {
-  99701: { description: 'غرف في زقاق هادئ على بعد ثلاث دقائق من برج غلطة، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', 'Car park': 'موقف سيارات', 'Airport shuttle': 'توصيل من المطار' } },
-  99702: { description: 'غرف هادئة في زقاق على بعد ثلاث دقائق من برج غلطة. غرف متصلة عند الطلب، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', Breakfast: 'فطور', 'Connecting rooms': 'غرف متصلة', 'Airport shuttle': 'توصيل من المطار' } },
+const HOTELS_AR: Record<string, { description: string; facilities: Record<string, string> }> = {
+  m_mockhotel99701: { description: 'غرف في زقاق هادئ على بعد ثلاث دقائق من برج غلطة، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', 'Car park': 'موقف سيارات', 'Airport shuttle': 'توصيل من المطار' } },
+  m_mockhotel99702: { description: 'غرف هادئة في زقاق على بعد ثلاث دقائق من برج غلطة. غرف متصلة عند الطلب، والفطور على السطح.', facilities: { 'Wi-fi': 'واي فاي', Breakfast: 'فطور', 'Connecting rooms': 'غرف متصلة', 'Airport shuttle': 'توصيل من المطار' } },
 };
 
 async function tripOf(w: Wire, ctx: Parameters<AreaMock>[1], id: string): Promise<TripDetail | null> {
@@ -48,7 +48,7 @@ function optionsFor(tripId: string, people: number, landing: string): (TransferO
   const exp = new Date(Date.now() + 20 * 60_000).toISOString();
   const free = addDays(landing.slice(0, 10), -1);
   const list: (TransferOption & { tripId: string })[] = [
-    { id: uuid(), tripId, kind: 'shared', vehicle: 'Shuttle', category: 'Standard', maxPax: 99, minutes: 85, total: { amount: Math.ceil((11.2 * people * 4.15 * 1.0150 * 1.15)) * 100, currency: 'SAR' }, freeCancelUntil: addDays(landing.slice(0, 10), -2), refundable: true, pickupNote: 'Go to the Hotelbeds desk in the arrivals hall. Shuttles leave every 45 minutes.', imageUrl: null, expiresAt: exp },
+    { id: uuid(), tripId, kind: 'shared', vehicle: 'Shuttle', category: 'Standard', maxPax: 99, minutes: 85, total: { amount: Math.ceil((11.2 * people * 4.15 * 1.0150 * 1.15)) * 100, currency: 'SAR' }, freeCancelUntil: addDays(landing.slice(0, 10), -2), refundable: true, pickupNote: 'Go to the transfer desk in the arrivals hall. Shuttles leave every 45 minutes.', imageUrl: null, expiresAt: exp },
     { id: uuid(), tripId, kind: 'private', vehicle: 'Minivan', category: 'Standard', maxPax: 7, minutes: 50, total: { amount: 25_200, currency: 'SAR' }, freeCancelUntil: free, refundable: true, pickupNote: 'The driver waits in the arrivals hall, by meeting point 4, with a sign with your name.', imageUrl: null, expiresAt: exp },
     { id: uuid(), tripId, kind: 'private', vehicle: 'Car', category: 'Standard', maxPax: 3, minutes: 50, total: { amount: 18_700, currency: 'SAR' }, freeCancelUntil: free, refundable: true, pickupNote: 'The driver waits in the arrivals hall, by meeting point 4, with a sign with your name.', imageUrl: null, expiresAt: exp },
   ];
@@ -69,7 +69,7 @@ function stayVoucher(trip: TripDetail, s: State): SupplierVoucher | null {
     hotel: { name: st.name, address: st.address, category: '4 stars', destination: trip.city, phone: st.phone ?? '+90 212 000 0001' },
     checkIn: st.checkIn, checkOut: out, room: st.roomType ?? 'Double Standard', board: 'Bed And Breakfast',
     transfer: null, remarks: 'Check-in hour 14:00. A refundable deposit of EUR 50 per room is taken at the hotel. Guests must show the passport used for the booking.',
-    cancellation: st.cancellation, payableThrough: `Payable through HOTELBEDS PROFESSIONAL SERVICES, S.L.U, acting as agent for the service operating company, details of which can be provided upon request. VAT: ESB38877676 Reference: ${ref}`,
+    cancellation: st.cancellation, payableThrough: `Payable through THE PARTNER ON YOUR BOOKING (mock), acting as agent for the service operating company, details of which can be provided upon request. VAT: XX00000000 Reference: ${ref}`,
     canCancel: status === 'confirmed',
   };
 }
@@ -82,7 +82,7 @@ export const transfersMock: AreaMock = async (w, ctx) => {
   const { user } = ctx;
   // A hotel page is open to anyone (the server's openRoute); "Translate" has the desk's Arabic for the demo hotels.
   if (parts[0] === 'hotels') {
-    const h = HOTELS[Number(parts[1])];
+    const h = HOTELS[decodeURIComponent(parts[1] ?? '')];
     if (!h) return err('NOT_FOUND');
     if (parts[2] === 'translation') {
       const to = new URLSearchParams(w.path.split('?')[1] ?? '').get('to') === 'en' ? 'en' : 'ar';

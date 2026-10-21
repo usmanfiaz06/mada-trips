@@ -92,33 +92,34 @@ export const MOCK_ACTIVITIES: Readonly<Record<string, Activity[]>> = {
   ]),
 };
 
-const exp = (supplier: Experience['supplier'], code: string, title: string, sar: number, mins: number | null, x: Partial<Experience> = {}): Experience => ({
-  id: `${supplier}:${code}`, supplier, code, modality: supplier === 'hotelbeds' ? 'STD' : null, title, summary: null, image: null, photo: null,
+/** A sample experience: `x:<slug>` (the mock supplier's code is the slug). */
+const exp = (slug: string, title: string, sar: number, mins: number | null, x: Partial<Experience> = {}): Experience => ({
+  id: `x:${slug}`, title, summary: null, image: null, photo: null,
   priceFrom: { amount: sar * 100, currency: 'SAR' }, durationMin: mins, rating: null, reviews: null, family: false, minAge: null, freeCancel: true, ...x,
 });
 
 export const MOCK_EXPERIENCES: Readonly<Record<string, Experience[]>> = {
   '745044': [
-    exp('hotelbeds', 'E-E10-IST-BOSDIN', 'Bosphorus dinner cruise', 245, 180, { summary: 'Dinner on the water from Kabataş pier, with a halal menu and the bridges lit up.', photo: 'istanbul-bosphorus', family: true, minAge: 0, rating: 4.6, reviews: 2140, meetingPoint: { kind: 'meet', address: 'Kabataş pier, Meclis-i Mebusan Cd., Beyoğlu, İstanbul', note: 'Be at the pier 20 minutes before boarding. The crew wear navy jackets.', lat: 41.03313, lon: 28.99343 } }),
-    exp('hotelbeds', 'E-E10-IST-HSOPHIA', 'Hagia Sophia and Blue Mosque with a guide', 165, 150, { summary: 'A small group, a licensed guide, and the history you won’t read on the signs.', photo: 'istanbul-sultanahmet', rating: 4.7, reviews: 5120, meetingPoint: { kind: 'meet', address: 'German Fountain, Sultanahmet Square, Fatih, İstanbul', note: 'Your guide holds a red Hotelbeds sign.', lat: 41.00703, lon: 28.97626 } }),
-    exp('hotelbeds', 'E-E10-IST-CISTERN', 'Basilica Cistern: timed entry', 120, 60, { summary: 'A set time slot, so no queue.', family: true, minAge: 0 }),
-    exp('getyourguide', '61922', 'Princes’ Islands day trip with lunch', 310, 420, { summary: 'Ferry to Büyükada and Heybeliada. No cars, just bikes and walks.', family: true, rating: 4.4, reviews: 880 }),
+    exp('ist-bosdin', 'Bosphorus dinner cruise', 245, 180, { summary: 'Dinner on the water from Kabataş pier, with a halal menu and the bridges lit up.', photo: 'istanbul-bosphorus', family: true, minAge: 0, rating: 4.6, reviews: 2140, meetingPoint: { kind: 'meet', address: 'Kabataş pier, Meclis-i Mebusan Cd., Beyoğlu, İstanbul', note: 'Be at the pier 20 minutes before boarding. The crew wear navy jackets.', lat: 41.03313, lon: 28.99343 } }),
+    exp('ist-hsophia', 'Hagia Sophia and Blue Mosque with a guide', 165, 150, { summary: 'A small group, a licensed guide, and the history you won’t read on the signs.', photo: 'istanbul-sultanahmet', rating: 4.7, reviews: 5120, meetingPoint: { kind: 'meet', address: 'German Fountain, Sultanahmet Square, Fatih, İstanbul', note: 'Your guide holds a red Mada sign.', lat: 41.00703, lon: 28.97626 } }),
+    exp('ist-cistern', 'Basilica Cistern: timed entry', 120, 60, { summary: 'A set time slot, so no queue.', family: true, minAge: 0 }),
+    exp('ist-islands', 'Princes’ Islands day trip with lunch', 310, 420, { summary: 'Ferry to Büyükada and Heybeliada. No cars, just bikes and walks.', family: true, rating: 4.4, reviews: 880 }),
   ],
   '108410': [
-    exp('hotelbeds', 'E-E10-RUH-DIRIYAH', 'Diriyah at sunset with a local guide', 190, 150, { summary: 'At-Turaif’s mud-brick lanes, then dinner on the Bujairi terrace.', photo: 'riyadh-diriyah', family: true, minAge: 4, rating: 4.8, reviews: 412, meetingPoint: { kind: 'meet', address: 'At-Turaif Visitor Centre, Diriyah 13711', note: 'Meet at the ticket desk 15 minutes before the start.', lat: 24.73326, lon: 46.57401 } }),
-    exp('hotelbeds', 'E-E10-RUH-EDGE', 'Edge of the World by 4×4', 420, 480, { summary: 'The Tuwaiq escarpment with a driver, a picnic and a long view.', photo: 'dubai-desert', minAge: 8, rating: 4.7, reviews: 960, meetingPoint: { kind: 'pickup', address: null, note: 'The driver collects you from your hotel lobby.', lat: null, lon: null } }),
-    exp('hotelbeds', 'E-E10-RUH-CAMP', 'Desert camp evening', 280, 240, { summary: 'Dunes, a camp fire, Arabic coffee and dinner under the stars.', photo: 'desert-camp', family: true, minAge: 0, rating: 4.5, reviews: 380 }),
+    exp('ruh-diriyah', 'Diriyah at sunset with a local guide', 190, 150, { summary: 'At-Turaif’s mud-brick lanes, then dinner on the Bujairi terrace.', photo: 'riyadh-diriyah', family: true, minAge: 4, rating: 4.8, reviews: 412, meetingPoint: { kind: 'meet', address: 'At-Turaif Visitor Centre, Diriyah 13711', note: 'Meet at the ticket desk 15 minutes before the start.', lat: 24.73326, lon: 46.57401 } }),
+    exp('ruh-edge', 'Edge of the World by 4×4', 420, 480, { summary: 'The Tuwaiq escarpment with a driver, a picnic and a long view.', photo: 'dubai-desert', minAge: 8, rating: 4.7, reviews: 960, meetingPoint: { kind: 'pickup', address: null, note: 'The driver collects you from your hotel lobby.', lat: null, lon: null } }),
+    exp('ruh-camp', 'Desert camp evening', 280, 240, { summary: 'Dunes, a camp fire, Arabic coffee and dinner under the stars.', photo: 'desert-camp', family: true, minAge: 0, rating: 4.5, reviews: 380 }),
   ],
   '108841': [
-    exp('hotelbeds', 'E-E10-ULH-HEGRA', 'Hegra: the tombs by vintage Land Rover', 395, 180, { summary: 'Saudi Arabia’s first UNESCO site, with a Rawi storyteller.', photo: 'alula-hegra', family: true, minAge: 5, rating: 4.9, reviews: 1220, meetingPoint: { kind: 'meet', address: 'Hegra Welcome Centre, AlUla', note: null, lat: 26.78712, lon: 37.94877 } }),
-    exp('hotelbeds', 'E-E10-ULH-STARS', 'Stargazing at Gharameel', 210, 120, { summary: 'Telescopes, a guide to the night sky, and very dark skies.', photo: 'desert-camp', family: true, minAge: 6, rating: 4.8, reviews: 310 }),
+    exp('ulh-hegra', 'Hegra: the tombs by vintage Land Rover', 395, 180, { summary: 'Saudi Arabia’s first UNESCO site, with a Rawi storyteller.', photo: 'alula-hegra', family: true, minAge: 5, rating: 4.9, reviews: 1220, meetingPoint: { kind: 'meet', address: 'Hegra Welcome Centre, AlUla', note: null, lat: 26.78712, lon: 37.94877 } }),
+    exp('ulh-stars', 'Stargazing at Gharameel', 210, 120, { summary: 'Telescopes, a guide to the night sky, and very dark skies.', photo: 'desert-camp', family: true, minAge: 6, rating: 4.8, reviews: 310 }),
   ],
   '292223': [
-    exp('hotelbeds', 'E-E10-DXB-SAFARI', 'Desert safari with dinner', 260, 360, { summary: 'Dune drive, sandboarding and a camp dinner.', photo: 'dubai-desert', family: true, minAge: 3, rating: 4.6, reviews: 8400 }),
-    exp('viator', '5513P12', 'Burj Khalifa: At the Top, levels 124 and 125', 199, 90, { summary: 'A timed ticket to the observation decks.', photo: 'dubai-skyline', family: true, minAge: 0, rating: 4.5, reviews: 15200 }),
+    exp('dxb-safari', 'Desert safari with dinner', 260, 360, { summary: 'Dune drive, sandboarding and a camp dinner.', photo: 'dubai-desert', family: true, minAge: 3, rating: 4.6, reviews: 8400 }),
+    exp('dxb-burj-top', 'Burj Khalifa: At the Top, levels 124 and 125', 199, 90, { summary: 'A timed ticket to the observation decks.', photo: 'dubai-skyline', family: true, minAge: 0, rating: 4.5, reviews: 15200 }),
   ],
   '2643743': [
-    exp('hotelbeds', 'E-E10-LON-TOWER', 'Tower of London with the Crown Jewels', 175, 180, { summary: 'Entry, the Yeoman Warders’ tour, and the jewels.', family: true, minAge: 0, rating: 4.6, reviews: 4100 }),
+    exp('lon-tower', 'Tower of London with the Crown Jewels', 175, 180, { summary: 'Entry, the Yeoman Warders’ tour, and the jewels.', family: true, minAge: 0, rating: 4.6, reviews: 4100 }),
   ],
 };
 

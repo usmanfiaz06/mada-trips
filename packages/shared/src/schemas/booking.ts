@@ -250,10 +250,10 @@ export const StayOption = z.object({
   cancellation: z.string(),
   freeCancelUntil: IsoDay.nullable(),
   expiresAt: IsoDateTime,
-  /** A room from Hotelbeds: the hotel's code (for its details), category, photo, room and board, and the rate's essential information. */
+  /** A partner's room: the hotel's opaque id (for its details), category, photo (through Mada's image link), room and board, and the rate's essential information. */
   hotel: z.object({
-    code: z.number().int(), category: z.string().nullable(), imageUrl: z.string().nullable(), room: z.string().nullable(), board: z.string().nullable(),
-    rateComments: z.string().nullable(), rateCommentsId: z.string().nullable().optional(), supplier: z.literal('hotelbeds'),
+    code: z.string(), category: z.string().nullable(), imageUrl: z.string().nullable(), room: z.string().nullable(), board: z.string().nullable(),
+    rateComments: z.string().nullable(),
   }).nullable().optional(),
   /** At most one "Best for you" and one "Lowest price" in a list; null for the rest (label stays for older apps). */
   badge: z.enum(['best', 'lowest']).nullable().optional(),
@@ -476,7 +476,7 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional() }),
   /** packageId: the plan picked (schemas/esim.ts), one eSIM per traveller; topupOf: more GB on an eSIM already bought. */
   z.object({
-    kind: z.literal('esim'), count: z.number().int().min(1).max(12), packageId: z.string().min(1).max(80).optional(), where: z.string().max(20).optional(),
+    kind: z.literal('esim'), count: z.number().int().min(1).max(12), packageId: z.string().min(1).max(400).optional(), where: z.string().max(20).optional(),
     tripId: Id.nullish(), travellerIds: z.array(Id).max(12).optional(), topupOf: Id.optional(),
     /** A daily plan: how many days. */
     days: z.number().int().min(1).max(365).optional(),

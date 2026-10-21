@@ -31,6 +31,8 @@ import { GET as voucherGet } from "@/app/api/app/v1/vouchers/[id]/route";
 import { POST as voucherCancel } from "@/app/api/app/v1/vouchers/[id]/cancel/route";
 import { GET as hotelGet } from "@/app/api/app/v1/hotels/[code]/route";
 import { callP, signIn } from "./wallet-helpers";
+import { imageOf, seal } from "@/lib/app/shield";
+import { scanJson } from "../../../tools/leak-scan/denylist.mjs";
 
 /*
  * Hotelbeds (docs/app/HOTELBEDS.md): the signed client, the hotels and transfers adapters against recorded-shape
@@ -275,8 +277,11 @@ describe("stays from Hotelbeds in the app", () => {
     const people = (await get(peopleGet, me.token)).json.people as { id: string }[];
     const s = await hotelbedsStays(me.token, people.map((p) => p.id));
     expect(s.outcome).toBe("ok");
-    expect(s.options[0]!.hotel).toMatchObject({ supplier: "hotelbeds" });
-    expect(s.options.map((o) => o.hotel?.code)).toContain(99703);
+    // The partner and its hotel codes stay on the server: an opaque id, a photo through our own image route.
+    expect(s.options[0]!.hotel).not.toHaveProperty("supplier");
+    expect(s.options[0]!.hotel).not.toHaveProperty("rateCommentsId");
+    expect(s.options.map((o) => o.hotel?.code)).toContain(seal("hotel", "99703"));
+    expect(JSON.stringify(s)).not.toMatch(/hotelbeds|"rateKey"|"net"/i);
     expect(s.options.filter((o) => o.badge === "best")).toHaveLength(1);
     // Every option is stored (in one insert) under the id the app sees, with the option itself as the payload.
     const rows = await db.select().from(appOffers).where(inArray(appOffers.id, s.options.map((o) => o.id)));
@@ -340,6 +345,8 @@ describe("stays from Hotelbeds in the app", () => {
     const v = await get(voucherGet, me.token, { id: row.id });
     expect(v.status, JSON.stringify(v.json)).toBe(200);
     const voucher = SupplierVoucherResponse.parse(v.json).voucher;
+    // The partner is named on the voucher's payment line only (the contract's), nowhere else in the answer.
+    expect(scanJson(v.json)).toEqual([]);
     expect(voucher).toMatchObject({ kind: "stay", reference: row.supplierRef, checkIn: CHECK_IN, checkOut: CHECK_OUT, room: "Double Standard", board: "Bed And Breakfast", canCancel: true });
     expect(voucher.payableThrough).toBe(payableThrough("HOTELBEDS PROFESSIONAL SERVICES, S.L.U", "ESB38877676", row.supplierRef!));
     expect(voucher.remarks).toMatch(/Check-in hour 14:00/);
@@ -358,7 +365,8 @@ describe("stays from Hotelbeds in the app", () => {
     // Cancel from the voucher: Hotelbeds' simulation first (the fee), then for real.
     const sim = CancelSupplierVoucherResponse.parse((await post(voucherCancel, me.token, { confirm: false }, { id: row.id })).json);
     expect(sim.simulated).toBe(true);
-    expect(sim.supplierFee.amount).toBeGreaterThan(0);
+    expect(sim.fee.amount).toBeGreaterThan(0);
+    expect(sim).not.toHaveProperty("supplierFee");
     expect(sim.voucher.status).toBe("confirmed");
     const done = await post(voucherCancel, me.token, { confirm: true }, { id: row.id });
     expect(done.status).toBe(201);
@@ -419,10 +427,16 @@ describe("stays from Hotelbeds in the app", () => {
     const run = await refreshHotelContent({ api: mockHotelbedsHotels(undefined, fixtureFetch()) });
     expect(run.missing).toBeGreaterThanOrEqual(1);
     resetMockHotelbeds();
-    const h = await get(hotelGet, me.token, { code: "99701" });
+    const h = await get(hotelGet, me.token, { code: seal("hotel", "99701") });
     expect(h.status).toBe(200);
-    expect(h.json.hotel).toMatchObject({ name: "Galata Tower Suites", category: "4 stars", source: "HBX Group" });
-    expect(h.json.hotel.images[0]).toMatch(/^https:\/\/photos\.hotelbeds\.com\/giata\/xl\//);
+    expect(h.json.hotel).toMatchObject({ name: "Galata Tower Suites", category: "4 stars" });
+    expect(h.json.hotel).not.toHaveProperty("source");
+    // Photos come from our own host; the token names the partner's photo, which only the server reads.
+    const img = h.json.hotel.images[0] as string;
+    expect(img).toMatch(/\/api\/app\/v1\/img\/m_[\w-]+$/);
+    expect(imageOf(img.split("/img/")[1]!)).toMatch(/^https:\/\/photos\.hotelbeds\.com\/giata\/xl\//);
+    expect(JSON.stringify(h.json)).not.toMatch(/hotelbeds|hbx/i);
+    expect((await get(hotelGet, me.token, { code: "99701" })).status).toBe(404); // a partner's own code isn't an id
     expect(h.json.hotel.facilities).toContainEqual({ name: "Wi-fi", paid: false });
     expect(mockHotelbedsState().calls).toHaveLength(0);
     expect((await get(hotelGet, me.token, { code: "123" })).status).toBe(404);

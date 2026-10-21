@@ -17,6 +17,7 @@ import { Badge, Card, CardHead, Field, Input, KV, Money, PageHeader, Select, Tab
 import { Journey, type JourneyStep } from "@/components/journey";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
+import { canDeskFinance } from "@/lib/app/finance/access";
 import { FlightSupplierCard } from "@/components/desk/flight-supplier";
 import { BoardingPassesCard } from "@/components/desk/boarding";
 import { HotelRequestsCard } from "@/components/desk/hotel-requests";
@@ -283,7 +284,7 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
           {open && <AssignCard kind={o.stage === "held" ? "ticketing" : "order"} id={r.id} userId={r.ownerId} canAct={act} />}
           <TicketsCard about={{ kind: "order", id: r.id }} customerId={r.ownerId} subject={r.summary} canAct={act} />
           <FlightSupplierCard order={o.order ?? null} requestId={r.id} act={act} issue={issue} names={ticketNames} t={t} />
-          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
+          <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} finance={canDeskFinance(u)} t={t} />
           {o.segments.length > 0 && <BoardingPassesCard requestId={r.id} tripId={o.trip?.id ?? null} carrier={o.segments[0]?.carrier ?? null} act={act} t={t} />}
           {prefs && (
             <Card>

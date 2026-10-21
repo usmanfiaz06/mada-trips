@@ -141,7 +141,7 @@ try {
     await k.sweep('ask-stays');
 
     step('guest: hotel, plan, Discover, Circles, Trips, Wallet, Mada');
-    await page.goto(ORIGIN + '/hotel/99701');
+    await page.goto(ORIGIN + '/hotel/m_mockhotel99701');
     await k.see('Galata Tower Suites', 'hotel');
     await k.sweep('hotel');
     await page.goto(ORIGIN + '/plan/alula2');

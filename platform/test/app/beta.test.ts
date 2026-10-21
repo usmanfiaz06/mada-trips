@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { launchStatus } from "@/lib/app/launch";
 import { and, eq, sql as rawSql } from "drizzle-orm";
 import {
   ConfigResponse, CreateOrderResponse, MessagesResponse, OrderResponse, PreviewResponse, RequestResponse, StatusResponse, SupportMessage, TripDetail, normalizeContactPhone, type OrderDraft,
@@ -442,7 +443,7 @@ describe("scheduled jobs", () => {
 });
 
 describe("the launch guard", () => {
-  it("on production, closes app routes while a supplier is a mock, env is missing, or legacy sign-in is on; /status says why", async () => {
+  it("on production, closes app routes while a supplier is a mock, env is missing, or legacy sign-in is on; /status says only that it is closed", async () => {
     process.env.VERCEL_ENV = "production";
     delete process.env.APP_ALLOW_MOCKS;
     delete process.env.SUPABASE_URL;
@@ -451,8 +452,10 @@ describe("the launch guard", () => {
     const st = StatusResponse.parse((await callP(statusGet, {})).json);
     expect(st.status).toBe("down");
     expect(st.launch!.ready).toBe(false);
-    expect(st.launch!.problems.join("\n")).toMatch(/SUPABASE_URL is missing/);
-    expect(st.launch!.problems.join("\n")).toMatch(/flights is in mock mode on production/);
+    // The reasons name partners and env keys: they stay in the logs, never in the public answer.
+    expect(st.launch!.problems).toEqual([]);
+    expect(launchStatus().problems.join("\n")).toMatch(/SUPABASE_URL is missing/);
+    expect(launchStatus().problems.join("\n")).toMatch(/flights is in mock mode on production/);
     expect((await callP(configGet, {})).status).toBe(200);
     const blocked = await callP(peopleGet, {}, { method: "GET", token: "x" });
     expect(blocked.status).toBe(503);

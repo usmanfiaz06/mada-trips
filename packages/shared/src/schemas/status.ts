@@ -72,7 +72,7 @@ export const StatusResponse = z.object({
   time: z.string(),
   /** The launch guard (production): what keeps app routes closed, in plain words for the team. Empty when ready. */
   launch: z.object({ ready: z.boolean(), problems: z.array(z.string()) }).optional(),
-  /** Where flight status comes from right now: aerodatabox | aviationstack | flightaware | mock | none (no key). */
+  /** Whether flight status is live right now: live, mock or none (no key). The vendor is never named. */
   flightStatusSource: z.string().optional(),
 });
 export type StatusResponse = z.infer<typeof StatusResponse>;
