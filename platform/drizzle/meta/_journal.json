@@ -302,6 +302,13 @@
       "when": 1792592623571,
       "tag": "0042_ask_threads_list",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1792564617643,
+      "tag": "0043_plans",
+      "breakpoints": true
     }
   ]
 }

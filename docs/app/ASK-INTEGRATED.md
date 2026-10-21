@@ -325,6 +325,25 @@ Edits to the plan remain the owner's (and the desk's). A companion's suggestion 
 
 ---
 
+### 5.5 Permissions and changes asked by a companion (owner decision, 21 Oct)
+
+Each person on a trip has a role the trip owner sets when adding them, and can change later on the trip's Travellers screen:
+
+| Role | Sees | Can do |
+|---|---|---|
+| Can view | The plan, times, places, their own documents (no prices unless the owner shares them) | Ask Mada questions about the trip |
+| Can suggest (default) | As above | Ask Mada for a change; it becomes a change request the owner approves |
+| Can edit | As above, plus prices if shared | Change ideas and unbooked items directly; anything that costs money or shares data still goes to the payer |
+
+How a change request flows, all inside the chats:
+1. Abdullah, in his chat for the trip: "Can we stay two nights in Melaka?" Mada checks the plan and his role. With "Can suggest": "We'll ask Omar to confirm." A `change_request` card shows the diff (Melaka 1 → 2 nights, Penang 2 → 1) and its status "Waiting for Omar".
+2. Omar gets a push ("Abdullah suggests a change to Riyadh → Penang") and, in his own chat for the trip, the same card with Approve · Decline · Change it. Approve applies the plan ops (versioned, §3.5); Decline can carry a one-line reason.
+3. Abdullah's chat updates: "Omar approved. Melaka is now two nights." (or "Omar kept it as it is: <reason>"). Both plans, the trip page and Today update through the event map (§1.3).
+4. A change that costs money (a second Melaka night that has to be booked) needs the payer's approval and then goes to the pay sheet on the payer's phone; Mada never charges the companion's card unless they pay their own share.
+5. Requests expire after 48 h with a reminder at 24 h; open requests show on the trip page.
+
+A shared trip chat (optional, per trip): the owner can turn on "Trip chat" so all travellers and Mada talk in one thread; private one-to-one chats with Mada stay. In the shared chat, Mada says who asked for what and approvals happen in place. Built in U5 (roles, change requests, cards) and U8 (Travellers screen, shared trip chat); new tables `app_trip_travellers.role`, `app_plan_change_requests`.
+
 ## 6. Documents in chat
 
 ### 6.1 Attaching
@@ -616,6 +635,7 @@ Order is by dependency. ∥ marks units that can run in parallel without touchin
 | # | Unit | Scope | Files | Migration | Acceptance checks | Size |
 |---|---|---|---|---|---|---|
 | U1 | **Data model + conversation list** | Thread columns (title, titled_by, trip_id, archived_at, last_at, preview, ended_at); list/get/patch/delete endpoints; server title derivation (destination/kind until plans exist); attach rule §2.2 (trip id, or the "About your X trip?" choice card); the app's list screen, thread open from server, cache by thread id, orb behaviour; desk U5 list shows title. | `db/app-schema-ask.ts`, `drizzle/0042_ask_threads_list.sql`, `ask-chat/store.ts`, `ask-chat/chat.ts`, new `ask-chat/titles.ts`, new `app/api/app/v1/ask/threads/**`, `packages/shared/src/schemas/ask-chat.ts` (thread list, `moved`), `apps/mobile/src/app/ask.tsx` → `ask/index.tsx` (list) + `ask/[threadId].tsx`, `lib/ask-chat.ts`, copy words, desk `ask/page.tsx` | yes (backfill `last_at` = updated_at, `preview` from transcript) | Two chats about two places stay separate; reopening each shows its own turns on a second device; orb within 24 h opens the last chat; search finds by title; archive/unarchive; take-over still works (`desk-ask.test.ts` passes); Arabic list RTL screenshots. | M |
+| U1+ | **Search and dates (owner, 21 Oct)** | Full-text search across chats (title and messages) and find-in-chat; list grouped Today / Yesterday / This week / This month / Earlier with last-activity times; filter chips All · Trips · Upcoming · Past · Archived; day separators and per-message time on long-press in conversations. Added to U1. | as U1 | no | Search finds a word from an old message and opens the chat at it; groups and filters in en/ar. | S |
 | U2 | **Living plan core** | `app_plans`, `app_plan_items`, `app_plan_events`; `trips.origin/title/kind`; `plans.ts` (create from shape or template, ops with version, read with statuses from bookings, checks); plan endpoints; templates migrated to data (PLANS untouched for `GET /plans`); event emitter + listeners for stays/segments/esims/orders → items. | `db/app-schema-plans.ts` (new), `drizzle/0043_plans.sql`, new `lib/app/plans/{plans,ops,checks,templates,events}.ts`, `app/api/app/v1/trips/[id]/plan/**`, `packages/shared/src/schemas/plans.ts` (new) | yes | Create from template with origin JED → first leg JED→ULH; stale version rejected; booking a stay on the trip marks the matching item booked; checks compute passport/visa/stay gaps on seed data; unit tests for ops and status reads. | L |
 | U3 (after U1, U2) | **Ask tools for plans** | `create_plan`, `get_plan`, `update_plan`, `set_origin`, `find_for_item`, `open_in_app`; `plan` and `plan_diff` cards; origin defaults from memory; thread ↔ trip attach on create; manual-edit context line; "never say no" rule + evals; sentence gate for km/durations. | `ask-chat/tools.ts` (+ new `ask-chat/tools-plan.ts`), `prompt.ts`, `persona.ts` + ASSISTANT.md, `guard.ts`, `evals.ts`, `chat.ts` (context), shared `ask-chat.ts` cards, `ChatThread.tsx` (PlanCard, PlanDiffCard) | no | Eval "7-day road trip SG→MY" creates a plan with ≥ 3 drive legs and no invented time; "start from Jeddah" rebuilds legs and title; manual move shows up in the next turn's context; `never-no` passes on all 8 new conversations. | L |
 | U4 ∥ (after U2) | **Drives** | `drive.ts` interface, Google Routes adapter (server key), OSRM adapter (tests + fallback), cache table, budget guard, border detection, unknown states; leg enrichment on plan create/update. | new `lib/app/drive/{drive,google,osrm,borders}.ts`, `db/app-schema-plans.ts` (cache table only), `drizzle/0044_drive_cache.sql`, `lib/app/plans/ops.ts` (one call site) | yes | Riyadh→AlUla returns km/time from the fixture; budget hit → estimate label, no time; SG→Melaka lists the border; cache hit makes no call. | M |
@@ -677,5 +697,5 @@ Parallel lanes: after U1 and U2 land, **U4, U5, U6** touch disjoint files (drive
 | 2 | When a message matches an existing trip, ask or attach silently? | Ask once with a choice card; attach silently only from the trip page. |
 | 3 | Can the agent add items without the traveller confirming each one? | Yes for ideas (free, reversible, shown in a diff card); never for anything that costs money or shares data. |
 | 4 | Routing provider | Google Routes API on the server with an OSRM fallback; switch the default to self-hosted OSRM if counsel finds Google's caching terms too tight for plans that live for weeks. |
-| 5 | Can companions edit the plan? | Not in v1: they view it and suggest through the trip circle; the owner and the desk edit. Revisit after launch data. |
+| 5 | Can companions edit the plan? | Decided 21 Oct: roles per person set by the owner (view / suggest (default) / edit); suggestions become change requests the owner approves inside the chat (§5.5); money always goes to the payer. |
 | 6 | Self-drive car rental: request-only or a live supplier? | Request-only through the desk now (it shows up as "car rental" in plans and is counted); pick a supplier once 50 requests a month come in. |
