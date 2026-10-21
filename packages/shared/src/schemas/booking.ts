@@ -156,6 +156,11 @@ export const FlightOption = z.object({
   infantPrice: Money,
   total: Money,
   expiresAt: IsoDateTime,
+  /**
+   * A sample fare from the mock catalogue (SUPPLIER_MODE_FLIGHTS=mock, outside production or on a staging copy with
+   * APP_ALLOW_MOCKS=yes): every card that shows it says "Demo fare · not bookable" (search.demoFare).
+   */
+  demo: z.boolean().optional(),
 });
 export type FlightOption = z.infer<typeof FlightOption>;
 
@@ -358,6 +363,9 @@ export type BookingRequestKind = z.infer<typeof BookingRequestKind>;
 export const BookingRequestStatus = z.enum(['queued', 'sent', 'reviewing', 'quoted', 'paid', 'done', 'cancelled']);
 export type BookingRequestStatus = z.infer<typeof BookingRequestStatus>;
 
+export const ContactPreference = z.enum(['call', 'whatsapp', 'in_app']);
+export type ContactPreference = z.infer<typeof ContactPreference>;
+
 export const CreateRequestBody = z.object({
   kind: BookingRequestKind.exclude(['package']),
   /** What the traveller typed. */
@@ -384,6 +392,10 @@ export const CreateRequestBody = z.object({
   serviceFor: z.object({ personId: Id.nullable(), need: z.string().max(60).nullable(), destination: z.string().max(40).nullable() }).nullish(),
   /** Set by the app when it sends a request it saved offline, so a retry never makes two. */
   clientId: z.string().min(8).max(64).optional(),
+  /** How the traveller wants the team to come back (Ask chat asks once): a call, WhatsApp, or here in the app. */
+  contactPreference: ContactPreference.nullish(),
+  /** With a call: the best time, in their words ("evenings", "after 4"). */
+  contactWindow: z.string().trim().max(60).nullish(),
 });
 export type CreateRequestBody = z.input<typeof CreateRequestBody>;
 
@@ -423,6 +435,8 @@ export const BookingRequestView = z.object({
   /** How it ended, once closed; what Mada is doing, by when and the cost while open (schemas/outcomes.ts). */
   result: RequestResult.nullable().optional(),
   progress: RequestProgress.nullable().optional(),
+  /** How the traveller asked to be reached (CreateRequestBody.contactPreference). */
+  contact: z.object({ preference: ContactPreference, window: z.string().nullable() }).nullable().optional(),
   createdAt: IsoDateTime,
   updatedAt: IsoDateTime,
 });
@@ -559,6 +573,8 @@ export const OrderPreview = z.object({
   renewals: z.array(OrderRenewal).optional(),
   /** A flight with a family: the bags each, a bassinet asked for each baby on a lap, child meals, and who 12 to 17 pays as an adult. */
   family: OrderFamily.nullable().optional(),
+  /** The flight on the sheet is a sample fare from the mock catalogue (FlightOption.demo): the sheet says so. */
+  demoFare: z.boolean().optional(),
 });
 export type OrderPreview = z.infer<typeof OrderPreview>;
 export const PreviewResponse = z.object({ preview: OrderPreview });

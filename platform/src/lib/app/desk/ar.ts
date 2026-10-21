@@ -669,6 +669,7 @@ export const AR_DESK: Record<string, string> = {
   "Marked confirmed by call": "سُجّل التأكيد بالاتصال",
   "Flights": "رحلات طيران",
   "Phone not verified": "رقم غير موثّق",
+  "Reach by call": "التواصل باتصال", "Reach on WhatsApp": "التواصل بواتساب", "Reach in the app": "التواصل في التطبيق",
   "The hold must last at least 10 minutes": "يجب أن يستمر الحجز 10 دقائق على الأقل",
   "Holds last 7 days at most": "الحجز 7 أيام كحد أقصى",
   "Fares go on a flight request": "الأسعار تُرسل على طلب طيران",

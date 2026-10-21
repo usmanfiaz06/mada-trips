@@ -4,11 +4,11 @@ import { ProviderHttpError } from "./providers-openai";
 import { costMicros, type Price } from "./config";
 import { firstSentence, openEndedIn, outgoingProblems, questionsIn, redact, unbacked } from "./guard";
 import { readSlots, slotsLine } from "./slots";
-import { personLine, type ToolCtx, type ToolOut } from "./tools";
+import { personLine, requestModeText, type ToolCtx, type ToolOut } from "./tools";
 import type Anthropic from "@anthropic-ai/sdk";
 
 /*
- * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 36 conversations in English and spoken Saudi Arabic,
+ * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 41 conversations in English and spoken Saudi Arabic,
  * run turn by turn through the real engine (the same prompt, tools, gate and slots) with fixed tool results, so the
  * checks are about the model and nothing else. Each turn is held to:
  *   prices   the model wrote no price or time that no tool returned (checked on its raw words, before the gate)
@@ -19,6 +19,8 @@ import type Anthropic from "@anthropic-ai/sdk";
  *   next     it ends with a concrete next step: its own <next> choices (2 or 3), or choices said in its last sentence
  *            (docs/app/ASSISTANT.md "Always resolve"; the app fills chips in when it forgets, but that is a fail here)
  *   open     no open-ended closer ("Anything else?", "How can I help", "Let me know", «أي خدمة ثانية»)
+ *   reach    found by hand (flights by request, a cruise, a train, a group): it asks how to reach them (WhatsApp, a
+ *            call, the app) as its own choices, then makes the request with that preference
  *   first    the answer first: no preamble, and the first sentence is not a question unless the whole turn may be
  *            one needed question
  * scripts/ask-chat-eval.ts runs it against the live model when ANTHROPIC_API_KEY is set; the tests run it on a stand-in.
@@ -35,7 +37,7 @@ export const EVAL_TODAY = "2026-10-20";
 const TRIPS = ["id=55555555-5555-4555-8555-555555555555 · Cairo · 2026-10-20 to 2026-10-24 · Omar"];
 
 /** Tool results as the real tools write them (tools.ts), for fixed inputs. */
-export async function fixtureTool(name: string, input: unknown): Promise<ToolOut> {
+export async function fixtureTool(name: string, input: unknown, flights: "live" | "request" = "live"): Promise<ToolOut> {
   const a = (input ?? {}) as Record<string, unknown>;
   const n = Array.isArray(a.traveller_ids) && a.traveller_ids.length ? a.traveller_ids.length : 1;
   const each = 2025;
@@ -43,11 +45,12 @@ export async function fixtureTool(name: string, input: unknown): Promise<ToolOut
   switch (name) {
     case "search_flights": {
       const dest = String(a.destination);
-      if (a.cabin === "business") return { text: `Flights RUH → ${dest}, ${a.depart}, checked 9, for ${n} people:\n1. id=f-biz-1 · best · Saudia · out SV263 RUH 09:40 → IST 13:10 on ${a.depart} (4h30m) · direct · bags 2 x 32 kg · refundable · ${fmt(7900 * n)} all in for ${n} (${fmt(7900)} each adult) · why: Direct. Flat bed.` };
-      return { text: `Flights RUH → ${dest}, ${a.depart}${a.return ? ` to ${a.return}` : " one way"}, checked 14, for ${n} people:\n1. id=f-1 · best · Saudia · out SV263 RUH 09:40 → ${dest.slice(0, 3).toUpperCase()} 13:10 on ${a.depart} (4h30m) · direct · bags 2 x 23 kg · not refundable · ${fmt(each * n)} all in for ${n} (${fmt(each)} each adult) · why: Direct. Lands before check-in.\n2. id=f-2 · lowest · flynas · out XY125 RUH 02:15 → ${dest.slice(0, 3).toUpperCase()} 08:05 on ${a.depart} (6h50m) · One stop in Kuwait · bags 1 x 20 kg · not refundable · ${fmt(1610 * n)} all in for ${n} (${fmt(1610)} each adult) · why: One stop. SAR ${(415 * n).toLocaleString("en-US")} less.\n3. id=f-3 · fastest · Turkish Airlines · out TK145 RUH 14:20 → ${dest.slice(0, 3).toUpperCase()} 18:15 on ${a.depart} (4h55m) · direct · bags 2 x 23 kg · refundable · ${fmt(2390 * n)} all in for ${n} (${fmt(2390)} each adult) · why: Refundable.` };
+      if (flights === "request") return { text: requestModeText(dest, String(a.depart), typeof a.return === "string" ? a.return : null), mode: "request" };
+      if (a.cabin === "business") return { text: `Flights RUH → ${dest}, ${a.depart}, checked 9, for ${n} people:\n1. id=f-biz-1 · best · Saudia SV263 · RUH 09:40 → 13:10 (4h30m) · direct · refundable · ${fmt(7900 * n)} all in` };
+      return { text: `Flights RUH → ${dest}, ${a.depart}${a.return ? ` to ${a.return}` : " one way"}, checked 14, for ${n} people:\n1. id=f-1 · best · Saudia SV263 · RUH 09:40 → 13:10 (4h30m) · direct · not refundable · ${fmt(each * n)} all in\n2. id=f-2 · lowest · flynas XY125 · RUH 02:15 → 08:05 (6h50m) · One stop in Kuwait · not refundable · ${fmt(1610 * n)} all in\n3. id=f-3 · fastest · Turkish Airlines TK145 · RUH 14:20 → 18:15 (4h55m) · direct · refundable · ${fmt(2390 * n)} all in` };
     }
     case "search_stays":
-      return { text: `Stays in ${a.destination}, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-1 · hotel_code=9001 · Rove Downtown · Downtown · 3 stars · 1 room for ${n} · ${a.nights} nights from ${a.check_in} · ${fmt(1840)} all in · free cancellation until ${a.check_in} · has pool, wifi\n2. id=s-2 · hotel_code=9002 · Address Sky View · Downtown · 5 stars · 1 room for ${n} · ${fmt(5260)} all in · not refundable · has pool, gym, spa` };
+      return { text: `Stays in ${a.destination}, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-1 · hotel_code=9001 · Rove Downtown · Downtown · 3 stars · ${fmt(1840)} all in · free cancellation until ${a.check_in} · has pool, wifi\n2. id=s-2 · hotel_code=9002 · Address Sky View · Downtown · 5 stars · ${fmt(5260)} all in · not refundable · has pool, gym, spa` };
     case "esim_plans":
       return { text: `eSIM plans for Pakistan, ${a.days ?? 7} days:\n1. id=pk-10-5 · 5 GB · 10 days · Pakistan · SAR 39 each eSIM · lasts the trip\n2. id=pk-10-10 · 10 GB · 15 days · Pakistan · SAR 59 each eSIM · lasts the trip\n3. id=pk-30-20 · 20 GB · 30 days · Pakistan · SAR 89 each eSIM · lasts the trip` };
     case "entry_rules":
@@ -63,7 +66,7 @@ export async function fixtureTool(name: string, input: unknown): Promise<ToolOut
     case "get_hotel":
       return { text: `{"name":"Rove Downtown","facilities":["Outdoor pool","Gym","Wi-Fi"],"address":"Sheikh Mohammed bin Rashid Blvd"}` };
     case "create_request":
-      return { text: `Request r-1 sent to the desk: ${String(a.kind)} (${String(a.summary).slice(0, 80)}). Mada answers by 2026-10-20T18:00:00+03:00.` };
+      return { text: `Request r-1 noted for the team at Mada: ${String(a.kind)} (${String(a.summary).slice(0, 80)}). The team gets back to the traveller ${a.contact_preference === "call" ? "by a call" : a.contact_preference === "whatsapp" ? "on WhatsApp" : "here in the app"} by 18:00. Say it in one line: "We've noted it and the team will get back to you by 18:00".`, cards: [{ type: "request", requestId: SELF, kind: String(a.kind), title: String(a.summary).slice(0, 60) }] };
     case "price_quote_for_pay":
       return { text: `Pay sheet opened in the app: Riyadh → Istanbul, ${fmt(each * n)} all in. Free to cancel within 24 hours. Nothing is charged until the traveller slides to pay.`, pay: { draft: { kind: "trip", flightOfferId: SELF, bundle: false, travellerIds: [SELF] }, title: "Riyadh → Istanbul" } };
     case "talk_to_human":
@@ -85,8 +88,13 @@ export type EvalTurn = {
   noTools?: boolean;
   /** A question it must not ask (already answered). */
   notAsk?: RegExp;
+  /** Found by hand: it must ask how to reach them, as its own choices (WhatsApp, a call, here in the app). */
+  reachChips?: boolean;
+  /** It must make the request with how they asked to be reached. */
+  requestWithContact?: boolean;
 };
-export type EvalCase = { id: string; lang: "en" | "ar"; turns: EvalTurn[] };
+/** flights: how search_flights answers in this case (APP_FLIGHTS_MODE). */
+export type EvalCase = { id: string; lang: "en" | "ar"; turns: EvalTurn[]; flights?: "live" | "request" };
 
 const FLIGHT = ["search_flights"];
 export const EVAL_CASES: EvalCase[] = [
@@ -127,6 +135,22 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "delay-rights", lang: "en", turns: [{ user: "My Cairo flight today is delayed 4 hours, what are my rights?", toolsAnyOf: ["get_trips", "get_trip", "talk_to_human"] }] },
   { id: "ar-thanks-close", lang: "ar", turns: [{ user: "مشكورين، كذا تمام", noTools: true }] },
   { id: "ar-default-dates", lang: "ar", turns: [{ user: "دبي في نوفمبر لنا كلنا", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /متى|تاريخ|كم شخص|مين/ }] },
+  // Found by hand (docs/app/ASK-CHAT.md §Found by hand): what the team needs, confirmed, how to reach them, then the request.
+  { id: "flights-by-request", lang: "en", flights: "request", turns: [
+    { user: "Flights to Istanbul 3 to 10 December, just me", toolsAnyOf: FLIGHT, notTools: ["create_request", "price_quote_for_pay"], reachChips: true },
+    { user: "WhatsApp", toolsAnyOf: ["create_request"], requestWithContact: true }] },
+  { id: "ar-flights-by-request", lang: "ar", flights: "request", turns: [
+    { user: "طيران لإسطنبول من ٣ إلى ١٠ ديسمبر لي بس", toolsAnyOf: FLIGHT, notTools: ["create_request"], reachChips: true },
+    { user: "واتساب", toolsAnyOf: ["create_request"], requestWithContact: true }] },
+  { id: "cruise", lang: "en", turns: [
+    { user: "A Red Sea cruise for the four of us, 10 to 17 January", notTools: [...FLIGHT, "search_stays", "create_request"], reachChips: true },
+    { user: "Call me, evenings after 7", toolsAnyOf: ["create_request"], requestWithContact: true }] },
+  { id: "train-dammam", lang: "en", turns: [
+    { user: "Train from Riyadh to Dammam next Thursday for me and Hessa", notTools: [...FLIGHT, "create_request"], reachChips: true },
+    { user: "Here in the app", toolsAnyOf: ["create_request"], requestWithContact: true }] },
+  { id: "company-group", lang: "en", turns: [
+    { user: "A company trip to Dubai for 25 people, 3 to 6 February, with a meeting room", notTools: ["price_quote_for_pay", "create_request"], reachChips: true },
+    { user: "WhatsApp", toolsAnyOf: ["create_request"], requestWithContact: true }] },
 ];
 
 /** Choices said in the reply's last sentence ("…the Saudia at 09:40, or the flynas for less?"). */
@@ -146,7 +170,7 @@ export function dialectOf(replies: string[]): { spoken: number; msa: number } {
 }
 
 /** The checks for one turn. Pure. */
-export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text: string; toolsUsed: string[]; toolText: string; dropped: number; modelChoices: string[]; closers: number }): string[] {
+export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text: string; toolsUsed: string[]; toolText: string; dropped: number; modelChoices: string[]; closers: number; calls?: { name: string; input: Record<string, unknown> }[] }): string[] {
   const out: string[] = [];
   const invented = unbacked(r.raw, r.toolText);
   if (invented.length || r.dropped) out.push(`prices: ${invented.join(", ") || `${r.dropped} sentence(s) held back`}`);
@@ -161,6 +185,14 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
   const bad = (t.notTools ?? []).filter((x) => r.toolsUsed.includes(x));
   if (bad.length) out.push(`tools: must not use ${bad.join(", ")}`);
   if (r.modelChoices.length < 2 && !saysChoices(r.text)) out.push(`next: no next step${r.modelChoices.length ? ` (only ${r.modelChoices.length} choice)` : ""}, the app filled chips in`);
+  if (t.reachChips) {
+    const c = r.modelChoices.join(" | ");
+    if (!/whatsapp|واتساب/i.test(c) || !/call|اتصل/i.test(c)) out.push(`reach: didn't ask how to reach them (WhatsApp, a call, the app); chips: ${c || "none"}`);
+  }
+  if (t.requestWithContact) {
+    const req = (r.calls ?? []).find((x) => x.name === "create_request");
+    if (!req || !req.input.contact_preference) out.push(`reach: create_request without contact_preference`);
+  }
   const open = openEndedIn(r.raw);
   if (open.length || r.closers) out.push(`open: ${open.join(", ") || `${r.closers} closer(s) dropped`}`);
   const first = firstSentence(r.text);
@@ -186,7 +218,8 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
           const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY, opts.fastModel);
           const r = await runTurn({
             model: opts.model,
-            history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input),
+            intent: slots.intent.kind,
+            history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input, c.flights),
             context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
           }, () => {}, api);
           const ms = Date.now() - started;

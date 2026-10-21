@@ -33,6 +33,8 @@ export type TurnState = {
   cards: ChatCard[];
   pay: boolean;
   handoff: boolean;
+  /** search_flights answered {"mode":"request"} (APP_FLIGHTS_MODE=request): the trip goes to the team, once they say how to reach them. */
+  flightRequest?: boolean;
   lang: "en" | "ar";
 };
 
@@ -45,6 +47,8 @@ export function nextFromState(s: TurnState): string[] {
   let out: string[];
   if (s.handoff) out = [say("chat.next.openChat"), say("chat.next.myTrips")];
   else if (s.pay) out = [say("chat.next.pay"), say("chat.next.otherOptions")];
+  // Found by hand: how the team should get back (the request is made once they say).
+  else if (s.flightRequest && last?.type !== "request") out = [say("chat.next.reachWhatsapp"), say("chat.next.reachCall"), say("chat.next.reachApp")];
   else if (!last) out = [say("chat.next.flights"), say("chat.next.stays"), say("chat.next.esim")];
   else {
     switch (last.type) {

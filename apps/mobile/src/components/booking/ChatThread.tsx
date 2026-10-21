@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { formatSar, type ChatCard, type ChatPay } from '@mada/shared';
+import { formatSar, timeLabel, type ChatCard, type ChatPay } from '@mada/shared';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
 import { LinkButton } from '@/components/Button';
@@ -12,7 +12,8 @@ import { PlanCard } from '../esim/look';
 import { enter } from './parts';
 import type { ChatTurn } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
+import { DemoFare } from './DemoFare';
 import { colors, ff } from '@/theme';
 
 /*
@@ -87,6 +88,7 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
                 <View style={{ flex: 1, gap: 2 }}>
                   <T v="small" style={{ fontFamily: ff.ui600 }}>{`${f.out.dep} → ${f.out.arr} · ${f.airline}`}</T>
                   <T v="tiny" color={colors.ink2}>{f.stop ?? f.reason}</T>
+                  {f.demo ? <DemoFare testID={`chat-demo-fare-${f.out.flightNumber}`} /> : null}
                 </View>
                 <T v="small" style={{ fontFamily: ff.ui600 }} testID={`chat-flight-${f.out.flightNumber}`}>{formatSar(f.total.amount)}</T>
               </View>
@@ -136,7 +138,14 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
         </View>
       );
     case 'request':
-      return <LinkButton label={t('chat.request')} size={14} onPress={() => onOpen({ kind: 'request', id: card.requestId })} testID="chat-request" />;
+      return (
+        <Card onPress={() => { buzz('tap'); onOpen({ kind: 'request', id: card.requestId }); }} accessibilityLabel={card.title}>
+          <T v="small" style={{ fontFamily: ff.ui600 }}>{card.title}</T>
+          {card.detail ? <T v="tiny" color={colors.ink2}>{card.detail}</T> : null}
+          {card.promisedBy ? <T v="tiny" color={colors.ink2} testID="chat-request-by">{[t('chat.request.by', { time: timeLabel(card.promisedBy, { locale: getLocale() }) }), card.contact ? t(`chat.request.${card.contact}`) : null].filter(Boolean).join(' · ')}</T> : null}
+          <T v="small" color={colors.green} testID="chat-request">{t('chat.request')}</T>
+        </Card>
+      );
     default:
       return null;
   }

@@ -16,6 +16,11 @@ export const askChatCopy = {
   'chat.pay': 'Review and pay',
   'chat.carGo': 'Set up the car',
   'chat.request': 'See the request',
+  /** On the request card: the promise, and how the team will reach them. */
+  'chat.request.by': 'The team gets back to you by {time}',
+  'chat.request.call': 'By a call',
+  'chat.request.whatsapp': 'On WhatsApp',
+  'chat.request.in_app': 'Here in the app',
   'chat.entryGo': 'See what’s needed',
   'chat.stopped': 'We lost the thread there. Here it is the usual way.',
   'chat.working': 'Mada is writing',
@@ -44,4 +49,11 @@ export const askChatCopy = {
   'chat.next.stays': 'Find a hotel',
   'chat.next.esim': 'Get an eSIM',
   'chat.next.myTrips': 'My trips',
+  /**
+   * Something the team arranges by hand (flights by request, a cruise, a group): how they want the team to come back.
+   * Tapping one sends its words, and the request is made with that preference.
+   */
+  'chat.next.reachWhatsapp': 'WhatsApp',
+  'chat.next.reachCall': 'Call me',
+  'chat.next.reachApp': 'Here in the app',
 } as const;

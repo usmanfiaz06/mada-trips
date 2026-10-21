@@ -35,6 +35,7 @@ import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
 import { FareBreakdown, PartyStep } from './Party';
 import { ASK_RESUME, requireAccount } from '@/lib/signin-ask';
+import { DemoFare } from './DemoFare';
 import { flightPickKey, noteAskPick, pendingPick, usedPendingPick } from '@/lib/resume';
 
 /* Flights in Ask: one question at a time (where, when, back when, who), then Mada shows its work and three options. */
@@ -453,6 +454,7 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
                 </View>
                 <Leg dep={f.out.dep} arr={f.out.arr} from={f.out.from} to={f.out.to} durationMin={f.out.durationMin} stop={f.stop} />
                 <T v="small">{nightIds.has(f.id) ? t('search.family.night', { time: f.out.dep }) : f.reason}</T>
+                {f.demo ? <DemoFare testID={`demo-fare-${f.out.flightNumber}`} /> : null}
                 {on && (travellers.length > 1 || f.infants) ? <FareBreakdown option={f} travellers={travellers} onDay={f.out.date} testID="fare-breakdown" /> : null}
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={t('search.rules.a11y', { airline: f.airline })} hitSlop={8}

@@ -1,11 +1,12 @@
 import "server-only";
 import {
-  DESTINATIONS, ageOn, formatSar, landmarkById, parseStayWishes, refineStays, isIsoDay,
+  DESTINATIONS, ageOn, formatSar, landmarkById, nameIn, parseStayWishes, refineStays, isIsoDay,
   type ChatCard, type ChatPay, type DemoFlag, type EsimPlan, type FlightOption, type Person, type StayOption,
 } from "@mada/shared";
 import { AppError } from "../http";
 import { checkEntry, searchFlights, searchStays } from "../booking/search";
-import { createRequest } from "../booking/requests";
+import { REQUEST_PROMISE_MIN, createRequest } from "../booking/requests";
+import { flightsMode } from "../switches";
 import { priceDraft } from "../booking/pricing";
 import { esimPlans } from "../esim/service";
 import { hotelContent } from "../suppliers/hotelbeds/content";
@@ -20,10 +21,13 @@ import { redact } from "./guard";
  * the same checks hold: offers belong to the caller, people to the household). Each returns a short text the model
  * reads (prices formatted exactly as the cards show them) plus what the app draws: cards, a pay sheet, a handoff.
  * Nothing here charges, books or cancels.
+ * What the model reads is kept short (tokens per minute are the limit on free tiers): at most 3 options, each with
+ * only what a reply says (the cards carry the rest). Sample fares say `demo: true`; flights by request
+ * (APP_FLIGHTS_MODE=request) return `{"mode":"request"}` and no prices at all.
  */
 
 export type ToolCtx = { ownerId: string; people: Person[]; today: string; lang: "en" | "ar"; ipHash: string | null; demo: Set<DemoFlag> };
-export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean };
+export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean; mode?: "request" };
 
 const sar = (h: number) => formatSar(h);
 const hm = (min: number) => `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}m`;
@@ -39,13 +43,28 @@ export function whoOf(ctx: ToolCtx, ids: unknown): string[] {
   return self ? [self.id] : [];
 }
 
-const flightLine = (f: FlightOption, i: number) => {
-  const leg = (l: FlightOption["out"]) => `${l.flightNumber} ${l.from} ${l.dep} → ${l.to} ${l.arr} on ${l.date} (${hm(l.durationMin)})`;
-  return `${i + 1}. id=${f.id} · ${f.label} · ${f.airline} · out ${leg(f.out)}${f.back ? ` · back ${leg(f.back)}` : ""} · ${f.stop ?? "direct"} · bags ${f.bags} · ${f.refundable ? "refundable" : "not refundable"} · ${sar(f.total.amount)} all in for ${f.adults + f.infants} (${sar(f.pricePerPerson.amount)} each adult) · why: ${f.reason}`;
-};
+/** One flight as the model reads it: what a reply names (airline, times, stops, refundable, the total). Dates and who are in the header. */
+export const flightLine = (f: FlightOption, i: number) =>
+  `${i + 1}. id=${f.id} · ${f.label} · ${f.airline} ${f.out.flightNumber} · ${f.out.from} ${f.out.dep} → ${f.out.arr} (${hm(f.out.durationMin)})${f.back ? ` · back ${f.back.dep} → ${f.back.arr}` : ""} · ${f.stop ?? "direct"} · ${f.refundable ? "refundable" : "not refundable"} · ${sar(f.total.amount)} all in`;
 
-const stayLine = (s: StayOption, i: number, ev: string[] = []) =>
-  `${i + 1}. id=${s.id}${s.hotel ? ` · hotel_code=${s.hotel.code}` : ""} · ${s.name} · ${s.area} · ${s.facts?.stars ? `${s.facts.stars} stars · ` : ""}${s.roomsLabel} · ${s.nights} nights from ${s.checkIn} · ${sar(s.total.amount)} all in · ${s.freeCancelUntil ? `free cancellation until ${s.freeCancelUntil}` : s.cancellation}${s.facts?.amenities.length ? ` · has ${s.facts.amenities.join(", ")}` : ""}${ev.length ? ` · fits: ${ev.join("; ")}` : ""}`;
+/** One stay as the model reads it; nights, check-in and who are in the header. */
+export const stayLine = (s: StayOption, i: number, ev: string[] = []) =>
+  `${i + 1}. id=${s.id}${s.hotel ? ` · hotel_code=${s.hotel.code}` : ""} · ${s.name} · ${s.area}${s.facts?.stars ? ` · ${s.facts.stars} stars` : ""} · ${sar(s.total.amount)} all in · ${s.freeCancelUntil ? `free cancellation until ${s.freeCancelUntil}` : s.cancellation}${ev.length ? ` · fits: ${ev.join("; ")}` : s.facts?.amenities.length ? ` · has ${s.facts.amenities.slice(0, 4).join(", ")}` : ""}`;
+
+/** "18:40" (today) or "18:40 on 2026-10-21", Riyadh time: what the reply says the team answers by. */
+export function riyadhClock(iso: string, today: string): string {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" });
+  const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false });
+  return day === today ? time : `${time} on ${day}`;
+}
+
+/** Said first when the fares are samples, so the model can't present them as real (prompt.ts "Truth"). */
+const DEMO = "demo: true (sample fares from a test catalogue: not real, not bookable)";
+
+/** Flights by request: no prices, and what to offer instead, with the desk's promise (booking/requests.ts). */
+export const requestModeText = (to: string, depart: string, ret: string | null) =>
+  `{"mode":"request"} Flights to ${to} (${depart}${ret ? ` to ${ret}` : ", one way"}) are found by hand: there are no fares, prices, times or flight numbers here. Confirm the trip back in one line (where, when, who), say the team at Mada finds the fares and gets back within ${REQUEST_PROMISE_MIN / 60} hours, any time of day, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. When they answer, call create_request with kind flight, the destination name, the dates and contact_preference.`;
 
 const planLine = (p: EsimPlan, i: number) => `${i + 1}. id=${p.id} · ${p.gb == null ? "unlimited" : `${p.gb} GB${p.daily ? " a day" : ""}`} · ${p.days} days · ${p.coverage.name} · ${sar(p.price.amount)} each eSIM · ${p.fits ? "lasts the trip" : "a top-up covers the rest"}`;
 
@@ -67,6 +86,8 @@ const RUN: Record<string, Run> = {
     if (depart < ctx.today) return { text: `Not searched: ${depart} is in the past (today is ${ctx.today}).`, isError: true };
     const from: "RUH" | "JED" | "DMM" = a.from === "JED" || a.from === "DMM" ? a.from : "RUH";
     const ret = iso(a.return);
+    // Flights by request (switches.ts): the same answer the app's own flows give, never a price.
+    if (flightsMode() === "request") return { text: requestModeText(destName(destination), depart, ret && ret > depart ? ret : null), mode: "request" };
     const travellerIds = whoOf(ctx, a.traveller_ids);
     const r = await searchFlights(ctx.ownerId, {
       from, destination, depart, return: ret && ret > depart ? ret : null, travellerIds,
@@ -76,8 +97,9 @@ const RUN: Record<string, Run> = {
     const options = r.options.slice(0, 3);
     const search = { destination, destinationName: r.destinationName, from, depart, return: r.return, travellerIds };
     if (!options.length) return { text: `No flights found ${from} → ${r.destinationName} on ${depart} (outcome ${r.outcome}; checked ${r.checked}).${r.unavailable.length ? ` Not answering: ${r.unavailable.map((u) => u.airline).join(", ")}.` : ""}` };
+    const demo = options.some((o) => o.demo);
     return {
-      text: `Flights ${from} → ${r.destinationName}, ${depart}${r.return ? ` to ${r.return}` : " one way"}, checked ${r.checked}, for ${travellerIds.length} people:\n${options.map(flightLine).join("\n")}${r.bundle ? `\nHotel and pickup can be added: ${r.bundle.hotelName}, ${r.bundle.nights} nights, ${sar(r.bundle.total.amount)} more.` : ""}`,
+      text: `${demo ? `${DEMO}\n` : ""}Flights ${from} → ${r.destinationName}, ${depart}${r.return ? ` to ${r.return}` : " one way"}, checked ${r.checked}, for ${travellerIds.length} people:\n${options.map(flightLine).join("\n")}${r.bundle ? `\nHotel and pickup can be added: ${r.bundle.hotelName}, ${r.bundle.nights} nights, ${sar(r.bundle.total.amount)} more.` : ""}`,
       cards: [{ type: "flights", search, options }],
     };
   },
@@ -118,7 +140,7 @@ const RUN: Record<string, Run> = {
     const r = await esimPlans(ctx.ownerId, { destination: String(a.where).slice(0, 40), days: String(days), ...(trip ? { tripId: trip } : {}) });
     const where = r.plans[0]?.coverage.name ?? String(a.where).slice(0, 40);
     if (!r.plans.length) return { text: `No eSIM plans for ${where} (outcome ${r.outcome}).` };
-    return { text: `eSIM plans for ${where}, ${r.days} days:\n${r.plans.map(planLine).join("\n")}`, cards: [{ type: "esim", where, days: r.days, plans: r.plans.slice(0, 3) }] };
+    return { text: `eSIM plans for ${where}, ${r.days} days:\n${r.plans.slice(0, 3).map(planLine).join("\n")}`, cards: [{ type: "esim", where, days: r.days, plans: r.plans.slice(0, 3) }] };
   },
 
   async plan_car_now(_ctx, a) {
@@ -136,7 +158,7 @@ const RUN: Record<string, Run> = {
 
   async get_trip(ctx, a) {
     const t = await tripDetail(ctx.ownerId, String(a.trip_id), null);
-    return { text: compact(t) };
+    return { text: compact(t, 1500) };
   },
 
   async get_household(ctx) {
@@ -158,9 +180,13 @@ const RUN: Record<string, Run> = {
     const isSearch = kind === "flight" || kind === "stay";
     const r = await createRequest(ctx.ownerId, {
       kind, query: summary, travellerIds: whoOf(ctx, a.traveller_ids), note: "",
+      contactPreference: a.contact_preference === "call" || a.contact_preference === "whatsapp" || a.contact_preference === "in_app" ? a.contact_preference : null,
+      contactWindow: typeof a.contact_window === "string" && a.contact_window.trim() ? redact(a.contact_window).text.slice(0, 60) : null,
       ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
     } as Parameters<typeof createRequest>[1], ctx.ipHash);
-    return { text: `Request ${r.id} sent to the desk: ${r.title} (${r.summary}).${r.promisedBy ? ` Mada answers by ${r.promisedBy}.` : ""}`, cards: [{ type: "request", requestId: r.id, kind: r.kind, title: r.title }] };
+    const by = r.promisedBy ? riyadhClock(r.promisedBy, ctx.today) : null;
+    const how = r.contact ? ({ call: `by a call${r.contact.window ? ` (${r.contact.window})` : ""}`, whatsapp: "on WhatsApp", in_app: "here in the app" } as const)[r.contact.preference] : "here in the app";
+    return { text: `Request ${r.id} noted for the team at Mada: ${r.title}${r.summary ? ` (${r.summary})` : ""}. The team gets back to the traveller ${how}${by ? ` by ${by}` : ""}. Say it in one line: "We've noted it and the team will get back to you by ${by ?? "then"}".`, cards: [{ type: "request", requestId: r.id, kind: r.kind, title: r.title, detail: [r.summary, r.detail].filter(Boolean).join(" · "), promisedBy: r.promisedBy, contact: r.contact?.preference ?? null }] };
   },
 
   async price_quote_for_pay(ctx, a) {
@@ -173,7 +199,7 @@ const RUN: Record<string, Run> = {
     else return { text: "Need the option id from a search this conversation (or the eSIM plan id).", isError: true };
     const { preview } = await priceDraft(ctx.ownerId, { draft, useCredit: true }, { demo: ctx.demo });
     return {
-      text: `Pay sheet opened in the app: ${preview.title}, ${sar(preview.total.amount)} all in${preview.credit.used.amount ? ` after ${sar(preview.credit.used.amount)} Mada credit` : ""}. ${preview.rule}. Nothing is charged until the traveller slides to pay.`,
+      text: `${preview.demoFare ? `${DEMO}. Say this is a sample fare for testing. ` : ""}Pay sheet opened in the app: ${preview.title}, ${sar(preview.total.amount)} all in${preview.credit.used.amount ? ` after ${sar(preview.credit.used.amount)} Mada credit` : ""}. ${preview.rule}. Nothing is charged until the traveller slides to pay.`,
       pay: { draft, title: preview.title },
       status: "pay",
     };
@@ -194,9 +220,15 @@ export function personLine(p: Person, today: string): string {
   return `${p.id}: ${p.firstName || (p.isSelf ? "the account holder" : "unnamed")} (${p.isSelf ? "account holder" : p.relation}${age != null ? `, ${age}` : ""}${p.nationality ? `, ${p.nationality} passport` : ""})`;
 }
 
+/** A place's name for a status line, in the reader's language ("istanbul" → «إسطنبول»; "pakistan" → «باكستان»). */
+const placeName = (raw: string, lang: "en" | "ar") => {
+  const en = DESTINATIONS[raw]?.name ?? raw.trim().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+  return nameIn(en, lang);
+};
+
 /** The status line while a tool runs ("Checking flights to Istanbul"), in the traveller's language. */
 export function statusFor(name: string, input: Record<string, unknown>, lang: "en" | "ar"): string {
-  const city = typeof input.destination === "string" ? destName(input.destination) : typeof input.where === "string" ? input.where : "";
+  const city = placeName(typeof input.destination === "string" ? input.destination : typeof input.where === "string" ? input.where : "", lang);
   const en: Record<string, string> = {
     search_flights: `Checking flights to ${city}`, search_stays: `Checking places to stay in ${city}`, esim_plans: `Checking internet plans for ${city}`,
     entry_rules: `Checking entry rules for ${city}`, get_trips: "Looking at your trips", get_trip: "Looking at your trip", price_quote_for_pay: "Checking the price again",

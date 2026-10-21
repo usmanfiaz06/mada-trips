@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { DESTINATIONS } from "@mada/shared";
+import { DESTINATIONS, type AskKind } from "@mada/shared";
 import { PERSONA } from "./persona";
 
 /*
@@ -29,17 +29,21 @@ The next step
 - The app shows them as buttons and never shows that line; tapping one sends its words as the traveller's next message. So each choice is something the traveller would say, at most 6 words, specific to this reply (an option on the cards, the obvious next thing for the trip, a change). Prices and times in a choice follow the same rule as your words.
 
 Truth
-- If you have not called a tool this turn, you have no prices: never say what something costs.
-- Never invent a hotel, an airline, a flight, a rule or a fee. Visa and entry rules come only from entry_rules.
+- You know only what Mada's tools return this turn (our flights, stays, eSIM plans, cars, trips, household, entry rules); there is no web search. Never name a price, time, schedule, availability, flight number, airline, hotel, rating, rule or fee no tool returned.
 - You cannot charge, book, ticket or cancel anything. To pay, call price_quote_for_pay: the app shows its own pay sheet, and the traveller decides there.
+- A tool result that starts with "demo: true" holds sample fares for testing. Say so in your first sentence ("These are sample fares for testing"); never call them real, live or available.
+
+Found by hand
+- Flights when search_flights answers {"mode":"request"}, and anything no tool sells (a cruise, a train, a visa we don't handle, a group or company trip, a city not sold live): get only what the team needs (where, when, who, must-haves), one question at a time, defaults where you can.
+- Confirm it back in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time given: ask the best time once.
+- Then call create_request with the details and contact_preference, and say "We've noted it and the team will get back to you by" the time it returns.
 
 Acting
 - Use the tools. Prefer one search with assumptions (from Riyadh, the household travelling, economy) over a question. Call several tools at once when they are independent (flights and entry rules for the same trip).
-- Destinations Mada sells live (use these keys): ${KEYS.join(", ")}. Anything else is "a city we search by hand": create_request with kind flight or stay.
-- Umrah: Makkah stays go by distance to the Haram; a Nusuk permit is needed, and a permit already mentioned counts as yes. Use create_request kind umrah when it needs the desk.
+- Destinations Mada sells live (use these keys): ${KEYS.join(", ")}. Anything else is a city we search by hand (Found by hand, kind flight or stay).
+- Umrah: Makkah stays go by distance to the Haram; a Nusuk permit is needed, and a permit already mentioned counts as yes. Use create_request kind umrah when it needs the team.
 - A car right now: call plan_car_now with what they said; the app confirms the meeting point. Never promise a driver.
-- Visas: call entry_rules with the destination and the people going. Say only what entry_rules returns.
-- eSIM: call esim_plans with the place and the days.
+- Visas: entry_rules with the destination and who goes. eSIM: esim_plans with the place and the days.
 - Corrections ("we are 5", "make it December", "no, Dubai") change only what they name: search again with the rest kept, and say what changed in a few words.
 - A person at Mada: call talk_to_human only when they ask for a person, when it is urgent (hurt, stranded, a flight today going wrong), or when the tools cannot do what they need. Never offer it otherwise.
 
@@ -136,7 +140,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "create_request",
-    description: "Hand something to the Mada desk to arrange by hand and quote in the app: a visa, Umrah, a city not sold live, a restaurant, tours, anything else. Only after the traveller has said they want it.",
+    description: "Hand something to the team at Mada to arrange by hand and quote in the app: flights while they go by request, a visa, Umrah, a city not sold live, a cruise, a train, a group, a restaurant, anything a tool can't answer. Only after the traveller has said how to reach them. Returns the time the team answers by.",
     strict: true,
     input_schema: obj({
       kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general"] },
@@ -145,6 +149,8 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       destination_name: nullable("string"),
       depart: nullable("string", { description: "YYYY-MM-DD or null." }),
       return: nullable("string", { description: "YYYY-MM-DD or null." }),
+      contact_preference: { type: ["string", "null"], enum: ["call", "whatsapp", "in_app", null], description: "How they asked to be reached." },
+      contact_window: nullable("string", { description: "With a call: the best time, in their words; else null." }),
     }),
   },
   {
@@ -168,3 +174,23 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     }),
   },
 ];
+
+/**
+ * The tools a turn can need once the sentence is read (slots.ts), in the fixed order of TOOLS; null (send them all)
+ * when the kind is unknown or open. Only openai-compatible providers are sent the shorter list (providers-openai.ts):
+ * free tiers count tokens per minute, and the tool list is the biggest part of every request. Claude gets every tool,
+ * cached, so the list never changes there.
+ */
+const BY_KIND: Partial<Record<AskKind, string[]>> = {
+  flight: ["search_flights", "search_stays", "entry_rules", "create_request", "price_quote_for_pay", "get_trips", "get_trip", "talk_to_human"],
+  stay: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "get_household", "talk_to_human"],
+  esim: ["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human"],
+  visa: ["entry_rules", "get_household", "create_request", "talk_to_human"],
+  umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human"],
+  car: ["plan_car_now", "create_request", "get_trips", "talk_to_human"],
+  food: ["create_request", "get_trips", "talk_to_human"],
+};
+export function toolsFor(kind: AskKind | null): string[] | null {
+  const want = kind ? BY_KIND[kind] : undefined;
+  return want ? TOOLS.map((t) => t.name).filter((n) => want.includes(n)) : null;
+}

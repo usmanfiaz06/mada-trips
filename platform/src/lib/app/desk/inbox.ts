@@ -14,6 +14,9 @@ import { disruptedToday } from "./disruptions";
 import { esimsNeedingDesk } from "../esim/ops";
 import { routeFor, type Route } from "./routing";
 import { compareUrgency, DESK_KINDS, slaFor, type DeskKind, type Sla } from "./sla";
+import { CONTACT_LABEL, contactPreferenceOf } from "../booking/requests";
+
+const reachOf = (details: unknown) => { const c = contactPreferenceOf(details); return c ? { label: CONTACT_LABEL[c.preference], window: c.window } : null; };
 
 /*
  * The desk's one queue. Every source (orders, ticketing, chats, quotes, refunds, disruptions, moderation) becomes an
@@ -21,7 +24,9 @@ import { compareUrgency, DESK_KINDS, slaFor, type DeskKind, type Sla } from "./s
  */
 
 export type InboxItem = {
-  key: string; kind: DeskKind; id: string; title: string; sub: string; note: string; tag?: string | null; link?: { label: string; href: string } | null; userId: string | null; userName: string;
+  key: string; kind: DeskKind; id: string; title: string; sub: string; note: string; tag?: string | null;
+  /** How the traveller asked to be reached (Ask chat): an English key the desk translates, and a call's best time. */
+  reach?: { label: string; window: string | null } | null; link?: { label: string; href: string } | null; userId: string | null; userName: string;
   href: string; sla: Sla; route: Route; agentName: string | null; escalated: boolean; escalationNote: string | null; amount: number | null;
   /** Urgent help waiting on a call-back: above everything else, whatever its promise says. */
   urgent?: boolean;
@@ -59,7 +64,7 @@ async function sources(now: Date) {
       const place = r.kind === "destination" ? destinationOf(r.details) : null;
       raw.push({ kind: "request", id: r.id, title: place ? `${place.name}${place.country ? `, ${place.country}` : ""}` : r.summary, note: "Needs a quote", sub: `${r.ref} · ${r.userName}${place?.airports.length ? ` · ${place.airports.join(" ")}` : ""}`,
         userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.createdAt, now, { due: r.promisedBy }), amount: null,
-        tag: place ? "Destination" : r.kind === "flight" ? "Flights" : r.kind === "activity" ? "Activity" : null, link: place ? { label: "City guide", href: place.guideUrl } : null });
+        tag: place ? "Destination" : r.kind === "flight" ? "Flights" : r.kind === "activity" ? "Activity" : null, link: place ? { label: "City guide", href: place.guideUrl } : null, reach: reachOf(r.details) });
     } else if (r.status === "with_agent") {
       raw.push({ kind: "request", id: r.id, title: r.summary, note: "Paid, finish it", sub: `${r.ref} · ${r.userName}`, userId: r.ownerId, userName: r.userName, href: `/adminwork/desk/requests/${r.id}`, sla: slaFor("request", r.updatedAt, now, { targetMinutes: 24 * 60 }), amount: null });
     }

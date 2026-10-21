@@ -231,7 +231,16 @@ describe("a conversation", () => {
 
 describe("the guards", () => {
   it("find prices and times no tool returned", () => {
-    expect(unbacked("Saudia at SAR 2,025, leaves 09:40.", "SV263 RUH 09:40 → IST · SAR 2,025 all in")).toEqual([]);
+    expect(unbacked("Saudia at SAR 2,025, leaves 09:40.", "Saudia SV263 RUH 09:40 → IST · SAR 2,025 all in")).toEqual([]);
+    // Answers come only from the tools: flight numbers, ratings, airlines and hotels no tool returned are held back too.
+    const tool = "Saudia SV263 · RUH 09:40 → 13:10 · SAR 2,025 all in\n1. id=s-1 · Rove Downtown · Downtown · 3 stars · SAR 1,840 all in";
+    expect(unbacked("The Saudia SV 263 is direct, and the Rove Downtown has 3 stars.", tool)).toEqual([]);
+    expect(unbacked("Take SV 1123 instead.", tool)).toEqual(["SV 1123"]);
+    expect(unbacked("Emirates flies at night too.", tool)).toEqual(["Emirates"]);
+    expect(unbacked("The Hilton Garden Inn is closer.", tool)).toEqual(expect.arrayContaining(["Hilton"]));
+    expect(unbacked("The Grand Plaza Hotel is rated 9.1.", tool)).toEqual(expect.arrayContaining(["rated 9.1", "The Grand Plaza Hotel"]));
+    expect(unbacked("It is a 5-star place.", tool)).toEqual(["5-star"]);
+    expect(unbacked("The United Arab Emirates needs no visa, and 5 GB lasts 10 days.", tool)).toEqual([]);
     expect(unbacked("About SAR 1,500 each.", "SAR 2,025 all in")).toEqual(["SAR 1,500"]);
     expect(unbacked("يطلع 21:15 بـ 900 ر.س", "SV 09:40 · SAR 900")).toEqual(["21:15"]);
     expect(unbacked("A UK ETA costs £16.", "UK ETA, GBP 16")).toEqual([]);

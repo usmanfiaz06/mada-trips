@@ -109,6 +109,8 @@ export const bookingCopy = {
   'search.sort.fastest': 'Fastest',
   'search.sort.earliest': 'Earliest',
   'search.label.best': 'Best for you',
+  /** On every card and pay sheet for a sample fare from the mock catalogue (FlightOption.demo). */
+  'search.demoFare': 'Demo fare · not bookable',
   'search.label.lowest': 'Lowest price',
   'search.label.earliest': 'Earliest',
   'search.label.fastest': 'Fastest',

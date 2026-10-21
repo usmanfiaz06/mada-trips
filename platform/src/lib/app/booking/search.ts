@@ -96,7 +96,14 @@ export function flightOptionOf(o: BookingFlightOffer, id: string, adults: number
     reason: o.reason, bags: o.baggage, changeRule: o.changeRule, refundRule: o.refundRule, refundable: o.meta?.refundable ?? o.refundRule !== "Not refundable",
     cabin: o.cabin, adults, infants, children: kids, pricePerPerson: money(pp), childPrice: money(child), infantPrice: money(infant),
     total: money(flightTotal({ pricePerPerson: money(pp), childPrice: money(child), infantPrice: money(infant) }, adults, kids, infants)), expiresAt: o.expiresAt,
+    // A sample fare from the mock catalogue: every card and the pay sheet say "Demo fare · not bookable".
+    ...(demoFlights() ? { demo: true } : {}),
   };
+}
+
+/** Flights come from the mock catalogue (never on a production deployment unless APP_ALLOW_MOCKS=yes). */
+export function demoFlights(): boolean {
+  try { return supplierMode("flights") === "mock"; } catch { return true; }
 }
 
 /** Who is going: the household's people when signed in, else the people a guest said (priced, never stored). */

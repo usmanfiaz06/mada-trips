@@ -15,6 +15,19 @@ import { agentFor, autopilotOn, isUuid, today, travellersOf } from "./common";
 import { flightQuoteOf, flightSummary, flightTitle, isFlightAsk, isFlightRequest, type FlightSearch } from "./flight-requests";
 import { flightsMode } from "../switches";
 
+/** Every price, quote or set of options found by hand: within 2 hours, any time of day, as the app promises (copy/words.ts). */
+export const REQUEST_PROMISE_MIN = 120;
+
+/** How the traveller asked to be reached about a request, or null (the desk request page and inbox show it). */
+export function contactPreferenceOf(details: unknown): { preference: "call" | "whatsapp" | "in_app"; window: string | null } | null {
+  const d = (details ?? {}) as { contactPreference?: unknown; contactWindow?: unknown };
+  const p = d.contactPreference;
+  if (p !== "call" && p !== "whatsapp" && p !== "in_app") return null;
+  return { preference: p, window: typeof d.contactWindow === "string" && d.contactWindow ? d.contactWindow : null };
+}
+/** The desk's words for it (English keys, Arabic in desk/ar.ts). */
+export const CONTACT_LABEL = { call: "Reach by call", whatsapp: "Reach on WhatsApp", in_app: "Reach in the app" } as const;
+
 /*
  * Requests a person at Mada completes (visa, Umrah, car, a table, things to do, flights and rooms searched by hand,
  * services from the entry check). One pipe, app_requests, which the desk in Ops works from; quotes in app_quotes with
@@ -28,6 +41,8 @@ export type AskDetails = {
   answers: Record<string, string[]>; needs: Record<string, NeedKey[]>; search?: CreateRequestInput["search"] | null;
   service?: string | null; serviceFor?: { personId: string | null; need: string | null; destination: string | null } | null; clientId?: string | null;
   flightRequest?: boolean;
+  /** How to reach the traveller about it (Ask chat asks once), and the best time for a call. */
+  contactPreference?: "call" | "whatsapp" | "in_app" | null; contactWindow?: string | null;
   /** Who an entry service is for, so "UK ETA issued for you and Hessa" reads in the reader's language when it's done. */
   serviceWho?: { name: string; self: boolean }[];
   // Read by Trips → Requests (lib/app/trips/requests.ts): one line, and the quote once there is one.
@@ -88,7 +103,7 @@ export function requestView(r: RequestRow, q?: typeof appQuotes.$inferSelect): B
     id: r.id, kind: (d.askKind ?? "general") as BookingRequestView["kind"], status: VIEW_STATUS[r.status] ?? "sent",
     title: flight ? flightTitle(flight) : readTitle(d) ?? d.title ?? r.summary, summary: flight && d.flightRequest ? flightSummary(flight, r.travellerIds.length) : d.summaryLine ?? "",
     detail: d.detail ?? "", note: d.note ?? null, travellerIds: r.travellerIds, agent: r.agentName ? { name: r.agentName } : null, quote: quoteView(q),
-    promisedBy: r.promisedBy?.toISOString() ?? null, result: resultOfRequest(r), progress: progressOfRequest(r), createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
+    promisedBy: r.promisedBy?.toISOString() ?? null, result: resultOfRequest(r), progress: progressOfRequest(r), contact: contactPreferenceOf(d), createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString(),
   };
 }
 
@@ -120,8 +135,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   let title = words.title;
   let detail = words.detail;
   let titleCopy: [string, Record<string, string>] | null = null;
-  // Every price, quote or set of options found by hand: within 2 hours, as the app promises (copy/words.ts).
-  const promisedMin = 120;
+  const promisedMin = REQUEST_PROMISE_MIN;
   if (b.service) {
     const who = b.serviceFor?.personId ? travellers.find((p) => p.id === b.serviceFor!.personId) ?? null : null;
     const name = who ? personName(who) : "";
@@ -143,6 +157,7 @@ export async function createRequest(ownerId: string, input: CreateRequestInput, 
   const details: AskDetails = {
     source: "ask", askKind: b.kind, title, detail, summaryLine: flightRequest ? flightSummary(b.search as FlightSearch, travellers.length) : summaryLine, note: words.note, query: b.query, answers: b.answers, needs: b.needs, flightRequest,
     search: b.search ?? null, service: b.service ?? null, serviceFor: b.serviceFor ?? null, clientId: b.clientId ?? null,
+    ...(b.contactPreference ? { contactPreference: b.contactPreference, contactWindow: b.contactPreference === "call" ? b.contactWindow ?? null : null } : {}),
     short: b.service ? title : SHORT[b.kind], quote: null, quoteText: null, withWhom: "faisal", titleCopy,
     ...(b.service ? { serviceWho: (b.serviceFor?.personId ? travellers.filter((p) => p.id === b.serviceFor!.personId) : travellers).map((p) => ({ name: personName(p), self: !!p.isSelf })) } : {}),
   };

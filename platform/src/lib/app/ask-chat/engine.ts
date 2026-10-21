@@ -1,11 +1,11 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi, StreamParams } from "./providers";
-import { t, type AskChatEvent, type AskIntent, type ChatCard, type Person } from "@mada/shared";
+import { t, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type Person } from "@mada/shared";
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
-import { isCloser, outgoingProblems, tidy, unbacked } from "./guard";
+import { isCloser, outgoingProblems, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
-import { SYSTEM_PROMPT, TOOLS } from "./prompt";
+import { SYSTEM_PROMPT, TOOLS, toolsFor } from "./prompt";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
 import { schemaProblems, toolNameFor } from "./schema";
 
@@ -108,11 +108,14 @@ export class SentenceGate {
   /** The open sentence is short and starts like a closer: hold it until it ends (it is dropped if it is one). */
   private maybeCloser() {
     const s = this.buf.trimStart();
-    return s.length < 48 && /^(?:any|is there|how (?:can|else)|let (?:me|us)|feel|hope|don|هل|فيه? |أي |تبي|تبغى|تأمر|لا تت)/i.test(s);
+    return s.length < 120 && /^(?:and |so |or )?(?:any|is there|how (?:can|else)|let (?:me|us)|tell (?:me|us)|just|say the|if you|should you|whenever|we'?re here|feel|hope|don|هل|فيه? |أي |تبي|تبغى|تأمر|لا تت|و?خب|و?قو?ل لنا|و?علّ?منا|و?بلّ?غنا|و?إذا|و?اذا|و?لو )/i.test(s);
   }
 
-  private close(sentence: string) {
-    if (isCloser(sentence)) { this.closers += 1; if (this.shownUpTo > 0) this.dirty = true; return; }
+  private close(whole: string) {
+    if (isCloser(whole)) { this.closers += 1; if (this.shownUpTo > 0) this.dirty = true; return; }
+    // "Three ways for Eid, let us know which you prefer.": the closing clause goes, the content stays.
+    const sentence = trimCloser(whole);
+    if (sentence !== whole) { this.closers += 1; if (this.shownUpTo > 0) this.dirty = true; }
     const ok = !unbacked(sentence, this.toolText()).length && !outgoingProblems(sentence).length;
     if (ok) {
       this.kept.push(sentence);
@@ -138,6 +141,11 @@ export type TurnInput = {
   runTool?: typeof runTool;
   /** The evals compare models; the app uses ASK_CHAT_MODEL. */
   model?: string;
+  /**
+   * What the sentence was read as (slots.ts). When known, an openai-compatible provider is sent only the tools such a
+   * turn can need (prompt.ts toolsFor), which saves tokens on free tiers; Claude always gets the full cached list.
+   */
+  intent?: AskKind | null;
 };
 
 export type TurnResult = {
@@ -161,6 +169,8 @@ export type TurnResult = {
   modelChoices: string[];
   /** Closing lines dropped ("Anything else?"). */
   closers: number;
+  /** The tool calls that ran, with their inputs (for the evals; never logged). */
+  calls: { name: string; input: Record<string, unknown> }[];
 };
 
 const addUsage = (u: Usage, x: Anthropic.Beta.BetaUsage) => {
@@ -184,6 +194,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let toolText = "";
   const cards: ChatCard[] = [];
   const toolsUsed: string[] = [];
+  const calls: TurnResult["calls"] = [];
   let sep = false;
   let raw = "";
   const exec = input.runTool ?? runTool;
@@ -192,6 +203,9 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let stop: TurnResult["stop"] = "steps";
   let paid = false;
   let handedOff = false;
+  let flightRequest = false;
+  // Only a hint: providers that cache the tool list (Claude) ignore it and get every tool (providers.ts).
+  const onlyTools = toolsFor(input.intent ?? null);
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const params = {
@@ -204,6 +218,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       cache_control: { type: "ephemeral" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: TOOLS,
+      ...(onlyTools ? { only_tools: onlyTools } : {}),
       tool_choice: { type: "auto" },
       messages: [...input.history, ...added],
     } as unknown as StreamParams;
@@ -252,6 +267,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       const inp = (c.input ?? {}) as Record<string, unknown>;
       emit({ type: "status", text: statusFor(name, inp, input.lang) });
       toolsUsed.push(name);
+      calls.push({ name, input: inp });
       const out = await exec(name, inp, input.tool);
       return { c, out };
     }));
@@ -260,6 +276,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       if (out.cards?.length) { cards.push(...out.cards); emit({ type: "cards", cards: out.cards }); }
       if (out.pay) { paid = true; emit({ type: "pay", pay: out.pay }); }
       if (out.handoff) handedOff = true;
+      if (out.mode === "request") flightRequest = true;
       if (out.handoff) emit({ type: "handoff", threadId: out.handoff.threadId, agent: out.handoff.agent });
       void c;
     }
@@ -279,9 +296,9 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   if (gate.dropped) console.warn(`[ask-chat] ${gate.dropped} sentence(s) held back (unbacked number or banned word)`);
   // Never open-ended: Mada's own choices when it gave at least 2 good ones, otherwise the turn's (next.ts).
   const modelChoices = stop === "refusal" ? [] : gate.choices;
-  const next = resolveNext(modelChoices, { cards, pay: paid, handoff: handedOff, lang: input.lang });
+  const next = resolveNext(modelChoices, { cards, pay: paid, handoff: handedOff, flightRequest, lang: input.lang });
   if (next.choices.length) emit({ type: "next", choices: next.choices });
-  return { added, text, cards, usage, costMicros: cost, toolsUsed, raw: raw.trim(), dropped: gate.dropped, toolText, stop, next: next.choices, nextFrom: next.from, modelChoices, closers: gate.closers };
+  return { added, text, cards, usage, costMicros: cost, toolsUsed, raw: raw.trim(), dropped: gate.dropped, toolText, stop, next: next.choices, nextFrom: next.from, modelChoices, closers: gate.closers, calls };
 }
 
 /** The context block for a turn: Mada's systems speaking, never the traveller. Changes every turn, so it sits in the turn. */

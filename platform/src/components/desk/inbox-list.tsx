@@ -11,7 +11,7 @@ import { useT } from "@/lib/i18n/client";
 
 export type InboxRow = {
   key: string; kind: string; id: string; title: string; note: string; sub: string; href: string; due: string; opened: string;
-  agentName: string | null; reason: string; tag?: string | null; link?: { label: string; href: string } | null; escalated: boolean; escalationNote: string | null; amount: string | null; mine: boolean;
+  agentName: string | null; reason: string; tag?: string | null; reach?: { label: string; window: string | null } | null; link?: { label: string; href: string } | null; escalated: boolean; escalationNote: string | null; amount: string | null; mine: boolean;
 };
 
 
@@ -64,6 +64,7 @@ export function InboxList({ rows, take, myAgentId, filterHref }: {
                   <span className="text-[11.5px] font-medium uppercase tracking-[0.06em] text-ink-3">{t(M.label)}</span>
                   <span className="text-[12.5px] font-medium text-ink-2">· {t(r.note)}</span>
                   {r.tag && <span className="inline-flex h-5 items-center rounded-full bg-info-soft px-1.5 text-[11px] font-medium text-info">{t(r.tag)}</span>}
+                  {r.reach && <span className="inline-flex h-5 items-center rounded-full bg-surface-2 px-1.5 text-[11px] font-medium text-ink-2" data-testid="inbox-reach">{t(r.reach.label)}{r.reach.window ? <> · <bdi>{r.reach.window}</bdi></> : null}</span>}
                   {r.escalated && <span className="inline-flex h-5 items-center gap-1 rounded-full bg-bad-soft px-1.5 text-[11px] font-medium text-bad" title={r.escalationNote ?? ""}><Flag className="size-3" />{t("Escalated")}</span>}
                 </span>
                 <span className="mt-0.5 block truncate text-[14.5px] text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4"><bdi>{r.title}</bdi></span>

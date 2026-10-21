@@ -67,6 +67,7 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     context: turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today) }),
     lang,
     tool: { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set() },
+    intent: slots.intent.kind,
     signal,
   }, emit, api);
 

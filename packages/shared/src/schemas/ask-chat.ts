@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Id, IsoDay } from './common';
+import { Id, IsoDateTime, IsoDay } from './common';
 import { AskIntent, EntryCheckResponse, FlightOption, HomeAirport, OrderDraft, StayOption } from './booking';
 import { EsimPlan } from './esim';
 import { TripCard } from './trips';
@@ -44,7 +44,12 @@ export const ChatCard = z.discriminatedUnion('type', [
   z.object({ type: z.literal('trips'), trips: z.array(TripCard).max(4) }),
   /** A car now: what was read, for the app's car flow to finish (the meeting point is always confirmed there). */
   z.object({ type: z.literal('car'), city: z.string().nullable(), from: z.string().nullable(), to: z.string().nullable(), when: z.enum(['now', 'in15']) }),
-  z.object({ type: z.literal('request'), requestId: Id, kind: z.string(), title: z.string() }),
+  /** Something the team arranges by hand: what, when and who (detail), when the team gets back, and how. */
+  z.object({
+    type: z.literal('request'), requestId: Id, kind: z.string(), title: z.string(),
+    detail: z.string().optional(), promisedBy: IsoDateTime.nullable().optional(),
+    contact: z.enum(['call', 'whatsapp', 'in_app']).nullable().optional(),
+  }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
 

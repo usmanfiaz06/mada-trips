@@ -23,6 +23,7 @@ import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteA
 import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
 import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
 import { flightQuoteOf } from "@/lib/app/booking/flight-requests";
+import { CONTACT_LABEL, contactPreferenceOf } from "@/lib/app/booking/requests";
 import { ActivityCard } from "@/components/desk/activity";
 import { OutcomeCard } from "@/components/desk/outcome";
 import { progressOfRequest, resultOfRequest } from "@/lib/app/outcomes";
@@ -43,12 +44,14 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   const closed = ["done", "cancelled", "confirmed"].includes(r.status);
   const sla = r.status === "sent" || r.status === "reviewing" ? slaFor("request", r.createdAt, new Date(), { due: r.promisedBy }) : null;
   const checklist = d.checklist ?? (CHECKLISTS[r.kind] ?? []).map((label) => ({ label, done: false }));
-  const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message", "activity"].includes(k)).slice(0, 12);
+  const asked = Object.entries(r.details).filter(([k]) => !["desk", "offer", "place", "message", "activity", "contactPreference", "contactWindow"].includes(k)).slice(0, 12);
   const quote = x.quotes.find((q) => q.status !== "withdrawn");
   const place = r.kind === "destination" ? destinationOf(r.details) : null;
   // Flights by request: the form's answers as facts, fares with the quote builder (components/desk/flight-quote.tsx).
   const fr = x.flightAsk ? flightFacts(r.details, x.travellers, L) : null;
   const flightQuote = quote ? flightQuoteOf(quote.offerSnapshot) : null;
+  // How they asked to be reached (Ask chat asks once): a call (with the best time), WhatsApp, or here in the app.
+  const reach = contactPreferenceOf(r.details);
   // Passport copies the travellers chose to keep: opened only while this request needs them, each look audited.
   const [copies, copyOpen] = await Promise.all([travellersWithCopy(x.travellers.map((p) => p.id)), copyWindowOpen(r)]);
   const copyLinks = act && copyOpen ? x.travellers.filter((p) => copies.has(p.id)) : [];
@@ -62,6 +65,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           {(r.details as { withdrawn?: boolean; withdrawnAt?: string }).withdrawn && <Badge tone="neutral" dot>{t("Withdrawn by the traveller")} · {timeAgo(new Date(String((r.details as { withdrawnAt?: string }).withdrawnAt ?? r.updatedAt)), L)}</Badge>}
           {sla && <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} />}
           <span>· {timeAgo(r.createdAt, L)}</span>
+          {reach && <Badge tone="info" dot><span data-testid="request-reach">{t(CONTACT_LABEL[reach.preference])}{reach.window ? <> · <bdi>{reach.window}</bdi></> : null}</span></Badge>}
           {x.contact && <ContactBadge contact={x.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
         <h1 className="mt-2 text-[32px] font-[380] leading-tight tracking-[-0.03em]">{r.summary}</h1>

@@ -315,6 +315,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     applied,
     renewals,
     family: fam ? { bags: fam.bags, bassinets: fam.bassinets, childMeals: fam.childMeals, adultFares: fam.adultFares } : null,
+    ...(flight?.demo ? { demoFare: true } : {}),
   };
   return { preview, snapshot, travellers, offerRows, place };
 }

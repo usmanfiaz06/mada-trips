@@ -19,6 +19,10 @@ export const arAskChat: ArSection<typeof askChatCopy> = {
   'chat.pay': 'راجع وادفع',
   'chat.carGo': 'جهّز السيارة',
   'chat.request': 'شوف الطلب',
+  'chat.request.by': 'الفريق يرد عليك قبل {time}',
+  'chat.request.call': 'باتصال',
+  'chat.request.whatsapp': 'على واتساب',
+  'chat.request.in_app': 'هنا في التطبيق',
   'chat.entryGo': 'شوف وش المطلوب',
   'chat.stopped': 'انقطع علينا الكلام. هذا هو بالطريقة المعتادة.',
   'chat.working': 'مادا تكتب',
@@ -47,4 +51,7 @@ export const arAskChat: ArSection<typeof askChatCopy> = {
   'chat.next.stays': 'دوّر فندق',
   'chat.next.esim': 'شريحة نت',
   'chat.next.myTrips': 'رحلاتي',
+  'chat.next.reachWhatsapp': 'واتساب',
+  'chat.next.reachCall': 'اتصلوا علي',
+  'chat.next.reachApp': 'هنا في التطبيق',
 };

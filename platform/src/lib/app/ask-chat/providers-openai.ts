@@ -12,6 +12,8 @@ import { toOpenApiSchema } from "./schema";
  *   out  streamed content → text_delta events; a new tool call → a tool_use block start; finish_reason → stop_reason
  *        (tool_calls → tool_use, length → max_tokens, content_filter → refusal); usage → usage (cached prompt tokens
  *        as cache reads)
+ * A turn whose kind is known sends only the tools it can need (`only_tools`, engine.ts / prompt.ts toolsFor): the
+ * tool list is most of each request, and free tiers count tokens per minute.
  * Tool arguments are parsed once the stream ends; arguments that aren't JSON come back as {} and the tool answers
  * that its input is missing, like any bad input. Strict schemas aren't promised by these providers: the tools check
  * every field themselves (tools.ts).
@@ -19,8 +21,18 @@ import { toOpenApiSchema } from "./schema";
 
 /** An HTTP failure from the provider, with its status (chat.ts maps it to the code the app sees). */
 export class ProviderHttpError extends Error {
-  constructor(readonly status: number, message: string, readonly retryAfter: number | null = null) { super(message); this.name = "ProviderHttpError"; }
+  /** quota: the provider said its quota or balance is used up (some answer 400, 402 or 403 for that, not 429). */
+  constructor(readonly status: number, message: string, readonly retryAfter: number | null = null, readonly quota = false) { super(message); this.name = "ProviderHttpError"; }
 }
+
+/** How long a provider asks us to wait: Retry-After, or Gemini's "retryDelay": "37s" in the body. Seconds, or null. */
+export function retryAfterOf(header: string | null, body: string): number | null {
+  const h = Number(header);
+  if (Number.isFinite(h) && h > 0) return h;
+  const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
+  return m ? Math.ceil(Number(m[1])) : null;
+}
+const QUOTA = /quota|rate.?limit|resource.?exhausted|insufficient|balance|exceeded|tokens per (?:minute|day)|too many requests/i;
 
 type OaMessage =
   | { role: "system" | "user"; content: string }
@@ -48,8 +60,10 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
     const text = blocks.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n\n");
     if (text) messages.push({ role: m.role === "system" ? "system" : "user", content: text });
   }
+  const only = (p as { only_tools?: string[] }).only_tools;
   const tools = (p.tools ?? []).flatMap((t) => {
     if (!("input_schema" in t)) return [];
+    if (only && !only.includes(t.name)) return [];
     const schema = t.input_schema as { properties?: Record<string, unknown> };
     // The OpenAPI subset (Gemini) has no null types and no empty parameter objects.
     const parameters = !openapi ? schema : Object.keys(schema.properties ?? {}).length ? toOpenApiSchema(schema as never) : undefined;
@@ -96,8 +110,9 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
       signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
     });
     if (!res.ok) {
-      const ra = Number(res.headers.get("retry-after"));
-      throw new ProviderHttpError(res.status, `provider answered ${res.status}`, Number.isFinite(ra) && ra > 0 ? ra : null);
+      // The body only to read a wait or a quota word from; never logged.
+      const body = (await res.text().catch(() => "")).slice(0, 2000);
+      throw new ProviderHttpError(res.status, `provider answered ${res.status}`, retryAfterOf(res.headers.get("retry-after"), body), res.status !== 429 && res.status < 500 && QUOTA.test(body));
     }
     return res;
   };

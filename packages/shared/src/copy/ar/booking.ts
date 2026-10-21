@@ -111,6 +111,7 @@ export const arBooking: ArSection<typeof bookingCopy> = {
   'search.sort.fastest': 'الأسرع',
   'search.sort.earliest': 'الأبكر',
   'search.label.best': 'الأنسب لك',
+  'search.demoFare': 'سعر تجريبي · ما ينحجز',
   'search.label.lowest': 'أقل سعر',
   'search.label.earliest': 'الأبكر',
   'search.label.fastest': 'الأسرع',

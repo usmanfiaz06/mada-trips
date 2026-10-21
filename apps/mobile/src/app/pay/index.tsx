@@ -33,6 +33,7 @@ import { toast } from '@/lib/toast';
 import { useCards } from '@/lib/wallet';
 import { useBookingBack } from '@/lib/hardware-back';
 import { travelEnds } from '@/lib/travel-ends';
+import { DemoFare } from '@/components/booking/DemoFare';
 import { colors, font, radii, ff } from '@/theme';
 
 /*
@@ -286,6 +287,7 @@ export default function Pay() {
             <T style={[font('displaySmall'), { flex: 1 }]} accessibilityRole="header">{p?.title ?? pd.title}</T>
             {holdText ? <View style={[styles.pill, expired ? null : styles.pillOk]} accessibilityLiveRegion="polite"><T v="caption" color={expired ? colors.green : colors.ok} style={{ fontFamily: ff.ui600, fontVariant: ['tabular-nums'] }}>{holdText}</T></View> : null}
           </View>
+          {p?.demoFare ? <DemoFare testID="pay-demo-fare" /> : null}
           {(p?.lines ?? []).map((l) => (
             <View key={l.key + l.text} style={styles.spread}>
               <View style={[styles.row, { flex: 1 }]}><Icon name={l.icon as IconName} size={20} /><T v="callout" color={colors.green} style={{ flex: 1, fontSize: 15 }}>{l.text}</T></View>

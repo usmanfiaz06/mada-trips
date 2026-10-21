@@ -65,21 +65,45 @@ const TIME = /\b\d{1,2}:\d{2}\b/g;
 
 const numbersOf = (s: string) => new Set((normalizeDigits(s).match(/\d[\d,٬]*(?:\.\d+)?/g) ?? []).map((x) => x.replace(/[,٬]/g, "").replace(/\.0+$/, "")));
 
+/** Flight numbers as written: "SV263", "XY 125", "F3 211". Not data sizes, quarters or clock words. */
+const FLIGHT_NO = /\b((?:[A-Z]{2}|[A-Z]\d|\d[A-Z]))\s?(\d{2,4})\b/g;
+const NOT_CARRIER = new Set(["GB", "MB", "KB", "KM", "AM", "PM", "ID", "UK", "US", "EU", "NO", "AD", "Q1", "Q2", "Q3", "Q4", "H1", "H2"]);
+/** Star ratings and scores: "5 stars", "4-star", "rated 8.7", "9.1/10", «٥ نجوم». */
+const RATING = /(\d(?:\.\d)?)\s?(?:-?\s?stars?\b|★|نجوم|نجمات|نجمة)|\brated\s(\d{1,2}(?:\.\d)?)|\b(\d{1,2}(?:\.\d)?)\s?\/\s?(?:5|10)\b/gi;
+/** Airlines by name (a reply never names one no tool returned). "Emirates" in "United Arab Emirates" is a country. */
+const AIRLINES = /\b(?:Saudia|flynas|flyadeal|Riyadh Air|Turkish Airlines|(?<!Arab )Emirates|Qatar Airways|Etihad|Gulf Air|Oman Air|EgyptAir|Royal Jordanian|flydubai|Pegasus|Azerbaijan Airlines|Georgian Airways|British Airways|Lufthansa|Air Arabia|Kuwait Airways|AJet)\b/g;
+/** Hotel brands, and "<Name> Hotel / Resort / Suites / Palace": a hotel no tool returned is never named. */
+const HOTEL_BRANDS = /\b(?:Hilton|Marriott|Sheraton|Hyatt|Rixos|Swiss[oô]tel|M[oö]venpick|Fairmont|Ritz-Carlton|Four Seasons|Kempinski|InterContinental|Radisson|Novotel|Ibis|Pullman|Sofitel|Rotana|Rove|Raffles|Waldorf|Shangri-La|Anantara|Conrad|Crowne Plaza|Holiday Inn|Millennium|Hilton|Westin|Le M[eé]ridien|Mandarin Oriental|Park Hyatt|Address)\b/g;
+const HOTEL_PHRASE = /\b((?:[A-Z][\w'’&-]+\s){1,3})(?:Hotel|Resort|Suites|Palace|Inn)\b|\b(?:Hotel|Resort)\s((?:[A-Z][\w'’&-]+\s?){1,3})/g;
+const NOT_NAME = new Set(["the", "a", "an", "our", "this", "that", "we", "book", "your", "any", "one", "best", "top"]);
+
 /**
- * Prices and times in a reply that no tool returned this turn: each must appear, as a number, in the tool results.
- * An empty list means the reply only says what the tools said.
+ * What a reply says that no tool returned this turn: every price, amount and clock time must appear, as a number, in
+ * the tool results; so must every flight number, star rating or score, airline and hotel it names. An empty list means
+ * the reply only says what the tools said (docs/app/ASK-CHAT.md §Safety: answers come only from Mada's own tools).
  */
 export function unbacked(reply: string, toolText: string): string[] {
   const known = numbersOf(toolText);
   const s = normalizeDigits(reply);
   const found = [...(s.match(MONEY) ?? []), ...(s.match(TIME) ?? [])];
-  return found.filter((m) => {
+  const out = found.filter((m) => {
     const nums = [...numbersOf(m)];
     if (!nums.length) return false;
     // "09:40" is checked as itself and as "9:40"; money as its number.
     if (/^\d{1,2}:\d{2}$/.test(m)) return !toolText.includes(m) && !toolText.includes(m.padStart(5, "0")) && !toolText.includes(m.replace(/^0/, ""));
     return nums.some((n) => !known.has(n));
   });
+  const flat = toolText.replace(/\s+/g, "");
+  const lower = toolText.toLowerCase();
+  for (const m of s.matchAll(FLIGHT_NO)) if (!NOT_CARRIER.has(m[1]!) && !flat.includes(`${m[1]}${m[2]}`)) out.push(m[0]);
+  for (const m of s.matchAll(RATING)) { const n = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\.0+$/, ""); if (n && !known.has(n)) out.push(m[0]); }
+  for (const m of s.matchAll(AIRLINES)) if (!lower.includes(m[0].toLowerCase())) out.push(m[0]);
+  for (const m of s.matchAll(HOTEL_BRANDS)) if (!lower.includes(m[0].toLowerCase())) out.push(m[0]);
+  for (const m of s.matchAll(HOTEL_PHRASE)) {
+    const words = (m[1] ?? m[2] ?? "").trim().split(/\s+/).filter((w) => w && !NOT_NAME.has(w.toLowerCase()));
+    if (words.length && !words.every((w) => lower.includes(w.toLowerCase()))) out.push(m[0].trim());
+  }
+  return out;
 }
 
 /** Banned words (English and Arabic) in a reply. */
@@ -93,12 +117,36 @@ export const questionsIn = (reply: string) => (reply.match(/[?؟]/g) ?? []).leng
 
 /*
  * Never open-ended (docs/app/ASSISTANT.md §1 "Always resolve"): the closers a reply must not end on, and the preambles
- * it must not start with. The chips take a closer's place.
+ * it must not start with. The chips take a closer's place. A closer is a sentence that hands the next step back to the
+ * traveller without giving one: "Let us know which you prefer or if you'd like other dates.", "Feel free to ask.",
+ * "Just say the word.", «خبرنا إذا تبي تواريخ ثانية». A sentence with content stays: "If you'd like a sea view, the
+ * Address Sky View has one." names something (a capitalised name or a number), so it is kept.
  */
-const OPEN_ENDED = /\b(?:anything else|how (?:else )?can (?:i|we) help|let (?:me|us) know|feel free to|hope (?:this|that) helps|don'?t hesitate)\b|أي خدمة (?:ثانية|أخرى)|هل (?:من|هناك) خدمة|تبي شي ثاني|تبغى شي ثاني|في شي ثاني|أي شي ثاني|تأمر(?:ني)? على شي|لا تتردد|كيف (?:يمكنني|أقدر|نقدر) (?:أساعدك|نساعدك|مساعدتك)/i;
+const AR_TELL = "(?:خبّرنا|خبرنا|خبروني|قول(?:ي)? لنا|قل لنا|علّمنا|علمنا|بلّغنا|بلغنا)";
+const EN_CLOSE = String.raw`let (?:me|us) know|feel free(?: to)?|just (?:say|tell us|let us know)(?: the word)?|say the word|tell (?:me|us) (?:which|what you(?:'d| would)? (?:like|prefer)|if|whether|when you(?:'re| are) ready)|anything else|how (?:else )?can (?:i|we) help|hope (?:this|that) helps|don'?t hesitate|we'?re here (?:if|whenever|when)`;
+const OPEN_ENDED = new RegExp(String.raw`\b(?:${EN_CLOSE})\b|أي خدمة (?:ثانية|أخرى)|هل (?:من|هناك) خدمة|تبي شي ثاني|تبغى شي ثاني|في شي ثاني|أي شي ثاني|تأمر(?:ني)? على شي|لا تتردد|كيف (?:يمكنني|أقدر|نقدر) (?:أساعدك|نساعدك|مساعدتك)|${AR_TELL}(?=\s+(?:أي|وش|إذا|اذا|لو|متى|بس)|\s*[.؟?،]|\s*$)`, "i");
+/** At the start of a sentence: it only closes the reply. */
+const CLOSER = new RegExp(String.raw`^\s*(?:(?:and |so |or )?(?:is there )?(?:${EN_CLOSE})\b|(?:هل )?(?:في|فيه)? ?(?:أي خدمة (?:ثانية|أخرى)|شي ثاني)|تبي شي ثاني|تبغى شي ثاني|تأمر(?:ني)? على شي|لا تتردد|هل (?:من|هناك) خدمة|(?:و|ف)?${AR_TELL}(?=\s+(?:أي|وش|إذا|اذا|لو|متى|بس)|\s*[.؟?،]|\s*$))`, "i");
+/** "If you'd like other dates, just ask." Kept when it names something: a number, or a capitalised name after the start. */
+const IF_LIKE = /^\s*(?:if you(?:'d| would)? (?:like|want|prefer|rather)|should you (?:want|like|prefer)|whenever you(?:'re| are) ready|if (?:you need|there'?s) anything)\b/i;
+const AR_IF_LIKE = new RegExp(String.raw`^\s*(?:و)?(?:إذا|اذا|لو)\s+(?:تبي|تبغى|حاب|حابب|ودك)(?=\s).*${AR_TELL}`);
+const namesSomething = (s: string) => /\d/.test(s) || /\s[A-Z][a-z]/.test(s.trim().slice(1).replace(/\b(?:I|I'd|I'm|Mada)\b/g, ""));
 /** A sentence that only closes the reply without a next step ("Anything else?", "Let us know if…"): dropped. */
-const CLOSER = /^\s*(?:(?:is there )?anything else\b|how (?:else )?can (?:i|we) help\b|let (?:me|us) know (?:if|when|whether)\b|feel free\b|hope (?:this|that) helps\b|don'?t hesitate\b|(?:هل )?(?:في|فيه)? ?(?:أي خدمة (?:ثانية|أخرى)|شي ثاني)|تبي شي ثاني|تبغى شي ثاني|تأمر(?:ني)? على شي|لا تتردد|هل (?:من|هناك) خدمة)/i;
-export const isCloser = (sentence: string) => CLOSER.test(sentence.trim());
+export const isCloser = (sentence: string) => {
+  const s = sentence.trim();
+  if (CLOSER.test(s)) return true;
+  if (AR_IF_LIKE.test(s)) return true;
+  return IF_LIKE.test(s) && !namesSomething(s);
+};
+/** A closing clause after real content ("Three ways to go, let us know which you prefer."): cut, the content kept. */
+const CLOSING_CLAUSE = new RegExp(String.raw`(?:\s*[,،;]\s*(?:(?:and|or|so) |و)?|\s+(?:and|or|so)\s+|\s+و)(?:(?:${EN_CLOSE})\b|${AR_TELL}|if you(?:'d| would)? (?:like|want|prefer)\b(?=[^A-Z\d]*$))[^.?؟]*(?=[.?؟]?\s*$)`, "i");
+export function trimCloser(sentence: string): string {
+  const m = CLOSING_CLAUSE.exec(sentence);
+  if (!m || m.index === 0) return sentence;
+  const end = /[.?؟]?\s*$/.exec(sentence.slice(m.index + m[0].length))![0];
+  const trail = /\s*$/.exec(end)![0];
+  return `${sentence.slice(0, m.index)}${end.trim() && end.trim() !== "?" && end.trim() !== "؟" ? end.trim() : "."}${trail}`;
+}
 /** Open-ended phrases anywhere in a reply (the evals hold every reply to none). */
 export const openEndedIn = (reply: string): string[] => { const m = OPEN_ENDED.exec(reply); return m ? [m[0]] : []; };
 const PREAMBLE = /^\s*(?:great|good|excellent) question|^\s*(?:sure|of course|absolutely|certainly|definitely|happy to help|thanks for (?:asking|your message)|i understand)\b|^\s*(?:سؤال (?:حلو|رائع|جميل|ممتاز)|بكل سرور|بالتأكيد|أكيد[،,]|يسعدني|شكرًا على سؤالك)/i;

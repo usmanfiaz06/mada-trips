@@ -63,8 +63,9 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
    - Tool calls in one step run in parallel, and all their results go back in one message. A failed tool returns `is_error` with a plain sentence. The prompt tells the model to say so and offer the next step.
    - `stop_reason: "refusal"` ends the turn with the fixed line `chat.refusal`.
    - `max_tokens` on a step that holds a tool call never runs the tool.
-6. Sentence gate: words stream as they arrive. A sentence that contains a digit is held until it ends. It is shown only if every price and clock time in it appears in a tool result from this turn, and it has no banned word (COPY.md §3.2, English and Arabic). A sentence that fails is dropped. If part of it had already been shown, a `replace` event sends the cleaned text. If nothing is left, the fixed line is `chat.found` (when there are cards) or `chat.cant`. Exclamation marks, em dashes and emoji are tidied away as the words stream.
-7. Append the turn, add the spend, and write one log line. The line holds thread id, turn number, model, input/output/cache tokens, USD, tools used, the stop reason and how many items were redacted. **Message bodies are never logged.**
+6. Sentence gate: words stream as they arrive. A sentence that contains a digit is held until it ends. It is shown only if every price and clock time in it appears in a tool result from this turn, and it has no banned word (COPY.md §3.2, English and Arabic). The same check holds every flight number ("SV 263"), star rating or score ("5-star", "rated 9.1"), airline and hotel it names (brands, and "<Name> Hotel / Resort / Suites"): Mada answers only from its own tools, never from general knowledge or the web (there is no web search tool).
+   Closers are dropped too: a sentence that hands the next step back without giving one ("Let us know which you prefer or if you'd like other dates.", "Tell us which one suits you.", "Feel free to…", "If you'd like other dates, just ask.", "Just say the word.", «خبرنا إذا تبي…», «قول لنا وش تفضل»). A closing clause after real content is cut and the content kept ("Three ways for Eid, let us know which you prefer." → "Three ways for Eid."). A sentence that names something ("If you'd like a sea view, the Address Sky View has one.") stays (`guard.ts` isCloser, trimCloser). A sentence that fails is dropped. If part of it had already been shown, a `replace` event sends the cleaned text. If nothing is left, the fixed line is `chat.found` (when there are cards) or `chat.cant`. Exclamation marks, em dashes and emoji are tidied away as the words stream.
+7. Append the turn, add the spend, and write one log line (with a chain of providers, one more line per call says which provider answered). The line holds thread id, turn number, model, input/output/cache tokens, USD, tools used, the stop reason and how many items were redacted. **Message bodies are never logged.**
 
 ### Tools (strict JSON schemas, run server-side as the traveller)
 
@@ -78,11 +79,25 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 | `get_trips` / `get_trip` | `overview` / `tripDetail` (photos, links, passport and eSIM codes stripped, then redacted) | `trips` card |
 | `get_household` | the household from the turn (name, relation, age) | — |
 | `entry_rules` | `checkEntry` (visa, ETA, passport, from each person's nationality) | `entry` card |
-| `create_request` | `createRequest` (the desk), only after the traveller says yes | `request` card |
+| `create_request` | `createRequest` (the desk), once the traveller has said how to reach them; stores `contactPreference` (call, whatsapp, in_app) and `contactWindow` (a call's best time) on the request | `request` card: what, when and who, "The team gets back to you by 18:40", and how |
 | `price_quote_for_pay` | `priceDraft`: prices the offer again, **never charges** | `pay` event with an `OrderDraft`; the app opens its own pay sheet |
 | `talk_to_human` | `openThread` + `sendMessage` (summary, redacted) + `presenceFor` | `handoff` event. The app says the duty person's name ("Noura at Mada can take it from here") only when the desk names someone online; otherwise "The team at Mada…" (COPY.md §1) |
 
-Every tool goes through the same checks as the app's own routes. Offers must belong to the caller. Person ids the model gives are filtered to the household, and an empty list means the account holder. Days in the past are refused.
+What the model reads is kept short, because free tiers count tokens per minute: at most 3 options, each with only what a reply says (a flight is id, label, airline and number, times, duration, stops, refundable and the total; dates and who are in the header). The cards carry the rest.
+
+Every tool goes through the same checks as the app's own routes.
+
+### Honest results
+
+- **Sample fares.** When flights come from the mock catalogue (`SUPPLIER_MODE_FLIGHTS=mock`: outside production, or a staging copy with `APP_ALLOW_MOCKS=yes`; production refuses mock flights otherwise), every `FlightOption` carries `demo: true` and the pay sheet's preview `demoFare: true`. The chat cards, the FlightFlow cards and the pay sheet show "Demo fare · not bookable" («سعر تجريبي · ما ينحجز», `search.demoFare`). The tool result starts with `demo: true (sample fares from a test catalogue: not real, not bookable)` and the prompt tells the model to say they are sample fares for testing and never call them real or available.
+- **Flights by request** (`APP_FLIGHTS_MODE=request`, the default in production until TBO is certified). `search_flights` returns `{"mode":"request"}` with no fares, prices, times or flight numbers, the same as the app's own flows. The model confirms the trip back, says the team at Mada gets back within 2 hours (`REQUEST_PROMISE_MIN`, booking/requests.ts), and asks how to reach them. If it leaves no choices, the app fills in "WhatsApp · Call me · Here in the app" (`chat.next.reach*`).
+- **Found by hand.** The same goes for anything no tool sells: a cruise, a train, a visa we don't handle, a group or company trip, a city not sold live. The model:
+  1. gets only what the team needs (where, when, who, must-haves), one question at a time, with defaults;
+  2. confirms it back in one line and asks how to reach them (WhatsApp, a call and its best time, or here in the app);
+  3. calls `create_request` with `contact_preference` and says "We've noted it and the team will get back to you by 18:40", with the time the tool returned (Riyadh time).
+
+  The desk request page and the desk inbox show how to reach them ("Reach on WhatsApp", "Reach by call · evenings after 7").
+- **Status lines** name the place in the reader's language («نشوف الرحلات لـإسطنبول», via `nameIn`). Offers must belong to the caller. Person ids the model gives are filtered to the household, and an empty list means the account holder. Days in the past are refused.
 
 ### In the app
 
@@ -136,10 +151,26 @@ Totals at these rates:
 1. Vercel → project **mada-staging** → Settings → Environment Variables (Preview/Staging only, never Production):
    - `ANTHROPIC_API_KEY` = the staging key (set in Vercel only; never in the repo or a chat)
    - `ASK_CHAT` = `on`
+   - or a chain of free and paid providers in place of the Claude key (see "A chain of providers" below)
    - optional: `ASK_CHAT_MODEL`, `ASK_FAST_MODEL`, `ASK_CHAT_PER_MINUTE` (8), `ASK_CHAT_PER_DAY` (120), `ASK_CHAT_USER_DAILY_USD` (1), `ASK_CHAT_DAILY_USD` (50)
 2. Redeploy. Migration `0034_ask_chat` must be applied on the staging database (`npm --prefix platform run db:migrate` against it). Preview builds skip migrations.
 3. Check that GET `/api/app/v1/config` shows `features.askChat: true`. The app picks it up on its next config refresh (at most 10 minutes, or on reopen).
 4. To turn it off, set `ASK_CHAT=off` (or remove the key). `askChat` goes false and the app goes back to the flows on its next config read. Any stream already open finishes, or falls back.
+
+### A chain of providers (staging recipe)
+
+`ASK_CHAT_PROVIDERS` is an ordered list. Each call goes to the first provider that isn't resting. A provider that answers with a rate limit (429, or Groq's 413 for tokens per minute), a 5xx, a timeout or a quota error (some say so with a 400, 402 or 403) rests for its `Retry-After` (or Gemini's `retryDelay`), else 60 seconds. The same call then goes to the next one, inside the same turn. Every provider reads and writes the same Messages-shaped thread, so a switch mid-conversation, even mid-turn after a tool ran, needs nothing else. The app's own flows answer only when every provider is resting (`RATE_LIMITED`). Once words have streamed from one provider, a failure is the turn's error, as with one provider.
+
+Rest times are kept in memory, per server instance; a cold instance tries a resting provider once more. Each call logs `provider=… model=… call=stream|create` (and `after=groq` when it moved on), never message bodies.
+
+For staging:
+- `ASK_CHAT` = `on`
+- `ASK_CHAT_PROVIDERS` = `groq,gemini` (the keys are already set as `GROQ_API_KEY` and `GEMINI_API_KEY`)
+- optional: `ASK_CHAT_MODEL_GEMINI` (default `gemini-2.5-flash`), `ASK_CHAT_MODEL_GROQ` (default `openai/gpt-oss-120b`), `ASK_FAST_MODEL_<NAME>` (default: that provider's chat model)
+
+Names: `anthropic` (ANTHROPIC_API_KEY, default `claude-sonnet-5-5` / `claude-haiku-5-5`), `groq`, `gemini`, `zai` (their preset keys), `openai-compatible` (ASK_CHAT_BASE_URL, ASK_CHAT_API_KEY, ASK_CHAT_MODEL). A provider without its key is left out. Ask is on while one is left. When `ASK_CHAT_PROVIDERS` is unset, `ASK_CHAT_PROVIDER` works as before.
+
+**Fewer tokens on free tiers.** Once the sentence is read (slots), an openai-compatible provider is sent only the tools such a turn can need (`prompt.ts` toolsFor: a flight turn gets the flight, stay, entry, request, pay, trips and desk tools; an eSIM turn four tools). The full set is sent when the kind is unknown. Claude always gets every tool, so its cached prefix never changes. Mocked eval, estimated tokens per turn (all calls, chars/4 of the request): 6,811 before, 6,386 after on average. The second call of a turn: 3,949 before, 3,650 after. A known kind drops further, e.g. an eSIM turn goes from 3,677 + 3,806 to 2,587 + 2,715.
 
 ## 5. Evals
 
@@ -158,16 +189,17 @@ Totals at these rates:
   - the spend cap
   - the guards
   - the eval checker itself
+- `platform/test/app/ask-chat-honest.test.ts` covers sample fares (`demo: true` on cards and in the tool result), flights by request (no price, chips for how to reach them, then a request with the contact preference and the promise), the closer seen live in both languages, Arabic status lines, the tool subset, and the provider chain (Groq 429 → Gemini answers, cooldown expiry returns to Groq, both down → fallback).
 - `apps/mobile/test/unit/ask-chat.test.ts` covers frames split mid-way, the turn reducer, the thread id carried across turns, and every fallback path.
 
 **Live (needs a key, costs about $0.10 for the set on Claude):**
 
 ```
-ANTHROPIC_API_KEY=… npm run ask:eval              # all 36
+ANTHROPIC_API_KEY=… npm run ask:eval              # all 41
 ANTHROPIC_API_KEY=… npm run ask:eval -- visa-uk ar-esim
 ```
 
-There are 36 conversations, 24 in English and 12 in Arabic. They cover:
+There are 41 conversations, 28 in English and 13 in Arabic. They cover:
 - a family Eid trip and its correction
 - Umrah with a permit
 - a car now
@@ -185,6 +217,7 @@ There are 36 conversations, 24 in English and 12 in Arabic. They cover:
 - a table
 - a baby on a flight
 - a thank-you that must still end with a next step, a trip with no dates (a default, not a question), a refund, a delay and its rights
+- found by hand: flights by request (English and Arabic), a Red Sea cruise, a train from Riyadh to Dammam, a company trip for 25. Each must ask how to reach them, then make the request with that preference, with no invented facts
 
 Each one runs through the real engine, with fixture tool results and no database. Every turn is checked for:
 - **prices**: no price or time in the model's raw words that no tool returned
@@ -195,10 +228,11 @@ Each one runs through the real engine, with fixture tool results and no database
 - **next**: the reply ends with Mada's own 2 or 3 choices, or choices said in its last sentence (chips the app had to fill in count as a fail)
 - **open**: no open-ended closer ("Anything else?", "How can I help", "Let me know", «أي خدمة ثانية»)
 - **first**: the answer first: no preamble, and no question first unless the turn may be one needed question
+- **reach**: found by hand, it asks how to reach them (WhatsApp, a call, the app) as its own choices, then calls `create_request` with `contact_preference`
 
 The script exits 1 on any failure and prints the tokens and cost of each turn.
 
-**Comparing providers.** The same 36 conversations, fixtures and checks run against any number of profiles in one go, followed by a table. The quickest way uses the presets (§6), with keys taken from the environment:
+**Comparing providers.** The same 41 conversations, fixtures and checks run against any number of profiles in one go, followed by a table. The quickest way uses the presets (§6), with keys taken from the environment:
 
 ```
 ANTHROPIC_API_KEY=… GROQ_API_KEY=… ZAI_API_KEY=… GEMINI_API_KEY=… npm run ask:eval -- --provider anthropic,groq,zai,gemini
@@ -275,7 +309,7 @@ It speaks the Messages API's shapes, so the engine, the sentence gate, the tools
 
 A call that fails gets an `is_error` result saying exactly what is wrong, and the model gets **one** repair per turn. If it is still wrong, the turn stops with `error {code: "TOOL_INPUT", fallback: true}` and the app's own flows answer. With Claude and `strict: true` this check never fires.
 
-**Rate limits.** In the app, a provider's 429 (Groq's and Z.ai's free tiers are tight) becomes `error {code: "RATE_LIMITED", fallback: true}`. The app answers with its own flows, so it never dead-ends and never waits. Every other HTTP failure falls back the same way.
+**Rate limits.** With one provider, its 429 (Groq's and Z.ai's free tiers are tight) becomes `error {code: "RATE_LIMITED", fallback: true}`. With a chain (`ASK_CHAT_PROVIDERS`, §4) the next provider takes the call first. The app answers with its own flows, so it never dead-ends and never waits. Every other HTTP failure falls back the same way.
 
 **Free tiers are for staging and test accounts only.**
 - Google's free Gemini tier may use prompts and replies to improve Google's products, for use outside the EEA, the UK and Switzerland. Saudi Arabia is outside, so free Gemini must never carry real travellers. Production needs the paid tier, with its data terms checked by counsel.
