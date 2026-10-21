@@ -1,5 +1,6 @@
 import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey } from "drizzle-orm/pg-core";
 import { appUsers } from "./app-schema";
+import { users as opsUsers } from "./schema";
 
 /*
  * Ask Mada as a conversation (lib/app/ask-chat, docs/app/ASK-CHAT.md). One row per thread: the model-facing history,
@@ -32,9 +33,22 @@ export const appAskThreads = pgTable("app_ask_threads", {
   summary: text("summary"),
   /** How many turns the summary stands for (turns - folded_turns are still in `messages` word for word). */
   foldedTurns: integer("folded_turns").notNull().default(0),
+  /**
+   * Who answers (desk/ask, DESK-PLAN.md U5): "ai", or "agent" while a person on the desk has taken the thread over.
+   * While taken over the model never runs: the traveller's messages are kept in the transcript and the agent replies
+   * from the desk. Migration 0038.
+   */
+  mode: text("mode").notNull().default("ai"),
+  /** The Ops user who took it over (null in "ai" mode). */
+  takenBy: uuid("taken_by").references(() => opsUsers.id, { onDelete: "set null" }),
+  takenAt: timestamp("taken_at", { withTimezone: true }),
+  /** When the model handed it to the desk (talk_to_human). */
+  handedOffAt: timestamp("handed_off_at", { withTimezone: true }),
+  /** What happened while a person had it, for the model's next turn after Hand back; cleared once read. */
+  deskNote: text("desk_note"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt)]);
+}, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt), index("app_ask_threads_updated_idx").on(t.updatedAt)]);
 
 /** Spend per day, per person and for everyone (owner_key "all"), for ASK_CHAT_DAILY_USD and ASK_CHAT_USER_DAILY_USD. */
 export const appAskSpend = pgTable("app_ask_spend", {

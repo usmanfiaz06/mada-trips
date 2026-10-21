@@ -17,7 +17,7 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
       { href: D, label: t("My queue"), icon: "Headset", count: c.queue },
       { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck" },
       { href: `${D}/chats`, label: t("Chats"), icon: "MessagesSquare", count: c.chats },
-      { href: `${D}/ask`, label: t("Ask threads"), icon: "Bot", soon: true },
+      { href: `${D}/ask`, label: t("Ask threads"), icon: "Bot", show: can(u, "desk.ask.read") || can(u, "desk.admin") },
       { href: `${D}/customers`, label: t("Customers"), icon: "Contact" },
     ] },
     { label: t("App bookings"), items: [

@@ -267,6 +267,13 @@
       "when": 1792557401294,
       "tag": "0037_desk_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792557946482,
+      "tag": "0038_ask_takeover",
+      "breakpoints": true
     }
   ]
 }

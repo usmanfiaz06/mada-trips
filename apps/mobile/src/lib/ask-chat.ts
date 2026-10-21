@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { create } from 'zustand';
-import { API_PREFIX, ASK_CHAT_FEATURE, ASK_CHAT_ROUTE, HEADERS, readSseFrames, type AskChatEvent, type AskIntent, type ChatCard, type ChatPay } from '@mada/shared';
-import { refreshSession } from './api';
+import { API_PREFIX, ASK_CHAT_DESK_ROUTE, ASK_CHAT_FEATURE, ASK_CHAT_ROUTE, AskDeskResponse, HEADERS, readSseFrames, type AskChatEvent, type AskDeskLine, type AskIntent, type ChatCard, type ChatPay } from '@mada/shared';
+import { refreshSession, request } from './api';
 import { API_MODE, API_ORIGIN, SHOW_DEMO_HINTS } from './config';
 import { getLocale } from './i18n';
 import { getAppVersion, useFeature } from './net/gates';
@@ -17,14 +17,18 @@ import { useSession } from './session';
 
 export type ChatTurn = {
   id: number;
+  /** What the traveller wrote. Empty on a line from the desk that answers nothing new (a person on the desk wrote again). */
   me: string;
   /** When the traveller sent it (ISO), for the time shown after a quiet gap. */
   at?: string;
   /**
-   * A person on the desk who wrote this reply themselves, by name. Missing or null: Mada wrote it (always, today: the
-   * conversation never puts words in a person's mouth).
+   * A person on the desk who wrote this reply themselves, by name: only after they took the conversation over (their
+   * replies come from GET /ask/chat/desk). Missing or null: Mada wrote it; the conversation never puts words in a
+   * person's mouth.
    */
   by?: string | null;
+  /** joined: the line "Noura from Mada joined", shown once when a person takes the conversation over. */
+  desk?: 'joined';
   /** What Mada has said so far (token by token while streaming). */
   text: string;
   /** What is being done right now ("Checking flights to Istanbul"). */
@@ -116,6 +120,8 @@ export function applyChatEvent(turn: ChatTurn, e: AskChatEvent): ChatTurn {
     case 'intent': return { ...turn, intent: e.intent };
     case 'pay': return { ...turn, pay: e.pay };
     case 'handoff': return { ...turn, handoff: { threadId: e.threadId, agent: e.agent } };
+    // A person has the conversation: this message waits for them, nothing more comes in this turn.
+    case 'agent': return { ...turn, status: null };
     case 'next': return { ...turn, next: e.choices };
     case 'done': return { ...turn, text: e.text || turn.text, status: null, state: 'done' };
     case 'error': return { ...turn, status: null, state: 'stopped' };
@@ -127,9 +133,31 @@ type ChatState = {
   threadId: string | null;
   turns: ChatTurn[];
   busy: boolean;
+  /** Who on the desk has the conversation now (they took it over), or null while Mada answers. */
+  agent: string | null;
+  /** The last thread line the desk's replies were read up to (GET /ask/chat/desk `after`). */
+  deskAfter: number;
   reset: () => void;
 };
-export const useAskChat = create<ChatState>((set) => ({ threadId: null, turns: [], busy: false, reset: () => set({ threadId: null, turns: [], busy: false }) }));
+export const useAskChat = create<ChatState>((set) => ({ threadId: null, turns: [], busy: false, agent: null, deskAfter: -1, reset: () => set({ threadId: null, turns: [], busy: false, agent: null, deskAfter: -1 }) }));
+
+/**
+ * The desk's lines into the conversation. Pure, so it is tested on its own. "Noura from Mada joined" is a line of its
+ * own; a reply fills the traveller's latest message that nobody answered yet, or follows the same person's last reply,
+ * or starts a line of its own.
+ */
+export function applyDeskLines(turns: ChatTurn[], lines: AskDeskLine[], nextId: () => number, lang: 'en' | 'ar' = 'en'): ChatTurn[] {
+  const out = [...turns];
+  for (const l of lines) {
+    const last = out[out.length - 1];
+    const line = (o: Partial<ChatTurn>): ChatTurn => ({ id: nextId(), me: '', at: l.at, text: l.text, status: null, cards: [], pay: null, handoff: null, intent: null, lang: last?.lang ?? lang, state: 'done', ...o });
+    if (l.kind === 'joined') { out.push(line({ by: null, desk: 'joined' })); continue; }
+    if (last && last.state === 'done' && !last.text && !last.cards.length && last.me) out[out.length - 1] = { ...last, by: l.by, text: l.text };
+    else if (last && !last.me && last.by === l.by && !last.desk) out[out.length - 1] = { ...last, text: `${last.text}\n\n${l.text}` };
+    else out.push(line({ by: l.by }));
+  }
+  return out;
+}
 
 let seq = 0;
 
@@ -141,15 +169,15 @@ let seq = 0;
 export const ASK_CHAT_KEY = 'mada.ask.chat.v1';
 export const ASK_CHAT_KEEP_MS = 24 * 60 * 60_000;
 const SAVED_TURNS = 8;
-export type SavedChat = { v: 1; at: number; user: string | null; threadId: string | null; turns: ChatTurn[] };
+export type SavedChat = { v: 1; at: number; user: string | null; threadId: string | null; turns: ChatTurn[]; deskAfter?: number };
 
 const lastAt = (turns: ChatTurn[]) => Math.max(0, ...turns.map((x) => (x.at ? Date.parse(x.at) : 0)));
 
 /** What is worth keeping: finished turns only, the last few. Null when there is nothing. */
-export function savedOf(s: Pick<ChatState, 'threadId' | 'turns'>, user: string | null): SavedChat | null {
+export function savedOf(s: Pick<ChatState, 'threadId' | 'turns'> & { deskAfter?: number }, user: string | null): SavedChat | null {
   const turns = s.turns.filter((x) => x.state === 'done').slice(-SAVED_TURNS);
   if (!turns.length || !s.threadId) return null;
-  return { v: 1, at: lastAt(turns) || Date.now(), user, threadId: s.threadId, turns };
+  return { v: 1, at: lastAt(turns) || Date.now(), user, threadId: s.threadId, turns, ...(s.deskAfter !== undefined && s.deskAfter >= 0 ? { deskAfter: s.deskAfter } : {}) };
 }
 
 /** A saved conversation still worth continuing: this account's, and its last turn within 24 hours. */
@@ -160,7 +188,7 @@ export function freshSaved(x: SavedChat | null, user: string | null, now = Date.
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 let hydrated = false;
 useAskChat.subscribe((s, prev) => {
-  if (!hydrated || s.busy || (s.turns === prev.turns && s.threadId === prev.threadId && s.busy === prev.busy)) return;
+  if (!hydrated || s.busy || (s.turns === prev.turns && s.threadId === prev.threadId && s.busy === prev.busy && s.deskAfter === prev.deskAfter)) return;
   if (writeTimer) clearTimeout(writeTimer);
   writeTimer = setTimeout(() => {
     writeTimer = null;
@@ -177,12 +205,48 @@ export async function restoreAskChat(now = Date.now()): Promise<boolean> {
   hydrated = true;
   if (!saved) { if (here.turns.length) here.reset(); return false; }
   seq = Math.max(seq, ...saved.turns.map((x) => x.id));
-  useAskChat.setState({ threadId: saved.threadId, turns: saved.turns, busy: false });
+  useAskChat.setState({ threadId: saved.threadId, turns: saved.turns, busy: false, deskAfter: saved.deskAfter ?? -1 });
+  followDesk();
   return true;
+}
+
+/*
+ * A person on the desk can take the conversation over (DESK-PLAN.md U5). While Ask is open on a thread, the app asks
+ * GET /ask/chat/desk now and then: every 6 s while someone has it, every 30 s otherwise. Live builds only.
+ */
+let deskTimer: ReturnType<typeof setTimeout> | null = null;
+let deskOn = false;
+export async function pollDesk(): Promise<void> {
+  const { threadId, deskAfter } = useAskChat.getState();
+  if (!threadId || API_MODE !== 'live' || isOffline() || useSession.getState().status !== 'signedIn') return;
+  let r: AskDeskResponse;
+  try {
+    r = await request({ method: 'GET', path: `${ASK_CHAT_DESK_ROUTE}?threadId=${threadId}&after=${deskAfter}`, retries: 0 }, AskDeskResponse);
+  } catch { return; }
+  const now = useAskChat.getState();
+  if (now.threadId !== threadId) return; // a new chat started meanwhile
+  const lang = getLocale() === 'ar' ? 'ar' : 'en';
+  useAskChat.setState({ agent: r.agent, deskAfter: Math.max(now.deskAfter, r.last), ...(r.lines.length ? { turns: applyDeskLines(now.turns, r.lines, () => ++seq, lang).slice(-12) } : {}) });
+}
+function followDesk() {
+  if (deskOn) return;
+  deskOn = true;
+  const tick = async () => {
+    deskTimer = null;
+    if (!deskOn) return;
+    if (!useAskChat.getState().busy) await pollDesk();
+    if (deskOn) deskTimer = setTimeout(() => { void tick(); }, useAskChat.getState().agent ? 6_000 : 30_000);
+  };
+  deskTimer = setTimeout(() => { void tick(); }, 1_000);
+}
+function unfollowDesk() {
+  deskOn = false;
+  if (deskTimer) { clearTimeout(deskTimer); deskTimer = null; }
 }
 
 /** "New chat": the words in flight stop, the thread is let go, and nothing comes back next time. */
 export function newAskChat() {
+  unfollowDesk();
   current?.abort();
   current = null;
   useAskChat.getState().reset();
@@ -192,7 +256,7 @@ export function newAskChat() {
 let current: AbortController | null = null;
 
 /** Leaving Ask: the words in flight stop, and nothing falls back. */
-export function stopAskChat() { current?.abort(); current = null; }
+export function stopAskChat() { current?.abort(); current = null; unfollowDesk(); }
 
 /**
  * Send one message. Resolves with the turn as it ended: state 'stopped' means the app should answer with its own flows
@@ -208,10 +272,12 @@ export async function sendAskChat(text: string, opts: { tripId?: string | null }
   const update = (fn: (t: ChatTurn) => ChatTurn) => useAskChat.setState((s) => ({ turns: s.turns.map((t) => (t.id === id ? fn(t) : t)) }));
   const r = await streamAskChat({ text, threadId: useAskChat.getState().threadId, tripId: opts.tripId ?? null }, (e) => {
     if (e.type === 'thread') useAskChat.setState({ threadId: e.threadId });
+    if (e.type === 'agent') useAskChat.setState({ agent: e.name });
     update((t) => applyChatEvent(t, e));
   }, abort.signal);
   if (abort.signal.aborted) update((t) => ({ ...t, status: null, state: 'superseded' }));
   else if (r === 'fallback') update((t) => ({ ...t, status: null, state: 'stopped' }));
   if (current === abort) { current = null; useAskChat.setState({ busy: false }); }
+  if (r === 'done') followDesk();
   return useAskChat.getState().turns.find((t) => t.id === id) ?? { ...blank, state: 'stopped' };
 }

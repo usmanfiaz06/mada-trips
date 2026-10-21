@@ -332,7 +332,8 @@ export function askAccess(perms: ReadonlySet<string>, t: { handedOff: boolean; c
   return t.customerHasOpen ? "open_item" : null;
 }
 
-const HANDED = sql<boolean>`position('talk_to_human' in ${appAskThreads.messages}::text) > 0`;
+// handed_off_at survives a fold that drops the talk_to_human call from the history; a taken-over thread counts too (desk/ask.ts).
+const HANDED = sql<boolean>`(${appAskThreads.handedOffAt} IS NOT NULL OR ${appAskThreads.mode} = 'agent' OR position('talk_to_human' in ${appAskThreads.messages}::text) > 0)`;
 
 export async function customerChats(actor: DeskActor, userId: string, hasOpen: boolean) {
   const [support, requests, ask] = await Promise.all([

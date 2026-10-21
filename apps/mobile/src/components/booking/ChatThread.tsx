@@ -65,9 +65,9 @@ function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: st
   return (
     <View style={{ gap: 10 }} testID={`chat-turn-${turn.id}`}>
       {stamp ? <T v="tiny" color={colors.muted} style={s.stamp} testID="chat-time">{stamp}</T> : null}
-      <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
+      {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
         <View style={s.me}><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T></View>
-      </Animated.View>
+      </Animated.View> : null}
       {turn.text || writing ? (
         <Animated.View entering={mada.entering} style={[s.madaRow, mada.style]}>
           {turn.by ? <AgentDot name={turn.by} size={AVATAR} /> : <MadaDot size={AVATAR} />}

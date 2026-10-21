@@ -72,6 +72,11 @@ export const AskChatEvent = z.discriminatedUnion('type', [
   /** A person takes it from here, in this support thread. agent: who is on duty, only when the desk names someone. */
   z.object({ type: z.literal('handoff'), threadId: Id, agent: z.string().nullable() }),
   /**
+   * A person on the desk has taken this conversation over (desk/ask): the message was kept for them and Mada doesn't
+   * answer it. Their replies come from GET /ask/chat/desk. name: their first name, as the app shows people.
+   */
+  z.object({ type: z.literal('agent'), name: z.string() }),
+  /**
    * What the traveller can do next, as 2 or 3 chips that send their words when tapped (docs/app/ASSISTANT.md: every
    * reply ends with a next step). Mada's own when it wrote them; otherwise the server fills them from the turn.
    */
@@ -81,6 +86,29 @@ export const AskChatEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), code: z.string(), fallback: z.boolean() }),
 ]);
 export type AskChatEvent = z.infer<typeof AskChatEvent>;
+
+/** GET /ask/chat/desk?threadId=…&after=n: what a person on the desk said in this thread since line n (the desk's take-over). */
+export const ASK_CHAT_DESK_ROUTE = '/ask/chat/desk';
+export const AskDeskLine = z.object({
+  /** Its place in the thread: pass the last one back as `after`. */
+  n: z.number().int(),
+  /** agent: a reply from a person on the desk (`by`). joined: the line "Noura from Mada joined", shown once. */
+  kind: z.enum(['agent', 'joined']),
+  by: z.string(),
+  text: z.string(),
+  at: IsoDateTime,
+});
+export type AskDeskLine = z.infer<typeof AskDeskLine>;
+export const AskDeskResponse = z.object({
+  /** agent: a person has the conversation (Mada doesn't answer); ai: Mada answers. */
+  mode: z.enum(['ai', 'agent']),
+  /** Who has it, while a person does. */
+  agent: z.string().nullable(),
+  lines: z.array(AskDeskLine),
+  /** The last line in the thread: the next `after`. */
+  last: z.number().int(),
+});
+export type AskDeskResponse = z.infer<typeof AskDeskResponse>;
 
 /** Read an SSE body as it arrives: complete `data:` frames out, the rest kept for the next chunk. */
 export function readSseFrames(buffer: string): { events: AskChatEvent[]; rest: string } {
