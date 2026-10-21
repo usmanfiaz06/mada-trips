@@ -92,7 +92,7 @@ describe("merged with the first source", () => {
     expect((await merged.price(d.id, 2)).supplier).toBe("duffel");
     await merged.price("tbo.a", 2);
     expect(first.price).toHaveBeenCalledTimes(1);
-    const broken = withSecondSource({ ...first, search: async () => { throw new Error("tbo answered 503"); } }, mockDuffel);
+    const broken = withSecondSource<BookingFlightSupplier>({ ...first, search: async () => { throw new Error("tbo answered 503"); } }, mockDuffel);
     expect((await broken.search(search)).every((o) => o.supplier === "duffel")).toBe(true);
     const lone = withSecondSource(first, { ...mockDuffel, search: async () => { throw new Error("duffel answered 503"); } });
     expect((await lone.search(search)).map((o) => o.id)).toEqual(["tbo.a"]);

@@ -16,6 +16,7 @@ import { bookingSuppliers, householdOf, isUuid, renewalsAsked, today, travellers
 import { guestPeople } from "../guest";
 import { entryRulesSupplier, withEntryRequirements } from "../suppliers/sherpa";
 import { duffelSource } from "../suppliers/duffel";
+import { rateHawkSource } from "../suppliers/ratehawk";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -189,7 +190,7 @@ export async function searchStays(ownerId: string | null, input: StaySearchReque
   if (demo.has("noResults")) return { ...base, outcome: "none", options: [] };
   // Who is going decides what fits (docs/app/RANKING.md): a family, a couple, someone alone, a group.
   const shape = tripShape(people, q.checkIn);
-  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape]);
+  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape, ...(rateHawkSource() ? ["ratehawk"] : [])]);
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
   const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
