@@ -15,7 +15,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 4 | WhatsApp codes (Meta + Zoho CPaaS) | sign-in codes on WhatsApp | Ready | Owner |
 | 5 | SMS (Unifonic or Taqnyat) | sign-in codes by SMS, fallback | Ready | Owner |
 | 6 | MyFatoorah | card, mada, Apple Pay payments, refunds | Ready | Owner |
-| 7 | Tabby / Tamara | pay later | To build | Owner + code |
+| 7 | Tabby / Tamara | pay later | Built (backend, §29); pay sheet hook-up to do | Owner + code |
 | 8 | Hotelbeds Hotels | hotel search, prices, booking, vouchers | Ready (test keys work) | Owner (live keys) |
 | 9 | Hotelbeds Transfers | airport and pre-booked cars | Ready | Owner (live keys) |
 | 10 | Hotelbeds Activities / Viator / GetYourGuide | things to do | Ready | Owner |
@@ -37,6 +37,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 26 | Klook | things to do in Asia, ranked with Hotelbeds/GYG/Viator | Ready (search; desk books) | Owner |
 | 27 | Sherpa | visa / entry rules for every passport, behind the entry check | Ready (built-in rules until key) | Owner |
 | 28 | Cover Genius XCover | travel insurance: quote, buy, cancel | Ready in code; **needs Saudi licensing** | Owner + legal |
+| 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
 
 ## Processes
 
@@ -81,9 +82,10 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 4. Vercel: `MYFATOORAH_API_KEY`, `MYFATOORAH_BASE_URL` (test first), `MYFATOORAH_WEBHOOK_SECRET`.
 5. Coordinator runs test cards end to end on staging, then you switch to the live key.
 
-### 7. Tabby / Tamara (pay later) — to build
+### 7. Tabby / Tamara (pay later) — backend built, see §29
 1. Apply as a merchant with each (CR, website, expected volume); they review travel merchants case by case.
-2. Send sandbox keys via Vercel. Code: checkout session, webhook, refunds, and the instalment line on Money/Payments.
+2. Put the sandbox keys in Vercel (§29). Backend done: checkout session, webhooks, capture, refund, cancel, the
+   instalment line. Still to do: the pay sheet in the app and the order flow (§29, "Hook-up").
 
 ### 8–10. Hotelbeds (Hotels, Transfers, Activities)
 1. Ask your Hotelbeds account manager for **live** keys for each API you signed (Hotels, Transfers, Activities) and
@@ -313,3 +315,41 @@ which they support with a Saudi insurer.
 **Licence notes.** The traveller must see the policy wording and key exclusions before buying (the option carries
 `wordingUrl`); Mada must not describe cover beyond what the wording says. Keep claims with Cover Genius (their
 claims link goes in the confirmation).
+
+### 29. Pay later — Tabby and Tamara
+**What it does.** `payLater("tabby" | "tamara")` (`suppliers/pay-later`): a **checkout session** for an order (the
+provider's page, opened in the app's browser sheet), **webhooks** at `/api/app/v1/payments/tabby/webhook` and
+`/api/app/v1/payments/tamara/webhook` (authenticated, then the payment is read back from the provider before anything
+acts on it; Tamara's approved order is **authorised** there, as Tamara requires), **capture** when the booking is
+confirmed, **refund** (part or full), **cancel** before capture. `payLaterOptions(amount, today)` gives the pay sheet
+its **instalment line** per provider ("4 payments of SAR 300.01, the first today", due dates monthly), only within the
+limits (`PAYLATER_MIN_SAR`, `TABBY_MAX_SAR`, `TAMARA_MAX_SAR`; the provider decides the real limit per traveller).
+
+**Hook-up still needed (not in this change).** (1) Mobile pay sheet: show the instalment line under the card options
+and open `checkoutUrl`; on return, poll the order. (2) Order flow: a new payment method `tabby`/`tamara` in the order
+service — on the `authorized` webhook mark the order paid-on-hold and send it to the desk as today; capture when the
+desk confirms (ticketed/booked); cancel if the booking fails; refunds through the existing refund path.
+
+**Apply.** Tabby: tabby.ai/business → "Get started" (CR, VAT, website, bank IBAN); travel merchants are reviewed case
+by case — ask for **Tabby Pay in 4** with merchant code for KSA and **sandbox keys**. Tamara: tamara.co/business →
+"Join Tamara" (same documents); ask for **Pay in 3/4** and **sandbox** API and notification tokens. Both ask for the
+refund and delivery policy for non-physical goods (e-tickets).
+
+**Keys in Vercel.** Tabby: `TABBY_SECRET_KEY`, `TABBY_MERCHANT_CODE`, `TABBY_WEBHOOK_SECRET` (a long random value you
+choose; register the webhook with Tabby — `POST /api/v1/webhooks` or in their dashboard — with header title
+`X-Mada-Webhook` and this value; without it every Tabby webhook is refused), optional `TABBY_MAX_SAR`;
+`SUPPLIER_MODE_TABBY=live|mock|off`. Tamara: `TAMARA_API_TOKEN`, `TAMARA_NOTIFICATION_TOKEN`, `TAMARA_ENV`
+(`sandbox`/`live`), optional `TAMARA_INSTALMENTS=3`, `TAMARA_MAX_SAR`; `SUPPLIER_MODE_TAMARA=live|mock|off`. Shared:
+`PAYLATER_MIN_SAR`.
+
+**Certification.** Both run a go-live review on sandbox: a full checkout with their test customers (approve and
+reject), capture, partial refund, cancel, and screenshots of how the instalments and their logos/terms appear on
+the pay sheet. Tabby also requires their promo snippet/"split in 4" messaging to follow their brand guide.
+
+**Cost model.** The merchant pays: a fee per transaction (typically 4–7% + a fixed fee, negotiated; travel is often at
+the higher end); the traveller pays no interest or fee if on time. Settlement to Mada's IBAN in full, usually within
+a few days of capture. Refunds return the fee only partly — check the contract.
+
+**Licence notes.** Both are licensed by SAMA as BNPL providers; Mada needs no licence of its own to offer them, but
+must show their terms link and must not call it a loan. Pay later can't be used for items they exclude (ask whether
+flights for third parties and eSIMs are allowed).
