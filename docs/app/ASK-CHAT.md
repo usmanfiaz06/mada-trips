@@ -4,7 +4,7 @@
 
 **What the owner asked for:** "Make Ask Mada conversational like a real assistant, not automated replies suggesting Today / next week."
 
-**What this builds:** Ask talks back like a warm, brief Saudi travel host. It answers in 1 to 3 short sentences and then shows the cards the app already draws. It acts through tools that run on the server as the signed-in traveller. It never makes up a price.
+**What this builds:** Ask talks back like a warm, brief Saudi travel host (the persona and its rules: [ASSISTANT.md](ASSISTANT.md)). It answers in 1 to 3 short sentences and then shows the cards the app already draws. It acts through tools that run on the server as the signed-in traveller. It never makes up a price.
 
 ---
 
@@ -30,7 +30,8 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 |---|---|
 | `platform/src/app/api/app/v1/ask/chat/route.ts` | The SSE endpoint. It checks everything that can fail before it opens a stream, so the app gets an ordinary error. Once the stream is open, any failure arrives as `error {code, fallback: true}`. |
 | `ask-chat/config.ts` | Switches, models, limits, prices and cost in micro-dollars. |
-| `ask-chat/prompt.ts` | The **frozen** system prompt and the strict tool list. They are the same for everyone and in a fixed order, so they cache. |
+| `ask-chat/prompt.ts` | The **frozen** system prompt and the strict tool list. They are the same for everyone and in a fixed order, so they cache. The prompt opens with `persona.ts`, which is ASSISTANT.md §1 word for word (`npm run ask:persona`). |
+| `ask-chat/next.ts` | The next step: the model's `<next>` choices, checked, or chips filled from the turn when it gave none (ASSISTANT.md §3). |
 | `ask-chat/engine.ts` | One turn: a streamed message in a manual tool loop, the sentence gate, refusal and `max_tokens` handling. |
 | `ask-chat/providers.ts` | Who answers, behind one interface (§6). Claude through the official SDK (`client.beta.messages.stream`) by default. |
 | `ask-chat/providers-openai.ts` | A thin adapter for any OpenAI-compatible `/chat/completions` endpoint, for comparing cheaper models. |
@@ -162,11 +163,11 @@ Totals at these rates:
 **Live (needs a key, costs about $0.10 for the set on Claude):**
 
 ```
-ANTHROPIC_API_KEY=… npm run ask:eval              # all 30
+ANTHROPIC_API_KEY=… npm run ask:eval              # all 36
 ANTHROPIC_API_KEY=… npm run ask:eval -- visa-uk ar-esim
 ```
 
-There are 30 conversations, 20 in English and 10 in Arabic. They cover:
+There are 36 conversations, 24 in English and 12 in Arabic. They cover:
 - a family Eid trip and its correction
 - Umrah with a permit
 - a car now
@@ -183,6 +184,7 @@ There are 30 conversations, 20 in English and 10 in Arabic. They cover:
 - Muscat by hand
 - a table
 - a baby on a flight
+- a thank-you that must still end with a next step, a trip with no dates (a default, not a question), a refund, a delay and its rights
 
 Each one runs through the real engine, with fixture tool results and no database. Every turn is checked for:
 - **prices**: no price or time in the model's raw words that no tool returned
@@ -190,10 +192,13 @@ Each one runs through the real engine, with fixture tool results and no database
 - **lang**: reply language matches the traveller's
 - **tools**: the right tools were used, or one question where that is allowed, and no forbidden tool
 - **words**: no banned words
+- **next**: the reply ends with Mada's own 2 or 3 choices, or choices said in its last sentence (chips the app had to fill in count as a fail)
+- **open**: no open-ended closer ("Anything else?", "How can I help", "Let me know", «أي خدمة ثانية»)
+- **first**: the answer first: no preamble, and no question first unless the turn may be one needed question
 
 The script exits 1 on any failure and prints the tokens and cost of each turn.
 
-**Comparing providers.** The same 30 conversations, fixtures and checks run against any number of profiles in one go, followed by a table. The quickest way uses the presets (§6), with keys taken from the environment:
+**Comparing providers.** The same 36 conversations, fixtures and checks run against any number of profiles in one go, followed by a table. The quickest way uses the presets (§6), with keys taken from the environment:
 
 ```
 ANTHROPIC_API_KEY=… GROQ_API_KEY=… ZAI_API_KEY=… GEMINI_API_KEY=… npm run ask:eval -- --provider anthropic,groq,zai,gemini

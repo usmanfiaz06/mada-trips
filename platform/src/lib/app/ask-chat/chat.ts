@@ -9,6 +9,7 @@ import { askChatLimits, askChatModel, askChatOn, askFastModel, costMicros, noUsa
 import { ToolInputError, chatApi, runTurn, turnContext, type ChatApi } from "./engine";
 import { redact, screen } from "./guard";
 import { ProviderHttpError } from "./providers-openai";
+import { nextFromState } from "./next";
 import { readSlots, slotsLine } from "./slots";
 import { appendTurn, addSpend, loadThread, newThread, spentToday } from "./store";
 import { personLine } from "./tools";
@@ -45,6 +46,8 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   if (!screened.ok) {
     const line = t("chat.abuse", undefined, lang);
     emit({ type: "replace", text: line });
+    // Even here the reply ends with a next step (docs/app/ASSISTANT.md).
+    emit({ type: "next", choices: nextFromState({ cards: [], pay: false, handoff: false, lang }) });
     emit({ type: "done", text: line });
     await appendTurn(auth.userId, thread.id, { messages: [], transcript: [{ who: "mada", text: line, held: screened.reason }], usage: noUsage(), costMicros: 0, lang });
     console.info(`[ask-chat] thread=${thread.id} held=${screened.reason}`);
@@ -71,12 +74,12 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const total = r.costMicros + fastCost;
   await appendTurn(auth.userId, thread.id, {
     messages: r.added,
-    transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type) }],
+    transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],
     usage: r.usage, costMicros: total, lang,
   });
   await addSpend(auth.userId, total);
   // Tokens and cost only: no words from either side.
-  console.info(`[ask-chat] thread=${thread.id} turn=${thread.turns + 1} model=${askChatModel()} in=${r.usage.input} out=${r.usage.output} cache_read=${r.usage.cacheRead} cache_write=${r.usage.cacheWrite} usd=${(total / 1e6).toFixed(5)} tools=${r.toolsUsed.join(",") || "-"} stop=${r.stop}${redacted ? ` redacted=${redacted}` : ""}`);
+  console.info(`[ask-chat] thread=${thread.id} turn=${thread.turns + 1} model=${askChatModel()} in=${r.usage.input} out=${r.usage.output} cache_read=${r.usage.cacheRead} cache_write=${r.usage.cacheWrite} usd=${(total / 1e6).toFixed(5)} tools=${r.toolsUsed.join(",") || "-"} stop=${r.stop} next=${r.nextFrom}${redacted ? ` redacted=${redacted}` : ""}`);
   emit({ type: "done", text: r.text });
 }
 

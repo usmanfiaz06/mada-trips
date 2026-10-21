@@ -325,7 +325,7 @@ export default function Ask() {
         <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (replyTo || (chatTurns.length && !intent)) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
           <EarlierAsks items={earlier} />
-          <ChatThread turns={chatTurns} onOpen={openChat} />
+          <ChatThread turns={chatTurns} onOpen={openChat} onSay={(x) => { void submit(x, undefined, true); }} />
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
           {fixes.map((f, i) => (

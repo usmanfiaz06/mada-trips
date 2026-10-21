@@ -24,6 +24,8 @@ export type ChatTurn = {
   cards: ChatCard[];
   pay: ChatPay | null;
   handoff: { threadId: string; agent: string | null } | null;
+  /** What the traveller can do next, as chips that send their words (docs/app/ASSISTANT.md). */
+  next?: string[];
   intent: AskIntent | null;
   lang: 'en' | 'ar';
   /** stopped: the app's flows answer. superseded: a newer message took over (nothing to do). */
@@ -99,6 +101,7 @@ export function applyChatEvent(turn: ChatTurn, e: AskChatEvent): ChatTurn {
     case 'intent': return { ...turn, intent: e.intent };
     case 'pay': return { ...turn, pay: e.pay };
     case 'handoff': return { ...turn, handoff: { threadId: e.threadId, agent: e.agent } };
+    case 'next': return { ...turn, next: e.choices };
     case 'done': return { ...turn, text: e.text || turn.text, status: null, state: 'done' };
     case 'error': return { ...turn, status: null, state: 'stopped' };
     default: return turn;

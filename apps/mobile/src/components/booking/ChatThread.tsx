@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { formatSar, type ChatCard, type ChatPay } from '@mada/shared';
 import { Card } from '@/components/Card';
+import { Chip } from '@/components/Chip';
 import { LinkButton } from '@/components/Button';
 import { T } from '@/components/Text';
 import { AirlineMark } from './AirlineMark';
@@ -27,17 +28,17 @@ export type ChatOpen =
   | { kind: 'request'; id: string }
   | { kind: 'trip'; id: string };
 
-export function ChatThread({ turns, onOpen }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void }) {
+export function ChatThread({ turns, onOpen, onSay }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   if (!turns.length) return null;
   return (
     <View style={{ gap: 16 }} testID="chat-thread">
       <T v="tiny" color={colors.muted} testID="chat-disclosure">{t('chat.disclosure')}</T>
-      {turns.map((turn) => <Turn key={turn.id} turn={turn} onOpen={onOpen} />)}
+      {turns.map((turn, i) => <Turn key={turn.id} turn={turn} onOpen={onOpen} onSay={i === turns.length - 1 ? onSay : undefined} />)}
     </View>
   );
 }
 
-function Turn({ turn, onOpen }: { turn: ChatTurn; onOpen: (o: ChatOpen) => void }) {
+function Turn({ turn, onOpen, onSay }: { turn: ChatTurn; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   const writing = turn.state === 'streaming';
   return (
     <View style={{ gap: 12 }} testID={`chat-turn-${turn.id}`}>
@@ -58,6 +59,12 @@ function Turn({ turn, onOpen }: { turn: ChatTurn; onOpen: (o: ChatOpen) => void 
         </Animated.View>
       ) : null}
       {turn.handoff ? <LinkButton label={t('chat.openThread')} size={14} onPress={() => onOpen({ kind: 'handoff', threadId: turn.handoff!.threadId })} testID="chat-handoff" /> : null}
+      {/* The next step, on the latest reply only: every reply ends with one (docs/app/ASSISTANT.md). */}
+      {onSay && turn.state === 'done' && turn.next?.length ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2 }} testID="chat-next">
+          {turn.next.map((c) => <Chip key={c} label={c} onPress={() => { buzz('tap'); onSay(c); }} testID="chat-next-chip" />)}
+        </ScrollView>
+      ) : null}
     </View>
   );
 }

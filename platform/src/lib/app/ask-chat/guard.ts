@@ -90,3 +90,20 @@ export const tidy = (delta: string) => delta.replace(/[!！]/g, ".").replace(/\s
 
 /** Questions asked in a reply (the evals hold it to one). */
 export const questionsIn = (reply: string) => (reply.match(/[?؟]/g) ?? []).length;
+
+/*
+ * Never open-ended (docs/app/ASSISTANT.md §1 "Always resolve"): the closers a reply must not end on, and the preambles
+ * it must not start with. The chips take a closer's place.
+ */
+const OPEN_ENDED = /\b(?:anything else|how (?:else )?can (?:i|we) help|let (?:me|us) know|feel free to|hope (?:this|that) helps|don'?t hesitate)\b|أي خدمة (?:ثانية|أخرى)|هل (?:من|هناك) خدمة|تبي شي ثاني|تبغى شي ثاني|في شي ثاني|أي شي ثاني|تأمر(?:ني)? على شي|لا تتردد|كيف (?:يمكنني|أقدر|نقدر) (?:أساعدك|نساعدك|مساعدتك)/i;
+/** A sentence that only closes the reply without a next step ("Anything else?", "Let us know if…"): dropped. */
+const CLOSER = /^\s*(?:(?:is there )?anything else\b|how (?:else )?can (?:i|we) help\b|let (?:me|us) know (?:if|when|whether)\b|feel free\b|hope (?:this|that) helps\b|don'?t hesitate\b|(?:هل )?(?:في|فيه)? ?(?:أي خدمة (?:ثانية|أخرى)|شي ثاني)|تبي شي ثاني|تبغى شي ثاني|تأمر(?:ني)? على شي|لا تتردد|هل (?:من|هناك) خدمة)/i;
+export const isCloser = (sentence: string) => CLOSER.test(sentence.trim());
+/** Open-ended phrases anywhere in a reply (the evals hold every reply to none). */
+export const openEndedIn = (reply: string): string[] => { const m = OPEN_ENDED.exec(reply); return m ? [m[0]] : []; };
+const PREAMBLE = /^\s*(?:great|good|excellent) question|^\s*(?:sure|of course|absolutely|certainly|definitely|happy to help|thanks for (?:asking|your message)|i understand)\b|^\s*(?:سؤال (?:حلو|رائع|جميل|ممتاز)|بكل سرور|بالتأكيد|أكيد[،,]|يسعدني|شكرًا على سؤالك)/i;
+/** The reply's first sentence: a preamble, or a question (before any answer). */
+export function firstSentence(reply: string): { text: string; preamble: boolean; question: boolean } {
+  const text = (reply.trim().split(/(?<=[.?؟\n])\s/)[0] ?? "").trim();
+  return { text, preamble: PREAMBLE.test(text), question: /[?؟]\s*$/.test(text) };
+}

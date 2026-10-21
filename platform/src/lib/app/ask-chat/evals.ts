@@ -2,13 +2,13 @@ import { languageOfText, type Person } from "@mada/shared";
 import { ToolInputError, type ChatApi, runTurn, turnContext } from "./engine";
 import { ProviderHttpError } from "./providers-openai";
 import { costMicros, type Price } from "./config";
-import { outgoingProblems, questionsIn, redact, unbacked } from "./guard";
+import { firstSentence, openEndedIn, outgoingProblems, questionsIn, redact, unbacked } from "./guard";
 import { readSlots, slotsLine } from "./slots";
 import { personLine, type ToolCtx, type ToolOut } from "./tools";
 import type Anthropic from "@anthropic-ai/sdk";
 
 /*
- * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 30 conversations in English and spoken Saudi Arabic,
+ * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 36 conversations in English and spoken Saudi Arabic,
  * run turn by turn through the real engine (the same prompt, tools, gate and slots) with fixed tool results, so the
  * checks are about the model and nothing else. Each turn is held to:
  *   prices   the model wrote no price or time that no tool returned (checked on its raw words, before the gate)
@@ -16,6 +16,11 @@ import type Anthropic from "@anthropic-ai/sdk";
  *   lang     the reply's language is the traveller's
  *   tools    the tools it should reach for (any of a list), and none it must not
  *   words    no banned words
+ *   next     it ends with a concrete next step: its own <next> choices (2 or 3), or choices said in its last sentence
+ *            (docs/app/ASSISTANT.md "Always resolve"; the app fills chips in when it forgets, but that is a fail here)
+ *   open     no open-ended closer ("Anything else?", "How can I help", "Let me know", «أي خدمة ثانية»)
+ *   first    the answer first: no preamble, and the first sentence is not a question unless the whole turn may be
+ *            one needed question
  * scripts/ask-chat-eval.ts runs it against the live model when ANTHROPIC_API_KEY is set; the tests run it on a stand-in.
  */
 
@@ -115,9 +120,22 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "ar-correction", lang: "ar", turns: [{ user: "طيران لدبي الأسبوع الجاي لي بس", toolsAnyOf: FLIGHT }, { user: "لا، خلها لندن", toolsAnyOf: FLIGHT, notAsk: /متى/ }] },
   { id: "ar-off-topic", lang: "ar", turns: [{ user: "وش رأيك في الدوري السعودي؟", noTools: true }] },
   { id: "ar-rude", lang: "ar", turns: [{ user: "انتم فاشلين وما تفهمون", noTools: true }] },
+  // Never open-ended, answer first, a default instead of a question (docs/app/ASSISTANT.md).
+  { id: "thanks-close", lang: "en", turns: [{ user: "Thanks, that's all for now", noTools: true }] },
+  { id: "default-dates", lang: "en", turns: [{ user: "Dubai in November, all of us", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /when|date|who|how many/i }] },
+  { id: "refund-where", lang: "en", turns: [{ user: "Where is my refund for the Cairo trip?", toolsAnyOf: ["get_trips", "get_trip", "talk_to_human", "create_request"], notTools: ["price_quote_for_pay"] }] },
+  { id: "delay-rights", lang: "en", turns: [{ user: "My Cairo flight today is delayed 4 hours, what are my rights?", toolsAnyOf: ["get_trips", "get_trip", "talk_to_human"] }] },
+  { id: "ar-thanks-close", lang: "ar", turns: [{ user: "مشكورين، كذا تمام", noTools: true }] },
+  { id: "ar-default-dates", lang: "ar", turns: [{ user: "دبي في نوفمبر لنا كلنا", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /متى|تاريخ|كم شخص|مين/ }] },
 ];
 
-export type TurnVerdict = { case: string; lang: "en" | "ar"; turn: number; user: string; reply: string; tools: string[]; problems: string[]; costMicros: number; inTokens: number; outTokens: number; cacheRead: number; ms: number };
+/** Choices said in the reply's last sentence ("…the Saudia at 09:40, or the flynas for less?"). */
+const saysChoices = (text: string) => {
+  const last = text.trim().split(/(?<=[.?؟])\s/).at(-1) ?? "";
+  return /\bor\b|(?:^|\s)(?:ولا|أو)(?:\s|$)/i.test(last);
+};
+
+export type TurnVerdict = { case: string; lang: "en" | "ar"; turn: number; user: string; reply: string; next: string[]; nextFrom: "model" | "app"; tools: string[]; problems: string[]; costMicros: number; inTokens: number; outTokens: number; cacheRead: number; ms: number };
 
 /** Words that mark spoken Saudi against Modern Standard Arabic, for a first read of a provider's dialect (a person reads the samples). */
 const SPOKEN = ["وش", "الحين", "وين", "بس", "عشان", "مو", "تبي", "تبغى", "أبشر", "ابشر", "زين", "كذا", "لين", "حق", "شي", "يبي", "نبي", "بكرة", "ودك", "حيّاك", "حياك"];
@@ -128,7 +146,7 @@ export function dialectOf(replies: string[]): { spoken: number; msa: number } {
 }
 
 /** The checks for one turn. Pure. */
-export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text: string; toolsUsed: string[]; toolText: string; dropped: number }): string[] {
+export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text: string; toolsUsed: string[]; toolText: string; dropped: number; modelChoices: string[]; closers: number }): string[] {
   const out: string[] = [];
   const invented = unbacked(r.raw, r.toolText);
   if (invented.length || r.dropped) out.push(`prices: ${invented.join(", ") || `${r.dropped} sentence(s) held back`}`);
@@ -142,6 +160,12 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
   if (t.toolsAnyOf && !t.toolsAnyOf.some((x) => r.toolsUsed.includes(x)) && !(t.orAsk && q === 1)) out.push(`tools: wanted one of ${t.toolsAnyOf.join("/")}, used ${r.toolsUsed.join(", ") || "none"}`);
   const bad = (t.notTools ?? []).filter((x) => r.toolsUsed.includes(x));
   if (bad.length) out.push(`tools: must not use ${bad.join(", ")}`);
+  if (r.modelChoices.length < 2 && !saysChoices(r.text)) out.push(`next: no next step${r.modelChoices.length ? ` (only ${r.modelChoices.length} choice)` : ""}, the app filled chips in`);
+  const open = openEndedIn(r.raw);
+  if (open.length || r.closers) out.push(`open: ${open.join(", ") || `${r.closers} closer(s) dropped`}`);
+  const first = firstSentence(r.text);
+  if (first.preamble) out.push(`first: starts with a preamble ("${first.text}")`);
+  else if (first.question && !(t.orAsk && q === 1)) out.push(`first: starts with a question ("${first.text}")`);
   if (t.notAsk && q && t.notAsk.test(r.text.split(/(?<=[.?؟])\s/).filter((s) => /[?؟]/.test(s)).join(" "))) out.push(`asked again: ${t.notAsk}`);
   return out;
 }
@@ -168,7 +192,7 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
           const ms = Date.now() - started;
           history.push(...r.added);
           const cost = opts.price ? costMicros("", r.usage, opts.price) + (slots.usage ? costMicros("", { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }, opts.price) : 0) : r.costMicros;
-          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: r.text, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: cost, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead, ms };
+          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: r.text, next: r.next, nextFrom: r.nextFrom, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: cost, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead, ms };
         } catch (e) {
           const limited = (e instanceof ProviderHttpError && e.status === 429) || (e instanceof Error && "status" in e && (e as { status?: number }).status === 429);
           if (limited && attempt < 3) {
@@ -178,7 +202,7 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
           }
           // The app would fall back here: counted as a failed turn, and the conversation goes on.
           const why = e instanceof ToolInputError ? "tools: arguments still invalid after one repair (the app falls back)" : limited ? "rate: still rate limited after 3 waits" : `error: ${e instanceof Error ? e.message : String(e)}`;
-          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: "", tools: [], problems: [why], costMicros: 0, inTokens: 0, outTokens: 0, cacheRead: 0, ms: Date.now() - started };
+          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: "", next: [], nextFrom: "app", tools: [], problems: [why], costMicros: 0, inTokens: 0, outTokens: 0, cacheRead: 0, ms: Date.now() - started };
         }
       }
       verdicts.push(v);

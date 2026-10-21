@@ -66,6 +66,11 @@ export const AskChatEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('pay'), pay: ChatPay }),
   /** A person takes it from here, in this support thread. agent: who is on duty, only when the desk names someone. */
   z.object({ type: z.literal('handoff'), threadId: Id, agent: z.string().nullable() }),
+  /**
+   * What the traveller can do next, as 2 or 3 chips that send their words when tapped (docs/app/ASSISTANT.md: every
+   * reply ends with a next step). Mada's own when it wrote them; otherwise the server fills them from the turn.
+   */
+  z.object({ type: z.literal('next'), choices: z.array(z.string().min(1).max(60)).min(1).max(3) }),
   z.object({ type: z.literal('done'), text: z.string() }),
   /** fallback: the app should answer with its own flows. */
   z.object({ type: z.literal('error'), code: z.string(), fallback: z.boolean() }),

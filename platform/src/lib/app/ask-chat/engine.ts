@@ -3,7 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi, StreamParams } from "./providers";
 import { t, type AskChatEvent, type AskIntent, type ChatCard, type Person } from "@mada/shared";
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
-import { outgoingProblems, tidy, unbacked } from "./guard";
+import { isCloser, outgoingProblems, tidy, unbacked } from "./guard";
+import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
 import { SYSTEM_PROMPT, TOOLS } from "./prompt";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
 import { schemaProblems, toolNameFor } from "./schema";
@@ -33,19 +34,45 @@ export class ToolInputError extends Error {
 // Who answers is behind one interface (providers.ts): Claude by default, another provider for comparing.
 export { chatApi, setChatApi, type ChatApi } from "./providers";
 
-/** Holds sentences with digits until they end, so an unbacked price never reaches the screen. */
+/** How much of the end of `s` could be the start of the `<next>` line (held back until it is clear). */
+const partialTag = (s: string) => {
+  for (let k = Math.min(NEXT_OPEN.length - 1, s.length); k > 0; k--) if (NEXT_OPEN.startsWith(s.slice(-k))) return k;
+  return 0;
+};
+
+/**
+ * Holds sentences with digits until they end, so an unbacked price never reaches the screen. Also keeps the closing
+ * `<next>…</next>` line off the screen (its choices become the turn's chips) and drops closers ("Anything else?").
+ */
 export class SentenceGate {
   private buf = "";
   private shownUpTo = 0;
+  /** The `<next>` line while it arrives. */
+  private tag: string | null = null;
   /** Every sentence, and whether it was kept. */
   readonly kept: string[] = [];
   dropped = 0;
+  /** Closers dropped (not counted as `dropped`: nothing wrong was said, the chips take their place). */
+  closers = 0;
+  /** The choices from the last `<next>` line, checked. */
+  choices: string[] = [];
   /** Words of a dropped sentence were already on screen: the turn ends with a `replace`. */
   dirty = false;
   constructor(private readonly toolText: () => string, private readonly out: (s: string) => void) {}
 
   push(delta: string) {
+    if (this.tag !== null) {
+      this.tag += delta;
+      const close = this.tag.indexOf(NEXT_CLOSE);
+      if (close < 0) return;
+      const rest = this.tag.slice(close + NEXT_CLOSE.length);
+      this.readTag(this.tag.slice(0, close));
+      if (rest.trim()) this.push(rest);
+      return;
+    }
     this.buf += tidy(delta);
+    const at = this.buf.indexOf(NEXT_OPEN);
+    if (at >= 0) { this.tag = this.buf.slice(at); this.buf = this.buf.slice(0, at); }
     for (;;) {
       const m = /[.?؟](?=\s)|\n/.exec(this.buf);
       const end = m ? m.index + 1 : -1;
@@ -54,22 +81,38 @@ export class SentenceGate {
       this.buf = this.buf.slice(end);
       this.shownUpTo = 0;
     }
-    // No digit in the open sentence yet: show it as it comes.
-    if (!/\d/.test(this.buf) && this.buf.length > this.shownUpTo) {
-      this.out(this.buf.slice(this.shownUpTo));
-      this.shownUpTo = this.buf.length;
+    // No digit in the open sentence yet: show it as it comes (all but what could be the start of `<next>`). A sentence
+    // that could still turn out to be a closer waits for its end.
+    const upTo = this.buf.length - partialTag(this.buf);
+    if (!/\d/.test(this.buf) && !this.maybeCloser() && upTo > this.shownUpTo) {
+      this.out(this.buf.slice(this.shownUpTo, upTo));
+      this.shownUpTo = upTo;
     }
   }
 
-  /** The end of a step: whatever is open is a sentence too. */
+  /** The end of a step: whatever is open is a sentence too, and a `<next>` line is read. */
   flush() {
     if (this.buf.trim()) this.close(this.buf);
     else if (this.buf.length > this.shownUpTo) this.out(this.buf.slice(this.shownUpTo));
+    if (this.tag !== null) this.readTag(this.tag);
     this.buf = "";
     this.shownUpTo = 0;
   }
 
+  private readTag(line: string) {
+    const c = parseNext(line, this.toolText());
+    if (c.length) this.choices = c;
+    this.tag = null;
+  }
+
+  /** The open sentence is short and starts like a closer: hold it until it ends (it is dropped if it is one). */
+  private maybeCloser() {
+    const s = this.buf.trimStart();
+    return s.length < 48 && /^(?:any|is there|how (?:can|else)|let (?:me|us)|feel|hope|don|هل|فيه? |أي |تبي|تبغى|تأمر|لا تت)/i.test(s);
+  }
+
   private close(sentence: string) {
+    if (isCloser(sentence)) { this.closers += 1; if (this.shownUpTo > 0) this.dirty = true; return; }
     const ok = !unbacked(sentence, this.toolText()).length && !outgoingProblems(sentence).length;
     if (ok) {
       this.kept.push(sentence);
@@ -111,6 +154,13 @@ export type TurnResult = {
   /** The tool results the model read this turn. */
   toolText: string;
   stop: "end_turn" | "refusal" | "max_tokens" | "steps" | "error";
+  /** The next step shown as chips (docs/app/ASSISTANT.md): Mada's own, or filled from the turn. */
+  next: string[];
+  nextFrom: "model" | "app";
+  /** The choices the model wrote itself, after the checks (for the evals). */
+  modelChoices: string[];
+  /** Closing lines dropped ("Anything else?"). */
+  closers: number;
 };
 
 const addUsage = (u: Usage, x: Anthropic.Beta.BetaUsage) => {
@@ -140,6 +190,8 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let repairs = 0;
   const gate = new SentenceGate(() => toolText, (s) => { emit({ type: "text", delta: s }); sep = true; });
   let stop: TurnResult["stop"] = "steps";
+  let paid = false;
+  let handedOff = false;
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const params = {
@@ -206,7 +258,8 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     for (const { c, out } of results) {
       toolText += `\n${out.text}`;
       if (out.cards?.length) { cards.push(...out.cards); emit({ type: "cards", cards: out.cards }); }
-      if (out.pay) emit({ type: "pay", pay: out.pay });
+      if (out.pay) { paid = true; emit({ type: "pay", pay: out.pay }); }
+      if (out.handoff) handedOff = true;
       if (out.handoff) emit({ type: "handoff", threadId: out.handoff.threadId, agent: out.handoff.agent });
       void c;
     }
@@ -224,7 +277,11 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     emit({ type: "replace", text });
   }
   if (gate.dropped) console.warn(`[ask-chat] ${gate.dropped} sentence(s) held back (unbacked number or banned word)`);
-  return { added, text, cards, usage, costMicros: cost, toolsUsed, raw: raw.trim(), dropped: gate.dropped, toolText, stop };
+  // Never open-ended: Mada's own choices when it gave at least 2 good ones, otherwise the turn's (next.ts).
+  const modelChoices = stop === "refusal" ? [] : gate.choices;
+  const next = resolveNext(modelChoices, { cards, pay: paid, handoff: handedOff, lang: input.lang });
+  if (next.choices.length) emit({ type: "next", choices: next.choices });
+  return { added, text, cards, usage, costMicros: cost, toolsUsed, raw: raw.trim(), dropped: gate.dropped, toolText, stop, next: next.choices, nextFrom: next.from, modelChoices, closers: gate.closers };
 }
 
 /** The context block for a turn: Mada's systems speaking, never the traveller. Changes every turn, so it sits in the turn. */

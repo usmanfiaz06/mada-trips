@@ -88,6 +88,49 @@ describe("a conversation", () => {
     expect(api.requests[1]!.messages.length).toBe(sent.messages.length + 2);
   });
 
+  it("ends with Mada's own next-step chips and never shows the line they came in", async () => {
+    const { token } = await signIn();
+    const me = await selfId(token);
+    setChatApi(fakeApi((p, n) => {
+      if (n === 0) return { blocks: [{ type: "tool_use", name: "search_flights", input: { destination: "istanbul", from: null, depart: EID_OUT, return: EID_BACK, traveller_ids: [me], infants: 0, cabin: null } }] };
+      const dep = /RUH (\d\d:\d\d)/.exec(lastToolText(p))![1];
+      return { blocks: [{ type: "text", text: `Three ways for Eid; the first is the one we'd take.\n<next>Book the first at ${dep} | Hotels near Taksim | Book it for SAR 777 | Change dates</next>` }] };
+    }));
+    const r = await chat(token, { text: "Istanbul for Eid, just me" });
+    const { streamed, final } = said(r.events);
+    expect(streamed).not.toContain("<");
+    expect(final).toBe("Three ways for Eid; the first is the one we'd take.");
+    const next = r.events.find((e) => e.type === "next");
+    // The unbacked price chip is dropped; the rest are kept in order.
+    expect(next).toEqual({ type: "next", choices: [expect.stringMatching(/^Book the first at \d\d:\d\d$/), "Hotels near Taksim", "Change dates"] });
+    expect(r.events.findIndex((e) => e.type === "next")).toBeLessThan(r.events.findIndex((e) => e.type === "done"));
+  });
+
+  it("drops an open-ended closer and fills the chips from the turn when the model forgets", async () => {
+    const { token } = await signIn();
+    const me = await selfId(token);
+    setChatApi(fakeApi((_p, n) => {
+      if (n === 0) return { blocks: [{ type: "tool_use", name: "search_flights", input: { destination: "istanbul", from: null, depart: EID_OUT, return: EID_BACK, traveller_ids: [me], infants: 0, cabin: null } }] };
+      return { blocks: [{ type: "text", text: "Three ways for Eid. Anything else? Let us know if you need help." }] };
+    }));
+    const r = await chat(token, { text: "Istanbul for Eid, just me" });
+    expect(said(r.events).final).toBe("Three ways for Eid.");
+    const next = r.events.find((e) => e.type === "next");
+    expect(next?.type === "next" && next.choices.length).toBeGreaterThanOrEqual(2);
+    expect(next?.type === "next" && next.choices[0]).toMatch(/^Book the .+ at \d\d:\d\d$/);
+    expect(next?.type === "next" && next.choices).toContain("Other dates");
+  });
+
+  it("gives chips even with a fixed line (abuse, refusal), in the traveller's language", async () => {
+    const { token } = await signIn();
+    setChatApi(fakeApi(() => ({ blocks: [], stop: "refusal" })));
+    const r = await chat(token, { text: "وش السالفة" });
+    const next = r.events.find((e) => e.type === "next");
+    expect(next).toEqual({ type: "next", choices: ["دوّر طيران", "دوّر فندق", "شريحة نت"] });
+    const abuse = await chat(token, { text: "you are a fucking idiot" });
+    expect(abuse.events.find((e) => e.type === "next")).toEqual({ type: "next", choices: ["Find flights", "Find a hotel", "Get an eSIM"] });
+  });
+
   it("never shows a price no tool returned", async () => {
     const { token } = await signIn();
     setChatApi(fakeApi(() => ({ blocks: [{ type: "text", text: "Dubai is lovely in March. Flights start at SAR 999 return." }] })));
@@ -210,13 +253,13 @@ describe("the eval harness", () => {
     const { runEvals } = await import("@/lib/app/ask-chat/evals");
     const good = fakeApi((p, n) => {
       if (n === 0) return { blocks: [{ type: "tool_use", name: "esim_plans", input: { where: "pakistan", days: 10, trip_id: null } }] };
-      return { blocks: [{ type: "text", text: `Pakistan for 10 days: we'd take the 5 GB at ${/SAR \d+/.exec(lastToolText(p))![0]}.` }] };
+      return { blocks: [{ type: "text", text: `Pakistan for 10 days: we'd take the 5 GB at ${/SAR \d+/.exec(lastToolText(p))![0]}.\n<next>Get the 5 GB plan | A bigger plan | One for Hessa too</next>` }] };
     });
     const [ok] = await runEvals(good, { only: ["esim-pakistan"] });
     expect(ok!.problems).toEqual([]);
     const bad = fakeApi(() => ({ blocks: [{ type: "text", text: "Usually about SAR 50. Which country? For how long?" }] }));
     const [no] = await runEvals(bad, { only: ["esim-pakistan"] });
-    expect(no!.problems.join(" | ")).toMatch(/prices: .*one: 2 questions.*tools: wanted one of esim_plans/);
+    expect(no!.problems.join(" | ")).toMatch(/prices: .*one: 2 questions.*tools: wanted one of esim_plans.*next: no next step/);
   });
 });
 

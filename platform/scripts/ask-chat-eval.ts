@@ -13,7 +13,7 @@
  *       "baseUrl": "https://api.deepseek.com/v1", "apiKeyEnv": "DEEPSEEK_API_KEY", "price"?: [0.27, 1.10, 0.07] }
  *     (keys are read from the named environment variable, never from the file; anthropic uses ANTHROPIC_API_KEY)
  *
- * Prints every turn, then a table: pass rate and failures by check (prices, one question, language, tools, words),
+ * Prints every turn, then a table: pass rate and failures by check (prices, one question, language, tools, words, next step, open-ended, answer first),
  * Arabic dialect markers (spoken Saudi against MSA, with samples to read), median latency per turn, tokens and cost
  * per conversation. Exit code 1 when any profile fails a turn. Nothing the models say is stored.
  */
@@ -86,7 +86,7 @@ for (const p of await profiles()) {
     only, model: p.model, fastModel: p.fastModel ?? p.model, price: p.price,
     log: (v) => {
       console.log(`${v.problems.length ? "FAIL" : "ok  "} ${v.case}#${v.turn}  tools=${v.tools.join(",") || "-"}  ${v.ms} ms  $${(v.costMicros / 1e6).toFixed(4)}`);
-      console.log(`     > ${v.user}\n     < ${v.reply}`);
+      console.log(`     > ${v.user}\n     < ${v.reply}\n     [${v.next.join(" · ")}]${v.nextFrom === "app" ? " (filled in by the app)" : ""}`);
       for (const x of v.problems) console.log(`     ! ${x}`);
     },
   }).catch((e) => { console.log(`${p.label}: stopped: ${e instanceof Error ? e.message : String(e)}`); return []; });
@@ -102,11 +102,11 @@ if (!runs.length) {
 }
 
 const row = (cells: string[]) => `| ${cells.join(" | ")} |`;
-console.log(`\n${row(["Profile", "Model", "Pass", "Prices", "≤1 question", "Language", "Tools", "Words", "Errors / rate limits", "Arabic: spoken / MSA markers", "Median latency", "Tokens / conv", "$ / conv"])}`);
-console.log(row(Array(13).fill("---")));
+console.log(`\n${row(["Profile", "Model", "Pass", "Prices", "≤1 question", "Language", "Tools", "Words", "Next step", "Open-ended", "Answer first", "Errors / rate limits", "Arabic: spoken / MSA markers", "Median latency", "Tokens / conv", "$ / conv"])}`);
+console.log(row(Array(16).fill("---")));
 for (const { p, s } of runs) {
   const f = (k: string) => String(s.byCheck[k] ?? 0);
-  console.log(row([p.label, p.model, `${s.passed}/${s.turns} (${Math.round((100 * s.passed) / s.turns)}%)`, f("prices"), f("one"), f("lang"), String((s.byCheck.tools ?? 0) + (s.byCheck["asked again"] ?? 0)), f("words"), `${f("error")} / ${f("rate")}`,
+  console.log(row([p.label, p.model, `${s.passed}/${s.turns} (${Math.round((100 * s.passed) / s.turns)}%)`, f("prices"), f("one"), f("lang"), String((s.byCheck.tools ?? 0) + (s.byCheck["asked again"] ?? 0)), f("words"), f("next"), f("open"), f("first"), `${f("error")} / ${f("rate")}`,
     `${s.dialect.spoken} / ${s.dialect.msa}`, `${(s.medianMs / 1000).toFixed(1)} s`, String(s.tokensPerConversation),
     p.provider !== "anthropic" && !p.price ? "n/a (no price; --price)" : p.price === FREE ? "free tier" : `$${s.costPerConversation.toFixed(4)}`]));
 }
