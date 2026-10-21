@@ -18,7 +18,8 @@ Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touche
 
 ## 21 Oct
 - Done overnight: desk U1 920001c, U2 tickets 3464c31, U3 customers 80d3a52, U4 board/drop-offs da6f2ec, U5 Ask on desk fb43b79, U7 agents/rota/performance/CSAT a02a7d6 · app: waiting states + Ask cards 934f8e5, living Today cards 3cbc2a0 · Ask memory 5589a1d. Merged tree at 05:30: platform build + tsc clean, 163 desk/ask tests, 185 mobile tests, copy lint, root typecheck all pass.
-- Running (cloud): U6 finance session_01D6oqZJUvKJg6TNVwUfVvTj; Ask token trim session_016dGBcR6KfTqprEUuS7y4tj. Then U8 dashboard + alerts.
+- Also done: U6 refunds/credits/app finance 27c2de9 (owner items in docs/app/APP-FINANCE.md), Ask token trim −42% a928afa. Merged tree 06:20: build/tsc clean, 188 desk+ask, 185 mobile, copy lint, root typecheck pass.
+- Running (cloud): U8 dashboard + alerts session_019W3YBPGHQb8w6fgxmgGFBZ (last unit).
 - Desk plan docs/app/DESK-PLAN.md (defaults §7).
 - Earlier 21 Oct: bubbles 0aac18b/5992166 · build fix 601d744 · no second eSIM flow 6df3516 · follow-ups read with context a587f45 · complete requests only a6c6dd5.
 
