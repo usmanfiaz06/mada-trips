@@ -31,10 +31,12 @@ export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; base
 
 /** The engine's hint for providers that pay per tool (`only_tools`) is not an API field: Claude gets every tool, cached. */
 const forClaude = (p: StreamParams): StreamParams => {
-  if (!("only_tools" in p)) return p;
   const { only_tools: _drop, ...rest } = p as StreamParams & { only_tools?: unknown };
   void _drop;
-  return rest as StreamParams;
+  // A thread Gemini answered earlier carries its tool-call signatures (extra_content), which Claude doesn't take.
+  const messages = rest.messages.map((m) => (typeof m.content === "string" || !m.content.some((b) => "extra_content" in b) ? m
+    : { ...m, content: m.content.map((b) => { if (!("extra_content" in b)) return b; const { extra_content: _x, ...keep } = b as typeof b & { extra_content?: unknown }; void _x; return keep as typeof b; }) }));
+  return { ...rest, messages } as StreamParams;
 };
 
 export function anthropicApi(apiKey = process.env.ANTHROPIC_API_KEY): ChatApi {
