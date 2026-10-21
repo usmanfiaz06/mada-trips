@@ -16,7 +16,7 @@ import { UmrahFlow } from '@/components/booking/UmrahFlow';
 import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversation';
-import { ChatThread, type ChatOpen } from '@/components/booking/ChatThread';
+import { ChatThread, matchesIn, type ChatOpen } from '@/components/booking/ChatThread';
 import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
@@ -93,8 +93,11 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
   const scroll = useRef<ScrollView>(null);
-  // Opened at a search match: the thread stays there (not at its end) until something new is said.
-  const [finding, setFinding] = useState(find);
+  // Find in this chat (U1+), also opened by a search in the list: the latest match first, then previous / next. While
+  // on a match the thread stays there (not at its end) until something new is said.
+  const [findOpen, setFindOpen] = useState(!!find);
+  const [findText, setFindText] = useState(find ?? '');
+  const [findBack, setFindBack] = useState(0);
   const [pinned, setPinned] = useState(false);
   const foundY = useRef<number | null>(null);
   // The corrections typed since the ask, shown as bubbles, each with Mada's line on what changed.
@@ -108,6 +111,9 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
   const headStart = useFlightHeadStart(household, today);
   const chatOn = useAskChatOn() && !offline;
   const chatTurns = useAskChat((s) => s.turns);
+  const matches = findOpen ? matchesIn(chatTurns, findText) : [];
+  const findAt = matches.length ? Math.max(0, matches.length - 1 - (findBack % matches.length)) : -1;
+  const foundId = findAt >= 0 ? matches[findAt]! : null;
   // Ask opens on the chat asked for (lib/ask-chat.ts), a new one, or the conversation from the last 24 hours.
   useEffect(() => {
     if (thread === 'last') void restoreAskChat();
@@ -183,7 +189,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
     setVoice(languageOfText(v));
     if (query) { const was = { query, fixes: fixes.map((f) => f.text) }; setEarlier((e) => [...e, was].slice(-5)); }
     setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
-    setFinding(null); setPinned(false);
+    setFindOpen(false); setFindText(''); setPinned(false);
     const turn = await sendAskChat(v, { tripId });
     if (turn.state !== 'stopped') return; // done, or a newer message took over
     // Nothing said yet: as if the conversation had never been there.
@@ -353,6 +359,11 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
         <TopBar onBack={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/today')))} backLabel={onBack ? t('chat.list.back') : t('ask.close')} home={false} right={(
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {chatTurns.length ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.find.open')} onPress={() => { buzz('tap'); setFindOpen((v) => !v); setFindBack(0); }} style={styles.find} testID="ask-find">
+                <Icon name="search" size={18} color={colors.green} />
+              </Pressable>
+            ) : null}
+            {chatTurns.length ? (
               <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={startNewChat} style={styles.demo} testID="ask-new-chat">
                 <T v="caption" color={colors.green}>{t('chat.newChat')}</T>
               </Pressable>
@@ -364,11 +375,27 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
             {SHOW_DEMO_SWITCHES ? <Pressable accessibilityRole="button" onPress={() => setDemoOpen(true)} style={styles.demo} testID="ask-demo"><T v="caption" color={colors.goldInk}>{t('ask.demo.open')}</T></Pressable> : null}
           </View>
         )} />
+        {findOpen && chatTurns.length ? (
+          <View style={styles.findBar} testID="ask-find-bar">
+            <TextInput value={findText} onChangeText={(v) => { setFindText(v); setFindBack(0); foundY.current = null; }} autoFocus={!find} placeholder={t('chat.find.open')} placeholderTextColor={colors.muted}
+              accessibilityLabel={t('chat.find.open')} returnKeyType="search" onSubmitEditing={() => setFindBack((b) => b + 1)} style={[styles.findInput, webNoOutline]} testID="ask-find-input" />
+            {findText.trim() ? <T v="tiny" color={colors.ink2} testID="ask-find-count">{matches.length ? t('chat.find.count', { n: findAt + 1, total: matches.length }) : t('chat.find.none')}</T> : null}
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.find.prev')} disabled={matches.length < 2} onPress={() => { buzz('tap'); foundY.current = null; setFindBack((b) => b + 1); }} hitSlop={6} style={styles.findBtn} testID="ask-find-prev">
+              <Icon name="up" size={18} color={matches.length < 2 ? colors.muted : colors.green} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.find.next')} disabled={matches.length < 2} onPress={() => { buzz('tap'); foundY.current = null; setFindBack((b) => (b + matches.length - 1) % Math.max(1, matches.length)); }} hitSlop={6} style={styles.findBtn} testID="ask-find-next">
+              <View style={{ transform: [{ rotate: '180deg' }] }}><Icon name="up" size={18} color={matches.length < 2 ? colors.muted : colors.green} /></View>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.find.close')} onPress={() => { buzz('tap'); setFindOpen(false); setFindText(''); setPinned(false); }} hitSlop={6} style={styles.findBtn} testID="ask-find-close">
+              <Icon name="close" size={16} color={colors.ink2} />
+            </Pressable>
+          </View>
+        ) : null}
         <View style={{ flex: 1 }}>
         <ScrollView ref={scroll} aria-hidden={stage ? true : undefined} importantForAccessibility={stage ? 'no-hide-descendants' : 'auto'} onContentSizeChange={() => { if (!pinned && (replyTo || (chatTurns.length && !intent))) scroll.current?.scrollToEnd({ animated: true }); }} style={{ flex: 1 }} contentContainerStyle={[styles.scroll, { paddingBottom: 170 + bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={{ gap: 16 }} {...dirProps}>
           <EarlierAsks items={earlier} />
-          <ChatThread turns={chatTurns} onOpen={openChat} onSay={(x) => { void submit(x, undefined, true); }} find={finding}
+          <ChatThread turns={chatTurns} onOpen={openChat} onSay={(x) => { void submit(x, undefined, true); }} foundId={foundId}
             onFound={(y) => { if (foundY.current === y) return; foundY.current = y; setPinned(true); setTimeout(() => scroll.current?.scrollTo({ y: Math.max(0, y - 24), animated: false }), 60); }} />
           {query ? <MeBubble text={query} testID="ask-query" /> : null}
           {answering ? <T v="tiny" testID="ask-voice">{t('ask.voice.note')}</T> : null}
@@ -494,5 +521,9 @@ const styles = StyleSheet.create({
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },
   listening: { backgroundColor: colors.gold },
   send: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
+  find: { width: 30, height: 30, borderRadius: 999, backgroundColor: colors.goldWash, alignItems: 'center', justifyContent: 'center' },
+  findBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 20, marginBottom: 6, height: 44, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 16, paddingEnd: 8 },
+  findInput: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 15, color: colors.green },
+  findBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
   demo: { height: 30, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.goldWash, justifyContent: 'center' },
 });

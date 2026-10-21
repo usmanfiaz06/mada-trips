@@ -41,24 +41,36 @@ export type ChatOpen =
   | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn };
 
 /**
- * find: words searched in the chats list (ASK-INTEGRATED.md §11 U1+): the last turn that has them is marked, and
- * onFound gets where it sits in the thread so the screen can scroll to it.
+ * foundId: the turn a search landed on (the chats list's search, or find in this chat, ASK-INTEGRATED.md §11 U1+): it
+ * is marked, and onFound gets where it sits in the thread so the screen can scroll to it.
  */
-export function ChatThread({ turns, onOpen, onSay, find, onFound }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; find?: string | null; onFound?: (y: number) => void }) {
+export function ChatThread({ turns, onOpen, onSay, foundId, onFound }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; foundId?: number | null; onFound?: (y: number) => void }) {
   const still = useReduceMotion();
   const top = useRef(0);
-  const q = (find ?? '').trim().toLowerCase();
-  const found = q ? [...turns].reverse().find((x) => x.me.toLowerCase().includes(q) || x.text.toLowerCase().includes(q))?.id ?? null : null;
+  const found = foundId ?? null;
+  // Where each turn sits, so moving to another match scrolls to it without waiting for a layout.
+  const ys = useRef(new Map<number, number>());
+  useEffect(() => {
+    const y = found !== null ? ys.current.get(found) : undefined;
+    if (y !== undefined) onFound?.(top.current + y);
+  }, [found]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!turns.length) return null;
   return (
     <View style={{ gap: 14 }} testID="chat-thread" onLayout={(e) => { top.current = e.nativeEvent.layout.y; }}>
       <T v="tiny" color={colors.muted} testID="chat-disclosure">{t('chat.disclosure')}</T>
       {turns.map((turn, i) => (
         <Turn key={turn.id} turn={turn} stamp={stampFor(turn, turns[i - 1])} still={still} onOpen={onOpen} onSay={i === turns.length - 1 ? onSay : undefined}
-          found={turn.id === found} onFoundAt={turn.id === found && onFound ? (y) => onFound(top.current + y) : undefined} />
+          found={turn.id === found} onY={(y) => { ys.current.set(turn.id, y); if (turn.id === found) onFound?.(top.current + y); }} />
       ))}
     </View>
   );
+}
+
+/** The turns that have the words, oldest first (find in this chat, and a search from the list). */
+export function matchesIn(turns: ChatTurn[], words: string | null | undefined): number[] {
+  const q = (words ?? '').trim().toLowerCase();
+  if (!q) return [];
+  return turns.filter((x) => x.me.toLowerCase().includes(q) || x.text.toLowerCase().includes(q)).map((x) => x.id);
 }
 
 /**
@@ -84,7 +96,7 @@ function stampFor(turn: ChatTurn, prev?: ChatTurn): string | null {
 /** The thread's gentle arrival: a short rise, nothing at all with Reduce Motion (native entering, web CSS). */
 const appear = (still: boolean) => ({ entering: still ? undefined : enter(0), style: still ? null : riseStyle(0) });
 
-function Turn({ turn, stamp, still, onOpen, onSay, found, onFoundAt }: { turn: ChatTurn; stamp: string | null; still: boolean; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; found?: boolean; onFoundAt?: (y: number) => void }) {
+function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTurn; stamp: string | null; still: boolean; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void; found?: boolean; onY?: (y: number) => void }) {
   const writing = turn.state === 'streaming';
   const waitKind = SKELETON_FOR[turn.statusTool ?? ''];
   const me = appear(still);
@@ -92,10 +104,11 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onFoundAt }: { turn: C
   // Long-press a message for its time (U1+).
   const [showAt, setShowAt] = useState(false);
   return (
-    <View style={{ gap: 10 }} testID={found ? 'chat-found' : `chat-turn-${turn.id}`} onLayout={onFoundAt ? (e) => onFoundAt(e.nativeEvent.layout.y) : undefined}>
+    <View style={{ gap: 10 }} testID={found ? 'chat-found' : `chat-turn-${turn.id}`} onLayout={onY ? (e) => onY(e.nativeEvent.layout.y) : undefined}>
       {stamp ? <T v="tiny" color={colors.muted} style={s.stamp} testID="chat-time">{stamp}</T> : null}
       {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
-        <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350} style={[s.me, found ? s.found : null]}>
+        <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350}
+          onHoverIn={turn.at ? () => setShowAt(true) : undefined} onHoverOut={turn.at ? () => setShowAt(false) : undefined} style={[s.me, found ? s.found : null]}>
           <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>
         </Pressable>
         {showAt && turn.at ? <T v="tiny" color={colors.muted} testID="chat-me-time">{clock(turn.at)}</T> : null}

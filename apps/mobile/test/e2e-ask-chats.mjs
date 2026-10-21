@@ -5,7 +5,7 @@
 //   DIST=dist node test/e2e-ask-chats.mjs [shot-dir]          (default docs/app/screens)
 //
 // The orb opens the list (nothing kept on the phone yet), grouped by day; search finds by title and by a word said in a
-// chat (opening it at that line); the Upcoming and Past filters; archive and unarchive; two new chats about two places keep their own turns; a chat the phone
+// chat (opening it at that line); find in an open chat with previous / next; the Upcoming and Past filters; archive and unarchive; two new chats about two places keep their own turns; a chat the phone
 // never kept opens from the server; the orb within 24 hours goes straight into the last chat; the list in Arabic reads
 // right to left with the RTL arrow in titles.
 import { createServer } from 'node:http';
@@ -83,11 +83,32 @@ async function english() {
   t = await s.titlesWhen((x) => x.length === 1 && /Istanbul/.test(x[0] ?? ''));
   check(t.length === 1 && /Riyadh → Istanbul/.test(t[0] ?? ''), `search finds a word from a message (${t.join(' | ')})`);
   check(/Taksim/.test(await byTest('ask-thread-match').innerText().catch(() => '')), 'the row shows the line that matched');
+  await page.waitForTimeout(400);
+  await s.shot('ai-u1-search-en');
   await byTest('ask-thread-title').click();
   check(await s.visible('chat-found'), 'the chat opens at the matching line, marked');
   await byTest('topbar-back').click();
   await page.waitForTimeout(600);
   await byTest('ask-list-search').fill('');
+  await page.waitForTimeout(700);
+
+  // Find in this chat: the header's search, previous / next through the matches.
+  await s.all('ask-thread-title').filter({ hasText: /^A stay in Dubai/ }).click();
+  await s.visible('chat-thread');
+  await page.waitForTimeout(800);
+  await byTest('ask-find').click();
+  await byTest('ask-find-input').fill('sea');
+  await page.waitForTimeout(400);
+  check((await byTest('ask-find-count').innerText().catch(() => '')) === '2 of 2', 'find in chat counts the matches, on the latest');
+  check(/sea view/i.test(await byTest('chat-found').innerText().catch(() => '')), 'the match is marked');
+  await byTest('ask-find-prev').click();
+  await page.waitForTimeout(300);
+  check((await byTest('ask-find-count').innerText().catch(() => '')) === '1 of 2', 'previous goes to the earlier match');
+  await byTest('ask-find-next').click();
+  await page.waitForTimeout(300);
+  check((await byTest('ask-find-count').innerText().catch(() => '')) === '2 of 2', 'next comes back');
+  await byTest('ask-find-close').click();
+  await byTest('topbar-back').click();
   await page.waitForTimeout(700);
 
   // Filters: Upcoming holds the chat about the upcoming trip, in trip order.

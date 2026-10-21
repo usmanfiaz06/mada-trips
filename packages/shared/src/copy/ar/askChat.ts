@@ -109,5 +109,11 @@ export const arAskChat: ArSection<typeof askChatCopy> = {
   'chat.list.group.week': 'هالأسبوع',
   'chat.list.group.month': 'هالشهر',
   'chat.list.group.earlier': 'قبل',
+  'chat.find.open': 'دوّر في المحادثة',
+  'chat.find.count': '{n} من {total}',
+  'chat.find.none': 'مو موجودة في المحادثة',
+  'chat.find.prev': 'اللي قبل',
+  'chat.find.next': 'اللي بعد',
+  'chat.find.close': 'سكّر البحث',
   'chat.askTrip': 'اسأل عن هذي الرحلة',
 };

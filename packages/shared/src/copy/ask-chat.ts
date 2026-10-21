@@ -119,6 +119,13 @@ export const askChatCopy = {
   'chat.list.group.week': 'This week',
   'chat.list.group.month': 'This month',
   'chat.list.group.earlier': 'Earlier',
+  /** Find inside an open chat (U1+): the icon in the header, then previous / next through the matches. */
+  'chat.find.open': 'Find in this chat',
+  'chat.find.count': '{n} of {total}',
+  'chat.find.none': 'Not in this chat',
+  'chat.find.prev': 'Previous match',
+  'chat.find.next': 'Next match',
+  'chat.find.close': 'Close find',
   /** On the trip page: opens this trip's own chat, or starts one about it. */
   'chat.askTrip': 'Ask about this trip',
 } as const;
