@@ -360,9 +360,17 @@ export async function probeTurn(): Promise<{ name: string; model: string; ok: bo
     const models = l.auto ? await flashModels(l) : [l.model];
     const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models, { warm: true }) : await apiFor(linkConfig(l));
     try {
-      const s = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [{ role: "user", content: "Hotel in Baku 2 nights from 20 November 2026, 2 adults" }] }, { timeout: 40_000, maxRetries: 0 });
+      const first: Anthropic.Beta.BetaMessageParam = { role: "user", content: "Hotel in Baku 2 nights from 20 November 2026, 2 adults" };
+      const s = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [first] }, { timeout: 40_000, maxRetries: 0 });
       for await (const _ of s) { void _; }
-      const m = await s.finalMessage();
+      let m = await s.finalMessage();
+      // The second step, as a turn makes it: each tool call answered, then the model again.
+      const uses = m.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
+      if (uses.length) {
+        const s2 = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [first, { role: "assistant", content: m.content as Anthropic.Beta.BetaContentBlockParam[] }, { role: "user", content: uses.map((u) => ({ type: "tool_result" as const, tool_use_id: u.id, content: "Household: Test (self, 34). No other travellers." })) }] }, { timeout: 40_000, maxRetries: 0 });
+        for await (const _ of s2) { void _; }
+        m = await s2.finalMessage();
+      }
       const text = m.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join(" ");
       return { name: l.name, model: m.model ?? l.model, ok: true, ms: Date.now() - t0, stop: m.stop_reason ?? null, blocks: m.content.map((b) => b.type === "tool_use" ? `tool_use:${(b as { name: string }).name}` : b.type), text: text.slice(0, 300), error: null };
     } catch (e) {
