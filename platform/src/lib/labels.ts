@@ -96,3 +96,28 @@ export const ESIM_STATUS: Record<string, { label: string; tone: Tone }> = {
 export const AGENT_STATUS: Record<string, { label: string; tone: Tone }> = {
   online: { label: "Online", tone: "ok" }, away: { label: "Away", tone: "warn" }, offline: { label: "Signed off", tone: "neutral" },
 };
+// Desk tickets (lib/app/desk/tickets.ts, DESK-PLAN.md §4.4).
+export const TICKET_STATUS: Record<string, { label: string; tone: Tone }> = {
+  new: { label: "New", tone: "gold" }, open: { label: "Open", tone: "info" }, waiting_customer: { label: "Waiting on customer", tone: "neutral" },
+  waiting_supplier: { label: "Waiting on supplier", tone: "neutral" }, resolved: { label: "Resolved", tone: "ok" }, closed: { label: "Closed", tone: "neutral" },
+};
+export const TICKET_PRIORITY: Record<string, { label: string; tone: Tone }> = {
+  urgent: { label: "Urgent", tone: "bad" }, high: { label: "High", tone: "warn" }, normal: { label: "Normal", tone: "neutral" }, low: { label: "Low", tone: "neutral" },
+};
+// The live board's lifecycle tabs and products (lib/app/desk/board.ts), and where a drop-off stopped (dropoffs.ts).
+export const BOARD_STAGE: Record<string, { label: string; tone: Tone }> = {
+  searching: { label: "Searching", tone: "neutral" }, held: { label: "Held · not paid", tone: "gold" }, paid: { label: "Paid · with the desk", tone: "info" },
+  confirmed: { label: "Confirmed · ticketed", tone: "ok" }, travelling: { label: "Travelling", tone: "brand" }, done: { label: "Done", tone: "neutral" }, problem: { label: "Problem", tone: "bad" },
+};
+export const BOARD_PRODUCT: Record<string, string> = {
+  flight: "Flights", stay: "Stays", package: "Flight + stay", esim: "eSIMs", transfer: "Transfers", activity: "Things to do", umrah: "Umrah", visa: "Visa", share: "Circle share", request: "Other requests",
+};
+export const BOARD_SUPPLIER: Record<string, string> = { mada: "Mada desk", tbo: "TBO", hotelbeds: "Hotelbeds", esimaccess: "eSIM Access", airalo: "Airalo", mock: "Test supplier" };
+export const DROPOFF_KIND: Record<string, { label: string; tone: Tone }> = {
+  search: { label: "Searched, didn't book", tone: "neutral" }, sheet: { label: "Pay sheet, not paid", tone: "gold" },
+  payment: { label: "Payment didn't go through", tone: "bad" }, held: { label: "Held, not paid", tone: "warn" },
+};
+export const DROPOFF_STEP: Record<string, string> = {
+  searched: "Saw the results", pay_sheet: "Opened the pay sheet", declined: "Card declined", bank_check: "Stopped at the bank check", friend_to_pay: "Waiting for a friend to pay", quote_sent: "Quote sent, not paid",
+};
+export const DROPOFF_MARK: Record<string, { label: string; tone: Tone }> = { recovered: { label: "Recovered", tone: "ok" }, ignored: { label: "Ignored", tone: "neutral" } };

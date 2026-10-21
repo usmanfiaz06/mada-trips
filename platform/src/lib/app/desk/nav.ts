@@ -15,16 +15,16 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
   const sections: { label: string; items: Item[] }[] = [
     { label: t("Support"), items: [
       { href: D, label: t("My queue"), icon: "Headset", count: c.queue },
-      { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck", soon: true },
+      { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck" },
       { href: `${D}/chats`, label: t("Chats"), icon: "MessagesSquare", count: c.chats },
       { href: `${D}/ask`, label: t("Ask threads"), icon: "Bot", soon: true },
       { href: `${D}/customers`, label: t("Customers"), icon: "Contact", soon: true },
     ] },
     { label: t("App bookings"), items: [
-      // The live board (U4) replaces Orders: until then Orders is the bookings list.
-      { href: `${D}/bookings`, label: t("Live board"), icon: "ShoppingBag", soon: true },
+      // The live board shows every booking by lifecycle; Orders stays as the desk's work list for flights and stays.
+      { href: `${D}/bookings`, label: t("Live board"), icon: "ShoppingBag" },
       { href: `${D}/orders`, label: t("Orders"), icon: "ShoppingBag", count: c.orders },
-      { href: `${D}/drop-offs`, label: t("Drop-offs"), icon: "TrendingDown", soon: true },
+      { href: `${D}/drop-offs`, label: t("Drop-offs"), icon: "TrendingDown" },
       { href: `${D}/requests`, label: t("Requests"), icon: "Receipt", count: c.requests },
       { href: `${D}/refunds`, label: t("Refunds & credits"), icon: "Undo2", count: c.refunds },
       { href: `${D}/esims`, label: t("eSIMs"), icon: "Smartphone", count: c.esims, tone: "bad" },
