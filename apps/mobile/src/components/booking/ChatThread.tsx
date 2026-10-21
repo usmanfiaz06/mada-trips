@@ -21,6 +21,7 @@ import type { ChatTurn } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { DemoFare } from './DemoFare';
+import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
 import { DocumentCard, ShareCard } from './DocCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
 import { colors, ff, font, radii } from '@/theme';
@@ -39,7 +40,9 @@ export type ChatOpen =
   | { kind: 'request'; id: string }
   | { kind: 'trip'; id: string }
   /** "About your AlUla trip?": into that trip's chat, or a chat of its own (ASK-INTEGRATED.md §2.2). */
-  | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn };
+  | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn }
+  /** open_in_app: a place in the app (PlanCards.tsx linkHref). */
+  | { kind: 'link'; screen: Extract<ChatCard, { type: 'link' }>['screen']; id: string | null };
 
 /**
  * foundId: the turn a search landed on (the chats list's search, or find in this chat, ASK-INTEGRATED.md §11 U1+): it
@@ -131,7 +134,7 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
       ) : null}
       {/* What Mada found, under her words and in line with the bubble (not the mark). */}
       <View style={s.under}>
-        {turn.cards.map((c, i) => <CardFor key={`${c.type}-${i}`} card={c} turn={turn} onOpen={onOpen} />)}
+        {turn.cards.map((c, i) => <CardFor key={`${c.type}-${i}`} card={c} turn={turn} onOpen={onOpen} onSay={onSay} />)}
         {turn.pay ? (
           <Box icon="card" title={turn.pay.title} testID="chat-pay-card">
             <View style={s.line}><Icon name="lock" size={16} color={colors.ink3} /><T v="small" color={colors.ink2} style={{ flex: 1 }}>{t('chat.pay.line')}</T></View>
@@ -205,7 +208,7 @@ function Dot({ delay, still }: { delay: number; still: boolean }) {
   return <Animated.View style={[s.dot, st]} />;
 }
 
-function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpen: (o: ChatOpen) => void }) {
+function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   const open = (kind: 'flights' | 'stays' | 'esim' | 'entry' | 'car') => { buzz('tap'); onOpen({ kind, card, turn }); };
   const locale = getLocale();
   switch (card.type) {
@@ -293,6 +296,13 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
           <CardButton soft label={t('chat.attach.new')} onPress={() => onOpen({ kind: 'attach', choice: 'new', tripId: card.tripId, turn })} testID="chat-attach-new" />
         </View>
       );
+    // The living plan (PlanCards.tsx): review it on its trip until the plan screen lands.
+    case 'plan':
+      return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} onSay={onSay} />;
+    case 'plan_diff':
+      return <PlanDiffCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} />;
+    case 'link':
+      return <LinkCard card={card} onOpen={() => onOpen({ kind: 'link', screen: card.screen, id: card.id })} />;
     // A passport, visa or ID sent in the chat, and asking a companion for theirs (ASK-INTEGRATED.md §6, §5.4).
     case 'document':
       return <DocumentCard card={card} turnId={turn.id} />;

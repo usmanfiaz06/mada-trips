@@ -16,6 +16,7 @@ import { openThread, sendMessage } from "../support/threads";
 import { presenceFor } from "../desk/agents";
 import { redact } from "./guard";
 import { isSensitive, saveFact, unkeepable } from "./memory";
+import { PLAN_RUN, PLAN_STATUS } from "./tools-plan";
 import { DOC_RUN } from "./tools-docs";
 
 /*
@@ -32,8 +33,9 @@ export type ToolCtx = {
   ownerId: string; people: Person[]; today: string; lang: "en" | "ar"; ipHash: string | null; demo: Set<DemoFlag>;
   /** For `remember`: Mada's last reply asked to remember something, and this message says yes (memory.ts consentOf). */
   consent?: { asked: boolean; yes: boolean };
-  /** The chat this turn is in (documents sent in it, ask-chat/tools-docs.ts). */
+  /** The chat and the trip it's about (tools-plan.ts): a plan made here attaches the chat to its trip. */
   threadId?: string | null;
+  tripId?: string | null;
 };
 export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean; mode?: "request"; /** A fact was saved (the reply says so once). */ remembered?: string };
 
@@ -245,6 +247,8 @@ const RUN: Record<string, Run> = {
     return { text: `Saved for next time: ${f.text}. The app tells them it is remembered; don't say it again.`, remembered: f.text };
   },
 
+  // The living plan (tools-plan.ts).
+  ...PLAN_RUN,
   // Documents in chat (ASK-INTEGRATED.md §6): read-only, or a card that waits for the traveller's tap.
   ...DOC_RUN,
 };
@@ -294,7 +298,7 @@ export function statusFor(name: string, input: Record<string, unknown>, lang: "e
     remember: "نسجّلها للمرة الجاية",
     documents_on_file: "نشوف مستنداتك", use_document: "نشوف مستنداتك", request_document_share: "نجهّز الطلب",
   };
-  return (lang === "ar" ? ar : en)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
+  return (lang === "ar" ? ar : en)[name] ?? (PLAN_STATUS[lang] as Record<string, string>)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
 }
 
 /** Run one tool call. Expected failures (a gone offer, a person not in the household) come back as a sentence. */

@@ -42,6 +42,29 @@ export const ChatSearch = z.object({
 });
 export type ChatSearch = z.infer<typeof ChatSearch>;
 
+/**
+ * One plan item as a chat card draws it: what it is, its places (names, so the app writes them in the reader's language
+ * and direction), its status, and a drive's numbers only when the drive interface measured them.
+ */
+export const ChatPlanRow = z.object({
+  kind: z.enum(['leg', 'stay', 'car', 'activity', 'meal', 'note', 'check']),
+  mode: z.enum(['flight', 'drive', 'train', 'ferry', 'transfer', 'walk']).nullable(),
+  title: z.string(),
+  place: z.string().nullable(),
+  from: z.string().nullable(),
+  to: z.string().nullable(),
+  status: z.enum(['idea', 'priced', 'requested', 'held', 'booked', 'confirmed', 'cancelled', 'skipped']),
+  nights: z.number().int().nullable(),
+  /** "09:40": only a time a template, a tool or the traveller gave. */
+  at: z.string().nullable(),
+  km: z.number().nullable(),
+  minutes: z.number().int().nullable(),
+  borders: z.array(z.string()).max(4).default([]),
+  /** The hotel's or flight's name once booked. */
+  booking: z.string().nullable(),
+});
+export type ChatPlanRow = z.infer<typeof ChatPlanRow>;
+
 export const ChatCard = z.discriminatedUnion('type', [
   z.object({ type: z.literal('flights'), search: ChatSearch, options: z.array(FlightOption).max(3) }),
   z.object({ type: z.literal('stays'), search: ChatSearch, nights: z.number().int(), options: z.array(StayOption).max(3), near: z.string().nullable() }),
@@ -66,6 +89,29 @@ export const ChatCard = z.discriminatedUnion('type', [
    * never guessed (ASK-INTEGRATED.md §2.2): the app sends the same words again with `attach`.
    */
   z.object({ type: z.literal('attach'), tripId: Id, place: z.string(), when: z.string().nullable() }),
+  /** "Here's your plan, review it" (ASK-INTEGRATED.md §3.3): the living plan at this version, a few rows a day. */
+  z.object({
+    type: z.literal('plan'), planId: Id, tripId: Id, version: z.number().int(), title: z.string(),
+    start: IsoDay, end: IsoDay,
+    /** Where it starts and how we know (said, remembered…); null with originNeeded when nobody knows yet. */
+    origin: z.object({ name: z.string(), code: z.string().nullable(), source: z.string() }).nullable(),
+    originNeeded: z.boolean(),
+    travellers: z.array(z.object({ name: z.string(), self: z.boolean() })).max(12),
+    days: z.array(z.object({ day: z.number().int(), items: z.array(ChatPlanRow).max(5) })).max(7),
+    /** Days after the seventh, not drawn (the plan screen has them). */
+    more: z.number().int(),
+    /** What's left to do (the checks that aren't fine), at most 3. */
+    todo: z.array(z.object({ key: z.string(), state: z.string(), days: z.array(z.number().int()).default([]) })).max(3),
+  }),
+  /** What a later turn changed in the plan, instead of the whole plan again (§3.3). */
+  z.object({
+    type: z.literal('plan_diff'), planId: Id, tripId: Id, title: z.string(), from: z.number().int(), to: z.number().int(),
+    changes: z.array(z.object({ op: z.enum(['create', 'add', 'move', 'update', 'remove', 'status', 'origin']), day: z.number().int().nullable(), row: ChatPlanRow })).max(8),
+    /** Booked items a change couldn't touch: Mada offers the change flow for them. */
+    untouched: z.array(z.string()).max(4).default([]),
+  }),
+  /** A place in the app (open_in_app): "Your boarding pass is in Wallet" with a button there. */
+  z.object({ type: z.literal('link'), screen: z.enum(['plan', 'trip', 'documents', 'household', 'esim', 'requests', 'money', 'change', 'refund', 'support']), id: Id.nullable() }),
   /** A passport, visa or ID sent in the chat (ask-docs.ts, ASK-INTEGRATED.md §6): one card, saved only on its tap. */
   ChatDocCard,
   /** Asking a companion to share their passport for the trip (§5.4): sent only on its tap. */

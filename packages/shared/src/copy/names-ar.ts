@@ -18,6 +18,7 @@ export const NAMES_AR: Readonly<Record<string, string>> = {
   Vienna: 'فيينا', Munich: 'ميونخ', Berlin: 'برلين', Rome: 'روما', Milan: 'ميلانو', Madrid: 'مدريد', Barcelona: 'برشلونة',
   Amsterdam: 'أمستردام', Prague: 'براغ', Sarajevo: 'سراييفو', Athens: 'أثينا', Lisbon: 'لشبونة',
   'Kuala Lumpur': 'كوالالمبور', Bali: 'بالي', Jakarta: 'جاكرتا', Bangkok: 'بانكوك', Phuket: 'بوكيت', Singapore: 'سنغافورة',
+  Melaka: 'ملقا', Malacca: 'ملقا', Penang: 'بينانغ', Langkawi: 'لنكاوي', 'Johor Bahru': 'جوهور بارو', Ipoh: 'إيبوه',
   Tokyo: 'طوكيو', Seoul: 'سول', Male: 'ماليه', Maldives: 'جزر المالديف', 'New York': 'نيويورك', Marrakech: 'مراكش',
   Casablanca: 'الدار البيضاء', Tunis: 'تونس', Zanzibar: 'زنجبار', Mumbai: 'مومباي', Delhi: 'دلهي', Karachi: 'كراتشي',
   Lahore: 'لاهور', Islamabad: 'إسلام آباد', Dhaka: 'دكا', Manila: 'مانيلا', Colombo: 'كولومبو', Almaty: 'ألماتي', Tashkent: 'طشقند',

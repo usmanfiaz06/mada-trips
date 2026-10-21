@@ -16,7 +16,9 @@ import { askAttach, ownTrip, tripFor, tripTitleOf } from "./attach";
 import { nextTitle, titleFrom } from "./titles";
 import { foldThread, historyOf, needsFold } from "./fold";
 import { MEMORY_HEAD, consentOf, memoryBlock } from "./memory";
-import { personLine } from "./tools";
+import { personLine, type ToolCtx } from "./tools";
+import { markPlanSeen, planContext, planTitleFor } from "./tools-plan";
+import { kindFor } from "./prompt";
 import { keepForAgent } from "./takeover";
 import { attachmentsContext } from "./attachments";
 
@@ -104,21 +106,27 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const known = JSON.stringify(thread.messages).includes(MEMORY_HEAD);
   const taken = (trips?.past ?? []).filter((tr) => tr.status !== "cancelled").map((tr) => `${tr.city} ${tr.startDate.slice(0, 7)}`);
   const memory = known ? null : await memoryBlock(auth.userId, { kind: slots.intent.kind, taken });
+  // A chat about a trip with a plan: its id and version, and what the traveller or the desk changed meanwhile (§3.6).
+  const planned = await planContext(auth.userId, thread.tripId).catch(() => ({ lines: [] as string[], seen: [] as string[] }));
+  const tool: ToolCtx = { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set(), consent: consentOf(history, clean), threadId: thread.id, tripId: thread.tripId };
 
   const r = await runTurn({
     history,
     text: clean,
     // After the desk's Hand back, what was said meanwhile rides in this turn's context once (takeover.ts handBackNote).
     // Documents sent in this chat, as their cards say them (attachments.ts): never a number or a line of the MRZ.
-    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
+    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
     lang,
-    tool: { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set(), consent: consentOf(history, clean), threadId: thread.id },
-    intent: slots.intent.kind,
+    tool,
+    intent: kindFor(clean, slots.intent.kind, planned.lines.length > 0),
     signal,
   }, emit, api);
 
   const fastCost = slots.usage ? costMicros(askFastModel(), { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }) : 0;
   const total = r.costMicros + fastCost + foldCost;
+  await markPlanSeen(auth.userId, thread.tripId, planned.seen).catch(() => {});
+  // A plan made this turn attached the chat to its trip (tools-plan.ts): the title follows the plan from now on.
+  if (tool.tripId && tool.tripId !== thread.tripId) thread.tripId = tool.tripId;
   await appendTurn(auth.userId, thread.id, {
     messages: r.added,
     transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],
@@ -133,6 +141,9 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
 
 /** The title after this turn (titles.ts), or null to keep the one it has. */
 async function titleAfter(ownerId: string, thread: Thread, intent: AskIntent, words: string, lang: string) {
+  // "Riyadh → Singapore → Penang · 12–18 Dec": a trip with a plan is titled by its route, start first (§2.3).
+  const planned = await planTitleFor(ownerId, thread.tripId, lang === "ar" ? "ar" : "en").catch(() => null);
+  if (planned) return nextTitle({ title: thread.title, by: thread.titledBy }, { title: planned, by: "trip" });
   const trip = thread.tripId ? await tripTitleOf(ownerId, thread.tripId) : null;
   return nextTitle({ title: thread.title, by: thread.titledBy }, titleFrom({ intent, trip, words, lang: lang === "ar" ? "ar" : "en" }));
 }

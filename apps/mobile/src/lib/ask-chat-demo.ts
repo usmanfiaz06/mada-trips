@@ -47,6 +47,41 @@ const demoWait = () => {
   const v = (globalThis as { __MADA_DEMO__?: { askChatWait?: number } }).__MADA_DEMO__?.askChatWait;
   return typeof v === 'number' && v > 0 ? Math.min(v, 30_000) : 600;
 };
+/** A trip of several days or places: the demo answers with a plan card; a new start with what changed. */
+const PLAN_WORDS = /road trip|رحلة برية|خطة/i;
+const START_WORDS = /start from|leaving from|نبدأ من|البداية من|من جدة/i;
+const PLAN_LINES = {
+  en: { status: 'Putting the plan together', plan: 'Here’s your 7-day plan from Riyadh, through Melaka and Kuala Lumpur to Penang. Review it.', next: ['Book a car for days 3–6', 'Find stays', 'Start in Singapore'], startStatus: 'Moving the start', start: 'Now starting from Jeddah. The flights need checking again.', startNext: ['Find Jeddah flights', 'Review the plan'] },
+  ar: { status: 'نجهّز الخطة', plan: 'هذي خطتك ٧ أيام من الرياض، عن طريق ملقا وكوالالمبور لين بينانغ. شوفها.', next: ['احجز سيارة للأيام ٣–٦', 'دوّر سكن', 'ابدأ من سنغافورة'], startStatus: 'نغيّر نقطة البداية', start: 'صارت البداية من جدة. الرحلات تحتاج نشوفها من جديد.', startNext: ['رحلات من جدة', 'شوف الخطة'] },
+} as const;
+const row = (kind: 'leg' | 'stay' | 'activity', title: string, o: { mode?: 'flight' | 'drive'; from?: string; to?: string; place?: string; nights?: number; status?: 'idea' | 'booked'; booking?: string } = {}) =>
+  ({ kind, mode: o.mode ?? null, title, place: o.place ?? null, from: o.from ?? null, to: o.to ?? null, status: o.status ?? 'idea', nights: o.nights ?? null, at: null, km: null, minutes: null, borders: [], booking: o.booking ?? null });
+function demoPlanCard(start: string, who: { name: string; self: boolean }[]): ChatCard {
+  return {
+    type: 'plan', planId: '5b0c6a3e-2f41-4c7d-9e18-6a4b2d9f0c11', tripId: '0f6e2d1c-8b3a-4e59-a7c2-3d1b9e8f4a60', version: 1, title: 'Riyadh → Singapore → Penang',
+    start, end: addDays(start, 6), origin: { name: 'Riyadh', code: 'RUH', source: 'memory' }, originNeeded: false, travellers: who,
+    days: [
+      { day: 0, items: [row('leg', 'Riyadh → Singapore', { mode: 'flight', from: 'Riyadh', to: 'Singapore' }), row('stay', 'Stay in Singapore', { place: 'Singapore', nights: 2 })] },
+      { day: 1, items: [row('activity', 'Gardens by the Bay', { place: 'Singapore' })] },
+      { day: 2, items: [row('leg', 'Singapore → Melaka', { mode: 'drive', from: 'Singapore', to: 'Melaka' }), row('stay', 'Stay in Melaka', { place: 'Melaka', nights: 1 })] },
+      { day: 3, items: [row('leg', 'Melaka → Kuala Lumpur', { mode: 'drive', from: 'Melaka', to: 'Kuala Lumpur' }), row('stay', 'Stay in Kuala Lumpur', { place: 'Kuala Lumpur', nights: 2 })] },
+      { day: 4, items: [] },
+      { day: 5, items: [row('leg', 'Kuala Lumpur → Penang', { mode: 'drive', from: 'Kuala Lumpur', to: 'Penang' }), row('stay', 'Stay in Penang', { place: 'Penang', nights: 1 })] },
+      { day: 6, items: [row('leg', 'Penang → Riyadh', { mode: 'flight', from: 'Penang', to: 'Riyadh' })] },
+    ],
+    more: 0, todo: [{ key: 'car', state: 'todo', days: [2, 3, 4, 5] }, { key: 'stays', state: 'todo', days: [] }],
+  };
+}
+const demoDiffCard: ChatCard = {
+  type: 'plan_diff', planId: '5b0c6a3e-2f41-4c7d-9e18-6a4b2d9f0c11', tripId: '0f6e2d1c-8b3a-4e59-a7c2-3d1b9e8f4a60', title: 'Jeddah → Singapore → Penang', from: 1, to: 2,
+  changes: [
+    { op: 'origin', day: null, row: row('leg', 'Jeddah', { place: 'Jeddah' }) },
+    { op: 'update', day: 0, row: row('leg', 'Jeddah → Singapore', { mode: 'flight', from: 'Jeddah', to: 'Singapore' }) },
+    { op: 'update', day: 6, row: row('leg', 'Penang → Jeddah', { mode: 'flight', from: 'Penang', to: 'Jeddah' }) },
+  ],
+  untouched: [],
+};
+
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
 
@@ -65,6 +100,23 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
     onEvent({ type: 'thread', threadId, lang });
     await wait(700, signal);
     let cards: ChatCard[] = [];
+    if (PLAN_WORDS.test(body.text) || START_WORDS.test(body.text)) {
+      const P = PLAN_LINES[lang];
+      const start = START_WORDS.test(body.text);
+      onEvent({ type: 'status', text: start ? P.startStatus : P.status, tool: start ? 'set_origin' : 'create_plan' });
+      const people = (await api.people()).people;
+      const self = people.find((p) => p.isSelf) ?? people[0];
+      const other = people.find((p) => !p.isSelf && p.relation !== 'child');
+      await wait(900, signal);
+      const card = start ? demoDiffCard : demoPlanCard(addDays(todayIn(), 52), [self, other].filter((p): p is NonNullable<typeof p> => !!p).map((p) => ({ name: p.firstName, self: !!p.isSelf })));
+      const text = start ? P.start : P.plan;
+      for (const word of text.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
+      onEvent({ type: 'cards', cards: [card] });
+      onEvent({ type: 'next', choices: [...(start ? P.startNext : P.next)] });
+      onEvent({ type: 'done', text });
+      keep(text);
+      return 'done';
+    }
     if (REQUEST_WORDS.test(body.text)) {
       onEvent({ type: 'status', text: L.requestStatus, tool: 'create_request' });
       const people = (await api.people()).people;

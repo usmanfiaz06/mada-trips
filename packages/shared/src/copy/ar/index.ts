@@ -24,6 +24,7 @@ import { arStays } from './stays';
 import { arNow } from './now';
 import { arAskChat } from './askChat';
 import { arAskMemory } from './askMemory';
+import { arAskPlan } from './askPlan';
 import { arAskDocs } from './askDocs';
 import { arTodayIdeas } from './todayIdeas';
 import { arOutcomes } from './outcomes';
@@ -59,6 +60,7 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arNow,
   ...arAskChat,
   ...arAskMemory,
+  ...arAskPlan,
   ...arAskDocs,
   ...arTodayIdeas,
   ...arAskHeard,
