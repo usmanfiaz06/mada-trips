@@ -38,6 +38,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 27 | Sherpa | visa / entry rules for every passport, behind the entry check | Ready (built-in rules until key) | Owner |
 | 28 | Cover Genius XCover | travel insurance: quote, buy, cancel | Ready in code; **needs Saudi licensing** | Owner + legal |
 | 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
+| 30 | Duffel | second flight source next to TBO (NDC airlines, low-cost) | Ready (mock until key) | Owner |
 
 ## Processes
 
@@ -353,3 +354,32 @@ a few days of capture. Refunds return the fee only partly — check the contract
 **Licence notes.** Both are licensed by SAMA as BNPL providers; Mada needs no licence of its own to offer them, but
 must show their terms link and must not call it a loan. Pay later can't be used for items they exclude (ask whether
 flights for third parties and eSIMs are allowed).
+
+### 30. Duffel — second flight source
+**What it does.** Searched together with TBO (or the catalogue in mock): the **same flights** (every leg's flight number
+and departure time) appear **once, at the lower price**, then cheapest first. If one source fails the other answers
+alone; if both fail it's exactly as today (the desk books by request). Offer price and hold go to the source the offer
+came from; TBO's own booking and ticketing on the desk are unchanged. For Duffel offers the adapter has **order
+create** (instant, paid from Mada's Duffel balance, or hold where the airline allows), **order read** (PNR, ticket
+numbers) and **cancel** (Duffel's refund quote, then confirm). Margin: `APP_DUFFEL_MARKUP_BPS` (default 300 = 3%).
+Still to do: a "Book with Duffel" button on the desk's order page (today a Duffel offer is booked by the desk by hand,
+like any request), using `createOrder`.
+
+**Apply.** app.duffel.com → sign up (instant) → you get **test mode** at once (`duffel_test_…` token: Duffel Airways and
+sandbox airlines, nothing real). To book real tickets: Settings → **Go live** — company details, KYB checks, and a
+**balance** top-up (Duffel's own payments, or IATA/airline-direct for some carriers). Ask Duffel which content is
+available for a Saudi agency (NDC from Saudia? flynas/flyadeal? Duffel lists airlines per country).
+
+**Keys in Vercel.** `DUFFEL_ACCESS_TOKEN` (test token on staging, live token on production), `APP_DUFFEL_MARKUP_BPS`;
+`SUPPLIER_MODE_DUFFEL=live|mock|off` (`mock` merges fixture flights on staging).
+
+**Certification.** None formal. Before live: on test mode run search → price → order → cancel from staging, and check
+Duffel's "go-live checklist" (show fare conditions before payment; passenger names exactly as passport).
+
+**Cost model.** Per order: about **USD 3 + 1% of the order value** for "managed content" (Duffel holds the airline
+relationship), plus card/payment fees if Duffel Payments is used; excess search-to-book ratio may be billed (ask
+for the threshold — every app search hits Duffel when on, so cache matters: searches are cached 10 minutes). No fee
+for test mode.
+
+**Licence notes.** Mada is the seller of record to the traveller: fare rules and baggage must be shown before payment
+(the card does). Duffel's terms forbid scraping/redistributing their content outside the booking flow.

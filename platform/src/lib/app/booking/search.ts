@@ -15,6 +15,7 @@ import { SupplierDown } from "../suppliers/mock/flights";
 import { bookingSuppliers, householdOf, isUuid, renewalsAsked, today, travellersOf } from "./common";
 import { guestPeople } from "../guest";
 import { entryRulesSupplier, withEntryRequirements } from "../suppliers/sherpa";
+import { duffelSource } from "../suppliers/duffel";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -131,7 +132,7 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
     if (!q.return || later < q.return) depart = later;
   }
   const from = dest.code === q.from ? (q.from === "RUH" ? "JED" : "RUH") : q.from;
-  const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, kids, q.infants, q.cabin]);
+  const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, kids, q.infants, q.cabin, ...(duffelSource() ? ["duffel"] : [])]);
   let offers: BookingFlightOffer[];
   let at: number;
   let saved: Promise<void>;

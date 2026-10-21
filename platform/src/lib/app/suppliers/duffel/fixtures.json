@@ -1,0 +1,10 @@
+{
+  "_comment": "Mock Duffel routes, written as Duffel offers are (times local, durations ISO 8601, amounts per party in USD per seat). SV263 is also in the catalogue, at a different price, so the merge can be seen.",
+  "routes": [
+    { "from": "RUH", "to": "IST", "carrier": "SV", "name": "Saudia", "number": "263", "back": "264", "dep": "09:40", "minutes": 255, "backDep": "15:10", "backMinutes": 240, "usdPerSeat": 545, "bags": 2, "refund": { "allowed": true, "penalty_amount": "107", "penalty_currency": "USD" }, "change": { "allowed": true, "penalty_amount": "80", "penalty_currency": "USD" } },
+    { "from": "RUH", "to": "SAW", "carrier": "PC", "name": "Pegasus Airlines", "number": "663", "back": "662", "dep": "03:05", "minutes": 290, "backDep": "21:40", "backMinutes": 275, "usdPerSeat": 310, "bags": 0, "refund": { "allowed": false }, "change": { "allowed": true, "penalty_amount": "60", "penalty_currency": "USD" } },
+    { "from": "RUH", "to": "IST", "carrier": "TK", "name": "Turkish Airlines", "number": "143", "back": "142", "dep": "14:30", "minutes": 260, "backDep": "08:55", "backMinutes": 245, "usdPerSeat": 640, "bags": 2, "refund": { "allowed": true, "penalty_amount": "80", "penalty_currency": "USD" }, "change": { "allowed": true, "penalty_amount": "0", "penalty_currency": "USD" } },
+    { "from": "RUH", "to": "DXB", "carrier": "FZ", "name": "flydubai", "number": "844", "back": "843", "dep": "08:20", "minutes": 115, "backDep": "05:30", "backMinutes": 120, "usdPerSeat": 160, "bags": 1, "refund": { "allowed": false }, "change": { "allowed": true, "penalty_amount": "40", "penalty_currency": "USD" } },
+    { "from": "JED", "to": "CAI", "carrier": "MS", "name": "EgyptAir", "number": "644", "back": "643", "dep": "11:45", "minutes": 135, "backDep": "07:10", "backMinutes": 130, "usdPerSeat": 230, "bags": 2, "refund": { "allowed": true, "penalty_amount": "50", "penalty_currency": "USD" }, "change": { "allowed": true, "penalty_amount": "30", "penalty_currency": "USD" } }
+  ]
+}
