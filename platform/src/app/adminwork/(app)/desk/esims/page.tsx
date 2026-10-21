@@ -38,7 +38,7 @@ export default async function EsimsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader eyebrow={t("App bookings")} title={t("eSIMs")} subtitle={t("Bought from the supplier once the card is captured. One row per eSIM: open it for usage, top-ups and notes, send the install details again, refund, or order a stuck one again (the supplier is checked first, so nothing is bought twice).")}
-        actions={can(u, "settings.manage") ? <LinkButton href="/adminwork/desk/esims/pricing" variant="outline" size="sm">{t("eSIM pricing")}</LinkButton> : null} />
+        actions={can(u, "settings.manage") ? <LinkButton href="/adminwork/desk/finance/esim-pricing" variant="outline" size="sm">{t("eSIM pricing")}</LinkButton> : null} />
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
         <Badge tone={vendor !== "mock" ? "ok" : "neutral"}>{vendor === "esimaccess" ? t("eSIM Access") : vendor === "airalo" ? t("Airalo {env}", { env: airaloEnv() }) : t("Mock supplier")}</Badge>
         <span>{t("Margin {pct}%, at least SAR {min} a plan", { pct: rules.marginPct, min: rules.minProfitSar })}</span>

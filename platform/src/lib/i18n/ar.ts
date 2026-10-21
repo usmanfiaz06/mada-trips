@@ -8,6 +8,7 @@ import { AR_DESK_BOARDING } from "../app/desk/ar-boarding";
 import { AR_DESK_CUSTOMERS } from "../app/desk/ar-customers";
 import { AR_DESK_TICKETS } from "../app/desk/ar-tickets";
 import { AR_DESK_BOARD } from "../app/desk/ar-board";
+import { AR_DESK_FINANCE } from "../app/desk/ar-finance";
 import { AR_DESK_AGENTS } from "../app/desk/ar-agents";
 import { AR_DESK_ASK } from "../app/desk/ar-ask";
 
@@ -21,6 +22,7 @@ export const AR: Record<string, string> = {
   ...AR_DESK_CUSTOMERS,
   ...AR_DESK_TICKETS, // desk tickets
   ...AR_DESK_BOARD, // the live board and drop-offs
+  ...AR_DESK_FINANCE, // refunds, credits and app finance
   ...AR_DESK_AGENTS, // agents, rota, performance, saved replies
   ...AR_DESK_ASK, // Ask threads on the desk
   ", retail only": "، للأفراد فقط",

@@ -8,7 +8,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "goodwill";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "goodwill" | "app_refund";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -109,6 +109,9 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   } else if (input.kind === "goodwill") {
     pool = "permission:desk.admin"; required = 1;
     rule = `App goodwill credit above what an agent gives alone (SAR ${sar(s.deskGoodwillLimit)}): one support lead approves`;
+  } else if (input.kind === "app_refund") {
+    pool = "permission:desk.admin"; required = 1;
+    rule = `App refund above what an agent approves alone (SAR ${sar(s.deskRefundLimit)} each, SAR ${sar(s.deskRefundDailyLimit)} a day): one support lead approves`;
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -278,6 +281,11 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
     case "goodwill": {
       const { applyGoodwillApproval } = await import("./app/desk/customers");
       await applyGoodwillApproval(tx, req, ok, actorId);
+      return;
+    }
+    case "app_refund": {
+      const { applyRefundApproval } = await import("./app/finance/refunds");
+      await applyRefundApproval(tx, req, outcome, actorId);
       return;
     }
     case "settlement": {

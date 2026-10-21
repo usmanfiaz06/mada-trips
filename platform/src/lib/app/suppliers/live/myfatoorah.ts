@@ -50,4 +50,14 @@ export const liveMyFatoorah: BookingPaymentSupplier = {
     const r = await call("/v2/MakeRefund", { Key: providerRef, KeyType: "InvoiceId", RefundChargeOnCustomer: false, ServiceChargeOnCustomer: false, Amount: halalasToSar(amount), Comment: idempotencyKey });
     return { status: r?.IsSuccess ? "refunded" : "failed", providerRef: String(r?.Data?.RefundReference ?? providerRef) };
   },
+  async refundStatus(providerRef, refundRef) {
+    // GetRefundStatus by the invoice: one entry per refund on it; ours is the one MakeRefund gave back as RefundReference.
+    const r = await call("/v2/GetRefundStatus", { Key: providerRef, KeyType: "InvoiceId" });
+    const list = (r?.Data?.RefundStatusResult ?? []) as { RefundId?: unknown; RefundReference?: unknown; RefundStatus?: unknown }[];
+    const it = list.find((x) => String(x.RefundReference ?? "") === refundRef || String(x.RefundId ?? "") === refundRef);
+    const st = String(it?.RefundStatus ?? "");
+    if (/refunded|completed|paid/i.test(st)) return { status: "refunded", reference: String(it?.RefundReference ?? refundRef) };
+    if (/cancel|fail|reject/i.test(st)) return { status: "failed" };
+    return { status: "pending" };
+  },
 };

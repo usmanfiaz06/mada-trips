@@ -281,6 +281,13 @@
       "when": 1792559598410,
       "tag": "0039_desk_agents",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792560844426,
+      "tag": "0040_app_finance",
+      "breakpoints": true
     }
   ]
 }

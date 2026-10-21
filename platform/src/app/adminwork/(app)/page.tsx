@@ -41,6 +41,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const currentIdx = daysBetween(d.current.start, d.today);
   const dotUnit = niceUnit(Math.max(...d.last14.map((x) => x.margin)), 10);
   const retailSell = d.cycleBookings.filter((b) => b.channel === "retail").reduce((s, b) => s + b.sell, 0);
+  // App sales post here as their own channel (DESK-PLAN §7 default 3), shown beside retail and corporate.
+  const appSell = d.cycleBookings.filter((b) => b.channel === "app").reduce((s, b) => s + b.sell, 0);
 
   const barcodeItems = d.cycleBookings.map((b) => ({
     id: b.id, ref: b.ref, day: daysBetween(d.cycle.start, b.businessDate), sell: b.sell,
@@ -241,8 +243,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <CardHead title={t("By channel")} hint={d.view === "prev" ? t("Sold last cycle") : t("Sold this cycle")} />
           <SplitBar parts={[
             { label: t("Retail"), value: retailSell, color: "var(--chart-1)", display: sar(retailSell, { compact: true }) },
-            { label: t("Corporate"), value: sell - retailSell, color: "var(--chart-2)", display: sar(sell - retailSell, { compact: true }) },
+            { label: t("Corporate"), value: sell - retailSell - appSell, color: "var(--chart-2)", display: sar(sell - retailSell - appSell, { compact: true }) },
+            ...(appSell > 0 ? [{ label: t("App"), value: appSell, color: "var(--info)", display: sar(appSell, { compact: true }) }] : []),
           ]} />
+          {appSell > 0 && <Link href="/adminwork/desk/finance" className="mt-3 block text-[12px] text-ink-3 hover:text-ink">{t("App sales this cycle")} <span className="num text-ink" dir="ltr">{sar(appSell)}</span> · {t("App revenue & margin")} →</Link>}
           {f && f.rec.length > 0 && (
             <div className="mt-auto pt-6">
               <div className="mb-2 flex items-center justify-between text-[12px] text-ink-3"><span>{t("Owed by clients")}</span>

@@ -13,7 +13,7 @@ import { syncCatalogue } from "@/lib/app/esim/catalogue";
 import { esimBalance } from "@/lib/app/esim/ops";
 
 /*
- * The desk's eSIM actions (esims/page.tsx, esims/[id], esims/pricing): send the install details again, refund one eSIM
+ * The desk's eSIM actions (esims/page.tsx, esims/[id], finance/esim-pricing): send the install details again, refund one eSIM
  * (its share of the order back to the card; the supplier asked for its money or the unused eSIM cancelled), order a stuck
  * one again (looked up at the supplier first, never bought twice), top up on the traveller's behalf, a note to them;
  * and the owner's pricing rules (settings.manage only, every change in the audit trail).
@@ -52,7 +52,7 @@ async function admin() {
   const me = await agentForOps(u.id);
   return { name: me?.displayName ?? u.name.split(" ")[0]!, opsUserId: u.id };
 }
-const priced = (ok: string): ActionState => { revalidatePath("/adminwork/desk/esims/pricing"); revalidatePath("/adminwork/desk/esims"); return { ok }; };
+const priced = (ok: string): ActionState => { revalidatePath("/adminwork/desk/finance/esim-pricing"); revalidatePath("/adminwork/desk/esims"); return { ok }; };
 const fields = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string").map(([k, v]) => [k, String(v)]));
 
 export async function esimRulesAction(_: ActionState, fd: FormData): Promise<ActionState> {
