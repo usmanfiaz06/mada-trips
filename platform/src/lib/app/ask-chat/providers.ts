@@ -195,7 +195,11 @@ export type ChainMember = { name: string; model: string; fastModel: string; api:
 
 /** Until when each provider rests, per server instance (ms since epoch). A restart forgets it, which only costs one retry. */
 const cooling = new Map<string, number>();
+/** Why each provider is resting (status and the start of its own error), for the staging debug line only. */
+const whyResting = new Map<string, string>();
 export const COOL_MS = 60_000;
+/** The longest a turn waits for a provider that is back within seconds, instead of failing. */
+const SHORT_WAIT_MS = 6_000;
 /** Tests: forget every cooldown. */
 export function resetCooldowns() { cooling.clear(); }
 /** Who is resting and for how many more seconds (GET /health-style checks and tests). */
@@ -230,7 +234,8 @@ const restMs = (e: unknown): number => {
 async function allResting(now: number): Promise<never> {
   const { ProviderHttpError } = await import("./providers-openai");
   const next = Math.min(...[...cooling.values()].filter((u) => u > now));
-  throw new ProviderHttpError(429, "every provider in ASK_CHAT_PROVIDERS is cooling down", Number.isFinite(next) ? Math.ceil((next - now) / 1000) : COOL_MS / 1000);
+  const err = new ProviderHttpError(429, "every provider in ASK_CHAT_PROVIDERS is cooling down", Number.isFinite(next) ? Math.ceil((next - now) / 1000) : COOL_MS / 1000);
+  throw Object.assign(err, { detail: [...whyResting].map(([k, v]) => `${k}: ${v}`).join(" | ") });
 }
 
 /**
@@ -243,17 +248,31 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
   const now = opts.now ?? Date.now;
   const log = opts.log ?? ((l: string) => console.info(l));
   const order = (tried: Set<string>) => members.filter((m) => !tried.has(m.name) && (cooling.get(m.name) ?? 0) <= now());
+  // Everyone resting but someone is back within seconds (Groq's per-minute cap often asks for under one): wait once.
+  const backSoon = async (signal?: AbortSignal): Promise<boolean> => {
+    const until = Math.min(...members.map((m) => cooling.get(m.name) ?? 0));
+    const wait = until - now();
+    if (!Number.isFinite(wait) || wait > SHORT_WAIT_MS || signal?.aborted) return false;
+    await new Promise((r) => setTimeout(r, Math.max(0, wait) + 50));
+    return true;
+  };
   const rest = (m: ChainMember, e: unknown) => {
     cooling.set(m.name, now() + restMs(e));
+    const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
+    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${detail.slice(0, 180)}`.trim());
     log(`[ask-chat] provider=${m.name} resting ${Math.round(restMs(e) / 1000)}s (${statusOf(e) ?? (e instanceof Error ? e.name : "error")})`);
   };
   return {
     async create(p, o) {
       const tried = new Set<string>();
       let skipped: string[] = [];
+      let waited = false;
       for (;;) {
         const m = order(tried)[0];
-        if (!m) return allResting(now());
+        if (!m) {
+          if (!waited && (await backSoon(o?.signal))) { waited = true; tried.clear(); continue; }
+          return allResting(now());
+        }
         tried.add(m.name);
         try {
           const res = await m.api.create({ ...p, model: m.fastModel }, o);
@@ -273,10 +292,14 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
       async function* events(): AsyncGenerator<Anthropic.Beta.BetaRawMessageStreamEvent> {
         const tried = new Set<string>();
         const skipped: string[] = [];
+        let waited = false;
         try {
           for (;;) {
             const m = order(tried)[0];
-            if (!m) await allResting(now());
+            if (!m) {
+              if (!waited && (await backSoon(o?.signal))) { waited = true; tried.clear(); continue; }
+              await allResting(now());
+            }
             const link = m!;
             tried.add(link.name);
             const s = link.api.stream({ ...p, model: link.model }, o);
