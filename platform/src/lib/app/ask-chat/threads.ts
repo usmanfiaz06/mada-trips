@@ -1,0 +1,118 @@
+import "server-only";
+import { and, desc, eq, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
+import { todayIn, type AskThreadLine, type AskThreadResponse, type AskThreadRow, type AskTripStatus } from "@mada/shared";
+import { db } from "@/db";
+import { appTrips } from "@/db/app-schema";
+import { appAskThreads } from "@/db/app-schema-ask";
+import { appAgents } from "@/db/app-schema-desk";
+import { joinedText, nameIn, type AskLine } from "./takeover";
+
+/*
+ * The conversations list (docs/app/ASK-INTEGRATED.md §2.4): the traveller's own chats, newest first, 30 to a page.
+ * Search reads the title, the preview and the trip's place, never the words inside a chat. A chat with nothing said in
+ * it (a turn that stopped before anything was kept) isn't listed. Archiving keeps everything; deleting a chat never
+ * touches its trip, plan or bookings.
+ */
+
+const PAGE = 30;
+const SAID = sql`jsonb_array_length(${appAskThreads.transcript}) > 0`;
+
+const cols = {
+  id: appAskThreads.id, title: appAskThreads.title, tripId: appAskThreads.tripId, preview: appAskThreads.preview, lastAt: appAskThreads.lastAt,
+  mode: appAskThreads.mode, archivedAt: appAskThreads.archivedAt, endedAt: appAskThreads.endedAt, lang: appAskThreads.lang,
+  tripStatus: appTrips.status, tripStart: appTrips.startDate, tripEnd: appTrips.endDate,
+  agent: appAgents.displayName, agentAr: appAgents.displayNameAr,
+  unread: sql<boolean>`coalesce(${appAskThreads.transcript} -> -1 ->> 'who' = 'agent', false)`,
+};
+type Raw = {
+  id: string; title: string | null; tripId: string | null; preview: string | null; lastAt: Date; mode: string; archivedAt: Date | null; endedAt: Date | null; lang: string;
+  tripStatus: string | null; tripStart: string | null; tripEnd: string | null; agent: string | null; agentAr: string | null; unread: boolean;
+};
+
+/** Planning, booked, today or done, from the trip's status and days. */
+export function tripStatusOf(status: string | null, start: string | null, end: string | null, today = todayIn()): AskTripStatus | null {
+  if (!status || !start) return null;
+  if (status === "cancelled" || status === "completed" || (end ?? start) < today) return "done";
+  if (status === "planning") return "planning";
+  return start <= today ? "today" : "booked";
+}
+
+function rowOf(r: Raw, today: string): AskThreadRow {
+  const lang = r.lang === "ar" ? "ar" : "en";
+  const agent = r.mode === "agent" ? (lang === "ar" && r.agentAr ? r.agentAr : r.agent) ?? "Mada" : null;
+  return {
+    id: r.id, title: r.title, tripId: r.tripId, tripStatus: r.tripId ? tripStatusOf(r.tripStatus, r.tripStart, r.tripEnd, today) : null,
+    tripStart: r.tripId ? r.tripStart : null, preview: r.preview, lastAt: r.lastAt.toISOString(), mode: r.mode === "agent" ? "agent" : "ai", agent,
+    unread: !!r.unread, archived: !!r.archivedAt, ended: !!r.endedAt, lang,
+  };
+}
+
+const base = () => db.select(cols).from(appAskThreads)
+  .leftJoin(appTrips, eq(appTrips.id, appAskThreads.tripId))
+  .leftJoin(appAgents, eq(appAgents.opsUserId, appAskThreads.takenBy));
+
+/** `before`: the cursor from the page before ("<lastAt ISO>|<id>"). */
+export async function listThreads(ownerId: string, o: { q?: string | null; archived?: boolean; tripId?: string | null; before?: string | null; limit?: number } = {}) {
+  const q = (o.q ?? "").trim().slice(0, 80);
+  const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+  const search: SQL | undefined = q ? sql`(${appAskThreads.title} ILIKE ${like} OR ${appAskThreads.preview} ILIKE ${like} OR ${appTrips.city} ILIKE ${like})` : undefined;
+  const [at, id] = (o.before ?? "").split("|");
+  const cursor = at && id && !Number.isNaN(Date.parse(at)) && /^[0-9a-f-]{36}$/i.test(id)
+    ? sql`(${appAskThreads.lastAt}, ${appAskThreads.id}) < (${new Date(at).toISOString()}::timestamptz, ${id}::uuid)` : undefined;
+  const mine = and(eq(appAskThreads.ownerId, ownerId), SAID);
+  const limit = Math.min(Math.max(o.limit ?? PAGE, 1), PAGE);
+  const [rows, [arch]] = await Promise.all([
+    base().where(and(mine, o.archived ? isNotNull(appAskThreads.archivedAt) : isNull(appAskThreads.archivedAt), o.tripId ? eq(appAskThreads.tripId, o.tripId) : undefined, search, cursor))
+      .orderBy(desc(appAskThreads.lastAt), desc(appAskThreads.id)).limit(limit + 1),
+    db.select({ n: sql<number>`count(*)::int` }).from(appAskThreads).where(and(mine, isNotNull(appAskThreads.archivedAt))),
+  ]);
+  const today = todayIn();
+  const page = (rows as Raw[]).slice(0, limit);
+  const last = page.at(-1);
+  return {
+    threads: page.map((r) => rowOf(r, today)),
+    next: rows.length > limit && last ? `${last.lastAt.toISOString()}|${last.id}` : null,
+    archivedCount: arch?.n ?? 0,
+  };
+}
+
+/** The lines the app shows again: the traveller's, Mada's, the desk's replies and "Noura from Mada joined". */
+export function linesOf(transcript: unknown[], lang: "en" | "ar"): AskThreadLine[] {
+  const out: AskThreadLine[] = [];
+  for (const raw of transcript as AskLine[]) {
+    if (!raw || typeof raw !== "object") continue;
+    if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null });
+    else if (raw.who === "mada" && typeof raw.text === "string") out.push({ who: "mada", text: raw.text, cards: (raw.cards ?? []).filter((c) => typeof c === "string").slice(0, 6), next: (raw.next ?? []).filter((c) => typeof c === "string").slice(0, 3) });
+    else if (raw.who === "agent") out.push({ who: "agent", text: raw.text, by: nameIn(raw, lang), at: raw.at });
+    else if (raw.who === "system" && raw.event === "joined") out.push({ who: "joined", text: joinedText(nameIn(raw, lang), raw.pronoun, lang), by: nameIn(raw, lang), at: raw.at });
+  }
+  return out;
+}
+
+/** One chat and every line of it, for opening it on any device. Null when it isn't the caller's. */
+export async function getThread(ownerId: string, id: string): Promise<AskThreadResponse | null> {
+  const [r] = await base().where(and(eq(appAskThreads.id, id), eq(appAskThreads.ownerId, ownerId))).limit(1);
+  if (!r) return null;
+  const [t] = await db.select({ transcript: appAskThreads.transcript }).from(appAskThreads).where(eq(appAskThreads.id, id));
+  const transcript = t?.transcript ?? [];
+  const row = rowOf(r as Raw, todayIn());
+  return { thread: row, lines: linesOf(transcript, row.lang), last: transcript.length - 1 };
+}
+
+/** Rename (empty: back to the automatic title, written again on the next turn), archive or unarchive. */
+export async function patchThread(ownerId: string, id: string, p: { title?: string | null; archived?: boolean }): Promise<AskThreadRow | null> {
+  const title = p.title === undefined ? undefined : (p.title ?? "").trim();
+  const set = {
+    ...(title === undefined ? {} : title ? { title, titledBy: "traveller" } : { title: null, titledBy: null }),
+    ...(p.archived === undefined ? {} : { archivedAt: p.archived ? new Date() : null }),
+  };
+  const done = await db.update(appAskThreads).set(set).where(and(eq(appAskThreads.id, id), eq(appAskThreads.ownerId, ownerId))).returning({ id: appAskThreads.id });
+  if (!done.length) return null;
+  return (await getThread(ownerId, id))?.thread ?? null;
+}
+
+/** Delete a chat for good. Its trip, plan, requests and bookings stay. */
+export async function deleteThread(ownerId: string, id: string): Promise<boolean> {
+  const done = await db.delete(appAskThreads).where(and(eq(appAskThreads.id, id), eq(appAskThreads.ownerId, ownerId))).returning({ id: appAskThreads.id });
+  return done.length > 0;
+}

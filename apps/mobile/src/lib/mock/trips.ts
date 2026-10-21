@@ -56,6 +56,9 @@ function err(code: ErrorCode, message?: string, fields?: Record<string, string>)
 /** Card payments on this account's trips (mock/wallet.ts: the cards used but not saved). */
 export const cardChargesOf = (userId: string) => (states.get(userId)?.charges ?? []).filter((c) => c.method === 'card').map((c) => ({ label: c.label, at: c.paidAt }));
 
+/** The account's trips, for the mock Ask chats list (mock/ask-threads.ts): what a chat about a trip shows. */
+export const mockTripsOf = (user: MockUser) => stateOf(user).trips.map((x) => ({ id: x.id, city: x.city, startDate: x.startDate, endDate: x.endDate, status: x.status }));
+
 function stateOf(user: MockUser): State {
   let s = states.get(user.id);
   if (!s) {

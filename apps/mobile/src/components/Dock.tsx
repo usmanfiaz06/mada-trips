@@ -40,7 +40,7 @@ export function Dock({ state, navigation }: BottomTabBarProps) {
         {items.map((it) => {
           if ('orb' in it) {
             return (
-              <Pressable key="ask" accessibilityRole="button" accessibilityLabel={t('tabs.ask')} onPress={() => { buzz('tap'); router.push('/ask'); }}
+              <Pressable key="ask" accessibilityRole="button" accessibilityLabel={t('tabs.ask')} onPress={() => { buzz('tap'); router.push({ pathname: '/ask', params: { from: 'orb' } }); }}
                 style={({ pressed }) => [styles.orb, narrow ? styles.orbNarrow : null, pressed ? { transform: [{ scale: 0.96 }] } : null]} testID="dock-ask">
                 <Sun width={26} />
                 <T style={[styles.label, narrow ? styles.labelNarrow : null, { color: colors.mist }]} numberOfLines={1}>{t('tabs.askShort')}</T>

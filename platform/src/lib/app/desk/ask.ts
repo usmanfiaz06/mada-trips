@@ -7,6 +7,7 @@ import { appNotifications, appUsers } from "@/db/app-schema";
 import { localeOfUser } from "@/lib/app/locale";
 import { withCopy } from "@/lib/app/notify-copy";
 import { handBackNote, type AskLine } from "../ask-chat/takeover";
+import { previewOf } from "../ask-chat/titles";
 import { appAgents } from "@/db/app-schema-desk";
 import { agentForOps } from "./agents";
 import { assertCap, deskAudit, DeskError, has, shortRef, travellerName, type DeskActor } from "./core";
@@ -31,6 +32,12 @@ const OPEN_TICKET = sql<boolean>`EXISTS (SELECT 1 FROM desk_tickets dt WHERE dt.
 /** Handed to the desk: the model passed it on (talk_to_human; the history is read for threads written before 0038), or someone has it now. */
 const HANDED = sql<boolean>`(${appAskThreads.handedOffAt} IS NOT NULL OR ${appAskThreads.mode} = 'agent' OR position('talk_to_human' in ${appAskThreads.messages}::text) > 0)`;
 
+/**
+ * The title the desk may see: only one made from what was read (a place, a route, the trip). A title made of the first
+ * words, or a traveller's rename, is their words, and the list never shows words.
+ */
+const DESK_TITLE = sql<string | null>`CASE WHEN ${appAskThreads.titledBy} IN ('place', 'route', 'trip') THEN ${appAskThreads.title} END`;
+
 export const ASK_TABS = ["all", "handed", "taken", "ticket"] as const;
 export type AskTab = (typeof ASK_TABS)[number];
 const TAB_WHERE: Record<AskTab, SQL | undefined> = {
@@ -48,13 +55,15 @@ export async function listAskThreads(actor: DeskActor, o: { tab?: string; q?: st
   const digits = q.replace(/\D/g, "").replace(/^0+/, "");
   const ref = /^a-?([0-9a-f]{6})$/i.exec(q)?.[1]?.toLowerCase();
   const search = !q ? undefined : ref ? sql`replace(${appAskThreads.id}::text, '-', '') LIKE ${`${ref}%`}`
-    : sql`(${appUsers.name} ILIKE ${`%${q}%`} OR lower(${appUsers.email}) LIKE ${`%${q.toLowerCase()}%`}${digits.length >= 5 ? sql` OR regexp_replace(${appUsers.phone}, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}` : sql``})`;
+    : sql`(${appUsers.name} ILIKE ${`%${q}%`} OR ${DESK_TITLE} ILIKE ${`%${q}%`} OR lower(${appUsers.email}) LIKE ${`%${q.toLowerCase()}%`}${digits.length >= 5 ? sql` OR regexp_replace(${appUsers.phone}, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}` : sql``})`;
   const lang = o.lang === "en" || o.lang === "ar" ? eq(appAskThreads.lang, o.lang) : undefined;
   const base = and(search, lang);
   const where = and(base, TAB_WHERE[tab]);
   const [rows, [tot], [counts]] = await Promise.all([
     db.select({
       id: appAskThreads.id, ownerId: appAskThreads.ownerId, lang: appAskThreads.lang, turns: appAskThreads.turns, mode: appAskThreads.mode,
+      // The chat's title (ASK-INTEGRATED.md §2.3, §10): what it's about, never the words inside.
+      title: DESK_TITLE, tripId: appAskThreads.tripId,
       createdAt: appAskThreads.createdAt, updatedAt: appAskThreads.updatedAt, handedOffAt: appAskThreads.handedOffAt,
       handed: HANDED, openTicket: OPEN_TICKET, customer: appUsers.name,
       // The first name travellers see, else the Ops login's name.
@@ -188,7 +197,8 @@ export async function replyOnAsk(actor: DeskActor, id: string, body: string, now
     if (!row) throw new DeskError("Not found", "NOT_FOUND");
     if (row.mode !== "agent" || row.takenBy !== actor.id) throw new DeskError("Take the conversation over before replying", "CONFLICT");
     const line: AskLine = { who: "agent", text, by: agent.displayName, byAr: agent.displayNameAr, agentId: agent.id, opsUserId: actor.id, at: now.toISOString() };
-    await tx.update(appAskThreads).set({ transcript: sql`${appAskThreads.transcript} || ${JSON.stringify([line])}::jsonb`, updatedAt: now }).where(eq(appAskThreads.id, id));
+    // The traveller's list shows the reply as the chat's last line (ASK-INTEGRATED.md §2.4).
+    await tx.update(appAskThreads).set({ transcript: sql`${appAskThreads.transcript} || ${JSON.stringify([line])}::jsonb`, updatedAt: now, lastAt: now, preview: previewOf(line.text) }).where(eq(appAskThreads.id, id));
     const locale = await localeOfUser(row.ownerId, tx);
     const name = locale === "ar" && agent.displayNameAr ? agent.displayNameAr : agent.displayName;
     const vars = { agent: name, text };

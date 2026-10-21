@@ -17,11 +17,12 @@ import { ridesMock } from './mock/rides';
 import { boardingMock } from './mock/boarding';
 import { esimMock } from './mock/esim';
 import { memoryMock } from './mock/memory';
+import { askThreadsMock } from './mock/ask-threads';
 
 /** Extra endpoints per area: each returns null for paths it doesn't own. `user` is the signed-in mock user (mutable). */
 export type MockUser = User & { people: Person[] };
 export type AreaMock = (w: Wire, ctx: { user: MockUser | null; byPhone: Map<string, string> }) => Promise<WireResponse | null>;
-const AREA_MOCKS: AreaMock[] = [memoryMock, esimMock, boardingMock, ridesMock, transfersMock, thingsMock, tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock, authMock];
+const AREA_MOCKS: AreaMock[] = [askThreadsMock, memoryMock, esimMock, boardingMock, ridesMock, transfersMock, thingsMock, tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock, authMock];
 
 /*
  * EXPO_PUBLIC_API_MODE=mock: the Core API's rules, in memory, for design work and screenshots without a server.
@@ -31,6 +32,8 @@ const AREA_MOCKS: AreaMock[] = [memoryMock, esimMock, boardingMock, ridesMock, t
 
 const users = new Map<string, MockUser>();
 const byPhone = new Map<string, string>();
+/** The signed-in mock account by id, for the demo conversation (ask-chat-demo.ts) to keep its turns in mock/ask-threads.ts. */
+export const mockUserById = (id: string | null | undefined): MockUser | null => (id ? users.get(id) ?? null : null);
 const access = new Map<string, { userId: string; exp: number }>();
 const refresh = new Map<string, string>();
 const otp = new Map<string, { sentAt: number; attempts: number; used: boolean }>();

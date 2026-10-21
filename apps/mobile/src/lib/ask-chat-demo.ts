@@ -2,6 +2,9 @@ import { addDays, languageOfText, todayIn, type AskChatEvent, type ChatCard } fr
 import { api } from './api';
 import { bookingApi } from './booking';
 import { getLocale } from './i18n';
+import { mockUserById } from './mock-api';
+import { demoThread, recordDemoTurn } from './mock/ask-threads';
+import { useSession } from './session';
 
 /*
  * The conversation in mock mode, for the web e2e and screenshots only: `window.__MADA_DEMO__ = { askChat: true }` in a
@@ -41,8 +44,6 @@ const LINES = {
   },
 } as const;
 
-let said = 0;
-
 /** Mock only, for the waiting screenshots: how long the first search "runs" (`__MADA_DEMO__.askChatWait`, ms). */
 const demoWait = () => {
   const v = (globalThis as { __MADA_DEMO__?: { askChatWait?: number } }).__MADA_DEMO__?.askChatWait;
@@ -51,12 +52,17 @@ const demoWait = () => {
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
 
-export async function demoAskChat(body: { text: string }, onEvent: (e: AskChatEvent) => void, signal?: AbortSignal): Promise<'done' | 'fallback'> {
+export async function demoAskChat(body: { text: string; threadId?: string | null }, onEvent: (e: AskChatEvent) => void, signal?: AbortSignal): Promise<'done' | 'fallback'> {
   const lang = languageOfText(body.text) ?? (getLocale() === 'ar' ? 'ar' : 'en');
   const L = LINES[lang];
-  const first = said++ === 0;
+  // A new chat starts with the flights; a chat that goes on answers about the area (or a request).
+  const first = !body.threadId;
+  // Kept as the server keeps it, so the chat opens again from the list (mock/ask-threads.ts).
+  const user = mockUserById(useSession.getState().user?.id);
+  const threadId = demoThread(user, body.threadId ?? null, lang);
+  const keep = (reply: string) => recordDemoTurn(user, threadId, body.text, reply, lang);
   try {
-    onEvent({ type: 'thread', threadId: '7d1f3c2a-5b4e-4c8d-9a61-2f0e8b7c6d51', lang });
+    onEvent({ type: 'thread', threadId, lang });
     await wait(700, signal);
     let cards: ChatCard[] = [];
     if (REQUEST_WORDS.test(body.text)) {
@@ -74,6 +80,7 @@ export async function demoAskChat(body: { text: string }, onEvent: (e: AskChatEv
       onEvent({ type: 'cards', cards: [card] });
       onEvent({ type: 'next', choices: [...L.requestNext] });
       onEvent({ type: 'done', text: L.request });
+      keep(L.request);
       return 'done';
     }
     if (first) {
@@ -92,6 +99,7 @@ export async function demoAskChat(body: { text: string }, onEvent: (e: AskChatEv
     if (cards.length) onEvent({ type: 'cards', cards });
     onEvent({ type: 'next', choices: [...(first ? L.flightsNext : L.areaNext)] });
     onEvent({ type: 'done', text });
+    keep(text);
     return 'done';
   } catch {
     return 'fallback';

@@ -24,7 +24,7 @@ import { useNet } from '@/lib/net';
 import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
-import { newAskChat, restoreAskChat, sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
+import { newAskChat, openAskThread, restoreAskChat, sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
@@ -41,6 +41,8 @@ import { colors, font, ff } from '@/theme';
  * With the conversation on (GET /config askChat, signed in, online: docs/app/ASK-CHAT.md), a new ask goes to Mada's
  * conversation instead, which talks back as it works and shows the same cards; a card opens the flow for that search.
  * If the conversation stops for any reason, the flows answer exactly as they always have.
+ * One chat at a time (docs/app/ASK-INTEGRATED.md §2): the routes app/ask/index.tsx (the chats list, and Ask itself when
+ * the conversation is off) and app/ask/[threadId].tsx open this screen on a chat, a new one, or the last one.
  */
 
 const webNoOutline = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null;
@@ -51,7 +53,11 @@ const onSync = (p: Partial<AskIntent>) => { settled = { ...settled, ...p }; note
 const forgetSettled = () => { settled = {}; };
 const PROMPT: Partial<Record<AskKind, CopyKey>> = { flight: 'ask.prompt.flight', stay: 'ask.prompt.stay', visa: 'ask.prompt.visa', umrah: 'ask.prompt.umrah', car: 'ask.prompt.car', food: 'ask.prompt.food', todo: 'ask.prompt.todo', esim: 'ask.prompt.esim' };
 
-export default function Ask() {
+/**
+ * thread: a chat's id (opened from the server, the phone's copy first), 'new', or 'last' (the conversation from the
+ * last 24 hours, as Ask always opened). tripId: the trip this chat is about (from the trip page). onBack: to the list.
+ */
+export function AskScreen({ thread = 'last', tripId = null, onBack }: { thread?: string; tripId?: string | null; onBack?: () => void }) {
   const router = useRouter();
   const params = useLocalSearchParams<{ prefill?: string; intent?: string; resume?: string }>();
   const qc = useQueryClient();
@@ -97,8 +103,13 @@ export default function Ask() {
   const headStart = useFlightHeadStart(household, today);
   const chatOn = useAskChatOn() && !offline;
   const chatTurns = useAskChat((s) => s.turns);
-  // Ask opens on the conversation from the last 24 hours, kept on the phone (lib/ask-chat.ts); "New chat" starts fresh.
-  useEffect(() => { void restoreAskChat(); return () => { stopAskChat(); }; }, []);
+  // Ask opens on the chat asked for (lib/ask-chat.ts), a new one, or the conversation from the last 24 hours.
+  useEffect(() => {
+    if (thread === 'last') void restoreAskChat();
+    else if (thread === 'new') newAskChat();
+    else void openAskThread(thread);
+    return () => { stopAskChat(); };
+  }, [thread]);
   const startNewChat = () => {
     buzz('tap');
     newAskChat();
@@ -167,7 +178,7 @@ export default function Ask() {
     setVoice(languageOfText(v));
     if (query) { const was = { query, fixes: fixes.map((f) => f.text) }; setEarlier((e) => [...e, was].slice(-5)); }
     setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null);
-    const turn = await sendAskChat(v);
+    const turn = await sendAskChat(v, { tripId });
     if (turn.state !== 'stopped') return; // done, or a newer message took over
     // Nothing said yet: as if the conversation had never been there.
     if (!turn.text && !turn.cards.length) useAskChat.setState((s) => ({ turns: s.turns.filter((x) => x.id !== turn.id) }));
@@ -185,6 +196,13 @@ export default function Ask() {
     if (o.kind === 'handoff') { router.push('/support' as Href); return; }
     if (o.kind === 'request') { router.push({ pathname: '/ask/request/[id]', params: { id: o.id } }); return; }
     if (o.kind === 'trip') { router.push({ pathname: '/trip/[id]', params: { id: o.id } }); return; }
+    // "About your AlUla trip?": the same words again, into the trip's chat or a chat of their own (§2.2).
+    if (o.kind === 'attach') {
+      buzz('tap');
+      useAskChat.setState((s) => ({ turns: s.turns.filter((x) => x.id !== o.turn.id) }));
+      void sendAskChat(o.turn.me, { attach: o.choice, tripId: o.choice === 'trip' ? o.tripId : null });
+      return;
+    }
     const c = o.card;
     const base: AskIntent = o.turn.intent ?? askIntentOfRules(parseAskRules(o.turn.me, { today, people: household }));
     let next: AskIntent;
@@ -326,7 +344,7 @@ export default function Ask() {
   return (
     <Screen>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={(
+        <TopBar onBack={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/today')))} backLabel={onBack ? t('chat.list.back') : t('ask.close')} home={false} right={(
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {chatTurns.length ? (
               <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={startNewChat} style={styles.demo} testID="ask-new-chat">

@@ -18,7 +18,8 @@
     "eas-build-pre-install": "node scripts/eas-fonts.mjs",
     "store:screenshots": "node test/store-screenshots.mjs",
     "store:listing": "node scripts/store-listing.mjs",
-    "e2e:transfers": "node test/e2e-transfers.mjs"
+    "e2e:transfers": "node test/e2e-transfers.mjs",
+    "e2e:ask-chats": "node test/e2e-ask-chats.mjs"
   },
   "dependencies": {
     "@bacons/apple-targets": "5.0.0",

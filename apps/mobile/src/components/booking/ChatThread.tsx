@@ -36,7 +36,9 @@ export type ChatOpen =
   | { kind: 'pay'; pay: ChatPay }
   | { kind: 'handoff'; threadId: string }
   | { kind: 'request'; id: string }
-  | { kind: 'trip'; id: string };
+  | { kind: 'trip'; id: string }
+  /** "About your AlUla trip?": into that trip's chat, or a chat of its own (ASK-INTEGRATED.md §2.2). */
+  | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn };
 
 export function ChatThread({ turns, onOpen, onSay }: { turns: ChatTurn[]; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   const still = useReduceMotion();
@@ -245,6 +247,13 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
       );
     case 'request':
       return <RequestCard card={card} onOpen={() => { buzz('tap'); onOpen({ kind: 'request', id: card.requestId }); }} />;
+    case 'attach':
+      return (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} testID="chat-attach">
+          <CardButton label={t('chat.attach.yes')} onPress={() => onOpen({ kind: 'attach', choice: 'trip', tripId: card.tripId, turn })} testID="chat-attach-trip" />
+          <CardButton soft label={t('chat.attach.new')} onPress={() => onOpen({ kind: 'attach', choice: 'new', tripId: card.tripId, turn })} testID="chat-attach-new" />
+        </View>
+      );
     default:
       return null;
   }

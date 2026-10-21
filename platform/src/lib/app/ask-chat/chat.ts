@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { languageOfText, t, todayIn, type AskChatEvent, type AskChatRequest } from "@mada/shared";
+import { languageOfText, t, todayIn, type AskChatEvent, type AskChatRequest, type AskIntent } from "@mada/shared";
 import { AppError } from "../http";
 import { householdOf } from "../booking/common";
 import { hit } from "../circles/limits";
@@ -11,7 +11,9 @@ import { redact, screen } from "./guard";
 import { ProviderHttpError } from "./providers-openai";
 import { nextFromState } from "./next";
 import { readSlots, slotsLine } from "./slots";
-import { appendTurn, addSpend, loadThread, newThread, saveFold, spentToday } from "./store";
+import { appendTurn, addSpend, attachTrip, loadThread, newThread, primaryThreadOf, saveFold, spentToday, tripOfEnded, type Thread } from "./store";
+import { askAttach, ownTrip, tripFor, tripTitleOf } from "./attach";
+import { nextTitle, titleFrom } from "./titles";
 import { foldThread, historyOf, needsFold } from "./fold";
 import { MEMORY_HEAD, consentOf, memoryBlock } from "./memory";
 import { personLine } from "./tools";
@@ -40,11 +42,32 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const typed = String(req.text ?? "").trim();
   const lang = languageOfText(typed) ?? "en";
   const today = todayIn();
-  const thread = (await loadThread(auth.userId, req.threadId)) ?? (await newThread(auth.userId, lang));
-  emit({ type: "thread", threadId: thread.id, lang });
+  let thread = await loadThread(auth.userId, req.threadId);
+  // Which chat this goes in (ASK-INTEGRATED.md §2.2): the one asked for; from the trip page, that trip's own chat (or a
+  // new one about it); after "Yes, that trip", the trip's chat; a full chat's trip carries over to the new one.
+  const onTrip = req.tripId ? await ownTrip(auth.userId, req.tripId) : null;
+  let moved = false;
+  let early: Awaited<ReturnType<typeof readSlots>> | null = null;
+  let api: ChatApi | null = given ?? null;
+  if (!thread) {
+    const primary = onTrip && req.attach !== "new" ? await primaryThreadOf(auth.userId, onTrip.id) : null;
+    if (primary) { thread = primary; moved = req.attach === "trip"; }
+    else if (!onTrip && !req.attach && screen(typed).ok) {
+      // A first message about a place they already have a trip to: asked once, never attached silently.
+      api ??= await chatApi();
+      early = await readSlots(api, redact(typed).text, await householdOf(auth.userId), today);
+      const match = await tripFor(auth.userId, early.intent, today);
+      if (match) return askAttach(auth.userId, match, early, lang, emit);
+    }
+    thread ??= await newThread(auth.userId, lang, onTrip?.id ?? (await tripOfEnded(auth.userId, req.threadId)));
+  } else if (onTrip && !thread.tripId && thread.turns === 0) {
+    await attachTrip(auth.userId, thread.id, onTrip.id);
+    thread.tripId = onTrip.id;
+  }
+  emit({ type: "thread", threadId: thread.id, lang, tripId: thread.tripId, ...(moved ? { moved: true } : {}) });
   // A person on the desk has this thread (takeover.ts): the message is theirs to answer, the model stays out.
   if (thread.mode === "agent") return keepForAgent(auth.userId, thread, typed, emit);
-  const api = given ?? (await chatApi());
+  api ??= await chatApi();
   // A long thread: the older turns folded into a summary first, so every turn stays cheap (fold.ts).
   let foldCost = 0;
   if (needsFold(thread)) {
@@ -70,7 +93,7 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
 
   const { text: clean, redacted } = redact(typed);
   const [people, trips] = await Promise.all([householdOf(auth.userId), overview(auth.userId, null).catch(() => null)]);
-  const slots = await readSlots(api, clean, people, today);
+  const slots = early ?? (await readSlots(api, clean, people, today));
   emit({ type: "intent", intent: slots.intent });
   const tripLines = (trips?.upcoming ?? []).slice(0, 5).map((tr) => `id=${tr.id} · ${tr.city} · ${tr.startDate}${tr.endDate ? ` to ${tr.endDate}` : ""} · ${tr.travellerNames.join(", ")}`);
   const onScreen = req.tripId ? tripLines.find((l) => l.startsWith(`id=${req.tripId}`)) ?? null : null;
@@ -98,11 +121,18 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     messages: r.added,
     transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],
     usage: r.usage, costMicros: total, lang, handedOff: r.toolsUsed.includes("talk_to_human"),
+    title: await titleAfter(auth.userId, thread, slots.intent, clean, lang),
   });
   await addSpend(auth.userId, total);
   // Tokens and cost only: no words from either side.
   console.info(`[ask-chat] thread=${thread.id} turn=${thread.turns + 1} model=${askChatModel()} in=${r.usage.input} out=${r.usage.output} cache_read=${r.usage.cacheRead} cache_write=${r.usage.cacheWrite} usd=${(total / 1e6).toFixed(5)} tools=${r.toolsUsed.join(",") || "-"} stop=${r.stop} next=${r.nextFrom}${redacted ? ` redacted=${redacted}` : ""}`);
   emit({ type: "done", text: r.text });
+}
+
+/** The title after this turn (titles.ts), or null to keep the one it has. */
+async function titleAfter(ownerId: string, thread: Thread, intent: AskIntent, words: string, lang: string) {
+  const trip = thread.tripId ? await tripTitleOf(ownerId, thread.tripId) : null;
+  return nextTitle({ title: thread.title, by: thread.titledBy }, titleFrom({ intent, trip, words, lang: lang === "ar" ? "ar" : "en" }));
 }
 
 /** An SDK error as the code the app sees. Every one of them means: answer with the app's own flows. */

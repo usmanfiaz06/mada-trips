@@ -85,6 +85,8 @@ export default function TripDetail() {
             </Pressable>
           ) : null}
           <MoveNotice trip={trip} />
+          {/* This trip's own chat (ASK-INTEGRATED.md §2.2): opens it, or starts one about the trip. */}
+          <Button testID="ask-about-trip" label={t('chat.askTrip')} variant="secondary" size="small" block={false} onPress={() => { buzz('tap'); router.push({ pathname: '/ask', params: { tripId: trip.id } }); }} />
           {out ? (
             <Box testID="flight-box">
               <Spread>

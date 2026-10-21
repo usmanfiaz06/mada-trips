@@ -61,6 +61,7 @@ export default async function AskThreadsPage({ searchParams }: { searchParams: P
                     <span className="inline-flex items-center gap-1.5 text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">
                       {!x.open && <Lock className="size-3.5 text-ink-4" aria-label={t("Locked")} />}<span className="num" dir="ltr">{ASK_REF(x.id)}</span>
                     </span>
+                    {x.title && <span className="block max-w-[28ch] truncate text-[13px] text-ink-2" dir="auto" data-testid="ask-row-title">{x.title}</span>}
                     <span className="block text-[12px] text-ink-3">{t("Started {when}", { when: timeAgo(x.createdAt, L) })}</span></Link></Td>
                   <Td className="whitespace-nowrap"><CustomerLink id={x.ownerId} className="text-ink">{x.customer}</CustomerLink></Td>
                   <Td><span className="flex flex-wrap gap-1">

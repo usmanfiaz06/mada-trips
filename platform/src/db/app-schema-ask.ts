@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey } from "drizzle-orm/pg-core";
-import { appUsers } from "./app-schema";
+import { appTrips, appUsers } from "./app-schema";
 import { users as opsUsers } from "./schema";
 
 /*
@@ -46,9 +46,29 @@ export const appAskThreads = pgTable("app_ask_threads", {
   handedOffAt: timestamp("handed_off_at", { withTimezone: true }),
   /** What happened while a person had it, for the model's next turn after Hand back; cleared once read. */
   deskNote: text("desk_note"),
+  /**
+   * The conversations list (docs/app/ASK-INTEGRATED.md §2, migration 0042). title: "Riyadh → AlUla · 20–22 Nov", written
+   * on the server after each turn until the traveller renames it. titled_by: traveller (renamed, never touched again),
+   * or how the automatic title was made, weakest first: words (the first words) → place ("eSIM for Pakistan") →
+   * route (start and destination) → trip (the attached trip). A later turn only ever makes it stronger.
+   */
+  title: text("title"),
+  titledBy: text("titled_by"),
+  /** The trip this chat is about (at most one); the oldest unarchived chat of a trip is its primary. */
+  tripId: uuid("trip_id").references(() => appTrips.id, { onDelete: "set null" }),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  /** The last line said, by anyone: the list's order. */
+  lastAt: timestamp("last_at", { withTimezone: true }).notNull().defaultNow(),
+  /** That last line, redacted, ≤ 140 characters. From the transcript, never from `messages`. */
+  preview: text("preview"),
+  /** The thread reached MAX_TURNS: the list says "Continue in a new one", and the new one carries the trip. */
+  endedAt: timestamp("ended_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt), index("app_ask_threads_updated_idx").on(t.updatedAt)]);
+}, (t) => [
+  index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt), index("app_ask_threads_updated_idx").on(t.updatedAt),
+  index("app_ask_threads_list_idx").on(t.ownerId, t.archivedAt, t.lastAt.desc()), index("app_ask_threads_trip_idx").on(t.ownerId, t.tripId),
+]);
 
 /** Spend per day, per person and for everyone (owner_key "all"), for ASK_CHAT_DAILY_USD and ASK_CHAT_USER_DAILY_USD. */
 export const appAskSpend = pgTable("app_ask_spend", {
