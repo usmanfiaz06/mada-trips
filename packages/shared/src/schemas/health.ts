@@ -17,5 +17,7 @@ export const HealthResponse = z.object({
   maintenance: z.boolean().optional(),
   /** How long the database took to answer SELECT 1, in ms. */
   dbMs: z.number().int().optional(),
+  /** The database is reached through its connection pooler. */
+  dbPooled: z.boolean().optional(),
 });
 export type HealthResponse = z.infer<typeof HealthResponse>;

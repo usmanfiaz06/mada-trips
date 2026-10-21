@@ -30,6 +30,8 @@ export const GET = route(async () => {
     ok: db === "ok", service: "mada-core", apiVersion: "v1", db, suppliers: publicSlots({ ...supplierModes(), ...keyedModes() }),
     dataKey: hasDataKey() ? "ok" : "missing", time: new Date().toISOString(), breakers,
     maintenance: (await runtimeConfig()).maintenance.on, dbMs,
+    // Whether the database is reached through its connection pooler (serverless instances need it); never the address.
+    dbPooled: /-pooler\./.test(process.env.DATABASE_URL ?? ""),
   };
   return json(body, db === "ok" ? 200 : 503);
 }, { ungated: true });
