@@ -33,6 +33,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 22 | Ticketmaster | events | Ready | Owner |
 | 23 | Free/open (FX, weather, places, ADS-B) | rates, weather, places, aircraft position | Working | — (OpenSky needs a licence for commercial use) |
 | 24 | Google Routes API | daily drives in plans: km, hours, border crossings | Ready (mock until key) | Owner |
+| 25 | CarTrawler (car hire) | self-drive cars: search, deposit, insurance, book, cancel | Ready (mock until key) | Owner |
 
 ## Processes
 
@@ -189,3 +190,33 @@ the field mask without checking cost.
 never in the database), and a route **line** may be drawn only **on a Google map** (Android's map is Google; on iPhone,
 show the line only on a Google map or show text only — km and hours — which is fine anywhere). Keep "Google" credited
 where the figures appear.
+
+### 25. Car hire (self-drive) — CarTrawler
+**What it does.** One interface, `carHire()` (`suppliers/car-hire`): search by pickup and drop-off place and time
+(airport code or a point), driver's age and licence country → cars with class (economy, SUV, van…), seats and bags,
+total and per-day price in SAR (net + `APP_CAR_MARKUP_BPS`, default 1000 = 10%), the **deposit** held on the driver's
+card, the **insurance** included (CDW, theft, third party), the **excess** and an optional full cover, mileage, fuel
+policy, whether the desk is in the terminal, whether driving into another country is allowed, free cancellation until.
+Then quote (price again before payment), book (our order id as the idempotency key), status and cancel. CarTrawler
+was chosen over Rentalcars Connect because its OTA API is open to new agencies and covers Yelo, Theeb, Budget, Hertz
+and Sixt in Saudi Arabia; Rentalcars (Booking Holdings) only takes large affiliates. Another supplier can be added
+behind the same interface.
+
+**Apply.** cartrawler.com → Partners → "Become a partner" (travel agency / OTA). Ask for **OTA API (XML/JSON)
+access** and test credentials. They review the business, then issue a **Client ID**. Ask them: the test and
+production hosts, whether they whitelist IPs (Vercel has no fixed outbound IP — ask for client-ID-only access or use a
+fixed-IP proxy), how payment works (see Cost) and their Arabic content.
+
+**Keys in Vercel.** `CARTRAWLER_CLIENT_ID`, `CARTRAWLER_ENV` (`test` first, `live` after certification), optional
+`CARTRAWLER_BASE_URL` (if they give a different host), `APP_CAR_MARKUP_BPS`; `SUPPLIER_MODE_CAR_HIRE=live|mock|off`.
+
+**Certification.** CarTrawler certifies the integration on their test host: a search, a booking, a retrieve and a
+cancellation, with screenshots of how price, deposit, insurance and the rental terms are shown. Then live access.
+
+**Cost model.** No fee to integrate. Usually **"pay at desk" or "pay now"**: with pay now CarTrawler charges the card
+and pays Mada a commission (typically 6–12% of the rental); with Mada as merchant of record we charge the traveller
+(MyFatoorah) and settle net with CarTrawler. Confirm which they give us; the code supports our own markup either way.
+
+**Licence/commercial notes.** Show the supplier's rental terms (deposit, excess, fuel, mileage, cross-border) before
+payment — CarTrawler requires it. A driver usually needs a credit card in their own name for the deposit and, for
+visitors, an International Driving Permit; the app says so on the card.

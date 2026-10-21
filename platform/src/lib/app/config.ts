@@ -96,7 +96,7 @@ export const supplierEnvName = envName;
  */
 export const KEYED_SUPPLIERS = {
   routes: ["GOOGLE_ROUTES_API_KEY"],
-  carHire: ["CARTRAWLER_CLIENT_ID", "CARTRAWLER_API_KEY"],
+  carHire: ["CARTRAWLER_CLIENT_ID"],
   klook: ["KLOOK_API_KEY"],
   sherpa: ["SHERPA_API_KEY"],
   insurance: ["XCOVER_API_KEY", "XCOVER_API_SECRET", "XCOVER_PARTNER_CODE"],
