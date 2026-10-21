@@ -119,12 +119,29 @@ export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: bool
   // Some listed models never answer on a free key (they hang): the first time it is used, one tiny call to each of the
   // top few at once, and the first to answer is the one used, so a traveller never waits on a hanging model.
   let ready: Promise<void> | null = null;
-  const warmUp = () => (ready ??= opts.warm && models.length > 1
-    ? Promise.any(models.slice(0, 6).map(async (m, k) => {
-      await api.create({ model: m, max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 9_000, maxRetries: 0 });
-      return k;
-    })).then((k) => { if (k !== i) console.info(`[ask-chat] model=${models[k]} answers first; using it`); i = k; }, () => {})
-    : Promise.resolve());
+  const warmUp = () => (ready ??= opts.warm && models.length > 1 ? new Promise<void>((resolve) => {
+    // The best-ranked model that answers wins; after the first answer, better-ranked ones get 2 s more to answer.
+    const top = models.slice(0, 6);
+    const answered = new Set<number>();
+    let left = top.length;
+    let grace: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (grace) clearTimeout(grace);
+      const k = Math.min(...answered);
+      if (Number.isFinite(k)) { if (k !== i) console.info(`[ask-chat] model=${models[k]} answers; using it`); i = k; }
+      resolve();
+    };
+    top.forEach((m, k) => {
+      api.create({ model: m, max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 9_000, maxRetries: 0 })
+        .then(() => {
+          answered.add(k);
+          if (k === 0 || [...Array(k).keys()].every((j) => !pending.has(j))) return finish();
+          grace ??= setTimeout(finish, 2_000);
+        }, () => {})
+        .finally(() => { pending.delete(k); if (--left === 0) finish(); });
+    });
+    const pending = new Set(top.keys());
+  }) : Promise.resolve());
   const pick = () => models[Math.min(i, models.length - 1)];
   const skip = (e: unknown) => {
     if (!wrongModel(e) || i >= models.length - 1) return false;
