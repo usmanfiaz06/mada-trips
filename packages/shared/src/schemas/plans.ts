@@ -97,8 +97,25 @@ export const PlanItem = z.object({
   offerId: z.string().uuid().nullable(),
   drive: PlanDrive.nullable(),
   source: z.enum(['ask', 'manual', 'template', 'desk', 'booking']),
+  /**
+   * Booking from the plan (U7). price: what a tool priced it at (an offer) or what the order charged, with "as of" and
+   * the offer's end; demo for a sample fare. quote: the desk's quote on its request ("Quote ready · SAR 4,200").
+   * promisedBy: when the team gets back on its request. priceExpired: priced once, ran out: "Price again".
+   */
+  price: z.object({ amount: z.number().int(), currency: z.literal('SAR'), asOf: z.string(), expiresAt: z.string().nullable(), demo: z.boolean() }).nullable().optional(),
+  quote: z.object({ requestId: z.string().uuid(), amount: z.number().int(), currency: z.literal('SAR'), expiresAt: z.string().nullable() }).nullable().optional(),
+  promisedBy: z.string().nullable().optional(),
+  priceExpired: z.boolean().optional(),
 });
 export type PlanItem = z.infer<typeof PlanItem>;
+
+/**
+ * What the plan adds up to (§3.3, §7.4): only prices from a tool, a quote or a booking, never an estimate. priced: what
+ * the "Book what's ready" sheet would charge (priced items and open quotes); booked: what was paid. demo when any of
+ * it is a sample fare: the total says "Demo fare · not bookable" too. ready: how many items can be paid now.
+ */
+export const PlanTotals = z.object({ priced: z.number().int(), booked: z.number().int(), currency: z.literal('SAR'), demo: z.boolean(), ready: z.number().int() });
+export type PlanTotals = z.infer<typeof PlanTotals>;
 
 export const PLAN_CHECK_KEYS = ['passports', 'visa', 'stays', 'car', 'esim', 'insurance', 'money'] as const;
 export const PlanCheckKey = z.enum(PLAN_CHECK_KEYS);
@@ -137,6 +154,7 @@ export const Plan = z.object({
   notes: z.array(z.string()),
   items: z.array(PlanItem),
   checks: z.array(PlanCheck),
+  totals: PlanTotals.nullable().optional(),
   createdBy: z.enum(['ask', 'template', 'desk', 'traveller']),
   updatedAt: z.string(),
 });

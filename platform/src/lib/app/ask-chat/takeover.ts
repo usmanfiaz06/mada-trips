@@ -22,7 +22,8 @@ export type AgentLine = { who: "agent"; text: string; by: string; byAr: string |
 export type SystemLine = { who: "system"; event: "joined" | "handed_back"; by: string; byAr?: string | null; pronoun?: string; at: string };
 /** attachment: a document sent in the chat, by its masked label only (attachments.ts). */
 export type TravellerLine = { who: "me"; text: string; at?: string; held?: string; attachment?: { kind: string; label: string } };
-export type MadaLine = { who: "mada"; text: string; cards?: string[]; next?: string[]; held?: string };
+/** kept: reference cards kept whole with a line Mada adds on her own (a change asked by a companion, trips/change-requests.ts). */
+export type MadaLine = { who: "mada"; text: string; cards?: string[]; next?: string[]; held?: string; kept?: unknown[]; at?: string };
 export type AskLine = TravellerLine | MadaLine | AgentLine | SystemLine;
 
 /** The name the traveller reads: the Arabic one in Arabic when the agent has one. */

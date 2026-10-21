@@ -358,7 +358,8 @@ export const PlanResponse = z.object({ plan: PlanDetail });
 
 /* ───────────── requests ───────────── */
 
-export const BookingRequestKind = z.enum(['visa', 'umrah', 'car', 'food', 'todo', 'flight', 'stay', 'general', 'package']);
+/** car_rental (self-drive) and driver are found by hand until a car-hire supplier is live (ASK-INTEGRATED §13.6). */
+export const BookingRequestKind = z.enum(['visa', 'umrah', 'car', 'food', 'todo', 'flight', 'stay', 'general', 'package', 'car_rental', 'driver']);
 export type BookingRequestKind = z.infer<typeof BookingRequestKind>;
 export const BookingRequestStatus = z.enum(['queued', 'sent', 'reviewing', 'quoted', 'paid', 'done', 'cancelled']);
 export type BookingRequestStatus = z.infer<typeof BookingRequestStatus>;
@@ -396,6 +397,18 @@ export const CreateRequestBody = z.object({
   contactPreference: ContactPreference.nullish(),
   /** With a call: the best time, in their words ("evenings", "after 4"). */
   contactWindow: z.string().trim().max(60).nullish(),
+  /** The living plan's item this request fulfils, and its trip (ASK-INTEGRATED §7.3): the item reads "With the team". */
+  planItemId: Id.nullish(),
+  tripId: Id.nullish(),
+  /** A car rental or a driver: where and when, from the plan or the chat. Nothing here is priced; the desk quotes it. */
+  car: z.object({
+    pickup: z.string().trim().max(80).nullable(),
+    dropoff: z.string().trim().max(80).nullable(),
+    from: IsoDay.nullable(),
+    to: IsoDay.nullable(),
+    driverAge: z.number().int().min(18).max(99).nullable(),
+    size: z.enum(['small', 'medium', 'suv', 'van']).nullable(),
+  }).nullish(),
 });
 export type CreateRequestBody = z.input<typeof CreateRequestBody>;
 
@@ -467,19 +480,23 @@ export const AcceptOfferBody = z.object({ messageId: Id });
 export const OrderKind = z.enum(['trip', 'stay', 'package', 'quote', 'esim', 'share']);
 export type OrderKind = z.infer<typeof OrderKind>;
 
+/** The living plan's items this booking fulfils (ASK-INTEGRATED §7.1): once the order is in they move priced → held → booked → confirmed. */
+const PlanItemIds = z.array(Id).min(1).max(12).optional();
+
 export const OrderDraft = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('trip'), flightOfferId: Id, bundle: z.boolean().default(false), travellerIds: z.array(Id).min(1).max(9) }),
+  z.object({ kind: z.literal('trip'), flightOfferId: Id, bundle: z.boolean().default(false), travellerIds: z.array(Id).min(1).max(9), tripId: Id.nullish(), planItemIds: PlanItemIds }),
   /** requests: what to tell the hotel (late check-in, high floor, a cot…), kept on the order and sent on as its remark. */
-  z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish(), requests: HotelRequests.nullish() }),
+  z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish(), requests: HotelRequests.nullish(), planItemIds: PlanItemIds }),
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
   /** optionId: which fare option of a flight quote (the first when there is only one). */
-  z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional() }),
+  z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional(), planItemIds: PlanItemIds }),
   /** packageId: the plan picked (schemas/esim.ts), one eSIM per traveller; topupOf: more GB on an eSIM already bought. */
   z.object({
     kind: z.literal('esim'), count: z.number().int().min(1).max(12), packageId: z.string().min(1).max(400).optional(), where: z.string().max(20).optional(),
     tripId: Id.nullish(), travellerIds: z.array(Id).max(12).optional(), topupOf: Id.optional(),
     /** A daily plan: how many days. */
     days: z.number().int().min(1).max(365).optional(),
+    planItemIds: PlanItemIds,
   }),
   /** Your share of a split in a circle, paid by card. The amount comes from the circle, never from the app. */
   z.object({ kind: z.literal('share'), circleId: Id, messageId: Id, shareKey: z.string().min(1).max(64) }),
@@ -578,6 +595,39 @@ export const OrderPreview = z.object({
 });
 export type OrderPreview = z.infer<typeof OrderPreview>;
 export const PreviewResponse = z.object({ preview: OrderPreview });
+
+/**
+ * "Book what's ready" (ASK-INTEGRATED §7.2): every priced item of a plan (and every desk quote waiting on one), each
+ * priced again by the server as its own order, with its lines; the sheet ticks them and adds them up. An item whose
+ * price ran out is listed apart with nothing to pay, to be priced again.
+ */
+export const BookReadyItem = z.object({
+  itemId: Id,
+  kind: z.enum(['leg', 'stay', 'car', 'activity', 'meal', 'note', 'check']),
+  mode: z.enum(['flight', 'drive', 'train', 'ferry', 'transfer', 'walk']).nullable(),
+  day: z.number().int().nullable(),
+  title: z.string(),
+  draft: OrderDraft,
+  lines: z.array(OrderLine),
+  total: Money,
+  rule: z.string(),
+  /** A sample fare from the mock catalogue: "Demo fare · not bookable" on its line and on the total. */
+  demo: z.boolean(),
+  /** From the desk's quote rather than a search. */
+  quote: z.boolean(),
+  expiresAt: IsoDateTime.nullable(),
+});
+export type BookReadyItem = z.infer<typeof BookReadyItem>;
+export const BookReadyResponse = z.object({
+  tripId: Id,
+  title: z.string(),
+  items: z.array(BookReadyItem),
+  /** Priced once, now out of date: "Price again" (back to an idea until then). */
+  expired: z.array(z.object({ itemId: Id, title: z.string(), kind: BookReadyItem.shape.kind, mode: BookReadyItem.shape.mode, day: z.number().int().nullable() })),
+  total: Money,
+  demo: z.boolean(),
+});
+export type BookReadyResponse = z.infer<typeof BookReadyResponse>;
 
 export const PaymentChoice = z.discriminatedUnion('method', [
   z.object({ method: z.literal('card'), cardId: Id }),

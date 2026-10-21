@@ -22,6 +22,7 @@ import { deskTicketsJob } from "./desk/tickets";
 import { financeJob } from "./finance/job";
 import { nightCover } from "./desk/oncall";
 import { evaluateAlerts } from "./desk/alerts";
+import { changeRequestsJob } from "./trips/change-requests";
 import { documentsJob } from "./ask-chat/attachments";
 import { expireShares } from "./ask-chat/doc-shares";
 
@@ -44,6 +45,7 @@ import { expireShares } from "./ask-chat/doc-shares";
  *   quotes      quotes whose hold has passed become expired (the traveller hears it once, and the thread says so);
  *               bookings stuck at the bank's code for 30 minutes are cancelled, nothing charged; requests whose
  *               dates have passed close (unpaid, nothing charged, said in the thread) or go to the desk (outcomes.ts)
+ *               changes a companion asked for: the owner reminded at 24 hours, closed at 48 (trips/change-requests.ts)
  *   desk        desk tickets (desk/tickets.ts): one per open item on the desk, resolved when their source is done,
  *               closed after 72 quiet hours; tickets past their promise escalate; the desk's alerts (desk/alerts.ts) fire
  *               once each in the lead's bell, and urgent work with nobody on duty pages the on-call lead
@@ -149,7 +151,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob(), documents: async () => ({ ...await documentsJob(), sharesExpired: await expireShares() }) };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob(), ...await changeRequestsJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob(), documents: async () => ({ ...await documentsJob(), sharesExpired: await expireShares() }) };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

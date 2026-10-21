@@ -2,6 +2,7 @@ import { ERROR_CODES, AskThreadPatch, localeOr, nameIn, rangeLabel, t, type AskT
 import type { WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { mockTripsOf } from './trips';
+import { mockDemoChange } from './trip-people';
 
 /*
  * EXPO_PUBLIC_API_MODE=mock for the Ask chats list: the same contract as platform/src/app/api/app/v1/ask/threads
@@ -64,6 +65,12 @@ function threadsOf(user: MockUser): MockThread[] {
       { id: '5a1e0000-0000-4000-8000-000000000003', title: S.esimTitle, tripId: null, lines: lines(S.esim, null, now - 74 * HOUR), lastAt: now - 74 * HOUR, archived: false, mode: 'ai', agent: null, lang },
       { id: '5a1e0000-0000-4000-8000-000000000004', title: S.visaTitle, tripId: null, lines: lines(S.visa, null, now - 400 * HOUR), lastAt: now - 400 * HOUR, archived: true, mode: 'ai', agent: null, lang },
     ];
+    // Companions (U5, mock only with __MADA_DEMO__.askPeople): Abdullah's change waiting in the trip's chat.
+    const change = trip && (globalThis as { __MADA_DEMO__?: { askPeople?: boolean } }).__MADA_DEMO__?.askPeople ? mockDemoChange(user) : null;
+    if (change && list[0]?.tripId === trip!.id) {
+      list[0].lines.push({ who: 'mada', text: t('people.line.asked', { name: change.byName, trip: change.tripTitle, summary: change.summary }, lang), kept: [{ type: 'change', change }], at: new Date(now - 40 * 60_000).toISOString() });
+      list[0].lastAt = now - 40 * 60_000;
+    }
     byUser.set(user.id, list);
   }
   return list;

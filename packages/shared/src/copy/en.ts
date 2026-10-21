@@ -24,8 +24,10 @@ import { askFlowCopy } from './ask-flow';
 import { staysCopy } from './stays';
 import { nowCopy } from './now';
 import { askChatCopy } from './ask-chat';
+import { askPeopleCopy } from './ask-people';
 import { askMemoryCopy } from './ask-memory';
 import { askPlanCopy } from './ask-plan';
+import { bookReadyCopy } from './book-ready';
 import { askDocsCopy } from './ask-docs';
 import { todayIdeasCopy } from './today-ideas';
 import { outcomesCopy } from './outcomes';
@@ -83,9 +85,12 @@ export const en = {
   ...nowCopy,
   // Ask as a conversation: the fixed lines around what Mada writes: packages/shared/src/copy/ask-chat.ts
   ...askChatCopy,
+  ...askPeopleCopy,
   // What Mada remembers across chats, and a new chat: packages/shared/src/copy/ask-memory.ts
   ...askMemoryCopy,
   ...askPlanCopy,
+  // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
+  ...bookReadyCopy,
   // Documents in chat: packages/shared/src/copy/ask-docs.ts
   ...askDocsCopy,
   // Today's living bento with nothing planned: packages/shared/src/copy/today-ideas.ts

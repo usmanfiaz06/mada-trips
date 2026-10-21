@@ -8,6 +8,8 @@ import "server-only";
  */
 
 export type PlanDomainEvent =
+  /** An order is in (the pay sheet slid): the plan items its draft names, or the item whose request's quote it pays (U7). */
+  | { kind: "order.created"; orderId: string; ownerId: string; planItemIds: string[]; requestId: string | null }
   | { kind: "order.confirmed"; orderId: string; tripId: string | null; ownerId: string }
   | { kind: "order.cancelled"; orderId: string; tripId: string | null; ownerId: string }
   | { kind: "stay.changed"; tripId: string }
@@ -49,6 +51,11 @@ function ensureListeners() {
     const { syncTripBookings } = await import("./plans");
     await syncTripBookings(tripId);
   };
+  on("order.created", async (e) => {
+    if (!e.planItemIds.length && !e.requestId) return;
+    const { linkOrder } = await import("./booking");
+    await linkOrder(e.ownerId, e.orderId, e.planItemIds, e.requestId);
+  });
   on("order.confirmed", (e) => sync(e.tripId));
   on("order.cancelled", (e) => sync(e.tripId));
   on("stay.changed", (e) => sync(e.tripId));

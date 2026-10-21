@@ -127,6 +127,9 @@ export const appPeople = pgTable("app_people", {
   passportExpiry: date("passport_expiry"),
   passportSource: text("passport_source"),
   passportUpdatedAt: timestamp("passport_updated_at", { withTimezone: true }),
+  // A household row that stands for a circle member travelling with you (ASK-INTEGRATED §5.4, 0045): his passport can
+  // sit here with his consent, and the plan counts him.
+  linkedUserId: uuid("linked_user_id").references(() => appUsers.id, { onDelete: "set null" }),
   /**
    * HMAC-SHA256 of the passport's issuer, number and date of birth (documents/fingerprint.ts): "the same passport again"
    * without decrypting anything. Written with every passport save; older rows filled by the documents job. Migration 0046.
@@ -137,6 +140,7 @@ export const appPeople = pgTable("app_people", {
   updatedAt: updatedAt(),
 }, (t) => [
   index("app_people_owner_idx").on(t.ownerId),
+  index("app_people_linked_idx").on(t.ownerId, t.linkedUserId).where(sql`${t.linkedUserId} IS NOT NULL`),
   index("app_people_fingerprint_idx").on(t.ownerId, t.passportFingerprint),
   uniqueIndex("app_people_one_self").on(t.ownerId).where(sql`${t.isSelf} AND ${t.deletedAt} IS NULL`),
 ]);
@@ -248,9 +252,11 @@ export const appRequests = pgTable("app_requests", {
   // What the traveller asked for and the offer they saw, for the agent in the Ops inbox.
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
   opsBookingId: uuid("ops_booking_id").references(() => opsBookings.id, { onDelete: "set null" }),
+  // The plan item this request fulfils (ASK-INTEGRATED §7.3); the FK to app_plan_items is in 0047 (that table imports this file).
+  planItemId: uuid("plan_item_id"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index("app_requests_owner_idx").on(t.ownerId, t.createdAt), index("app_requests_status_idx").on(t.status, t.promisedBy)]);
+}, (t) => [index("app_requests_owner_idx").on(t.ownerId, t.createdAt), index("app_requests_status_idx").on(t.status, t.promisedBy), index("app_requests_plan_item_idx").on(t.planItemId)]);
 
 export const appQuotes = pgTable("app_quotes", {
   id: id(),

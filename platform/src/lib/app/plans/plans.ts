@@ -1,12 +1,12 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
-  ENTRY_RULES, addDays, daysBetween, planTitle, type CreatePlanRequest, type Plan, type PlanItem, type PlanItemStatus, type PlaceInput,
+  ENTRY_RULES, addDays, daysBetween, formatSar, planTitle, t, type CreatePlanRequest, type Plan, type PlanItem, type PlanItemStatus, type PlaceInput,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
-import { appPickups, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
+import { appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
 import { appAskMemory } from "@/db/app-schema-ask";
-import { appOffers, appOrders } from "@/db/app-schema-booking";
+import { appOffers, appOrders, appTripBookings } from "@/db/app-schema-booking";
 import { appEsims } from "@/db/app-schema-esim";
 import { appPlanEvents, appPlanItems, appPlans, type PlanPlaceJson } from "@/db/app-schema-plans";
 import { appTripFacts } from "@/db/app-schema-trips";
@@ -177,11 +177,15 @@ export type Bookings = {
   segments: Segment[];
   pickups: Pickup[];
   esims: Esim[];
-  orders: Map<string, { status: string; ref: string | null }>;
-  requests: Map<string, { status: string }>;
-  offers: Map<string, { expiresAt: Date }>;
+  orders: Map<string, { status: string; ref: string | null; total?: number; demo?: boolean }>;
+  /** promisedBy: when the team gets back; quote: the desk's open quote on it (U7). */
+  requests: Map<string, { status: string; promisedBy?: Date | null; quote?: { amount: number; expiresAt: Date | null } | null }>;
+  /** total and demo: the price a tool gave (halalas) and whether it was a sample fare; createdAt is its "as of". */
+  offers: Map<string, { expiresAt: Date; total?: number; demo?: boolean; createdAt?: Date }>;
+  /** What each linked order wrote on the trip, so a booked item moves onto its stay or flight once confirmed (U7). */
+  wrote?: Map<string, { stays: string[]; segments: string[]; esims: string[] }>;
 };
-export type Link = { kind: "stay" | "segment" | "pickup"; id: string };
+export type Link = { kind: "stay" | "segment" | "pickup" | "esim"; id: string };
 
 const localOf = (s: string) => s.replace(" ", "T").slice(0, 16);
 const dayOfDate = (start: string, date: string) => daysBetween(start, date.slice(0, 10));
@@ -221,6 +225,9 @@ function codeOrCity(place: PlanPlaceJson | null, code: string): boolean {
   const p = resolvePlace({ name: code, code });
   return samePlace(place, p);
 }
+
+/** "18:40", Riyadh time: when the team gets back on a request. */
+export const riyadhHm = (d: Date) => d.toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit", hour12: false });
 
 export type Derived = { status: PlanItemStatus; line: string | null; booking: PlanItem["booking"] };
 
@@ -262,22 +269,32 @@ export function deriveStatus(item: Pick<ItemRow, "status" | "statusNote" | "book
     if (kind === "order") {
       const o = b.orders.get(id);
       if (o) {
-        const status: PlanItemStatus = ["cancelled", "refunded", "declined"].includes(o.status) ? "cancelled"
-          : ["held", "price_locked", "fare_changed", "awaiting_payment", "payment_requested"].includes(o.status) ? "held" : "booked";
-        return { status, line: null, booking: { kind: "order", id, name: null, ref: o.ref } };
+        // A card the bank declined books nothing: the item is back to its price (below).
+        if (o.status !== "declined") {
+          const status: PlanItemStatus = ["cancelled", "refunded"].includes(o.status) ? "cancelled"
+            : ["held", "price_locked", "fare_changed", "awaiting_payment", "payment_requested", "requires_action"].includes(o.status) ? "held"
+            : o.status === "confirmed" ? "confirmed" : "booked";
+          return { status, line: null, booking: { kind: "order", id, name: null, ref: status === "confirmed" ? o.ref : null } };
+        }
       }
     }
+    if (kind === "order" && b.orders.get(id)?.status === "declined") return deriveStatus({ ...item, bookingKind: null, bookingId: null }, b, null, now);
     // A booking we can't see any more (deleted, or a kind with no table yet): keep the cached status, say nothing new.
     return { status: item.status as PlanItemStatus, line: item.statusNote, booking: null };
   }
   if (item.requestId) {
     const r = b.requests.get(item.requestId);
-    if (r && !["cancelled", "declined", "withdrawn"].includes(r.status)) return { status: "requested", line: "With the team", booking: null };
+    if (r && !["cancelled", "declined", "withdrawn"].includes(r.status)) {
+      // The desk's quote is the item's price now ("Quote ready · SAR 4,200", with Pay); else when the team gets back.
+      if (r.quote && (!r.quote.expiresAt || r.quote.expiresAt.getTime() > now.getTime())) return { status: "requested", line: t("plan.line.quoteReady", { amount: formatSar(r.quote.amount) }), booking: null };
+      const by = r.promisedBy && r.promisedBy.getTime() > now.getTime() ? riyadhHm(r.promisedBy) : null;
+      return { status: "requested", line: by ? t("plan.line.withTeam", { time: by }) : t("plan.line.withTeamNow"), booking: null };
+    }
   }
   if (item.offerId) {
     const o = b.offers.get(item.offerId);
     if (o && o.expiresAt.getTime() > now.getTime()) return { status: "priced", line: null, booking: null };
-    return { status: "idea", line: "Price expired, check again", booking: null };
+    return { status: "idea", line: t("plan.line.priceExpired"), booking: null };
   }
   const cached = item.status as PlanItemStatus;
   if (cached === "priced" || cached === "requested") return { status: "idea", line: item.statusNote, booking: null };
@@ -288,20 +305,27 @@ export async function loadBookings(tripId: string, items: Pick<ItemRow, "booking
   const orderIds = items.filter((i) => i.bookingKind === "order" && i.bookingId).map((i) => i.bookingId!);
   const requestIds = items.map((i) => i.requestId).filter((x): x is string => !!x);
   const offerIds = items.map((i) => i.offerId).filter((x): x is string => !!x);
-  const [stays, segments, pickups, esims, orders, requests, offers] = await Promise.all([
+  const [stays, segments, pickups, esims, orders, requests, offers, quotes, wrote] = await Promise.all([
     q.select().from(appStays).where(eq(appStays.tripId, tripId)).orderBy(asc(appStays.checkIn)),
     q.select().from(appSegments).where(eq(appSegments.tripId, tripId)).orderBy(asc(appSegments.sort)),
     q.select().from(appPickups).where(eq(appPickups.tripId, tripId)).orderBy(asc(appPickups.at)),
     q.select().from(appEsims).where(eq(appEsims.tripId, tripId)),
-    orderIds.length ? q.select({ id: appOrders.id, status: appOrders.status, ref: appOrders.ref }).from(appOrders).where(inArray(appOrders.id, orderIds)) : Promise.resolve([]),
-    requestIds.length ? q.select({ id: appRequests.id, status: appRequests.status }).from(appRequests).where(inArray(appRequests.id, requestIds)) : Promise.resolve([]),
-    offerIds.length ? q.select({ id: appOffers.id, expiresAt: appOffers.expiresAt }).from(appOffers).where(inArray(appOffers.id, offerIds)) : Promise.resolve([]),
+    orderIds.length ? q.select({ id: appOrders.id, status: appOrders.status, ref: appOrders.ref, total: appOrders.total, demo: sql<boolean>`coalesce((${appOrders.snapshot}->'preview'->>'demoFare')::boolean, false)` }).from(appOrders).where(inArray(appOrders.id, orderIds)) : Promise.resolve([]),
+    requestIds.length ? q.select({ id: appRequests.id, status: appRequests.status, promisedBy: appRequests.promisedBy }).from(appRequests).where(inArray(appRequests.id, requestIds)) : Promise.resolve([]),
+    offerIds.length ? q.select({ id: appOffers.id, expiresAt: appOffers.expiresAt, total: appOffers.total, payload: appOffers.payload, createdAt: appOffers.createdAt }).from(appOffers).where(inArray(appOffers.id, offerIds)) : Promise.resolve([]),
+    requestIds.length ? q.select({ requestId: appQuotes.requestId, total: appQuotes.total, expiresAt: appQuotes.expiresAt }).from(appQuotes).where(and(inArray(appQuotes.requestId, requestIds), eq(appQuotes.status, "open"))).orderBy(desc(appQuotes.createdAt)) : Promise.resolve([]),
+    orderIds.length ? q.select({ orderId: appTripBookings.orderId, details: appTripBookings.details }).from(appTripBookings).where(inArray(appTripBookings.orderId, orderIds)) : Promise.resolve([]),
   ]);
+  const quoteOf = (id: string) => { const x = quotes.find((r) => r.requestId === id); return x ? { amount: x.total, expiresAt: x.expiresAt } : null; };
   return {
     stays, segments, pickups, esims,
-    orders: new Map(orders.map((o) => [o.id, { status: o.status, ref: o.ref }])),
-    requests: new Map(requests.map((r) => [r.id, { status: r.status }])),
-    offers: new Map(offers.map((o) => [o.id, { expiresAt: o.expiresAt }])),
+    orders: new Map(orders.map((o) => [o.id, { status: o.status, ref: o.ref, total: o.total, demo: !!o.demo }])),
+    requests: new Map(requests.map((r) => [r.id, { status: r.status, promisedBy: r.promisedBy, quote: quoteOf(r.id) }])),
+    offers: new Map(offers.map((o) => [o.id, { expiresAt: o.expiresAt, total: o.total, demo: (o.payload as { demo?: unknown }).demo === true, createdAt: o.createdAt }])),
+    wrote: new Map(orderIds.map((id) => {
+      const d = (wrote.find((w) => w.orderId === id)?.details ?? {}) as { segments?: string[]; stays?: Record<string, unknown> };
+      return [id, { stays: Object.keys(d.stays ?? {}), segments: d.segments ?? [], esims: esims.filter((e) => e.orderId === id).map((e) => e.id) }];
+    })),
   };
 }
 
@@ -356,6 +380,7 @@ export async function readPlan(ownerId: string, tripId: string): Promise<Plan> {
       id: it.id, day: it.day, sort: it.sort, kind: it.kind as PlanItem["kind"], mode: (it.mode ?? null) as PlanItem["mode"], title: it.title, note: it.note,
       place: it.place ?? null, from: it.fromPlace ?? null, to: it.toPlace ?? null, startsAt: it.startsAt, endsAt: it.endsAt, tz: it.tz, nights: it.nights,
       status: d.status, statusLine: d.line, booking: d.booking, requestId: it.requestId, offerId: it.offerId, drive: it.drive ?? null, source: it.source as PlanItem["source"],
+      ...moneyOf(it, d, bookings),
     };
   });
   const travellers = people.filter((p) => trip.travellerIds.includes(p.id));
@@ -372,8 +397,42 @@ export async function readPlan(ownerId: string, tripId: string): Promise<Plan> {
     id: plan.id, tripId: trip.id, version: plan.version, title: titleOf(trip, origin, items), kind: (trip.kind ?? "simple") as Plan["kind"],
     origin: origin ? { ...origin, source: origin.source as Origin["source"] } : null, originNeeded: !origin, returnTo: plan.returnTo ?? null,
     startDate: plan.startDate, endDate: plan.endDate, days, pace: plan.pace as Plan["pace"], templateId: plan.templateId, travellerIds: trip.travellerIds,
-    notes: plan.notes, items: out, checks, createdBy: plan.createdBy as Plan["createdBy"], updatedAt: plan.updatedAt.toISOString(),
+    notes: plan.notes, items: out, checks, totals: planTotals(out), createdBy: plan.createdBy as Plan["createdBy"], updatedAt: plan.updatedAt.toISOString(),
   };
+}
+
+/* ───────────── money on the plan (U7) ───────────── */
+
+/**
+ * What an item costs, only as a tool, a quote or a booking said: the offer's price while it lives (with its "as of"),
+ * the desk's open quote, or what the order charged. A price that ran out is flagged so the plan offers "Price again".
+ */
+export function moneyOf(it: Pick<ItemRow, "offerId" | "requestId" | "bookingKind" | "bookingId">, d: Derived, b: Bookings): Pick<PlanItem, "price" | "quote" | "promisedBy" | "priceExpired"> {
+  const out: Pick<PlanItem, "price" | "quote" | "promisedBy" | "priceExpired"> = { price: null, quote: null, promisedBy: null };
+  const offer = it.offerId ? b.offers.get(it.offerId) : undefined;
+  if (d.status === "priced" && offer?.total != null) {
+    out.price = { amount: offer.total, currency: "SAR", asOf: (offer.createdAt ?? new Date()).toISOString(), expiresAt: offer.expiresAt.toISOString(), demo: !!offer.demo };
+  }
+  const order = it.bookingKind === "order" && it.bookingId ? b.orders.get(it.bookingId) : undefined;
+  if (["held", "booked", "confirmed"].includes(d.status) && order?.total != null) out.price = { amount: order.total, currency: "SAR", asOf: new Date().toISOString(), expiresAt: null, demo: !!order.demo };
+  const r = it.requestId ? b.requests.get(it.requestId) : undefined;
+  if (d.status === "requested" && r) {
+    if (r.quote && (!r.quote.expiresAt || r.quote.expiresAt.getTime() > Date.now())) out.quote = { requestId: it.requestId!, amount: r.quote.amount, currency: "SAR", expiresAt: r.quote.expiresAt?.toISOString() ?? null };
+    out.promisedBy = r.promisedBy?.toISOString() ?? null;
+  }
+  if (d.status === "idea" && it.offerId) out.priceExpired = true;
+  return out;
+}
+
+/** The plan's totals: what "Book what's ready" would charge, what's paid, and a demo flag when any of it is a sample (§7.4). */
+export function planTotals(items: Pick<PlanItem, "status" | "price" | "quote">[]): NonNullable<Plan["totals"]> | null {
+  let priced = 0, booked = 0, ready = 0, demo = false, any = false;
+  for (const i of items) {
+    if (i.status === "priced" && i.price) { priced += i.price.amount; ready++; demo ||= i.price.demo; any = true; }
+    else if (i.status === "requested" && i.quote) { priced += i.quote.amount; ready++; any = true; }
+    else if (["held", "booked", "confirmed"].includes(i.status) && i.price) { booked += i.price.amount; demo ||= i.price.demo; any = true; }
+  }
+  return any ? { priced, booked, currency: "SAR", demo, ready } : null;
 }
 
 /* ───────────── events and the booking listener ───────────── */
@@ -414,7 +473,11 @@ export async function syncTripBookings(tripId: string): Promise<{ changed: numbe
     if (!trip) return { changed: 0 };
     const items = await liveItems(plan.id, tx);
     const b = await loadBookings(tripId, items, tx);
-    const links = matchBookings(items, b, plan.startDate);
+    // An item booked through its own order (U7) moves onto what that order wrote once it's confirmed: the hotel on
+    // its nights, the flight on its leg. Before that it reads the order's status.
+    const fromOrder = relinkOrders(items, b);
+    const links = matchBookings(items.filter((i) => !fromOrder.has(i.id)), b, plan.startDate);
+    for (const [k, v] of fromOrder) links.set(k, v);
     const days = daysBetween(plan.startDate, plan.endDate) + 1;
     let changed = 0;
     let anyBooked = false;
@@ -422,7 +485,7 @@ export async function syncTripBookings(tripId: string): Promise<{ changed: numbe
       const link = links.get(it.id) ?? null;
       const d = deriveStatus(it, b, link);
       if (d.status === "booked" || d.status === "confirmed") anyBooked = true;
-      if (!link && d.status === it.status) continue;
+      if (!link && d.status === it.status && d.line === it.statusNote) continue;
       await tx.update(appPlanItems).set({
         ...(link ? { bookingKind: link.kind, bookingId: link.id, offerId: null } : {}), status: d.status, statusNote: d.line, updatedAt: new Date(),
       }).where(eq(appPlanItems.id, it.id));
@@ -461,6 +524,22 @@ export async function syncTripBookings(tripId: string): Promise<{ changed: numbe
     if (anyBooked && trip.status === "planning") await tx.update(appTrips).set({ status: "booked", updatedAt: new Date() }).where(eq(appTrips.id, trip.id));
     return { changed };
   });
+}
+
+/** Items linked to an order whose booking rows exist now: each takes the first row of its kind that order wrote. */
+export function relinkOrders(items: Pick<ItemRow, "id" | "kind" | "mode" | "bookingKind" | "bookingId" | "deletedAt">[], b: Pick<Bookings, "wrote" | "stays" | "segments" | "esims">): Map<string, Link> {
+  const out = new Map<string, Link>();
+  const used = new Set<string>();
+  for (const it of items) {
+    if (it.deletedAt || it.bookingKind !== "order" || !it.bookingId) continue;
+    const w = b.wrote?.get(it.bookingId);
+    if (!w) continue;
+    const pick = (kind: "stay" | "segment" | "esim", ids: string[]) => { const id = ids.find((x) => !used.has(`${kind}:${x}`)); if (id) { used.add(`${kind}:${id}`); out.set(it.id, { kind, id }); } };
+    if (it.kind === "stay") pick("stay", w.stays.filter((id) => b.stays.some((s) => s.id === id)));
+    else if (it.kind === "leg" && it.mode === "flight") pick("segment", w.segments.filter((id) => b.segments.some((s) => s.id === id)));
+    else if (w.esims.length) pick("esim", w.esims);
+  }
+  return out;
 }
 
 /* ───────────── create helpers shared with ops.ts ───────────── */

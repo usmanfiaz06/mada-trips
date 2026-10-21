@@ -21,6 +21,9 @@ import type { ChatTurn } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { DemoFare } from './DemoFare';
+import { ChoiceCard } from './ChoiceCard';
+import { InviteCard } from './InviteCard';
+import { ChangeRequestCard } from './ChangeRequestCard';
 import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
 import { DocumentCard, ShareCard } from './DocCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
@@ -296,6 +299,13 @@ function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn
           <CardButton soft label={t('chat.attach.new')} onPress={() => onOpen({ kind: 'attach', choice: 'new', tripId: card.tripId, turn })} testID="chat-attach-new" />
         </View>
       );
+    // Companions (ASK-INTEGRATED.md §5): which one, the invite, a change asked by a companion.
+    case 'people':
+      return <ChoiceCard card={card} />;
+    case 'invite':
+      return <InviteCard card={card} />;
+    case 'change':
+      return <ChangeRequestCard card={card} />;
     // The living plan (PlanCards.tsx): review it on its trip until the plan screen lands.
     case 'plan':
       return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} onSay={onSay} />;

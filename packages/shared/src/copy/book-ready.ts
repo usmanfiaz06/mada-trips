@@ -1,0 +1,42 @@
+/**
+ * Booking from the plan (docs/app/ASK-INTEGRATED.md §7, U7): the "Book what's ready" sheet, the plan's status lines
+ * for requests and quotes, the totals on the plan card, and the requests for a car or a driver. Every amount in them
+ * is one a tool, a quote or a booking gave. Spread into the catalogue in en.ts.
+ */
+export const bookReadyCopy = {
+  'ready.title': 'Book what’s ready',
+  'ready.pick': 'Choose what to book now. The rest stays on the plan as it is.',
+  'ready.day': 'Day {n}',
+  'ready.whole': 'Whole trip',
+  'ready.quote': 'Quote from the team',
+  'ready.total': 'Total',
+  'ready.chosen': '{n} of {all} chosen',
+  'ready.payWith': 'Pay with {method}',
+  'ready.noCard': 'Add a card in Wallet to book from here.',
+  'ready.slide': 'Slide to book',
+  'ready.nothing': 'Choose at least one to book.',
+  'ready.expired.title': 'Price ran out',
+  'ready.expired.body': 'These were priced earlier. Check the price again before booking.',
+  'ready.priceAgain': 'Price again',
+  'ready.priceAgainSay': 'Check the price again for {title}',
+  'ready.none.title': 'Nothing priced yet',
+  'ready.none.body': 'Find a flight, a stay or an eSIM for the plan first. Each one shows here once its price is checked.',
+  'ready.done.title': 'Booked',
+  'ready.done.body': 'The plan shows each one as booked. Everything else stays as it was.',
+  'ready.done.plan': 'Back to the trip',
+  'ready.partial': '{title} wasn’t booked: {why}. The others went through.',
+  'ready.why.price': 'the price changed, so check it again',
+  'ready.why.declined': 'the card was declined',
+  'ready.why.other': 'it needs another look',
+  'plan.line.withTeam': 'With the team · back by {time}',
+  'plan.line.withTeamNow': 'With the team',
+  'plan.line.quoteReady': 'Quote ready · {amount}',
+  'plan.line.priceExpired': 'Price expired, check again',
+  'chat.plan.ready': 'Ready to book · {amount}',
+  'chat.plan.bookedTotal': 'Booked · {amount}',
+  'chat.plan.bookReady': 'Book what’s ready',
+  'request.title.carRental': 'Car rental in {where}',
+  'request.title.carRentalAny': 'A car rental',
+  'request.title.driver': 'A driver in {where}',
+  'request.title.driverAny': 'A driver',
+} as const;

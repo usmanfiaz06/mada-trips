@@ -39,7 +39,7 @@ Truth
 Found by hand
 - Flights when search_flights answers {"mode":"request"}, and anything no tool sells (a cruise, a train, a visa we don't handle, a group or company trip, a city not sold live): get only what the team needs (where, when, who, must-haves), one question at a time, defaults where you can.
 - Confirm it back in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time given: ask the best time once.
-- Promise only what a tool does this turn. No tool invites friends or adds people to a trip: say how they do it ("Invite Abdullah from Circles in the app").
+- Promise only what a tool does this turn.
 - A restaurant, a table, an activity, a gift: first say what you can (a short idea of the kind of place, no names no tool gave), then ask the city and the night. Never send it to the team on the first message.
 - Then call create_request with the details (destination_name and depart included) and contact_preference, and say "We've noted it and the team will get back to you by" the time it returns.
 
@@ -60,6 +60,11 @@ Plans
 - Options for one item: find_for_item. A rental car, a driver, a train, a ferry or a border permit isn't sold live: take what the team needs and create_request.
 - Drive distances and times only as the plan or a tool gave them; never a km or an hour of your own.
 - Something that lives in the app (a boarding pass, a passport, a refund, the plan): open_in_app with one line.
+
+People on a trip
+- "With Abdullah", "add my brother": add_traveller with the trip and the first name. One person in the household is added; several, or a friend on Mada, come back as a card: ask "Which Abdullah?" and never pick one yourself. Nobody found: say they aren't in the circle yet and offer the invite; the card sends it only on their tap.
+- A trip someone else organised (shared_trip lists them): answer from shared_trip, never prices. To change it, request_change with the item ids: with "Can suggest" say "We'll ask Omar to confirm" and nothing changes until he approves; the organiser books and pays for anything it needs.
+- The organiser deciding a change in their own chat: decide_change.
 
 Once you have answered something, treat that answer as done. On later turns your thinking goes to what the traveller is asking now; do not go back over an earlier answer unless they ask about it or point out a problem with it.`;
 
@@ -186,7 +191,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     description: "Hand something to the team at Mada to arrange by hand and quote in the app: flights while they go by request, a visa, Umrah, a city not sold live, a cruise, a train, a group, a restaurant, anything a tool can't answer. Only after the traveller has said how to reach them. Returns the time the team answers by.",
     strict: true,
     input_schema: obj({
-      kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general"] },
+      kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general", "car_rental", "driver"] },
       summary: { type: "string", description: "What they want, in one or two plain sentences, in their language." },
       traveller_ids: ids,
       destination_name: nullable("string"),
@@ -194,6 +199,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       return: nullable("string", { description: "YYYY-MM-DD or null." }),
       contact_preference: { type: ["string", "null"], enum: ["call", "whatsapp", "in_app", null], description: "How they asked to be reached." },
       contact_window: nullable("string", { description: "With a call: the best time, in their words; else null." }),
+      item_id: nullable("string", { description: "Plan item [id]." }),
     }),
   },
   {
@@ -205,6 +211,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       offer_id: nullable("string", { description: "The flight or stay option id from a search result this conversation." }),
       package_id: nullable("string", { description: "The eSIM plan id." }),
       traveller_ids: ids,
+      item_ids: nullable("string", { description: "Plan item [ids] it books, space-separated." }),
     }),
   },
   {
@@ -230,6 +237,60 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   ...PLAN_TOOLS,
   // Documents in chat (tools-docs.ts): read-only, or a card the traveller taps.
   ...DOC_TOOLS,
+  // Companions (tools-people.ts): who goes, and changes a companion asks for.
+  {
+    name: "add_traveller",
+    description: "Put someone on one of the traveller's own trips by first name. Searches the household and the circle: one household match is added; several matches or a friend on Mada return a choice card; nobody returns an invite card. Never sends anything by itself.",
+    strict: true,
+    input_schema: obj({
+      trip_id: { type: "string" },
+      name: { type: "string", description: "The first name as said, e.g. Abdullah." },
+      relation: nullable("string", { description: "How they said it, e.g. brother, wife; else null." }),
+    }),
+  },
+  {
+    name: "remove_traveller",
+    description: "Take someone off one of the traveller's own trips (the traveller id from get_trip). Booked tickets stay until changed.",
+    strict: true,
+    input_schema: obj({ trip_id: { type: "string" }, traveller_id: { type: "string" } }),
+  },
+  {
+    name: "shared_trip",
+    description: "Trips someone else organised and put this traveller on: with trip_id null, the list; with a trip_id, its plan (item ids, days, places, times, no prices) and their role.",
+    strict: true,
+    input_schema: obj({ trip_id: nullable("string") }),
+  },
+  {
+    name: "request_change",
+    description: "A change to a trip someone else organised, asked by a companion: becomes a change request the organiser approves (or applies at once for a companion who can edit ideas). Item ids from shared_trip.",
+    strict: true,
+    input_schema: obj({
+      trip_id: { type: "string" },
+      summary: { type: "string", description: "The change in one short sentence, their language, e.g. 'Two nights in Melaka, one in Penang'." },
+      ops: {
+        type: "array",
+        items: obj({
+          op: { type: "string", enum: ["add", "update", "move", "remove", "skip"] },
+          item_id: nullable("string"),
+          day: { type: ["integer", "null"], description: "0-based day for add or move." },
+          nights: { type: ["integer", "null"], description: "New number of nights for a stay." },
+          title: nullable("string", { description: "For add: what it is." }),
+          kind: { type: ["string", "null"], enum: ["stay", "activity", "meal", "note", "leg", "car", null] },
+        }),
+      },
+    }),
+  },
+  {
+    name: "decide_change",
+    description: "The organiser approves or declines a change a companion asked for on their trip (the change id is on its card).",
+    strict: true,
+    input_schema: obj({
+      trip_id: { type: "string" },
+      change_id: { type: "string" },
+      decision: { type: "string", enum: ["approve", "decline"] },
+      reason: nullable("string", { description: "With decline: their reason in a few words, or null." }),
+    }),
+  },
 ];
 
 /**
@@ -304,11 +365,16 @@ const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   get_trip: { d: "One trip in full: flights, stay, travellers, documents needed." },
   get_household: { d: "The people they book for." },
   entry_rules: { d: "Visa, ETA and passport rules for these people.", p: { depart: "Arriving.", return: "Leaving." } },
-  create_request: { d: "To the team at Mada to arrange by hand, only after they said how to reach them. Returns when the team answers.", p: { summary: "One or two sentences, their language.", contact_window: "With a call: the best time." } },
-  price_quote_for_pay: { d: "Book a flight, stay or eSIM from a card: prices it again and opens the app's pay sheet. Never charges.", p: { offer_id: "Option id from a search.", package_id: "eSIM plan id." } },
+  create_request: { d: "For the Mada team to arrange by hand, once they said how to reach them; gives the reply time.", p: { summary: "A sentence or two, their language.", contact_window: "A call's best time." } },
+  price_quote_for_pay: { d: "Book a flight, stay or eSIM card: reprices it, opens the pay sheet; never charges.", p: { offer_id: "Option id from a search.", package_id: "eSIM plan id." } },
   talk_to_human: { d: "Pass the conversation to a person at the Mada desk.", p: { summary: "What they need and what was done, their language." } },
   remember: { d: "Keep a lasting preference or need for next time; not trip details, numbers or documents.", p: { sensitive: "Health, mobility or religion: true, kept only after a yes." } },
   ...PLAN_LEAN,
+  add_traveller: { d: "Add someone to their trip by first name; several or a friend → choice card, nobody → invite card." },
+  remove_traveller: { d: "Take someone off their trip." },
+  shared_trip: { d: "Trips others organised for them: null → list; id → plan, item ids, role, no prices." },
+  request_change: { d: "A companion asks for a change; the organiser approves it.", p: { summary: "One sentence, their language." } },
+  decide_change: { d: "The organiser approves or declines a companion's change." },
 };
 const LEAN_IDS = "Household ids; unsaid: the account holder.";
 /** Dates are YYYY-MM-DD everywhere: said once, in the compact prompt. */

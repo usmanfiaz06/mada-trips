@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import {
-  AskParseResponse, GeocodeResponse, StayRoomsResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OfferResponse, OrderResponse, OrdersResponse,
+  AskParseResponse, BookReadyResponse, GeocodeResponse, StayRoomsResponse, CreateOrderResponse, EntryCheckResponse, FlightSearchResponse, MessagesResponse, OfferResponse, OrderResponse, OrdersResponse,
   NudgeResponse, PlanResponse, PlansResponse, PreviewResponse, RequestResponse, RequestsResponse, StaySearchResponse, BookingRequestView, ThreadMessage,
   type CreateOrderBody, type CreateRequestBody, type DemoFlag, type EntryCheckRequest, type FlightSearchRequest, type OrderDraft, type PreviewBody, type StaySearchRequest,
   type DistanceAnchor,
@@ -78,6 +78,8 @@ export const bookingApi = {
   acceptOffer: (quoteId: string, messageId: string) => call('POST', `/quotes/${quoteId}/accept-offer`, QuoteOut, { messageId }),
   preview: (b: PreviewBody) => call('POST', '/orders/preview', PreviewResponse, b),
   createOrder: (b: CreateOrderBody) => call('POST', '/orders', CreateOrderResponse, b, b.idempotencyKey),
+  /** "Book what's ready" on a trip's plan: each priced item as the order it would be (ASK-INTEGRATED §7.2). */
+  planReady: (tripId: string) => call('GET', `/trips/${encodeURIComponent(tripId)}/plan/ready`, BookReadyResponse),
   order: (id: string) => request({ method: 'GET', path: `/orders/${id}` }, OrderResponse),
   // A guest has no orders: don't ask (the server answers 401, which only fills the console).
   activeOrders: () => (useSession.getState().status === 'signedIn' ? request({ method: 'GET', path: '/orders' }, OrdersResponse) : Promise.resolve({ orders: [] })),
@@ -92,6 +94,7 @@ export const bookingKeys = {
   request: (id: string) => ['booking', 'request', id] as const,
   messages: (id: string) => ['booking', 'messages', id] as const,
   order: (id: string) => ['booking', 'order', id] as const,
+  planReady: (tripId: string) => ['booking', 'planReady', tripId] as const,
 };
 
 const useOn = () => useSession((s) => s.status === 'signedIn');
