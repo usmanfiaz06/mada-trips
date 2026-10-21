@@ -46,6 +46,7 @@ export const WALLET_ROUTES = {
   supportAttachment: '/support/attachments/:id',
   supportRead: '/support/threads/:id/read',
   supportUnread: '/support/unread',
+  supportCsat: '/support/csat',
 } as const;
 
 /** "/documents/:id" + { id } → "/documents/7b…". */
@@ -416,6 +417,17 @@ export const SendSupportMessageRequest = z.object({
 export type SendSupportMessageRequest = z.input<typeof SendSupportMessageRequest>;
 export const SendSupportMessageResponse = z.object({ messages: z.array(SupportMessage) });
 export const SupportUnreadResponse = z.object({ unread: z.number().int().nonnegative() });
+
+/**
+ * The one-tap rating after the desk resolves a conversation or ticket (DESK-PLAN.md §7 default 4): asked once,
+ * skippable. GET /support/csat names the one waiting, if any; POST answers it with 1–5, or null to skip.
+ */
+export const SupportCsatResponse = z.object({
+  pending: z.object({ ticketId: z.string(), agent: z.string().nullable() }).nullable(),
+});
+export type SupportCsatResponse = z.infer<typeof SupportCsatResponse>;
+export const SupportCsatRequest = z.object({ ticketId: z.uuid(), score: z.number().int().min(1).max(5).nullable() });
+export type SupportCsatRequest = z.infer<typeof SupportCsatRequest>;
 
 /** The desk: one number, day and night. The same number as the website (madatrips.sa) header and contact page. */
 export const DESK_PHONE = '+966 56 668 2662';

@@ -20,7 +20,7 @@ import { useDeviceOffline, useNet } from '@/lib/net/state';
 import { discardItem, retryItem, useOutbox } from '@/lib/net/outbox';
 import { chooseFile } from '@/lib/pick';
 import { useSession } from '@/lib/session';
-import { SUPPORT_KIND, deliver, newClientId, useChat, useSendToMada } from '@/lib/support-chat';
+import { SUPPORT_KIND, deliver, newClientId, useChat, useCsat, useSendToMada } from '@/lib/support-chat';
 import { toast } from '@/lib/toast';
 import { usePresence, useTrips, walletApi, walletKeys } from '@/lib/wallet';
 import { demo } from '@/lib/wallet-demo';
@@ -125,6 +125,8 @@ function SupportChat() {
     toast(t('support.uploadFailed'));
   };
 
+  const csat = useCsat(!!th && messages.length > 0 && !demo('offline'));
+  const [rated, setRated] = useState(false);
   const lastResolved = messages.map((m) => !!m.card?.resolved).lastIndexOf(true);
   const lastRated = messages.map((m) => !!m.card?.rated).lastIndexOf(true);
   const askRating = lastResolved > -1 && lastResolved > lastRated && !typing && !pending.length;
@@ -231,6 +233,20 @@ function SupportChat() {
               </View>
             </View>
           ) : null}
+          {csat.pending && !askRating && !typing ? (
+            <View style={styles.well} testID="support-csat">
+              <T v="h3" style={{ fontSize: 15 }}>{csat.pending.agent ? t('support.csat.title', { agent: csat.pending.agent }) : t('support.csat.titleMada')}</T>
+              <T v="tiny">{t('support.csat.sub')}</T>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Pressable key={n} accessibilityRole="button" accessibilityLabel={t('support.csat.score', { n })} onPress={() => { buzz('tap'); setRated(true); csat.answer(csat.pending!.ticketId, n); }} style={styles.csatDot} testID={`support-csat-${n}`}>
+                    <T v="h3" style={{ fontSize: 15 }}>{n}</T>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="button" onPress={() => csat.answer(csat.pending!.ticketId, null)} style={{ marginStart: 'auto', padding: 8 }} testID="support-csat-skip"><T v="tiny" style={{ textDecorationLine: 'underline' }}>{t('support.csat.skip')}</T></Pressable>
+              </View>
+            </View>
+          ) : rated ? <T v="tiny" style={{ textAlign: 'center' }} testID="support-csat-thanks">{t('support.csat.thanks')}</T> : null}
         </ScrollView>
         <View style={[styles.act, { paddingBottom: 20 + bottom }]}>
           <View style={styles.composer}>
@@ -368,6 +384,7 @@ const styles = StyleSheet.create({
   urgent: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.green, borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16 },
   pill: { height: 24, paddingHorizontal: 10, borderRadius: 999, backgroundColor: colors.paper, justifyContent: 'center' },
   well: { gap: 8, padding: 16, borderRadius: 24, backgroundColor: colors.mist },
+  csatDot: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper },
   form: { gap: 8, padding: 12, borderRadius: 16, backgroundColor: colors.mist },
   act: { position: 'absolute', start: 0, end: 0, bottom: 0, paddingTop: 24, paddingHorizontal: 20, backgroundColor: 'transparent' },
   composer: { height: 52, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 8, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },

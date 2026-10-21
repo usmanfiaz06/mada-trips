@@ -22,7 +22,8 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const [me] = await Promise.all([agentForOps(u.id), syncTickets().catch(() => null)]);
   const { page, offset, size } = pageParam(sp);
-  const owner = sp.o === "me" || sp.o === "none" ? sp.o : undefined;
+  // me, none, or one agent's id (from Agents & roles and Performance).
+  const owner = sp.o === "me" || sp.o === "none" || /^[0-9a-f-]{36}$/i.test(sp.o ?? "") ? sp.o : undefined;
   const data = await listTickets({ tab: sp.s, q: sp.q, priority: sp.p, owner, me, limit: size, offset });
   const href = listHref("/adminwork/desk/tickets", { s: sp.s, q: sp.q, p: sp.p, o: owner });
   const filtered = !!(sp.q || sp.p || owner);

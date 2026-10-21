@@ -92,7 +92,7 @@ ids.ticket = await firstHref(lead.page, /\/desk\/tickets\/T-\d+$/);
 const PAGES = [
   ['inbox', '/adminwork/desk'], ['inbox-team', '/adminwork/desk?f=team'], ['orders', '/adminwork/desk/orders'], ['order-awaiting', ids.awaiting], ['order-held', ids.held],
   ['order-issued', ids.issued], ['requests', '/adminwork/desk/requests'], ['request-visa', ids.visa], ['request-umrah', ids.umrah], ['chats', '/adminwork/desk/chats'], ['chat-thread', ids.chat],
-  ['refunds', '/adminwork/desk/refunds'], ['disruptions', '/adminwork/desk/disruptions'], ['moderation', '/adminwork/desk/moderation'], ['moderation-blocked', '/adminwork/desk/moderation?s=blocked'], ['team', '/adminwork/desk/team'],
+  ['refunds', '/adminwork/desk/refunds'], ['disruptions', '/adminwork/desk/disruptions'], ['moderation', '/adminwork/desk/moderation'], ['moderation-blocked', '/adminwork/desk/moderation?s=blocked'], ['agents', '/adminwork/desk/agents'], ['rota', '/adminwork/desk/rota'], ['performance', '/adminwork/desk/performance'], ['macros', '/adminwork/desk/macros'],
   ['tickets', '/adminwork/desk/tickets'], ['ticket', ids.ticket], ['ticket-new', '/adminwork/desk/tickets/new'],
   ['bookings', '/adminwork/desk/bookings'], ['bookings-travelling', '/adminwork/desk/bookings?s=travelling'], ['bookings-problem', '/adminwork/desk/bookings?s=problem'], ['drop-offs', '/adminwork/desk/drop-offs'],
 ];
@@ -225,7 +225,7 @@ if (ONLY !== 'pages') {
   await shot(page, 'flow-moderation');
 
   // Rota: Omar covers for Faisal tomorrow night.
-  await go(page, '/adminwork/desk/team');
+  await go(page, '/adminwork/desk/rota');
   const shift = page.locator('form:has(input[name=startsAt])');
   await shift.locator('select[name=agentId]').selectOption({ label: 'Omar' });
   await shift.locator('select[name=coveringForId]').selectOption({ label: 'Faisal' });
@@ -235,8 +235,30 @@ if (ONLY !== 'pages') {
   await shift.locator('input[name=endsAt]').fill(iso(new Date(t0.getTime() + 8 * 3600_000)));
   await shift.getByRole('button', { name: 'Add to the rota' }).click();
   await settle();
+  await go(page, `/adminwork/desk/rota?w=${iso(t0).slice(0, 10)}`);
   await expectText(page, 'covering for Faisal');
   await shot(page, 'flow-rota');
+
+  // Agents & roles: add an agent in one step (login, role, profile, invite), then deactivate them.
+  await go(page, '/adminwork/desk/agents');
+  const add = page.locator('#add-agent form');
+  const who = `e2e.agent.${Date.now()}@madatrips.com`;
+  await add.locator('input[name=name]').fill('Reem Al-Otaibi');
+  await add.locator('input[name=email]').fill(who);
+  await add.locator('select[name=role]').selectOption('support_agent');
+  await add.locator('input[name=displayName]').fill('Reem');
+  await add.getByRole('button', { name: 'Add agent' }).click();
+  await page.locator('[data-testid=agent-invite]').waitFor({ timeout: 30_000 }).catch(() => problems.push('Add agent: no invite card'));
+  await expectText(page, 'Temporary password');
+  await shot(page, 'flow-agent-added', false);
+  await go(page, '/adminwork/desk/agents?q=Reem');
+  await go(page, await firstHref(page, /\/desk\/agents\/[0-9a-f-]{36}$/, 'Reem'));
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Deactivate', exact: true }).click();
+  await settle();
+  await go(page, '/adminwork/desk/agents?f=inactive');
+  await expectText(page, 'Reem');
+  await shot(page, 'flow-agent-deactivated', false);
 
   // The activity log has the desk's actions.
   await go(page, '/adminwork/activity');

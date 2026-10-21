@@ -1,10 +1,11 @@
 import "server-only";
-import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { t as copy } from "@mada/shared";
 import type { PresenceAgent, PresenceResponse } from "@mada/shared";
-import { db, schema } from "@/db";
+import { db, schema, type Tx } from "@/db";
 import { appMessages, appUsers } from "@/db/app-schema";
 import { appAgentAssignments, appAgentShifts, appAgents, appDeskTyping } from "@/db/app-schema-desk";
+import { appAgentPresenceLog } from "@/db/app-schema-agents";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
 import { available, routeFor, type RotaShift } from "./routing";
 import { typicalReplyMinutes } from "./sla";
@@ -45,10 +46,18 @@ export async function setAgentStatus(actor: DeskActor, agentId: string, status: 
     if (!a) throw new DeskError("Agent not found", "NOT_FOUND");
     if (a.opsUserId !== actor.id) assertCap(actor, "desk.admin");
     if (a.status === status) return;
-    await tx.update(appAgents).set({ status, statusAt: new Date(), updatedAt: new Date() }).where(eq(appAgents.id, agentId));
+    const now = new Date();
+    await tx.update(appAgents).set({ status, statusAt: now, updatedAt: now }).where(eq(appAgents.id, agentId));
+    await logPresence(tx, agentId, status, now, actor.id);
     await deskAudit(tx, actor, { action: "desk.agent.status", entityType: "agent", entityId: agentId, ref: a.displayName,
       summary: `${a.displayName} is now ${status}`, data: { status: { from: a.status, to: status } } });
   });
+}
+
+/** Close the agent's open presence interval and open the next one (the time logs read these). */
+export async function logPresence(tx: Tx, agentId: string, status: string, now: Date, setBy: string | null) {
+  await tx.update(appAgentPresenceLog).set({ endedAt: now }).where(and(eq(appAgentPresenceLog.agentId, agentId), isNull(appAgentPresenceLog.endedAt)));
+  await tx.insert(appAgentPresenceLog).values({ agentId, status, startedAt: now, setBy });
 }
 
 export type AgentInput = { opsUserId: string; displayName: string; displayNameAr?: string | null; languages: string[]; pronoun: "he" | "she"; replyMinutes: number; photoUrl?: string | null; active?: boolean };
@@ -75,34 +84,71 @@ export async function saveAgent(actor: DeskActor, v: AgentInput) {
   });
 }
 
-/** Put a shift on the rota. covering_for makes this agent the one travellers of that agent are routed to. */
-export async function addShift(actor: DeskActor, v: { agentId: string; startsAt: Date; endsAt: Date; coveringForId?: string | null; note?: string | null }) {
+export type ShiftInput = { agentId: string; startsAt: Date; endsAt: Date; coveringForId?: string | null; note?: string | null; weeks?: number; days?: number[] };
+
+/** Every start of a repeating shift: the same hours on each chosen weekday (0 Sunday … 6 Saturday, Riyadh), for `weeks` weeks. */
+export function shiftOccurrences(startsAt: Date, endsAt: Date, weeks = 1, days?: number[]): { startsAt: Date; endsAt: Date }[] {
+  const len = endsAt.getTime() - startsAt.getTime();
+  const local = (d: Date) => new Date(d.getTime() + 3 * 3600_000); // Riyadh is UTC+3 all year
+  const first = local(startsAt).getUTCDay();
+  const wanted = [...new Set(days?.length ? days : [first])].filter((d) => d >= 0 && d <= 6).sort();
+  const out: { startsAt: Date; endsAt: Date }[] = [];
+  for (let w = 0; w < Math.max(1, Math.min(weeks, 26)); w++) {
+    for (const d of wanted) {
+      const offset = ((d - first + 7) % 7) + w * 7;
+      const s = new Date(startsAt.getTime() + offset * 86400_000);
+      out.push({ startsAt: s, endsAt: new Date(s.getTime() + len) });
+    }
+  }
+  return out.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+/**
+ * Put a shift on the rota, once or every week (weeks > 1 or several days). covering_for makes this agent the one
+ * travellers of that agent are routed to. A week that would overlap one of the person's shifts is skipped.
+ */
+export async function addShift(actor: DeskActor, v: ShiftInput) {
   assertCap(actor, "desk.admin");
   if (!(v.endsAt > v.startsAt)) throw new DeskError("A shift ends after it starts");
   if (v.endsAt.getTime() - v.startsAt.getTime() > 16 * 3600_000) throw new DeskError("Keep a shift to 16 hours or less");
   if (v.coveringForId && v.coveringForId === v.agentId) throw new DeskError("Someone can't cover for themselves");
+  const repeating = (v.weeks ?? 1) > 1 || (v.days?.length ?? 0) > 1;
+  const times = repeating ? shiftOccurrences(v.startsAt, v.endsAt, v.weeks, v.days) : [{ startsAt: v.startsAt, endsAt: v.endsAt }];
   return db.transaction(async (tx) => {
     const ids = [v.agentId, ...(v.coveringForId ? [v.coveringForId] : [])];
-    const found = await tx.select({ id: appAgents.id, name: appAgents.displayName }).from(appAgents).where(inArray(appAgents.id, ids));
+    const found = await tx.select({ id: appAgents.id, name: appAgents.displayName, active: appAgents.active }).from(appAgents).where(inArray(appAgents.id, ids));
     if (found.length !== ids.length) throw new DeskError("Agent not found", "NOT_FOUND");
-    const overlap = await tx.select({ id: appAgentShifts.id }).from(appAgentShifts)
-      .where(and(eq(appAgentShifts.agentId, v.agentId), lt(appAgentShifts.startsAt, v.endsAt), gt(appAgentShifts.endsAt, v.startsAt))).limit(1);
-    if (overlap.length) throw new DeskError("That overlaps another shift for the same person", "CONFLICT");
-    const [row] = await tx.insert(appAgentShifts).values({ agentId: v.agentId, startsAt: v.startsAt, endsAt: v.endsAt, coveringForId: v.coveringForId ?? null, note: v.note ?? null, createdBy: actor.id }).returning();
+    if (!found.find((f) => f.id === v.agentId)!.active) throw new DeskError("That agent is deactivated");
+    const seriesId = repeating ? crypto.randomUUID() : null;
+    const rows: (typeof appAgentShifts.$inferSelect)[] = [];
+    for (const t of times) {
+      const overlap = await tx.select({ id: appAgentShifts.id }).from(appAgentShifts)
+        .where(and(eq(appAgentShifts.agentId, v.agentId), lt(appAgentShifts.startsAt, t.endsAt), gt(appAgentShifts.endsAt, t.startsAt))).limit(1);
+      if (overlap.length) continue;
+      const [row] = await tx.insert(appAgentShifts).values({ agentId: v.agentId, startsAt: t.startsAt, endsAt: t.endsAt, coveringForId: v.coveringForId ?? null, note: v.note ?? null, seriesId, repeat: repeating ? "weekly" : null, createdBy: actor.id }).returning();
+      rows.push(row!);
+    }
+    if (!rows.length) throw new DeskError("That overlaps another shift for the same person", "CONFLICT");
     const nm = (id: string) => found.find((f) => f.id === id)?.name ?? "—";
-    await deskAudit(tx, actor, { action: "desk.shift.added", entityType: "shift", entityId: row!.id, ref: nm(v.agentId),
-      summary: `Put ${nm(v.agentId)} on shift ${v.startsAt.toISOString().slice(0, 16).replace("T", " ")}–${v.endsAt.toISOString().slice(11, 16)} UTC${v.coveringForId ? `, covering for ${nm(v.coveringForId)}` : ""}` });
-    return row!;
+    const when = `${v.startsAt.toISOString().slice(0, 16).replace("T", " ")}–${v.endsAt.toISOString().slice(11, 16)} UTC`;
+    await deskAudit(tx, actor, { action: "desk.shift.added", entityType: "shift", entityId: rows[0]!.id, ref: nm(v.agentId),
+      summary: `Put ${nm(v.agentId)} on shift ${when}${repeating ? `, every week (${rows.length} shifts${times.length > rows.length ? `, ${times.length - rows.length} skipped as overlapping` : ""})` : ""}${v.coveringForId ? `, covering for ${nm(v.coveringForId)}` : ""}` });
+    return Object.assign(rows[0]!, { added: rows.length, skipped: times.length - rows.length });
   });
 }
 
-export async function removeShift(actor: DeskActor, shiftId: string) {
+/** Take a shift off the rota; with `series`, this one and every later shift in its weekly series. */
+export async function removeShift(actor: DeskActor, shiftId: string, opts: { series?: boolean } = {}) {
   assertCap(actor, "desk.admin");
   await db.transaction(async (tx) => {
     const [s] = await tx.select({ s: appAgentShifts, name: appAgents.displayName }).from(appAgentShifts).innerJoin(appAgents, eq(appAgents.id, appAgentShifts.agentId)).where(eq(appAgentShifts.id, shiftId));
     if (!s) throw new DeskError("Shift not found", "NOT_FOUND");
-    await tx.delete(appAgentShifts).where(eq(appAgentShifts.id, shiftId));
-    await deskAudit(tx, actor, { action: "desk.shift.removed", entityType: "shift", entityId: shiftId, ref: s.name, summary: `Took ${s.name} off the ${s.s.startsAt.toISOString().slice(0, 16).replace("T", " ")} UTC shift` });
+    const series = opts.series && s.s.seriesId;
+    const gone = series
+      ? await tx.delete(appAgentShifts).where(and(eq(appAgentShifts.seriesId, s.s.seriesId!), gte(appAgentShifts.startsAt, s.s.startsAt))).returning({ id: appAgentShifts.id })
+      : await tx.delete(appAgentShifts).where(eq(appAgentShifts.id, shiftId)).returning({ id: appAgentShifts.id });
+    await deskAudit(tx, actor, { action: "desk.shift.removed", entityType: "shift", entityId: shiftId, ref: s.name,
+      summary: series ? `Took ${s.name} off ${gone.length} weekly shifts from ${s.s.startsAt.toISOString().slice(0, 16).replace("T", " ")} UTC` : `Took ${s.name} off the ${s.s.startsAt.toISOString().slice(0, 16).replace("T", " ")} UTC shift` });
   });
 }
 

@@ -44,6 +44,10 @@ export const appAgentShifts = pgTable("app_agent_shifts", {
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
   coveringForId: uuid("covering_for_id").references(() => appAgents.id, { onDelete: "set null" }),
   note: text("note"),
+  // A repeating shift: every week on the same days and hours. Each week is its own row (routing reads plain rows);
+  // series_id ties them together so the whole series can be taken off at once.
+  seriesId: uuid("series_id"),
+  repeat: text("repeat"), // weekly | null
   createdBy: uuid("created_by").references(() => opsUsers.id, { onDelete: "set null" }),
   createdAt: createdAt(),
 }, (t) => [check("app_agent_shifts_order", sql`${t.endsAt} > ${t.startsAt}`), index("app_agent_shifts_time_idx").on(t.startsAt, t.endsAt), index("app_agent_shifts_agent_idx").on(t.agentId, t.startsAt)]);
@@ -94,6 +98,7 @@ export const appDeskCanned = pgTable("app_desk_canned", {
   sort: integer("sort").notNull().default(0),
   createdBy: uuid("created_by").references(() => opsUsers.id, { onDelete: "set null" }),
   createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
 });
 
 /** "Faisal is typing…": one row per agent, refreshed while they type, read by the app's presence endpoint. */
@@ -203,6 +208,8 @@ export const deskTickets = pgTable("desk_tickets", {
   mergedIntoId: uuid("merged_into_id").references((): AnyPgColumn => deskTickets.id, { onDelete: "set null" }),
   csat: integer("csat"),
   csatComment: text("csat_comment"),
+  // When the traveller answered the one-tap rating, or skipped it (csat stays null): the app asks once.
+  csatAt: timestamp("csat_at", { withTimezone: true }),
   createdBy: uuid("created_by").references(() => opsUsers.id, { onDelete: "set null" }),
   lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: createdAt(),
