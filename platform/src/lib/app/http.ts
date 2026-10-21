@@ -42,7 +42,9 @@ export function errorResponse(e: unknown): Response {
     return json(body, e.status, headers);
   }
   console.error(`[app-api]${rid ? ` ${rid}` : ""} unexpected error`, e);
-  return json({ error: { code: "INTERNAL", message: t("error.internal"), ...(rid ? { requestId: rid } : null) } }, 500);
+  // Staging only: the cause, so a broken path can be found without the server logs (never on production).
+  const debug = !isProductionDeploy() && e instanceof Error ? { debug: `${e.name}: ${e.message}`.slice(0, 300) } : null;
+  return json({ error: { code: "INTERNAL", message: t("error.internal"), ...(rid ? { requestId: rid } : null), ...debug } }, 500);
 }
 
 type Handler = (req: Request) => Promise<Response>;
