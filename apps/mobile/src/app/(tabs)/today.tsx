@@ -13,6 +13,7 @@ import { Guest, Nothing, useLastTripLine } from '@/components/today/Nothing';
 import { Cancelled, TravelDay } from '@/components/today/TravelDay';
 import { LowPowerEntry } from '@/components/today/LowPower';
 import { FollowLockScreen } from '@/components/today/FollowLockScreen';
+import { PlanToday } from '@/components/today/PlanToday';
 import { slowLink } from '@/lib/net/slow-link';
 import { useSession } from '@/lib/session';
 import { clockOffset, serverNow } from '@/lib/net/clock';
@@ -69,6 +70,8 @@ export default function Today() {
         <TodayHeader clock={clock} unread={trips.data?.unread ?? 0} />
         {status === 'signedIn' ? <LowPowerEntry /> : null}
         {status === 'signedIn' && trip ? <FollowLockScreen trip={trip} now={now} /> : null}
+        {/* A trip near: the plan's cards come first, above the ideas (U9). Travel day and the air keep the flight first. */}
+        {status === 'signedIn' && (!trip || ['none', 'booked', 'daybefore', 'home'].includes(trip.clock.phase)) ? <PlanToday /> : null}
         {body}
       </ScrollView>
       <BannerHost />

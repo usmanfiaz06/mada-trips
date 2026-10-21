@@ -830,6 +830,22 @@ export function retitleRequest(id: string, words: { title: string; detail: strin
 }
 
 /** For the e2e script and tests: forget everything (a fresh install). */
+/**
+ * The team's price for a companion's change that needs booking (U9, mock only): a stay request on the trip already
+ * quoted, so the payer's card can open the pay sheet with it (draft kind quote).
+ */
+export function mockQuotedChange(user: MockUser, o: { title: string; detail: string; total: number }): string {
+  const id = uuid();
+  const self = user.people.find((p) => p.isSelf);
+  requests.set(id, {
+    id, owner: user.id, created: Date.now(), messages: [], details: { kind: 'stay', answers: {}, needs: {}, note: '' },
+    view: { id, kind: 'stay', status: 'quoted', title: o.title, summary: o.detail, detail: o.detail, note: null, travellerIds: self ? [self.id] : [], agent: { name: agentName() },
+      quote: { id: uuid(), total: money(o.total), text: o.detail, lead: null, needLines: [], status: 'open', expiresAt: new Date(Date.now() + 86_400_000).toISOString(), breakdown: [] },
+      promisedBy: null, createdAt: nowIso(), updatedAt: nowIso() },
+  } as Req);
+  return id;
+}
+
 export function resetBookingMock() { offers.clear(); requests.clear(); orders.clear(); creditSpent.clear(); resetEsimMock(); }
 
 /**

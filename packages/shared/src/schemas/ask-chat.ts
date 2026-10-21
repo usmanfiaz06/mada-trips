@@ -132,6 +132,15 @@ export const ChatCard = z.discriminatedUnion('type', [
    * Mada answers here and offers the tap; the words are carried over to the new chat. Never split silently.
    */
   z.object({ type: z.literal('new_chat'), place: z.string(), text: z.string().max(1000) }),
+  /**
+   * A companion's change the owner approved that costs money (§5.5 step 4), on the payer's phone only: "Abdullah's
+   * change needs booking · SAR 650" with Book · Not now. amount is the desk's quote; null while the team prices it.
+   * Book opens the pay sheet with that quote; nothing is charged from the chat.
+   */
+  z.object({
+    type: z.literal('pay_change'), tripId: Id, changeId: Id, byName: z.string(), tripTitle: z.string(), what: z.string(),
+    requestId: Id.nullable(), amount: z.number().int().nullable(), promisedBy: z.string().nullable(),
+  }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
 

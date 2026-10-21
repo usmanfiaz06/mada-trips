@@ -180,11 +180,13 @@ export async function decideChange(ownerId: string, tripId: string, changeId: st
   if (r.ownerId !== ownerId) throw new AppError("FORBIDDEN");
   if (r.status !== "pending") return viewOf(r, ownerId);
   if (r.expiresAt.getTime() <= Date.now()) return viewOf((await expire(r)) ?? r, ownerId);
+  let added: string[] = [];
   if (b.decision === "approve") {
     const plan = await planRowOf(tripId);
     if (!plan) throw new AppError("NOT_FOUND");
     try {
-      await applyOps(ownerId, tripId, { version: plan.version, ops: await approvable(r, plan.id, plan.startDate) }, "traveller");
+      const res = await applyOps(ownerId, tripId, { version: plan.version, ops: await approvable(r, plan.id, plan.startDate) }, "traveller");
+      added = res.changes.filter((c) => c.op === "add" && c.itemId).map((c) => c.itemId!);
     } catch (e) {
       if (e instanceof AppError && (e.code === "NOT_FOUND" || e.code === "VALIDATION" || e.code === "PLAN_CHANGED")) throw new AppError("VALIDATION", { copy: "people.change.stale", details: { stale: true } });
       throw e;
@@ -195,6 +197,11 @@ export async function decideChange(ownerId: string, tripId: string, changeId: st
     .where(and(eq(appPlanChangeRequests.id, r.id), eq(appPlanChangeRequests.status, "pending"))).returning();
   if (!done) return viewOf(await ownRow(ownerId, tripId, changeId), ownerId);
   await tellAsker(done);
+  // It costs money: the team prices it and the payer's chat gets the card (Book · Not now) once it's priced (U9).
+  if (done.status === "approved" && done.costs) {
+    const { payChangeOnApprove } = await import("../plans/nudges");
+    await payChangeOnApprove(done, added).catch((e) => console.warn("[plans] pay change failed", e instanceof Error ? e.message : e));
+  }
   return viewOf(done, ownerId);
 }
 
@@ -211,7 +218,8 @@ async function approvable(r: Row, planId: string, start: string): Promise<PlanOp
     if (!it || !["booked", "confirmed", "held"].includes(deriveStatus(it, bookings, links.get(it.id) ?? null).status)) return op;
     const extra = Math.max(1, op.item.nights - (it.nights ?? 1));
     const day = (it.day ?? 0) + (it.nights ?? 1);
-    return { op: "add", day, afterItemId: it.id, item: { kind: "stay", title: it.title, nights: extra, note: null } };
+    // The extra nights start the day after the booked ones: an item of that day, so it goes at the end of it.
+    return { op: "add", day, afterItemId: null, item: { kind: "stay", title: it.title, nights: extra, note: null } };
   });
 }
 

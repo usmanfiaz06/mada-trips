@@ -1356,4 +1356,12 @@ export const AR: Record<string, string> = {
   "Choose the plan item": "اختر عنصر الخطة",
   "Link to plan item": "اربط بعنصر في الخطة",
   "Linked to the plan": "تم الربط بالخطة",
+  "Has a plan": "لها خطة",
+  "Plan · {booked} of {items} booked": "خطة · {booked} من {items} محجوز",
+  "Plans": "الخطط",
+  "{n} booked": "{n} محجوز",
+  "{n} priced": "{n} مسعّر",
+  "{n} with the team": "{n} عند الفريق",
+  "{n} ideas": "{n} أفكار",
+  "{n} to do": "{n} للإنجاز",
 };

@@ -261,3 +261,23 @@ export function planTitle(origin: { name: string; city?: string | null } | null,
 
 /** The rank of a status on the way to a confirmed booking (for "the furthest along wins"). */
 export const statusRank = (s: PlanItemStatus) => ({ skipped: -1, cancelled: 0, idea: 1, priced: 2, requested: 3, held: 4, booked: 5, confirmed: 6 })[s];
+
+/**
+ * Today from the plan (ASK-INTEGRATED §1.3, U9): the trip that's near, and what its plan says for today and tomorrow.
+ * pickup: a booked pickup (time and meeting point from the booking) or a car to collect; checkin: a booked stay whose
+ * first night is that day; drive: a drive leg U4 measured ("3 h to Melaka", "leave by" only when the item has a time);
+ * todo: a check that isn't fine (passports from 30 days before, the rest from 7). Times are never made up here.
+ */
+export const TodayPlanWhen = z.enum(['today', 'tomorrow']);
+export const TodayPlanCard = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('pickup'), when: TodayPlanWhen, time: z.string().nullable(), place: z.string().nullable(), car: z.boolean(), href: z.string() }),
+  z.object({ kind: z.literal('checkin'), when: TodayPlanWhen, hotel: z.string(), city: z.string().nullable(), href: z.string() }),
+  z.object({ kind: z.literal('drive'), when: TodayPlanWhen, minutes: z.number().int().positive(), to: z.string(), leaveBy: z.string().nullable(), href: z.string() }),
+  z.object({ kind: z.literal('todo'), check: PlanCheckKey, state: z.enum(['todo', 'warn']), names: z.array(z.string()).max(6), days: z.array(z.number().int()), href: z.string() }),
+]);
+export type TodayPlanCard = z.infer<typeof TodayPlanCard>;
+export const TodayPlanResponse = z.object({
+  trip: z.object({ id: z.string().uuid(), title: z.string(), startDate: z.string(), endDate: z.string(), startsIn: z.number().int() }).nullable(),
+  cards: z.array(TodayPlanCard).max(8),
+});
+export type TodayPlanResponse = z.infer<typeof TodayPlanResponse>;

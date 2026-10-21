@@ -25,9 +25,10 @@ export default async function AskThreadsPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const { page, offset, size } = pageParam(sp);
   const lang = sp.lang === "en" || sp.lang === "ar" ? sp.lang : undefined;
-  const data = await listAskThreads(u, { tab: sp.s, q: sp.q, lang, limit: size, offset });
-  const href = listHref("/adminwork/desk/ask", { s: sp.s, q: sp.q, lang });
-  const filtered = !!(sp.q || lang);
+  const plan = sp.plan === "1";
+  const data = await listAskThreads(u, { tab: sp.s, q: sp.q, lang, plan, limit: size, offset });
+  const href = listHref("/adminwork/desk/ask", { s: sp.s, q: sp.q, lang, plan: plan ? "1" : undefined });
+  const filtered = !!(sp.q || lang || plan);
   const L = t.locale;
   return (
     <>
@@ -36,12 +37,15 @@ export default async function AskThreadsPage({ searchParams }: { searchParams: P
         subtitle={t("Conversations travellers had with Ask Mada in the app. Open one to read it, take it over and reply as yourself, then hand it back to Mada. Every read is logged.")} />
       <Tabs active={data.tab} items={ASK_TABS.map((s) => ({ key: s, label: t(LABEL[s]!), href: href({ s: s === "all" ? undefined : s, page: undefined }), count: data.counts[s] ?? 0 }))} />
       <Card pad={false}>
-        <ListFilter action="/adminwork/desk/ask" q={sp.q} keep={{ s: sp.s }} placeholder={t("Name, phone, email or A-1B2C3D…")} clear={filtered ? href({ q: undefined, lang: undefined, page: undefined }) : null}>
+        <ListFilter action="/adminwork/desk/ask" q={sp.q} keep={{ s: sp.s }} placeholder={t("Name, phone, email or A-1B2C3D…")} clear={filtered ? href({ q: undefined, lang: undefined, plan: undefined, page: undefined }) : null}>
           <select name="lang" defaultValue={lang ?? ""} className="field w-auto" aria-label={t("Language")}>
             <option value="">{t("Any language")}</option>
             <option value="en">{t("English")}</option>
             <option value="ar">{t("Arabic")}</option>
           </select>
+          <label className="inline-flex items-center gap-2 text-[13px] text-ink-2">
+            <input type="checkbox" name="plan" value="1" defaultChecked={plan} data-testid="ask-filter-plan" />{t("Has a plan")}
+          </label>
         </ListFilter>
         <SummaryStrip>
           <span>{t("{n} conversations", { n: data.total })}</span>
@@ -68,6 +72,7 @@ export default async function AskThreadsPage({ searchParams }: { searchParams: P
                     {x.mode === "agent" ? <Badge tone="gold" dot>{x.takenByName ? t("{name} has it", { name: x.takenByName.split(" ")[0]! }) : t("Taken over")}</Badge>
                       : x.handed ? <Badge tone="info">{t("Handed off")}</Badge> : <Badge>{t("Mada answering")}</Badge>}
                     {x.openTicket && <Badge tone="warn">{t("Open ticket")}</Badge>}
+                    {x.plan && <Link href={`/adminwork/desk/customers/${x.ownerId}?tab=plans`} data-testid="ask-row-plan"><Badge tone="ok" dot>{t("Plan · {booked} of {items} booked", { booked: x.plan.booked, items: x.plan.items })}</Badge></Link>}
                   </span></Td>
                   <Td className="whitespace-nowrap">{t(LANG[x.lang] ?? x.lang)}</Td>
                   <Td align="end" className="num">{x.lines}</Td>

@@ -230,6 +230,8 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
   const due = rows.filter((r) => (r.status === "sent" && now - r.createdAt.getTime() > 4000) || (r.status === "reviewing" && now - r.createdAt.getTime() > 9000)
     || (r.status === "confirmed" && now - r.updatedAt.getTime() > 15_000 && (r.details as AskDetails).askKind !== "package"));
   if (!due.length) return false;
+  // Quotes on plan items are told after the writes (plans/nudges.ts): one push that opens the plan.
+  const toldAfter: string[] = [];
   for (const r of due) {
     const age = now - r.createdAt.getTime();
     if (r.status === "sent" && age > 4000) {
@@ -242,6 +244,7 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
     }
     if (r.status === "reviewing" && age > 9000) {
       const q = await quoteFor(r);
+      if (q && r.planItemId) toldAfter.push(r.id);
       const d = r.details as AskDetails;
       await db.transaction(async (tx) => {
         const [cur] = await tx.select().from(appRequests).where(eq(appRequests.id, r.id)).for("update");
@@ -264,6 +267,10 @@ export async function progressRequests(ownerId: string, now = Date.now()): Promi
     if (r.status === "confirmed" && now - r.updatedAt.getTime() > 15_000 && (r.details as AskDetails).askKind !== "package") {
       await db.update(appRequests).set({ status: "done", updatedAt: new Date(now) }).where(and(eq(appRequests.id, r.id), eq(appRequests.status, "confirmed")));
     }
+  }
+  if (toldAfter.length) {
+    const { quoteReady } = await import("../plans/nudges");
+    for (const id of toldAfter) await quoteReady(id).catch(() => false);
   }
   return true;
 }

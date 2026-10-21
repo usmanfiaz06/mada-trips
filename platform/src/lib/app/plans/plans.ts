@@ -166,6 +166,17 @@ export async function resolveOrigin(ownerId: string, said: PlaceInput | null | u
   return null;
 }
 
+/**
+ * The airport a flight search leaves from when nobody said one (U9, memory → origin): the remembered home airport when
+ * it is one we search from (RUH, JED, DMM), else Riyadh, as before.
+ */
+export async function homeAirport(ownerId: string): Promise<"RUH" | "JED" | "DMM"> {
+  const [mem] = await db.select({ text: appAskMemory.text }).from(appAskMemory)
+    .where(and(eq(appAskMemory.ownerId, ownerId), eq(appAskMemory.kind, "home_airport"))).orderBy(desc(appAskMemory.createdAt)).limit(1);
+  const code = mem ? placeInText(mem.text)?.code : null;
+  return code === "JED" || code === "DMM" ? code : "RUH";
+}
+
 /* ───────────── statuses from bookings ───────────── */
 
 type Stay = typeof appStays.$inferSelect;

@@ -110,7 +110,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     strict: true,
     input_schema: obj({
       destination: { type: "string", enum: KEYS },
-      from: { type: ["string", "null"], enum: ["RUH", "JED", "DMM", null], description: "Null means Riyadh." },
+      from: { type: ["string", "null"], enum: ["RUH", "JED", "DMM", null], description: "Null: home airport." },
       depart: day("Leaving"),
       return: nullable("string", { description: "Coming back, YYYY-MM-DD; null for one way." }),
       traveller_ids: ids,
@@ -356,7 +356,7 @@ const PLAN_TOOL_NAMES = new Set(PLAN_TOOLS.map((t) => t.name));
  * TOOLS), shorter words. A field whose meaning is plain from its name loses its description.
  */
 const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
-  search_flights: { d: "Live flights, all-in prices, up to 3 (shown as cards).", p: { from: "Null: Riyadh.", return: "Null: one way.", infants: "Under 2, on a lap." } },
+  search_flights: { d: "Live flights, all-in prices, up to 3 (shown as cards).", p: { from: "Null: home.", return: "Null: one way.", infants: "Under 2, on a lap." } },
   search_stays: { d: "Live hotels, up to 3 (shown as cards). Wishes (pool, sea view, near a landmark, breakfast, free cancellation) filter them.", p: { wishes: "Their words." } },
   get_hotel: { d: "One hotel from a stay card: address, facilities." },
   esim_plans: { d: "eSIM data plans for a place and days.", p: { where: "Key, country or city, in English.", days: "Null: 7." } },

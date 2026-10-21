@@ -14,7 +14,7 @@ import type { Exec } from "./core";
  * the body names the person only when they acted (COPY.md §1).
  */
 
-export type NotifyKind = "gate_change" | "leave_now" | "driver_here" | "booking_confirmed" | "connection_risk" | "flight_cancelled" | "flight_delayed" | "refund_moved" | "agent_reply" | "agent_needs_answer" | "document_problem" | "digest" | "circle" | "other";
+export type NotifyKind = "gate_change" | "leave_now" | "driver_here" | "booking_confirmed" | "connection_risk" | "flight_cancelled" | "flight_delayed" | "refund_moved" | "agent_reply" | "agent_needs_answer" | "document_problem" | "digest" | "circle" | "plan" | "other";
 
 export async function notify(userId: string, n: { kind: NotifyKind; level: "time_sensitive" | "active" | "passive"; copy: string; vars?: NotifyVars; href?: string | null; data?: Record<string, unknown> }, tx: Exec = db) {
   // In the traveller's own language, whoever's action caused it. A parameter may itself be a copy key (a reason),

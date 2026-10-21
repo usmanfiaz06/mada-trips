@@ -14,7 +14,7 @@ import { Badge, Card, CardHead, Empty, KV, Money, Table, Td, Th, cx } from "@/co
 import { PassportReveal } from "@/components/desk/live";
 import { StatusBadge } from "@/components/desk/parts";
 import { revealCustomerPassportAction } from "../actions";
-import { customerPlans } from "@/lib/app/desk/plans";
+import { customerPlans, planState } from "@/lib/app/desk/plans";
 
 /* The customer page's tabs (server components). Each one reads only what it shows. */
 
@@ -74,6 +74,8 @@ export async function OverviewTab({ c, canReveal }: { c: Customer; canReveal: bo
           </Table>
         )}
       </Card>
+
+      <PlanStateCard userId={u.id} />
 
       <Card pad={false}>
         <div className="px-6 pt-6"><CardHead title={t("Open items")} hint={t("Everything this customer is waiting on, oldest first.")} /></div>
@@ -502,6 +504,38 @@ export async function AuditTab({ userId }: { userId: string }) {
           ))}
         </ol>
       )}
+    </Card>
+  );
+}
+
+/** Each plan that hasn't ended, in one line (U9): booked, priced, with the team, ideas and what's left, linking to the plan. */
+async function PlanStateCard({ userId }: { userId: string }) {
+  const t = await getT();
+  const L = t.locale;
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = (await customerPlans(userId)).filter((x) => x.plan.endDate >= today);
+  if (!rows.length) return null;
+  return (
+    <Card>
+      <CardHead title={t("Plans")} />
+      <ul className="space-y-2" data-testid="desk-plan-state">
+        {rows.map((x) => {
+          const s = planState(x.plan);
+          return (
+            <li key={x.tripId} className="flex flex-wrap items-center justify-between gap-2 text-[13.5px]">
+              <Link href="?tab=plans" className={linkCls}><bdi>{x.title}</bdi></Link>
+              <span className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[12.5px] text-ink-3">{fmtDate(new Date(`${x.plan.startDate}T12:00:00Z`), L)}</span>
+                <Badge tone={s.booked ? "ok" : "neutral"}>{t("{n} booked", { n: s.booked })}</Badge>
+                {s.priced > 0 && <Badge tone="gold">{t("{n} priced", { n: s.priced })}</Badge>}
+                {s.requested > 0 && <Badge tone="info">{t("{n} with the team", { n: s.requested })}</Badge>}
+                {s.ideas > 0 && <Badge>{t("{n} ideas", { n: s.ideas })}</Badge>}
+                {s.todo > 0 && <Badge tone="warn" dot>{t("{n} to do", { n: s.todo })}</Badge>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

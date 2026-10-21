@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { and, eq, isNull, like } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, lt, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { appDevices, appPayments, appUsers } from "@/db/app-schema";
 import { appOrderEvents, appOrders } from "@/db/app-schema-booking";
@@ -152,24 +152,32 @@ describe("alerts fire once", () => {
     await db.insert(appDevices).values({ userId: lead!.id, pushToken: "ExponentPushToken[overviewoncall01]", platform: "ios" }).onConflictDoNothing();
     const prev = process.env.DESK_ONCALL_PHONE;
     process.env.DESK_ONCALL_PHONE = phone;
+    // Other files leave running tickets that are late too, and the alerts read the 50 most overdue: park them for this
+    // test (paused tickets aren't "running") so this one is read, and give them back after. No open alert carries over.
+    const parked = await db.update(deskTickets).set({ pausedAt: now })
+      .where(and(inArray(deskTickets.status, ["new", "open"]), isNull(deskTickets.pausedAt), lt(deskTickets.dueAt, now), ne(deskTickets.id, late.id)))
+      .returning({ id: deskTickets.id });
+    await db.update(deskAlerts).set({ clearedAt: new Date(now.getTime() - MIN) }).where(isNull(deskAlerts.clearedAt));
     try {
+      // The mock outboxes put the newest first: what this test sent is the head of each list.
       const before = outbox.length, pushBefore = pushOutbox.length;
+      const sentSince = <T,>(list: T[], n: number) => list.slice(0, list.length - n);
       const first = await evaluateAlerts(now);
       const sla = first.fired.filter((a) => a.key === `sla:${late.id}:${late.slaStartedAt.getTime()}`);
       expect(sla).toHaveLength(1);
       const noduty = first.fired.filter((a) => a.kind === "noduty");
       expect(noduty).toHaveLength(1);
       expect(noduty[0]!.paged).toMatch(/sms/);
-      const sms = outbox.slice(before).filter((o) => o.channel === "sms" && o.to === phone);
+      const sms = sentSince(outbox, before).filter((o) => o.channel === "sms" && o.to === phone);
       expect(sms).toHaveLength(1);
       expect(sms[0]!.body).toMatch(/urgent/i);
-      expect(pushOutbox.slice(pushBefore).filter((p) => p.to === "ExponentPushToken[overviewoncall01]")).toHaveLength(1);
+      expect(sentSince(pushOutbox, pushBefore).filter((p) => p.to === "ExponentPushToken[overviewoncall01]")).toHaveLength(1);
 
       // Again, and again later: nothing new fires and nobody is paged twice.
       const again = await evaluateAlerts(new Date(now.getTime() + 5 * MIN));
       expect(again.fired.filter((a) => a.kind === "sla" || a.kind === "noduty")).toHaveLength(0);
       await evaluateAlerts(new Date(now.getTime() + 10 * MIN));
-      expect(outbox.slice(before).filter((o) => o.channel === "sms" && o.to === phone)).toHaveLength(1);
+      expect(sentSince(outbox, before).filter((o) => o.channel === "sms" && o.to === phone)).toHaveLength(1);
       expect(await db.select().from(deskAlerts).where(like(deskAlerts.key, `sla:${late.id}:%`))).toHaveLength(1);
       expect(await db.select().from(deskAlerts).where(and(eq(deskAlerts.kind, "noduty"), isNull(deskAlerts.clearedAt)))).toHaveLength(1);
 
@@ -193,6 +201,7 @@ describe("alerts fire once", () => {
       expect(next.fired.filter((a) => a.key === `sla:${late.id}:${restart.getTime()}`)).toHaveLength(1);
     } finally {
       if (prev === undefined) delete process.env.DESK_ONCALL_PHONE; else process.env.DESK_ONCALL_PHONE = prev;
+      if (parked.length) await db.update(deskTickets).set({ pausedAt: null }).where(inArray(deskTickets.id, parked.map((p) => p.id)));
     }
   });
 

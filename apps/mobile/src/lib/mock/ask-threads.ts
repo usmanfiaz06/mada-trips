@@ -175,6 +175,14 @@ export function setMockTripChat(user: MockUser, tripId: string, on: boolean) {
   return mockTripChat(user, tripId);
 }
 
+/** A line in the owner's own chat about the trip (the payer's card for a change, U9). */
+export function mockOwnerTripLine(user: MockUser, tripId: string, line: AskThreadLine) {
+  const th = threadsOf(user).find((x) => x.tripId === tripId && x.kind !== 'trip');
+  if (!th) return;
+  th.lines.push(line);
+  th.lastAt = Date.now();
+}
+
 /** A line Mada adds to the trip chat (the organiser approved in place). */
 export function mockTripChatLine(user: MockUser, tripId: string, text: string) {
   const th = tripChatOf(user, tripId);

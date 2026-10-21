@@ -51,7 +51,7 @@ export const askPeopleCopy = {
   'people.change.costsTheirs': '{name} books and pays for anything this needs.',
   'people.change.until': 'Open until {time}',
   'people.change.why': 'Because: {reason}',
-  'people.change.stale': 'The plan changed since this was asked. Ask again from the plan as it is now.',
+  'people.change.stale': 'The plan changed after this was asked. Ask again from the latest plan.',
   'people.change.bookNext': 'Approved. Book the extra night from the plan.',
   'people.change.openPlan': 'Open the trip',
   // The lines Mada adds to each chat

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { create } from 'zustand';
 import {
-  LivingPlanResponse, PlanChangeAskResponse, PlanChangeResponse, TripChatResponse, planRoute, tripChatRoute,
+  LivingPlanResponse, PlanChangeAskResponse, PlanChangeResponse, TodayPlanResponse, TripChatResponse, planRoute, tripChatRoute,
   type ChangeAsk, type CreatePlanRequest, type PlanOp, type SetOriginRequest,
 } from '@mada/shared';
 import { ApiError, request } from './api';
@@ -36,7 +36,17 @@ export const plansApi = {
   ask: (tripId: string, body: ChangeAsk) => request({ method: 'POST', path: `/trips/${tripId}/change-requests`, body }, PlanChangeAskResponse),
   tripChat: (tripId: string) => request({ method: 'GET', path: tripChatRoute(tripId) }, TripChatResponse),
   setTripChat: (tripId: string, on: boolean) => request({ method: on ? 'POST' : 'DELETE', path: tripChatRoute(tripId) }, TripChatResponse),
+  /** Today from the plan (U9): the trip that's near and its cards for today and tomorrow. */
+  today: () => request({ method: 'GET', path: '/trips/plan-today' }, TodayPlanResponse),
 };
+
+export const todayPlanKey = ['plan', 'today'] as const;
+
+/** Today's cards from the plan; read again whenever Today opens (a booking or the desk may have changed the plan). */
+export function useTodayPlan() {
+  const on = useSession((s) => s.status) === 'signedIn';
+  return useQuery({ queryKey: todayPlanKey, queryFn: () => plansApi.today(), enabled: on, refetchOnMount: 'always', staleTime: 30_000 });
+}
 
 const signedIn = () => useSession.getState().status === 'signedIn';
 

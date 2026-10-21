@@ -636,7 +636,7 @@ async function sendQuoteHere(actor: DeskActor, id: string, v: { lines: { label: 
   if (lines.some((l) => !Number.isInteger(l.amount) || Math.abs(l.amount) > 100_000_000_00 || l.label.length > 80)) throw new DeskError("Check each line's name and amount");
   const total = lines.reduce((s, l) => s + l.amount, 0);
   if (total <= 0) throw new DeskError("The total must be more than zero");
-  return db.transaction(async (tx) => {
+  const sent = await db.transaction(async (tx) => {
     const r = await lockRequest(tx, id);
     if (["confirmed", "done", "cancelled"].includes(r.status)) throw new DeskError("This request is already closed", "CONFLICT");
     await tx.update(appQuotes).set({ status: "withdrawn" }).where(and(eq(appQuotes.requestId, id), eq(appQuotes.status, "open")));
@@ -645,10 +645,14 @@ async function sendQuoteHere(actor: DeskActor, id: string, v: { lines: { label: 
     await claim(tx, r, actor);
     await tx.update(appRequests).set({ status: "quoted", updatedAt: new Date() }).where(eq(appRequests.id, id));
     const { agent } = await agentMessage(tx, "request", id, actor, copy("desk.quote.sent"), { quoteId: q!.id, total, lines });
-    await notify(tx, r.ownerId, { kind: "agent_reply", level: "active", title: "notify.desk.quote.title", body: "notify.desk.quote.body", vars: { agent: agent.name, summary: r.summary }, href: `/requests/${id}` });
+    // A request for a plan item is told once, after the commit, opening the plan at the item (plans/nudges.ts).
+    if (!r.planItemId) await notify(tx, r.ownerId, { kind: "agent_reply", level: "active", title: "notify.desk.quote.title", body: "notify.desk.quote.body", vars: { agent: agent.name, summary: r.summary }, href: `/requests/${id}` });
     await deskAudit(tx, actor, { action: "desk.quote.sent", entityType: "request", entityId: id, ref: shortRef(id), summary: `Sent a quote for ${shortRef(id)}: ${sarText(total)} in ${lines.length} line${lines.length === 1 ? "" : "s"}`, data: { quoteId: q!.id, total } });
     return q!;
   });
+  const { quoteReady } = await import("../plans/nudges");
+  await quoteReady(id).catch((e) => console.warn("[plans] quote nudge failed", e instanceof Error ? e.message : e));
+  return sent;
 }
 
 /** What the traveller has to bring, per service (FLOWS.md §4: every pilgrim needs their own Nusuk permit). */

@@ -78,7 +78,7 @@ export const askDocsCopy = {
   'share.status.declined': '{name} didn’t share it this time.',
   'share.status.expired': 'This request has ended.',
   'share.screen.title': 'Share your passport for this trip?',
-  'share.screen.body': '{name} is booking {trip}. They see your name, the last two characters of your passport and when it expires, until {until}. Never the number.',
+  'share.screen.body': '{name} is booking {trip}. Until {until}, they see your name, the last two characters of your passport and its expiry. Never the number.',
   'share.screen.share': 'Share for this trip',
   'share.screen.decline': 'Not now',
   'share.screen.done': 'Shared until {until}. You can stop it from Documents.',

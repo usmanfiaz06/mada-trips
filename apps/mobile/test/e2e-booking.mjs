@@ -133,7 +133,8 @@ async function flights() {
   await k.see('Checking flights to Istanbul', 'working');
   await k.shot('ask-working', 200);
   await k.see('Three ways to get there.', 'results', 12000);
-  await k.see('Riyadh → Istanbul · 9–15 Mar 2027', 'summary');
+  // No start said: flights leave from the home airport Mada remembers (the mock remembers "Flies from Jeddah"; U9).
+  await k.see('Jeddah → Istanbul · 9–15 Mar 2027', 'summary');
   await k.see('4 people · Economy', 'party');
   await k.see('SAR 8,100', 'saudia price'); // Ahmed is 10: a child fare
   await k.shot('results');

@@ -22,6 +22,7 @@ import { deskTicketsJob } from "./desk/tickets";
 import { financeJob } from "./finance/job";
 import { nightCover } from "./desk/oncall";
 import { evaluateAlerts } from "./desk/alerts";
+import { planChecksJob } from "./plans/nudges";
 import { changeRequestsJob } from "./trips/change-requests";
 import { documentsJob } from "./ask-chat/attachments";
 import { expireShares } from "./ask-chat/doc-shares";
@@ -151,7 +152,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob(), ...await changeRequestsJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob(), documents: async () => ({ ...await documentsJob(), sharesExpired: await expireShares() }) };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob(), ...await changeRequestsJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: async () => { const r = await deskTicketsJob(); const n = await nightCover(); const al = await evaluateAlerts(); return { ...r, paged: n.paged, alerts: al.fired.length, alertsCleared: al.cleared }; }, finance: () => financeJob(), documents: async () => ({ ...await documentsJob(), sharesExpired: await expireShares(), ...await planChecksJob() }) };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

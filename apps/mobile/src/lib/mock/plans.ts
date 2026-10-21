@@ -1,5 +1,5 @@
 import {
-  ERROR_CODES, PLANS, PlanOpsRequest, addDays, daysBetween, localeOr, planTitle, t, todayIn,
+  ERROR_CODES, PLANS, PlanOpsRequest, TODAY_PASSPORT_DAYS, addDays, daysBetween, localeOr, planTitle, t, todayCards, todayIn,
   type ChatCard, type ErrorCode, type Plan, type PlanCheck, type PlanItem, type PlanPlace, type PlanOp,
 } from '@mada/shared';
 import type { WireResponse } from '../api';
@@ -179,8 +179,25 @@ export function mockPlanCard(user: MockUser, plan: Plan): ChatCard {
 
 export function resetPlansMock() { plans.clear(); }
 
+/**
+ * GET /trips/plan-today (U9): the nearest plan and its cards, built by the same shared todayCards() the server uses.
+ * Mock only: `__MADA_DEMO__.planToday = n` reads the day as n days from the plan's start (-1: the day before), so
+ * e2e and screenshots can stand on a near day.
+ */
+function planToday(user: MockUser): WireResponse {
+  const shift = (globalThis as { __MADA_DEMO__?: { planToday?: number } }).__MADA_DEMO__?.planToday;
+  const mine = [...plans.values()].filter((s) => s.owner === user.id).map((s) => read(user, s).plan).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const today = todayIn();
+  const near = typeof shift === 'number' ? mine.find((p) => p.endDate >= today) ?? mine[0]
+    : mine.find((p) => p.endDate >= today && p.startDate <= addDays(today, TODAY_PASSPORT_DAYS));
+  if (!near) return ok({ trip: null, cards: [] });
+  const day = typeof shift === 'number' ? addDays(near.startDate, shift) : today;
+  return ok({ trip: { id: near.tripId, title: near.title, startDate: near.startDate, endDate: near.endDate, startsIn: daysBetween(day, near.startDate) }, cards: todayCards(near, day) });
+}
+
 export const plansMock: AreaMock = async (w, ctx) => {
   const path = w.path.split('?')[0] ?? '';
+  if (path === '/trips/plan-today' && w.method === 'GET') return ctx.user ? planToday(ctx.user) : err('UNAUTHORIZED');
   const create = path === '/trips/plan';
   const m = /^\/trips\/([0-9a-f-]{36})\/(plan|change-requests|chat)(?:\/(ops|items|origin|events))?(?:\/([0-9a-f-]{36}))?$/.exec(path);
   if (!create && !m) return null;

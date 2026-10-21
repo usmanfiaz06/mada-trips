@@ -19,6 +19,7 @@ import { isSensitive, saveFact, unkeepable } from "./memory";
 import { PEOPLE_RUN, peopleStatus } from "./tools-people";
 import { PLAN_RUN, PLAN_STATUS } from "./tools-plan";
 import { esimOffer, priceItems, resolveItemIds } from "../plans/booking";
+import { homeAirport } from "../plans/plans";
 import { DOC_RUN } from "./tools-docs";
 
 /*
@@ -97,7 +98,8 @@ const RUN: Record<string, Run> = {
     const depart = iso(a.depart);
     if (!DESTINATIONS[destination] || !depart) return { text: "Not searched: need a destination key and a departure day (YYYY-MM-DD).", isError: true };
     if (depart < ctx.today) return { text: `Not searched: ${depart} is in the past (today is ${ctx.today}).`, isError: true };
-    const from: "RUH" | "JED" | "DMM" = a.from === "JED" || a.from === "DMM" ? a.from : "RUH";
+    // Not said: the remembered home airport (memory → origin), else Riyadh.
+    const from: "RUH" | "JED" | "DMM" = a.from === "RUH" || a.from === "JED" || a.from === "DMM" ? a.from : await homeAirport(ctx.ownerId);
     const ret = iso(a.return);
     // Flights by request (switches.ts): the same answer the app's own flows give, never a price.
     if (flightsMode() === "request") return { text: requestModeText(destName(destination), depart, ret && ret > depart ? ret : null), mode: "request" };
@@ -209,7 +211,7 @@ const RUN: Record<string, Run> = {
       kind, query: summary, travellerIds, note: "",
       contactPreference: a.contact_preference === "call" || a.contact_preference === "whatsapp" || a.contact_preference === "in_app" ? a.contact_preference : null,
       contactWindow: typeof a.contact_window === "string" && a.contact_window.trim() ? redact(a.contact_window).text.slice(0, 60) : null,
-      ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
+      ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: kind === "flight" ? await homeAirport(ctx.ownerId) : null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
       ...(planItemId ? { planItemId } : ctx.tripId ? { tripId: ctx.tripId } : {}), ...(car ? { car } : {}),
     } as Parameters<typeof createRequest>[1], ctx.ipHash);
     const by = r.promisedBy ? riyadhClock(r.promisedBy, ctx.today) : null;

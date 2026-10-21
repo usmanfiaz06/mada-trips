@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { DESTINATIONS, addDays, formatSar, type Plan, type PlanItem, type PlanOp, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
@@ -38,6 +38,9 @@ export default function PlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const q = usePlan(id);
+  // Back on the plan after booking or a chat: read it again (the event map, §1.3: picked up on focus).
+  const { refetch } = q;
+  useFocusEffect(useCallback(() => { void refetch(); }, [refetch]));
   usePlanSync(id);
   const queue = usePlanQueue((s) => s.edits);
   const conflict = usePlanQueue((s) => (s.conflict?.tripId === id ? s.conflict : null));

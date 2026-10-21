@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import type { Plan } from "@mada/shared";
+import { t, type Plan } from "@mada/shared";
 import { db } from "@/db";
 import { appPeople, appRequests, appTrips, appUsers } from "@/db/app-schema";
 import { appAskThreads } from "@/db/app-schema-ask";
@@ -8,6 +8,8 @@ import { appPlanItems, appPlans } from "@/db/app-schema-plans";
 import { appTripTravellers } from "@/db/app-schema-trips";
 import { readPlan } from "../plans/plans";
 import { linkRequest } from "../plans/booking";
+import { appendLine, primaryThreadOf } from "../ask-chat/store";
+import { localeOfUser } from "../locale";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
 
 /*
@@ -83,4 +85,19 @@ export async function linkRequestToItem(actor: DeskActor, requestId: string, ite
   const done = await linkRequest(r.ownerId, itemId, requestId, "desk");
   if (!done || !item) throw new DeskError("That plan item can't be linked (it's booked, gone, or on someone else's trip)");
   await deskAudit(db, actor, { action: "desk.request.plan_linked", entityType: "request", entityId: requestId, summary: `Linked to plan item: ${item.title}`, data: { itemId, tripId: done.tripId } });
+  // Desk edits are said in the traveller's chat for the trip (§3.6), in their language.
+  const thread = await primaryThreadOf(r.ownerId, done.tripId);
+  if (thread) await appendLine(r.ownerId, thread.id, { who: "mada", text: t("plan.line.desk", { title: item.title }, await localeOfUser(r.ownerId)), at: new Date().toISOString() });
+}
+
+/** A plan's state in one line for the desk (U9): how many items are booked, priced, with the team, still ideas, and the open checks. */
+export function planState(plan: Pick<Plan, "items" | "checks">): { booked: number; priced: number; requested: number; ideas: number; todo: number } {
+  const live = plan.items.filter((i) => i.status !== "skipped" && i.status !== "cancelled");
+  return {
+    booked: live.filter((i) => i.status === "booked" || i.status === "confirmed" || i.status === "held").length,
+    priced: live.filter((i) => i.status === "priced").length,
+    requested: live.filter((i) => i.status === "requested").length,
+    ideas: live.filter((i) => i.status === "idea").length,
+    todo: plan.checks.filter((c) => c.state === "todo" || c.state === "warn").length,
+  };
 }

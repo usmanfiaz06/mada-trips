@@ -4,6 +4,7 @@
  *
  *   npm run ask:eval                         the provider in the environment (ASK_CHAT_PROVIDER, default anthropic)
  *   npm run ask:eval -- visa-uk ar-esim      some cases only
+ *   npm run ask:eval -- --plan               the eight living-plan conversations (road trip, start from Jeddah, cars…)
  *   npm run ask:eval -- --provider anthropic,groq,zai,gemini [--model a,b] [--price 0.15,0.6,0.075]
  *     presets read GROQ_API_KEY, ZAI_API_KEY, GEMINI_API_KEY; without --model each runs its preset's models
  *     (groq: gpt-oss-120b, llama-3.3-70b, qwen3.8-27b; zai: glm-4.7-flash, glm-4.5-flash, glm-5.3-flash;
@@ -21,7 +22,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { apiFor, type ProviderConfig } from "../src/lib/app/ask-chat/providers";
 import { PRESETS, askChatModel, askFastModel, chatProvider, isPreset, parsePrice, type ChatProviderName, type Price } from "../src/lib/app/ask-chat/config";
 import { listModels } from "../src/lib/app/ask-chat/providers-openai";
-import { EVAL_CASES, runEvals, summarise, type EvalSummary } from "../src/lib/app/ask-chat/evals";
+import { EVAL_CASES, PLAN_EVAL_IDS, runEvals, summarise, type EvalSummary } from "../src/lib/app/ask-chat/evals";
 
 type Profile = { label: string; provider: ChatProviderName; model: string; fastModel?: string; baseUrl?: string; apiKeyEnv?: string; price?: Price | null; openapi?: boolean };
 
@@ -73,7 +74,8 @@ async function profiles(): Promise<Profile[]> {
   return [{ label: provider, provider, model: askChatModel(), fastModel: askFastModel(), baseUrl: process.env.ASK_CHAT_BASE_URL, apiKeyEnv: provider === "anthropic" ? "ANTHROPIC_API_KEY" : "ASK_CHAT_API_KEY", price: parsePrice(process.env.ASK_CHAT_PRICE) }];
 }
 
-const only = args.filter((a, i) => !a.startsWith("-") && !/^--(provider|model|price)$/.test(args[i - 1] ?? ""));
+// --plan: the eight living-plan conversations (ASK-INTEGRATED.md §11 U3) on their own.
+const only = [...args.filter((a, i) => !a.startsWith("-") && !/^--(provider|model|price)$/.test(args[i - 1] ?? "")), ...(args.includes("--plan") ? PLAN_EVAL_IDS : [])];
 const runs: { p: Profile; s: EvalSummary }[] = [];
 let anyFailed = false;
 for (const p of await profiles()) {

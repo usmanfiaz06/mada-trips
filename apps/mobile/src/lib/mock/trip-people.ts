@@ -162,6 +162,15 @@ export const tripPeopleMock: AreaMock = async (w, ctx) => {
         const { mockTripChatLine } = await import('./ask-threads');
         const l = lang();
         mockTripChatLine(user, c.tripId, (c.status as string) === 'approved' ? t('people.line.approved', { owner: c.ownerName, summary: c.summary }, l) : t('people.line.declined', { owner: c.ownerName }, l));
+        // It costs money (U9): the team prices it, and the payer's chat gets the card with Book · Not now. The mock desk
+        // prices it at once (a sample price for screenshots and e2e; the server's comes from the desk's quote).
+        if ((c.status as string) === 'approved' && c.costs && c.ownerId === user.id) {
+          const { mockOwnerTripLine } = await import('./ask-threads');
+          const { mockQuotedChange } = await import('./booking');
+          const what = c.lines.find((x) => x.field === 'nights')?.title ?? c.summary;
+          const requestId = mockQuotedChange(user, { title: what, detail: c.summary, total: 650_00 });
+          mockOwnerTripLine(user, c.tripId, { who: 'mada', text: t('people.line.priced', { name: c.byName }, l), kept: [{ type: 'pay_change', tripId: c.tripId, changeId: c.id, byName: c.byName, tripTitle: c.tripTitle, what, requestId, amount: 650_00, promisedBy: null }], at: new Date().toISOString() });
+        }
       }
       return ok({ change: viewOf(c, user.id) });
     }

@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, type Href } from 'expo-router';
-import { dayLabel, timeLabel, type ChangeLine, type ChangeRequestView, type ChatCard } from '@mada/shared';
+import { dayLabel, formatSar, timeLabel, type ChangeLine, type ChangeRequestView, type ChatCard } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Field } from '@/components/Field';
 import { Pill } from '@/components/Pill';
@@ -11,6 +11,7 @@ import { sendAskChat } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { peopleApi, pk, useChange } from '@/lib/trip-people';
+import { kvReadJson, kvWriteJson } from '@/lib/net/kv';
 import { colors } from '@/theme';
 import { Frame, Line, s } from './PeopleFrame';
 
@@ -102,6 +103,47 @@ export function ChangeRequestCard({ card }: { card: ChangeChatCard }) {
             onPress={() => { buzz('tap'); void sendAskChat(t('people.change.changeItSay', { name: c.byName, trip: c.tripTitle }), { tripId: c.tripId }); }} style={{ height: 44, flexGrow: 1 }} testID="chat-change-edit" />
         </View>
       ) : null}
+    </Frame>
+  );
+}
+
+/* ───────── the payer's card for a change that needs booking (§5.5 step 4, U9) ───────── */
+
+type PayChangeChatCard = Extract<ChatCard, { type: 'pay_change' }>;
+const LATER_KEY = 'mada.payChange.later.v1';
+let later: Set<string> | null = null;
+const laterSet = async () => (later ??= new Set(((await kvReadJson<string[]>(LATER_KEY)) ?? []).slice(-50)));
+
+/**
+ * "Abdullah's change needs booking · SAR 650" with Book · Not now, on the payer's phone only. Book opens the pay sheet
+ * with the team's quote (nothing is charged from the chat); Not now folds it to one line, kept on this phone. While the
+ * team prices it, it says when they're back instead.
+ */
+export function PayChangeCard({ card }: { card: PayChangeChatCard }) {
+  const router = useRouter();
+  const key = card.requestId ?? card.changeId;
+  const [parked, setParked] = useState(false);
+  useEffect(() => { void laterSet().then((s) => { if (s.has(key)) setParked(true); }); }, [key]);
+  const park = async () => {
+    buzz('tap');
+    setParked(true);
+    const s = await laterSet();
+    s.add(key);
+    await kvWriteJson(LATER_KEY, [...s]);
+  };
+  const priced = card.amount != null && !!card.requestId;
+  if (priced && parked) return <View testID="chat-pay-change-parked"><Line icon="card" text={t('chat.payChange.parked')} /></View>;
+  return (
+    <Frame icon="card" title={t('chat.payChange.title', { name: card.byName })} sub={`${card.what} · ${card.tripTitle}`}
+      pill={priced ? <View testID="chat-pay-change-amount"><Pill label={formatSar(card.amount!)} variant="gold" style={{ marginTop: 2, alignSelf: 'flex-start' }} /></View> : null} testID="chat-pay-change">
+      {priced ? (
+        <View style={s.buttons}>
+          <Button size="small" block={false} label={t('chat.payChange.book')} onPress={() => { buzz('tap'); router.push(`/pay?requestId=${card.requestId}` as Href); }} style={{ height: 44, flexGrow: 1 }} testID="chat-pay-change-book" />
+          <Button size="small" block={false} variant="secondary" label={t('chat.payChange.later')} onPress={() => void park()} style={{ height: 44, flexGrow: 1, backgroundColor: colors.mist }} testID="chat-pay-change-later" />
+        </View>
+      ) : (
+        <Line icon="calendar" text={card.promisedBy ? t('chat.payChange.pricing', { time: `⁦${card.promisedBy}⁩` }) : t('people.line.needsBooking', { name: card.byName })} testID="chat-pay-change-pricing" />
+      )}
     </Frame>
   );
 }

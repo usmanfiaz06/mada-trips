@@ -31,6 +31,7 @@ import { Answered } from './Conversation';
 import { PhoneGate, usePhoneNeeded } from './PhoneSheet';
 import { FlightRequestForm } from './FlightRequest';
 import { useFlightsByRequest } from '@/lib/beta';
+import { useHomeAirport } from '@/lib/ask-memory';
 import { SearchSheet, type TripSearch } from './SearchSheet';
 import { TravellerChips } from './Travellers';
 import { FareBreakdown, PartyStep } from './Party';
@@ -67,7 +68,7 @@ function monthWeeks(year: number, month: number, today: string): [string, string
 }
 
 /* The first search of a flow, built the same way here and in useFlightHeadStart, so a search started early is the one the flow shows. */
-const tripOf = (intent: AskIntent): TripSearch => ({ from: intent.from ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
+const tripOf = (intent: AskIntent, home: TripSearch['from'] | null = null): TripSearch => ({ from: intent.from ?? home ?? 'RUH', type: intent.tripType ?? 'return', dep: intent.depart, ret: intent.return, cabin: intent.cabin ?? 'economy', infants: intent.infants, flex: false });
 const whoOf = (intent: AskIntent, H: Household): string[] => (intent.travellerIds?.length ? intent.travellerIds : H.nonHelper.length ? H.nonHelper.map((p) => p.id) : H.me ? [H.me] : []);
 const flightsKey = (dest: string | undefined, trip: TripSearch, who: string[], flex: boolean, runKey: number, flags: string) => ['booking', 'flights', dest, trip, who.join(), flex, runKey, flags];
 const flightsBody = (dest: string, trip: TripSearch, who: string[], flex: boolean): FlightSearchRequest => ({ from: trip.from, destination: dest, depart: trip.dep!, return: trip.type === 'oneway' ? null : trip.ret, travellerIds: who, infants: trip.infants, cabin: trip.cabin, flexibleDays: flex || trip.flex ? 2 : 0 });
@@ -83,10 +84,11 @@ export function useFlightHeadStart(people: Person[], today: string) {
   const demo = useDemo((s) => s.on);
   const byRequest = useFlightsByRequest();
   const phoneNeeded = usePhoneNeeded();
+  const home = useHomeAirport();
   return (intent: AskIntent) => {
     if (byRequest || phoneNeeded || intent.kind !== 'flight' || intent.ask || !people.length || isOffline()) return;
     const dest = intent.destination ? DESTINATIONS[intent.destination] : undefined;
-    const trip = tripOf(intent);
+    const trip = tripOf(intent, home);
     if (!dest || dest.byHand || !trip.dep || (trip.type === 'return' && !trip.ret)) return;
     const H = householdOf(people, today);
     // Who is going is settled without asking (FlightFlow's whoDone): named, or a household of one.
@@ -115,7 +117,10 @@ export function FlightFlow({ intent, query, people, selfName, today, setCta, onS
   const [where, setWhere] = useState<{ key: string | null; other: string | null }>({ key: intent.destination && intent.destination !== 'other' ? intent.destination : null, other: intent.destination === 'other' ? intent.destinationName : null });
   const [askingCity, setAskingCity] = useState(false);
   const [cityDraft, setCityDraft] = useState('');
-  const [trip, setTrip] = useState<TripSearch>(() => tripOf(intent));
+  const home = useHomeAirport();
+  const [trip, setTrip] = useState<TripSearch>(() => tripOf(intent, home));
+  // The remembered home airport can arrive after the flow opens: leave from it unless a start was said.
+  useEffect(() => { if (!intent.from && home) setTrip((tr) => (tr.from === 'RUH' && home !== 'RUH' ? { ...tr, from: home } : tr)); }, [home, intent.from]);
   const nonHelper = H.nonHelper.map((p) => p.id);
   const [who, setWho] = useWho(() => whoOf(intent, H));
   // Asked only for a household of more than one, which may arrive after the flow opens.

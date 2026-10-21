@@ -48,7 +48,14 @@ const isLead = (a: DeskActor) => a.permissions.has("desk.admin");
 const mayList = (a: DeskActor) => isLead(a) || a.permissions.has("desk.ask.read");
 
 /** The Ask threads list: search (name, phone, email, A-ref), tabs, language, 50 to a page. Never the words. */
-export async function listAskThreads(actor: DeskActor, o: { tab?: string; q?: string; lang?: string; limit?: number; offset?: number } = {}) {
+/** The plan behind a chat's trip (ASK-INTEGRATED §10): its version and how far along it is, from the items' status cache. */
+const PLAN_OF = sql<{ v: number; booked: number; items: number } | null>`(SELECT json_build_object('v', p.version,
+  'booked', (SELECT count(*) FROM app_plan_items i WHERE i.plan_id = p.id AND i.deleted_at IS NULL AND i.status IN ('booked','confirmed')),
+  'items', (SELECT count(*) FROM app_plan_items i WHERE i.plan_id = p.id AND i.deleted_at IS NULL AND i.status NOT IN ('skipped','cancelled')))
+  FROM app_plans p WHERE p.trip_id = ${appAskThreads.tripId})`;
+const HAS_PLAN = sql<boolean>`EXISTS (SELECT 1 FROM app_plans p WHERE p.trip_id = ${appAskThreads.tripId})`;
+
+export async function listAskThreads(actor: DeskActor, o: { tab?: string; q?: string; lang?: string; plan?: boolean; limit?: number; offset?: number } = {}) {
   if (!mayList(actor)) throw new DeskError("You don't have access to Ask conversations", "FORBIDDEN");
   const tab: AskTab = (ASK_TABS as readonly string[]).includes(o.tab ?? "") ? (o.tab as AskTab) : "all";
   const q = (o.q ?? "").trim();
@@ -57,13 +64,13 @@ export async function listAskThreads(actor: DeskActor, o: { tab?: string; q?: st
   const search = !q ? undefined : ref ? sql`replace(${appAskThreads.id}::text, '-', '') LIKE ${`${ref}%`}`
     : sql`(${appUsers.name} ILIKE ${`%${q}%`} OR ${DESK_TITLE} ILIKE ${`%${q}%`} OR lower(${appUsers.email}) LIKE ${`%${q.toLowerCase()}%`}${digits.length >= 5 ? sql` OR regexp_replace(${appUsers.phone}, '[^0-9]', '', 'g') LIKE ${`%${digits}%`}` : sql``})`;
   const lang = o.lang === "en" || o.lang === "ar" ? eq(appAskThreads.lang, o.lang) : undefined;
-  const base = and(search, lang);
+  const base = and(search, lang, o.plan ? HAS_PLAN : undefined);
   const where = and(base, TAB_WHERE[tab]);
   const [rows, [tot], [counts]] = await Promise.all([
     db.select({
       id: appAskThreads.id, ownerId: appAskThreads.ownerId, lang: appAskThreads.lang, turns: appAskThreads.turns, mode: appAskThreads.mode,
       // The chat's title (ASK-INTEGRATED.md §2.3, §10): what it's about, never the words inside.
-      title: DESK_TITLE, tripId: appAskThreads.tripId,
+      title: DESK_TITLE, tripId: appAskThreads.tripId, plan: PLAN_OF,
       createdAt: appAskThreads.createdAt, updatedAt: appAskThreads.updatedAt, handedOffAt: appAskThreads.handedOffAt,
       handed: HANDED, openTicket: OPEN_TICKET, customer: appUsers.name,
       // The first name travellers see, else the Ops login's name.

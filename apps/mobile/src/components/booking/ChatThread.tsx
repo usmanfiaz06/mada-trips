@@ -23,7 +23,7 @@ import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { DemoFare } from './DemoFare';
 import { ChoiceCard } from './ChoiceCard';
 import { InviteCard } from './InviteCard';
-import { ChangeRequestCard } from './ChangeRequestCard';
+import { ChangeRequestCard, PayChangeCard } from './ChangeRequestCard';
 import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
 import { DocumentCard, ShareCard } from './DocCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
@@ -317,6 +317,8 @@ function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn
       return <InviteCard card={card} />;
     case 'change':
       return <ChangeRequestCard card={card} />;
+    case 'pay_change':
+      return <PayChangeCard card={card} />;
     // The living plan (PlanCards.tsx): Review the plan opens the plan screen (app/trip/[id]/plan.tsx).
     case 'plan':
       return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'link', screen: 'plan', id: card.tripId })} onSay={onSay} />;

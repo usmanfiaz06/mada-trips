@@ -15,7 +15,7 @@ export const bookReadyCopy = {
   'ready.noCard': 'Add a card in Wallet to book from here.',
   'ready.slide': 'Slide to book',
   'ready.nothing': 'Choose at least one to book.',
-  'ready.expired.title': 'Price ran out',
+  'ready.expired.title': 'Price expired',
   'ready.expired.body': 'These were priced earlier. Check the price again before booking.',
   'ready.priceAgain': 'Price again',
   'ready.priceAgainSay': 'Check the price again for {title}',

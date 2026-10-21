@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { and, eq, sql as rawSql } from "drizzle-orm";
+import { and, asc, eq, sql as rawSql } from "drizzle-orm";
 import { PresenceResponse } from "@mada/shared";
 import { db, schema } from "@/db";
 import {
@@ -355,7 +355,8 @@ describe("chat", () => {
     await sendAgentReply(counter, "support", threadId, { body: "I'm on it. Send me the bag tag photo." });
     c = (await listConversations()).find((x) => x.id === threadId)!;
     expect(c.waitingSince).toBeNull();
-    const msgs = await db.select().from(appMessages).where(eq(appMessages.threadId, threadId));
+    // In the order they were written: without it Postgres may return them in any order once the table is busy.
+    const msgs = await db.select().from(appMessages).where(eq(appMessages.threadId, threadId)).orderBy(asc(appMessages.createdAt));
     expect(msgs.map((m) => m.body).join(" ")).not.toContain("baggage desk");
     expect(msgs.at(-1)).toMatchObject({ authorKind: "agent", authorName: "Faisal", authorOpsUserId: counter.id });
     await expect(sendAgentReply(counter, "support", crypto.randomUUID(), { body: "Hi" })).rejects.toThrow(/not found/);

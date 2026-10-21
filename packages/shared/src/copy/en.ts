@@ -28,6 +28,7 @@ import { askPeopleCopy } from './ask-people';
 import { askMemoryCopy } from './ask-memory';
 import { askPlanCopy } from './ask-plan';
 import { planScreenCopy } from './plan-screen';
+import { askPolishCopy } from './ask-polish';
 import { bookReadyCopy } from './book-ready';
 import { askDocsCopy } from './ask-docs';
 import { todayIdeasCopy } from './today-ideas';
@@ -92,6 +93,8 @@ export const en = {
   ...askPlanCopy,
   // The plan screen, the trip page's plan, the trip chat: packages/shared/src/copy/plan-screen.ts
   ...planScreenCopy,
+  // Today from the plan, the payer's card for a companion's change, plan pushes: packages/shared/src/copy/ask-polish.ts
+  ...askPolishCopy,
   // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
   ...bookReadyCopy,
   // Documents in chat: packages/shared/src/copy/ask-docs.ts
