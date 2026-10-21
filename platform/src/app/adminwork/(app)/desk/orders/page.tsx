@@ -11,6 +11,7 @@ import { Card, Empty, Money, PageHeader, Table, Tabs, Td, Th } from "@/component
 import { StatusBadge } from "@/components/desk/parts";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Orders · Desk" };
 const TABS = ["open", "awaiting", "held", "needs_answer", "price_changed", "failed", "issued", "not_issued", "all"] as const;
@@ -49,7 +50,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <Td><Link href={`/adminwork/desk/orders/${o.id}`} className="block">
                       <span className="block max-w-[340px] truncate text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{o.summary}</span>
                       <span className="block text-[12px] text-ink-3"><span className="num">{o.ref}</span> · {timeAgo(o.createdAt, t.locale)}</span></Link></Td>
-                    <Td className="whitespace-nowrap"><bdi className="block text-ink">{o.userName}</bdi>{o.phone && <span className="num block text-[12px] text-ink-3" dir="ltr">{o.phone}</span>}</Td>
+                    <Td className="whitespace-nowrap"><CustomerLink id={o.ownerId} className="block text-ink">{o.userName}</CustomerLink>{o.phone && <span className="num block text-[12px] text-ink-3" dir="ltr">{o.phone}</span>}</Td>
                     <Td><StatusBadge map={ORDER_STAGE} value={o.stage} /></Td>
                     <Td className="whitespace-nowrap">{o.payment ? <StatusBadge map={PAY_STATUS} value={o.payment.status} /> : <span className="text-ink-4">—</span>}</Td>
                     <Td><span className="num tracking-wider" dir="ltr">{pnr ?? "—"}</span></Td>

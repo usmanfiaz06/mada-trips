@@ -30,6 +30,7 @@ import { CONTACT_LABEL, contactPreferenceOf } from "@/lib/app/booking/requests";
 import { ActivityCard } from "@/components/desk/activity";
 import { OutcomeCard } from "@/components/desk/outcome";
 import { progressOfRequest, resultOfRequest } from "@/lib/app/outcomes";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Request · Desk" };
 
@@ -82,7 +83,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           {x.contact && <ContactBadge contact={x.contact} requestId={r.id} canAct={act} action={confirmCallAction} locale={L} />}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 text-[13.5px] text-ink-3">
-          <span className="text-ink">{x.user.name || t("Traveller")}</span>
+          <CustomerLink id={x.user.id} className="text-ink">{x.user.name || t("Traveller")}</CustomerLink>
           {x.user.phone && <a href={`tel:${x.user.phone}`} className="num inline-flex items-center gap-1 hover:text-ink" dir="ltr"><Phone className="size-3.5" />{x.user.phone}</a>}
           {x.travellers.length > 0 && <span>{x.travellers.map((p) => p.name.split(" ")[0]).join(", ")}</span>}
           {copyLinks.map((p) => <a key={p.id} href={`/adminwork/desk/passport-copy/${r.id}/${p.id}`} target="_blank" rel="noopener noreferrer" title={t("Passport copies open while this booking needs them, and every look is logged.")} className="text-info underline-offset-2 hover:underline">{t("Passport copy")} · {p.name.split(" ")[0]}</a>)}

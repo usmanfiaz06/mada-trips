@@ -5,6 +5,7 @@ import { AR_ESIM } from "../app/esim/desk-ar";
 import { AR_DESK_THINGS } from "../app/desk/ar-things";
 import { AR_DESK_OUTCOMES } from "../app/desk/ar-outcomes";
 import { AR_DESK_BOARDING } from "../app/desk/ar-boarding";
+import { AR_DESK_CUSTOMERS } from "../app/desk/ar-customers";
 import { AR_DESK_TICKETS } from "../app/desk/ar-tickets";
 import { AR_DESK_BOARD } from "../app/desk/ar-board";
 
@@ -15,6 +16,7 @@ export const AR: Record<string, string> = {
   ...AR_DESK_THINGS,
   ...AR_DESK_OUTCOMES,
   ...AR_DESK_BOARDING,
+  ...AR_DESK_CUSTOMERS,
   ...AR_DESK_TICKETS, // desk tickets
   ...AR_DESK_BOARD, // the live board and drop-offs
   ", retail only": "، للأفراد فقط",

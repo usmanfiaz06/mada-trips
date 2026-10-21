@@ -18,7 +18,7 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
       { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck" },
       { href: `${D}/chats`, label: t("Chats"), icon: "MessagesSquare", count: c.chats },
       { href: `${D}/ask`, label: t("Ask threads"), icon: "Bot", soon: true },
-      { href: `${D}/customers`, label: t("Customers"), icon: "Contact", soon: true },
+      { href: `${D}/customers`, label: t("Customers"), icon: "Contact" },
     ] },
     { label: t("App bookings"), items: [
       // The live board shows every booking by lifecycle; Orders stays as the desk's work list for flights and stays.

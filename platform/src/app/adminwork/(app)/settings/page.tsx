@@ -38,6 +38,10 @@ export default async function SettingsPage() {
             <Field label={t("Daily close hour (Riyadh, 24h)")}><Input name="closeHour" type="number" min={12} max={23} defaultValue={s.closeHour} /></Field>
             <Field label={t("Target margin (%)")} hint={t("Below this, the POS shows amber.")}><Input name="targetMarginBps" type="number" min={0} max={100} step="0.1" defaultValue={s.targetMarginBps / 100} /></Field>
           </Group>
+          <Group title={t("App desk")} hint={t("What a support agent gives alone. Above it, a support lead approves in Approvals.")}>
+            <Field label={t("Goodwill credit per customer (SAR)")}><Input name="deskGoodwillLimit" defaultValue={amountInput(s.deskGoodwillLimit)} dir="ltr" /></Field>
+            <Field label={t("Goodwill per agent per day (SAR)")}><Input name="deskAgentDailyLimit" defaultValue={amountInput(s.deskAgentDailyLimit)} dir="ltr" /></Field>
+          </Group>
         </div>
         <div className="flex justify-end"><SubmitButton variant="gold" size="lg">{t("Save rules")}</SubmitButton></div>
       </ActionForm>
