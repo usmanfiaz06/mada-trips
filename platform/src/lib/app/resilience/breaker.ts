@@ -29,6 +29,8 @@ export const BREAKER = { FAILURES: 5, WINDOW_MS: 60_000, COOLDOWN_MS: 30_000, MA
 export const SUPPLIER_TIMEOUTS: Record<string, number> = {
   flights: 45_000, hotels: 15_000, payments: 25_000, sms: 8_000, whatsapp: 8_000, email: 8_000,
   flightStatus: 6_000, flightPositions: 6_000, ai: 20_000, identity: 8_000, esim: 25_000,
+  // Keyed suppliers (config.ts KEYED_SUPPLIERS).
+  routes: 8_000, carHire: 20_000, klook: 10_000, sherpa: 8_000, insurance: 15_000, tabby: 15_000, tamara: 15_000, duffel: 30_000, ratehawk: 20_000,
 };
 
 /** The traveller-facing name of each supplier slot (copy catalogue). */

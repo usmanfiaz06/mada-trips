@@ -1,5 +1,5 @@
 import type { StatusResponse } from "@mada/shared";
-import { SUPPLIERS } from "@/lib/app/config";
+import { KEYED_SUPPLIERS, SUPPLIERS } from "@/lib/app/config";
 import { json, route } from "@/lib/app/http";
 import { launchStatus } from "@/lib/app/launch";
 import { degradedSuppliers } from "@/lib/app/resilience/breaker";
@@ -12,7 +12,7 @@ import { flightStatusVendor } from "@/lib/app/suppliers";
 export const dynamic = "force-dynamic";
 
 export const GET = route(async () => {
-  const [degraded, cfg] = await Promise.all([degradedSuppliers(SUPPLIERS), runtimeConfig()]);
+  const [degraded, cfg] = await Promise.all([degradedSuppliers([...SUPPLIERS, ...Object.keys(KEYED_SUPPLIERS)]), runtimeConfig()]);
   const status: StatusResponse["status"] = cfg.maintenance.on || degraded.some((d) => d.state === "down" && (d.name === "flights" || d.name === "payments"))
     ? "down" : degraded.length ? "degraded" : "ok";
   // The launch guard: on production, what keeps app routes closed (launch.ts). Ready and empty elsewhere.

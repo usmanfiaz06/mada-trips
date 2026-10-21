@@ -85,6 +85,56 @@ export function flightsVendor(): "mock" | "tbo" | "gds" {
 
 export const supplierEnvName = envName;
 
+/*
+ * Suppliers added one at a time (docs/app/CONNECT.md §24 onwards), each live as soon as its keys are in Vercel:
+ *
+ *   SUPPLIER_MODE_<NAME>  live (or the vendor's name) | mock | off. Unset: live when every key below is set, else mock
+ *                         outside production and off on production (mock there only with APP_ALLOW_MOCKS=yes).
+ *
+ * Off means the feature isn't offered (or, for the second flight and hotel sources, the first source answers alone,
+ * and for Sherpa the built-in entry rules answer). These never block the launch guard: none of them is required.
+ */
+export const KEYED_SUPPLIERS = {
+  routes: ["GOOGLE_ROUTES_API_KEY"],
+  carHire: ["CARTRAWLER_CLIENT_ID", "CARTRAWLER_API_KEY"],
+  klook: ["KLOOK_API_KEY"],
+  sherpa: ["SHERPA_API_KEY"],
+  insurance: ["XCOVER_API_KEY", "XCOVER_API_SECRET", "XCOVER_PARTNER_CODE"],
+  tabby: ["TABBY_SECRET_KEY", "TABBY_MERCHANT_CODE"],
+  tamara: ["TAMARA_API_TOKEN", "TAMARA_NOTIFICATION_TOKEN"],
+  duffel: ["DUFFEL_ACCESS_TOKEN"],
+  ratehawk: ["RATEHAWK_KEY_ID", "RATEHAWK_API_KEY"],
+} as const satisfies Record<string, readonly string[]>;
+export type KeyedSupplier = keyof typeof KEYED_SUPPLIERS;
+export type KeyedMode = SupplierMode | "off";
+const KEYED_VENDORS: ReadonlySet<string> = new Set(["google", "cartrawler", "klook", "sherpa", "xcover", "covergenius", "tabby", "tamara", "duffel", "ratehawk", "etg", "worldota"]);
+
+export const keyedEnvName = (name: KeyedSupplier) => `SUPPLIER_MODE_${name.replace(/[A-Z]/g, (c) => `_${c}`).toUpperCase()}`;
+export const keyedConfigured = (name: KeyedSupplier) => KEYED_SUPPLIERS[name].every((k) => !!process.env[k]);
+
+export function keyedMode(name: KeyedSupplier): KeyedMode {
+  const raw = (process.env[keyedEnvName(name)] ?? "").trim().toLowerCase();
+  const mockAllowed = !isProductionDeploy() || process.env.APP_ALLOW_MOCKS === "yes";
+  if (raw === "off") return "off";
+  if (raw === "live" || KEYED_VENDORS.has(raw)) return "live";
+  if (raw === "mock") return mockAllowed ? "mock" : "off";
+  if (keyedConfigured(name)) return "live";
+  return mockAllowed ? "mock" : "off";
+}
+
+/** Set by name (not just by having keys): a second source joins search only when switched on itself. */
+export const keyedExplicit = (name: KeyedSupplier) => !!process.env[keyedEnvName(name)]?.trim();
+
+/** For GET /health: mock or live per keyed supplier; one that's off isn't listed. */
+export function keyedModes(): Record<string, SupplierMode> {
+  const out: Record<string, SupplierMode> = {};
+  for (const s of Object.keys(KEYED_SUPPLIERS) as KeyedSupplier[]) {
+    const m = keyedMode(s);
+    if (m !== "off") out[s] = m;
+  }
+  return out;
+}
+
 export function supplierModes(): Record<string, SupplierMode> {
   const out: Record<string, SupplierMode> = {};
   for (const s of SUPPLIERS) {

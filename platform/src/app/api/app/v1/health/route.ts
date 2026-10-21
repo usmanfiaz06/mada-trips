@@ -1,6 +1,6 @@
 import { sql } from "@/db";
 import type { HealthResponse } from "@mada/shared";
-import { SUPPLIERS, supplierModes } from "@/lib/app/config";
+import { KEYED_SUPPLIERS, SUPPLIERS, keyedModes, supplierModes } from "@/lib/app/config";
 import { hasDataKey } from "@/lib/app/crypto";
 import { json, route } from "@/lib/app/http";
 import { healthOf } from "@/lib/app/resilience/breaker";
@@ -20,12 +20,12 @@ export const GET = route(async () => {
   }
   const dbMs = Date.now() - t0;
   const breakers: NonNullable<HealthResponse["breakers"]> = {};
-  for (const s of SUPPLIERS) {
+  for (const s of [...SUPPLIERS, ...Object.keys(KEYED_SUPPLIERS)]) {
     const h = healthOf(s);
     if (h !== "up") breakers[s] = h;
   }
   const body: HealthResponse = {
-    ok: db === "ok", service: "mada-core", apiVersion: "v1", db, suppliers: supplierModes(),
+    ok: db === "ok", service: "mada-core", apiVersion: "v1", db, suppliers: { ...supplierModes(), ...keyedModes() },
     dataKey: hasDataKey() ? "ok" : "missing", time: new Date().toISOString(), breakers,
     maintenance: (await runtimeConfig()).maintenance.on, dbMs,
   };

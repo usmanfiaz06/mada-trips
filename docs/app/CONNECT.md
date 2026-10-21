@@ -32,6 +32,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 21 | Sentry | crash reports | Ready | Owner |
 | 22 | Ticketmaster | events | Ready | Owner |
 | 23 | Free/open (FX, weather, places, ADS-B) | rates, weather, places, aircraft position | Working | — (OpenSky needs a licence for commercial use) |
+| 24 | Google Routes API | daily drives in plans: km, hours, border crossings | Ready (mock until key) | Owner |
 
 ## Processes
 
@@ -154,3 +155,37 @@ Developer key → `TICKETMASTER_KEY`.
 ### 23. Free and open data
 Working with no keys. Before commercial launch: an OpenSky licence (or rely on adsb.lol only), and keep the
 attributions shown in the app.
+
+## Added one by one (21 Oct 2026): live by adding keys
+
+Each of these has its own switch, `SUPPLIER_MODE_<NAME>`: `live` (or the vendor's name), `mock` or `off`. Left unset,
+it goes **live by itself as soon as all its keys are set**; without keys it runs on its fixtures outside production and
+is **off** on production (mock there only with `APP_ALLOW_MOCKS=yes`). None of them can close the app at launch (they
+are not in the launch guard's list). Each live adapter runs behind its own circuit breaker and shows in
+`GET /api/app/v1/health` (`suppliers.<name>`: mock or live; `breakers.<name>` when it is failing). Code:
+`platform/src/lib/app/config.ts` (`KEYED_SUPPLIERS`) and `platform/src/lib/app/suppliers/<name>/`.
+
+### 24. Google Routes API — daily drives
+**What it does.** For a plan with drives (Riyadh → AlUla, Dammam → Bahrain), each day's drive: kilometres, hours
+without traffic, and whether it **crosses a border** (both countries known and different, or Google's own "crosses
+country borders" warning). One call per origin/destination/day, kept 24 hours per server; if Google is down or not set
+up, the plan shows an estimate (straight line × 1.3 at 85 km/h, +45 min at a border), marked as an estimate.
+Interface: `driveLeg()` and `dailyDrives(stops)` in `suppliers/routes` (used by plans, `ASK-INTEGRATED.md`).
+
+**Apply.** Google Cloud console (the same project as Maps for Android is fine) → enable **Routes API** → billing
+account → Credentials → create an API key, restrict it to *Routes API* only (server key: no app restriction; Vercel
+has no fixed IP so IP restriction can't be used). Set a daily quota cap (e.g. 2,000 requests/day) as a safety net.
+
+**Keys in Vercel.** `GOOGLE_ROUTES_API_KEY` (optional `SUPPLIER_MODE_ROUTES=live|mock|off`).
+
+**Certification.** None. Test: set the key on staging, open a plan with a drive; `GET /health` shows `routes: live`.
+
+**Cost.** Pay per call. We ask for `TRAFFIC_UNAWARE` and only distance, duration, warnings and the line, which keeps
+every call on the **Compute Routes Essentials** SKU (about USD 5 per 1,000 calls after the monthly free calls; check
+the current price list). Asking for traffic or toll prices moves calls to the Pro SKU (about double): don't change
+the field mask without checking cost.
+
+**Licence notes.** Google Maps Platform terms: Routes content may be cached only briefly (we keep 24 h, in memory,
+never in the database), and a route **line** may be drawn only **on a Google map** (Android's map is Google; on iPhone,
+show the line only on a Google map or show text only — km and hours — which is fine anywhere). Keep "Google" credited
+where the figures appear.

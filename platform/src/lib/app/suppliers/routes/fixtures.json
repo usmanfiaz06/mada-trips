@@ -1,0 +1,28 @@
+{
+  "_comment": "Mock drive legs for the routes supplier (mock mode). Distances and times are realistic road figures (no traffic), not Google output.",
+  "places": {
+    "riyadh": { "lat": 24.7136, "lng": 46.6753, "countryCode": "SA" },
+    "alula": { "lat": 26.6084, "lng": 37.9232, "countryCode": "SA" },
+    "jeddah": { "lat": 21.4858, "lng": 39.1925, "countryCode": "SA" },
+    "makkah": { "lat": 21.3891, "lng": 39.8579, "countryCode": "SA" },
+    "madinah": { "lat": 24.5247, "lng": 39.5692, "countryCode": "SA" },
+    "taif": { "lat": 21.2703, "lng": 40.4158, "countryCode": "SA" },
+    "abha": { "lat": 18.2164, "lng": 42.5053, "countryCode": "SA" },
+    "dammam": { "lat": 26.4207, "lng": 50.0888, "countryCode": "SA" },
+    "manama": { "lat": 26.2285, "lng": 50.586, "countryCode": "BH" },
+    "dubai": { "lat": 25.2048, "lng": 55.2708, "countryCode": "AE" },
+    "muscat": { "lat": 23.588, "lng": 58.3829, "countryCode": "OM" }
+  },
+  "legs": [
+    { "from": "riyadh", "to": "alula", "distanceKm": 1076, "durationMin": 620, "warnings": [] },
+    { "from": "riyadh", "to": "jeddah", "distanceKm": 949, "durationMin": 545, "warnings": [] },
+    { "from": "jeddah", "to": "makkah", "distanceKm": 86, "durationMin": 65, "warnings": [] },
+    { "from": "makkah", "to": "madinah", "distanceKm": 447, "durationMin": 270, "warnings": [] },
+    { "from": "makkah", "to": "taif", "distanceKm": 88, "durationMin": 80, "warnings": [] },
+    { "from": "taif", "to": "abha", "distanceKm": 565, "durationMin": 390, "warnings": [] },
+    { "from": "madinah", "to": "alula", "distanceKm": 330, "durationMin": 215, "warnings": [] },
+    { "from": "riyadh", "to": "dammam", "distanceKm": 411, "durationMin": 235, "warnings": [] },
+    { "from": "dammam", "to": "manama", "distanceKm": 61, "durationMin": 55, "warnings": ["This route crosses country borders.", "This route includes a toll road (King Fahd Causeway)."] },
+    { "from": "dubai", "to": "muscat", "distanceKm": 447, "durationMin": 300, "warnings": ["This route crosses country borders."] }
+  ]
+}
