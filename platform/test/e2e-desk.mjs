@@ -2,6 +2,7 @@
 //
 //   DATABASE_URL=… npm run db:migrate
 //   DATABASE_URL=… npm run db:seed && DATABASE_URL=… npx tsx --conditions=react-server src/lib/app/desk/seed.ts
+//   DATABASE_URL=… npx tsx --conditions=react-server src/lib/app/desk/seed-board.ts   (live board and drop-offs)
 //   DATABASE_URL=… APP_DATA_KEY=… npm run dev
 //   BASE=http://localhost:3100 node test/e2e-desk.mjs [shot-dir]
 //
@@ -88,6 +89,7 @@ const PAGES = [
   ['inbox', '/adminwork/desk'], ['inbox-team', '/adminwork/desk?f=team'], ['orders', '/adminwork/desk/orders'], ['order-awaiting', ids.awaiting], ['order-held', ids.held],
   ['order-issued', ids.issued], ['requests', '/adminwork/desk/requests'], ['request-visa', ids.visa], ['request-umrah', ids.umrah], ['chats', '/adminwork/desk/chats'], ['chat-thread', ids.chat],
   ['refunds', '/adminwork/desk/refunds'], ['disruptions', '/adminwork/desk/disruptions'], ['moderation', '/adminwork/desk/moderation'], ['moderation-blocked', '/adminwork/desk/moderation?s=blocked'], ['team', '/adminwork/desk/team'],
+  ['bookings', '/adminwork/desk/bookings'], ['bookings-travelling', '/adminwork/desk/bookings?s=travelling'], ['bookings-problem', '/adminwork/desk/bookings?s=problem'], ['drop-offs', '/adminwork/desk/drop-offs'],
 ];
 await lead.ctx.close();
 
