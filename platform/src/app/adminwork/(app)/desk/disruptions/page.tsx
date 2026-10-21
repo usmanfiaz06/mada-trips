@@ -72,7 +72,7 @@ export default async function DisruptionsPage({ searchParams }: { searchParams: 
   return (
     <>
       <AutoRefresh every={60} />
-      <PageHeader eyebrow={t("App desk")} title={t("Disruptions")} subtitle={t("Today's flights with Mada travellers on board. Status from the airline feed, positions from open ADS-B. Travellers on a disrupted flight hear the plan within 10 minutes.")} />
+      <PageHeader eyebrow={t("App bookings")} title={t("Disruptions")} subtitle={t("Today's flights with Mada travellers on board. Status from the airline feed, positions from open ADS-B. Travellers on a disrupted flight hear the plan within 10 minutes.")} />
       <div className="mb-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[[t("Flights today"), flights.length, PlaneTakeoff, "neutral"], [t("Travellers flying"), travellers, Users, "neutral"], [t("Disrupted"), disrupted.length, Plane, disrupted.length ? "bad" : "ok"], [t("In the air now"), airborne, Plane, "info"]].map(([l, n, I, tone]) => {
           const Icon = I as typeof Plane;

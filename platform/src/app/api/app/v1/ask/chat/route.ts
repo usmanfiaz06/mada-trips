@@ -2,6 +2,7 @@ import { AskChatRequest, type AskChatEvent } from "@mada/shared";
 import { body, route } from "@/lib/app/http";
 import { requestContext } from "@/lib/app/context";
 import { authenticate } from "@/lib/app/tokens";
+import { isProductionDeploy } from "@/lib/app/config";
 import { chatTurn, errorCode, preflight } from "@/lib/app/ask-chat/chat";
 
 // POST /ask/chat { text, threadId?, tripId? } → text/event-stream of AskChatEvent (schemas/ask-chat.ts): thread, status,
@@ -32,6 +33,11 @@ export const POST = route(async (req) => {
       } catch (e) {
         if (!abort.signal.aborted) console.warn("[ask-chat] turn stopped:", e instanceof Error ? `${e.name} ${"status" in e ? String((e as { status?: number }).status) : ""}` : "");
         emit({ type: "error", code: errorCode(e), fallback: true });
+        // Staging only: the provider's own words, to find why a turn stopped (never on production).
+        if (!isProductionDeploy() && e instanceof Error) {
+          const detail = "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
+          controller.enqueue(enc.encode(`event: debug\ndata: ${JSON.stringify({ type: "debug", name: e.name, message: e.message.slice(0, 200), detail: detail.slice(0, 1500) })}\n\n`));
+        }
       } finally {
         open = false;
         try { controller.close(); } catch { /* already closed by the client going away */ }

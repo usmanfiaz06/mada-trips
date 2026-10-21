@@ -1,12 +1,11 @@
 "use client";
 import { useEffect, useRef, useState, useTransition } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Clock3, Eye, EyeOff, Loader2 } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-/* Small live pieces of the desk: the SLA clock, auto-refresh, the sub-navigation, the passport reveal. */
+/* Small live pieces of the desk: the SLA clock, auto-refresh, the passport reveal. */
 
 type SlaState = "ok" | "soon" | "breached" | "met";
 const SLA_TONE: Record<SlaState, string> = {
@@ -49,27 +48,6 @@ export function AutoRefresh({ every = 20 }: { every?: number }) {
     return () => clearInterval(i);
   }, [router, every]);
   return null;
-}
-
-export function DeskNav({ items }: { items: { href: string; label: string; count?: number; tone?: "bad" | "gold" }[] }) {
-  const path = usePathname();
-  const current = items.filter((i) => (i.href === "/adminwork/desk" ? path === i.href : path === i.href || path.startsWith(i.href + "/"))).sort((a, b) => b.href.length - a.href.length)[0]?.href;
-  return (
-    <nav className="-mx-4 mb-6 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" aria-label="Desk">
-      {items.map((it) => {
-        const on = current === it.href;
-        return (
-          <Link key={it.href} href={it.href} aria-current={on ? "page" : undefined}
-            className={cx("flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 text-[13.5px] transition",
-              on ? "bg-ink text-bg" : "bg-surface text-ink-2 shadow-soft hover:bg-surface-2 hover:text-ink")}>
-            {it.label}
-            {!!it.count && <span className={cx("num grid h-[19px] min-w-[19px] place-items-center rounded-full px-1.5 text-[11px] font-medium",
-              it.tone === "bad" ? "bg-bad text-white" : on ? "bg-gold text-[#1a140a]" : "bg-sunken text-ink-2")}>{it.count}</span>}
-          </Link>
-        );
-      })}
-    </nav>
-  );
 }
 
 /** Masked by default. Revealing asks the server, which checks desk.issue and logs the look. */

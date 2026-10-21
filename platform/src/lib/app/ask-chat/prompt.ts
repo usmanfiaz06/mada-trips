@@ -174,6 +174,16 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       urgent: { type: "boolean" },
     }),
   },
+  {
+    name: "remember",
+    description: "Keep a lasting preference or need for next time (home airport, airline, cabin, seat, budget, food, mobility, health, family, how to reach them). Not for one-off trip details. Never numbers or documents.",
+    strict: true,
+    input_schema: obj({
+      kind: { type: "string", enum: ["home_airport", "airline", "cabin", "seat", "budget", "food", "mobility", "health", "family", "contact", "other"] },
+      text: { type: "string", description: "The fact in a few words, e.g. 'Aisle seat', 'Mother (Hessa) uses a wheelchair'." },
+      sensitive: { type: "boolean", description: "Health, mobility or religion: true. Saved only after the traveller said yes to remembering it." },
+    }),
+  },
 ];
 
 /**
@@ -183,13 +193,13 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
  * cached, so the list never changes there.
  */
 const BY_KIND: Partial<Record<AskKind, string[]>> = {
-  flight: ["search_flights", "search_stays", "entry_rules", "create_request", "price_quote_for_pay", "get_trips", "get_trip", "talk_to_human"],
-  stay: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "get_household", "talk_to_human"],
-  esim: ["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human"],
-  visa: ["entry_rules", "get_household", "create_request", "talk_to_human"],
-  umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human"],
-  car: ["plan_car_now", "create_request", "get_trips", "talk_to_human"],
-  food: ["create_request", "get_trips", "talk_to_human"],
+  flight: ["search_flights", "search_stays", "entry_rules", "create_request", "price_quote_for_pay", "get_trips", "get_trip", "talk_to_human", "remember"],
+  stay: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "get_household", "talk_to_human", "remember"],
+  esim: ["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human", "remember"],
+  visa: ["entry_rules", "get_household", "create_request", "talk_to_human", "remember"],
+  umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human", "remember"],
+  car: ["plan_car_now", "create_request", "get_trips", "talk_to_human", "remember"],
+  food: ["create_request", "get_trips", "talk_to_human", "remember"],
 };
 export function toolsFor(kind: AskKind | null): string[] | null {
   const want = kind ? BY_KIND[kind] : undefined;

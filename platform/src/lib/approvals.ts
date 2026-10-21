@@ -8,7 +8,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "goodwill";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -106,6 +106,9 @@ export async function createApproval(tx: Tx, input: CreateInput) {
     else { requiresAll = true; rule = `SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
   } else if (input.kind === "void") {
     pool = "directors"; required = 1; rule = "Voiding a sale: one director approves";
+  } else if (input.kind === "goodwill") {
+    pool = "permission:desk.admin"; required = 1;
+    rule = `App goodwill credit above what an agent gives alone (SAR ${sar(s.deskGoodwillLimit)}): one support lead approves`;
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -270,6 +273,11 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       if (!ok) return;
       const { applyCashMove } = await import("./cash");
       await applyCashMove(tx, req, actorId);
+      return;
+    }
+    case "goodwill": {
+      const { applyGoodwillApproval } = await import("./app/desk/customers");
+      await applyGoodwillApproval(tx, req, ok, actorId);
       return;
     }
     case "settlement": {

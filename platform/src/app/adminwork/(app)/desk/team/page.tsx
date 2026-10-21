@@ -34,7 +34,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={admin ? t("Team and rota") : t("Team")} subtitle={t("The people travellers talk to. Each traveller has their own agent; when that agent is off, whoever covers for them answers, then the shared queue.")} />
+      <PageHeader eyebrow={t("Support admin")} title={admin ? t("Team and rota") : t("Team")} subtitle={t("The people travellers talk to. Each traveller has their own agent; when that agent is off, whoever covers for them answers, then the shared queue.")} />
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-4">

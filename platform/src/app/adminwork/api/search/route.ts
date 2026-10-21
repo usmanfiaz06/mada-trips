@@ -3,6 +3,7 @@ import { desc, ilike, or, eq, and } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getCurrentUser } from "@/lib/auth";
 import { likeContains } from "@/lib/security";
+import { quickSearch } from "@/lib/app/desk/customers";
 
 export async function GET(req: Request) {
   const u = await getCurrentUser();
@@ -11,7 +12,9 @@ export async function GET(req: Request) {
   if (q.length < 2) return NextResponse.json([]);
   const like = likeContains(q);
   const seeAll = u.permissions.has("sales.view_all");
-  const [bookings, clients, expenses, tasks] = await Promise.all([
+  // App desk: customers by name, phone or email, orders and requests by ref or PNR, eSIMs by ICCID (DESK-PLAN U3).
+  const [desk, bookings, clients, expenses, tasks] = await Promise.all([
+    u.permissions.has("desk.view") ? quickSearch(q).catch(() => []) : Promise.resolve([]),
     db.select({ id: schema.bookings.id, ref: schema.bookings.ref, pax: schema.bookings.passengers, pnr: schema.bookings.pnr })
       .from(schema.bookings)
       .where(and(or(ilike(schema.bookings.ref, like), ilike(schema.bookings.pnr, like), ilike(schema.bookings.passengers, like), ilike(schema.bookings.ticketNumbers, like)),
@@ -29,6 +32,7 @@ export async function GET(req: Request) {
       .orderBy(desc(schema.tasks.createdAt)).limit(4),
   ]);
   return NextResponse.json([
+    ...desk,
     ...bookings.map((b) => ({ id: b.id, kind: "booking", label: `${b.ref} · ${b.pax}`, hint: b.pnr ?? "", href: `/adminwork/sales/${b.id}` })),
     ...clients.map((c) => ({ id: c.id, kind: "client", label: c.name, hint: c.type, href: `/adminwork/clients/${c.id}` })),
     ...tasks.map((k) => ({ id: k.id, kind: "task", label: `${k.ref} · ${k.title}`, hint: k.status, href: `/adminwork/tasks/${k.id}` })),

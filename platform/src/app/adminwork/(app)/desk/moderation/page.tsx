@@ -12,13 +12,15 @@ import { slaFor } from "@/lib/app/desk/sla";
 import { Avatar, Badge, Card, Empty, Input, PageHeader, Tabs, cx, type Tone } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SlaClock } from "@/components/desk/live";
+import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { moderateAction, unblockAction } from "../actions";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Moderation · Desk" };
 const REASON: Record<string, string> = { unwanted: "Unwanted contact", impostor: "Pretending to be someone", unsafe: "Unsafe", other: "Something else" };
 const DECISION: Record<string, { label: string; tone: Tone }> = { approved: { label: "Approved", tone: "ok" }, rejected: { label: "Rejected", tone: "bad" }, removed: { label: "Removed", tone: "bad" }, dismissed: { label: "Dismissed", tone: "neutral" } };
 
-export default async function ModerationPage({ searchParams }: { searchParams: Promise<{ s?: string; focus?: string }> }) {
+export default async function ModerationPage({ searchParams }: { searchParams: Promise<{ s?: string; focus?: string; q?: string; page?: string }> }) {
   const u = await requirePerm("desk.view");
   const t = await getT();
   const L = t.locale;
@@ -30,10 +32,14 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
     db.select({ b: appDeskBlocks, name: appUsers.name, by: schema.users.name }).from(appDeskBlocks).innerJoin(appUsers, eq(appUsers.id, appDeskBlocks.userId))
       .leftJoin(schema.users, eq(schema.users.id, appDeskBlocks.blockedBy)).where(isNull(appDeskBlocks.liftedAt)).orderBy(desc(appDeskBlocks.createdAt)),
   ]);
-  const rows = tab === "open" ? open : decided;
+  const q = (sp.q ?? "").trim().toLowerCase();
+  const matched = (tab === "open" ? open : decided).filter((m) => !q || `${m.authorName} ${m.reporterName} ${m.snapshot.text ?? ""} ${m.snapshot.place ?? ""} ${m.snapshot.city ?? ""} ${m.snapshot.name ?? ""}`.toLowerCase().includes(q));
+  const { page, offset, size } = pageParam(sp);
+  const rows = matched.slice(offset, offset + size);
+  const href = listHref("/adminwork/desk/moderation", { s: sp.s, q: sp.q });
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={t("Moderation")} subtitle={t("Tips, circle messages and DMs the check held, cover photos, and what people report. Decide with a reason: the author reads it, and a reporter hears back.")} />
+      <PageHeader eyebrow={t("Support admin")} title={t("Moderation")} subtitle={t("Tips, circle messages and DMs the check held, cover photos, and what people report. Decide with a reason: the author reads it, and a reporter hears back.")} />
       <Tabs active={tab} items={[
         { key: "open", label: t("To review"), count: open.length, href: "/adminwork/desk/moderation" },
         { key: "decided", label: t("Decided"), href: "/adminwork/desk/moderation?s=decided" },
@@ -46,14 +52,19 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
               {blocked.map(({ b, name, by }) => (
                 <li key={b.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
                   <Avatar name={name || "?"} size={36} />
-                  <div className="min-w-0 flex-1"><div className="text-[14px] text-ink">{travellerName(name)}</div><div className="text-[12.5px] text-ink-3">{b.reason} · {t("by {name}", { name: by ?? "—" })} · {fmtDate(b.createdAt, L)}</div></div>
+                  <div className="min-w-0 flex-1"><div className="text-[14px] text-ink"><CustomerLink id={b.userId}>{travellerName(name)}</CustomerLink></div><div className="text-[12.5px] text-ink-3">{b.reason} · {t("by {name}", { name: by ?? "—" })} · {fmtDate(b.createdAt, L)}</div></div>
                   {mod && <form action={unblockAction}><input type="hidden" name="userId" value={b.userId} /><SubmitButton variant="outline" size="sm" confirm={t("Lift this block?")}>{t("Lift block")}</SubmitButton></form>}
                 </li>
               ))}
             </ul>
           )}
         </Card>
-      ) : rows.length === 0 ? <Card><Empty icon={<ShieldCheck className="size-5" />} title={tab === "open" ? t("Nothing to review") : t("Nothing decided yet")} hint={t("New tips and reports from the app land here.")} /></Card> : (
+      ) : <>
+        <Card pad={false} className="mb-4">
+          <ListFilter action="/adminwork/desk/moderation" q={sp.q} keep={{ s: sp.s }} placeholder={t("Author, reporter, place, words…")} clear={sp.q ? listHref("/adminwork/desk/moderation", { s: sp.s })() : null} />
+          <SummaryStrip><span>{t("{n} shown", { n: matched.length })}</span></SummaryStrip>
+        </Card>
+      {rows.length === 0 ? <Card><Empty icon={<ShieldCheck className="size-5" />} title={tab === "open" ? t("Nothing to review") : t("Nothing decided yet")} hint={t("New tips and reports from the app land here.")} /></Card> : (
         <div className="grid gap-4 lg:grid-cols-2">
           {rows.map((m) => {
             const unsafe = m.kind === "report" && m.reason === "unsafe";
@@ -105,6 +116,8 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
           })}
         </div>
       )}
+      {matched.length > size && <Card pad={false} className="mt-4"><Pager page={page} total={matched.length} size={size} href={href} /></Card>}
+      </>}
     </>
   );
 }

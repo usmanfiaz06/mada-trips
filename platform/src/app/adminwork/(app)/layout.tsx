@@ -9,12 +9,36 @@ import { CommandPalette, CommandTrigger } from "@/components/shell/command";
 import { CloseClock, LocaleSwitch, ThemeToggle } from "@/components/client";
 import { NotificationBell, DueToasts } from "@/components/notify";
 import { logout } from "../login/actions";
-import { deskBadge } from "@/lib/app/desk/inbox";
+import { deskNavCounts } from "@/lib/app/desk/inbox";
+import { deskSections } from "@/lib/app/desk/nav";
+import { agentForOps, loadRota } from "@/lib/app/desk/agents";
+import { onShift } from "@/lib/app/desk/routing";
+import { esimBalance } from "@/lib/app/esim/ops";
+import { escalationAlerts } from "@/lib/app/desk/tickets";
+import { PresenceSwitch } from "@/components/desk/presence";
+import { statusPillAction } from "./desk/actions";
+import type { Alert } from "@/components/notify";
+
+const NO_COUNTS = { queue: 0, chats: 0, orders: 0, requests: 0, refunds: 0, disruptions: 0, moderation: 0, recovery: 0, esims: 0 };
+
+/** For desk users: their agent profile and shift (the header switch), the sidebar numbers, and the eSIM balance alert. */
+async function deskBits(u: Awaited<ReturnType<typeof requireUser>>, t: Awaited<ReturnType<typeof getT>>) {
+  if (!can(u, "desk.view")) return { counts: NO_COUNTS, me: null, alerts: [] as Alert[] };
+  const [counts, me, bal, late] = await Promise.all([deskNavCounts().catch(() => NO_COUNTS), agentForOps(u.id).catch(() => null), esimBalance().catch(() => null), escalationAlerts(u).catch(() => [])]);
+  const shift = me ? onShift(me.id, (await loadRota()).shifts, new Date()) : false;
+  const alerts: Alert[] = bal?.low ? [{ key: "esim-balance", tone: "urgent", icon: "Wallet", title: t("eSIM Access balance is low: ${usd}", { usd: (bal.usd ?? 0).toFixed(2) }),
+    detail: t("Top it up in the eSIM Access console, or paid eSIMs wait."), href: "/adminwork/desk/esims" }] : [];
+  // Late and escalated tickets, for leads (desk.tickets.manage): level 2 is twice past its promise.
+  for (const a of late) alerts.push({ key: `ticket-${a.id}-${a.level}`, tone: a.level >= 2 ? "urgent" : "warn", icon: "Ticket", title: t("{ref} is late: {subject}", { ref: a.ref, subject: a.subject }),
+    detail: a.note ?? (a.ownerName ? t("With {name}", { name: a.ownerName }) : t("Nobody has it")), href: `/adminwork/desk/tickets/${a.ref}` });
+  return { counts, me: me ? { id: me.id, name: me.displayName, status: me.status, onShift: shift } : null, alerts };
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await requireUser();
   const t = await getT();
-  const [counts, issuer, s, alerts, desk] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u), can(u, "desk.view") ? deskBadge(u.id).catch(() => 0) : Promise.resolve(0)]);
+  const [counts, issuer, s, due, desk] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u), deskBits(u, t)]);
+  const alerts = [...desk.alerts, ...due];
 
   const sections: NavSection[] = [
     { label: t("Workspace"), items: [
@@ -23,9 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       { href: "/adminwork/tasks", label: t("Tasks"), icon: "ListChecks" as const, count: counts.tasks },
       { href: "/adminwork/approvals", label: t("Approvals"), icon: "Stamp" as const, count: counts.approvals },
     ] },
-    ...(can(u, "desk.view") ? [{ label: t("App desk"), items: [
-      { href: "/adminwork/desk", label: t("Desk inbox"), icon: "Headset" as const, count: desk },
-    ] }] : []),
+    ...deskSections(u, t, desk.counts),
     { label: t("Operations"), items: [
       { href: "/adminwork/sales", label: t("Sales & bookings"), icon: "ReceiptText" as const },
       ...(issuer ? [{ href: "/adminwork/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
@@ -61,6 +83,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="flex h-14 items-center gap-2 rounded-full bg-tile ps-2 pe-2 text-tile-ink shadow-float">
             <CommandTrigger />
             <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
+              {desk.me && <PresenceSwitch agent={desk.me} onShift={desk.me.onShift} action={statusPillAction} />}
               <CloseClock closeHour={s.closeHour} showPk={u.team === "pakistan" || u.team === "management"} />
               <NotificationBell alerts={alerts} />
               <LocaleSwitch />

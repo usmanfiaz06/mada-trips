@@ -767,7 +767,7 @@ export const walletCopy = {
   'legal.terms.5h': 'Your account',
   'legal.terms.5b': 'Keep your sign-in to yourself. You’re responsible for bookings made from your account.',
   'legal.privacy.1h': 'What we collect',
-  'legal.privacy.1b': 'Your details, your household’s passports (and a copy of the photo page, if you keep one), your trips and payments, and, if you allow it, location on travel days.',
+  'legal.privacy.1b': 'Your details, your household’s passports (and a copy of the photo page, if you keep one), your trips and payments, and, if you allow it, location on travel days. Ask Mada keeps the preferences you tell it, which you can see and remove under What Mada remembers.',
   'legal.privacy.2h': 'Why',
   'legal.privacy.2b': 'To book and look after your trips. Nothing else.',
   'legal.privacy.3h': 'Who sees it',

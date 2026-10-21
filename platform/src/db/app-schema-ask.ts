@@ -25,6 +25,13 @@ export const appAskThreads = pgTable("app_ask_threads", {
   cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
   /** US dollars × 1,000,000. */
   costMicros: integer("cost_micros").notNull().default(0),
+  /**
+   * Older turns folded into a few lines by the fast model once the thread passed its token budget (ask-chat/fold.ts):
+   * `messages` then holds only the recent turns, and this summary is read in front of them. Migration 0035.
+   */
+  summary: text("summary"),
+  /** How many turns the summary stands for (turns - folded_turns are still in `messages` word for word). */
+  foldedTurns: integer("folded_turns").notNull().default(0),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt)]);
@@ -36,3 +43,22 @@ export const appAskSpend = pgTable("app_ask_spend", {
   costMicros: integer("cost_micros").notNull().default(0),
   turns: integer("turns").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.day, t.ownerKey] })]);
+
+/**
+ * What Mada remembers about a traveller across conversations (ask-chat/memory.ts, docs/app/ASK-CHAT.md §7): small
+ * lasting facts the traveller said ("aisle seat", "flies from Jeddah", "mother uses a wheelchair"), saved by the
+ * `remember` tool, sensitive ones only after a yes. Never a passport, card or anything redaction removes. Shown and
+ * deletable in Account → What Mada remembers; removed with the account. Migration: drizzle/0035_ask_memory.sql.
+ */
+export const appAskMemory = pgTable("app_ask_memory", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  /** home_airport | airline | cabin | seat | budget | food | mobility | health | family | contact | other */
+  kind: text("kind").notNull(),
+  text: text("text").notNull(),
+  /** chat (said in a conversation) | booking (read from a booking) */
+  source: text("source").notNull().default("chat"),
+  createdAt: createdAt(),
+  /** The last turn it was put in front of the model (for "most relevant first"). */
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+}, (t) => [index("app_ask_memory_owner_idx").on(t.ownerId, t.createdAt)]);

@@ -1,4 +1,4 @@
-import { KeyRound, MessageCircle, PlaneTakeoff, Receipt, ShieldAlert, ShoppingBag, Ticket, Undo2 } from "lucide-react";
+import { KeyRound, LifeBuoy, MessageCircle, PlaneTakeoff, Receipt, ShieldAlert, ShoppingBag, Ticket, Undo2 } from "lucide-react";
 
 /** How each kind of desk work looks in lists: label, icon, colour. Shared by server and client components. */
 export const KIND_META: Record<string, { label: string; icon: typeof Ticket; tone: string }> = {
@@ -10,4 +10,5 @@ export const KIND_META: Record<string, { label: string; icon: typeof Ticket; ton
   disruption: { label: "Disruption", icon: PlaneTakeoff, tone: "bg-bad-soft text-bad" },
   moderation: { label: "Moderation", icon: ShieldAlert, tone: "bg-sunken text-ink-2" },
   recovery: { label: "Account recovery", icon: KeyRound, tone: "bg-info-soft text-info" },
+  manual: { label: "Ticket", icon: LifeBuoy, tone: "bg-gold-soft text-gold-2" },
 };

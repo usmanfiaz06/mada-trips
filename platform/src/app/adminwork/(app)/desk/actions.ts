@@ -17,6 +17,11 @@ import { confirmContactByCall, sendFlightQuote } from "@/lib/app/desk/flight-quo
 import { decideModeration } from "@/lib/app/desk/moderation";
 import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
+import {
+  addTicketNote, assignTicket, createTicket, findCustomer, LINK_KINDS, MANUAL_MOVES, mergeTickets, moveTicket, replyOnTicket, setDetails, setPriority, takeTicket,
+  ticketHref, ticketsRepliedOnThread, type LinkKind, type ManualMove,
+} from "@/lib/app/desk/tickets";
+import { redirect } from "next/navigation";
 import { appDeskCanned } from "@/db/app-schema-desk";
 import { deskAudit } from "@/lib/app/desk/core";
 import { setOutcome, setPromise } from "@/lib/app/outcomes";
@@ -96,12 +101,16 @@ export async function reassignAction(_: ActionState, fd: FormData): Promise<Acti
   } catch (e) { return toState(e); }
 }
 
-/** One-click "Take it" from the inbox. */
+/** One-click "Take it" from the queue: the row's ticket when it has one. */
 export async function takeAction(fd: FormData) {
   const u = await requirePerm("desk.act");
-  const agentId = str(fd, "agentId");
-  if (!isUuid(agentId)) return;
-  await reassign(u, str(fd, "kind"), str(fd, "itemId"), agentId).catch(() => {});
+  const ticketId = str(fd, "ticketId");
+  if (isUuid(ticketId)) await takeTicket(u, ticketId).catch(() => {});
+  else {
+    const agentId = str(fd, "agentId");
+    if (!isUuid(agentId)) return;
+    await reassign(u, str(fd, "kind"), str(fd, "itemId"), agentId).catch(() => {});
+  }
   revalidatePath("/adminwork/desk", "layout");
 }
 
@@ -261,26 +270,30 @@ const MAX_FILE = 6 * 1024 * 1024;
 export async function replyAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requirePerm("desk.act");
+    // The ticket page's composer posts threadKind "ticket": its reply goes to the ticket's thread.
+    if (str(fd, "threadKind") === "ticket") return ticketReply(u, fd);
     const kind = threadKind(fd), id = uuid(fd, "threadId");
     const body = str(fd, "body");
     if (str(fd, "mode") === "note") {
       await addNote(u, kind, id, body);
       return done("Note added");
     }
-    let attachment: { id: string; filename: string; mime: string; size: number } | null = null;
-    const file = fd.get("file");
-    if (file instanceof File && file.size > 0) {
-      if (file.size > MAX_FILE) throw new DeskError("Files must be under 6 MB");
-      const data = Buffer.from(await file.arrayBuffer());
-      const mime = detectFileType(data);
-      if (!mime) throw new DeskError("Upload a PDF or an image");
-      const filename = file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 200) || "file";
-      const [row] = await db.insert(schema.attachments).values({ entityType: "app_thread", entityId: id, filename, mime, size: data.length, data, uploadedBy: u.id }).returning({ id: schema.attachments.id });
-      attachment = { id: row!.id, filename, mime, size: data.length };
-    }
-    await sendAgentReply(u, kind, id, { body, attachment });
+    await sendAgentReply(u, kind, id, { body, attachment: await attachmentOf(u, fd, id) });
+    await ticketsRepliedOnThread(u, kind, id).catch(() => 0);
     return done("Sent");
   } catch (e) { return toState(e); }
+}
+
+async function attachmentOf(u: { id: string }, fd: FormData, entityId: string) {
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return null;
+  if (file.size > MAX_FILE) throw new DeskError("Files must be under 6 MB");
+  const data = Buffer.from(await file.arrayBuffer());
+  const mime = detectFileType(data);
+  if (!mime) throw new DeskError("Upload a PDF or an image");
+  const filename = file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 200) || "file";
+  const [row] = await db.insert(schema.attachments).values({ entityType: "app_thread", entityId, filename, mime, size: data.length, data, uploadedBy: u.id }).returning({ id: schema.attachments.id });
+  return { id: row!.id, filename, mime, size: data.length };
 }
 
 export async function typingAction(kind: string, id: string) {
@@ -354,13 +367,13 @@ export async function unblockAction(fd: FormData) {
   revalidatePath("/adminwork/desk", "layout");
 }
 
-/** The status pill in the desk bar: a plain form post, no message. */
+/** The presence switch in the header pill (on every Ops page): a plain form post, no message. */
 export async function statusPillAction(fd: FormData) {
   const u = await requirePerm("desk.view");
   const status = str(fd, "status");
   if (status !== "online" && status !== "away" && status !== "offline") return;
   await setAgentStatus(u, uuid(fd, "agentId"), status).catch(() => {});
-  revalidatePath("/adminwork/desk", "layout");
+  revalidatePath("/adminwork", "layout");
 }
 
 /* ───────────── account recovery ───────────── */
@@ -374,4 +387,77 @@ export async function recoveryAction(_: ActionState, fd: FormData): Promise<Acti
     await declineRecovery(u, id, str(fd, "note"));
     return done("Declined. We've told them on the new contact.");
   } catch (e) { return toState(e); }
+}
+
+/* ───────────── tickets (lib/app/desk/tickets.ts) ───────────── */
+
+async function ticketReply(u: Awaited<ReturnType<typeof requirePerm>>, fd: FormData): Promise<ActionState> {
+  const id = uuid(fd, "threadId");
+  const body = str(fd, "body");
+  if (str(fd, "mode") === "note") { await addTicketNote(u, id, body); return done("Note added"); }
+  await replyOnTicket(u, id, { body, attachment: await attachmentOf(u, fd, id) });
+  return done("Sent");
+}
+
+/** "Create ticket" from an order, a request, a chat, a customer, or blank (/desk/tickets/new). Opens the new ticket. */
+export async function createTicketAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let href: string;
+  try {
+    const u = await requirePerm("desk.act");
+    const kind = str(fd, "aboutKind"), aboutId = str(fd, "aboutId");
+    const about = kind && aboutId ? (LINK_KINDS.includes(kind as LinkKind) && aboutId.length <= 120 ? { kind: kind as LinkKind, id: aboutId } : (() => { throw new DeskError("Unknown item", "NOT_FOUND"); })()) : null;
+    const id = str(fd, "customerId"), contact = str(fd, "customer");
+    const customerId = isUuid(id) ? id : contact ? await findCustomer(contact) : null;
+    if (contact && !customerId) throw new DeskError("No traveller with that phone or email");
+    const t = await createTicket(u, { subject: str(fd, "subject"), note: str(fd, "note") || null, priority: str(fd, "priority"), category: str(fd, "category") || null, customerId, about });
+    href = ticketHref(t);
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork/desk", "layout");
+  redirect(href);
+}
+
+export async function assignTicketAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const to = str(fd, "agentId");
+    await assignTicket(u, uuid(fd, "id"), to && to !== "rota" ? (isUuid(to) ? to : (() => { throw new DeskError("Choose someone on the desk"); })()) : null);
+    return done(to && to !== "rota" ? "Reassigned" : "Back on the rota");
+  } catch (e) { return toState(e); }
+}
+
+export async function takeTicketAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try { const u = await requirePerm("desk.act"); await takeTicket(u, uuid(fd, "id")); return done("It's yours"); } catch (e) { return toState(e); }
+}
+
+export async function ticketPropsAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const id = uuid(fd, "id");
+    const priority = str(fd, "priority");
+    if (priority) await setPriority(u, id, priority);
+    await setDetails(u, id, { category: str(fd, "category"), tags: str(fd, "tags").split(","), ...(fd.has("subject") ? { subject: str(fd, "subject") } : {}) });
+    return done("Saved");
+  } catch (e) { return toState(e); }
+}
+
+export async function moveTicketAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    const m = str(fd, "move");
+    if (!MANUAL_MOVES.includes(m as ManualMove)) throw new DeskError("That can't be done to this ticket now");
+    await moveTicket(u, uuid(fd, "id"), m as ManualMove, str(fd, "note") || null);
+    const said: Record<ManualMove, string> = { wait_customer: "Waiting on the customer. The clock is paused", wait_supplier: "Waiting on the supplier. The clock is paused", supplier_answered: "Back with us. The clock runs again", customer_replied: "Back with us. The clock runs again", resolve: "Resolved", reopen: "Reopened", close: "Closed" };
+    return done(said[m as ManualMove]);
+  } catch (e) { return toState(e); }
+}
+
+export async function mergeTicketAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  let href: string;
+  try {
+    const u = await requirePerm("desk.tickets.manage");
+    const into = await mergeTickets(u, uuid(fd, "id"), str(fd, "into"));
+    href = ticketHref(into);
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork/desk", "layout");
+  redirect(href);
 }

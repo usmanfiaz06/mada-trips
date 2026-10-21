@@ -124,7 +124,7 @@ describe("fewer tokens per turn", () => {
     expect(toolsFor(null)).toBeNull();
     expect(toolsFor("general")).toBeNull();
     const only = toolsFor("esim")!;
-    expect(only).toEqual(["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human"]);
+    expect(only).toEqual(["esim_plans", "get_trips", "price_quote_for_pay", "talk_to_human", "remember"]);
     const req = toChatCompletion({ model: "m", max_tokens: 10, system: "x", tools: TOOLS, only_tools: only, messages: [{ role: "user", content: "eSIM" }] } as never, true);
     expect(req.tools!.map((t) => t.function.name)).toEqual(only);
     const { token } = await signIn();

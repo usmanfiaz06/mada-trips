@@ -5,6 +5,7 @@ import { refreshSession } from './api';
 import { API_MODE, API_ORIGIN, SHOW_DEMO_HINTS } from './config';
 import { getLocale } from './i18n';
 import { getAppVersion, useFeature } from './net/gates';
+import { kvReadJson, kvWriteJson } from './net/kv';
 import { isOffline } from './net/state';
 import { useSession } from './session';
 
@@ -134,6 +135,63 @@ type ChatState = {
 export const useAskChat = create<ChatState>((set) => ({ threadId: null, turns: [], busy: false, reset: () => set({ threadId: null, turns: [], busy: false }) }));
 
 let seq = 0;
+
+/*
+ * Continuity on the phone: the thread id and the recent finished turns are kept on the device (lib/net/kv), so
+ * reopening Ask within a day continues the same conversation (the server holds the rest of it). "New chat" starts
+ * fresh. Kept per account: another sign-in on this phone never sees them.
+ */
+export const ASK_CHAT_KEY = 'mada.ask.chat.v1';
+export const ASK_CHAT_KEEP_MS = 24 * 60 * 60_000;
+const SAVED_TURNS = 8;
+export type SavedChat = { v: 1; at: number; user: string | null; threadId: string | null; turns: ChatTurn[] };
+
+const lastAt = (turns: ChatTurn[]) => Math.max(0, ...turns.map((x) => (x.at ? Date.parse(x.at) : 0)));
+
+/** What is worth keeping: finished turns only, the last few. Null when there is nothing. */
+export function savedOf(s: Pick<ChatState, 'threadId' | 'turns'>, user: string | null): SavedChat | null {
+  const turns = s.turns.filter((x) => x.state === 'done').slice(-SAVED_TURNS);
+  if (!turns.length || !s.threadId) return null;
+  return { v: 1, at: lastAt(turns) || Date.now(), user, threadId: s.threadId, turns };
+}
+
+/** A saved conversation still worth continuing: this account's, and its last turn within 24 hours. */
+export function freshSaved(x: SavedChat | null, user: string | null, now = Date.now()): SavedChat | null {
+  return x && x.v === 1 && x.user === user && x.threadId && x.turns.length && now - x.at < ASK_CHAT_KEEP_MS ? x : null;
+}
+
+let writeTimer: ReturnType<typeof setTimeout> | null = null;
+let hydrated = false;
+useAskChat.subscribe((s, prev) => {
+  if (!hydrated || s.busy || (s.turns === prev.turns && s.threadId === prev.threadId && s.busy === prev.busy)) return;
+  if (writeTimer) clearTimeout(writeTimer);
+  writeTimer = setTimeout(() => {
+    writeTimer = null;
+    void kvWriteJson(ASK_CHAT_KEY, savedOf(useAskChat.getState(), useSession.getState().user?.id ?? null));
+  }, 300);
+});
+
+/** Opening Ask: the conversation from the last 24 hours comes back, or it starts fresh. */
+export async function restoreAskChat(now = Date.now()): Promise<boolean> {
+  const user = useSession.getState().user?.id ?? null;
+  const here = useAskChat.getState();
+  const inMemory = freshSaved(savedOf(here, user), user, now);
+  const saved = inMemory ?? freshSaved(await kvReadJson<SavedChat>(ASK_CHAT_KEY), user, now);
+  hydrated = true;
+  if (!saved) { if (here.turns.length) here.reset(); return false; }
+  seq = Math.max(seq, ...saved.turns.map((x) => x.id));
+  useAskChat.setState({ threadId: saved.threadId, turns: saved.turns, busy: false });
+  return true;
+}
+
+/** "New chat": the words in flight stop, the thread is let go, and nothing comes back next time. */
+export function newAskChat() {
+  current?.abort();
+  current = null;
+  useAskChat.getState().reset();
+  if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; }
+  void kvWriteJson(ASK_CHAT_KEY, null);
+}
 let current: AbortController | null = null;
 
 /** Leaving Ask: the words in flight stop, and nothing falls back. */

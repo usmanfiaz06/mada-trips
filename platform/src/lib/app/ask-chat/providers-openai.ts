@@ -30,14 +30,23 @@ export function retryAfterOf(header: string | null, body: string): number | null
   const h = Number(header);
   if (Number.isFinite(h) && h > 0) return h;
   const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
-  return m ? Math.ceil(Number(m[1])) : null;
+  if (m) return Math.ceil(Number(m[1]));
+  // Groq says it in words: "Please try again in 885ms" or "in 1.5s".
+  const g = /try again in (\d+(?:\.\d+)?)(ms|s)\b/i.exec(body);
+  return g ? Math.max(1, Math.ceil(Number(g[1]) / (g[2].toLowerCase() === "ms" ? 1000 : 1))) : null;
 }
 const QUOTA = /quota|rate.?limit|resource.?exhausted|insufficient|balance|exceeded|tokens per (?:minute|day)|too many requests/i;
 
 type OaMessage =
   | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string } }[] }
+  | { role: "assistant"; content: string | null; tool_calls?: { id: string; type: "function"; function: { name: string; arguments: string }; extra_content?: unknown }[] }
   | { role: "tool"; tool_call_id: string; content: string };
+
+/**
+ * Gemini 3 signs each tool call (extra_content.google.thought_signature) and needs the signature back with it on the
+ * next request, or it refuses the turn. It rides on the tool_use block as extra_content and goes back unchanged.
+ */
+const extraOf = (b: unknown): unknown => (b && typeof b === "object" && "extra_content" in b ? (b as { extra_content: unknown }).extra_content : undefined);
 
 const textOf = (c: unknown): string => (typeof c === "string" ? c : Array.isArray(c) ? c.map((b) => (b && typeof b === "object" && "text" in b && typeof b.text === "string" ? b.text : "")).join("\n") : "");
 
@@ -51,7 +60,7 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
     if (m.role === "assistant") {
       const text = blocks.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
       const calls = blocks.filter((b): b is Anthropic.Beta.BetaToolUseBlockParam => b.type === "tool_use")
-        .map((b) => ({ id: b.id, type: "function" as const, function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } }));
+        .map((b) => ({ id: b.id, type: "function" as const, function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) }, ...(extraOf(b) ? { extra_content: extraOf(b) } : {}) }));
       messages.push({ role: "assistant", content: text || null, ...(calls.length ? { tool_calls: calls } : {}) });
       continue;
     }
@@ -81,8 +90,8 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
   };
 }
 
-type Delta = { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] };
-type Chunk = { model?: string; x_groq?: { usage?: Chunk["usage"] }; choices?: { delta?: Delta; message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; prompt_cache_hit_tokens?: number } };
+type Delta = { content?: string | null; tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string }; extra_content?: unknown }[] };
+type Chunk = { model?: string; x_groq?: { usage?: Chunk["usage"] }; choices?: { delta?: Delta; message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string }; extra_content?: unknown }[] }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; prompt_cache_hit_tokens?: number } };
 
 const stopOf = (r: string | null | undefined): Anthropic.Beta.BetaStopReason => (r === "tool_calls" ? "tool_use" : r === "length" ? "max_tokens" : r === "content_filter" ? "refusal" : "end_turn");
 const usageOf = (u: Chunk["usage"]): Anthropic.Beta.BetaUsage => {
@@ -93,10 +102,10 @@ const parseArgs = (s: string): Record<string, unknown> => {
   try { const v = JSON.parse(s || "{}"); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; }
 };
 
-function message(model: string, text: string, calls: { id: string; name: string; args: string }[], stop: string | null | undefined, usage: Chunk["usage"]): Anthropic.Beta.BetaMessage {
+function message(model: string, text: string, calls: { id: string; name: string; args: string; extra?: unknown }[], stop: string | null | undefined, usage: Chunk["usage"]): Anthropic.Beta.BetaMessage {
   const content = [
     ...(text ? [{ type: "text", text, citations: null }] : []),
-    ...calls.map((c) => ({ type: "tool_use", id: c.id, name: c.name, input: parseArgs(c.args) })),
+    ...calls.map((c) => ({ type: "tool_use", id: c.id, name: c.name, input: parseArgs(c.args), ...(c.extra ? { extra_content: c.extra } : {}) })),
   ];
   return { id: `oa_${Date.now().toString(36)}`, type: "message", role: "assistant", model, content, stop_reason: calls.length && stopOf(stop) === "end_turn" ? "tool_use" : stopOf(stop), stop_sequence: null, usage: usageOf(usage) } as unknown as Anthropic.Beta.BetaMessage;
 }
@@ -124,7 +133,7 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
       const res = await post(toChatCompletion(p, false, cfg.openapi), opts);
       const j = (await res.json()) as Chunk;
       const m = j.choices?.[0]?.message;
-      const calls = (m?.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, args: c.function.arguments }));
+      const calls = (m?.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, args: c.function.arguments, extra: c.extra_content }));
       return message(j.model ?? p.model, m?.content ?? "", calls, j.choices?.[0]?.finish_reason, j.usage);
     },
 
@@ -143,7 +152,7 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
           let stop: string | null | undefined = null;
           let usage: Chunk["usage"];
           let model = p.model;
-          const calls: { id: string; name: string; args: string }[] = [];
+          const calls: { id: string; name: string; args: string; extra?: unknown }[] = [];
           let textOpen = false;
           for (;;) {
             const { value, done: end } = await reader.read();
@@ -169,13 +178,19 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
                 yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: d.content } } as Anthropic.Beta.BetaRawMessageStreamEvent;
               }
               for (const tc of d.tool_calls ?? []) {
-                let call = calls[tc.index];
+                // Gemini sends each call whole and without an index: place it by its id, else as a new call (a piece
+                // with no name and no id continues the last one).
+                const at = typeof tc.index === "number" ? tc.index
+                  : tc.id ? (calls.findIndex((x) => x?.id === tc.id) + 1 || calls.length + 1) - 1
+                  : !tc.function?.name && calls.length ? calls.length - 1 : calls.length;
+                let call = calls[at];
                 if (!call) {
-                  call = calls[tc.index] = { id: tc.id ?? `call_${tc.index}_${Date.now().toString(36)}`, name: tc.function?.name ?? "", args: "" };
-                  yield { type: "content_block_start", index: tc.index + 1, content_block: { type: "tool_use", id: call.id, name: call.name, input: {} } } as unknown as Anthropic.Beta.BetaRawMessageStreamEvent;
+                  call = calls[at] = { id: tc.id ?? `call_${at}_${Date.now().toString(36)}`, name: tc.function?.name ?? "", args: "" };
+                  yield { type: "content_block_start", index: at + 1, content_block: { type: "tool_use", id: call.id, name: call.name, input: {} } } as unknown as Anthropic.Beta.BetaRawMessageStreamEvent;
                 }
                 if (tc.function?.name && !call.name) call.name = tc.function.name;
                 if (tc.function?.arguments) call.args += tc.function.arguments;
+                if (tc.extra_content) call.extra = tc.extra_content;
               }
             }
           }
