@@ -16,6 +16,11 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 
 Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touches build config — run alone), #18 credentials line (needs owner's licence/IATA numbers), then retest (CRITIQUE-3).
 
+## 21 Oct
+- Running: loading states (Waiting), Today living cards, Ask memory + context.
+- Queued after the loading worker (shares ChatThread.tsx): Ask card redesign — request card (real button, no "You · You", what/when/where/who, status pill, contact icon), every chat card type to the same quality.
+- Done: bubbles 0aac18b/5992166 · build fix 601d744 · Gemini auto-model 95ef945, 0102780 (works: gemini-3.6-flash; 3.8/3.7 hang on free key) · staging /ask/providers check · no second eSIM flow 6df3516 · follow-ups read with context, mobility rule a587f45 · complete requests only a6c6dd5.
+
 ## Done (17–18 Oct)
 
 - Map pin → hotel card, grouped pins, map layout 1b3b0f6 · SW updates per build + refresh bar, no endless spinners (12 s; live flight/stay 20 s), eSIM size words 3cfc4f5 · CRITIQUE-2 37687ab (6.8/10). Combined e2e green at 3cfc4f5.
