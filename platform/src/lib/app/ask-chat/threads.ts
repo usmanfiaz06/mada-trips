@@ -108,7 +108,7 @@ export function linesOf(transcript: unknown[], lang: "en" | "ar"): AskThreadLine
   const out: AskThreadLine[] = [];
   for (const raw of transcript as AskLine[]) {
     if (!raw || typeof raw !== "object") continue;
-    if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null });
+    if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null, ...(raw.attachment?.label ? { attachment: { kind: String(raw.attachment.kind ?? "other"), label: String(raw.attachment.label) } } : {}) });
     else if (raw.who === "mada" && typeof raw.text === "string") {
       // Reference cards kept with a line (a companion's change request): only the kinds that are read again live.
       const kept = (raw.kept ?? []).map((c) => ChatCard.safeParse(c)).filter((c) => c.success && KEPT.has(c.data.type)).map((c) => c.data!).slice(0, 2);

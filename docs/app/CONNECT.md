@@ -179,6 +179,10 @@ without traffic, and whether it **crosses a border** (both countries known and d
 country borders" warning). One call per origin/destination/day, kept 24 hours per server; if Google is down or not set
 up, the plan shows an estimate (straight line × 1.3 at 85 km/h, +45 min at a border), marked as an estimate.
 Interface: `driveLeg()` and `dailyDrives(stops)` in `suppliers/routes` (used by plans, `ASK-INTEGRATED.md`).
+Plans use it through `lib/app/drive` (ASK-INTEGRATED §4): numbers only (km, minutes, tolls, ferries, crossings) kept in
+`app_drive_cache` for `DRIVE_CACHE_DAYS_MAP` days (default 30, per §4.3; lower it if counsel reads Google's terms
+more tightly), no route line stored; `DRIVE_DAILY_CALLS` (default 2,000) caps calls a day, then an estimate with no
+time; `DRIVE_OSRM_URL` adds self-hosted OSRM as the fallback (`DRIVE_PROVIDER=osrm` makes it the default).
 
 **Apply.** Google Cloud console (the same project as Maps for Android is fine) → enable **Routes API** → billing
 account → Credentials → create an API key, restrict it to *Routes API* only (server key: no app restriction; Vercel

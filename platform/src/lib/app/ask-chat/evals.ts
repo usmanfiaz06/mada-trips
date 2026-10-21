@@ -1,14 +1,15 @@
-import { languageOfText, type Person } from "@mada/shared";
+import { languageOfText, type ChatCard, type Person } from "@mada/shared";
 import { ToolInputError, type ChatApi, runTurn, turnContext } from "./engine";
 import { ProviderHttpError } from "./providers-openai";
 import { costMicros, type Price } from "./config";
 import { firstSentence, openEndedIn, outgoingProblems, questionsIn, redact, unbacked } from "./guard";
 import { readSlots, slotsLine } from "./slots";
+import { kindFor } from "./prompt";
 import { personLine, requestModeText, type ToolCtx, type ToolOut } from "./tools";
 import type Anthropic from "@anthropic-ai/sdk";
 
 /*
- * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 41 conversations in English and spoken Saudi Arabic,
+ * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 49 conversations in English and spoken Saudi Arabic,
  * run turn by turn through the real engine (the same prompt, tools, gate and slots) with fixed tool results, so the
  * checks are about the model and nothing else. Each turn is held to:
  *   prices   the model wrote no price or time that no tool returned (checked on its raw words, before the gate)
@@ -23,6 +24,9 @@ import type Anthropic from "@anthropic-ai/sdk";
  *            call, the app) as its own choices, then makes the request with that preference
  *   first    the answer first: no preamble, and the first sentence is not a question unless the whole turn may be
  *            one needed question
+ *   never-no never "we don't do that" alone (docs/app/ASK-INTEGRATED.md §8.2): a reply that says we don't offer it, it
+ *            isn't available, «ما نقدر», «ما عندنا», also does it (a tool), sends it to the team (a request, or asks how
+ *            to reach them for one), or opens it in the app
  * scripts/ask-chat-eval.ts runs it against the live model when ANTHROPIC_API_KEY is set; the tests run it on a stand-in.
  */
 
@@ -69,11 +73,41 @@ export async function fixtureTool(name: string, input: unknown, flights: "live" 
       return { text: `Request r-1 noted for the team at Mada: ${String(a.kind)} (${String(a.summary).slice(0, 80)}). The team gets back to the traveller ${a.contact_preference === "call" ? "by a call" : a.contact_preference === "whatsapp" ? "on WhatsApp" : "here in the app"} by 18:00. Say it in one line: "We've noted it and the team will get back to you by 18:00".`, cards: [{ type: "request", requestId: SELF, kind: String(a.kind), title: String(a.summary).slice(0, 60) }] };
     case "price_quote_for_pay":
       return { text: `Pay sheet opened in the app: Riyadh → Istanbul, ${fmt(each * n)} all in. Free to cancel within 24 hours. Nothing is charged until the traveller slides to pay.`, pay: { draft: { kind: "trip", flightOfferId: SELF, bundle: false, travellerIds: [SELF] }, title: "Riyadh → Istanbul" } };
+    case "create_plan": case "get_plan": case "update_plan": case "set_origin": case "find_for_item": case "open_in_app":
+      return planFixture(name, a);
     case "talk_to_human":
       return { text: "Handed to the desk: Noura is on duty and has the summary. Say that Noura at Mada can take it from here, in one sentence.", handoff: { threadId: SELF, agent: "Noura" } };
     default:
       return { text: `There is no tool called ${name}.`, isError: true };
   }
+}
+
+/*
+ * The living plan as the plan tools write it (tools-plan.ts planGist), for fixed inputs: a road trip from Singapore with
+ * drive legs and no drive times measured, the AlUla weekend from Riyadh, and the same from Jeddah after set_origin.
+ */
+const PLAN_ID = "66666666-6666-4666-8666-666666666666";
+const TRIP_ID = "77777777-7777-4777-8777-777777777777";
+const planRow = (kind: "leg" | "stay" | "activity", title: string, o: Partial<{ mode: "flight" | "drive"; from: string; to: string; place: string; nights: number }> = {}) =>
+  ({ kind, mode: o.mode ?? null, title, place: o.place ?? null, from: o.from ?? null, to: o.to ?? null, status: "idea" as const, nights: o.nights ?? null, at: null, km: null, minutes: null, borders: [], booking: null });
+export function planFixture(name: string, a: Record<string, unknown>): ToolOut {
+  const stops = Array.isArray(a.stops) ? a.stops.map((x) => String((x as { place?: unknown })?.place ?? "")).filter(Boolean) : [];
+  const alula = name === "set_origin" || stops.some((x) => /ula/i.test(x)) || /ula/i.test(String(a.template_id ?? ""));
+  const from = name === "set_origin" ? "Jeddah" : "Riyadh";
+  if (name === "open_in_app") return { text: `A button to ${String(a.screen)} is shown. Say in one line what they'll find there.`, cards: [{ type: "link", screen: (a.screen as "trip") ?? "trip", id: null }] };
+  if (name === "find_for_item") return { text: "Not sold live in the app: the team at Mada arranges it. Confirm in one line (Singapore, 2026-12-12, 2026-12-17, 2 travellers), ask how to reach them (<next>WhatsApp | Call me | Here in the app</next>), then create_request kind car with destination_name Singapore and depart 2026-12-12 and return 2026-12-17." };
+  if (alula) {
+    const text = `plan_id=${PLAN_ID} version=${name === "set_origin" ? 2 : 1} · "${from} → AlUla" · 2026-11-19 to 2026-11-20, 2 days (D1 is the first; n = nights) · Omar, Hessa\nStarts from ${from} (${name === "set_origin" ? "as they said" : "their remembered home airport"}).\nD1: [a1b2c3d4] flight ${from}→AlUla; [b2c3d4e5] stay AlUla 1n; [c3d4e5f6] activity Old Town\nD2: [d4e5f6a7] activity Hegra guided tour 09:00; [e5f6a7b8] flight AlUla→${from}\nTo do: Car: needed days 1–2; Stays: night 1 has no stay yet.`;
+    const card: ChatCard = name === "set_origin"
+      ? { type: "plan_diff", planId: PLAN_ID, tripId: TRIP_ID, title: `${from} → AlUla`, from: 1, to: 2, changes: [{ op: "origin", day: null, row: planRow("leg", from, { place: from }) }, { op: "update", day: 0, row: planRow("leg", `${from} → AlUla`, { mode: "flight", from, to: "AlUla" }) }], untouched: [] }
+      : { type: "plan", planId: PLAN_ID, tripId: TRIP_ID, version: 1, title: `${from} → AlUla`, start: "2026-11-19", end: "2026-11-20", origin: { name: from, code: "RUH", source: "memory" }, originNeeded: false, travellers: [{ name: "Omar", self: true }, { name: "Hessa", self: false }], days: [{ day: 0, items: [planRow("leg", `${from} → AlUla`, { mode: "flight", from, to: "AlUla" })] }], more: 0, todo: [] };
+    return { text: `${name === "set_origin" ? "Start changed and shown as a card." : "Plan made and shown as a card."} ${text}\nSay it in one sentence.`, cards: [card] };
+  }
+  const text = `plan_id=${PLAN_ID} version=1 · "Riyadh → Singapore → Penang" · 2026-12-10 to 2026-12-16, 7 days (D1 is the first; n = nights) · Omar\nStarts from Riyadh (their remembered home airport).\nD1: [a1b2c3d4] flight Riyadh→Singapore; [b2c3d4e5] stay Singapore 2n\nD3: [c3d4e5f6] drive Singapore→Melaka; [d4e5f6a7] stay Melaka 1n\nD4: [e5f6a7b8] drive Melaka→Kuala Lumpur; [f6a7b8c9] stay Kuala Lumpur 2n\nD6: [a7b8c9d0] drive Kuala Lumpur→Penang; [b8c9d0e1] stay Penang 1n\nD7: [c9d0e1f2] flight Penang→Riyadh\nTo do: Car: needed days 3–6; Stays: nothing booked yet. Drive km and times only as written here; none written: never say one.`;
+  const card: ChatCard = { type: "plan", planId: PLAN_ID, tripId: TRIP_ID, version: 1, title: "Riyadh → Singapore → Penang", start: "2026-12-10", end: "2026-12-16", origin: { name: "Riyadh", code: "RUH", source: "memory" }, originNeeded: false, travellers: [{ name: "Omar", self: true }], days: [{ day: 2, items: [planRow("leg", "Singapore → Melaka", { mode: "drive", from: "Singapore", to: "Melaka" })] }], more: 0, todo: [{ key: "car", state: "todo", days: [2, 3, 4, 5] }] };
+  if (name === "update_plan") return { text: `Changed and shown as a card. ${text}\nSay what changed in a few words.`, cards: [{ type: "plan_diff", planId: PLAN_ID, tripId: TRIP_ID, title: "Riyadh → Singapore → Penang", from: 1, to: 2, changes: [{ op: "move", day: 1, row: planRow("activity", "Hegra guided tour") }], untouched: [] }] };
+  if (name === "get_plan") return { text };
+  return { text: `Plan made and shown as a card. ${text}\nSay it in one sentence (the places in order, and "Review it"). Say where it starts in a few words ("Starting from Riyadh.") so they can change it.`, cards: [card] };
 }
 
 export type EvalTurn = {
@@ -151,7 +185,27 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "company-group", lang: "en", turns: [
     { user: "A company trip to Dubai for 25 people, 3 to 6 February, with a meeting room", notTools: ["price_quote_for_pay", "create_request"], reachChips: true },
     { user: "WhatsApp", toolsAnyOf: ["create_request"], requestWithContact: true }] },
+  // The living plan (docs/app/ASK-INTEGRATED.md §12) and "never say we don't do it" (§8.2).
+  { id: "road-trip-sg-my", lang: "en", turns: [{ user: "7-day road trip from Singapore to Malaysia with Hessa", toolsAnyOf: ["create_plan"], notAsk: /where|when|how many days/i }] },
+  { id: "start-jeddah", lang: "en", turns: [
+    { user: "Plan a weekend in AlUla for me and Hessa", toolsAnyOf: ["create_plan"] },
+    { user: "Start from Jeddah instead", toolsAnyOf: ["set_origin"], notTools: ["create_plan"], notAsk: /where/i }] },
+  { id: "ar-road-trip", lang: "ar", turns: [{ user: "رحلة برية ٧ أيام من سنغافورة لماليزيا لي ولزوجتي", toolsAnyOf: ["create_plan"] }] },
+  { id: "plan-car", lang: "en", turns: [
+    { user: "7-day road trip from Singapore to Malaysia with Hessa", toolsAnyOf: ["create_plan"] },
+    { user: "Book a car for the drives", toolsAnyOf: ["find_for_item", "create_request"], orAsk: true, notTools: ["price_quote_for_pay"], reachChips: true }] },
+  { id: "rent-car-langkawi", lang: "en", turns: [{ user: "Rent a car in Langkawi for 3 days from 12 December", notTools: ["price_quote_for_pay", "create_request"], reachChips: true }] },
+  { id: "driver-alula", lang: "en", turns: [{ user: "A driver for the day in AlUla on 20 November", notTools: ["price_quote_for_pay", "create_request"], reachChips: true }] },
+  { id: "train-kl-penang", lang: "en", turns: [{ user: "Train from KL to Penang on 15 December for me and Hessa", notTools: ["search_flights", "create_request"], reachChips: true }] },
+  { id: "ar-car-permit", lang: "ar", turns: [{ user: "أبي أدخل سنغافورة بسيارة مستأجرة من ماليزيا، وش أحتاج تصريح؟", notTools: ["price_quote_for_pay"], reachChips: true }] },
 ];
+
+/** The cases for the living plan and "never no" (ASK-INTEGRATED.md §8.2): eight conversations. */
+export const PLAN_EVAL_IDS = ["road-trip-sg-my", "start-jeddah", "ar-road-trip", "plan-car", "rent-car-langkawi", "driver-alula", "train-kl-penang", "ar-car-permit"];
+
+/** "We don't do that" in a reply, in English or spoken Arabic. */
+const SAYS_NO = /\b(?:we|mada) (?:don'?t|do not|can'?t|cannot) (?:offer|do|sell|arrange|book|provide|rent|have)\b|\b(?:is|are)n'?t (?:available|offered|possible)\b|\bnot (?:available|offered|possible)\b|ما نقدر|ما عندنا|ما نوفر|مو متوفر|غير متوفر|ما نسوي/i;
+const DOES_IT = ["create_request", "open_in_app", "search_flights", "search_stays", "esim_plans", "create_plan", "update_plan", "find_for_item", "plan_car_now", "entry_rules", "talk_to_human"];
 
 /** Choices said in the reply's last sentence ("…the Saudia at 09:40, or the flynas for less?"). */
 const saysChoices = (text: string) => {
@@ -193,6 +247,7 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
     const req = (r.calls ?? []).find((x) => x.name === "create_request");
     if (!req || !req.input.contact_preference) out.push(`reach: create_request without contact_preference`);
   }
+  if (!t.noTools && SAYS_NO.test(r.raw) && !r.toolsUsed.some((x) => DOES_IT.includes(x)) && !/whatsapp|واتساب/i.test(r.modelChoices.join(" "))) out.push(`never-no: said we don't do it without a way it gets done`);
   const open = openEndedIn(r.raw);
   if (open.length || r.closers) out.push(`open: ${open.join(", ") || `${r.closers} closer(s) dropped`}`);
   const first = firstSentence(r.text);
@@ -218,7 +273,7 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
           const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY, opts.fastModel);
           const r = await runTurn({
             model: opts.model,
-            intent: slots.intent.kind,
+            intent: kindFor(clean, slots.intent.kind, history.some((m) => JSON.stringify(m.content).includes("create_plan"))),
             history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input, c.flights),
             context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
           }, () => {}, api);

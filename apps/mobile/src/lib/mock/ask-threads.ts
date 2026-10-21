@@ -101,6 +101,16 @@ export function recordDemoTurn(user: MockUser | null, threadId: string, me: stri
   if (!th.title) { const w = me.trim().split(/\s+/); th.title = w.slice(0, 6).join(' ') + (w.length > 6 ? '…' : ''); }
 }
 
+/** A line kept without a turn (a document sent in the chat, mock/ask-docs.ts), as the server's appendLine. */
+export function recordDemoLine(user: MockUser | null, threadId: string, line: AskThreadLine, lang: 'en' | 'ar'): void {
+  if (!user) return;
+  const th = threadsOf(user).find((x) => x.id === demoThread(user, threadId, lang));
+  if (!th) return;
+  th.lines.push(line);
+  th.lastAt = Date.now();
+  th.archived = false;
+}
+
 function statusOf(user: MockUser, tripId: string | null): { status: AskTripStatus | null; start: string | null } {
   const trip = tripId ? mockTripsOf(user).find((x) => x.id === tripId) : undefined;
   if (!trip) return { status: null, start: null };

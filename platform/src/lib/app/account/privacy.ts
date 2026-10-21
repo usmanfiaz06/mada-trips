@@ -1,10 +1,10 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { t, type ExportStatus } from "@mada/shared";
 import { db } from "@/db";
 import { appCreditLedger, appMessages, appNotifications, appPeople, appRequests, appSessions, appTrackedFlights, appTrips, appUsers } from "@/db/app-schema";
 import { appAccounts, appCards, appDataExports, appDocuments, appEmailCodes, appFiles, appPersonDetails, appSupportThreads } from "@/db/app-schema-wallet";
-import { appAskMemory, appAskThreads } from "@/db/app-schema-ask";
+import { appAskAttachments, appAskMemory, appAskThreads, appDocShareRequests } from "@/db/app-schema-ask";
 import { appAuditLog } from "../audit";
 import { AppError } from "../http";
 import { listPeople } from "../people";
@@ -64,6 +64,9 @@ export async function anonymiseAccount(userId: string, actor: { kind: "user" | "
     await tx.delete(appTrackedFlights).where(eq(appTrackedFlights.userId, userId));
     // Ask Mada: what it remembers and every conversation (docs/app/ASK-CHAT.md §7).
     await tx.delete(appAskMemory).where(eq(appAskMemory.ownerId, userId));
+    // Documents sent in chat, and passport-share requests either way (ASK-INTEGRATED.md §6, §5.4).
+    await tx.delete(appAskAttachments).where(eq(appAskAttachments.ownerId, userId));
+    await tx.delete(appDocShareRequests).where(or(eq(appDocShareRequests.ownerId, userId), eq(appDocShareRequests.toUserId, userId)));
     await tx.delete(appAskThreads).where(eq(appAskThreads.ownerId, userId));
     // Trips and requests go (bookings stay with the airline and hotel); payments and invoices stay as receipts.
     await tx.delete(appRequests).where(eq(appRequests.ownerId, userId));

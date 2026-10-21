@@ -78,6 +78,26 @@ const HOTEL_BRANDS = /\b(?:Hilton|Marriott|Sheraton|Hyatt|Rixos|Swiss[oô]tel|M[
 const HOTEL_PHRASE = /\b((?:[A-Z][\w'’&-]+\s){1,3})(?:Hotel|Resort|Suites|Palace|Inn)\b|\b(?:Hotel|Resort)\s((?:[A-Z][\w'’&-]+\s?){1,3})/g;
 const NOT_NAME = new Set(["the", "a", "an", "our", "this", "that", "we", "book", "your", "any", "one", "best", "top"]);
 
+/*
+ * Distances and travel times (ASK-INTEGRATED.md §8.1 rule 5): "240 km", "about 3 h", "3h05m", "2 hours 10 min",
+ * «٢٤٠ كم», «٣ ساعات». A drive time nobody measured is never said. "Within 2 hours" (when the team answers) is a
+ * promise, not a travel time, and is checked as a number like any other only if a tool said it.
+ */
+const KM = /(\d[\d,٬]*(?:\.\d+)?)\s?(?:km|kilomet(?:er|re)s?|كم|كيلو(?:متر)?(?:ات)?)(?![a-z])/gi;
+const DURATION = /(?<!within |in under |خلال )(?:about |around |roughly |حوالي |تقريبًا |تقريبا )?(\d{1,3}(?:\.\d)?)\s?(?:h(?:ours?|rs?)?|ساعات|ساعة|ساعتين)(?:\s?(?:and\s)?(\d{1,2})\s?(?:m(?:in(?:utes?)?)?|دقيقة|دقايق|دقائق))?(?![a-z])|(?<!within |in under |خلال )(\d{1,3})\s?(?:min(?:utes?)?s?|دقيقة|دقايق|دقائق)(?![a-z])/gi;
+const num = (x: string) => String(Number(x.replace(/[,٬]/g, "")));
+function unbackedDistances(s: string, known: Set<string>): string[] {
+  const all = new Set([...known].map(num));
+  const has = (x: string) => all.has(num(x));
+  const out: string[] = [];
+  for (const m of s.matchAll(KM)) if (!has(m[1]!)) out.push(m[0]);
+  for (const m of s.matchAll(DURATION)) {
+    const parts = [m[1], m[2], m[3]].filter((x): x is string => !!x);
+    if (parts.some((x) => !has(x))) out.push(m[0].trim());
+  }
+  return out;
+}
+
 /**
  * What a reply says that no tool returned this turn: every price, amount and clock time must appear, as a number, in
  * the tool results; so must every flight number, star rating or score, airline and hotel it names. An empty list means
@@ -94,6 +114,7 @@ export function unbacked(reply: string, toolText: string): string[] {
     if (/^\d{1,2}:\d{2}$/.test(m)) return !toolText.includes(m) && !toolText.includes(m.padStart(5, "0")) && !toolText.includes(m.replace(/^0/, ""));
     return nums.some((n) => !known.has(n));
   });
+  out.push(...unbackedDistances(s, known));
   const flat = toolText.replace(/\s+/g, "");
   const lower = toolText.toLowerCase();
   for (const m of s.matchAll(FLIGHT_NO)) if (!NOT_CARRIER.has(m[1]!) && !flat.includes(`${m[1]}${m[2]}`)) out.push(m[0]);

@@ -17,6 +17,7 @@ import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversation';
 import { ChatThread, matchesIn, type ChatOpen } from '@/components/booking/ChatThread';
+import { linkHref } from '@/components/booking/PlanCards';
 import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
@@ -25,6 +26,7 @@ import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
 import { newAskChat, openAskThread, restoreAskChat, sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
+import { attachToChat, type AttachSource } from '@/lib/ask-docs';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
@@ -92,6 +94,8 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
   // A request sent from here: its thread takes the bottom box (one composer, never two). "Ask something else" gives it back.
   const [replyTo, setReplyTo] = useState<{ id: string; agent: string } | null>(null);
   const [askNew, setAskNew] = useState(false);
+  // The composer's +: a photo, the library or a file into the chat (documents in chat, ASK-INTEGRATED.md §6).
+  const [attachOpen, setAttachOpen] = useState(false);
   const scroll = useRef<ScrollView>(null);
   // Find in this chat (U1+), also opened by a search in the list: the latest match first, then previous / next. While
   // on a match the thread stays there (not at its end) until something new is said.
@@ -208,6 +212,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
     if (o.kind === 'handoff') { router.push('/support' as Href); return; }
     if (o.kind === 'request') { router.push({ pathname: '/ask/request/[id]', params: { id: o.id } }); return; }
     if (o.kind === 'trip') { router.push({ pathname: '/trip/[id]', params: { id: o.id } }); return; }
+    if (o.kind === 'link') { router.push(linkHref(o.screen, o.id) as Href); return; }
     // "About your AlUla trip?": the same words again, into the trip's chat or a chat of their own (§2.2).
     if (o.kind === 'attach') {
       buzz('tap');
@@ -335,8 +340,18 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
   else body = <RequestFlow key={round} kind={kind as 'visa'} query={query} intent={intent} people={household} selfName={selfName} />;
 
   /** The Ask box: type or speak. On results it refines them (hint and onSend from the flow); otherwise it asks anew. */
-  const composer = (hint: string, onSend: (text: string) => void, testID?: string) => (
-    <View style={styles.composer} testID={testID}>
+  const attach = (source: AttachSource) => {
+    setAttachOpen(false);
+    setFindOpen(false); setPinned(false);
+    void attachToChat(source, { tripId });
+  };
+  const composer = (hint: string, onSend: (text: string) => void, testID?: string, withAttach = false) => (
+    <View style={[styles.composer, withAttach ? styles.composerAttach : null]} testID={testID}>
+      {withAttach ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={t('doc.attach.a11y')} accessibilityState={{ expanded: attachOpen }} onPress={() => { buzz('tap'); setAttachOpen((v) => !v); }} hitSlop={6} style={styles.plus} testID="ask-attach">
+          <Icon name={attachOpen ? 'close' : 'plus'} size={20} color={colors.green} />
+        </Pressable>
+      ) : null}
       <TextInput value={draft} onChangeText={setDraft} placeholder={voice.listening ? t('ask.voice.listening') : hint} placeholderTextColor={voice.listening ? colors.goldInk : colors.muted} accessibilityLabel={t('ask.a11y.input')}
         onSubmitEditing={() => { if (draft.trim()) onSend(draft.trim()); }} returnKeyType="send" style={[styles.input, webNoOutline]} testID="ask-input" />
       <Pressable accessibilityRole="button"
@@ -435,7 +450,19 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
               <ReplyBar requestId={replyTo.id} agent={replyTo.agent} />
               <View style={{ alignSelf: 'center' }}><LinkButton label={t('ask.somethingElse')} size={13} onPress={() => setAskNew(true)} testID="ask-something-else" /></View>
             </>
-          ) : composer(voice.listening ? t('ask.voice.listening') : intent ? t('ask.composerMore') : t('ask.composer'), (text) => submit(text))}
+          ) : (
+            <>
+              {attachOpen && chatOn ? (
+                <View style={styles.attachMenu} testID="ask-attach-menu">
+                  {([['camera', 'scan', 'doc.attach.camera'], ['library', 'doc', 'doc.attach.library'], ['file', 'doc', 'doc.attach.file']] as const).map(([src, icon, key]) => (
+                    <Chip key={src} label={t(key)} icon={(c) => <Icon name={icon} size={16} color={c} />} background={colors.paper} onPress={() => attach(src)} testID={`ask-attach-${src}`} />
+                  ))}
+                  <T v="tiny" color={colors.ink3} style={{ width: '100%' }}>{t('doc.attach.private')}</T>
+                </View>
+              ) : null}
+              {composer(voice.listening ? t('ask.voice.listening') : intent ? t('ask.composerMore') : t('ask.composer'), (text) => submit(text), undefined, chatOn)}
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
       <DemoSheet visible={demoOpen} onClose={() => setDemoOpen(false)} />
@@ -519,6 +546,9 @@ const styles = StyleSheet.create({
   stage: { position: 'absolute', top: 0, start: 0, end: 0, backgroundColor: colors.sand },
   composer: { height: 56, borderRadius: 999, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingStart: 20, paddingEnd: 6, flexDirection: 'row', alignItems: 'center', gap: 8, boxShadow: '0px 10px 30px -18px rgba(30,53,45,0.4)' },
   input: { flex: 1, minWidth: 0, fontFamily: ff.ui400, fontSize: 16, color: colors.green },
+  composerAttach: { paddingStart: 6 },
+  plus: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
+  attachMenu: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 6 },
   listening: { backgroundColor: colors.gold },
   send: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   find: { width: 30, height: 30, borderRadius: 999, backgroundColor: colors.goldWash, alignItems: 'center', justifyContent: 'center' },

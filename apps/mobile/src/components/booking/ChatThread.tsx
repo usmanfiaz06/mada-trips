@@ -24,6 +24,8 @@ import { DemoFare } from './DemoFare';
 import { ChoiceCard } from './ChoiceCard';
 import { InviteCard } from './InviteCard';
 import { ChangeRequestCard } from './ChangeRequestCard';
+import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
+import { DocumentCard, ShareCard } from './DocCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
 import { colors, ff, font, radii } from '@/theme';
 
@@ -41,7 +43,9 @@ export type ChatOpen =
   | { kind: 'request'; id: string }
   | { kind: 'trip'; id: string }
   /** "About your AlUla trip?": into that trip's chat, or a chat of its own (ASK-INTEGRATED.md §2.2). */
-  | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn };
+  | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn }
+  /** open_in_app: a place in the app (PlanCards.tsx linkHref). */
+  | { kind: 'link'; screen: Extract<ChatCard, { type: 'link' }>['screen']; id: string | null };
 
 /**
  * foundId: the turn a search landed on (the chats list's search, or find in this chat, ASK-INTEGRATED.md §11 U1+): it
@@ -112,7 +116,9 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
       {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
         <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350}
           onHoverIn={turn.at ? () => setShowAt(true) : undefined} onHoverOut={turn.at ? () => setShowAt(false) : undefined} style={[s.me, found ? s.found : null]}>
-          <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>
+          {turn.attachment ? (
+            <View style={s.attached} testID="chat-me-attachment"><Icon name="doc" size={16} color={colors.mist} /><T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T></View>
+          ) : <T style={[font('body', colors.mist), { fontSize: 16, lineHeight: 22 }]}>{turn.me}</T>}
         </Pressable>
         {showAt && turn.at ? <T v="tiny" color={colors.muted} testID="chat-me-time">{clock(turn.at)}</T> : null}
       </Animated.View> : null}
@@ -131,7 +137,7 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
       ) : null}
       {/* What Mada found, under her words and in line with the bubble (not the mark). */}
       <View style={s.under}>
-        {turn.cards.map((c, i) => <CardFor key={`${c.type}-${i}`} card={c} turn={turn} onOpen={onOpen} />)}
+        {turn.cards.map((c, i) => <CardFor key={`${c.type}-${i}`} card={c} turn={turn} onOpen={onOpen} onSay={onSay} />)}
         {turn.pay ? (
           <Box icon="card" title={turn.pay.title} testID="chat-pay-card">
             <View style={s.line}><Icon name="lock" size={16} color={colors.ink3} /><T v="small" color={colors.ink2} style={{ flex: 1 }}>{t('chat.pay.line')}</T></View>
@@ -205,7 +211,7 @@ function Dot({ delay, still }: { delay: number; still: boolean }) {
   return <Animated.View style={[s.dot, st]} />;
 }
 
-function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpen: (o: ChatOpen) => void }) {
+function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   const open = (kind: 'flights' | 'stays' | 'esim' | 'entry' | 'car') => { buzz('tap'); onOpen({ kind, card, turn }); };
   const locale = getLocale();
   switch (card.type) {
@@ -300,6 +306,18 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
       return <InviteCard card={card} />;
     case 'change':
       return <ChangeRequestCard card={card} />;
+    // The living plan (PlanCards.tsx): review it on its trip until the plan screen lands.
+    case 'plan':
+      return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} onSay={onSay} />;
+    case 'plan_diff':
+      return <PlanDiffCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} />;
+    case 'link':
+      return <LinkCard card={card} onOpen={() => onOpen({ kind: 'link', screen: card.screen, id: card.id })} />;
+    // A passport, visa or ID sent in the chat, and asking a companion for theirs (ASK-INTEGRATED.md §6, §5.4).
+    case 'document':
+      return <DocumentCard card={card} turnId={turn.id} />;
+    case 'doc_share':
+      return <ShareCard card={card} turnId={turn.id} />;
     default:
       return null;
   }
@@ -385,6 +403,7 @@ const AVATAR_GAP = 8;
 
 const s = StyleSheet.create({
   found: { borderWidth: 2, borderColor: colors.gold },
+  attached: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stamp: { textAlign: 'center', alignSelf: 'center', paddingTop: 4 },
   meWrap: { alignSelf: 'flex-end', maxWidth: '82%', alignItems: 'flex-end' },

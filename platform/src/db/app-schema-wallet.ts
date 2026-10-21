@@ -44,10 +44,12 @@ export const appDocuments = pgTable("app_documents", {
   fileId: uuid("file_id").references(() => appFiles.id, { onDelete: "set null" }),
   source: text("source").notNull().default("upload"), // scan | upload | setup | manual
   removable: boolean("removable").notNull().default(true),
+  /** A visa or ID read from its lines: the same HMAC as a passport's (documents/fingerprint.ts). Migration 0046. */
+  fingerprint: text("fingerprint"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-}, (t) => [index("app_documents_owner_idx").on(t.ownerId, t.personId)]);
+}, (t) => [index("app_documents_owner_idx").on(t.ownerId, t.personId), index("app_documents_fingerprint_idx").on(t.ownerId, t.fingerprint)]);
 
 /** Faisal may see a document for one trip, read-only, until the grant ends. Every view is audited. */
 export const appDocumentGrants = pgTable("app_document_grants", {

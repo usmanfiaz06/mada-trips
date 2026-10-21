@@ -84,7 +84,7 @@ function open(blob: Buffer, key: Buffer): Buffer {
 export type StoredFile = typeof appFiles.$inferSelect;
 
 /** Encrypt and store a file, and record it. Throws NOT_CONFIGURED without APP_DATA_KEY or a store. */
-export async function storeFile(tx: Tx | typeof db, ownerId: string, purpose: "document" | "support" | "photo" | "export" | "cover", file: { name: string; mime: string; bytes: Buffer }): Promise<StoredFile> {
+export async function storeFile(tx: Tx | typeof db, ownerId: string, purpose: "document" | "support" | "photo" | "export" | "cover" | "ask", file: { name: string; mime: string; bytes: Buffer }): Promise<StoredFile> {
   const id = randomUUID();
   const key = randomBytes(32);
   const keyEnc = encryptField(key.toString("base64"), fileAad(id)); // NOT_CONFIGURED without APP_DATA_KEY
