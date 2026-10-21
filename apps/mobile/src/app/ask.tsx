@@ -168,7 +168,9 @@ export default function Ask() {
     // Cards already on screen are the answer: never a second flow under them asking the same thing again.
     if (turn.cards.length) return;
     if (turn.intent) { saveAsk(v, turn.intent); setQuery(v); setIntent(turn.intent); setRound((r) => r + 1); return; }
-    await runFlows(v, undefined, true);
+    // The conversation's earlier messages (this turn's thread) so the app's own flows keep its thread.
+    const before = useAskChat.getState().turns.filter((x) => x.id !== turn.id).slice(-3).map((x) => x.me).filter(Boolean).join('. ');
+    await runFlows(v, undefined, true, before);
   };
 
   /** A card in the conversation: the flow for the same search, the pay sheet, the desk. */
@@ -191,7 +193,7 @@ export default function Ask() {
   };
 
   /** Ask's own flows: the words read on the server (POST /ask/parse), then the flow for what was asked. */
-  const runFlows = async (v: string, kindHint?: AskKind, quiet = false) => {
+  const runFlows = async (v: string, kindHint?: AskKind, quiet = false, context = '') => {
     if (!quiet) buzz('tap');
     forgetSettled();
     // Mada answers in the language this was written in, whatever the app is set to (per message).
@@ -203,9 +205,11 @@ export default function Ask() {
     setParsing(true);
     // The flight search starts from the phone's own reading while the server reads the words (FlightFlow.tsx).
     setParseOffline(false);
-    if ((!kindHint || kindHint === 'flight') && !offline) { const r = parseAskRules(v, { today, people: household }); headStart(askIntentOfRules(r, kindHint ?? r.kind)); }
+    // A follow-up ("just 14 hours next Friday") is read with what came before it in the conversation.
+    const read = context ? `${context}. ${v}` : v;
+    if ((!kindHint || kindHint === 'flight') && !offline) { const r = parseAskRules(read, { today, people: household }); headStart(askIntentOfRules(r, kindHint ?? r.kind)); }
     try {
-      const { intent: it } = await bookingApi.parse(v);
+      const { intent: it } = await bookingApi.parse(read);
       const next = kindHint ? { ...it, kind: kindHint } : it;
       saveAsk(v, next);
       setIntent(next);
