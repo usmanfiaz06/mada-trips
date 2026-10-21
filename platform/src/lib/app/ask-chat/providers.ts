@@ -201,3 +201,23 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
     },
   };
 }
+
+/**
+ * Staging check (GET /ask/providers): one tiny plain call to each provider in the chain, so "is Gemini answering?" has
+ * a yes or a reason. Name, model, status and the provider's own short error only; never a key or a thread.
+ */
+export async function probeChain(): Promise<{ name: string; model: string; ok: boolean; ms: number; status: number | null; error: string | null; restingFor: number | null }[]> {
+  const chain = providerChain() ?? [];
+  const resting = cooldowns();
+  return Promise.all(chain.map(async (l) => {
+    const t0 = Date.now();
+    try {
+      const api = await apiFor(linkConfig(l));
+      await api.create({ model: l.fastModel, max_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 15_000, maxRetries: 0 });
+      return { name: l.name, model: l.fastModel, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message.replace(/\s+/g, " ").slice(0, 200) : "error";
+      return { name: l.name, model: l.fastModel, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
+    }
+  }));
+}
