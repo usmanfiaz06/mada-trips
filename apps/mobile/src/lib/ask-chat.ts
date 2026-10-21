@@ -253,7 +253,8 @@ export async function restoreAskChat(now = Date.now()): Promise<boolean> {
 
 /**
  * The lines the server kept, as turns: what the traveller wrote and what came back (Mada's words, a person's reply,
- * "Noura joined"). The cards aren't kept on the server (only their kinds), so a turn the phone still has keeps its own.
+ * "Noura joined"). The cards aren't kept on the server (only their kinds), so a turn the phone still has keeps its own;
+ * a line Mada added on her own (a change asked by a companion) keeps its card whole (`kept`), read again live.
  */
 export function turnsOfLines(lines: AskThreadLine[], cached: ChatTurn[], lang: 'en' | 'ar', nextId: () => number): ChatTurn[] {
   const out: ChatTurn[] = [];
@@ -262,14 +263,14 @@ export function turnsOfLines(lines: AskThreadLine[], cached: ChatTurn[], lang: '
     const last = out[out.length - 1];
     if (l.who === 'me') out.push(blank({ me: l.text, at: l.at ?? undefined, ...(l.attachment ? { attachment: l.attachment } : {}) }));
     else if (l.who === 'joined') out.push(blank({ desk: 'joined', text: l.text, at: l.at ?? undefined }));
-    else if (last && last.me && !last.text && !last.desk && !last.by) out[out.length - 1] = { ...last, text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next };
+    else if (last && last.me && !last.text && !last.desk && !last.by) out[out.length - 1] = { ...last, text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next, ...(l.kept ? { cards: l.kept } : {}) };
     else if (last && !last.me && l.who === 'agent' && last.by === l.by) out[out.length - 1] = { ...last, text: `${last.text}\n\n${l.text}` };
-    else out.push(blank({ text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next, at: l.at ?? undefined }));
+    else out.push(blank({ text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next, at: l.at ?? undefined, cards: l.kept ?? [] }));
   }
   // The phone's own copy of a turn keeps its cards and pay sheet.
   return out.map((x) => {
     const mine = cached.find((c) => c.me === x.me && c.text === x.text && (c.cards.length || c.pay));
-    return mine ? { ...x, cards: mine.cards, pay: mine.pay, handoff: mine.handoff, intent: mine.intent } : x;
+    return mine && !x.cards.length ? { ...x, cards: mine.cards, pay: mine.pay, handoff: mine.handoff, intent: mine.intent } : x;
   });
 }
 

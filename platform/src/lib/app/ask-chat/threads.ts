@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
-import { todayIn, type AskThreadLine, type AskThreadResponse, type AskThreadRow, type AskTripStatus } from "@mada/shared";
+import { ChatCard, todayIn, type AskThreadLine, type AskThreadResponse, type AskThreadRow, type AskTripStatus } from "@mada/shared";
 import { db } from "@/db";
 import { appTrips } from "@/db/app-schema";
 import { appAskThreads } from "@/db/app-schema-ask";
@@ -101,13 +101,19 @@ export async function listThreads(ownerId: string, o: { q?: string | null; archi
   };
 }
 
+const KEPT = new Set(["change", "people", "invite"]);
+
 /** The lines the app shows again: the traveller's, Mada's, the desk's replies and "Noura from Mada joined". */
 export function linesOf(transcript: unknown[], lang: "en" | "ar"): AskThreadLine[] {
   const out: AskThreadLine[] = [];
   for (const raw of transcript as AskLine[]) {
     if (!raw || typeof raw !== "object") continue;
     if (raw.who === "me" && typeof raw.text === "string") out.push({ who: "me", text: raw.text, at: raw.at ?? null, ...(raw.attachment?.label ? { attachment: { kind: String(raw.attachment.kind ?? "other"), label: String(raw.attachment.label) } } : {}) });
-    else if (raw.who === "mada" && typeof raw.text === "string") out.push({ who: "mada", text: raw.text, cards: (raw.cards ?? []).filter((c) => typeof c === "string").slice(0, 6), next: (raw.next ?? []).filter((c) => typeof c === "string").slice(0, 3) });
+    else if (raw.who === "mada" && typeof raw.text === "string") {
+      // Reference cards kept with a line (a companion's change request): only the kinds that are read again live.
+      const kept = (raw.kept ?? []).map((c) => ChatCard.safeParse(c)).filter((c) => c.success && KEPT.has(c.data.type)).map((c) => c.data!).slice(0, 2);
+      out.push({ who: "mada", text: raw.text, cards: (raw.cards ?? []).filter((c) => typeof c === "string").slice(0, 6), next: (raw.next ?? []).filter((c) => typeof c === "string").slice(0, 3), ...(kept.length ? { kept, at: raw.at ?? null } : {}) });
+    }
     else if (raw.who === "agent") out.push({ who: "agent", text: raw.text, by: nameIn(raw, lang), at: raw.at });
     else if (raw.who === "system" && raw.event === "joined") out.push({ who: "joined", text: joinedText(nameIn(raw, lang), raw.pronoun, lang), by: nameIn(raw, lang), at: raw.at });
   }

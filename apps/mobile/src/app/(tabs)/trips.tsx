@@ -1,3 +1,4 @@
+import { SharedTrips } from '@/components/trips/SharedTrips';
 import { useEffect, useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
 import { Skeleton } from '@/components/states/Skeleton';
@@ -62,6 +63,7 @@ export default function Trips() {
         </View>
         {list.isError && data ? <StaleBadge testID="trips-fresh" updatedAt={list.dataUpdatedAt || null} stale /> : null}
         {tab === 'upcoming' && (!data && list.isPending ? <TripCardLoading /> : <Upcoming trips={data?.upcoming ?? []} tracked={data?.tracked ?? []} ask={ask} />)}
+        {tab === 'upcoming' ? <SharedTrips /> : null}
         {tab === 'requests' && <Requests requests={data?.requests ?? []} refunds={data?.refunds ?? []} ask={ask} />}
         {tab === 'past' && <Past trips={data?.past ?? []} refunds={data?.refunds ?? []} ask={ask} />}
       </Scroll>

@@ -134,9 +134,10 @@ export default function TripDetail() {
             {manage.map(([href, icon, title, sub], i) => <ListRow key={href} testID={`manage-${i}`} first={i === 0} icon={icon} tone={i === 0 ? 'gold' : undefined} title={title} sub={sub} onPress={() => router.push(href as Href)} />)}
           </Box>
           <ThingsView mode="section" placeId={trip.city} city={trip.city} tripId={trip.id} days={tripDays(trip.startDate, trip.endDate)} />
-          <Box>
+          <Box onPress={() => router.push(`/trip/${trip.id}/travellers` as Href)} label={t('people.screen.open')} testID="trip-travellers">
             <H3>{t('tm.detail.travellers')}</H3>
             <Row style={{ flexWrap: 'wrap' }}>{trip.travellers.map((p) => <Tag key={p.id} label={p.isSelf ? t('tm.detail.you', { name: p.firstName }) : p.firstName} />)}</Row>
+            <Tiny>{t('people.screen.open')}</Tiny>
           </Box>
           {trip.travellers.some((p) => p.ticketNumber) ? (
             <Box testID="tickets-box">

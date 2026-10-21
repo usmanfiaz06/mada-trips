@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey } from "drizzle-orm/pg-core";
-import { appInvoices, appPayments, appRefunds, appRequests, appTrackedFlights, appTrips, appUsers } from "./app-schema";
+import { pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
+import { appInvoices, appPayments, appPeople, appRefunds, appRequests, appTrackedFlights, appTrips, appUsers } from "./app-schema";
+import { appCircleInvites } from "./app-schema-circles";
+import { appPlans } from "./app-schema-plans";
+import { appAskThreads } from "./app-schema-ask";
 
 /*
  * The trip companion (M3): what the trip screens need beyond the M0 trip tables, the money side per charge (payments,
@@ -153,3 +156,72 @@ export const appFlightEvents = pgTable("app_flight_events", {
   source: text("source").notNull(),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("app_flight_events_key").on(t.flightNumber, t.day, t.kind, t.value)]);
+
+/*
+ * Companions (ASK-INTEGRATED §5, U5; migration drizzle/0045_trip_travellers.sql). Who goes on a trip: a household
+ * person, a Mada user from the circle (with a household row linked to him, `person_id`, so the plan and the pay sheet
+ * count him), or a pending invite. The owner's role is `owner`; everyone else's is what the owner set: view, suggest
+ * (default) or edit (§5.5). `app_trips.traveller_ids` stays as a cache of the household people going.
+ */
+export const appTripTravellers = pgTable("app_trip_travellers", {
+  id: id(),
+  tripId: uuid("trip_id").notNull().references(() => appTrips.id, { onDelete: "cascade" }),
+  personId: uuid("person_id").references(() => appPeople.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => appUsers.id, { onDelete: "cascade" }),
+  inviteId: uuid("invite_id").references(() => appCircleInvites.id, { onDelete: "set null" }),
+  // The first name as the owner said it, for an invitee who has no row of his own yet.
+  name: text("name"),
+  role: text("role").notNull().default("suggest"), // owner | view | suggest | edit
+  status: text("status").notNull().default("going"), // going | invited | declined
+  addedByKind: text("added_by_kind").notNull().default("traveller"), // ask | traveller | system
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  check("app_trip_travellers_who", sql`${t.personId} IS NOT NULL OR ${t.userId} IS NOT NULL OR ${t.inviteId} IS NOT NULL`),
+  check("app_trip_travellers_role", sql`${t.role} IN ('owner', 'view', 'suggest', 'edit')`),
+  check("app_trip_travellers_status", sql`${t.status} IN ('going', 'invited', 'declined')`),
+  uniqueIndex("app_trip_travellers_person_key").on(t.tripId, t.personId).where(sql`${t.personId} IS NOT NULL`),
+  uniqueIndex("app_trip_travellers_user_key").on(t.tripId, t.userId).where(sql`${t.userId} IS NOT NULL`),
+  index("app_trip_travellers_user_idx").on(t.userId, t.status),
+  index("app_trip_travellers_invite_idx").on(t.inviteId),
+]);
+
+/** Per trip: whether companions who can edit see prices (§5.5). Off unless the owner turns it on. */
+export const appTripSharing = pgTable("app_trip_sharing", {
+  tripId: uuid("trip_id").primaryKey().references(() => appTrips.id, { onDelete: "cascade" }),
+  sharePrices: boolean("share_prices").notNull().default(false),
+  updatedAt: updatedAt(),
+});
+
+export type ChangeLineRow = { op: "add" | "update" | "move" | "remove" | "skip" | "unskip"; title: string; day: number | null; field: "nights" | "day" | "title" | "other" | null; from: string | null; to: string | null; text: string };
+
+/**
+ * A change a companion asked for (§5.5): the plan ops against the version he read, the lines both chats show, and
+ * the owner's decision. Open for 48 hours with a reminder at 24 (the quotes job). `costs`: it needs booking, so the
+ * payer decides and it goes to the payer's pay sheet. The chats it was asked and answered in, so both update.
+ */
+export const appPlanChangeRequests = pgTable("app_plan_change_requests", {
+  id: id(),
+  tripId: uuid("trip_id").notNull().references(() => appTrips.id, { onDelete: "cascade" }),
+  planId: uuid("plan_id").notNull().references(() => appPlans.id, { onDelete: "cascade" }),
+  ownerId: uuid("owner_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  byUserId: uuid("by_user_id").notNull().references(() => appUsers.id, { onDelete: "cascade" }),
+  byThreadId: uuid("by_thread_id").references(() => appAskThreads.id, { onDelete: "set null" }),
+  ownerThreadId: uuid("owner_thread_id").references(() => appAskThreads.id, { onDelete: "set null" }),
+  summary: text("summary").notNull(),
+  ops: jsonb("ops").$type<unknown[]>().notNull(),
+  lines: jsonb("lines").$type<ChangeLineRow[]>().notNull().default([]),
+  baseVersion: integer("base_version").notNull(),
+  costs: boolean("costs").notNull().default(false),
+  status: text("status").notNull().default("pending"), // pending | approved | declined | expired | cancelled
+  reason: text("reason"),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  remindedAt: timestamp("reminded_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+}, (t) => [
+  check("app_plan_change_requests_status", sql`${t.status} IN ('pending', 'approved', 'declined', 'expired', 'cancelled')`),
+  index("app_plan_change_requests_trip_idx").on(t.tripId, t.status),
+  index("app_plan_change_requests_by_idx").on(t.byUserId, t.createdAt),
+  index("app_plan_change_requests_open_idx").on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+]);

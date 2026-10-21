@@ -48,3 +48,4 @@ export * from './ask-chat';
 export * from './ask-docs';
 export * from './ask-memory';
 export * from './plans';
+export * from './trip-travellers';

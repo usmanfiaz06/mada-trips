@@ -3,6 +3,7 @@ import { Id, IsoDateTime, IsoDay } from './common';
 import { AskIntent, EntryCheckResponse, FlightOption, HomeAirport, OrderDraft, StayOption } from './booking';
 import { EsimPlan } from './esim';
 import { TripCard } from './trips';
+import { ChangeRequestView, PeopleMatch } from './trip-travellers';
 import { ChatDocCard, ChatShareCard } from './ask-docs';
 
 /*
@@ -89,6 +90,14 @@ export const ChatCard = z.discriminatedUnion('type', [
    * never guessed (ASK-INTEGRATED.md §2.2): the app sends the same words again with `attach`.
    */
   z.object({ type: z.literal('attach'), tripId: Id, place: z.string(), when: z.string().nullable() }),
+  /**
+   * Companions (ASK-INTEGRATED.md §5, U5). "Which Abdullah?": up to 4 people the name matched, never a guess; the tap
+   * adds the one picked. "He isn't in your circle yet": an invite that only goes out on a tap (it shares the trip's
+   * name and dates). A change a companion asked for: the same card in his chat and the owner's, read again live.
+   */
+  z.object({ type: z.literal('people'), tripId: Id, name: z.string(), options: z.array(PeopleMatch).min(1).max(4) }),
+  z.object({ type: z.literal('invite'), tripId: Id, name: z.string(), tripTitle: z.string(), when: z.string().nullable() }),
+  z.object({ type: z.literal('change'), change: ChangeRequestView }),
   /** "Here's your plan, review it" (ASK-INTEGRATED.md §3.3): the living plan at this version, a few rows a day. */
   z.object({
     type: z.literal('plan'), planId: Id, tripId: Id, version: z.number().int(), title: z.string(),
@@ -236,6 +245,8 @@ export const AskThreadLine = z.object({
   /** A person on the desk, by the name the traveller knows. */
   by: z.string().nullable().optional(),
   at: IsoDateTime.nullable().optional(),
+  /** Cards kept with the line because they are references, read again live (a change asked by a companion, §5.5). */
+  kept: z.array(ChatCard).max(2).optional(),
   /** A document the traveller sent: its kind and the masked label, never the photo (ASK-INTEGRATED.md §6.4). */
   attachment: z.object({ kind: z.string(), label: z.string() }).optional(),
 });
