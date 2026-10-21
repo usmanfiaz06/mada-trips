@@ -13,6 +13,7 @@ import {
   rejectRefund, revealPassport, saveChecklist, sendAgentReply, sendQuote, unblockTraveller,
 } from "@/lib/app/desk/adapters";
 import { pushPlan } from "@/lib/app/desk/disruptions";
+import { linkRequestToItem } from "@/lib/app/desk/plans";
 import { confirmContactByCall, sendFlightQuote } from "@/lib/app/desk/flight-quotes";
 import { decideModeration } from "@/lib/app/desk/moderation";
 import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
@@ -261,6 +262,11 @@ export async function promiseAction(_: ActionState, fd: FormData): Promise<Actio
 
 export async function doneAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try { const u = await requirePerm("desk.act"); await markDone(u, uuid(fd, "id")); return done("Marked done"); } catch (e) { return toState(e); }
+}
+
+/** "Link to plan item" on a request page (ASK-INTEGRATED.md §10): the request fulfils that item of the customer's plan. */
+export async function linkPlanItemAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try { const u = await requirePerm("desk.act"); await linkRequestToItem(u, uuid(fd, "id"), uuid(fd, "itemId")); return done("Linked to the plan"); } catch (e) { return toState(e); }
 }
 
 /* ───────────── chat ───────────── */

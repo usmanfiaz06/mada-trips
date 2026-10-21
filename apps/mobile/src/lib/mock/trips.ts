@@ -56,6 +56,30 @@ function err(code: ErrorCode, message?: string, fields?: Record<string, string>)
 /** Card payments on this account's trips (mock/wallet.ts: the cards used but not saved). */
 export const cardChargesOf = (userId: string) => (states.get(userId)?.charges ?? []).filter((c) => c.method === 'card').map((c) => ({ label: c.label, at: c.paidAt }));
 
+/**
+ * A trip with a plan and nothing booked yet ("planning", ASK-INTEGRATED §1.1), for the mock's plans (mock/plans.ts).
+ * The same id again returns the trip it already made.
+ */
+export function mockPlanningTrip(user: MockUser, t0: { id: string; city: string; country: string | null; photo: string | null; startDate: string; endDate: string }): Omit<TripDetail, 'clock'> {
+  const s = stateOf(user);
+  const have = s.trips.find((x) => x.id === t0.id);
+  if (have) return have;
+  const self = user.people.find((p) => p.isSelf) ?? user.people[0]!;
+  const travellers: TripTraveller[] = [{ id: self.id, firstName: self.firstName || user.name, fullName: `${self.givenNames || user.name} ${self.surname}`.trim(), initial: (self.firstName || user.name || 'O').charAt(0).toUpperCase(), relation: self.relation, isSelf: true, birthYear: null, passportExpiry: self.passport?.expiry ?? null }];
+  const trip: Omit<TripDetail, 'clock'> = {
+    id: t0.id, city: t0.city, country: t0.country, imageUrl: t0.photo, startDate: t0.startDate, endDate: t0.endDate, travellerIds: [self.id], segments: [], stays: [], pickups: [],
+    status: 'planning', bookingRef: null, confirmedBy: null, imported: false, createdAt: nowIso(), travellers, fare: null,
+    prices: { flights: SAR(0), stays: SAR(0), pickups: SAR(0), discount: SAR(0), total: SAR(0) },
+    noStay: null, rebooked: false, vouchers: [], bagReport: null, picks: [], rating: null, company: null, weather: null, disruption: null, openRequests: 0,
+    agent: { name: 'Faisal', initial: 'F', online: true, covering: null }, bookedAt: nowIso(),
+  };
+  s.trips.push(trip);
+  return trip;
+}
+
+/** The stays booked on a trip, for the mock plan (a stay booked from the plan shows on its nights). */
+export const mockStaysOf = (user: MockUser, tripId: string) => stateOf(user).trips.find((x) => x.id === tripId)?.stays ?? [];
+
 /** The account's trips, for the mock Ask chats list (mock/ask-threads.ts): what a chat about a trip shows. */
 export const mockTripsOf = (user: MockUser) => stateOf(user).trips.map((x) => ({ id: x.id, city: x.city, startDate: x.startDate, endDate: x.endDate, status: x.status }));
 
@@ -173,6 +197,8 @@ export type BookedTrip = {
   payer?: string | null;
   payLink?: { circleId: string; messageId: string } | null;
   bookedAt: string;
+  /** A planning trip the booking was made from (its plan): the flights and stay land on it, not on a new trip. */
+  intoTripId?: string | null;
 };
 
 /** A confirmed booking becomes a trip in Trips and Today, with its charges and invoices. Returns the trip id. */
@@ -241,6 +267,21 @@ export function recordBookedTrip(b: BookedTrip): string {
   const flights = amountOf(['flight', 'children', 'infants']);
   const stayAmt = amountOf(['stay']);
   const pickupAmt = amountOf(['pickup']);
+  // Booked from a plan: onto that trip (it stops being "planning"), with its charges.
+  const into = b.intoTripId ? s.trips.find((x) => x.id === b.intoTripId) : undefined;
+  if (into) {
+    into.segments.push(...segments);
+    into.stays.push(...stays);
+    into.status = 'booked';
+    into.bookingRef ??= ref;
+    into.prices = { flights: SAR(into.prices.flights.amount + flights), stays: SAR(into.prices.stays.amount + stayAmt), pickups: into.prices.pickups, discount: into.prices.discount, total: SAR(into.prices.total.amount + flights + stayAmt) };
+    const paidAt = nowIso();
+    for (const [item, amount, title, sub] of [['flight', flights, segments.map((x) => x.flightNumber).join(' and '), ''], ['stay', stayAmt, stays[0]?.name ?? 'Stay', stays.map((x) => `${x.nights} ${x.nights === 1 ? 'night' : 'nights'}`).join('')]] as const) {
+      if (amount) addCharge(s, into, { item, title: title || item, sub, amount: SAR(amount), method: 'card', label: b.paymentLabel, paidAt, plan: null, creditUsed: SAR(0) });
+    }
+    notify(s, { kind: 'booking_confirmed', level: 'active', copy: 'notify.confirmed', vars: { city: into.city, agent: b.agentName, ref: b.ref }, href: `/trips/${into.id}` });
+    return into.id;
+  }
   const tripId = uuid();
   if (b.payLink) s.payLinks.push({ tripId, circleId: b.payLink.circleId, messageId: b.payLink.messageId });
   const trip: Omit<TripDetail, 'clock'> = {

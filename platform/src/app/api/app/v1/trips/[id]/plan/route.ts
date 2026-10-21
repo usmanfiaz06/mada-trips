@@ -2,15 +2,17 @@ import { z } from "zod";
 import { LivingPlanResponse } from "@mada/shared";
 import { body, json } from "@/lib/app/http";
 import { createPlan } from "@/lib/app/plans/ops";
-import { ownTrip, readPlan } from "@/lib/app/plans/plans";
+import { ownTrip } from "@/lib/app/plans/plans";
+import { planFor } from "@/lib/app/plans/access";
 import { withParams } from "@/lib/app/trips/route";
 
-// GET /api/app/v1/trips/{id}/plan → { plan }: items with statuses read from the trip's bookings, checks, the title
-// from the origin. 404 when the trip has no plan. POST (same body as POST /trips/plan; stops default to the trip's
+// GET /api/app/v1/trips/{id}/plan → { plan, access, people }: items with statuses read from the trip's bookings, checks,
+// the title from the origin; access says what the caller may do (owner, or a companion's role, and whether prices
+// show). A companion reads it without prices unless shared (plans/access.ts). 404 when the trip has no plan. POST (same body as POST /trips/plan; stops default to the trip's
 // city and dates) → 201 { plan } for a trip that has none yet, its bookings linked to the new items.
 export const dynamic = "force-dynamic";
 
-export const GET = withParams<{ id: string }>(async (_req, { id }, { userId }) => json(LivingPlanResponse.parse({ plan: await readPlan(userId, id) })));
+export const GET = withParams<{ id: string }>(async (_req, { id }, { userId }) => json(LivingPlanResponse.parse(await planFor(userId, id))));
 
 export const POST = withParams<{ id: string }>(async (req, { id }, { userId }) => {
   const raw = (await body(req, z.record(z.string(), z.unknown()))) as Record<string, unknown>;

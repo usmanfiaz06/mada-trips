@@ -15,6 +15,7 @@ import { Sun } from '@/components/Sun';
 import { T } from '@/components/Text';
 import { Photo, useNow, enter } from '@/components/booking/parts';
 import { bookingApi, bookingKeys, finishInBackground, stopWatching, useOrder, usePayDraft } from '@/lib/booking';
+import { attachChatToTrip } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
 import { getLocale, listSep, t, tn } from '@/lib/i18n';
 import { useUpdateMe } from '@/lib/queries';
@@ -71,7 +72,14 @@ export default function Waiting() {
   const knocked = useRef(false);
   const confirmedBuzz = useRef(false);
   useEffect(() => { if (!knocked.current) { knocked.current = true; buzz('knock'); } }, []);
-  useEffect(() => { if (o?.status === 'confirmed' && !confirmedBuzz.current) { confirmedBuzz.current = true; buzz('success'); stopWatching(o.id); usePayDraft.getState().clear(); void qc.invalidateQueries({ queryKey: ['trips'] }); } }, [o?.status, o?.id, qc]);
+  useEffect(() => {
+    if (o?.status !== 'confirmed' || confirmedBuzz.current) return;
+    confirmedBuzz.current = true; buzz('success'); stopWatching(o.id);
+    // Booked from a chat about no trip yet: the chat is about the trip this booking made (ASK-INTEGRATED §2.2).
+    const from = usePayDraft.getState().current?.threadId;
+    if (from && o.tripId) void attachChatToTrip(from, o.tripId);
+    usePayDraft.getState().clear(); void qc.invalidateQueries({ queryKey: ['trips'] });
+  }, [o?.status, o?.id, qc]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (o?.status === 'fare_changed' || o?.status === 'ticketing_failed' || o?.status === 'needs_answer') buzz('warn'); }, [o?.status]);
   // A booking that won't go ahead stays on screen with its outcome (why, the money, what next); an older server sends none.
   useEffect(() => { if (o?.status === 'cancelled' && !o.result) { toast(t('wait.cancelled')); router.replace('/today'); } }, [o?.status]); // eslint-disable-line react-hooks/exhaustive-deps

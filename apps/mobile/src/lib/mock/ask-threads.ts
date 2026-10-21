@@ -14,6 +14,8 @@ import { mockDemoChange } from './trip-people';
 type MockThread = {
   id: string; title: string | null; tripId: string | null; lines: AskThreadLine[]; lastAt: number; archived: boolean;
   mode: 'ai' | 'agent'; agent: string | null; lang: 'en' | 'ar';
+  /** trip: the shared trip chat (§5.5), with the people in it. */
+  kind?: 'trip'; members?: { name: string; initial: string; owner: boolean; me: boolean }[];
 };
 
 const byUser = new Map<string, MockThread[]>();
@@ -101,6 +103,12 @@ export function recordDemoTurn(user: MockUser | null, threadId: string, me: stri
   if (!th.title) { const w = me.trim().split(/\s+/); th.title = w.slice(0, 6).join(' ') + (w.length > 6 ? '…' : ''); }
 }
 
+/** A plan made in the chat attaches it to its trip, and the title follows the route (the server's tools-plan.ts). */
+export function attachDemoThread(user: MockUser | null, threadId: string, tripId: string, title: string): void {
+  const th = user ? threadsOf(user).find((x) => x.id === threadId) : undefined;
+  if (th) { th.tripId = tripId; th.title = title; }
+}
+
 /** A line kept without a turn (a document sent in the chat, mock/ask-docs.ts), as the server's appendLine. */
 export function recordDemoLine(user: MockUser | null, threadId: string, line: AskThreadLine, lang: 'en' | 'ar'): void {
   if (!user) return;
@@ -126,7 +134,53 @@ function rowOf(user: MockUser, x: MockThread): AskThreadRow {
   return {
     id: x.id, title: x.title, tripId: x.tripId, tripStatus: trip.status, tripStart: trip.start, preview: last?.text.slice(0, 140) ?? null,
     lastAt: new Date(x.lastAt).toISOString(), mode: x.mode, agent: x.agent, unread: x.lines.at(-1)?.who === 'agent', archived: x.archived, ended: false, lang: x.lang,
+    ...(x.kind === 'trip' ? { kind: 'trip' as const, members: x.members ?? [] } : {}),
   };
+}
+
+/*
+ * The shared trip chat in mock mode (§5.5): the organiser turns it on for the seeded trip, and it opens with Mada's
+ * line on who reads it, Abdullah asking for a change and Mada's line with the change card, approved in place.
+ */
+const TRIP_CHAT_ID = '5a1e0000-0000-4000-8000-0000000000c1';
+const tripChatOf = (user: MockUser, tripId: string) => threadsOf(user).find((x) => x.kind === 'trip' && x.tripId === tripId) ?? null;
+
+export function mockTripChat(user: MockUser, tripId: string) {
+  const th = tripChatOf(user, tripId);
+  const lang: 'en' | 'ar' = localeOr() === 'ar' ? 'ar' : 'en';
+  const members = th?.members ?? [
+    { name: user.name || 'Omar', initial: (user.name || 'O').charAt(0).toUpperCase(), owner: true, me: true },
+    { name: lang === 'ar' ? 'عبدالله' : 'Abdullah', initial: lang === 'ar' ? 'ع' : 'A', owner: false, me: false },
+  ];
+  return { on: !!th && !th.archived, threadId: th && !th.archived ? th.id : null, canManage: true, members };
+}
+
+export function setMockTripChat(user: MockUser, tripId: string, on: boolean) {
+  const have = tripChatOf(user, tripId);
+  if (have) { have.archived = !on; if (on) have.lastAt = Date.now(); return mockTripChat(user, tripId); }
+  if (!on) return mockTripChat(user, tripId);
+  const lang: 'en' | 'ar' = localeOr() === 'ar' ? 'ar' : 'en';
+  const trip = mockTripsOf(user).find((x) => x.id === tripId);
+  const title = trip ? tripTitle(trip.city, trip.startDate, trip.endDate, lang) : '';
+  const now = Date.now();
+  const { members } = mockTripChat(user, tripId);
+  const abdullah = members[1]!.name;
+  const change = mockDemoChange(user);
+  const lines: AskThreadLine[] = [
+    { who: 'mada', text: t('tripChat.first', { trip: title }, lang), at: new Date(now - 30 * 60_000).toISOString() },
+    { who: 'member', text: lang === 'ar' ? 'نقدر نجلس ليلتين على البوسفور ونرجع الجمعة؟' : 'Can we have two nights by the Bosphorus and fly back on Friday?', by: abdullah, at: new Date(now - 12 * 60_000).toISOString() },
+  ];
+  if (change && change.tripId === tripId) lines.push({ who: 'mada', text: t('people.line.asked', { name: abdullah, trip: change.tripTitle, summary: change.summary }, lang), kept: [{ type: 'change', change }], at: new Date(now - 11 * 60_000).toISOString() });
+  threadsOf(user).push({ id: TRIP_CHAT_ID, title: t('tripChat.label', undefined, lang), tripId, lines, lastAt: now - 11 * 60_000, archived: false, mode: 'ai', agent: null, lang, kind: 'trip', members });
+  return mockTripChat(user, tripId);
+}
+
+/** A line Mada adds to the trip chat (the organiser approved in place). */
+export function mockTripChatLine(user: MockUser, tripId: string, text: string) {
+  const th = tripChatOf(user, tripId);
+  if (!th || th.archived) return;
+  th.lines.push({ who: 'mada', text, at: new Date().toISOString() });
+  th.lastAt = Date.now();
 }
 
 export const askThreadsMock: AreaMock = async (w, ctx) => {

@@ -33,7 +33,7 @@ import { blockTraveller, revealPassport, unblockTraveller } from "./adapters";
 export const PAGE_SIZE = 50;
 export const CUSTOMER_FILTERS = ["all", "open", "blocked", "credit", "new"] as const;
 export type CustomerFilter = (typeof CUSTOMER_FILTERS)[number];
-export const CUSTOMER_TABS = ["overview", "bookings", "payments", "credit", "esims", "requests", "chats", "memory", "audit"] as const;
+export const CUSTOMER_TABS = ["overview", "bookings", "plans", "payments", "credit", "esims", "requests", "chats", "memory", "audit"] as const;
 export type CustomerTab = (typeof CUSTOMER_TABS)[number];
 
 /* ───────────── what a search term can be ───────────── */

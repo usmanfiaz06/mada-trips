@@ -127,6 +127,11 @@ export const ChatCard = z.discriminatedUnion('type', [
   ChatDocCard,
   /** Asking a companion to share their passport for the trip (§5.4): sent only on its tap. */
   ChatShareCard,
+  /**
+   * "Start a chat for Istanbul?" (ASK-INTEGRATED.md §2.2): this chat is about another trip and the words name a new place.
+   * Mada answers here and offers the tap; the words are carried over to the new chat. Never split silently.
+   */
+  z.object({ type: z.literal('new_chat'), place: z.string(), text: z.string().max(1000) }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
 
@@ -199,6 +204,19 @@ export type AskDeskResponse = z.infer<typeof AskDeskResponse>;
 export const ASK_THREADS_ROUTE = '/ask/threads';
 export const askThreadRoute = (id: string) => `/ask/threads/${id}`;
 
+/**
+ * The shared trip chat (§5.5): GET says whether it's on and who's in it; POST (owner) turns it on and answers with its
+ * thread; DELETE (owner) turns it off (archived, kept). Private chats with Mada stay as they are.
+ */
+export const TripChatResponse = z.object({
+  on: z.boolean(),
+  threadId: Id.nullable(),
+  canManage: z.boolean(),
+  members: z.array(z.object({ name: z.string(), initial: z.string(), owner: z.boolean(), me: z.boolean() })).max(12),
+});
+export type TripChatResponse = z.infer<typeof TripChatResponse>;
+export const tripChatRoute = (tripId: string) => `/trips/${tripId}/chat`;
+
 /** Planning (no booking yet), booked, today (the trip is on), done (ended or cancelled). */
 export const AskTripStatus = z.enum(['planning', 'booked', 'today', 'done']);
 export type AskTripStatus = z.infer<typeof AskTripStatus>;
@@ -225,6 +243,12 @@ export const AskThreadRow = z.object({
   lang: z.enum(['en', 'ar']),
   /** With a search: the line said in the chat that has the words (a few words either side), or null when the title matched. */
   match: z.string().nullable().optional(),
+  /** trip: the shared trip chat (§5.5), every traveller on Mada and Mada in one thread. Missing means private. */
+  kind: z.enum(['private', 'trip']).optional(),
+  /** The trip chat's people, owner first, for the row's avatars (first names only). */
+  members: z.array(z.object({ name: z.string(), initial: z.string(), owner: z.boolean(), me: z.boolean() })).max(12).optional(),
+  /** The caller may rename, archive and delete it (a companion in a trip chat may not). */
+  mine: z.boolean().optional(),
 });
 export type AskThreadRow = z.infer<typeof AskThreadRow>;
 
@@ -238,7 +262,8 @@ export type AskThreadsResponse = z.infer<typeof AskThreadsResponse>;
 
 /** One line of a chat as the app shows it again: words, the cards' kinds, the next steps, who wrote it. */
 export const AskThreadLine = z.object({
-  who: z.enum(['me', 'mada', 'agent', 'joined']),
+  /** member: another traveller in a shared trip chat, named in `by`. */
+  who: z.enum(['me', 'mada', 'agent', 'joined', 'member']),
   text: z.string(),
   cards: z.array(z.string()).optional(),
   next: z.array(z.string()).optional(),
@@ -260,7 +285,9 @@ export type AskThreadResponse = z.infer<typeof AskThreadResponse>;
 export const AskThreadPatch = z.object({
   title: z.string().trim().max(80).nullable().optional(),
   archived: z.boolean().optional(),
-}).refine((v) => v.title !== undefined || v.archived !== undefined, { message: 'Nothing to change' });
+  /** The trip a booking made in this chat created (§2.2): only a chat not yet about a trip, only the caller's trip. */
+  tripId: Id.optional(),
+}).refine((v) => v.title !== undefined || v.archived !== undefined || v.tripId !== undefined, { message: 'Nothing to change' });
 export type AskThreadPatch = z.input<typeof AskThreadPatch>;
 
 /** Read an SSE body as it arrives: complete `data:` frames out, the rest kept for the next chunk. */

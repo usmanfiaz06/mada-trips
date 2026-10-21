@@ -197,7 +197,8 @@ export type PlanItemInput = z.infer<typeof PlanItemInput>;
 export const PlanOp = z.discriminatedUnion('op', [
   z.object({ op: z.literal('add'), day: z.number().int().min(0).nullable(), afterItemId: z.string().uuid().nullable().optional(), item: PlanItemInput }),
   z.object({ op: z.literal('update'), itemId: z.string().uuid(), item: PlanItemInput.partial() }),
-  z.object({ op: z.literal('move'), itemId: z.string().uuid(), day: z.number().int().min(0).nullable(), afterItemId: z.string().uuid().nullable().optional() }),
+  /** first: to the top of the day (afterItemId is then ignored); else after the given item, or last. */
+  z.object({ op: z.literal('move'), itemId: z.string().uuid(), day: z.number().int().min(0).nullable(), afterItemId: z.string().uuid().nullable().optional(), first: z.boolean().optional() }),
   z.object({ op: z.literal('remove'), itemId: z.string().uuid() }),
   z.object({ op: z.literal('skip'), itemId: z.string().uuid() }),
   z.object({ op: z.literal('unskip'), itemId: z.string().uuid() }),
@@ -217,7 +218,16 @@ export type SetOriginRequest = z.infer<typeof SetOriginRequest>;
 export const PlanChange = z.object({ op: z.enum(['create', 'add', 'move', 'update', 'remove', 'status', 'origin']), itemId: z.string().nullable(), day: z.number().int().nullable(), title: z.string() });
 export type PlanChange = z.infer<typeof PlanChange>;
 
-export const LivingPlanResponse = z.object({ plan: Plan });
+/**
+ * Who is reading the plan and what they may do (§5.5): the owner edits; a companion who can edit changes ideas at
+ * once; one who can suggest sends a change request the owner approves; one who can view only reads. prices: whether
+ * prices are shown (always for the owner; for companions only when the owner shares them).
+ */
+export const PlanAccess = z.object({ role: z.enum(['owner', 'view', 'suggest', 'edit']), prices: z.boolean(), ownerName: z.string().nullable() });
+export type PlanAccess = z.infer<typeof PlanAccess>;
+
+/** people: first names of everyone on the trip, for the plan's header (never contacts or documents). */
+export const LivingPlanResponse = z.object({ plan: Plan, access: PlanAccess.optional(), people: z.array(z.object({ name: z.string(), initial: z.string() })).optional() });
 export type LivingPlanResponse = z.infer<typeof LivingPlanResponse>;
 export const PlanChangeResponse = z.object({
   plan: Plan,
@@ -231,6 +241,12 @@ export const PlanEvent = z.object({ id: z.string(), itemId: z.string().nullable(
 export type PlanEvent = z.infer<typeof PlanEvent>;
 export const PlanEventsResponse = z.object({ events: z.array(PlanEvent) });
 export type PlanEventsResponse = z.infer<typeof PlanEventsResponse>;
+
+/** POST /trips/{id}/change-requests: a companion's edit on the plan screen, as a change request (or applied, "Can edit"). */
+export const PlanChangeAskResponse = z.object({ applied: z.boolean(), changeId: z.string().uuid().nullable(), text: z.string() });
+export type PlanChangeAskResponse = z.infer<typeof PlanChangeAskResponse>;
+
+export const planRoute = (tripId: string) => `/trips/${tripId}/plan`;
 
 /* ───────────── pure helpers (app and server alike) ───────────── */
 

@@ -23,7 +23,8 @@ import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
 import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
 import { REQUEST_KIND, REQUEST_STATUS } from "@/lib/labels";
-import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, linkPlanItemAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { requestPlan } from "@/lib/app/desk/plans";
 import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
 import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
 import { flightQuoteOf } from "@/lib/app/booking/flight-requests";
@@ -58,7 +59,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   // How they asked to be reached (Ask chat asks once): a call (with the best time), WhatsApp, or here in the app.
   const reach = contactPreferenceOf(r.details);
   // Passport copies the travellers chose to keep: opened only while this request needs them, each look audited.
-  const [copies, copyOpen] = await Promise.all([travellersWithCopy(x.travellers.map((p) => p.id)), copyWindowOpen(r)]);
+  const [copies, copyOpen, planned] = await Promise.all([travellersWithCopy(x.travellers.map((p) => p.id)), copyWindowOpen(r), requestPlan(r.id)]);
   const copyLinks = act && copyOpen ? x.travellers.filter((p) => copies.has(p.id)) : [];
 
   // Where the request is: asked, quoted, paid, done (or cancelled).
@@ -123,6 +124,27 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             <Card>
               <CardHead title={quote ? t("Send new fares") : t("Send the fares")} hint={t("A price for each traveller, bags and rules for each fare. The traveller picks one and pays in the app.")} />
               <FlightQuoteBuilder action={flightQuoteAction} requestId={r.id} travellers={fr.travellers} seed={fr.seed} />
+            </Card>
+          )}
+
+          {planned && (planned.linked || (act && planned.candidates.length > 0)) && (
+            <Card data-testid="request-plan-item">
+              <CardHead title={t("Plan item")} hint={t("The part of the traveller's plan this request fulfils. Booked by hand? Link it so the plan shows it.")} />
+              {planned.linked ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[13.5px]">
+                  <span className="min-w-0"><bdi>{planned.linked.planTitle}</bdi> · {planned.linked.day == null ? t("Whole trip") : t("Day {n}", { n: planned.linked.day + 1 })} · <bdi className="text-ink">{planned.linked.title}</bdi></span>
+                  <Link href={`/adminwork/desk/customers/${x.user.id}?tab=plans`} className="text-info underline-offset-2 hover:underline">{t("Open the plan")}</Link>
+                </div>
+              ) : (
+                <ActionForm action={linkPlanItemAction} className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="id" value={r.id} />
+                  <select name="itemId" required className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-surface px-3 text-[13.5px]" defaultValue="">
+                    <option value="" disabled>{t("Choose the plan item")}</option>
+                    {planned.candidates.map((c) => <option key={c.itemId} value={c.itemId}>{c.label}</option>)}
+                  </select>
+                  <SubmitButton>{t("Link to plan item")}</SubmitButton>
+                </ActionForm>
+              )}
             </Card>
           )}
 

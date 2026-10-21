@@ -45,7 +45,9 @@ export type ChatOpen =
   /** "About your AlUla trip?": into that trip's chat, or a chat of its own (ASK-INTEGRATED.md §2.2). */
   | { kind: 'attach'; choice: 'trip' | 'new'; tripId: string; turn: ChatTurn }
   /** open_in_app: a place in the app (PlanCards.tsx linkHref). */
-  | { kind: 'link'; screen: Extract<ChatCard, { type: 'link' }>['screen']; id: string | null };
+  | { kind: 'link'; screen: Extract<ChatCard, { type: 'link' }>['screen']; id: string | null }
+  /** "Start a chat for Istanbul": a new chat with these words (ASK-INTEGRATED.md §2.2). */
+  | { kind: 'newChat'; text: string };
 
 /**
  * foundId: the turn a search landed on (the chats list's search, or find in this chat, ASK-INTEGRATED.md §11 U1+): it
@@ -113,7 +115,16 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
   return (
     <View style={{ gap: 10 }} testID={found ? 'chat-found' : `chat-turn-${turn.id}`} onLayout={onY ? (e) => onY(e.nativeEvent.layout.y) : undefined}>
       {stamp ? <T v="tiny" color={colors.muted} style={s.stamp} testID="chat-time">{stamp}</T> : null}
-      {turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
+      {turn.me && turn.from != null ? (
+        // Someone else on the trip, in the shared trip chat: on the start side, with their initial and name.
+        <Animated.View entering={me.entering} style={[s.madaRow, me.style]} testID="chat-member" accessible accessibilityLabel={`${turn.from}: ${turn.me}`}>
+          <View style={s.memberDot}><T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{(turn.from[0] ?? '?').toUpperCase()}</T></View>
+          <View style={s.madaCol}>
+            <T v="tiny" color={colors.ink3} style={{ paddingHorizontal: 4 }} testID="chat-member-name">{turn.from}</T>
+            <View style={[s.member, found ? s.found : null]}><T v="body" color={colors.green} style={{ lineHeight: 22 }}>{turn.me}</T></View>
+          </View>
+        </Animated.View>
+      ) : turn.me ? <Animated.View entering={me.entering} style={[s.meWrap, me.style]} testID="chat-me" accessible accessibilityLabel={t('chat.a11y.you', { text: turn.me })}>
         <Pressable onLongPress={turn.at ? () => { buzz('soft'); setShowAt((v) => !v); } : undefined} delayLongPress={350}
           onHoverIn={turn.at ? () => setShowAt(true) : undefined} onHoverOut={turn.at ? () => setShowAt(false) : undefined} style={[s.me, found ? s.found : null]}>
           {turn.attachment ? (
@@ -306,11 +317,17 @@ function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn
       return <InviteCard card={card} />;
     case 'change':
       return <ChangeRequestCard card={card} />;
-    // The living plan (PlanCards.tsx): review it on its trip until the plan screen lands.
+    // The living plan (PlanCards.tsx): Review the plan opens the plan screen (app/trip/[id]/plan.tsx).
     case 'plan':
-      return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} onSay={onSay} />;
+      return <LivingPlanCard card={card} onReview={() => onOpen({ kind: 'link', screen: 'plan', id: card.tripId })} onSay={onSay} />;
     case 'plan_diff':
-      return <PlanDiffCard card={card} onReview={() => onOpen({ kind: 'trip', id: card.tripId })} />;
+      return <PlanDiffCard card={card} onReview={() => onOpen({ kind: 'link', screen: 'plan', id: card.tripId })} />;
+    case 'new_chat':
+      return (
+        <View style={{ gap: 6 }} testID="chat-new-chat">
+          <CardButton soft label={t('chat.newChat.offer', { place: card.place })} onPress={() => onOpen({ kind: 'newChat', text: card.text })} testID="chat-new-chat-go" />
+        </View>
+      );
     case 'link':
       return <LinkCard card={card} onOpen={() => onOpen({ kind: 'link', screen: card.screen, id: card.id })} />;
     // A passport, visa or ID sent in the chat, and asking a companion for theirs (ASK-INTEGRATED.md §6, §5.4).
@@ -410,6 +427,8 @@ const s = StyleSheet.create({
   me: { backgroundColor: colors.green, paddingVertical: 11, paddingHorizontal: 16, borderRadius: 22, borderBottomEndRadius: 6 },
   madaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: AVATAR_GAP, maxWidth: '90%' },
   madaCol: { flexShrink: 1, gap: 4, alignItems: 'flex-start' },
+  memberDot: { width: AVATAR, height: AVATAR, borderRadius: 99, backgroundColor: colors.goldWash, alignItems: 'center', justifyContent: 'center' },
+  member: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, borderRadius: 20, borderTopStartRadius: 6, paddingVertical: 10, paddingHorizontal: 14 },
   // Warm, not white: mist on the sand, the corner toward the mark kept small.
   bubble: { backgroundColor: colors.mist, borderWidth: 1, borderColor: colors.line, borderRadius: 20, borderTopStartRadius: 6, paddingVertical: 10, paddingHorizontal: 14, minHeight: 44, justifyContent: 'center' },
   dots: { flexDirection: 'row', gap: 5, paddingVertical: 6 },

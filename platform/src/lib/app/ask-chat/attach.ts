@@ -1,9 +1,10 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 import { DESTINATIONS, nameIn, t, type AskChatEvent, type AskIntent } from "@mada/shared";
 import { db } from "@/db";
 import { appTrips } from "@/db/app-schema";
+import { appPlanItems, appPlans } from "@/db/app-schema-plans";
 import { askFastModel, costMicros } from "./config";
 import { addSpend } from "./store";
 import { datesOf, placeOf, type TitleTrip } from "./titles";
@@ -74,4 +75,25 @@ export async function askAttach(ownerId: string, trip: TripRow, slots: { intent:
   const cost = slots.usage ? costMicros(askFastModel(), { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }) : 0;
   if (cost) await addSpend(ownerId, cost);
   console.info(`[ask-chat] attach asked trip=${trip.id}`);
+}
+
+/**
+ * Two trips in one chat (§2.2): a chat about a trip whose new words name somewhere else ("also, Istanbul in March").
+ * Mada answers and offers "Start a chat for Istanbul"; nothing is split without the tap. The trip's own city and every
+ * place on its plan count as the same trip. Returns the place to offer, or null.
+ */
+export async function pivotPlace(tripId: string, i: AskIntent, lang: string): Promise<string | null> {
+  const said = placeOf(i);
+  if (!said) return null;
+  const [trip] = await db.select({ city: appTrips.city }).from(appTrips).where(eq(appTrips.id, tripId)).limit(1);
+  if (!trip) return null;
+  const places = [trip.city];
+  const [plan] = await db.select({ id: appPlans.id }).from(appPlans).where(eq(appPlans.tripId, tripId)).limit(1);
+  if (plan) {
+    const items = await db.select({ place: appPlanItems.place, to: appPlanItems.toPlace, from: appPlanItems.fromPlace }).from(appPlanItems)
+      .where(and(eq(appPlanItems.planId, plan.id), isNull(appPlanItems.deletedAt)));
+    for (const it of items) for (const p of [it.place, it.to, it.from]) if (p) places.push(p.city || p.name);
+  }
+  if (places.some((c) => samePlace(c, i))) return null;
+  return nameIn(said, lang === "ar" ? "ar" : "en");
 }

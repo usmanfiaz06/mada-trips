@@ -37,7 +37,8 @@ function Home({ tripId, orb }: { tripId: string | null; orb: boolean }) {
     let live = true;
     void (async () => {
       if (tripId) {
-        const own = await askThreadsApi.list({ tripId }).then((r) => r.threads[0]?.id ?? null).catch(() => null);
+        // The trip's own chat with Mada, not the shared trip chat (§5.5).
+        const own = await askThreadsApi.list({ tripId }).then((r) => r.threads.find((x) => x.kind !== 'trip')?.id ?? null).catch(() => null);
         if (live) router.replace({ pathname: '/ask/[threadId]', params: { threadId: own ?? 'new', tripId } });
         return;
       }

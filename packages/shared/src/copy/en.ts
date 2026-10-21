@@ -27,6 +27,7 @@ import { askChatCopy } from './ask-chat';
 import { askPeopleCopy } from './ask-people';
 import { askMemoryCopy } from './ask-memory';
 import { askPlanCopy } from './ask-plan';
+import { planScreenCopy } from './plan-screen';
 import { bookReadyCopy } from './book-ready';
 import { askDocsCopy } from './ask-docs';
 import { todayIdeasCopy } from './today-ideas';
@@ -89,6 +90,8 @@ export const en = {
   // What Mada remembers across chats, and a new chat: packages/shared/src/copy/ask-memory.ts
   ...askMemoryCopy,
   ...askPlanCopy,
+  // The plan screen, the trip page's plan, the trip chat: packages/shared/src/copy/plan-screen.ts
+  ...planScreenCopy,
   // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
   ...bookReadyCopy,
   // Documents in chat: packages/shared/src/copy/ask-docs.ts

@@ -11,8 +11,8 @@ import { redact, screen } from "./guard";
 import { ProviderHttpError } from "./providers-openai";
 import { nextFromState } from "./next";
 import { readSlots, slotsLine } from "./slots";
-import { appendTurn, addSpend, attachTrip, loadThread, newThread, primaryThreadOf, saveFold, spentToday, tripOfEnded, type Thread } from "./store";
-import { askAttach, ownTrip, tripFor, tripTitleOf } from "./attach";
+import { appendTurn, addSpend, asThread, attachTrip, loadThread, newThread, primaryThreadOf, saveFold, spentToday, tripOfEnded, type Thread } from "./store";
+import { askAttach, ownTrip, pivotPlace, tripFor, tripTitleOf } from "./attach";
 import { nextTitle, titleFrom } from "./titles";
 import { foldThread, historyOf, needsFold } from "./fold";
 import { MEMORY_HEAD, consentOf, memoryBlock } from "./memory";
@@ -21,6 +21,7 @@ import { markPlanSeen, planContext, planTitleFor } from "./tools-plan";
 import { kindFor } from "./prompt";
 import { keepForAgent } from "./takeover";
 import { attachmentsContext } from "./attachments";
+import { sharedThreadRow, speakerName, tripChatContext } from "./trip-chat";
 
 /*
  * POST /ask/chat, before and after the model: the switch, limits and the daily spend cap (all checked before a
@@ -46,6 +47,8 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const lang = languageOfText(typed) ?? "en";
   const today = todayIn();
   let thread = await loadThread(auth.userId, req.threadId);
+  // The shared trip chat someone else owns (trip-chat.ts): anyone going on the trip writes in it.
+  if (!thread) { const shared = await sharedThreadRow(auth.userId, req.threadId); thread = shared ? asThread(shared) : null; }
   // Which chat this goes in (ASK-INTEGRATED.md §2.2): the one asked for; from the trip page, that trip's own chat (or a
   // new one about it); after "Yes, that trip", the trip's chat; a full chat's trip carries over to the new one.
   const onTrip = req.tripId ? await ownTrip(auth.userId, req.tripId) : null;
@@ -68,14 +71,17 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     thread.tripId = onTrip.id;
   }
   emit({ type: "thread", threadId: thread.id, lang, tripId: thread.tripId, ...(moved ? { moved: true } : {}) });
+  // Writes go to the thread's owner: the trip's owner for a trip chat, the caller for their own chats.
+  const owner = thread.ownerId;
+  const shared = thread.kind === "trip";
   // A person on the desk has this thread (takeover.ts): the message is theirs to answer, the model stays out.
-  if (thread.mode === "agent") return keepForAgent(auth.userId, thread, typed, emit);
+  if (thread.mode === "agent") return keepForAgent(owner, thread, typed, emit);
   api ??= await chatApi();
   // A long thread: the older turns folded into a summary first, so every turn stays cheap (fold.ts).
   let foldCost = 0;
   if (needsFold(thread)) {
     const f = await foldThread(api, thread, askFastModel());
-    await saveFold(auth.userId, thread.id, f);
+    await saveFold(owner, thread.id, f);
     Object.assign(thread, { messages: f.messages, summary: f.summary, foldedTurns: thread.foldedTurns + f.folded });
     if (f.usage) foldCost = costMicros(askFastModel(), { input: f.usage.input_tokens ?? 0, output: f.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 });
     console.info(`[ask-chat] thread=${thread.id} folded=${f.folded} by=${f.by} kept=${f.messages.length}`);
@@ -89,12 +95,14 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     // Even here the reply ends with a next step (docs/app/ASSISTANT.md).
     emit({ type: "next", choices: nextFromState({ cards: [], pay: false, handoff: false, lang }) });
     emit({ type: "done", text: line });
-    await appendTurn(auth.userId, thread.id, { messages: [], transcript: [{ who: "mada", text: line, held: screened.reason }], usage: noUsage(), costMicros: 0, lang });
+    await appendTurn(owner, thread.id, { messages: [], transcript: [{ who: "mada", text: line, held: screened.reason }], usage: noUsage(), costMicros: 0, lang });
     console.info(`[ask-chat] thread=${thread.id} held=${screened.reason}`);
     return;
   }
 
   const { text: clean, redacted } = redact(typed);
+  // In the trip chat each message carries who wrote it, for the model ("Abdullah: …") and for everyone reading it.
+  const speaker = shared ? await speakerName(auth.userId) : null;
   const [people, trips] = await Promise.all([householdOf(auth.userId), overview(auth.userId, null).catch(() => null)]);
   const slots = early ?? (await readSlots(api, clean, people, today));
   emit({ type: "intent", intent: slots.intent });
@@ -108,14 +116,15 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const memory = known ? null : await memoryBlock(auth.userId, { kind: slots.intent.kind, taken });
   // A chat about a trip with a plan: its id and version, and what the traveller or the desk changed meanwhile (§3.6).
   const planned = await planContext(auth.userId, thread.tripId).catch(() => ({ lines: [] as string[], seen: [] as string[] }));
+  const together = shared ? await tripChatContext(thread, owner, auth.userId) : null;
   const tool: ToolCtx = { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set(), consent: consentOf(history, clean), threadId: thread.id, tripId: thread.tripId };
 
   const r = await runTurn({
     history,
-    text: clean,
+    text: speaker ? `${speaker}: ${clean}` : clean,
     // After the desk's Hand back, what was said meanwhile rides in this turn's context once (takeover.ts handBackNote).
     // Documents sent in this chat, as their cards say them (attachments.ts): never a number or a line of the MRZ.
-    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
+    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), together, ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
     lang,
     tool,
     intent: kindFor(clean, slots.intent.kind, planned.lines.length > 0),
@@ -127,11 +136,15 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   await markPlanSeen(auth.userId, thread.tripId, planned.seen).catch(() => {});
   // A plan made this turn attached the chat to its trip (tools-plan.ts): the title follows the plan from now on.
   if (tool.tripId && tool.tripId !== thread.tripId) thread.tripId = tool.tripId;
-  await appendTurn(auth.userId, thread.id, {
+  // Two trips in one chat (§2.2): answered here, and a new chat offered for the other place, never split silently.
+  const pivot = !shared && thread.tripId && thread.turns > 0 ? await pivotPlace(thread.tripId, slots.intent, lang).catch(() => null) : null;
+  if (pivot) emit({ type: "cards", cards: [{ type: "new_chat", place: pivot, text: clean }] });
+  await appendTurn(owner, thread.id, {
     messages: r.added,
-    transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],
+    transcript: [{ who: "me", text: clean, ...(shared ? { by: auth.userId, name: speaker, at: new Date().toISOString() } : {}) }, { who: "mada", text: r.text, cards: [...r.cards.map((c) => c.type), ...(pivot ? ["new_chat"] : [])], next: r.next }],
     usage: r.usage, costMicros: total, lang, handedOff: r.toolsUsed.includes("talk_to_human"),
-    title: await titleAfter(auth.userId, thread, slots.intent, clean, lang),
+    // The trip chat keeps the trip's name; a private chat's title follows what it's about.
+    title: shared ? null : await titleAfter(auth.userId, thread, slots.intent, clean, lang),
   });
   await addSpend(auth.userId, total);
   // Tokens and cost only: no words from either side.

@@ -19,6 +19,7 @@ import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversati
 import { ChatThread, matchesIn, type ChatOpen } from '@/components/booking/ChatThread';
 import { linkHref } from '@/components/booking/PlanCards';
 import { IdeaTiles } from '@/components/trips/ui';
+import { ChatMenu } from '@/components/ask/ChatMenu';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
 import { useNet } from '@/lib/net';
@@ -96,6 +97,9 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
   const [askNew, setAskNew] = useState(false);
   // The composer's +: a photo, the library or a file into the chat (documents in chat, ASK-INTEGRATED.md §6).
   const [attachOpen, setAttachOpen] = useState(false);
+  // The conversation's own menu (⋯): rename, archive, delete, its plan and trip (§9.2).
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chatThreadId = useAskChat((s) => s.threadId);
   const scroll = useRef<ScrollView>(null);
   // Find in this chat (U1+), also opened by a search in the list: the latest match first, then previous / next. While
   // on a match the thread stays there (not at its end) until something new is said.
@@ -208,7 +212,9 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
 
   /** A card in the conversation: the flow for the same search, the pay sheet, the desk. */
   const openChat = (o: ChatOpen) => {
-    if (o.kind === 'pay') { usePayDraft.getState().set({ draft: o.pay.draft, title: o.pay.title }); router.push('/pay'); return; }
+    if (o.kind === 'pay') { usePayDraft.getState().set({ draft: o.pay.draft, title: o.pay.title, threadId: useAskChat.getState().threadId }); router.push('/pay'); return; }
+    // "Start a chat for Istanbul": a new chat with the words carried over (§2.2); this one stays as it is.
+    if (o.kind === 'newChat') { buzz('tap'); router.push({ pathname: '/ask', params: { prefill: o.text } }); return; }
     if (o.kind === 'handoff') { router.push('/support' as Href); return; }
     if (o.kind === 'request') { router.push({ pathname: '/ask/request/[id]', params: { id: o.id } }); return; }
     if (o.kind === 'trip') { router.push({ pathname: '/trip/[id]', params: { id: o.id } }); return; }
@@ -378,6 +384,11 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
                 <Icon name="search" size={18} color={colors.green} />
               </Pressable>
             ) : null}
+            {chatTurns.length && chatThreadId ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.menu.title')} onPress={() => { buzz('tap'); setMenuOpen(true); }} style={styles.find} testID="ask-menu">
+                <Icon name="more" size={18} color={colors.green} />
+              </Pressable>
+            ) : null}
             {chatTurns.length ? (
               <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={startNewChat} style={styles.demo} testID="ask-new-chat">
                 <T v="caption" color={colors.green}>{t('chat.newChat')}</T>
@@ -466,6 +477,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
         </View>
       </KeyboardAvoidingView>
       <DemoSheet visible={demoOpen} onClose={() => setDemoOpen(false)} />
+      {chatThreadId ? <ChatMenu threadId={chatThreadId} visible={menuOpen} onClose={() => setMenuOpen(false)} onGone={() => { newAskChat(); if (onBack) onBack(); }} /> : null}
     </Screen>
   );
 }

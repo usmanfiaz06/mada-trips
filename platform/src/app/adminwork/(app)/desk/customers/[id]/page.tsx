@@ -11,11 +11,11 @@ import { CUSTOMER_TABS, getCustomer, type CustomerTab } from "@/lib/app/desk/cus
 import { Badge, Card, CardHead, Input, KV, Money, PageHeader, Stat, Tabs, Textarea, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { blockCustomerAction, goodwillAction, unblockCustomerAction } from "../actions";
-import { AuditTab, BookingsTab, ChatsTab, CreditTab, EsimsTab, MemoryTab, OverviewTab, PaymentsTab, RequestsTab, OPEN_KIND } from "./tabs";
+import { AuditTab, BookingsTab, ChatsTab, CreditTab, EsimsTab, MemoryTab, OverviewTab, PaymentsTab, PlansTab, RequestsTab, OPEN_KIND } from "./tabs";
 
 export const metadata = { title: "Customer · Desk" };
 const TAB_LABEL: Record<CustomerTab, string> = {
-  overview: "Overview", bookings: "Bookings", payments: "Payments & refunds", credit: "Credit ledger", esims: "eSIMs", requests: "Requests",
+  overview: "Overview", bookings: "Bookings", plans: "Trips & plans", payments: "Payments & refunds", credit: "Credit ledger", esims: "eSIMs", requests: "Requests",
   chats: "Chats", memory: "What Mada remembers", audit: "History",
 };
 
@@ -61,6 +61,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         <div className="min-w-0 space-y-4">
           {tab === "overview" && <OverviewTab c={c} canReveal={can(u, "desk.issue")} />}
           {tab === "bookings" && <BookingsTab userId={id} />}
+          {tab === "plans" && <PlansTab userId={id} />}
           {tab === "payments" && <PaymentsTab userId={id} />}
           {tab === "credit" && <CreditTab userId={id} />}
           {tab === "esims" && <EsimsTab userId={id} />}

@@ -85,11 +85,11 @@ export async function esimOffer(ownerId: string, o: { packageId: string; count: 
 }
 
 /** A request made for a plan item: the item reads "With the team · back by 18:40" and the request knows its item and trip. */
-export async function linkRequest(ownerId: string, itemId: string, requestId: string): Promise<{ tripId: string } | null> {
+export async function linkRequest(ownerId: string, itemId: string, requestId: string, by: By = "ask"): Promise<{ tripId: string } | null> {
   const [r] = (await ownItems(ownerId, [itemId])).filter((x) => !BOOKED.has(x.item.status));
   if (!r) return null;
   await db.update(appRequests).set({ planItemId: r.item.id, tripId: r.tripId, updatedAt: new Date() }).where(and(eq(appRequests.id, requestId), eq(appRequests.ownerId, ownerId)));
-  await write([r], "ask", () => ({ requestId, status: "requested", statusNote: null }));
+  await write([r], by, () => ({ requestId, status: "requested", statusNote: null }));
   return { tripId: r.tripId };
 }
 

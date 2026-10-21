@@ -21,11 +21,18 @@ import { askThreadsMock } from './mock/ask-threads';
 import { planReadyMock } from './mock/plan-ready';
 import { tripPeopleMock } from './mock/trip-people';
 import { askDocsMock } from './mock/ask-docs';
+import { plansMock } from './mock/plans';
+
+/** The demo conversation's plan (ask-chat-demo.ts), reached through this module so a live build never bundles it. */
+export { mockCreatePlan, mockPlanCard } from './mock/plans';
+export { attachDemoThread, demoThread, recordDemoTurn } from './mock/ask-threads';
+export { mockTripsOf } from './mock/trips';
+export { DEMO_ABDULLAH, mockAskChange, mockTripTitle } from './mock/trip-people';
 
 /** Extra endpoints per area: each returns null for paths it doesn't own. `user` is the signed-in mock user (mutable). */
 export type MockUser = User & { people: Person[] };
 export type AreaMock = (w: Wire, ctx: { user: MockUser | null; byPhone: Map<string, string> }) => Promise<WireResponse | null>;
-const AREA_MOCKS: AreaMock[] = [planReadyMock, tripPeopleMock, askThreadsMock, askDocsMock, memoryMock, esimMock, boardingMock, ridesMock, transfersMock, thingsMock, tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock, authMock];
+const AREA_MOCKS: AreaMock[] = [planReadyMock, plansMock, tripPeopleMock, askThreadsMock, askDocsMock, memoryMock, esimMock, boardingMock, ridesMock, transfersMock, thingsMock, tripsMock, walletMock, circlesMock, bookingMock, resilienceMock, placesMock, authMock];
 
 /*
  * EXPO_PUBLIC_API_MODE=mock: the Core API's rules, in memory, for design work and screenshots without a server.

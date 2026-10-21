@@ -21,7 +21,7 @@ import { appendLine, type Thread } from "./store";
 export type AgentLine = { who: "agent"; text: string; by: string; byAr: string | null; agentId: string; opsUserId: string; at: string };
 export type SystemLine = { who: "system"; event: "joined" | "handed_back"; by: string; byAr?: string | null; pronoun?: string; at: string };
 /** attachment: a document sent in the chat, by its masked label only (attachments.ts). */
-export type TravellerLine = { who: "me"; text: string; at?: string; held?: string; attachment?: { kind: string; label: string } };
+export type TravellerLine = { who: "me"; text: string; at?: string; held?: string; attachment?: { kind: string; label: string }; /** In a trip chat: who wrote it (user id) and their first name. */ by?: string; name?: string | null };
 /** kept: reference cards kept whole with a line Mada adds on her own (a change asked by a companion, trips/change-requests.ts). */
 export type MadaLine = { who: "mada"; text: string; cards?: string[]; next?: string[]; held?: string; kept?: unknown[]; at?: string };
 export type AskLine = TravellerLine | MadaLine | AgentLine | SystemLine;

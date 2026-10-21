@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bot, Brain, CreditCard, History, Lock, MessagesSquare, Receipt, ShoppingBag, Smartphone, Wallet } from "lucide-react";
+import { Bot, Brain, CreditCard, History, Lock, Map as MapIcon, MessagesSquare, Receipt, ShoppingBag, Smartphone, Wallet } from "lucide-react";
 import type { CurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { fmtDate, timeAgo } from "@/lib/dates";
@@ -14,6 +14,7 @@ import { Badge, Card, CardHead, Empty, KV, Money, Table, Td, Th, cx } from "@/co
 import { PassportReveal } from "@/components/desk/live";
 import { StatusBadge } from "@/components/desk/parts";
 import { revealCustomerPassportAction } from "../actions";
+import { customerPlans } from "@/lib/app/desk/plans";
 
 /* The customer page's tabs (server components). Each one reads only what it shows. */
 
@@ -394,6 +395,59 @@ export async function ChatsTab({ actor, userId, hasOpen, ask }: { actor: Current
         )}
       </Card>
     </>
+  );
+}
+
+const PLAN_STATUS: Record<string, { label: string; tone: "neutral" | "ok" | "gold" | "info" | "bad" }> = {
+  idea: { label: "Idea", tone: "neutral" }, priced: { label: "Priced", tone: "gold" }, requested: { label: "With the team", tone: "info" }, held: { label: "Held", tone: "gold" },
+  booked: { label: "Booked", tone: "ok" }, confirmed: { label: "Confirmed", tone: "ok" }, cancelled: { label: "Cancelled", tone: "bad" }, skipped: { label: "Skipped", tone: "neutral" },
+};
+const CHECK_TONE: Record<string, "neutral" | "ok" | "gold" | "warn"> = { ok: "ok", todo: "gold", warn: "warn", none: "neutral", unknown: "neutral" };
+
+/** Trips & plans (ASK-INTEGRATED.md §10): each trip's living plan as the traveller sees it, read-only. */
+export async function PlansTab({ userId }: { userId: string }) {
+  const t = await getT();
+  const L = t.locale;
+  const rows = await customerPlans(userId);
+  if (!rows.length) return <Card><Empty icon={<MapIcon className="size-5" />} title={t("No plans yet")} /></Card>;
+  return (
+    <div className="space-y-4" data-testid="desk-plans">
+      {rows.map((x) => {
+        const days = new Map<number | null, typeof x.plan.items>();
+        for (const i of x.plan.items) days.set(i.day, [...(days.get(i.day) ?? []), i]);
+        const order = [...days.keys()].sort((a, b) => (a ?? 999) - (b ?? 999));
+        return (
+          <Card key={x.tripId}>
+            <CardHead title={<bdi>{x.title}</bdi>} hint={`${fmtDate(new Date(`${x.plan.startDate}T12:00:00Z`), L)} – ${fmtDate(new Date(`${x.plan.endDate}T12:00:00Z`), L)} · ${t("Version {n}", { n: x.plan.version })} · ${t("Read-only")}`}
+              action={<Badge tone={x.status === "planning" ? "gold" : "ok"}>{t(x.status === "planning" ? "Planning" : "Booked")}</Badge>} />
+            <div className="mb-3 flex flex-wrap gap-2 text-[12.5px]">
+              {x.travellers.map((p, i) => <Badge key={i} tone={p.status === "going" ? "neutral" : "warn"}><bdi>{p.name}</bdi>{p.status !== "going" ? ` · ${t(p.status === "invited" ? "Invited" : "Declined")}` : ""}</Badge>)}
+              {x.plan.checks.filter((c) => c.state !== "ok").map((c) => <Badge key={c.key} tone={CHECK_TONE[c.state] ?? "neutral"} dot>{c.text}</Badge>)}
+            </div>
+            <ol className="space-y-3">
+              {order.map((d) => (
+                <li key={String(d)}>
+                  <div className="mb-1 text-[12px] font-medium text-ink-3">{d == null ? t("Whole trip") : t("Day {n}", { n: d + 1 })}</div>
+                  <ul className="space-y-1">
+                    {days.get(d)!.map((i) => (
+                      <li key={i.id} className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-2 text-[13.5px]">
+                        <span className="min-w-0 truncate"><span className="num me-2 text-ink-3" dir="ltr">{i.startsAt?.slice(11, 16) ?? ""}</span><bdi>{i.title}</bdi>{i.drive?.line ? <span className="ms-2 text-ink-3">{i.drive.line}</span> : null}{i.statusLine ? <span className="ms-2 text-ink-3">{i.statusLine}</span> : null}</span>
+                        <Badge tone={PLAN_STATUS[i.status]?.tone ?? "neutral"}>{t(PLAN_STATUS[i.status]?.label ?? i.status)}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+            {x.threads.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-3 text-[13px]">
+                {x.threads.map((th) => <Link key={th.id} href={`?tab=chats&ask=${th.id}`} className={linkCls}>{th.kind === "trip" ? t("Trip chat") : <bdi>{th.title ?? t("Ask chat")}</bdi>}</Link>)}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 

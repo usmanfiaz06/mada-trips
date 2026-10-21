@@ -23,13 +23,19 @@ export type Thread = {
   deskNote: string | null;
   /** The conversations list (ASK-INTEGRATED.md §2): the trip it's about, and its title and how that was made. */
   tripId: string | null; title: string | null; titledBy: string | null;
+  /** private, or trip: the shared trip chat (trip-chat.ts), whose owner is the trip's owner. */
+  kind: string; ownerId: string;
 };
 
 type Row = typeof appAskThreads.$inferSelect;
 const threadOf = (row: Row): Thread => ({
   id: row.id, messages: row.messages, transcript: row.transcript, turns: row.turns, lang: row.lang, summary: row.summary, foldedTurns: row.foldedTurns,
   mode: row.mode, takenBy: row.takenBy, deskNote: row.deskNote, tripId: row.tripId, title: row.title, titledBy: row.titledBy,
+  kind: row.kind, ownerId: row.ownerId,
 });
+
+/** A row as a thread, for the trip chat (trip-chat.ts sharedThreadRow decided the caller may use it). */
+export const asThread = (row: Row): Thread | null => (row.turns >= MAX_TURNS && row.mode !== "agent" ? null : threadOf(row));
 
 export async function loadThread(ownerId: string, threadId: string | null | undefined): Promise<Thread | null> {
   if (!threadId) return null;
@@ -57,7 +63,7 @@ export async function primaryThreadOf(ownerId: string, tripId: string): Promise<
 
 export async function newThread(ownerId: string, lang: string, tripId: string | null = null): Promise<Thread> {
   const [row] = await db.insert(appAskThreads).values({ ownerId, lang, tripId }).returning({ id: appAskThreads.id });
-  return { id: row!.id, messages: [], transcript: [], turns: 0, lang, summary: null, foldedTurns: 0, mode: "ai", takenBy: null, deskNote: null, tripId, title: null, titledBy: null };
+  return { id: row!.id, messages: [], transcript: [], turns: 0, lang, summary: null, foldedTurns: 0, mode: "ai", takenBy: null, deskNote: null, tripId, title: null, titledBy: null, kind: "private", ownerId };
 }
 
 /** The chat is about this trip from now on (a trip-page chat, or "Yes, that trip"). */
@@ -114,6 +120,18 @@ export async function appendLine(ownerId: string, threadId: string, line: unknow
     transcript: sql`${appAskThreads.transcript} || ${JSON.stringify([line])}::jsonb`,
     updatedAt: new Date(),
   }).where(and(eq(appAskThreads.id, threadId), eq(appAskThreads.ownerId, ownerId)));
+}
+
+/**
+ * A line kept in a thread whoever owns it: the trip chat (its owner is the trip's owner, and anyone on the trip writes
+ * in it) and the lines a change request adds there. Server-side only; callers decided who may write.
+ */
+export async function appendLineTo(threadId: string, line: unknown) {
+  await db.update(appAskThreads).set({
+    ...listed((line as { text?: string })?.text),
+    transcript: sql`${appAskThreads.transcript} || ${JSON.stringify([line])}::jsonb`,
+    updatedAt: new Date(),
+  }).where(eq(appAskThreads.id, threadId));
 }
 
 const day = () => todayIn();

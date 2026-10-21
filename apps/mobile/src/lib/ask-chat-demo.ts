@@ -82,6 +82,13 @@ const demoDiffCard: ChatCard = {
   untouched: [],
 };
 
+/** "A 3-day plan for Istanbul": a living plan from the Istanbul template, on a new planning trip (mock/plans.ts). */
+const ISTANBUL_PLAN = /plan.*istanbul|istanbul.*plan|days in istanbul|خطة.*إسطنبول|إسطنبول.*خطة/i;
+const ISTANBUL_LINES = {
+  en: { status: 'Putting the plan together', text: 'Here’s a 3-day plan for Istanbul, starting from Riyadh. Review it.', next: ['Find a stay', 'Add an eSIM', 'Start from Jeddah'] },
+  ar: { status: 'نجهّز الخطة', text: 'هذي خطة ٣ أيام في إسطنبول، البداية من الرياض. شوفها.', next: ['دوّر سكن', 'أضف شريحة نت', 'ابدأ من جدة'] },
+} as const;
+
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
 /** Companions (ASK-INTEGRATED.md §5): two Abdullahs, someone not in the circle, a change asked by a companion. */
@@ -95,8 +102,8 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
   // A new chat starts with the flights; a chat that goes on answers about the area (or a request).
   const first = !body.threadId;
   // Kept as the server keeps it, so the chat opens again from the list (mock/ask-threads.ts).
-  // Loaded on demand, so the mock's code stays in its own chunk (tools/leak-scan allows sample prices there only).
-  const [{ mockUserById }, { demoThread, recordDemoTurn }] = await Promise.all([import('./mock-api'), import('./mock/ask-threads')]);
+  // Loaded on demand through mock-api, which a live build swaps for its stub: none of the mock's code ships there.
+  const { mockUserById, demoThread, recordDemoTurn } = await import('./mock-api');
   const user = mockUserById(useSession.getState().user?.id);
   const threadId = demoThread(user, body.threadId ?? null, lang);
   const keep = (reply: string) => recordDemoTurn(user, threadId, body.text, reply, lang);
@@ -106,6 +113,24 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
     let cards: ChatCard[] = [];
     const people = await demoPeople(body.text, lang, user, signal, onEvent);
     if (people) { keep(people); return 'done'; }
+    if (ISTANBUL_PLAN.test(body.text) && user) {
+      const P = ISTANBUL_LINES[lang];
+      onEvent({ type: 'status', text: P.status, tool: 'create_plan' });
+      // Through mock-api, which a live build swaps for its stub (metro.config.js): the mock's trips never ship there.
+      const { mockCreatePlan, mockPlanCard, attachDemoThread } = await import('./mock-api');
+      await wait(900, signal);
+      const plan = mockCreatePlan(user, 'istanbul3');
+      if (plan) {
+        attachDemoThread(user, threadId, plan.tripId, `${plan.title} · ${rangeLabel(plan.startDate, plan.endDate, lang)}`);
+        onEvent({ type: 'thread', threadId, lang, tripId: plan.tripId });
+        for (const word of P.text.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
+        onEvent({ type: 'cards', cards: [mockPlanCard(user, plan)] });
+        onEvent({ type: 'next', choices: [...P.next] });
+        onEvent({ type: 'done', text: P.text });
+        keep(P.text);
+        return 'done';
+      }
+    }
     if (PLAN_WORDS.test(body.text) || START_WORDS.test(body.text)) {
       const P = PLAN_LINES[lang];
       const start = START_WORDS.test(body.text);
@@ -170,7 +195,7 @@ async function demoPeople(text: string, lang: 'en' | 'ar', user: import('./mock-
   const invite = !which && INVITE_WORDS.test(text);
   const change = !which && !invite && CHANGE_WORDS.test(text);
   if (!user || (!which && !invite && !change)) return null;
-  const [{ mockTripsOf }, { DEMO_ABDULLAH, mockAskChange, mockTripTitle }] = await Promise.all([import('./mock/trips'), import('./mock/trip-people')]);
+  const { mockTripsOf, DEMO_ABDULLAH, mockAskChange, mockTripTitle } = await import('./mock-api');
   const trip = mockTripsOf(user).find((x) => x.status !== 'cancelled' && x.status !== 'completed');
   if (!trip && !change) return null;
   const name = which ? (lang === 'ar' ? 'عبدالله' : 'Abdullah') : lang === 'ar' ? 'فيصل' : 'Faisal';

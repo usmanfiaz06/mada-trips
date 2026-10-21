@@ -21,6 +21,7 @@ Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touche
 - Running (cloud): U3 plan tools session_016yJq5f5oHv6Rws4W8PhJPV · U4 drives session_01JfpbadgWdqmreUgWX6RF5A · U5 companions/roles/approvals session_01JnQAGLMp99aGMxkd2yzKJV · U6 documents in chat session_01BdYjfbVuaTCUZEVWF1DRNu. Next: U7 booking from plan → U8 plan screen + trip page + shared trip chat → U9 Today/polish.
 - Done since: U3 plan tools 78f0b0d · U4 drives b18ca7c · U6 documents in chat b4a739a. Merged 17:15: build/tsc clean, 831 platform tests (known failures + desk-overview alerts test fails only in the full run: shared-state flake → fix in U9), 190 mobile, live export leak scan clean. Running: U5 (nudged to push), U7.
 - Carry into U8/U9 (from U1): attach a chat to the trip a booking creates; "Start a chat for X?" on destination switch; rename/archive/delete inside a conversation; e2e-booking flaked once on the "Checking flights to Istanbul" line — recheck.
+- U8 plan screen + trip page + shared trip chat + U1 leftovers + desk plan view: built (migration 0048_trip_chat). Left for U9: Today cards from the plan, push on trip-chat messages, desk "updated your plan" chat line, map tab on the plan, trip-chat composer words, desk-overview alerts flake.
 - Owner: confirm voucher "Payable through" line + drop of "HBX Group" mark with Hotelbeds certification; eSIM network names OK to show?
 
 ## 21 Oct

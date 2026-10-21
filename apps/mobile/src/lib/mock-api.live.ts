@@ -7,3 +7,8 @@ import type { Wire, WireResponse } from './api';
 export async function mockTransport(_w: Wire): Promise<WireResponse> {
   return { status: 503, json: { error: { code: 'NOT_CONFIGURED', message: 'Mock mode is not in this build.' } } };
 }
+
+/** The demo conversation's plan helpers (mock-api.ts): never called in a live build. */
+export const mockCreatePlan = (): null => null;
+export const mockPlanCard = (): never => { throw new Error('Mock mode is not in this build.'); };
+export const attachDemoThread = (): void => {};

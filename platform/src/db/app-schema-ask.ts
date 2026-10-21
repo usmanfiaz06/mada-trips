@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, uuid, text, integer, timestamp, jsonb, index, date, primaryKey, uniqueIndex, check } from "drizzle-orm/pg-core";
 import { appPeople, appTrips, appUsers } from "./app-schema";
 import { appDocuments, appFiles } from "./app-schema-wallet";
 import { users as opsUsers } from "./schema";
@@ -64,11 +65,19 @@ export const appAskThreads = pgTable("app_ask_threads", {
   preview: text("preview"),
   /** The thread reached MAX_TURNS: the list says "Continue in a new one", and the new one carries the trip. */
   endedAt: timestamp("ended_at", { withTimezone: true }),
+  /**
+   * private: one traveller and Mada. trip: the shared trip chat (ASK-INTEGRATED.md §5.5, migration 0048), owned by the
+   * trip's owner and read and written by everyone going on the trip with a Mada account; one per trip, archived when
+   * the owner turns it off. Its members are the trip's travellers (app_trip_travellers), never a list of its own.
+   */
+  kind: text("kind").notNull().default("private"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index("app_ask_threads_owner_idx").on(t.ownerId, t.updatedAt), index("app_ask_threads_updated_idx").on(t.updatedAt),
   index("app_ask_threads_list_idx").on(t.ownerId, t.archivedAt, t.lastAt.desc()), index("app_ask_threads_trip_idx").on(t.ownerId, t.tripId),
+  uniqueIndex("app_ask_threads_trip_chat_idx").on(t.tripId).where(sql`${t.kind} = 'trip'`),
+  check("app_ask_threads_kind", sql`${t.kind} IN ('private', 'trip')`),
 ]);
 
 /** Spend per day, per person and for everyone (owner_key "all"), for ASK_CHAT_DAILY_USD and ASK_CHAT_USER_DAILY_USD. */

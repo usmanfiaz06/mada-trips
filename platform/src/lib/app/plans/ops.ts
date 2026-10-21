@@ -216,7 +216,10 @@ export async function applyOps(ownerId: string, tripId: string, input: OpsInput,
         const it = find(op.itemId);
         refuseBooked(it);
         dayOk(op.day);
-        const sort = await placeIn(tx, plan.id, items.filter((i) => i.id !== it.id), op.day, op.afterItemId);
+        // "Move up" to the top of a day: before everything on it.
+        const others = items.filter((i) => i.id !== it.id);
+        const top = Math.min(...others.filter((i) => i.day === op.day).map((i) => i.sort));
+        const sort = op.first ? (Number.isFinite(top) ? top - 10 : 10) : await placeIn(tx, plan.id, others, op.day, op.afterItemId);
         // A timed item keeps its time of day on its new day.
         const startsAt = it.startsAt && op.day != null ? `${addDays(plan.startDate, op.day)}T${it.startsAt.slice(11, 16)}` : it.startsAt;
         const endsAt = it.endsAt && op.day != null ? `${addDays(plan.startDate, op.day)}T${it.endsAt.slice(11, 16)}` : it.endsAt;

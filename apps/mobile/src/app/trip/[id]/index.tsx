@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { addDays, dayLabel, formatSar, liveStay, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
+import { AIRPORT_CITY, addDays, dayLabel, formatSar, liveStay, nameIn, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { Screen, Scroll, TopBar } from '@/components/Layout';
@@ -12,7 +12,7 @@ import { BannerHost } from '@/components/today/common';
 import { MoveNotice, NoStayChoices } from '@/components/trips/MoveNotice';
 import { AirlineMark, Box, Display, Divider, Eyebrow, Grow, H3, ListRow, Photo, Row, RouteLine, Shade, Small, Spread, Tag, TextLink, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
-import { t } from '@/lib/i18n';
+import { getLocale, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, usePayments, useRefundQuote, useTrip, useTripMutation } from '@/lib/trips';
 import { colors } from '@/theme';
@@ -21,6 +21,10 @@ import { EsimTripRow } from '@/components/esim/parts';
 import { ThingsView } from '@/components/things/ThingsView';
 import { ErrorState, GoneState } from '@/components/states';
 import { describeError } from '@/lib/net/describe';
+import { Initial } from '@/components/booking/PeopleFrame';
+import { routeTitle } from '@/components/booking/PlanCards';
+import { ItemRow } from '@/components/plan/PlanParts';
+import { usePlan, useSetTripChat, useTripChat } from '@/lib/plans';
 
 const tripDays = (from: string, to: string | null) => { const out: string[] = []; for (let d = from, i = 0; d <= (to ?? from) && i < 30; d = addDays(d, 1), i++) out.push(d); return out; };
 
@@ -33,6 +37,9 @@ export default function TripDetail() {
   const quote = useRefundQuote(id);
   const [sheet, setSheet] = useState<'cancel' | 'nostay' | null>(null);
   const cancel = useTripMutation(() => tripsApi.cancelStay(id, newKey()));
+  const planQ = usePlan(id);
+  const chatQ = useTripChat(id);
+  const setChat = useSetTripChat(id);
   const trip = q.data?.trip;
   if (!trip) {
     return (
@@ -47,6 +54,10 @@ export default function TripDetail() {
   }
   const out = outSegment(trip);
   const back = backSegment(trip);
+  const plan = planQ.data?.plan ?? null;
+  // "Riyadh → AlUla" (§9.4): the plan's route, or the flight's start and the trip's city; the city alone otherwise.
+  const from = out ? AIRPORT_CITY[out.from] ?? null : null;
+  const title = plan ? routeTitle(plan.title) : from && from !== trip.city ? routeTitle(`${from} → ${trip.city}`) : nameIn(trip.city, getLocale());
   const st = trip.stays[0];
   const stLive = liveStay(trip);
   const tm = timing(trip.clock.phase);
@@ -72,7 +83,7 @@ export default function TripDetail() {
           <Shade id="trip-top" />
           <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/trips'))} dark /></View>
           <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
-            <Display size={40} color={colors.paper}>{trip.city}</Display>
+            <Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display>
             <T v="small" color="rgba(255,253,249,0.9)">{rangeLong(trip.startDate, trip.endDate)}{trip.bookingRef ? ` · ${t('tm.detail.booking', { ref: trip.bookingRef })}` : ''}</T>
           </View>
         </Photo>
@@ -87,6 +98,23 @@ export default function TripDetail() {
           <MoveNotice trip={trip} />
           {/* This trip's own chat (ASK-INTEGRATED.md §2.2): opens it, or starts one about the trip. */}
           <Button testID="ask-about-trip" label={t('chat.askTrip')} variant="secondary" size="small" block={false} onPress={() => { buzz('tap'); router.push({ pathname: '/ask', params: { tripId: trip.id } }); }} />
+          {/* The plan (§9.4): a summary, what's left to do, the first items, and Open the plan. */}
+          {plan ? (() => {
+            const live = plan.items.filter((i) => i.status !== 'skipped' && i.status !== 'cancelled');
+            const booked = live.filter((i) => ['held', 'booked', 'confirmed'].includes(i.status)).length;
+            const todo = plan.checks.filter((c) => c.state === 'todo' || c.state === 'warn').length;
+            const next = live.filter((i) => i.day != null).sort((a, b) => (a.day! - b.day!) || a.sort - b.sort).slice(0, 3);
+            return (
+              <Box testID="trip-plan" onPress={() => router.push(`/trip/${trip.id}/plan` as Href)} label={t('trip.plan.open')}>
+                <Spread><H3>{t('trip.plan.title')}</H3><Tag tone={todo ? 'gold' : 'ok'} label={todo ? t('trip.plan.todo', { n: todo }) : t('plan.screen.allSet')} /></Spread>
+                <Tiny>{[t('trip.plan.days', { n: plan.days }), t('trip.plan.booked', { booked, total: live.length })].join(' · ')}</Tiny>
+                {next.map((i) => <ItemRow key={i.id} item={i} prices={planQ.data?.access?.prices ?? true} />)}
+                <TextLink testID="trip-plan-open" label={t('trip.plan.open')} onPress={() => router.push(`/trip/${trip.id}/plan` as Href)} />
+              </Box>
+            );
+          })() : planQ.isError && trip.status !== 'cancelled' ? (
+            <TextLink testID="trip-plan-make" label={t('trip.plan.make')} onPress={() => router.push({ pathname: '/ask', params: { tripId: trip.id, prefill: t('trip.plan.makeSay') } })} />
+          ) : null}
           {out ? (
             <Box testID="flight-box">
               <Spread>
@@ -134,6 +162,25 @@ export default function TripDetail() {
             {manage.map(([href, icon, title, sub], i) => <ListRow key={href} testID={`manage-${i}`} first={i === 0} icon={icon} tone={i === 0 ? 'gold' : undefined} title={title} sub={sub} onPress={() => router.push(href as Href)} />)}
           </Box>
           <ThingsView mode="section" placeId={trip.city} city={trip.city} tripId={trip.id} days={tripDays(trip.startDate, trip.endDate)} />
+          {/* The shared trip chat (§5.5): the owner turns it on; everyone on the trip and Mada in one chat. */}
+          {chatQ.data && (chatQ.data.on || chatQ.data.canManage) ? (
+            <Box testID="trip-chat">
+              <Spread>
+                <H3>{t('tripChat.title')}</H3>
+                <Row gap={4}>{chatQ.data.members.slice(0, 5).map((m, i) => <Initial key={i} letter={m.initial} size={26} gold={m.owner} />)}</Row>
+              </Spread>
+              <Tiny>{chatQ.data.on ? t('tripChat.members', { names: chatQ.data.members.map((m) => m.name).join(getLocale() === 'ar' ? '، ' : ', ') }) : t('tripChat.sub')}</Tiny>
+              {chatQ.data.on && chatQ.data.threadId ? (
+                <Row gap={8} style={{ flexWrap: 'wrap' }}>
+                  <Button testID="trip-chat-open" size="small" block={false} label={t('tripChat.open')} onPress={() => { buzz('tap'); router.push({ pathname: '/ask/[threadId]', params: { threadId: chatQ.data!.threadId! } }); }} />
+                  {chatQ.data.canManage ? <TextLink testID="trip-chat-off" label={t('tripChat.off')} onPress={() => setChat.mutate(false, { onSuccess: () => toast(t('tripChat.offDone')) })} /> : null}
+                </Row>
+              ) : (
+                <Button testID="trip-chat-on" size="small" variant="secondary" block={false} busy={setChat.isPending} label={t('tripChat.on')}
+                  onPress={() => setChat.mutate(true, { onSuccess: (r) => { buzz('success'); if (r.threadId) router.push({ pathname: '/ask/[threadId]', params: { threadId: r.threadId } }); } })} />
+              )}
+            </Box>
+          ) : null}
           <Box onPress={() => router.push(`/trip/${trip.id}/travellers` as Href)} label={t('people.screen.open')} testID="trip-travellers">
             <H3>{t('tm.detail.travellers')}</H3>
             <Row style={{ flexWrap: 'wrap' }}>{trip.travellers.map((p) => <Tag key={p.id} label={p.isSelf ? t('tm.detail.you', { name: p.firstName }) : p.firstName} />)}</Row>

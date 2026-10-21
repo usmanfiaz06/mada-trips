@@ -337,6 +337,13 @@
       "when": 1792700000000,
       "tag": "0047_request_plan_item",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792800000000,
+      "tag": "0048_trip_chat",
+      "breakpoints": true
     }
   ]
 }

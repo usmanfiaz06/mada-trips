@@ -201,10 +201,11 @@ export function LinkCard({ card, onOpen }: { card: LinkChatCard; onOpen: () => v
   return <Button size="small" variant="secondary" label={t(`chat.link.${card.screen}`)} onPress={() => { buzz('tap'); onOpen(); }} style={[s.button, s.soft]} testID={`chat-link-${card.screen}`} />;
 }
 
-/** Where a link card goes. The plan opens on its trip until the plan screen lands (U8). */
+/** Where a link card goes: the plan screen (U8), the trip, and the rest of the app. */
 export function linkHref(screen: LinkChatCard['screen'], id: string | null): string {
   switch (screen) {
-    case 'plan': case 'trip': return id ? `/trip/${id}` : '/trips';
+    case 'plan': return id ? `/trip/${id}/plan` : '/trips';
+    case 'trip': return id ? `/trip/${id}` : '/trips';
     case 'money': return id ? `/trip/${id}/money` : '/trips';
     case 'change': return id ? `/trip/${id}/change` : '/trips';
     case 'refund': return id ? `/trip/${id}/refund` : '/trips';

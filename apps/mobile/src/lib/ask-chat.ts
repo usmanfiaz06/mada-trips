@@ -30,6 +30,8 @@ export type ChatTurn = {
   by?: string | null;
   /** A document the traveller sent (lib/ask-docs.ts): its kind and masked label ("Passport · Omar · ••41"). */
   attachment?: { kind: string; label: string };
+  /** In the shared trip chat (§5.5): someone else on the trip wrote `me`, by first name. Missing: the reader wrote it. */
+  from?: string | null;
   /** joined: the line "Noura from Mada joined", shown once when a person takes the conversation over. */
   desk?: 'joined';
   /** What Mada has said so far (token by token while streaming). */
@@ -262,6 +264,7 @@ export function turnsOfLines(lines: AskThreadLine[], cached: ChatTurn[], lang: '
   for (const l of lines) {
     const last = out[out.length - 1];
     if (l.who === 'me') out.push(blank({ me: l.text, at: l.at ?? undefined, ...(l.attachment ? { attachment: l.attachment } : {}) }));
+    else if (l.who === 'member') out.push(blank({ me: l.text, from: l.by ?? '', at: l.at ?? undefined }));
     else if (l.who === 'joined') out.push(blank({ desk: 'joined', text: l.text, at: l.at ?? undefined }));
     else if (last && last.me && !last.text && !last.desk && !last.by) out[out.length - 1] = { ...last, text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next, ...(l.kept ? { cards: l.kept } : {}) };
     else if (last && !last.me && l.who === 'agent' && last.by === l.by) out[out.length - 1] = { ...last, text: `${last.text}\n\n${l.text}` };
@@ -321,6 +324,7 @@ export const askThreadsApi = {
     const tail = qs.toString();
     return request({ method: 'GET', path: `${ASK_THREADS_ROUTE}${tail ? `?${tail}` : ''}`, retries: 0 }, AskThreadsResponse);
   },
+  get: (id: string) => request({ method: 'GET', path: askThreadRoute(id), retries: 0 }, AskThreadResponse),
   patch: (id: string, body: AskThreadPatch) => request({ method: 'PATCH', path: askThreadRoute(id), body }, z.object({ thread: AskThreadRow })),
   remove: async (id: string) => {
     await request({ method: 'DELETE', path: askThreadRoute(id) }, z.object({ deleted: z.boolean() }));
@@ -329,6 +333,14 @@ export const askThreadsApi = {
     if (useAskChat.getState().threadId === id) useAskChat.getState().reset();
   },
 };
+
+/**
+ * A booking priced in a chat made a trip (§2.2 "A booking made in an unattached chat creates a trip"): the chat is
+ * about that trip from now on. The server only attaches a chat about no trip yet, and only to the caller's own trip.
+ */
+export async function attachChatToTrip(threadId: string, tripId: string): Promise<void> {
+  await askThreadsApi.patch(threadId, { tripId }).catch(() => {});
+}
 
 /*
  * A person on the desk can take the conversation over (DESK-PLAN.md U5). While Ask is open on a thread, the app asks

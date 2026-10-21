@@ -134,6 +134,8 @@ export type PayDraft = {
   destination?: string | null;
   /** "See other options" goes back to Ask with this. */
   askAgain?: string | null;
+  /** The Ask chat it was priced in: once the booking makes a trip, the chat is about that trip (ASK-INTEGRATED §2.2). */
+  threadId?: string | null;
 };
 type DraftState = { current: PayDraft | null; set: (d: PayDraft) => void; clear: () => void };
 export const usePayDraft = create<DraftState>((set) => ({ current: null, set: (d) => set({ current: d }), clear: () => set({ current: null }) }));

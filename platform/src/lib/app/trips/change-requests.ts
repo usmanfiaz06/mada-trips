@@ -13,7 +13,7 @@ import { peopleByIds } from "../circles/common";
 import { applyOps } from "../plans/ops";
 import { deriveStatus, liveItems, loadBookings, matchBookings, planRowOf, type ItemRow } from "../plans/plans";
 import { redact } from "../ask-chat/guard";
-import { appendLine, newThread, primaryThreadOf } from "../ask-chat/store";
+import { appendLine, appendLineTo, newThread, primaryThreadOf } from "../ask-chat/store";
 import { notify } from "./notify";
 import { roleOf, tripName } from "./travellers";
 
@@ -117,13 +117,24 @@ export async function requestChange(userId: string, tripId: string, input: Chang
   return { change, applied: false, text: `Change request sent to ${change.ownerName}: ${lines.map((l) => l.text).join("; ")}.` };
 }
 
-/** The owner's chat for the trip gets the card (a new chat about the trip if he has none), and his phone a push. */
+/**
+ * The owner's chat for the trip gets the card (a new chat about the trip if he has none), and his phone a push. Asked
+ * in the shared trip chat (§5.5), the card goes into that same chat, so the owner approves it in place where everyone
+ * reads it.
+ */
 async function tellOwner(r: Row): Promise<string | null> {
   const lang = await localeOfUser(r.ownerId);
   const owner = await roleOf(r.ownerId, r.tripId);
   if (!owner) return null;
   const trip = await tripName(owner.trip);
   const by = (await peopleByIds([r.byUserId])).get(r.byUserId)?.short ?? "";
+  const [asked] = r.byThreadId ? await db.select({ kind: appAskThreads.kind, tripId: appAskThreads.tripId }).from(appAskThreads).where(eq(appAskThreads.id, r.byThreadId)) : [];
+  if (asked?.kind === "trip" && asked.tripId === r.tripId) {
+    const change = await viewOf(r, r.ownerId);
+    await appendLineTo(r.byThreadId!, { who: "mada", text: t("people.line.asked", { name: by, trip, summary: r.summary }, lang), kept: [changeCard(change)], at: new Date().toISOString() });
+    await notify(r.ownerId, { kind: "circle", level: "active", copy: "notify.tripChange", vars: { name: by, trip }, href: `/ask/${r.byThreadId}`, data: { tripId: r.tripId, changeId: r.id } }).catch(() => {});
+    return r.byThreadId;
+  }
   let thread = await primaryThreadOf(r.ownerId, r.tripId);
   if (!thread) {
     thread = await newThread(r.ownerId, lang, r.tripId);
@@ -213,7 +224,8 @@ async function tellAsker(r: Row): Promise<void> {
   const text = r.status === "approved" ? t("people.line.approved", { owner, summary: r.summary }, lang)
     : r.status === "declined" ? (r.reason ? t("people.line.declinedWhy", { owner, reason: r.reason }, lang) : t("people.line.declined", { owner }, lang))
     : t("people.line.expired", { owner }, lang);
-  if (r.byThreadId) await appendLine(r.byUserId, r.byThreadId, { who: "mada", text, kept: [changeCard(await viewOf(r, r.byUserId))], at: new Date().toISOString() });
+  // His own chat, or the trip chat he asked in (whoever owns it).
+  if (r.byThreadId) await appendLineTo(r.byThreadId, { who: "mada", text, kept: [changeCard(await viewOf(r, r.byUserId))], at: new Date().toISOString() });
   if (r.status === "approved" || r.status === "declined") {
     await notify(r.byUserId, { kind: "circle", level: "active", copy: r.status === "approved" ? "notify.tripChangeYes" : "notify.tripChangeNo", vars: { name: owner, trip: tripTitle }, href: r.byThreadId ? `/ask/${r.byThreadId}` : "/trips", data: { tripId: r.tripId, changeId: r.id } }).catch(() => {});
   }

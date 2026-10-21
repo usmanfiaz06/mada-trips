@@ -21,6 +21,7 @@ import { usePeople } from '@/lib/queries';
 import { toast } from '@/lib/toast';
 import { colors, font, ff } from '@/theme';
 import { requireAccount } from '@/lib/signin-ask';
+import { plansApi } from '@/lib/plans';
 
 /* A curated plan, day by day (Plan.jsx). Book it all through the same order sheet; change something in Ask. */
 
@@ -31,6 +32,18 @@ export default function PlanScreen() {
   const plan = usePlan(String(id ?? ''));
   const people = usePeople();
   const [day, setDay] = useState(0);
+  const [using, setUsing] = useState(false);
+  /** "Use this plan" (ASK-INTEGRATED.md §3.7): a living plan of their own from this template, from where they start. */
+  const startFromTemplate = async () => {
+    if (!requireAccount('book')) return;
+    buzz('tap');
+    setUsing(true);
+    try {
+      const r = await plansApi.create({ templateId: String(id) });
+      void qc.invalidateQueries({ queryKey: ['trips'] });
+      router.push(`/trip/${r.plan.tripId}/plan` as never);
+    } catch (e) { toast(e instanceof Error ? e.message : t('error.internal')); } finally { setUsing(false); }
+  };
   const qc = useQueryClient();
   const saves = useSaved();
   const savedItem = saves.data?.saved.find((x) => x.kind === 'plan' && x.refId === String(id));
@@ -83,6 +96,8 @@ export default function PlanScreen() {
         <Card variant="well" style={{ gap: 8 }}>
           <T v="h3">{t('plan.yours.title')}</T>
           <T v="small">{t('plan.yours.body')}</T>
+          <Button size="small" block={false} style={{ alignSelf: 'flex-start' }} label={t('plan.useThis')} busy={using} onPress={() => { void startFromTemplate(); }} testID="plan-use-this" />
+          <T v="tiny" color={colors.ink2}>{t('plan.useThisSub')}</T>
           <Button size="small" block={false} variant="secondary" style={{ alignSelf: 'flex-start' }} label={t('plan.change')} onPress={() => router.push({ pathname: '/ask', params: { prefill: t('plan.changePrefill', { title: planWords(p).title }) } })} />
         </Card>
       </ScrollView>

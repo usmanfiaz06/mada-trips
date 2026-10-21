@@ -156,7 +156,13 @@ export const tripPeopleMock: AreaMock = async (w, ctx) => {
       if (c.ownerId !== user.id) return err('FORBIDDEN');
       const b = DecideChangeRequest.safeParse(w.body);
       if (!b.success) return err('VALIDATION');
-      if (c.status === 'pending') Object.assign(c, { status: b.data.decision === 'approve' ? 'approved' : 'declined', reason: b.data.decision === 'decline' ? b.data.reason ?? null : null, decidedAt: new Date().toISOString() });
+      if (c.status === 'pending') {
+        Object.assign(c, { status: b.data.decision === 'approve' ? 'approved' : 'declined', reason: b.data.decision === 'decline' ? b.data.reason ?? null : null, decidedAt: new Date().toISOString() });
+        // Decided in the trip chat: everyone there reads the outcome (§5.5).
+        const { mockTripChatLine } = await import('./ask-threads');
+        const l = lang();
+        mockTripChatLine(user, c.tripId, (c.status as string) === 'approved' ? t('people.line.approved', { owner: c.ownerName, summary: c.summary }, l) : t('people.line.declined', { owner: c.ownerName }, l));
+      }
       return ok({ change: viewOf(c, user.id) });
     }
     return null;

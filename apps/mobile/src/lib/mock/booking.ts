@@ -16,7 +16,7 @@ import type { Wire, WireResponse } from '../api';
 import type { AreaMock, MockUser } from '../mock-api';
 import { walletMock } from './wallet';
 import { circlesMock } from './circles';
-import { recordBookedTrip } from './trips';
+import { mockTripsOf, recordBookedTrip } from './trips';
 import { mockBeta } from './beta';
 import { fulfilEsimMock, priceEsimMock, resetEsimMock, type EsimSnap } from './esim';
 
@@ -36,7 +36,7 @@ export const setMockFareHold = (ms: number | null) => { mockFareHoldMs = ms; };
 /** owner '' is a guest's search: the first account to book it takes it (as search.ts ownOffer does). */
 type Offer = { id: string; owner: string; kind: 'flight' | 'stay'; option: FlightOption | StayOption; search: Record<string, unknown>; expiresAt: number };
 type Req = { id: string; owner: string; withdrawn?: boolean; nudgedAt?: string | null; result?: RequestResult; whoNames?: string; view: BookingRequestView; details: { kind: string; answers: Record<string, string[]>; needs: Record<string, string[]>; note: string; search?: Record<string, unknown> | null; service?: string | null; serviceNeed?: string | null; servicePerson?: string | null; clientId?: string | null; flightRequest?: boolean }; created: number; messages: ThreadMessage[]; quoteSnapshot?: RequestQuote };
-type Order = OrderView & { why?: OutcomeReason; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
+type Order = OrderView & { why?: OutcomeReason; /** The planning trip the draft named (a stay booked from its plan): the booking lands on it. */ intoTripId?: string | null; owner: string; nextAt: number | null; applied?: AppliedPrefs | null; ssr?: string[]; hotelRemarks?: string[]; demo: Set<DemoFlag>; done: Set<string>; key: string; resume?: string; otpTries: number; resends?: number; created: number; travellers: Person[]; user: MockUser; snap: { flight: FlightOption | null; stay: StayOption | null; destination: string | null; discount: number; quoted?: FareOption | null; requestId?: string | null; requests?: HotelRequests | null; esim?: EsimSnap | null } };
 
 const offers = new Map<string, Offer>();
 const requests = new Map<string, Req>();
@@ -329,6 +329,7 @@ function confirm(o: Order) {
       travellers: o.travellers, flight: o.snap.flight, stay: o.snap.stay, bundle: o.bundle, lines: o.lines, extra: o.extra.amount, discount: o.snap.discount, creditUsed: o.creditUsed.amount,
       paymentLabel: o.paymentLabel, plan: o.plan, bookedAt: new Date(o.created).toISOString(), quoted: o.snap.quoted ?? null, pnr: o.snap.quoted ? o.ref : null, tickets,
       payer: o.payRequest?.name ?? null, payLink: o.payRequest ? { circleId: o.payRequest.circleId, messageId: o.payRequest.messageId } : null, requests: o.snap.requests ?? null,
+      intoTripId: o.intoTripId ?? null,
     });
   }
   if (o.kind === 'quote' && o.requestId) { const r = requests.get(o.requestId); if (r) { r.view.status = 'paid'; r.view.quote = r.view.quote ? { ...r.view.quote, status: 'accepted' } : null; r.view.updatedAt = nowIso(); } }
@@ -740,6 +741,7 @@ export const bookingMock: AreaMock = async (w, ctx) => {
       travellerIds: pv.travellerIds, lines: pv.lines, total: pv.total, extra: money(0), plan: label === 'Tabby' ? 'tabby' : label === 'Tamara' ? 'tamara' : 'full', paymentLabel: label,
       creditUsed: pv.credit.used, bundle: !!(priced.search as { bundle?: boolean } | undefined)?.bundle, ref: null, agent: { name: agentName() }, confirmedBy: null,
       question: null, fareChange: null, problem: null, slow: false, tripId: null, requestId: b.draft.kind === 'quote' ? b.draft.requestId : null,
+      intoTripId: (() => { const d = b.draft; const id = d.kind === 'stay' || d.kind === 'trip' ? d.tripId : null; return id && mockTripsOf(user).some((x) => x.id === id) ? id : null; })(),
       action: requires3ds ? { kind: 'otp', triesLeft: 3, label, amount: pv.total } : null, createdAt: nowIso(), confirmedAt: null,
       owner: user.id, nextAt: requires3ds || payRequest ? null : Date.now() + 1200, demo, done: new Set(), key: b.idempotencyKey, otpTries: 0, created: Date.now(), travellers: priced.travellers,
       user, snap: { flight: priced.flight ?? null, stay: priced.stay ?? null, destination: (priced.search as { destination?: string } | undefined)?.destination ?? null, discount: pv.promo?.status === 'applied' ? pv.promo.discount.amount : 0, quoted: priced.quoted ?? null, requestId: priced.quoted && b.draft.kind === 'quote' ? b.draft.requestId : null, requests: b.draft.kind === 'stay' ? b.draft.requests ?? null : null, esim: priced.esim ?? null },

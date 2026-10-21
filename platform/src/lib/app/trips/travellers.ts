@@ -134,7 +134,7 @@ export async function findMatches(ownerId: string, name: string, opts: { tripId?
 
 /* ───────────── reading ───────────── */
 
-async function sharePricesOf(tripId: string, q: Exec = db): Promise<boolean> {
+export async function sharePricesOf(tripId: string, q: Exec = db): Promise<boolean> {
   const [s] = await q.select({ on: appTripSharing.sharePrices }).from(appTripSharing).where(eq(appTripSharing.tripId, tripId));
   return !!s?.on;
 }

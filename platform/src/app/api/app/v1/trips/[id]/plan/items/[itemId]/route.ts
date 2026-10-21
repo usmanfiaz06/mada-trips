@@ -4,7 +4,7 @@ import { AppError, body, json } from "@/lib/app/http";
 import { applyOps } from "@/lib/app/plans/ops";
 import { withParams } from "@/lib/app/trips/route";
 
-// PATCH /api/app/v1/trips/{id}/plan/items/{itemId} { version, item?, day?, afterItemId?, skipped? } → { plan, changes }
+// PATCH /api/app/v1/trips/{id}/plan/items/{itemId} { version, item?, day?, afterItemId?, first?, skipped? } → { plan, changes }
 // (an update, a move to another day or place in the day, a skip). DELETE ?version=N → { plan, changes }.
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,8 @@ const PatchItem = z.object({
   item: PlanItemInput.partial().optional(),
   day: z.number().int().min(0).nullable().optional(),
   afterItemId: z.string().uuid().nullable().optional(),
+  /** To the top of the day ("Move up" past the first item). */
+  first: z.boolean().optional(),
   skipped: z.boolean().optional(),
 });
 
@@ -20,7 +22,7 @@ export const PATCH = withParams<{ id: string; itemId: string }>(async (req, { id
   const b = await body(req, PatchItem);
   const ops: PlanOp[] = [];
   if (b.item && Object.keys(b.item).length) ops.push({ op: "update", itemId, item: b.item });
-  if (b.day !== undefined || b.afterItemId !== undefined) ops.push({ op: "move", itemId, day: b.day ?? null, afterItemId: b.afterItemId });
+  if (b.day !== undefined || b.afterItemId !== undefined || b.first) ops.push({ op: "move", itemId, day: b.day ?? null, afterItemId: b.afterItemId, first: b.first });
   if (b.skipped !== undefined) ops.push({ op: b.skipped ? "skip" : "unskip", itemId });
   if (!ops.length) throw new AppError("VALIDATION", { fields: { _: "Nothing to change" } });
   return json(PlanChangeResponse.parse(await applyOps(userId, id, { version: b.version, ops }, "traveller")));

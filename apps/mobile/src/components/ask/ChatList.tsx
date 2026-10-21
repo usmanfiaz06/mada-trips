@@ -119,9 +119,17 @@ export function ChatList({ onBack }: { onBack: () => void }) {
     return (
       <View key={r.id} style={styles.rowWrap} testID="ask-thread-row">
         <Pressable accessibilityRole="button" accessibilityLabel={t('chat.list.a11y.row', { title, when }) + (r.unread ? `. ${t('chat.list.a11y.unread')}` : '')}
-          onPress={() => open(r)} onLongPress={() => { buzz('soft'); setMenu(r.id); }} style={styles.row} testID={`ask-thread-${r.id}`}>
+          onPress={() => open(r)} onLongPress={r.mine === false ? undefined : () => { buzz('soft'); setMenu(r.id); }} style={styles.row} testID={`ask-thread-${r.id}`}>
+          {/* The shared trip chat (§5.5): its people, the organiser first. */}
+          {r.kind === 'trip' && r.members?.length ? (
+            <View style={styles.faces} testID="ask-thread-members">
+              {r.members.slice(0, 3).map((m, i) => (
+                <View key={i} style={[styles.face, { marginStart: i ? -10 : 0, backgroundColor: m.owner ? colors.goldWash : colors.mist }]}><T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{m.initial}</T></View>
+              ))}
+            </View>
+          ) : null}
           <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
-            <T v="body" numberOfLines={1} style={{ fontFamily: ff.ui600, color: colors.green }} testID="ask-thread-title">{title}</T>
+            <T v="body" numberOfLines={1} style={{ fontFamily: ff.ui600, color: colors.green }} testID="ask-thread-title">{r.kind === 'trip' ? `${t('tripChat.label')} · ${title}` : title}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {r.tripStatus ? <View style={[styles.chip, r.tripStatus === 'planning' ? styles.chipPlan : null]}><T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{t(STATUS_KEY[r.tripStatus])}</T></View> : null}
               {line ? <T v="small" color={r.mode === 'agent' && !r.match ? colors.goldInk : colors.ink2} numberOfLines={1} style={{ flex: 1 }} testID={r.match ? 'ask-thread-match' : undefined}>
@@ -133,9 +141,11 @@ export function ChatList({ onBack }: { onBack: () => void }) {
             <T v="tiny" color={colors.muted}>{when}</T>
             {r.unread ? <View style={styles.dot} testID="ask-thread-unread" /> : <View style={{ height: 8 }} />}
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('chat.list.more')} hitSlop={10} onPress={() => { buzz('tap'); setConfirm(null); setRenaming(null); setMenu(menu === r.id ? null : r.id); }} style={styles.more} testID="ask-thread-more">
-            <Icon name="more" size={18} color={colors.ink2} />
-          </Pressable>
+          {r.mine !== false ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={t('chat.list.more')} hitSlop={10} onPress={() => { buzz('tap'); setConfirm(null); setRenaming(null); setMenu(menu === r.id ? null : r.id); }} style={styles.more} testID="ask-thread-more">
+              <Icon name="more" size={18} color={colors.ink2} />
+            </Pressable>
+          ) : null}
         </Pressable>
         {menu === r.id ? (
           confirm === r.id ? (
@@ -236,6 +246,8 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.gold },
   more: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   menu: { gap: 8, paddingBottom: 12 },
+  faces: { flexDirection: 'row', alignItems: 'center' },
+  face: { width: 28, height: 28, borderRadius: 99, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.sand },
   renameInput: { flex: 1, minWidth: 0, height: 40, borderRadius: 12, backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12, fontFamily: ff.ui400, fontSize: 15, color: colors.green },
   archivedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   skeleton: { height: 56, borderRadius: 14, backgroundColor: 'rgba(30,53,45,0.06)' },
