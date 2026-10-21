@@ -17,6 +17,7 @@ import { bookingSuppliers, newRef } from "./common";
 import { canTicket } from "../suppliers/flight-ticketing";
 import { reauthorize } from "./payments";
 import { markPaid } from "../circles/messages";
+import { emit as emitPlanEvent } from "../plans/events";
 
 /*
  * The agent desk's actions on an order. The desk UI (Mada Ops) calls these; in mock mode the autopilot in orders.ts
@@ -241,6 +242,8 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
   });
   if (out.failed) return failTicketing(orderId, agent, CAPTURE_FAILED);
   if (out.o.kind === "share") await settleShare(out.o);
+  // The trip's living plan links what was booked to its items (plans/events.ts); never fails the booking.
+  await emitPlanEvent({ kind: "order.confirmed", orderId: out.o.id, tripId: out.o.tripId, ownerId: out.o.ownerId });
   return out.o;
 }
 

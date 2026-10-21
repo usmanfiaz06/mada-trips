@@ -42,6 +42,8 @@ export const ERROR_CODES = {
   IN_PROGRESS: { status: 409, copy: 'error.inProgress' },
   /** The server gave up waiting on something (a supplier, the database). */
   TIMEOUT: { status: 504, copy: 'error.timeout' },
+  /** A plan edit sent with an old `version` (another device, the desk or Ask changed it): read it again. `details.version` is the current one. */
+  PLAN_CHANGED: { status: 409, copy: 'error.planChanged' },
 } as const satisfies Record<string, { status: number; copy: CopyKey }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

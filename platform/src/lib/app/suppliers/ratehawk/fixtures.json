@@ -1,0 +1,23 @@
+{
+  "_comment": "Mock RateHawk: regions, a SERP per region and hotel info, shaped as the ETG API v3 answers. Amounts in SAR per stay for 2 adults, 1 night; the mock scales them by nights and guests. Bereketzade and the Sultanahmet garden hotel are also in the catalogue (near the same coordinates) so the merge can be seen.",
+  "regions": [
+    { "id": 2734, "name": "Istanbul", "country_code": "TR" },
+    { "id": 6053839, "name": "Dubai", "country_code": "AE" },
+    { "id": 6308838, "name": "Makkah", "country_code": "SA" }
+  ],
+  "hotels": {
+    "2734": [
+      { "id": "bereketzade_hotel", "night": 850, "room_name": "Deluxe Double Room", "meal": "breakfast", "freeDays": 7, "info": { "name": "Bereketzade Hotel", "address": "Galata Kulesi Sk. 12, Beyoğlu, Istanbul", "latitude": 41.02633, "longitude": 28.97342, "star_rating": 4, "kind": "Hotel", "images": ["https://cdn.worldota.net/t/{size}/content/fixtures/bereketzade.jpg"], "amenity_groups": [{ "amenities": ["Free Wi-Fi", "Family rooms", "Connecting rooms"] }] } },
+      { "id": "sultanahmet_garden_hotel", "night": 820, "room_name": "Family Suite", "meal": "breakfast", "freeDays": 3, "info": { "name": "Sultanahmet Garden Hotel", "address": "Akbıyık Cd. 21, Fatih, Istanbul", "latitude": 41.00552, "longitude": 28.97818, "star_rating": 3, "kind": "Hotel", "images": [], "amenity_groups": [{ "amenities": ["Free Wi-Fi", "Garden"] }] } },
+      { "id": "pera_palace_hotel", "night": 1690, "room_name": "Superior King Room", "meal": "nomeal", "freeDays": 2, "info": { "name": "Pera Palace Hotel", "address": "Meşrutiyet Cd. 52, Beyoğlu, Istanbul", "latitude": 41.03181, "longitude": 28.97452, "star_rating": 5, "kind": "Hotel", "images": ["https://cdn.worldota.net/t/{size}/content/fixtures/pera.jpg"], "amenity_groups": [{ "amenities": ["Spa", "Fitness centre", "Free Wi-Fi"] }] } },
+      { "id": "galata_hostel", "night": 160, "room_name": "Bed in 6-Bed Mixed Dormitory", "meal": "nomeal", "freeDays": null, "info": { "name": "Galata Backpackers Hostel", "address": "Şahkulu Bostanı Sk., Beyoğlu, Istanbul", "latitude": 41.02811, "longitude": 28.97391, "star_rating": 0, "kind": "Hostel", "images": [], "amenity_groups": [] } }
+    ],
+    "6053839": [
+      { "id": "rove_downtown", "night": 520, "room_name": "Rover Room", "meal": "nomeal", "freeDays": 2, "info": { "name": "Rove Downtown", "address": "Al Mustaqbal St, Downtown Dubai", "latitude": 25.19095, "longitude": 55.27645, "star_rating": 3, "kind": "Hotel", "images": [], "amenity_groups": [{ "amenities": ["Outdoor pool", "Gym", "Free Wi-Fi"] }] } },
+      { "id": "address_sky_view", "night": 1450, "room_name": "Deluxe Room Burj View", "meal": "breakfast", "freeDays": 5, "info": { "name": "Address Sky View", "address": "Sheikh Mohammed bin Rashid Blvd, Downtown Dubai", "latitude": 25.20115, "longitude": 55.27005, "star_rating": 5, "kind": "Hotel", "images": [], "amenity_groups": [{ "amenities": ["Infinity pool", "Spa", "Kids club", "Fitness centre"] }] } }
+    ],
+    "6308838": [
+      { "id": "swissotel_makkah", "night": 1250, "room_name": "Superior Room Haram View", "meal": "breakfast", "freeDays": 7, "info": { "name": "Swissôtel Makkah", "address": "Abraj Al Bait, Makkah", "latitude": 21.41893, "longitude": 39.82552, "star_rating": 5, "kind": "Hotel", "images": [], "amenity_groups": [{ "amenities": ["Free Wi-Fi", "Family rooms", "Wheelchair accessible"] }] } }
+    ]
+  }
+}

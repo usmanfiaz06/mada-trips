@@ -15,7 +15,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 4 | WhatsApp codes (Meta + Zoho CPaaS) | sign-in codes on WhatsApp | Ready | Owner |
 | 5 | SMS (Unifonic or Taqnyat) | sign-in codes by SMS, fallback | Ready | Owner |
 | 6 | MyFatoorah | card, mada, Apple Pay payments, refunds | Ready | Owner |
-| 7 | Tabby / Tamara | pay later | To build | Owner + code |
+| 7 | Tabby / Tamara | pay later | Built (backend, §29); pay sheet hook-up to do | Owner + code |
 | 8 | Hotelbeds Hotels | hotel search, prices, booking, vouchers | Ready (test keys work) | Owner (live keys) |
 | 9 | Hotelbeds Transfers | airport and pre-booked cars | Ready | Owner (live keys) |
 | 10 | Hotelbeds Activities / Viator / GetYourGuide | things to do | Ready | Owner |
@@ -37,6 +37,9 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 26 | Klook | things to do in Asia, ranked with Hotelbeds/GYG/Viator | Ready (search; desk books) | Owner |
 | 27 | Sherpa | visa / entry rules for every passport, behind the entry check | Ready (built-in rules until key) | Owner |
 | 28 | Cover Genius XCover | travel insurance: quote, buy, cancel | Ready in code; **needs Saudi licensing** | Owner + legal |
+| 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
+| 30 | Duffel | second flight source next to TBO (NDC airlines, low-cost) | Ready (mock until key) | Owner |
+| 31 | RateHawk (ETG / WorldOTA) | second hotel source next to Hotelbeds, cheapest per hotel | Ready (mock until keys) | Owner |
 
 ## Processes
 
@@ -81,9 +84,10 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 4. Vercel: `MYFATOORAH_API_KEY`, `MYFATOORAH_BASE_URL` (test first), `MYFATOORAH_WEBHOOK_SECRET`.
 5. Coordinator runs test cards end to end on staging, then you switch to the live key.
 
-### 7. Tabby / Tamara (pay later) — to build
+### 7. Tabby / Tamara (pay later) — backend built, see §29
 1. Apply as a merchant with each (CR, website, expected volume); they review travel merchants case by case.
-2. Send sandbox keys via Vercel. Code: checkout session, webhook, refunds, and the instalment line on Money/Payments.
+2. Put the sandbox keys in Vercel (§29). Backend done: checkout session, webhooks, capture, refund, cancel, the
+   instalment line. Still to do: the pay sheet in the app and the order flow (§29, "Hook-up").
 
 ### 8–10. Hotelbeds (Hotels, Transfers, Activities)
 1. Ask your Hotelbeds account manager for **live** keys for each API you signed (Hotels, Transfers, Activities) and
@@ -313,3 +317,118 @@ which they support with a Saudi insurer.
 **Licence notes.** The traveller must see the policy wording and key exclusions before buying (the option carries
 `wordingUrl`); Mada must not describe cover beyond what the wording says. Keep claims with Cover Genius (their
 claims link goes in the confirmation).
+
+### 29. Pay later — Tabby and Tamara
+**What it does.** `payLater("tabby" | "tamara")` (`suppliers/pay-later`): a **checkout session** for an order (the
+provider's page, opened in the app's browser sheet), **webhooks** at `/api/app/v1/payments/tabby/webhook` and
+`/api/app/v1/payments/tamara/webhook` (authenticated, then the payment is read back from the provider before anything
+acts on it; Tamara's approved order is **authorised** there, as Tamara requires), **capture** when the booking is
+confirmed, **refund** (part or full), **cancel** before capture. `payLaterOptions(amount, today)` gives the pay sheet
+its **instalment line** per provider ("4 payments of SAR 300.01, the first today", due dates monthly), only within the
+limits (`PAYLATER_MIN_SAR`, `TABBY_MAX_SAR`, `TAMARA_MAX_SAR`; the provider decides the real limit per traveller).
+
+**Hook-up still needed (not in this change).** (1) Mobile pay sheet: show the instalment line under the card options
+and open `checkoutUrl`; on return, poll the order. (2) Order flow: a new payment method `tabby`/`tamara` in the order
+service — on the `authorized` webhook mark the order paid-on-hold and send it to the desk as today; capture when the
+desk confirms (ticketed/booked); cancel if the booking fails; refunds through the existing refund path.
+
+**Apply.** Tabby: tabby.ai/business → "Get started" (CR, VAT, website, bank IBAN); travel merchants are reviewed case
+by case — ask for **Tabby Pay in 4** with merchant code for KSA and **sandbox keys**. Tamara: tamara.co/business →
+"Join Tamara" (same documents); ask for **Pay in 3/4** and **sandbox** API and notification tokens. Both ask for the
+refund and delivery policy for non-physical goods (e-tickets).
+
+**Keys in Vercel.** Tabby: `TABBY_SECRET_KEY`, `TABBY_MERCHANT_CODE`, `TABBY_WEBHOOK_SECRET` (a long random value you
+choose; register the webhook with Tabby — `POST /api/v1/webhooks` or in their dashboard — with header title
+`X-Mada-Webhook` and this value; without it every Tabby webhook is refused), optional `TABBY_MAX_SAR`;
+`SUPPLIER_MODE_TABBY=live|mock|off`. Tamara: `TAMARA_API_TOKEN`, `TAMARA_NOTIFICATION_TOKEN`, `TAMARA_ENV`
+(`sandbox`/`live`), optional `TAMARA_INSTALMENTS=3`, `TAMARA_MAX_SAR`; `SUPPLIER_MODE_TAMARA=live|mock|off`. Shared:
+`PAYLATER_MIN_SAR`.
+
+**Certification.** Both run a go-live review on sandbox: a full checkout with their test customers (approve and
+reject), capture, partial refund, cancel, and screenshots of how the instalments and their logos/terms appear on
+the pay sheet. Tabby also requires their promo snippet/"split in 4" messaging to follow their brand guide.
+
+**Cost model.** The merchant pays: a fee per transaction (typically 4–7% + a fixed fee, negotiated; travel is often at
+the higher end); the traveller pays no interest or fee if on time. Settlement to Mada's IBAN in full, usually within
+a few days of capture. Refunds return the fee only partly — check the contract.
+
+**Licence notes.** Both are licensed by SAMA as BNPL providers; Mada needs no licence of its own to offer them, but
+must show their terms link and must not call it a loan. Pay later can't be used for items they exclude (ask whether
+flights for third parties and eSIMs are allowed).
+
+### 30. Duffel — second flight source
+**What it does.** Searched together with TBO (or the catalogue in mock): the **same flights** (every leg's flight number
+and departure time) appear **once, at the lower price**, then cheapest first. If one source fails the other answers
+alone; if both fail it's exactly as today (the desk books by request). Offer price and hold go to the source the offer
+came from; TBO's own booking and ticketing on the desk are unchanged. For Duffel offers the adapter has **order
+create** (instant, paid from Mada's Duffel balance, or hold where the airline allows), **order read** (PNR, ticket
+numbers) and **cancel** (Duffel's refund quote, then confirm). Margin: `APP_DUFFEL_MARKUP_BPS` (default 300 = 3%).
+Still to do: a "Book with Duffel" button on the desk's order page (today a Duffel offer is booked by the desk by hand,
+like any request), using `createOrder`.
+
+**Apply.** app.duffel.com → sign up (instant) → you get **test mode** at once (`duffel_test_…` token: Duffel Airways and
+sandbox airlines, nothing real). To book real tickets: Settings → **Go live** — company details, KYB checks, and a
+**balance** top-up (Duffel's own payments, or IATA/airline-direct for some carriers). Ask Duffel which content is
+available for a Saudi agency (NDC from Saudia? flynas/flyadeal? Duffel lists airlines per country).
+
+**Keys in Vercel.** `DUFFEL_ACCESS_TOKEN` (test token on staging, live token on production), `APP_DUFFEL_MARKUP_BPS`;
+`SUPPLIER_MODE_DUFFEL=live|mock|off` (`mock` merges fixture flights on staging).
+
+**Certification.** None formal. Before live: on test mode run search → price → order → cancel from staging, and check
+Duffel's "go-live checklist" (show fare conditions before payment; passenger names exactly as passport).
+
+**Cost model.** Per order: about **USD 3 + 1% of the order value** for "managed content" (Duffel holds the airline
+relationship), plus card/payment fees if Duffel Payments is used; excess search-to-book ratio may be billed (ask
+for the threshold — every app search hits Duffel when on, so cache matters: searches are cached 10 minutes). No fee
+for test mode.
+
+**Licence notes.** Mada is the seller of record to the traveller: fare rules and baggage must be shown before payment
+(the card does). Duffel's terms forbid scraping/redistributing their content outside the booking flow.
+
+### 31. RateHawk (Emerging Travel Group / WorldOTA) — second hotel source
+**What it does.** Searched together with Hotelbeds (or the catalogue in mock): the **same hotel** from both is shown
+**once, at the cheaper price**. The same hotel means names that agree (most of their words, accents and "hotel"
+aside) **and** within 300 m when both give coordinates (a source without coordinates needs the exact same name), so
+two Hiltons in one city never merge. Prices go through the same stay markup as Hotelbeds (`APP_STAY_MARKUP_BPS`) so
+the comparison is fair; RateHawk asks for **Saudi-resident** prices in SAR. Then the shared ranking (who is going,
+"Best for you", "Lowest price") runs as before. Price on the order sheet uses RateHawk's hotel page + **prebook**
+(the final price); the adapter also has **book** (paid from Mada's RateHawk deposit, our order id as
+`partner_order_id`), **status** and **cancel** for the desk. If either source fails the other answers alone.
+Still to do: a "Book on RateHawk" button on the desk (today a RateHawk stay goes to the desk as a request, like
+Hotelbeds in `APP_STAYS_MODE=request`). `HOTELS_VENDOR=ratehawk` makes RateHawk the only source.
+
+**Apply.** ratehawk.com → "Become a partner" → **API access** (B2B, travel agency). ETG checks the company (CR,
+tourism licence, website) and issues **sandbox keys** (key id + API key; test hotel `test_hotel`). Ask for: Saudi
+residency pricing, the deposit/credit line terms, the Arabic content, and whether they whitelist IPs (Vercel has no
+fixed outbound IP).
+
+**Keys in Vercel.** `RATEHAWK_KEY_ID`, `RATEHAWK_API_KEY`, optional `RATEHAWK_BASE_URL` (if they give a sandbox host),
+`RATEHAWK_MAX_HOTELS` (default 30 cheapest looked up per search); `SUPPLIER_MODE_RATEHAWK=live|mock|off`.
+
+**Certification.** ETG certifies on sandbox before live keys: search → hotel page → prebook → book → status →
+cancel on `test_hotel`, with screenshots showing taxes/fees "paid at the hotel", cancellation policy and meal type.
+
+**Cost model.** **Net rates** (Mada sets the sell price) paid by **deposit or credit line**; no API fee. Commissionable
+"gross" rates are also possible — ask which. Look-to-book limits apply (ask the ratio; searches are cached 10 min).
+
+**Licence notes.** Hotel content (photos, descriptions) is licensed for selling RateHawk rates; when a merged hotel
+shows RateHawk's price, show RateHawk's room/meal/cancellation for that rate (the offer carries them). Rates for Saudi
+residents may only be sold to Saudi residents (residency must match the guest).
+
+## Not available as an API (how Mada handles them)
+
+| Service | Why there's no integration | What Mada does |
+|---|---|---|
+| **Nusuk** (Umrah permits, Rawdah slots) | The Ministry of Hajj and Umrah's platform; programmatic access is only for its licensed **Umrah companies/agents partner programme** (Nusuk Masar), not general travel apps. | "Ask Mada" request: the team books the permit or the package through a licensed Umrah partner (or tells the traveller to book the free permit in the Nusuk app themselves). Apply to Nusuk Masar only if Mada becomes a licensed Umrah agent. |
+| **Haramain High Speed Railway** (Makkah–Jeddah–Madinah) | No public or partner booking API; tickets are sold on hhr.sa, its app and agent desks. | Request to the team, who book on hhr.sa with the traveller's details and send the e-ticket to the trip. The Routes adapter (§24) can still show the drive as an alternative. |
+| **Saudi Arabia Railways (SAR)** (Riyadh–Dammam, North line to Qurayyat/Hail) | No booking API for third parties; sold on sar.com.sa and its app. | Request to the team, booked by hand. |
+| **Careem / Uber** (on-demand cars) | No open booking API for agencies (Uber's Guest Rides / Careem Business are business accounts, not an API we can resell). | "Car right now" stays a request ("Mada calls you back"); pre-booked cars go through Hotelbeds Transfers (§9) or self-drive via car hire (§25). See §14. |
+
+**IATA — accreditation vs Timatic.** Two different things: (1) **IATA accreditation / BSP** lets an agency issue
+airline tickets on its own stock and settle through the Billing and Settlement Plan; Mada doesn't need it while TBO
+and Duffel ticket for us (they are the accredited issuers). Get it later only to ticket directly with a GDS (needs
+a bank guarantee, an accredited office and staff qualifications). (2) **Timatic** is IATA's database of entry,
+visa and health rules that airlines use at check-in. It is licensed (Timatic Web/API, AutoCheck) at a price meant for
+airlines and large agencies, and its terms restrict how its text is shown. Mada uses **Sherpa** (§27) for entry rules
+instead — built for consumer apps, with Arabic text and a per-request price — and keeps its own built-in rules as the
+fallback. Revisit Timatic only if an airline partner requires Timatic-exact answers.

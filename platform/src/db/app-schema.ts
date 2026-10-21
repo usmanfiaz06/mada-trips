@@ -153,6 +153,11 @@ export const appTrips = pgTable("app_trips", {
   confirmedByOpsUserId: uuid("confirmed_by_ops_user_id").references(() => opsUsers.id, { onDelete: "set null" }),
   opsBookingId: uuid("ops_booking_id").references(() => opsBookings.id, { onDelete: "set null" }),
   imported: boolean("imported").notNull().default(false),
+  // Where the trip starts ({kind, code?, name, city?, country?, lat?, lng?, source}), the traveller's own name for it
+  // (null: derived "Riyadh → AlUla" at read time) and its shape: simple | multi | road (ASK-INTEGRATED §1.2, 0043).
+  origin: jsonb("origin").$type<{ kind: "airport" | "city" | "place"; code?: string | null; name: string; city?: string | null; country?: string | null; lat?: number | null; lng?: number | null; source: "said" | "memory" | "booking" | "profile" | "default" } | null>(),
+  title: text("title"),
+  kind: text("kind").notNull().default("simple"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index("app_trips_owner_idx").on(t.ownerId, t.startDate)]);

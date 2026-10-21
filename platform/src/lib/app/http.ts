@@ -58,7 +58,7 @@ export type RouteOptions = {
 };
 
 /** Paths that answer whatever the app's version or maintenance says: the app needs them to find out. */
-const UNGATED = [/\/(health|config|status)$/, /\/payments\/webhook$/, /\/flights\/alerts$/];
+const UNGATED = [/\/(health|config|status)$/, /\/payments\/(tabby\/|tamara\/)?webhook$/, /\/flights\/alerts$/];
 const MUTATION = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
 /**

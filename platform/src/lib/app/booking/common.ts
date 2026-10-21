@@ -12,9 +12,12 @@ import { catalogueHotels } from "../suppliers/mock/catalogue-hotels";
 import { mockMyFatoorah } from "../suppliers/mock/myfatoorah";
 import { liveMyFatoorah } from "../suppliers/live/myfatoorah";
 import { claudeAsk } from "../suppliers/live/ask-claude";
-import { gdsFlights, rateHawkHotels } from "../suppliers/live/commerce";
+import { gdsFlights } from "../suppliers/live/commerce";
+import { rateHawk } from "../suppliers/ratehawk/ratehawk";
+import { rateHawkSource, withSecondHotelSource } from "../suppliers/ratehawk";
 import { tboAir } from "../suppliers/live/tbo-air";
 import { guarded } from "../resilience/breaker";
+import { duffelSource, withSecondSource } from "../suppliers/duffel";
 import { bookingHotelbeds, hotelVendor } from "../suppliers/hotelbeds/app";
 import type { AskParser, BookingFlightSupplier, BookingHotelSupplier, BookingPaymentSupplier } from "../suppliers/booking-types";
 
@@ -29,15 +32,22 @@ const notConfiguredAsk: AskParser = { name: "rules-only", async parse() { return
 
 /** Picked on every call, so an env change or a test takes effect at once. */
 export const bookingSuppliers = {
-  /** Catalogue (mock), TBO Air (SUPPLIER_MODE_FLIGHTS=tbo; behind the breaker) or the GDS stub (not built). */
+  /** Catalogue (mock), TBO Air (SUPPLIER_MODE_FLIGHTS=tbo; behind the breaker) or the GDS stub (not built); plus Duffel when on. */
   flights: (): BookingFlightSupplier => {
     const v = flightsVendor();
-    return v === "mock" ? catalogueFlights : v === "tbo" ? guarded("flights", tboAir) : (gdsFlights as BookingFlightSupplier);
+    const first = v === "mock" ? catalogueFlights : v === "tbo" ? guarded("flights", tboAir) : (gdsFlights as BookingFlightSupplier);
+    // Duffel (SUPPLIER_MODE_DUFFEL / DUFFEL_ACCESS_TOKEN) joins as a second source: merged, the same flights once.
+    const second = duffelSource();
+    return second ? withSecondSource(first, second) : first;
   },
-  /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock for its fixtures) or RateHawk (not built). */
+  /** Catalogue (mock), Hotelbeds (SUPPLIER_MODE_HOTELS=hotelbeds, or hotelbeds-mock), or RateHawk alone (HOTELS_VENDOR=ratehawk); plus RateHawk when on. */
   hotels: (): BookingHotelSupplier => {
     const v = hotelVendor();
-    return v === "catalogue" ? catalogueHotels : v === "ratehawk" ? (rateHawkHotels as BookingHotelSupplier) : bookingHotelbeds();
+    const second = rateHawkSource();
+    if (v === "ratehawk") return second ?? guarded("ratehawk", rateHawk);
+    const first = v === "catalogue" ? catalogueHotels : bookingHotelbeds();
+    // RateHawk (SUPPLIER_MODE_RATEHAWK / its keys) joins as a second source: the same hotel once, the cheaper.
+    return second ? withSecondHotelSource(first, second) : first;
   },
   payments: (): BookingPaymentSupplier => (supplierMode("payments") === "live" ? liveMyFatoorah : mockMyFatoorah),
   /** Live: Claude with a strict tool schema. Mock: none, the deterministic rules answer. */

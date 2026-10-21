@@ -19,6 +19,7 @@ import { markMockEsimInstalled } from "../suppliers/mock/esim";
 import { bookingSuppliers, householdOf, isUuid, travellersOf } from "../booking/common";
 import { orderEvent } from "../booking/desk";
 import { notify } from "../trips/notify";
+import { emit as emitPlanEvent } from "../plans/events";
 
 /*
  * eSIMs (eSIM Access or Airalo), docs in docs/app/ESIM.md, platform/src/lib/app/suppliers/README.md and the shared
@@ -247,6 +248,7 @@ export async function fulfilEsimOrder(orderId: string, opts: { demoFail?: boolea
     plan: { id: s.packageId, coverage: s.coverage, gb: s.gb, days: s.days, operator: s.operator, topup: s.topup, ...(s.daily ? { daily: true } : {}) }, netUsdCents: Math.round(s.netUsd * 100), status: "ordering",
   }));
   await db.insert(appEsims).values(rows).onConflictDoNothing();
+  if (s.tripId) await emitPlanEvent({ kind: "esim.bought", tripId: s.tripId, ownerId: o.ownerId });
   // Claim the purchase: one caller at a time; a claim older than CLAIM_MS (a crashed call) can be taken over.
   const claimed = await db.update(appEsims).set({ problem: "ordering", updatedAt: new Date() })
     .where(and(eq(appEsims.orderId, o.id), eq(appEsims.idx, 0), isNull(appEsims.iccid), inArray(appEsims.status, ["ordering", "stuck"]),
