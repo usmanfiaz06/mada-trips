@@ -326,7 +326,7 @@ export async function ChatsTab({ actor, userId, hasOpen, ask }: { actor: Current
         <Card id="ask">
           <CardHead title={<span className="inline-flex items-center gap-2"><Bot className="size-4 text-gold" />{t("Ask Mada conversation")}</span>}
             hint={thread ? `${t(WHY[thread.why]!)} ${t("Read-only. This read is in the audit log.")}` : undefined}
-            action={<Link href={base} className="text-[12.5px] text-ink-3 hover:text-ink">{t("Close")}</Link>} />
+            action={<span className="flex items-center gap-3">{thread && <Link href={`/adminwork/desk/ask/${thread.id}`} className="text-[12.5px] text-ink-3 underline decoration-gold decoration-2 underline-offset-4 hover:text-ink">{t("Open in Ask threads")}</Link>}<Link href={base} className="text-[12.5px] text-ink-3 hover:text-ink">{t("Close")}</Link></span>} />
           {refused ? <p className="rounded-2xl bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn"><Lock className="me-1.5 inline size-3.5" />{t(refused)}</p> : thread && (
             <>
               {thread.summary && <p className="mb-4 rounded-2xl bg-surface-2 px-3.5 py-2.5 text-[12.5px] text-ink-3"><span className="font-medium text-ink-2">{t("Earlier, in short:")}</span> <span dir="auto">{thread.summary}</span></p>}

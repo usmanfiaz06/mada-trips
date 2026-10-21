@@ -1,19 +1,17 @@
 import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { addDays, dayLabel, durationLabel, FlightNumber, AIRPORT_CITY, todayIn, type TrackedFlightView } from '@mada/shared';
-import { ArtFriends, ArtPass } from '@/components/art/Arts';
+import { ArtPass } from '@/components/art/Arts';
 import { AirlineMark } from '@/components/booking/AirlineMark';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
 import { EmptyState } from '@/components/EmptyState';
-import { VGradient } from '@/components/Gradient';
 import { Icon, type IconName } from '@/components/Icon';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { Box, Display, Eyebrow, H3, IdeaTiles, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
+import { Box, Display, Eyebrow, H3, Rise, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, Dot } from '@/components/trips/ui';
 import { eidLine } from '@/lib/days';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
@@ -21,8 +19,9 @@ import { usePeople, useUpdateMe } from '@/lib/queries';
 import { useSession } from '@/lib/session';
 import { toast } from '@/lib/toast';
 import { newKey, tripsApi, tk, useGuestFlights, useTrips, useTripMutation, type GuestFlight } from '@/lib/trips';
-import { colors, ff, font, radii, shadow } from '@/theme';
+import { colors, ff, font, shadow } from '@/theme';
 import { RequestsCard } from './common';
+import { IdeasBento } from './Ideas';
 import { askNotifications } from '@/lib/notify-permission';
 import { requireAccount } from '@/lib/signin-ask';
 
@@ -54,7 +53,6 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
   const people = usePeople();
   const { data } = useTrips();
   const hasPassport = people.data?.some((p) => p.isSelf && p.passport);
-  const family = (people.data?.length ?? 1) > 1;
   return (
     <>
       <View style={{ gap: 8 }}>
@@ -74,29 +72,7 @@ export function Nothing({ pastLine }: { pastLine: string | null }) {
           </Card>
         </Rise>
       )}
-      <Rise step={4} style={styles.bento}>
-        <Card onPress={() => router.push(`/ask?prefill=${encodeURIComponent(t('td.ideas.alulaAsk'))}` as Href)} padding={0} style={styles.photoTile} accessibilityLabel={t('today.tile.alula.title')}>
-          <Image source={require('../../../assets/images/alula.jpg')} style={StyleSheet.absoluteFill} contentFit="cover" />
-          <VGradient id="alula" stops={[[0, 'rgba(15,26,22,0.05)'], [0.25, 'rgba(15,26,22,0.05)'], [1, 'rgba(15,26,22,0.78)']]} />
-          <View style={{ padding: 16, gap: 4 }}>
-            <T style={[font('displaySmall', colors.paper), { fontSize: 28 }]}>{t('today.tile.alula.title')}</T>
-            <T v="small" color="rgba(255,253,249,0.9)">{t('today.tile.alula.body')}</T>
-          </View>
-        </Card>
-        <View style={{ flex: 1, gap: 12 }}>
-          <Card variant="focal" onPress={() => router.push(`/ask?prefill=${encodeURIComponent('Istanbul')}` as Href)} style={styles.smallTile} accessibilityLabel={t('today.tile.istanbul.title')}>
-            <Spread>
-              <Image source={require('../../../assets/images/istanbul.jpg')} style={styles.cityDot} contentFit="cover" />
-              <Icon name="chevron" color={colors.gold} />
-            </Spread>
-            <View><T v="h3" color={colors.mist}>{t('today.tile.istanbul.title')}</T><T v="tiny" color={colors.onDark2}>{t('today.tile.istanbul.body')}</T></View>
-          </Card>
-          <Card onPress={() => router.push(family ? '/circles' : '/household')} style={styles.smallTile} accessibilityLabel={family ? t('td.tile.circle') : t('today.tile.family.title')}>
-            <View style={{ marginStart: -8, marginTop: -6 }}><ArtFriends width={66} height={50} /></View>
-            <View><T v="h3">{family ? t('td.tile.circle') : t('today.tile.family.title')}</T><T v="tiny">{family ? t('td.tile.circleBody') : t('today.tile.family.body')}</T></View>
-          </Card>
-        </View>
-      </Rise>
+      <IdeasBento />
     </>
   );
 }
@@ -256,7 +232,7 @@ export function Guest({ scrollTo }: { scrollTo?: (y: number) => void }) {
     <>
       {/* Looking around: where to first (search and prices need no account), then a flight to watch. */}
       <Rise><Display size={44}>{t('ask.title')}</Display></Rise>
-      <Rise step={1}><IdeaTiles keys={['alula', 'dubai', 'season']} onAsk={(x) => router.push({ pathname: '/ask', params: { prefill: x } })} testID="guest-ideas" /></Rise>
+      <IdeasBento guest step={1} testID="guest-ideas" />
       <Rise step={1}><Button label={t('ask.composer')} variant="secondary" onPress={() => router.push('/ask')} testID="guest-ask" /></Rise>
       <Rise step={2}><H3>{t('td.guest.title')}</H3></Rise>
       <View onLayout={(e) => { if (track && !scrolled.current) { scrolled.current = true; scrollTo?.(e.nativeEvent.layout.y); } }}>
@@ -292,10 +268,6 @@ const styles = StyleSheet.create({
   mic: { width: 44, height: 44, borderRadius: 999, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   ppMini: { width: 28, height: 36, borderRadius: 5, backgroundColor: colors.green, alignItems: 'center', paddingTop: 8, borderWidth: 1, borderColor: 'rgba(217,183,122,0.35)' },
   ppMiniRing: { width: 14, height: 14, borderRadius: 99, borderWidth: 1.5, borderColor: colors.gold },
-  bento: { flexDirection: 'row', gap: 12 },
-  photoTile: { flex: 1, minHeight: 250, borderRadius: radii.card, overflow: 'hidden', justifyContent: 'flex-end' },
-  smallTile: { flex: 1, minHeight: 119, justifyContent: 'space-between' },
-  cityDot: { width: 34, height: 34, borderRadius: 999, borderWidth: 2, borderColor: colors.gold },
   trackMark: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   label: { fontFamily: ff.ui600, fontSize: 13, lineHeight: 17, color: colors.ink2 },
   input: { height: 52, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent', backgroundColor: colors.mist, paddingHorizontal: 16, fontSize: 17, fontFamily: ff.ui500, color: colors.green },

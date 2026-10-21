@@ -17,9 +17,15 @@ Sources: owner's 31 questions → `scratchpad/OWNER-AUDIT.md`; outside-in critiq
 Next after these: #5 entry bundle / 3G cold start (42 s → < 8 s, M–L, touches build config — run alone), #18 credentials line (needs owner's licence/IATA numbers), then retest (CRITIQUE-3).
 
 ## 21 Oct
-- Running (cloud): waiting states + Ask card redesign session_01KFd5cTyooy1iFBKBkfVQh9; Today living cards session_0166FEGi2mPcCu9uWM3X1T2b (local workers were lost to an interrupt at 02:45 and restarted 04:24); Desk U1 done 920001c. Cloud: U2 tickets session_017zJ6cND4bz58JU8YoDSLgM, U3 customers session_01Jk7WhrhZbnGySgap2g8MSG, U4 board/drop-offs session_018873xp3uR7bepvrhQsdQjH.
+- Running (cloud): waiting states + Ask card redesign session_01KFd5cTyooy1iFBKBkfVQh9; Today living cards session_0166FEGi2mPcCu9uWM3X1T2b (local workers were lost to an interrupt at 02:45 and restarted 04:24); Desk U1 done 920001c. U2 tickets 3464c31 and U4 board/drop-offs da6f2ec done (merged tree builds, 122 desk+ask tests pass). Cloud: U3 customers session_01Jk7WhrhZbnGySgap2g8MSG, U5 Ask on desk session_01RcSsbJEnw3heY1YqKQFNiK, U6 finance session_01D6oqZJUvKJg6TNVwUfVvTj, U7 agents session_01NyMe9ZCpbCgwx55xB4YzkR. U8 dashboard after U6+U7.
 - Desk plan docs/app/DESK-PLAN.md f1517f5 (defaults §7). Order: U1 → U2 tickets → (U3 customers ∥ U4 board/drop-offs ∥ U5 Ask on desk) → (U6 finance ∥ U7 agents) → U8 dashboard. U5 waits for the Ask memory worker (ask-chat files).
 - Done: Ask memory 5589a1d · Gemini fixes: index-less tool calls e665e80, thought signatures 05c548e, best model fc8913b · bubbles 0aac18b/5992166 · build fix 601d744 · Gemini auto-model 95ef945, 0102780 (works: gemini-3.6-flash; 3.8/3.7 hang on free key) · staging /ask/providers check · no second eSIM flow 6df3516 · follow-ups read with context, mobility rule a587f45 · complete requests only a6c6dd5.
+
+### Ask on free tiers (21 Oct, verified on staging)
+- Code path works with Gemini: tool calls without index (e665e80), thought signatures (05c548e), best answering model (fc8913b, warm-up 3 models d88f6e8), short waits for a provider back within 6 s (7ef9453). Deep check: Gemini runs the search and the next step.
+- Limits are the blocker: Groq free = 8,000 tokens/min and one turn ≈ 2 calls × 4.5k tokens, so about one turn a minute; Gemini free quota was used up by testing ("exceeded your current quota").
+- Owner decision: enable billing on Gemini (Flash-Lite ≈ $0.10/M input) or Groq Dev tier; optionally add Z.ai to the chain (ASK_CHAT_PROVIDERS=groq,gemini,zai with ZAI_API_KEY). Pin ASK_CHAT_MODEL_GEMINI=gemini-3.6-flash to skip the warm-up calls.
+- Possible next: trim per-turn tokens (system prompt + tool schemas) for free tiers.
 
 ## Done (17–18 Oct)
 

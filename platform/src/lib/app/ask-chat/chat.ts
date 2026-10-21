@@ -15,6 +15,7 @@ import { appendTurn, addSpend, loadThread, newThread, saveFold, spentToday } fro
 import { foldThread, historyOf, needsFold } from "./fold";
 import { MEMORY_HEAD, consentOf, memoryBlock } from "./memory";
 import { personLine } from "./tools";
+import { keepForAgent } from "./takeover";
 
 /*
  * POST /ask/chat, before and after the model: the switch, limits and the daily spend cap (all checked before a
@@ -36,12 +37,14 @@ export async function preflight(auth: ChatAuth): Promise<void> {
 }
 
 export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: AskChatEvent) => void, signal?: AbortSignal, given?: ChatApi): Promise<void> {
-  const api = given ?? (await chatApi());
   const typed = String(req.text ?? "").trim();
   const lang = languageOfText(typed) ?? "en";
   const today = todayIn();
   const thread = (await loadThread(auth.userId, req.threadId)) ?? (await newThread(auth.userId, lang));
   emit({ type: "thread", threadId: thread.id, lang });
+  // A person on the desk has this thread (takeover.ts): the message is theirs to answer, the model stays out.
+  if (thread.mode === "agent") return keepForAgent(auth.userId, thread, typed, emit);
+  const api = given ?? (await chatApi());
   // A long thread: the older turns folded into a summary first, so every turn stays cheap (fold.ts).
   let foldCost = 0;
   if (needsFold(thread)) {
@@ -81,7 +84,8 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const r = await runTurn({
     history,
     text: clean,
-    context: turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }),
+    // After the desk's Hand back, what was said meanwhile rides in this turn's context once (takeover.ts handBackNote).
+    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), thread.deskNote].filter(Boolean).join("\n"),
     lang,
     tool: { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set(), consent: consentOf(history, clean) },
     intent: slots.intent.kind,
@@ -93,7 +97,7 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   await appendTurn(auth.userId, thread.id, {
     messages: r.added,
     transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],
-    usage: r.usage, costMicros: total, lang,
+    usage: r.usage, costMicros: total, lang, handedOff: r.toolsUsed.includes("talk_to_human"),
   });
   await addSpend(auth.userId, total);
   // Tokens and cost only: no words from either side.

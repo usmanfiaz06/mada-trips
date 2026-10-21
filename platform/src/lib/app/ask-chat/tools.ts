@@ -191,15 +191,16 @@ const RUN: Record<string, Run> = {
     ].filter(Boolean);
     if (missing.length) return { text: `Not sent yet. Still needed: ${missing.join(", ")}. Ask for the first missing one in one short question with choices in <next>, then call create_request again with everything.${missing.includes("how to reach them") && missing.length === 1 ? " <next>WhatsApp | Call me | Here in the app</next>" : ""}`, isError: true };
     const isSearch = kind === "flight" || kind === "stay";
+    const travellerIds = whoOf(ctx, a.traveller_ids);
     const r = await createRequest(ctx.ownerId, {
-      kind, query: summary, travellerIds: whoOf(ctx, a.traveller_ids), note: "",
+      kind, query: summary, travellerIds, note: "",
       contactPreference: a.contact_preference === "call" || a.contact_preference === "whatsapp" || a.contact_preference === "in_app" ? a.contact_preference : null,
       contactWindow: typeof a.contact_window === "string" && a.contact_window.trim() ? redact(a.contact_window).text.slice(0, 60) : null,
       ...(isSearch ? { search: { destination: null, destinationName: typeof a.destination_name === "string" ? a.destination_name.slice(0, 60) : null, from: null, depart: iso(a.depart), return: iso(a.return), cabin: null, carrier: null } } : {}),
     } as Parameters<typeof createRequest>[1], ctx.ipHash);
     const by = r.promisedBy ? riyadhClock(r.promisedBy, ctx.today) : null;
     const how = r.contact ? ({ call: `by a call${r.contact.window ? ` (${r.contact.window})` : ""}`, whatsapp: "on WhatsApp", in_app: "here in the app" } as const)[r.contact.preference] : "here in the app";
-    return { text: `Request ${r.id} noted for the team at Mada: ${r.title}${r.summary ? ` (${r.summary})` : ""}. The team gets back to the traveller ${how}${by ? ` by ${by}` : ""}. Say it in one line: "We've noted it and the team will get back to you by ${by ?? "then"}".`, cards: [{ type: "request", requestId: r.id, kind: r.kind, title: r.title, detail: [r.summary, r.detail].filter(Boolean).join(" · "), promisedBy: r.promisedBy, contact: r.contact?.preference ?? null }] };
+    return { text: `Request ${r.id} noted for the team at Mada: ${r.title}${r.summary ? ` (${r.summary})` : ""}. The team gets back to the traveller ${how}${by ? ` by ${by}` : ""}. Say it in one line: "We've noted it and the team will get back to you by ${by ?? "then"}".`, cards: [requestCard(ctx, r, travellerIds, { where: where || null, depart: iso(a.depart), return: iso(a.return) })] };
   },
 
   async price_quote_for_pay(ctx, a) {
@@ -254,6 +255,23 @@ const placeName = (raw: string, lang: "en" | "ar") => {
 };
 
 /** The status line while a tool runs ("Checking flights to Istanbul"), in the traveller's language. */
+/**
+ * The request as a card: what (each part said once, and never only the travellers' names, which the card writes out
+ * as "who"), where, the days, who, when the team gets back and how.
+ */
+export function requestCard(ctx: ToolCtx, r: { id: string; kind: string; title: string; summary: string; detail: string; promisedBy: string | null; contact?: { preference: "call" | "whatsapp" | "in_app" } | null },
+  travellerIds: string[], at: { where: string | null; depart: string | null; return: string | null }): ChatCard {
+  const who = travellerIds.map((id) => ctx.people.find((p) => p.id === id)).filter((p): p is Person => !!p).map((p) => ({ name: p.firstName, self: !!p.isSelf }));
+  const names = new Set(["you", "me", ...who.map((w) => w.name.toLowerCase())]);
+  const onlyNames = (part: string) => part.split(/,|\band\b|&|\+/i).map((x) => x.trim().toLowerCase()).filter(Boolean).every((x) => names.has(x));
+  const parts = [r.summary, r.detail].flatMap((x) => (x ?? "").split(" · ")).map((x) => x.trim()).filter(Boolean);
+  const what = [...new Set(parts)].filter((x) => !onlyNames(x) && x !== r.title && x !== at.where);
+  return {
+    type: "request", requestId: r.id, kind: r.kind, title: r.title, detail: what.join(" · "), promisedBy: r.promisedBy, contact: r.contact?.preference ?? null,
+    where: at.where, depart: at.depart, return: at.return, who,
+  };
+}
+
 export function statusFor(name: string, input: Record<string, unknown>, lang: "en" | "ar"): string {
   const city = placeName(typeof input.destination === "string" ? input.destination : typeof input.where === "string" ? input.where : "", lang);
   const en: Record<string, string> = {
