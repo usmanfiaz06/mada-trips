@@ -31,6 +31,7 @@ import { arEsim } from './esim';
 import { arGuest } from './guest';
 import { arAskHeard } from './askHeard';
 import { arPayFamily } from './payFamily';
+import { arWaiting } from './waiting';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
@@ -62,5 +63,6 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arNative,
   ...arEsim,
   ...arGuest,
+  ...arWaiting,
   ...arCommon,
 } as Record<string, string>;

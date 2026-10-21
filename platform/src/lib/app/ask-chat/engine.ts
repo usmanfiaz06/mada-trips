@@ -265,7 +265,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     const results = await Promise.all(checked.map(async ({ c, name, problems }) => {
       if (problems.length) return { c, out: { text: `Not run. The arguments don't match the schema: ${problems.join("; ")}. Call it again with arguments that match exactly.`, isError: true } as ToolOut };
       const inp = (c.input ?? {}) as Record<string, unknown>;
-      emit({ type: "status", text: statusFor(name, inp, input.lang) });
+      emit({ type: "status", text: statusFor(name, inp, input.lang), tool: name });
       toolsUsed.push(name);
       calls.push({ name, input: inp });
       const out = await exec(name, inp, input.tool);
