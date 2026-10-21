@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/desk/parts";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { approveRefundAction, rejectRefundAction } from "../actions";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Refunds · Desk" };
 const STAGES = ["requested", "approved", "sent", "rejected", "withdrawn"] as const;
@@ -57,7 +58,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                       <Td><Link href={href({ focus: r.id })} scroll={false} className="block" aria-current={f?.id === r.id ? "true" : undefined}>
                         <span className="block max-w-[240px] truncate text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{r.summary ?? t("Refund")}</span>
                         <span className="block text-[12px] text-ink-3"><span className="num">{r.ref}</span> · {timeAgo(r.createdAt, L)}</span></Link></Td>
-                      <Td className="whitespace-nowrap"><bdi className="block text-ink">{r.userName}</bdi><span className="block text-[12px] text-ink-3">{provider(r.payment.method) ?? r.payment.label ?? r.payment.method}</span></Td>
+                      <Td className="whitespace-nowrap"><CustomerLink id={r.userId} className="block text-ink">{r.userName}</CustomerLink><span className="block text-[12px] text-ink-3">{provider(r.payment.method) ?? r.payment.label ?? r.payment.method}</span></Td>
                       <Td><StatusBadge map={REFUND_STAGE} value={r.stage} /></Td>
                       <Td className="whitespace-nowrap">{s ? <SlaClock due={s.dueAt.toISOString()} opened={s.openedAt.toISOString()} /> : <span className="text-[12.5px] text-ink-3">{fmtDate(r.updatedAt, L, true)}</span>}</Td>
                       <Td align="end"><Money v={r.amount} /></Td>
@@ -73,7 +74,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
         <aside className="space-y-4">
           {!f ? null : (
             <Card id={f.id} className={cx(f.stage === "requested" && "ring-2 ring-gold/40")}>
-              <CardHead title={f.summary ?? t("Refund")} hint={<><span className="num">{f.ref}</span> · <bdi>{f.userName}</bdi> · {timeAgo(f.createdAt, L)}</>}
+              <CardHead title={f.summary ?? t("Refund")} hint={<><span className="num">{f.ref}</span> · <CustomerLink id={f.userId}>{f.userName}</CustomerLink> · {timeAgo(f.createdAt, L)}</>}
                 action={sla ? <SlaClock due={sla.dueAt.toISOString()} opened={sla.openedAt.toISOString()} /> : <StatusBadge map={REFUND_STAGE} value={f.stage} />} />
               <div className="mb-4 flex items-baseline justify-between border-b border-line pb-4"><span className="text-[13px] text-ink-3">{t("Asked back")}</span><Money v={f.amount} className="text-[26px] font-[350] tracking-[-0.03em]" /></div>
               <KV items={[

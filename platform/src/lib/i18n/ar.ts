@@ -5,6 +5,7 @@ import { AR_ESIM } from "../app/esim/desk-ar";
 import { AR_DESK_THINGS } from "../app/desk/ar-things";
 import { AR_DESK_OUTCOMES } from "../app/desk/ar-outcomes";
 import { AR_DESK_BOARDING } from "../app/desk/ar-boarding";
+import { AR_DESK_CUSTOMERS } from "../app/desk/ar-customers";
 
 export const AR: Record<string, string> = {
   ...AR_DESK, // the app desk (src/lib/app/desk/ar.ts); keys below win
@@ -13,6 +14,7 @@ export const AR: Record<string, string> = {
   ...AR_DESK_THINGS,
   ...AR_DESK_OUTCOMES,
   ...AR_DESK_BOARDING,
+  ...AR_DESK_CUSTOMERS,
   ", retail only": "، للأفراد فقط",
   "1 more approval needed.": "مطلوب موافقة واحدة إضافية.",
   "1 · Cleared funds": "1 · الأموال المحصّلة",

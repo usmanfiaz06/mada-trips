@@ -14,6 +14,7 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { SlaClock } from "@/components/desk/live";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 import { moderateAction, unblockAction } from "../actions";
+import { CustomerLink } from "@/components/desk/customer-link";
 
 export const metadata = { title: "Moderation · Desk" };
 const REASON: Record<string, string> = { unwanted: "Unwanted contact", impostor: "Pretending to be someone", unsafe: "Unsafe", other: "Something else" };
@@ -51,7 +52,7 @@ export default async function ModerationPage({ searchParams }: { searchParams: P
               {blocked.map(({ b, name, by }) => (
                 <li key={b.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
                   <Avatar name={name || "?"} size={36} />
-                  <div className="min-w-0 flex-1"><div className="text-[14px] text-ink">{travellerName(name)}</div><div className="text-[12.5px] text-ink-3">{b.reason} · {t("by {name}", { name: by ?? "—" })} · {fmtDate(b.createdAt, L)}</div></div>
+                  <div className="min-w-0 flex-1"><div className="text-[14px] text-ink"><CustomerLink id={b.userId}>{travellerName(name)}</CustomerLink></div><div className="text-[12.5px] text-ink-3">{b.reason} · {t("by {name}", { name: by ?? "—" })} · {fmtDate(b.createdAt, L)}</div></div>
                   {mod && <form action={unblockAction}><input type="hidden" name="userId" value={b.userId} /><SubmitButton variant="outline" size="sm" confirm={t("Lift this block?")}>{t("Lift block")}</SubmitButton></form>}
                 </li>
               ))}
