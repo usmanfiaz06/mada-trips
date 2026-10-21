@@ -259,7 +259,7 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
   const rest = (m: ChainMember, e: unknown) => {
     cooling.set(m.name, now() + restMs(e));
     const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
-    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${detail.slice(0, 180)}`.trim());
+    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${(/"message"\s*:\s*"([^"]{0,220})/.exec(detail)?.[1] ?? detail).slice(0, 220)}`.trim());
     log(`[ask-chat] provider=${m.name} resting ${Math.round(restMs(e) / 1000)}s (${statusOf(e) ?? (e instanceof Error ? e.name : "error")})`);
   };
   return {
