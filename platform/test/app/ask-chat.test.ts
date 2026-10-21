@@ -329,8 +329,8 @@ describe("another provider (openai-compatible)", () => {
     const { dialectOf, summarise } = await import("@/lib/app/ask-chat/evals");
     expect(dialectOf(["وش تبي الحين؟", "ماذا تريد الآن؟"])).toEqual({ spoken: 3, msa: 3 });
     const s = summarise([
-      { case: "a", lang: "ar", turn: 1, user: "", reply: "أبشر", tools: [], problems: [], costMicros: 2000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 900 },
-      { case: "b", lang: "en", turn: 1, user: "", reply: "x", tools: [], problems: ["one: 2 questions"], costMicros: 4000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 1500 },
+      { case: "a", lang: "ar", turn: 1, user: "", reply: "أبشر", next: [], nextFrom: "app" as const, tools: [], problems: [], costMicros: 2000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 900 },
+      { case: "b", lang: "en", turn: 1, user: "", reply: "x", next: [], nextFrom: "app" as const, tools: [], problems: ["one: 2 questions"], costMicros: 4000, inTokens: 10, outTokens: 5, cacheRead: 100, ms: 1500 },
     ]);
     expect(s).toMatchObject({ turns: 2, passed: 1, byCheck: { one: 1 }, medianMs: 1500, costPerConversation: 0.003, dialect: { spoken: 1, msa: 0 } });
   });

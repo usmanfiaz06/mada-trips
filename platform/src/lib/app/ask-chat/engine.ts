@@ -237,18 +237,18 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     added.push({ role: "assistant", content: msg.content as Anthropic.Beta.BetaContentBlockParam[] });
 
     if (msg.stop_reason === "refusal") { stop = "refusal"; break; }
-    const calls = msg.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-    if (!calls.length) { stop = msg.stop_reason === "max_tokens" ? "max_tokens" : "end_turn"; break; }
+    const uses = msg.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
+    if (!uses.length) { stop = msg.stop_reason === "max_tokens" ? "max_tokens" : "end_turn"; break; }
     // A tool input cut off at max_tokens can still look whole: never run it. The turn ends with what was said.
     if (msg.stop_reason === "max_tokens") {
-      added.push({ role: "user", content: calls.map((c) => ({ type: "tool_result" as const, tool_use_id: c.id, is_error: true, content: "Not run: the request was cut off." })) });
+      added.push({ role: "user", content: uses.map((c) => ({ type: "tool_result" as const, tool_use_id: c.id, is_error: true, content: "Not run: the request was cut off." })) });
       stop = "max_tokens";
       break;
     }
 
     // Arguments checked against the strict schemas (a provider without strict tool use can get them wrong): a bad
     // call is answered with what is wrong, once per turn; wrong again and the app's own flows take over.
-    const checked = calls.map((c) => {
+    const checked = uses.map((c) => {
       const name = toolNameFor(c.name, TOOL_LIST.map((x) => x.name));
       const schema = TOOL_LIST.find((x) => x.name === name)?.input_schema;
       const problems = !name ? [`there is no tool called ${c.name}; the tools are ${TOOL_LIST.map((x) => x.name).join(", ")}`] : schemaProblems(schema as never, c.input);
