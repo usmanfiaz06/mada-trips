@@ -127,11 +127,17 @@ export const appPeople = pgTable("app_people", {
   passportExpiry: date("passport_expiry"),
   passportSource: text("passport_source"),
   passportUpdatedAt: timestamp("passport_updated_at", { withTimezone: true }),
+  /**
+   * HMAC-SHA256 of the passport's issuer, number and date of birth (documents/fingerprint.ts): "the same passport again"
+   * without decrypting anything. Written with every passport save; older rows filled by the documents job. Migration 0046.
+   */
+  passportFingerprint: text("passport_fingerprint"),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [
   index("app_people_owner_idx").on(t.ownerId),
+  index("app_people_fingerprint_idx").on(t.ownerId, t.passportFingerprint),
   uniqueIndex("app_people_one_self").on(t.ownerId).where(sql`${t.isSelf} AND ${t.deletedAt} IS NULL`),
 ]);
 

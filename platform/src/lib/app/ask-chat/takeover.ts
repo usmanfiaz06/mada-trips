@@ -20,7 +20,8 @@ import { appendLine, type Thread } from "./store";
 
 export type AgentLine = { who: "agent"; text: string; by: string; byAr: string | null; agentId: string; opsUserId: string; at: string };
 export type SystemLine = { who: "system"; event: "joined" | "handed_back"; by: string; byAr?: string | null; pronoun?: string; at: string };
-export type TravellerLine = { who: "me"; text: string; at?: string; held?: string };
+/** attachment: a document sent in the chat, by its masked label only (attachments.ts). */
+export type TravellerLine = { who: "me"; text: string; at?: string; held?: string; attachment?: { kind: string; label: string } };
 export type MadaLine = { who: "mada"; text: string; cards?: string[]; next?: string[]; held?: string };
 export type AskLine = TravellerLine | MadaLine | AgentLine | SystemLine;
 

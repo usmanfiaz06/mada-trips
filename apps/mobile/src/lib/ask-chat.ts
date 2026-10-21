@@ -28,6 +28,8 @@ export type ChatTurn = {
    * person's mouth.
    */
   by?: string | null;
+  /** A document the traveller sent (lib/ask-docs.ts): its kind and masked label ("Passport · Omar · ••41"). */
+  attachment?: { kind: string; label: string };
   /** joined: the line "Noura from Mada joined", shown once when a person takes the conversation over. */
   desk?: 'joined';
   /** What Mada has said so far (token by token while streaming). */
@@ -258,7 +260,7 @@ export function turnsOfLines(lines: AskThreadLine[], cached: ChatTurn[], lang: '
   const blank = (o: Partial<ChatTurn>): ChatTurn => ({ id: nextId(), me: '', text: '', status: null, cards: [], pay: null, handoff: null, intent: null, lang, state: 'done', ...o });
   for (const l of lines) {
     const last = out[out.length - 1];
-    if (l.who === 'me') out.push(blank({ me: l.text, at: l.at ?? undefined }));
+    if (l.who === 'me') out.push(blank({ me: l.text, at: l.at ?? undefined, ...(l.attachment ? { attachment: l.attachment } : {}) }));
     else if (l.who === 'joined') out.push(blank({ desk: 'joined', text: l.text, at: l.at ?? undefined }));
     else if (last && last.me && !last.text && !last.desk && !last.by) out[out.length - 1] = { ...last, text: l.text, by: l.who === 'agent' ? l.by ?? null : null, next: l.next };
     else if (last && !last.me && l.who === 'agent' && last.by === l.by) out[out.length - 1] = { ...last, text: `${last.text}\n\n${l.text}` };

@@ -3,6 +3,7 @@ import { Id, IsoDateTime, IsoDay } from './common';
 import { AskIntent, EntryCheckResponse, FlightOption, HomeAirport, OrderDraft, StayOption } from './booking';
 import { EsimPlan } from './esim';
 import { TripCard } from './trips';
+import { ChatDocCard, ChatShareCard } from './ask-docs';
 
 /*
  * Ask Mada as a conversation (docs/app/ASK-CHAT.md). POST /ask/chat answers with Server-Sent Events: the words as they
@@ -65,6 +66,10 @@ export const ChatCard = z.discriminatedUnion('type', [
    * never guessed (ASK-INTEGRATED.md §2.2): the app sends the same words again with `attach`.
    */
   z.object({ type: z.literal('attach'), tripId: Id, place: z.string(), when: z.string().nullable() }),
+  /** A passport, visa or ID sent in the chat (ask-docs.ts, ASK-INTEGRATED.md §6): one card, saved only on its tap. */
+  ChatDocCard,
+  /** Asking a companion to share their passport for the trip (§5.4): sent only on its tap. */
+  ChatShareCard,
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
 
@@ -183,6 +188,8 @@ export const AskThreadLine = z.object({
   /** A person on the desk, by the name the traveller knows. */
   by: z.string().nullable().optional(),
   at: IsoDateTime.nullable().optional(),
+  /** A document the traveller sent: its kind and the masked label, never the photo (ASK-INTEGRATED.md §6.4). */
+  attachment: z.object({ kind: z.string(), label: z.string() }).optional(),
 });
 export type AskThreadLine = z.infer<typeof AskThreadLine>;
 
