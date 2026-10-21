@@ -286,8 +286,11 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
  * a yes or a reason. Name, model, status and the provider's own short error only; never a key or a thread.
  */
 export async function probeChain(): Promise<{ name: string; model: string; ok: boolean; ms: number; status: number | null; error: string | null; restingFor: number | null }[]> {
+  const set = process.env.ASK_CHAT_PROVIDERS?.trim();
   const chain = providerChain() ?? [];
   const resting = cooldowns();
+  // Nothing usable: say why, by name only (unset, or listed providers without keys).
+  if (!chain.length) return [{ name: set ? `ASK_CHAT_PROVIDERS="${set.slice(0, 60)}" has no provider with a key` : `ASK_CHAT_PROVIDERS not set; one provider: ${process.env.ASK_CHAT_PROVIDER?.trim() || "none"}`, model: "", ok: false, ms: 0, status: null, error: null, restingFor: null }];
   return Promise.all(chain.map(async (l) => {
     const t0 = Date.now();
     try {

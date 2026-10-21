@@ -70,7 +70,7 @@ export function providerChain(): ChainLink[] | null {
   const raw = env("ASK_CHAT_PROVIDERS");
   if (!raw) return null;
   const out: ChainLink[] = [];
-  for (const name of [...new Set(raw.toLowerCase().split(",").map((x) => x.trim()).filter(Boolean))]) {
+  for (const name of [...new Set(raw.toLowerCase().replace(/["'`]/g, "").split(/[,\s]+/).map((x) => x.trim()).filter(Boolean))]) {
     const up = name.replace(/[^a-z0-9]/g, "_").toUpperCase();
     const own = (k: string) => env(`${k}_${up}`);
     if (name === "anthropic") {
