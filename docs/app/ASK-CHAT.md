@@ -30,7 +30,7 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 |---|---|
 | `platform/src/app/api/app/v1/ask/chat/route.ts` | The SSE endpoint. It checks everything that can fail before it opens a stream, so the app gets an ordinary error. Once the stream is open, any failure arrives as `error {code, fallback: true}`. |
 | `ask-chat/config.ts` | Switches, models, limits, prices and cost in micro-dollars. |
-| `ask-chat/prompt.ts` | The **frozen** system prompt and the strict tool list. They are the same for everyone and in a fixed order, so they cache. The prompt opens with `persona.ts`, which is ASSISTANT.md §1 word for word (`npm run ask:persona`). |
+| `ask-chat/prompt.ts` | The **frozen** system prompt and the strict tool list. They are the same for everyone and in a fixed order, so they cache. The prompt opens with `persona.ts`, which is ASSISTANT.md §1 word for word (`npm run ask:persona`). openai-compatible providers get the compact prompt and shorter tool words instead (§4 "Fewer tokens on free tiers"). |
 | `ask-chat/next.ts` | The next step: the model's `<next>` choices, checked, or chips filled from the turn when it gave none (ASSISTANT.md §3). |
 | `ask-chat/engine.ts` | One turn: a streamed message in a manual tool loop, the sentence gate, refusal and `max_tokens` handling. |
 | `ask-chat/providers.ts` | Who answers, behind one interface (§6). Claude through the official SDK (`client.beta.messages.stream`) by default. |
@@ -174,7 +174,30 @@ For staging:
 
 Names: `anthropic` (ANTHROPIC_API_KEY, default `claude-sonnet-5-5` / `claude-haiku-5-5`), `groq`, `gemini`, `zai` (their preset keys), `openai-compatible` (ASK_CHAT_BASE_URL, ASK_CHAT_API_KEY, ASK_CHAT_MODEL). A provider without its key is left out. Ask is on while one is left. When `ASK_CHAT_PROVIDERS` is unset, `ASK_CHAT_PROVIDER` works as before.
 
-**Fewer tokens on free tiers.** Once the sentence is read (slots), an openai-compatible provider is sent only the tools such a turn can need (`prompt.ts` toolsFor: a flight turn gets the flight, stay, entry, request, pay, trips and desk tools; an eSIM turn four tools). The full set is sent when the kind is unknown. Claude always gets every tool, so its cached prefix never changes. Mocked eval, estimated tokens per turn (all calls, chars/4 of the request): 6,811 before, 6,386 after on average. The second call of a turn: 3,949 before, 3,650 after. A known kind drops further, e.g. an eSIM turn goes from 3,677 + 3,806 to 2,587 + 2,715.
+**Fewer tokens on free tiers.** Groq's free tier caps `openai/gpt-oss-120b` at 8,000 tokens a minute and a turn is usually two calls, so every call an openai-compatible provider gets is cut down. Claude is sent the same params as before (full prompt, every tool, the whole thread, all cached): the lighter words ride along as engine hints (`lean`, `only_tools`) that `providers.ts` strips for Claude and `providers-openai.ts` reads instead of the full ones.
+
+- **Compact prompt** (`prompt.ts` COMPACT_SYSTEM_PROMPT): the compact persona from [ASSISTANT.md](ASSISTANT.md) §1a (the same rules, fewer words, generated into `persona.ts` with §1) and the app's rules without the repeats. About 1,250 tokens instead of 2,340.
+- **Tool words** (`prompt.ts` LEAN_TOOLS): the same names and fields, short descriptions, only the non-null fields marked required and no `additionalProperties`. The engine fills a left-out nullable field with null (`schema.ts` withNulls) and checks every call against the strict schema as before.
+- **Only the tools the turn needs** (`prompt.ts` leanToolsFor), always a list: the kind's tools, or an everyday set (flights, stays, eSIM, trips, request, desk, remember) when the kind is open; plus every tool used earlier in the thread; the pay sheet and hotel facts only once a search has run in the thread.
+- **Lighter history** (`fold.ts` leanHistory, the stored thread untouched): earlier turns lose their context block (today, the household and the trips are in the latest one; what Mada knew from before and a desk hand-back note stay), thinking is dropped, and turns before the last one keep only the gist of their tool results (the last turn's stay whole, so "book the cheapest one" finds its ids). Threads also fold sooner: `ASK_CHAT_HISTORY_TOKENS` defaults to 3,500 when the first provider is openai-compatible (§7).
+
+Mocked eval, every conversation of the eval set through the real engine on a stand-in that calls the turn's tool and then answers, each request measured as the provider receives it (chars ÷ 4; `test/app/ask-chat-tokens.test.ts`, `ASK_TOKENS_TABLE=rows.json` writes the table). Mean input tokens per call:
+
+| Turn kind | Calls | Before | After | Cut | Largest call |
+|---|---|---|---|---|---|
+| all | 86 | 4,384 | 2,525 | −42% | 5,342 → 3,067 |
+| first call of a turn | 49 | 4,333 | 2,456 | −43% | 5,149 → 2,874 |
+| second call of a turn | 37 | 4,452 | 2,616 | −41% | 5,342 → 3,067 |
+| flight | 40 | 4,407 | 2,626 | −40% | 4,890 → 3,067 |
+| stay | 4 | 4,122 | 2,392 | −42% | 4,204 → 2,474 |
+| umrah | 4 | 4,075 | 2,364 | −42% | 4,157 → 2,446 |
+| esim | 3 | 3,326 | 1,871 | −44% | 3,410 → 1,955 |
+| visa | 4 | 3,617 | 2,232 | −38% | 3,706 → 2,320 |
+| car | 4 | 3,502 | 2,113 | −40% | 3,546 → 2,157 |
+| food | 2 | 3,433 | 2,097 | −39% | 3,511 → 2,175 |
+| general (open) | 24 | 4,912 | 2,639 | −46% | 5,342 → 3,063 |
+
+A two-call turn is now about 5,100 tokens instead of 8,800, so a free tier's minute holds a turn with room for the slots call. The second call still resends the prompt and tools (the model may call another tool); what it adds is only this turn's tool results. The test fails if the mean passes 2,600 or any call 3,200.
 
 ## 5. Evals
 
@@ -369,7 +392,7 @@ What Mada knows about this traveller (from earlier chats and bookings; use it wh
 
 ### Long conversations stay cheap
 
-- Every turn replays the thread. Once the thread passes `ASK_CHAT_HISTORY_TOKENS` (default **6,000** estimated tokens, characters ÷ 4) and has more than **6 turns**, the turns before the last 6 are folded, at the start of the next turn (`fold.ts`).
+- Every turn replays the thread. Once the thread passes `ASK_CHAT_HISTORY_TOKENS` (default **6,000** estimated tokens, characters ÷ 4; **3,500** when the first provider is openai-compatible) and has more than **6 turns**, the turns before the last 6 are folded, at the start of the next turn (`fold.ts`).
 - The fast model (`ASK_FAST_MODEL`, 4 s, at most 90 words) writes the summary from the folded turns' gists, on top of the summary so far. If it doesn't answer, the gists themselves become the summary (≤ 900 characters): a fold never fails a turn.
 - The summary is stored on the thread (`summary`, `folded_turns`) and read in front of the first kept message as `[Earlier in this conversation, summarised by Mada's systems: …]`.
 - Of the 6 kept turns, all but the last 2 are lightened once, at the fold: tool results become their gist (≤ 200 characters), thinking and the old context block go. Tool call ids stay paired. Between folds the history doesn't change, so the prompt cache holds.

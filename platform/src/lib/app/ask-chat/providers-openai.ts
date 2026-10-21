@@ -12,8 +12,9 @@ import { toOpenApiSchema } from "./schema";
  *   out  streamed content → text_delta events; a new tool call → a tool_use block start; finish_reason → stop_reason
  *        (tool_calls → tool_use, length → max_tokens, content_filter → refusal); usage → usage (cached prompt tokens
  *        as cache reads)
- * A turn whose kind is known sends only the tools it can need (`only_tools`, engine.ts / prompt.ts toolsFor): the
- * tool list is most of each request, and free tiers count tokens per minute.
+ * Free tiers count tokens per minute, so every call reads the engine's `lean` words when they are there (the compact
+ * prompt, shorter tool descriptions, a lighter history) and only the tools the turn can need (`only_tools`, prompt.ts
+ * leanToolsFor).
  * Tool arguments are parsed once the stream ends; arguments that aren't JSON come back as {} and the tool answers
  * that its input is missing, like any bad input. Strict schemas aren't promised by these providers: the tools check
  * every field themselves (tools.ts).
@@ -53,9 +54,11 @@ const textOf = (c: unknown): string => (typeof c === "string" ? c : Array.isArra
 /** The Messages-shaped request as a chat completion request. Exported for the tests. */
 export function toChatCompletion(p: StreamParams, stream: boolean, openapi = false) {
   const messages: OaMessage[] = [];
-  const system = typeof p.system === "string" ? p.system : (p.system ?? []).map((b) => b.text).join("\n\n");
+  // The engine's lighter words for providers counted in tokens per minute (engine.ts): used whenever they are there.
+  const lean = (p as { lean?: { system?: string; tools?: StreamParams["tools"]; messages?: StreamParams["messages"] } }).lean;
+  const system = lean?.system ?? (typeof p.system === "string" ? p.system : (p.system ?? []).map((b) => b.text).join("\n\n"));
   if (system) messages.push({ role: "system", content: system });
-  for (const m of p.messages) {
+  for (const m of lean?.messages ?? p.messages) {
     const blocks = typeof m.content === "string" ? [{ type: "text", text: m.content } as const] : m.content;
     if (m.role === "assistant") {
       const text = blocks.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("");
@@ -70,7 +73,7 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
     if (text) messages.push({ role: m.role === "system" ? "system" : "user", content: text });
   }
   const only = (p as { only_tools?: string[] }).only_tools;
-  const tools = (p.tools ?? []).flatMap((t) => {
+  const tools = (lean?.tools ?? p.tools ?? []).flatMap((t) => {
     if (!("input_schema" in t)) return [];
     if (only && !only.includes(t.name)) return [];
     const schema = t.input_schema as { properties?: Record<string, unknown> };

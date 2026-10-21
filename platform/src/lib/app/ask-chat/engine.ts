@@ -5,9 +5,10 @@ import { t, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { isCloser, outgoingProblems, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
-import { SYSTEM_PROMPT, TOOLS, toolsFor } from "./prompt";
+import { COMPACT_SYSTEM_PROMPT, LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, leanToolsFor } from "./prompt";
+import { leanHistory } from "./fold";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
-import { schemaProblems, toolNameFor } from "./schema";
+import { schemaProblems, toolNameFor, withNulls } from "./schema";
 
 /*
  * One turn of the conversation: the traveller's message (already redacted and screened) in, events out as they
@@ -142,8 +143,8 @@ export type TurnInput = {
   /** The evals compare models; the app uses ASK_CHAT_MODEL. */
   model?: string;
   /**
-   * What the sentence was read as (slots.ts). When known, an openai-compatible provider is sent only the tools such a
-   * turn can need (prompt.ts toolsFor), which saves tokens on free tiers; Claude always gets the full cached list.
+   * What the sentence was read as (slots.ts). An openai-compatible provider is sent only the tools such a turn can
+   * need (prompt.ts leanToolsFor), which saves tokens on free tiers; Claude always gets the full cached list.
    */
   intent?: AskKind | null;
 };
@@ -205,8 +206,12 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let handedOff = false;
   let flightRequest = false;
   let remembered = false;
-  // Only a hint: providers that cache the tool list (Claude) ignore it and get every tool (providers.ts).
-  const onlyTools = toolsFor(input.intent ?? null);
+  // Only hints: Claude gets the full prompt, every tool and the whole thread, cached (providers.ts). An openai-compatible
+  // provider (a free tier, counted in tokens per minute) reads the compact prompt, the shorter tool words, only the
+  // tools this turn can need and a lighter history (providers-openai.ts): about half the tokens of every call.
+  const usedBefore = input.history.flatMap((m) => (typeof m.content === "string" ? [] : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : []))));
+  const onlyTools = leanToolsFor(input.intent ?? null, usedBefore);
+  const leanBefore = leanHistory(input.history);
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const params = {
@@ -219,7 +224,8 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       cache_control: { type: "ephemeral" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: TOOLS,
-      ...(onlyTools ? { only_tools: onlyTools } : {}),
+      only_tools: onlyTools,
+      lean: { system: COMPACT_SYSTEM_PROMPT, tools: LEAN_TOOLS, messages: [...leanBefore, ...added] },
       tool_choice: { type: "auto" },
       messages: [...input.history, ...added],
     } as unknown as StreamParams;
@@ -252,8 +258,10 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     const checked = uses.map((c) => {
       const name = toolNameFor(c.name, TOOL_LIST.map((x) => x.name));
       const schema = TOOL_LIST.find((x) => x.name === name)?.input_schema;
-      const problems = !name ? [`there is no tool called ${c.name}; the tools are ${TOOL_LIST.map((x) => x.name).join(", ")}`] : schemaProblems(schema as never, c.input);
-      return { c, name: name ?? c.name, problems };
+      // A field that may be null and was left out is null (the lean schemas don't list those as required).
+      const input = schema ? withNulls(schema as never, c.input) : c.input;
+      const problems = !name ? [`there is no tool called ${c.name}; the tools are ${TOOL_LIST.map((x) => x.name).join(", ")}`] : schemaProblems(schema as never, input);
+      return { c, name: name ?? c.name, problems, input };
     });
     const bad = checked.filter((x) => x.problems.length);
     if (bad.length) {
@@ -263,9 +271,9 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
     }
 
     // Independent calls run together; all results go back in one message.
-    const results = await Promise.all(checked.map(async ({ c, name, problems }) => {
+    const results = await Promise.all(checked.map(async ({ c, name, problems, input: given }) => {
       if (problems.length) return { c, out: { text: `Not run. The arguments don't match the schema: ${problems.join("; ")}. Call it again with arguments that match exactly.`, isError: true } as ToolOut };
-      const inp = (c.input ?? {}) as Record<string, unknown>;
+      const inp = (given ?? {}) as Record<string, unknown>;
       emit({ type: "status", text: statusFor(name, inp, input.lang), tool: name });
       toolsUsed.push(name);
       calls.push({ name, input: inp });

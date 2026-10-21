@@ -29,10 +29,13 @@ export interface ChatApi {
 
 export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; baseUrl?: string; openapi?: boolean };
 
-/** The engine's hint for providers that pay per tool (`only_tools`) is not an API field: Claude gets every tool, cached. */
+/**
+ * The engine's hints for providers that pay per token (`only_tools`, `lean`: the compact prompt, tool words and
+ * history) are not API fields: Claude gets the full prompt, every tool and the whole thread, cached.
+ */
 const forClaude = (p: StreamParams): StreamParams => {
-  const { only_tools: _drop, ...rest } = p as StreamParams & { only_tools?: unknown };
-  void _drop;
+  const { only_tools: _drop, lean: _lean, ...rest } = p as StreamParams & { only_tools?: unknown; lean?: unknown };
+  void _drop; void _lean;
   // A thread Gemini answered earlier carries its tool-call signatures (extra_content), which Claude doesn't take.
   const messages = rest.messages.map((m) => (typeof m.content === "string" || !m.content.some((b) => "extra_content" in b) ? m
     : { ...m, content: m.content.map((b) => { if (!("extra_content" in b)) return b; const { extra_content: _x, ...keep } = b as typeof b & { extra_content?: unknown }; void _x; return keep as typeof b; }) }));

@@ -1,10 +1,13 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi } from "./providers";
+import { answersLean } from "./config";
+import { MEMORY_HEAD } from "./memory";
 
 /*
  * Long conversations stay cheap (docs/app/ASK-CHAT.md §7). Every turn replays the thread, and free tiers count tokens
- * per minute, so once a thread passes its budget (ASK_CHAT_HISTORY_TOKENS, default 6,000 estimated tokens) the turns
+ * per minute, so once a thread passes its budget (ASK_CHAT_HISTORY_TOKENS, default 6,000 estimated tokens, 3,500 when
+ * an openai-compatible provider answers first) the turns
  * before the last KEEP_TURNS are folded into a few lines by the fast model, stored on the thread (summary), and read
  * in front of the turns kept word for word. In the kept turns, all but the last two lose their tool results' detail
  * (the gist stays), their thinking and their old context block. Folding happens at most once per budget crossing, so
@@ -20,7 +23,7 @@ export const FULL_TURNS = 2;
 export const SUMMARY_CHARS = 900;
 export const GIST_CHARS = 200;
 
-export const historyBudget = () => Number(process.env.ASK_CHAT_HISTORY_TOKENS) || 6000;
+export const historyBudget = () => Number(process.env.ASK_CHAT_HISTORY_TOKENS) || (answersLean() ? 3500 : 6000);
 
 /** A cheap estimate: about 4 characters a token, the same rule the evals use. */
 export const estimateTokens = (v: unknown) => Math.ceil(JSON.stringify(v ?? "").length / 4);
@@ -130,4 +133,35 @@ export function historyOf(messages: unknown[], summary: string | null): Msg[] {
   const note = { type: "text" as const, text: `[Earlier in this conversation, summarised by Mada's systems: ${summary}]` };
   const content = typeof first!.content === "string" ? [note, { type: "text" as const, text: first!.content }] : [note, ...first!.content];
   return [{ ...first!, content }, ...rest];
+}
+
+/** An old context block down to what only it carried: what Mada knew from before, and the desk's hand-back note. */
+function oldContext(text: string): string | null {
+  const lines = text.split("\n");
+  const read = lines.findIndex((l) => l.startsWith("Read from the message:"));
+  const mem = lines.findIndex((l) => l.startsWith(MEMORY_HEAD));
+  const keep = [...(mem >= 0 ? lines.slice(mem, read > mem ? read : undefined) : []), ...(read >= 0 ? lines.slice(read + 1) : [])].filter((l) => l.trim());
+  return keep.length ? `[Earlier context from Mada's systems]\n${keep.join("\n")}` : null;
+}
+
+/**
+ * The history as openai-compatible providers read it (free tiers count tokens per minute; the stored thread is never
+ * changed, Claude replays it whole and cached): every earlier turn without its context block (today, the household
+ * and the trips are in the latest one; what Mada knew from before and a desk note stay), without thinking, and every
+ * turn before the last one with its tool results down to their gist. The last turn keeps its results whole, so "book
+ * the cheapest one" still finds the option ids.
+ */
+export function leanHistory(history: Msg[]): Msg[] {
+  const turns = splitTurns(history);
+  return turns.flatMap((turn, i) => turn.map((m) => {
+    if (typeof m.content === "string") return m;
+    const content = m.content
+      .filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking")
+      .flatMap((b) => {
+        if (m.role === "user" && b.type === "text" && CONTEXT.test(b.text)) { const kept = oldContext(b.text); return kept ? [{ ...b, text: kept }] : []; }
+        if (b.type === "tool_result" && i < turns.length - 1) return [{ ...b, content: gist(resultText(b), 300) }];
+        return [b];
+      });
+    return { ...m, content: content.length ? content : [{ type: "text" as const, text: "…" }] };
+  }));
 }
