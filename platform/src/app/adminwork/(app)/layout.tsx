@@ -14,6 +14,7 @@ import { deskSections } from "@/lib/app/desk/nav";
 import { agentForOps, loadRota } from "@/lib/app/desk/agents";
 import { onShift } from "@/lib/app/desk/routing";
 import { esimBalance } from "@/lib/app/esim/ops";
+import { escalationAlerts } from "@/lib/app/desk/tickets";
 import { PresenceSwitch } from "@/components/desk/presence";
 import { statusPillAction } from "./desk/actions";
 import type { Alert } from "@/components/notify";
@@ -23,10 +24,13 @@ const NO_COUNTS = { queue: 0, chats: 0, orders: 0, requests: 0, refunds: 0, disr
 /** For desk users: their agent profile and shift (the header switch), the sidebar numbers, and the eSIM balance alert. */
 async function deskBits(u: Awaited<ReturnType<typeof requireUser>>, t: Awaited<ReturnType<typeof getT>>) {
   if (!can(u, "desk.view")) return { counts: NO_COUNTS, me: null, alerts: [] as Alert[] };
-  const [counts, me, bal] = await Promise.all([deskNavCounts().catch(() => NO_COUNTS), agentForOps(u.id).catch(() => null), esimBalance().catch(() => null)]);
+  const [counts, me, bal, late] = await Promise.all([deskNavCounts().catch(() => NO_COUNTS), agentForOps(u.id).catch(() => null), esimBalance().catch(() => null), escalationAlerts(u).catch(() => [])]);
   const shift = me ? onShift(me.id, (await loadRota()).shifts, new Date()) : false;
   const alerts: Alert[] = bal?.low ? [{ key: "esim-balance", tone: "urgent", icon: "Wallet", title: t("eSIM Access balance is low: ${usd}", { usd: (bal.usd ?? 0).toFixed(2) }),
     detail: t("Top it up in the eSIM Access console, or paid eSIMs wait."), href: "/adminwork/desk/esims" }] : [];
+  // Late and escalated tickets, for leads (desk.tickets.manage): level 2 is twice past its promise.
+  for (const a of late) alerts.push({ key: `ticket-${a.id}-${a.level}`, tone: a.level >= 2 ? "urgent" : "warn", icon: "Ticket", title: t("{ref} is late: {subject}", { ref: a.ref, subject: a.subject }),
+    detail: a.note ?? (a.ownerName ? t("With {name}", { name: a.ownerName }) : t("Nobody has it")), href: `/adminwork/desk/tickets/${a.ref}` });
   return { counts, me: me ? { id: me.id, name: me.displayName, status: me.status, onShift: shift } : null, alerts };
 }
 

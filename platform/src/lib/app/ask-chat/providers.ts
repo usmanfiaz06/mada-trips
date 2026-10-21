@@ -123,7 +123,7 @@ export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: bool
   let ready: Promise<void> | null = null;
   const warmUp = () => (ready ??= opts.warm && models.length > 1 ? new Promise<void>((resolve) => {
     // The best-ranked model that answers wins; after the first answer, better-ranked ones get 2 s more to answer.
-    const top = models.slice(0, 6);
+    const top = models.slice(0, 3); // free tiers count requests per minute; three is enough to step past a hanging one
     const answered = new Set<number>();
     let left = top.length;
     let grace: ReturnType<typeof setTimeout> | null = null;
@@ -195,7 +195,11 @@ export type ChainMember = { name: string; model: string; fastModel: string; api:
 
 /** Until when each provider rests, per server instance (ms since epoch). A restart forgets it, which only costs one retry. */
 const cooling = new Map<string, number>();
+/** Why each provider is resting (status and the start of its own error), for the staging debug line only. */
+const whyResting = new Map<string, string>();
 export const COOL_MS = 60_000;
+/** The longest a turn waits for a provider that is back within seconds, instead of failing. */
+const SHORT_WAIT_MS = 6_000;
 /** Tests: forget every cooldown. */
 export function resetCooldowns() { cooling.clear(); }
 /** Who is resting and for how many more seconds (GET /health-style checks and tests). */
@@ -230,7 +234,8 @@ const restMs = (e: unknown): number => {
 async function allResting(now: number): Promise<never> {
   const { ProviderHttpError } = await import("./providers-openai");
   const next = Math.min(...[...cooling.values()].filter((u) => u > now));
-  throw new ProviderHttpError(429, "every provider in ASK_CHAT_PROVIDERS is cooling down", Number.isFinite(next) ? Math.ceil((next - now) / 1000) : COOL_MS / 1000);
+  const err = new ProviderHttpError(429, "every provider in ASK_CHAT_PROVIDERS is cooling down", Number.isFinite(next) ? Math.ceil((next - now) / 1000) : COOL_MS / 1000);
+  throw Object.assign(err, { detail: [...whyResting].map(([k, v]) => `${k}: ${v}`).join(" | ") });
 }
 
 /**
@@ -243,17 +248,31 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
   const now = opts.now ?? Date.now;
   const log = opts.log ?? ((l: string) => console.info(l));
   const order = (tried: Set<string>) => members.filter((m) => !tried.has(m.name) && (cooling.get(m.name) ?? 0) <= now());
+  // Everyone resting but someone is back within seconds (Groq's per-minute cap often asks for under one): wait once.
+  const backSoon = async (signal?: AbortSignal): Promise<boolean> => {
+    const until = Math.min(...members.map((m) => cooling.get(m.name) ?? 0));
+    const wait = until - now();
+    if (!Number.isFinite(wait) || wait > SHORT_WAIT_MS || signal?.aborted) return false;
+    await new Promise((r) => setTimeout(r, Math.max(0, wait) + 50));
+    return true;
+  };
   const rest = (m: ChainMember, e: unknown) => {
     cooling.set(m.name, now() + restMs(e));
+    const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
+    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${(/"message"\s*:\s*"([^"]{0,220})/.exec(detail)?.[1] ?? detail).slice(0, 220)}`.trim());
     log(`[ask-chat] provider=${m.name} resting ${Math.round(restMs(e) / 1000)}s (${statusOf(e) ?? (e instanceof Error ? e.name : "error")})`);
   };
   return {
     async create(p, o) {
       const tried = new Set<string>();
       let skipped: string[] = [];
+      let waited = false;
       for (;;) {
         const m = order(tried)[0];
-        if (!m) return allResting(now());
+        if (!m) {
+          if (!waited && (await backSoon(o?.signal))) { waited = true; tried.clear(); continue; }
+          return allResting(now());
+        }
         tried.add(m.name);
         try {
           const res = await m.api.create({ ...p, model: m.fastModel }, o);
@@ -273,10 +292,14 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
       async function* events(): AsyncGenerator<Anthropic.Beta.BetaRawMessageStreamEvent> {
         const tried = new Set<string>();
         const skipped: string[] = [];
+        let waited = false;
         try {
           for (;;) {
             const m = order(tried)[0];
-            if (!m) await allResting(now());
+            if (!m) {
+              if (!waited && (await backSoon(o?.signal))) { waited = true; tried.clear(); continue; }
+              await allResting(now());
+            }
             const link = m!;
             tried.add(link.name);
             const s = link.api.stream({ ...p, model: link.model }, o);
@@ -360,9 +383,17 @@ export async function probeTurn(): Promise<{ name: string; model: string; ok: bo
     const models = l.auto ? await flashModels(l) : [l.model];
     const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models, { warm: true }) : await apiFor(linkConfig(l));
     try {
-      const s = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [{ role: "user", content: "Hotel in Baku 2 nights from 20 November 2026, 2 adults" }] }, { timeout: 40_000, maxRetries: 0 });
+      const first: Anthropic.Beta.BetaMessageParam = { role: "user", content: "Hotel in Baku 2 nights from 20 November 2026, 2 adults" };
+      const s = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [first] }, { timeout: 40_000, maxRetries: 0 });
       for await (const _ of s) { void _; }
-      const m = await s.finalMessage();
+      let m = await s.finalMessage();
+      // The second step, as a turn makes it: each tool call answered, then the model again.
+      const uses = m.content.filter((b) => b.type === "tool_use") as Anthropic.Beta.BetaToolUseBlock[];
+      if (uses.length) {
+        const s2 = api.stream({ model: l.model, max_tokens: 4096, system: SYSTEM_PROMPT, tools: TOOLS, messages: [first, { role: "assistant", content: m.content as Anthropic.Beta.BetaContentBlockParam[] }, { role: "user", content: uses.map((u) => ({ type: "tool_result" as const, tool_use_id: u.id, content: "Household: Test (self, 34). No other travellers." })) }] }, { timeout: 40_000, maxRetries: 0 });
+        for await (const _ of s2) { void _; }
+        m = await s2.finalMessage();
+      }
       const text = m.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join(" ");
       return { name: l.name, model: m.model ?? l.model, ok: true, ms: Date.now() - t0, stop: m.stop_reason ?? null, blocks: m.content.map((b) => b.type === "tool_use" ? `tool_use:${(b as { name: string }).name}` : b.type), text: text.slice(0, 300), error: null };
     } catch (e) {

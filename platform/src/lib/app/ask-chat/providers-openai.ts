@@ -30,7 +30,10 @@ export function retryAfterOf(header: string | null, body: string): number | null
   const h = Number(header);
   if (Number.isFinite(h) && h > 0) return h;
   const m = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(body);
-  return m ? Math.ceil(Number(m[1])) : null;
+  if (m) return Math.ceil(Number(m[1]));
+  // Groq says it in words: "Please try again in 885ms" or "in 1.5s".
+  const g = /try again in (\d+(?:\.\d+)?)(ms|s)\b/i.exec(body);
+  return g ? Math.max(1, Math.ceil(Number(g[1]) / (g[2].toLowerCase() === "ms" ? 1000 : 1))) : null;
 }
 const QUOTA = /quota|rate.?limit|resource.?exhausted|insufficient|balance|exceeded|tokens per (?:minute|day)|too many requests/i;
 

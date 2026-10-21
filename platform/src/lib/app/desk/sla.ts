@@ -54,3 +54,45 @@ export function typicalReplyMinutes(samples: number[], min = 5): number | null {
   const mid = xs.length % 2 ? xs[(xs.length - 1) / 2]! : (xs[xs.length / 2 - 1]! + xs[xs.length / 2]!) / 2;
   return Math.min(10, Math.max(1, Math.ceil(mid)));
 }
+
+/* ───────────── tickets (DESK-PLAN.md §4.5) ───────────── */
+
+export const TICKET_PRIORITIES = ["urgent", "high", "normal", "low"] as const;
+export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
+
+/** A ticket opened by hand is due by its priority. */
+export const MANUAL_SLA_MINUTES: Record<TicketPriority, number> = { urgent: 30, high: 4 * 60, normal: 24 * 60, low: 72 * 60 };
+/** Once a chat has had its first reply, each next reply is due within 30 minutes. */
+export const CHAT_NEXT_REPLY_MINUTES = 30;
+
+type Clock = { slaStartedAt: Date; dueAt: Date; pausedAt: Date | null };
+
+/** Waiting on the customer or a supplier: the clock stops where it is. */
+export function pauseClock(c: Clock, now: Date): Clock {
+  return c.pausedAt ? c : { ...c, pausedAt: now };
+}
+
+/** Back with us: the due time moves on by however long the clock stood still. */
+export function resumeClock(c: Clock, now: Date): Clock {
+  if (!c.pausedAt) return c;
+  const stood = Math.max(0, now.getTime() - c.pausedAt.getTime());
+  return { slaStartedAt: c.slaStartedAt, dueAt: new Date(c.dueAt.getTime() + stood), pausedAt: null };
+}
+
+/**
+ * How far past its promise a running ticket is: 0 within it, 1 past it (the on-shift lead is told), 2 at twice the
+ * target (the partners are told). A paused clock never escalates.
+ */
+export function escalationLevel(c: Clock, now: Date): 0 | 1 | 2 {
+  if (c.pausedAt) return 0;
+  const over = now.getTime() - c.dueAt.getTime();
+  if (over < 0) return 0;
+  const target = Math.max(60_000, c.dueAt.getTime() - c.slaStartedAt.getTime());
+  return over >= target ? 2 : 1;
+}
+
+/** A ticket's SLA as the queue shows it: a paused clock reads "met" so it never shows as late. */
+export function ticketSla(t: Clock & { slaMinutes: number }, now: Date = new Date()): Sla {
+  if (t.pausedAt) return { target: t.slaMinutes, openedAt: t.slaStartedAt, dueAt: t.dueAt, answeredAt: null, minutesLeft: Math.floor((t.dueAt.getTime() - t.pausedAt.getTime()) / 60_000), state: "ok" };
+  return slaFor("chat", t.slaStartedAt, now, { due: t.dueAt, targetMinutes: t.slaMinutes });
+}

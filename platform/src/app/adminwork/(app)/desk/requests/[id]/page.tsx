@@ -17,6 +17,7 @@ import { Journey, type JourneyStep } from "@/components/journey";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { HotelbedsCard } from "@/components/desk/hotelbeds";
 import { AssignCard } from "@/components/desk/assign";
+import { TicketsCard } from "@/components/desk/tickets";
 import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
 import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
@@ -187,6 +188,7 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
           <OutcomeCard requestId={r.id} act={act} open={!closed} result={closed ? resultOfRequest(r) : null} progress={progressOfRequest(r)} t={t} />
           <HotelbedsCard requestId={r.id} details={r.details as Record<string, unknown>} act={act} t={t} />
           <AssignCard kind="request" id={r.id} userId={r.ownerId} canAct={act} />
+          <TicketsCard about={{ kind: "request", id: r.id }} customerId={r.ownerId} subject={r.summary} canAct={act} />
         </aside>
       </div>
     </>

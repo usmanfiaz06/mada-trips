@@ -7,7 +7,7 @@ import { appAudit } from "@/db/app-schema";
  * Server actions pass the signed-in Ops user (CurrentUser fits this shape); tests pass one they build.
  */
 
-export const DESK_CAPS = ["desk.view", "desk.act", "desk.issue", "desk.refund", "desk.moderate", "desk.admin"] as const;
+export const DESK_CAPS = ["desk.view", "desk.act", "desk.issue", "desk.refund", "desk.moderate", "desk.admin", "desk.tickets.manage"] as const;
 export type DeskCap = (typeof DESK_CAPS)[number];
 export type DeskActor = { id: string; name: string; permissions: Set<string> | ReadonlySet<string> };
 

@@ -32,6 +32,7 @@ export const PERMISSIONS = {
   "desk.moderate":       { group: "desk",      en: "Moderate tips, reports & blocks",    ar: "مراجعة النصائح والبلاغات والحظر" },
   "desk.admin":          { group: "desk",      en: "Run the rota & assign agents",       ar: "إدارة المناوبات وإسناد الموظفين" },
   "desk.ask.read":       { group: "desk",      en: "Read Ask Mada chats handed to the desk", ar: "قراءة محادثات اسأل مادا المحوّلة للمكتب" },
+  "desk.tickets.manage": { group: "desk",      en: "Reassign anyone's tickets & merge them", ar: "إعادة إسناد تذاكر الجميع ودمجها" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
