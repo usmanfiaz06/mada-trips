@@ -64,7 +64,10 @@ export async function chatApi(): Promise<ChatApi> {
   const chain = providerChain();
   if (chain) {
     const key = `chain|${chain.map((l) => `${l.name}:${l.model}:${l.fastModel}:${l.apiKey.slice(-6)}`).join(",")}`;
-    if (real?.key !== key) real = { key, api: chainApi(await Promise.all(chain.map(async (l) => ({ name: l.name, model: l.model, fastModel: l.fastModel, api: await apiFor(linkConfig(l)) })))) };
+    if (real?.key !== key) real = { key, api: chainApi(await Promise.all(chain.map(async (l) => {
+      const api = await apiFor(linkConfig(l));
+      return { name: l.name, model: l.model, fastModel: l.fastModel, api: l.auto ? autoModelApi(api, await flashModels(l)) : api };
+    }))) };
     return real.api;
   }
   const provider = chatProvider();
@@ -77,6 +80,82 @@ export async function chatApi(): Promise<ChatApi> {
 
 const linkConfig = (l: ChainLink): ProviderConfig =>
   l.name === "anthropic" ? { provider: "anthropic", apiKey: l.apiKey } : { provider: l.name, apiKey: l.apiKey, baseUrl: l.baseUrl, openapi: l.openapi };
+
+/* ───────────── Gemini's model, found from its key ───────────── */
+
+/**
+ * Gemini Flash models newest first, from the key's own model list (GET {base}/models), so nobody has to know the exact
+ * name: the plain Flash before Flash-Lite, a stable name before a preview; never image, voice or live models. Falls back
+ * to the preset's model when the list can't be read.
+ */
+export function rankFlash(ids: string[]): string[] {
+  const rows = ids.map((raw) => raw.replace(/^models\//, "")).filter((id) => !/tts|image|audio|live|thinking|embed/i.test(id)).flatMap((id) => {
+    const m = /^gemini-(\d+(?:\.\d+)?)-flash(-lite)?(?:-(latest|preview(?:-[\w-]+)?|\d{3}))?$/.exec(id);
+    return m ? [{ id, v: Number(m[1]), lite: !!m[2], preview: (m[3] ?? "").startsWith("preview") }] : [];
+  });
+  rows.sort((a, b) => b.v - a.v || Number(a.lite) - Number(b.lite) || Number(a.preview) - Number(b.preview) || a.id.localeCompare(b.id));
+  return [...new Set(rows.map((r) => r.id))];
+}
+
+export async function flashModels(l: ChainLink): Promise<string[]> {
+  try {
+    const { listModels } = await import("./providers-openai");
+    const ids = await listModels({ baseUrl: l.baseUrl ?? "", apiKey: l.apiKey });
+    const found = rankFlash(ids);
+    console.info(`[ask-chat] provider=${l.name} models=${found.slice(0, 4).join(",") || "none"}`);
+    return found.length ? found : [l.model];
+  } catch (e) {
+    console.info(`[ask-chat] provider=${l.name} model list unreadable (${e instanceof Error ? e.message : "error"}), using ${l.model}`);
+    return [l.model];
+  }
+}
+
+/** A model this key can't use: not found, or a free tier with no allowance for it (providers-openai.ts noModel). */
+const wrongModel = (e: unknown): boolean => statusOf(e) === 404 || (!!e && typeof e === "object" && (e as { noModel?: unknown }).noModel === true);
+
+/** Calls go to the first model that works; one the key can't use is skipped for good on this instance. */
+export function autoModelApi(api: ChatApi, models: string[]): ChatApi {
+  let i = 0;
+  const pick = () => models[Math.min(i, models.length - 1)];
+  const skip = (e: unknown) => {
+    if (!wrongModel(e) || i >= models.length - 1) return false;
+    console.info(`[ask-chat] model=${pick()} not usable with this key (${statusOf(e)}), trying ${models[i + 1]}`);
+    i++;
+    return true;
+  };
+  return {
+    async create(p, o) {
+      for (;;) {
+        try { return await api.create({ ...p, model: pick() }, o); } catch (e) { if (!skip(e)) throw e; }
+      }
+    },
+    stream(p, o) {
+      let current = api.stream({ ...p, model: pick() }, o);
+      let failed: unknown = null;
+      async function* events(): AsyncGenerator<Anthropic.Beta.BetaRawMessageStreamEvent> {
+        for (;;) {
+          let started = false;
+          try {
+            for await (const ev of current) { started = true; yield ev; }
+            return;
+          } catch (e) {
+            if (started || !skip(e)) { failed = e; throw e; }
+            current = api.stream({ ...p, model: pick() }, o);
+          }
+        }
+      }
+      const it = events();
+      return {
+        [Symbol.asyncIterator]: () => it,
+        async finalMessage() {
+          for await (const _ of it) { void _; }
+          if (failed) throw failed;
+          return current.finalMessage();
+        },
+      };
+    },
+  };
+}
 
 /* ───────────── the fallback chain (ASK_CHAT_PROVIDERS) ───────────── */
 
@@ -212,12 +291,13 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
   return Promise.all(chain.map(async (l) => {
     const t0 = Date.now();
     try {
-      const api = await apiFor(linkConfig(l));
+      const models = l.auto ? await flashModels(l) : [l.fastModel];
+      const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models) : await apiFor(linkConfig(l));
       await api.create({ model: l.fastModel, max_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 15_000, maxRetries: 0 });
-      return { name: l.name, model: l.fastModel, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
+      return { name: l.name, model: l.auto ? models.join(" > ") : l.fastModel, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
     } catch (e) {
       const msg = e instanceof Error ? e.message.replace(/\s+/g, " ").slice(0, 200) : "error";
-      return { name: l.name, model: l.fastModel, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
+      return { name: l.name, model: l.auto ? (await flashModels(l)).join(" > ") : l.fastModel, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
     }
   }));
 }

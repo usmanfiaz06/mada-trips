@@ -63,7 +63,7 @@ export function openAiSettings(p = chatProvider()): { baseUrl: string; apiKey: s
 }
 
 /** One link of ASK_CHAT_PROVIDERS, with what it needs filled in. */
-export type ChainLink = { name: "anthropic" | PresetName | "openai-compatible"; model: string; fastModel: string; apiKey: string; baseUrl?: string; openapi?: boolean };
+export type ChainLink = { name: "anthropic" | PresetName | "openai-compatible"; model: string; fastModel: string; apiKey: string; baseUrl?: string; openapi?: boolean; /** Gemini with no model set: the newest Flash its key can use is found at start (providers.ts). */ auto?: boolean };
 
 /** ASK_CHAT_PROVIDERS as links that have a key and a model, in order; null when it isn't set (one provider, as before). */
 export function providerChain(): ChainLink[] | null {
@@ -83,7 +83,7 @@ export function providerChain(): ChainLink[] | null {
       const pr = PRESETS[name];
       const apiKey = env(pr.keyEnv);
       const model = own("ASK_CHAT_MODEL") || pr.chainModel || pr.models[0] || "";
-      if (apiKey && model) out.push({ name, apiKey, baseUrl: pr.baseUrl, openapi: !!pr.openapi, model, fastModel: own("ASK_FAST_MODEL") || model });
+      if (apiKey && model) out.push({ name, apiKey, baseUrl: pr.baseUrl, openapi: !!pr.openapi, model, fastModel: own("ASK_FAST_MODEL") || model, auto: name === "gemini" && !own("ASK_CHAT_MODEL") && !own("ASK_FAST_MODEL") });
     }
   }
   return out;
