@@ -257,13 +257,20 @@ export const TICKET_TABS: Record<string, readonly TicketStatus[] | null> = {
   open: ["new", "open"], waiting: ["waiting_customer", "waiting_supplier"], resolved: ["resolved"], closed: ["closed"], all: null,
 };
 
+/** How long a ticket has been open, in the bands the desk overview counts the backlog by (Tickets ?age=). */
+export const TICKET_AGES = ["1h", "4h", "24h", "older"] as const;
+export type TicketAge = (typeof TICKET_AGES)[number];
+/** The band of a ticket's age as SQL, against the database's clock: the overview and the list read the same one. */
+export const ageBand = sql<TicketAge>`CASE WHEN now() - ${deskTickets.openedAt} < interval '1 hour' THEN '1h' WHEN now() - ${deskTickets.openedAt} < interval '4 hours' THEN '4h'
+  WHEN now() - ${deskTickets.openedAt} < interval '24 hours' THEN '24h' ELSE 'older' END`;
+
 /** The Tickets list: every ticket, by status tab, with search and filters, 50 to a page. */
-export async function listTickets(o: { tab?: string; q?: string; priority?: string; owner?: "me" | "none" | string; customerId?: string; me?: Agent | null; limit?: number; offset?: number } = {}) {
+export async function listTickets(o: { tab?: string; q?: string; priority?: string; owner?: "me" | "none" | string; customerId?: string; age?: string; me?: Agent | null; limit?: number; offset?: number } = {}) {
   const tab = o.tab && o.tab in TICKET_TABS ? o.tab : "open";
   const st = TICKET_TABS[tab];
   const owner = o.owner === "me" ? (o.me ? eq(deskTickets.ownerAgentId, o.me.id) : sql`false`) : o.owner === "none" ? sql`${deskTickets.ownerAgentId} IS NULL` : o.owner ? eq(deskTickets.ownerAgentId, o.owner) : undefined;
   const base = and((TICKET_PRIORITIES as readonly string[]).includes(o.priority ?? "") ? eq(deskTickets.priority, o.priority!) : undefined, owner,
-    o.customerId ? eq(deskTickets.customerId, o.customerId) : undefined, search(o.q ?? ""));
+    o.customerId ? eq(deskTickets.customerId, o.customerId) : undefined, (TICKET_AGES as readonly string[]).includes(o.age ?? "") ? sql`${ageBand} = ${o.age}` : undefined, search(o.q ?? ""));
   const where = and(st ? inArray(deskTickets.status, [...st]) : undefined, base);
   const [rows, [tot], byStatus] = await Promise.all([
     db.select({ t: deskTickets, customerName: customer, ownerName }).from(deskTickets).where(where)

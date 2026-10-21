@@ -25,8 +25,10 @@ export default async function DropoffsPage({ searchParams }: { searchParams: Pro
   const L = t.locale;
   const sp = await searchParams;
   const { page, offset } = pageParam(sp, PAGE_SIZE);
-  const [data, canned] = await Promise.all([pageDropoffs({ tab: sp.s, q: sp.q, offset }), savedReplies()]);
-  const href = listHref("/adminwork/desk/drop-offs", { s: sp.s, q: sp.q, page: sp.page });
+  // day: one Riyadh day, from the desk overview's "dropped off today".
+  const day = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : undefined;
+  const [data, canned] = await Promise.all([pageDropoffs({ tab: sp.s, q: sp.q, day, offset }), savedReplies()]);
+  const href = listHref("/adminwork/desk/drop-offs", { s: sp.s, q: sp.q, day, page: sp.page });
   // The rail shows the drop-off picked in the table, else the newest one on this page.
   const f = (sp.focus ? data.rows.find((r) => r.key === sp.focus) ?? await getDropoff(sp.focus) : null) ?? data.rows[0] ?? null;
   const act = can(u, "desk.act");
@@ -37,12 +39,13 @@ export default async function DropoffsPage({ searchParams }: { searchParams: Pro
       <PageHeader eyebrow={t("App bookings")} title={t("Drop-offs")}
         subtitle={t("People who left halfway: a search, a pay sheet, a card that didn't go through, a price held and not paid. Nudge them in the app within 48 hours; call or WhatsApp only if they gave a number on a request.")}
         actions={<LinkButton href="/adminwork/desk/bookings" variant="outline"><LayoutList className="size-4" />{t("Live board")}</LinkButton>} />
-      <Tabs active={data.tab} items={DROPOFF_TABS.map((s) => ({ key: s, label: t(TAB_LABEL[s]!), href: listHref("/adminwork/desk/drop-offs", { q: sp.q })({ s: s === "open" ? undefined : s }), count: data.counts[s] }))} />
+      <Tabs active={data.tab} items={DROPOFF_TABS.map((s) => ({ key: s, label: t(TAB_LABEL[s]!), href: listHref("/adminwork/desk/drop-offs", { q: sp.q, day })({ s: s === "open" ? undefined : s }), count: data.counts[s] }))} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <Card pad={false} className="min-w-0 self-start">
-          <ListFilter action="/adminwork/desk/drop-offs" q={sp.q} keep={{ s: sp.s }} placeholder={t("Traveller, phone, what they looked at…")} clear={sp.q ? listHref("/adminwork/desk/drop-offs", { s: sp.s })() : null} />
+          <ListFilter action="/adminwork/desk/drop-offs" q={sp.q} keep={{ s: sp.s, day }} placeholder={t("Traveller, phone, what they looked at…")} clear={sp.q || day ? listHref("/adminwork/desk/drop-offs", { s: sp.s })() : null} />
           <SummaryStrip>
             <span>{t("{n} drop-offs", { n: data.total })}</span>
+            {day && <span>{t("On {day}", { day })}</span>}
             <span>{t("Value")} <span className="num text-ink" dir="ltr">{sar(data.value)}</span></span>
             {data.tab !== "closed" && <span>{t("Recovered or ignored")} <span className="num text-ink">{data.counts.closed}</span></span>}
           </SummaryStrip>

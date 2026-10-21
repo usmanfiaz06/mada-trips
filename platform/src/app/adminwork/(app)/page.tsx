@@ -8,6 +8,7 @@ import { ArcGauge, CycleBarcode, DotColumns, SunGauge, SplitBar } from "@/compon
 import { addDays, daysBetween, fmtDate, riyadhDate, timeAgo } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { APPROVAL_KIND } from "@/lib/labels";
+import { deskBriefing } from "@/lib/app/desk/overview";
 
 export const metadata = { title: "Dashboard" };
 
@@ -28,7 +29,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const u = await requireUser();
   const t = await getT();
   const { denied, cycle: view } = await searchParams;
-  const d = await dashboardData(u, view === "prev" ? "prev" : "current");
+  // Desk leads get a line about the desk (DESK-PLAN U8) under the greeting.
+  const deskLead = can(u, "desk.tickets.manage") || can(u, "desk.reports");
+  const [d, desk] = await Promise.all([dashboardData(u, view === "prev" ? "prev" : "current"), deskLead ? deskBriefing().catch(() => null) : Promise.resolve(null)]);
   const L = t.locale;
 
   const sell = d.cycleBookings.reduce((s, b) => s + b.sell, 0);
@@ -76,6 +79,13 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div>
           <div className="text-[13px] text-ink-3">{fmtDate(new Date(), L)} · {t("Cycle")} {fmtDate(d.current.start, L)} → {fmtDate(d.current.end, L)}</div>
           <h1 className="mt-1 text-[38px] font-[350] leading-none tracking-[-0.04em]">{greeting(t)}, {u.name.split(" ")[0]}</h1>
+          {desk && (
+            <Link href="/adminwork/desk/overview" className="mt-3 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink" data-testid="desk-briefing" aria-label={t("Open the desk overview")}>
+              <span className={cx("size-1.5 rounded-full", desk.late || desk.urgent ? "bg-bad" : "bg-ok")} />
+              {t("Desk now: {open} waiting, {urgent} urgent, {late} past their promise", { open: desk.open, urgent: desk.urgent, late: desk.late })}
+              <ArrowUpRight className="size-3.5 rtl:-scale-x-100" />
+            </Link>
+          )}
         </div>
         <div className="flex gap-2">
           {can(u, "expenses.create") && <LinkButton href="/adminwork/expenses/new" variant="outline"><Wallet className="size-4" />{t("Add expense")}</LinkButton>}

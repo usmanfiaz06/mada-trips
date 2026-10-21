@@ -24,6 +24,8 @@ export const DEFAULT_SETTINGS = {
   // App supplier credit lines (Supplier balances): 0 = not set up. Hotelbeds and TBO bill us on credit; eSIM Access is prepaid.
   appHotelbedsCreditLine: 0,
   appTboCreditLine: 0,
+  // Desk overview (DESK-PLAN U8): the share of tickets the desk aims to answer within their promise.
+  deskSlaTargetBps: 9000,           // 90%
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

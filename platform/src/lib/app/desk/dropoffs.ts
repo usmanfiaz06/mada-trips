@@ -98,8 +98,12 @@ function toRow(r: Record<string, unknown>): DropoffRow {
 export const canNudge = (r: Pick<DropoffRow, "at" | "nudgedAt" | "mark">, now = new Date()) =>
   !r.mark && !r.nudgedAt && now.getTime() - r.at.getTime() <= NUDGE_HOURS * 3_600_000;
 
-/** One tab of drop-offs, searched, 50 at a time, with the count and value behind every tab. */
-export async function pageDropoffs(opts: { tab?: string; q?: string; limit?: number; offset?: number } = {}) {
+/** A Riyadh day (YYYY-MM-DD) as a filter on when they dropped off, or nothing. */
+export const dropoffDay = (day?: string | null) => (day && /^\d{4}-\d{2}-\d{2}$/.test(day)
+  ? sql`AND at >= (${day}::date)::timestamp AT TIME ZONE 'Asia/Riyadh' AND at < ((${day}::date + 1)::timestamp AT TIME ZONE 'Asia/Riyadh')` : sql``);
+
+/** One tab of drop-offs, searched, 50 at a time, with the count and value behind every tab. `day` keeps one Riyadh day. */
+export async function pageDropoffs(opts: { tab?: string; q?: string; day?: string; limit?: number; offset?: number } = {}) {
   const tab: DropoffTab = (DROPOFF_TABS as readonly string[]).includes(opts.tab ?? "") ? (opts.tab as DropoffTab) : "open";
   const limit = Math.min(Math.max(opts.limit ?? PAGE_SIZE, 1), 200);
   const offset = Math.max(opts.offset ?? 0, 0);
@@ -108,7 +112,7 @@ export async function pageDropoffs(opts: { tab?: string; q?: string; limit?: num
   const search = q ? sql`AND (what ILIKE ${like} OR user_name ILIKE ${like} OR phone ILIKE ${like})` : sql``;
   const want = tab === "open" ? sql`mark IS NULL` : tab === "closed" ? sql`mark IS NOT NULL` : sql`mark IS NULL AND kind = ${tab}`;
   const res = await db.execute(sql`
-    WITH a AS (SELECT * FROM (${WITH_MARKS}) w WHERE true ${search}), shown AS (SELECT * FROM a WHERE ${want})
+    WITH a AS (SELECT * FROM (${WITH_MARKS}) w WHERE true ${search} ${dropoffDay(opts.day)}), shown AS (SELECT * FROM a WHERE ${want})
     SELECT 'c' AS t, CASE WHEN mark IS NULL THEN kind ELSE 'closed' END AS k, count(*)::int AS n, coalesce(sum(value), 0)::bigint AS v, NULL::json AS row FROM a GROUP BY 2
     UNION ALL SELECT 's', '', count(*)::int, coalesce(sum(value), 0)::bigint, NULL FROM shown
     UNION ALL (SELECT 'r', '', 0, 0, row_to_json(shown) FROM shown ORDER BY at DESC LIMIT ${limit} OFFSET ${offset})`);
@@ -134,6 +138,14 @@ export async function getDropoff(key: string): Promise<DropoffRow | null> {
 export async function openDropoffCount(): Promise<number> {
   const res = await db.execute(sql`SELECT count(*)::int AS n FROM (${WITH_MARKS}) w WHERE mark IS NULL`);
   return (res as unknown as { n: number }[])[0]?.n ?? 0;
+}
+
+/** Drop-offs (open or marked) in the last hour against the hourly average of the 7 days before it, for the desk's spike alert. */
+export async function dropoffRate(): Promise<{ lastHour: number; perHour: number }> {
+  const res = await db.execute(sql`SELECT count(*) FILTER (WHERE at >= now() - interval '1 hour')::int AS h,
+    count(*) FILTER (WHERE at < now() - interval '1 hour' AND at >= now() - interval '169 hours')::int AS w FROM (${DROPOFFS}) d`);
+  const r = (res as unknown as { h: number; w: number }[])[0];
+  return { lastHour: r?.h ?? 0, perHour: (r?.w ?? 0) / 168 };
 }
 
 /** The record a drop-off points at, for the desk's activity log. */

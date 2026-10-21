@@ -2,16 +2,16 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Stamp, ListChecks, Inbox, Ticket, MoonStar, Wallet, X, Check, ArrowRight } from "lucide-react";
+import { Bell, Stamp, ListChecks, Inbox, Ticket, MoonStar, Wallet, TrendingDown, Siren, X, Check, ArrowRight } from "lucide-react";
 import { cx } from "./ui";
 import { useT } from "@/lib/i18n/client";
 import { BASE } from "@/lib/base";
 
 export type AlertTone = "urgent" | "warn" | "info";
-export type AlertIcon = "Stamp" | "ListChecks" | "Inbox" | "Ticket" | "MoonStar" | "Wallet";
+export type AlertIcon = "Stamp" | "ListChecks" | "Inbox" | "Ticket" | "MoonStar" | "Wallet" | "TrendingDown" | "Siren";
 export type Alert = { key: string; tone: AlertTone; icon: AlertIcon; title: string; detail?: string; href: string };
 
-const ICONS: Record<AlertIcon, React.ComponentType<{ className?: string }>> = { Stamp, ListChecks, Inbox, Ticket, MoonStar, Wallet };
+const ICONS: Record<AlertIcon, React.ComponentType<{ className?: string }>> = { Stamp, ListChecks, Inbox, Ticket, MoonStar, Wallet, TrendingDown, Siren };
 
 const TONE: Record<AlertTone, { dot: string; ring: string; chip: string }> = {
   urgent: { dot: "bg-bad", ring: "ring-bad/30", chip: "bg-bad-soft text-bad" },

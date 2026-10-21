@@ -6,7 +6,7 @@ import { timeAgo } from "@/lib/dates";
 import { TICKET_PRIORITY, TICKET_STATUS } from "@/lib/labels";
 import { agentForOps } from "@/lib/app/desk/agents";
 import { TICKET_PRIORITIES, ticketSla } from "@/lib/app/desk/sla";
-import { listTickets, syncTickets, ticketHref, ticketRef, TICKET_TABS } from "@/lib/app/desk/tickets";
+import { listTickets, syncTickets, ticketHref, ticketRef, TICKET_AGES, TICKET_TABS } from "@/lib/app/desk/tickets";
 import { Card, Empty, LinkButton, PageHeader, Table, Tabs, Td, Th } from "@/components/ui";
 import { StatusBadge } from "@/components/desk/parts";
 import { KIND_META } from "@/components/desk/kinds";
@@ -14,6 +14,7 @@ import { AutoRefresh, SlaClock } from "@/components/desk/live";
 import { ListFilter, Pager, SummaryStrip, listHref, pageParam } from "@/components/desk/list";
 
 export const metadata = { title: "Tickets · Desk" };
+const AGE_LABEL: Record<string, string> = { "1h": "Under an hour", "4h": "1 to 4 hours", "24h": "4 to 24 hours", older: "Over a day" };
 const LABEL: Record<string, string> = { open: "Open", waiting: "Waiting", resolved: "Resolved", closed: "Closed", all: "All" };
 
 export default async function TicketsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -24,9 +25,11 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   const { page, offset, size } = pageParam(sp);
   // me, none, or one agent's id (from Agents & roles and Performance).
   const owner = sp.o === "me" || sp.o === "none" || /^[0-9a-f-]{36}$/i.test(sp.o ?? "") ? sp.o : undefined;
-  const data = await listTickets({ tab: sp.s, q: sp.q, priority: sp.p, owner, me, limit: size, offset });
-  const href = listHref("/adminwork/desk/tickets", { s: sp.s, q: sp.q, p: sp.p, o: owner });
-  const filtered = !!(sp.q || sp.p || owner);
+  // age: how long it has been open, from the desk overview's backlog (1h, 4h, 24h, older).
+  const age = (TICKET_AGES as readonly string[]).includes(sp.age ?? "") ? sp.age : undefined;
+  const data = await listTickets({ tab: sp.s, q: sp.q, priority: sp.p, owner, age, me, limit: size, offset });
+  const href = listHref("/adminwork/desk/tickets", { s: sp.s, q: sp.q, p: sp.p, o: owner, age });
+  const filtered = !!(sp.q || sp.p || owner || age);
   return (
     <>
       <AutoRefresh every={30} />
@@ -34,7 +37,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
         actions={can(u, "desk.act") ? <LinkButton href="/adminwork/desk/tickets/new" variant="primary"><Plus className="size-4" />{t("New ticket")}</LinkButton> : null} />
       <Tabs active={data.tab} items={Object.keys(TICKET_TABS).map((s) => ({ key: s, label: t(LABEL[s]!), href: href({ s: s === "open" ? undefined : s, page: undefined }), count: data.counts[s] ?? 0 }))} />
       <Card pad={false}>
-        <ListFilter action="/adminwork/desk/tickets" q={sp.q} keep={{ s: sp.s }} placeholder={t("T-000123, subject, traveller, category…")} clear={filtered ? href({ q: undefined, p: undefined, o: undefined, page: undefined }) : null}>
+        <ListFilter action="/adminwork/desk/tickets" q={sp.q} keep={{ s: sp.s }} placeholder={t("T-000123, subject, traveller, category…")} clear={filtered ? href({ q: undefined, p: undefined, o: undefined, age: undefined, page: undefined }) : null}>
           <select name="p" defaultValue={sp.p ?? ""} className="field w-auto" aria-label={t("Priority")}>
             <option value="">{t("Any priority")}</option>
             {TICKET_PRIORITIES.map((p) => <option key={p} value={p}>{t(TICKET_PRIORITY[p]!.label)}</option>)}
@@ -43,6 +46,10 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
             <option value="">{t("Anyone's")}</option>
             {me && <option value="me">{t("Mine")}</option>}
             <option value="none">{t("Unassigned")}</option>
+          </select>
+          <select name="age" defaultValue={age ?? ""} className="field w-auto" aria-label={t("Open for")}>
+            <option value="">{t("Any age")}</option>
+            {TICKET_AGES.map((a) => <option key={a} value={a}>{t(AGE_LABEL[a]!)}</option>)}
           </select>
         </ListFilter>
         <SummaryStrip>

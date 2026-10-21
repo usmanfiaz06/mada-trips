@@ -15,6 +15,8 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
   const D = "/adminwork/desk";
   const sections: { label: string; items: Item[] }[] = [
     { label: t("Support"), items: [
+      // The leads' overview (DESK-PLAN U8): backlog, SLA, funnel, money, balances and who's on.
+      { href: `${D}/overview`, label: t("Overview"), icon: "LayoutDashboard", show: can(u, "desk.tickets.manage") || can(u, "desk.reports") },
       { href: D, label: t("My queue"), icon: "Headset", count: c.queue },
       { href: `${D}/tickets`, label: t("Tickets"), icon: "TicketCheck" },
       { href: `${D}/chats`, label: t("Chats"), icon: "MessagesSquare", count: c.chats },
