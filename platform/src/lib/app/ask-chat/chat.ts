@@ -11,7 +11,9 @@ import { redact, screen } from "./guard";
 import { ProviderHttpError } from "./providers-openai";
 import { nextFromState } from "./next";
 import { readSlots, slotsLine } from "./slots";
-import { appendTurn, addSpend, loadThread, newThread, spentToday } from "./store";
+import { appendTurn, addSpend, loadThread, newThread, saveFold, spentToday } from "./store";
+import { foldThread, historyOf, needsFold } from "./fold";
+import { MEMORY_HEAD, consentOf, memoryBlock } from "./memory";
 import { personLine } from "./tools";
 
 /*
@@ -40,6 +42,15 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const today = todayIn();
   const thread = (await loadThread(auth.userId, req.threadId)) ?? (await newThread(auth.userId, lang));
   emit({ type: "thread", threadId: thread.id, lang });
+  // A long thread: the older turns folded into a summary first, so every turn stays cheap (fold.ts).
+  let foldCost = 0;
+  if (needsFold(thread)) {
+    const f = await foldThread(api, thread, askFastModel());
+    await saveFold(auth.userId, thread.id, f);
+    Object.assign(thread, { messages: f.messages, summary: f.summary, foldedTurns: thread.foldedTurns + f.folded });
+    if (f.usage) foldCost = costMicros(askFastModel(), { input: f.usage.input_tokens ?? 0, output: f.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 });
+    console.info(`[ask-chat] thread=${thread.id} folded=${f.folded} by=${f.by} kept=${f.messages.length}`);
+  }
 
   // Abuse and scams get a fixed calm line and never reach the model.
   const screened = screen(typed);
@@ -61,18 +72,24 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
   const tripLines = (trips?.upcoming ?? []).slice(0, 5).map((tr) => `id=${tr.id} · ${tr.city} · ${tr.startDate}${tr.endDate ? ` to ${tr.endDate}` : ""} · ${tr.travellerNames.join(", ")}`);
   const onScreen = req.tripId ? tripLines.find((l) => l.startsWith(`id=${req.tripId}`)) ?? null : null;
 
+  const history = historyOf(thread.messages, thread.summary);
+  // What Mada knows from before: once per thread (the history carries it after that), and again after a fold.
+  const known = JSON.stringify(thread.messages).includes(MEMORY_HEAD);
+  const taken = (trips?.past ?? []).filter((tr) => tr.status !== "cancelled").map((tr) => `${tr.city} ${tr.startDate.slice(0, 7)}`);
+  const memory = known ? null : await memoryBlock(auth.userId, { kind: slots.intent.kind, taken });
+
   const r = await runTurn({
-    history: thread.messages as Anthropic.Beta.BetaMessageParam[],
+    history,
     text: clean,
-    context: turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today) }),
+    context: turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }),
     lang,
-    tool: { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set() },
+    tool: { ownerId: auth.userId, people, today, lang, ipHash: auth.ipHash, demo: new Set(), consent: consentOf(history, clean) },
     intent: slots.intent.kind,
     signal,
   }, emit, api);
 
   const fastCost = slots.usage ? costMicros(askFastModel(), { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }) : 0;
-  const total = r.costMicros + fastCost;
+  const total = r.costMicros + fastCost + foldCost;
   await appendTurn(auth.userId, thread.id, {
     messages: r.added,
     transcript: [{ who: "me", text: clean }, { who: "mada", text: r.text, cards: r.cards.map((c) => c.type), next: r.next }],

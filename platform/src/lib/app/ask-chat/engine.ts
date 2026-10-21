@@ -204,6 +204,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let paid = false;
   let handedOff = false;
   let flightRequest = false;
+  let remembered = false;
   // Only a hint: providers that cache the tool list (Claude) ignore it and get every tool (providers.ts).
   const onlyTools = toolsFor(input.intent ?? null);
 
@@ -277,6 +278,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       if (out.pay) { paid = true; emit({ type: "pay", pay: out.pay }); }
       if (out.handoff) handedOff = true;
       if (out.mode === "request") flightRequest = true;
+      if (out.remembered) remembered = true;
       if (out.handoff) emit({ type: "handoff", threadId: out.handoff.threadId, agent: out.handoff.agent });
       void c;
     }
@@ -293,6 +295,12 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   } else if (gate.dirty) {
     emit({ type: "replace", text });
   }
+  // Something was kept for next time: the reply says so once, in Mada's words (unless the model already did).
+  if (remembered && stop !== "refusal" && !/remember|نتذكر|بنتذكر|نحفظ|حفظنا|سجّلنا|سجلنا/i.test(text)) {
+    const line = t("chat.remembered", undefined, input.lang);
+    emit({ type: "text", delta: `${text ? " " : ""}${line}` });
+    text = text ? `${text} ${line}` : line;
+  }
   if (gate.dropped) console.warn(`[ask-chat] ${gate.dropped} sentence(s) held back (unbacked number or banned word)`);
   // Never open-ended: Mada's own choices when it gave at least 2 good ones, otherwise the turn's (next.ts).
   const modelChoices = stop === "refusal" ? [] : gate.choices;
@@ -302,7 +310,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
 }
 
 /** The context block for a turn: Mada's systems speaking, never the traveller. Changes every turn, so it sits in the turn. */
-export function turnContext(o: { today: string; lang: "en" | "ar"; people: Person[]; trips: string[]; onScreen: string | null; slots: string; household: (p: Person) => string }): string {
+export function turnContext(o: { today: string; lang: "en" | "ar"; people: Person[]; trips: string[]; onScreen: string | null; slots: string; household: (p: Person) => string; /** What Mada knows from before (memory.ts memoryBlock), once per thread. */ memory?: string | null }): string {
   const weekday = new Date(`${o.today}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
   return [
     "[Context from Mada's systems for this message. Not written by the traveller.]",
@@ -311,6 +319,7 @@ export function turnContext(o: { today: string; lang: "en" | "ar"; people: Perso
     `Household (id: name, relation, age):\n${o.people.map(o.household).join("\n") || "only the account holder"}`,
     `Trips: ${o.trips.length ? `\n${o.trips.join("\n")}` : "none upcoming"}`,
     o.onScreen ? `On screen: ${o.onScreen}` : null,
+    o.memory || null,
     `Read from the message: ${o.slots}`,
   ].filter(Boolean).join("\n");
 }

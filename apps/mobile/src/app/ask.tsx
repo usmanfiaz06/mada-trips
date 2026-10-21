@@ -24,7 +24,7 @@ import { useNet } from '@/lib/net';
 import { keys, usePeople } from '@/lib/queries';
 import { flushAsk, loadAsk, noteAskSettled, peekAsk, remapAsk, saveAsk, setRelaunchTo } from '@/lib/resume';
 import { bookingApi, useDemo, usePayDraft } from '@/lib/booking';
-import { sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
+import { newAskChat, restoreAskChat, sendAskChat, stopAskChat, useAskChat, useAskChatOn } from '@/lib/ask-chat';
 import { SHOW_DEMO_SWITCHES } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
 import { appLocale, setVoice, switchLanguage, t, useVoiceLocale } from '@/lib/i18n';
@@ -97,8 +97,14 @@ export default function Ask() {
   const headStart = useFlightHeadStart(household, today);
   const chatOn = useAskChatOn() && !offline;
   const chatTurns = useAskChat((s) => s.turns);
-  // Each Ask opens on a fresh conversation (the server keeps the thread while this screen is open).
-  useEffect(() => { useAskChat.getState().reset(); return () => { stopAskChat(); useAskChat.getState().reset(); }; }, []);
+  // Ask opens on the conversation from the last 24 hours, kept on the phone (lib/ask-chat.ts); "New chat" starts fresh.
+  useEffect(() => { void restoreAskChat(); return () => { stopAskChat(); }; }, []);
+  const startNewChat = () => {
+    buzz('tap');
+    newAskChat();
+    forgetSettled();
+    setQuery(''); setIntent(null); setCta(null); setDraft(''); setReplyTo(null); setAskNew(false); setFixes([]); setFixing(null); setEarlier([]);
+  };
 
   /** "we are 5", "December", "عندي تصريح": change the answer in hand instead of starting again. */
   const correct = (text: string): 'done' | 'unclear' | 'new' => {
@@ -320,6 +326,11 @@ export default function Ask() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/today'))} backLabel={t('ask.close')} home={false} right={(
           <View style={{ flexDirection: 'row', gap: 8 }}>
+            {chatTurns.length ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={t('chat.newChat.a11y')} onPress={startNewChat} style={styles.demo} testID="ask-new-chat">
+                <T v="caption" color={colors.green}>{t('chat.newChat')}</T>
+              </Pressable>
+            ) : null}
             {/* The other language, without losing this search (lib/resume.ts). */}
             <Pressable accessibilityRole="button" accessibilityLabel={tShared('ask.lang.a11y', undefined, appLocale())} onPress={() => { void switchTo(); }} style={styles.demo} testID="ask-lang">
               <T v="caption" color={colors.green}>{appLocale() === 'ar' ? tShared('ask.lang.toEnglish', undefined, 'en') : tShared('ask.lang.toArabic', undefined, 'ar')}</T>
