@@ -165,6 +165,8 @@ export default function Ask() {
     if (turn.state !== 'stopped') return; // done, or a newer message took over
     // Nothing said yet: as if the conversation had never been there.
     if (!turn.text && !turn.cards.length) useAskChat.setState((s) => ({ turns: s.turns.filter((x) => x.id !== turn.id) }));
+    // Cards already on screen are the answer: never a second flow under them asking the same thing again.
+    if (turn.cards.length) return;
     if (turn.intent) { saveAsk(v, turn.intent); setQuery(v); setIntent(turn.intent); setRound((r) => r + 1); return; }
     await runFlows(v, undefined, true);
   };

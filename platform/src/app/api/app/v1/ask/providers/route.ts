@@ -7,6 +7,7 @@ import { probeChain } from "@/lib/app/ask-chat/providers";
 // ASK_CHAT_PROVIDERS answering right now. Staging only, signed in; 404 on production.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export const GET = route(async (req) => {
   if (isProductionDeploy()) throw new AppError("NOT_FOUND");

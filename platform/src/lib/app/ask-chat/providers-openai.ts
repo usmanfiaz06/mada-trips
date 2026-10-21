@@ -22,7 +22,7 @@ import { toOpenApiSchema } from "./schema";
 /** An HTTP failure from the provider, with its status (chat.ts maps it to the code the app sees). */
 export class ProviderHttpError extends Error {
   /** quota: the provider said its quota or balance is used up (some answer 400, 402 or 403 for that, not 429). */
-  constructor(readonly status: number, message: string, readonly retryAfter: number | null = null, readonly quota = false, /** the model is unknown to this key, or its free tier gives it nothing ("limit: 0") */ readonly noModel = false) { super(message); this.name = "ProviderHttpError"; }
+  constructor(readonly status: number, message: string, readonly retryAfter: number | null = null, readonly quota = false, /** the model is unknown to this key, or its free tier gives it nothing ("limit: 0") */ readonly noModel = false, /** the start of the provider's own error, for the staging check only; never logged */ readonly detail = "") { super(message); this.name = "ProviderHttpError"; }
 }
 
 /** How long a provider asks us to wait: Retry-After, or Gemini's "retryDelay": "37s" in the body. Seconds, or null. */
@@ -76,6 +76,8 @@ export function toChatCompletion(p: StreamParams, stream: boolean, openapi = fal
     ...(tools.length ? { tools, tool_choice: "auto" } : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
+    // Gemini's Flash models think before answering by default; a travel reply needs little of it, and it costs seconds.
+    ...(openapi ? { reasoning_effort: "low" } : {}),
   };
 }
 
@@ -112,7 +114,7 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; open
     if (!res.ok) {
       // The body only to read a wait or a quota word from; never logged.
       const body = (await res.text().catch(() => "")).slice(0, 2000);
-      throw new ProviderHttpError(res.status, `provider answered ${res.status}`, retryAfterOf(res.headers.get("retry-after"), body), res.status !== 429 && res.status < 500 && QUOTA.test(body), res.status === 404 || (res.status === 429 && /limit:\s*0\b/.test(body)) || (res.status === 400 && /model/i.test(body) && /not (found|supported)|invalid/i.test(body)));
+      throw new ProviderHttpError(res.status, `provider answered ${res.status}`, retryAfterOf(res.headers.get("retry-after"), body), res.status !== 429 && res.status < 500 && QUOTA.test(body), res.status === 404 || (res.status === 429 && /limit:\s*0\b/.test(body)) || (res.status === 400 && /model/i.test(body) && /not (found|supported)|invalid/i.test(body)), body.slice(0, 300));
     }
     return res;
   };

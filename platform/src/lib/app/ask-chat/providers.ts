@@ -296,10 +296,11 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
     try {
       const models = l.auto ? await flashModels(l) : [l.fastModel];
       const api = l.auto ? autoModelApi(await apiFor(linkConfig(l)), models) : await apiFor(linkConfig(l));
-      await api.create({ model: l.fastModel, max_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 15_000, maxRetries: 0 });
+      await api.create({ model: l.fastModel, max_tokens: 8, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 40_000, maxRetries: 0 });
       return { name: l.name, model: l.auto ? models.join(" > ") : l.fastModel, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
     } catch (e) {
-      const msg = e instanceof Error ? e.message.replace(/\s+/g, " ").slice(0, 200) : "error";
+      const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail: unknown }).detail) : "";
+      const msg = `${e instanceof Error ? e.message : "error"}${detail ? ` · ${detail}` : ""}`.replace(/\s+/g, " ").slice(0, 400);
       return { name: l.name, model: l.auto ? (await flashModels(l)).join(" > ") : l.fastModel, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
     }
   }));
