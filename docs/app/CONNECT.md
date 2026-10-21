@@ -35,6 +35,7 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 24 | Google Routes API | daily drives in plans: km, hours, border crossings | Ready (mock until key) | Owner |
 | 25 | CarTrawler (car hire) | self-drive cars: search, deposit, insurance, book, cancel | Ready (mock until key) | Owner |
 | 26 | Klook | things to do in Asia, ranked with Hotelbeds/GYG/Viator | Ready (search; desk books) | Owner |
+| 27 | Sherpa | visa / entry rules for every passport, behind the entry check | Ready (built-in rules until key) | Owner |
 
 ## Processes
 
@@ -248,3 +249,29 @@ in Mada.
 **Licence notes.** Klook's content (photos, descriptions) may be shown only for selling Klook products and must keep
 "Klook" credit on the image (the app does). Check whether the agreement allows showing Klook next to competitors'
 products (ranking together); some agent agreements restrict price comparison.
+
+### 27. Sherpa — visa and entry requirements
+**What it does.** Becomes the source of each traveller's **visa line** in the entry check (`POST /search/entry`): for
+every passport in the party, Sherpa says visa-free, visa on arrival, e-Visa/ETA, embassy visa or not allowed, with the
+text, the length of stay and the passport validity it wants. Where Sherpa has an answer it replaces the visa line (or
+the "we check by hand" line for passports the built-in rules don't know: today they only know Saudi and Philippine
+passports for six countries). Passport validity, iqama, exit/re-entry and the UK ETA lines stay as the built-in rules
+write them. If Sherpa is down, not configured or has nothing, **the built-in rules answer, as today**. Answers are kept
+6 hours per nationality/country/month.
+
+**Apply.** joinsherpa.com → "Partners / API" → talk to sales; ask for the **Requirements API v3** (trips) with a
+sandbox key, Arabic content, and the "Visa & entry requirements" product (not only the widget). They sign a data
+licence agreement.
+
+**Keys in Vercel.** `SHERPA_API_KEY`, `SHERPA_ENV` (`sandbox` / `live`); `SUPPLIER_MODE_SHERPA=live|mock|off`
+(`mock` uses illustrative fixtures on staging; `off` = built-in rules only).
+
+**Certification.** None formal; Sherpa reviews how the requirements are shown (their attribution and the "check with
+the embassy" disclaimer). Test on staging with a Saudi, an Indian and a British passport to Istanbul.
+
+**Cost model.** Annual licence or per-request tiers (a few cents per trip lookup at low volume; ask for a startup
+tier). Our cache keeps calls to about one per nationality/country/month per server.
+
+**Licence notes.** Content is licensed for display to our own travellers, not for resale or bulk storage; keep the
+"Powered by Sherpa°" credit where the rules show and the disclaimer that the embassy has the final word. Sherpa is
+already built on Timatic-grade sources; see "IATA" below for why Timatic itself isn't used directly.

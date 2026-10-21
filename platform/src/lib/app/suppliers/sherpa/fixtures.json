@@ -1,0 +1,16 @@
+{
+  "_comment": "Illustrative entry rules for mock mode only (pairs the built-in rules don't cover). Never shown to travellers as current rules: mock mode never runs on production.",
+  "pairs": [
+    { "nationality": "SAU", "destination": "FR", "kind": "visa_required", "name": "Schengen visa", "text": "{name} needs a Schengen visa from the French visa centre (TLScontact Riyadh). Appointments take about 2 weeks.", "maxStayDays": 90, "passportDays": 90 },
+    { "nationality": "SAU", "destination": "ID", "kind": "visa_on_arrival", "name": null, "text": "Visa on arrival in Bali, IDR 500,000, or an e-VOA online before flying.", "maxStayDays": 30, "passportDays": 180 },
+    { "nationality": "SAU", "destination": "JP", "kind": "evisa", "name": "Japan eVISA", "text": "{name} needs a Japan eVISA. It's online, about 5 working days.", "maxStayDays": 90, "passportDays": null },
+    { "nationality": "GBR", "destination": "TR", "kind": "visa_free", "name": null, "text": "Visa-free for 90 days.", "maxStayDays": 90, "passportDays": 150 },
+    { "nationality": "GBR", "destination": "AE", "kind": "visa_on_arrival", "name": null, "text": "A free visit visa on arrival, 30 days.", "maxStayDays": 30, "passportDays": 180 },
+    { "nationality": "IND", "destination": "TR", "kind": "visa_required", "name": "Türkiye visa", "text": "{name} needs a Türkiye visa from the consulate in Riyadh, about 15 working days (or an e-Visa with a valid US, UK or Schengen visa).", "maxStayDays": 30, "passportDays": 150 },
+    { "nationality": "IND", "destination": "AE", "kind": "evisa", "name": "UAE visit visa", "text": "{name} needs a UAE visit visa before flying. It takes about 3 working days.", "maxStayDays": 30, "passportDays": 180 },
+    { "nationality": "PAK", "destination": "AZ", "kind": "evisa", "name": "Azerbaijan e-Visa", "text": "{name} needs an Azerbaijan e-Visa. It's online, about 3 working days.", "maxStayDays": 30, "passportDays": null },
+    { "nationality": "EGY", "destination": "GB", "kind": "visa_required", "name": "UK visit visa", "text": "{name} needs a UK visit visa. VFS Riyadh appointments take about 3 weeks.", "maxStayDays": 180, "passportDays": null },
+    { "nationality": "USA", "destination": "GB", "kind": "eta", "name": "UK ETA", "text": "{name} needs a UK ETA: online, GBP 16, usually 3 days.", "maxStayDays": 180, "passportDays": null },
+    { "nationality": "SYR", "destination": "GE", "kind": "not_allowed", "name": null, "text": "{name} can't visit Georgia on this passport for tourism.", "maxStayDays": null, "passportDays": null }
+  ]
+}

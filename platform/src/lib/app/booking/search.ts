@@ -14,6 +14,7 @@ import type { BookingFlightOffer, BookingHotelOffer } from "../suppliers/booking
 import { SupplierDown } from "../suppliers/mock/flights";
 import { bookingSuppliers, householdOf, isUuid, renewalsAsked, today, travellersOf } from "./common";
 import { guestPeople } from "../guest";
+import { entryRulesSupplier, withEntryRequirements } from "../suppliers/sherpa";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -296,10 +297,15 @@ export async function checkEntry(ownerId: string | null, input: EntryCheckReques
   // Renewals already asked for count as answered (pricing.ts renewalsAsked): the passport card says Mada is on it.
   const [travellers, asked] = await Promise.all([partyOf(ownerId, q.travellerIds, q.guests), ownerId ? renewalsAsked(ownerId) : Promise.resolve({})]);
   const mock = supplierMode("flights") === "mock";
-  return entryChecks({
-    destination: q.destination, travellers, depart: q.depart, return: q.return, answers: { ...asked, ...q.answers }, today: today(),
+  const answers = { ...asked, ...q.answers };
+  const rules = entryChecks({
+    destination: q.destination, travellers, depart: q.depart, return: q.return, answers, today: today(),
     demo: { passportProblemFor: demo.has("passportProblem") && ownerId ? demoPassportTarget(await householdOf(ownerId)) : null }, iqamaOf: mock ? demoIqama : undefined,
   });
+  // Sherpa (when switched on) decides each passport's visa line; the built-in rules stay as the fallback.
+  const sherpa = entryRulesSupplier();
+  if (!sherpa) return rules;
+  return withEntryRequirements(sherpa, rules, { country: DESTINATIONS[q.destination]!.country, travellers, depart: q.depart, return: q.return, answers });
 }
 
 export const nightsOf = (a: string, b: string | null) => (b ? Math.max(1, daysBetween(a, b)) : 6);
