@@ -17,6 +17,7 @@ import { ChipWrap, Notice, enter } from '@/components/booking/parts';
 import { AskReplyContext, ReplyBar, RequestFlow } from '@/components/booking/Requests';
 import { EarlierAsks, MadaLine, MeBubble } from '@/components/booking/Conversation';
 import { ChatThread, matchesIn, type ChatOpen } from '@/components/booking/ChatThread';
+import { linkHref } from '@/components/booking/PlanCards';
 import { IdeaTiles } from '@/components/trips/ui';
 import { ApiError, api } from '@/lib/api';
 import { carryOverGuestPeople } from '@/lib/guest';
@@ -208,6 +209,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
     if (o.kind === 'handoff') { router.push('/support' as Href); return; }
     if (o.kind === 'request') { router.push({ pathname: '/ask/request/[id]', params: { id: o.id } }); return; }
     if (o.kind === 'trip') { router.push({ pathname: '/trip/[id]', params: { id: o.id } }); return; }
+    if (o.kind === 'link') { router.push(linkHref(o.screen, o.id) as Href); return; }
     // "About your AlUla trip?": the same words again, into the trip's chat or a chat of their own (§2.2).
     if (o.kind === 'attach') {
       buzz('tap');

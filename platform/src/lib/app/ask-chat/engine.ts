@@ -5,7 +5,7 @@ import { t, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { isCloser, outgoingProblems, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
-import { COMPACT_SYSTEM_PROMPT, LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, leanToolsFor } from "./prompt";
+import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, compactPromptFor, leanToolsFor } from "./prompt";
 import { leanHistory } from "./fold";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
 import { schemaProblems, toolNameFor, withNulls } from "./schema";
@@ -225,7 +225,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools: TOOLS,
       only_tools: onlyTools,
-      lean: { system: COMPACT_SYSTEM_PROMPT, tools: LEAN_TOOLS, messages: [...leanBefore, ...added] },
+      lean: { system: compactPromptFor(onlyTools), tools: LEAN_TOOLS, messages: [...leanBefore, ...added] },
       tool_choice: { type: "auto" },
       messages: [...input.history, ...added],
     } as unknown as StreamParams;

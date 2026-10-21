@@ -16,6 +16,7 @@ import { openThread, sendMessage } from "../support/threads";
 import { presenceFor } from "../desk/agents";
 import { redact } from "./guard";
 import { isSensitive, saveFact, unkeepable } from "./memory";
+import { PLAN_RUN, PLAN_STATUS } from "./tools-plan";
 
 /*
  * The tools, run on the server as the signed-in traveller, through the same functions the app's own routes call (so
@@ -31,6 +32,9 @@ export type ToolCtx = {
   ownerId: string; people: Person[]; today: string; lang: "en" | "ar"; ipHash: string | null; demo: Set<DemoFlag>;
   /** For `remember`: Mada's last reply asked to remember something, and this message says yes (memory.ts consentOf). */
   consent?: { asked: boolean; yes: boolean };
+  /** The chat and the trip it's about (tools-plan.ts): a plan made here attaches the chat to its trip. */
+  threadId?: string | null;
+  tripId?: string | null;
 };
 export type ToolOut = { text: string; cards?: ChatCard[]; pay?: ChatPay; handoff?: { threadId: string; agent: string | null }; status?: string; isError?: boolean; mode?: "request"; /** A fact was saved (the reply says so once). */ remembered?: string };
 
@@ -241,6 +245,9 @@ const RUN: Record<string, Run> = {
     const f = await saveFact(ctx.ownerId, kind, text, "chat");
     return { text: `Saved for next time: ${f.text}. The app tells them it is remembered; don't say it again.`, remembered: f.text };
   },
+
+  // The living plan (tools-plan.ts).
+  ...PLAN_RUN,
 };
 
 export function personLine(p: Person, today: string): string {
@@ -286,7 +293,7 @@ export function statusFor(name: string, input: Record<string, unknown>, lang: "e
     create_request: "نرسلها للفريق", talk_to_human: "نحوّلها للفريق", plan_car_now: "نجهّز السيارة", get_hotel: "نقرأ عن الفندق", get_household: "نشوف مين مسافر",
     remember: "نسجّلها للمرة الجاية",
   };
-  return (lang === "ar" ? ar : en)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
+  return (lang === "ar" ? ar : en)[name] ?? (PLAN_STATUS[lang] as Record<string, string>)[name] ?? (lang === "ar" ? "لحظة" : "One moment");
 }
 
 /** Run one tool call. Expected failures (a gone offer, a person not in the household) come back as a sentence. */
