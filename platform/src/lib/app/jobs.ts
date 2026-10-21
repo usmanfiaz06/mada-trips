@@ -19,6 +19,7 @@ import { liveJob } from "./live";
 import { esimJob } from "./esim/ops";
 import { pastDatesJob } from "./outcomes";
 import { deskTicketsJob } from "./desk/tickets";
+import { financeJob } from "./finance/job";
 
 /*
  * Scheduled jobs (Vercel Cron → GET /api/cron/{job} with CRON_SECRET; locally `npm run app:jobs -- all`). Each is
@@ -41,9 +42,11 @@ import { deskTicketsJob } from "./desk/tickets";
  *               dates have passed close (unpaid, nothing charged, said in the thread) or go to the desk (outcomes.ts)
  *   desk        desk tickets (desk/tickets.ts): one per open item on the desk, resolved when their source is done,
  *               closed after 72 quiet hours; tickets past their promise escalate, and the lead's bell shows them
+ *   finance     app finance (finance/job.ts): cost lines for new captures, refunds a lead approved sent, card refunds
+ *               checked with the provider (approved → sent), captured sales and finished refunds posted to Ops
  */
 
-export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights", "live", "esim", "desk"] as const;
+export const JOBS = ["exports", "deletions", "recovery", "quotes", "hotelbeds", "flights", "live", "esim", "desk", "finance"] as const;
 export type JobName = (typeof JOBS)[number];
 export type JobResult = Record<string, number>;
 
@@ -138,7 +141,7 @@ export async function quotesJob(now = new Date()): Promise<JobResult> {
   return { expired: ended.length, told, stopped };
 }
 
-const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: () => deskTicketsJob() };
+const RUN: Record<JobName, () => Promise<JobResult>> = { exports: () => exportsJob(), deletions: () => deletionsJob(), recovery: () => recoveryJob(), quotes: async () => ({ ...await quotesJob(), ...await pastDatesJob() }), hotelbeds: () => hotelbedsContentJob(), flights: () => flightsJob(), live: () => liveJob(), esim: () => esimJob(), desk: () => deskTicketsJob(), finance: () => financeJob() };
 
 /** Run some jobs (or all), one after another; a job that throws doesn't stop the others. */
 export async function runJobs(names: readonly JobName[]): Promise<Record<string, JobResult | { error: string }>> {

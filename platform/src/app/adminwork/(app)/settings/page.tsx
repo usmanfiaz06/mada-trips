@@ -41,6 +41,10 @@ export default async function SettingsPage() {
           <Group title={t("App desk")} hint={t("What a support agent gives alone. Above it, a support lead approves in Approvals.")}>
             <Field label={t("Goodwill credit per customer (SAR)")}><Input name="deskGoodwillLimit" defaultValue={amountInput(s.deskGoodwillLimit)} dir="ltr" /></Field>
             <Field label={t("Goodwill per agent per day (SAR)")}><Input name="deskAgentDailyLimit" defaultValue={amountInput(s.deskAgentDailyLimit)} dir="ltr" /></Field>
+            <Field label={t("Refund an agent approves alone (SAR)")}><Input name="deskRefundLimit" defaultValue={amountInput(s.deskRefundLimit)} dir="ltr" /></Field>
+            <Field label={t("Refunds per agent per day (SAR)")}><Input name="deskRefundDailyLimit" defaultValue={amountInput(s.deskRefundDailyLimit)} dir="ltr" /></Field>
+            <Field label={t("Hotelbeds credit line (SAR)")} hint={t("0 if not set up. Shown on Supplier balances.")}><Input name="appHotelbedsCreditLine" defaultValue={amountInput(s.appHotelbedsCreditLine)} dir="ltr" /></Field>
+            <Field label={t("TBO credit line (SAR)")} hint={t("0 if not set up. Shown on Supplier balances.")}><Input name="appTboCreditLine" defaultValue={amountInput(s.appTboCreditLine)} dir="ltr" /></Field>
           </Group>
         </div>
         <div className="flex justify-end"><SubmitButton variant="gold" size="lg">{t("Save rules")}</SubmitButton></div>

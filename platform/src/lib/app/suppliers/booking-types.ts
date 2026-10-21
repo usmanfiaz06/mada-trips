@@ -36,6 +36,11 @@ export interface BookingPaymentSupplier extends PaymentSupplier {
   completeAction(providerRef: string, code: string): Promise<PaymentResult & { triesLeft?: number }>;
   /** Ask the bank for a new code. A gateway whose bank page has its own "send again" leaves it out. */
   resendCode?(providerRef: string): Promise<{ sent: boolean }>;
+  /**
+   * Where a card refund stands at the provider (the desk's approved → sent check, finance/refunds.ts): `refunded` once
+   * the provider has sent it to the card, `pending` while it is still queued, `failed` when the provider gave up.
+   */
+  refundStatus?(providerRef: string, refundRef: string): Promise<{ status: "refunded" | "pending" | "failed"; reference?: string | null }>;
 }
 
 export type AskParserContext = { today: string; people: Person[]; destinations: string[] };

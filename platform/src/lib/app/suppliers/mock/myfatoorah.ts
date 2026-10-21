@@ -45,4 +45,10 @@ export const mockMyFatoorah: BookingPaymentSupplier = {
   async refund(ref, amount, key) {
     return refundResult(ref, amount, key);
   },
+  async refundStatus(_ref, refundRef) {
+    // Stateless like the rest: a refund this mock made has gone to the card. Test references can ask for the other answers.
+    if (refundRef.includes("pending")) return { status: "pending" as const };
+    if (refundRef.includes("fail")) return { status: "failed" as const };
+    return { status: "refunded" as const, reference: refundRef };
+  },
 };

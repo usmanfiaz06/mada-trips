@@ -36,7 +36,7 @@ export const EXPENSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   void: { label: "Void", tone: "neutral" },
 };
 export const PAID_BY: Record<string, string> = { retail: "Company · SNB", corporate: "Company · Alinma (B2B Account)", partner: "Partner, personally" };
-export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale", goodwill: "Goodwill credit" };
+export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale", goodwill: "Goodwill credit", app_refund: "App refund" };
 export const APPROVAL_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Pending", tone: "gold" }, approved: { label: "Approved", tone: "ok" }, rejected: { label: "Rejected", tone: "bad" }, cancelled: { label: "Withdrawn", tone: "neutral" },
 };
@@ -86,8 +86,17 @@ export const PAY_STATUS: Record<string, { label: string; tone: Tone }> = {
   partially_refunded: { label: "Partly refunded", tone: "neutral" },
 };
 export const REFUND_STAGE: Record<string, { label: string; tone: Tone }> = {
-  requested: { label: "To decide", tone: "gold" }, approved: { label: "Approved · on its way", tone: "info" }, sent: { label: "Sent", tone: "ok" }, rejected: { label: "Declined", tone: "bad" },
+  requested: { label: "To decide", tone: "gold" }, awaiting_lead: { label: "With a lead", tone: "warn" }, lead_approved: { label: "Lead approved · sending", tone: "info" },
+  approved: { label: "Approved · on its way", tone: "info" }, sent: { label: "Sent", tone: "ok" }, settled: { label: "Settled", tone: "ok" }, rejected: { label: "Declined", tone: "bad" },
   withdrawn: { label: "Withdrawn by the traveller", tone: "neutral" },
+};
+/** App finance (DESK-PLAN U6): products on the revenue page, cost basis, reconciliation match. */
+export const APP_PRODUCT: Record<string, string> = { flight: "Flights", stay: "Stays", esim: "eSIMs", transfer: "Transfers", activity: "Things to do", request: "Requests", other: "Other" };
+export const COST_BASIS: Record<string, { label: string; tone: Tone }> = {
+  supplier: { label: "From the supplier", tone: "ok" }, estimated: { label: "Estimated", tone: "warn" }, manual: { label: "Typed by finance", tone: "info" }, missing: { label: "No cost yet", tone: "bad" },
+};
+export const RECON_STATUS: Record<string, { label: string; tone: Tone }> = {
+  matched: { label: "Matched", tone: "ok" }, amount_mismatch: { label: "Amount differs", tone: "bad" }, missing_ours: { label: "Not in Mada", tone: "bad" }, missing_provider: { label: "Not in the file", tone: "warn" },
 };
 export const ESIM_STATUS: Record<string, { label: string; tone: Tone }> = {
   ordering: { label: "Ordering", tone: "info" }, ready: { label: "Ready to install", tone: "info" }, installed: { label: "Installed", tone: "ok" }, active: { label: "On", tone: "ok" },

@@ -1,6 +1,7 @@
 import { can, type CurrentUser } from "@/lib/auth";
 import type { NavItem, NavSection } from "@/components/shell/sidebar";
 import type { DeskNavCounts } from "./inbox";
+import { canDeskFinance } from "@/lib/app/finance/access";
 
 /*
  * The desk's sidebar sections (DESK-PLAN.md §4.1). Entries marked `soon` are screens later units build: they stay
@@ -31,10 +32,10 @@ export function deskSections(u: CurrentUser, t: (s: string) => string, c: DeskNa
       { href: `${D}/disruptions`, label: t("Disruptions"), icon: "TriangleAlert", count: c.disruptions, tone: "bad" },
     ] },
     { label: t("App finance"), items: [
-      { href: `${D}/finance`, label: t("App revenue & margin"), icon: "ChartLine", soon: true },
-      { href: `${D}/finance/reconciliation`, label: t("Reconciliation"), icon: "Scale", soon: true },
-      { href: `${D}/finance/balances`, label: t("Supplier balances"), icon: "Gauge", soon: true },
-      { href: `${D}/esims/pricing`, label: t("eSIM pricing"), icon: "Tags", show: can(u, "settings.manage") },
+      { href: `${D}/finance`, label: t("App revenue & margin"), icon: "ChartLine", show: canDeskFinance(u) },
+      { href: `${D}/finance/reconciliation`, label: t("Reconciliation"), icon: "Scale", show: canDeskFinance(u) },
+      { href: `${D}/finance/balances`, label: t("Supplier balances"), icon: "Gauge", show: canDeskFinance(u) },
+      { href: `${D}/finance/esim-pricing`, label: t("eSIM pricing"), icon: "Tags", show: can(u, "settings.manage") },
     ] },
     { label: t("Support admin"), items: [
       { href: `${D}/team`, label: can(u, "desk.admin") ? t("Team & rota") : t("Team"), icon: "UsersRound" },
