@@ -164,6 +164,7 @@ export const resilienceCopy = {
   'error.idempotencyConflict': 'That was already sent with different details. Check it and send again.',
   'error.inProgress': 'We’re still on the first try. Give it a few seconds.',
   'error.timeout': 'This is taking too long. Nothing you did was lost.',
+  'error.planChanged': 'The plan changed since you opened it. Here it is again.',
   'outbox.weakTitle': 'Mada is loading slowly',
   'outbox.weakLine': 'Everything still works, it just takes longer. Anything you send waits here until it goes through.',
 } as const;
