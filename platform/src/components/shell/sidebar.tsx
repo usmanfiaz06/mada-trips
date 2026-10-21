@@ -6,19 +6,28 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange,
   Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, Menu, X, LogOut, Headset,
+  MessagesSquare, ShoppingBag, Receipt, Undo2, Smartphone, TriangleAlert, Flag, KeyRound, CalendarDays, UsersRound, ChartLine, Scale, Gauge, Tags,
+  Bot, Contact, TicketCheck, TrendingDown, CalendarClock, Activity, MessageSquareText,
 } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, Headset };
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number; accent?: boolean };
+const ICONS = {
+  LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, Headset,
+  MessagesSquare, ShoppingBag, Receipt, Undo2, Smartphone, TriangleAlert, Flag, KeyRound, CalendarDays, UsersRound, ChartLine, Scale, Gauge, Tags,
+  Bot, Contact, TicketCheck, TrendingDown, CalendarClock, Activity, MessageSquareText,
+};
+/** `tone: "bad"` shows the count in red (late or disrupted work); `match` lights the item for other paths too. */
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number; accent?: boolean; tone?: "bad"; match?: string[] };
 export type NavSection = { label: string; items: NavItem[] };
 
 function Nav({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: () => void }) {
   const path = usePathname();
-  const active = (href: string) => (href === "/adminwork" ? path === "/adminwork" : path === href || path.startsWith(href + "/"));
+  const under = (href: string) => path === href || path.startsWith(href + "/");
+  // The dashboard and the desk queue are roots of other pages, so they only light up on themselves.
+  const active = (i: NavItem) => (i.href === "/adminwork" || i.href === "/adminwork/desk" ? path === i.href : under(i.href)) || !!i.match?.some(under);
   // Most specific match wins so /team/roles doesn't also light up /team.
-  const current = sections.flatMap((s) => s.items).filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const current = sections.flatMap((s) => s.items).filter(active).sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
     <nav className="flex-1 space-y-7 overflow-y-auto px-4 pb-6">
       {sections.map((s) => (
@@ -45,7 +54,7 @@ function Nav({ sections, onNavigate }: { sections: NavSection[]; onNavigate?: ()
                       on ? "bg-surface text-ink shadow-card" : "text-ink-2 hover:bg-surface/60 hover:text-ink")}>
                     <Icon className={cx("size-[17px] shrink-0", on ? "text-gold-2" : "text-ink-3")} strokeWidth={1.7} />
                     <span className="truncate">{it.label}</span>
-                    {!!it.count && <span className="num ms-auto grid h-[22px] min-w-[22px] place-items-center rounded-full bg-gold px-1.5 text-[11.5px] font-medium text-[#1a140a]">{it.count}</span>}
+                    {!!it.count && <span className={cx("num ms-auto grid h-[22px] min-w-[22px] place-items-center rounded-full px-1.5 text-[11.5px] font-medium", it.tone === "bad" ? "bg-bad text-white" : "bg-gold text-[#1a140a]")}>{it.count}</span>}
                   </Link>
                 </li>
               );

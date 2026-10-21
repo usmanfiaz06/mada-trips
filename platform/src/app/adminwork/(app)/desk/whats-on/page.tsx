@@ -50,7 +50,7 @@ export default async function WhatsOnPage({ searchParams }: { searchParams: Prom
   const rows = await listWhatsOn({ past });
   return (
     <>
-      <PageHeader eyebrow={t("App desk")} title={t("What's on")}
+      <PageHeader eyebrow={t("Support admin")} title={t("What's on")}
         subtitle={t("Events the app shows in Things to do. Saudi events have no open feed, so we keep them here: dates, city, a photo with its credit, and both languages.")} />
       <Tabs active={past ? "past" : "now"} items={[
         { key: "now", label: t("On now and coming up"), count: past ? undefined : rows.length, href: "/adminwork/desk/whats-on" },

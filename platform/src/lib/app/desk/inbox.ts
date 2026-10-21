@@ -2,11 +2,16 @@ import "server-only";
 import { contactOf } from "./flight-quotes";
 import { cache } from "react";
 import { CALLBACK_MINUTES } from "@mada/shared";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { appDeskItems } from "@/db/app-schema-desk";
-import { agentForOps, loadRota, primaryAgents, type Agent } from "./agents";
-import { destinationOf, listConversations, listOrders, listRefunds, listRequests, type OrderStage } from "./adapters";
+import { appDeskItems, appDeskModeration } from "@/db/app-schema-desk";
+import { appMessages, appRefunds, appRequests, appSegments, appTrips } from "@/db/app-schema";
+import { appReports } from "@/db/app-schema-circles";
+import { appRecoveryRequests } from "@/db/app-schema-recovery";
+import { appEsims } from "@/db/app-schema-esim";
+import { riyadhDate } from "@/lib/dates";
+import { loadRota, primaryAgents, type Agent } from "./agents";
+import { destinationOf, listConversations, listOrders, listRefunds, listRequests, orderStageCounts, type OrderStage } from "./adapters";
 import { listModeration } from "./moderation";
 import { listRecovery } from "./recovery";
 import { assertCap, deskAudit, DeskError, type DeskActor } from "./core";
@@ -142,11 +147,6 @@ export function inboxCounts(items: InboxItem[], me: Agent | null) {
   };
 }
 
-/** The sidebar number: what's mine or nobody's yet. */
-export async function deskBadge(opsUserId: string) {
-  const [{ items }, me] = await Promise.all([deskInbox(), agentForOps(opsUserId)]);
-  return items.filter((i) => !i.route.agentId || (me && i.route.agentId === me.id)).length;
-}
 
 const KIND_SET = new Set<string>(DESK_KINDS);
 function checkKey(kind: string, id: string) {
@@ -196,3 +196,28 @@ export async function itemRoute(kind: string, id: string, userId: string | null)
   const route = routeFor(userId ? primary.get(userId) ?? null : null, rota.agents, rota.shifts, rota.now, o?.assignedAgentId);
   return { route, agents: rota.agents.filter((a) => a.active), escalated: !!o?.escalatedAt, escalationNote: o?.escalationNote ?? null, primaryId: userId ? primary.get(userId) ?? null : null };
 }
+
+export type DeskNavCounts = { queue: number; chats: number; orders: number; requests: number; refunds: number; disruptions: number; moderation: number; recovery: number; esims: number };
+
+/**
+ * The sidebar's numbers, from count queries only: every Ops page renders the sidebar, so this must not rebuild the
+ * queue (deskInbox reads every source and routes it). "queue" is everything open on the desk, the inbox's "Whole team".
+ */
+export const deskNavCounts = cache(async (now: Date = new Date()): Promise<DeskNavCounts> => {
+  const today = riyadhDate(now);
+  const [stages, res] = await Promise.all([orderStageCounts(), db.execute(sql`SELECT
+    (SELECT count(*)::int FROM ${appRequests} WHERE (${appRequests.kind} NOT IN ('flight','stay','trip','cancel','refund') AND ${appRequests.status} IN ('sent','reviewing'))
+      OR (${appRequests.kind} NOT IN ('flight','stay','trip') AND ${appRequests.status} = 'with_agent')
+      OR (${appRequests.kind} = 'flight' AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing'))) AS requests,
+    (SELECT count(*)::int FROM (SELECT thread_kind, thread_id, max(created_at) FILTER (WHERE author_kind = 'user') AS u, max(created_at) FILTER (WHERE author_kind = 'agent') AS a
+      FROM ${appMessages} WHERE thread_kind IN ('support','request') GROUP BY 1, 2) x WHERE x.u > coalesce(x.a, 'epoch')) AS chats,
+    (SELECT count(*)::int FROM ${appRefunds} WHERE ${appRefunds.stage} = 'requested') AS refunds,
+    (SELECT count(DISTINCT ${appSegments.flightNumber})::int FROM ${appSegments} JOIN ${appTrips} ON ${appTrips.id} = ${appSegments.tripId}
+      WHERE ${appSegments.departLocal}::date = ${today}::date AND ${appSegments.status} IN ('delayed','cancelled','diverted') AND ${appTrips.status} <> 'cancelled') AS disruptions,
+    ((SELECT count(*)::int FROM ${appDeskModeration} WHERE ${appDeskModeration.status} = 'open') + (SELECT count(*)::int FROM ${appReports} WHERE ${appReports.status} = 'open')) AS moderation,
+    (SELECT count(*)::int FROM ${appRecoveryRequests} WHERE ${appRecoveryRequests.status} = 'open') AS recovery,
+    (SELECT count(*)::int FROM ${appEsims} WHERE ${appEsims.status} = 'stuck' AND ${appEsims.idx} = 0) AS esims`)]);
+  const c = (res as unknown as Omit<DeskNavCounts, "queue" | "orders">[])[0]!;
+  const orders = (stages.awaiting ?? 0) + (stages.held ?? 0) + (stages.failed ?? 0);
+  return { ...c, orders, queue: orders + c.requests + c.chats + c.refunds + c.disruptions + c.moderation + c.recovery + c.esims };
+});
