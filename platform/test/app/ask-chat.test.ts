@@ -283,3 +283,61 @@ describe("another provider (openai-compatible)", () => {
     expect(s).toMatchObject({ turns: 2, passed: 1, byCheck: { one: 1 }, medianMs: 1500, costPerConversation: 0.003, dialect: { spoken: 1, msa: 0 } });
   });
 });
+
+describe("weaker tool calling and the presets", () => {
+  afterEach(() => { vi.unstubAllGlobals(); for (const k of ["ASK_CHAT_PROVIDER", "GROQ_API_KEY", "ZAI_API_KEY", "GEMINI_API_KEY"]) delete process.env[k]; });
+
+  it("checks arguments against the strict schemas and matches names loosely", async () => {
+    const { schemaProblems, toolNameFor, toOpenApiSchema } = await import("@/lib/app/ask-chat/schema");
+    const flights = TOOLS.find((t) => t.name === "search_flights")!.input_schema as never;
+    expect(schemaProblems(flights, { destination: "dubai", from: null, depart: "2027-03-09", return: null, traveller_ids: [], infants: 0, cabin: null })).toEqual([]);
+    expect(schemaProblems(flights, { destination: "dubai", depart: "x", extra: 1 }).join(" | ")).toMatch(/from is required.*extra is not a field/);
+    expect(schemaProblems(flights, { destination: "mars", from: "RUH", depart: 5, return: null, traveller_ids: [1], infants: 0, cabin: null })).toEqual(["input.destination must be one of " + (flights as { properties: { destination: { enum: string[] } } }).properties.destination.enum.map((e) => JSON.stringify(e)).join(", "), "input.depart must be string", "input.traveller_ids[0] must be string"]);
+    expect(toolNameFor("Search-Flights", TOOL_NAMES)).toBe("search_flights");
+    expect(toolNameFor("book_it", TOOL_NAMES)).toBeNull();
+    expect(JSON.stringify(toOpenApiSchema(flights))).not.toMatch(/"null"|additionalProperties/);
+    expect(toOpenApiSchema(flights)).toMatchObject({ properties: { from: { type: "string", nullable: true, enum: ["RUH", "JED", "DMM"] } } });
+  });
+
+  it("answers a bad call with what is wrong once, then runs the repaired one", async () => {
+    const { token } = await signIn();
+    setChatApi(fakeApi((_p, n) => {
+      if (n === 0) return { blocks: [{ type: "tool_use", name: "Get_Trips", input: { all: true } }] };
+      if (n === 1) return { blocks: [{ type: "tool_use", name: "get_trips", input: {} }] };
+      return { blocks: [{ type: "text", text: "Nothing booked yet." }] };
+    }));
+    const r = await chat(token, { text: "my trips?" });
+    expect(said(r.events).final).toBe("Nothing booked yet.");
+  });
+
+  it("falls back when the arguments are still wrong after the repair", async () => {
+    const { token } = await signIn();
+    setChatApi(fakeApi(() => ({ blocks: [{ type: "tool_use", name: "search_flights", input: { destination: "dubai" } }] })));
+    const r = await chat(token, { text: "Dubai" });
+    expect(r.events.at(-1)).toEqual({ type: "error", code: "TOOL_INPUT", fallback: true });
+  });
+
+  it("groq, zai and gemini fill in the base URL, key and model; a 429 falls back; Gemini gets OpenAPI schemas", async () => {
+    const { token } = await signIn();
+    delete process.env.ANTHROPIC_API_KEY;
+    Object.assign(process.env, { ASK_CHAT_PROVIDER: "groq", GROQ_API_KEY: "g" });
+    expect((await call(configGet, { method: "GET" })).json.features.askChat).toBe(true);
+    const seen: { url: string; body: { model: string; tools?: { function: { parameters?: unknown } }[] } }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => { seen.push({ url, body: JSON.parse(String(init.body)) }); return new Response("slow down", { status: 429, headers: { "retry-after": "7" } }); }));
+    const r = await chat(token, { text: "Istanbul for Eid" });
+    expect(r.events.at(-1)).toEqual({ type: "error", code: "RATE_LIMITED", fallback: true });
+    expect(seen.at(-1)).toMatchObject({ url: "https://api.groq.com/openai/v1/chat/completions", body: { model: "openai/gpt-oss-120b" } });
+    Object.assign(process.env, { ASK_CHAT_PROVIDER: "zai", ZAI_API_KEY: "z" });
+    await chat(token, { text: "Istanbul for Eid" });
+    expect(seen.at(-1)).toMatchObject({ url: "https://api.z.ai/api/paas/v4/chat/completions", body: { model: "glm-4.7-flash" } });
+    // Gemini has no default model (its ids are read at run time): off until ASK_CHAT_MODEL names one.
+    Object.assign(process.env, { ASK_CHAT_PROVIDER: "gemini", GEMINI_API_KEY: "m" });
+    expect((await call(configGet, { method: "GET" })).json.features.askChat).toBe(false);
+    process.env.ASK_CHAT_MODEL = "gemini-flash-test";
+    await chat(token, { text: "Istanbul for Eid" });
+    const g = seen.at(-1)!;
+    expect(g.url).toBe("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions");
+    expect(JSON.stringify(g.body.tools)).not.toMatch(/"null"|additionalProperties/);
+    delete process.env.ASK_CHAT_MODEL;
+  });
+});

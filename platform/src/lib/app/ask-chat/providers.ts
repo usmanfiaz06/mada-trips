@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { chatProvider, type ChatProviderName } from "./config";
+import { chatProvider, openAiSettings, type ChatProviderName } from "./config";
 
 /*
  * Who the conversation talks to, behind one small interface: a streamed message with tool calls, and a plain one (for
@@ -10,6 +10,7 @@ import { chatProvider, type ChatProviderName } from "./config";
  *   anthropic          the Claude API through the official SDK (default; the production path)
  *   openai-compatible  any /chat/completions endpoint with streaming and function tools: DeepSeek, Qwen, Kimi, GLM,
  *                      vLLM or another self-hosted model (providers-openai.ts). For comparing in the evals first.
+ *   groq, zai, gemini  openai-compatible with the base URL and key variable filled in (config.ts PRESETS).
  * Bedrock is not wired: it needs @anthropic-ai/bedrock-sdk and none of the betas this uses (docs/app/ASK-CHAT.md §6).
  */
 
@@ -23,7 +24,7 @@ export interface ChatApi {
   create(params: StreamParams, opts?: ReqOpts): Promise<Anthropic.Beta.BetaMessage>;
 }
 
-export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; baseUrl?: string };
+export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; baseUrl?: string; openapi?: boolean };
 
 export function anthropicApi(apiKey = process.env.ANTHROPIC_API_KEY): ChatApi {
   const client = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
@@ -38,7 +39,7 @@ export async function apiFor(cfg: ProviderConfig): Promise<ChatApi> {
   if (cfg.provider === "anthropic") return anthropicApi(cfg.apiKey);
   const { openAiCompatibleApi } = await import("./providers-openai");
   if (!cfg.baseUrl || !cfg.apiKey) throw new Error("openai-compatible needs a base URL and a key");
-  return openAiCompatibleApi({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey });
+  return openAiCompatibleApi({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, openapi: cfg.openapi });
 }
 
 let override: ChatApi | null = null;
@@ -51,9 +52,7 @@ export async function chatApi(): Promise<ChatApi> {
   if (override) return override;
   const provider = chatProvider();
   if (!provider) throw new Error("ASK_CHAT_PROVIDER names a provider without an adapter");
-  const cfg: ProviderConfig = provider === "anthropic"
-    ? { provider, apiKey: process.env.ANTHROPIC_API_KEY }
-    : { provider, apiKey: process.env.ASK_CHAT_API_KEY?.trim(), baseUrl: process.env.ASK_CHAT_BASE_URL?.trim() };
+  const cfg: ProviderConfig = provider === "anthropic" ? { provider, apiKey: process.env.ANTHROPIC_API_KEY } : { provider, ...openAiSettings(provider) };
   const key = `${cfg.provider}|${cfg.baseUrl ?? ""}|${cfg.apiKey?.slice(-6) ?? ""}`;
   if (real?.key !== key) real = { key, api: await apiFor(cfg) };
   return real.api;

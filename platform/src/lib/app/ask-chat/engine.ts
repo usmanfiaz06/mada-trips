@@ -5,7 +5,8 @@ import { t, type AskChatEvent, type AskIntent, type ChatCard, type Person } from
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { outgoingProblems, tidy, unbacked } from "./guard";
 import { SYSTEM_PROMPT, TOOLS } from "./prompt";
-import { runTool, statusFor, type ToolCtx } from "./tools";
+import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
+import { schemaProblems, toolNameFor } from "./schema";
 
 /*
  * One turn of the conversation: the traveller's message (already redacted and screened) in, events out as they
@@ -22,6 +23,12 @@ import { runTool, statusFor, type ToolCtx } from "./tools";
  */
 
 export const MAX_STEPS = 6;
+const TOOL_LIST = TOOLS as { name: string; input_schema: unknown }[];
+
+/** A provider's tool call was still wrong after one repair: the app answers with its own flows. */
+export class ToolInputError extends Error {
+  constructor(tools: string) { super(`tool input still invalid after a repair: ${tools}`); this.name = "ToolInputError"; }
+}
 
 // Who answers is behind one interface (providers.ts): Claude by default, another provider for comparing.
 export { chatApi, setChatApi, type ChatApi } from "./providers";
@@ -130,6 +137,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   let sep = false;
   let raw = "";
   const exec = input.runTool ?? runTool;
+  let repairs = 0;
   const gate = new SentenceGate(() => toolText, (s) => { emit({ type: "text", delta: s }); sep = true; });
   let stop: TurnResult["stop"] = "steps";
 
@@ -171,12 +179,28 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       break;
     }
 
+    // Arguments checked against the strict schemas (a provider without strict tool use can get them wrong): a bad
+    // call is answered with what is wrong, once per turn; wrong again and the app's own flows take over.
+    const checked = calls.map((c) => {
+      const name = toolNameFor(c.name, TOOL_LIST.map((x) => x.name));
+      const schema = TOOL_LIST.find((x) => x.name === name)?.input_schema;
+      const problems = !name ? [`there is no tool called ${c.name}; the tools are ${TOOL_LIST.map((x) => x.name).join(", ")}`] : schemaProblems(schema as never, c.input);
+      return { c, name: name ?? c.name, problems };
+    });
+    const bad = checked.filter((x) => x.problems.length);
+    if (bad.length) {
+      if (repairs >= 1) throw new ToolInputError(bad.map((x) => x.name).join(","));
+      repairs += 1;
+      console.warn(`[ask-chat] tool input repaired: ${bad.map((x) => x.name).join(",")}`);
+    }
+
     // Independent calls run together; all results go back in one message.
-    const results = await Promise.all(calls.map(async (c) => {
+    const results = await Promise.all(checked.map(async ({ c, name, problems }) => {
+      if (problems.length) return { c, out: { text: `Not run. The arguments don't match the schema: ${problems.join("; ")}. Call it again with arguments that match exactly.`, isError: true } as ToolOut };
       const inp = (c.input ?? {}) as Record<string, unknown>;
-      emit({ type: "status", text: statusFor(c.name, inp, input.lang) });
-      toolsUsed.push(c.name);
-      const out = await exec(c.name, inp, input.tool);
+      emit({ type: "status", text: statusFor(name, inp, input.lang) });
+      toolsUsed.push(name);
+      const out = await exec(name, inp, input.tool);
       return { c, out };
     }));
     for (const { c, out } of results) {

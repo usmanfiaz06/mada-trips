@@ -193,7 +193,21 @@ Each one runs through the real engine, with fixture tool results and no database
 
 The script exits 1 on any failure and prints the tokens and cost of each turn.
 
-**Comparing providers.** The same 30 conversations, fixtures and checks run against any number of profiles in one go, followed by a table:
+**Comparing providers.** The same 30 conversations, fixtures and checks run against any number of profiles in one go, followed by a table. The quickest way uses the presets (§6), with keys taken from the environment:
+
+```
+ANTHROPIC_API_KEY=… GROQ_API_KEY=… ZAI_API_KEY=… GEMINI_API_KEY=… npm run ask:eval -- --provider anthropic,groq,zai,gemini
+npm run ask:eval -- --provider groq --model llama-3.3-70b-versatile visa-uk ar-esim     # one model, two cases
+npm run ask:eval -- --provider openai-compatible --model deepseek-chat --price 0.27,1.10,0.07
+```
+
+Without `--model`, each preset runs its listed models. Gemini runs the Flash models its own `GET /models` lists for that key, at most 4, so no Gemini model id is hard-coded. A provider whose key isn't set is skipped.
+
+A 429 waits for `Retry-After`, or 5, 10 then 20 s, up to 3 tries, and then counts as a failed turn ("rate"). Any other error also counts as a failed turn ("error"), and the run carries on.
+
+Cost per conversation shows "free tier" for the Z.ai Flash models. For a non-Claude model with no `--price` it shows "n/a", because no price is guessed.
+
+For profiles that need more control (several base URLs, different fast models), use a profiles file:
 
 ```
 ASK_EVAL_PROFILES=profiles.json ANTHROPIC_API_KEY=… DEEPSEEK_API_KEY=… npm run ask:eval
@@ -235,6 +249,9 @@ It speaks the Messages API's shapes, so the engine, the sentence gate, the tools
 |---|---|---|
 | `anthropic` (default) | Done: the official SDK, with caching, refusal fallbacks and adaptive thinking | `ANTHROPIC_API_KEY`, `ASK_CHAT_MODEL`, `ASK_FAST_MODEL` |
 | `openai-compatible` | Done: a thin adapter (`providers-openai.ts`) for DeepSeek, Qwen, Kimi, GLM, vLLM or Ollama, or anything that serves `/chat/completions` with streaming and function tools | `ASK_CHAT_BASE_URL`, `ASK_CHAT_API_KEY`, `ASK_CHAT_MODEL` (required), `ASK_FAST_MODEL` (default: the chat model), `ASK_CHAT_PRICE` (`in,out,cacheRead` USD per MTok, for the spend cap and the log) |
+| `groq` | Preset: `https://api.groq.com/openai/v1`, key `GROQ_API_KEY`. Models `openai/gpt-oss-120b` (default), `llama-3.3-70b-versatile`, `qwen/qwen3.8-27b` | `GROQ_API_KEY`; `ASK_CHAT_MODEL` picks one |
+| `zai` | Preset: `https://api.z.ai/api/paas/v4` (docs.z.ai quick start), key `ZAI_API_KEY`. Free: `glm-4.7-flash` (default), `glm-4.5-flash`; paid: `glm-5.3-flash` | `ZAI_API_KEY`; `ASK_CHAT_MODEL` |
+| `gemini` | Preset: Google's OpenAI-compatible endpoint `https://generativelanguage.googleapis.com/v1beta/openai/`, key `GEMINI_API_KEY`. No default model: the evals read the ids from `GET /models`, and the app needs `ASK_CHAT_MODEL`. Tool schemas are sent as the OpenAPI subset Gemini reads (`nullable` instead of null types, no `additionalProperties`). | `GEMINI_API_KEY`, `ASK_CHAT_MODEL` |
 | `bedrock` | Not wired: it needs the `@anthropic-ai/bedrock-sdk` dependency, and the betas used here (server-side fallbacks) aren't on Bedrock. Adding it is one more `ChatApi` that leaves out `betas` and `fallbacks`. | — |
 | anything else | Off: `askChat` is false and the app runs its flows | — |
 
@@ -249,7 +266,21 @@ It speaks the Messages API's shapes, so the engine, the sentence gate, the tools
   - `finish_reason` maps to the stop reason: `tool_calls` → `tool_use`, `length` → `max_tokens`, `content_filter` → `refusal`.
   - Cached prompt tokens count as cache reads.
 
-These providers don't promise strict schemas, so every tool checks its own fields. An HTTP failure becomes an `error` event with `fallback: true`, so the app runs its own flows as with Claude.
+**Weaker tool calling.** These providers don't promise strict schemas, so the engine checks every tool call against that tool's strict JSON schema before running it (`ask-chat/schema.ts`). It checks types and nulls, enums, required fields, extra fields and array items. Names are matched tolerantly, so "Search-Flights" is search_flights when only one tool fits.
+
+A call that fails gets an `is_error` result saying exactly what is wrong, and the model gets **one** repair per turn. If it is still wrong, the turn stops with `error {code: "TOOL_INPUT", fallback: true}` and the app's own flows answer. With Claude and `strict: true` this check never fires.
+
+**Rate limits.** In the app, a provider's 429 (Groq's and Z.ai's free tiers are tight) becomes `error {code: "RATE_LIMITED", fallback: true}`. The app answers with its own flows, so it never dead-ends and never waits. Every other HTTP failure falls back the same way.
+
+**Free tiers are for staging and test accounts only.**
+- Google's free Gemini tier may use prompts and replies to improve Google's products, for use outside the EEA, the UK and Switzerland. Saudi Arabia is outside, so free Gemini must never carry real travellers. Production needs the paid tier, with its data terms checked by counsel.
+- Groq and Z.ai free tiers have their own terms and tight limits. They are for comparing in the evals and trying on test accounts.
+
+**Later: voice (not built now).** Groq also hosts two models worth trying when Ask gets spoken replies (the "spoken replies" decision the owner put on hold on 18 Oct):
+- `canopylabs/orpheus-arabic-saudi`: text to speech in Saudi Arabic.
+- `whisper-large-v3`: speech to text.
+
+Both sit behind Groq's OpenAI-compatible audio endpoints, so they would reuse the same key and preset. Measure them on spoken Riyadh Arabic with a native listener first.
 
 **Privacy is the same for every provider.** Moderation and redaction run in `chat.ts` before any provider is called. Passport numbers, MRZ lines, cards, CVVs and IBANs are removed. Household lines carry first name, relation, age and nationality. Tool results drop surnames, full names, birthdays, contacts, documents, eSIM codes and links before the model reads them.
 
@@ -257,4 +288,8 @@ Before a provider other than Claude carries real travellers, two things need che
 - **Data residency.** Several of the cheaper hosted models process data outside the region. A self-hosted open model through vLLM avoids that.
 - **The Arabic register.** The comparison's samples and a native reader decide this.
 
-To compare, run the evals with a profiles file (§5). To try one live on staging, set `ASK_CHAT_PROVIDER=openai-compatible` and its three settings in place of the Claude key.
+To compare, run the evals (§5).
+
+To try one live on a staging test account:
+- **A preset:** set `ASK_CHAT_PROVIDER=groq`, `zai` or `gemini` and its key (plus `ASK_CHAT_MODEL` for Gemini), in place of the Claude key.
+- **Any other provider:** set `ASK_CHAT_PROVIDER=openai-compatible` and its three settings.

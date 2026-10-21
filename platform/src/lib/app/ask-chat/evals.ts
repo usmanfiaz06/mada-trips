@@ -1,5 +1,6 @@
 import { languageOfText, type Person } from "@mada/shared";
-import { type ChatApi, runTurn, turnContext } from "./engine";
+import { ToolInputError, type ChatApi, runTurn, turnContext } from "./engine";
+import { ProviderHttpError } from "./providers-openai";
 import { costMicros, type Price } from "./config";
 import { outgoingProblems, questionsIn, redact, unbacked } from "./guard";
 import { readSlots, slotsLine } from "./slots";
@@ -153,17 +154,33 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
     const history: Anthropic.Beta.BetaMessageParam[] = [];
     for (const [i, turn] of c.turns.entries()) {
       const clean = redact(turn.user).text;
-      const started = Date.now();
-      const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY, opts.fastModel);
-      const r = await runTurn({
-        model: opts.model,
-        history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input),
-        context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
-      }, () => {}, api);
-      const ms = Date.now() - started;
-      history.push(...r.added);
-      const cost = opts.price ? costMicros("", r.usage, opts.price) + (slots.usage ? costMicros("", { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }, opts.price) : 0) : r.costMicros;
-      const v: TurnVerdict = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: r.text, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: cost, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead, ms };
+      let v: TurnVerdict | null = null;
+      // A provider's rate limit waits and tries again (up to 3 times); in the app the same 429 means its own flows answer.
+      for (let attempt = 0; !v; attempt++) {
+        const started = Date.now();
+        try {
+          const slots = await readSlots(api, clean, EVAL_PEOPLE, EVAL_TODAY, opts.fastModel);
+          const r = await runTurn({
+            model: opts.model,
+            history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input),
+            context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
+          }, () => {}, api);
+          const ms = Date.now() - started;
+          history.push(...r.added);
+          const cost = opts.price ? costMicros("", r.usage, opts.price) + (slots.usage ? costMicros("", { input: slots.usage.input_tokens ?? 0, output: slots.usage.output_tokens ?? 0, cacheRead: 0, cacheWrite: 0 }, opts.price) : 0) : r.costMicros;
+          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: r.text, tools: r.toolsUsed, problems: checkTurn(turn, c.lang, r), costMicros: cost, inTokens: r.usage.input, outTokens: r.usage.output, cacheRead: r.usage.cacheRead, ms };
+        } catch (e) {
+          const limited = (e instanceof ProviderHttpError && e.status === 429) || (e instanceof Error && "status" in e && (e as { status?: number }).status === 429);
+          if (limited && attempt < 3) {
+            const wait = e instanceof ProviderHttpError && e.retryAfter ? e.retryAfter * 1000 : 5000 * 2 ** attempt;
+            await new Promise((res) => setTimeout(res, Math.min(wait, 60_000)));
+            continue;
+          }
+          // The app would fall back here: counted as a failed turn, and the conversation goes on.
+          const why = e instanceof ToolInputError ? "tools: arguments still invalid after one repair (the app falls back)" : limited ? "rate: still rate limited after 3 waits" : `error: ${e instanceof Error ? e.message : String(e)}`;
+          v = { case: c.id, lang: c.lang, turn: i + 1, user: turn.user, reply: "", tools: [], problems: [why], costMicros: 0, inTokens: 0, outTokens: 0, cacheRead: 0, ms: Date.now() - started };
+        }
+      }
       verdicts.push(v);
       opts.log?.(v);
     }

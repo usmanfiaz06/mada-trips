@@ -1,6 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi, ChatStream, ReqOpts, StreamParams } from "./providers";
+import { toOpenApiSchema } from "./schema";
 
 /*
  * Any OpenAI-compatible /chat/completions endpoint (DeepSeek, Qwen, Kimi, GLM, vLLM…), behind the engine's
@@ -18,7 +19,7 @@ import type { ChatApi, ChatStream, ReqOpts, StreamParams } from "./providers";
 
 /** An HTTP failure from the provider, with its status (chat.ts maps it to the code the app sees). */
 export class ProviderHttpError extends Error {
-  constructor(readonly status: number, message: string) { super(message); this.name = "ProviderHttpError"; }
+  constructor(readonly status: number, message: string, readonly retryAfter: number | null = null) { super(message); this.name = "ProviderHttpError"; }
 }
 
 type OaMessage =
@@ -29,7 +30,7 @@ type OaMessage =
 const textOf = (c: unknown): string => (typeof c === "string" ? c : Array.isArray(c) ? c.map((b) => (b && typeof b === "object" && "text" in b && typeof b.text === "string" ? b.text : "")).join("\n") : "");
 
 /** The Messages-shaped request as a chat completion request. Exported for the tests. */
-export function toChatCompletion(p: StreamParams, stream: boolean) {
+export function toChatCompletion(p: StreamParams, stream: boolean, openapi = false) {
   const messages: OaMessage[] = [];
   const system = typeof p.system === "string" ? p.system : (p.system ?? []).map((b) => b.text).join("\n\n");
   if (system) messages.push({ role: "system", content: system });
@@ -47,7 +48,13 @@ export function toChatCompletion(p: StreamParams, stream: boolean) {
     const text = blocks.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n\n");
     if (text) messages.push({ role: m.role === "system" ? "system" : "user", content: text });
   }
-  const tools = (p.tools ?? []).flatMap((t) => ("input_schema" in t ? [{ type: "function", function: { name: t.name, description: t.description ?? "", parameters: t.input_schema } }] : []));
+  const tools = (p.tools ?? []).flatMap((t) => {
+    if (!("input_schema" in t)) return [];
+    const schema = t.input_schema as { properties?: Record<string, unknown> };
+    // The OpenAPI subset (Gemini) has no null types and no empty parameter objects.
+    const parameters = !openapi ? schema : Object.keys(schema.properties ?? {}).length ? toOpenApiSchema(schema as never) : undefined;
+    return [{ type: "function", function: { name: t.name, description: t.description ?? "", ...(parameters ? { parameters } : {}) } }];
+  });
   return {
     model: p.model,
     max_tokens: p.max_tokens,
@@ -59,7 +66,7 @@ export function toChatCompletion(p: StreamParams, stream: boolean) {
 }
 
 type Delta = { content?: string | null; tool_calls?: { index: number; id?: string; function?: { name?: string; arguments?: string } }[] };
-type Chunk = { model?: string; choices?: { delta?: Delta; message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; prompt_cache_hit_tokens?: number } };
+type Chunk = { model?: string; x_groq?: { usage?: Chunk["usage"] }; choices?: { delta?: Delta; message?: { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; prompt_cache_hit_tokens?: number } };
 
 const stopOf = (r: string | null | undefined): Anthropic.Beta.BetaStopReason => (r === "tool_calls" ? "tool_use" : r === "length" ? "max_tokens" : r === "content_filter" ? "refusal" : "end_turn");
 const usageOf = (u: Chunk["usage"]): Anthropic.Beta.BetaUsage => {
@@ -78,7 +85,7 @@ function message(model: string, text: string, calls: { id: string; name: string;
   return { id: `oa_${Date.now().toString(36)}`, type: "message", role: "assistant", model, content, stop_reason: calls.length && stopOf(stop) === "end_turn" ? "tool_use" : stopOf(stop), stop_sequence: null, usage: usageOf(usage) } as unknown as Anthropic.Beta.BetaMessage;
 }
 
-export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string }): ChatApi {
+export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string; openapi?: boolean }): ChatApi {
   const url = `${cfg.baseUrl.replace(/\/+$/, "")}/chat/completions`;
   const post = async (body: unknown, opts?: ReqOpts) => {
     const timeout = AbortSignal.timeout(opts?.timeout ?? 60_000);
@@ -88,13 +95,16 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string }): C
       body: JSON.stringify(body),
       signal: opts?.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
     });
-    if (!res.ok) throw new ProviderHttpError(res.status, `provider answered ${res.status}`);
+    if (!res.ok) {
+      const ra = Number(res.headers.get("retry-after"));
+      throw new ProviderHttpError(res.status, `provider answered ${res.status}`, Number.isFinite(ra) && ra > 0 ? ra : null);
+    }
     return res;
   };
 
   return {
     async create(p, opts) {
-      const res = await post(toChatCompletion(p, false), opts);
+      const res = await post(toChatCompletion(p, false, cfg.openapi), opts);
       const j = (await res.json()) as Chunk;
       const m = j.choices?.[0]?.message;
       const calls = (m?.tool_calls ?? []).map((c) => ({ id: c.id, name: c.function.name, args: c.function.arguments }));
@@ -108,7 +118,7 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string }): C
       const ended = new Promise<void>((r) => { done = r; });
       async function* events(): AsyncGenerator<Anthropic.Beta.BetaRawMessageStreamEvent> {
         try {
-          const res = await post(toChatCompletion(p, true), opts);
+          const res = await post(toChatCompletion(p, true, cfg.openapi), opts);
           const reader = res.body!.getReader();
           const decoder = new TextDecoder();
           let buf = "";
@@ -131,6 +141,7 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string }): C
               try { c = JSON.parse(data) as Chunk; } catch { continue; }
               if (c.model) model = c.model;
               if (c.usage) usage = c.usage;
+              else if (c.x_groq?.usage) usage = c.x_groq.usage;
               const ch = c.choices?.[0];
               if (!ch) continue;
               if (ch.finish_reason) stop = ch.finish_reason;
@@ -172,4 +183,12 @@ export function openAiCompatibleApi(cfg: { baseUrl: string; apiKey: string }): C
       };
     },
   };
+}
+
+/** The models a provider lists (GET /models), ids without Google's "models/" prefix. */
+export async function listModels(cfg: { baseUrl: string; apiKey: string }): Promise<string[]> {
+  const res = await fetch(`${cfg.baseUrl.replace(/\/+$/, "")}/models`, { headers: { Authorization: `Bearer ${cfg.apiKey}` }, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new ProviderHttpError(res.status, `models: provider answered ${res.status}`);
+  const j = (await res.json()) as { data?: { id?: string }[] };
+  return (j.data ?? []).map((m) => String(m.id ?? "").replace(/^models\//, "")).filter(Boolean);
 }

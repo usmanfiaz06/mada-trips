@@ -6,7 +6,7 @@ import { householdOf } from "../booking/common";
 import { hit } from "../circles/limits";
 import { overview } from "../trips/overview";
 import { askChatLimits, askChatModel, askChatOn, askFastModel, costMicros, noUsage } from "./config";
-import { chatApi, runTurn, turnContext, type ChatApi } from "./engine";
+import { ToolInputError, chatApi, runTurn, turnContext, type ChatApi } from "./engine";
 import { redact, screen } from "./guard";
 import { ProviderHttpError } from "./providers-openai";
 import { readSlots, slotsLine } from "./slots";
@@ -90,6 +90,7 @@ export function errorCode(e: unknown): string {
   if (e instanceof Anthropic.BadRequestError) return "INTERNAL";
   if (e instanceof Anthropic.APIError) return "SUPPLIER_UNAVAILABLE";
   if (e instanceof ProviderHttpError) return e.status === 429 ? "RATE_LIMITED" : e.status === 401 || e.status === 403 ? "NOT_CONFIGURED" : "SUPPLIER_UNAVAILABLE";
+  if (e instanceof ToolInputError) return "TOOL_INPUT";
   if (e instanceof AppError) return e.code;
   return "INTERNAL";
 }
