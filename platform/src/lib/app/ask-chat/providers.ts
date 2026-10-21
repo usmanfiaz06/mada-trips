@@ -116,18 +116,15 @@ const wrongModel = (e: unknown): boolean => statusOf(e) === 404 || (!!e && typeo
 /** Calls go to the first model that works; one the key can't use is skipped for good on this instance. */
 export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: boolean } = {}): ChatApi {
   let i = 0;
-  // Some listed models never answer on a free key (they hang): one tiny call to each, in the background at start, moves
-  // to the first that answers, so a traveller never waits on one.
-  if (opts.warm && models.length > 1) void (async () => {
-    for (let k = 0; k < models.length; k++) {
-      try {
-        await api.create({ model: models[k], max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 9_000, maxRetries: 0 });
-        if (k !== i) console.info(`[ask-chat] model=${models[k]} answers; using it`);
-        i = k;
-        return;
-      } catch { /* the next one */ }
-    }
-  })();
+  // Some listed models never answer on a free key (they hang): the first time it is used, one tiny call to each of the
+  // top few at once, and the first to answer is the one used, so a traveller never waits on a hanging model.
+  let ready: Promise<void> | null = null;
+  const warmUp = () => (ready ??= opts.warm && models.length > 1
+    ? Promise.any(models.slice(0, 6).map(async (m, k) => {
+      await api.create({ model: m, max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout: 9_000, maxRetries: 0 });
+      return k;
+    })).then((k) => { if (k !== i) console.info(`[ask-chat] model=${models[k]} answers first; using it`); i = k; }, () => {})
+    : Promise.resolve());
   const pick = () => models[Math.min(i, models.length - 1)];
   const skip = (e: unknown) => {
     if (!wrongModel(e) || i >= models.length - 1) return false;
@@ -137,14 +134,17 @@ export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: bool
   };
   return {
     async create(p, o) {
+      await warmUp();
       for (;;) {
         try { return await api.create({ ...p, model: pick() }, o); } catch (e) { if (!skip(e)) throw e; }
       }
     },
     stream(p, o) {
-      let current = api.stream({ ...p, model: pick() }, o);
+      let current: ChatStream | null = null;
       let failed: unknown = null;
       async function* events(): AsyncGenerator<Anthropic.Beta.BetaRawMessageStreamEvent> {
+        await warmUp();
+        current = api.stream({ ...p, model: pick() }, o);
         for (;;) {
           let started = false;
           try {
@@ -162,7 +162,7 @@ export function autoModelApi(api: ChatApi, models: string[], opts: { warm?: bool
         async finalMessage() {
           for await (const _ of it) { void _; }
           if (failed) throw failed;
-          return current.finalMessage();
+          return current!.finalMessage();
         },
       };
     },

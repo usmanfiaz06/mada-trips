@@ -30,3 +30,20 @@ describe("Gemini model from the key", () => {
     await expect(autoModelApi(api, ["a", "b"]).create({ model: "x", max_tokens: 1, messages: [] })).rejects.toThrow("429");
   });
 });
+
+describe("Gemini warm-up", () => {
+  it("uses the first model that answers when a newer one hangs", async () => {
+    const asked: string[] = [];
+    const api: ChatApi = {
+      async create(p, o) {
+        asked.push(p.model);
+        if (p.model === "new") return new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error("timeout"), { name: "TimeoutError" })), o?.timeout === 9_000 ? 50 : 10_000));
+        return { model: p.model } as never;
+      },
+      stream: () => { throw new Error("unused"); },
+    };
+    const auto = autoModelApi(api, ["new", "old"], { warm: true });
+    const r = await auto.create({ model: "x", max_tokens: 1, messages: [] });
+    expect((r as { model: string }).model).toBe("old");
+  });
+});
