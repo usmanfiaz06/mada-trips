@@ -1,10 +1,16 @@
-import { useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, type ReactNode } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
-import { formatSar, timeLabel, type ChatCard, type ChatPay } from '@mada/shared';
+import { formatSar, nameIn, rangeLabel, timeLabel, type ChatCard, type ChatPay, type CopyKey } from '@mada/shared';
 import { Card } from '@/components/Card';
 import { Chip } from '@/components/Chip';
-import { LinkButton } from '@/components/Button';
+import { Appear } from '@/components/Appear';
+import { WhatsAppMark } from '@/components/BrandMarks';
+import { Button } from '@/components/Button';
+import { Icon, type IconName } from '@/components/Icon';
+import { Pill } from '@/components/Pill';
+import { SkeletonFor, useStagedLine } from '@/components/states/Waiting';
+import { IconTile } from '@/components/trips/ui';
 import { T } from '@/components/Text';
 import { AirlineMark } from './AirlineMark';
 import { clock } from './Conversation';
@@ -13,10 +19,10 @@ import { PlanCard } from '../esim/look';
 import { AgentDot, MadaDot, enter } from './parts';
 import type { ChatTurn } from '@/lib/ask-chat';
 import { buzz } from '@/lib/haptics';
-import { getLocale, t } from '@/lib/i18n';
+import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { DemoFare } from './DemoFare';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
-import { colors, ff, font } from '@/theme';
+import { colors, ff, font, radii } from '@/theme';
 
 /*
  * Ask as a conversation, in bubbles: the traveller's on the end side (green), Mada's on the start side beside her mark
@@ -60,6 +66,7 @@ const appear = (still: boolean) => ({ entering: still ? undefined : enter(0), st
 
 function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: string | null; still: boolean; onOpen: (o: ChatOpen) => void; onSay?: (text: string) => void }) {
   const writing = turn.state === 'streaming';
+  const waitKind = SKELETON_FOR[turn.statusTool ?? ''];
   const me = appear(still);
   const mada = appear(still);
   return (
@@ -77,7 +84,7 @@ function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: st
               accessibilityLabel={turn.text ? (turn.by ? t('chat.a11y.agent', { agent: turn.by, text: turn.text }) : t('chat.a11y.mada', { text: turn.text })) : (turn.status ?? t('chat.working'))}>
               {turn.text ? <T v="body" color={colors.green} style={{ lineHeight: 22 }} testID="chat-text" accessibilityLiveRegion="polite">{turn.text}</T> : <Dots still={still} />}
             </View>
-            {writing && turn.status ? <T v="tiny" color={colors.muted} style={{ paddingHorizontal: 4 }} testID="chat-status" accessibilityLiveRegion="polite">{`${turn.status}…`}</T> : null}
+            {writing && turn.status ? <StatusLine turn={turn} /> : null}
           </View>
         </Animated.View>
       ) : null}
@@ -85,14 +92,26 @@ function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: st
       <View style={s.under}>
         {turn.cards.map((c, i) => <CardFor key={`${c.type}-${i}`} card={c} turn={turn} onOpen={onOpen} />)}
         {turn.pay ? (
-          <Animated.View entering={enter(0)}>
-            <Card onPress={() => { buzz('tap'); onOpen({ kind: 'pay', pay: turn.pay! }); }} accessibilityLabel={`${t('chat.pay')}, ${turn.pay.title}`}>
-              <T v="small" style={{ fontFamily: ff.ui600 }}>{turn.pay.title}</T>
-              <T v="small" color={colors.green} testID="chat-pay">{t('chat.pay')}</T>
-            </Card>
+          <Box icon="card" title={turn.pay.title} testID="chat-pay-card">
+            <View style={s.line}><Icon name="lock" size={16} color={colors.ink3} /><T v="small" color={colors.ink2} style={{ flex: 1 }}>{t('chat.pay.line')}</T></View>
+            <CardButton label={t('chat.pay')} onPress={() => { buzz('tap'); onOpen({ kind: 'pay', pay: turn.pay! }); }} testID="chat-pay" />
+          </Box>
+        ) : null}
+        {turn.handoff ? (
+          <Animated.View entering={enter(0)} style={s.box} testID="chat-handoff-card">
+            <View style={s.row}>
+              {turn.handoff.agent ? <AgentDot name={turn.handoff.agent} size={38} /> : <MadaDot size={38} />}
+              <T v="h3" style={{ flex: 1, fontSize: 15 }}>{turn.handoff.agent ? t('chat.handoff.cardNamed', { agent: turn.handoff.agent }) : t('chat.handoff.card')}</T>
+            </View>
+            <CardButton soft label={t('chat.openThread')} onPress={() => onOpen({ kind: 'handoff', threadId: turn.handoff!.threadId })} testID="chat-handoff" />
           </Animated.View>
         ) : null}
-        {turn.handoff ? <View style={s.link}><LinkButton label={t('chat.openThread')} size={14} onPress={() => onOpen({ kind: 'handoff', threadId: turn.handoff!.threadId })} testID="chat-handoff" /></View> : null}
+        {/* Where the cards will land, while a search runs: their shape, before they come. */}
+        {writing && turn.status && waitKind && !turn.cards.some((c) => c.type === waitKind) ? (
+          <View style={{ gap: 8 }} testID="chat-skeleton" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            {[0, 1].map((i) => <SkeletonFor key={i} kind={waitKind} compact />)}
+          </View>
+        ) : null}
         {/* The next step, on the latest reply only: every reply ends with one (docs/app/ASSISTANT.md). */}
         {onSay && turn.state === 'done' && turn.next?.length ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingVertical: 2 }} testID="chat-next">
@@ -101,6 +120,28 @@ function Turn({ turn, stamp, still, onOpen, onSay }: { turn: ChatTurn; stamp: st
         ) : null}
       </View>
     </View>
+  );
+}
+
+/** The tools whose cards have a shape to show while they run. */
+const SKELETON_FOR: Record<string, 'flights' | 'stays' | 'esim' | undefined> = { search_flights: 'flights', search_stays: 'stays', esim_plans: 'esim' };
+const CHAT_STAGES = [0, 3000, 8000, 14000] as const;
+
+/**
+ * What is being done, under the bubble: Mada's own line first; if the tool is still running after 3 s it moves on
+ * ("Comparing rooms and prices", …, "Still going, a few hotels answer slowly"), timed from the last status event.
+ */
+function StatusLine({ turn }: { turn: ChatTurn }) {
+  const tool = turn.statusTool ?? '';
+  const more = tool === 'search_stays' ? ['waiting.stays.1', 'waiting.stays.2', 'waiting.stays.3']
+    : tool === 'search_flights' ? ['waiting.flights.1', 'waiting.flights.2', 'waiting.flights.3']
+    : ['waiting.chat.1', 'waiting.chat.2', 'waiting.chat.3'];
+  const lines = [turn.status ?? '', ...more.map((k) => t(k as CopyKey))];
+  const line = useStagedLine(lines, CHAT_STAGES, turn.status ? `${turn.status}|${turn.statusAt ?? 0}` : null, turn.statusAt);
+  return (
+    <Appear key={line.index} enter="fade" ms={320}>
+      <T v="tiny" color={colors.muted} style={{ paddingHorizontal: 4 }} testID="chat-status" accessibilityLiveRegion="polite">{`${line.text}…`}</T>
+    </Appear>
   );
 }
 
@@ -125,6 +166,7 @@ function Dot({ delay, still }: { delay: number; still: boolean }) {
 
 function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpen: (o: ChatOpen) => void }) {
   const open = (kind: 'flights' | 'stays' | 'esim' | 'entry' | 'car') => { buzz('tap'); onOpen({ kind, card, turn }); };
+  const locale = getLocale();
   switch (card.type) {
     case 'flights':
       return (
@@ -142,7 +184,7 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
               </View>
             </Card>
           ))}
-          <LinkButton label={t('chat.seeAll')} size={13} onPress={() => open('flights')} testID="chat-flights-all" />
+          <CardButton soft label={t('chat.seeAll')} onPress={() => open('flights')} testID="chat-flights-all" />
         </View>
       );
     case 'stays':
@@ -161,42 +203,126 @@ function CardFor({ card, turn, onOpen }: { card: ChatCard; turn: ChatTurn; onOpe
     }
     case 'entry':
       return (
-        <Card onPress={() => open('entry')} accessibilityLabel={card.entry.countryName}>
-          <T v="small" style={{ fontFamily: ff.ui600 }}>{card.entry.countryName}</T>
-          {card.entry.okText ? <T v="small">{card.entry.okText}</T> : null}
-          {card.entry.checks.slice(0, 4).map((c, i) => <T key={i} v="tiny" color={colors.ink2}>{c.name ? `${c.name}: ${c.text}` : c.text}</T>)}
-          <T v="small" color={colors.green} testID="chat-entry">{t('chat.entryGo')}</T>
-        </Card>
+        <Box icon="visa" title={card.entry.countryName} sub={card.entry.okText ?? null} testID="chat-entry-card">
+          {card.entry.checks.length ? (
+            <View style={{ gap: 8 }}>
+              {card.entry.checks.slice(0, 4).map((c, i) => (
+                <View key={i} style={s.line}>
+                  <Icon name={c.done ? 'check' : c.blocking ? 'doc' : 'check'} size={16} color={c.done ? colors.ok : c.blocking ? colors.goldInk : colors.ink3} width={c.done ? 2.4 : 1.8} />
+                  <T v="small" color={c.blocking && !c.done ? colors.green : colors.ink2} style={{ flex: 1 }}>{c.name ? `${c.name}: ${c.text}` : c.text}</T>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <CardButton soft label={t('chat.entryGo')} onPress={() => open('entry')} testID="chat-entry" />
+        </Box>
       );
-    case 'car':
+    case 'car': {
+      const route = [card.from, card.to].filter(Boolean).join(' → ');
       return (
-        <Card onPress={() => open('car')} accessibilityLabel={t('chat.carGo')}>
-          <T v="small" style={{ fontFamily: ff.ui600 }}>{[card.from, card.to].filter(Boolean).join(' → ') || card.city || t('now.car.title')}</T>
-          <T v="small" color={colors.green} testID="chat-car">{t('chat.carGo')}</T>
-        </Card>
+        <Box icon="car" title={route || card.city || t('now.car.title')} sub={route && card.city ? card.city : null} testID="chat-car-card">
+          <View style={s.line}><Icon name="pin" size={16} color={colors.ink3} /><T v="small" color={colors.ink2} style={{ flex: 1 }}>{t('chat.car.line')}</T></View>
+          <CardButton label={t('chat.carGo')} onPress={() => open('car')} testID="chat-car" />
+        </Box>
       );
+    }
     case 'trips':
       return (
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 8 }} testID="chat-trips">
           {card.trips.map((tr) => (
-            <Pressable key={tr.id} accessibilityRole="button" onPress={() => onOpen({ kind: 'trip', id: tr.id })}>
-              <Card><T v="small" style={{ fontFamily: ff.ui600 }}>{tr.city}</T><T v="tiny" color={colors.ink2}>{tr.travellerNames.join(', ')}</T></Card>
-            </Pressable>
+            <Card key={tr.id} onPress={() => onOpen({ kind: 'trip', id: tr.id })} accessibilityLabel={`${t('chat.trip.open')}, ${nameIn(tr.city, locale)}`}>
+              <View style={s.row}>
+                <IconTile name="trips" />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <T v="h3" style={{ fontSize: 15 }} numberOfLines={1}>{nameIn(tr.city, locale)}</T>
+                  <T v="tiny" color={colors.ink2} numberOfLines={1}>{[rangeLabel(tr.startDate, tr.endDate, locale), tr.justYou ? t('chat.who.justYou') : tr.travellerNames.join(locale === 'ar' ? '، ' : ', ')].filter(Boolean).join(' · ')}</T>
+                </View>
+                <View style={s.go}><Icon name="arrow" size={16} color={colors.green} /></View>
+              </View>
+            </Card>
           ))}
         </View>
       );
     case 'request':
-      return (
-        <Card onPress={() => { buzz('tap'); onOpen({ kind: 'request', id: card.requestId }); }} accessibilityLabel={card.title}>
-          <T v="small" style={{ fontFamily: ff.ui600 }}>{card.title}</T>
-          {card.detail ? <T v="tiny" color={colors.ink2}>{card.detail}</T> : null}
-          {card.promisedBy ? <T v="tiny" color={colors.ink2} testID="chat-request-by">{[t('chat.request.by', { time: timeLabel(card.promisedBy, { locale: getLocale() }) }), card.contact ? t(`chat.request.${card.contact}`) : null].filter(Boolean).join(' · ')}</T> : null}
-          <T v="small" color={colors.green} testID="chat-request">{t('chat.request')}</T>
-        </Card>
-      );
+      return <RequestCard card={card} onOpen={() => { buzz('tap'); onOpen({ kind: 'request', id: card.requestId }); }} />;
     default:
       return null;
   }
+}
+
+const KIND_ICON: Record<string, IconName> = { visa: 'visa', umrah: 'umrah', car: 'car', food: 'food', todo: 'list', flight: 'flight', stay: 'stay' };
+
+/** "Just you", "You and Hessa", "Hessa and Sara": the travellers said once, the account holder as "you". */
+export function whoLine(who: { name: string; self: boolean }[]): string | null {
+  if (!who.length) return null;
+  const others = who.filter((w) => !w.self).map((w) => nameIn(w.name, getLocale()));
+  const me = who.some((w) => w.self);
+  if (me && !others.length) return t('chat.who.justYou');
+  return me ? t('chat.who.youAnd', { names: joinAnd(others) }) : joinAnd(others);
+}
+
+/** Each part of the detail once ("You · You" → "You"), for a card from a server that sends only the detail. */
+const dedupe = (detail: string | undefined) => [...new Set((detail ?? '').split(' · ').map((x) => x.trim()).filter(Boolean))].join(' · ');
+
+type RequestChatCard = Extract<ChatCard, { type: 'request' }>;
+
+/** Something the team arranges by hand: what, where, when and who written out, where it stands, how they'll reach you. */
+function RequestCard({ card, onOpen }: { card: RequestChatCard; onOpen: () => void }) {
+  const locale = getLocale();
+  const who = whoLine(card.who ?? []);
+  const when = card.depart ? rangeLabel(card.depart, card.return ?? null, locale) : null;
+  const what = dedupe(card.detail);
+  const rows: { icon: IconName; label: string; text: string; testID: string }[] = [
+    what && what !== card.title ? { icon: 'doc' as const, label: t('chat.request.what'), text: what, testID: 'chat-request-what' } : null,
+    card.where ? { icon: 'pin' as const, label: t('chat.request.where'), text: nameIn(card.where, locale), testID: 'chat-request-where' } : null,
+    when ? { icon: 'calendar' as const, label: t('chat.request.when'), text: when, testID: 'chat-request-when' } : null,
+    who ? { icon: 'user' as const, label: t('chat.request.who'), text: who, testID: 'chat-request-who' } : null,
+  ].filter((r): r is NonNullable<typeof r> => !!r);
+  const status = card.promisedBy ? t('chat.request.status', { time: timeLabel(card.promisedBy, { locale }) }) : t('chat.request.statusOpen');
+  return (
+    <Box icon={KIND_ICON[card.kind] ?? 'doc'} title={card.title} testID="chat-request-card"
+      pill={<Pill label={status} variant="gold" icon={<View style={s.liveDot} />} style={{ marginTop: 2 }} />} pillTestID="chat-request-by">
+      {rows.length ? (
+        <View style={s.facts}>
+          {rows.map((r) => (
+            <View key={r.testID} style={s.line} accessible accessibilityLabel={`${r.label}: ${r.text}`} testID={r.testID}>
+              <Icon name={r.icon} size={16} color={colors.ink3} />
+              <T v="small" color={colors.green} style={{ flex: 1 }}>{r.text}</T>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {card.contact ? (
+        <View style={s.line} testID="chat-request-contact">
+          {card.contact === 'whatsapp' ? <WhatsAppMark size={16} /> : <Icon name={card.contact === 'call' ? 'phone' : 'bell'} size={16} color={colors.ink3} />}
+          <T v="small" color={colors.ink2} style={{ flex: 1 }}>{t(`chat.request.${card.contact}`)}</T>
+        </View>
+      ) : null}
+      <CardButton label={t('chat.request')} onPress={onOpen} testID="chat-request" />
+    </Box>
+  );
+}
+
+/** Every chat card's frame: the kind's icon and a clear title, an optional status pill, the body, the button. */
+function Box({ icon, title, sub, pill, pillTestID, children, testID }: { icon: IconName; title: string; sub?: string | null; pill?: ReactNode; pillTestID?: string; children?: ReactNode; testID?: string }) {
+  return (
+    <Animated.View entering={enter(0)} style={s.box} testID={testID}>
+      <View style={[s.row, { alignItems: 'flex-start' }]}>
+        <IconTile name={icon} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <T v="h3" style={{ fontSize: 16, lineHeight: 22 }} accessibilityRole="header">{title}</T>
+          {sub ? <T v="small" color={colors.ink2}>{sub}</T> : null}
+          {pill ? <View testID={pillTestID}>{pill}</View> : null}
+        </View>
+      </View>
+      {children}
+    </Animated.View>
+  );
+}
+
+/** A card's action: a real button, 44 high. `soft` is the quieter one (mist on paper). */
+function CardButton({ label, onPress, soft, testID }: { label: string; onPress: () => void; soft?: boolean; testID?: string }) {
+  return <Button size="small" variant={soft ? 'secondary' : 'primary'} label={label} onPress={onPress} style={[s.button, soft ? s.soft : null]} testID={testID} />;
 }
 
 const AVATAR = 28;
@@ -214,5 +340,11 @@ const s = StyleSheet.create({
   dots: { flexDirection: 'row', gap: 5, paddingVertical: 6 },
   dot: { width: 7, height: 7, borderRadius: 999, backgroundColor: colors.ink3 },
   under: { marginStart: AVATAR + AVATAR_GAP, gap: 10 },
-  link: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  box: { backgroundColor: colors.paper, borderRadius: radii.card, padding: 16, gap: 14 },
+  facts: { gap: 8, paddingTop: 2 },
+  line: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  liveDot: { width: 7, height: 7, borderRadius: 99, backgroundColor: colors.green },
+  go: { width: 32, height: 32, borderRadius: 99, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
+  button: { height: 44, alignSelf: 'stretch' },
+  soft: { backgroundColor: colors.mist },
 });

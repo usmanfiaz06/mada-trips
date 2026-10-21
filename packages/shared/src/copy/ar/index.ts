@@ -24,6 +24,7 @@ import { arStays } from './stays';
 import { arNow } from './now';
 import { arAskChat } from './askChat';
 import { arAskMemory } from './askMemory';
+import { arTodayIdeas } from './todayIdeas';
 import { arOutcomes } from './outcomes';
 import { arOffline } from './offline';
 import { arUmrah } from './umrah';
@@ -32,6 +33,7 @@ import { arEsim } from './esim';
 import { arGuest } from './guest';
 import { arAskHeard } from './askHeard';
 import { arPayFamily } from './payFamily';
+import { arWaiting } from './waiting';
 
 export const arSections: Readonly<Record<string, string>> = {
   ...arWallet,
@@ -56,6 +58,7 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arNow,
   ...arAskChat,
   ...arAskMemory,
+  ...arTodayIdeas,
   ...arAskHeard,
   ...arAskHeard,
   ...arOutcomes,
@@ -64,5 +67,6 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arNative,
   ...arEsim,
   ...arGuest,
+  ...arWaiting,
   ...arCommon,
 } as Record<string, string>;

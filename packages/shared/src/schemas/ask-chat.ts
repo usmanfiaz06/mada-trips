@@ -49,6 +49,11 @@ export const ChatCard = z.discriminatedUnion('type', [
     type: z.literal('request'), requestId: Id, kind: z.string(), title: z.string(),
     detail: z.string().optional(), promisedBy: IsoDateTime.nullable().optional(),
     contact: z.enum(['call', 'whatsapp', 'in_app']).nullable().optional(),
+    /** Written out on the card: where, the days, and who (each traveller's name, the account holder marked). */
+    where: z.string().max(80).nullable().optional(),
+    depart: IsoDay.nullable().optional(),
+    return: IsoDay.nullable().optional(),
+    who: z.array(z.object({ name: z.string(), self: z.boolean() })).max(12).optional(),
   }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
@@ -61,7 +66,7 @@ export type ChatPay = z.infer<typeof ChatPay>;
 export const AskChatEvent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('thread'), threadId: Id, lang: z.enum(['en', 'ar']) }),
   /** What is being done right now ("Checking flights to Istanbul"), for the typing line. */
-  z.object({ type: z.literal('status'), text: z.string() }),
+  z.object({ type: z.literal('status'), text: z.string(), tool: z.string().max(40).optional() }),
   z.object({ type: z.literal('text'), delta: z.string() }),
   /** The words so far are replaced (a check failed, or a fixed line answers): show this instead. */
   z.object({ type: z.literal('replace'), text: z.string() }),
