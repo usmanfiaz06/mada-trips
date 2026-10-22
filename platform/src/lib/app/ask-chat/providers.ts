@@ -231,9 +231,21 @@ export function worthAnother(e: unknown, signal?: AbortSignal): boolean {
   if (signal?.aborted) return false;
   if (e instanceof Anthropic.APIConnectionError) return true; // timeouts too
   const st = statusOf(e);
-  if (st !== null) return st === 429 || st === 408 || st === 413 || st >= 500 || (e as { quota?: boolean }).quota === true;
+  if (st !== null) return st === 429 || st === 408 || st === 413 || st >= 500 || (e as { quota?: boolean }).quota === true || refusesRequest(e);
   if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError" || (e.name === "TypeError" && /fetch|network/i.test(e.message)))) return true;
   return false;
+}
+
+/**
+ * A provider that can't take this request at all (its model gone, or a tool schema or field it doesn't support): the
+ * next one can, so the call moves on and this one rests longer. A 400 about the traveller's own words isn't one.
+ */
+export function refusesRequest(e: unknown): boolean {
+  const st = statusOf(e);
+  if (st === 404) return true;
+  if (st !== 400) return false;
+  const msg = `${e instanceof Error ? e.message : ""} ${e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : ""}`;
+  return /invalid schema|tools?\.\d+|not supported|unsupported|does not support|extra inputs|unknown (?:field|parameter)|model/i.test(msg);
 }
 
 /** How long to rest a provider after this error: its own Retry-After when it gave one, else a minute. */
@@ -241,7 +253,7 @@ const restMs = (e: unknown): number => {
   const ra = e && typeof e === "object" && "retryAfter" in e ? Number((e as { retryAfter: unknown }).retryAfter) : NaN;
   const hdr = e instanceof Anthropic.APIError ? Number(e.headers?.get?.("retry-after")) : NaN;
   const s = Number.isFinite(ra) && ra > 0 ? ra : Number.isFinite(hdr) && hdr > 0 ? hdr : 0;
-  return s ? Math.min(s * 1000, 15 * 60_000) : COOL_MS;
+  return s ? Math.min(s * 1000, 15 * 60_000) : refusesRequest(e) ? 10 * 60_000 : COOL_MS;
 };
 
 /** Every provider is resting: the app answers with its own flows (chat.ts errorCode → RATE_LIMITED). */

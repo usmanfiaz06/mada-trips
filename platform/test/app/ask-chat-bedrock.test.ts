@@ -157,3 +157,13 @@ describe("bedrock: older Claude schemas", () => {
     expect(newer.tools[0]!.input_schema).toEqual(schema);
   });
 });
+
+describe("chain: a provider that refuses the request", () => {
+  it("moves on to the next provider on a schema 400 or a missing model, not on any 400", async () => {
+    const { worthAnother } = await import("@/lib/app/ask-chat/providers");
+    const err = (status: number, message: string) => Object.assign(new Error(message), { status });
+    expect(worthAnother(err(400, "400 tools.0.custom: Invalid schema: Enum value 'RUH' does not match declared type"))).toBe(true);
+    expect(worthAnother(err(404, "model not found"))).toBe(true);
+    expect(worthAnother(err(400, "messages: text content blocks must be non-empty"))).toBe(false);
+  });
+});
