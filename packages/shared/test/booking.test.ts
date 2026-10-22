@@ -169,3 +169,14 @@ describe('Saudi weekend', () => {
     expect(weekendLine('2026-10-25')).toMatch(/Weekend Fri–Sat, out Thu.*2026-10-29→2026-10-31.*2026-11-05→2026-11-07/);
   });
 });
+
+describe('days of the week', () => {
+  const read = (s: string) => { const r = parseAskRules(s, { today: '2026-10-22', people: [] }); return [r.destination, r.destinationName, r.depart, r.return]; };
+  it('reads "Thursday to Saturday" as dates, never a place, in English and Arabic', () => {
+    expect(read('Make it Thursday to Saturday instead')).toEqual([null, null, '2026-10-22', '2026-10-24']);
+    expect(read('فندق في دبي من الخميس للسبت')).toEqual(['dubai', null, '2026-10-22', '2026-10-24']);
+    expect(read('flight to Jeddah on Friday')).toEqual(['jeddah', null, '2026-10-23', null]);
+    expect(read('next Thursday to Saturday')[2]).toBe('2026-10-22');
+    expect(read('flights to London next month')[2]).toBeNull();
+  });
+});

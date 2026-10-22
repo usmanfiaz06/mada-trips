@@ -136,7 +136,7 @@ const RUN: Record<string, Run> = {
     const search = { destination, destinationName: r.destinationName, from: null, depart: checkIn, return: null, travellerIds };
     if (!top.length) return { text: `No stays found in ${r.destinationName} from ${checkIn} for ${nights} nights (outcome ${r.outcome}).` };
     return {
-      text: `Stays in ${r.destinationName}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "nothing fits every wish, these are closest"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
+      text: `Stays in ${r.destinationName}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "none of these is confirmed for every wish in our hotel details (they may just not list it); these are closest. Say that, never that no such hotel exists"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
       cards: [{ type: "stays", search, nights, options: top.map((x) => x.option), near }],
     };
   },

@@ -218,7 +218,7 @@ export function parseDetails(text: string, today: string): ParsedDetails {
   else if (/same as last/.test(s2)) out.destination = 'istanbul';
   else {
     const m = s2.match(/\bto ([a-z][a-z-]{2,}(?: [a-z][a-z-]{2,})?)(?=\s+(?:on|in|for|next|this|with|at|by|and|from|over|during)\b|\s*[.,]|\s*$)/);
-    const stop = /^(the|go|be|me|us|stay|fly|visit|book|see|get|take|bring|somewhere|anywhere|travel|do|have|leave|come)\b/;
+    const stop = /^(the|go|be|me|us|stay|fly|visit|book|see|get|take|bring|somewhere|anywhere|travel|do|have|leave|come|(?:sun|mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?)(?:day)?)\b/;
     if (m && !stop.test(m[1]!)) { out.destination = 'other'; out.destinationName = m[1]!.replace(/\b\w/g, (c) => c.toUpperCase()); }
   }
   let dep: string | null = null;
@@ -232,6 +232,17 @@ export function parseDetails(text: string, today: string): ParsedDetails {
     const ds = all.map((x) => (x[1] ? upcoming(today, Number(x[1]), mIdx(x[2]!)) : upcoming(today, Number(x[4]), mIdx(x[3]!)))).filter((x): x is string => !!x);
     if (ds[0]) dep = ds[0];
     if (ds[1] && dep) { ret = ds[1]; if (ret <= dep) ret = ymd(Number(ret.slice(0, 4)) + 1, Number(ret.slice(5, 7)) - 1, Number(ret.slice(8, 10))); }
+  }
+  if (!dep) {
+    // Days of the week ("Thursday to Saturday", "on Friday"): the next such day (today when it is that day), and the
+    // second day after it.
+    const DAY = '(sun|mon|tue|wed|thu|fri|sat)(?:day|sday|nesday|rsday|urday)?';
+    const span = s.match(new RegExp(`\\b${DAY}\\s*(?:-|\\u2013|to|until|till|through|thru)\\s*${DAY}\\b`));
+    const one = span ? null : s.match(new RegExp(`\\b(?:on|this|next|from)\\s+${DAY}\\b`));
+    const idx = (d: string) => ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(d);
+    const nextDay = (from: string, d: number, after: boolean) => addDays(from, ((d - weekdayIdx(from) + 7) % 7) || (after ? 7 : 0));
+    if (span) { dep = nextDay(today, idx(span[1]!), false); ret = nextDay(dep, idx(span[2]!), true); }
+    else if (one) dep = nextDay(today, idx(one[1]!), /next/.test(one[0]));
   }
   if (!dep) {
     // A week said as a week ("the first week of December", "next week", «الأسبوع الجاي»): the seven days, to change if need be.
