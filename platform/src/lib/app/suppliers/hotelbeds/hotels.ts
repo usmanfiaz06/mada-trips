@@ -380,7 +380,7 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
 /** Availability while a traveller waits on the search screen: per try, and extra tries. */
 export const SEARCH_BUDGET = { timeoutMs: 8_000, retries: 1 } as const;
 
-export type StayQueryExtras = { childAges?: number[] };
+export type StayQueryExtras = { childAges?: number[]; /** Only these hotels (a hotel the traveller named, booking/named-hotel.ts). */ hotelCodes?: number[] };
 
 export type BookStayInput = {
   rateKey: string;
@@ -481,7 +481,7 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     // "Hotelbeds isn't answering, try again" rather than three tries of 12 s that the app never sees the end of.
     const res = await this.availability({
       checkIn: q.checkIn, checkOut, rooms: splitParty(adults, childAges, rooms),
-      ...(useCode ? { destination: place.code } : { geolocation: { latitude: place.lat, longitude: place.lng, radius: place.radiusKm, unit: "km" as const } }),
+      ...(input.hotelCodes?.length ? { hotelCodes: input.hotelCodes.slice(0, 5) } : useCode ? { destination: place.code } : { geolocation: { latitude: place.lat, longitude: place.lng, radius: place.radiusKm, unit: "km" as const } }),
     }, SEARCH_BUDGET);
     const codes = (res.hotels?.hotels ?? []).map((h) => h.code);
     const facts = this.facts && codes.length ? await this.facts(codes).catch(() => undefined) : undefined;

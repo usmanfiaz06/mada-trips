@@ -5,6 +5,7 @@ import {
 } from "@mada/shared";
 import { AppError } from "../http";
 import { checkEntry, searchFlights, searchStays } from "../booking/search";
+import { hotelTitle, nameQuery, nameScore, namedHotels } from "../booking/named-hotel";
 import { REQUEST_PROMISE_MIN, createRequest } from "../booking/requests";
 import { flightsMode } from "../switches";
 import { priceDraft } from "../booking/pricing";
@@ -76,6 +77,23 @@ export function riyadhClock(iso: string, today: string): string {
 /** Said first when the fares are samples, so the model can't present them as real (prompt.ts "Truth"). */
 const DEMO = "demo: true (sample fares from a test catalogue: not real, not bookable)";
 
+/** "15–22 Nov" (or "28 Nov–3 Dec"): the stay's dates as a reply says them. */
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function stayDates(checkIn: string, nights: number): string {
+  const out = new Date(Date.parse(`${checkIn}T00:00:00Z`) + nights * 86_400_000).toISOString().slice(0, 10);
+  const d = (x: string) => ({ day: Number(x.slice(8, 10)), mon: MONTHS[Number(x.slice(5, 7)) - 1]! });
+  const a = d(checkIn), b = d(out);
+  return a.mon === b.mon ? `${a.day}–${b.day} ${a.mon}` : `${a.day} ${a.mon}–${b.day} ${b.mon}`;
+}
+
+/** A named hotel we hold, with nothing we can book for these dates: said plainly, no other hotel in its place. */
+export const noRoomsText = (names: string[], checkIn: string, nights: number) =>
+  `${names.join("; ")}: no rooms we can book online for ${stayDates(checkIn, nights)} (only ${names.length > 1 ? "these hotels were" : "this hotel was"} checked). Say exactly that, plainly. Next step: other dates, or create_request kind stay so the team at Mada asks the hotel directly. Never present another hotel as this one; any other hotel you offer is an alternative and is called one.`;
+
+/** A name we hold no hotel under: we can't find it online, which never means it doesn't exist. */
+export const unknownHotelText = (named: string, where: string) =>
+  `"${named}" is not among the hotels we can book online in ${where}. Say we can't find it online here (never that it doesn't exist) and offer create_request kind stay: the team at Mada books it by hand. Other hotels only if offered as alternatives, called so.`;
+
 /** Flights by request: no prices, and what to offer instead, with the desk's promise (booking/requests.ts). */
 export const requestModeText = (to: string, depart: string, ret: string | null) =>
   `{"mode":"request"} Flights to ${to} (${depart}${ret ? ` to ${ret}` : ", one way"}) are found by hand: there are no fares, prices, times or flight numbers here. Confirm the trip back in one line (where, when, who), say the team at Mada finds the fares and gets back within ${REQUEST_PROMISE_MIN / 60} hours, any time of day, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. When they answer, call create_request with kind flight, the destination name, the dates and contact_preference.`;
@@ -126,17 +144,27 @@ const RUN: Record<string, Run> = {
     if (!DESTINATIONS[destination] || !checkIn || !nights) return { text: "Not searched: need a destination key, a check-in day and nights.", isError: true };
     if (checkIn < ctx.today) return { text: `Not searched: ${checkIn} is in the past (today is ${ctx.today}).`, isError: true };
     const travellerIds = whoOf(ctx, a.traveller_ids);
-    const r = await searchStays(ctx.ownerId, { destination, checkIn, nights, travellerIds }, ctx.demo);
+    // A hotel they named: only that hotel (or the few under that name) is searched, and nothing else stands in for it.
+    const named = typeof a.hotel_name === "string" ? a.hotel_name.trim().slice(0, 80) : "";
+    const query = named ? nameQuery(named, destination) : [];
+    const held = query.length ? await namedHotels(destination, query) : null;
+    if (held?.known && !held.hotels.length) return { text: unknownHotelText(named, destName(destination)) };
+    const codes = (held?.hotels ?? []).map((h) => h.code).filter((c): c is number => c != null);
+    const r = await searchStays(ctx.ownerId, { destination, checkIn, nights, travellerIds }, ctx.demo, codes.length ? { hotelCodes: codes } : {});
+    const options = held ? r.options.filter((o) => (o.hotel?.code && codes.includes(Number(o.hotel.code))) || nameScore(query, o.name) > 0) : r.options;
+    if (held && !options.length) {
+      return { text: held.known ? noRoomsText(held.hotels.map((h) => hotelTitle(h.name)), checkIn, nights) : unknownHotelText(named, r.destinationName) };
+    }
     const wishes = typeof a.wishes === "string" && a.wishes.trim() ? parseStayWishes(a.wishes, destination).wishes : [];
-    const refined = wishes.length ? refineStays(r.options, wishes, ctx.lang) : null;
-    const picked = refined ? (refined.matches.length ? refined.matches : refined.closest) : r.options.map((option) => ({ option, ev: [] as string[] }));
+    const refined = wishes.length ? refineStays(options, wishes, ctx.lang) : null;
+    const picked = refined ? (refined.matches.length ? refined.matches : refined.closest) : options.map((option) => ({ option, ev: [] as string[] }));
     const top = picked.slice(0, 3);
     const nearWish = wishes.find((w) => w.k === "near");
     const near = nearWish && nearWish.k === "near" ? landmarkById(nearWish.id)?.name ?? null : null;
     const search = { destination, destinationName: r.destinationName, from: null, depart: checkIn, return: null, travellerIds };
     if (!top.length) return { text: `No stays found in ${r.destinationName} from ${checkIn} for ${nights} nights (outcome ${r.outcome}).` };
     return {
-      text: `Stays in ${r.destinationName}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "none of these is confirmed for every wish in our hotel details (they may just not list it); these are closest. Say that, never that no such hotel exists"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
+      text: `${held ? `The hotel they named ("${named}"): only ${top.length > 1 ? "these hotels by that name were" : "this hotel was"} searched; say it is the one they asked for.\n` : ""}Stays in ${r.destinationName}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "none of these is confirmed for every wish in our hotel details (they may just not list it); these are closest. Say that, never that no such hotel exists"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
       cards: [{ type: "stays", search, nights, options: top.map((x) => x.option), near }],
     };
   },

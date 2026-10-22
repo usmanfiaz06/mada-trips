@@ -51,6 +51,8 @@ Acting
 - Visas: entry_rules with the destination and who goes. eSIM: esim_plans with the place and the days.
 - Passports and documents: documents_on_file says what Mada holds (never ask for a number or a photo of one already on file). A document sent in the chat is read by the app, which shows its own card; the traveller decides there with a tap, so you never save, use or share one yourself (use_document only says where it stands). A companion's passport comes only from them: request_document_share.
 - Corrections ("we are 5", "make it December", "no, Dubai") change only what they name: search again with the rest kept, and say what changed in a few words.
+- A hotel they name ("Four Seasons London", «فورسيزونز»): search_stays with hotel_name in English. Never present another hotel as the one they asked for; any other is an alternative, said so.
+- "Anytime in November" for a week: pick a week in it, search, and say they can move the dates; never just ask which dates.
 - A person at Mada: call talk_to_human only when they ask for a person, when it is urgent (hurt, stranded, a flight today going wrong), or when the tools cannot do what they need. Never offer it otherwise.
 
 Plans
@@ -94,6 +96,7 @@ Acting
 - Live destination keys: ${KEYS.join(", ")}. Anywhere else goes by hand.
 - Umrah: Makkah stays by distance to the Haram; a Nusuk permit is needed (one mentioned counts); create_request kind umrah for the team. Car now: plan_car_now, never promise a driver.
 - Corrections change only what they name: search again with the rest kept, say what changed.
+- Named hotel: hotel_name in English; no other as it. "Anytime in <month>": pick dates, search, say they can move.
 - talk_to_human only when they ask for a person, it is urgent, or no tool can do it; never offer it.
 - An earlier answer is done: answer what they ask now.`;
 
@@ -128,6 +131,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       nights: { type: "integer", description: "1 to 60." },
       traveller_ids: ids,
       wishes: nullable("string", { description: "What they asked for, in their words, e.g. 'with a pool, close to Sultanahmet'." }),
+      hotel_name: nullable("string", { description: "A hotel they named, in English, e.g. 'Four Seasons'; null when they named none." }),
     }),
   },
   {
@@ -357,7 +361,7 @@ const PLAN_TOOL_NAMES = new Set(PLAN_TOOLS.map((t) => t.name));
  */
 const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   search_flights: { d: "Live flights, all-in prices, up to 3 (shown as cards).", p: { from: "Null: home.", return: "Null: one way.", infants: "Under 2, on a lap." } },
-  search_stays: { d: "Live hotels, up to 3 (shown as cards). Wishes (pool, sea view, near a landmark, breakfast, free cancellation) filter them.", p: { wishes: "Their words." } },
+  search_stays: { d: "Live hotels, up to 3 (shown as cards). Wishes (pool, sea view, near a landmark, breakfast, free cancellation) filter them.", p: { wishes: "Their words.", hotel_name: "English." } },
   get_hotel: { d: "One hotel from a stay card: address, facilities." },
   esim_plans: { d: "eSIM data plans for a place and days.", p: { where: "Key, country or city, in English.", days: "Null: 7." } },
   plan_car_now: { d: "A car now or in 15 minutes; the app confirms the meeting point. Books nothing." },

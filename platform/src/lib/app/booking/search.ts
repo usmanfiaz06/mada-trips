@@ -182,7 +182,8 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
   };
 }
 
-export async function searchStays(ownerId: string | null, input: StaySearchRequest, demo: Set<DemoFlag>): Promise<StaySearchResponse> {
+/** `hotelCodes`: only these hotels (a hotel the traveller named in Ask, named-hotel.ts); suppliers without codes ignore it. */
+export async function searchStays(ownerId: string | null, input: StaySearchRequest, demo: Set<DemoFlag>, only: { hotelCodes?: number[] } = {}): Promise<StaySearchResponse> {
   const q = StaySchema.parse(input);
   const dest = DESTINATIONS[q.destination];
   if (!dest) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
@@ -193,10 +194,10 @@ export async function searchStays(ownerId: string | null, input: StaySearchReque
   if (demo.has("noResults")) return { ...base, outcome: "none", options: [] };
   // Who is going decides what fits (docs/app/RANKING.md): a family, a couple, someone alone, a group.
   const shape = tripShape(people, q.checkIn);
-  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape, ...(rateHawkSource() ? ["ratehawk"] : [])]);
+  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape, ...(rateHawkSource() ? ["ratehawk"] : []), ...(only.hotelCodes?.length ? [only.hotelCodes] : [])]);
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
-  const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
+  const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges, ...(only.hotelCodes?.length ? { hotelCodes: only.hotelCodes } : {}) } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
   const expiresAt = holdEnds();
   const search = { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
   // Ranked for this trip, with one "Best for you" and one "Lowest price"; the reasons are stored with each offer.

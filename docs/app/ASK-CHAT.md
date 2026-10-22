@@ -75,7 +75,7 @@ app/ask.tsx ──POST /api/app/v1/ask/chat {text, threadId?, tripId?}──▶ 
 | Tool | Calls | The app gets |
 |---|---|---|
 | `search_flights` | `searchFlights` (booking/search.ts) | `flights` card (≤ 3 `FlightOption`s plus the search) |
-| `search_stays` | `searchStays`, then `parseStayWishes` + `refineStays` for wishes and distance from a landmark | `stays` card (≤ 3 `StayOption`s, `near`) |
+| `search_stays` | `searchStays`, then `parseStayWishes` + `refineStays` for wishes and distance from a landmark. `hotel_name` (a hotel the traveller named, in English): `booking/named-hotel.ts` finds it in the stored hotel content (case, accents and a plural aside; up to 5 hotels of that name) and only those hotel codes are searched. No rooms for the dates is said plainly with the next step (other dates, or `create_request` so the team asks the hotel); a name we hold nothing under is "we can't find it online", with the team offered. Other hotels never stand in for it | `stays` card (≤ 3 `StayOption`s, `near`) |
 | `get_hotel` | `hotelContent` | — |
 | `esim_plans` | `esimPlans` | `esim` card (≤ 3 `EsimPlan`s) |
 | `plan_car_now` | nothing is booked: what was said becomes a card | `car` card; the app's car flow confirms the meeting point |

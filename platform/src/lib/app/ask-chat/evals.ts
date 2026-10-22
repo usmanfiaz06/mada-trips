@@ -9,7 +9,7 @@ import { personLine, requestModeText, type ToolCtx, type ToolOut } from "./tools
 import type Anthropic from "@anthropic-ai/sdk";
 
 /*
- * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 49 conversations in English and spoken Saudi Arabic,
+ * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 51 conversations in English and spoken Saudi Arabic,
  * run turn by turn through the real engine (the same prompt, tools, gate and slots) with fixed tool results, so the
  * checks are about the model and nothing else. Each turn is held to:
  *   prices   the model wrote no price or time that no tool returned (checked on its raw words, before the gate)
@@ -54,6 +54,7 @@ export async function fixtureTool(name: string, input: unknown, flights: "live" 
       return { text: `Flights RUH → ${dest}, ${a.depart}${a.return ? ` to ${a.return}` : " one way"}, checked 14, for ${n} people:\n1. id=f-1 · best · Saudia SV263 · RUH 09:40 → 13:10 (4h30m) · direct · not refundable · ${fmt(each * n)} all in\n2. id=f-2 · lowest · flynas XY125 · RUH 02:15 → 08:05 (6h50m) · One stop in Kuwait · not refundable · ${fmt(1610 * n)} all in\n3. id=f-3 · fastest · Turkish Airlines TK145 · RUH 14:20 → 18:15 (4h55m) · direct · refundable · ${fmt(2390 * n)} all in` };
     }
     case "search_stays":
+      if (typeof a.hotel_name === "string" && /four season/i.test(a.hotel_name)) return { text: `The hotel they named ("${a.hotel_name}"): only these hotels by that name were searched; say it is the one they asked for.\nStays in London, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-fs1 · hotel_code=9101 · Four Seasons Hotel London at Park Lane · Mayfair · 5 stars · ${fmt(38400)} all in · free cancellation until ${a.check_in} · has spa, gym` };
       return { text: `Stays in ${a.destination}, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-1 · hotel_code=9001 · Rove Downtown · Downtown · 3 stars · ${fmt(1840)} all in · free cancellation until ${a.check_in} · has pool, wifi\n2. id=s-2 · hotel_code=9002 · Address Sky View · Downtown · 5 stars · ${fmt(5260)} all in · not refundable · has pool, gym, spa` };
     case "esim_plans":
       return { text: `eSIM plans for Pakistan, ${a.days ?? 7} days:\n1. id=pk-10-5 · 5 GB · 10 days · Pakistan · SAR 39 each eSIM · lasts the trip\n2. id=pk-10-10 · 10 GB · 15 days · Pakistan · SAR 59 each eSIM · lasts the trip\n3. id=pk-30-20 · 20 GB · 30 days · Pakistan · SAR 89 each eSIM · lasts the trip` };
@@ -126,6 +127,8 @@ export type EvalTurn = {
   reachChips?: boolean;
   /** It must make the request with how they asked to be reached. */
   requestWithContact?: boolean;
+  /** A tool it must call with this field matching (a named hotel goes in hotel_name). */
+  inputHas?: { tool: string; field: string; match: RegExp };
 };
 /** flights: how search_flights answers in this case (APP_FLIGHTS_MODE). */
 export type EvalCase = { id: string; lang: "en" | "ar"; turns: EvalTurn[]; flights?: "live" | "request" };
@@ -169,6 +172,9 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "delay-rights", lang: "en", turns: [{ user: "My Cairo flight today is delayed 4 hours, what are my rights?", toolsAnyOf: ["get_trips", "get_trip", "talk_to_human"] }] },
   { id: "ar-thanks-close", lang: "ar", turns: [{ user: "مشكورين، كذا تمام", noTools: true }] },
   { id: "ar-default-dates", lang: "ar", turns: [{ user: "دبي في نوفمبر لنا كلنا", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /متى|تاريخ|كم شخص|مين/ }] },
+  // A hotel by name, any week of a month (staging: the generic London list came back instead of the Four Seasons).
+  { id: "named-hotel", lang: "en", turns: [{ user: "Four season london, I need rates for one week anytime in November for me and Hessa", toolsAnyOf: ["search_stays"], inputHas: { tool: "search_stays", field: "hotel_name", match: /four season/i }, notAsk: /when|which dates|what dates/i }] },
+  { id: "ar-named-hotel", lang: "ar", turns: [{ user: "فورسيزونز لندن أبي أسعار أسبوع أي وقت في نوفمبر لي ولزوجتي", toolsAnyOf: ["search_stays"], inputHas: { tool: "search_stays", field: "hotel_name", match: /four season/i }, notAsk: /متى|تاريخ|أي أسبوع/ }] },
   // Found by hand (docs/app/ASK-CHAT.md §Found by hand): what the team needs, confirmed, how to reach them, then the request.
   { id: "flights-by-request", lang: "en", flights: "request", turns: [
     { user: "Flights to Istanbul 3 to 10 December, just me", toolsAnyOf: FLIGHT, notTools: ["create_request", "price_quote_for_pay"], reachChips: true },
@@ -246,6 +252,10 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
   if (t.requestWithContact) {
     const req = (r.calls ?? []).find((x) => x.name === "create_request");
     if (!req || !req.input.contact_preference) out.push(`reach: create_request without contact_preference`);
+  }
+  if (t.inputHas) {
+    const want = t.inputHas;
+    if (!(r.calls ?? []).some((x) => x.name === want.tool && want.match.test(String(x.input[want.field] ?? "")))) out.push(`input: ${want.tool} without ${want.field} ${want.match}`);
   }
   if (!t.noTools && SAYS_NO.test(r.raw) && !r.toolsUsed.some((x) => DOES_IT.includes(x)) && !/whatsapp|واتساب/i.test(r.modelChoices.join(" "))) out.push(`never-no: said we don't do it without a way it gets done`);
   const open = openEndedIn(r.raw);
