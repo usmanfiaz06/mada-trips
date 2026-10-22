@@ -20,7 +20,7 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { apiFor, type ProviderConfig } from "../src/lib/app/ask-chat/providers";
-import { PRESETS, askChatModel, askFastModel, chatProvider, isPreset, parsePrice, type ChatProviderName, type Price } from "../src/lib/app/ask-chat/config";
+import { PRESETS, askChatModel, askFastModel, bedrockModel, bedrockSettings, chatProvider, isPreset, parsePrice, type ChatProviderName, type Price } from "../src/lib/app/ask-chat/config";
 import { listModels } from "../src/lib/app/ask-chat/providers-openai";
 import { EVAL_CASES, PLAN_EVAL_IDS, runEvals, summarise, type EvalSummary } from "../src/lib/app/ask-chat/evals";
 
@@ -40,11 +40,15 @@ async function fromFlags(providers: string[]): Promise<Profile[]> {
       for (const m of models.length ? models : [askChatModel() || "claude-sonnet-5-5"]) out.push({ label: `anthropic/${m}`, provider: "anthropic", model: m, fastModel: m.startsWith("claude-") ? askFastModel() || "claude-haiku-5-5" : m, apiKeyEnv: "ANTHROPIC_API_KEY", price });
       continue;
     }
+    if (p === "bedrock") {
+      for (const m of (models.length ? models : ["claude-haiku-5-5"]).map(bedrockModel)) out.push({ label: `bedrock/${m}`, provider: "bedrock", model: m, fastModel: bedrockModel("claude-haiku-5-5"), apiKeyEnv: "AWS_BEARER_TOKEN_BEDROCK", price });
+      continue;
+    }
     if (p === "openai-compatible") {
       for (const m of models.length ? models : [process.env.ASK_CHAT_MODEL ?? ""]) out.push({ label: `openai-compatible/${m}`, provider: p, model: m, baseUrl: process.env.ASK_CHAT_BASE_URL, apiKeyEnv: "ASK_CHAT_API_KEY", price: price ?? parsePrice(process.env.ASK_CHAT_PRICE) });
       continue;
     }
-    if (!isPreset(p)) { console.log(`${p}: no such provider (anthropic, openai-compatible, ${Object.keys(PRESETS).join(", ")})`); continue; }
+    if (!isPreset(p)) { console.log(`${p}: no such provider (anthropic, bedrock, openai-compatible, ${Object.keys(PRESETS).join(", ")})`); continue; }
     const preset = PRESETS[p];
     const key = process.env[preset.keyEnv]?.trim();
     let list = models.length ? models : preset.models;
@@ -70,7 +74,7 @@ async function profiles(): Promise<Profile[]> {
   if (wanted.length) return fromFlags(wanted);
   const provider = chatProvider();
   if (!provider) throw new Error("ASK_CHAT_PROVIDER names a provider without an adapter");
-  if (isPreset(provider)) return fromFlags([provider]);
+  if (isPreset(provider) || provider === "bedrock") return fromFlags([provider]);
   return [{ label: provider, provider, model: askChatModel(), fastModel: askFastModel(), baseUrl: process.env.ASK_CHAT_BASE_URL, apiKeyEnv: provider === "anthropic" ? "ANTHROPIC_API_KEY" : "ASK_CHAT_API_KEY", price: parsePrice(process.env.ASK_CHAT_PRICE) }];
 }
 
@@ -79,9 +83,10 @@ const only = [...args.filter((a, i) => !a.startsWith("-") && !/^--(provider|mode
 const runs: { p: Profile; s: EvalSummary }[] = [];
 let anyFailed = false;
 for (const p of await profiles()) {
-  const key = process.env[p.apiKeyEnv ?? (p.provider === "anthropic" ? "ANTHROPIC_API_KEY" : "ASK_CHAT_API_KEY")]?.trim();
+  const bedrock = p.provider === "bedrock" ? bedrockSettings() : null;
+  const key = bedrock ? bedrock.apiKey ?? bedrock.accessKeyId : process.env[p.apiKeyEnv ?? (p.provider === "anthropic" ? "ANTHROPIC_API_KEY" : "ASK_CHAT_API_KEY")]?.trim();
   if (!key || !p.model) { console.log(`${p.label}: skipped (no key in ${p.apiKeyEnv ?? "the environment"}, or no model)`); continue; }
-  const cfg: ProviderConfig = { provider: p.provider, apiKey: key, baseUrl: p.baseUrl, openapi: p.openapi };
+  const cfg: ProviderConfig = { provider: p.provider, apiKey: key, baseUrl: p.baseUrl, openapi: p.openapi, bedrock };
   const api = await apiFor(cfg);
   console.log(`\n=== ${p.label} · ${p.provider} · chat ${p.model} · slots ${p.fastModel ?? p.model} · ${only.length ? only.join(", ") : `${EVAL_CASES.length} conversations`}\n`);
   const verdicts = await runEvals(api, {
@@ -110,7 +115,7 @@ for (const { p, s } of runs) {
   const f = (k: string) => String(s.byCheck[k] ?? 0);
   console.log(row([p.label, p.model, `${s.passed}/${s.turns} (${Math.round((100 * s.passed) / s.turns)}%)`, f("prices"), f("one"), f("lang"), String((s.byCheck.tools ?? 0) + (s.byCheck["asked again"] ?? 0)), f("words"), f("next"), f("open"), f("first"), `${f("error")} / ${f("rate")}`,
     `${s.dialect.spoken} / ${s.dialect.msa}`, `${(s.medianMs / 1000).toFixed(1)} s`, String(s.tokensPerConversation),
-    p.provider !== "anthropic" && !p.price ? "n/a (no price; --price)" : p.price === FREE ? "free tier" : `$${s.costPerConversation.toFixed(4)}`]));
+    p.provider !== "anthropic" && p.provider !== "bedrock" && !p.price ? "n/a (no price; --price)" : p.price === FREE ? "free tier" : `$${s.costPerConversation.toFixed(4)}`]));
 }
 console.log("\nArabic samples (read for dialect: spoken Riyadh per docs/app/ARABIC.md, not MSA):");
 for (const { p, s } of runs) for (const a of s.arabicSamples) console.log(`  ${p.label}: ${a}`);

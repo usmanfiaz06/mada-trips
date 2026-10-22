@@ -172,7 +172,7 @@ For staging:
 - `ASK_CHAT_PROVIDERS` = `groq,gemini` (the keys are already set as `GROQ_API_KEY` and `GEMINI_API_KEY`)
 - optional: `ASK_CHAT_MODEL_GEMINI` (default `gemini-2.5-flash`), `ASK_CHAT_MODEL_GROQ` (default `openai/gpt-oss-120b`), `ASK_FAST_MODEL_<NAME>` (default: that provider's chat model)
 
-Names: `anthropic` (ANTHROPIC_API_KEY, default `claude-sonnet-5-5` / `claude-haiku-5-5`), `groq`, `gemini`, `zai` (their preset keys), `openai-compatible` (ASK_CHAT_BASE_URL, ASK_CHAT_API_KEY, ASK_CHAT_MODEL). A provider without its key is left out. Ask is on while one is left. When `ASK_CHAT_PROVIDERS` is unset, `ASK_CHAT_PROVIDER` works as before.
+Names: `anthropic` (ANTHROPIC_API_KEY, default `claude-sonnet-5-5` / `claude-haiku-5-5`), `bedrock` (AWS_BEARER_TOKEN_BEDROCK + AWS_REGION, default `anthropic.claude-haiku-5-5` for both), `groq`, `gemini`, `zai` (their preset keys), `openai-compatible` (ASK_CHAT_BASE_URL, ASK_CHAT_API_KEY, ASK_CHAT_MODEL). A provider without its key is left out. Ask is on while one is left. When `ASK_CHAT_PROVIDERS` is unset, `ASK_CHAT_PROVIDER` works as before.
 
 **Fewer tokens on free tiers.** Groq's free tier caps `openai/gpt-oss-120b` at 8,000 tokens a minute and a turn is usually two calls, so every call an openai-compatible provider gets is cut down. Claude is sent the same params as before (full prompt, every tool, the whole thread, all cached): the lighter words ride along as engine hints (`lean`, `only_tools`) that `providers.ts` strips for Claude and `providers-openai.ts` reads instead of the full ones.
 
@@ -198,6 +198,22 @@ Mocked eval, every conversation of the eval set through the real engine on a sta
 | general (open) | 24 | 4,912 | 2,639 | −46% | 5,342 → 3,063 |
 
 A two-call turn is now about 5,100 tokens instead of 8,800, so a free tier's minute holds a turn with room for the slots call. The second call still resends the prompt and tools (the model may call another tool); what it adds is only this turn's tool results. The test fails if the mean passes 2,600 or any call 3,200.
+
+### Claude on Amazon Bedrock (owner steps)
+
+Ask can run Claude Haiku 5.5 (or Sonnet 5.5) billed through the AWS account. Staging only until it has been checked.
+
+1. AWS console → **Amazon Bedrock**, in the region you'll use (e.g. `us-east-1`) → **Model catalog** → **Claude Haiku 5.5**. If asked, submit the Anthropic use-case form (a few lines on Mada's travel assistant) and wait for access.
+2. Open it in the **playground** and send "Say ok." to check it answers.
+3. Bedrock → **API keys** → create a **long-term** API key. Copy it once; keep it only in Vercel.
+4. Vercel → project **mada-staging** → Settings → Environment Variables (Preview/Staging only, never Production):
+   - `AWS_BEARER_TOKEN_BEDROCK` = that key
+   - `AWS_REGION` = the region from step 1
+   - `ASK_CHAT_PROVIDERS` = `bedrock,groq,gemini` (Bedrock first; Groq and Gemini take over while it rests)
+   - optional: `ASK_CHAT_MODEL_BEDROCK` = `anthropic.claude-sonnet-5-5` for the conversation (`ASK_FAST_MODEL_BEDROCK` stays Haiku)
+5. Redeploy, then GET `/api/app/v1/ask/providers` (signed in; it calls each provider once): the `bedrock` row should say `ok: true`. An error row names the reason (403: access not granted in that region or a wrong key; 404: the model ID).
+
+An IAM user's `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` work in place of the API key. Costs are priced at Anthropic's list rates (Haiku 5.5 $0.10 / $0.50, cache read $0.01; Sonnet 5.5 $2 / $10 / $0.20 per MTok) for the spend caps; the AWS bill is what's charged.
 
 ## 5. Evals
 
@@ -318,7 +334,7 @@ It speaks the Messages API's shapes, so the engine, the sentence gate, the tools
 | `groq` | Preset: `https://api.groq.com/openai/v1`, key `GROQ_API_KEY`. Models `openai/gpt-oss-120b` (default), `llama-3.3-70b-versatile`, `qwen/qwen3.8-27b` | `GROQ_API_KEY`; `ASK_CHAT_MODEL` picks one |
 | `zai` | Preset: `https://api.z.ai/api/paas/v4` (docs.z.ai quick start), key `ZAI_API_KEY`. Free: `glm-4.7-flash` (default), `glm-4.5-flash`; paid: `glm-5.3-flash` | `ZAI_API_KEY`; `ASK_CHAT_MODEL` |
 | `gemini` | Preset: Google's OpenAI-compatible endpoint `https://generativelanguage.googleapis.com/v1beta/openai/`, key `GEMINI_API_KEY`. No default model: the evals read the ids from `GET /models`, and the app needs `ASK_CHAT_MODEL`. Tool schemas are sent as the OpenAPI subset Gemini reads (`nullable` instead of null types, no `additionalProperties`). | `GEMINI_API_KEY`, `ASK_CHAT_MODEL` |
-| `bedrock` | Not wired: it needs the `@anthropic-ai/bedrock-sdk` dependency, and the betas used here (server-side fallbacks) aren't on Bedrock. Adding it is one more `ChatApi` that leaves out `betas` and `fallbacks`. | — |
+| `bedrock` | Done: the same Claude through Amazon Bedrock, billed to the AWS account (`providers-bedrock.ts`, the official `@anthropic-ai/bedrock-sdk` Mantle client). Same tools, streaming, adaptive thinking, effort `low`, caching and error mapping as `anthropic`. Model IDs carry the `anthropic.` prefix (added when missing). Server-side refusal fallbacks aren't on Bedrock, so `fallbacks` and its beta are left out (Haiku 5.5 has none anyway). Setup: §4 "Claude on Amazon Bedrock". | `AWS_BEARER_TOKEN_BEDROCK` (or `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`), `AWS_REGION`; `ASK_CHAT_MODEL` / `ASK_FAST_MODEL` (default `anthropic.claude-haiku-5-5` for both); in a chain `ASK_CHAT_MODEL_BEDROCK` / `ASK_FAST_MODEL_BEDROCK` |
 | anything else | Off: `askChat` is false and the app runs its flows | — |
 
 **What the adapter does.** It translates in both directions:

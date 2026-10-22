@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { chatProvider, openAiSettings, providerChain, type ChainLink, type ChatProviderName } from "./config";
+import { askChatModel, askFastModel, bedrockSettings, chatProvider, openAiSettings, providerChain, type BedrockSettings, type ChainLink, type ChatProviderName } from "./config";
 
 /*
  * Who the conversation talks to, behind one small interface: a streamed message with tool calls, and a plain one (for
@@ -8,13 +8,14 @@ import { chatProvider, openAiSettings, providerChain, type ChainLink, type ChatP
  * engine, the guards, the tools, the threads and the evals are the same whoever answers. Redaction happens before any
  * of this (chat.ts), so no provider ever sees a passport, a card or a surname.
  *   anthropic          the Claude API through the official SDK (default; the production path)
+ *   bedrock            the same Claude through Amazon Bedrock, billed to the AWS account (providers-bedrock.ts: the
+ *                      SDK's Mantle client, "anthropic."-prefixed model IDs, no server-side refusal fallbacks)
  *   openai-compatible  any /chat/completions endpoint with streaming and function tools: DeepSeek, Qwen, Kimi, GLM,
  *                      vLLM or another self-hosted model (providers-openai.ts). For comparing in the evals first.
  *   groq, zai, gemini  openai-compatible with the base URL and key variable filled in (config.ts PRESETS).
  *   ASK_CHAT_PROVIDERS a chain of the above (chainApi below): the same call moves to the next provider when one is
  *                      rate limited, down or out of quota. Every provider reads and writes the same Messages-shaped
  *                      thread, so a switch mid-conversation (even mid-turn, after a tool ran) needs nothing else.
- * Bedrock is not wired: it needs @anthropic-ai/bedrock-sdk and none of the betas this uses (docs/app/ASK-CHAT.md §6).
  */
 
 export type StreamParams = Anthropic.Beta.MessageCreateParamsNonStreaming;
@@ -27,7 +28,7 @@ export interface ChatApi {
   create(params: StreamParams, opts?: ReqOpts): Promise<Anthropic.Beta.BetaMessage>;
 }
 
-export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; baseUrl?: string; openapi?: boolean };
+export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; baseUrl?: string; openapi?: boolean; bedrock?: BedrockSettings | null };
 
 /**
  * The engine's hints for providers that pay per token (`only_tools`, `lean`: the compact prompt, tool words and
@@ -53,6 +54,11 @@ export function anthropicApi(apiKey = process.env.ANTHROPIC_API_KEY): ChatApi {
 /** A provider from explicit settings (the evals compare several in one run). */
 export async function apiFor(cfg: ProviderConfig): Promise<ChatApi> {
   if (cfg.provider === "anthropic") return anthropicApi(cfg.apiKey);
+  if (cfg.provider === "bedrock") {
+    if (!cfg.bedrock) throw new Error("bedrock needs AWS_REGION and AWS_BEARER_TOKEN_BEDROCK (or an IAM access key)");
+    const { bedrockApi } = await import("./providers-bedrock");
+    return bedrockApi(cfg.bedrock);
+  }
   const { openAiCompatibleApi } = await import("./providers-openai");
   if (!cfg.baseUrl || !cfg.apiKey) throw new Error("openai-compatible needs a base URL and a key");
   return openAiCompatibleApi({ baseUrl: cfg.baseUrl, apiKey: cfg.apiKey, openapi: cfg.openapi });
@@ -68,7 +74,7 @@ export async function chatApi(): Promise<ChatApi> {
   if (override) return override;
   const chain = providerChain();
   if (chain) {
-    const key = `chain|${chain.map((l) => `${l.name}:${l.model}:${l.fastModel}:${l.apiKey.slice(-6)}`).join(",")}`;
+    const key = `chain|${chain.map((l) => `${l.name}:${l.model}:${l.fastModel}:${l.bedrock?.region ?? ""}:${l.apiKey.slice(-6)}`).join(",")}`;
     if (real?.key !== key) real = { key, api: chainApi(await Promise.all(chain.map(async (l) => {
       const api = await apiFor(linkConfig(l));
       return { name: l.name, model: l.model, fastModel: l.fastModel, api: l.auto ? autoModelApi(api, await flashModels(l), { warm: true }) : api };
@@ -77,14 +83,19 @@ export async function chatApi(): Promise<ChatApi> {
   }
   const provider = chatProvider();
   if (!provider) throw new Error("ASK_CHAT_PROVIDER names a provider without an adapter");
-  const cfg: ProviderConfig = provider === "anthropic" ? { provider, apiKey: process.env.ANTHROPIC_API_KEY } : { provider, ...openAiSettings(provider) };
-  const key = `${cfg.provider}|${cfg.baseUrl ?? ""}|${cfg.apiKey?.slice(-6) ?? ""}`;
+  const b = provider === "bedrock" ? bedrockSettings() : null;
+  const cfg: ProviderConfig = provider === "anthropic" ? { provider, apiKey: process.env.ANTHROPIC_API_KEY }
+    : provider === "bedrock" ? { provider, bedrock: b, apiKey: b?.apiKey ?? b?.accessKeyId }
+    : { provider, ...openAiSettings(provider) };
+  const key = `${cfg.provider}|${cfg.baseUrl ?? ""}|${cfg.bedrock?.region ?? ""}|${cfg.apiKey?.slice(-6) ?? ""}`;
   if (real?.key !== key) real = { key, api: await apiFor(cfg) };
   return real.api;
 }
 
 const linkConfig = (l: ChainLink): ProviderConfig =>
-  l.name === "anthropic" ? { provider: "anthropic", apiKey: l.apiKey } : { provider: l.name, apiKey: l.apiKey, baseUrl: l.baseUrl, openapi: l.openapi };
+  l.name === "anthropic" ? { provider: "anthropic", apiKey: l.apiKey }
+    : l.name === "bedrock" ? { provider: "bedrock", apiKey: l.apiKey, bedrock: l.bedrock }
+    : { provider: l.name, apiKey: l.apiKey, baseUrl: l.baseUrl, openapi: l.openapi };
 
 /* ───────────── Gemini's model, found from its key ───────────── */
 
@@ -338,13 +349,23 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
   };
 }
 
+/** One provider (ASK_CHAT_PROVIDER) as a chain link, so the staging check probes it too: bedrock or anthropic with a key. */
+function singleLink(): ChainLink[] {
+  const p = chatProvider();
+  const b = p === "bedrock" ? bedrockSettings() : null;
+  if (b) return [{ name: "bedrock", apiKey: b.apiKey ?? b.accessKeyId ?? "", bedrock: b, model: askChatModel(), fastModel: askFastModel() }];
+  const key = process.env.ANTHROPIC_API_KEY?.trim();
+  if (p === "anthropic" && key) return [{ name: "anthropic", apiKey: key, model: askChatModel(), fastModel: askFastModel() }];
+  return [];
+}
+
 /**
- * Staging check (GET /ask/providers): one tiny plain call to each provider in the chain, so "is Gemini answering?" has
+ * Staging check (GET /ask/providers): one tiny plain call to each provider in the chain (or the one provider), so "is Gemini answering?" has
  * a yes or a reason. Name, model, status and the provider's own short error only; never a key or a thread.
  */
 export async function probeChain(): Promise<{ name: string; model: string; ok: boolean; ms: number; status: number | null; error: string | null; restingFor: number | null }[]> {
   const set = process.env.ASK_CHAT_PROVIDERS?.trim();
-  const chain = providerChain() ?? [];
+  const chain = providerChain() ?? singleLink();
   const resting = cooldowns();
   // Nothing usable: say why, by name only (unset, or listed providers without keys).
   if (!chain.length) return [{ name: set ? `ASK_CHAT_PROVIDERS="${set.slice(0, 60)}" has no provider with a key` : `ASK_CHAT_PROVIDERS not set; one provider: ${process.env.ASK_CHAT_PROVIDER?.trim() || "none"}`, model: "", ok: false, ms: 0, status: null, error: null, restingFor: null }];
