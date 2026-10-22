@@ -145,3 +145,15 @@ describe("bedrock: an inference profile and an older Claude", () => {
     expect(keep.thinking).toEqual({ type: "adaptive" });
   });
 });
+
+describe("bedrock: older Claude schemas", () => {
+  it("turns an enum on a nullable type into anyOf, values or null", async () => {
+    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const schema = { type: "object", properties: { from: { type: ["string", "null"], enum: ["RUH", "JED", null], description: "d" }, kind: { type: "string", enum: ["a"] } } };
+    const out = forBedrock({ model: "global.anthropic.claude-haiku-4-5-20251001-v1:0", max_tokens: 9, messages: [], tools: [{ name: "t", input_schema: schema }] } as never) as unknown as { tools: { input_schema: { properties: Record<string, unknown> } }[] };
+    expect(out.tools[0]!.input_schema.properties.from).toEqual({ description: "d", anyOf: [{ type: "string", enum: ["RUH", "JED"] }, { type: "null" }] });
+    expect(out.tools[0]!.input_schema.properties.kind).toEqual({ type: "string", enum: ["a"] });
+    const newer = forBedrock({ model: "claude-haiku-5-5", max_tokens: 9, messages: [], tools: [{ name: "t", input_schema: schema }] } as never) as unknown as { tools: { input_schema: unknown }[] };
+    expect(newer.tools[0]!.input_schema).toEqual(schema);
+  });
+});

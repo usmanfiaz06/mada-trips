@@ -23,6 +23,25 @@ const PROFILE = /^(?:global|us|eu|apac|jp|au|ca)\./;
 export const olderClaude = (m: string) => /claude-(?:3|(?:haiku|sonnet|opus)-4(?:-[0-5])?)(?![\d.])/.test(m) || /claude-3-/.test(m);
 export const onRuntime = (m: string) => PROFILE.test(m) || olderClaude(m);
 
+/**
+ * A Claude older than 4.6 rejects an enum on a nullable type ({ type: ["string", "null"], enum: ["RUH", …, null] }:
+ * "Enum value 'RUH' does not match declared type"). The same choice as anyOf: the values, or null.
+ */
+export function olderSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(olderSchema);
+  if (!node || typeof node !== "object") return node;
+  const o = Object.fromEntries(Object.entries(node).map(([k, v]) => [k, olderSchema(v)])) as Record<string, unknown>;
+  if (Array.isArray(o.type) && Array.isArray(o.enum)) {
+    const { type, enum: values, ...rest } = o as { type: string[]; enum: unknown[] } & Record<string, unknown>;
+    const real = type.filter((x) => x !== "null");
+    const nullable = type.includes("null") || values.includes(null);
+    const kept = values.filter((v) => v !== null);
+    const one = real.length === 1 ? { type: real[0], enum: kept } : { enum: kept };
+    return nullable ? { ...rest, anyOf: [one, { type: "null" }] } : { ...rest, ...one };
+  }
+  return o;
+}
+
 /** The request as Bedrock takes it: the engine's `only_tools` hint and server-side fallbacks dropped, the model prefixed. */
 export function forBedrock(p: StreamParams): StreamParams {
   const { only_tools: _tools, fallbacks: _fallbacks, betas, ...rest } = p as StreamParams & { only_tools?: unknown; fallbacks?: unknown };
@@ -32,6 +51,8 @@ export function forBedrock(p: StreamParams): StreamParams {
   const out = { ...rest, model, ...(kept.length ? { betas: kept } : {}) } as StreamParams & { thinking?: unknown; output_config?: { effort?: unknown } };
   if (olderClaude(model)) {
     delete out.thinking;
+    const tools = (out as { tools?: Array<Record<string, unknown>> }).tools;
+    if (tools) (out as { tools?: unknown }).tools = tools.map((t) => (t.input_schema ? { ...t, input_schema: olderSchema(t.input_schema) } : t));
     if (out.output_config) { const { effort: _e, ...oc } = out.output_config; void _e; out.output_config = Object.keys(oc).length ? oc : undefined; if (!out.output_config) delete out.output_config; }
   }
   return out as StreamParams;
