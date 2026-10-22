@@ -285,7 +285,7 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
   const rest = (m: ChainMember, e: unknown) => {
     cooling.set(m.name, now() + restMs(e));
     const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : "";
-    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${(/"message"\s*:\s*"([^"]{0,220})/.exec(detail)?.[1] ?? detail).slice(0, 220)}`.trim());
+    whyResting.set(m.name, `${statusOf(e) ?? (e instanceof Error ? e.name : "error")} ${(/"message"\s*:\s*"([^"]{0,220})/.exec(detail)?.[1] ?? (detail || (e instanceof Error ? e.message : ""))).slice(0, 220)}`.trim());
     log(`[ask-chat] provider=${m.name} resting ${Math.round(restMs(e) / 1000)}s (${statusOf(e) ?? (e instanceof Error ? e.name : "error")})`);
   };
   return {
@@ -375,7 +375,7 @@ function singleLink(): ChainLink[] {
  * Staging check (GET /ask/providers): one tiny plain call to each provider in the chain (or the one provider), so "is Gemini answering?" has
  * a yes or a reason. Name, model, status and the provider's own short error only; never a key or a thread.
  */
-export async function probeChain(): Promise<{ name: string; model: string; ok: boolean; ms: number; status: number | null; error: string | null; restingFor: number | null }[]> {
+export async function probeChain(): Promise<{ name: string; model: string; ok: boolean; ms: number; status: number | null; error: string | null; restingFor: number | null; why?: string | null }[]> {
   const set = process.env.ASK_CHAT_PROVIDERS?.trim();
   const chain = providerChain() ?? singleLink();
   const resting = cooldowns();
@@ -386,11 +386,11 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
     try {
       const api = await apiFor(linkConfig(l));
       await api.create({ model, max_tokens: 64, messages: [{ role: "user", content: "Say ok." }] }, { timeout, maxRetries: 0 });
-      return { name: l.name, model, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null };
+      return { name: l.name, model, ok: true, ms: Date.now() - t0, status: 200, error: null, restingFor: resting[l.name] ?? null, why: resting[l.name] ? whyResting.get(l.name) ?? null : null };
     } catch (e) {
       const detail = e && typeof e === "object" && "detail" in e ? String((e as { detail: unknown }).detail) : "";
       const msg = `${e instanceof Error ? e.message : "error"}${detail ? ` · ${detail}` : ""}`.replace(/\s+/g, " ").slice(0, 400);
-      return { name: l.name, model, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null };
+      return { name: l.name, model, ok: false, ms: Date.now() - t0, status: statusOf(e), error: msg, restingFor: resting[l.name] ?? null, why: resting[l.name] ? whyResting.get(l.name) ?? null : null };
     }
   };
   // A provider that finds its own model: each candidate in turn, a few seconds each, so the answer names the one that works.
