@@ -248,6 +248,12 @@ export function refusesRequest(e: unknown): boolean {
   return /invalid schema|tools?\.\d+|not supported|unsupported|does not support|extra inputs|unknown (?:field|parameter)|model/i.test(msg);
 }
 
+/** A timeout on a call given under 15 s: the caller's short budget, not the provider being down. */
+export function ranOutOfOwnTime(e: unknown, timeout: number | undefined): boolean {
+  if (!timeout || timeout >= 15_000) return false;
+  return e instanceof Anthropic.APIConnectionTimeoutError || (e instanceof Error && (e.name === "TimeoutError" || /timed out|timeout/i.test(e.message)));
+}
+
 /** How long to rest a provider after this error: its own Retry-After when it gave one, else a minute. */
 const restMs = (e: unknown): number => {
   const ra = e && typeof e === "object" && "retryAfter" in e ? Number((e as { retryAfter: unknown }).retryAfter) : NaN;
@@ -306,7 +312,9 @@ export function chainApi(members: ChainMember[], opts: { now?: () => number; log
           return res;
         } catch (e) {
           if (!worthAnother(e, o?.signal)) throw e;
-          rest(m, e);
+          // A quick helper call (reading the sentence, a few seconds' budget) that ran out of time says nothing about
+          // the provider: the next one takes this call, but the turn's answer still goes to the first.
+          if (!ranOutOfOwnTime(e, o?.timeout)) rest(m, e);
           skipped = [...skipped, m.name];
         }
       }

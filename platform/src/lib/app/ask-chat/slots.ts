@@ -33,7 +33,7 @@ export async function readSlots(api: ChatApi | null, text: string, people: Perso
       tools: [{ name: "record_intent", description: "Record what the traveller asked for.", input_schema: ASK_TOOL_SCHEMA as unknown as Anthropic.Beta.BetaTool.InputSchema, strict: true }],
       tool_choice: { type: "auto" },
       messages: [{ role: "user", content: text.slice(0, 500) }],
-    }, { timeout: 4_000, maxRetries: 0 });
+    }, { timeout: 6_000, maxRetries: 0 });
     if (res.stop_reason === "refusal") return { intent: fromRules, usage: res.usage };
     const call = res.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === "record_intent");
     if (!call) return { intent: fromRules, usage: res.usage };

@@ -181,3 +181,22 @@ describe("bedrock: a thread another provider answered", () => {
     expect(JSON.stringify(out.messages)).toContain("search_stays");
   });
 });
+
+describe("chain: a quick helper call that runs out of time", () => {
+  it("passes that call on but keeps the first provider for the turn's answer", async () => {
+    const { chainApi, cooldowns, resetCooldowns, ranOutOfOwnTime } = await import("@/lib/app/ask-chat/providers");
+    resetCooldowns();
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const timedOut = new Anthropic.APIConnectionTimeoutError();
+    expect(ranOutOfOwnTime(timedOut, 6_000)).toBe(true);
+    expect(ranOutOfOwnTime(timedOut, 60_000)).toBe(false);
+    const slow = { create: async () => { throw timedOut; }, stream: () => { throw new Error("unused"); } };
+    const ok = { create: async () => ({ id: "m", content: [] }), stream: () => { throw new Error("unused"); } };
+    const api = chainApi([{ name: "first", model: "a", fastModel: "a", api: slow as never }, { name: "second", model: "b", fastModel: "b", api: ok as never }], { log: () => {} });
+    await api.create({ model: "x", max_tokens: 9, messages: [] } as never, { timeout: 6_000, maxRetries: 0 });
+    expect(cooldowns().first).toBeUndefined();
+    await expect(api.create({ model: "x", max_tokens: 9, messages: [] } as never, { timeout: 60_000 })).resolves.toBeTruthy();
+    expect(cooldowns().first).toBeGreaterThan(0);
+    resetCooldowns();
+  });
+});
