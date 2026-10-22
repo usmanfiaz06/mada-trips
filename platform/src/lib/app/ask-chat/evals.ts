@@ -275,7 +275,7 @@ export async function runEvals(api: ChatApi, opts: { only?: string[]; log?: (v: 
             model: opts.model,
             intent: kindFor(clean, slots.intent.kind, history.some((m) => JSON.stringify(m.content).includes("create_plan"))),
             history: [...history], text: clean, lang: c.lang, tool: { ...ctx, lang: c.lang }, runTool: (name, input) => fixtureTool(name, input, c.flights),
-            context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY) }),
+            context: turnContext({ today: EVAL_TODAY, lang: c.lang, people: EVAL_PEOPLE, trips: TRIPS, onScreen: null, slots: slotsLine(slots.intent), household: (x) => personLine(x, EVAL_TODAY), text: clean }),
           }, () => {}, api);
           const ms = Date.now() - started;
           history.push(...r.added);

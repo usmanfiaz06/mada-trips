@@ -125,3 +125,23 @@ describe("Ask on Amazon Bedrock: the client", () => {
     expect(await probeChain()).toMatchObject([{ name: "bedrock", model: "anthropic.claude-haiku-5-5", ok: true }]);
   });
 });
+
+describe("bedrock: an inference profile and an older Claude", () => {
+  it("prices Haiku 4.5's global profile, sends it to bedrock-runtime, and drops adaptive thinking and effort", async () => {
+    const { priceOf } = await import("@/lib/app/ask-chat/config");
+    const { forBedrock, onRuntime, olderClaude } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const id = "global.anthropic.claude-haiku-4-5-20251001-v1:0";
+    expect(priceOf(id)?.slice(0, 2)).toEqual([1, 5]);
+    expect(onRuntime(id)).toBe(true);
+    expect(olderClaude(id)).toBe(true);
+    expect(olderClaude("anthropic.claude-haiku-5-5")).toBe(false);
+    expect(onRuntime("anthropic.claude-haiku-5-5")).toBe(false);
+    const out = forBedrock({ model: id, max_tokens: 9, messages: [], thinking: { type: "adaptive" }, output_config: { effort: "low" } } as never) as unknown as Record<string, unknown>;
+    expect(out.model).toBe(id);
+    expect(out.thinking).toBeUndefined();
+    expect(out.output_config).toBeUndefined();
+    const keep = forBedrock({ model: "claude-haiku-5-5", max_tokens: 9, messages: [], thinking: { type: "adaptive" }, output_config: { effort: "low" } } as never) as unknown as Record<string, unknown>;
+    expect(keep.model).toBe("anthropic.claude-haiku-5-5");
+    expect(keep.thinking).toEqual({ type: "adaptive" });
+  });
+});

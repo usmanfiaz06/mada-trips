@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AskParser, AskParserContext, ModelIntent } from "../booking-types";
 import { requireEnv } from "./not-configured";
+import { weekendLine } from "@mada/shared";
 
 /*
  * Ask on the Claude API: what the traveller typed → a structured intent, through one strict tool (the arguments always
@@ -54,7 +55,7 @@ export const claudeAsk: AskParser = {
     const system = [
       "You read travel requests for Mada Trips, a Saudi travel agency, and record them with the record_intent tool.",
       "Always call record_intent exactly once. Use null for anything not stated. Never invent dates, people or places.",
-      `Today is ${ctx.today} (Riyadh). Eid al-Fitr 2027 is 9 to 15 March 2027. Saudi weekends run Thursday to Saturday.`,
+      `Today is ${ctx.today} (Riyadh). Eid al-Fitr 2027 is 9 to 15 March 2027. ${weekendLine(ctx.today)}`,
       `Destination keys: ${ctx.destinations.join(", ")}.`,
       `The household (id: name):\n${household}`,
     ].join("\n");

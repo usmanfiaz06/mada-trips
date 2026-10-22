@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bannedIn, bundleFor, calendarMonths, cardBrandOf, cardProblems, checkPromo, deskFirstReply, deskQuote, deskReply, requestText, requestTitle, wordFor, entryChecks, eventIn, fareSar, luhnOk, parseAskRules, quickDates, seatsFor,
-  weekendDates, type Person,
+  weekendDates, weekendLine, type Person,
 } from '../src';
 
 const TODAY = '2026-10-10';
@@ -156,5 +156,16 @@ describe('requests ask only what is missing, and say each thing once', () => {
     expect(deskReply('todo', 'This weekend works', 2).text).toMatch(/that day/);
     expect(deskReply('visa', 'Is there an earlier appointment?', 1).text).toMatch(/earlier appointment/);
     for (const k of ['food', 'car', 'visa', 'todo', 'general', 'stay', 'flight']) expect(bannedIn(deskReply(k, 'anything', 2).text)).toEqual([]);
+  });
+});
+
+describe('Saudi weekend', () => {
+  it('is Thursday out, Saturday back, and a Friday is already this weekend', () => {
+    expect(weekendDates('2026-10-22', 0)).toEqual(['2026-10-22', '2026-10-24']); // Thursday
+    expect(weekendDates('2026-10-22', 1)).toEqual(['2026-10-29', '2026-10-31']);
+    expect(weekendDates('2026-10-23', 0)).toEqual(['2026-10-23', '2026-10-24']); // Friday
+    expect(weekendDates('2026-10-23', 1)).toEqual(['2026-10-29', '2026-10-31']);
+    expect(weekendDates('2026-10-25', 0)).toEqual(['2026-10-29', '2026-10-31']); // Sunday
+    expect(weekendLine('2026-10-25')).toMatch(/Weekend Fri–Sat, out Thu.*2026-10-29→2026-10-31.*2026-11-05→2026-11-07/);
   });
 });

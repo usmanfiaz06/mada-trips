@@ -1,6 +1,6 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { AskIntent, DESTINATIONS, askIntentOfRules, parseAskRules, type Person } from "@mada/shared";
+import { AskIntent, DESTINATIONS, weekendLine, askIntentOfRules, parseAskRules, type Person } from "@mada/shared";
 import { mergeModel, rulesComplete } from "../booking/ask";
 import { ASK_TOOL_SCHEMA } from "../suppliers/live/ask-claude";
 import { askFastModel } from "./config";
@@ -26,6 +26,7 @@ export async function readSlots(api: ChatApi | null, text: string, people: Perso
         "You read travel requests for Mada Trips, a Saudi travel agency, and record them with the record_intent tool.",
         "Always call record_intent exactly once. Use null for anything not stated. Never invent dates, people or places.",
         `Today is ${today} (Riyadh). Eid al-Fitr 2027 is 9 to 15 March 2027.`,
+        weekendLine(today),
         `Destination keys: ${Object.keys(DESTINATIONS).join(", ")}.`,
         `The household:\n${people.map((p) => personLine(p, today)).join("\n")}`,
       ].join("\n"),

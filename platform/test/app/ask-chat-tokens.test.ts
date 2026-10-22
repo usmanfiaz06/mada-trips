@@ -68,7 +68,7 @@ describe("ask chat: tokens per call for openai-compatible providers", () => {
     // ASK_TOKENS_TABLE=/path/rows.json writes the table by kind and step (docs/app/ASK-CHAT.md §6).
     if (process.env.ASK_TOKENS_TABLE) (await import("node:fs")).writeFileSync(process.env.ASK_TOKENS_TABLE, JSON.stringify(rows, null, 1));
     expect(calls.length).toBeGreaterThan(60);
-    expect(rows.find((r) => r.kind === "all")!.mean).toBeLessThan(2600);
+    expect(rows.find((r) => r.kind === "all")!.mean).toBeLessThan(2650); // 2650: + the Saudi weekend line when days are named
     expect(Math.max(...calls.map((c) => c.tokens))).toBeLessThan(3200);
   });
 

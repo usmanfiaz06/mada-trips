@@ -30,9 +30,18 @@ const weekdayIdx = (iso: string) => utc(iso).getUTCDay();
 
 /** Saudi weekends: out on Thursday, back on Saturday. offset 0 = this weekend. */
 export function weekendDates(today: string, offset = 0): [string, string] {
+  // On a Friday the weekend is already here: this weekend is today and Saturday, next weekend starts next Thursday.
+  if (weekdayIdx(today) === 5) return offset === 0 ? [today, addDays(today, 1)] : weekendDates(addDays(today, 6), offset - 1);
   const delta = (4 - weekdayIdx(today) + 7) % 7;
   const thu = addDays(today, delta + offset * 7);
   return [thu, addDays(thu, 2)];
+}
+
+/** For a model reading dates: the Saudi weekend and the two weekends' dates, so "next weekend" is never a Saturday–Sunday. */
+export function weekendLine(today: string): string {
+  const [a, b] = weekendDates(today, 0);
+  const [c, d] = weekendDates(today, 1);
+  return `Weekend Fri–Sat, out Thu: this ${a}→${b}, next ${c}→${d}`;
 }
 
 /** Quick picks in the calendar and the "When?" chips. Fixed season dates drop off once they're past. */

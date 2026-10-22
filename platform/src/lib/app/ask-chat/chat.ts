@@ -124,7 +124,7 @@ export async function chatTurn(auth: ChatAuth, req: AskChatRequest, emit: (e: As
     text: speaker ? `${speaker}: ${clean}` : clean,
     // After the desk's Hand back, what was said meanwhile rides in this turn's context once (takeover.ts handBackNote).
     // Documents sent in this chat, as their cards say them (attachments.ts): never a number or a line of the MRZ.
-    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory }), together, ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
+    context: [turnContext({ today, lang, people, trips: tripLines, onScreen, slots: slotsLine(slots.intent), household: (p) => personLine(p, today), memory, text: clean }), together, ...planned.lines, thread.deskNote, await attachmentsContext(auth.userId, thread.id)].filter(Boolean).join("\n"),
     lang,
     tool,
     intent: kindFor(clean, slots.intent.kind, planned.lines.length > 0),

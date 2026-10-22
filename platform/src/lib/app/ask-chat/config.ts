@@ -172,13 +172,14 @@ const BASE_PRICES: Record<string, [number, number, number, number]> = {
   "claude-sonnet-5-5": [2, 10, 0.2, 2.5],
   "claude-haiku-5-5": [0.1, 0.5, 0.01, 0.125],
   "claude-opus-5-5": [4, 20, 0.2, 5],
+  "claude-haiku-4-5": [1, 5, 0.1, 1.25],
 };
 const PRICES: Record<string, [number, number, number, number]> = {
   ...BASE_PRICES,
   ...Object.fromEntries(Object.entries(BASE_PRICES).map(([k, v]) => [`anthropic.${k}`, v])),
 };
 /** A model's price: its own, or a cross-region Bedrock ID's ("us.anthropic.claude-haiku-5-5") by its plain name. */
-export const priceOf = (model: string): Price | null => PRICES[model] ?? PRICES[model.replace(/^(?:[a-z]+\.)?anthropic\./, "")] ?? null;
+export const priceOf = (model: string): Price | null => PRICES[model] ?? PRICES[model.replace(/^(?:[a-z]+\.)?anthropic\./, "").replace(/-\d{8}(?:-v\d+(?::\d+)?)?$/, "")] ?? null;
 
 export type Usage = { input: number; output: number; cacheRead: number; cacheWrite: number };
 export const noUsage = (): Usage => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });

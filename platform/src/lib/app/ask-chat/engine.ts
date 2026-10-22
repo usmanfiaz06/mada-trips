@@ -1,7 +1,7 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi, StreamParams } from "./providers";
-import { t, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type Person } from "@mada/shared";
+import { t, weekendLine, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type Person } from "@mada/shared";
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { isCloser, outgoingProblems, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
@@ -317,12 +317,16 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   return { added, text, cards, usage, costMicros: cost, toolsUsed, raw: raw.trim(), dropped: gate.dropped, toolText, stop, next: next.choices, nextFrom: next.from, modelChoices, closers: gate.closers, calls };
 }
 
+/** A weekend or a day named, in English or Arabic: the turn gets the Saudi weekend's dates. */
+const SAYS_DAYS = /weekend|week|thu|fri|sat|sun|ويكند|ويك اند|اسبوع|أسبوع|خميس|جمع|سبت|احد|أحد/i;
+
 /** The context block for a turn: Mada's systems speaking, never the traveller. Changes every turn, so it sits in the turn. */
-export function turnContext(o: { today: string; lang: "en" | "ar"; people: Person[]; trips: string[]; onScreen: string | null; slots: string; household: (p: Person) => string; /** What Mada knows from before (memory.ts memoryBlock), once per thread. */ memory?: string | null }): string {
+export function turnContext(o: { today: string; lang: "en" | "ar"; people: Person[]; trips: string[]; onScreen: string | null; slots: string; household: (p: Person) => string; /** What Mada knows from before (memory.ts memoryBlock), once per thread. */ memory?: string | null; /** The message's words, so the weekend's dates come only when days are mentioned. */ text?: string }): string {
   const weekday = new Date(`${o.today}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
   return [
     "[Context from Mada's systems for this message. Not written by the traveller.]",
     `Today: ${weekday} ${o.today}, Riyadh time. Eid al-Fitr 2027 is 9 to 15 March 2027.`,
+    o.text === undefined || SAYS_DAYS.test(o.text) ? weekendLine(o.today) : null,
     `Reply in: ${o.lang === "ar" ? "Arabic, spoken Saudi" : "English"}.`,
     `Household (id: name, relation, age):\n${o.people.map(o.household).join("\n") || "only the account holder"}`,
     `Trips: ${o.trips.length ? `\n${o.trips.join("\n")}` : "none upcoming"}`,
