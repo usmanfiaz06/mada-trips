@@ -34,7 +34,7 @@ export type ProviderConfig = { provider: ChatProviderName; apiKey?: string; base
  * The engine's hints for providers that pay per token (`only_tools`, `lean`: the compact prompt, tool words and
  * history) are not API fields: Claude gets the full prompt, every tool and the whole thread, cached.
  */
-const forClaude = (p: StreamParams): StreamParams => {
+export const forClaude = (p: StreamParams): StreamParams => {
   const { only_tools: _drop, lean: _lean, ...rest } = p as StreamParams & { only_tools?: unknown; lean?: unknown };
   void _drop; void _lean;
   // A thread Gemini answered earlier carries its tool-call signatures (extra_content), which Claude doesn't take.

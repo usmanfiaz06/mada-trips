@@ -167,3 +167,17 @@ describe("chain: a provider that refuses the request", () => {
     expect(worthAnother(err(400, "messages: text content blocks must be non-empty"))).toBe(false);
   });
 });
+
+describe("bedrock: a thread another provider answered", () => {
+  it("takes Gemini's extra_content off earlier tool calls", async () => {
+    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const messages = [
+      { role: "user", content: "hotel" },
+      { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "search_stays", input: {}, extra_content: { google: { thought_signature: "x" } } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] },
+    ];
+    const out = forBedrock({ model: "global.anthropic.claude-haiku-4-5-20251001-v1:0", max_tokens: 9, messages } as never) as unknown as { messages: { content: unknown }[] };
+    expect(JSON.stringify(out.messages)).not.toContain("extra_content");
+    expect(JSON.stringify(out.messages)).toContain("search_stays");
+  });
+});

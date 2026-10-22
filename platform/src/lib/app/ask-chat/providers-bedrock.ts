@@ -2,7 +2,7 @@ import "server-only";
 import { AnthropicBedrock, AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import { bedrockModel, type BedrockSettings } from "./config";
-import type { ChatApi, StreamParams } from "./providers";
+import { forClaude, type ChatApi, type StreamParams } from "./providers";
 
 /*
  * Claude through Amazon Bedrock, billed to the AWS account: the same Messages API (tools, streaming, adaptive thinking,
@@ -44,7 +44,9 @@ export function olderSchema(node: unknown): unknown {
 
 /** The request as Bedrock takes it: the engine's `only_tools` hint and server-side fallbacks dropped, the model prefixed. */
 export function forBedrock(p: StreamParams): StreamParams {
-  const { only_tools: _tools, fallbacks: _fallbacks, betas, ...rest } = p as StreamParams & { only_tools?: unknown; fallbacks?: unknown };
+  // As for Claude direct: the engine's hints dropped, and Gemini's tool-call signatures (extra_content) taken off an
+  // older thread's turns, which Claude rejects.
+  const { only_tools: _tools, fallbacks: _fallbacks, betas, ...rest } = forClaude(p) as StreamParams & { only_tools?: unknown; fallbacks?: unknown };
   void _tools; void _fallbacks;
   const kept = (betas ?? []).filter((b) => !FALLBACK_BETA.test(String(b)));
   const model = bedrockModel(String(p.model));
