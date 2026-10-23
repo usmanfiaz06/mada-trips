@@ -117,7 +117,8 @@ export async function listThreads(ownerId: string, o: { q?: string | null; archi
   };
 }
 
-const KEPT = new Set(["change", "people", "invite"]);
+// A desk quote (stay_quote) and a change that needs booking (pay_change) are kept too: they carry the Book button.
+const KEPT = new Set(["change", "people", "invite", "pay_change", "stay_quote"]);
 
 /**
  * The lines the app shows again: the traveller's, Mada's, the desk's replies and "Noura from Mada joined". In a trip

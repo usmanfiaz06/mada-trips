@@ -15,6 +15,7 @@ import {
 import { pushPlan } from "@/lib/app/desk/disruptions";
 import { linkRequestToItem } from "@/lib/app/desk/plans";
 import { confirmContactByCall, sendFlightQuote } from "@/lib/app/desk/flight-quotes";
+import { confirmHandStay, sendHotelQuote } from "@/lib/app/desk/hotel-quotes";
 import { decideModeration } from "@/lib/app/desk/moderation";
 import { approveRecovery, declineRecovery } from "@/lib/app/desk/recovery";
 import { escalate, reassign } from "@/lib/app/desk/inbox";
@@ -203,6 +204,28 @@ export async function flightQuoteAction(_: ActionState, fd: FormData): Promise<A
     }));
     await sendFlightQuote(u, uuid(fd, "id"), { options: options as never, holdUntil: riyadh(String(raw.holdUntil ?? "")).toISOString(), pnr: raw.pnr || null, message: raw.message || null });
     return done(options.length === 1 ? "Fare sent" : "Fares sent");
+  } catch (e) { return toState(e); }
+}
+
+/** Hotels for a stay request from "Add hotel quote" (components/desk/hotel-quote.tsx): up to three, net in the supplier's currency. */
+export async function hotelQuoteAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.act");
+    let raw: { options?: unknown[]; message?: string };
+    try { raw = JSON.parse(str(fd, "payload") || "{}"); } catch { throw new DeskError("Check the hotel quote"); }
+    const { quote } = await sendHotelQuote(u, uuid(fd, "id"), raw as never);
+    const n = ((quote.offerSnapshot as { options?: unknown[] }).options ?? []).length;
+    return done(n === 1 ? "Sent to the traveller" : "Hotels sent to the traveller");
+  } catch (e) { return toState(e); }
+}
+
+/** Paid, booked on the portal by hand: the hotel's confirmation goes on the stay; the supplier's stays with the desk. */
+export async function handStayConfirmAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  try {
+    const u = await requirePerm("desk.issue");
+    const r = await confirmHandStay(u, uuid(fd, "id"), { hotelRef: str(fd, "hotelRef"), supplierRef: str(fd, "supplierRef") || null });
+    if (!r.ok) { revalidatePath("/adminwork/desk", "layout"); return { error: "The payment capture didn't go through. Try again, or tell the traveller and cancel it." }; }
+    return done("Booked. The stay is on the traveller's trip");
   } catch (e) { return toState(e); }
 }
 

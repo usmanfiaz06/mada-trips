@@ -23,6 +23,7 @@ export * from './status';
 export * from './places';
 export * from './flight-quote';
 export * from './flight-quote-logic';
+export * from './stay-quote';
 export * from './activities';
 export * from './activities-logic';
 export * from './review';

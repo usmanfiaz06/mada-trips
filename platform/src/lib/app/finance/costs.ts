@@ -8,6 +8,7 @@ import { appSupplierBookings } from "@/db/app-schema-hotelbeds";
 import { appTripCharges } from "@/db/app-schema-trips";
 import { appOrderCosts } from "@/db/app-schema-finance";
 import { fxRates } from "@/lib/app/suppliers/hotelbeds/money";
+import { HAND_SUPPLIER_FINANCE, handStayCostsOf } from "@/lib/app/desk/hotel-quote-math";
 import { businessDate } from "@/lib/dates";
 import { getSettings } from "@/lib/settings";
 
@@ -19,6 +20,7 @@ import { getSettings } from "@/lib/settings";
  * Where the cost comes from, best first:
  *   eSIM        app_esims.net_usd_cents (the supplier's price for that eSIM), at the USD peg          basis supplier
  *   Hotelbeds   app_supplier_bookings net + currency for the order or request                         basis supplier
+ *   By hand     a room the desk priced from a portal or the hotel: the quote's net + currency (desk/hotel-quotes.ts) basis supplier
  *   TBO flight  no net on the offer: the line less TBO_AIR_MARKUP_BPS (what we added to their fare)   basis estimated
  *   anything else (a desk-quoted visa, a flight the desk bought elsewhere): no cost known yet          basis missing
  * Finance types a cost on a missing or estimated line from the revenue page (basis manual).
@@ -123,6 +125,10 @@ export async function costLinesFor(q: Tx | typeof db, p: Pay): Promise<{ lines: 
   const hb = sources.length ? await q.select().from(appSupplierBookings).where(and(inArray(appSupplierBookings.sourceId, sources), inArray(appSupplierBookings.status, ["confirmed", "cancelled"]))) : [];
   const snap = (order?.snapshot ?? {}) as { flightSupplierId?: string | null; flightBooking?: { parts?: { pnr?: string | null }[] } | null };
   const tbo = !!snap.flightSupplierId?.startsWith("tbo") || !!snap.flightBooking;
+  // A room priced by hand: the net the agent entered with the quote, for the option the traveller booked.
+  const hs = (order?.snapshot ?? {}) as { quotedStay?: unknown; quote?: { id?: string; optionId?: string } };
+  const [handQuote] = hs.quotedStay && hs.quote?.id ? await q.select({ s: appQuotes.offerSnapshot }).from(appQuotes).where(eq(appQuotes.id, hs.quote.id)) : [];
+  const hand = handQuote ? handStayCostsOf(handQuote.s).find((c) => c.id === hs.quote?.optionId) ?? null : null;
 
   const usd = sarPerUnit("USD") ?? 3.75;
   const lines: CostLine[] = raw.map((l, i) => {
@@ -137,6 +143,11 @@ export async function costLinesFor(q: Tx | typeof db, p: Pay): Promise<{ lines: 
       const rate = sarPerUnit(stay.currency);
       const net = Number(stay.net);
       if (rate && Number.isFinite(net)) return { ...base, supplier: "hotelbeds", supplierRef: stay.supplierRef, netAmount: net.toFixed(2), currency: stay.currency.toUpperCase(), fxRate: String(rate), netSar: toHalalas(net, rate), basis: "supplier" };
+    }
+    if (l.product === "stay" && hand) {
+      const rate = sarPerUnit(hand.currency);
+      const net = Number(hand.netAmount);
+      if (rate && Number.isFinite(net)) return { ...base, supplier: HAND_SUPPLIER_FINANCE[hand.supplier] ?? "other", supplierRef: order?.supplierRef ?? hand.supplierRef, netAmount: net.toFixed(2), currency: hand.currency, fxRate: String(rate), netSar: toHalalas(net, rate), basis: "supplier" };
     }
     if (l.product === "flight" && tbo) {
       const net = Math.round((sell - (vats[i] ?? 0)) / (1 + tboMarkupBps() / 10_000));

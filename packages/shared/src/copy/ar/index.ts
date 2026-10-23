@@ -28,6 +28,7 @@ import { arAskMemory } from './askMemory';
 import { arAskPlan } from './askPlan';
 import { arPlanScreen } from './planScreen';
 import { arAskPolish } from './askPolish';
+import { arStayQuote } from './stayQuote';
 import { arBookReady } from './bookReady';
 import { arAskDocs } from './askDocs';
 import { arTodayIdeas } from './todayIdeas';
@@ -68,6 +69,7 @@ export const arSections: Readonly<Record<string, string>> = {
   ...arAskPlan,
   ...arPlanScreen,
   ...arAskPolish,
+  ...arStayQuote,
   ...arBookReady,
   ...arAskDocs,
   ...arTodayIdeas,

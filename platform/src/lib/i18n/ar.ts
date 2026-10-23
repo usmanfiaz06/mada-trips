@@ -12,6 +12,7 @@ import { AR_DESK_FINANCE } from "../app/desk/ar-finance";
 import { AR_DESK_AGENTS } from "../app/desk/ar-agents";
 import { AR_DESK_ASK } from "../app/desk/ar-ask";
 import { AR_DESK_OVERVIEW } from "../app/desk/ar-overview";
+import { AR_DESK_HOTEL_QUOTES } from "../app/desk/ar-hotel-quotes";
 
 export const AR: Record<string, string> = {
   ...AR_DESK, // the app desk (src/lib/app/desk/ar.ts); keys below win
@@ -27,6 +28,7 @@ export const AR: Record<string, string> = {
   ...AR_DESK_AGENTS, // agents, rota, performance, saved replies
   ...AR_DESK_ASK, // Ask threads on the desk
   ...AR_DESK_OVERVIEW, // the desk overview and its alerts
+  ...AR_DESK_HOTEL_QUOTES, // hotel quotes found by hand
   ", retail only": "، للأفراد فقط",
   "1 more approval needed.": "مطلوب موافقة واحدة إضافية.",
   "1 · Cleared funds": "1 · الأموال المحصّلة",

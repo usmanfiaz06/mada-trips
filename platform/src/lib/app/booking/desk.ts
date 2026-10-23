@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   CARRIERS, CATALOGUE_HOTELS, DESTINATIONS, ENTRY_RULES, PICKUP_SAR, addDays, instalments, legMinutes, sarToHalalas, seatsFor, t, zonedToInstant,
-  type FareOption, type FlightOption, type OrderLine, type OutcomeReason, type RequestResult, type StayOption,
+  type FareOption, type FlightOption, type OrderLine, type OutcomeReason, type RequestResult, type StayOption, type StayQuoteOption, type CopyKey,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appMessages, appNotifications, appPayments, appPickups, appQuotes, appRequests, appSegments, appStays, appTrips } from "@/db/app-schema";
@@ -284,7 +284,9 @@ async function capture(tx: Tx, o: OrderRow): Promise<boolean> {
 const SV_DRIVER = { home: { driver: "Khalid", phone: "+966 55 014 2287", waits: "10 min" }, arrive: { driver: "Ahmet", car: "Grey Mercedes Vito", plate: "34 MDA 21", door: "Door 3", phone: "+90 532 418 6610", waits: "60 min" } };
 
 async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent, now: Date): Promise<string> {
-  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string; destinationName?: string; place?: { country?: string | null } }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown> };
+  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string; destinationName?: string; place?: { country?: string | null } }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown>;
+    /** A room the desk priced by hand (desk/hotel-quotes.ts), and the hotel's own reference the agent entered on confirming it. */
+    quotedStay?: StayQuoteOption; hotelRef?: string | null };
   if (snap.quotedFlight) return writeQuotedTrip(tx, o, snap.quotedFlight, agent, now);
   const n = Math.max(1, o.travellerIds.length);
   const dest = DESTINATIONS[snap.search?.destination ?? ""] ?? null;
@@ -303,7 +305,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
   }
   if (!tripId) {
     const [trip] = await tx.insert(appTrips).values({
-      ownerId: o.ownerId, city: dest?.name ?? snap.search?.destinationName ?? snap.place ?? (snap.stay ? "Istanbul" : ""), country, imageUrl: dest?.photo ?? null, startDate, endDate,
+      ownerId: o.ownerId, city: dest?.name ?? snap.quotedStay?.city ?? snap.search?.destinationName ?? snap.place ?? (snap.stay ? "Istanbul" : ""), country, imageUrl: dest?.photo ?? null, startDate, endDate,
       travellerIds: o.travellerIds, status: "booked", bookingRef: o.ref, confirmedByName: agent.name, confirmedByOpsUserId: agent.opsUserId ?? null,
     }).returning({ id: appTrips.id });
     tripId = trip!.id;
@@ -333,12 +335,15 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     const nights = hotel?.nights ?? Math.max(1, Math.round((Date.parse(`${f!.back!.date}T00:00:00Z`) - Date.parse(`${f!.out.date}T00:00:00Z`)) / 86_400_000));
     const [st] = await tx.insert(appStays).values({
       tripId, name: hotel?.name ?? galata.name, area: hotel?.area ?? galata.area, address: hotel?.address ?? galata.address, checkIn, nights, rooms: hotel?.rooms ?? (n > 2 ? 2 : 1),
-      price: amountOf(["stay"]), cancellation: hotel?.cancellation ?? t("pay.rule.stay", { date: addDays(checkIn, -7) }), status: "booked", confirmation: o.ref, supplier: "catalogue",
+      price: amountOf(["stay"]), cancellation: hotel?.cancellation ?? t("pay.rule.stay", { date: addDays(checkIn, -7) }), status: "booked",
+      // Priced by hand: the hotel's own reference is the confirmation; the supplier's stays with the desk.
+      ...(snap.quotedStay ? { confirmation: snap.hotelRef || o.ref, supplier: "desk", supplierRef: o.supplierRef ?? null } : { confirmation: o.ref, supplier: "catalogue" }),
     }).returning({ id: appStays.id });
     // A Hotelbeds room keeps the hotel's code (the stay opens its hotel page) and the room as booked.
     stayFacts[st!.id] = {
-      addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel ? null : "+90 212 000 0000", fromAirport: hotel?.hotel ? null : "45 min",
-      roomType: hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ? Number(hotel.hotel.code) : null,
+      // A room priced by hand has no catalogue facts to borrow: none are invented.
+      addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel || snap.quotedStay ? null : "+90 212 000 0000", fromAirport: hotel?.hotel || snap.quotedStay ? null : "45 min",
+      roomType: snap.quotedStay ? `${snap.quotedStay.room} · ${t(`stay.board.${snap.quotedStay.board}` as CopyKey)}` : hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ? Number(hotel.hotel.code) : null,
       // What the traveller asked the hotel for on the order sheet (the stay repeats it; the desk and the supplier got it).
       requests: (o.draft as { requests?: StayFacts["requests"] }).requests ?? null,
     };

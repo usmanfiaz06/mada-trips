@@ -4,7 +4,7 @@ import {
   DESK_PRICES, DESTINATIONS, PLANS, childSeats, fareToFlightOption, PreviewBody, bundleFor, checkPromo, freeUntilLabel, instalments, money, rangeLabel, sarToHalalas, t, tn, roomsFor,
   BookingPrefs, airlineRequests, bookingPrefsOf, formatSar, hotelRemarks, loyaltyToAttach, maskLoyalty, prefScope, prefsSummary, programmeFor, programmeName, seatsTogetherOffer,
   type AppliedPrefs, type BookingLoyalty, type CopyKey, type FlightOption, type OrderLine, type OrderPreview, type StayOption, type Person, type PreviewBody as PreviewInput,
-  type DemoFlag, demoPassportTarget, entryChecks, familyLines, renewalsOf,
+  type DemoFlag, demoPassportTarget, entryChecks, familyLines, renewalsOf, stayQuoteOf,
 } from "@mada/shared";
 import { db } from "@/db";
 import { appMessages, appQuotes, appRequests } from "@/db/app-schema";
@@ -201,6 +201,31 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
       snapshot.quotedFlight = o;
       snapshot.search = { ...search, destination: search.destination ?? "", depart: f.out.date, return: f.back?.date ?? null };
       snapshot.quote = { id: q.id, requestId: r.id, optionId: o.id, total: o.total.amount, pnr: (q.offerSnapshot as { pnr?: string | null } | null)?.pnr ?? null };
+    } else if (stayQuoteOf(q.offerSnapshot)) {
+      // A room the desk priced by hand (desk/hotel-quotes.ts): booked as a stay, so it lands on the trip like any
+      // other once the desk confirms it on the portal. Only what the traveller reads is in the quote's options.
+      const sq = stayQuoteOf(q.offerSnapshot)!;
+      const o = d.optionId ? sq.find((x) => x.id === d.optionId) : sq[0];
+      if (!o) throw new AppError("NOT_FOUND");
+      travellers = r.travellerIds.length ? await travellersOf(ownerId, r.travellerIds, household) : [];
+      const dest = det.search?.destination ? DESTINATIONS[det.search.destination] ?? null : null;
+      lines = [line("stay", "stay", `${o.hotel} · ${t("pay.line.hotel", { rooms: o.room, dates: rangeLabel(o.checkIn, o.checkOut), count: o.nights })}`, o.total)];
+      rule = o.freeCancelUntil ? t("pay.rule.stayQuote", { date: rangeLabel(o.freeCancelUntil.slice(0, 10)), time: o.freeCancelUntil.slice(11, 16) }) : t("stay.nonRefundable");
+      stayFacts = { name: o.hotel, checkIn: o.checkIn, nights: o.nights, freeCancelUntil: o.freeCancelUntil?.slice(0, 10) ?? null, refundable: !!o.freeCancelUntil, payAtHotel: null, essentials: o.note, facts: null };
+      title = o.hotel;
+      place = o.city;
+      photo = dest?.photo ?? "riyadh-kingdom-centre";
+      hold = q.expiresAt;
+      kind = "stay";
+      snapshot.stay = {
+        id: q.id, name: o.hotel, area: o.city, address: "", note: o.note ?? "", rating: "", photo, focal: "", checkIn: o.checkIn, nights: o.nights, rooms: 1, roomsLabel: o.room,
+        total: money(o.total), cancellation: rule, freeCancelUntil: stayFacts.freeCancelUntil, expiresAt: (q.expiresAt ?? new Date()).toISOString(), hotel: null,
+      };
+      snapshot.quotedStay = o;
+      snapshot.search = { destination: dest?.key ?? "", destinationName: o.city, checkIn: o.checkIn, depart: o.checkIn, return: o.checkOut };
+      // The stay goes on the trip the request is about, when there is one.
+      snapshot.draft = { ...d, tripId: r.tripId ?? null };
+      snapshot.quote = { id: q.id, requestId: r.id, optionId: o.id, total: o.total };
     } else {
     lines = [line("quote", "doc", det.askKind === "visa" ? t("pay.line.quoteVisa") : t("pay.line.quote"), q.total)];
     rule = t("pay.rule.quote");

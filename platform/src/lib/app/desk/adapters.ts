@@ -18,6 +18,7 @@ import { bookingSuppliers } from "@/lib/app/booking/common";
 import { checkWithSupplier, flightBookingOf, holdWithSupplier, supplierFlightOf, ticketWithSupplier, type SupplierStep } from "@/lib/app/booking/supplier-flights";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, travellerName, type DeskActor } from "./core";
 import { isFlightAsk } from "@/lib/app/booking/flight-requests";
+import { isStayAsk } from "./hotel-quote-math";
 import { contactOf } from "./flight-quotes";
 import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
 import { withCopy } from "@/lib/app/notify-copy";
@@ -132,10 +133,11 @@ export function orderStage(r: { status: string; details: unknown }, payStatus?: 
 }
 
 /**
- * A flight request from Ask that hasn't been paid yet (flights by request): the desk quotes it from Requests. Once the
- * traveller pays, its order moves it to Orders, where the tickets are issued.
+ * A flight or stay request from Ask that hasn't been paid yet (flights by request, rooms found by hand): the desk quotes
+ * it from Requests. Once the traveller pays, its order moves it to Orders, where the tickets are issued or the stay is
+ * confirmed on the portal.
  */
-const PRE_PAYMENT_FLIGHT_ASK = sql`(${appRequests.kind} = 'flight' AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing','needs_answer','quoted','cancelled'))`;
+const PRE_PAYMENT_FLIGHT_ASK = sql`(${appRequests.kind} IN ('flight','stay') AND ${appRequests.details}->>'source' = 'ask' AND ${appRequests.status} IN ('sent','reviewing','needs_answer','quoted','cancelled'))`;
 
 const OPEN_STAGES: OrderStage[] = ["awaiting", "held", "needs_answer", "price_changed", "failed"];
 const ORDER_WHERE = sql`${appRequests.kind} IN ('flight','stay','trip') AND ${appRequests.status} <> 'queued' AND NOT (${PRE_PAYMENT_FLIGHT_ASK})`;
@@ -259,6 +261,7 @@ export async function getRequestFull(id: string) {
   const order = isOrderKind(r.kind) ? await linkedOrder(id) : null;
   // A flight request from Ask is quoted on the Requests page until it's paid; then it's an order like any other.
   const flightAsk = isFlightAsk(r.details);
+  const stayAsk = isStayAsk(r.details);
   const [orderPay, events] = order ? await Promise.all([
     order.paymentId ? db.select().from(appPayments).where(eq(appPayments.id, order.paymentId)).then((x) => x[0] ?? null) : Promise.resolve(null),
     db.select().from(appOrderEvents).where(eq(appOrderEvents.orderId, order.id)).orderBy(asc(appOrderEvents.createdAt)),
@@ -273,7 +276,7 @@ export async function getRequestFull(id: string) {
   return {
     request: r, ref: shortRef(r.id, isOrderKind(r.kind) ? "O" : "R"), user: u, travellers, quotes, payments, payment, trip, segments,
     messages, notes, desk: { ...deskState(r.details), ...(order?.supplierRef && !deskState(r.details).heldPnr ? { heldPnr: order.supplierRef } : {}) },
-    stage: orderStage(r, payment?.status, order), isOrder: isOrderKind(r.kind) && !(flightAsk && !order), order, events, flightAsk, contact: contactOf(r.details),
+    stage: orderStage(r, payment?.status, order), isOrder: isOrderKind(r.kind) && !((flightAsk || stayAsk) && !order), order, events, flightAsk, stayAsk, contact: contactOf(r.details),
   };
 }
 export type RequestFull = NonNullable<Awaited<ReturnType<typeof getRequestFull>>>;

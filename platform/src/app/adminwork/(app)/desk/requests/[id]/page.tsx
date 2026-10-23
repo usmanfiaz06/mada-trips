@@ -23,7 +23,7 @@ import { Composer, QuoteBuilder } from "@/components/desk/forms";
 import { SlaClock } from "@/components/desk/live";
 import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
 import { REQUEST_KIND, REQUEST_STATUS } from "@/lib/labels";
-import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, linkPlanItemAction, quoteAction, replyAction, typingAction } from "../../actions";
+import { askAction, checklistAction, confirmCallAction, doneAction, flightQuoteAction, hotelQuoteAction, linkPlanItemAction, quoteAction, replyAction, typingAction } from "../../actions";
 import { requestPlan } from "@/lib/app/desk/plans";
 import { FlightQuoteBuilder } from "@/components/desk/flight-quote";
 import { ContactBadge, FlightQuoteSummary, flightFacts } from "@/components/desk/flight-parts";
@@ -33,6 +33,9 @@ import { ActivityCard } from "@/components/desk/activity";
 import { OutcomeCard } from "@/components/desk/outcome";
 import { progressOfRequest, resultOfRequest } from "@/lib/app/outcomes";
 import { CustomerLink } from "@/components/desk/customer-link";
+import { HotelQuoteBuilder } from "@/components/desk/hotel-quote";
+import { HandQuoteSummary } from "@/components/desk/hotel-quote-parts";
+import { pricingRules } from "@/lib/app/suppliers/hotelbeds/money";
 
 export const metadata = { title: "Request · Desk" };
 
@@ -56,6 +59,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
   // Flights by request: the form's answers as facts, fares with the quote builder (components/desk/flight-quote.tsx).
   const fr = x.flightAsk ? flightFacts(r.details, x.travellers, L) : null;
   const flightQuote = quote ? flightQuoteOf(quote.offerSnapshot) : null;
+  // Rooms found by hand: the hotels go out from "Add hotel quote" (components/desk/hotel-quote.tsx).
+  const search = (r.details as { search?: { destinationName?: string | null; depart?: string | null; return?: string | null } }).search ?? null;
+  const stay = x.stayAsk ? { city: search?.destinationName ?? "", checkIn: search?.depart ?? "", checkOut: search?.return ?? "", guests: Math.max(1, x.travellers.length) } : null;
   // How they asked to be reached (Ask chat asks once): a call (with the best time), WhatsApp, or here in the app.
   const reach = contactPreferenceOf(r.details);
   // Passport copies the travellers chose to keep: opened only while this request needs them, each look audited.
@@ -127,6 +133,13 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             </Card>
           )}
 
+          {stay && act && !closed && (
+            <Card data-testid="hotel-quote-card">
+              <CardHead title={quote ? t("Send new hotels") : t("Add hotel quote")} hint={t("Find the room on the supplier's portal or with the hotel, then add it here. Up to three hotels; the traveller picks one and pays in the app.")} />
+              <HotelQuoteBuilder action={hotelQuoteAction} requestId={r.id} seed={stay} rules={pricingRules()} />
+            </Card>
+          )}
+
           {planned && (planned.linked || (act && planned.candidates.length > 0)) && (
             <Card data-testid="request-plan-item">
               <CardHead title={t("Plan item")} hint={t("The part of the traveller's plan this request fulfils. Booked by hand? Link it so the plan shows it.")} />
@@ -159,9 +172,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         <aside className="space-y-4">
           {act && !closed && (
             <Card className="ring-2 ring-gold/40">
-              <CardHead title={t("Next step")} hint={fr ? (quote ? t("Fares sent. Answer questions, then finish it once it's booked.") : t("Send the fares from the builder on the left.")) : !quote ? t("A line for each person, so everyone sees their share.") : r.status === "with_agent" ? t("Paid. Book it, then mark it done.") : t("Quote sent. Answer questions, or send a new quote.")} />
-              {!fr && !quote && <div className="mb-4"><QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} /></div>}
-              {!fr && quote && (
+              <CardHead title={t("Next step")} hint={fr ? (quote ? t("Fares sent. Answer questions, then finish it once it's booked.") : t("Send the fares from the builder on the left.")) : stay ? (quote ? t("Hotels sent. Once the traveller pays, confirm it on the portal from the order.") : t("Add the hotels from the form on the left.")) : !quote ? t("A line for each person, so everyone sees their share.") : r.status === "with_agent" ? t("Paid. Book it, then mark it done.") : t("Quote sent. Answer questions, or send a new quote.")} />
+              {!fr && !stay && !quote && <div className="mb-4"><QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} /></div>}
+              {!fr && !stay && quote && (
                 <details className="mb-3 rounded-2xl bg-surface-2 px-4 py-3 [&_summary::-webkit-details-marker]:hidden">
                   <summary className="cursor-pointer text-[13.5px] text-ink">{t("Send a new quote")}</summary>
                   <div className="mt-3"><QuoteBuilder action={quoteAction} requestId={r.id} people={x.travellers.map((p) => p.name.split(" ")[0]!)} defaultKind={r.kind} /></div>
@@ -186,8 +199,9 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
             <Card>
               <CardHead title={t("Quote sent")} hint={`${fmtDate(quote.createdAt, L, true)}${quote.expiresAt ? ` · ${t("held until {time}", { time: fmtDate(quote.expiresAt, L, true) })}` : ""}`} action={<Badge tone={quote.status === "accepted" ? "ok" : "info"}>{t(quote.status === "accepted" ? "Accepted" : quote.status === "expired" ? "Expired" : "Open")}</Badge>} />
               {flightQuote ? <FlightQuoteSummary quote={flightQuote} locale={L} /> : null}
-              {!flightQuote && <dl className="divide-y divide-line">{quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-3 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}</dl>}
-              <div className="mt-2 flex justify-between border-t border-line-strong pt-2.5"><span className="text-[13px] text-ink-3">{t(flightQuote ? "From" : "Total")}</span><Money v={quote.total} className="text-[18px]" /></div>
+              {!flightQuote && x.stayAsk ? <HandQuoteSummary snapshot={quote.offerSnapshot} finance={canDeskFinance(u)} t={t} /> : null}
+              {!flightQuote && !x.stayAsk && <dl className="divide-y divide-line">{quote.lines.map((l, i) => <div key={i} className="flex justify-between gap-3 py-2 text-[13.5px]"><dt className="text-ink-2">{l.label}</dt><dd><Money v={l.amount} /></dd></div>)}</dl>}
+              <div className="mt-2 flex justify-between border-t border-line-strong pt-2.5"><span className="text-[13px] text-ink-3">{t(flightQuote || (x.stayAsk && quote.lines.length > 1) ? "From" : "Total")}</span><Money v={quote.total} className="text-[18px]" /></div>
               {quote.cancellation && <p className="mt-2 text-[12.5px] text-ink-3">{quote.cancellation}</p>}
             </Card>
           )}

@@ -156,9 +156,9 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
   }
   const [charge, agentName] = await Promise.all([chargeFor(ownerId, body.payment, body.plan, preview.total.amount, demo), agentP]);
   const requestId = body.draft.kind === "quote" ? body.draft.requestId : null;
-  // A fare the desk quoted for a flight request: the request itself goes with the order to the desk (no new row).
+  // A fare or a room the desk quoted for a request: the request itself goes with the order to the desk (no new row).
   const quoted = priced.snapshot.quote as { id: string; requestId: string; optionId?: string; pnr?: string | null } | undefined;
-  const quotedFlight = !!priced.snapshot.quotedFlight && !!quoted;
+  const quotedByDesk = (!!priced.snapshot.quotedFlight || !!priced.snapshot.quotedStay) && !!quoted;
   const f = priced.snapshot.flight as FlightOption | undefined;
 
   // Known before the insert, so the desk request can point at its order in the same write (Trips → Requests).
@@ -170,7 +170,7 @@ export async function createOrder(ownerId: string, input: CreateOrderInput, demo
     const status = pay?.status === "requires_action" ? "requires_action" : agentKind ? "pending_agent" : "paid_now";
     const order = { id: orderId, status: status === "paid_now" ? "pending_agent" : status, failure: null };
     let deskRequest: string | null = requestId;
-    if (agentKind && quotedFlight) {
+    if (agentKind && quotedByDesk) {
       await tx.update(appRequests).set({ status: "with_agent", promisedBy: new Date(Date.now() + 30 * 60_000), updatedAt: new Date(),
         details: sql`${appRequests.details} || ${JSON.stringify({ prefs: deskPrefs(priced.snapshot), ...(contact ? { contactPhone: contact.phone, contactVerified: false } : {}) })}::jsonb` }).where(eq(appRequests.id, quoted!.requestId));
       await tx.update(appQuotes).set({ status: "accepted" }).where(eq(appQuotes.id, quoted!.id));

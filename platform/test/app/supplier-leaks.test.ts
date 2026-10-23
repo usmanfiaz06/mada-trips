@@ -44,6 +44,17 @@ afterEach(() => {
 });
 
 describe("the shield's pieces", () => {
+  it("drops a hand-priced hotel quote's costs and supplier, keeping what the traveller reads", () => {
+    const quote = {
+      kind: "stay", options: [{ id: "h1", hotel: "Pera Palace", city: "Istanbul", room: "Superior room", board: "RO", total: 340_000, freeCancelUntil: null, note: null }],
+      wholesale: [{ id: "h1", supplier: "hotelbeds_portal", supplierRef: "1-2345678", netAmount: "812.40", currency: "EUR", costHalalas: 348_032, marginHalalas: 41_768 }],
+    };
+    const out = scrubResponse(quote, "https://api.madatrips.com") as typeof quote;
+    expect(out.options).toEqual(quote.options);
+    expect(out).not.toHaveProperty("wholesale");
+    expect(leaks(out)).toEqual([]);
+  });
+
   it("seals a partner id to a stable opaque id only the server reads, per kind", () => {
     const a = seal("hotel", "99701");
     expect(a).toMatch(/^m_[\w-]+$/);

@@ -503,7 +503,7 @@ export const OrderDraft = z.discriminatedUnion('kind', [
   /** requests: what to tell the hotel (late check-in, high floor, a cot…), kept on the order and sent on as its remark. */
   z.object({ kind: z.literal('stay'), stayOfferId: Id, travellerIds: z.array(Id).min(1).max(12), tripId: Id.nullish(), requests: HotelRequests.nullish(), planItemIds: PlanItemIds }),
   z.object({ kind: z.literal('package'), planId: z.string().max(40), travellerIds: z.array(Id).min(1).max(12) }),
-  /** optionId: which fare option of a flight quote (the first when there is only one). */
+  /** optionId: which option of a flight or hotel quote (the first when there is only one). */
   z.object({ kind: z.literal('quote'), requestId: Id, optionId: z.string().min(1).max(40).optional(), planItemIds: PlanItemIds }),
   /** packageId: the plan picked (schemas/esim.ts), one eSIM per traveller; topupOf: more GB on an eSIM already bought. */
   z.object({

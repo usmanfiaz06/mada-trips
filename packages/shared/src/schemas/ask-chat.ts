@@ -5,6 +5,7 @@ import { EsimPlan } from './esim';
 import { TripCard } from './trips';
 import { ChangeRequestView, PeopleMatch } from './trip-travellers';
 import { ChatDocCard, ChatShareCard } from './ask-docs';
+import { StayQuoteOption } from './stay-quote';
 
 /*
  * Ask Mada as a conversation (docs/app/ASK-CHAT.md). POST /ask/chat answers with Server-Sent Events: the words as they
@@ -142,6 +143,14 @@ export const ChatCard = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('pay_change'), tripId: Id, changeId: Id, byName: z.string(), tripTitle: z.string(), what: z.string(),
     requestId: Id.nullable(), amount: z.number().int().nullable(), promisedBy: z.string().nullable(),
+  }),
+  /**
+   * Rooms the team priced by hand for a stay request (desk "Add hotel quote"): up to three options, each with its
+   * hotel, dates, room, board, all-in total and cancellation line, and Book (the pay sheet with that option) · Not now.
+   * Nothing is charged from the chat.
+   */
+  z.object({
+    type: z.literal('stay_quote'), requestId: Id, quoteId: Id, options: z.array(StayQuoteOption).min(1).max(3), expiresAt: IsoDateTime.nullable(),
   }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;

@@ -27,7 +27,9 @@ import { Composer } from "@/components/desk/forms";
 import { PassportReveal, SlaClock } from "@/components/desk/live";
 import { DeskTimeline, StatusBadge, Thread } from "@/components/desk/parts";
 import { ORDER_STAGE, PAY_STATUS } from "@/lib/labels";
-import { askAction, confirmCallAction, failAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
+import { askAction, confirmCallAction, failAction, handStayConfirmAction, holdAction, issueAction, priceAction, replyAction, revealAction, typingAction } from "../../actions";
+import { HandStayConfirmCard } from "@/components/desk/hotel-quote-parts";
+import { handStayOf } from "@/lib/app/desk/hotel-quotes";
 import { ContactBadge, FlightQuoteSummary } from "@/components/desk/flight-parts";
 import { FareOption } from "@mada/shared";
 import { deskPrefs, payRequestOf } from "@/lib/app/booking/orders";
@@ -39,7 +41,7 @@ export const metadata = { title: "Order · Desk" };
 const hm = (local: string) => local.slice(11, 16);
 const EVENT: Record<string, string> = {
   created: "Order placed", authorised: "Card authorised", held: "Seats held", pnr: "PNR recorded", price_locked: "Fare confirmed", question: "Question sent", answered: "Traveller answered",
-  fare_changed: "New fare sent", issuing: "Issuing", tickets: "Ticket numbers entered", captured: "Card captured", confirmed: "Confirmed", ticketing_failed: "Ticketing failed", voided: "Card hold released", cancelled: "Cancelled",
+  fare_changed: "New fare sent", hotel_confirmed: "Hotel confirmation entered", issuing: "Issuing", tickets: "Ticket numbers entered", captured: "Card captured", confirmed: "Confirmed", ticketing_failed: "Ticketing failed", voided: "Card hold released", cancelled: "Cancelled",
   supplier_fare_confirmed: "Fare confirmed at TBO", hold_pending: "Hold sent to TBO", hold_failed: "TBO didn't hold it", ticketing_pending: "Tickets requested at TBO", schedule_changed: "Airline changed the times", supplier_checked: "Checked with TBO",
 };
 
@@ -68,6 +70,8 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
   // Flights by request: the fare the traveller chose from the desk's quote.
   const quotedParse = FareOption.safeParse((o.order?.snapshot as { quotedFlight?: unknown } | undefined)?.quotedFlight);
   const quoted = quotedParse.success ? quotedParse.data : null;
+  // A room the desk priced by hand: paid, it's booked on the portal and confirmed here with the hotel's reference.
+  const handStay = handStayOf(o.order);
   // Preferences and loyalty as applied on the order sheet, and a friend asked to pay (booking/orders.ts).
   const prefs = o.order ? deskPrefs(o.order.snapshot as Record<string, unknown>) : null;
   const payRequest = o.order ? payRequestOf(o.order) : null;
@@ -198,18 +202,21 @@ export default async function OrderPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <aside className="space-y-4">
+          {handStay && act && (o.stage === "awaiting" || o.stage === "held") && (
+            <HandStayConfirmCard requestId={r.id} stay={handStay} total={o.order?.total ?? total} canIssue={issue} action={handStayConfirmAction} t={t} />
+          )}
           {open && act && (
             <Card className="ring-2 ring-gold/40">
-              <CardHead title={t("Next step")} hint={o.stage === "awaiting" ? t("Check names against passports, then hold the seats.") : o.stage === "held" ? t("Seats are held. Issue to capture the card.") : t("Waiting on the traveller. You can still act.")} />
+              <CardHead title={t("Next step")} hint={handStay ? t("Confirm it on the portal above, or ask the traveller.") : o.stage === "awaiting" ? t("Check names against passports, then hold the seats.") : o.stage === "held" ? t("Seats are held. Issue to capture the card.") : t("Waiting on the traveller. You can still act.")} />
               <div className="space-y-4">
-                {o.stage === "awaiting" && (
+                {!handStay && o.stage === "awaiting" && (
                   <ActionForm action={holdAction} className="space-y-2">
                     <input type="hidden" name="id" value={r.id} />
                     <Field label={t("PNR from the GDS (optional)")}><Input name="pnr" maxLength={8} className="num uppercase" dir="ltr" placeholder="X7K2QD" /></Field>
                     <SubmitButton variant="gold" className="w-full"><BadgeCheck className="size-4" />{t("Confirm and hold")}</SubmitButton>
                   </ActionForm>
                 )}
-                {(o.stage === "awaiting" || o.stage === "held") && (issue ? (
+                {!handStay && (o.stage === "awaiting" || o.stage === "held") && (issue ? (
                   <ActionForm action={issueAction} className="space-y-2 border-t border-line pt-4">
                     <input type="hidden" name="id" value={r.id} />
                     <Field label={t("PNR")} required><Input name="pnr" required maxLength={8} defaultValue={d.heldPnr ?? ""} className="num uppercase" dir="ltr" /></Field>
