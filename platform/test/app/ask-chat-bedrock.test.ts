@@ -220,3 +220,21 @@ describe("claude: strict tools", () => {
     expect(out.tools).toHaveLength(27);
   });
 });
+
+describe("pure Saudi Arabic", () => {
+  it("swaps other dialects' words for Riyadh ones, whole words only", async () => {
+    const { saudiWords } = await import("@/lib/app/ask-chat/guard");
+    expect(saudiWords("وش تبغى؟ عندنا فندق حلو كده وايد")).toBe("وش تبي؟ عندنا فندق حلو كذا مرّة");
+    expect(saudiWords("إيش رأيك؟ مش بعيد، وتبغى فطور؟")).toBe("وش رأيك؟ مو بعيد، وتبي فطور؟");
+    expect(saudiWords("مشي خمس دقايق")).toBe("مشي خمس دقايق");
+    expect(saudiWords("Hotels in Dubai")).toBe("Hotels in Dubai");
+  });
+  it("swaps in the stream too, never showing half a word", async () => {
+    const { SentenceGate } = await import("@/lib/app/ask-chat/engine");
+    let shown = "";
+    const g = new SentenceGate(() => "", (x) => { shown += x; });
+    for (const d of ["هذي فنادق ", "في دبي، تبغ", "ى وحدة قري", "بة من البحر؟ وكده"]) g.push(d);
+    g.flush();
+    expect(shown).toBe("هذي فنادق في دبي، تبي وحدة قريبة من البحر؟ وكذا");
+  });
+});

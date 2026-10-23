@@ -141,6 +141,26 @@ export const outgoingProblems = (reply: string): string[] => [...bannedIn(reply)
 /** The mechanics COPY.md §4 fixes without asking: no exclamation marks, no em dashes, no emoji. */
 export const tidy = (delta: string) => delta.replace(/[!！]/g, ".").replace(/\s?—\s?/g, ", ").replace(/\p{Extended_Pictographic}️?/gu, "");
 
+/*
+ * Pure Saudi (Riyadh) Arabic: other dialects' everyday words that slip into a model's Arabic, each with the word a
+ * Riyadh speaker says (docs/app/ASSISTANT.md §1, ARABIC.md). Only one-for-one swaps that read right in any sentence;
+ * the persona carries the rest. Whole words, with a leading و or ف kept.
+ */
+export const SAUDI_FOR: Record<string, string> = {
+  // Hijazi
+  "تبغى": "تبي", "أبغى": "أبي", "ابغى": "أبي", "نبغى": "نبي", "يبغى": "يبي", "تبغون": "تبون", "دحين": "الحين", "إيش": "وش", "ايش": "وش", "كدا": "كذا",
+  // Egyptian
+  "عايز": "تبي", "عاوز": "تبي", "عايزة": "تبين", "دلوقتي": "الحين", "إزاي": "كيف", "ازاي": "كيف", "كده": "كذا", "أوي": "مرّة", "اوي": "مرّة", "مش": "مو", "خالص": "أبد",
+  // Kuwaiti and Iraqi
+  "شلون": "كيف", "اشلون": "كيف", "شنو": "وش", "وايد": "مرّة", "جذي": "كذا",
+  // Levantine
+  "هلق": "الحين", "هلأ": "الحين", "منيح": "زين", "هيك": "كذا", "كتير": "مرّة",
+};
+const SAUDI_RE = new RegExp(`(?<![\\p{L}\\p{M}])([وف]?)(${Object.keys(SAUDI_FOR).join("|")})(?![\\p{L}\\p{M}])`, "gu");
+export const saudiWords = (text: string) => text.replace(SAUDI_RE, (_m, pre: string, w: string) => `${pre}${SAUDI_FOR[w] ?? w}`);
+/** Where the last whole word ends (after a space or a mark): what is before it can be swapped and shown. */
+export const lastBreak = (s: string) => { const m = /[\s.,،؛;:?؟)\]»"]+(?!.*[\s.,،؛;:?؟)\]»"])/su.exec(s); return m ? m.index + m[0].length : 0; };
+
 /** Questions asked in a reply (the evals hold it to one). */
 export const questionsIn = (reply: string) => (reply.match(/[?؟]/g) ?? []).length;
 

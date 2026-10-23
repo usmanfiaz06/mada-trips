@@ -225,7 +225,7 @@ const saysChoices = (text: string) => {
 export type TurnVerdict = { case: string; lang: "en" | "ar"; turn: number; user: string; reply: string; next: string[]; nextFrom: "model" | "app"; tools: string[]; problems: string[]; costMicros: number; inTokens: number; outTokens: number; cacheRead: number; ms: number };
 
 /** Words that mark spoken Saudi against Modern Standard Arabic, for a first read of a provider's dialect (a person reads the samples). */
-const SPOKEN = ["وش", "الحين", "وين", "بس", "عشان", "مو", "تبي", "تبغى", "أبشر", "ابشر", "زين", "كذا", "لين", "حق", "شي", "يبي", "نبي", "بكرة", "ودك", "حيّاك", "حياك"];
+const SPOKEN = ["وش", "الحين", "وين", "بس", "عشان", "مو", "تبي", "أبشر", "ابشر", "زين", "كذا", "لين", "حق", "شي", "يبي", "نبي", "بكرة", "ودك", "حيّاك", "حياك"];
 const MSA = ["ماذا", "الآن", "أين", "لماذا", "سوف", "هل", "لكن", "حسناً", "حسنا", "يرجى", "نرجو", "بإمكانك", "تريد", "ليس", "لدينا", "الذي", "التي", "سيكون", "يمكنني", "أود"];
 export function dialectOf(replies: string[]): { spoken: number; msa: number } {
   const words = replies.join(" ").replace(/[؟،.?!]/g, " ").split(/\s+/).map((w) => w.replace(/^(و|ف)(?=..)/, ""));

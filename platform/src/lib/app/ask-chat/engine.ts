@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatApi, StreamParams } from "./providers";
 import { t, weekendLine, type AskChatEvent, type AskIntent, type AskKind, type ChatCard, type Person } from "@mada/shared";
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
-import { isCloser, outgoingProblems, tidy, trimCloser, unbacked } from "./guard";
+import { isCloser, lastBreak, outgoingProblems, saudiWords, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
 import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, compactPromptFor, leanToolsFor } from "./prompt";
 import { leanHistory } from "./fold";
@@ -74,6 +74,9 @@ export class SentenceGate {
     this.buf += tidy(delta);
     const at = this.buf.indexOf(NEXT_OPEN);
     if (at >= 0) { this.tag = this.buf.slice(at); this.buf = this.buf.slice(0, at); }
+    // Pure Saudi: other dialects' words swapped (guard.ts saudiWords), on whole words not yet shown.
+    const cut = lastBreak(this.buf);
+    if (cut > this.shownUpTo) this.buf = this.buf.slice(0, this.shownUpTo) + saudiWords(this.buf.slice(this.shownUpTo, cut)) + this.buf.slice(cut);
     for (;;) {
       const m = /[.?؟](?=\s)|\n/.exec(this.buf);
       const end = m ? m.index + 1 : -1;
@@ -84,7 +87,7 @@ export class SentenceGate {
     }
     // No digit in the open sentence yet: show it as it comes (all but what could be the start of `<next>`). A sentence
     // that could still turn out to be a closer waits for its end.
-    const upTo = this.buf.length - partialTag(this.buf);
+    const upTo = Math.min(this.buf.length - partialTag(this.buf), lastBreak(this.buf));
     if (!/\d/.test(this.buf) && !this.maybeCloser() && upTo > this.shownUpTo) {
       this.out(this.buf.slice(this.shownUpTo, upTo));
       this.shownUpTo = upTo;
@@ -93,6 +96,7 @@ export class SentenceGate {
 
   /** The end of a step: whatever is open is a sentence too, and a `<next>` line is read. */
   flush() {
+    this.buf = this.buf.slice(0, this.shownUpTo) + saudiWords(this.buf.slice(this.shownUpTo));
     if (this.buf.trim()) this.close(this.buf);
     else if (this.buf.length > this.shownUpTo) this.out(this.buf.slice(this.shownUpTo));
     if (this.tag !== null) this.readTag(this.tag);
