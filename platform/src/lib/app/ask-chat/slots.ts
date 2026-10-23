@@ -16,7 +16,11 @@ import { personLine } from "./tools";
 
 export async function readSlots(api: ChatApi | null, text: string, people: Person[], today: string, model = askFastModel()): Promise<{ intent: AskIntent; usage: Anthropic.Beta.BetaUsage | null }> {
   const fromRules = AskIntent.parse(askIntentOfRules(parseAskRules(text, { today, people })));
-  if (!api || rulesComplete(fromRules)) return { intent: fromRules, usage: null };
+  // The model reads the sentence only when the rules leave the gist open: a greeting or a few words, or a place with a
+  // day already read, go straight to the turn (one model call less before the first words).
+  const short = text.trim().split(/\s+/).length <= 3;
+  const placeAndDay = !!fromRules.destination && fromRules.destination !== "other" && !!fromRules.depart;
+  if (!api || rulesComplete(fromRules) || short || placeAndDay) return { intent: fromRules, usage: null };
   try {
     const res = await api.create({
       model,

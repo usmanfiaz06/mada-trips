@@ -40,8 +40,13 @@ export const forClaude = (p: StreamParams): StreamParams => {
   // A thread Gemini answered earlier carries its tool-call signatures (extra_content), which Claude doesn't take.
   const messages = rest.messages.map((m) => (typeof m.content === "string" || !m.content.some((b) => "extra_content" in b) ? m
     : { ...m, content: m.content.map((b) => { if (!("extra_content" in b)) return b; const { extra_content: _x, ...keep } = b as typeof b & { extra_content?: unknown }; void _x; return keep as typeof b; }) }));
-  return { ...rest, messages } as StreamParams;
+  // Claude takes at most 20 strict tools in one request: the first 20 (the core ones lead the list) keep strict.
+  const tools = (rest as { tools?: Array<Record<string, unknown>> }).tools;
+  let strict = 0;
+  const capped = tools?.map((t) => (t.strict && ++strict > MAX_STRICT_TOOLS ? (({ strict: _s, ...k }) => (void _s, k))(t) : t));
+  return { ...rest, messages, ...(capped ? { tools: capped } : {}) } as StreamParams;
 };
+const MAX_STRICT_TOOLS = 20;
 
 export function anthropicApi(apiKey = process.env.ANTHROPIC_API_KEY): ChatApi {
   const client = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });

@@ -210,3 +210,13 @@ describe("bedrock: request-level caching", () => {
     expect(JSON.stringify(out.system)).toContain("ephemeral");
   });
 });
+
+describe("claude: strict tools", () => {
+  it("keeps strict on the first 20 tools only (Claude's limit)", async () => {
+    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const tools = Array.from({ length: 27 }, (_, i) => ({ name: `t${i}`, strict: true, input_schema: { type: "object", properties: {} } }));
+    const out = forBedrock({ model: "anthropic.claude-haiku-5-5", max_tokens: 9, messages: [], tools } as never) as unknown as { tools: { strict?: boolean }[] };
+    expect(out.tools.filter((t) => t.strict).length).toBe(20);
+    expect(out.tools).toHaveLength(27);
+  });
+});
