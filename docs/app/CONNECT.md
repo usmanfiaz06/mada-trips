@@ -1,4 +1,4 @@
-# Connecting the real services (owner checklist, 17 Oct 2026)
+# Connecting the real services (owner checklist, updated 23 Oct 2026)
 
 Each service is built behind a switch: until its keys are in Vercel (Production for the real app, Preview/Staging for
 staging) it runs on a stand-in or says plainly that it is not available. Keys go **only** into Vercel or EAS
@@ -6,6 +6,26 @@ environment variables, never into chat, email or the repo. After adding keys, te
 tested on staging before production.
 
 Legend: **Ready** = code done, needs your keys · **Partly** = code done for part of it · **To build** = needs code too.
+
+## Where things stand (23 Oct 2026)
+
+**Connected on staging (mada-staging):** Hotelbeds Hotels + Transfers (test keys), eSIM Access (live, real balance),
+AeroDataBox, weather/events/open data, Amazon Bedrock (Claude Haiku 4.5, global profile, Ask's main model),
+Groq (free backup), Neon database through the pooler (`dbPooled: true`).
+
+**Next keys, in order (each goes into Vercel → mada-staging only; never into chat):**
+
+| # | Key | Variable(s) | What it turns on | Steps |
+|---|---|---|---|---|
+| A | Google Places API (New) | `GOOGLE_PLACES_API_KEY` | Opening hours, ratings, address, "near me", restaurants and sights in Ask | §32 |
+| B | Tavily web search | `SEARCH_API_KEY` | Current answers in Ask: news, events, new openings | §33 |
+| C | Google sign-in | Supabase Google provider + `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` (EAS/app), `GOOGLE_CLIENT_IDS` (Vercel) | "Continue with Google" | AUTH.md §4, §3 below |
+| D | WhatsApp codes | `ZOHO_CPAAS_*` (§4) | Sign-in codes on WhatsApp | §4 |
+| E | SMS | aggregator keys (§5) | Sign-in codes by SMS | §5 |
+| F | Hotelbeds live keys | `HOTELBEDS_*` live pair, `HOTELBEDS_ENV=live` (production) | Real inventory and prices | §8, HOTELBEDS.md §6 (certification email ready) |
+| G | TBO API keys | §11 | Flights and a second hotel source | §11 |
+| H | Bedrock newer models | `ASK_CHAT_MODEL_BEDROCK` | Haiku 5.5 / Sonnet 5.5 once AWS lifts the account block (support case open) | §34 |
+
 
 | # | Service | What it does in the app | Status | Who acts first |
 |---|---|---|---|---|
@@ -40,6 +60,9 @@ Legend: **Ready** = code done, needs your keys · **Partly** = code done for par
 | 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
 | 30 | Duffel | second flight source next to TBO (NDC airlines, low-cost) | Ready (mock until key) | Owner |
 | 31 | RateHawk (ETG / WorldOTA) | second hotel source next to Hotelbeds, cheapest per hotel | Ready (mock until keys) | Owner |
+| 32 | Google Places API (New) | Places in Ask: hours, ratings, photos with credit | Ready to build on key | Owner |
+| 33 | Tavily (web search) | Current information in Ask | Ready to build on key | Owner |
+| 34 | Amazon Bedrock (Claude) | Ask's model, billed to AWS credits | Connected (Haiku 4.5) | Owner (newer models) |
 
 ## Processes
 
@@ -418,6 +441,25 @@ cancel on `test_hotel`, with screenshots showing taxes/fees "paid at the hotel",
 **Licence notes.** Hotel content (photos, descriptions) is licensed for selling RateHawk rates; when a merged hotel
 shows RateHawk's price, show RateHawk's room/meal/cancellation for that rate (the offer carries them). Rates for Saudi
 residents may only be sold to Saudi residents (residency must match the guest).
+
+### 32. Google Places API (New) — places in Ask
+1. console.cloud.google.com → the Mada project (the one holding the Routes key, §24) → APIs & Services → Library →
+   enable **Places API (New)**.
+2. Credentials → Create credentials → API key → Restrict key → API restrictions: **Places API (New)** only.
+3. Vercel → mada-staging → `GOOGLE_PLACES_API_KEY` (Sensitive). Google bills per call above a free monthly allowance
+   per call type; set a budget alert in Billing.
+Photos from Places may be shown only with their credit line; hotel photos stay the supplier's (licensed for selling).
+
+### 33. Tavily — web search in Ask
+1. tavily.com → sign up with the company email → API keys → create a key.
+2. Vercel → mada-staging → `SEARCH_API_KEY` (Sensitive). Free tier to start; paid plans per search.
+Claude's own web search tool isn't offered on Amazon Bedrock, so Ask calls Tavily as one of its tools.
+
+### 34. Amazon Bedrock — Ask's model
+Connected on staging: `AWS_BEARER_TOKEN_BEDROCK` (Bedrock long-term API key, Sensitive, expires — renew before),
+`AWS_REGION=us-east-1`, `ASK_CHAT_MODEL_BEDROCK` and `ASK_FAST_MODEL_BEDROCK` =
+`global.anthropic.claude-haiku-4-5-20251001-v1:0`, `ASK_CHAT_PROVIDERS=bedrock,groq`. Newer models (Haiku 5.5,
+Sonnet 5.5) are blocked for the account until AWS Support answers; then only `ASK_CHAT_MODEL_BEDROCK` changes.
 
 ## Not available as an API (how Mada handles them)
 
