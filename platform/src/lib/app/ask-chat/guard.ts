@@ -155,8 +155,10 @@ export const SAUDI_FOR: Record<string, string> = {
   "شلون": "كيف", "اشلون": "كيف", "شنو": "وش", "وايد": "مرّة", "جذي": "كذا",
   // Levantine
   "هلق": "الحين", "هلأ": "الحين", "منيح": "زين", "هيك": "كذا", "كتير": "مرّة",
+  // The brand is «مادا» (never «مدى», the card network, which stays as written)
+  "مادة": "مادا", "ماده": "مادا",
 };
-const SAUDI_RE = new RegExp(`(?<![\\p{L}\\p{M}])([وف]?)(${Object.keys(SAUDI_FOR).join("|")})(?![\\p{L}\\p{M}])`, "gu");
+const SAUDI_RE = new RegExp(`(?<![\\p{L}\\p{M}])([وفلب]?)(${Object.keys(SAUDI_FOR).join("|")})(?![\\p{L}\\p{M}])`, "gu");
 export const saudiWords = (text: string) => text.replace(SAUDI_RE, (_m, pre: string, w: string) => `${pre}${SAUDI_FOR[w] ?? w}`);
 /** Where the last whole word ends (after a space or a mark): what is before it can be swapped and shown. */
 export const lastBreak = (s: string) => { const m = /[\s.,،؛;:?؟)\]»"]+(?!.*[\s.,،؛;:?؟)\]»"])/su.exec(s); return m ? m.index + m[0].length : 0; };

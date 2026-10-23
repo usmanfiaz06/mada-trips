@@ -228,6 +228,8 @@ describe("pure Saudi Arabic", () => {
     expect(saudiWords("إيش رأيك؟ مش بعيد، وتبغى فطور؟")).toBe("وش رأيك؟ مو بعيد، وتبي فطور؟");
     expect(saudiWords("مشي خمس دقايق")).toBe("مشي خمس دقايق");
     expect(saudiWords("Hotels in Dubai")).toBe("Hotels in Dubai");
+    expect(saudiWords("فريق مادة يتابع، كلّم ماده")).toBe("فريق مادا يتابع، كلّم مادا");
+    expect(saudiWords("نقبل Visa ومدى")).toBe("نقبل Visa ومدى");
   });
   it("swaps in the stream too, never showing half a word", async () => {
     const { SentenceGate } = await import("@/lib/app/ask-chat/engine");
