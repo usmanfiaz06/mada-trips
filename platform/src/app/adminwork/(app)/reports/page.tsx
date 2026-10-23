@@ -117,6 +117,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <div className="py-3 text-[13px] text-ink-4">{t("No fees, commission or expenses in this period.")}</div>
           )}
           <Row label={t("Net profit")} v={pl.netProfit} strong />
+          {pl.startupCosts > 0 && <>
+            <Row label={t("Startup / capital costs")} v={-pl.startupCosts} muted indent />
+            <Row label={t("After startup costs")} v={pl.afterStartup} strong />
+            <p className="mt-3 text-[12px] leading-relaxed text-ink-4">
+              {t("Startup / capital costs are one-time investments partners paid in (registration, licences, lease, furnishing). They sit outside operating profit and are tracked on the Partners page as money owed back, repaid from profit over time.")}
+            </p>
+          </>}
         </Card>
 
         {/* Money flow */}
