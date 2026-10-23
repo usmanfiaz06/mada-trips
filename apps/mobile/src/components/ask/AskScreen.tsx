@@ -231,7 +231,7 @@ export function AskScreen({ thread = 'last', tripId = null, onBack, find = null 
     let next: AskIntent;
     if (c.type === 'flights' || c.type === 'stays') {
       const back = c.type === 'stays' ? addDays(c.search.depart, c.nights) : c.search.return;
-      next = { ...base, kind: c.type === 'flights' ? 'flight' : 'stay', destination: c.search.destination, destinationName: null, from: c.search.from ?? base.from, depart: c.search.depart, return: back, tripType: back ? 'return' : 'oneway', monthOnly: null, travellerIds: c.search.travellerIds, travellerCount: null, party: null, ask: null };
+      next = { ...base, kind: c.type === 'flights' ? 'flight' : 'stay', destination: c.search.destination, destinationName: c.search.destination === 'other' ? c.search.destinationName : null, from: c.search.from ?? base.from, depart: c.search.depart, return: back, tripType: back ? 'return' : 'oneway', monthOnly: null, travellerIds: c.search.travellerIds, travellerCount: null, party: null, ask: null };
     } else next = { ...base, kind: c.type === 'esim' ? 'esim' : c.type === 'entry' ? 'visa' : 'car' };
     forgetSettled();
     setQuery(o.turn.me); setCta(null); setFixes([]); setFixing(null);

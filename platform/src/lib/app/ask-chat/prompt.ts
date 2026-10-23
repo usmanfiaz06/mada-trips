@@ -37,7 +37,7 @@ Truth
 - A tool result that starts with "demo: true" holds sample fares for testing. Say so in your first sentence ("These are sample fares for testing"); never call them real, live or available.
 
 Found by hand
-- Flights when search_flights answers {"mode":"request"}, and anything no tool sells (a cruise, a train, a visa we don't handle, a group or company trip, a city not sold live): get only what the team needs (where, when, who, must-haves), one question at a time, defaults where you can.
+- Flights when search_flights answers {"mode":"request"}, and anything no tool sells (a cruise, a train, a visa we don't handle, a group or company trip, flights to a city without a key): get only what the team needs (where, when, who, must-haves), one question at a time, defaults where you can.
 - Confirm it back in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time given: ask the best time once.
 - Promise only what a tool does this turn.
 - A restaurant, a table, an activity, a gift: first say what you can (a short idea of the kind of place, no names no tool gave), then ask the city and the night. Never send it to the team on the first message.
@@ -48,7 +48,7 @@ Acting
 - Do what was asked, nothing more: a hotel request is a stay search, never flights too (offer them as a choice in <next>). A greeting or a thank-you gets one warm line and no tool.
 - Never announce a search ("I'll search…", "Let me check…"): call the tool, then say what it found.
 - A weekday only as a tool or the context gave it; otherwise the date alone ("8 Nov", never a guessed "Mon 8 Nov").
-- Mada plans and books trips anywhere in the world. Places with instant search (use these keys): ${KEYS.join(", ")}. Anywhere else the team finds the flights and hotels by hand (Found by hand). That split is ours: never tell the traveller a place isn't sold, isn't live or isn't something we do; just do it.
+- Mada plans and books trips anywhere in the world. Flights search instantly for these keys: ${KEYS.join(", ")}; flights anywhere else are found by hand. Hotels search instantly anywhere: search_stays with the key, or with place (city and country in English, "Lahore, Pakistan") when no key fits. A stay goes to create_request only when search_stays found nothing. Never tell the traveller a place isn't sold, isn't live or isn't something we do; just do it.
 - Umrah: Makkah stays go by distance to the Haram; a Nusuk permit is needed, and a permit already mentioned counts as yes. Use create_request kind umrah when it needs the team.
 - A car right now: call plan_car_now with what they said; the app confirms the meeting point. Never promise a driver.
 - Visas: entry_rules with the destination and who goes. eSIM: esim_plans with the place and the days.
@@ -88,15 +88,15 @@ How you write here
 - You cannot charge, book, ticket or cancel: to pay, call price_quote_for_pay and the app's pay sheet opens.
 - A tool result that starts with "demo: true" holds sample fares for testing: say so in your first sentence ("These are sample fares for testing"), never real or live.
 
-Found by hand: search_flights answers {"mode":"request"}, or no tool sells it (a cruise, a train, a visa we don't handle, a group, a city not live)
+Found by hand: search_flights answers {"mode":"request"}, or no tool sells it (a cruise, a train, a visa we don't handle, a group)
 - Ask only what the team needs (where, when, who, must-haves), one question at a time. Confirm in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time: ask the best time once.
-- Promise only what a tool does this turn; no tool invites friends or adds people: say how they do it in the app (Circles → Invite).
+- Promise only what a tool does this turn.
 - A restaurant, table, activity or gift: first a short idea of the kind of place (no names), then ask the city and night; never to the team on the first message.
 - Then create_request with the details (destination_name, depart) and contact_preference; say "We've noted it and the team will get back to you by" its time.
 
 Acting
 - One search with defaults (from Riyadh, the household, economy) beats a question. Call independent tools together.
-- Live destination keys: ${KEYS.join(", ")}. Anywhere else goes by hand.
+- Flight keys: ${KEYS.join(", ")}; other flights by hand. Hotels anywhere: search_stays (place when no key); create_request only if none found. Never say a place isn't sold.
 - Umrah: Makkah stays by distance to the Haram; a Nusuk permit is needed (one mentioned counts); create_request kind umrah for the team. Car now: plan_car_now, never promise a driver.
 - Corrections change only what they name: search again with the rest kept, say what changed.
 - Named hotel: hotel_name in English; no other as it. "Anytime in <month>": pick dates, search, say they can move.
@@ -126,10 +126,11 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "search_stays",
-    description: "Search live hotels for a stay, ranked for who is going. Wishes (a pool, sea view, near a landmark, breakfast, free cancellation) filter and sort the results. Returns up to 3; the app shows them as cards.",
+    description: "Search live hotels for a stay anywhere in the world, ranked for who is going. Wishes (a pool, sea view, near a landmark, breakfast, free cancellation) filter and sort the results. Returns up to 3; the app shows them as cards.",
     strict: true,
     input_schema: obj({
-      destination: { type: "string", enum: KEYS },
+      destination: { type: ["string", "null"], enum: [...KEYS, null], description: "Null when no key fits: use place." },
+      place: nullable("string", { description: "Anywhere without a key: the city or town and country in English, e.g. 'Lahore, Pakistan'; null with a key." }),
       check_in: day("Check-in"),
       nights: { type: "integer", description: "1 to 60." },
       traveller_ids: ids,
@@ -195,7 +196,7 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   {
     name: "create_request",
-    description: "Hand something to the team at Mada to arrange by hand and quote in the app: flights while they go by request, a visa, Umrah, a city not sold live, a cruise, a train, a group, a restaurant, anything a tool can't answer. Only after the traveller has said how to reach them. Returns the time the team answers by.",
+    description: "Hand something to the team at Mada to arrange by hand and quote in the app: flights while they go by request, a visa, Umrah, flights to a city without a key, hotels a search found none of, a cruise, a train, a group, a restaurant, anything a tool can't answer. Only after the traveller has said how to reach them. Returns the time the team answers by.",
     strict: true,
     input_schema: obj({
       kind: { type: "string", enum: ["visa", "umrah", "car", "food", "todo", "flight", "stay", "general", "car_rental", "driver"] },
@@ -364,7 +365,7 @@ const PLAN_TOOL_NAMES = new Set(PLAN_TOOLS.map((t) => t.name));
  */
 const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   search_flights: { d: "Live flights, all-in prices, up to 3 (shown as cards).", p: { from: "Null: home.", return: "Null: one way.", infants: "Under 2, on a lap." } },
-  search_stays: { d: "Live hotels, up to 3 (shown as cards). Wishes (pool, sea view, near a landmark, breakfast, free cancellation) filter them.", p: { wishes: "Their words.", hotel_name: "English." } },
+  search_stays: { d: "Live hotels anywhere, up to 3 (cards). Wishes (pool, view, landmark, breakfast, free cancellation) filter them.", p: { destination: "A flight key; null: place.", place: "No key: 'Lahore, Pakistan'.", wishes: "Their words.", hotel_name: "English." } },
   get_hotel: { d: "One hotel from a stay card: address, facilities." },
   esim_plans: { d: "eSIM data plans for a place and days.", p: { where: "Key, country or city, in English.", days: "Null: 7." } },
   plan_car_now: { d: "A car now or in 15 minutes; the app confirms the meeting point. Books nothing." },
@@ -384,13 +385,18 @@ const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   decide_change: { d: "The organiser approves or declines a companion's change." },
 };
 const LEAN_IDS = "Household ids; unsaid: the account holder.";
+/** Fields whose enum the lean list leaves out (the keys are in the prompt and in search_flights; the server checks them). */
+const LEAN_NO_ENUM = new Set(["search_stays.destination"]);
 /** Dates are YYYY-MM-DD everywhere: said once, in the compact prompt. */
 export const LEAN_TOOLS: Anthropic.Beta.BetaTool[] = TOOLS.map((t) => {
   const lean = LEAN[t.name];
   const schema = t.input_schema as { properties?: Record<string, Record<string, unknown>> };
   const properties = Object.fromEntries(Object.entries(schema.properties ?? {}).map(([k, v]) => {
-    const { description: _d, ...rest } = v;
+    const { description: _d, ...all } = v;
     void _d;
+    const { enum: _e, ...plain } = all;
+    void _e;
+    const rest = LEAN_NO_ENUM.has(`${t.name}.${k}`) ? plain : all;
     const say = k === "traveller_ids" ? LEAN_IDS : lean?.p?.[k];
     return [k, say ? { ...rest, description: say } : rest];
   }));

@@ -284,11 +284,12 @@ async function capture(tx: Tx, o: OrderRow): Promise<boolean> {
 const SV_DRIVER = { home: { driver: "Khalid", phone: "+966 55 014 2287", waits: "10 min" }, arrive: { driver: "Ahmet", car: "Grey Mercedes Vito", plate: "34 MDA 21", door: "Door 3", phone: "+90 532 418 6610", waits: "60 min" } };
 
 async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent, now: Date): Promise<string> {
-  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown> };
+  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string; destinationName?: string; place?: { country?: string | null } }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown> };
   if (snap.quotedFlight) return writeQuotedTrip(tx, o, snap.quotedFlight, agent, now);
   const n = Math.max(1, o.travellerIds.length);
   const dest = DESTINATIONS[snap.search?.destination ?? ""] ?? null;
-  const country = dest ? ENTRY_RULES[dest.country]?.name ?? null : null;
+  // A stay anywhere else carries its place with the search (booking/stay-place.ts).
+  const country = dest ? ENTRY_RULES[dest.country]?.name ?? null : snap.search?.place?.country ?? null;
   const lines = o.lines as OrderLine[];
   const amountOf = (keys: string[]) => lines.filter((l) => keys.includes(l.key)).reduce((a, l) => a + l.amount, 0) + (keys.includes("flight") ? o.extra : 0);
   const f = snap.flight;
@@ -302,7 +303,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
   }
   if (!tripId) {
     const [trip] = await tx.insert(appTrips).values({
-      ownerId: o.ownerId, city: dest?.name ?? (snap.stay ? "Istanbul" : ""), country, imageUrl: dest?.photo ?? null, startDate, endDate,
+      ownerId: o.ownerId, city: dest?.name ?? snap.search?.destinationName ?? snap.place ?? (snap.stay ? "Istanbul" : ""), country, imageUrl: dest?.photo ?? null, startDate, endDate,
       travellerIds: o.travellerIds, status: "booked", bookingRef: o.ref, confirmedByName: agent.name, confirmedByOpsUserId: agent.opsUserId ?? null,
     }).returning({ id: appTrips.id });
     tripId = trip!.id;
@@ -336,7 +337,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
     }).returning({ id: appStays.id });
     // A Hotelbeds room keeps the hotel's code (the stay opens its hotel page) and the room as booked.
     stayFacts[st!.id] = {
-      addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel ? null : "+90 212 000 0000", fromAirport: "45 min",
+      addressShort: hotel ? null : "Galata Kulesi Sk. 12, Beyoğlu", walk: hotel ? null : "3 min walk to Galata Tower", phone: hotel?.hotel ? null : "+90 212 000 0000", fromAirport: hotel?.hotel ? null : "45 min",
       roomType: hotel?.hotel?.room ?? hotel?.roomsLabel ?? (n > 2 ? "Connecting rooms" : "A quiet room"), plan: o.plan, hotelCode: hotel?.hotel?.code ? Number(hotel.hotel.code) : null,
       // What the traveller asked the hotel for on the order sheet (the stay repeats it; the desk and the supplier got it).
       requests: (o.draft as { requests?: StayFacts["requests"] }).requests ?? null,

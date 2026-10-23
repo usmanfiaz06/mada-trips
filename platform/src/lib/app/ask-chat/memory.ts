@@ -125,7 +125,7 @@ export function rankFacts(facts: MemoryFact[], kind: AskKind | null, now = Date.
   return [...facts].sort((a, b) => score(b) - score(a) || b.createdAt.localeCompare(a.createdAt));
 }
 
-type Search = { kind?: string; destination?: string; depart?: string; return?: string | null; checkIn?: string; nights?: number; travellerIds?: string[]; cabin?: string | null };
+type Search = { kind?: string; destination?: string; destinationName?: string; depart?: string; return?: string | null; checkIn?: string; nights?: number; travellerIds?: string[]; cabin?: string | null };
 const placeOf = (k: string | undefined) => (k ? DESTINATIONS[k]?.name ?? k : "?");
 const shortDay = (d: string | undefined | null) => (d ? d.slice(5) : "");
 
@@ -133,7 +133,7 @@ const shortDay = (d: string | undefined | null) => (d ? d.slice(5) : "");
 export function searchLine(s: Search): string {
   const n = s.travellerIds?.length ?? 1;
   const when = s.kind === "stay" ? `${shortDay(s.checkIn)}${s.nights ? `, ${s.nights} nights` : ""}` : `${shortDay(s.depart)}${s.return ? ` to ${shortDay(s.return)}` : ""}`;
-  return `${s.kind ?? "flight"} ${placeOf(s.destination)} ${when}, ${n} ${n === 1 ? "person" : "people"}${s.cabin && s.cabin !== "economy" ? `, ${s.cabin}` : ""}`;
+  return `${s.kind ?? "flight"} ${s.destinationName ?? placeOf(s.destination)} ${when}, ${n} ${n === 1 ? "person" : "people"}${s.cabin && s.cabin !== "economy" ? `, ${s.cabin}` : ""}`;
 }
 
 /** The derived signals: the last 3 searches and up to 3 saved places, from the tables that already hold them. */

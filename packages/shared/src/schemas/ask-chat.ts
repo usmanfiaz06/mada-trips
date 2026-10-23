@@ -36,6 +36,8 @@ export type AskChatRequest = z.input<typeof AskChatRequest>;
 export const ChatSearch = z.object({
   destination: z.string(),
   destinationName: z.string(),
+  /** A place without a key ('other'): its Arabic name when we hold one. */
+  destinationNameAr: z.string().nullable().optional(),
   from: HomeAirport.nullable(),
   depart: IsoDay,
   return: IsoDay.nullable(),

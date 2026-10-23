@@ -182,7 +182,7 @@ describe("the plan tools", () => {
     void me;
   });
 
-  it("find_for_item: a drive leg and a stay where nothing is sold live go to the team; open_in_app shows a button", async () => {
+  it("find_for_item: a drive leg goes to the team, a stay anywhere is searched; open_in_app shows a button", async () => {
     const { ctx } = await ctxFor();
     const made = await runTool("create_plan", { ...ROAD, origin: "RUH" }, ctx);
     const card = made.cards![0] as Extract<ChatCard, { type: "plan" }>;
@@ -192,7 +192,10 @@ describe("the plan tools", () => {
     expect(car.text).toMatch(/create_request kind car/);
     expect(car.text).toContain("WhatsApp | Call me | Here in the app");
     const stay = /\[([0-9a-f]{8})\] stay Melaka/.exec(gist)![1]!;
-    expect((await runTool("find_for_item", { plan_id: card.planId, item: stay }, ctx)).text).toMatch(/create_request kind stay/);
+    // A night without a destination key is searched like any other (stays-anywhere.test.ts); never "not sold live".
+    const melaka = (await runTool("find_for_item", { plan_id: card.planId, item: stay }, ctx)).text;
+    expect(melaka).not.toMatch(/Not sold live/);
+    expect(melaka).toMatch(/Melaka/);
     const link = await runTool("open_in_app", { screen: "plan", id: card.planId }, ctx);
     expect(link.cards).toEqual([{ type: "link", screen: "plan", id: card.tripId }]);
   });

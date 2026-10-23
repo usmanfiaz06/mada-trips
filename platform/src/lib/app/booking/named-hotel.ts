@@ -55,11 +55,13 @@ export function bestNamed<T extends { name: string }>(query: string[], hotels: r
  * catalogue's own hotels. `known: false` when we can't tell beforehand (a source with no stored content): the search
  * then runs as usual and its results are matched by name.
  */
-export async function namedHotels(destination: string, query: string[]): Promise<{ known: boolean; hotels: NamedHotel[] }> {
+export async function namedHotels(destination: string | { lat: number; lng: number; radiusKm: number }, query: string[]): Promise<{ known: boolean; hotels: NamedHotel[] }> {
   const vendor = hotelVendor();
-  if (vendor === "catalogue") return { known: true, hotels: bestNamed(query, (CATALOGUE_HOTELS[destination] ?? []).map((h) => ({ code: null, name: h.name }))) };
+  const key = typeof destination === "string" ? destination : null;
+  if (vendor === "catalogue") return { known: true, hotels: bestNamed(query, (CATALOGUE_HOTELS[key ?? ""] ?? []).map((h) => ({ code: null, name: h.name }))) };
   if (vendor === "ratehawk") return { known: false, hotels: [] };
-  const place = HB_PLACES[destination];
+  // A place without a key (anywhere in the world, stay-place.ts) is looked up around its point.
+  const place: { lat: number; lng: number; radiusKm: number; code?: string } | undefined = key ? HB_PLACES[key] : (destination as { lat: number; lng: number; radiusKm: number });
   if (!place) return { known: true, hotels: [] };
   // A named hotel can sit a little outside the search circle (Canary Wharf, a resort out of town): twice the radius.
   const dLat = (place.radiusKm * 2) / 111;
@@ -68,6 +70,8 @@ export async function namedHotels(destination: string, query: string[]): Promise
   try {
     const rows = await db.select({ code: appHotelbedsHotels.code, name: appHotelbedsHotels.name }).from(appHotelbedsHotels)
       .where(place.code ? or(near, eq(appHotelbedsHotels.destinationCode, place.code)) : near).limit(20_000);
+    // Anywhere else we may hold no hotel content at all: then we can't tell, and the search's own names are matched.
+    if (!key && !rows.length) return { known: false, hotels: [] };
     return { known: true, hotels: bestNamed(query, rows) };
   } catch {
     // The content table isn't there yet: match the search's own names instead.

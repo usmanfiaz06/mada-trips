@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
 import {
-  CARRIERS, CATALOGUE_HOTELS, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, childSar, childSeats, flightTotal, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
+  CARRIERS, CATALOGUE_HOTELS, ENTRY_RULES, rankStays, tripShape, demoPassportTarget, CHECKED_FARES, DESTINATIONS, addDays, bundleFor, daysBetween, demoIqama, entryChecks, childSar, childSeats, flightTotal, infantSar, money, roomsFor, roomsLabel, sarToHalalas,
   type DemoFlag, type EntryCheckRequest, type EntryCheckResponse, type FlightOption, type FlightSearchRequest, type FlightSearchResponse, type OfferResponse,
   type StayOption, type StaySearchRequest, type StaySearchResponse, EntryCheckRequest as EntrySchema, FlightSearchRequest as FlightSchema, StaySearchRequest as StaySchema,
 } from "@mada/shared";
@@ -17,6 +17,7 @@ import { guestPeople } from "../guest";
 import { entryRulesSupplier, withEntryRequirements } from "../suppliers/sherpa";
 import { duffelSource } from "../suppliers/duffel";
 import { rateHawkSource } from "../suppliers/ratehawk";
+import { destinationIn, resolveStayPlace } from "./stay-place";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -182,32 +183,62 @@ export function stayOptionOf(h: BookingHotelOffer, id: string, n: number, checkI
   };
 }
 
-/** `hotelCodes`: only these hotels (a hotel the traveller named in Ask, named-hotel.ts); suppliers without codes ignore it. */
+/** Where a stay search looks: one of our destination keys, or a place anywhere else (stay-place.ts). */
+type StayTarget = { key: string | null; name: string; nameAr: string | null; country: string | null; centre: { lat: number; lng: number } | null; radiusKm: number };
+
+async function stayTarget(destination: string, place: { name: string; lat?: number | null; lng?: number | null } | null | undefined): Promise<StayTarget | null> {
+  const dest = DESTINATIONS[destination] ?? (place ? destinationIn(place.name) : null);
+  if (dest) return { key: dest.key, name: dest.name, nameAr: null, country: ENTRY_RULES[dest.country]?.name ?? null, centre: null, radiusKm: 8 };
+  // A destination that isn't a key and isn't "other" is read as the place's name ("lahore").
+  const said = place ?? (destination !== "other" ? { name: destination } : null);
+  if (!said) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
+  const w = await resolveStayPlace(said);
+  return w ? { key: null, name: w.name, nameAr: w.nameAr, country: w.country, centre: { lat: w.lat, lng: w.lng }, radiusKm: w.radiusKm } : null;
+}
+
+/**
+ * Stays in one of our cities, or anywhere in the world (`destination: "other"` with `place`): a place without a key is
+ * searched around its point (Hotelbeds by geolocation) and answers `destination: "other"` with `place`. The catalogue
+ * (mock) has rooms only in our cities: anywhere else answers "none", never a sample hotel.
+ * `hotelCodes`: only these hotels (a hotel the traveller named in Ask, named-hotel.ts); suppliers without codes ignore it.
+ */
 export async function searchStays(ownerId: string | null, input: StaySearchRequest, demo: Set<DemoFlag>, only: { hotelCodes?: number[] } = {}): Promise<StaySearchResponse> {
   const q = StaySchema.parse(input);
-  const dest = DESTINATIONS[q.destination];
-  if (!dest) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
+  const where = await stayTarget(q.destination, q.place);
   const people = await partyOf(ownerId, q.travellerIds, q.guests);
   const n = people.length;
-  const base = { destination: dest.key, destinationName: dest.name, cachedUntil: new Date(Date.now() + CACHE_MS).toISOString() };
-  if (!CATALOGUE_HOTELS[dest.key] && supplierMode("hotels") === "mock") return { ...base, outcome: "by_hand", options: [] };
+  const cachedUntil = new Date(Date.now() + CACHE_MS).toISOString();
+  // A place nobody could put on the map: nothing to search; the answer says so (the place as it was said).
+  if (!where) return { destination: "other", destinationName: q.place?.name ?? q.destination, cachedUntil, outcome: "none", options: [], place: null };
+  const anywhere = where.key ? null : { name: where.name, nameAr: where.nameAr, country: where.country, lat: where.centre!.lat, lng: where.centre!.lng };
+  const base = { destination: where.key ?? "other", destinationName: where.name, cachedUntil, ...(anywhere ? { place: anywhere } : {}) };
+  if (where.key && !CATALOGUE_HOTELS[where.key] && supplierMode("hotels") === "mock") return { ...base, outcome: "by_hand", options: [] };
   if (demo.has("noResults")) return { ...base, outcome: "none", options: [] };
   // Who is going decides what fits (docs/app/RANKING.md): a family, a couple, someone alone, a group.
   const shape = tripShape(people, q.checkIn);
-  const key = JSON.stringify(["h", supplierMode("hotels"), dest.key, q.checkIn, q.nights, n, shape.shape, ...(rateHawkSource() ? ["ratehawk"] : []), ...(only.hotelCodes?.length ? [only.hotelCodes] : [])]);
+  const at = anywhere ? `geo:${anywhere.lat.toFixed(3)},${anywhere.lng.toFixed(3)},${where.radiusKm}` : where.key;
+  const key = JSON.stringify(["h", supplierMode("hotels"), at, q.checkIn, q.nights, n, shape.shape, ...(rateHawkSource() ? ["ratehawk"] : []), ...(only.hotelCodes?.length ? [only.hotelCodes] : [])]);
   // Children's ages on the day they check in (Hotelbeds prices children by age; the catalogue ignores them).
   const childAges = people.map((p) => (p.dateOfBirth ? daysBetween(p.dateOfBirth, q.checkIn) / 365.25 : 99)).filter((a) => a < 18).map((a) => Math.floor(a));
-  const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: dest.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges, ...(only.hotelCodes?.length ? { hotelCodes: only.hotelCodes } : {}) } as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
+  const geo = anywhere ? { geo: { lat: anywhere.lat, lng: anywhere.lng, radiusKm: where.radiusKm } } : {};
+  const { value: offers, saved } = await cached(key, () => bookingSuppliers.hotels().search({ city: where.name, checkIn: q.checkIn, nights: q.nights, adults: n, rooms: roomsFor(n), childAges, ...geo, ...(only.hotelCodes?.length ? { hotelCodes: only.hotelCodes } : {}) } as unknown as Parameters<ReturnType<typeof bookingSuppliers.hotels>["search"]>[0]), supplierMode("hotels") === "live");
   const expiresAt = holdEnds();
-  const search = { kind: "stay", destination: dest.key, checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
+  // The place travels with the offer: the order sheet, the trip and the desk name it from here (no key to look up).
+  const search = { kind: "stay", destination: where.key ?? "other", ...(anywhere ? { destinationName: where.name, place: anywhere } : {}), checkIn: q.checkIn, nights: q.nights, travellerIds: people.map((p) => p.id) };
   // Ranked for this trip, with one "Best for you" and one "Lowest price"; the reasons are stored with each offer.
-  const ranked = rankStays(offers.map((h) => ({ h, name: h.name, total: h.total, facts: h.meta?.facts ?? null })), { shape: shape.shape, city: dest.key, radiusKm: 8 });
+  const ranked = rankStays(offers.map((h) => ({ h, name: h.name, total: h.total, facts: h.meta?.facts ?? null })), { shape: shape.shape, city: where.key, centre: where.centre, radiusKm: where.radiusKm });
   const options: StayOption[] = ranked.map((r) => ({ ...stayOptionOf(r.h, randomUUID(), n, q.checkIn), label: r.badge === "lowest" ? "lowest" as const : "best" as const, badge: r.badge, score: r.score, fit: r.fit, expiresAt: expiresAt.toISOString() }));
   await Promise.all([saved, storeOffers(ranked.map(({ h }, i) => ({
     id: options[i]!.id, ownerId, kind: "stay", supplier: h.supplier, supplierOfferId: h.id, search, payload: options[i] as unknown as Record<string, unknown>, total: h.total.amount, expiresAt,
   })))]);
   return { ...base, outcome: options.length ? "ok" : "none", options, shape: { shape: shape.shape, because: shape.because, travellers: shape.travellers, under12: shape.under12 } };
 }
+
+/** The place a stay offer was searched for, by name: a key's city, or the place stored with it (anywhere else). */
+export const stayPlaceName = (search: unknown): string => {
+  const s = (search ?? {}) as { destination?: string; destinationName?: string | null };
+  return (s.destination ? DESTINATIONS[s.destination]?.name : undefined) ?? s.destinationName ?? "";
+};
 
 export type OfferRow = typeof appOffers.$inferSelect;
 

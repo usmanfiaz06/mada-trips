@@ -6,6 +6,7 @@ import {
 import { AppError } from "../http";
 import { checkEntry, searchFlights, searchStays } from "../booking/search";
 import { hotelTitle, nameQuery, nameScore, namedHotels } from "../booking/named-hotel";
+import { destinationIn, resolveStayPlace } from "../booking/stay-place";
 import { REQUEST_PROMISE_MIN, createRequest } from "../booking/requests";
 import { flightsMode } from "../switches";
 import { priceDraft } from "../booking/pricing";
@@ -94,6 +95,10 @@ export const noRoomsText = (names: string[], checkIn: string, nights: number) =>
 export const unknownHotelText = (named: string, where: string) =>
   `"${named}" is not among the hotels we can book online in ${where}. Say we can't find it online here (never that it doesn't exist) and offer create_request kind stay: the team at Mada books it by hand. Other hotels only if offered as alternatives, called so.`;
 
+/** A place without a key where nothing came back: said plainly, never "not sold"; other dates, or the team asks hotels by hand. */
+export const noneAnywhereText = (place: string, checkIn: string, nights: number) =>
+  `No rooms we can book instantly in ${place} for ${stayDates(checkIn, nights)} (nothing came back from our hotels there). Say exactly that, plainly; never that the place isn't sold. Next step: other dates or a bigger city nearby, or create_request kind stay so the team at Mada finds rooms by hand.`;
+
 /** Flights by request: no prices, and what to offer instead, with the desk's promise (booking/requests.ts). */
 export const requestModeText = (to: string, depart: string, ret: string | null) =>
   `{"mode":"request"} Flights to ${to} (${depart}${ret ? ` to ${ret}` : ", one way"}) are found by hand: there are no fares, prices, times or flight numbers here. Confirm the trip back in one line (where, when, who), say the team at Mada finds the fares and gets back within ${REQUEST_PROMISE_MIN / 60} hours, any time of day, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. When they answer, call create_request with kind flight, the destination name, the dates and contact_preference.`;
@@ -138,33 +143,41 @@ const RUN: Record<string, Run> = {
   },
 
   async search_stays(ctx, a) {
-    const destination = String(a.destination);
+    // One of our keys, or a place anywhere in the world in words ("Lahore, Pakistan"); a place that is a key reads as it.
+    const said = typeof a.place === "string" ? a.place.trim().slice(0, 80) : "";
+    const key = typeof a.destination === "string" && DESTINATIONS[a.destination] ? a.destination : said ? destinationIn(said)?.key ?? null : null;
     const checkIn = iso(a.check_in);
     const nights = Number.isInteger(a.nights) ? Math.min(60, Math.max(1, a.nights as number)) : 0;
-    if (!DESTINATIONS[destination] || !checkIn || !nights) return { text: "Not searched: need a destination key, a check-in day and nights.", isError: true };
+    if ((!key && said.length < 2) || !checkIn || !nights) return { text: "Not searched: need a destination key or a place (city and country in English), a check-in day and nights.", isError: true };
     if (checkIn < ctx.today) return { text: `Not searched: ${checkIn} is in the past (today is ${ctx.today}).`, isError: true };
+    // A plan's place can carry its point (find_for_item): it is searched there.
+    const point = a._point as { lat?: number; lng?: number } | undefined;
+    const where = key ? null : await resolveStayPlace({ name: said, lat: point?.lat ?? null, lng: point?.lng ?? null });
+    if (!key && !where) return { text: `"${said}": we couldn't place it on the map. Ask once which city or town and country they mean (never say it isn't sold), then search_stays with place.` };
+    const destination = key ?? "other";
+    const placeName = where?.name ?? destName(destination);
     const travellerIds = whoOf(ctx, a.traveller_ids);
     // A hotel they named: only that hotel (or the few under that name) is searched, and nothing else stands in for it.
     const named = typeof a.hotel_name === "string" ? a.hotel_name.trim().slice(0, 80) : "";
-    const query = named ? nameQuery(named, destination) : [];
-    const held = query.length ? await namedHotels(destination, query) : null;
-    if (held?.known && !held.hotels.length) return { text: unknownHotelText(named, destName(destination)) };
+    const query = named ? nameQuery(named, key ?? placeName) : [];
+    const held = query.length ? await namedHotels(key ?? { lat: where!.lat, lng: where!.lng, radiusKm: where!.radiusKm }, query) : null;
+    if (held?.known && !held.hotels.length) return { text: unknownHotelText(named, placeName) };
     const codes = (held?.hotels ?? []).map((h) => h.code).filter((c): c is number => c != null);
-    const r = await searchStays(ctx.ownerId, { destination, checkIn, nights, travellerIds }, ctx.demo, codes.length ? { hotelCodes: codes } : {});
+    const r = await searchStays(ctx.ownerId, { destination, ...(where ? { place: { name: said, lat: where.lat, lng: where.lng } } : {}), checkIn, nights, travellerIds }, ctx.demo, codes.length ? { hotelCodes: codes } : {});
     const options = held ? r.options.filter((o) => (o.hotel?.code && codes.includes(Number(o.hotel.code))) || nameScore(query, o.name) > 0) : r.options;
     if (held && !options.length) {
       return { text: held.known ? noRoomsText(held.hotels.map((h) => hotelTitle(h.name)), checkIn, nights) : unknownHotelText(named, r.destinationName) };
     }
-    const wishes = typeof a.wishes === "string" && a.wishes.trim() ? parseStayWishes(a.wishes, destination).wishes : [];
+    const wishes = typeof a.wishes === "string" && a.wishes.trim() ? parseStayWishes(a.wishes, key).wishes : [];
     const refined = wishes.length ? refineStays(options, wishes, ctx.lang) : null;
     const picked = refined ? (refined.matches.length ? refined.matches : refined.closest) : options.map((option) => ({ option, ev: [] as string[] }));
     const top = picked.slice(0, 3);
     const nearWish = wishes.find((w) => w.k === "near");
     const near = nearWish && nearWish.k === "near" ? landmarkById(nearWish.id)?.name ?? null : null;
-    const search = { destination, destinationName: r.destinationName, from: null, depart: checkIn, return: null, travellerIds };
-    if (!top.length) return { text: `No stays found in ${r.destinationName} from ${checkIn} for ${nights} nights (outcome ${r.outcome}).` };
+    const search = { destination: r.destination, destinationName: r.destinationName, ...(r.place?.nameAr ? { destinationNameAr: r.place.nameAr } : {}), from: null, depart: checkIn, return: null, travellerIds };
+    if (!top.length) return { text: key ? `No stays found in ${r.destinationName} from ${checkIn} for ${nights} nights (outcome ${r.outcome}).` : noneAnywhereText(r.destinationName, checkIn, nights) };
     return {
-      text: `${held ? `The hotel they named ("${named}"): only ${top.length > 1 ? "these hotels by that name were" : "this hotel was"} searched; say it is the one they asked for.\n` : ""}Stays in ${r.destinationName}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "none of these is confirmed for every wish in our hotel details (they may just not list it); these are closest. Say that, never that no such hotel exists"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
+      text: `${held ? `The hotel they named ("${named}"): only ${top.length > 1 ? "these hotels by that name were" : "this hotel was"} searched; say it is the one they asked for.\n` : ""}Stays in ${r.destinationName}${r.place?.country ? `, ${r.place.country}` : ""}, ${nights} nights from ${checkIn}, for ${travellerIds.length} people${r.shape ? ` (ranked for ${r.shape.shape})` : ""}${refined ? `; wishes: ${refined.matches.length ? "these fit" : "none of these is confirmed for every wish in our hotel details (they may just not list it); these are closest. Say that, never that no such hotel exists"}` : ""}:\n${top.map((x, i) => stayLine(x.option, i, x.ev)).join("\n")}`,
       cards: [{ type: "stays", search, nights, options: top.map((x) => x.option), near }],
     };
   },
@@ -333,7 +346,8 @@ export function requestCard(ctx: ToolCtx, r: { id: string; kind: string; title: 
 }
 
 export function statusFor(name: string, input: Record<string, unknown>, lang: "en" | "ar"): string {
-  const city = placeName(typeof input.destination === "string" ? input.destination : typeof input.where === "string" ? input.where : "", lang);
+  // A place anywhere ("Lahore, Pakistan") is named by its city.
+  const city = placeName(typeof input.destination === "string" ? input.destination : typeof input.place === "string" ? input.place.split(",")[0]! : typeof input.where === "string" ? input.where : "", lang);
   const en: Record<string, string> = {
     search_flights: `Checking flights to ${city}`, search_stays: `Checking places to stay in ${city}`, esim_plans: `Checking internet plans for ${city}`,
     entry_rules: `Checking entry rules for ${city}`, get_trips: "Looking at your trips", get_trip: "Looking at your trip", price_quote_for_pay: "Checking the price again",

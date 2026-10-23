@@ -356,7 +356,7 @@ export const maxResults = () => { const n = Number(process.env.HOTELBEDS_MAX_RES
  * The offers the app shows: one rate per hotel, in the order that fits best (stayFit, by trip shape), with exactly one "Best for
  * you" (the best fit at 3 stars and up) and one "Lowest price" (the cheapest); the rest carry no badge.
  */
-export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number; city?: string | null; shape?: TripShape }): BookingHotelOffer[] {
+export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOptions & { limit?: number; city?: string | null; shape?: TripShape; centre?: { lat: number; lng: number } | null; radiusKm?: number }): BookingHotelOffer[] {
   const picked: BookingHotelOffer[] = [];
   for (const h of res.hotels?.hotels ?? []) {
     const b = bestRate(h, o.rooms);
@@ -368,7 +368,7 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
   // thing in a city and would otherwise take the places of real rooms.
   picked.sort((a, b) => Number(!!a.meta!.facts?.shared) - Number(!!b.meta!.facts?.shared) || a.total.amount - b.total.amount);
   const list = picked.slice(0, o.limit ?? maxResults());
-  const ranked = rankStays(list.map((x) => ({ x, name: x.name, total: x.total, facts: x.meta!.facts ?? null })), { shape: o.shape ?? "couple", city: o.city ?? null, radiusKm: (o.city ? HB_PLACES[o.city]?.radiusKm : undefined) ?? 8 });
+  const ranked = rankStays(list.map((x) => ({ x, name: x.name, total: x.total, facts: x.meta!.facts ?? null })), { shape: o.shape ?? "couple", city: o.city ?? null, centre: o.centre ?? null, radiusKm: o.radiusKm ?? (o.city ? HB_PLACES[o.city]?.radiusKm : undefined) ?? 8 });
   return ranked.map((r) => {
     const label = r.badge === "lowest" ? "lowest" : "best";
     return { ...r.x, label, meta: { ...r.x.meta!, label, score: r.score, badge: r.badge, fit: r.fit } };
@@ -380,7 +380,13 @@ export function offersFromAvailability(res: HbAvailabilityResponse, o: MapOption
 /** Availability while a traveller waits on the search screen: per try, and extra tries. */
 export const SEARCH_BUDGET = { timeoutMs: 8_000, retries: 1 } as const;
 
-export type StayQueryExtras = { childAges?: number[]; /** Only these hotels (a hotel the traveller named, booking/named-hotel.ts). */ hotelCodes?: number[] };
+export type StayQueryExtras = {
+  childAges?: number[];
+  /** Only these hotels (a hotel the traveller named, booking/named-hotel.ts). */
+  hotelCodes?: number[];
+  /** A place without a key (anywhere in the world, booking/stay-place.ts): searched around this point. */
+  geo?: { lat: number; lng: number; radiusKm: number };
+};
 
 export type BookStayInput = {
   rateKey: string;
@@ -469,8 +475,9 @@ export class HotelbedsHotels implements BookingHotelSupplier {
 
   async search(input: HotelSearch & StayQueryExtras) {
     const q = HotelSearchSchema.parse(input);
-    const dest = Object.values(DESTINATIONS).find((d) => d.words.test(q.city.toLowerCase()) || d.key === q.city.toLowerCase());
-    const place = dest ? HB_PLACES[dest.key] : undefined;
+    const dest = input.geo ? undefined : Object.values(DESTINATIONS).find((d) => d.words.test(q.city.toLowerCase()) || d.key === q.city.toLowerCase());
+    // Hotelbeds caps a geolocation search at 200 km; ours stay well inside it.
+    const place = input.geo ? { lat: input.geo.lat, lng: input.geo.lng, radiusKm: Math.min(200, Math.max(1, input.geo.radiusKm)), code: undefined } : dest ? HB_PLACES[dest.key] : undefined;
     if (!place) return [];
     const childAges = (input.childAges ?? []).slice(0, q.children || (input.childAges?.length ?? 0));
     const adults = Math.max(1, q.adults - childAges.length);
@@ -485,7 +492,7 @@ export class HotelbedsHotels implements BookingHotelSupplier {
     }, SEARCH_BUDGET);
     const codes = (res.hotels?.hotels ?? []).map((h) => h.code);
     const facts = this.facts && codes.length ? await this.facts(codes).catch(() => undefined) : undefined;
-    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts, city: dest!.key });
+    return offersFromAvailability(res, { nights: q.nights, party: q.adults, rooms, checkIn: q.checkIn, facts, city: dest?.key ?? null, ...(input.geo ? { centre: { lat: place.lat, lng: place.lng }, radiusKm: place.radiusKm } : {}) });
   }
 
   /** Every room the hotel has for the same stay and party: one per room, board and refundability, cheapest first. */

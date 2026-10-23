@@ -78,7 +78,8 @@ Never put keys in the app or in the repo. `npm run hotelbeds:smoke` refuses `HOT
 - The app wraps every call in the circuit breaker (`resilience/breaker.ts`, names `hotels` and `transfers`).
 
 ### Hotels (`hotels.ts`)
-- Availability `POST /hotel-api/1.0/hotels`: by geolocation (our city centre + radius, `HB_PLACES`), destination code
+- Availability `POST /hotel-api/1.0/hotels`: by geolocation (our city centre + radius, `HB_PLACES`; anywhere else the
+  place's point and a radius by population from `booking/stay-place.ts`, passed as `geo`), destination code
   (`HOTELBEDS_USE_DESTINATION_CODES=yes`) or hotel codes; one call carries all rooms (identical occupancies grouped with
   `rooms`, children as `CH` paxes with ages); filters `paymentType=AT_WEB`, `maxHotels=2000`, optional `maxRate`,
   `minCategory`/`maxCategory`, `boards`.

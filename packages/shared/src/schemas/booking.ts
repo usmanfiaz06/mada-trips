@@ -186,8 +186,21 @@ export const FlightSearchResponse = z.object({
 });
 export type FlightSearchResponse = z.infer<typeof FlightSearchResponse>;
 
+/**
+ * A place without a destination key (any city or town in the world): its name in English ("Lahore, Pakistan") and, when
+ * the caller knows it (a plan's place), where it is. The server finds the rest (booking/stay-place.ts).
+ */
+export const StayPlace = z.object({
+  name: z.string().trim().min(2).max(80),
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
+});
+export type StayPlace = z.infer<typeof StayPlace>;
+
 export const StaySearchRequest = z.object({
+  /** A key of DESTINATIONS, or 'other' with `place` for anywhere else. */
   destination: z.string().min(2).max(40),
+  place: StayPlace.nullish(),
   checkIn: IsoDay,
   nights: z.number().int().min(1).max(60),
   travellerIds: z.array(Id).min(1).max(12),
@@ -271,6 +284,8 @@ export const StaySearchResponse = z.object({
   destinationName: z.string(),
   options: z.array(StayOption),
   cachedUntil: IsoDateTime,
+  /** A place without a key: where it was searched (its Arabic name when we hold one). `destination` is 'other'. */
+  place: z.object({ name: z.string(), nameAr: z.string().nullable(), country: z.string().nullable(), lat: z.number(), lng: z.number() }).nullable().optional(),
   /** Who the list was ranked for ("family: 2 children under 12"), so the app can say so. */
   shape: z.object({ shape: z.string(), because: z.string(), travellers: z.number().int(), under12: z.number().int() }).nullable().optional(),
 });

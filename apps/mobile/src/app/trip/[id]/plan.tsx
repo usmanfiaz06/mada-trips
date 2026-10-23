@@ -211,10 +211,14 @@ function ItemSheet({ plan, item, tripId, role, prices, busy, onEdit, onAsk, onCl
     const dest = destinationOf(item);
     const self = people.data?.find((p) => p.isSelf);
     const travellerIds = plan.travellerIds.length ? plan.travellerIds : self ? [self.id] : [];
-    if (!dest || item.day == null || !travellerIds.length) { setStays('none'); return; }
+    // A night anywhere in the world: the same instant search, by the place's name and its point when the plan has one.
+    const p = item.place;
+    const name = p ? [p.city || p.name, p.country].filter(Boolean).join(', ') : '';
+    if ((!dest && name.length < 2) || item.day == null || !travellerIds.length) { setStays('none'); return; }
     setFinding(true);
     try {
-      const r = await bookingApi.searchStays({ destination: dest, checkIn: addDays(plan.startDate, item.day), nights: Math.max(1, item.nights ?? 1), travellerIds });
+      const place = dest ? null : { name, lat: p?.lat ?? null, lng: p?.lng ?? null };
+      const r = await bookingApi.searchStays({ destination: dest ?? 'other', place, checkIn: addDays(plan.startDate, item.day), nights: Math.max(1, item.nights ?? 1), travellerIds });
       setStays(r.options.length ? r.options.slice(0, 3) : 'none');
     } catch { setStays('none'); } finally { setFinding(false); }
   };

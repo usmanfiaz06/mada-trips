@@ -302,6 +302,13 @@ export const PLAN_RUN: Record<string, Run> = {
     if (it.kind === "stay") {
       const dest = keyOf(it.place);
       if (dest) return runTool("search_stays", { destination: dest, check_in: date, nights: it.nights ?? 1, traveller_ids: travellers, wishes: null }, ctx);
+      // Anywhere else: the same instant search, by the place's name and its point when the plan knows it.
+      const p = it.place;
+      const name = p ? [p.city || p.name, p.country].filter(Boolean).join(", ") : "";
+      if (name) {
+        const point = p?.lat != null && p?.lng != null ? { lat: p.lat, lng: p.lng } : undefined;
+        return runTool("search_stays", { destination: null, place: name, check_in: date, nights: it.nights ?? 1, traveller_ids: travellers, wishes: null, ...(point ? { _point: point } : {}) }, ctx);
+      }
       return { text: byHand("stay", nm(it.place), addDays(date, it.nights ?? 1)) };
     }
     if (it.kind === "car" || (it.kind === "leg" && (it.mode === "drive" || it.mode === "transfer"))) {

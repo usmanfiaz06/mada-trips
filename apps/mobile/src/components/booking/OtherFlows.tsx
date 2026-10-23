@@ -76,7 +76,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   const recent = useRecentCities();
   useEffect(() => { void recent.load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // What was typed answers what it can: "a hotel in Dubai next weekend for 4" asks nothing but who and rooms.
-  const [city, setCity] = useState<City | null>(() => (intent.destination && intent.destination !== 'other' ? { key: intent.destination, name: DESTINATIONS[intent.destination]?.name ?? intent.destination } : intent.destination === 'other' && intent.destinationName ? { key: null, name: intent.destinationName } : null));
+  const [city, setCity] = useState<City | null>(() => (intent.destination && DESTINATIONS[intent.destination] ? { key: intent.destination, name: DESTINATIONS[intent.destination]!.name } : intent.destinationName ? { key: null, name: intent.destinationName } : null));
   const [checkIn, setCheckIn] = useState<string | null>(intent.depart && intent.depart >= today ? intent.depart : null);
   const [checkOut, setCheckOut] = useState<string | null>(intent.depart && intent.return && intent.return > intent.depart ? intent.return : null);
   const said = intent.travellerIds?.filter((id) => people.some((p) => p.id === id)) ?? [];
@@ -96,7 +96,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   const [deskNote, setDeskNote] = useState<string | null>(null);
 
   const dest = destOf(city);
-  const live = !!dest && !dest.byHand;
+  // Rooms are searched instantly anywhere in the world: a city without a key goes by its name (the server finds where it is).
+  const live = !!city;
   const nights = checkIn && checkOut ? Math.max(1, daysBetween(checkIn, checkOut)) : 0;
   const n = who.length;
   const rooms = n > 2 ? t('search.rooms.connecting') : n === 2 ? t('search.rooms.forTwo') : t('search.rooms.one');
@@ -106,8 +107,8 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
 
   const flags = [...demo].sort().join(',');
   const searching = phase === 'results' && live && !byHand;
-  const staysKey = ['booking', 'stays', dest?.key, checkIn, nights, who.join(), flags];
-  const staysFn = () => bookingApi.searchStays({ destination: dest!.key, checkIn: checkIn!, nights, travellerIds: who });
+  const staysKey = ['booking', 'stays', dest?.key ?? city?.name, checkIn, nights, who.join(), flags];
+  const staysFn = () => bookingApi.searchStays({ destination: dest?.key ?? 'other', place: dest ? null : { name: city!.name }, checkIn: checkIn!, nights, travellerIds: who });
   const search = useQuery({ queryKey: staysKey, enabled: searching, staleTime: 600_000, queryFn: staysFn });
   // While the hotels answer: the cards to come, and a line that says what is being done as the seconds pass.
   const stayLines = [t('waiting.stays.0', { city: city ? cityLabel(city) : '', dates: checkIn && checkOut ? rangeName(checkIn, checkOut, today) : '' }), t('waiting.stays.1'), t('waiting.stays.2'), t('waiting.stays.3')];
@@ -119,10 +120,11 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   const likely = signedIn && phase === 'who' && live && !byHand && !needParty && !phoneNeeded && who.length > 0;
   useEffect(() => {
     if (likely) void qc.prefetchQuery({ queryKey: staysKey, queryFn: staysFn, staleTime: 600_000 });
-  }, [likely, dest?.key, checkIn, nights, who.join(), flags]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [likely, dest?.key, city?.name, checkIn, nights, who.join(), flags]); // eslint-disable-line react-hooks/exhaustive-deps
   // Entry checks don't depend on the rooms: asked at the same time as the search, not after it.
   // "I have a permit", typed as a correction: the visa and re-entry checks count as in hand.
-  const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, !!intent.answers.permit, flags], enabled: searching, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }) });
+  // Entry rules are held for our destinations; a place without a key has its own line on the trip later.
+  const entry = useQuery({ queryKey: ['booking', 'entry', dest?.key, who.join(), checkIn, checkOut, answers, !!intent.answers.permit, flags], enabled: searching && !!dest, placeholderData: (p) => p, queryFn: () => bookingApi.entry({ destination: dest!.key, travellerIds: who, depart: checkIn!, return: checkOut, answers: { ...permitAnswers(intent, who, dest?.key), ...answers } }) });
   // A city can answer with a couple of hundred hotels: draw a page at a time, cheapest first.
   const s = search.data;
   const cur = s?.options.find((o) => o.id === pick) ?? s?.options[0];
@@ -142,7 +144,7 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
     // Results set their own action (StayResults: Review, and the box to say what matters).
     if (!ready) setCta(null);
   }, [phase, ready, who.join(), phoneNeeded, live, needParty]); // eslint-disable-line react-hooks/exhaustive-deps
-  const review = (o: StayOption) => { if (!requireAccount('book', ASK_RESUME)) return; usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest!.key, askAgain: query }); router.push('/pay'); };
+  const review = (o: StayOption) => { if (!requireAccount('book', ASK_RESUME)) return; usePayDraft.getState().set({ draft: { kind: 'stay', stayOfferId: o.id, travellerIds: who }, title: o.name, destination: dest?.key ?? 'other', askAgain: query }); router.push('/pay'); };
   useEffect(() => () => setCta(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const change = (what: 'where' | 'when') => { setGo(false); setPick(null); setByHand(false); setDeskNote(null); setEditing(what); };
@@ -250,13 +252,17 @@ export function StayFlow({ intent, query, people, selfName, today, setCta, onSyn
   if (!s && search.isError && !search.isFetching) return <View style={{ gap: 14 }}>{summary}<ErrorState variant="card" error={search.error} onRetry={wait.retry} onSignIn={wait.signIn} always testID="stays-error" /></View>;
   if (!s && wait.view === 'timeout') return <View style={{ gap: 14 }}>{summary}<GaveUp wait={wait} kind="stays" onFind={() => { buzz('tap'); setByHand(true); }} testID="stays-timeout" /></View>;
   if (!s) return <View style={{ gap: 18 }}>{summary}<Waiting kind="stays" line={waitLine} fact={localTimeFact(dest?.key)} testID="stays-waiting" /></View>;
+  // A place without a key: the server's name for it, in Arabic when it holds one («لاهور»).
+  const placeLabel = getLocale() === 'ar' && s.place?.nameAr ? s.place.nameAr : cityLabel(city!);
   if (s.outcome === 'none') {
-    return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms })} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
+    // Galata is the catalogue's own neighbourhood: any other city is named as it is.
+    const body = dest?.key === 'istanbul' ? t('search.stays.none.body', { rooms: s.options[0]?.roomsLabel ?? rooms }) : t('search.stays.none.city', { city: placeLabel, rooms });
+    return <EmptyState art={<ArtSuitcase />} title={t('search.stays.none.title')} body={body} action={<Button label={t('search.stays.byHand')} onPress={() => { buzz('tap'); setByHand(true); }} />} />;
   }
   return (
-    <StayResults guestLines={(o) => <StayGuests option={o} travellers={people.filter((p) => who.includes(p.id))} lapInfants={lap} onDay={checkIn!} testID="stay-guests" />} s={s} city={dest!.key} cityName={cityLabel(city!)} dates={rangeName(checkIn!, checkOut!, today)} people={people} who={who} checkIn={checkIn!} summary={summary}
+    <StayResults guestLines={(o) => <StayGuests option={o} travellers={people.filter((p) => who.includes(p.id))} lapInfants={lap} onDay={checkIn!} testID="stay-guests" />} s={s} city={dest?.key ?? 'other'} cityName={placeLabel} dates={rangeName(checkIn!, checkOut!, today)} people={people} who={who} checkIn={checkIn!} summary={summary}
       block={blockLabel(entry.data)} setCta={setCta} onReview={review} onDesk={(note) => { buzz('tap'); setDeskNote(note); setByHand(true); }}
-      entry={<EntryChecks result={entry.data} destination={dest!.key} travellerIds={who} depart={checkIn!} ret={checkOut} answer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} remove={(id) => setWho((w) => w.filter((x) => x !== id))} />} />
+      entry={dest ? <EntryChecks result={entry.data} destination={dest.key} travellerIds={who} depart={checkIn!} ret={checkOut} answer={(k, v) => setAnswers((a) => ({ ...a, [k]: v }))} remove={(id) => setWho((w) => w.filter((x) => x !== id))} /> : null} />
   );
 }
 
@@ -293,7 +299,7 @@ function CityPicker({ recent, onPick }: { recent: City[]; onPick: (c: City) => v
               <Icon name="pin" size={18} />
               <View style={{ flex: 1 }}>
                 <T v="h3" style={{ fontSize: 15 }}>{cityLabel(c)}</T>
-                <T v="tiny">{c.key && !DESTINATIONS[c.key]?.byHand ? t('ask.stay.liveCity') : t('ask.stay.handCity')}</T>
+                <T v="tiny">{t('ask.stay.liveCity')}</T>
               </View>
             </Pressable>
           ))}

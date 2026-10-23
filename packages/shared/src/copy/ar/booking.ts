@@ -161,6 +161,7 @@ export const arBooking: ArSection<typeof bookingCopy> = {
   'search.stays.sub': '{dates} · {nights} ليالي · {rooms}',
   'search.stays.none.title': 'ما فيه غرف فاضية في هذي التواريخ.',
   'search.stays.none.body': 'كل اللي حول غلطة محجوز لـ {rooms}. مادا تعرف أماكن ما تطلع على النت، وتقدر تدوّر يدوي.',
+  'search.stays.none.city': 'ما فيه شي في {city} نقدر نحجزه أونلاين لـ {rooms} بهذي التواريخ. مادا تقدر تدوّر يدوي.',
   'search.stays.byHand': 'خلّ مادا تدوّر لك غرف',
   'search.stays.more': 'اعرض {count} أماكن ثانية',
   'search.stays.shown': 'نعرض {shown} من {count} مكان، الأرخص أول.',

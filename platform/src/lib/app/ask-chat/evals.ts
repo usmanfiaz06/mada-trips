@@ -55,7 +55,7 @@ export async function fixtureTool(name: string, input: unknown, flights: "live" 
     }
     case "search_stays":
       if (typeof a.hotel_name === "string" && /four season/i.test(a.hotel_name)) return { text: `The hotel they named ("${a.hotel_name}"): only these hotels by that name were searched; say it is the one they asked for.\nStays in London, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-fs1 · hotel_code=9101 · Four Seasons Hotel London at Park Lane · Mayfair · 5 stars · ${fmt(38400)} all in · free cancellation until ${a.check_in} · has spa, gym` };
-      return { text: `Stays in ${a.destination}, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-1 · hotel_code=9001 · Rove Downtown · Downtown · 3 stars · ${fmt(1840)} all in · free cancellation until ${a.check_in} · has pool, wifi\n2. id=s-2 · hotel_code=9002 · Address Sky View · Downtown · 5 stars · ${fmt(5260)} all in · not refundable · has pool, gym, spa` };
+      return { text: `Stays in ${a.destination ?? a.place}, ${a.nights} nights from ${a.check_in}, for ${n} people:\n1. id=s-1 · hotel_code=9001 · Rove Downtown · Downtown · 3 stars · ${fmt(1840)} all in · free cancellation until ${a.check_in} · has pool, wifi\n2. id=s-2 · hotel_code=9002 · Address Sky View · Downtown · 5 stars · ${fmt(5260)} all in · not refundable · has pool, gym, spa` };
     case "esim_plans":
       return { text: `eSIM plans for Pakistan, ${a.days ?? 7} days:\n1. id=pk-10-5 · 5 GB · 10 days · Pakistan · SAR 39 each eSIM · lasts the trip\n2. id=pk-10-10 · 10 GB · 15 days · Pakistan · SAR 59 each eSIM · lasts the trip\n3. id=pk-30-20 · 20 GB · 30 days · Pakistan · SAR 89 each eSIM · lasts the trip` };
     case "entry_rules":
@@ -175,6 +175,9 @@ export const EVAL_CASES: EvalCase[] = [
   // A hotel by name, any week of a month (staging: the generic London list came back instead of the Four Seasons).
   { id: "named-hotel", lang: "en", turns: [{ user: "Four season london, I need rates for one week anytime in November for me and Hessa", toolsAnyOf: ["search_stays"], inputHas: { tool: "search_stays", field: "hotel_name", match: /four season/i }, notAsk: /when|which dates|what dates/i }] },
   { id: "ar-named-hotel", lang: "ar", turns: [{ user: "فورسيزونز لندن أبي أسعار أسبوع أي وقت في نوفمبر لي ولزوجتي", toolsAnyOf: ["search_stays"], inputHas: { tool: "search_stays", field: "hotel_name", match: /four season/i }, notAsk: /متى|تاريخ|أي أسبوع/ }] },
+  // Hotels anywhere in the world are searched instantly (a place without a key goes in `place`), never handed to the team first.
+  { id: "stay-lahore", lang: "en", turns: [{ user: "Hotel in Lahore next weekend for 2", toolsAnyOf: ["search_stays"], notTools: ["create_request"], inputHas: { tool: "search_stays", field: "place", match: /lahore/i }, notAsk: /when|where/i }] },
+  { id: "ar-stay-lahore", lang: "ar", turns: [{ user: "فندق في لاهور الويكند الجاي لشخصين", toolsAnyOf: ["search_stays"], notTools: ["create_request"], inputHas: { tool: "search_stays", field: "place", match: /lahore/i }, notAsk: /متى|وين/ }] },
   // Found by hand (docs/app/ASK-CHAT.md §Found by hand): what the team needs, confirmed, how to reach them, then the request.
   { id: "flights-by-request", lang: "en", flights: "request", turns: [
     { user: "Flights to Istanbul 3 to 10 December, just me", toolsAnyOf: FLIGHT, notTools: ["create_request", "price_quote_for_pay"], reachChips: true },

@@ -92,20 +92,22 @@ export type FitContext = {
   radiusKm: number;
   /** A place the traveller asked to be near ("closer to Dubai Mall"): measured from there instead of the centre. */
   nearId?: string | null;
+  /** The centre of a place without a key (anywhere in the world), when `city` has none in CITY_CENTRES. */
+  centre?: { lat: number; lng: number } | null;
 };
 
 const BREAKFAST = ['BB', 'HB', 'FB', 'AI'];
 
 /** Where "near" is measured from: the place asked for, the Haram for a pilgrimage, else the centre. */
-export function fitAnchor(ctx: Pick<FitContext, 'shape' | 'city' | 'nearId'>): { place: string; lat: number; lng: number } | null {
+export function fitAnchor(ctx: Pick<FitContext, 'shape' | 'city' | 'nearId' | 'centre'>): { place: string; lat: number; lng: number } | null {
   const asked = ctx.nearId ? landmarkById(ctx.nearId) : null;
   if (asked) return { place: asked.id, lat: asked.lat, lng: asked.lng };
   if (ctx.shape === 'pilgrimage') {
     const holy = LANDMARKS.find((l) => l.city === ctx.city && l.view === 'haram');
     if (holy) return { place: holy.id, lat: holy.lat, lng: holy.lng };
   }
-  const c = ctx.city ? CITY_CENTRES[ctx.city] : undefined;
-  return c ? { place: 'centre', ...c } : null;
+  const c = (ctx.city ? CITY_CENTRES[ctx.city] : undefined) ?? ctx.centre ?? undefined;
+  return c ? { place: 'centre', lat: c.lat, lng: c.lng } : null;
 }
 
 /** The score and the facts behind it. Deterministic; nothing here is guessed. */

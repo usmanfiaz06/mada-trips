@@ -156,6 +156,7 @@ export const bookingCopy = {
   'search.stays.sub': '{dates} · {nights} nights · {rooms}',
   'search.stays.none.title': 'No rooms free on those dates.',
   'search.stays.none.body': 'Everything near Galata is taken for {rooms}. Mada knows places that never show online, and can look by hand.',
+  'search.stays.none.city': 'Nothing in {city} we can book online for {rooms} on those dates. Mada can look by hand.',
   'search.stays.byHand': 'Ask Mada to find rooms',
   'search.stays.more': 'Show {count} more places',
   'search.stays.shown': 'Showing {shown} of {count} places, cheapest first.',

@@ -14,7 +14,7 @@ import { getBalance } from "../credit";
 import { AppError } from "../http";
 import { householdOf, isUuid, renewalsAsked, today, travellersOf } from "./common";
 import { getAccount } from "../account";
-import { ownOffer, repriceOffer, type OfferRow } from "./search";
+import { ownOffer, repriceOffer, stayPlaceName, type OfferRow } from "./search";
 import { hotelbedsRule, withHotelbedsEssentials } from "./hotelbeds-stays";
 import { cityOf, flightQuoteOf, pickOption, type FlightSearch } from "./flight-requests";
 import { priceEsim } from "../esim/service";
@@ -145,7 +145,7 @@ export async function priceDraft(ownerId: string, input: PreviewInput, opts: { b
     };
     title = s.name;
     photo = s.photo;
-    place = DESTINATIONS[(row.search as { destination: string }).destination]?.name ?? "";
+    place = stayPlaceName(row.search);
     hold = row.expiresAt;
     offerRows.push(row);
     snapshot.stay = s;

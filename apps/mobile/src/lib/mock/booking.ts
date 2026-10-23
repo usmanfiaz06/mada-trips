@@ -486,9 +486,12 @@ export const bookingMock: AreaMock = async (w, ctx) => {
     const p = StaySearchRequest.safeParse(body);
     if (!p.success) return bad(p.error.issues);
     const dest = DESTINATIONS[p.data.destination];
-    if (!dest) return err('VALIDATION');
+    const said = p.data.place?.name ?? (p.data.destination !== 'other' ? p.data.destination : '');
+    if (!dest && !said) return err('VALIDATION');
     if (!mine(p.data.travellerIds)) return err('NOT_FOUND');
     await new Promise((r) => setTimeout(r, 400));
+    // A place without a key: the mock holds no hotels anywhere else, so nothing instant (never a sample hotel there).
+    if (!dest) return ok({ destination: 'other', destinationName: (said.split(',')[0] ?? said).trim().replace(/\b\p{Ll}/gu, (c) => c.toUpperCase()), cachedUntil: new Date(Date.now() + 600_000).toISOString(), outcome: 'none', options: [], place: null });
     const base = { destination: dest.key, destinationName: dest.name, cachedUntil: new Date(Date.now() + 600_000).toISOString() };
     if (!CATALOGUE_HOTELS[dest.key]) return ok({ ...base, outcome: 'by_hand', options: [] });
     if (demo.has('noResults')) return ok({ ...base, outcome: 'none', options: [] });

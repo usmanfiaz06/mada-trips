@@ -61,7 +61,8 @@ export function StayResults({ s, city, cityName, dates, people, who, checkIn, su
   const stored = useStayAnchor((x) => x.byCity[city]);
   const setStored = useStayAnchor((x) => x.set);
   const first = landmarksIn(city)[0];
-  const centre = CITY_CENTRES[city];
+  // A place without a key: its centre as the server found it.
+  const centre = CITY_CENTRES[city] ?? (s.place ? { lat: s.place.lat, lng: s.place.lng } : undefined);
   const anchor: DistanceAnchor | null = useMemo(() => stored ?? (first ? anchorOfLandmark(first) : centre ? { id: 'centre', kind: 'centre', name: t('dist.centre'), lat: centre.lat, lng: centre.lng } : null), [stored, first, centre]);
 
   const refined = useMemo(() => refineStays(s.options, wishes, lang), [s.options, wishes, lang]);
