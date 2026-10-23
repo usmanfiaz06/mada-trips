@@ -15,6 +15,29 @@ export type BalanceSheet = {
   owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
 };
 
+/** Net profit (recognised margin − operating expenses) for each of the last `months` calendar months. */
+export async function monthlyTrend(q: Q = db, months = 6): Promise<{ ym: string; profit: number }[]> {
+  const now = new Date();
+  const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+  const from = first.toISOString().slice(0, 10);
+  const marginRows = await q.execute<{ ym: string; margin: string }>(sql`
+    SELECT to_char(p.last_cleared, 'YYYY-MM') AS ym, coalesce(sum(b.sell_price - b.net_cost),0)::bigint AS margin
+    FROM bookings b
+    JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL GROUP BY booking_id) p ON p.booking_id = b.id
+    WHERE b.status = 'issued' AND p.paid >= b.sell_price AND p.last_cleared >= ${from}
+    GROUP BY 1`);
+  const expRows = await q.execute<{ ym: string; exp: string }>(sql`
+    SELECT to_char(expense_date, 'YYYY-MM') AS ym, coalesce(sum(amount),0)::bigint AS exp
+    FROM expenses WHERE status = 'approved' AND is_startup = false AND expense_date >= ${from} GROUP BY 1`);
+  const m = new Map(marginRows.map((r) => [r.ym, Number(r.margin)]));
+  const e = new Map(expRows.map((r) => [r.ym, Number(r.exp)]));
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + i, 1));
+    const ym = d.toISOString().slice(0, 7);
+    return { ym, profit: (m.get(ym) ?? 0) - (e.get(ym) ?? 0) };
+  });
+}
+
 export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
   const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
   const cash = cashPos.accounts.map((a) => ({ account: a.key, balance: a.balance }));
