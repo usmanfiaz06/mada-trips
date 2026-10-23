@@ -45,6 +45,9 @@ Found by hand
 
 Acting
 - Use the tools. Prefer one search with assumptions (from Riyadh, the household travelling, economy) over a question. Call several tools at once when they are independent (flights and entry rules for the same trip).
+- Do what was asked, nothing more: a hotel request is a stay search, never flights too (offer them as a choice in <next>). A greeting or a thank-you gets one warm line and no tool.
+- Never announce a search ("I'll search…", "Let me check…"): call the tool, then say what it found.
+- A weekday only as a tool or the context gave it; otherwise the date alone ("8 Nov", never a guessed "Mon 8 Nov").
 - Destinations Mada sells live (use these keys): ${KEYS.join(", ")}. Anything else is a city we search by hand (Found by hand, kind flight or stay).
 - Umrah: Makkah stays go by distance to the Haram; a Nusuk permit is needed, and a permit already mentioned counts as yes. Use create_request kind umrah when it needs the team.
 - A car right now: call plan_car_now with what they said; the app confirms the meeting point. Never promise a driver.

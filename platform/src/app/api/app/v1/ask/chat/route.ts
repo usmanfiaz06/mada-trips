@@ -5,11 +5,15 @@ import { authenticate } from "@/lib/app/tokens";
 import { isProductionDeploy } from "@/lib/app/config";
 import { chatTurn, errorCode, preflight } from "@/lib/app/ask-chat/chat";
 import { scrubResponse } from "@/lib/app/shield";
+import { pushToUser } from "@/lib/app/push";
+import { after } from "next/server";
 
 // POST /ask/chat { text, threadId?, tripId? } → text/event-stream of AskChatEvent (schemas/ask-chat.ts): thread, status,
 // text (deltas), cards, intent, pay, handoff, replace, done; error { code, fallback: true } when the app should answer
 // with its own flows. Signed in only. Off unless ASK_CHAT=on and ANTHROPIC_API_KEY is set (501 NOT_CONFIGURED); the
 // per-person limits and the daily spend cap answer 429 before any stream opens. docs/app/ASK-CHAT.md.
+// The traveller leaving (the app sent to the background, the screen closed) doesn't stop the turn: it finishes, is
+// saved to the thread as usual, and the reply comes as a push ("messages" channel) that opens that chat.
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -26,13 +30,29 @@ export const POST = route(async (req) => {
 
   const origin = new URL(req.url).origin;
   const abort = new AbortController();
-  req.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+  let gone = false;
+  let threadId: string | null = null;
+  let lang = "en";
+  let reply = "";
+  req.signal?.addEventListener("abort", () => { gone = true; }, { once: true });
+  let finished: () => void = () => {};
+  // Keeps the function alive until the turn ends, even after the traveller has gone.
+  const done = new Promise<void>((resolve) => { finished = resolve; });
+  try { after(() => done); } catch { /* outside a request (tests): nothing to keep alive */ }
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let open = true;
-      const emit = (e: AskChatEvent) => { if (open) { try { controller.enqueue(frame(e, origin)); } catch { open = false; } } };
+      const emit = (e: AskChatEvent) => {
+        if (e.type === "thread") { threadId = e.threadId; lang = e.lang; }
+        if (e.type === "done") reply = e.text;
+        if (open) { try { controller.enqueue(frame(e, origin)); } catch { open = false; gone = true; } }
+      };
       try {
         await chatTurn({ userId, ipHash }, input, emit, abort.signal);
+        if (gone && threadId && reply.trim()) {
+          const body = reply.replace(/<next>[\s\S]*?<\/next>/g, "").replace(/\s+/g, " ").trim();
+          await pushToUser(userId, { title: lang === "ar" ? "مادا" : "Mada", body: body.length > 140 ? `${body.slice(0, 139)}…` : body, data: { href: `/ask/${threadId}` }, channel: "messages" }).catch(() => {});
+        }
       } catch (e) {
         if (!abort.signal.aborted) console.warn("[ask-chat] turn stopped:", e instanceof Error ? `${e.name} ${"status" in e ? String((e as { status?: number }).status) : ""}` : "");
         emit({ type: "error", code: errorCode(e), fallback: true });
@@ -44,9 +64,10 @@ export const POST = route(async (req) => {
       } finally {
         open = false;
         try { controller.close(); } catch { /* already closed by the client going away */ }
+        finished();
       }
     },
-    cancel() { abort.abort(); },
+    cancel() { gone = true; },
   });
   return new Response(stream, {
     headers: {
