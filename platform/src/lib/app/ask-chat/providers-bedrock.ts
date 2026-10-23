@@ -50,7 +50,10 @@ export function forBedrock(p: StreamParams): StreamParams {
   void _tools; void _fallbacks;
   const kept = (betas ?? []).filter((b) => !FALLBACK_BETA.test(String(b)));
   const model = bedrockModel(String(p.model));
-  const out = { ...rest, model, ...(kept.length ? { betas: kept } : {}) } as StreamParams & { thinking?: unknown; output_config?: { effort?: unknown } };
+  const out = { ...rest, model, ...(kept.length ? { betas: kept } : {}) } as StreamParams & { thinking?: unknown; output_config?: { effort?: unknown }; cache_control?: unknown };
+  // Bedrock rejects the request-level cache_control ("Extra inputs are not permitted"); the breakpoints on the system
+  // prompt and the tools still cache.
+  delete out.cache_control;
   if (olderClaude(model)) {
     delete out.thinking;
     const tools = (out as { tools?: Array<Record<string, unknown>> }).tools;

@@ -108,12 +108,13 @@ describe("Ask on Amazon Bedrock: the client", () => {
     expect(built.at(-1)).toMatchObject({ awsRegion: "ap-south-1", apiKey: "k2" });
   });
 
-  it("leaves out server-side fallbacks and the engine's tool hint; keeps effort, thinking, caching, tool_choice auto", () => {
+  it("leaves out server-side fallbacks and the engine's tool hint; keeps effort, thinking, tool_choice auto (request-level caching dropped)", () => {
     const p = forBedrock({ model: "anthropic.claude-haiku-5-5", max_tokens: 4096, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", only_tools: ["x"], thinking: { type: "adaptive" }, output_config: { effort: "low" }, cache_control: { type: "ephemeral" }, tool_choice: { type: "auto" }, messages: [] } as never) as unknown as Record<string, unknown>;
     expect(p).not.toHaveProperty("fallbacks");
     expect(p).not.toHaveProperty("betas");
     expect(p).not.toHaveProperty("only_tools");
-    expect(p).toMatchObject({ thinking: { type: "adaptive" }, output_config: { effort: "low" }, cache_control: { type: "ephemeral" }, tool_choice: { type: "auto" } });
+    expect(p).toMatchObject({ thinking: { type: "adaptive" }, output_config: { effort: "low" }, tool_choice: { type: "auto" } });
+    expect(p.cache_control).toBeUndefined();
     for (const k of ["temperature", "top_p", "top_k"]) expect(p).not.toHaveProperty(k);
   });
 
@@ -198,5 +199,14 @@ describe("chain: a quick helper call that runs out of time", () => {
     await expect(api.create({ model: "x", max_tokens: 9, messages: [] } as never, { timeout: 60_000 })).resolves.toBeTruthy();
     expect(cooldowns().first).toBeGreaterThan(0);
     resetCooldowns();
+  });
+});
+
+describe("bedrock: request-level caching", () => {
+  it("drops the top-level cache_control Bedrock rejects, keeps the system prompt's breakpoint", async () => {
+    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const out = forBedrock({ model: "global.anthropic.claude-haiku-4-5-20251001-v1:0", max_tokens: 9, messages: [], cache_control: { type: "ephemeral" }, system: [{ type: "text", text: "s", cache_control: { type: "ephemeral" } }] } as never) as unknown as Record<string, unknown>;
+    expect(out.cache_control).toBeUndefined();
+    expect(JSON.stringify(out.system)).toContain("ephemeral");
   });
 });
