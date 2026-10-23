@@ -40,30 +40,13 @@ export const forClaude = (p: StreamParams): StreamParams => {
   // A thread Gemini answered earlier carries its tool-call signatures (extra_content), which Claude doesn't take.
   const messages = rest.messages.map((m) => (typeof m.content === "string" || !m.content.some((b) => "extra_content" in b) ? m
     : { ...m, content: m.content.map((b) => { if (!("extra_content" in b)) return b; const { extra_content: _x, ...keep } = b as typeof b & { extra_content?: unknown }; void _x; return keep as typeof b; }) }));
-  // Claude caps strict tools per request: at most 20, and few nullable or union-typed parameters across them ("too many
-  // parameters with union types"). In list order (the core tools lead) a tool keeps strict while both budgets hold; the
-  // rest go without it, and each tool's handler checks its arguments anyway.
+  // No strict tools for Claude: its grammar compiler refuses Ask's set (more than 20 strict tools, too many nullable
+  // parameters, then "schema too complex", after half a minute). Claude keeps to the schemas without it, and every
+  // tool's handler checks its arguments.
   const tools = (rest as { tools?: Array<Record<string, unknown>> }).tools;
-  let strict = 0;
-  let unions = 0;
-  const capped = tools?.map((t) => {
-    if (!t.strict) return t;
-    const u = unionsIn(t.input_schema);
-    if (strict < MAX_STRICT_TOOLS && unions + u <= MAX_STRICT_UNIONS) { strict++; unions += u; return t; }
-    const { strict: _s, ...k } = t; void _s; return k;
-  });
+  const capped = tools?.map((t) => { if (!("strict" in t)) return t; const { strict: _s, ...k } = t; void _s; return k; });
   return { ...rest, messages, ...(capped ? { tools: capped } : {}) } as StreamParams;
 };
-const MAX_STRICT_TOOLS = 20;
-const MAX_STRICT_UNIONS = 10;
-/** Parameters typed as a union (a type array or anyOf), counted through the whole schema. */
-export function unionsIn(node: unknown): number {
-  if (Array.isArray(node)) return node.reduce((n: number, x) => n + unionsIn(x), 0);
-  if (!node || typeof node !== "object") return 0;
-  const o = node as Record<string, unknown>;
-  const own = (Array.isArray(o.type) && o.type.length > 1) || Array.isArray(o.anyOf) ? 1 : 0;
-  return own + Object.values(o).reduce((n: number, v) => n + unionsIn(v), 0);
-}
 
 export function anthropicApi(apiKey = process.env.ANTHROPIC_API_KEY): ChatApi {
   const client = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
@@ -267,7 +250,7 @@ export function refusesRequest(e: unknown): boolean {
   if (st === 404) return true;
   if (st !== 400) return false;
   const msg = `${e instanceof Error ? e.message : ""} ${e && typeof e === "object" && "detail" in e ? String((e as { detail?: unknown }).detail ?? "") : ""}`;
-  return /invalid schema|tools?\.\d+|not supported|unsupported|does not support|extra inputs|unknown (?:field|parameter)|model/i.test(msg);
+  return /invalid schema|schemas? (?:is|contains) too|too complex|too many|tools?\.\d+|not supported|unsupported|does not support|extra inputs|unknown (?:field|parameter)|model/i.test(msg);
 }
 
 /** A timeout on a call given under 15 s: the caller's short budget, not the provider being down. */

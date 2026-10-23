@@ -212,23 +212,11 @@ describe("bedrock: request-level caching", () => {
 });
 
 describe("claude: strict tools", () => {
-  it("keeps strict on the first 20 tools only (Claude's limit)", async () => {
+  it("sends no strict tools to Claude (its compiler refuses Ask's set)", async () => {
     const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
     const tools = Array.from({ length: 27 }, (_, i) => ({ name: `t${i}`, strict: true, input_schema: { type: "object", properties: {} } }));
     const out = forBedrock({ model: "anthropic.claude-haiku-5-5", max_tokens: 9, messages: [], tools } as never) as unknown as { tools: { strict?: boolean }[] };
-    expect(out.tools.filter((t) => t.strict).length).toBe(20);
+    expect(out.tools.some((t) => "strict" in t)).toBe(false);
     expect(out.tools).toHaveLength(27);
-  });
-});
-
-describe("claude: union-typed parameters in strict tools", () => {
-  it("keeps strict only while the nullable-parameter budget holds", async () => {
-    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
-    const { unionsIn } = await import("@/lib/app/ask-chat/providers");
-    const nullable = (n: number) => ({ type: "object", properties: Object.fromEntries(Array.from({ length: n }, (_, i) => [`p${i}`, { type: ["string", "null"] }])) });
-    expect(unionsIn(nullable(4))).toBe(4);
-    const tools = [{ name: "a", strict: true, input_schema: nullable(6) }, { name: "b", strict: true, input_schema: nullable(6) }, { name: "c", strict: true, input_schema: nullable(3) }];
-    const out = forBedrock({ model: "anthropic.claude-haiku-5-5", max_tokens: 9, messages: [], tools } as never) as unknown as { tools: { name: string; strict?: boolean }[] };
-    expect(out.tools.map((t) => !!t.strict)).toEqual([true, false, true]);
   });
 });
