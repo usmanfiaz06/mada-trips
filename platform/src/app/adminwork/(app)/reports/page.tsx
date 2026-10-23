@@ -1,13 +1,15 @@
+import type { ReactNode } from "react";
+import { Landmark, TrendingUp, Handshake, Scale } from "lucide-react";
 import { requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
-import { periodReport, balanceSheet } from "@/lib/reports";
+import { periodReport, balanceSheet, monthlyTrend } from "@/lib/reports";
 import { addDays, businessDate, cycleFor, fmtDate, riyadhDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
-import { ACCOUNT, EXPENSE_CATEGORY } from "@/lib/labels";
-import { Card, CardHead, InkCard, Money, PageHeader, cx } from "@/components/ui";
+import { ACCOUNT } from "@/lib/labels";
+import { Card, CardHead, Money, PageHeader, cx } from "@/components/ui";
 
-export const metadata = { title: "Reports" };
+export const metadata = { title: "Overview" };
 
 type SP = { period?: string; c?: string; m?: string; from?: string; to?: string };
 
@@ -45,7 +47,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     title = `${fmtDate(start, L)} – ${fmtDate(end, L)}`;
   }
 
-  const [bs, { pl }] = await Promise.all([balanceSheet(), periodReport(undefined, start, end)]);
+  const [bs, { pl }, trend] = await Promise.all([balanceSheet(), periodReport(undefined, start, end), monthlyTrend(undefined, 6)]);
+
+  const H = 116;
+  const vals = trend.map((x) => x.profit);
+  const up = Math.max(0, ...vals), down = Math.min(0, ...vals);
+  const span = up - down || 1;
+  const zero = (up / span) * H;
+  const monthLabel = (ym: string) => new Intl.DateTimeFormat(L === "ar" ? "ar" : "en", { month: "short", timeZone: "UTC" }).format(new Date(`${ym}-15`));
 
   const presets: { label: string; href: string; on: boolean }[] = [
     { label: t("This cycle"), href: "/adminwork/reports?period=cycle", on: period === "cycle" && sp.c !== "prev" },
@@ -54,107 +63,111 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { label: t("Last month"), href: `/adminwork/reports?period=month&m=${prevMonth}`, on: period === "month" && sp.m === prevMonth },
   ];
 
-  const Row = ({ label, v, sub, sign, strong, muted, indent }: { label: string; v: number; sub?: string; sign?: boolean; strong?: boolean; muted?: boolean; indent?: boolean }) => (
-    <div className={cx("flex items-center justify-between py-2", strong ? "border-t border-line mt-1 pt-3" : "border-b border-line/60")}>
-      <span className={cx(indent && "ps-4", strong ? "text-[14px] font-semibold" : "text-[13.5px]", muted ? "text-ink-3" : "text-ink-2")}>{label}{sub && <span className="ms-2 text-[12px] text-ink-4">{sub}</span>}</span>
-      <Money v={v} sign={sign} className={cx(strong ? "text-[15px] font-semibold" : "text-[13.5px]", muted && "text-ink-3")} />
+  // A stat tile: soft neutral icon, muted label, big number, one muted sub-line.
+  const Stat = ({ icon, label, v, sub }: { icon: ReactNode; label: string; v: number; sub: string }) => (
+    <Card className="flex flex-col">
+      <div className="flex items-center gap-2.5">
+        <span className="grid size-9 place-items-center rounded-xl bg-sunken text-ink-3">{icon}</span>
+        <span className="text-[12.5px] font-medium text-ink-3">{label}</span>
+      </div>
+      <div className="figure mt-4 text-[27px] leading-none" dir="ltr">{sar(v).split(".")[0]}<span className="text-[0.46em] text-ink-4">.{sar(v).split(".")[1]} SAR</span></div>
+      <div className="mt-2 text-[12px] text-ink-4">{sub}</div>
+    </Card>
+  );
+
+  const Row = ({ label, v, strong }: { label: string; v: number; strong?: boolean }) => (
+    <div className={cx("flex items-center justify-between", strong ? "mt-1 border-t border-line pt-3" : "border-b border-line/60 py-2")}>
+      <span className={cx(strong ? "text-[14px] font-semibold text-ink" : "py-0.5 text-[13.5px] text-ink-2")}>{label}</span>
+      <Money v={v} muted className={cx(strong ? "text-[14.5px] font-semibold" : "text-[13.5px] text-ink-2")} />
     </div>
   );
 
+  const bankSub = bs.cash.map((a) => `${t(ACCOUNT[a.account] ?? a.account).split(" ")[0]} ${sar(a.balance, { compact: true })}`).join(" · ");
+
   return (
-    <div className="space-y-10">
-      <PageHeader eyebrow={t("Treasury")} title={t("Reports")} subtitle={t("Where the company stands today, and how it did over a chosen period.")} />
+    <div className="space-y-5">
+      <PageHeader eyebrow={t("Treasury")} title={t("Overview")} subtitle={t("Where the money is, and how the business is doing.")} />
 
-      {/* ───── Balance sheet: where we stand ───── */}
-      <section className="space-y-4">
-        <h2 className="text-[15px] font-semibold text-ink">{t("Where the company stands")} <span className="text-ink-4 font-normal">· {t("today")}</span></h2>
+      {/* Headline numbers */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat icon={<Landmark className="size-[18px]" />} label={t("Cash in the bank")} v={bs.cashTotal} sub={bankSub || t("No accounts yet")} />
+        <Stat icon={<TrendingUp className="size-[18px]" />} label={t("Profit this period")} v={pl.netProfit} sub={title} />
+        <Stat icon={<Handshake className="size-[18px]" />} label={t("Owners' capital in")} v={bs.owedPartners} sub={t("Still to repay from profit")} />
+        <Stat icon={<Scale className="size-[18px]" />} label={t("Overall position")} v={bs.netWorth} sub={t("If everything were settled today")} />
+      </div>
 
-        <InkCard className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="text-[12px] font-medium uppercase tracking-wide text-white/55">{t("Net worth")}</div>
-            <div className="mt-2 figure text-[44px] leading-none" dir="ltr">{sar(bs.netWorth).split(".")[0]}<span className="text-[0.38em] opacity-50">.{sar(bs.netWorth).split(".")[1]} SAR</span></div>
-          </div>
-          <p className="max-w-sm text-[12.5px] leading-relaxed text-white/55">
-            {bs.netWorth < 0
-              ? t("If the company collected everything owed to it and paid off everyone — suppliers, IATA and the partners — it would still be short this much. That's normal while partner capital hasn't been earned back yet.")
-              : t("If the company collected everything owed to it and paid off everyone — suppliers, IATA and the partners — this is what would be left over.")}
-          </p>
-        </InkCard>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHead title={t("What we have")} hint={t("Cash and money owed to us")} />
-            {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${t(ACCOUNT[a.account] ?? a.account)}`} v={a.balance} />)}
-            <Row label={t("Money clients still owe us")} v={bs.receivable} />
-            <Row label={t("Total we have")} v={bs.assets} strong />
-          </Card>
-          <Card>
-            <CardHead title={t("What we owe")} hint={t("Money going out to others")} />
-            <Row label={t("Suppliers (not yet paid)")} v={bs.owedSuppliers} />
-            <Row label={t("IATA / BSP (coming up)")} v={bs.owedBsp} />
-            <Row label={t("Partners (their capital)")} v={bs.owedPartners} />
-            <Row label={t("Total we owe")} v={bs.liabilities} strong />
-          </Card>
+      {/* Profit trend */}
+      <Card>
+        <CardHead title={t("Profit trend")} hint={t("Net profit · last 6 months")} />
+        <div className="flex items-end gap-2 sm:gap-4" style={{ height: H + 34 }}>
+          {trend.map((x) => {
+            const h = Math.max(2, (Math.abs(x.profit) / span) * H);
+            const pos = x.profit >= 0;
+            return (
+              <div key={x.ym} className="flex flex-1 flex-col items-center">
+                <div className="relative w-full" style={{ height: H }}>
+                  <div className="absolute inset-x-0 border-t border-dashed border-line-strong/70" style={{ top: zero }} />
+                  <div className="absolute start-1/2 w-6 -translate-x-1/2 rounded-md sm:w-8" dir="ltr"
+                    style={{ top: pos ? zero - h : zero, height: h, background: pos ? "var(--gold)" : "var(--bad)" }} />
+                  <div className="absolute inset-x-0 text-center text-[10.5px] text-ink-4" style={{ top: pos ? Math.max(0, zero - h - 16) : zero + h + 2 }}>
+                    {sar(x.profit, { compact: true })}
+                  </div>
+                </div>
+                <div className="mt-2 text-[11px] text-ink-3">{monthLabel(x.ym)}</div>
+              </div>
+            );
+          })}
         </div>
-        <p className="text-[12px] leading-relaxed text-ink-4">
-          {t("“Partners (their capital)” is money the owners put in — startup costs and advances — which the company repays from profit over time. It's counted as owed back, so net worth only turns positive once the business has earned back what the owners invested.")}
-        </p>
-      </section>
+      </Card>
 
-      {/* ───── Profit & loss: how we did over a period ───── */}
-      <section className="space-y-4">
-        <h2 className="text-[15px] font-semibold text-ink">{t("How we did")} <span className="text-ink-4 font-normal">· {title}</span></h2>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Balance: what we have vs owe */}
+        <Card>
+          <CardHead title={t("Where the money stands")} hint={t("Right now")} />
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we have")}</div>
+          {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${t(ACCOUNT[a.account] ?? a.account)}`} v={a.balance} />)}
+          <Row label={t("Clients still owe us")} v={bs.receivable} />
+          <Row label={t("Total we have")} v={bs.assets} strong />
+          <div className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we owe")}</div>
+          <Row label={t("Suppliers & IATA to pay")} v={bs.owedSuppliers + bs.owedBsp} />
+          <Row label={t("Owners' capital to repay")} v={bs.owedPartners} />
+          <Row label={t("Total we owe")} v={bs.liabilities} strong />
+          <Row label={t("Overall position")} v={bs.netWorth} strong />
+        </Card>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {presets.map((p) => (
-            <a key={p.href} href={p.href} className={cx("rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition", p.on ? "border-ink bg-ink text-white" : "border-line text-ink-2 hover:border-ink/40")}>{p.label}</a>
-          ))}
-          <form action="/adminwork/reports" method="get" className="ms-auto flex items-center gap-2">
+        {/* Profit & loss for a period */}
+        <Card>
+          <CardHead title={t("Profit & loss")} hint={title} action={
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {presets.map((p) => (
+                <a key={p.href} href={p.href} className={cx("rounded-full px-3 py-1.5 text-[12px] font-medium transition", p.on ? "bg-ink text-bg" : "bg-surface-2 text-ink-3 hover:text-ink")}>{p.label}</a>
+              ))}
+            </div>
+          } />
+          <Row label={t("Revenue")} v={pl.revenue} />
+          <Row label={t("Supplier cost")} v={-pl.directCost} />
+          <Row label={t("Gross profit")} v={pl.grossProfit} strong />
+          {pl.feesEarned - pl.feesLost !== 0 && <Row label={t("Cancellation fees (net)")} v={pl.feesEarned - pl.feesLost} />}
+          {pl.commissions > 0 && <Row label={t("Team commission")} v={-pl.commissions} />}
+          {pl.expensesTotal > 0 && <Row label={t("Expenses")} v={-pl.expensesTotal} />}
+          <Row label={t("Net profit")} v={pl.netProfit} strong />
+          {pl.startupCosts > 0 && <>
+            <Row label={t("Startup / capital costs")} v={-pl.startupCosts} />
+            <Row label={t("After startup costs")} v={pl.afterStartup} strong />
+          </>}
+          <form action="/adminwork/reports" method="get" className="mt-4 flex items-center gap-2">
             <input type="hidden" name="period" value="custom" />
-            <input type="date" name="from" defaultValue={period === "custom" ? start : ""} className="field h-9 w-[150px]" dir="ltr" />
+            <input type="date" name="from" defaultValue={period === "custom" ? start : ""} className="field h-8 w-[140px] text-[12.5px]" dir="ltr" />
             <span className="text-ink-4">–</span>
-            <input type="date" name="to" defaultValue={period === "custom" ? end : ""} className="field h-9 w-[150px]" dir="ltr" />
-            <button className="rounded-full border border-line px-3.5 py-1.5 text-[13px] font-medium text-ink-2 hover:border-ink/40">{t("Apply")}</button>
+            <input type="date" name="to" defaultValue={period === "custom" ? end : ""} className="field h-8 w-[140px] text-[12.5px]" dir="ltr" />
+            <button className="rounded-full bg-surface-2 px-3 py-1.5 text-[12px] font-medium text-ink-3 hover:text-ink">{t("Custom range")}</button>
           </form>
-        </div>
+        </Card>
+      </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <Card>
-            <CardHead title={t("Profit & loss")} hint={t("Recognised when a sale is fully paid and cleared")} />
-            <Row label={t("Revenue")} v={pl.revenue} />
-            <Row label={t("Direct cost (supplier)")} v={-pl.directCost} />
-            <Row label={t("Gross profit")} v={pl.grossProfit} strong />
-            {pl.feesEarned > 0 && <Row label={t("Cancellation fees kept")} v={pl.feesEarned} muted indent />}
-            {pl.feesLost > 0 && <Row label={t("Cancellation fees lost")} v={-pl.feesLost} muted indent />}
-            {pl.commissions > 0 && <Row label={t("Team commission")} v={-pl.commissions} muted indent />}
-            {pl.expenses.map((e) => <Row key={e.category} label={t(EXPENSE_CATEGORY[e.category] ?? e.category)} v={-e.total} muted indent />)}
-            {pl.expenses.length === 0 && pl.commissions === 0 && pl.feesEarned === 0 && pl.feesLost === 0 && (
-              <div className="py-3 text-[13px] text-ink-4">{t("No fees, commission or expenses in this period.")}</div>
-            )}
-            <Row label={t("Net profit")} v={pl.netProfit} strong />
-            {pl.startupCosts > 0 && <>
-              <Row label={t("Startup / capital costs")} v={-pl.startupCosts} muted indent />
-              <Row label={t("After startup costs")} v={pl.afterStartup} strong />
-              <p className="mt-3 text-[12px] leading-relaxed text-ink-4">
-                {t("Startup / capital costs are one-time investments partners paid in (registration, licences, lease, furnishing). They sit outside operating profit and are tracked on the Partners page as money owed back, repaid from profit over time.")}
-              </p>
-            </>}
-          </Card>
-
-          <div className="space-y-4">
-            <InkCard>
-              <div className="text-[12px] font-medium uppercase tracking-wide text-white/55">{t("Net profit")}</div>
-              <div className="mt-2 figure text-[34px] leading-none" dir="ltr">{sar(pl.netProfit).split(".")[0]}<span className="text-[0.4em] opacity-50">.{sar(pl.netProfit).split(".")[1]} SAR</span></div>
-              <div className="mt-2 text-[12.5px] text-white/50">{title}</div>
-            </InkCard>
-            <Card>
-              <div className="text-[12px] font-medium uppercase tracking-wide text-ink-4">{t("Gross profit")}</div>
-              <div className="mt-2"><Money v={pl.grossProfit} className="text-[24px] font-semibold" /></div>
-              <div className="mt-1 text-[12.5px] text-ink-4">{t("{n} sales recognised", { n: pl.salesCount })}{pl.refundCount > 0 ? ` · ${t("{n} refunded", { n: pl.refundCount })}` : ""}</div>
-            </Card>
-          </div>
-        </div>
-      </section>
+      <p className="text-[12px] leading-relaxed text-ink-4">
+        {t("“Owners' capital” is money the partners put in (startup costs and advances), repaid from profit over time. The overall position only turns positive once the business has earned it back — so a negative figure early on is normal.")}
+      </p>
     </div>
   );
 }
