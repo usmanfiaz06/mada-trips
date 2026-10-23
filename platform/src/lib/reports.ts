@@ -1,8 +1,31 @@
 import "server-only";
 import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
 import { db, schema, type DB, type Tx } from "@/db";
+import { cashPosition, receivables, payables, partnerBalances } from "./finance";
 
 type Q = DB | Tx;
+
+/**
+ * Where the company stands right now (a balance sheet): what it has (cash in each bank + money clients still
+ * owe) against what it owes (suppliers, upcoming IATA/BSP, and partners' capital). Net worth is the difference
+ * — negative means the company hasn't yet earned back everything the partners put in.
+ */
+export type BalanceSheet = {
+  cash: { account: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
+  owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
+};
+
+export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
+  const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
+  const cash = cashPos.accounts.map((a) => ({ account: a.key, balance: a.balance }));
+  const receivable = recv.reduce((s, r) => s + r.owed, 0);
+  const assets = cashPos.total + receivable;
+  const owedSuppliers = pay.reduce((s, r) => s + r.net_cost, 0);
+  const owedBsp = cashPos.upcomingBsp;
+  const owedPartners = partners.reduce((s, p) => s + Math.max(0, p.outstanding), 0);
+  const liabilities = owedSuppliers + owedBsp + owedPartners;
+  return { cash, cashTotal: cashPos.total, receivable, assets, owedSuppliers, owedBsp, owedPartners, liabilities, netWorth: assets - liabilities };
+}
 const sum = sql<number>`coalesce(sum(amount),0)::bigint`.mapWith(Number);
 
 export type PeriodReport = {
