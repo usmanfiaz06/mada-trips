@@ -66,6 +66,43 @@ Groq (free backup), Neon database through the pooler (`dbPooled: true`).
 
 ## Processes
 
+### 0. D-U-N-S number, Apple and Google developer accounts (step by step)
+
+Both stores want the **company** (not a person) as the seller, and both check it against a **D-U-N-S number** from
+Dun & Bradstreet (free, about 5 business days, sometimes 2 weeks). The legal name and address must match the Saudi
+Commercial Registration (CR) **exactly, in English** — most refusals come from a different spelling or a trade name.
+
+**Before you start, have ready:** the CR (English legal name, CR number, registered address), a company website on its
+own domain, a company email on that domain (not Gmail), a phone number that answers, and a personal Apple ID and Google
+account with two-step sign-in for the person who signs (must be allowed to sign for the company).
+
+**A. Get the D-U-N-S number (once, used by both stores)**
+1. Apple's free lookup and request tool (fastest route, also sends the number to Apple):
+   https://developer.apple.com/enroll/duns-lookup/ — Apple's help page: https://developer.apple.com/support/D-U-N-S/
+2. Fill the **legal entity name** exactly as on the CR (e.g. "Mada Travel and Tourism Company"), the **CR address**,
+   and your work contact. If it finds the company: have the number emailed and go to B. If not: **Submit** the
+   request to D&B (free). Don't pay anyone who offers to "get a D-U-N-S" — D&B warns about impostors.
+3. D&B (Middle East: https://dnbsame.com) may email or call asking for a copy of the CR — answer quickly.
+4. Still nothing after 10 business days: email D&B from the contact on Apple's D-U-N-S page, quoting your request
+   number and attaching the CR. Check an existing record any time at https://www.dnb.com/duns/duns-lookup.html.
+5. "Not listed as a legal entity" means D&B has the company as something else (e.g. a sole proprietorship) or hasn't
+   verified it yet: ask D&B to correct the legal status, then wait 2 business days before Apple sees it.
+
+**B. Apple Developer Program (organisation, USD 99 a year)**
+1. Install the **Apple Developer** app on an iPhone (enrolment there is the smoothest) or go to
+   https://developer.apple.com/programs/enroll/ → Start your enrollment → **Organization**.
+2. Enter the D-U-N-S number, legal name, website, work email and phone. Apple may call the work number to confirm
+   you can sign for the company.
+3. Pay; Apple confirms within a few days. Then add the developer as **Admin** in https://appstoreconnect.apple.com
+   (Users and Access) and continue with §1.
+
+**C. Google Play Console (organisation, USD 25 once)**
+1. https://play.google.com/console/signup → choose **an organization** → sign in with the company Google account.
+2. Enter the D-U-N-S number when asked (Google reads the name and address from D&B — they must match), the website,
+   contact email and phone (both verified by code), and the developer's ID.
+3. Pay the fee; Google's verification can take a few days (up to 30 in their guidance). Help:
+   https://support.google.com/googleplay/android-developer/answer/10841920 . Then continue with §2.
+
 ### 1. Apple Developer + App Store Connect (in process)
 1. Finish enrolment as an organisation (D-U-N-S number) and add the developer as Admin.
 2. Follow `docs/app/NATIVE.md`: App ID `com.mada.trips` (or the final one) with Push, Sign in with Apple, App Groups;
