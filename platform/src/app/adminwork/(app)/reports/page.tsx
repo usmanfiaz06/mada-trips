@@ -55,6 +55,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const span = up - down || 1;
   const zero = (up / span) * H;
   const monthLabel = (ym: string) => new Intl.DateTimeFormat(L === "ar" ? "ar" : "en", { month: "short", timeZone: "UTC" }).format(new Date(`${ym}-15`));
+  // Line-chart points: x as a percent across the card (small gutter so end points don't touch the edges),
+  // y mapped with the same zero baseline as the figures above.
+  const PAD = 5;
+  const pts = trend.map((x, i) => ({ ym: x.ym, v: x.profit, x: trend.length > 1 ? PAD + (i / (trend.length - 1)) * (100 - 2 * PAD) : 50, y: ((up - x.profit) / span) * H }));
+  const linePath = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+  const areaPath = pts.length ? `M${pts[0].x.toFixed(2)},${H} ` + pts.map((p) => `L${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ") + ` L${pts[pts.length - 1].x.toFixed(2)},${H} Z` : "";
 
   const presets: { label: string; href: string; on: boolean }[] = [
     { label: t("This cycle"), href: "/adminwork/reports?period=cycle", on: period === "cycle" && sp.c !== "prev" },
@@ -99,24 +105,21 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       {/* Profit trend */}
       <Card>
         <CardHead title={t("Profit trend")} hint={t("Net profit · last 6 months")} />
-        <div className="flex items-end gap-2 sm:gap-4" style={{ height: H + 34 }}>
-          {trend.map((x) => {
-            const h = Math.max(2, (Math.abs(x.profit) / span) * H);
-            const pos = x.profit >= 0;
-            return (
-              <div key={x.ym} className="flex flex-1 flex-col items-center">
-                <div className="relative w-full" style={{ height: H }}>
-                  <div className="absolute inset-x-0 border-t border-dashed border-line-strong/70" style={{ top: zero }} />
-                  <div className="absolute start-1/2 w-6 -translate-x-1/2 rounded-md sm:w-8" dir="ltr"
-                    style={{ top: pos ? zero - h : zero, height: h, background: pos ? "var(--gold)" : "var(--bad)" }} />
-                  <div className="absolute inset-x-0 text-center text-[10.5px] text-ink-4" style={{ top: pos ? Math.max(0, zero - h - 16) : zero + h + 2 }}>
-                    {sar(x.profit, { compact: true })}
-                  </div>
-                </div>
-                <div className="mt-2 text-[11px] text-ink-3">{monthLabel(x.ym)}</div>
-              </div>
-            );
-          })}
+        <div className="relative mt-1" style={{ height: H }} dir="ltr">
+          <div className="absolute inset-x-0 border-t border-dashed border-line-strong/60" style={{ top: zero }} />
+          <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-hidden>
+            <path d={areaPath} fill="var(--gold)" opacity="0.08" />
+            <path d={linePath} fill="none" stroke="var(--gold)" strokeWidth="1.75" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+          </svg>
+          {pts.map((p) => (
+            <div key={p.ym} className="group absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${p.x}%`, top: p.y }}>
+              <span className="block size-[7px] rounded-full bg-gold ring-2 ring-surface" />
+              <span className="pointer-events-none absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-ink px-1.5 py-0.5 text-[10.5px] text-bg opacity-0 transition-opacity group-hover:opacity-100">{sar(p.v, { compact: true })}</span>
+            </div>
+          ))}
+        </div>
+        <div className="relative mt-2 h-4" dir="ltr">
+          {pts.map((p) => <span key={p.ym} className="absolute -translate-x-1/2 text-[11px] text-ink-3" style={{ left: `${p.x}%` }}>{monthLabel(p.ym)}</span>)}
         </div>
       </Card>
 
