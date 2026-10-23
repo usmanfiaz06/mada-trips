@@ -13,6 +13,7 @@ export type PeriodReport = {
     expenses: { category: string; total: number }[]; expensesTotal: number;
     commissions: number;
     netProfit: number;
+    startupCosts: number; afterStartup: number;
     salesCount: number; refundCount: number;
   };
   flow: {
@@ -68,10 +69,16 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const expenses = expRows.map((e) => ({ category: e.category, total: e.total })).sort((a, b) => b.total - a.total);
   const expensesTotal = expenses.reduce((s, e) => s + e.total, 0);
 
+  // Startup / capital costs: one-time investment (partner-paid, booked as capital advances), kept out of
+  // operating profit but shown below it so the overall position reflects them.
+  const startupCosts = (await q.select({ total: sum }).from(schema.expenses)
+    .where(and(eq(schema.expenses.status, "approved"), eq(schema.expenses.isStartup, true), gte(schema.expenses.expenseDate, start), lte(schema.expenses.expenseDate, end))))[0].total;
+
   const refundCount = (await q.select({ n: sql<number>`count(*)::int` }).from(schema.approvalRequests)
     .where(and(eq(schema.approvalRequests.kind, "refund"), eq(schema.approvalRequests.status, "approved"), gte(schema.approvalRequests.decidedAt, sql`${start}::date`), lte(schema.approvalRequests.decidedAt, sql`${end}::date + 1`))))[0].n;
 
   const netProfit = grossProfit + feesEarned - feesLost - expensesTotal - commissions;
+  const afterStartup = netProfit - startupCosts;
 
   // ── Cash flow ──────────────────────────────────────────────────────────────
   const byAcc = new Map<string, { in: number; out: number }>();
@@ -152,7 +159,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
 
   return {
     start, end,
-    pl: { revenue, directCost, grossProfit, feesEarned, feesLost, expenses, expensesTotal, commissions, netProfit, salesCount: sales.length, refundCount },
+    pl: { revenue, directCost, grossProfit, feesEarned, feesLost, expenses, expensesTotal, commissions, netProfit, startupCosts, afterStartup, salesCount: sales.length, refundCount },
     flow: { in: inRows, out: outRows, totalIn, totalOut, net: totalIn - totalOut, byAccount },
   };
 }
