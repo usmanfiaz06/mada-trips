@@ -7,7 +7,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { Initial } from '@/components/booking/PeopleFrame';
 import { routeTitle } from '@/components/booking/PlanCards';
-import { TripHero } from '@/components/trips/ui';
+import { Ring, SmallButton, TripHero } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { carOn, isBooked } from '@/lib/plan-logic';
@@ -201,18 +201,37 @@ const CHECK_WORDS = (c: PlanCheck): string => {
   return t(`chat.plan.check.${c.key}` as 'chat.plan.check.visa');
 };
 
-/** What's left: the checks that aren't fine, each a dot and a line (§3.4). Nothing left says so once. */
-export function TodoCard({ checks }: { checks: PlanCheck[] }) {
+/** What each check is about, and the one thing that sorts it (design v3: the same shape as Today's readiness card). */
+const CHECK_ICON: Record<PlanCheck['key'], IconName> = { esim: 'sim', stays: 'stay', car: 'car', passports: 'doc', visa: 'visa', insurance: 'lock', money: 'wallet' };
+const checkWhy = (c: PlanCheck) => (c.key === 'passports' && c.state === 'warn' ? t('plan.todo.why.passportsWarn') : t(`plan.todo.why.${c.key}` as 'plan.todo.why.esim'));
+
+/**
+ * Before you go: a ring of what's done, then each thing left with why it matters and one button that sorts it, the
+ * first in gold. Nothing left says so once, with the ring full.
+ */
+export function TodoCard({ checks, onAct }: { checks: PlanCheck[]; onAct?: (c: PlanCheck) => void }) {
   const open = checks.filter((c) => c.state === 'todo' || c.state === 'warn');
+  const done = checks.filter((c) => c.state === 'ok').length;
+  const total = done + open.length;
   return (
     <View style={st.todo} testID="plan-todo">
-      <T v="tiny" color={colors.ink3} style={{ fontFamily: ff.ui600 }}>{t('plan.screen.todo')}</T>
-      {open.length ? open.map((c) => (
-        <View key={c.key} style={st.line} testID={`plan-todo-${c.key}`}>
-          <View style={[st.dot, { backgroundColor: c.state === 'warn' ? colors.goldInk : colors.gold }]} />
-          <T v="small" color={colors.green} style={{ flex: 1 }}>{CHECK_WORDS(c)}</T>
+      <View style={st.todoHead}>
+        <Ring done={done} total={Math.max(total, 1)} size={48} stroke={5} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <T v="h3" style={{ fontSize: 16 }}>{open.length ? (open.length === 1 ? t('plan.todo.left.one') : t('plan.todo.left.other', { n: open.length })) : t('plan.screen.allSet')}</T>
+          {done ? <T v="tiny" color={colors.ink3}>{t('plan.todo.done', { n: done })}</T> : null}
         </View>
-      )) : <T v="small" color={colors.ink2}>{t('plan.screen.allSet')}</T>}
+      </View>
+      {open.map((c, i) => (
+        <View key={c.key} style={st.todoRow} testID={`plan-todo-${c.key}`}>
+          <View style={[st.todoIcon, c.state === 'warn' ? { backgroundColor: colors.goldWash } : null]}><Icon name={CHECK_ICON[c.key]} size={17} color={c.state === 'warn' ? colors.goldInk : colors.green} /></View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{CHECK_WORDS(c)}</T>
+            <T v="tiny" color={colors.ink3}>{checkWhy(c)}</T>
+          </View>
+          {onAct ? <SmallButton label={t(`plan.todo.do.${c.key}` as 'plan.todo.do.esim')} tone={i === 0 ? 'gold' : 'soft'} onPress={() => onAct(c)} testID={`plan-todo-do-${c.key}`} /> : null}
+        </View>
+      ))}
     </View>
   );
 }
@@ -315,7 +334,10 @@ export const st = StyleSheet.create({
   struck: { textDecorationLine: 'line-through', color: colors.ink3 },
   line: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 99 },
-  todo: { gap: 8, backgroundColor: colors.paper, borderRadius: radii.card, padding: 16 },
+  todo: { gap: 14, backgroundColor: colors.paper, borderRadius: radii.card, padding: 16 },
+  todoHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  todoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, paddingTop: 12 },
+  todoIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.mist, alignItems: 'center', justifyContent: 'center' },
   day: { gap: 4, backgroundColor: colors.paper, borderRadius: radii.card, paddingVertical: 14, paddingHorizontal: 14 },
   note: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingStart: 50, paddingVertical: 2 },
   add: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', paddingVertical: 10, paddingHorizontal: 4, minHeight: 44 },

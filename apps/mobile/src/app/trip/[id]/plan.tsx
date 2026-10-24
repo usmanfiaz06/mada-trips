@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { DESTINATIONS, addDays, formatSar, type Plan, type PlanItem, type PlanOp, type StayOption } from '@mada/shared';
+import { DESTINATIONS, addDays, formatSar, type Plan, type PlanCheck, type PlanItem, type PlanOp, type StayOption } from '@mada/shared';
 import { Button } from '@/components/Button';
 import { Chip } from '@/components/Chip';
 import { EmptyState } from '@/components/EmptyState';
@@ -74,6 +74,14 @@ export default function PlanScreen() {
   const item = sheet?.kind === 'item' ? plan.items.find((i) => i.id === sheet.itemId) ?? null : null;
   const skippedCount = plan.items.filter((i) => i.status === 'skipped').length;
   const askAbout = (words: string) => { setSheet(null); router.push({ pathname: '/ask', params: { tripId: id, prefill: words } }); };
+  // Before you go: each check's button goes where it gets sorted (eSIM plans, the pay sheet, the travellers' passports),
+  // or to Ask with the words to do it.
+  const todoAct = (c: PlanCheck) => {
+    if (c.key === 'esim') router.push(`/esim/plans?trip=${id}` as Href);
+    else if (c.key === 'money') router.push({ pathname: '/pay', params: { plan: id } });
+    else if (c.key === 'passports') router.push(`/trip/${id}/travellers` as Href);
+    else askAbout(t(`plan.todo.say.${c.key}` as 'plan.todo.say.stays'));
+  };
 
   /** One edit: the owner's to the plan (queued offline), a companion's as a change request. */
   const edit = async (ops: PlanOp[], title: string, summary?: string) => {
@@ -149,7 +157,7 @@ export default function PlanScreen() {
           <Banner icon="lock" testID="plan-role"
             text={access.role === 'view' ? t('plan.role.view') : access.role === 'edit' ? t('plan.role.edit', { name: access.ownerName ?? '' }) : t('plan.role.suggest', { name: access.ownerName ?? '' })} />
         ) : null}
-        <Rise step={1}><TodoCard checks={plan.checks} /></Rise>
+        <Rise step={1}><TodoCard checks={plan.checks} onAct={owner ? todoAct : undefined} /></Rise>
         {/* Whole-trip items (an eSIM, insurance) before the days. */}
         {plan.items.some((i) => i.day == null) ? (
           <View style={{ gap: 4 }} testID="plan-whole-trip">
