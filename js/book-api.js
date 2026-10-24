@@ -115,6 +115,7 @@
     offer: (id) => call("GET", `/offers/${id}`),
     reprice: (id) => call("POST", `/offers/${id}/price`, {}),
     rooms: (id) => call("GET", `/offers/${id}/rooms`, undefined, { timeout: 40000 }),
+    hotelReviews: (code) => call("GET", `/hotels/${encodeURIComponent(code)}/reviews?lang=${lang}`, undefined, { auth: false, timeout: 9000 }),
     hotel: (code) => call("GET", `/hotels/${encodeURIComponent(code)}`, undefined, { auth: false }),
     esimPlans: (countries, days) => call("GET", `/esim/plans?countries=${encodeURIComponent(countries)}&days=${days}`),
 

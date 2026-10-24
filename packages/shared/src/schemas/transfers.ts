@@ -128,6 +128,35 @@ export const HotelTranslationResponse = z.object({
   machine: z.boolean(),
 });
 export type HotelTranslationResponse = z.infer<typeof HotelTranslationResponse>;
+
+/**
+ * What guests say about a hotel on Google Maps: the rating, how many reviews, a few of them in the reader's language
+ * when Google has it, and the link to all of them. Shown with Google's name and each author, as Google asks; never
+ * stored. `place` is null when Google has no hotel at that spot (the page then shows nothing rather than a guess).
+ */
+export const HotelReview = z.object({
+  author: z.string(),
+  authorUrl: z.string().nullable(),
+  authorPhoto: z.string().nullable(),
+  rating: z.number().min(1).max(5),
+  text: z.string(),
+  /** "2 weeks ago", as Google words it in the reader's language. */
+  when: z.string(),
+  /** The language the text is in. */
+  lang: z.string().nullable(),
+  translated: z.boolean(),
+});
+export type HotelReview = z.infer<typeof HotelReview>;
+export const HotelReviewsResponse = z.object({
+  place: z.object({
+    rating: z.number().min(1).max(5).nullable(),
+    count: z.number().int().min(0),
+    mapsUrl: z.string(),
+    reviews: z.array(HotelReview),
+  }).nullable(),
+  source: z.literal('google'),
+});
+export type HotelReviewsResponse = z.infer<typeof HotelReviewsResponse>;
 /** A message the desk or Mada wrote, in the reader's language (GET /messages/{id}/translation?to=). */
 export const MessageTranslationResponse = z.object({ lang: z.enum(['en', 'ar']), text: z.string(), machine: z.boolean() });
 export type MessageTranslationResponse = z.infer<typeof MessageTranslationResponse>;

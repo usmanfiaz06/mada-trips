@@ -1490,3 +1490,18 @@ body:has(.sheet) .fab { display: none; }
 .lfo-more .ico { width: 18px; height: 18px; }
 @media (max-width: 640px) { .lfo-more { flex-direction: column; align-items: flex-start; } }
 .lfo__pr b { white-space: nowrap; }
+
+/* ---------- Google reviews ---------- */
+.grate { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 14px; border-radius: 99px; background: var(--white); border: 1px solid var(--hair); font-size: 14.5px; color: var(--ink-2); }
+.grate b { font-size: 17px; color: var(--ink); }
+.gstars { color: #e3a008; letter-spacing: 1px; }
+.grevs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.grev { background: var(--white); border: 1px solid var(--hair); border-radius: 18px; padding: 16px 18px; display: grid; gap: 10px; align-content: start; }
+.grev header { display: flex; gap: 10px; align-items: center; }
+.grev header img, .grev header .av { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex: none; }
+.grev header a, .grev header b { font-size: 15px; font-weight: 600; color: var(--ink); }
+.grev header small { display: block; font-size: 13px; color: var(--ink-3); }
+.grev__t { margin: 0; font-size: 15px; line-height: 1.55; unicode-bidi: plaintext; }
+.gfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0 0; }
+.gby { font-size: 13px; color: var(--ink-3); }
+.gby b { font-family: Arial, Helvetica, sans-serif; color: var(--ink-2); }

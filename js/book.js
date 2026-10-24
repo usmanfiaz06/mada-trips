@@ -1293,6 +1293,7 @@
         <div class="hd-top">${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}${o.badge === "best" ? `<span class="pick__k">${esc(t("bestForYou"))}</span>` : ""}</div>
         <h1 class="pg__h hd-t">${esc(h ? h.name : o.name)}</h1>
         <p class="ht__loc">${ico("pin")}${esc((h && h.address) || o.address)}${near ? ` · ${esc(t("kmCentre")(near.km))}` : ""}</p>
+        <div id="gRate"></div>
         ${amen.length ? `<ul class="hl">${amen.map((k) => `<li>${ico(AMEN_ICON[k])}<span>${esc(t("amenLive")[k] || k)}</span></li>`).join("")}</ul>` : ""}
         ${short ? `<p class="hd-lede">${esc(short)}${desc.length > short.length + 20 ? ` <button type="button" class="link" id="moreDesc">${esc(t("readMore"))}</button>` : ""}</p><p class="hd-lede hd-lede--all" id="allDesc" hidden>${esc(desc)}</p>` : ""}
 
@@ -1304,6 +1305,7 @@
         </section>`).join("")}</div>
         ${groups.length > 10 ? `<p class="note-s">${esc(t("moreRooms")(groups.length - 10))}</p>` : ""}
 
+        <section id="gRev"></section>
         ${hotelLL(o) ? `<h2 class="hd-h">${esc(t("whereIs"))}</h2><div id="hdMap" class="hd-map"></div><p class="map-credit">${esc(t("mapCredit"))}</p><ul class="dists">${marksFor(d).map((m) => { const far = howFar(o, m); return far ? `<li>${ico(m.airport ? "flights" : "pin")}<span>${esc(far.text)}</span></li>` : ""; }).join("")}</ul>` : ""}
         ${facs.length ? `<h2 class="hd-h">${esc(t("amenH"))}</h2><ul class="facs2">${facs.slice(0, 12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul>${facs.length > 12 ? `<details class="fine"><summary>${esc(t("allFacs")(facs.length))}</summary><ul class="facs2 facs2--all">${facs.slice(12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul></details>` : ""}` : ""}
         <h2 class="hd-h">${esc(t("policyH"))}</h2>
@@ -1334,6 +1336,18 @@
     $("#lb").addEventListener("click", (e) => { if (e.target.id === "lb") closeLb(); });
     document.onkeydown = (e) => { if ($("#lb") && !$("#lb").hidden) { if (e.key === "Escape") closeLb(); if (e.key === "ArrowRight") show(gi + (lang === "ar" ? -1 : 1)); if (e.key === "ArrowLeft") show(gi + (lang === "ar" ? 1 : -1)); } };
     if ($("#hdMap")) drawMap($("#hdMap"), [o], marksFor(d), { selected: o.id, zoom: 14 });
+    // What guests say on Google Maps (only when Google has this hotel at this spot; nothing otherwise).
+    A.hotelReviews(o.hotel.code).then((r) => {
+      const g = r && r.place, R = t("rev");
+      if (!g || route().name !== "hotel" || !$("#gRev")) return;
+      const stars = (n) => `<span class="gstars" aria-label="${n}/5">${"★".repeat(Math.round(n))}${"☆".repeat(5 - Math.round(n))}</span>`;
+      if (g.rating) $("#gRate").innerHTML = `<a class="grate" href="${esc(g.mapsUrl)}" target="_blank" rel="noopener"><b>${g.rating.toFixed(1)}</b>${stars(g.rating)}<span>${esc(R.count(g.count.toLocaleString(lang === "ar" ? "ar-SA" : "en-US")))}</span></a>`;
+      if (!g.reviews.length) return;
+      $("#gRev").innerHTML = `<h2 class="hd-h">${esc(R.h)}${g.rating ? `<small>${esc(R.sub(g.rating.toFixed(1), g.count.toLocaleString(lang === "ar" ? "ar-SA" : "en-US")))}</small>` : ""}</h2>
+        <div class="grevs">${g.reviews.slice(0, 3).map((v) => `<article class="grev"><header>${v.authorPhoto ? `<img src="${esc(v.authorPhoto)}" alt="" referrerpolicy="no-referrer" loading="lazy" />` : `<span class="av">${esc(v.author[0] || "G")}</span>`}<div>${v.authorUrl ? `<a href="${esc(v.authorUrl)}" target="_blank" rel="noopener">${esc(v.author)}</a>` : `<b>${esc(v.author)}</b>`}<small>${stars(v.rating)} · ${esc(v.when)}</small></div></header>
+          <p class="grev__t">${esc(v.text.length > 320 ? v.text.slice(0, 317).replace(/\s+\S*$/, "") + "…" : v.text)}</p>${v.translated ? `<small class="note-s">${esc(R.translated)}</small>` : ""}</article>`).join("")}</div>
+        <p class="gfoot"><a class="link" href="${esc(g.mapsUrl)}" target="_blank" rel="noopener">${esc(R.all)} →</a><span class="gby">${esc(R.by)} <b>Google</b></span></p>`;
+    }).catch(() => {});
   }
 
   // ----- sign in: a 6-digit code to the phone (staging and mock servers always use 123456) -----
