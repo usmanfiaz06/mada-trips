@@ -7,6 +7,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { T } from '@/components/Text';
 import { Initial } from '@/components/booking/PeopleFrame';
 import { routeTitle } from '@/components/booking/PlanCards';
+import { TripHero } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { getLocale, joinAnd, t } from '@/lib/i18n';
 import { carOn, isBooked } from '@/lib/plan-logic';
@@ -85,43 +86,94 @@ export function StatusTag({ status, testID }: { status: PlanItem['status']; test
   );
 }
 
-/** One item: its time, icon, words and status. Tapping opens its sheet. */
-export function ItemRow({ item, prices, onPress, testID }: { item: PlanItem; prices: boolean; onPress?: () => void; testID?: string }) {
-  const w = itemWords(item, prices);
-  const at = item.startsAt?.slice(11, 16) ?? null;
-  const done = isBooked(item);
-  const label = [at, w.main, w.sub, t(`chat.plan.status.${item.status}`)].filter(Boolean).join(', ');
+/**
+ * The right side of a row (design v3): what the traveller can do, or where it stands. A flight to find, a stay to find,
+ * an idea to look at, a price to pay, with the team, booked. Only from the item's own status, price and quote.
+ */
+export type RowAct = { label: string; tone?: 'link' | 'gold' | 'ok'; onPress?: () => void; testID?: string };
+export type RowActKind = 'search' | 'findStay' | 'view' | 'price' | 'pending' | 'booked';
+export function rowActKind(i: PlanItem, prices: boolean, owner: boolean): { kind: RowActKind; amount?: number } | null {
+  if (i.status === 'skipped' || i.status === 'cancelled') return null;
+  if (isBooked(i)) return { kind: 'booked' };
+  const amount = i.quote?.amount ?? (i.status === 'priced' ? i.price?.amount : undefined);
+  if (amount != null && prices) return { kind: 'price', amount };
+  if (i.status === 'requested') return { kind: 'pending' };
+  if (owner && i.status === 'idea' && !i.priceExpired && i.kind === 'leg' && i.mode === 'flight') return { kind: 'search' };
+  if (owner && i.status === 'idea' && !i.priceExpired && i.kind === 'stay') return { kind: 'findStay' };
+  return { kind: 'view' };
+}
+export const rowActLabel = (a: { kind: RowActKind; amount?: number }): Pick<RowAct, 'label' | 'tone'> =>
+  a.kind === 'price' ? { label: formatSar(a.amount ?? 0), tone: 'gold' } : a.kind === 'pending' ? { label: t('plan.row.pending'), tone: 'gold' }
+    : a.kind === 'booked' ? { label: t('plan.row.booked'), tone: 'ok' } : { label: t(`plan.row.${a.kind}`), tone: 'link' };
+
+export function RowActTag({ act }: { act: RowAct }) {
+  const tone = act.tone === 'gold' ? TONE.priced! : act.tone === 'ok' ? TONE.booked! : null;
+  const inner = tone ? (
+    <View style={[st.tag, { backgroundColor: tone.bg }]}>
+      {act.tone === 'ok' ? <Icon name="check" size={12} color={tone.fg} width={2.4} /> : null}
+      <T v="tiny" color={tone.fg} style={{ fontFamily: ff.ui600 }}>{act.label}</T>
+    </View>
+  ) : <T v="tiny" color={colors.green} style={{ fontFamily: ff.ui600 }}>{act.label}</T>;
+  if (!act.onPress) return <View testID={act.testID ?? 'plan-item-status'}>{inner}</View>;
   return (
-    <Pressable onPress={onPress ? () => { buzz('tap'); onPress(); } : undefined} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={label} testID={testID ?? 'plan-item'}
-      style={({ pressed }) => [st.item, item.status === 'skipped' || item.status === 'cancelled' ? { opacity: 0.55 } : null, pressed ? { opacity: 0.8 } : null]}>
-      <T v="tiny" color={colors.ink3} style={st.time}>{at ? iso(at) : ''}</T>
-      <View style={[st.icon, done ? { backgroundColor: colors.mist } : null]}><Icon name={iconOf(item)} size={16} color={done ? colors.ok : colors.ink2} /></View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <T v="small" color={colors.green} style={[{ fontFamily: ff.ui600 }, item.status === 'cancelled' ? st.struck : null]} numberOfLines={2} testID="plan-item-title">{w.main}</T>
-        {w.sub ? <T v="tiny" color={colors.ink2} numberOfLines={2} testID="plan-item-sub">{w.sub}</T> : null}
-      </View>
-      <StatusTag status={item.status} testID="plan-item-status" />
+    <Pressable onPress={() => { buzz('tap'); act.onPress!(); }} hitSlop={10} accessibilityRole="button" accessibilityLabel={act.label} testID={act.testID ?? 'plan-item-act'}
+      style={({ pressed }) => [{ minHeight: 32, justifyContent: 'center' }, pressed ? { opacity: 0.7 } : null]}>
+      {inner}
     </Pressable>
   );
 }
 
-/** "Riyadh → AlUla", the dates, who's going, where it starts (and Change, for the owner). */
-export function PlanHeader({ plan, people, canEdit, onOrigin }: { plan: Plan; people: { name: string; initial: string }[]; canEdit: boolean; onOrigin: () => void }) {
+/** One item: its time, icon, words and status (or what to do). Tapping opens its sheet. `line`: the day's dotted thread. */
+export function ItemRow({ item, prices, onPress, testID, act, line }: { item: PlanItem; prices: boolean; onPress?: () => void; testID?: string; act?: RowAct; line?: { up: boolean; down: boolean } }) {
+  const w = itemWords(item, prices);
+  const at = item.startsAt?.slice(11, 16) ?? null;
+  const done = isBooked(item);
+  const label = [at, w.main, w.sub, done ? t('plan.row.booked') : t(`chat.plan.status.${item.status}`)].filter(Boolean).join(', ');
+  const iconTile = <View style={[st.icon, done ? { backgroundColor: colors.mist } : null]}><Icon name={iconOf(item)} size={16} color={done ? colors.ok : colors.ink2} /></View>;
+  return (
+    <Pressable onPress={onPress ? () => { buzz('tap'); onPress(); } : undefined} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={label} testID={testID ?? 'plan-item'}
+      style={({ pressed }) => [st.item, item.status === 'skipped' || item.status === 'cancelled' ? { opacity: 0.55 } : null, pressed ? { opacity: 0.8 } : null]}>
+      <T v="tiny" color={colors.ink3} style={st.time}>{at ? iso(at) : ''}</T>
+      {line ? (
+        <View style={st.thread}>
+          <View style={[st.dots, line.up ? null : { borderColor: 'transparent' }]} />
+          {iconTile}
+          <View style={[st.dots, line.down ? null : { borderColor: 'transparent' }]} />
+        </View>
+      ) : iconTile}
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <T v="small" color={colors.green} style={[{ fontFamily: ff.ui600 }, item.status === 'cancelled' ? st.struck : null]} numberOfLines={2} testID="plan-item-title">{w.main}</T>
+        {w.sub ? <T v="tiny" color={colors.ink2} numberOfLines={2} testID="plan-item-sub">{w.sub}</T> : null}
+      </View>
+      {act ? <RowActTag act={act} /> : done ? <RowActTag act={{ label: t('plan.row.booked'), tone: 'ok', testID: 'plan-item-status' }} /> : <StatusTag status={item.status} testID="plan-item-status" />}
+    </Pressable>
+  );
+}
+
+/** The trip page's photo header for the plan: "Riyadh → AlUla", the dates and who's going over the city's photo. */
+export function PlanHero({ plan, people, photo, onBack }: { plan: Plan; people: { name: string; initial: string }[]; photo?: string | null; onBack: () => void }) {
   const locale = getLocale();
   return (
-    <View style={{ gap: 10 }}>
-      <T v="h1" style={{ fontSize: 28, lineHeight: 34 }} accessibilityRole="header" testID="plan-title">{routeTitle(plan.title)}</T>
-      <T v="small" color={colors.ink2} testID="plan-dates">{rangeLabel(plan.startDate, plan.endDate, locale)}</T>
+    <TripHero photo={photo} title={routeTitle(plan.title)} onBack={onBack} shadeId="plan-top" titleTestID="plan-title"
+      sub={<T v="small" color="rgba(255,253,249,0.9)" testID="plan-dates">{rangeLabel(plan.startDate, plan.endDate, locale)}</T>}>
       {people.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} testID="plan-people">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }} testID="plan-people">
           {people.map((p, i) => (
             <View key={`${p.name}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Initial letter={p.initial} size={26} gold={i === 0} />
-              <T v="small" color={colors.green}>{nameIn(p.name, locale)}</T>
+              <Initial letter={p.initial} size={22} gold={i === 0} />
+              <T v="small" color={colors.paper}>{nameIn(p.name, locale)}</T>
             </View>
           ))}
         </View>
       ) : null}
+    </TripHero>
+  );
+}
+
+/** Where it starts (and Change, for the owner), under the photo header. */
+export function PlanHeader({ plan, canEdit, onOrigin }: { plan: Plan; canEdit: boolean; onOrigin: () => void }) {
+  return (
+    <View style={{ gap: 10 }}>
       <View style={st.line} testID="plan-origin">
         <Icon name="pin" size={16} color={plan.origin ? colors.ink3 : colors.goldInk} />
         <T v="small" color={plan.origin ? colors.ink2 : colors.goldInk} style={{ flexShrink: 1, fontFamily: plan.origin ? undefined : ff.ui600 }}>
@@ -162,8 +214,8 @@ export function TodoCard({ checks }: { checks: PlanCheck[] }) {
 }
 
 /** One day: its date, the nights with no stay, the car, its items in order, and Add. */
-export function DaySection({ plan, day, prices, canEdit, onItem, onAdd, showSkipped }: {
-  plan: Plan; day: number; prices: boolean; canEdit: boolean; onItem: (i: PlanItem) => void; onAdd: () => void; showSkipped: boolean;
+export function DaySection({ plan, day, prices, canEdit, onItem, onAdd, showSkipped, actOf }: {
+  plan: Plan; day: number; prices: boolean; canEdit: boolean; onItem: (i: PlanItem) => void; onAdd: () => void; showSkipped: boolean; actOf?: (i: PlanItem) => RowAct | undefined;
 }) {
   const locale = getLocale();
   const items = plan.items.filter((i) => i.day === day && (showSkipped || i.status !== 'skipped')).sort((a, b) => a.sort - b.sort);
@@ -173,7 +225,7 @@ export function DaySection({ plan, day, prices, canEdit, onItem, onAdd, showSkip
   return (
     <View style={st.day} testID={`plan-day-${day + 1}`}>
       <T v="h3" style={{ fontSize: 16 }} accessibilityRole="header">{t('plan.screen.dayDate', { n: day + 1, date: dayLabel(addDays(plan.startDate, day), { locale, today: plan.startDate }) })}</T>
-      {items.length ? items.map((i) => <ItemRow key={i.id} item={i} prices={prices} onPress={() => onItem(i)} />)
+      {items.length ? items.map((i, n) => <ItemRow key={i.id} item={i} prices={prices} onPress={() => onItem(i)} act={actOf?.(i)} line={{ up: n > 0, down: n < items.length - 1 }} />)
         : <T v="small" color={colors.ink3} testID="plan-day-free">{t('plan.screen.free')}</T>}
       {!covered ? (
         <View style={st.note} testID="plan-night-gap"><Icon name="stay" size={14} color={colors.goldInk} /><T v="tiny" color={colors.goldInk}>{t('plan.screen.nightGap', { n: day + 1 })}</T></View>
@@ -249,6 +301,9 @@ export function Banner({ icon, text, tone = 'well', onClose, testID }: { icon: I
 export const st = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, minHeight: 48 },
   time: { width: 40, fontVariant: ['tabular-nums'] },
+  // The day's dotted thread through the icons: it runs into the row's padding and half the gap so the rows join.
+  thread: { alignSelf: 'stretch', alignItems: 'center', marginTop: -10, marginBottom: -10 },
+  dots: { flex: 1, width: 0, minHeight: 10, borderWidth: 1, borderStyle: 'dotted', borderColor: 'rgba(30, 53, 45, 0.26)', borderRadius: 1 },
   icon: { width: 30, height: 30, borderRadius: 99, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.sand },
   tag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, height: 24, borderRadius: 99 },
   struck: { textDecorationLine: 'line-through', color: colors.ink3 },

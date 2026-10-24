@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { DESTINATIONS, addDays, formatSar, type Plan, type PlanItem, type PlanOp, type StayOption } from '@mada/shared';
@@ -10,7 +10,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { DemoFare } from '@/components/booking/DemoFare';
 import { Rise, SmallButton, TripScreen } from '@/components/trips/ui';
-import { AddForm, Banner, DaySection, OriginForm, PlanHeader, StatusTag, TodoCard, itemWords, placeName } from '@/components/plan/PlanParts';
+import { AddForm, Banner, DaySection, OriginForm, PlanHeader, PlanHero, RowActTag, StatusTag, TodoCard, itemWords, placeName, rowActKind, rowActLabel, type RowAct } from '@/components/plan/PlanParts';
 import { ApiError } from '@/lib/api';
 import { bookingApi, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -19,6 +19,7 @@ import { useNet } from '@/lib/net';
 import { isBooked, moveOp, withQueued } from '@/lib/plan-logic';
 import { dismissConflict, editPlan, planKey, plansApi, usePlan, usePlanQueue, usePlanSync } from '@/lib/plans';
 import { queryClient, usePeople } from '@/lib/queries';
+import { useTrip } from '@/lib/trips';
 import { toast } from '@/lib/toast';
 import { colors, ff } from '@/theme';
 
@@ -32,12 +33,14 @@ import { colors, ff } from '@/theme';
  * context (§3.6). Someone on the trip who can suggest sends a change request to the owner instead; who can view reads.
  */
 
-type SheetState = { kind: 'item'; itemId: string } | { kind: 'add'; day: number } | { kind: 'origin' } | null;
+type SheetState = { kind: 'item'; itemId: string; find?: boolean } | { kind: 'add'; day: number } | { kind: 'origin' } | null;
 
 export default function PlanScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const q = usePlan(id);
+  // The trip page's photo for the header (a trip shared with you may not have one here: the default photo then).
+  const photo = useTrip(id).data?.trip.imageUrl ?? null;
   // Back on the plan after booking or a chat: read it again (the event map, §1.3: picked up on focus).
   const { refetch } = q;
   useFocusEffect(useCallback(() => { void refetch(); }, [refetch]));
@@ -100,9 +103,23 @@ export default function PlanScreen() {
   };
 
   const ready = owner && plan.totals?.ready ? plan.totals : null;
+  /** The right side of a row: Search (Mada finds the leg's flights), Find a stay, View, the price (pay), Pending, Booked. */
+  const actOf = (i: PlanItem): RowAct | undefined => {
+    const a = rowActKind(i, access.prices, owner);
+    if (!a) return undefined;
+    const open = () => setSheet({ kind: 'item', itemId: i.id });
+    const onPress = a.kind === 'search' ? () => router.push({ pathname: '/ask', params: { tripId: id, prefill: t('plan.row.searchSay', { title: itemWords(i, access.prices).main }) } })
+      : a.kind === 'findStay' ? () => setSheet({ kind: 'item', itemId: i.id, find: true })
+      : a.kind === 'price' && owner ? () => router.push({ pathname: '/pay', params: { plan: id } })
+      : open;
+    return { ...rowActLabel(a), onPress, testID: `plan-item-act-${a.kind}` };
+  };
+  const onBack = () => (router.canGoBack() ? router.back() : router.replace(`/trip/${id}` as Href));
   return (
     <TripScreen
       title={t('plan.screen.title')}
+      onBack={onBack}
+      hero={<PlanHero plan={plan} people={data?.people ?? []} photo={photo} onBack={onBack} />}
       act={(
         <View style={{ gap: 8 }}>
           {ready ? (
@@ -127,19 +144,19 @@ export default function PlanScreen() {
           <Banner icon="lock" testID="plan-role"
             text={access.role === 'view' ? t('plan.role.view') : access.role === 'edit' ? t('plan.role.edit', { name: access.ownerName ?? '' }) : t('plan.role.suggest', { name: access.ownerName ?? '' })} />
         ) : null}
-        <Rise><PlanHeader plan={plan} people={data?.people ?? []} canEdit={owner} onOrigin={() => setSheet({ kind: 'origin' })} /></Rise>
+        <Rise><PlanHeader plan={plan} canEdit={owner} onOrigin={() => setSheet({ kind: 'origin' })} /></Rise>
         <Rise step={1}><TodoCard checks={plan.checks} /></Rise>
         {/* Whole-trip items (an eSIM, insurance) before the days. */}
         {plan.items.some((i) => i.day == null) ? (
           <View style={{ gap: 4 }} testID="plan-whole-trip">
             <T v="eyebrow">{t('plan.screen.wholeTrip')}</T>
-            {plan.items.filter((i) => i.day == null && (skipped || i.status !== 'skipped')).map((i) => <SheetRow key={i.id} item={i} prices={access.prices} onPress={() => setSheet({ kind: 'item', itemId: i.id })} />)}
+            {plan.items.filter((i) => i.day == null && (skipped || i.status !== 'skipped')).map((i) => <SheetRow key={i.id} item={i} prices={access.prices} act={actOf(i)} onPress={() => setSheet({ kind: 'item', itemId: i.id })} />)}
           </View>
         ) : null}
         {Array.from({ length: plan.days }, (_, d) => (
           <Rise key={d} step={Math.min(d + 2, 6)}>
             <DaySection plan={plan} day={d} prices={access.prices} canEdit={canEdit} showSkipped={skipped}
-              onItem={(i) => setSheet({ kind: 'item', itemId: i.id })} onAdd={() => setSheet({ kind: 'add', day: d })} />
+              onItem={(i) => setSheet({ kind: 'item', itemId: i.id })} onAdd={() => setSheet({ kind: 'add', day: d })} actOf={actOf} />
           </Rise>
         ))}
         {skippedCount ? (
@@ -150,7 +167,7 @@ export default function PlanScreen() {
       </View>
 
       <Sheet visible={sheet?.kind === 'item' && !!item} onClose={() => setSheet(null)} label={item ? itemWords(item, access.prices).main : ''}>
-        {item ? <ItemSheet plan={plan} item={item} tripId={id} role={access.role} prices={access.prices} busy={busy} onEdit={edit} onAsk={askAbout} onClose={() => setSheet(null)} /> : null}
+        {item ? <ItemSheet key={`${item.id}-${sheet?.kind === 'item' && sheet.find ? 'find' : ''}`} autoFind={sheet?.kind === 'item' && !!sheet.find} plan={plan} item={item} tripId={id} role={access.role} prices={access.prices} busy={busy} onEdit={edit} onAsk={askAbout} onClose={() => setSheet(null)} /> : null}
       </Sheet>
       <Sheet visible={sheet?.kind === 'add'} onClose={() => setSheet(null)} label={t('plan.add.title', { n: sheet?.kind === 'add' ? sheet.day + 1 : 1 })}>
         {sheet?.kind === 'add' ? (
@@ -167,7 +184,7 @@ export default function PlanScreen() {
   );
 }
 
-function SheetRow({ item, prices, onPress }: { item: PlanItem; prices: boolean; onPress: () => void }) {
+function SheetRow({ item, prices, onPress, act }: { item: PlanItem; prices: boolean; onPress: () => void; act?: RowAct }) {
   const w = itemWords(item, prices);
   return (
     <Pressable onPress={onPress} accessibilityRole="button" testID="plan-item" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.paper, borderRadius: 16, padding: 12 }}>
@@ -175,7 +192,7 @@ function SheetRow({ item, prices, onPress }: { item: PlanItem; prices: boolean; 
         <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }}>{w.main}</T>
         {w.sub ? <T v="tiny" color={colors.ink2}>{w.sub}</T> : null}
       </View>
-      <StatusTag status={item.status} />
+      {act ? <RowActTag act={act} /> : <StatusTag status={item.status} />}
     </Pressable>
   );
 }
@@ -190,8 +207,8 @@ const destinationOf = (i: PlanItem) => {
  * One item's sheet: what and when, where it stands, and what can be done from here. A booked item stays where it is
  * (the change flow moves it); priced items book from "Book what's ready"; a stay idea finds rooms for its nights.
  */
-function ItemSheet({ plan, item, tripId, role, prices, busy, onEdit, onAsk, onClose }: {
-  plan: Plan; item: PlanItem; tripId: string; role: 'owner' | 'view' | 'suggest' | 'edit'; prices: boolean; busy: boolean;
+function ItemSheet({ plan, item, tripId, role, prices, busy, onEdit, onAsk, onClose, autoFind }: {
+  autoFind?: boolean; plan: Plan; item: PlanItem; tripId: string; role: 'owner' | 'view' | 'suggest' | 'edit'; prices: boolean; busy: boolean;
   onEdit: (ops: PlanOp[], title: string, summary?: string) => Promise<void>; onAsk: (words: string) => void; onClose: () => void;
 }) {
   const router = useRouter();
@@ -222,6 +239,13 @@ function ItemSheet({ plan, item, tripId, role, prices, busy, onEdit, onAsk, onCl
       setStays(r.options.length ? r.options.slice(0, 3) : 'none');
     } catch { setStays('none'); } finally { setFinding(false); }
   };
+  // "Find a stay" on the row: the sheet opens already looking (the same search as its button).
+  const started = useRef(false);
+  useEffect(() => {
+    if (!autoFind || started.current || !owner || item.kind !== 'stay' || item.status !== 'idea' || item.priceExpired) return;
+    started.current = true;
+    void findStay();
+  });
   const book = (o: StayOption) => {
     const self = people.data?.find((p) => p.isSelf);
     const travellerIds = plan.travellerIds.length ? plan.travellerIds : self ? [self.id] : [];

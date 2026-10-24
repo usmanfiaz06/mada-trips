@@ -73,10 +73,12 @@ async function run(lang) {
   await byTest('trip-card-Istanbul').first().click();
   await page.waitForTimeout(1500);
   const tripId = new URL(page.url()).pathname.split('/').filter(Boolean)[1];
-  await scroll(600);
+  // The hotel's voucher is under the hotel card's Manage.
+  await byTest('stay-manage').click();
+  await page.waitForTimeout(500);
   await see(c.voucher, 'voucher row');
   await shot('trip-vouchers');
-  await byTest('voucher-0').click();
+  await byTest('stay-manage-voucher').click();
   await see(c.ref, 'voucher reference');
   if (!/1-3982401/.test(await byTest('voucher-ref').innerText().catch(() => ''))) errors.push(`${lang} HBX reference missing`);
   await shot('voucher-top');

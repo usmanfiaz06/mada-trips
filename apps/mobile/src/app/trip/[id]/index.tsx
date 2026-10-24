@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StaleBadge } from '@/components/states/StaleBadge';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { AIRPORT_CITY, addDays, dayLabel, formatSar, liveStay, nameIn, outSegment, backSegment, rangeLabel, rangeLong, stayEnd, timing } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -10,7 +10,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { BannerHost } from '@/components/today/common';
 import { MoveNotice, NoStayChoices } from '@/components/trips/MoveNotice';
-import { AirlineMark, Box, Display, Divider, Eyebrow, Grow, H3, ListRow, Photo, Row, RouteLine, Shade, Small, Spread, Tag, TextLink, Tiny } from '@/components/trips/ui';
+import { AirlineMark, Box, Divider, Eyebrow, Grow, H3, ListRow, Row, RouteLine, Small, Spread, Tag, TextLink, Tiny, TripHero } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { getLocale, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -24,6 +24,8 @@ import { describeError } from '@/lib/net/describe';
 import { Initial } from '@/components/booking/PeopleFrame';
 import { routeTitle } from '@/components/booking/PlanCards';
 import { ItemRow } from '@/components/plan/PlanParts';
+import { mapsLinks } from '@/components/trips/AddressSheet';
+import { useTripVouchers } from '@/lib/transfers';
 import { usePlan, useSetTripChat, useTripChat } from '@/lib/plans';
 
 const tripDays = (from: string, to: string | null) => { const out: string[] = []; for (let d = from, i = 0; d <= (to ?? from) && i < 30; d = addDays(d, 1), i++) out.push(d); return out; };
@@ -35,7 +37,8 @@ export default function TripDetail() {
   const q = useTrip(id);
   const pays = usePayments(id);
   const quote = useRefundQuote(id);
-  const [sheet, setSheet] = useState<'cancel' | 'nostay' | null>(null);
+  const [sheet, setSheet] = useState<'cancel' | 'nostay' | 'manage' | null>(null);
+  const vouchers = useTripVouchers(id).data?.vouchers ?? [];
   const cancel = useTripMutation(() => tripsApi.cancelStay(id, newKey()));
   const planQ = usePlan(id);
   const chatQ = useTripChat(id);
@@ -79,14 +82,8 @@ export default function TripDetail() {
   return (
     <Screen>
       <Scroll top={0} bottomPad={60} gutter={0}>
-        <Photo k={trip.imageUrl} style={{ height: 230, borderRadius: 0 }}>
-          <Shade id="trip-top" />
-          <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar onBack={() => (router.canGoBack() ? router.back() : router.replace('/trips'))} dark /></View>
-          <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
-            <Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display>
-            <T v="small" color="rgba(255,253,249,0.9)">{rangeLong(trip.startDate, trip.endDate)}{trip.bookingRef ? ` · ${t('tm.detail.booking', { ref: trip.bookingRef })}` : ''}</T>
-          </View>
-        </Photo>
+        <TripHero photo={trip.imageUrl} title={title} onBack={() => (router.canGoBack() ? router.back() : router.replace('/trips'))}
+          sub={`${rangeLong(trip.startDate, trip.endDate)}${trip.bookingRef ? ` · ${t('tm.detail.booking', { ref: trip.bookingRef })}` : ''}`} />
         <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 16 }}>
           {trip.openRequests > 0 ? (
             <Pressable testID="open-requests" onPress={() => { buzz('tap'); router.push('/trips?tab=requests' as Href); }} style={styles.strip}>
@@ -108,7 +105,9 @@ export default function TripDetail() {
               <Box testID="trip-plan" onPress={() => router.push(`/trip/${trip.id}/plan` as Href)} label={t('trip.plan.open')}>
                 <Spread><H3>{t('trip.plan.title')}</H3><Tag tone={todo ? 'gold' : 'ok'} label={todo ? t('trip.plan.todo', { n: todo }) : t('plan.screen.allSet')} /></Spread>
                 <Tiny>{[t('trip.plan.days', { n: plan.days }), t('trip.plan.booked', { booked, total: live.length })].join(' · ')}</Tiny>
-                {next.map((i) => <ItemRow key={i.id} item={i} prices={planQ.data?.access?.prices ?? true} />)}
+                {/* A flight not booked yet: "See options" asks Mada for that leg's flights (find_for_item). */}
+                {next.map((i) => <ItemRow key={i.id} item={i} prices={planQ.data?.access?.prices ?? true}
+                  act={i.kind === 'leg' && i.mode === 'flight' && i.status === 'idea' ? { label: t('plan.row.seeOptions'), testID: 'trip-plan-options', onPress: () => router.push({ pathname: '/ask', params: { tripId: trip.id, prefill: t('plan.row.searchSay', { title: routeTitle(`${i.from?.name ?? ''} → ${i.to?.name ?? ''}`) }) } }) } : undefined} />)}
                 <TextLink testID="trip-plan-open" label={t('trip.plan.open')} onPress={() => router.push(`/trip/${trip.id}/plan` as Href)} />
               </Box>
             );
@@ -136,7 +135,7 @@ export default function TripDetail() {
                 <Pressable style={{ flex: 1 }} accessibilityRole="link" accessibilityLabel={t('hotel.booked.openA11y', { name: st.name })} onPress={() => { buzz('tap'); router.push(`/hotel/${st.hotelCode ?? 'stay'}?trip=${trip.id}&stay=${st.id}&city=${encodeURIComponent(trip.city)}` as Href); }} testID="stay-open">
                   <Row><Icon name="stay" /><Grow gap={0}><H3 size={15}>{st.name}</H3><Tiny>{rangeLabel(st.checkIn, stayEnd(st))} · {t('tm.detail.nights', { n: st.nights })} · {t('hotel.booked.open')}</Tiny></Grow></Row>
                 </Pressable>
-                {st.status === 'cancelled' ? <Tag label={t('tm.detail.cancelled')} /> : tm.allUsed ? <Tag tone="ok" label={t('tm.detail.stayed')} /> : <TextLink testID="cancel-stay" label={t('common.cancel')} onPress={() => setSheet('cancel')} />}
+                {st.status === 'cancelled' ? <Tag label={t('tm.detail.cancelled')} /> : tm.allUsed ? <Tag tone="ok" label={t('tm.detail.stayed')} /> : <TextLink testID="stay-manage" label={t('trip.stay.manage')} onPress={() => setSheet('manage')} />}
               </Spread>
               {st.status === 'cancelled' ? <Small>{t('tm.detail.refundOnWay')}</Small> : null}
             </Box>
@@ -197,6 +196,20 @@ export default function TripDetail() {
           ) : null}
         </View>
       </Scroll>
+      {/* The hotel's Manage: its voucher, directions, and Cancel (through the confirmation below). */}
+      <Sheet visible={sheet === 'manage'} onClose={() => setSheet(null)} label={t('trip.stay.manage')}>
+        <T v="h2">{st?.name ?? t('trip.stay.manage')}</T>
+        <Box padding={6} gap={0} testID="stay-manage-sheet">
+          {(() => {
+            const v = vouchers.find((x) => x.kind === 'stay');
+            const rows: [string, Parameters<typeof ListRow>[0]['icon'], string, string | undefined, () => void][] = [];
+            if (v) rows.push(['stay-manage-voucher', 'doc', t('trip.stay.voucher'), v.status === 'cancelled' ? t('voucher.cancelled') : t('voucher.openSub', { ref: v.reference }), () => { setSheet(null); router.push(`/voucher/${v.id}` as Href); }]);
+            if (st) rows.push(['stay-manage-directions', 'pin', t('trip.stay.directions'), st.address ?? undefined, () => { buzz('tap'); void Linking.openURL(mapsLinks([st.name, st.address ?? trip.city].join(', ')).google).catch(() => toast(t('as.cantOpen'))); }]);
+            rows.push(['cancel-stay', 'close', t('common.cancel'), undefined, () => setSheet('cancel')]);
+            return rows.map(([testID, icon, title, sub, onPress], i) => <ListRow key={testID} testID={testID} first={i === 0} icon={icon} title={title} sub={sub} onPress={onPress} />);
+          })()}
+        </Box>
+      </Sheet>
       <Sheet visible={sheet === 'cancel'} onClose={() => setSheet(null)} label={t('tm.cancel.title')}>
         <T v="h2">{t('tm.cancel.title')}</T>
         <T v="body">{t('tm.cancel.body', { amount: formatSar(stayQ?.cash.amount ?? st?.price.amount ?? 0) })} {stayQ?.rule ?? ''} {t('tm.cancel.flightsStay')}</T>

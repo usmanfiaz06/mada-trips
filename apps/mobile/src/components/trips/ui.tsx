@@ -67,6 +67,22 @@ export function Photo({ k, uri, style, focal, children }: { k?: string | null; u
 export const Veil = ({ id }: { id: string }) => <VGradient id={id} stops={[[0, 'rgba(15,26,22,0.38)'], [0.3, 'rgba(15,26,22,0)'], [0.48, 'rgba(15,26,22,0.1)'], [1, 'rgba(15,26,22,0.82)']]} />;
 export const Shade = ({ id }: { id: string }) => <VGradient id={id} stops={[[0.25, 'rgba(15,26,22,0.05)'], [1, 'rgba(15,26,22,0.78)']]} />;
 
+/** A trip's photo header (the trip page's and the plan's): the city photo, Back over it, the title and a line under it. */
+export function TripHero({ photo, title, sub, onBack, shadeId = 'trip-top', children, titleTestID }: { photo?: string | null; title: string; sub: ReactNode; onBack: () => void; shadeId?: string; children?: ReactNode; titleTestID?: string }) {
+  return (
+    <Photo k={photo} style={{ height: 230, borderRadius: 0 }}>
+      <Shade id={shadeId} />
+      <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar onBack={onBack} dark /></View>
+      <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
+        {titleTestID ? <View testID={titleTestID} accessibilityRole="header"><Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display></View>
+          : <Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display>}
+        <T v="small" color="rgba(255,253,249,0.9)">{sub}</T>
+        {children}
+      </View>
+    </Photo>
+  );
+}
+
 /* ───────── text bits ───────── */
 
 export const Eyebrow = ({ children, color, style }: { children: ReactNode; color?: string; style?: StyleProp<object> }) => <T v="eyebrow" color={color} style={style}>{children}</T>;
@@ -338,13 +354,16 @@ export function AgentNote({ initial, children }: { initial?: string | null; chil
 /* ───────── screens ───────── */
 
 /** A pushed trip screen: back bar with a title, scrolling content, and an optional Act zone at the bottom. */
-export function TripScreen({ title, children, act, right, onBack, scrollRef }: { title?: string; children: ReactNode; act?: ReactNode; right?: ReactNode; onBack?: () => void; scrollRef?: never }) {
+export function TripScreen({ title, children, act, right, onBack, scrollRef, hero }: { title?: string; children: ReactNode; act?: ReactNode; right?: ReactNode; onBack?: () => void; scrollRef?: never; hero?: ReactNode }) {
   const router = useRouter();
   void scrollRef;
   return (
     <Screen>
-      <TopBar onBack={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/trips')))} title={title} right={right} />
-      <Scroll top={4} bottomPad={act ? 220 : 60}>{children}</Scroll>
+      {/* With a photo header (TripHero), Back sits on the photo and the page scrolls under nothing. */}
+      {hero ? null : <TopBar onBack={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/trips')))} title={title} right={right} />}
+      {hero ? (
+        <Scroll top={0} gutter={0} bottomPad={act ? 220 : 60}>{hero}<View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 16 }}>{children}</View></Scroll>
+      ) : <Scroll top={4} bottomPad={act ? 220 : 60}>{children}</Scroll>}
       {act ? (
         <View style={styles.actWrap} pointerEvents="box-none">
           <VGradient id="act-fade" stops={[[0, 'rgba(233,226,216,0)'], [0.26, colors.sand], [1, colors.sand]]} />

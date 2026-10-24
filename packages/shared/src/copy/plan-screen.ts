@@ -123,4 +123,16 @@ export const planScreenCopy = {
   'chat.newChat.offer': 'Start a chat for {place}',
   'chat.newChat.sub': 'This chat stays about {trip}.',
   'chat.attached': 'This chat is now about {trip}.',
+  // The right side of a plan row (design v3): what can be done, or where it stands.
+  'plan.row.search': 'Search',
+  'plan.row.findStay': 'Find a stay',
+  'plan.row.view': 'View',
+  'plan.row.pending': 'Pending',
+  'plan.row.booked': 'Booked',
+  'plan.row.seeOptions': 'See options',
+  'plan.row.searchSay': 'Find flights for {title}',
+  // The hotel card's Manage on the trip page.
+  'trip.stay.manage': 'Manage',
+  'trip.stay.voucher': 'Hotel voucher',
+  'trip.stay.directions': 'Directions',
 } as const;
