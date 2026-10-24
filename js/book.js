@@ -423,7 +423,7 @@
     if (r.name === "plan") return viewStudio();
     if (LIVE) {
       // The live pages: same API as the app. Trips booked in this browser before going live still open from #/trip.
-      if (r.name === "flights") return needPlan() && (draft.live ? viewFlightsLive() : location.replace("#/plan"));
+      if (r.name === "flights") return needPlan() && (draft.live ? viewFlightsLive(r.a) : location.replace("#/plan"));
       if (r.name === "stay") return needPlan() && (draft.live ? viewStayLive() : location.replace("#/plan"));
       if (r.name === "hotel") return needPlan() && (draft.live ? viewHotelLive(decodeURIComponent(r.a || "")) : location.replace("#/plan"));
       if (r.name === "travelers") return needPlan() && viewTravelersLive();
@@ -987,27 +987,58 @@
   const errBox = (txt, retry) => `<div class="wrap pg"><div class="empty"><p>${esc(txt)}</p>${retry ? `<button type="button" class="btn btn--main" onclick="location.reload()">${esc(t("tryAgain"))}</button>` : ""}</div></div>`;
 
   // ----- flights: the options the API found (best fit first), each with its rules in plain words -----
-  function viewFlightsLive() {
+  // ----- flights: the way out first, then the ways back the airline sells with it (a return is priced as a pair) -----
+  const legKey = (l) => `${l.flightNumber}|${l.date}|${l.dep}`;
+  function viewFlightsLive(step) {
     const d = draft, r = d.live && d.live.flights;
     if (!r || !r.options.length) return location.replace("#/plan");
+    const F = t("fl2"), cur = liveOut(d), round = r.options.some((o) => o.back);
     const leg = (l) => `<div class="fl__times"><b>${esc(l.dep)}</b><div class="fl__line">${esc(hrs(l.durationMin))}<i></i>${esc(l.from)} → ${esc(l.to)}</div><b>${esc(l.arr)}</b></div>`;
-    page(`<div class="wrap pg">
-      ${backLink("#/plan")}
-      <h1 class="pg__h">${esc(t("flTitle")(city(d.to)))}</h1>
-      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))} · ${esc(t("liveChecked")(r.checked))}</p>
-      ${r.options.some((o) => o.demo) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
-      <div class="lf">${r.options.map((o) => { const on = o.id === d.live.outId; return `<article class="lfo${on ? " on" : ""}">
-        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+    const rules = (o) => `<ul class="lfo__rules"><li><small>${esc(t("uxStops"))}</small>${esc(o.stop || t("direct"))}</li><li><small>${esc(t("uxBags"))}</small>${esc(o.bags)}</li><li><small>${esc(t("uxChange"))}</small>${esc(o.changeRule)}</li><li class="${o.refundable ? "" : "warn"}"><small>${esc(t("uxRefund"))}</small>${esc(o.refundRule)}</li></ul>`;
+    const pickBack = step === "back" && round && d.live.lfOut;
+    // Every way out, with the lowest price it comes at and the best label among its fares.
+    const outs = [];
+    for (const o of r.options) { const k = legKey(o.out); let g = outs.find((x) => x.k === k); if (!g) outs.push((g = { k, out: o.out, fares: [] })); g.fares.push(o); }
+    outs.forEach((g) => g.fares.sort((a, b) => a.total.amount - b.total.amount));
+    const steps2 = round ? `<ol class="fsteps"><li class="${pickBack ? "done" : "on"}"><a href="#/flights/out">${esc(F.stepOut(day(d.dep)))}</a></li><li class="${pickBack ? "on" : ""}">${esc(F.stepBack(day(d.ret)))}</li></ol>` : "";
+    let body;
+    if (!pickBack) {
+      body = outs.map((g) => { const o = g.fares[0], lab = g.fares.find((x) => x.label === "best") || o, on = cur && legKey(cur.out) === g.k; return `<article class="lfo${on ? " on" : ""}">
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(lab.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
         <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
-        <div class="lfo__legs"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div>${o.back ? `<div><small>${esc(day(o.back.date))}</small>${leg(o.back)}</div>` : ""}</div>
+        <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div></div>
         <p class="lfo__why">${esc(o.reason)}</p>
-        <ul class="lfo__rules"><li><small>${esc(t("uxStops"))}</small>${esc(o.stop || t("direct"))}</li><li><small>${esc(t("uxBags"))}</small>${esc(o.bags)}</li><li><small>${esc(t("uxChange"))}</small>${esc(o.changeRule)}</li><li class="${o.refundable ? "" : "warn"}"><small>${esc(t("uxRefund"))}</small>${esc(o.refundRule)}</li></ul>
-        <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(t("totalFor")(paxText(d.pax)))}</small></div>
-          <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-lf="${o.id}">${esc(on ? t("selected") : t("select"))}</button></div>
-      </article>`; }).join("")}</div>
+        <div class="lfo__pr"><div><b>${round ? `<small class="lfo__from">${esc(F.from)}</small> ` : ""}${esc(money(sar(o.total)))}</b><small>${esc(round ? F.roundFor(paxText(d.pax)) : t("totalFor")(paxText(d.pax)))}${round && g.fares.length > 1 ? ` · ${esc(F.backs(g.fares.length))}` : ""}</small></div>
+          <button type="button" class="btn ${on && !round ? "btn--plain" : "btn--main"}" data-out="${esc(g.k)}" data-one="${o.id}">${esc(round ? F.chooseOut : on ? t("selected") : t("select"))}</button></div>
+      </article>`; }).join("");
+    } else {
+      const g = outs.find((x) => x.k === d.live.lfOut) || outs[0], low = g.fares[0].total.amount, o0 = g.fares[0];
+      body = `<div class="lfo-chosen">${ico("check")}<div><small>${esc(F.goingOn(day(o0.out.date)))}</small><b>${esc(o0.airline)} · ${esc(o0.out.flightNumber)} · ${esc(o0.out.dep)} → ${esc(o0.out.arr)}</b></div><a class="link" href="#/flights/out">${esc(F.changeOut)}</a></div>`
+        + g.fares.map((o) => { const on = cur && cur.id === o.id, extra = o.total.amount - low; return `<article class="lfo${on ? " on" : ""}">
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.back.flightNumber)}</b>
+        <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.back.date))}</small>${leg(o.back)}</div></div>
+        ${rules(o)}
+        <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(F.bothWays(paxText(d.pax)))}${extra > 0 ? ` · +${esc(money(extra / 100))}` : ""}</small></div>
+          <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-lf="${o.id}">${esc(on ? t("selected") : F.chooseBack)}</button></div>
+      </article>`; }).join("")
+        + `<div class="lfo-more"><p>${esc(g.fares.length === 1 ? F.onlyOne : F.otherBack)}</p><a class="btn btn--plain btn--sm" target="_blank" rel="noopener" href="${wa(F.waBack(placeName(d), range(d.dep, d.ret)))}">${ico("chat")}${esc(F.askPerson)}</a></div>`;
+    }
+    page(`<div class="wrap pg">
+      ${backLink(pickBack ? "#/flights/out" : "#/plan")}
+      <h1 class="pg__h">${esc(pickBack ? F.backTitle(city(d.from)) : t("flTitle")(city(d.to)))}</h1>
+      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))} · ${esc(t("liveChecked")(r.checked))}</p>
+      ${steps2}
+      ${r.options.some((o) => o.demo) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
+      <div class="lf">${body}</div>
     </div>`);
+    $$("[data-out]").forEach((b) => b.addEventListener("click", () => {
+      if (!round) { d.live.outId = b.dataset.one; d.items.flight = true; saveDraft(); location.hash = "#/plan"; return; }
+      d.live.lfOut = b.dataset.out; saveDraft(); location.hash = "#/flights/back";
+    }));
     $$("[data-lf]").forEach((b) => b.addEventListener("click", () => { d.live.outId = b.dataset.lf; d.items.flight = true; saveDraft(); location.hash = "#/plan"; }));
   }
+
 
   // ----- where a hotel is: distance to the places that matter in this city, and a map -----
   const marksFor = (d) => {

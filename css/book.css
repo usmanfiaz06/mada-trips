@@ -1470,3 +1470,23 @@ body:has(.sheet) .fab { display: none; }
 .pp__private { display: flex; gap: 8px; align-items: flex-start; margin: 14px 2px 16px; }
 .pp__private .ico { width: 16px; height: 16px; flex: none; color: var(--good); margin-top: 2px; }
 .saved .chip .ico { width: 14px; height: 14px; color: var(--good); vertical-align: -2px; }
+
+/* ---------- flights in two steps ---------- */
+.fsteps { list-style: none; display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 0; padding: 0; }
+.fsteps li { padding: 8px 14px; border-radius: 99px; background: var(--paper-2); font-size: 14.5px; color: var(--ink-2); }
+.fsteps li.on { background: var(--green); color: #fff; font-weight: 600; }
+.fsteps li.done { background: #e7f3ec; color: #1d5c3f; }
+.fsteps a { color: inherit; }
+.lfo__legs--one { grid-template-columns: 1fr; }
+.lfo__from { font-size: 14px; font-weight: 500; color: var(--ink-2); }
+.lfo-chosen { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 18px; background: #f1f7f3; margin-bottom: 14px; }
+.lfo-chosen .ico { width: 22px; height: 22px; color: var(--good); flex: none; }
+.lfo-chosen div { flex: 1; }
+.lfo-chosen small { display: block; font-size: 13px; color: var(--ink-2); }
+.lfo-chosen b { font-size: 16px; }
+.lfo-more { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; padding: 16px 18px; border-radius: 18px; border: 1px dashed var(--hair); }
+.lfo-more p { margin: 0; font-size: 15px; color: var(--ink-2); }
+.lfo-more .btn { gap: 8px; flex: none; }
+.lfo-more .ico { width: 18px; height: 18px; }
+@media (max-width: 640px) { .lfo-more { flex-direction: column; align-items: flex-start; } }
+.lfo__pr b { white-space: nowrap; }
