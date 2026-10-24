@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, ne } from "drizzle-orm";
 import { Lock, Plus } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
@@ -13,7 +13,7 @@ export default async function RolesPage() {
   await requirePerm("roles.manage");
   const t = await getT();
   const L = t.locale;
-  const roles = await db.select().from(schema.roles).orderBy(schema.roles.createdAt);
+  const roles = await db.select().from(schema.roles).where(ne(schema.roles.key, "client_user")).orderBy(schema.roles.createdAt);
   const members = await db.select({ roleId: schema.users.roleId, name: schema.users.name }).from(schema.users).where(eq(schema.users.active, true));
   return (
     <>

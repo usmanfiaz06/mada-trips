@@ -28,7 +28,7 @@ const Fields = z.object({
 /** Can this person give work to that person? Themselves or their own team; tasks.manage can assign anyone. */
 async function assertAssignable(u: CurrentUser, assigneeId: string) {
   const [a] = await db.select().from(schema.users).where(eq(schema.users.id, assigneeId));
-  if (!a || !a.active) throw new Error("Choose who does it");
+  if (!a || !a.active || a.clientId) throw new Error("Choose who does it");
   if (!canManageAll(u) && a.id !== u.id && a.team !== u.team) throw new Error("You can assign tasks to yourself or your own team");
   return a;
 }

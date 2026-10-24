@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/db";
-import { clientIp, createSession, destroySession, getCurrentUser } from "@/lib/auth";
+import { clientIp, createSession, destroySession, getCurrentUser, homeFor, PORTAL_HOME } from "@/lib/auth";
 import { safeNext } from "@/lib/security";
 import { audit } from "@/lib/audit";
 import type { ActionState } from "@/lib/actions";
@@ -54,7 +54,9 @@ async function doLogin(_: ActionState, fd: FormData): Promise<ActionState> {
   }
   await createSession(u.id);
   await audit(db, { actorId: u.id, action: "auth.login", entityType: "user", entityId: u.id, entityRef: u.name, summary: `${u.name} signed in` });
-  redirect(u.mustChangePassword ? "/adminwork/me?welcome=1" : next);
+  // People at a client only ever land in their own workspace, whatever "next" says.
+  if (u.clientId) redirect(!u.mustChangePassword && next.startsWith(PORTAL_HOME) ? next : homeFor(u));
+  redirect(u.mustChangePassword ? "/adminwork/me?welcome=1" : next.startsWith(PORTAL_HOME) ? "/adminwork" : next);
 }
 
 export async function logout() {

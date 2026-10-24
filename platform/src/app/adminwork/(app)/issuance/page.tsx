@@ -43,7 +43,7 @@ export default async function IssuancePage({ searchParams }: { searchParams: Pro
   const usage = await Promise.all(delegations.map(async ({ d }) => (await db.select({ total: sql<number>`coalesce(sum(${schema.bookings.sellPrice}),0)::bigint`.mapWith(Number), n: sql<number>`count(*)::int` })
     .from(schema.bookings).where(and(eq(schema.bookings.issuedBy, d.userId), sql`${schema.bookings.issuedUnderDelegation} IS NOT NULL`, gte(schema.bookings.issuedAt, win.from), lt(schema.bookings.issuedAt, win.to))))[0]));
   const staff = can(u, "issue.delegate") ? await db.select({ id: schema.users.id, name: schema.users.name, team: schema.users.team }).from(schema.users)
-    .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).where(and(eq(schema.users.active, true), sql`NOT ('issue.unlimited' = ANY(${schema.roles.permissions}))`)) : [];
+    .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).where(and(eq(schema.users.active, true), isNull(schema.users.clientId), sql`NOT ('issue.unlimited' = ANY(${schema.roles.permissions}))`)) : [];
   const recent = await db.select({ b: schema.bookings, issuer: schema.users.name }).from(schema.bookings).innerJoin(schema.users, eq(schema.users.id, schema.bookings.issuedBy))
     .where(and(sql`${schema.bookings.issuedAt} > now() - interval '2 days'`, seeAll ? undefined : eq(schema.bookings.issuedBy, u.id))).orderBy(desc(schema.bookings.issuedAt)).limit(8);
 

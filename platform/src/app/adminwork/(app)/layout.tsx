@@ -31,6 +31,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ...(can(u, "close.submit") || can(u, "close.verify") ? [{ href: "/adminwork/close", label: t("Daily close"), icon: "MoonStar" as const, count: counts.closes }] : []),
       ...(can(u, "expenses.create") || can(u, "expenses.view_all") ? [{ href: "/adminwork/expenses", label: t("Expenses"), icon: "Wallet" as const }] : []),
     ] },
+    ...(can(u, "clients.manage") ? [{ label: t("Corporate clients"), items: [
+      { href: "/adminwork/corporate", label: t("Workspace requests"), icon: "Building2" as const, count: counts.corporate },
+      { href: "/adminwork/corporate/inbox", label: t("Client messages"), icon: "MessagesSquare" as const, count: counts.inbox },
+      ...(can(u, "clients.credit") ? [{ href: "/adminwork/corporate/catalog", label: t("Lease catalog"), icon: "CarFront" as const }] : []),
+    ] }] : []),
     ...(can(u, "finance.view") || u.partnerId ? [{ label: t("Finance"), items: [
       ...(can(u, "finance.view") ? [
         { href: "/adminwork/finance", label: t("Banks & cash"), icon: "Landmark" as const },

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-  pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, customType, serial,
+  type AnyPgColumn, pgTable, uuid, text, integer, bigint, boolean, timestamp, date, jsonb, index, uniqueIndex, customType, serial,
 } from "drizzle-orm/pg-core";
 
 // Money is stored in halalas (1 SAR = 100 halalas) as bigint so arithmetic is exact.
@@ -52,8 +52,13 @@ export const users = pgTable("users", {
   // Set when someone else chose the password (new member, reset): they must pick their own before doing anything.
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  // Set for people at a corporate client: they sign in to the same Mada Ops but only ever see their company's
+  // workspace (/adminwork/portal). Staff have no client.
+  clientId: uuid("client_id").references((): AnyPgColumn => clients.id),
+  clientRole: text("client_role"), // admin | approver | requester | viewer
   createdAt: createdAt(),
 }, (t) => [
+  index("users_client_idx").on(t.clientId),
   // One login per partner: a partner is one director vote, never two.
   uniqueIndex("users_one_per_partner").on(t.partnerId).where(sql`${t.partnerId} IS NOT NULL`),
 ]);
@@ -96,6 +101,20 @@ export const clients = pgTable("clients", {
   contractRef: text("contract_ref"),
   notes: text("notes"),
   createdBy: uuid("created_by").references(() => users.id),
+  // Corporate workspace: what this client sees when its people sign in.
+  portalEnabled: boolean("portal_enabled").notNull().default(false),
+  portalColor: text("portal_color"),
+  portalLogoId: uuid("portal_logo_id"), // an attachment (entity_type client_logo)
+  portalServices: jsonb("portal_services").notNull().default({}), // { lease: "price" | "quote", daily: "quote", ... }
+  // Client price = supplier cost × (1 + markup). Null: the catalog's list price. Per-vehicle overrides win over both.
+  portalMarkupBps: integer("portal_markup_bps"),
+  portalTerms: integer("portal_terms").array().notNull().default([24, 36, 48]),
+  portalHiddenVehicles: text("portal_hidden_vehicles").array().notNull().default([]),
+  // Plans from a requester need an approver at the client before they reach Mada.
+  portalNeedsApproval: boolean("portal_needs_approval").notNull().default(true),
+  // Names (usually staff or partners) that must never appear anywhere this client can see.
+  hiddenNames: text("hidden_names").array().notNull().default([]),
+  accountManagerId: uuid("account_manager_id").references((): AnyPgColumn => users.id),
   createdAt: createdAt(),
 }, (t) => [index("clients_name_idx").on(t.name)]);
 
@@ -142,6 +161,9 @@ export const bookings = pgTable("bookings", {
   returnNote: text("return_note"),
   recognizedCycleId: uuid("recognized_cycle_id"),
   invoiceId: uuid("invoice_id"),
+  // A monthly lease bill raised from a corporate workspace request: which request, and which month of the term.
+  portalRequestId: uuid("portal_request_id"),
+  portalMonth: integer("portal_month"),
   createdAt: createdAt(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
@@ -458,3 +480,75 @@ export const counters = pgTable("counters", {
   key: text("key").primaryKey(),
   value: integer("value").notNull().default(0),
 });
+
+/* ───────────── Corporate workspace ───────────── */
+
+// Vehicles Mada offers on long-term lease. Costs are the supplier's monthly rate per term and never reach a client.
+export const vehicles = pgTable("vehicles", {
+  id: id(),
+  key: text("key").notNull().unique(),
+  make: text("make").notNull(),
+  model: text("model").notNull(),
+  trim: text("trim"),
+  category: text("category").notNull(),   // e.g. Full-size SUV
+  year: integer("year").notNull(),
+  engine: text("engine"),
+  drive: text("drive"),                   // 4×4 | 4×2
+  fuel: text("fuel"),
+  seats: integer("seats"),
+  image: text("image"),                   // path under /adminwork, e.g. /vehicles/tahoe.png
+  supplier: text("supplier"),
+  cost: jsonb("cost").notNull().default({}),   // { "24": halalas, "36": ... } per month
+  price: jsonb("price").notNull().default({}), // list price per month, same shape
+  onRequest: boolean("on_request").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  sort: integer("sort").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+// A price agreed with one client for one vehicle and term. Wins over markup and list price.
+export const clientVehiclePrices = pgTable("client_vehicle_prices", {
+  id: id(),
+  clientId: uuid("client_id").notNull().references(() => clients.id),
+  vehicleId: uuid("vehicle_id").notNull().references(() => vehicles.id),
+  term: integer("term").notNull(),
+  price: money("price").notNull(),
+}, (t) => [uniqueIndex("client_vehicle_price_once").on(t.clientId, t.vehicleId, t.term)]);
+
+// A plan a client sent from their workspace: the cars, the term and where they go.
+export const portalRequests = pgTable("portal_requests", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  clientId: uuid("client_id").notNull().references(() => clients.id),
+  // awaiting_approval → submitted → confirmed → delivering → active → completed; or declined | cancelled
+  status: text("status").notNull().default("awaiting_approval"),
+  lines: jsonb("lines").notNull(), // [{ vehicleId, key, name, qty, unitPrice, unitCost }]
+  term: integer("term").notNull(),
+  monthly: money("monthly").notNull(),
+  monthlyCost: money("monthly_cost").notNull().default(0),
+  delivery: jsonb("delivery").notNull().default({}), // { place, address, city, contact, window }
+  note: text("note"),
+  requestedBy: uuid("requested_by").notNull().references(() => users.id),
+  approvedBy: uuid("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  confirmedBy: uuid("confirmed_by").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  decisionNote: text("decision_note"),
+  monthsBilled: integer("months_billed").notNull().default(0),
+  createdAt: createdAt(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("portal_requests_client_idx").on(t.clientId), index("portal_requests_status_idx").on(t.status)]);
+
+// One conversation per client company. side: client | mada | system. Mada replies are always shown as "Mada team".
+export const portalMessages = pgTable("portal_messages", {
+  id: id(),
+  clientId: uuid("client_id").notNull().references(() => clients.id),
+  requestId: uuid("request_id").references(() => portalRequests.id),
+  authorId: uuid("author_id").references(() => users.id),
+  side: text("side").notNull(),
+  kind: text("kind").notNull().default("message"), // message | price | call | issue | quote | status
+  body: text("body").notNull(),
+  handledAt: timestamp("handled_at", { withTimezone: true }), // client messages: when Mada answered or closed it
+  createdAt: createdAt(),
+}, (t) => [index("portal_messages_client_idx").on(t.clientId, t.createdAt)]);

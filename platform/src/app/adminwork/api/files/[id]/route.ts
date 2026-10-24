@@ -1,13 +1,13 @@
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getStaffUser } from "@/lib/auth";
 import { canViewRecord } from "@/lib/access";
 import { isUuid, SAFE_INLINE_TYPES } from "@/lib/security";
 
 const notFound = () => new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
 
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const u = await getCurrentUser();
+  const u = await getStaffUser();
   if (!u || u.mustChangePassword) return new Response("Unauthorized", { status: 401, headers: { "Cache-Control": "no-store" } });
   const { id } = await params;
   if (!isUuid(id)) return notFound();

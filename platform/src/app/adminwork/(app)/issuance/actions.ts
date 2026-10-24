@@ -27,7 +27,7 @@ export async function grantDelegation(_: ActionState, fd: FormData): Promise<Act
     if (expiresAt < new Date()) throw new Error("The end date is in the past");
     if (expiresAt.getTime() - Date.now() > 183 * 86_400_000) throw new Error("Grant issuing rights for 6 months at most, then renew");
     const [target] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-    if (!target || !target.active) throw new Error("User not found");
+    if (!target || !target.active || target.clientId) throw new Error("User not found");
     await db.transaction(async (tx) => {
       // One active delegation per person: the new one replaces the old.
       await tx.update(schema.delegations).set({ revokedAt: new Date(), revokedBy: u.id }).where(and(eq(schema.delegations.userId, userId), isNull(schema.delegations.revokedAt)));

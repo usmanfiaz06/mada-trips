@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, isNotNull, ne } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { nextRef } from "./refs";
@@ -36,7 +36,7 @@ export async function eligibleApprovers(tx: Tx, r: ReqLike) {
     .from(schema.users)
     .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId))
     .leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId))
-    .where(eq(schema.users.active, true));
+    .where(and(eq(schema.users.active, true), isNull(schema.users.clientId))); // client logins never vote
   const requester = users.find((u) => u.id === r.requestedBy);
   const [{ p: requesterPartner } = { p: null }] = requester ? [{ p: requester.partnerId }]
     : await tx.select({ p: schema.users.partnerId }).from(schema.users).where(eq(schema.users.id, r.requestedBy));

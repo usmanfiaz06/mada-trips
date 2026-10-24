@@ -6,12 +6,12 @@ import { redirect } from "next/navigation";
 import { createHash } from "node:crypto";
 import { BASE } from "@/lib/base";
 import { db, schema } from "@/db";
-import { requireUser, SESSION_COOKIE } from "@/lib/auth";
+import { PORTAL_HOME, requireUser, SESSION_COOKIE } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { str, type ActionState } from "@/lib/actions";
 
 export async function changePassword(_: ActionState, fd: FormData): Promise<ActionState> {
-  const u = await requireUser();
+  const u = await requireUser({ allowClient: true }); // the client workspace uses this too
   // Passwords are used exactly as typed (no trimming), same as at sign-in.
   const raw = (k: string) => String(fd.get(k) ?? "");
   const current = raw("current"), next = raw("next"), confirm = raw("confirm");
@@ -32,12 +32,12 @@ export async function changePassword(_: ActionState, fd: FormData): Promise<Acti
     await tx.delete(schema.sessions).where(and(eq(schema.sessions.userId, u.id), ne(schema.sessions.id, thisSession)));
     await audit(tx, { actorId: u.id, action: "user.password_changed", entityType: "user", entityId: u.id, entityRef: u.name, summary: `${u.name} changed their password and signed out other devices` });
   });
-  if (row.mustChangePassword) redirect("/adminwork");
+  if (row.mustChangePassword) redirect(u.clientId ? PORTAL_HOME : "/adminwork");
   return { ok: "Password changed. Other devices were signed out" };
 }
 
 export async function setLanguage(fd: FormData) {
-  const u = await requireUser();
+  const u = await requireUser({ allowClient: true });
   const locale = str(fd, "locale") === "ar" ? "ar" : "en";
   await db.update(schema.users).set({ locale }).where(eq(schema.users.id, u.id));
   (await cookies()).set("mada_locale", locale, { path: BASE || "/", maxAge: 31536000, sameSite: "lax" });

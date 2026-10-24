@@ -4,6 +4,7 @@
  * Add --reset to wipe everything first.
  */
 import bcrypt from "bcryptjs";
+import { readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { sql } from "drizzle-orm";
@@ -38,7 +39,7 @@ async function main() {
   }
   if (args.has("--reset")) {
     await db.execute(sql`DROP TRIGGER IF EXISTS audit_events_no_update ON audit_events`);
-    await db.execute(sql`TRUNCATE audit_events, attachments, remarks, settlement_cycles, bank_accounts, bsp_obligations, daily_closes, ledger_entries, expenses, approval_decisions, approval_requests, payments, bookings, clients, delegations, sessions, users, partners, roles, settings, counters RESTART IDENTITY CASCADE`);
+    await db.execute(sql`TRUNCATE audit_events, portal_messages, portal_requests, client_vehicle_prices, attachments, remarks, settlement_cycles, bank_accounts, bsp_obligations, daily_closes, ledger_entries, expenses, approval_decisions, approval_requests, payments, bookings, clients, delegations, sessions, users, partners, roles, settings, counters RESTART IDENTITY CASCADE`);
     await db.execute(sql`CREATE TRIGGER audit_events_no_update BEFORE UPDATE OR DELETE ON audit_events FOR EACH ROW EXECUTE FUNCTION audit_events_immutable()`);
     console.log("Wiped.");
   }
@@ -48,6 +49,8 @@ async function main() {
   if (!PASSWORD) { console.log("Skipping first-time setup: set SEED_PASSWORD (the partners' first password) and redeploy."); return; }
 
   const roleRows = await db.insert(schema.roles).values(SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }))).returning();
+  // People at corporate clients: no staff permissions at all (also created by migration 0015, but --reset wipes roles).
+  await db.insert(schema.roles).values({ key: "client_user", name: "Corporate client", nameAr: "عميل شركة", description: "People at a corporate client. They see only their own company's workspace.", permissions: [], isSystem: true }).onConflictDoNothing();
   const role = (k: string) => roleRows.find((r) => r.key === k)!.id;
 
   const [abdulaziz, bader, haneef] = await db.insert(schema.partners).values([
@@ -290,6 +293,36 @@ async function main() {
     FROM bookings b WHERE b.supplier_paid = true AND b.net_cost > 0`);
   ev.sort((a, b) => a.at!.getTime() - b.at!.getTime());
   for (let i = 0; i < ev.length; i += 200) await db.insert(schema.auditEvents).values(ev.slice(i, i + 200));
+
+  // Corporate workspace: KEO signs in to Mada Ops and sees only its own company. Mada's partners' names are hidden from them.
+  const [keo] = await db.insert(schema.clients).values({
+    name: "KEO International Consultants", type: "contracted", contactPerson: "Norbert", email: "norbert@keo.example", creditLimit: sar(2_000_000), paymentTermsDays: 30,
+    contractRef: "MT/KEO/1022/26", createdBy: uB.id, portalEnabled: true, portalColor: "#0e4679", portalServices: { lease: "price", daily: "quote", chauffeur: "quote" },
+    portalTerms: [24, 36, 48], hiddenNames: ["Haneef", "Abdulaziz"], accountManagerId: uB.id, portalNeedsApproval: true,
+  }).returning();
+  const logo = readFileSync(new URL("./demo/keo-logo.png", import.meta.url));
+  const [logoRow] = await db.insert(schema.attachments).values({ entityType: "client_logo", entityId: keo.id, filename: "logo", mime: "image/png", size: logo.length, data: logo, uploadedBy: uB.id }).returning({ id: schema.attachments.id });
+  await db.update(schema.clients).set({ portalLogoId: logoRow.id }).where(sql`id = ${keo.id}`);
+  const [clientRole] = await db.select().from(schema.roles).where(sql`key = 'client_user'`);
+  const [norbert, sara] = await db.insert(schema.users).values([
+    { name: "Norbert", email: "norbert@keo.example", passwordHash: hash, roleId: clientRole.id, clientId: keo.id, clientRole: "admin", team: "management" },
+    { name: "Sara M.", email: "sara@keo.example", passwordHash: hash, roleId: clientRole.id, clientId: keo.id, clientRole: "requester", team: "management" },
+  ]).returning();
+  const [tahoe] = await db.select().from(schema.vehicles).where(sql`key = 'tahoe'`);
+  if (tahoe) {
+    const [lr] = await db.insert(schema.portalRequests).values({
+      ref: "LR-1001", clientId: keo.id, status: "awaiting_approval", term: 36, monthly: 653100 * 7,
+      lines: [{ vehicleId: tahoe.id, key: "tahoe", name: "Chevrolet Tahoe LS", qty: 7, unitPrice: 653100, unitCost: null }],
+      delivery: { place: "office", address: "Head office, Olaya", city: "Riyadh", contact: "Norbert", window: "morning" }, requestedBy: sara.id, createdAt: at(1, 15),
+    }).returning();
+    await db.insert(schema.counters).values({ key: "LR", value: 1001 }).onConflictDoNothing();
+    await db.insert(schema.auditEvents).values({ at: at(1, 15), actorId: sara.id, action: "portal.plan", entityType: "portal_request", entityId: lr.id, entityRef: "LR-1001", summary: "Sara M. (KEO International Consultants) sent LR-1001: Chevrolet Tahoe LS × 7, 36 months" });
+  }
+  await db.insert(schema.portalMessages).values([
+    { clientId: keo.id, authorId: uB.id, side: "mada", body: "Welcome, Norbert. Your quotation is live here: change the term or the mix and the prices update.", createdAt: at(2, 10, 12) },
+    { clientId: keo.id, authorId: norbert.id, side: "client", kind: "price", body: "Can you also price 2 Prados for the site managers?", createdAt: at(1, 16, 40), handledAt: at(1, 16, 55) },
+    { clientId: keo.id, authorId: uH.id, side: "mada", body: "Haneef here. Abdulaziz is checking Prado stock with the supplier; you'll have a price by Sunday.", createdAt: at(1, 16, 55) },
+  ]);
 
   console.log(`Demo ready: ${n - 10000} sales, ${pn} payments, ${ex.length} expenses, ${tk.length} tasks, ${ld.length} leads. Every demo user signs in with the demo password (SEED_PASSWORD, or the local default).`);
 }

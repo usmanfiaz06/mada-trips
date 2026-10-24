@@ -43,4 +43,4 @@ export function middleware(req: NextRequest) {
 }
 
 // Anchored to the platform. Static brand files skip it.
-export const config = { matcher: ["/adminwork", "/adminwork/:path((?!symbol|wordmark|favicon).*)"] };
+export const config = { matcher: ["/adminwork", "/adminwork/:path((?!symbol|wordmark|favicon|vehicles/).*)"] };

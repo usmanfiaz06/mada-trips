@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { withBase } from "@/lib/base";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, homeFor } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { ActionForm, SubmitButton, LocaleSwitch } from "@/components/client";
 import { login } from "./actions";
@@ -21,7 +21,8 @@ function Sunburst() {
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  if (await getCurrentUser()) redirect("/adminwork");
+  const signedIn = await getCurrentUser();
+  if (signedIn) redirect(homeFor(signedIn));
   const t = await getT();
   const { next } = await searchParams;
   return (

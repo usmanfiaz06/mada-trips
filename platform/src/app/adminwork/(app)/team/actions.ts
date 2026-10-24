@@ -25,6 +25,7 @@ async function assertCanAssignRole(u: CurrentUser, roleId: string) {
   const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, roleId));
   if (!role) throw new Error("Choose a role");
   if (role.key === "partner" || role.key === "partner_issuer") throw new Error("Partner roles belong to the partners' own logins and can't be given to team members");
+  if (role.key === "client_user") throw new Error("That role is for people at corporate clients. Give them a login from the client's workspace settings");
   const extra = (role.permissions as Permission[]).filter((x) => !u.permissions.has(x) || x.startsWith("issue."));
   if (extra.length) throw new Error("That role includes access you can't hand out");
   return role;
@@ -75,7 +76,7 @@ export async function updateMember(_: ActionState, fd: FormData): Promise<Action
   if (!p.success) return zodError(p.error);
   try {
     const [before] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-    if (!before) throw new Error("Not found");
+    if (!before || before.clientId) throw new Error("Not found");
     if (before.partnerId && id !== u.id) throw new Error("Partner accounts are managed by that partner only");
     if (p.data.roleId !== before.roleId) {
       if (id === u.id) throw new Error("You can't change your own role");
@@ -104,7 +105,7 @@ export async function setActive(fd: FormData) {
   const active = str(fd, "active") === "true";
   if (id === u.id && !active) { await flash("You can't deactivate yourself"); redirect(`/adminwork/team/${id}`); }
   const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-  if (!m) redirect("/adminwork/team");
+  if (!m || m.clientId) redirect("/adminwork/team");
   if (m.partnerId) { await flash("Partner accounts can't be switched off here"); redirect(`/adminwork/team/${id}`); }
   if (!active) await assertAdminsRemain(id);
   await db.transaction(async (tx) => {
@@ -122,7 +123,7 @@ export async function resetPassword(_: ActionState, fd: FormData): Promise<Actio
   const id = str(fd, "id");
   const pw = tempPassword();
   const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-  if (!m) return { error: "Not found" };
+  if (!m || m.clientId) return { error: "Not found" };
   if (id === u.id) return { error: "Change your own password from your profile" };
   if (m.partnerId) return { error: "A partner's password can only be reset on the server, so no one can take over a partner's vote" };
   // Hash outside the transaction — bcrypt is slow, and hashing inside would hold the connection
@@ -158,6 +159,7 @@ export async function saveRole(_: ActionState, fd: FormData): Promise<ActionStat
       const [before] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
       if (!before) throw new Error("Role not found");
       if (before.key === "partner" || before.key === "partner_issuer") throw new Error("The partner roles are fixed by the governance document and can't be edited");
+      if (before.key === "client_user") throw new Error("The corporate client role has no staff access and can't be edited");
       if (id === u.role.id) throw new Error("You can't edit the role you're on");
       if (beyond.some((x) => !before.permissions.includes(x))) throw new Error("You can only grant access you have yourself. Ticket issuing is granted from Issuance, never through a role");
       // Don't let an edit lock everyone out of administration.
@@ -213,7 +215,7 @@ export async function setCommission(_: ActionState, fd: FormData): Promise<Actio
   const bps = Math.round(pct * 100);
   try {
     const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
-    if (!m) throw new Error("Not found");
+    if (!m || m.clientId) throw new Error("Not found");
     if (m.partnerId) throw new Error("Partners are paid through dividends, not commission");
     if (m.commissionBps === bps) return { ok: "No change" };
     await db.transaction(async (tx) => {
