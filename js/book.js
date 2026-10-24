@@ -349,6 +349,7 @@
     if (route().name !== "plan") location.hash = "#/plan"; else renderThread(true);
     if (!LIVE) await new Promise((r) => setTimeout(r, reduce ? 0 : 650));
     // Live: the same understanding as the app (/ask/parse), then real searches before Mada says anything about prices.
+    if (LIVE && !raw && A.canChat && await chatTurn(text)) { busy = false; setWork(null); saveDraft(); if (route().name === "plan") { renderThread(false); renderPlanPane(true); } return; }
     let intent = null;
     if (LIVE && !raw) { try { intent = (await A.parse(text, null)).intent; } catch { /* the rules here still read it */ } }
     reply(text, raw, intent);
@@ -361,6 +362,46 @@
     }
     busy = false; setWork(null); saveDraft();
     if (route().name === "plan") { renderThread(false); renderPlanPane(true); }
+  }
+  // Signed in, with the conversation on: Mada answers as in the app (POST /ask/chat, Claude behind it), her words as they
+  // come. What she read the sentence as (the intent event) fills the plan here with the same real searches; her own
+  // next steps become the chips. False when the conversation couldn't start, so the page answers with its own flow.
+  async function chatTurn(text) {
+    const d = draft, m = { who: "mada", html: "", extra: "" };
+    let words = "", intent = null, next = null, started = false, failed = false, person = null;
+    const clean = (s) => s.replace(/<next>[\s\S]*?(<\/next>|$)/g, "").replace(/<[^>]*$/, "").trim();
+    const show = () => { m.html = esc(clean(words)).replace(/\n+/g, "<br>"); if (route().name === "plan") renderThread(true); };
+    try {
+      await A.chat({ text, threadId: d.chatThread || null }, (e) => {
+        if (e.type === "thread") d.chatThread = e.threadId;
+        else if (e.type === "status") { setWork(e.text); if (route().name === "plan") renderThread(true); }
+        else if (e.type === "text") { if (!started) { started = true; d.msgs.push(m); } words += e.delta; show(); }
+        else if (e.type === "replace") { if (!started) { started = true; d.msgs.push(m); } words = e.text; show(); }
+        else if (e.type === "intent") intent = e.intent;
+        else if (e.type === "next") next = e.choices;
+        else if (e.type === "handoff" || e.type === "agent") person = e.name || e.agent || "";
+        else if (e.type === "done" && e.text) words = e.text;
+        else if (e.type === "error") failed = true;
+      });
+    } catch { failed = true; }
+    if (failed && !clean(words)) { if (started) d.msgs.splice(d.msgs.indexOf(m), 1); return false; }
+    if (!started) d.msgs.push(m);
+    show();
+    // The plan beside the chat: the sentence as Mada read it, the page's own questions left out (she asked hers).
+    if (intent) {
+      const n = d.msgs.length;
+      reply(text, false, intent);
+      d.msgs.splice(n).forEach((x) => x.who === "you" && d.msgs.push(x));
+      if (d.pendingSay) {
+        setWork(t("liveChecking")); if (route().name === "plan") renderThread(true);
+        try { await liveSearch(d); } catch { /* each part says for itself what failed */ }
+        d.pendingSay = null;
+        if (buildPlan(d).items.some((i) => !i.info)) m.extra = "plan";
+      }
+    }
+    if (person !== null) m.extra = helpLine(helpContext());
+    else if (m.extra !== "plan" && next && next.length) m.extra = chips(next.map((c) => ({ a: "say", v: c, l: c })));
+    return true;
   }
   let workText = null;
   const setWork = (txt) => { workText = txt; };

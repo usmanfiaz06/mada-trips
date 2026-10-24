@@ -109,6 +109,40 @@
 
     // ----- Ask and search (open to guests) -----
     parse: (text, tripCity) => call("POST", "/ask/parse", { text, tripCity: tripCity || null }),
+    /** Is the conversation on (GET /config askChat) for this person? Signed in only, as in the app. */
+    get canChat() { return !!(session && api.config && api.config.features && api.config.features.askChat); },
+    // Ask Mada as a conversation, the app's own (POST /ask/chat, docs/app/ASK-CHAT.md): each Server-Sent Event to
+    // onEvent as it comes. An error before the stream opens (off, limits, signed out) throws, so the page answers itself.
+    async chat(b, onEvent) {
+      const open = async () => {
+        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 70000);
+        const r = await fetch(BASE + "/ask/chat", { method: "POST", signal: ctl.signal, headers: { Accept: "text/event-stream", "Content-Type": "application/json", "Accept-Language": lang, "X-Request-Id": uuid(), Authorization: `Bearer ${session.tokens.accessToken}` }, body: JSON.stringify(b) });
+        return { r, ctl, timer };
+      };
+      if (!session) throw new ApiError("UNAUTHORIZED", "", 401);
+      let o;
+      try {
+        o = await open();
+        if (o.r.status === 401) { const e = ((await o.r.json().catch(() => null)) || {}).error || {}; clearTimeout(o.timer); if (e.code !== "TOKEN_EXPIRED") throw new ApiError(e.code || "UNAUTHORIZED", e.message, 401); await refresh(); o = await open(); }
+        if (!o.r.ok || !o.r.body) { const e = ((await o.r.json().catch(() => null)) || {}).error || {}; throw new ApiError(e.code || "HTTP_" + o.r.status, e.message, o.r.status, e); }
+        const rd = o.r.body.getReader(), dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await rd.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n\n")) >= 0) {
+            const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+            const data = frame.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("\n");
+            if (data) { try { onEvent(JSON.parse(data)); } catch { /* one bad frame doesn't end the turn */ } }
+          }
+        }
+      } catch (e) {
+        if (e instanceof ApiError) throw e;
+        throw new ApiError(e.name === "AbortError" ? "TIMEOUT" : "OFFLINE", e.message, 0);
+      } finally { if (o) clearTimeout(o.timer); }
+    },
     // Planning searches go as a guest (priced for the party said); at checkout they run again for the account's travellers (ids).
     flights: (b, pax, ids) => (ids ? call("POST", "/search/flights", { ...b, travellerIds: ids }, { timeout: 40000 }) : call("POST", "/search/flights", { ...b, guests: guests(pax), travellerIds: guests(pax).map((g) => g.id) }, { auth: false, timeout: 40000 })),
     stays: (b, pax, ids) => (ids ? call("POST", "/search/stays", { ...b, travellerIds: ids }, { timeout: 60000 }) : call("POST", "/search/stays", { ...b, guests: guests(pax), travellerIds: guests(pax).map((g) => g.id) }, { auth: false, timeout: 60000 })),
