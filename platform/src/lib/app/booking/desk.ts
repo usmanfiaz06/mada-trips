@@ -283,8 +283,24 @@ async function capture(tx: Tx, o: OrderRow): Promise<boolean> {
 
 const SV_DRIVER = { home: { driver: "Khalid", phone: "+966 55 014 2287", waits: "10 min" }, arrive: { driver: "Ahmet", car: "Grey Mercedes Vito", plate: "34 MDA 21", door: "Door 3", phone: "+90 532 418 6610", waits: "60 min" } };
 
+/**
+ * The trip a separately booked part belongs to: the owner's booked trip to the same city, created in the last 14 days,
+ * with dates that meet this part's (overlapping or touching within a day; a trip with no end yet is open for 30 days).
+ * Newest first.
+ */
+export async function tripToJoin(tx: Tx, ownerId: string, city: string, start: string, end: string): Promise<string | null> {
+  const [t] = await tx.select({ id: appTrips.id }).from(appTrips).where(and(
+    eq(appTrips.ownerId, ownerId), eq(appTrips.city, city), eq(appTrips.status, "booked"),
+    sql`${appTrips.createdAt} > now() - interval '14 days'`,
+    sql`${appTrips.startDate} <= (${end}::date + 1)`,
+    // A trip with no end yet (a one-way out) stays open for its way home, up to 30 days on.
+    sql`(${appTrips.endDate} >= (${start}::date - 1) or (${appTrips.endDate} is null and ${appTrips.startDate} >= (${start}::date - 30)))`,
+  )).orderBy(sql`${appTrips.createdAt} desc`).limit(1);
+  return t?.id ?? null;
+}
+
 async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent, now: Date): Promise<string> {
-  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string; destinationName?: string; place?: { country?: string | null } }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown>;
+  const snap = o.snapshot as { flight?: FlightOption; stay?: StayOption; search?: { destination?: string; destinationName?: string; place?: { country?: string | null }; direction?: "out" | "back" }; bundle?: boolean; draft?: { tripId?: string | null }; quotedFlight?: FareOption; place?: string; tickets?: string[]; flightRules?: Record<string, unknown>;
     /** A room the desk priced by hand (desk/hotel-quotes.ts), and the hotel's own reference the agent entered on confirming it. */
     quotedStay?: StayQuoteOption; hotelRef?: string | null };
   if (snap.quotedFlight) return writeQuotedTrip(tx, o, snap.quotedFlight, agent, now);
@@ -295,17 +311,29 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
   const lines = o.lines as OrderLine[];
   const amountOf = (keys: string[]) => lines.filter((l) => keys.includes(l.key)).reduce((a, l) => a + l.amount, 0) + (keys.includes("flight") ? o.extra : 0);
   const f = snap.flight;
+  // The way home booked on its own (a one-way from the destination, search.direction "back").
+  const homeLeg = !!f && snap.search?.direction === "back";
   const startDate = f ? f.out.date : snap.stay!.checkIn;
   const stayEnd = snap.stay ? addDays(snap.stay.checkIn, snap.stay.nights) : null;
-  const endDate = f ? f.back?.date ?? (snap.bundle ? null : null) : stayEnd;
+  const endDate = f ? f.back?.date ?? (homeLeg ? f.out.date : null) : stayEnd;
+  const city = dest?.name ?? snap.quotedStay?.city ?? snap.search?.destinationName ?? snap.place ?? (snap.stay ? "Istanbul" : "");
   let tripId = snap.draft?.tripId ?? null;
   if (tripId) {
     const [own] = await tx.select({ id: appTrips.id }).from(appTrips).where(and(eq(appTrips.id, tripId), eq(appTrips.ownerId, o.ownerId)));
     if (!own) tripId = null;
   }
+  // Parts of one trip paid as separate orders (the flight out, the hotel, the way home) land in one trip: the same
+  // person's trip to the same city, booked lately, whose dates meet these.
+  if (!tripId && city) tripId = await tripToJoin(tx, o.ownerId, city, startDate, endDate ?? startDate);
+  if (tripId) {
+    await tx.update(appTrips).set({
+      startDate: sql`least(${appTrips.startDate}, ${startDate}::date)`,
+      endDate: sql`greatest(coalesce(${appTrips.endDate}, ${appTrips.startDate}), ${endDate ?? startDate}::date)`,
+    }).where(eq(appTrips.id, tripId));
+  }
   if (!tripId) {
     const [trip] = await tx.insert(appTrips).values({
-      ownerId: o.ownerId, city: dest?.name ?? snap.quotedStay?.city ?? snap.search?.destinationName ?? snap.place ?? (snap.stay ? "Istanbul" : ""), country, imageUrl: dest?.photo ?? null, startDate, endDate,
+      ownerId: o.ownerId, city, country, imageUrl: dest?.photo ?? null, startDate, endDate,
       travellerIds: o.travellerIds, status: "booked", bookingRef: o.ref, confirmedByName: agent.name, confirmedByOpsUserId: agent.opsUserId ?? null,
     }).returning({ id: appTrips.id });
     tripId = trip!.id;
@@ -315,7 +343,7 @@ async function writeTrip(tx: Tx, o: OrderRow & { ref: string }, agent: DeskAgent
   const pickupFacts: Record<string, Record<string, unknown>> = {};
   if (f) {
     const carrier = CARRIERS[f.carrier];
-    const legs = [{ leg: f.out, dir: "out" as const, back: false }, ...(f.back ? [{ leg: f.back, dir: "back" as const, back: true }] : [])];
+    const legs = [{ leg: f.out, dir: homeLeg ? "back" as const : "out" as const, back: homeLeg }, ...(f.back ? [{ leg: f.back, dir: "back" as const, back: true }] : [])];
     for (const [i, { leg, dir, back }] of legs.entries()) {
       const arriveDay = leg.arr < leg.dep ? addDays(leg.date, 1) : leg.date;
       const [s] = await tx.insert(appSegments).values({

@@ -54,6 +54,8 @@ export const FlightSearch = z.object({
   infants: z.number().int().min(0).max(4).default(0),
   cabin: Cabin.default('economy'),
   flexibleDays: z.number().int().min(0).max(3).default(0),
+  /** "back": one way home from a destination (`from` is the destination's airport). Live suppliers only need from and to. */
+  direction: z.enum(['out', 'back']).optional(),
 });
 export type FlightSearch = z.input<typeof FlightSearch>;
 

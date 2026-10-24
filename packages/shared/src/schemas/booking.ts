@@ -114,6 +114,11 @@ export const FlightSearchRequest = z.object({
   flexibleDays: z.number().int().min(0).max(3).default(0),
   /** Without an account: who travellerIds are (GuestTraveller). Ignored when signed in. */
   guests: Guests,
+  /**
+   * "back": one way home from the destination (destination → from) on `depart`, to pair with a one-way out on another
+   * airline, day or time. Needs `return: null`. Left out, the trip starts from home as before.
+   */
+  direction: z.enum(['out', 'back']).default('out'),
 });
 export type FlightSearchRequest = z.input<typeof FlightSearchRequest>;
 
@@ -174,6 +179,8 @@ export const FlightSearchResponse = z.object({
   from: HomeAirport,
   depart: IsoDay,
   return: IsoDay.nullable(),
+  /** "back": these are one-way flights home from the destination (FlightSearchRequest.direction). */
+  direction: z.enum(['out', 'back']).optional(),
   cabin: Cabin,
   /** How many fares were looked at ("Checked 14 flights"). */
   checked: z.number().int(),

@@ -1505,3 +1505,6 @@ body:has(.sheet) .fab { display: none; }
 .gfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 14px 0 0; }
 .gby { font-size: 13px; color: var(--ink-3); }
 .gby b { font-family: Arial, Helvetica, sans-serif; color: var(--ink-2); }
+.fmode { margin-top: 20px; }
+.fmode button { min-height: 42px; padding: 8px 18px; }
+.fmode__note { margin: 12px 0 0; max-width: 70ch; }

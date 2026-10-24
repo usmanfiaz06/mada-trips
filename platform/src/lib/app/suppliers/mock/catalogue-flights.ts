@@ -32,12 +32,13 @@ function arrivalLocal(depLocal: string, from: string, to: string, durationMin: n
 }
 
 /** `adults` is every seat; `children` the seats on a child fare among them. */
-type Decoded = { dest: string; key: string; from: string; depart: string; ret: string | null; cabin: Cabin; adults: number; infants: number; children: number };
-const encode = (d: Decoded) => `cat.${d.dest}.${d.key}.${d.from}.${d.depart}.${d.ret ?? "ow"}.${d.cabin}.${d.adults}.${d.infants}${d.children ? `.${d.children}` : ""}`;
+/** `from` is always the home airport; `rev` is the way home on its own (one way from the destination, "hm" in the id). */
+type Decoded = { dest: string; key: string; from: string; depart: string; ret: string | null; cabin: Cabin; adults: number; infants: number; children: number; rev?: boolean };
+const encode = (d: Decoded) => `cat.${d.dest}.${d.key}.${d.from}.${d.depart}.${d.rev ? "hm" : d.ret ?? "ow"}.${d.cabin}.${d.adults}.${d.infants}${d.children ? `.${d.children}` : ""}`;
 function decode(id: string): Decoded | null {
-  const m = /^cat\.([a-z]+)\.([a-z0-9]+)\.([A-Z]{3})\.(\d{4}-\d{2}-\d{2})\.(\d{4}-\d{2}-\d{2}|ow)\.(economy|premium|business|first)\.(\d)\.(\d)(?:\.(\d))?$/.exec(id);
+  const m = /^cat\.([a-z]+)\.([a-z0-9]+)\.([A-Z]{3})\.(\d{4}-\d{2}-\d{2})\.(\d{4}-\d{2}-\d{2}|ow|hm)\.(economy|premium|business|first)\.(\d)\.(\d)(?:\.(\d))?$/.exec(id);
   if (!m) return null;
-  return { dest: m[1]!, key: m[2]!, from: m[3]!, depart: m[4]!, ret: m[5] === "ow" ? null : m[5]!, cabin: m[6] as Cabin, adults: Number(m[7]), infants: Number(m[8]), children: Number(m[9] ?? 0) };
+  return { dest: m[1]!, key: m[2]!, from: m[3]!, depart: m[4]!, ret: m[5] === "ow" || m[5] === "hm" ? null : m[5]!, rev: m[5] === "hm", cabin: m[6] as Cabin, adults: Number(m[7]), infants: Number(m[8]), children: Number(m[9] ?? 0) };
 }
 
 function offerOf(f: CatalogueFlight, d: Decoded, mainCode: string, now = new Date()): BookingFlightOffer {
@@ -60,7 +61,7 @@ function offerOf(f: CatalogueFlight, d: Decoded, mainCode: string, now = new Dat
   const kids = Math.min(d.children, d.adults);
   return {
     id: encode(d), supplier: "catalogue", label: f.label === "bags" ? "other" : f.label, reason: f.reason,
-    out: [leg(false, d.depart)], back: d.ret ? [leg(true, d.ret)] : [], cabin: d.cabin,
+    out: [leg(!!d.rev, d.depart)], back: d.ret ? [leg(true, d.ret)] : [], cabin: d.cabin,
     pricePerPerson: { amount: pp, currency: "SAR" }, childPrice: { amount: cp, currency: "SAR" }, infantPrice: { amount: ip, currency: "SAR" },
     total: { amount: times(pp, d.adults - kids) + times(cp, kids) + times(ip, d.infants), currency: "SAR" },
     baggage: f.bags, changeRule: f.change, refundRule: f.refund, seatsLeft: null,
@@ -75,9 +76,11 @@ export const catalogueFlights: BookingFlightSupplier = {
     const q = FlightSearchSchema.parse(input);
     if (q.to === "ERR") throw new SupplierDown("catalogue-flights");
     if (q.to === "XXX") return [];
-    const dest = destinationByCode(q.to);
+    // The way home: the same routes flown back, from the destination's airport to home.
+    const rev = q.direction === "back";
+    const dest = destinationByCode(rev ? q.from : q.to);
     const list = dest ? CATALOGUE_FLIGHTS[dest.key] ?? [] : [];
-    return list.map((f) => offerOf(f, { dest: dest!.key, key: f.key, from: q.from, depart: q.depart, ret: q.return, cabin: q.cabin, adults: q.adults + q.children, infants: q.infants, children: q.children }, dest!.code));
+    return list.map((f) => offerOf(f, { dest: dest!.key, key: f.key, from: rev ? q.to : q.from, depart: q.depart, ret: rev ? null : q.return, rev, cabin: q.cabin, adults: q.adults + q.children, infants: q.infants, children: q.children }, dest!.code));
   },
   async price(offerId, travellers, children) {
     const d = decode(offerId);

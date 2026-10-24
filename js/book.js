@@ -219,6 +219,14 @@
   }
   const sameFlight = (a, b) => !!(a && b && a.out.flightNumber === b.out.flightNumber && a.out.date === b.out.date && (a.back ? a.back.flightNumber : "") === (b.back ? b.back.flightNumber : ""));
   const liveOut = (d) => d.live && d.live.flights ? d.live.flights.options.find((o) => o.id === d.live.outId) || null : null;
+  // "Each way separately": a one-way out and a one-way home (direction "back"), each its own fare and its own order.
+  const owPick = (d) => { const w = d.live && d.live.mode === "ow" && d.live.ow; if (!w) return null; const a = w.out && w.out.options.find((o) => o.id === w.outId), b = w.back && w.back.options.find((o) => o.id === w.backId); return a && b ? [a, b] : null; };
+  const flightById = (d, id) => (d.live && [...(d.live.flights ? d.live.flights.options : []), ...(d.live.ow && d.live.ow.out ? d.live.ow.out.options : []), ...(d.live.ow && d.live.ow.back ? d.live.ow.back.options : [])].find((o) => o.id === id)) || null;
+  async function owSearch(d) {
+    const base = { from: d.from, destination: d.live.key, infants: d.pax.i, cabin: "economy", flexibleDays: 0, return: null };
+    const [out, back] = await Promise.all([A.flights({ ...base, depart: d.dep }, d.pax), A.flights({ ...base, depart: d.ret, direction: "back" }, d.pax)]);
+    d.live.ow = { out, back, outId: null, backId: null };
+  }
   const liveStay = (d) => d.live && (d.live.stayPick && d.live.stayPick.id === d.live.stayId ? d.live.stayPick : d.live.stays ? d.live.stays.options.find((o) => o.id === d.live.stayId) : null) || null;
   const liveEsim = (d) => d.live && d.live.esim ? d.live.esim.plans.find((x) => x.id === d.live.esimId) || null : null;
   const BOARD = { RO: ["Room only", "بدون وجبات"], BB: ["Breakfast included", "الإفطار مشمول"], HB: ["Breakfast and dinner", "إفطار وعشاء"], FB: ["All meals", "كل الوجبات"], AI: ["All inclusive", "شامل كليًا"] };
@@ -227,7 +235,14 @@
     const cc = D.byCode[d.to].country, lv = d.live, out = liveOut(d), stay = liveStay(d), esim = liveEsim(d);
     const people = d.pax.a + d.pax.c;
     const items = [];
-    if (out) items.push({
+    const ow = owPick(d);
+    if (ow) items.push({
+      k: "flight", icon: "flights", go: "#/flights/out", demo: ow.some((o) => o.demo),
+      title: `${ow[0].airline} ${ow[0].out.flightNumber} · ${ow[1].airline === ow[0].airline ? "" : ow[1].airline + " "}${ow[1].out.flightNumber}`,
+      sub: `${day(ow[0].out.date)} ${ow[0].out.dep} → ${ow[0].out.arr} · ${t("ret")} ${day(ow[1].out.date)} ${ow[1].out.dep} → ${ow[1].out.arr} · ${t("fl2").twoTickets}`,
+      price: sar(ow[0].total) + sar(ow[1].total),
+    });
+    else if (out) items.push({
       k: "flight", icon: "flights", go: "#/flights/out", demo: !!out.demo,
       title: `${out.airline} ${out.out.flightNumber}${out.back && out.back.flightNumber.slice(0, 2) !== out.out.flightNumber.slice(0, 2) ? " · " + out.back.flightNumber : ""}`,
       sub: `${day(out.out.date)} ${out.out.dep} → ${out.out.arr} · ${hrs(out.out.durationMin)} ${out.stop ? out.stop : t("direct")}${out.back ? ` · ${t("ret")} ${day(out.back.date)} ${out.back.dep}` : ""} · ${out.bags}`,
@@ -989,8 +1004,49 @@
   // ----- flights: the options the API found (best fit first), each with its rules in plain words -----
   // ----- flights: the way out first, then the ways back the airline sells with it (a return is priced as a pair) -----
   const legKey = (l) => `${l.flightNumber}|${l.date}|${l.dep}`;
+  // Return trip (one fare for both ways) or each way separately (two one-way fares, any airline, any time).
+  const modeSwitch = (d) => (d.ret ? `<div class="seg2 fmode" role="tablist">${[["rt", t("fl2").modeRt], ["ow", t("fl2").modeOw]].map(([k, l]) => `<button type="button" data-mode="${k}" class="${(d.live.mode || "rt") === k ? "on" : ""}">${esc(l)}</button>`).join("")}</div>` : "");
+  function wireMode(d) {
+    $$("[data-mode]").forEach((b) => b.addEventListener("click", () => { if ((d.live.mode || "rt") === b.dataset.mode) return; d.live.mode = b.dataset.mode; saveDraft(); location.hash === "#/flights/out" ? render() : (location.hash = "#/flights/out"); }));
+  }
+  async function viewFlightsOw(step) {
+    const d = draft, F = t("fl2");
+    if (!d.live.ow || !d.live.ow.out || !d.live.ow.back) {
+      page(loading(F.searchingOw));
+      try { await owSearch(d); saveDraft(); } catch (e) { return page(errBox(e.message || t("liveFlightsDown"), true)); }
+      if (route().name !== "flights") return;
+    }
+    const w = d.live.ow, back = step === "back" && w.outId, list = back ? w.back.options : w.out.options, chosenId = back ? w.backId : w.outId;
+    const leg = (l) => `<div class="fl__times"><b>${esc(l.dep)}</b><div class="fl__line">${esc(hrs(l.durationMin))}<i></i>${esc(l.from)} → ${esc(l.to)}</div><b>${esc(l.arr)}</b></div>`;
+    const first = back ? w.out.options.find((o) => o.id === w.outId) : null;
+    const cards = list.length ? list.map((o) => { const on = o.id === chosenId; return `<article class="lfo${on ? " on" : ""}">
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
+        <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div></div>
+        <ul class="lfo__rules"><li><small>${esc(t("uxStops"))}</small>${esc(o.stop || t("direct"))}</li><li><small>${esc(t("uxBags"))}</small>${esc(o.bags)}</li><li><small>${esc(t("uxChange"))}</small>${esc(o.changeRule)}</li><li class="${o.refundable ? "" : "warn"}"><small>${esc(t("uxRefund"))}</small>${esc(o.refundRule)}</li></ul>
+        <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(F.oneWayFor(paxText(d.pax)))}</small></div>
+          <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-ow="${o.id}">${esc(on ? t("selected") : back ? F.chooseBack : F.chooseOut)}</button></div>
+      </article>`; }).join("") : `<div class="empty empty--soft"><p>${esc(F.noneOw)}</p><a class="btn btn--plain" target="_blank" rel="noopener" href="${wa(F.waBack(placeName(d), range(d.dep, d.ret)))}">${esc(F.askPerson)}</a></div>`;
+    page(`<div class="wrap pg">
+      ${backLink(back ? "#/flights/out" : "#/plan")}
+      <h1 class="pg__h">${esc(back ? F.backTitle(city(d.from)) : t("flTitle")(city(d.to)))}</h1>
+      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))}</p>
+      ${modeSwitch(d)}
+      <ol class="fsteps"><li class="${back ? "done" : "on"}"><a href="#/flights/out">${esc(F.stepOut(day(d.dep)))}</a></li><li class="${back ? "on" : ""}">${esc(F.stepBack(day(d.ret)))}</li></ol>
+      <p class="note-s fmode__note">${esc(F.owNote)}</p>
+      ${list.some((o) => o.demo) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
+      ${first ? `<div class="lfo-chosen">${ico("check")}<div><small>${esc(F.goingOn(day(first.out.date)))}</small><b>${esc(first.airline)} · ${esc(first.out.flightNumber)} · ${esc(first.out.dep)} → ${esc(first.out.arr)} · ${esc(money(sar(first.total)))}</b></div><a class="link" href="#/flights/out">${esc(F.changeOut)}</a></div>` : ""}
+      <div class="lf">${cards}</div>
+    </div>`);
+    wireMode(d);
+    $$("[data-ow]").forEach((b) => b.addEventListener("click", () => {
+      if (back) { w.backId = b.dataset.ow; d.live.mode = "ow"; d.items.flight = true; saveDraft(); location.hash = "#/plan"; return; }
+      w.outId = b.dataset.ow; saveDraft(); location.hash = "#/flights/back";
+    }));
+  }
   function viewFlightsLive(step) {
     const d = draft, r = d.live && d.live.flights;
+    if (d.live && d.live.mode === "ow" && d.ret) return viewFlightsOw(step);
     if (!r || !r.options.length) return location.replace("#/plan");
     const F = t("fl2"), cur = liveOut(d), round = r.options.some((o) => o.back);
     const leg = (l) => `<div class="fl__times"><b>${esc(l.dep)}</b><div class="fl__line">${esc(hrs(l.durationMin))}<i></i>${esc(l.from)} → ${esc(l.to)}</div><b>${esc(l.arr)}</b></div>`;
@@ -1022,16 +1078,18 @@
         <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(F.bothWays(paxText(d.pax)))}${extra > 0 ? ` · +${esc(money(extra / 100))}` : ""}</small></div>
           <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-lf="${o.id}">${esc(on ? t("selected") : F.chooseBack)}</button></div>
       </article>`; }).join("")
-        + `<div class="lfo-more"><p>${esc(g.fares.length === 1 ? F.onlyOne : F.otherBack)}</p><a class="btn btn--plain btn--sm" target="_blank" rel="noopener" href="${wa(F.waBack(placeName(d), range(d.dep, d.ret)))}">${ico("chat")}${esc(F.askPerson)}</a></div>`;
+        + `<div class="lfo-more"><p>${esc(F.tryOw)}</p><button type="button" class="btn btn--plain btn--sm" data-mode="ow">${esc(F.modeOw)}</button></div>`;
     }
     page(`<div class="wrap pg">
       ${backLink(pickBack ? "#/flights/out" : "#/plan")}
       <h1 class="pg__h">${esc(pickBack ? F.backTitle(city(d.from)) : t("flTitle")(city(d.to)))}</h1>
       <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))} · ${esc(t("liveChecked")(r.checked))}</p>
+      ${modeSwitch(d)}
       ${steps2}
       ${r.options.some((o) => o.demo) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
       <div class="lf">${body}</div>
     </div>`);
+    wireMode(d);
     $$("[data-out]").forEach((b) => b.addEventListener("click", () => {
       if (!round) { d.live.outId = b.dataset.one; d.items.flight = true; saveDraft(); location.hash = "#/plan"; return; }
       d.live.lfOut = b.dataset.out; saveDraft(); location.hash = "#/flights/back";
@@ -1603,7 +1661,9 @@
       },
     };
     const drafts = [];
-    if (on("flight") && liveOut(d)) drafts.push({ kind: "trip", flightOfferId: d.live.outId, bundle: false, travellerIds: ids });
+    const ow = owPick(d);
+    if (on("flight") && ow) ow.forEach((o) => drafts.push({ kind: "trip", flightOfferId: o.id, bundle: false, travellerIds: ids }));
+    else if (on("flight") && liveOut(d)) drafts.push({ kind: "trip", flightOfferId: d.live.outId, bundle: false, travellerIds: ids });
     if (on("stay") && liveStay(d)) drafts.push({ kind: "stay", stayOfferId: d.live.stayId, travellerIds: ids });
     if (on("esim")) { const e = liveEsim(d); if (e) drafts.push({ kind: "esim", count: ids.length, packageId: e.id, travellerIds: ids, days: d.live.esim.days }); }
     if (!drafts.length) return page(errBox(t("liveNothing")));
@@ -1611,7 +1671,7 @@
     // out and named, and the rest still goes ahead.
     const got = await Promise.allSettled(drafts.map(async (x, i) => {
       try { return (await A.preview({ draft: x })).preview; }
-      catch (e) { if (!fresh[x.kind] || e.status === 401) throw e; drafts[i] = await fresh[x.kind](); return (await A.preview({ draft: drafts[i] })).preview; }
+      catch (e) { if (!fresh[x.kind] || e.status === 401 || (x.kind === "trip" && ow)) throw e; drafts[i] = await fresh[x.kind](); return (await A.preview({ draft: drafts[i] })).preview; }
     }));
     if (got.some((g) => g.status === "rejected" && g.reason && g.reason.status === 401)) { await A.signOut(); return location.replace("#/signin?next=travelers"); }
     const okIdx = got.map((g, i) => (g.status === "fulfilled" ? i : -1)).filter((i) => i >= 0);
@@ -1623,13 +1683,13 @@
   }
   // Long notes from a hotel, one point a line.
   const pointsOf = (txt) => String(txt || "").replace(/[\u00a0\s]+/g, " ").replace(/[“”"]/g, "").split(/(?<=[.!?])\s*(?=[A-Z\u0600-\u06FF])/).map((x) => x.trim()).filter((x) => x.length > 3);
-  function payCard(d, p) {
+  function payCard(d, p, draft) {
     const amt = esc(money(sar(p.total)));
     if (p.kind === "trip") {
-      const o = liveOut(d);
+      const o = (draft && flightById(d, draft.flightOfferId)) || liveOut(d), homeOnly = o && !o.back && o.out.to === d.from;
       const leg = (l, k) => `<div class="pl"><small>${esc(k)} · ${esc(day(l.date))}</small><div class="pl__t"><b>${esc(l.dep)}</b><span>${esc(city(l.from) || l.from)}</span></div><div class="pl__m">${esc(hrs(l.durationMin))}<i></i>${esc(o.stop || t("direct"))}</div><div class="pl__t pl__t--e"><b>${esc(l.arr)}</b><span>${esc(city(l.to) || l.to)}</span></div></div>`;
       return `<section class="pc"><header class="pc__h"><span class="pc__ic">${ico("flights")}</span><div><b>${o ? `${esc(o.airline)} · ${esc(o.out.flightNumber)}${o.back ? ` / ${esc(o.back.flightNumber)}` : ""}` : esc(p.title)}</b><small>${esc(p.lines.map((l) => l.text).join(" · "))}</small></div><strong>${amt}</strong></header>
-        ${o ? `<div class="pc__legs">${leg(o.out, t("outL"))}${o.back ? leg(o.back, t("retL")) : ""}</div>` : ""}
+        ${o ? `<div class="pc__legs">${leg(o.out, homeOnly ? t("retL") : t("outL"))}${o.back ? leg(o.back, t("retL")) : ""}</div>` : ""}
         <ul class="pc__f">${p.family && p.family.bags ? `<li>${ico("check")}${esc(t("bagsEach")(p.family.bags))}</li>` : o ? `<li>${ico("check")}${esc(o.bags)}</li>` : ""}${o ? `<li>${ico("clock")}${esc(t("changeL"))}: ${esc(o.changeRule)}</li>` : ""}<li>${ico("shield")}${esc(p.rule)}</li>${p.missingPassports && p.missingPassports.length ? `<li>${ico("visa")}${esc(t("passportLater"))}</li>` : ""}</ul></section>`;
     }
     if (p.kind === "stay") {
@@ -1655,7 +1715,7 @@
       ${pv.some((p) => p.demoFare) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
       ${(co.left || []).length ? `<div class="nudge nudge--left" style="margin-top:12px"><div><b>${esc(t("hlp").leftOut(joinNames(co.left.map((x) => t("payFor")(x.kind)))))}</b><small>${esc(t("hlp").leftOutSub)}</small></div><a class="btn btn--plain btn--sm" target="_blank" rel="noopener" href="${wa(t("hlp").waLeft(co.left.map((x) => t("payFor")(x.kind)).join(", "), placeName(d)))}">WhatsApp</a></div>` : ""}
       <div class="pg__grid"><form id="payForm" novalidate>
-        ${pv.map((p) => payCard(d, p)).join("")}
+        ${pv.map((p, i) => payCard(d, p, co.drafts[i])).join("")}
         <div class="box"><h2 class="box__h">${esc(t("payHow"))}</h2><div class="pm" id="pm">
           ${m("mada", t("mada"), "", LOGO.mada)}${m("card", t("card"), "", LOGO.visa + LOGO.mc)}
           ${tabby ? m("tabby", t("tabby"), t("tabbySub")(money(tabby)), LOGO.tabby) : ""}${tamara ? m("tamara", t("tamara"), t("tamaraSub")(money(tamara)), LOGO.tamara) : ""}
@@ -1701,8 +1761,8 @@
         }
         busyOff();
         co.orders = orders; store.set("checkout", co);
-        const lo = liveOut(d), ls = liveStay(d);
-        store.set("waitMeta", { ids: orders.join(","), to: d.to, dep: d.dep, ret: d.ret, pax: d.pax, flight: lo && { airline: lo.airline, out: lo.out, back: lo.back }, stay: ls && { name: ls.name, img: ls.hotel && ls.hotel.imageUrl, stars: (ls.facts || {}).stars }, passports: co.previews.some((p) => p.missingPassports && p.missingPassports.length) });
+        const lo = owPick(d) ? { airline: owPick(d)[0].airline, out: owPick(d)[0].out, back: owPick(d)[1].out } : liveOut(d), ls = liveStay(d);
+        store.set("waitMeta", { ids: orders.join(","), to: d.to, dep: d.dep, ret: d.ret, pax: d.pax, flight: lo && { airline: lo.airline, out: lo.out, back: lo.back }, twoFlights: !!owPick(d), stay: ls && { name: ls.name, img: ls.hotel && ls.hotel.imageUrl, stars: (ls.facts || {}).stars }, passports: co.previews.some((p) => p.missingPassports && p.missingPassports.length) });
         location.hash = `#/wait/${orders.join(",")}`;
       } catch (err) { busyOff(); const el = $("#payErr"); el.hidden = false; el.textContent = err.message; }
     });
@@ -1747,6 +1807,7 @@
     const legRow = (l) => `<div class="wl"><b>${esc(l.dep)}</b><span>${esc(city(l.from) || l.from)}</span><i></i><span>${esc(city(l.to) || l.to)}</span><b>${esc(l.arr)}</b><small>${esc(day(l.date))} · ${esc(l.flightNumber)}</small></div>`;
     const lines = (o) => `<small>${esc(o.lines.map((l) => l.text).join(" · "))}</small>`;
     const itemCard = (o) => {
+      if (o.kind === "trip" && meta.twoFlights) { const f = meta.flight, l = f && (o.flightNumber === f.back.flightNumber ? f.back : f.out); return `<article class="wc"><span class="pc__ic">${ico("flights")}</span><div class="wc__b"><b>${esc(o.airline || o.title)}</b>${l ? legRow(l) : lines(o)}</div>${chip(o)}</article>`; }
       if (o.kind === "trip") { const f = meta.flight; return `<article class="wc"><span class="pc__ic">${ico("flights")}</span><div class="wc__b"><b>${esc(f ? f.airline : o.airline || o.title)}</b>${f ? legRow(f.out) + (f.back ? legRow(f.back) : "") : lines(o)}</div>${chip(o)}</article>`; }
       if (o.kind === "stay") { const h = meta.stay || {}; return `<article class="wc">${h.img ? `<img class="wc__img" src="${esc(h.img)}" alt="" />` : `<span class="pc__ic">${ico("stays")}</span>`}<div class="wc__b">${h.stars ? `<span class="ht__stars">${"★".repeat(h.stars)}</span>` : ""}<b>${esc(o.title)}</b>${lines(o)}</div>${chip(o)}</article>`; }
       return `<article class="wc"><span class="pc__ic">${ico("esim")}</span><div class="wc__b"><b>${esc(o.title)}</b>${lines(o)}</div>${chip(o)}</article>`;

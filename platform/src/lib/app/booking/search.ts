@@ -118,12 +118,14 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
   const dest = DESTINATIONS[q.destination];
   if (!dest) throw new AppError("VALIDATION", { fields: { destination: "Unknown destination" } });
   if (q.return && q.return <= q.depart) throw new AppError("VALIDATION", { fields: { return: "Return must be after the day out" } });
+  const back = q.direction === "back";
+  if (back && q.return) throw new AppError("VALIDATION", { fields: { return: "A flight home is one way: leave the return out" } });
   if (q.depart < today()) throw new AppError("VALIDATION", { fields: { depart: "That day has passed" } });
   const people = await partyOf(ownerId, q.travellerIds, q.guests);
   const n = people.length;
   // Children 2 to 11 and babies with a seat fly on a child fare (their age on the day out).
   const kids = childSeats(people, q.depart);
-  const base = { destination: dest.key, destinationName: dest.name, from: q.from, depart: q.depart, return: q.return, cabin: q.cabin, unavailable: [] as { carrier: string; airline: string }[], bundle: null };
+  const base = { destination: dest.key, destinationName: dest.name, from: q.from, depart: q.depart, return: q.return, ...(q.direction === "back" ? { direction: "back" as const } : {}), cabin: q.cabin, unavailable: [] as { carrier: string; airline: string }[], bundle: null };
   const until = (at: number) => new Date(at + CACHE_MS).toISOString();
   if (dest.byHand) return { ...base, outcome: "by_hand", checked: 0, options: [], cachedUntil: until(Date.now()) };
   let depart = q.depart;
@@ -134,12 +136,14 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
     if (!q.return || later < q.return) depart = later;
   }
   const from = dest.code === q.from ? (q.from === "RUH" ? "JED" : "RUH") : q.from;
-  const key = JSON.stringify(["f", supplierMode("flights"), from, dest.code, depart, q.return, n, kids, q.infants, q.cabin, ...(duffelSource() ? ["duffel"] : [])]);
+  // The way home on its own: from the destination's airport to home, one way.
+  const [origin, to] = back ? [dest.code, from] : [from, dest.code];
+  const key = JSON.stringify(["f", supplierMode("flights"), q.direction, origin, to, depart, q.return, n, kids, q.infants, q.cabin, ...(duffelSource() ? ["duffel"] : [])]);
   let offers: BookingFlightOffer[];
   let at: number;
   let saved: Promise<void>;
   try {
-    ({ value: offers, at, saved } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin }), supplierMode("flights") === "live"));
+    ({ value: offers, at, saved } = await cached(key, () => bookingSuppliers.flights().search({ from: origin, to, depart, return: q.return, ...(back ? { direction: "back" as const } : {}), adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin }), supplierMode("flights") === "live"));
   } catch (e) {
     if (e instanceof SupplierDown) return { ...base, depart, outcome: "partial", checked: 0, options: [], unavailable: [{ carrier: "*", airline: "The airline" }], cachedUntil: until(Date.now()) };
     // A live supplier (TBO) that can't answer this route: the desk books it by hand, as a request (never an error screen).
@@ -154,13 +158,13 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
     offers = offers.filter((o) => o.out[0]?.carrier !== "SV");
     unavailable.push({ carrier: "SV", airline: CARRIERS.SV!.name });
   }
-  const search = { kind: "flight", destination: dest.key, from, depart, return: q.return, travellerIds: people.map((p) => p.id), infants: q.infants, cabin: q.cabin };
+  const search = { kind: "flight", destination: dest.key, from, depart, return: q.return, travellerIds: people.map((p) => p.id), infants: q.infants, cabin: q.cabin, ...(back ? { direction: "back" as const } : {}) };
   const expiresAt = holdEnds();
   const options: FlightOption[] = offers.map((o) => ({ ...flightOptionOf(o, randomUUID(), n, q.infants, kids), expiresAt: expiresAt.toISOString() }));
   await Promise.all([saved, storeOffers(offers.map((o, i) => ({
     id: options[i]!.id, ownerId, kind: "flight", supplier: o.supplier, supplierOfferId: o.id, search, payload: options[i] as unknown as Record<string, unknown>, total: options[i]!.total.amount, expiresAt,
   })))]);
-  const b = dest.key === "istanbul" && q.return ? bundleFor(n, depart, q.return) : null;
+  const b = dest.key === "istanbul" && q.return && !back ? bundleFor(n, depart, q.return) : null;
   return {
     ...base, depart, outcome: options.length ? (unavailable.length ? "partial" : "ok") : "none", checked: CHECKED_FARES[dest.key] ?? 9, options, unavailable,
     bundle: b ? { nights: b.nights, stay: money(sarToHalalas(b.staySar)), pickup: money(sarToHalalas(b.pickupSar)), total: money(sarToHalalas(b.totalSar)), hotelName: b.hotel.name, rooms: b.rooms } : null,
