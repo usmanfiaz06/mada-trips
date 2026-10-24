@@ -80,6 +80,15 @@
     halal: '<path d="M7 3v8M5 3v4.5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7h3"/>',
     kids: '<circle cx="12" cy="6" r="2.5"/><path d="M7 11l5-1.5 5 1.5M12 9.5V15l-3 5M12 15l3 5"/>',
     shuttle: '<rect x="4" y="4" width="16" height="12" rx="3"/><path d="M4 11h16M7 19v-3M17 19v-3"/><circle cx="8" cy="13.5" r=".6"/><circle cx="16" cy="13.5" r=".6"/>',
+    bed: '<path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5"/><circle cx="7" cy="11" r="1.8"/>',
+    view: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 15l4.5-4 3.5 3 3-2.5 6 4.5"/>',
+    cup: '<path d="M5 9h12v4a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H16.5M8 3.5v2.5M12 3.5v2.5"/>',
+    shield: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+    card: '<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    access: '<circle cx="12" cy="4.8" r="1.8"/><path d="M6 8.5l6 1 6-1M12 9.5v4.5l-3 6M12 14l3 6"/>',
+    smoke: '<path d="M3 15h13v3H3zM18 15v3M21 15v3M18 12c0-2 2-2 2-4M21 12c0-2-1.5-3-1.5-5"/>',
     star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8L3.5 9.7l5.9-.8z"/>',
   };
   const ico = (k) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k] || ""}</svg>`;
@@ -1060,6 +1069,11 @@
     return map;
   }
 
+  // Why a hotel ranks where it does, in one plain line, from the reasons the API gives (stay-fit.ts).
+  function whyLine(o) {
+    const w = t("fitWhy"), rs = (o.fit && o.fit.reasons) || [];
+    return rs.map((r) => (r.k === "near" ? null : r.k === "has" && r.what ? w.has((t("amenLive") || {})[r.what] || r.what) : w[r.k] && typeof w[r.k] === "string" ? w[r.k] : r.k === "stars" && r.n ? w.stars(r.n) : null)).filter(Boolean).slice(0, 3).join(" · ");
+  }
   // ----- hotels: real rooms from the hotel supplier, with photos -----
   let lsSort = "rec", lsStars = "all", lsF = { breakfast: false, cancel: false, pool: false }, lsMore = 12, lsView = "list", lsFrom = 0;
   function viewStayLive() {
@@ -1093,9 +1107,10 @@
           <b class="ht__t">${esc(o.name)}</b>
           <span class="ht__loc">${ico("pin")}${esc(far ? far.text : o.address || o.area)}</span>
           ${far ? `<span class="ht__addr">${esc(o.address || o.area)}</span>` : ""}
-          <p class="ht__take"><span>${SUN}</span>${esc(o.note)}</p>
+          ${(() => { const rf = roomFacts((o.hotel && o.hotel.room) || fa.room || ""); return rf.base ? `<span class="ht__room">${ico("bed")}${esc(roomName(rf.base))}${rf.beds.length ? ` · ${esc(bedText(rf.beds))}` : ""}${rf.view ? ` · ${esc(viewText(rf.view))}` : ""}</span>` : ""; })()}
+          ${whyLine(o) ? `<p class="ht__why"><span>${SUN}</span>${esc(whyLine(o))}</p>` : ""}
           <span class="ht__perks"><span class="${["BB", "HB", "FB", "AI"].includes(fa.board) ? "" : "no"}">${esc(fa.board && BOARD[fa.board] ? L(BOARD[fa.board]) : t("noBfast"))}</span><span class="${o.freeCancelUntil ? "" : "no"}">${esc(o.freeCancelUntil ? t("cancelBy")(fmt(o.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"))}</span></span>
-          <div class="amen">${(fa.amenities || []).slice(0, 6).map((a) => `<span title="${esc((t("amenLive") || {})[a] || a)}">${ico(AMEN_ICON[a] || "star")}<em>${esc((t("amenLive") || {})[a] || a)}</em></span>`).join("")}</div>
+          ${(fa.amenities || []).length ? `<ul class="hl hl--s">${fa.amenities.filter((a) => AMEN_ICON[a]).slice(0, 5).map((a) => `<li>${ico(AMEN_ICON[a])}<span>${esc((t("amenLive") || {})[a] || a)}</span></li>`).join("")}</ul>` : ""}
         </a>
         <div class="ht__pr"><small>${esc(o.roomsLabel)}</small><b>${esc(money(sar(o.total)))}</b><span class="ht__night">${esc(t("perNight")(money(sar(o.total) / nights / Math.max(1, o.rooms))))}</span>
           <button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-ls="${o.id}">${esc(on ? t("selected") : t("select"))}</button>
@@ -1128,39 +1143,130 @@
     $("#noHotel").addEventListener("click", () => { d.items.stay = false; saveDraft(); location.hash = "#/plan"; });
   }
 
+  // A supplier's room name ("Deluxe Room with One King Bed Sheikh Zayed Road View Smoking-Double") read into what a
+  // guest chooses by: the room, its beds, its view, how many bedrooms, accessible or smoking. Nothing is invented.
+  const NUM = { one: 1, two: 2, three: 3, four: 4, 1: 1, 2: 2, 3: 3, 4: 4 };
+  const VIEWS = /\b(partial sea|sea|ocean|burj khalifa|burj|fountain|city|skyline|garden|pool|marina|haram|kaaba|sheikh zayed road|creek|lake|mountain|courtyard|street|river|bosphorus|landmark|golf|beach)\s+view\b/i;
+  function roomFacts(raw) {
+    const s = String(raw || "").replace(/\s*-\s*double\s*$/i, "").replace(/-double\s*$/i, "").trim(), low = s.toLowerCase();
+    const view = (low.match(VIEWS) || [])[1] || null;
+    const br = low.match(/\b(one|two|three|four|[1-4])[- ]bedrooms?\b/);
+    const beds = [];
+    for (const m of low.matchAll(/\b(one|two|three|four|[1-4])\s+(king|queen|single|double|twin)(?:[- ]size)?\s+beds?\b/g)) beds.push([NUM[m[1]], m[2]]);
+    if (!beds.length) { const m = low.match(/\b(king|queen|twin|double)(?:[- ]size)?\s+beds?\b/); if (m) beds.push([m[1] === "twin" ? 2 : 1, m[1] === "twin" ? "single" : m[1]]); }
+    let base = s.split(/\s+with\s+|,/i)[0].replace(VIEWS, "").replace(/\b(non[- ]?)?smoking\b|\baccessible\b/gi, "").replace(/\s{2,}/g, " ").trim();
+    base = base ? base[0].toUpperCase() + base.slice(1).toLowerCase() : s;
+    if (/^double deluxe$/i.test(base)) base = "Deluxe double";
+    return { base, view, bedrooms: br ? NUM[br[1]] : null, beds, smoke: /non[- ]?smoking/.test(low) ? "no" : /smoking/.test(low) ? "yes" : null, access: /accessible/.test(low) };
+  }
+  // Common room words in Arabic, noun first ("Deluxe double room" → "غرفة مزدوجة ديلوكس"); anything else stays as the hotel wrote it.
+  const AR_NOUN = { room: "غرفة", suite: "جناح", studio: "استوديو", apartment: "شقة", villa: "فيلا", chalet: "شاليه", king: "غرفة كينج", double: "غرفة مزدوجة", twin: "غرفة توأم", triple: "غرفة ثلاثية", quadruple: "غرفة رباعية", single: "غرفة مفردة" };
+  const AR_ADJ = { deluxe: "ديلوكس", standard: "قياسية", superior: "سوبيريور", executive: "تنفيذية", classic: "كلاسيك", premium: "بريميوم", premier: "بريمير", family: "عائلية", junior: "جونيور", luxury: "فاخرة", grand: "جراند", club: "كلوب", signature: "سيغنتشر", double: "مزدوجة", twin: "توأم", triple: "ثلاثية", single: "مفردة", king: "كينج", queen: "كوين", city: "", one: "", bedroom: "", "two-bedroom": "بغرفتين", "one-bedroom": "بغرفة نوم" };
+  function roomName(base) {
+    if (lang !== "ar") return base;
+    const w = base.toLowerCase().split(/\s+/);
+    const ni = w.map((x) => x in AR_NOUN).lastIndexOf(true);
+    if (ni < 0 || !w.every((x, i) => i === ni || x in AR_ADJ)) return base;
+    return [AR_NOUN[w[ni]], ...w.filter((_, i) => i !== ni).map((x) => AR_ADJ[x])].filter(Boolean).join(" ");
+  }
+  const bedText = (beds) => beds.map(([n, k]) => t("bedN")(n, k)).join(" + ");
+  const viewText = (v) => t("viewOf")(v.replace(/\b\w/g, (c) => c.toUpperCase()));
+  // What a guest uses, first; the hotel's inventory and the cards it takes, never.
+  const FAC_FIRST = [/pool/i, /beach/i, /kids|children|playground|babysit/i, /wi-?fi|internet/i, /parking|garage/i, /breakfast|restaurant/i, /spa|sauna|massage|hammam/i, /gym|fitness/i, /family|connecting/i, /wheelchair|accessible|adapted/i, /shuttle|transfer|metro|bus/i, /room service/i, /24-hour|reception/i, /laundry/i];
+  const FAC_SKIP = /number of|^hotel$|rooms?$|suites?$|studios?$|renovation|express|jcb|diners|visa|mastercard|maestro|american express|card|built|floors?$|^city centre$|^airport$|^harbour$|area$|nearest/i;
+  function rankFacilities(list) {
+    const names = [...new Set((list || []).filter((x) => !FAC_SKIP.test(x.name)).map((x) => x.name + (x.paid ? ` (${t("paidExtra")})` : "")))];
+    const rank = (n) => { const i = FAC_FIRST.findIndex((re) => re.test(n)); return i < 0 ? 99 : i; };
+    return names.sort((a, b) => rank(a) - rank(b));
+  }
+  const FAC_ICON = [[/pool/i, "pool"], [/beach/i, "pool"], [/kids|children/i, "kids"], [/wi-?fi|internet/i, "wifi"], [/parking|garage|valet/i, "parking"], [/breakfast|restaurant|dining|bar|café|cafe/i, "cup"], [/spa|sauna|massage/i, "spa"], [/gym|fitness/i, "gym"], [/shuttle|transfer|bus|metro|train/i, "shuttle"], [/wheelchair|accessible|lift|elevator/i, "access"], [/prayer|mosque/i, "prayer"], [/24-hour|reception|concierge|security/i, "clock"]];
+  const facIco = (n) => ico((FAC_ICON.find(([re]) => re.test(n)) || [0, "check"])[1]);
+  const firstSentences = (txt, n) => { const parts = String(txt).match(/[^.!?]+[.!?]+(\s|$)/g) || [txt]; return parts.slice(0, n).join("").trim(); };
+
+  let hdPick = null;
   async function viewHotelLive(optId) {
     const d = draft, o = (d.live.stays ? d.live.stays.options.find((x) => x.id === optId) : null) || (d.live.stayPick && d.live.stayPick.id === optId ? d.live.stayPick : null);
     if (!o || !o.hotel) return location.replace("#/stay");
     page(loading(t("liveLoadingHotel")));
-    const [h, rooms] = await Promise.all([A.hotel(o.hotel.code).then((x) => x.hotel).catch(() => null), A.rooms(o.id).then((x) => x.options).catch(() => [o])]);
+    const [h, roomsR] = await Promise.all([A.hotel(o.hotel.code).then((x) => x.hotel).catch(() => null), A.rooms(o.id).then((x) => x.options).catch(() => [o])]);
     if (route().name !== "hotel") return;
-    const imgs = (h && h.images && h.images.length ? h.images : [o.hotel.imageUrl]).filter(Boolean).slice(0, 5);
+    const rooms = roomsR.length ? roomsR : [o];
+    const imgs = (h && h.images && h.images.length ? h.images : [o.hotel.imageUrl]).filter(Boolean);
     const fa = o.facts || {}, nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
-    // What a guest uses, not the hotel's inventory or the cards it takes.
-    const free = h && h.facilities ? h.facilities.filter((x) => !x.paid && !/number of|^hotel$|rooms?$|suites?$|studios?$|renovation|express|jcb|diners|visa|mastercard|maestro|card|built|floors?$|^city centre$/i.test(x.name)).slice(0, 16) : [];
-    page(`<div class="wrap pg">
+    if (!hdPick || !rooms.some((r) => r.id === hdPick)) hdPick = (rooms.find((r) => r.id === d.live.stayId) || rooms[0]).id;
+    // Rooms that differ only by board, refund or smoking are one room with choices under it.
+    const groups = [];
+    for (const r of rooms) {
+      const rf = roomFacts((r.hotel && r.hotel.room) || (r.facts || {}).room || r.name);
+      const key = [rf.base, bedText(rf.beds), rf.view, rf.bedrooms, rf.access].join("|").toLowerCase();
+      let g = groups.find((x) => x.key === key);
+      if (!g) groups.push((g = { key, rf, opts: [] }));
+      g.opts.push({ r, rf });
+    }
+    groups.forEach((g) => g.opts.sort((a, b) => a.r.total.amount - b.r.total.amount));
+    groups.sort((a, b) => a.opts[0].r.total.amount - b.opts[0].r.total.amount);
+    const cheapest = Math.min(...rooms.map((r) => r.total.amount));
+    const facs = rankFacilities(h && h.facilities);
+    const amen = (fa.amenities || []).filter((k) => AMEN_ICON[k]);
+    const near = (o.fit && o.fit.reasons || []).find((x) => x.k === "near");
+    const desc = h && h.description ? h.description.replace(/\s+/g, " ").trim() : "";
+    const short = desc ? firstSentences(desc, 2) : "";
+    const optRow = ({ r, rf }, g) => {
+      const f = r.facts || {}, on = r.id === hdPick, extra = r.total.amount - g.opts[0].r.total.amount;
+      const bits = [f.board && BOARD[f.board] ? L(BOARD[f.board]) : t("noBfast"), r.freeCancelUntil ? t("cancelBy")(fmt(r.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef")];
+      if (rf.smoke === "yes") bits.push(t("smoking")); else if (rf.smoke === "no") bits.push(t("nonSmoking"));
+      return `<label class="ro${on ? " on" : ""}"><input type="radio" name="room" value="${r.id}" ${on ? "checked" : ""} />
+        <span class="ro__w"><span class="ro__b">${["BB", "HB", "FB", "AI"].includes(f.board) ? ico("cup") : ""}${esc(bits[0])}</span><small>${bits.slice(1).map(esc).join(" · ")}</small></span>
+        <span class="ro__p"><b>${esc(money(sar(r.total)))}</b><small>${extra > 0 ? esc(t("plusAmt")(money(extra / 100))) : esc(t("perNightAmt")(money(Math.round(sar(r.total) / nights))))}</small></span></label>`;
+    };
+    page(`<div class="wrap pg hd">
       ${backLink("#/stay")}
-      <div class="hd-gal hd-gal--${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<img src="${esc(u)}" alt="" ${i ? 'loading="lazy"' : ""} />`).join("")}${h && h.images ? `<span class="hd-gal__n">${esc(t("photosN")(h.images.length))}</span>` : ""}</div>
+      <div class="hd-gal hd-gal--${Math.min(imgs.length, 4)}" id="hdGal">${imgs.slice(0, 4).map((u, i) => `<img src="${esc(u)}" alt="" data-gi="${i}" ${i ? 'loading="lazy"' : ""} />`).join("")}${imgs.length > 4 ? `<button type="button" class="hd-gal__n" id="allPh">${esc(t("photosN")(imgs.length))}</button>` : ""}</div>
       <div class="pg__grid"><div>
-        ${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}
-        <h1 class="pg__h" style="margin-top:6px">${esc(h ? h.name : o.name)}</h1>
-        <p class="ht__loc" style="margin-top:10px">${ico("pin")}${esc((h && h.address) || o.address)}</p>
-        <div class="box hd-take"><span class="say__mark">${SUN}</span><div><b>${esc(t("takeL"))}</b><p>${esc(o.note)}</p></div></div>
-        <h2 class="hd-h">${esc(t("roomsH"))}</h2>
-        ${(rooms.length ? rooms : [o]).slice(0, 8).map((r) => { const on = r.id === d.live.stayId, rf = r.facts || {}; return `<div class="room room--live${on ? " on" : ""}">
-          <div class="room__t"><b>${esc((r.hotel && r.hotel.room) || rf.room || r.name)}</b>
-            <span>${esc(r.roomsLabel)}</span>
-            <span class="ht__perks"><span class="${["BB", "HB", "FB", "AI"].includes(rf.board) ? "" : "no"}">${esc(rf.board && BOARD[rf.board] ? L(BOARD[rf.board]) : t("noBfast"))}</span><span class="${r.freeCancelUntil ? "" : "no"}">${esc(r.cancellation)}</span></span></div>
-          <div class="room__pr"><small>${esc(t("forStay")(nights, r.rooms))}</small><b>${esc(money(sar(r.total)))}</b><button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-room="${r.id}">${esc(on ? t("chosenRoom") : t("selectRoom"))}</button></div>
-        </div>`; }).join("")}
+        <div class="hd-top">${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}${o.badge === "best" ? `<span class="pick__k">${esc(t("bestForYou"))}</span>` : ""}</div>
+        <h1 class="pg__h hd-t">${esc(h ? h.name : o.name)}</h1>
+        <p class="ht__loc">${ico("pin")}${esc((h && h.address) || o.address)}${near ? ` · ${esc(t("kmCentre")(near.km))}` : ""}</p>
+        ${amen.length ? `<ul class="hl">${amen.map((k) => `<li>${ico(AMEN_ICON[k])}<span>${esc(t("amenLive")[k] || k)}</span></li>`).join("")}</ul>` : ""}
+        ${short ? `<p class="hd-lede">${esc(short)}${desc.length > short.length + 20 ? ` <button type="button" class="link" id="moreDesc">${esc(t("readMore"))}</button>` : ""}</p><p class="hd-lede hd-lede--all" id="allDesc" hidden>${esc(desc)}</p>` : ""}
+
+        <h2 class="hd-h" id="roomsH">${esc(t("roomsH"))}<small>${esc(t("roomsFor")(nights, paxText(d.pax)))}</small></h2>
+        <div class="rgs" id="rooms">${groups.slice(0, 10).map((g, gi) => `<section class="rg">
+          <div class="rg__h"><b>${esc(roomName(g.rf.base))}</b>${gi === 0 && groups.length > 1 && g.opts[0].r.total.amount === cheapest ? `<span class="tagg">${esc(t("lowestHere"))}</span>` : ""}</div>
+          <ul class="rg__f">${g.rf.bedrooms ? `<li>${ico("stays")}${esc(t("bedroomsN")(g.rf.bedrooms))}</li>` : ""}${g.rf.beds.length ? `<li>${ico("bed")}${esc(bedText(g.rf.beds))}</li>` : ""}${g.rf.view ? `<li>${ico("view")}${esc(viewText(g.rf.view))}</li>` : ""}${g.rf.access ? `<li>${ico("access")}${esc(t("accessibleRoom"))}</li>` : ""}<li>${ico("ppl")}${esc(g.opts[0].r.roomsLabel)}</li></ul>
+          <div class="rg__o">${g.opts.slice(0, 4).map((x) => optRow(x, g)).join("")}</div>
+        </section>`).join("")}</div>
+        ${groups.length > 10 ? `<p class="note-s">${esc(t("moreRooms")(groups.length - 10))}</p>` : ""}
+
         ${hotelLL(o) ? `<h2 class="hd-h">${esc(t("whereIs"))}</h2><div id="hdMap" class="hd-map"></div><p class="map-credit">${esc(t("mapCredit"))}</p><ul class="dists">${marksFor(d).map((m) => { const far = howFar(o, m); return far ? `<li>${ico(m.airport ? "flights" : "pin")}<span>${esc(far.text)}</span></li>` : ""; }).join("")}</ul>` : ""}
-        ${h && h.description ? `<h2 class="hd-h">${esc(t("aboutHotel"))}</h2><p class="hd-desc">${esc(h.description)}</p>` : ""}
-        ${free.length ? `<h2 class="hd-h">${esc(t("amenH"))}</h2><ul class="facs">${free.map((x) => `<li>${esc(x.name)}</li>`).join("")}</ul>` : ""}
+        ${facs.length ? `<h2 class="hd-h">${esc(t("amenH"))}</h2><ul class="facs2">${facs.slice(0, 12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul>${facs.length > 12 ? `<details class="fine"><summary>${esc(t("allFacs")(facs.length))}</summary><ul class="facs2 facs2--all">${facs.slice(12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul></details>` : ""}` : ""}
         <h2 class="hd-h">${esc(t("policyH"))}</h2>
-        <ul class="pol"><li>${esc(o.cancellation)}</li>${fa.payAtHotel ? `<li>${esc(t("payAtHotel")(money(fa.payAtHotel / 100)))}</li>` : ""}<li>${esc(t("idNote"))}</li></ul>
-      </div><aside class="pg__side">${sumCard(d)}</aside></div></div>`);
+        <ul class="gk">${fa.payAtHotel ? `<li>${ico("card")}<span>${esc(t("payAtHotel")(money(fa.payAtHotel / 100)))}</span></li>` : ""}<li>${ico("visa")}<span>${esc(t("idNote"))}</span></li>${h && h.phone ? `<li>${ico("chat")}<span>${esc(t("hotelPhone"))} <a class="link" href="tel:${esc(h.phone)}" dir="ltr">${esc(h.phone)}</a></span></li>` : ""}</ul>
+      </div><aside class="pg__side">${sumCard(d)}</aside></div>
+      <div class="choose" id="choose"></div>
+    </div>
+    <div class="lb" id="lb" hidden><button type="button" class="lb__x" id="lbX" aria-label="${esc(t("close"))}">×</button><button type="button" class="lb__nav" data-lb="-1" aria-label="‹">‹</button><img id="lbImg" alt="" /><button type="button" class="lb__nav" data-lb="1" aria-label="›">›</button><span id="lbN"></span></div>`);
+    const bar = () => {
+      const r = rooms.find((x) => x.id === hdPick), rf = roomFacts((r.hotel && r.hotel.room) || (r.facts || {}).room || r.name), f = r.facts || {};
+      const same = r.id === d.live.stayId;
+      $("#choose").innerHTML = `<div class="choose__in"><div><b>${esc(roomName(rf.base))}${rf.beds.length ? ` · ${esc(bedText(rf.beds))}` : ""}</b><small>${esc([f.board && BOARD[f.board] ? L(BOARD[f.board]) : t("noBfast"), r.freeCancelUntil ? t("cancelBy")(fmt(r.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"), t("forStay")(nights, r.rooms)].join(" · "))}</small></div>
+        <div class="choose__p"><b>${esc(money(sar(r.total)))}</b><button type="button" class="btn btn--main" id="chooseGo">${esc(same ? t("keepRoom") : t("selectRoom"))}</button></div></div>`;
+      $("#chooseGo").addEventListener("click", () => { d.live.stayId = r.id; d.live.stayPick = r; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; });
+    };
+    bar();
+    $("#rooms").addEventListener("change", (e) => { hdPick = e.target.value; $$("#rooms .ro").forEach((l) => l.classList.toggle("on", $("input", l).checked)); bar(); });
+    $("#moreDesc")?.addEventListener("click", () => { $("#allDesc").hidden = false; $("#moreDesc").closest("p").hidden = true; });
+    // Every photo, one at a time, with the arrows and the keyboard.
+    let gi = 0;
+    const show = (i) => { gi = (i + imgs.length) % imgs.length; $("#lbImg").src = imgs[gi]; $("#lbN").textContent = `${gi + 1} / ${imgs.length}`; };
+    const openLb = (i) => { $("#lb").hidden = false; show(i); document.body.style.overflow = "hidden"; };
+    const closeLb = () => { $("#lb").hidden = true; document.body.style.overflow = ""; };
+    $$("#hdGal img").forEach((im) => im.addEventListener("click", () => openLb(+im.dataset.gi)));
+    $("#allPh")?.addEventListener("click", () => openLb(0));
+    $("#lbX").addEventListener("click", closeLb);
+    $$("[data-lb]").forEach((b) => b.addEventListener("click", () => show(gi + +b.dataset.lb)));
+    $("#lb").addEventListener("click", (e) => { if (e.target.id === "lb") closeLb(); });
+    document.onkeydown = (e) => { if ($("#lb") && !$("#lb").hidden) { if (e.key === "Escape") closeLb(); if (e.key === "ArrowRight") show(gi + (lang === "ar" ? -1 : 1)); if (e.key === "ArrowLeft") show(gi + (lang === "ar" ? 1 : -1)); } };
     if ($("#hdMap")) drawMap($("#hdMap"), [o], marksFor(d), { selected: o.id, zoom: 14 });
-    $$("[data-room]").forEach((b) => b.addEventListener("click", () => { const r = rooms.find((x) => x.id === b.dataset.room) || o; d.live.stayId = r.id; d.live.stayPick = r; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
   }
 
   // ----- sign in: a 6-digit code to the phone (staging and mock servers always use 123456) -----
@@ -1194,6 +1300,7 @@
         if (lsi.step === "code") {
           const code = $$("[data-o]").map((x) => x.value).join(""); if (code.length < 6) { btn.disabled = false; return; }
           const r = await A.verifyCode("+966" + lsi.phone, code);
+          await afterSignIn();
           if (r.isNew || !r.user.name) { lsi.step = "name"; return viewSigninLive(); }
           return done();
         }
@@ -1324,6 +1431,28 @@
     if (route().name !== "pay") return;
     renderPayLive();
   }
+  // Long notes from a hotel, one point a line.
+  const pointsOf = (txt) => String(txt || "").replace(/[\u00a0\s]+/g, " ").replace(/[“”"]/g, "").split(/(?<=[.!?])\s*(?=[A-Z\u0600-\u06FF])/).map((x) => x.trim()).filter((x) => x.length > 3);
+  function payCard(d, p) {
+    const amt = esc(money(sar(p.total)));
+    if (p.kind === "trip") {
+      const o = liveOut(d);
+      const leg = (l, k) => `<div class="pl"><small>${esc(k)} · ${esc(day(l.date))}</small><div class="pl__t"><b>${esc(l.dep)}</b><span>${esc(city(l.from) || l.from)}</span></div><div class="pl__m">${esc(hrs(l.durationMin))}<i></i>${esc(o.stop || t("direct"))}</div><div class="pl__t pl__t--e"><b>${esc(l.arr)}</b><span>${esc(city(l.to) || l.to)}</span></div></div>`;
+      return `<section class="pc"><header class="pc__h"><span class="pc__ic">${ico("flights")}</span><div><b>${o ? `${esc(o.airline)} · ${esc(o.out.flightNumber)}${o.back ? ` / ${esc(o.back.flightNumber)}` : ""}` : esc(p.title)}</b><small>${esc(p.lines.map((l) => l.text).join(" · "))}</small></div><strong>${amt}</strong></header>
+        ${o ? `<div class="pc__legs">${leg(o.out, t("outL"))}${o.back ? leg(o.back, t("retL")) : ""}</div>` : ""}
+        <ul class="pc__f">${p.family && p.family.bags ? `<li>${ico("check")}${esc(t("bagsEach")(p.family.bags))}</li>` : o ? `<li>${ico("check")}${esc(o.bags)}</li>` : ""}${o ? `<li>${ico("clock")}${esc(t("changeL"))}: ${esc(o.changeRule)}</li>` : ""}<li>${ico("shield")}${esc(p.rule)}</li>${p.missingPassports && p.missingPassports.length ? `<li>${ico("visa")}${esc(t("passportLater"))}</li>` : ""}</ul></section>`;
+    }
+    if (p.kind === "stay") {
+      const st = liveStay(d) || {}, f = (p.stay && p.stay.facts) || st.facts || {}, rf = roomFacts((st.hotel && st.hotel.room) || f.room || "");
+      const notes = pointsOf(p.stay && p.stay.essentials);
+      const cardAtDesk = notes.some((x) => /card/i.test(x) && /check-?in|arrival/i.test(x));
+      const summary = p.stay ? (p.stay.refundable && p.stay.freeCancelUntil ? t("cancelBy")(fmt(p.stay.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRefLong")) : p.rule.split(/ From the hotel| من الفندق/)[0];
+      return `<section class="pc"><header class="pc__h pc__h--img">${st.hotel && st.hotel.imageUrl ? `<img src="${esc(st.hotel.imageUrl)}" alt="" />` : `<span class="pc__ic">${ico("stays")}</span>`}<div>${f.stars ? `<span class="ht__stars">${"★".repeat(f.stars)}</span>` : ""}<b>${esc(p.title)}</b><small>${esc(p.lines.map((l) => l.text).join(" · "))}</small></div><strong>${amt}</strong></header>
+        <ul class="pc__f">${rf.base ? `<li>${ico("bed")}${esc(roomName(rf.base))}${rf.beds.length ? ` · ${esc(bedText(rf.beds))}` : ""}</li>` : ""}<li>${ico("cup")}${esc(f.board && BOARD[f.board] ? L(BOARD[f.board]) : t("noBfast"))}</li><li class="${p.stay && p.stay.refundable ? "" : "warn"}">${ico("shield")}${esc(summary)}</li>${p.stay && p.stay.payAtHotel ? `<li>${ico("card")}${esc(t("payAtHotel")(money(sar(p.stay.payAtHotel))))}</li>` : ""}${cardAtDesk ? `<li>${ico("card")}${esc(t("cardAtDesk"))}</li>` : ""}</ul>
+        ${notes.length ? `<details class="fine pc__notes"><summary>${esc(t("hotelNotesN")(notes.length))}</summary><ul>${notes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></details>` : ""}</section>`;
+    }
+    return `<section class="pc"><header class="pc__h"><span class="pc__ic">${ico("esim")}</span><div><b>${esc(p.title)}</b><small>${esc(p.lines.map((l) => l.text).join(" · "))}</small></div><strong>${amt}</strong></header><ul class="pc__f"><li>${ico("shield")}${esc(p.rule)}</li></ul></section>`;
+  }
   function renderPayLive() {
     const d = draft, pv = co.previews, total = pv.reduce((s, p) => s + sar(p.total), 0);
     const holds = pv.map((p) => p.holdExpiresAt).filter(Boolean).sort()[0];
@@ -1335,10 +1464,7 @@
       <h1 class="pg__h">${esc(t("payTitle"))}</h1>
       ${pv.some((p) => p.demoFare) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
       <div class="pg__grid"><form id="payForm" novalidate>
-        ${pv.map((p) => `<div class="box"><h2 class="box__h">${esc(t("payFor")(p.kind))} · ${esc(p.title)}</h2>
-          <div class="sum__rows" style="margin:0">${p.lines.map((l) => `<div><span>${esc(l.text)}</span><span>${esc(money(l.amount / 100))}</span></div>`).join("")}</div>
-          <p class="note-s">${esc(p.rule.length > 180 ? p.rule.slice(0, p.rule.indexOf(".") + 1 || 180) : p.rule)}</p>${p.rule.length > 180 ? `<details class="fine"><summary>${esc(t("hotelNotes"))}</summary><p class="note-s">${esc(p.rule)}</p></details>` : ""}${p.stay && p.stay.payAtHotel ? `<p class="note-s">${esc(t("payAtHotel")(money(sar(p.stay.payAtHotel))))}</p>` : ""}
-          ${p.missingPassports && p.missingPassports.length ? `<p class="note-s">${esc(t("passportLater"))}</p>` : ""}</div>`).join("")}
+        ${pv.map((p) => payCard(d, p)).join("")}
         <div class="box"><h2 class="box__h">${esc(t("payHow"))}</h2><div class="pm" id="pm">
           ${m("mada", t("mada"), "", "mada")}${m("card", t("card"), "", "VISA · MC")}
           ${tabby ? m("tabby", t("tabby"), t("tabbySub")(money(tabby)), "4×") : ""}${tamara ? m("tamara", t("tamara"), t("tamaraSub")(money(tamara)), "3×") : ""}
@@ -1373,7 +1499,8 @@
           if (r.outcome === "declined" || r.outcome === "blocked") { busyOff(); const el = $("#payErr"); el.hidden = false; el.textContent = r.message; return; }
           if (r.outcome === "requires_action") {
             busyOff();
-            const code = await ask({ title: t("otpTitle"), text: t("otpHint"), code: true, hint: /staging|localhost/.test(location.host) ? t("demoCode") : "", ok: t("otpGo"), cancel: t("stopIt") });
+            const many = co.drafts.length > 1, what = t("payFor")(co.drafts[i].kind);
+            const code = await ask({ title: many ? t("otpForH")(what) : t("otpTitle"), text: many ? t("otpForT")(money(sar(co.previews[i].total)), i + 1, co.drafts.length) : t("otpHint"), code: true, hint: /staging|localhost/.test(location.host) ? t("demoCode") : "", ok: t("otpGo"), cancel: t("stopIt") });
             if (!code) return;
             busyOn(t("processing")); r = { order: (await A.threeDs(r.order.id, code.trim())).order };
           }
@@ -1381,6 +1508,8 @@
         }
         busyOff();
         co.orders = orders; store.set("checkout", co);
+        const lo = liveOut(d), ls = liveStay(d);
+        store.set("waitMeta", { ids: orders.join(","), to: d.to, dep: d.dep, ret: d.ret, pax: d.pax, flight: lo && { airline: lo.airline, out: lo.out, back: lo.back }, stay: ls && { name: ls.name, img: ls.hotel && ls.hotel.imageUrl, stars: (ls.facts || {}).stars }, passports: co.previews.some((p) => p.missingPassports && p.missingPassports.length) });
         location.hash = `#/wait/${orders.join(",")}`;
       } catch (err) { busyOff(); const el = $("#payErr"); el.hidden = false; el.textContent = err.message; }
     });
@@ -1418,16 +1547,37 @@
     const agent = (main.confirmedBy || main.agent || {}).name || "Mada";
     const q = orders.find((o) => o.question);
     const failed = orders.find((o) => o.status === "ticketing_failed" || o.status === "declined" || o.status === "cancelled");
-    page(`<div class="wrap pg pg--narrow wait">
-      <span class="status${ok ? "" : " held"}">${esc(ok ? t("waitDone") : t("waitTitle"))}</span>
-      <h1 class="pg__h" style="margin-top:12px">${esc(main.place || main.title)}</h1>
-      <p class="pg__sub">${esc(ok ? t("sentTo")(main.ref ? `${t("refL")} ${main.ref}` : agent) : t("waitSub")(agent))}</p>
-      ${main.photo ? "" : ""}
-      <div class="box"><ol class="tl">${t("waitSteps").map((s, i) => `<li class="${main.step >= i || ok ? "done" : ""}">${esc(s)}</li>`).join("")}</ol></div>
-      ${orders.map((o) => `<div class="box st-rows"><div>${ico(o.kind === "trip" ? "flights" : o.kind === "stay" ? "stays" : "esim")}<span><b class="st-t">${esc(o.title)}</b><small class="dim">${esc(o.lines.map((l) => l.text).join(" · "))}</small></span><em class="${o.status === "confirmed" ? "" : "held"}">${esc(o.status === "confirmed" ? o.ref || t("waitDone") : (t("orderStatus") || {})[o.status] || o.status.replace(/_/g, " "))}</em></div></div>`).join("")}
-      ${q ? `<div class="box"><h2 class="box__h">${esc(t("waitQuestion"))}</h2><p>${esc(q.question.text)}</p><div class="actions"><button type="button" class="btn btn--main" data-ans="yes">${esc(t("waitYes"))}</button><button type="button" class="btn btn--plain" data-ans="call">${esc(t("waitCall"))}</button></div></div>` : ""}
-      ${failed && !ok ? `<div class="nudge">${esc((failed.result && failed.result.reason) || failed.problem || t("waitFailed"))}</div>` : ""}
-      ${main.tripId && ok ? `<a class="primary primary--link" href="#/t/${main.tripId}">${esc(t("waitOpen"))}</a>` : ""}
+    const wm = store.get("waitMeta"), meta = wm && wm.ids === idsCsv ? wm : {};
+    const stepNow = ok ? 4 : Math.min(...orders.map((o) => (o.status === "confirmed" ? 4 : o.step)));
+    const words = t("orderStatus") || {};
+    const chip = (o) => o.status === "confirmed" ? `<span class="wc__st">${ico("check")}${esc(o.ref ? `${t("refL")} ${o.ref}` : t("waitDone"))}</span>` : `<span class="wc__st wc__st--on"><i></i>${esc(words[o.status] || o.status.replace(/_/g, " "))}</span>`;
+    const legRow = (l) => `<div class="wl"><b>${esc(l.dep)}</b><span>${esc(city(l.from) || l.from)}</span><i></i><span>${esc(city(l.to) || l.to)}</span><b>${esc(l.arr)}</b><small>${esc(day(l.date))} · ${esc(l.flightNumber)}</small></div>`;
+    const lines = (o) => `<small>${esc(o.lines.map((l) => l.text).join(" · "))}</small>`;
+    const itemCard = (o) => {
+      if (o.kind === "trip") { const f = meta.flight; return `<article class="wc"><span class="pc__ic">${ico("flights")}</span><div class="wc__b"><b>${esc(f ? f.airline : o.airline || o.title)}</b>${f ? legRow(f.out) + (f.back ? legRow(f.back) : "") : lines(o)}</div>${chip(o)}</article>`; }
+      if (o.kind === "stay") { const h = meta.stay || {}; return `<article class="wc">${h.img ? `<img class="wc__img" src="${esc(h.img)}" alt="" />` : `<span class="pc__ic">${ico("stays")}</span>`}<div class="wc__b">${h.stars ? `<span class="ht__stars">${"★".repeat(h.stars)}</span>` : ""}<b>${esc(o.title)}</b>${lines(o)}</div>${chip(o)}</article>`; }
+      return `<article class="wc"><span class="pc__ic">${ico("esim")}</span><div class="wc__b"><b>${esc(o.title)}</b>${lines(o)}</div>${chip(o)}</article>`;
+    };
+    const to = meta.to || Object.keys(KEY).find((c) => city(c) === main.place);
+    page(`<div class="wait2">
+      <header class="wh">${to && D.DEST[to] ? `<img src="${esc(D.photo(to))}" alt="" />` : ""}<div class="wrap wh__in">
+        <span class="wh__pill${ok ? " ok" : ""}">${ok ? ico("check") : "<i></i>"}${esc(ok ? t("waitDone") : t("waitTitle"))}</span>
+        <h1>${esc(ok ? t("waitBooked")(main.place || main.title) : main.place || main.title)}</h1>
+        <p>${esc(meta.dep ? `${range(meta.dep, meta.ret)} · ${paxText(meta.pax)}` : main.title)}</p></div></header>
+      <div class="wrap pg pg--narrow wait2__body">
+        <section class="wbox">
+          <div class="wa"><span class="wa__av">${esc((agent[0] || "M").toUpperCase())}</span><div><b>${esc(ok ? (main.confirmedBy && main.confirmedBy.name ? t("waitOkH")(main.confirmedBy.name) : t("waitOkPlain")) : t("waitOnIt")(agent))}</b><p>${esc(ok ? t("waitOkSub") : t("waitCloseOk"))}</p></div></div>
+          <ol class="wsteps">${t("waitSteps").map((x, i) => `<li class="${i < stepNow ? "done" : i === stepNow ? "now" : ""}"><span>${i < stepNow ? ico("check") : i + 1}</span><b>${esc(x)}</b></li>`).join("")}</ol>
+          ${orders.some((o) => o.slow) && !ok ? `<p class="note-s">${esc(t("waitSlow"))}</p>` : ""}
+        </section>
+        ${q ? `<section class="wbox wq"><h2 class="box__h">${esc(t("waitQuestion"))}</h2><p>${esc(q.question.text)}</p><div class="actions"><button type="button" class="btn btn--main" data-ans="yes">${esc(t("waitYes"))}</button><button type="button" class="btn btn--plain" data-ans="call">${esc(t("waitCall"))}</button></div></section>` : ""}
+        ${failed && !ok ? `<div class="nudge">${esc((failed.result && failed.result.reason) || failed.problem || t("waitFailed"))}</div>` : ""}
+        <h2 class="hd-h">${esc(t("waitWhat"))}</h2>
+        <div class="wcs">${orders.map(itemCard).join("")}</div>
+        <h2 class="hd-h">${esc(t("waitNext"))}</h2>
+        <ul class="gk wn"><li>${ico("chat")}<span>${esc(t("waitNext1"))}</span></li>${meta.passports ? `<li>${ico("visa")}<span>${esc(t("passportLater"))}</span></li>` : ""}<li>${ico("cal")}<span>${esc(t("waitNext3"))}</span></li></ul>
+        <div class="wgo">${main.tripId && ok ? `<a class="primary primary--link" href="#/t/${main.tripId}">${esc(t("waitOpen"))}</a>` : ""}<a class="btn btn--plain" href="${wa(t("waHi")(main.ref || main.id.slice(0, 8)))}" target="_blank" rel="noopener">${ico("chat")}${esc(t("waitTalk")(agent))}</a></div>
+      </div>
     </div>`);
     $$("[data-ans]").forEach((b) => b.addEventListener("click", async () => { try { await A.answer(q.id, b.dataset.ans); } catch (e) { toast(e.message); } viewWait(idsCsv); }));
     if (ok) { draft = null; store.set("draft", null); co = {}; store.set("checkout", null); }
@@ -1441,31 +1591,32 @@
     let r;
     try { r = await A.trips(); } catch (e) { return page(errBox(e.message, true)); }
     if (route().name !== "trips") return;
-    const card = (x) => `<a class="tcard" href="#/t/${x.id}">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" />` : `<span class="tcard__ph"></span>`}<div><b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellerNames.join(", "))}</span></div><span><em class="status">${esc(x.flight ? x.flight.code : (lang === "ar" ? "رحلة" : "Trip"))}</em></span></a>`;
+    const card = (x) => `<a class="tcard" href="#/t/${x.id}">${tripImg(x) ? `<img src="${esc(tripImg(x))}" alt="" />` : `<span class="tcard__ph"></span>`}<div><b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellerNames.join(", "))}</span></div><span><em class="status">${esc(x.flight ? x.flight.code : (lang === "ar" ? "رحلة" : "Trip"))}</em></span></a>`;
     page(`<div class="wrap pg"><h1 class="pg__h">${esc(t("tripsTitle"))}</h1>
       ${r.upcoming.length || r.past.length ? `<div class="tlist">${r.upcoming.map(card).join("")}</div>${r.past.length ? `<div class="bar"><h2>${esc(t("past"))}</h2></div><div class="tlist tlist--past">${r.past.map(card).join("")}</div>` : ""}`
         : `<div class="empty"><p>${esc(t("tripsNone"))}</p><a class="btn btn--main" href="#/">${esc(t("tripsPlan"))}</a></div>`}</div>`);
   }
+  // The API names its own photos ("dubai-skyline"); the site has the city's photo.
+  const tripImg = (x) => (x.imageUrl && /^(https?:)?\//.test(x.imageUrl) ? x.imageUrl : (() => { const c = Object.keys(KEY).find((k) => D.byCode[k] && D.byCode[k].city === x.city); return c ? D.photo(c) : null; })());
   async function viewTripLive(id) {
     page(loading(t("tripsTitle")));
     let x;
     try { x = (await A.trip(id)).trip; } catch (e) { return page(errBox(e.message, true)); }
     if (route().name !== "t") return;
-    const st = t("statusL");
-    page(`<div class="wrap pg">
-      ${backLink("#/trips", t("tripsTitle"))}
-      <span class="status">${esc(t("confirmed"))}</span>
-      <h1 class="pg__h" style="margin-top:12px">${esc(t("tripTo")(x.city))}</h1>
-      ${x.bookingRef ? `<p class="pg__sub">${esc(t("refL"))} <span class="ref">${esc(x.bookingRef)}</span></p>` : ""}
-      <div class="trip-hero">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" />` : ""}<b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellers.map((p) => p.firstName || p.name || "").filter(Boolean).join(", "))}</span></div>
-      <div class="pg__grid"><div>
-        ${x.segments.map((s) => `<div class="box seg-live"><div class="seg-live__top"><b>${esc(s.carrierName)} ${esc(s.flightNumber)}</b><span class="status${/delay|cancel/.test(s.status) ? " held" : ""}">${esc(st[s.status] || s.status)}</span></div>
-          <div class="fl__times"><b>${esc(s.departLocal.slice(11, 16))}</b><div class="fl__line">${esc(hrs(s.durationMin))}<i></i>${esc(s.from)} → ${esc(s.to)}</div><b>${esc(s.arriveLocal.slice(11, 16))}</b></div>
-          <p class="note-s">${esc(day(s.departLocal.slice(0, 10)))}${s.terminal ? ` · ${esc(t("terminal"))} ${esc(s.terminal)}` : ""}${s.gate ? ` · ${esc(t("gate"))} ${esc(s.gate)}` : ""}${s.seats.length ? ` · ${esc(t("seats"))} ${esc(s.seats.join(", "))}` : ""}${s.baggage ? ` · ${esc(s.baggage)}` : ""}</p></div>`).join("")}
-        ${x.stays.map((s) => `<div class="box st-rows"><div>${ico("stays")}<span><b class="st-t">${esc(s.name)}</b><small class="dim">${esc(day(s.checkIn))} · ${esc(t("forStay")(s.nights, s.rooms))}${s.cancellation ? " · " + esc(s.cancellation) : ""}</small></span><em>${esc(s.confirmation || s.status)}</em></div></div>`).join("")}
-      </div><aside class="pg__side"><div class="box"><h2 class="box__h">${esc(t("advIntro"))}${x.agent && x.agent.name ? ` · ${esc(x.agent.name)}` : ""}</h2><p class="note-s" style="margin-top:0">${esc(t("advLine"))}</p>
-        <div class="actions" style="margin-top:14px"><a class="btn btn--main" href="${wa(t("waHi")(x.bookingRef || x.id.slice(0, 8)))}" target="_blank" rel="noopener">${esc(t("msgAdv"))}</a><a class="btn btn--plain" href="${wa(t("waChange")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqChange"))}</a><a class="btn btn--plain" href="${wa(t("waCancel")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqCancel"))}</a></div></div>
-        <p class="note-s">${esc(t("appSync"))}</p></aside></div></div>`);
+    const st = t("statusL"), img = tripImg(x);
+    page(`<div class="wait2">
+      <header class="wh">${img ? `<img src="${esc(img)}" alt="" />` : ""}<div class="wrap wh__in">
+        <span class="wh__pill ok">${ico("check")}${esc(t("confirmed"))}${x.bookingRef ? ` · ${esc(x.bookingRef)}` : ""}</span>
+        <h1>${esc(t("tripTo")(x.city))}</h1>
+        <p>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellers.map((p) => p.firstName || p.name || "").filter(Boolean).join(", "))}</p></div></header>
+      <div class="wrap pg wait2__body"><div class="pg__grid" style="margin-top:0"><div>
+        ${x.segments.map((s) => `<article class="wbox tseg"><div class="tseg__top"><span class="pc__ic">${ico("flights")}</span><div><b>${esc(s.carrierName)} · ${esc(s.flightNumber)}</b><small>${esc(day(s.departLocal.slice(0, 10)))}</small></div><span class="wc__st${/delay|cancel/.test(s.status) ? " wc__st--on" : ""}">${esc(st[s.status] || s.status)}</span></div>
+          <div class="pl"><small>${esc(s.from)} → ${esc(s.to)}</small><div class="pl__t"><b>${esc(s.departLocal.slice(11, 16))}</b><span>${esc(city(s.from) || s.from)}</span></div><div class="pl__m">${esc(hrs(s.durationMin))}<i></i>${esc(t("direct"))}</div><div class="pl__t pl__t--e"><b>${esc(s.arriveLocal.slice(11, 16))}</b><span>${esc(city(s.to) || s.to)}</span></div></div>
+          <ul class="tseg__f">${s.terminal ? `<li><small>${esc(t("terminal"))}</small><b>${esc(String(s.terminal).replace(/^Terminal\s*/i, ""))}</b></li>` : ""}<li><small>${esc(t("gate"))}</small><b>${esc(s.gate || "—")}</b></li><li><small>${esc(t("seats"))}</small><b>${esc(s.seats.length ? s.seats.join(", ") : "—")}</b></li>${s.baggage ? `<li><small>${esc(t("bagsL"))}</small><b>${esc(s.baggage)}</b></li>` : ""}</ul></article>`).join("")}
+        ${x.stays.map((s) => `<article class="wc">${s.imageUrl && /^(https?:)?\//.test(s.imageUrl) ? `<img class="wc__img" src="${esc(s.imageUrl)}" alt="" />` : `<span class="pc__ic">${ico("stays")}</span>`}<div class="wc__b"><b>${esc(s.name)}</b><small>${esc(day(s.checkIn))} · ${esc(t("forStay")(s.nights, s.rooms))}${s.cancellation ? " · " + esc(s.cancellation) : ""}</small></div><span class="wc__st">${ico("check")}${esc(s.confirmation || s.status)}</span></article>`).join("")}
+      </div><aside class="pg__side"><div class="box"><div class="wa"><span class="wa__av">${esc(((x.agent && x.agent.name) || "M")[0].toUpperCase())}</span><div><b>${esc(t("advIntro"))}${x.agent && x.agent.name ? ` · ${esc(x.agent.name)}` : ""}</b><p>${esc(t("advLine"))}</p></div></div>
+        <div class="actions" style="margin-top:16px"><a class="btn btn--main" href="${wa(t("waHi")(x.bookingRef || x.id.slice(0, 8)))}" target="_blank" rel="noopener">${esc(t("msgAdv"))}</a><a class="btn btn--plain" href="${wa(t("waChange")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqChange"))}</a><a class="btn btn--plain" href="${wa(t("waCancel")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqCancel"))}</a></div></div>
+        <p class="note-s">${esc(t("appSync"))}</p></aside></div></div></div>`);
   }
 
   // ---------- popovers on the plan: dates, travelers, origin ----------
