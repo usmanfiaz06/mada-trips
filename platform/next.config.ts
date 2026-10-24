@@ -22,10 +22,6 @@ const config: NextConfig = {
       { source: "/ar/index.html", destination: "/ar", permanent: true },
       { source: "/ar/site-home", destination: "/ar", permanent: true },
       { source: "/ar/:page((?!index|site-home)[^/.]+)\\.html", destination: "/ar/:page", permanent: true },
-      // Sign-in links for corporate clients: /corporate/login, or /corporate/<their workspace> for a branded page.
-      { source: "/corporate", destination: "/adminwork/login?for=corporate", permanent: false },
-      { source: "/corporate/login", destination: "/adminwork/login?for=corporate", permanent: false },
-      { source: "/corporate/:slug([a-z0-9][a-z0-9-]{0,39})", destination: "/adminwork/login?for=:slug", permanent: false },
     ];
   },
   async rewrites() {
@@ -51,6 +47,15 @@ const config: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+      {
+        // Client sign-in pages (src/app/corporate): never indexed, never framed.
+        source: "/corporate/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Referrer-Policy", value: "same-origin" },
         ],
       },
       {
