@@ -136,9 +136,10 @@ export const askFastModel = () => {
  */
 export function answersLean(): boolean {
   const chain = providerChain();
-  if (chain) return !!chain[0] && chain[0].name !== "anthropic";
+  // Claude, direct or through Bedrock, reads the full prompt and the whole thread; only free tiers go lean.
+  if (chain) return !!chain[0] && chain[0].name !== "anthropic" && chain[0].name !== "bedrock";
   const p = chatProvider();
-  return !!p && p !== "anthropic";
+  return !!p && p !== "anthropic" && p !== "bedrock";
 }
 
 /** On, and the provider has what it needs. */

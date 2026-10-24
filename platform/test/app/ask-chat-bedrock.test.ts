@@ -252,3 +252,12 @@ describe("bedrock: caching the conversation and Sonnet 4.5's price", () => {
     expect(priceOf("global.anthropic.claude-sonnet-4-5-20250929-v1:0")?.slice(0, 2)).toEqual([3, 15]);
   });
 });
+
+describe("bedrock reads like Claude direct", () => {
+  it("gets the full thread budget, not the free tiers' lean one", async () => {
+    const { answersLean } = await import("@/lib/app/ask-chat/config");
+    const keep = { ...process.env };
+    Object.assign(process.env, { ASK_CHAT_PROVIDERS: "bedrock,groq", AWS_REGION: "us-east-1", AWS_BEARER_TOKEN_BEDROCK: "test-not-real", GROQ_API_KEY: "test-not-real" });
+    try { expect(answersLean()).toBe(false); } finally { process.env = keep; }
+  });
+});
