@@ -120,7 +120,11 @@ export function LocaleSwitch({ dark = true }: { dark?: boolean }) {
   const next = t.locale === "ar" ? "en" : "ar";
   return (
     <button disabled={pending} className={cx("grid h-10 min-w-10 place-items-center rounded-full px-2.5 text-[13px] font-medium transition", dark ? "text-tile-ink-3 hover:bg-white/10 hover:text-tile-ink" : "text-ink-2 hover:bg-surface")} title={t("Language")}
-      onClick={() => { document.cookie = `mada_locale=${next}; path=${BASE || "/"}; max-age=31536000; samesite=lax`; start(() => router.refresh()); }}>
+      onClick={() => {
+        // Ops and the client sign-in pages (/corporate) both remember the choice.
+        for (const path of [BASE || "/", "/corporate"]) document.cookie = `mada_locale=${next}; path=${path}; max-age=31536000; samesite=lax`;
+        start(() => router.refresh());
+      }}>
       {next === "ar" ? "عربي" : "EN"}
     </button>
   );

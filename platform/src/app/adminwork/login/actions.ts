@@ -65,5 +65,5 @@ export async function logout() {
   // Client people go back to their own branded sign-in page.
   const [c] = u?.clientId ? await db.select({ slug: schema.clients.portalSlug }).from(schema.clients).where(eq(schema.clients.id, u.clientId)) : [];
   await destroySession();
-  redirect(u?.clientId ? `/adminwork/login?for=${c?.slug ?? "corporate"}` : "/adminwork/login");
+  redirect(u?.clientId ? `/corporate/${c?.slug ?? "login"}` : "/adminwork/login");
 }

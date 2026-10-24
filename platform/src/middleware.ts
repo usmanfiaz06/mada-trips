@@ -7,10 +7,13 @@ import { NextResponse, type NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   const isApi = pathname.startsWith("/adminwork/api/");
-  if (!isApi && pathname !== "/adminwork/login" && !req.cookies.has("mada_session")) {
+  const isSignIn = pathname === "/adminwork/login" || pathname === "/corporate" || pathname.startsWith("/corporate/");
+  if (!isApi && !isSignIn && !req.cookies.has("mada_session")) {
     const url = req.nextUrl.clone();
-    url.pathname = "/adminwork/login";
-    url.search = pathname === "/adminwork" ? "" : `?next=${encodeURIComponent(pathname + search)}`;
+    // Someone at a client opening their workspace without a session goes to the client sign-in, not Ops'.
+    const portal = pathname.startsWith("/adminwork/portal");
+    url.pathname = portal ? "/corporate/login" : "/adminwork/login";
+    url.search = pathname === "/adminwork" || portal ? "" : `?next=${encodeURIComponent(pathname + search)}`;
     return NextResponse.redirect(url);
   }
 
@@ -43,4 +46,4 @@ export function middleware(req: NextRequest) {
 }
 
 // Anchored to the platform. Static brand files skip it.
-export const config = { matcher: ["/adminwork", "/adminwork/:path((?!symbol|wordmark|favicon|vehicles/).*)"] };
+export const config = { matcher: ["/adminwork", "/adminwork/:path((?!symbol|wordmark|favicon|vehicles/).*)", "/corporate", "/corporate/:path*"] };
