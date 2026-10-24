@@ -32,6 +32,8 @@ const weekdayIdx = (iso: string) => utc(iso).getUTCDay();
 export function weekendDates(today: string, offset = 0): [string, string] {
   // On a Friday the weekend is already here: this weekend is today and Saturday, next weekend starts next Thursday.
   if (weekdayIdx(today) === 5) return offset === 0 ? [today, addDays(today, 1)] : weekendDates(addDays(today, 6), offset - 1);
+  // On a Saturday the weekend is ending: "this weekend" and "next weekend" both mean the coming one.
+  if (weekdayIdx(today) === 6 && offset > 0) offset -= 1;
   const delta = (4 - weekdayIdx(today) + 7) % 7;
   const thu = addDays(today, delta + offset * 7);
   return [thu, addDays(thu, 2)];

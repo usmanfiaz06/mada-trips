@@ -25,7 +25,7 @@ describe('reading what people type', () => {
     expect(b).toMatchObject({ from: 'JED', destination: 'london', depart: '2026-12-03', return: '2026-12-10', cabin: 'premium', ids: [OMAR.id] });
     const c = parseAskRules('Flights to Dubai next weekend for the family', { today: TODAY, people: FAMILY });
     expect([c.depart, c.return]).toEqual(weekendDates(TODAY, 1));
-    expect(c.depart).toBe('2026-10-22');
+    expect(c.depart).toBe('2026-10-15'); // TODAY is a Saturday: the weekend is ending, "next weekend" is the coming one
     const d = parseAskRules('Flights to Istanbul in March for 2', { today: TODAY, people: FAMILY });
     expect(d).toMatchObject({ monthOnly: { month: 3, year: 2027 }, count: 2, ask: 'when' });
     expect(parseAskRules('first class to Cairo with twins', { today: TODAY, people: FAMILY })).toMatchObject({ cabin: 'business', infants: 2, cabinNote: expect.stringContaining('First') });
@@ -166,6 +166,7 @@ describe('Saudi weekend', () => {
     expect(weekendDates('2026-10-23', 0)).toEqual(['2026-10-23', '2026-10-24']); // Friday
     expect(weekendDates('2026-10-23', 1)).toEqual(['2026-10-29', '2026-10-31']);
     expect(weekendDates('2026-10-25', 0)).toEqual(['2026-10-29', '2026-10-31']); // Sunday
+    expect(weekendDates('2026-10-24', 1)).toEqual(['2026-10-29', '2026-10-31']); // Saturday: "next weekend" is the coming one
     expect(weekendLine('2026-10-25')).toMatch(/Weekend Fri–Sat, out Thu.*2026-10-29→2026-10-31.*2026-11-05→2026-11-07/);
   });
 });
