@@ -80,6 +80,9 @@
     halal: '<path d="M7 3v8M5 3v4.5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7h3"/>',
     kids: '<circle cx="12" cy="6" r="2.5"/><path d="M7 11l5-1.5 5 1.5M12 9.5V15l-3 5M12 15l3 5"/>',
     shuttle: '<rect x="4" y="4" width="16" height="12" rx="3"/><path d="M4 11h16M7 19v-3M17 19v-3"/><circle cx="8" cy="13.5" r=".6"/><circle cx="16" cy="13.5" r=".6"/>',
+    phone: '<path d="M6.6 3.5h2.6l1.4 4.1-2 1.4a12 12 0 0 0 6.4 6.4l1.4-2 4.1 1.4v2.6a2 2 0 0 1-2.1 2A16.4 16.4 0 0 1 4.6 5.6a2 2 0 0 1 2-2.1z"/>',
+    mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
     bed: '<path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5"/><circle cx="7" cy="11" r="1.8"/>',
     view: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 15l4.5-4 3.5 3 3-2.5 6 4.5"/>',
     cup: '<path d="M5 9h12v4a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H16.5M8 3.5v2.5M12 3.5v2.5"/>',
@@ -93,6 +96,20 @@
   };
   const ico = (k) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k] || ""}</svg>`;
   const SUN = '<svg viewBox="0 0 132 89"><path d="M73.3 0 68.4 41.7a17 17 0 0 0-4.5 0L59 0zM74.1 43.4a17 17 0 0 1 4.2 2.8l25.4-23.5-10.2-8.5zM114.3 35.4 81.8 50.4c.6 1.1 1.2 2.2 1.6 3.4l37.7-6.4zM84.4 60.2l47.9 9.3-4.8-11.4-43.2.5zM58.2 43.4a17 17 0 0 0-4.2 2.8L28.6 22.7l10.2-8.5zM18.1 35.4l32.4 15c-.6 1.1-1.2 2.2-1.6 3.4L11.2 47.4zM48 60.2 0 69.5l4.8-11.4 43.2.5z"/></svg>';
+  // The ways to pay, as people know them from the card in their wallet: drawn small, in each scheme's own colours.
+  const LOGO = {
+    visa: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Visa"><rect width="48" height="30" rx="5" fill="#fff"/><path d="M19.6 20.3h-2.9l1.8-10.6h2.9zm10.6-10.3a7.4 7.4 0 0 0-2.6-.5c-2.9 0-4.9 1.5-4.9 3.6 0 1.6 1.5 2.4 2.6 3 1.1.5 1.5.9 1.5 1.4 0 .7-.9 1.1-1.8 1.1a6 6 0 0 1-2.8-.6l-.4-.2-.4 2.4c.7.3 2 .6 3.3.6 3.1 0 5-1.5 5-3.8 0-1.3-.8-2.2-2.5-3-1-.5-1.7-.9-1.7-1.4s.6-1 1.7-1a5.5 5.5 0 0 1 2.3.4l.3.1zm7.4-.3h-2.2c-.7 0-1.2.2-1.5.9l-4.3 9.7h3l.6-1.6h3.7l.4 1.6h2.7zm-3.6 6.8 1.1-3 .4-1 .2 1 .7 3zM15.3 9.7l-2.8 7.2-.3-1.5a8.6 8.6 0 0 0-4-4.6l2.6 9.4h3.1l4.6-10.5z" fill="#1a1f71"/><path d="M9.8 9.7H5.1L5 10c3.7.9 6.1 3 7.1 5.5l-1-4.9c-.2-.7-.7-.9-1.3-.9z" fill="#f7a600"/></svg>',
+    mc: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Mastercard"><rect width="48" height="30" rx="5" fill="#fff"/><circle cx="19.5" cy="15" r="8" fill="#eb001b"/><circle cx="28.5" cy="15" r="8" fill="#f79e1b"/><path d="M24 8.4a8 8 0 0 1 0 13.2 8 8 0 0 1 0-13.2z" fill="#ff5f00"/></svg>',
+    mada: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="mada"><rect width="48" height="30" rx="5" fill="#fff"/><rect x="6" y="10.2" width="11" height="4" rx="1" fill="#259bd6"/><rect x="6" y="15.8" width="11" height="4" rx="1" fill="#84b740"/><text x="19.5" y="19.6" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="700" fill="#0b1f3a">mada</text></svg>',
+    tabby: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Tabby"><rect width="48" height="30" rx="5" fill="#3effc0"/><text x="24" y="19.4" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11.5" font-weight="700" fill="#141414">tabby</text></svg>',
+    tamara: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Tamara"><rect width="48" height="30" rx="5" fill="#fff4ee"/><rect x="8" y="21.2" width="32" height="2" rx="1" fill="#e98ab7"/><text x="24" y="18.2" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="700" fill="#1d1d1b">tamara</text></svg>',
+    apple: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Apple Pay"><rect width="48" height="30" rx="5" fill="#000"/><path d="M15.6 10.6c.5-.6.8-1.4.7-2.2-.7 0-1.5.5-2 1-.4.5-.8 1.3-.7 2.1.8.1 1.5-.4 2-.9zm.7 1.1c-1.1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2-.3 5.1.9 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.1-.5 1 0 1.3.5 2.2.5s1.4-.8 2-1.7c.6-.9.9-1.8.9-1.9 0 0-1.8-.7-1.8-2.7 0-1.7 1.4-2.5 1.4-2.5-.8-1.2-2-1.3-2.3-1.4z" fill="#fff"/><text x="20.5" y="19.6" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="10.5" font-weight="600" fill="#fff">Pay</text></svg>',
+  };
+  const acceptRow = (cls = "") => `<span class="accept ${cls}">${LOGO.mada}${LOGO.visa}${LOGO.mc}${LOGO.tabby}${LOGO.tamara}</span>`;
+  // Where to reach a person, the same everywhere: the number on the website, WhatsApp, email, and the hours.
+  const PHONE = "+966566682662", PHONE_TXT = "+966 56 668 2662", MAIL = "support@madatrips.sa";
+  const helpLine = (ctx) => `<div class="box helpbox"><b>${esc(t("hlp").stuck)}</b><p>${esc(t("hlp").hours)}</p>
+    <div class="helpbox__go"><a class="hb" href="tel:${PHONE}">${ico("phone")}<span><small>${esc(t("hlp").call)}</small><b dir="ltr">${PHONE_TXT}</b></span></a><a class="hb" href="${wa(ctx || t("hlp").waHi)}" target="_blank" rel="noopener">${ico("chat")}<span><small>WhatsApp</small><b>${esc(t("hlp").waShort)}</b></span></a></div></div>`;
 
   // ---------- state ----------
   let user = store.get("user");
@@ -370,7 +387,7 @@
       </div>
       ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t("demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
       <div class="plan__foot"><div class="plan__total"><small>${esc(t("totalFor")(paxText(d.pax)))}</small><b>${esc(money(plan.total))}</b></div>
-        <div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div></div>
+        <div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div><div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
     </div>`;
   }
   function renderPlanPane(flash) {
@@ -398,6 +415,7 @@
 
   function render() {
     const r = route();
+    setTimeout(placeFab, 0);
     closePop(); $("#acctMenu").hidden = true;
     renderHeader();
     if (r.name === "home") return viewHome();
@@ -441,6 +459,8 @@
     document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
     $$("[data-t]").forEach((el) => { const v = t(el.dataset.t); if (typeof v === "string") el.textContent = v; });
     $("#langBtn").textContent = t("lang");
+    if ($("#footAccept")) $("#footAccept").innerHTML = acceptRow();
+    if ($(".fab__mark")) $(".fab__mark").innerHTML = SUN;
     const acct = $("#acct");
     acct.classList.toggle("is-in", !!user);
     acct.innerHTML = user ? `<i>${esc((user.name || "?")[0])}</i><span>${esc(user.name)}</span>` : esc(t("signIn"));
@@ -690,8 +710,10 @@
   // ---------- checkout: travelers ----------
   const NATS = ["SA", "AE", "KW", "BH", "QA", "OM", "EG", "JO", "PK", "IN", "BD", "PH", "YE", "SD", "GB", "US"];
   const kinds = (pax) => [...Array(pax.a).fill("a"), ...Array(pax.c).fill("c"), ...Array(pax.i).fill("i")];
-  function sumCard(d, total) {
+  // With `only` (the parts in this payment), a part left out of it isn't listed or counted.
+  function sumCard(d, total, only) {
     const pl = buildPlan(d), dd = D.DEST[d.to];
+    if (only) pl.items = pl.items.filter((i) => only.includes(i.k));
     return `<div class="box">${dd ? `<div class="sum__img"><img src="${D.photo(d.to, true)}" alt="" style="object-position:${dd.pos}" /></div>` : ""}
       <div class="sum__t">${esc(placeName(d))}</div><div class="sum__s">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))}</div>
       <div class="sum__rows">${pl.items.filter((i) => i.on).map((i) => `<div><span>${esc(itemLabel(i))}</span><span>${esc(money(i.price))}</span></div>`).join("")}</div>
@@ -727,7 +749,7 @@
         ${user ? `<label class="check" style="margin-top:16px"><input type="checkbox" id="saveTrv" ${co.save !== false ? "checked" : ""} />${esc(t("saveTrv"))}</label>` : ""}
         </div>
         <button type="submit" class="primary">${esc(t("toPay"))}</button>
-      </form><aside class="pg__side">${sumCard(d)}</aside></div></div>`);
+      </form><aside class="pg__side">${sumCard(d)}${helpLine(helpContextFor("travelers", d))}</aside></div></div>`);
 
     const form = $("#trvForm");
     const tag = (i) => { const x = co.trv[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? `${(x.last || "").toUpperCase()}/${(x.first || "").toUpperCase()}${x.k === "a" ? " " + x.title.toUpperCase() : ""}` : ""; };
@@ -784,24 +806,25 @@
     if (!co.method || (co.method === "hold" && (!holdIso || held))) co.method = "apple";
     const people = held ? held.travelers : co.trv, contact = held ? held.contact : co.contact;
     const names = people.map((x) => `${x.first} ${x.last}`.trim()).join(", ");
-    const m = (k, b, small, badge, dis) => `<label class="${co.method === k ? "on" : ""}${dis ? " dis" : ""}"><input type="radio" name="pm" value="${k}" ${co.method === k ? "checked" : ""} ${dis ? "disabled" : ""} /><div><b>${esc(b)}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>${badge ? `<i>${esc(badge)}</i>` : "<span></span>"}</label>`;
+    const m = (k, b, small, badge, dis) => `<label class="${co.method === k ? "on" : ""}${dis ? " dis" : ""}"><input type="radio" name="pm" value="${k}" ${co.method === k ? "checked" : ""} ${dis ? "disabled" : ""} /><div><b>${esc(b)}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>${badge ? (/^</.test(badge) ? `<i class="pmlogo">${badge}</i>` : `<i>${esc(badge)}</i>`) : "<span></span>"}</label>`;
     page(`<div class="wrap pg">
       ${backLink(held ? `#/trip/${held.ref}` : "#/travelers")}${held ? "" : steps(2)}
       <h1 class="pg__h">${esc(t("payTitle"))}</h1>
       <div class="pg__grid"><form id="payForm" novalidate>
         <div class="box"><h2 class="box__h">${esc(t("whoGoing"))}</h2><p style="margin:0">${esc(names)}</p><p class="note-s">${esc(t("contact"))}: +966 ${esc(contact.phone)}${contact.email ? " · " + esc(contact.email) : ""}</p></div>
         <div class="box"><h2 class="box__h">${esc(t("payHow"))}</h2><div class="pm" id="pm">
-          ${m("apple", t("applePay"), "", "Pay")}
-          ${m("mada", t("mada"), "", "mada")}
-          ${m("card", t("card"), "", "VISA · MC")}
-          ${m("tabby", t("tabby"), t("tabbySub")(money(total / 4)), "4×")}
-          ${m("tamara", t("tamara"), t("tamaraSub")(money(total / 3)), "3×")}
+          ${m("apple", t("applePay"), "", LOGO.apple)}
+          ${m("mada", t("mada"), "", LOGO.mada)}
+          ${m("card", t("card"), "", LOGO.visa + LOGO.mc)}
+          ${m("tabby", t("tabby"), t("tabbySub")(money(total / 4)), LOGO.tabby)}
+          ${m("tamara", t("tamara"), t("tamaraSub")(money(total / 3)), LOGO.tamara)}
           ${held ? "" : m("hold", t("holdH"), holdIso ? t("holdSub")(when(holdIso)) : t("holdNo"), "", !holdIso)}
         </div>
         <div id="cardFields"></div>
         <p class="note-s">${esc(t("terms"))}</p>
         <p class="note-s">${esc(t("preview"))}</p></div>
         <button type="submit" class="primary" id="payBtn"></button>
+        <div class="trust">${ico("lock")}<p>${esc(t("hlp").secure)}</p></div>
       </form><aside class="pg__side">${held ? `<div class="box"><div class="sum__t">${esc(placeName(held))}</div><div class="sum__s">${esc(range(held.dep, held.ret))}</div><div class="sum__tot"><span>${esc(t("rTotal"))}</span><b>${esc(money(total))}</b></div></div>` : sumCard(draft, total)}</aside></div></div>`);
     const sync = () => {
       $$("#pm label").forEach((l) => l.classList.toggle("on", $("input", l).checked));
@@ -1057,7 +1080,7 @@
         const c = map.project([k.lng, k.lat]), w = pillW(k.name) + 14;
         const room = named(k) && !taken.some((b) => Math.abs(b.x - c.x) < (b.w + w) / 2 && Math.abs(b.y - c.y) < 28);
         if (room) taken.push({ ...c, w });
-        const e = pin("mk__land" + (room ? "" : " mk__land--dot"), `${ico("star")}${room ? `<b>${esc(k.name)}</b>` : ""}`); e.title = k.name; add(e, k.lng, k.lat);
+        const e = pin("mk__land" + (room ? "" : " mk__land--dot"), `${ico("star")}${room ? `<b>${esc(k.name)}</b>` : ""}`); e.title = k.name; e.setAttribute("role", "img"); e.setAttribute("aria-label", k.name); add(e, k.lng, k.lat);
       });
       for (const g of groups) {
         const one = (p, off) => add(pin("mk__pin" + (p.on ? " on" : ""), esc(p.label), single ? null : () => { pts.forEach((x) => (x.on = x === p)); draw(); onPick && onPick(p.o); }, `${p.o.name}, ${p.label}`), p.lng, p.lat, off);
@@ -1109,7 +1132,7 @@
       </div>
       ${lsView === "map" ? `<div class="ht-mapwrap"><div><div id="htMap" class="ht-map"></div><p class="map-credit">${esc(t("mapCredit"))}</p></div><div id="mapCard" class="map-card"><p class="note-s">${esc(t("mapTap"))}</p></div></div>` : ""}
       ${lsView === "map" ? "" : shown.map((o) => { const on = o.id === d.live.stayId, fa = f(o), far = howFar(o, mark); return `<article class="ht${on ? " on" : ""}">
-        <a class="gal" href="#/hotel/${o.id}">${o.hotel && o.hotel.imageUrl ? `<div class="gal__track"><img src="${esc(o.hotel.imageUrl)}" alt="" loading="lazy" /></div>` : ""}</a>
+        <a class="gal" href="#/hotel/${o.id}" aria-label="${esc(o.name)}">${o.hotel && o.hotel.imageUrl ? `<div class="gal__track"><img src="${esc(o.hotel.imageUrl)}" alt="" loading="lazy" /></div>` : ""}</a>
         <a class="ht__body" href="#/hotel/${o.id}">
           <span class="ht__top">${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}${o.badge ? `<span class="ht__in">${esc(o.badge === "best" ? LABEL("best") : LABEL("lowest"))}</span>` : ""}${on ? `<span class="ht__in">${esc(t("inPlan"))}</span>` : ""}</span>
           <b class="ht__t">${esc(o.name)}</b>
@@ -1249,7 +1272,7 @@
         ${facs.length ? `<h2 class="hd-h">${esc(t("amenH"))}</h2><ul class="facs2">${facs.slice(0, 12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul>${facs.length > 12 ? `<details class="fine"><summary>${esc(t("allFacs")(facs.length))}</summary><ul class="facs2 facs2--all">${facs.slice(12).map((x) => `<li>${facIco(x)}<span>${esc(x)}</span></li>`).join("")}</ul></details>` : ""}` : ""}
         <h2 class="hd-h">${esc(t("policyH"))}</h2>
         <ul class="gk">${fa.payAtHotel ? `<li>${ico("card")}<span>${esc(t("payAtHotel")(money(fa.payAtHotel / 100)))}</span></li>` : ""}<li>${ico("visa")}<span>${esc(t("idNote"))}</span></li>${h && h.phone ? `<li>${ico("chat")}<span>${esc(t("hotelPhone"))} <a class="link" href="tel:${esc(h.phone)}" dir="ltr">${esc(h.phone)}</a></span></li>` : ""}</ul>
-      </div><aside class="pg__side">${sumCard(d)}</aside></div>
+      </div><aside class="pg__side">${sumCard(d)}${helpLine(helpContextFor("hotel", d))}</aside></div>
       <div class="choose" id="choose"></div>
     </div>
     <div class="lb" id="lb" hidden><button type="button" class="lb__x" id="lbX" aria-label="${esc(t("close"))}">×</button><button type="button" class="lb__nav" data-lb="-1" aria-label="‹">‹</button><img id="lbImg" alt="" /><button type="button" class="lb__nav" data-lb="1" aria-label="›">›</button><span id="lbN"></span></div>`);
@@ -1358,7 +1381,7 @@
           <label class="fld" id="fEmail"><span>${esc(t("email"))}</span><input name="email" type="email" value="${esc(co.contact.email)}" /><em>${esc(t("errEmail"))}</em></label></div></div>
         <p class="note-s err-line" id="trvErr" hidden></p>
         <button type="submit" class="primary">${esc(t("toPay"))}</button>
-      </form><aside class="pg__side">${sumCard(d)}</aside></div></div>`);
+      </form><aside class="pg__side">${sumCard(d)}${helpLine(helpContextFor("travelers", d))}</aside></div></div>`);
     const form = $("#trvForm");
     const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? `${(x.last || "").toUpperCase()}/${(x.first || "").toUpperCase()}` : ""; };
     co.lt.forEach((_, i) => tag(i));
@@ -1429,13 +1452,17 @@
     if (on("stay") && liveStay(d)) drafts.push({ kind: "stay", stayOfferId: d.live.stayId, travellerIds: ids });
     if (on("esim")) { const e = liveEsim(d); if (e) drafts.push({ kind: "esim", count: ids.length, packageId: e.id, travellerIds: ids, days: d.live.esim.days }); }
     if (!drafts.length) return page(errBox(t("liveNothing")));
-    try {
-      co.previews = await Promise.all(drafts.map(async (x, i) => {
-        try { return (await A.preview({ draft: x })).preview; }
-        catch (e) { if (!fresh[x.kind] || e.status === 401) throw e; drafts[i] = await fresh[x.kind](); return (await A.preview({ draft: drafts[i] })).preview; }
-      }));
-      co.drafts = drafts; saveDraft();
-    } catch (e) { return page(errBox(e.message || t("liveFlightsDown"), true)); }
+    // Each part is priced on its own: one that can't be booked online (an eSIM before it's switched on, say) is left
+    // out and named, and the rest still goes ahead.
+    const got = await Promise.allSettled(drafts.map(async (x, i) => {
+      try { return (await A.preview({ draft: x })).preview; }
+      catch (e) { if (!fresh[x.kind] || e.status === 401) throw e; drafts[i] = await fresh[x.kind](); return (await A.preview({ draft: drafts[i] })).preview; }
+    }));
+    if (got.some((g) => g.status === "rejected" && g.reason && g.reason.status === 401)) { await A.signOut(); return location.replace("#/signin?next=travelers"); }
+    const okIdx = got.map((g, i) => (g.status === "fulfilled" ? i : -1)).filter((i) => i >= 0);
+    if (!okIdx.length) return page(errBox((got[0].reason && got[0].reason.message) || t("liveFlightsDown"), true));
+    co.left = got.map((g, i) => (g.status === "rejected" ? { kind: drafts[i].kind, why: (g.reason && g.reason.message) || "" } : null)).filter(Boolean);
+    co.previews = okIdx.map((i) => got[i].value); co.drafts = okIdx.map((i) => drafts[i]); saveDraft();
     if (route().name !== "pay") return;
     renderPayLive();
   }
@@ -1466,23 +1493,25 @@
     const holds = pv.map((p) => p.holdExpiresAt).filter(Boolean).sort()[0];
     const tabby = pv.every((p) => p.instalments) ? pv.reduce((s, p) => s + sar(p.instalments.tabby), 0) : null, tamara = pv.every((p) => p.instalments) ? pv.reduce((s, p) => s + sar(p.instalments.tamara), 0) : null;
     if (!co.method || co.method === "apple" || co.method === "hold") co.method = "mada";
-    const m = (k, b, small, badge) => `<label class="${co.method === k ? "on" : ""}"><input type="radio" name="pm" value="${k}" ${co.method === k ? "checked" : ""} /><div><b>${esc(b)}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>${badge ? `<i>${esc(badge)}</i>` : "<span></span>"}</label>`;
+    const m = (k, b, small, badge) => `<label class="${co.method === k ? "on" : ""}"><input type="radio" name="pm" value="${k}" ${co.method === k ? "checked" : ""} /><div><b>${esc(b)}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>${badge ? (/^</.test(badge) ? `<i class="pmlogo">${badge}</i>` : `<i>${esc(badge)}</i>`) : "<span></span>"}</label>`;
     page(`<div class="wrap pg">
       ${backLink("#/travelers")}${steps(2)}
       <h1 class="pg__h">${esc(t("payTitle"))}</h1>
       ${pv.some((p) => p.demoFare) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
+      ${(co.left || []).length ? `<div class="nudge nudge--left" style="margin-top:12px"><div><b>${esc(t("hlp").leftOut(joinNames(co.left.map((x) => t("payFor")(x.kind)))))}</b><small>${esc(t("hlp").leftOutSub)}</small></div><a class="btn btn--plain btn--sm" target="_blank" rel="noopener" href="${wa(t("hlp").waLeft(co.left.map((x) => t("payFor")(x.kind)).join(", "), placeName(d)))}">WhatsApp</a></div>` : ""}
       <div class="pg__grid"><form id="payForm" novalidate>
         ${pv.map((p) => payCard(d, p)).join("")}
         <div class="box"><h2 class="box__h">${esc(t("payHow"))}</h2><div class="pm" id="pm">
-          ${m("mada", t("mada"), "", "mada")}${m("card", t("card"), "", "VISA · MC")}
-          ${tabby ? m("tabby", t("tabby"), t("tabbySub")(money(tabby)), "4×") : ""}${tamara ? m("tamara", t("tamara"), t("tamaraSub")(money(tamara)), "3×") : ""}
+          ${m("mada", t("mada"), "", LOGO.mada)}${m("card", t("card"), "", LOGO.visa + LOGO.mc)}
+          ${tabby ? m("tabby", t("tabby"), t("tabbySub")(money(tabby)), LOGO.tabby) : ""}${tamara ? m("tamara", t("tamara"), t("tamaraSub")(money(tamara)), LOGO.tamara) : ""}
         </div>
         <div class="cardf"><label class="fld full" id="fCard"><span>${esc(t("cardNo"))}</span><input name="cno" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" /><em>${esc(t("errCard"))}</em></label><label class="fld"><span>${esc(t("exp"))}</span><input name="cexp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" /></label><label class="fld"><span>${esc(t("cvc"))}</span><input name="ccvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" /></label></div>
         ${holds ? `<p class="hold-line" id="holdLine"></p>` : ""}
         <p class="note-s">${esc(t("terms"))}</p></div>
         <p class="note-s err-line" id="payErr" hidden></p>
         <button type="submit" class="primary" id="payBtn">${esc(t("payBtn")(money(total)))}</button>
-      </form><aside class="pg__side">${sumCard(d, total)}</aside></div></div>`);
+        <div class="trust">${ico("lock")}<p>${esc(t("hlp").secure)}</p></div>
+      </form><aside class="pg__side">${sumCard(d, total, co.drafts.map((x) => (x.kind === "trip" ? "flight" : x.kind)))}${helpLine(helpContextFor("pay", d))}</aside></div></div>`);
     if (holds) { const tick = () => { const el = $("#holdLine"); if (!el) return; const mins = Math.max(0, Math.ceil((new Date(holds) - Date.now()) / 60000)); el.textContent = mins ? t("priceHeld")(mins) : t("priceGone"); if (mins) setTimeout(tick, 15000); }; tick(); }
     $("#pm").addEventListener("change", (e) => { co.method = e.target.value; $$("#pm label").forEach((l) => l.classList.toggle("on", $("input", l).checked)); });
     $("#payForm").addEventListener("input", (e) => e.target.closest(".fld")?.classList.remove("err"));
@@ -1585,6 +1614,7 @@
         <h2 class="hd-h">${esc(t("waitNext"))}</h2>
         <ul class="gk wn"><li>${ico("chat")}<span>${esc(t("waitNext1"))}</span></li>${meta.passports ? `<li>${ico("visa")}<span>${esc(t("passportLater"))}</span></li>` : ""}<li>${ico("cal")}<span>${esc(t("waitNext3"))}</span></li></ul>
         <div class="wgo">${main.tripId && ok ? `<a class="primary primary--link" href="#/t/${main.tripId}">${esc(t("waitOpen"))}</a>` : ""}<a class="btn btn--plain" href="${wa(t("waHi")(main.ref || main.id.slice(0, 8)))}" target="_blank" rel="noopener">${ico("chat")}${esc(t("waitTalk")(agent))}</a></div>
+        <p class="note-s wcall">${esc(t("hlp").orCall)} <a class="link" href="tel:${PHONE}" dir="ltr">${PHONE_TXT}</a> · ${esc(t("hlp").hours)}</p>
       </div>
     </div>`);
     $$("[data-ans]").forEach((b) => b.addEventListener("click", async () => { try { await A.answer(q.id, b.dataset.ans); } catch (e) { toast(e.message); } viewWait(idsCsv); }));
@@ -1626,6 +1656,64 @@
         <div class="actions" style="margin-top:16px"><a class="btn btn--main" href="${wa(t("waHi")(x.bookingRef || x.id.slice(0, 8)))}" target="_blank" rel="noopener">${esc(t("msgAdv"))}</a><a class="btn btn--plain" href="${wa(t("waChange")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqChange"))}</a><a class="btn btn--plain" href="${wa(t("waCancel")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqCancel"))}</a></div></div>
         <p class="note-s">${esc(t("appSync"))}</p></aside></div></div></div>`);
   }
+
+  // ----- Ask Mada and a person, from any page -----
+  // Mada plans and changes trips in the planner; questions about a booking or a payment go to a person, with what
+  // the traveller is looking at already in the message.
+  function askMada(text) {
+    if (draft && draft.plan) { location.hash = "#/plan"; setTimeout(() => send(text), 60); }
+    else { draft = freshDraft(); send(text); }
+  }
+  const helpContextFor = (r, d) => { const H = t("hlp"), trip = d && d.to ? `${placeName(d)} · ${range(d.dep, d.ret)}` : ""; return ["pay", "travelers"].includes(r) && trip ? H.waPay(trip) : ["hotel", "stay", "flights"].includes(r) && trip ? H.waChoosing(trip) : H.waHi; };
+  function helpContext() {
+    const r = route().name, d = draft, H = t("hlp");
+    const trip = d && d.to ? `${placeName(d)} · ${range(d.dep, d.ret)}` : "";
+    if (["pay", "travelers"].includes(r) && trip) return H.waPay(trip);
+    if (["wait", "t", "trip"].includes(r)) return H.waBooking;
+    if (["hotel", "stay", "flights"].includes(r) && trip) return H.waChoosing(trip);
+    return H.waHi;
+  }
+  function helpChips() {
+    const r = route().name, H = t("hlp");
+    if (draft && draft.plan && ["hotel", "stay"].includes(r)) return H.chipsStay;
+    if (draft && draft.plan && r === "flights") return H.chipsFlights;
+    if (draft && draft.plan && ["pay", "travelers", "plan"].includes(r)) return H.chipsPlan;
+    return H.chipsNew;
+  }
+  function helpSheet() {
+    $(".sheet--help")?.remove();
+    const H = t("hlp"), el = document.createElement("div");
+    el.className = "sheet sheet--help";
+    el.innerHTML = `<div class="sheet__card hs" role="dialog" aria-modal="true" aria-labelledby="hsT"><button type="button" class="lb__x appsheet__x" aria-label="${esc(t("close"))}">×</button>
+      <div class="hs__top"><span class="appsheet__mark">${SUN}</span><div><h2 id="hsT">${esc(H.askH)}</h2><p>${esc(draft && draft.plan ? H.askSubTrip(placeName(draft)) : H.askSub)}</p></div></div>
+      <form class="hs__ask" id="hsF"><textarea id="hsQ" rows="2" placeholder="${esc(H.askPh)}"></textarea><button class="btn btn--main">${esc(H.askGo)}</button></form>
+      <div class="chips hs__chips">${helpChips().map((c) => `<button type="button" class="chip" data-hs="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+      <p class="hs__or"><span>${esc(H.orPerson)}</span></p>
+      <div class="hs__ppl">
+        <a class="hb" href="tel:${PHONE}">${ico("phone")}<span><small>${esc(H.call)}</small><b dir="ltr">${PHONE_TXT}</b></span></a>
+        <a class="hb" href="${wa(helpContext())}" target="_blank" rel="noopener">${ico("chat")}<span><small>WhatsApp</small><b>${esc(H.waShort)}</b></span></a>
+        <a class="hb" href="mailto:${MAIL}">${ico("mail")}<span><small>${esc(H.email)}</small><b>${MAIL}</b></span></a>
+      </div>
+      <p class="note-s hs__hours">${esc(H.hours)}</p></div>`;
+    document.body.append(el);
+    const close = () => { el.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest(".appsheet__x")) close(); });
+    const q = $("#hsQ", el); setTimeout(() => q.focus(), 30);
+    q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#hsF", el).requestSubmit(); } });
+    $$("[data-hs]", el).forEach((b) => b.addEventListener("click", () => { close(); askMada(b.dataset.hs); }));
+    $("#hsF", el).addEventListener("submit", (e) => { e.preventDefault(); const v = q.value.trim(); if (!v) return q.focus(); close(); askMada(v); });
+  }
+  // The round button that is always there, except where the page already has Mada's box in view.
+  function placeFab() {
+    const fab = $("#fab"); if (!fab) return;
+    const r = route().name;
+    const hide = r === "plan" || r === "circle" || (r === "home" && heroAskVisible);
+    fab.hidden = hide;
+    document.body.classList.toggle("has-choose", !!$("#choose"));
+  }
+  let heroAskVisible = true;
 
   // =========================================================
   // Circles, friends and Discover: the app's Circles tab on the web (same API, same covers, same rules)
@@ -2228,7 +2316,9 @@
     addEventListener("keydown", (e) => { if (e.key === "Escape") { finishPop(); $("#acctMenu").hidden = true; } });
     $("#track").addEventListener("scroll", railArrows, { passive: true });
     $$(".rail__arrow").forEach((b) => b.addEventListener("click", () => { const tr = $("#track"); tr.scrollBy({ left: +b.dataset.dir * (lang === "ar" ? -1 : 1) * tr.clientWidth * 0.8, behavior: "smooth" }); }));
-    $$(".nav [data-app]").forEach((b) => b.addEventListener("click", appSheet));
+    $$(".nav [data-app], #foot [data-app]").forEach((b) => b.addEventListener("click", appSheet));
+    $$("[data-help]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); helpSheet(); }));
+    if ("IntersectionObserver" in window) new IntersectionObserver((es) => { heroAskVisible = es[0].isIntersecting; placeFab(); }, { threshold: 0.2 }).observe($("#ask"));
     $("#langBtn").addEventListener("click", () => { lang = lang === "en" ? "ar" : "en"; store.set("lang", lang); A.setLang(lang); render(); });
     $("#acct").addEventListener("click", () => { if (!user) { location.hash = "#/signin"; return; } $("#acctMenu").hidden = !$("#acctMenu").hidden; });
     $("#signOut").addEventListener("click", signOut);

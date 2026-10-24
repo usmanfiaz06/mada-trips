@@ -31,7 +31,7 @@
         <a href="#/discover" data-t="navDiscover">Discover</a>
         <a href="#/circles" data-t="navCircles">Circles</a>
         <a href="#/trips" data-t="trips">Trips</a>
-        <a href="https://wa.me/966566682662" target="_blank" rel="noopener" data-t="help">Help</a>
+        <a href="https://wa.me/966566682662" target="_blank" rel="noopener" data-t="help" data-help>Help</a>
         <button type="button" id="langBtn" class="nav__lang">العربية</button>
         <button type="button" class="nav__app" data-app data-t="getApp">Get the app</button>
         <div class="acct" id="acctWrap">
@@ -109,12 +109,19 @@
   </main>
 
   <footer class="foot wrap" id="foot">
-    <span data-t="footer"></span>
+    <div class="foot__top">
+      <div class="foot__brand"><b>Mada Trips</b><span data-t="footLicensed">A licensed travel agency in Riyadh, with real people on hand every day.</span></div>
+      <div class="foot__col"><b data-t="footHelpH">Need help?</b><a href="tel:+966566682662" dir="ltr">+966 56 668 2662</a><a href="https://wa.me/966566682662" target="_blank" rel="noopener">WhatsApp</a><a href="mailto:support@madatrips.sa">support@madatrips.sa</a><small data-t="footHours">8 am to midnight, every day</small></div>
+      <div class="foot__col"><b>Mada</b><a href="/about" data-t="footAbout">About us</a><a href="/support" data-t="footSupport">Help centre</a><a href="/contact" data-t="footContact">Contact</a><a href="/terms" data-t="footTerms">Terms</a><a href="/privacy" data-t="footPrivacy">Privacy</a></div>
+      <div class="foot__col"><b data-t="footPay">Pay with</b><span class="accept" id="footAccept"></span><button type="button" class="btn btn--plain btn--sm foot__app" data-app data-t="getApp">Get the app</button></div>
+    </div>
+    <div class="foot__bot"><span data-t="footer"></span>
     <div class="foot__end">
       <div class="demo" role="group"><span data-t="demo">Preview as</span><button type="button" data-as="new" data-t="demoNew">New visitor</button><button type="button" data-as="back" data-t="demoBack">Returning</button></div>
       <details class="foot__credits"><summary data-t="photos"></summary><ul id="credits"></ul></details>
-    </div>
+    </div></div>
   </footer>
+  <button type="button" class="fab" id="fab" data-help hidden><span class="fab__mark"></span><b data-t="askMadaBtn">Ask Mada</b></button>
 
   <div class="pop" id="pop" hidden><div class="pop__card" role="dialog" id="popCard"></div></div>
   <div class="busy" id="busy" hidden><div class="busy__card"><span class="spin"></span><p id="busyText"></p></div></div>
