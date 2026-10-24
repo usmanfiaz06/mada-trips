@@ -240,3 +240,15 @@ describe("pure Saudi Arabic", () => {
     expect(shown).toBe("هذي فنادق في دبي، تبي وحدة قريبة من البحر؟ وكذا");
   });
 });
+
+describe("bedrock: caching the conversation and Sonnet 4.5's price", () => {
+  it("puts one cache breakpoint on the last message, and prices the global Sonnet 4.5 profile", async () => {
+    const { forBedrock } = await import("@/lib/app/ask-chat/providers-bedrock");
+    const { priceOf } = await import("@/lib/app/ask-chat/config");
+    const out = forBedrock({ model: "global.anthropic.claude-sonnet-4-5-20250929-v1:0", max_tokens: 9, cache_control: { type: "ephemeral" }, messages: [{ role: "user", content: "hi" }, { role: "assistant", content: [{ type: "text", text: "Hello" }] }, { role: "user", content: [{ type: "text", text: "ctx" }, { type: "text", text: "hotel in Dubai" }] }] } as never) as unknown as { cache_control?: unknown; messages: { content: { cache_control?: unknown }[] }[] };
+    expect(out.cache_control).toBeUndefined();
+    expect(out.messages.at(-1)!.content.at(-1)!.cache_control).toEqual({ type: "ephemeral" });
+    expect(out.messages.at(-1)!.content[0]!.cache_control).toBeUndefined();
+    expect(priceOf("global.anthropic.claude-sonnet-4-5-20250929-v1:0")?.slice(0, 2)).toEqual([3, 15]);
+  });
+});

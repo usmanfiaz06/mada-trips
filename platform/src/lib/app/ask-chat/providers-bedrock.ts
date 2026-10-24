@@ -51,9 +51,21 @@ export function forBedrock(p: StreamParams): StreamParams {
   const kept = (betas ?? []).filter((b) => !FALLBACK_BETA.test(String(b)));
   const model = bedrockModel(String(p.model));
   const out = { ...rest, model, ...(kept.length ? { betas: kept } : {}) } as StreamParams & { thinking?: unknown; output_config?: { effort?: unknown }; cache_control?: unknown };
-  // Bedrock rejects the request-level cache_control ("Extra inputs are not permitted"); the breakpoints on the system
-  // prompt and the tools still cache.
+  // Bedrock rejects the request-level cache_control ("Extra inputs are not permitted"), so the conversation gets its
+  // breakpoint on its last block instead: the tool loop's second call and the next turn read the thread from the cache
+  // (a tenth of the input price) after the system prompt's own breakpoint.
   delete out.cache_control;
+  const msgs = (out as { messages?: Array<{ role: string; content: unknown }> }).messages;
+  const last = msgs?.at(-1);
+  if (last && Array.isArray(last.content) && last.content.length) {
+    const blocks = last.content as Array<Record<string, unknown>>;
+    const i = blocks.length - 1;
+    if (!blocks[i]!.cache_control && blocks[i]!.type !== "thinking" && blocks[i]!.type !== "redacted_thinking") {
+      (out as { messages: unknown[] }).messages = [...msgs!.slice(0, -1), { ...last, content: [...blocks.slice(0, i), { ...blocks[i], cache_control: { type: "ephemeral" } }] }];
+    }
+  } else if (last && typeof last.content === "string" && last.content) {
+    (out as { messages: unknown[] }).messages = [...msgs!.slice(0, -1), { ...last, content: [{ type: "text", text: last.content, cache_control: { type: "ephemeral" } }] }];
+  }
   if (olderClaude(model)) {
     delete out.thinking;
     const tools = (out as { tools?: Array<Record<string, unknown>> }).tools;

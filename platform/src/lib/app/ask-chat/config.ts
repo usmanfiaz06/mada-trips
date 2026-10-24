@@ -173,6 +173,7 @@ const BASE_PRICES: Record<string, [number, number, number, number]> = {
   "claude-haiku-5-5": [0.1, 0.5, 0.01, 0.125],
   "claude-opus-5-5": [4, 20, 0.2, 5],
   "claude-haiku-4-5": [1, 5, 0.1, 1.25],
+  "claude-sonnet-4-5": [3, 15, 0.3, 3.75],
 };
 const PRICES: Record<string, [number, number, number, number]> = {
   ...BASE_PRICES,
