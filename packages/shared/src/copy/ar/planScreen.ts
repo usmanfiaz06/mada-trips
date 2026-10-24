@@ -15,7 +15,7 @@ export const arPlanScreen: ArSection<typeof planScreenCopy> = {
   'plan.todo.left.one': 'باقي شي واحد قبل السفر',
   'plan.todo.left.other': 'باقي {n} قبل السفر',
   'plan.todo.done': 'خلصت {n}',
-  'plan.todo.why.esim': 'نت من أول ما توصل',
+  'plan.todo.why.esim': 'يشتغل من أول ما توصل',
   'plan.todo.why.stays': 'ليالي ما لها سكن',
   'plan.todo.why.car': 'لأيام المشوار بالسيارة',
   'plan.todo.why.passports': 'كل مسافر يحتاج جواز ساري',

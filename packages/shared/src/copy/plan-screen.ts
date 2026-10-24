@@ -14,7 +14,7 @@ export const planScreenCopy = {
   'plan.todo.left.one': 'One thing left before you go',
   'plan.todo.left.other': '{n} things left before you go',
   'plan.todo.done': '{n} done',
-  'plan.todo.why.esim': 'Internet from the moment you land',
+  'plan.todo.why.esim': 'Works from the moment you land',
   'plan.todo.why.stays': 'Nights without a place to stay',
   'plan.todo.why.car': 'For the drive days',
   'plan.todo.why.passports': 'Every traveller needs a valid one',
