@@ -62,6 +62,8 @@ async function doLogin(_: ActionState, fd: FormData): Promise<ActionState> {
 export async function logout() {
   const u = await getCurrentUser();
   if (u) await audit(db, { actorId: u.id, action: "auth.logout", entityType: "user", entityId: u.id, entityRef: u.name, summary: `${u.name} signed out` });
+  // Client people go back to their own branded sign-in page.
+  const [c] = u?.clientId ? await db.select({ slug: schema.clients.portalSlug }).from(schema.clients).where(eq(schema.clients.id, u.clientId)) : [];
   await destroySession();
-  redirect("/adminwork/login");
+  redirect(u?.clientId ? `/adminwork/login?for=${c?.slug ?? "corporate"}` : "/adminwork/login");
 }

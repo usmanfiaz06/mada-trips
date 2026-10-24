@@ -103,6 +103,7 @@ export const clients = pgTable("clients", {
   createdBy: uuid("created_by").references(() => users.id),
   // Corporate workspace: what this client sees when its people sign in.
   portalEnabled: boolean("portal_enabled").notNull().default(false),
+  portalSlug: text("portal_slug"), // their sign-in link: /corporate/<slug>
   portalColor: text("portal_color"),
   portalLogoId: uuid("portal_logo_id"), // an attachment (entity_type client_logo)
   portalServices: jsonb("portal_services").notNull().default({}), // { lease: "price" | "quote", daily: "quote", ... }
@@ -116,7 +117,7 @@ export const clients = pgTable("clients", {
   hiddenNames: text("hidden_names").array().notNull().default([]),
   accountManagerId: uuid("account_manager_id").references((): AnyPgColumn => users.id),
   createdAt: createdAt(),
-}, (t) => [index("clients_name_idx").on(t.name)]);
+}, (t) => [index("clients_name_idx").on(t.name), uniqueIndex("clients_portal_slug_once").on(t.portalSlug).where(sql`${t.portalSlug} IS NOT NULL`)]);
 
 export const bookings = pgTable("bookings", {
   id: id(),

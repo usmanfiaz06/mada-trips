@@ -7,11 +7,12 @@ import { can, requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { timeAgo } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
-import { agreedPrices, catalog, costFor, LEASE_TERMS, priceFor, SERVICES, staffList, vehicleName } from "@/lib/portal";
+import { agreedPrices, catalog, costFor, LEASE_TERMS, priceFor, SERVICES, siteOrigin, staffList, vehicleName, workspaceLink } from "@/lib/portal";
 import { isUuid } from "@/lib/security";
 import { Badge, Card, CardHead, Field, Input, LinkButton, Select, Table, Td, Textarea, Th, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { ClientMark } from "../../client-mark";
+import { CopyLink } from "../../copy-link";
 import { addClientLogin, manageClientLogin, savePricing, saveWorkspace, uploadLogo } from "../../actions";
 
 const ROLES = [
@@ -30,11 +31,12 @@ export default async function WorkspaceSettings({ params }: { params: Promise<{ 
   const [c] = await db.select().from(schema.clients).where(eq(schema.clients.id, id));
   if (!c) notFound();
   const pricing = can(u, "clients.credit");
-  const [staff, people, cars, agreed] = await Promise.all([
+  const [staff, people, cars, agreed, origin] = await Promise.all([
     staffList(),
     db.select().from(schema.users).where(eq(schema.users.clientId, id)).orderBy(asc(schema.users.name)),
-    catalog(), agreedPrices(id),
+    catalog(), agreedPrices(id), siteOrigin(),
   ]);
+  const link = workspaceLink(origin, c.portalSlug);
   const services = c.portalServices as Record<string, string>;
   const terms = [...c.portalTerms].sort((a, b) => a - b);
 
@@ -64,6 +66,9 @@ export default async function WorkspaceSettings({ params }: { params: Promise<{ 
               <span>{t("Workspace is on")}<span className="block text-[12px] text-ink-3">{t("Off: nobody at this company can sign in.")}</span></span>
               <input type="checkbox" name="enabled" defaultChecked={c.portalEnabled} className="size-5 accent-[var(--brand)]" />
             </label>
+            <Field label={t("Link name")} hint={t("Their sign-in link is /corporate/ followed by this. Lowercase letters, numbers and dashes.")}>
+              <Input name="slug" defaultValue={c.portalSlug ?? ""} dir="ltr" className="font-mono" />
+            </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label={t("Account manager")}><Select name="accountManagerId" defaultValue={c.accountManagerId ?? ""} placeholder={t("Nobody")} options={staff.map((s) => ({ value: s.id, label: s.name }))} /></Field>
               <Field label={t("Brand colour")}><Input type="color" name="color" defaultValue={c.portalColor ?? "#1e352d"} className="h-11 p-1" /></Field>
@@ -87,13 +92,17 @@ export default async function WorkspaceSettings({ params }: { params: Promise<{ 
             </label>
             <Field label={<span className="flex items-center gap-1.5"><EyeOff className="size-3.5" />{t("Names never shown to this client")}</span>}
               hint={t("Comma or one per line. Wherever these appear (messages, updates, documents) the client sees “Mada team”. Spelling variants and Arabic are caught.")}>
-              <Textarea name="hiddenNames" rows={2} defaultValue={c.hiddenNames.join(", ")} placeholder="Haneef, Abdulaziz" />
+              <Textarea name="hiddenNames" rows={2} defaultValue={c.hiddenNames.join(", ")} placeholder={t("e.g. names of Mada partners or staff")} />
             </Field>
             <SubmitButton>{t("Save workspace")}</SubmitButton>
           </ActionForm>
         </Card>
 
         <div className="space-y-4">
+          <Card>
+            <CardHead title={t("Sign-in link")} hint={t("Send this to people at {name} with their login. It opens a sign-in page with their logo; they land straight in their workspace.", { name: c.name })} />
+            <CopyLink url={link} />
+          </Card>
           <Card>
             <CardHead title={t("Logo")} hint={t("Shown next to Mada's in their workspace. PNG, JPEG or WebP, under 2 MB.")} />
             <div className="flex flex-wrap items-center gap-4">
@@ -128,12 +137,14 @@ export default async function WorkspaceSettings({ params }: { params: Promise<{ 
               ))}
             </ul>
             <div className="border-t border-line p-6">
-              <ActionForm action={addClientLogin} resetOnOk className="grid gap-3 sm:grid-cols-2">
+              <ActionForm action={addClientLogin} resetOnOk>
+                <div className="grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="clientId" value={c.id} />
                 <Field label={t("Name")}><Input name="name" required /></Field>
                 <Field label={t("Work email")}><Input name="email" type="email" required /></Field>
                 <Field label={t("Role")}><Select name="role" defaultValue="admin" options={ROLES.map((r) => ({ value: r.value, label: t(r.label) }))} /></Field>
                 <div className="flex items-end"><SubmitButton>{t("Create login")}</SubmitButton></div>
+                </div>
               </ActionForm>
             </div>
           </Card>

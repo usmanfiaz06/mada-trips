@@ -87,7 +87,7 @@ export default async function CorporatePage() {
                   <ClientMark clientId={c.id} name={c.name} hasLogo={!!c.portalLogoId} color={c.portalColor} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[14px] font-medium">{c.name}</div>
-                    <div className="text-[12px] text-ink-3">{t("{n} people", { n: users })} · {c.hiddenNames.length ? t("{n} hidden names", { n: c.hiddenNames.length }) : t("No hidden names")}</div>
+                    <div className="text-[12px] text-ink-3"><span className="font-mono" dir="ltr">/corporate/{c.portalSlug ?? "login"}</span> · {t("{n} people", { n: users })} · {c.hiddenNames.length ? t("{n} hidden names", { n: c.hiddenNames.length }) : t("No hidden names")}</div>
                   </div>
                   {!!unreadBy.get(c.id) && <Link href={`/adminwork/corporate/inbox?c=${c.id}`}><Badge tone="gold" dot>{t("{n} new", { n: unreadBy.get(c.id)! })}</Badge></Link>}
                   <Link href={`/adminwork/corporate/clients/${c.id}`} className="grid size-9 place-items-center rounded-full text-ink-3 hover:bg-sunken hover:text-ink" aria-label={t("Workspace settings")}><Settings2 className="size-4" /></Link>

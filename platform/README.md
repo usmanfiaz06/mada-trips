@@ -81,6 +81,8 @@ Corporate clients sign in at the same `/adminwork/login` as staff and land in th
 - **Flow:** the client sends a plan → their approver approves → Mada confirms (only once every car has a supplier cost) → out for delivery → delivered → **Bill month N** raises a corporate `transport` sale in Sales. It uses the client's credit terms, plus 15% VAT, and goes through the same credit-approval rules as any other sale. The client sees each bill under Invoices.
 - **Hidden names:** each client has a list of names that must never reach it (KEO: Haneef, Abdulaziz). Everything sent to a client's screen goes through `scrub()` in `src/lib/portal.ts`. It catches spelling variants, spaces and hyphens, and Arabic, and shows "Mada team" instead. Mada's own replies are always signed "Mada team", never with a staff name.
 
+- **Sign-in link:** each workspace has its own link, `madatrips.sa/corporate/<name>` (KEO: `/corporate/keo`), to copy from the client's settings in Ops. It opens the same sign-in page, branded with the client's logo. `/corporate/login` is the generic version. Signing out takes them back to their branded page.
+
 Demo logins (password `Mada@2026`): `norbert@keo.example` (KEO admin) and `sara@keo.example` (KEO requester). Vehicle photos in `public/adminwork/vehicles` are placeholders; see `CREDITS.txt` there.
 
 ## Security

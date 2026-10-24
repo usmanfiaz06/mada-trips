@@ -296,7 +296,7 @@ async function main() {
 
   // Corporate workspace: KEO signs in to Mada Ops and sees only its own company. Mada's partners' names are hidden from them.
   const [keo] = await db.insert(schema.clients).values({
-    name: "KEO International Consultants", type: "contracted", contactPerson: "Norbert", email: "norbert@keo.example", creditLimit: sar(2_000_000), paymentTermsDays: 30,
+    name: "KEO International Consultants", type: "contracted", portalSlug: "keo", contactPerson: "Norbert", email: "norbert@keo.example", creditLimit: sar(2_000_000), paymentTermsDays: 30,
     contractRef: "MT/KEO/1022/26", createdBy: uB.id, portalEnabled: true, portalColor: "#0e4679", portalServices: { lease: "price", daily: "quote", chauffeur: "quote" },
     portalTerms: [24, 36, 48], hiddenNames: ["Haneef", "Abdulaziz"], accountManagerId: uB.id, portalNeedsApproval: true,
   }).returning();

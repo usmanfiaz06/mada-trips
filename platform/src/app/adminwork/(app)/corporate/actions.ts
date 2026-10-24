@@ -11,7 +11,7 @@ import { audit } from "@/lib/audit";
 import { toHalalas, sar } from "@/lib/money";
 import { detectFileType, isUuid } from "@/lib/security";
 import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
-import { billNextMonth, LEASE_TERMS, postMessage, refreshCosts, SERVICES, type Line } from "@/lib/portal";
+import { billNextMonth, freeSlug, LEASE_TERMS, postMessage, refreshCosts, SERVICES, siteOrigin, SLUG_RE, workspaceLink, type Line } from "@/lib/portal";
 
 const tempPassword = () => `Mada-${randomBytes(10).toString("hex").match(/.{4}/g)!.join("-")}`;
 const done = (path: string) => { revalidatePath("/adminwork", "layout"); revalidatePath(path); };
@@ -33,7 +33,7 @@ export async function enableWorkspace(_: ActionState, fd: FormData): Promise<Act
       }
       if (!c) throw new Error("Choose a client or type a new company name");
       if (c.type === "retail") throw new Error("Workspaces are for companies. Change this client's type first");
-      await tx.update(schema.clients).set({ portalEnabled: true, portalServices: Object.keys(c.portalServices as object).length ? c.portalServices : { lease: "price" }, accountManagerId: c.accountManagerId ?? u.id })
+      await tx.update(schema.clients).set({ portalEnabled: true, portalSlug: c.portalSlug ?? (await freeSlug(tx, c.name)), portalServices: Object.keys(c.portalServices as object).length ? c.portalServices : { lease: "price" }, accountManagerId: c.accountManagerId ?? u.id })
         .where(eq(schema.clients.id, c.id));
       await audit(tx, { actorId: u.id, action: "portal.enabled", entityType: "client", entityId: c.id, entityRef: c.name, summary: `Opened a corporate workspace for ${c.name}` });
       return c.id;
@@ -50,6 +50,8 @@ const Settings = z.object({
   accountManagerId: z.string().uuid().optional().or(z.literal("").transform(() => undefined)),
   needsApproval: z.string().optional(),
   hiddenNames: z.string().max(1000).optional(),
+  slug: z.string().trim().toLowerCase().optional().transform((v) => v || undefined)
+    .refine((v) => v === undefined || (SLUG_RE.test(v) && v !== "login"), "Use 2–40 lowercase letters, numbers or dashes for the link"),
 });
 
 export async function saveWorkspace(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -65,7 +67,11 @@ export async function saveWorkspace(_: ActionState, fd: FormData): Promise<Actio
     await db.transaction(async (tx) => {
       const [before] = await tx.select().from(schema.clients).where(eq(schema.clients.id, v.id));
       if (!before) throw new Error("Client not found");
-      const after = { portalEnabled: v.enabled === "on", portalColor: v.color, portalServices: services, portalNeedsApproval: v.needsApproval === "on", hiddenNames, accountManagerId: v.accountManagerId ?? null };
+      if (v.slug && v.slug !== before.portalSlug) {
+        const [taken] = await tx.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.portalSlug, v.slug));
+        if (taken) throw new Error("Another client already uses that link");
+      }
+      const after = { portalSlug: v.slug ?? before.portalSlug, portalEnabled: v.enabled === "on", portalColor: v.color, portalServices: services, portalNeedsApproval: v.needsApproval === "on", hiddenNames, accountManagerId: v.accountManagerId ?? null };
       await tx.update(schema.clients).set(after).where(eq(schema.clients.id, v.id));
       await audit(tx, { actorId: u.id, action: "portal.settings", entityType: "client", entityId: v.id, entityRef: before.name, summary: `Updated ${before.name}'s workspace`,
         changes: { services, hiddenNames: hiddenNames.length, needsApproval: after.portalNeedsApproval, enabled: after.portalEnabled } });
@@ -193,7 +199,8 @@ export async function addClientLogin(_: ActionState, fd: FormData): Promise<Acti
     });
   } catch (e) { return toState(e); }
   done(`/adminwork/corporate/clients/${p.data.clientId}`);
-  return { ok: `Login created. Temporary password: ${pw}. Share it privately; they choose their own on first sign-in.` };
+  const [c] = await db.select({ slug: schema.clients.portalSlug }).from(schema.clients).where(eq(schema.clients.id, p.data.clientId));
+  return { ok: `Login created. Send ${p.data.email} this link: ${workspaceLink(await siteOrigin(), c?.slug ?? null)} and the temporary password ${pw}. They choose their own on first sign-in.` };
 }
 
 export async function manageClientLogin(_: ActionState, fd: FormData): Promise<ActionState> {

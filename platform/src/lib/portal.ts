@@ -1,4 +1,5 @@
 import "server-only";
+import { headers } from "next/headers";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { audit } from "./audit";
@@ -8,6 +9,33 @@ import { addDays, businessDate } from "./dates";
 import { getSettings } from "./settings";
 import { clientExposure } from "./finance";
 import { createApproval } from "./approvals";
+
+/* ───────── Sign-in links ───────── */
+
+export const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+
+/** This deployment's address as the browser sees it (madatrips.sa in production, localhost in development). */
+export async function siteOrigin() {
+  const h = await headers();
+  const host = (h.get("x-forwarded-host") ?? h.get("host") ?? "madatrips.sa").split(",")[0].trim();
+  const proto = (h.get("x-forwarded-proto") ?? (/^(localhost|127\.)/.test(host) ? "http" : "https")).split(",")[0].trim();
+  return `${proto}://${host}`;
+}
+export const workspaceLink = (origin: string, slug: string | null) => `${origin}/corporate/${slug ?? "login"}`;
+
+/** A short, unused link name from the company name: "KEO International Consultants" → "keo". */
+export async function freeSlug(q: Tx | typeof db, name: string) {
+  const words = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9\s-]/g, "").split(/[\s-]+/).filter(Boolean);
+  const candidates = [words[0], words.slice(0, 2).join("-"), words.slice(0, 3).join("-")].filter((x): x is string => !!x && x.length >= 2 && x !== "login");
+  if (!candidates.length) candidates.push("client");
+  for (const c of [...candidates, ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `${candidates[0]}-${n}`)]) {
+    const slug = c.slice(0, 40).replace(/-+$/, "");
+    if (!SLUG_RE.test(slug)) continue;
+    const [taken] = await q.select({ id: schema.clients.id }).from(schema.clients).where(eq(schema.clients.portalSlug, slug));
+    if (!taken) return slug;
+  }
+  return `client-${Date.now().toString(36)}`;
+}
 
 /* ───────── Catalog and prices ───────── */
 

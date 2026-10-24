@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { withBase } from "@/lib/base";
+import { and, eq } from "drizzle-orm";
+import { db, schema } from "@/db";
 import { getCurrentUser, homeFor } from "@/lib/auth";
+import { SLUG_RE } from "@/lib/portal";
 import { getT } from "@/lib/i18n";
 import { ActionForm, SubmitButton, LocaleSwitch } from "@/components/client";
 import { login } from "./actions";
@@ -20,11 +23,17 @@ function Sunburst() {
   );
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; for?: string }> }) {
   const signedIn = await getCurrentUser();
   if (signedIn) redirect(homeFor(signedIn));
   const t = await getT();
-  const { next } = await searchParams;
+  const { next, for: audience } = await searchParams;
+  // Corporate clients arrive from madatrips.sa/corporate/<workspace>: same sign-in, branded for them.
+  const corporate = !!audience;
+  const [client] = audience && SLUG_RE.test(audience) && audience !== "corporate"
+    ? await db.select({ name: schema.clients.name, slug: schema.clients.portalSlug, logo: schema.clients.portalLogoId }).from(schema.clients)
+      .where(and(eq(schema.clients.portalSlug, audience), eq(schema.clients.portalEnabled, true)))
+    : [];
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <section className="night grain relative hidden overflow-hidden lg:block">
@@ -39,15 +48,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="relative flex h-full flex-col justify-between p-12 xl:p-16">
           <div className="flex items-center gap-3">
             <img src={withBase("/symbol-sand.svg")} alt="" className="h-7" />
-            <span className="text-[15px] font-semibold tracking-[0.02em]">Mada Ops</span>
+            <span className="text-[15px] font-semibold tracking-[0.02em]">{corporate ? "Mada Business" : "Mada Ops"}</span>
+            {client?.logo && <><span className="text-[#efe9de]/40">×</span><img src={withBase(`/api/portal/brand/${client.slug}`)} alt={client.name} className="h-9 rounded-[6px]" /></>}
           </div>
 
           <div className="max-w-lg">
             <div className="mb-5 flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#d9b77a]">
-              <span className="h-px w-8 bg-gradient-to-r from-[#d9b77a] to-transparent" />{t("Internal platform")}
+              <span className="h-px w-8 bg-gradient-to-r from-[#d9b77a] to-transparent" />{client ? t("Prepared for {name}", { name: client.name }) : corporate ? t("Corporate workspace") : t("Internal platform")}
             </div>
-            <h1 className="text-[46px] font-semibold leading-[1.03] tracking-[-0.035em] xl:text-[54px]">{t("Every booking, riyal and decision in one place.")}</h1>
-            <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#efe9de]/60">{t("Sales, issuance, approvals, daily close and settlement — one calm, secure workspace.")}</p>
+            <h1 className="text-[46px] font-semibold leading-[1.03] tracking-[-0.035em] xl:text-[54px]">{corporate ? t("Your fleet, plans and invoices in one place.") : t("Every booking, riyal and decision in one place.")}</h1>
+            <p className="mt-6 max-w-md text-[15px] leading-relaxed text-[#efe9de]/60">{corporate ? t("Pick cars at your prices, get them approved, follow delivery to your door and talk to Mada.") : t("Sales, issuance, approvals, daily close and settlement — one calm, secure workspace.")}</p>
           </div>
 
           <div className="h-px w-16 bg-gradient-to-r from-[#efe9de]/25 to-transparent" />
@@ -58,10 +68,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="w-full max-w-[380px] animate-rise">
           <img src={withBase("/symbol-green.svg")} alt="Mada" className="mb-8 h-8 dark:hidden" />
           <img src={withBase("/symbol-sand.svg")} alt="Mada" className="mb-8 hidden h-8 dark:block" />
-          <h2 className="text-[24px] font-semibold tracking-[-0.02em]">{t("Sign in")}</h2>
-          <p className="mb-7 mt-1 text-[14px] text-ink-3">{t("Use the email your administrator set up for you.")}</p>
+          <h2 className="text-[24px] font-semibold tracking-[-0.02em]">{client ? t("Sign in to {name}", { name: client.name }) : t("Sign in")}</h2>
+          <p className="mb-7 mt-1 text-[14px] text-ink-3">{corporate ? t("Use the email and password Mada sent you. First time? You'll choose your own password next.") : t("Use the email your administrator set up for you.")}</p>
           <ActionForm action={login} className="space-y-4">
-            <input type="hidden" name="next" value={next ?? "/adminwork"} />
+            <input type="hidden" name="next" value={corporate ? "/adminwork/portal" : next ?? "/adminwork"} />
             <label className="block">
               <span className="mb-1.5 block text-[12.5px] font-medium text-ink-2">{t("Email")}</span>
               <input name="email" type="email" autoComplete="username" required autoFocus className="field h-11" dir="ltr" />
@@ -72,7 +82,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </label>
             <SubmitButton size="lg" className="mt-2 w-full">{t("Sign in")}</SubmitButton>
           </ActionForm>
-          <p className="mt-8 text-[12px] text-ink-4">{t("Every sign-in is recorded in the activity log.")}</p>
+          <p className="mt-8 text-[12px] text-ink-4">{corporate ? t("Trouble signing in? Call Mada, 8am–10pm.") : t("Every sign-in is recorded in the activity log.")}</p>
         </div>
       </section>
     </main>
