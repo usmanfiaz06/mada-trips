@@ -100,12 +100,15 @@ export async function clientCatalog(c: Client) {
 
 /* ───────── Names a client must never see ───────── */
 
+/** Hidden from every client workspace from the moment it opens. Staff never appear by name to clients anyway ("Mada team"). */
+export const ALWAYS_HIDDEN = ["Haneef", "Abdulaziz"];
+
 const ARABIC: Record<string, string> = { haneef: "حنيف", hanif: "حنيف", abdulaziz: "عبد ?العزيز", abdelaziz: "عبد ?العزيز", bader: "بدر" };
 
 /** Matches each hidden name loosely: case, spaces or hyphens between letters, common spellings, and Arabic. */
 export function hiddenNameRegex(names: string[]) {
   const parts: string[] = [];
-  for (const n of names) {
+  for (const n of new Set([...ALWAYS_HIDDEN, ...names])) {
     const k = n.toLowerCase().replace(/[^a-z]/g, "");
     if (k.length < 2) continue;
     const variants = new Set([k]);
