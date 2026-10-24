@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, isNull, ne } from "drizzle-orm";
 import { ShieldCheck, UserPlus } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
@@ -19,8 +19,8 @@ export default async function TeamPage() {
   const L = t.locale;
   const [members, roles] = await Promise.all([
     db.select({ m: schema.users, role: schema.roles.name, roleAr: schema.roles.nameAr, partner: schema.partners.name }).from(schema.users)
-      .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId)).orderBy(schema.users.createdAt),
-    db.select().from(schema.roles).orderBy(schema.roles.createdAt),
+      .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId)).leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId)).where(isNull(schema.users.clientId)).orderBy(schema.users.createdAt),
+    db.select().from(schema.roles).where(ne(schema.roles.key, "client_user")).orderBy(schema.roles.createdAt),
   ]);
   const teams = ["management", "riyadh", "pakistan"] as const;
   const online = (d: Date | null) => !!d && Date.now() - d.getTime() < 5 * 60_000;

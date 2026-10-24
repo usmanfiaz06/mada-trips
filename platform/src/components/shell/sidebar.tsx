@@ -2,15 +2,16 @@
 import Link from "next/link";
 import { withBase } from "@/lib/base";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange,
   Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart, Menu, X, LogOut,
+  Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen,
 } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart };
+const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart, Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen };
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number; accent?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -67,11 +68,11 @@ function Brand() {
   );
 }
 
-function UserBlock({ name, role, logout }: { name: string; role: string; logout: () => Promise<void> }) {
+function UserBlock({ name, role, logout, profileHref = "/adminwork/me" }: { name: string; role: string; logout: () => Promise<void>; profileHref?: string }) {
   const t = useT();
   return (
     <div className="m-4 flex items-center gap-3 rounded-[20px] bg-surface p-2 shadow-card">
-      <Link href="/adminwork/me" className="flex min-w-0 flex-1 items-center gap-3">
+      <Link href={profileHref} className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full bg-ink text-[12px] font-medium text-bg">
           {name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
         </span>
@@ -87,14 +88,18 @@ function UserBlock({ name, role, logout }: { name: string; role: string; logout:
   );
 }
 
-export function Sidebar({ sections, user, logout }: { sections: NavSection[]; user: { name: string; role: string }; logout: () => Promise<void> }) {
+export function Sidebar({ sections, user, logout, brand, profileHref }: {
+  sections: NavSection[]; user: { name: string; role: string }; logout: () => Promise<void>;
+  /** Replaces the Mada Ops mark, e.g. with a client's co-branded mark in their workspace. */
+  brand?: ReactNode; profileHref?: string;
+}) {
   const [open, setOpen] = useState(false);
   const path = usePathname();
   useEffect(() => setOpen(false), [path]);
   return (
     <>
       <aside className="fixed inset-y-0 start-0 z-40 hidden w-[272px] flex-col lg:flex">
-        <Brand /><Nav sections={sections} /><UserBlock {...user} logout={logout} />
+        {brand ?? <Brand />}<Nav sections={sections} /><UserBlock {...user} logout={logout} profileHref={profileHref} />
       </aside>
       <button onClick={() => setOpen(true)} className="fixed start-4 top-[18px] z-40 grid size-10 place-items-center rounded-full bg-tile text-tile-ink lg:hidden" aria-label="Menu"><Menu className="size-[18px]" /></button>
       {open && (
@@ -102,7 +107,7 @@ export function Sidebar({ sections, user, logout }: { sections: NavSection[]; us
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-fade" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-2 start-2 flex w-[290px] flex-col rounded-[26px] bg-bg shadow-float animate-rise">
             <button onClick={() => setOpen(false)} className="absolute end-4 top-6 text-ink-3" aria-label="Close"><X className="size-5" /></button>
-            <Brand /><Nav sections={sections} onNavigate={() => setOpen(false)} /><UserBlock {...user} logout={logout} />
+            {brand ?? <Brand />}<Nav sections={sections} onNavigate={() => setOpen(false)} /><UserBlock {...user} logout={logout} profileHref={profileHref} />
           </aside>
         </div>
       )}

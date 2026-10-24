@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
 import { addDays, riyadhDate } from "./dates";
@@ -20,7 +20,7 @@ export const canEditTask = (u: CurrentUser, t: Pick<Task, "createdBy">) => canMa
 /** People this person can hand work to, active only. */
 export async function assignableUsers(u: CurrentUser) {
   const rows = await db.select({ id: schema.users.id, name: schema.users.name, team: schema.users.team }).from(schema.users)
-    .where(and(eq(schema.users.active, true), canManageAll(u) ? undefined : or(eq(schema.users.team, u.team), eq(schema.users.id, u.id))))
+    .where(and(eq(schema.users.active, true), isNull(schema.users.clientId), canManageAll(u) ? undefined : or(eq(schema.users.team, u.team), eq(schema.users.id, u.id))))
     .orderBy(schema.users.name);
   return rows;
 }

@@ -22,6 +22,10 @@ const config: NextConfig = {
       { source: "/ar/index.html", destination: "/ar", permanent: true },
       { source: "/ar/site-home", destination: "/ar", permanent: true },
       { source: "/ar/:page((?!index|site-home)[^/.]+)\\.html", destination: "/ar/:page", permanent: true },
+      // Sign-in links for corporate clients: /corporate/login, or /corporate/<their workspace> for a branded page.
+      { source: "/corporate", destination: "/adminwork/login?for=corporate", permanent: false },
+      { source: "/corporate/login", destination: "/adminwork/login?for=corporate", permanent: false },
+      { source: "/corporate/:slug([a-z0-9][a-z0-9-]{0,39})", destination: "/adminwork/login?for=:slug", permanent: false },
     ];
   },
   async rewrites() {

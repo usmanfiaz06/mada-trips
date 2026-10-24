@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth";
+import { getStaffUser } from "@/lib/auth";
 import { queryActivity } from "@/lib/activity";
 import { audit } from "@/lib/audit";
 import { db } from "@/db";
@@ -7,7 +7,7 @@ import { csvCell as cell } from "@/lib/security";
 
 /** CSV export of the activity log, with the current filters. The export itself is logged. */
 export async function GET(req: Request) {
-  const u = await getCurrentUser();
+  const u = await getStaffUser();
   if (!u || u.mustChangePassword || !u.permissions.has("activity.view")) return new Response("Forbidden", { status: 403 });
   // Only when clicked inside the platform, so another site can't trigger (and log) exports on someone's behalf.
   const site = req.headers.get("sec-fetch-site");

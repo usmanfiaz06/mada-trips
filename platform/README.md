@@ -70,6 +70,21 @@ A sale can cover several visas, tickets or guests for the same client. Set the n
 
 Partners can record an expense another partner paid personally ("Which partner paid?"). It goes to that partner's ledger, and neither the one who recorded it nor the one being repaid can approve it.
 
+## Corporate workspace (client portal)
+
+Corporate clients sign in at the same `/adminwork/login` as staff and land in their own workspace at `/adminwork/portal`. It's the same app and database, but a client login can only ever reach its own company:
+
+- A client login is a user with `client_id` set and a `client_role` (admin · approver · requester · viewer). Its role (`client_user`) has no staff permissions. `requireUser`, which every staff page and action uses, sends client logins back to their workspace, and the internal APIs answer 401. Client logins never count as approvers, task assignees or team members.
+- **What they see:** the lease showroom with their own prices per term, their plan and delivery choice (office, home, project site or collection), approvals inside their company, a request tracker, invoices, their team, and the Mada desk conversation.
+- **What Ops controls** (`/adminwork/corporate`, needs `clients.manage`): which services each company sees, which cars, lease terms, brand colour and logo, their logins (temporary password, reset, switch off), and the account manager. The rule "plans need an approver at the company" is set here too.
+- **Prices** (`clients.credit`): the lease catalog holds the supplier cost and Mada's list price per car, per term. A client pays an agreed price if one is set, otherwise markup on cost if set, otherwise the list price. Costs, suppliers and margins never reach a client.
+- **Flow:** the client sends a plan → their approver approves → Mada confirms (only once every car has a supplier cost) → out for delivery → delivered → **Bill month N** raises a corporate `transport` sale in Sales. It uses the client's credit terms, plus 15% VAT, and goes through the same credit-approval rules as any other sale. The client sees each bill under Invoices.
+- **Hidden names:** each client has a list of names that must never reach it (KEO: Haneef, Abdulaziz). Everything sent to a client's screen goes through `scrub()` in `src/lib/portal.ts`. It catches spelling variants, spaces and hyphens, and Arabic, and shows "Mada team" instead. Mada's own replies are always signed "Mada team", never with a staff name.
+
+- **Sign-in link:** each workspace has its own link, `madatrips.sa/corporate/<name>` (KEO: `/corporate/keo`), to copy from the client's settings in Ops. It opens the same sign-in page, branded with the client's logo. `/corporate/login` is the generic version. Signing out takes them back to their branded page.
+
+Demo logins (password `Mada@2026`): `norbert@keo.example` (KEO admin) and `sara@keo.example` (KEO requester). Vehicle photos in `public/adminwork/vehicles` are placeholders; see `CREDITS.txt` there.
+
 ## Security
 
 - **One login per partner.** A partner is one director vote (unique index on `users.partner_id`). Votes are counted per partner, only from people still eligible, and never from the requester's partner or a partner who benefits (an expense reimbursed to them, an advance from them).

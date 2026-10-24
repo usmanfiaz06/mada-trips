@@ -1,0 +1,7 @@
+Vehicle photos (backgrounds removed), from Wikimedia Commons. Placeholders until supplier or brand photos replace them.
+tahoe.png        HJUdall, CC0                https://commons.wikimedia.org/wiki/File:23_Chevrolet_Tahoe_High_Country.jpg
+rav4.png         TTTNIS, CC0                 https://commons.wikimedia.org/wiki/File:2021_Toyota_RAV4_PHV.jpg
+highlander.png   Kevauto, CC BY-SA 4.0       https://commons.wikimedia.org/wiki/File:2020_Toyota_Highlander_LE_AWD,_front_12.12.20.jpg
+fortuner.png     Ethan Llamas, CC BY-SA 4.0  https://commons.wikimedia.org/wiki/File:Toyota_Fortuner_GUN165_Legender_2.8_Q_4x2_Platinum_White_Pearl_Mica.jpg
+sportage.png     Alexander Migl, CC BY-SA 4.0 https://commons.wikimedia.org/wiki/File:2025_Kia_Sportage_(NQ5)_Automesse_Ludwigsburg_2025_DSC_2532.jpg
+urbancruiser.png Haysnawri10, CC BY-SA 4.0   https://commons.wikimedia.org/wiki/File:Toyota_Urban_Cruiser_GL_in_Pearl_White_01.jpg
