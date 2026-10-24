@@ -15,7 +15,10 @@
    to the payment gateway, and the trip and account live on the server. Nothing in this file charges anyone.
    ========================================================= */
 (function () {
-  const D = window.MadaData, P = window.MadaParse, W = window.MadaWords;
+  const D = window.MadaData, P = window.MadaParse, W = window.MadaWords, A = window.MadaAPI;
+  // Live: the Core API is next to us (the platform serves /book), so answers, prices and bookings are real and the same
+  // as the app's. Otherwise the page runs on its preview data (js/book-data.js).
+  let LIVE = false;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const store = {
@@ -108,6 +111,7 @@
 
   // Everything the plan shows, priced. Items that are off stay listed so they can be switched back on.
   function buildPlan(d) {
+    if (LIVE && d.live) return buildLivePlan(d);
     const cc = D.byCode[d.to].country, umrah = d.umrah;
     const { out, back, nights, hotel, room } = chosen(d);
     const people = d.pax.a + d.pax.c, rooms = roomsFor(room, d.pax);
@@ -131,6 +135,92 @@
     const total = items.reduce((s, it) => s + (it.on ? it.price : 0), 0);
     return { items, total, nights, out, back, hotel };
   }
+
+  // ---------- live: the Core API's searches turned into the plan ----------
+  // Our airport codes ↔ the API's destination keys (packages/shared/src/schemas/booking-data.ts DESTINATIONS).
+  const KEY = { DXB: "dubai", IST: "istanbul", CAI: "cairo", LHR: "london", GYD: "baku", JED: "jeddah", ULH: "alula", AHB: "abha", TBS: "tbilisi", CDG: "paris", DPS: "bali", MLE: "maldives" };
+  const FROM_KEY = Object.fromEntries(Object.entries(KEY).map(([c, k]) => [k, c]));
+  const HOME = new Set(["RUH", "JED", "DMM"]);
+  const sar = (m) => (m ? m.amount / 100 : 0);
+  const searchSig = (d) => [d.from, d.to, d.dep, d.ret, d.pax.a, d.pax.c, d.pax.i, A.signedIn ? 1 : 0].join("|");
+
+  // What the API understood (/ask/parse), in the shape the conversation already reads.
+  function fromIntent(intent, p) {
+    if (!intent) return p;
+    const out = { ...p };
+    let to = intent.destination && intent.destination !== "other" ? FROM_KEY[intent.destination] : null;
+    if (!to && intent.destinationName) to = P.parse(intent.destinationName).to;
+    if (intent.kind === "umrah") { to = "JED"; out.makkah = true; }
+    if (to) out.to = to;
+    if (intent.from) out.from = intent.from;
+    if (intent.depart) { out.dates = [intent.depart, ...(intent.return ? [intent.return] : [])]; out.oneWay = intent.tripType === "oneway"; }
+    const party = intent.party;
+    if (party && (party.adults != null || party.childAges.length || party.total)) {
+      const kids = party.childAges.filter((a) => a == null || a >= 2).length, babies = party.infants + party.childAges.filter((a) => a != null && a < 2).length;
+      const adults = party.adults ?? Math.max(1, (party.total || 1) - kids - babies);
+      out.pax = { a: Math.min(9, adults), c: kids, i: Math.min(adults, babies) };
+    } else if (intent.travellerCount) out.pax = { a: intent.travellerCount, c: 0, i: intent.infants || 0 };
+    out.askWho = intent.ask === "who" && !out.pax;
+    out.kind = intent.kind;
+    return out;
+  }
+
+  // Flights, rooms and eSIMs for the plan, searched together. Searched again only when the trip itself changed.
+  async function liveSearch(d) {
+    const sig = searchSig(d);
+    if (d.live && d.live.sig === sig) return;
+    const key = KEY[d.to], cc = D.byCode[d.to].country, nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
+    const live = { sig, key, flights: null, stays: null, esim: null, err: {}, outId: null, stayId: null, esimId: null, stayPick: null };
+    const jobs = [];
+    if (key && HOME.has(d.from) && d.from !== d.to) {
+      jobs.push(A.flights({ from: d.from, destination: key, depart: d.dep, return: d.ret, infants: d.pax.i, cabin: "economy", flexibleDays: 0 }, d.pax)
+        .then((r) => { live.flights = r; }).catch((e) => { live.err.flights = e.code; }));
+    }
+    jobs.push(A.stays({ destination: key || "other", place: key ? null : { name: `${D.byCode[d.to].city}` }, checkIn: d.dep, nights }, d.pax)
+      .then((r) => { live.stays = r; }).catch((e) => { live.err.stays = e.code; }));
+    if (A.signedIn && cc !== "SA") {
+      jobs.push(A.esimPlans(cc, Math.max(1, nights + 1)).then((r) => { live.esim = r; }).catch((e) => { live.err.esim = e.code; }));
+    }
+    await Promise.all(jobs);
+    const keepOut = d.live && d.live.flights && live.flights && live.flights.options.find((o) => sameFlight(o, d.live.flights.options.find((x) => x.id === d.live.outId)));
+    live.outId = keepOut ? keepOut.id : live.flights && live.flights.options[0] ? live.flights.options[0].id : null;
+    const st = live.stays ? live.stays.options.filter((o) => !(o.facts && o.facts.shared)) : [];
+    live.stayId = (st.find((o) => o.badge === "best") || st[0] || {}).id || null;
+    const plans = live.esim ? live.esim.plans : [];
+    live.esimId = (plans.find((x) => x.fits && x.size === "regular") || plans.find((x) => x.fits) || plans[0] || {}).id || null;
+    d.live = live;
+  }
+  const sameFlight = (a, b) => !!(a && b && a.out.flightNumber === b.out.flightNumber && a.out.date === b.out.date && (a.back ? a.back.flightNumber : "") === (b.back ? b.back.flightNumber : ""));
+  const liveOut = (d) => d.live && d.live.flights ? d.live.flights.options.find((o) => o.id === d.live.outId) || null : null;
+  const liveStay = (d) => d.live && (d.live.stayPick && d.live.stayPick.id === d.live.stayId ? d.live.stayPick : d.live.stays ? d.live.stays.options.find((o) => o.id === d.live.stayId) : null) || null;
+  const liveEsim = (d) => d.live && d.live.esim ? d.live.esim.plans.find((x) => x.id === d.live.esimId) || null : null;
+  const BOARD = { RO: ["Room only", "بدون وجبات"], BB: ["Breakfast included", "الإفطار مشمول"], HB: ["Breakfast and dinner", "إفطار وعشاء"], FB: ["All meals", "كل الوجبات"], AI: ["All inclusive", "شامل كليًا"] };
+
+  function buildLivePlan(d) {
+    const cc = D.byCode[d.to].country, lv = d.live, out = liveOut(d), stay = liveStay(d), esim = liveEsim(d);
+    const people = d.pax.a + d.pax.c;
+    const items = [];
+    if (out) items.push({
+      k: "flight", icon: "flights", go: "#/flights/out", demo: !!out.demo,
+      title: `${out.airline} ${out.out.flightNumber}${out.back && out.back.flightNumber.slice(0, 2) !== out.out.flightNumber.slice(0, 2) ? " · " + out.back.flightNumber : ""}`,
+      sub: `${day(out.out.date)} ${out.out.dep} → ${out.out.arr} · ${hrs(out.out.durationMin)} ${out.stop ? out.stop : t("direct")}${out.back ? ` · ${t("ret")} ${day(out.back.date)} ${out.back.dep}` : ""} · ${out.bags}`,
+      price: sar(out.total),
+    });
+    else if (lv.key && HOME.has(d.from)) items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t(lv.err.flights ? "liveFlightsDown" : "liveFlightsNone"), price: null, info: true });
+    else items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t("liveByHand"), price: null, info: true });
+    if (stay) {
+      const f = stay.facts || {};
+      items.push({ k: "stay", icon: "stays", go: "#/stay", title: stay.name, sub: [f.stars ? `${f.stars}★` : "", stay.roomsLabel, f.board && BOARD[f.board] ? L(BOARD[f.board]) : "", stay.freeCancelUntil ? t("cancelBy")(fmt(stay.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef")].filter(Boolean).join(" · "), price: sar(stay.total) });
+    } else if (!d.flightsOnly) items.push({ k: "stay", icon: "stays", title: lang === "ar" ? "الفندق" : "Hotel", sub: t(lv.err.stays ? "liveStaysDown" : "liveStaysNone"), price: null, info: true });
+    if (cc !== "SA") {
+      if (esim) items.push({ k: "esim", icon: "esim", title: t("esimLive")(esim.coverage.name, esim.gb, esim.days), sub: `${esim.operator || ""}${esim.operator ? " · " : ""}${t("esimSub")}`, price: sar(esim.price) * people });
+      else items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: A.signedIn ? t("liveEsimNone") : t("liveEsimSignin"), price: null, info: true });
+      items.push({ k: "visa", icon: "visa", title: t("visa"), sub: D.GCC.has(cc) ? t("visaNo") : t("visaYes"), price: null, info: true });
+    }
+    for (const it of items) if (!it.info) it.on = d.items[it.k] !== false && !(d.flightsOnly && it.k !== "flight");
+    const total = items.reduce((s, it) => s + (it.on ? it.price : 0), 0);
+    return { items, total, nights: d.ret ? nightsOf(d.dep, d.ret) : 3, out: null, back: null, hotel: null, live: true, demo: items.some((i) => i.on && i.demo) };
+  }
   const L = (pair) => pair[lang === "ar" ? 1 : 0];
   const roomsFor = (room, pax) => (room && room.sleeps >= 4 ? Math.max(1, Math.ceil((pax.a + pax.c) / 4)) : Math.max(1, Math.ceil(pax.a / 2)));
   const stayPrice = (h, room, nights, pax) => Math.round(h.rate * room.mult * nights * roomsFor(room, pax) / 5) * 5;
@@ -147,8 +237,8 @@
   const destChips = () => chips(D.POPULAR.slice(0, 5).map((c) => ({ a: "go", v: c, l: city(c) })));
 
   // Read a message in the context of the trip so far: new facts replace old ones, everything else stays.
-  function reply(text, raw) {
-    const s = raw ? "" : P.norm(text), p = P.parse(raw ? "" : text), d = draft;
+  function reply(text, raw, intent) {
+    const s = raw ? "" : P.norm(text), p = fromIntent(intent, P.parse(raw ? "" : text)), d = draft;
     const has = (re) => re.test(s);
     let changed = false, note = "";
     if (has(/visa|تاشير/) && !d.visa) {
@@ -157,14 +247,22 @@
       return say(esc(t("askWhere")), destChips());
     }
     if (d.plan) {
-      if (has(/cheap|less|lower|ارخص|رخيص/)) {
+      if (has(/cheap|less|lower|ارخص|رخيص/) && LIVE && d.live) {
+        // Live: a cheaper room of the ones found (the flight already leads with the best fare).
+        const cur = liveStay(d), list = (d.live.stays ? d.live.stays.options : []).filter((o) => cur && o.total.amount < cur.total.amount).sort((a, b) => b.total.amount - a.total.amount);
+        if (list[0]) { d.live.stayId = list[0].id; d.live.stayPick = null; } else note = t("liveCheapest");
+        changed = true;
+      } else if (has(/cheap|less|lower|ارخص|رخيص/)) {
         if (d.tier > 0) { d.tier--; d.hotelId = null; }
         else { const ctx = D.priceContext(d.from, d.to, d.dep, d.pax); if (ctx && ctx.cheaper) { const n = d.ret ? nightsOf(d.dep, d.ret) : 0; d.dep = ctx.cheaper.date; if (n) d.ret = addDays(d.dep, n); d.outId = d.backId = null; note = t("cheapest")(day(d.dep)); } }
         changed = true;
       }
       if (has(/earlier|day before|قبلها|قبل بيوم/)) { d.dep = addDays(d.dep, -1); if (d.ret) d.ret = addDays(d.ret, -1); if (d.dep < todayIso()) d.dep = todayIso(); d.outId = d.backId = null; changed = true; }
       if (has(/later|day after|بعدها بيوم/)) { d.dep = addDays(d.dep, 1); if (d.ret) d.ret = addDays(d.ret, 1); d.outId = d.backId = null; changed = true; }
-      if (has(/5 ?★|5 ?star|five star|luxury|فخم|5 نجوم/)) { d.tier = 2; d.hotelId = null; d.items.stay = true; d.flightsOnly = false; changed = true; }
+      if (has(/5 ?★|5 ?star|five star|luxury|فخم|5 نجوم/)) {
+        d.tier = 2; d.hotelId = null; d.items.stay = true; d.flightsOnly = false; changed = true;
+        if (LIVE && d.live && d.live.stays) { const five = d.live.stays.options.filter((o) => o.facts && o.facts.stars === 5).sort((a, b) => (b.score || 0) - (a.score || 0))[0]; if (five) { d.live.stayId = five.id; d.live.stayPick = null; } }
+      }
       if (has(/4 ?star|four star/)) { d.tier = 1; d.hotelId = null; changed = true; }
       if (has(/just the flight|only the flight|flight only|الطيران بس|طيران فقط/)) { d.flightsOnly = true; changed = true; }
       if (has(/add a traveler|one more|another person|اضف مسافر|شخص زياده/)) { d.pax = { ...d.pax, a: Math.min(9, d.pax.a + 1) }; changed = true; }
@@ -175,7 +273,7 @@
     d.umrah = d.to === "JED" && (p.makkah || d.umrah);
     if (p.dates.length) { d.dep = p.dates[0]; d.ret = p.oneWay ? null : p.dates[1] || (p.nights ? addDays(p.dates[0], p.nights) : null); d.outId = d.backId = null; changed = true; }
     else if (p.nights && d.dep) { d.ret = addDays(d.dep, p.nights); changed = true; }
-    if (p.pax) { d.pax = p.pax; store.set("pax", p.pax); changed = true; }
+    if (p.pax) { d.pax = p.pax; store.set("pax", p.pax); d.paxSaid = true; changed = true; }
     if (!d.plan && has(/^flights? to|طيران الى/)) d.flightsOnly = true;
     if (!d.plan && has(/hotel|\bstay\b|فندق/) && !has(/flight|طيران/)) d.items = { ...d.items, flight: false };
     if (!d.plan && has(/esim|شريحه/)) d.items = { ...d.items, flight: false, stay: false, pickup: false };
@@ -186,9 +284,12 @@
     }
     if (!d.dep) return say(esc(d.umrah ? t("askWhenUmrah") : t("askWhen")(city(d.to))), chips([{ a: "wk", v: 0, l: t("wkThis") }, { a: "wk", v: 1, l: t("wkNext") }, { a: "in2", l: t("in2") }, { a: "cal", l: t("pickDates") }]));
     if (d.ret && d.ret <= d.dep) d.ret = null;
+    // Who's going changes every price: ask once, unless they said it or have searched before (the server asks the same).
+    if (LIVE && !d.paxSaid && !store.get("pax") && (p.askWho || !p.pax)) { d.paxSaid = true; return say(esc(t("askWho")), chips([{ a: "who", v: "1,0", l: t("whoMe") }, { a: "who", v: "2,0", l: t("whoTwo") }, { a: "who", v: "2,2", l: t("whoFamily") }, { a: "whoPick", l: t("whoOther") }])); }
     const first = !d.plan;
     d.plan = true;
-    say(note ? esc(note) : first || !changed ? t("planIntro")(esc(placeName(d)), esc(range(d.dep, d.ret)), esc(paxText(d.pax))) : esc(t("updated")), "plan");
+    d.pendingSay = note ? esc(note) : first || !changed ? t("planIntro")(esc(placeName(d)), esc(range(d.dep, d.ret)), esc(paxText(d.pax))) : esc(t("updated"));
+    if (!LIVE) { say(d.pendingSay, "plan"); d.pendingSay = null; }
   }
   function budgetAnswer(budget) {
     const w = weekend(), d = draft;
@@ -199,13 +300,28 @@
 
   let busy = false, prevSig = {};
   // raw: the trip was already changed by a tap (a chip, a card, the calendar); the text is only what the bubble shows.
-  function send(text, raw) {
+  async function send(text, raw) {
     text = String(text).trim(); if (!text || busy) return;
     if (!draft) draft = freshDraft();
     you(text); busy = true; saveDraft();
     if (route().name !== "plan") location.hash = "#/plan"; else renderThread(true);
-    setTimeout(() => { reply(text, raw); busy = false; saveDraft(); if (route().name === "plan") { renderThread(false); renderPlanPane(true); } }, reduce ? 0 : 650);
+    if (!LIVE) await new Promise((r) => setTimeout(r, reduce ? 0 : 650));
+    // Live: the same understanding as the app (/ask/parse), then real searches before Mada says anything about prices.
+    let intent = null;
+    if (LIVE && !raw) { try { intent = (await A.parse(text, null)).intent; } catch { /* the rules here still read it */ } }
+    reply(text, raw, intent);
+    if (LIVE && draft.pendingSay) {
+      setWork(t("liveChecking")); renderThread(true);
+      try { await liveSearch(draft); } catch { /* each part says for itself what failed */ }
+      const pl = buildPlan(draft);
+      say(pl.items.some((i) => !i.info) ? draft.pendingSay : esc(t("liveNothing")), "plan");
+      draft.pendingSay = null;
+    }
+    busy = false; setWork(null); saveDraft();
+    if (route().name === "plan") { renderThread(false); renderPlanPane(true); }
   }
+  let workText = null;
+  const setWork = (txt) => { workText = txt; };
 
   function renderThread(working) {
     const el = $("#thread"); if (!el || !draft) return;
@@ -220,7 +336,7 @@
       } else if (last) extra = m.extra;
       html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><p class="say__text">${m.html}</p>${extra}</div></div>`;
     });
-    if (working || busy) html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><span class="say__work">${esc(t("working"))} <i></i><i></i><i></i></span></div></div>`;
+    if (working || busy) html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><span class="say__work">${esc(workText || t("working"))} <i></i><i></i><i></i></span></div></div>`;
     el.innerHTML = html;
     const last = el.lastElementChild;
     if (last) requestAnimationFrame(() => {
@@ -234,8 +350,8 @@
   }
 
   function planCard(d) {
-    const plan = buildPlan(d), dd = D.DEST[d.to];
-    const img = dd ? `<img src="${D.photo(d.to)}" alt="" style="object-position:${dd.pos}" />${dd.credit !== "Mada Trips" ? `<small>${esc(dd.credit)}</small>` : ""}` : "";
+    const plan = buildPlan(d), dd = D.DEST[d.to], ls = LIVE && d.live ? liveStay(d) : null;
+    const img = dd ? `<img src="${D.photo(d.to)}" alt="" style="object-position:${dd.pos}" />${dd.credit !== "Mada Trips" ? `<small>${esc(dd.credit)}</small>` : ""}` : ls && ls.hotel && ls.hotel.imageUrl ? `<img src="${esc(ls.hotel.imageUrl)}" alt="" />` : "";
     return `<div class="plan">
       <div class="plan__hero${dd ? "" : " plan__hero--plain"}">${img}<b>${esc(placeName(d))}</b></div>
       <div class="plan__meta">
@@ -243,7 +359,7 @@
         <button type="button" data-pop="who">${ico("ppl")}<span>${esc(paxText(d.pax))}</span></button>
         <button type="button" data-pop="from">${ico("pin")}<span>${esc(city(d.from))}</span></button>
       </div>
-      ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? esc(t("visaChk")) : esc(money(it.price))}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
+      ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t("demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
       <div class="plan__foot"><div class="plan__total"><small>${esc(t("totalFor")(paxText(d.pax)))}</small><b>${esc(money(plan.total))}</b></div>
         <div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div></div>
     </div>`;
@@ -277,6 +393,18 @@
     renderHeader();
     if (r.name === "home") return viewHome();
     if (r.name === "plan") return viewStudio();
+    if (LIVE) {
+      // The live pages: same API as the app. Trips booked in this browser before going live still open from #/trip.
+      if (r.name === "flights") return needPlan() && (draft.live ? viewFlightsLive() : location.replace("#/plan"));
+      if (r.name === "stay") return needPlan() && (draft.live ? viewStayLive() : location.replace("#/plan"));
+      if (r.name === "hotel") return needPlan() && (draft.live ? viewHotelLive(decodeURIComponent(r.a || "")) : location.replace("#/plan"));
+      if (r.name === "travelers") return needPlan() && viewTravelersLive();
+      if (r.name === "pay") return needPlan() && viewPayLive();
+      if (r.name === "wait") return viewWait(r.a);
+      if (r.name === "t") return viewTripLive(r.a);
+      if (r.name === "trips") return viewTripsLive();
+      if (r.name === "signin") return viewSigninLive();
+    }
     if (r.name === "flights") return needPlan() && viewFlights(r.a === "back" && draft.ret ? "back" : "out");
     if (r.name === "stay") return needPlan() && viewStay();
     if (r.name === "hotel") return needPlan() && viewHotel(decodeURIComponent(r.a || ""));
@@ -807,7 +935,538 @@
     $$("[data-rm]").forEach((b) => b.addEventListener("click", () => { saved.splice(+b.dataset.rm, 1); store.set("travelers", saved); viewAccount(); }));
     $("#acOut").addEventListener("click", signOut);
   }
-  function signOut() { user = null; store.set("user", null); location.hash = "#/"; render(); }
+  async function signOut() { if (LIVE) await A.signOut(); user = null; store.set("user", null); location.hash = "#/"; render(); }
+
+  // =========================================================
+  // Live pages: the same API, rules and wording as the app
+  // =========================================================
+  const LABEL = (k) => (t("labels") || {})[k] || k;
+  const AMEN_ICON = { pool: "pool", beach: "pool", kidsClub: "kids", gym: "gym", spa: "spa", parking: "parking", connecting: "ppl", accessible: "ppl", familyRooms: "ppl", wifi: "wifi" };
+  const loading = (txt) => `<div class="wrap pg"><div class="empty"><span class="spin"></span><p>${esc(txt)}</p></div></div>`;
+  const errBox = (txt, retry) => `<div class="wrap pg"><div class="empty"><p>${esc(txt)}</p>${retry ? `<button type="button" class="btn btn--main" onclick="location.reload()">${esc(t("tryAgain"))}</button>` : ""}</div></div>`;
+
+  // ----- flights: the options the API found (best fit first), each with its rules in plain words -----
+  function viewFlightsLive() {
+    const d = draft, r = d.live && d.live.flights;
+    if (!r || !r.options.length) return location.replace("#/plan");
+    const leg = (l) => `<div class="fl__times"><b>${esc(l.dep)}</b><div class="fl__line">${esc(hrs(l.durationMin))}<i></i>${esc(l.from)} → ${esc(l.to)}</div><b>${esc(l.arr)}</b></div>`;
+    page(`<div class="wrap pg">
+      ${backLink("#/plan")}
+      <h1 class="pg__h">${esc(t("flTitle")(city(d.to)))}</h1>
+      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))} · ${esc(t("liveChecked")(r.checked))}</p>
+      ${r.options.some((o) => o.demo) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
+      <div class="lf">${r.options.map((o) => { const on = o.id === d.live.outId; return `<article class="lfo${on ? " on" : ""}">
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
+        <div class="lfo__legs"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div>${o.back ? `<div><small>${esc(day(o.back.date))}</small>${leg(o.back)}</div>` : ""}</div>
+        <p class="lfo__why">${esc(o.reason)}</p>
+        <ul class="lfo__rules"><li>${esc(o.stop || t("direct"))}</li><li>${esc(o.bags)}</li><li>${esc(o.changeRule)}</li><li>${esc(o.refundRule)}</li></ul>
+        <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(t("totalFor")(paxText(d.pax)))}</small></div>
+          <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-lf="${o.id}">${esc(on ? t("selected") : t("select"))}</button></div>
+      </article>`; }).join("")}</div>
+    </div>`);
+    $$("[data-lf]").forEach((b) => b.addEventListener("click", () => { d.live.outId = b.dataset.lf; d.items.flight = true; saveDraft(); location.hash = "#/plan"; }));
+  }
+
+  // ----- where a hotel is: distance to the places that matter in this city, and a map -----
+  const marksFor = (d) => {
+    const a = D.byCode[d.to];
+    return [...(D.LANDMARKS[d.to] || []).map((m) => ({ name: lang === "ar" ? m[1] : m[0], ll: [m[2], m[3]] })), { name: t("airportOf")(a.code), ll: [a.lat, a.lon], airport: true }];
+  };
+  const hotelLL = (o) => (o.facts && o.facts.lat != null ? [o.facts.lat, o.facts.lng] : null);
+  // Rough and labelled "about": walking under 1.2 km, otherwise by car through city traffic.
+  function howFar(o, m) {
+    const ll = hotelLL(o); if (!ll) return null;
+    const k = D.kmBetween(ll, m.ll);
+    const kmTxt = k < 10 ? k.toFixed(1) : Math.round(k);
+    return { k, text: k < 1.2 ? t("walkMin")(Math.max(2, Math.round(k * 13)), m.name) : t("driveMin")(kmTxt, Math.round(k * 1.6 + 6), m.name) };
+  }
+  let mapP = null;
+  // The same map as the app's web build (apps/mobile/src/components/maps/StaysMap.web.tsx): MapLibre with OpenFreeMap
+  // tiles (OpenStreetMap data, no key), loaded the first time a map is opened.
+  function mapLib() {
+    mapP ??= new Promise((resolve, reject) => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"; document.head.append(css);
+      const js = document.createElement("script"); js.src = "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js";
+      const timer = setTimeout(() => reject(new Error("map timeout")), 12000);
+      js.onload = () => { clearTimeout(timer); window.maplibregl ? resolve(window.maplibregl) : reject(new Error("no map")); };
+      js.onerror = () => { clearTimeout(timer); reject(new Error("map blocked")); };
+      document.head.append(js);
+    }).catch((e) => { mapP = null; throw e; });
+    return mapP;
+  }
+  const pillW = (label) => label.length * 7.4 + 22;
+  /** Pins whose pills would sit on each other at this zoom become one pill ("5 · from SAR 829") that zooms in on tap. */
+  function groupPins(pts, at) {
+    const free = pts.filter((p) => !p.on), xy = free.map(at), up = free.map((_, i) => i);
+    const root = (i) => { while (up[i] !== i) { up[i] = up[up[i]]; i = up[i]; } return i; };
+    for (let i = 0; i < free.length; i++) for (let j = i + 1; j < free.length; j++) {
+      if (Math.abs(xy[i].x - xy[j].x) < (pillW(free[i].label) + pillW(free[j].label)) / 2 + 2 && Math.abs(xy[i].y - xy[j].y) < 30) up[root(i)] = root(j);
+    }
+    const by = new Map(); free.forEach((p, i) => { const r = root(i); by.set(r, [...(by.get(r) || []), p]); });
+    const out = [...by.values()].map((m) => ({ members: m, lat: m.reduce((a, p) => a + p.lat, 0) / m.length, lng: m.reduce((a, p) => a + p.lng, 0) / m.length, same: m.length > 1 && Math.max(...m.map((p) => Math.abs(p.lat - m[0].lat) + Math.abs(p.lng - m[0].lng))) < 0.0003 }));
+    return [...out, ...pts.filter((p) => p.on).map((p) => ({ members: [p], lat: p.lat, lng: p.lng }))];
+  }
+  async function drawMap(el, hotels, marks, { selected, onPick, zoom } = {}) {
+    let ml; try { ml = await mapLib(); } catch { el.innerHTML = `<p class="empty">${esc(t("mapOff"))}</p>`; return null; }
+    if (!el.isConnected) return null;
+    if (lang === "ar" && ml.getRTLTextPluginStatus?.() === "unavailable") { try { Promise.resolve(ml.setRTLTextPlugin("https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js", true)).catch(() => {}); } catch {} }
+    const single = hotels.length === 1;
+    const pts = hotels.map((o) => { const ll = hotelLL(o); return ll && { o, lat: ll[0], lng: ll[1], price: o.total.amount, label: money(sar(o.total)), on: o.id === selected }; }).filter(Boolean);
+    const lands = marks.filter((x) => !x.airport || single || x.on).map((m) => ({ name: m.name, lat: m.ll[0], lng: m.ll[1], on: m.on }));
+    const named = lands.some((k) => k.on) ? (k) => k.on : () => true; // with a "distance from" place chosen, only it is named
+    const all = [...pts, ...lands];
+    if (!all.length) return null;
+    const lats = all.map((p) => p.lat), lngs = all.map((p) => p.lng);
+    const bounds = [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]];
+    const map = new ml.Map({ container: el, style: "https://tiles.openfreemap.org/styles/positron", attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, cooperativeGestures: false, scrollZoom: false,
+      ...(all.length === 1 ? { center: [all[0].lng, all[0].lat], zoom: zoom || 14 } : { bounds, fitBoundsOptions: { padding: 50, maxZoom: zoom || 14 } }) });
+    map.addControl(new ml.NavigationControl({ showCompass: false }), lang === "ar" ? "top-left" : "top-right");
+    map.on("error", () => {});
+    let markers = [];
+    const pin = (cls, html, click, label) => {
+      const b = document.createElement(click ? "button" : "div");
+      b.className = cls; b.innerHTML = html;
+      if (click) { b.type = "button"; b.setAttribute("aria-label", label); b.addEventListener("click", (e) => { e.stopPropagation(); click(); }); }
+      return b;
+    };
+    const draw = () => {
+      markers.forEach((m) => m.remove());
+      const groups = single ? pts.map((p) => ({ members: [p] })) : groupPins(pts, (p) => map.project([p.lng, p.lat]));
+      const add = (elx, lng, lat, offset) => markers.push(new ml.Marker({ element: elx, ...(offset ? { offset } : {}) }).setLngLat([lng, lat]).addTo(map));
+      // A place's name shows where it has room; where two would sit on each other the later one is a star (its name on hover).
+      const taken = [];
+      lands.forEach((k) => {
+        const c = map.project([k.lng, k.lat]), w = pillW(k.name) + 14;
+        const room = named(k) && !taken.some((b) => Math.abs(b.x - c.x) < (b.w + w) / 2 && Math.abs(b.y - c.y) < 28);
+        if (room) taken.push({ ...c, w });
+        const e = pin("mk__land" + (room ? "" : " mk__land--dot"), `${ico("star")}${room ? `<b>${esc(k.name)}</b>` : ""}`); e.title = k.name; add(e, k.lng, k.lat);
+      });
+      for (const g of groups) {
+        const one = (p, off) => add(pin("mk__pin" + (p.on ? " on" : ""), esc(p.label), single ? null : () => { pts.forEach((x) => (x.on = x === p)); draw(); onPick && onPick(p.o); }, `${p.o.name}, ${p.label}`), p.lng, p.lat, off);
+        if (g.members.length === 1) { one(g.members[0]); continue; }
+        if (g.same) { g.members.forEach((p, i) => one(p, [0, (i - (g.members.length - 1) / 2) * 30])); continue; }
+        const low = g.members.reduce((a, b) => (b.price < a.price ? b : a));
+        const text = t("mapGroup")(g.members.length, low.label);
+        add(pin("mk__grp", esc(text), () => {
+          const la = g.members.map((p) => p.lat), ln = g.members.map((p) => p.lng);
+          const cam = map.cameraForBounds([[Math.min(...ln), Math.min(...la)], [Math.max(...ln), Math.max(...la)]], { padding: 70 });
+          map.easeTo({ center: cam ? cam.center : [g.lng, g.lat], zoom: Math.min(18, Math.max(cam ? cam.zoom : 0, map.getZoom() + 1.5)), duration: 450 });
+        }, text), g.lng, g.lat);
+      }
+    };
+    map.on("load", () => { el.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); if (all.length > 1) map.fitBounds(bounds, { padding: 50, maxZoom: zoom || 14, duration: 0 }); draw(); });
+    map.on("zoomend", draw);
+    return map;
+  }
+
+  // ----- hotels: real rooms from the hotel supplier, with photos -----
+  let lsSort = "rec", lsStars = "all", lsF = { breakfast: false, cancel: false, pool: false }, lsMore = 12, lsView = "list", lsFrom = 0;
+  function viewStayLive() {
+    const d = draft, r = d.live && d.live.stays;
+    if (!r) return location.replace("#/plan");
+    let list = r.options.filter((o) => !(o.facts && o.facts.shared));
+    const f = (o) => o.facts || {};
+    list = list.filter((o) => (lsStars === "all" || f(o).stars === +lsStars) && (!lsF.breakfast || ["BB", "HB", "FB", "AI"].includes(f(o).board)) && (!lsF.cancel || o.freeCancelUntil) && (!lsF.pool || (f(o).amenities || []).includes("pool")));
+    const marks = marksFor(d), mark = marks[Math.min(lsFrom, marks.length - 1)];
+    const dist = (o) => { const h = howFar(o, mark); return h ? h.k : 1e9; };
+    list.sort(lsSort === "price" ? (a, b) => a.total.amount - b.total.amount : lsSort === "stars" ? (a, b) => (f(b).stars || 0) - (f(a).stars || 0) || a.total.amount - b.total.amount : lsSort === "near" ? (a, b) => dist(a) - dist(b) : (a, b) => (b.score || 0) - (a.score || 0));
+    const nights = d.ret ? nightsOf(d.dep, d.ret) : 3, shown = list.slice(0, lsMore);
+    page(`<div class="wrap pg">
+      ${backLink("#/plan")}
+      <h1 class="pg__h">${esc(t("stTitle")(d.umrah ? (lang === "ar" ? "مكة" : "Makkah") : city(d.to)))}</h1>
+      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))} · ${esc(t("liveFound")(list.length))}</p>
+      <div class="bar ht-bar">
+        <div class="bar__r"><span class="seg2">${["all", "3", "4", "5"].map((k) => `<button type="button" data-st="${k}" class="${lsStars === k ? "on" : ""}">${esc(k === "all" ? t("allStars") : k + "★")}</button>`).join("")}</span>
+          ${[["breakfast", "fBreakfast"], ["cancel", "fCancel"], ["pool", "fPool"]].map(([k, w]) => `<button type="button" class="fchip${lsF[k] ? " on" : ""}" data-f="${k}">${esc(t(w))}</button>`).join("")}</div>
+        <div class="bar__r"><span class="seg2">${[["rec", t("stSort").rec], ["price", t("stSort").price], ["near", t("nearest")], ["stars", t("starsSort")]].map(([k, l]) => `<button type="button" data-sort="${k}" class="${lsSort === k ? "on" : ""}">${esc(l)}</button>`).join("")}</span></div>
+      </div>
+      <div class="bar ht-bar2">
+        <div class="bar__r"><span class="ht-from">${esc(t("distFrom"))}</span>${marks.map((m, i) => `<button type="button" class="fchip${i === lsFrom ? " on" : ""}" data-from-mark="${i}">${esc(m.name)}</button>`).join("")}</div>
+        <span class="seg2"><button type="button" data-view="list" class="${lsView === "list" ? "on" : ""}">${esc(t("viewList"))}</button><button type="button" data-view="map" class="${lsView === "map" ? "on" : ""}">${esc(t("viewMap"))}</button></span>
+      </div>
+      ${lsView === "map" ? `<div class="ht-mapwrap"><div><div id="htMap" class="ht-map"></div><p class="map-credit">${esc(t("mapCredit"))}</p></div><div id="mapCard" class="map-card"><p class="note-s">${esc(t("mapTap"))}</p></div></div>` : ""}
+      ${lsView === "map" ? "" : shown.map((o) => { const on = o.id === d.live.stayId, fa = f(o), far = howFar(o, mark); return `<article class="ht${on ? " on" : ""}">
+        <a class="gal" href="#/hotel/${o.id}">${o.hotel && o.hotel.imageUrl ? `<div class="gal__track"><img src="${esc(o.hotel.imageUrl)}" alt="" loading="lazy" /></div>` : ""}</a>
+        <a class="ht__body" href="#/hotel/${o.id}">
+          <span class="ht__top">${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}${o.badge ? `<span class="ht__in">${esc(o.badge === "best" ? LABEL("best") : LABEL("lowest"))}</span>` : ""}${on ? `<span class="ht__in">${esc(t("inPlan"))}</span>` : ""}</span>
+          <b class="ht__t">${esc(o.name)}</b>
+          <span class="ht__loc">${ico("pin")}${esc(far ? far.text : o.address || o.area)}</span>
+          ${far ? `<span class="ht__addr">${esc(o.address || o.area)}</span>` : ""}
+          <p class="ht__take"><span>${SUN}</span>${esc(o.note)}</p>
+          <span class="ht__perks"><span class="${["BB", "HB", "FB", "AI"].includes(fa.board) ? "" : "no"}">${esc(fa.board && BOARD[fa.board] ? L(BOARD[fa.board]) : t("noBfast"))}</span><span class="${o.freeCancelUntil ? "" : "no"}">${esc(o.freeCancelUntil ? t("cancelBy")(fmt(o.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"))}</span></span>
+          <div class="amen">${(fa.amenities || []).slice(0, 6).map((a) => `<span title="${esc((t("amenLive") || {})[a] || a)}">${ico(AMEN_ICON[a] || "star")}<em>${esc((t("amenLive") || {})[a] || a)}</em></span>`).join("")}</div>
+        </a>
+        <div class="ht__pr"><small>${esc(o.roomsLabel)}</small><b>${esc(money(sar(o.total)))}</b><span class="ht__night">${esc(t("perNight")(money(sar(o.total) / nights / Math.max(1, o.rooms))))}</span>
+          <button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-ls="${o.id}">${esc(on ? t("selected") : t("select"))}</button>
+          <a class="link ht__more" href="#/hotel/${o.id}">${esc(t("viewHotel"))} →</a></div>
+      </article>`; }).join("") || `<p class="empty">${esc(t("liveStaysNone"))}</p>`}
+      ${lsView === "list" && list.length > lsMore ? `<button type="button" class="btn btn--plain more" id="lsMore">${esc(t("showMore")(list.length - lsMore))}</button>` : ""}
+      <div class="bar"><button type="button" class="link" id="noHotel">${esc(t("noHotel"))}</button></div>
+    </div>`, true);
+    $$("[data-ls]").forEach((b) => b.addEventListener("click", () => { d.live.stayId = b.dataset.ls; d.live.stayPick = null; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
+    $$("[data-st]").forEach((b) => b.addEventListener("click", () => { lsStars = b.dataset.st; lsMore = 12; viewStayLive(); }));
+    $$("[data-f]").forEach((b) => b.addEventListener("click", () => { lsF[b.dataset.f] = !lsF[b.dataset.f]; lsMore = 12; viewStayLive(); }));
+    $$(".ht-bar [data-sort]").forEach((b) => b.addEventListener("click", () => { lsSort = b.dataset.sort; viewStayLive(); }));
+    $("#lsMore")?.addEventListener("click", () => { lsMore += 12; const y = scrollY; viewStayLive(); scrollTo(0, y); });
+    $$("[data-from-mark]").forEach((b) => b.addEventListener("click", () => { lsFrom = +b.dataset.fromMark; if (lsSort === "rec") lsSort = "near"; viewStayLive(); }));
+    $$("[data-view]").forEach((b) => b.addEventListener("click", () => { lsView = b.dataset.view; viewStayLive(); }));
+    if (lsView === "map") {
+      // Every hotel that passes the filters goes on the map; a tap shows its card under it.
+      const card = (o) => { const fa = f(o), far = howFar(o, mark), on = o.id === d.live.stayId; return `<article class="map-card__in">
+        ${o.hotel && o.hotel.imageUrl ? `<img src="${esc(o.hotel.imageUrl)}" alt="" />` : ""}
+        <div><span class="ht__stars">${"★".repeat(fa.stars || 0)}</span><b class="ht__t">${esc(o.name)}</b><span class="ht__loc">${ico("pin")}${esc(far ? far.text : o.area)}</span>
+        <span class="ht__perks"><span class="${["BB", "HB", "FB", "AI"].includes(fa.board) ? "" : "no"}">${esc(fa.board && BOARD[fa.board] ? L(BOARD[fa.board]) : t("noBfast"))}</span><span class="${o.freeCancelUntil ? "" : "no"}">${esc(o.freeCancelUntil ? t("cancelBy")(fmt(o.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"))}</span></span></div>
+        <div class="map-card__pr"><b>${esc(money(sar(o.total)))}</b><button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-ls="${o.id}">${esc(on ? t("selected") : t("select"))}</button><a class="link" href="#/hotel/${o.id}">${esc(t("viewHotel"))} →</a></div></article>`; };
+      drawMap($("#htMap"), list, marks.map((m, i) => ({ ...m, on: i === lsFrom })), { selected: d.live.stayId, onPick: (o) => {
+        $("#mapCard").innerHTML = card(o);
+        $("#mapCard [data-ls]").addEventListener("click", () => { d.live.stayId = o.id; d.live.stayPick = null; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; });
+      } });
+      const cur = list.find((o) => o.id === d.live.stayId);
+      if (cur) { $("#mapCard").innerHTML = card(cur); $("#mapCard [data-ls]")?.addEventListener("click", () => { location.hash = "#/plan"; }); }
+    }
+    $("#noHotel").addEventListener("click", () => { d.items.stay = false; saveDraft(); location.hash = "#/plan"; });
+  }
+
+  async function viewHotelLive(optId) {
+    const d = draft, o = (d.live.stays ? d.live.stays.options.find((x) => x.id === optId) : null) || (d.live.stayPick && d.live.stayPick.id === optId ? d.live.stayPick : null);
+    if (!o || !o.hotel) return location.replace("#/stay");
+    page(loading(t("liveLoadingHotel")));
+    const [h, rooms] = await Promise.all([A.hotel(o.hotel.code).then((x) => x.hotel).catch(() => null), A.rooms(o.id).then((x) => x.options).catch(() => [o])]);
+    if (route().name !== "hotel") return;
+    const imgs = (h && h.images && h.images.length ? h.images : [o.hotel.imageUrl]).filter(Boolean).slice(0, 5);
+    const fa = o.facts || {}, nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
+    // What a guest uses, not the hotel's inventory or the cards it takes.
+    const free = h && h.facilities ? h.facilities.filter((x) => !x.paid && !/number of|^hotel$|rooms?$|suites?$|studios?$|renovation|express|jcb|diners|visa|mastercard|maestro|card|built|floors?$|^city centre$/i.test(x.name)).slice(0, 16) : [];
+    page(`<div class="wrap pg">
+      ${backLink("#/stay")}
+      <div class="hd-gal hd-gal--${Math.min(imgs.length, 4)}">${imgs.slice(0, 4).map((u, i) => `<img src="${esc(u)}" alt="" ${i ? 'loading="lazy"' : ""} />`).join("")}${h && h.images ? `<span class="hd-gal__n">${esc(t("photosN")(h.images.length))}</span>` : ""}</div>
+      <div class="pg__grid"><div>
+        ${fa.stars ? `<span class="ht__stars">${"★".repeat(fa.stars)}</span>` : ""}
+        <h1 class="pg__h" style="margin-top:6px">${esc(h ? h.name : o.name)}</h1>
+        <p class="ht__loc" style="margin-top:10px">${ico("pin")}${esc((h && h.address) || o.address)}</p>
+        <div class="box hd-take"><span class="say__mark">${SUN}</span><div><b>${esc(t("takeL"))}</b><p>${esc(o.note)}</p></div></div>
+        <h2 class="hd-h">${esc(t("roomsH"))}</h2>
+        ${(rooms.length ? rooms : [o]).slice(0, 8).map((r) => { const on = r.id === d.live.stayId, rf = r.facts || {}; return `<div class="room room--live${on ? " on" : ""}">
+          <div class="room__t"><b>${esc((r.hotel && r.hotel.room) || rf.room || r.name)}</b>
+            <span>${esc(r.roomsLabel)}</span>
+            <span class="ht__perks"><span class="${["BB", "HB", "FB", "AI"].includes(rf.board) ? "" : "no"}">${esc(rf.board && BOARD[rf.board] ? L(BOARD[rf.board]) : t("noBfast"))}</span><span class="${r.freeCancelUntil ? "" : "no"}">${esc(r.cancellation)}</span></span></div>
+          <div class="room__pr"><small>${esc(t("forStay")(nights, r.rooms))}</small><b>${esc(money(sar(r.total)))}</b><button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-room="${r.id}">${esc(on ? t("chosenRoom") : t("selectRoom"))}</button></div>
+        </div>`; }).join("")}
+        ${hotelLL(o) ? `<h2 class="hd-h">${esc(t("whereIs"))}</h2><div id="hdMap" class="hd-map"></div><p class="map-credit">${esc(t("mapCredit"))}</p><ul class="dists">${marksFor(d).map((m) => { const far = howFar(o, m); return far ? `<li>${ico(m.airport ? "flights" : "pin")}<span>${esc(far.text)}</span></li>` : ""; }).join("")}</ul>` : ""}
+        ${h && h.description ? `<h2 class="hd-h">${esc(t("aboutHotel"))}</h2><p class="hd-desc">${esc(h.description)}</p>` : ""}
+        ${free.length ? `<h2 class="hd-h">${esc(t("amenH"))}</h2><ul class="facs">${free.map((x) => `<li>${esc(x.name)}</li>`).join("")}</ul>` : ""}
+        <h2 class="hd-h">${esc(t("policyH"))}</h2>
+        <ul class="pol"><li>${esc(o.cancellation)}</li>${fa.payAtHotel ? `<li>${esc(t("payAtHotel")(money(fa.payAtHotel / 100)))}</li>` : ""}<li>${esc(t("idNote"))}</li></ul>
+      </div><aside class="pg__side">${sumCard(d)}</aside></div></div>`);
+    if ($("#hdMap")) drawMap($("#hdMap"), [o], marksFor(d), { selected: o.id, zoom: 14 });
+    $$("[data-room]").forEach((b) => b.addEventListener("click", () => { const r = rooms.find((x) => x.id === b.dataset.room) || o; d.live.stayId = r.id; d.live.stayPick = r; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
+  }
+
+  // ----- sign in: a 6-digit code to the phone (staging and mock servers always use 123456) -----
+  let lsi = { step: "phone", phone: "" };
+  function viewSigninLive() {
+    const next = (location.hash.split("?next=")[1] || "").replace(/[^a-z0-9/-]/gi, "");
+    const done = async () => { lsi = { step: "phone", phone: "" }; await afterSignIn(); location.hash = next ? `#/${next}` : "#/"; };
+    let body;
+    if (lsi.step === "phone") body = `<form id="si" novalidate><label class="fld" id="fSi"><span>${esc(t("siPhone"))}</span><div class="phone"><b>+966</b><input name="phone" inputmode="tel" placeholder="5X XXX XXXX" autocomplete="tel-national" value="${esc(lsi.phone)}" /></div><em>${esc(t("errPhone"))}</em></label><button class="primary">${esc(t("siSend"))}</button></form>`;
+    else if (lsi.step === "code") body = `<p class="pg__sub">${esc(t("siCode")("+966 " + lsi.phone))}</p><form id="si" novalidate><div class="otp otp--6">${[0, 1, 2, 3, 4, 5].map((i) => `<input inputmode="numeric" maxlength="1" data-o="${i}" aria-label="${i + 1}" autocomplete="one-time-code" />`).join("")}</div>${A.config && /staging|localhost/.test(location.host + (A.config.latestVersion || "")) || /staging|localhost/.test(location.host) ? `<p class="note-s" style="text-align:center">${esc(t("demoCode"))}</p>` : ""}<p class="note-s err-line" id="siErr" hidden></p><button class="primary">${esc(t("siVerify"))}</button></form><p style="text-align:center"><button type="button" class="link" id="resend">${esc(t("siResend"))}</button></p>`;
+    else body = `<form id="si" novalidate><label class="fld"><span>${esc(t("siNameL"))}</span><input name="name" autocomplete="given-name" /></label><button class="primary">${esc(t("siDone"))}</button></form>`;
+    page(`<div class="auth"><h1 class="pg__h">${esc(lsi.step === "name" ? t("siName") : t("siTitle"))}</h1>${lsi.step === "phone" ? `<p class="pg__sub">${esc(next === "travelers" ? t("liveSignFirst") : t("siSub"))}</p>` : ""}${body}</div>`);
+    const f = $("#si");
+    if (lsi.step === "code") {
+      const os = $$("[data-o]"); os[0].focus();
+      os.forEach((o, i) => {
+        o.addEventListener("input", () => { const v = o.value.replace(/\D/g, ""); if (v.length > 1) { v.split("").slice(0, 6 - i).forEach((c, k) => { os[i + k].value = c; }); } else o.value = v; const nx = os.find((x) => !x.value); if (nx) nx.focus(); else f.requestSubmit(); });
+        o.addEventListener("keydown", (e) => { if (e.key === "Backspace" && !o.value && os[i - 1]) os[i - 1].focus(); });
+      });
+      $("#resend").addEventListener("click", async () => { try { await A.sendCode("+966" + lsi.phone); toast("✓"); } catch (e) { toast(e.message); } });
+    } else $("input", f)?.focus();
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $(".primary", f); btn.disabled = true;
+      try {
+        if (lsi.step === "phone") {
+          const ph = $('[name="phone"]').value.replace(/\D/g, "").replace(/^966/, "").replace(/^0/, "");
+          if (!/^5\d{8}$/.test(ph)) { $("#fSi").classList.add("err"); btn.disabled = false; return; }
+          await A.sendCode("+966" + ph); lsi = { step: "code", phone: ph }; return viewSigninLive();
+        }
+        if (lsi.step === "code") {
+          const code = $$("[data-o]").map((x) => x.value).join(""); if (code.length < 6) { btn.disabled = false; return; }
+          const r = await A.verifyCode("+966" + lsi.phone, code);
+          if (r.isNew || !r.user.name) { lsi.step = "name"; return viewSigninLive(); }
+          return done();
+        }
+        const name = $('[name="name"]').value.trim(); if (!name) { btn.disabled = false; return; }
+        try { await A.updateMe({ name }); await A.me(); } catch {}
+        return done();
+      } catch (err) {
+        btn.disabled = false;
+        const el = $("#siErr"); if (el) { el.hidden = false; el.textContent = err.message || t("siWrong"); } else toast(err.message || t("siWrong"));
+        $$("[data-o]").forEach((x) => { x.value = ""; }); $$("[data-o]")[0]?.focus();
+      }
+    });
+  }
+  async function afterSignIn() {
+    const u = A.user || {};
+    user = A.signedIn ? { name: u.name || (lang === "ar" ? "مسافر" : "Traveller"), phone: (u.phone || "").replace(/^\+966/, ""), email: u.email || "" } : null;
+    store.set("user", user);
+    renderHeader();
+  }
+
+  // ----- travellers: the account's household (the same people as in the app) -----
+  async function viewTravelersLive() {
+    const d = draft;
+    if (!A.signedIn) return location.replace("#/signin?next=travelers");
+    page(loading(t("liveLoadingPeople")));
+    let people = [];
+    try { people = (await A.people()).people; } catch (e) { if (e.status === 401) { await A.signOut(); return location.replace("#/signin?next=travelers"); } return page(errBox(e.message, true)); }
+    if (route().name !== "travelers") return;
+    const ks = kinds(d.pax), self = people.find((p) => p.isSelf), others = people.filter((p) => !p.isSelf);
+    co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k) return prev; return i === 0 && k === "a" && self ? { k, personId: self.id, first: self.givenNames || (user && user.name) || "", last: self.surname || "", dob: "" } : { k, personId: null, first: "", last: "", dob: "" }; });
+    co.contact = co.contact || { phone: (A.user && A.user.phone || "").replace(/^\+966/, ""), email: (A.user && A.user.email) || "" };
+    const label = { a: t("tAdult"), c: t("tChild"), i: t("tInfant") };
+    page(`<div class="wrap pg">
+      ${backLink("#/plan")}${steps(1)}
+      <h1 class="pg__h">${esc(t("trvTitle"))}</h1><p class="pg__sub">${esc(t("trvSub"))}</p>
+      <div class="pg__grid"><form id="trvForm" novalidate>
+        ${others.length ? `<div class="box"><h2 class="box__h">${esc(t("savedPick"))}</h2><div class="saved">${others.map((p) => `<button type="button" class="chip" data-person="${p.id}">${esc(p.givenNames || p.firstName)} ${esc(p.surname)}</button>`).join("")}</div></div>` : ""}
+        <div class="box">${co.lt.map((x, i) => `<div class="trv" data-i="${i}">
+          <div class="trv__h"><b>${esc(t("travelerN")(i + 1, label[x.k]))}${x.personId && self && x.personId === self.id ? ` · ${esc(t("you"))}` : ""}</b><span class="tagname" data-tag="${i}"></span></div>
+          <div class="fgrid">
+            <label class="fld"><span>${esc(t("first"))}</span><input name="first" value="${esc(x.first)}" autocomplete="given-name" autocapitalize="characters" ${x.personId && x.personId !== (self && self.id) ? "readonly" : ""} /><em>${esc(t("errName"))}</em></label>
+            <label class="fld"><span>${esc(t("last"))}</span><input name="last" value="${esc(x.last)}" autocomplete="family-name" autocapitalize="characters" ${x.personId && x.personId !== (self && self.id) ? "readonly" : ""} /><em>${esc(t("errName"))}</em></label>
+            ${x.k !== "a" ? `<label class="fld"><span>${esc(t("dob"))}</span><input name="dob" type="date" value="${esc(x.dob)}" max="${todayIso()}" /><em>${esc(x.k === "c" ? t("errChildAge") : t("errInfAge"))}</em></label>` : ""}
+          </div></div>`).join("")}<p class="note-s">${esc(t("passportLater"))}</p></div>
+        <div class="box"><h2 class="box__h">${esc(t("contactH"))}</h2><div class="fgrid">
+          <label class="fld" id="fPhone"><span>${esc(t("phone"))}</span><div class="phone"><b>+966</b><input name="phone" inputmode="tel" value="${esc(co.contact.phone)}" placeholder="5X XXX XXXX" /></div><em>${esc(t("errPhone"))}</em></label>
+          <label class="fld" id="fEmail"><span>${esc(t("email"))}</span><input name="email" type="email" value="${esc(co.contact.email)}" /><em>${esc(t("errEmail"))}</em></label></div></div>
+        <p class="note-s err-line" id="trvErr" hidden></p>
+        <button type="submit" class="primary">${esc(t("toPay"))}</button>
+      </form><aside class="pg__side">${sumCard(d)}</aside></div></div>`);
+    const form = $("#trvForm");
+    const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? `${(x.last || "").toUpperCase()}/${(x.first || "").toUpperCase()}` : ""; };
+    co.lt.forEach((_, i) => tag(i));
+    form.addEventListener("input", (e) => {
+      const row = e.target.closest(".trv");
+      if (row) { const i = +row.dataset.i; co.lt[i][e.target.name] = e.target.value; tag(i); } else if (e.target.name) co.contact[e.target.name] = e.target.value;
+      e.target.closest(".fld")?.classList.remove("err"); store.set("checkout", co);
+    });
+    form.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-person]"); if (!b) return;
+      const p = people.find((x) => x.id === b.dataset.person); if (co.lt.some((x) => x.personId === p.id)) return;
+      const j = co.lt.findIndex((x, i) => i > 0 && !x.personId && !x.first); if (j < 0) return;
+      co.lt[j] = { ...co.lt[j], personId: p.id, first: p.givenNames || p.firstName, last: p.surname, dob: p.dateOfBirth || "" }; store.set("checkout", co); viewTravelersLive();
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      let firstBad = null; const bad = (el) => { el.classList.add("err"); firstBad = firstBad || el; };
+      const latin = /^[A-Za-z][A-Za-z' -]*$/;
+      co.lt.forEach((x, i) => {
+        const row = $(`.trv[data-i="${i}"]`);
+        if (!latin.test((x.first || "").trim())) bad($('[name="first"]', row).closest(".fld"));
+        if (!latin.test((x.last || "").trim())) bad($('[name="last"]', row).closest(".fld"));
+        if (x.k !== "a") { const age = x.dob ? (new Date(d.dep) - new Date(x.dob)) / (365.25 * 864e5) : -1; if (x.k === "c" ? age < 2 || age >= 12 : age < 0 || age >= 2) bad($('[name="dob"]', row).closest(".fld")); }
+      });
+      const ph = String(co.contact.phone || "").replace(/\D/g, "").replace(/^966/, "").replace(/^0/, "");
+      if (!/^5\d{8}$/.test(ph)) bad($("#fPhone")); else co.contact.phone = ph;
+      if (co.contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(co.contact.email)) bad($("#fEmail"));
+      if (firstBad) { firstBad.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      const btn = $(".primary", form); btn.disabled = true;
+      try {
+        // New people join the household on the account, so the app shows them too.
+        for (const x of co.lt) {
+          if (x.personId) continue;
+          const body = { givenNames: x.first.trim().toUpperCase(), surname: x.last.trim().toUpperCase(), relation: x.k === "a" ? "family" : "child", ...(x.dob ? { dateOfBirth: x.dob } : {}) };
+          x.personId = (await A.addPerson(body)).person.id;
+        }
+        store.set("checkout", co); location.hash = "#/pay";
+      } catch (err) { btn.disabled = false; const el = $("#trvErr"); el.hidden = false; el.textContent = err.message; }
+    });
+  }
+
+  // ----- pay: the same offers priced again for these travellers, the API's order sheet, then the orders -----
+  async function viewPayLive() {
+    const d = draft;
+    if (!A.signedIn) return location.replace("#/signin?next=travelers");
+    if (!co.lt || co.lt.some((x) => !x.personId)) return location.replace("#/travelers");
+    const ids = co.lt.filter((x) => x.k !== "i").map((x) => x.personId);
+    page(loading(t("rebinding")));
+    const pl = buildPlan(d), on = (k) => pl.items.some((i) => i.k === k && i.on && !i.info);
+    const nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
+    // The offers found while planning were priced for this party, so they book as they are; one that has expired is
+    // searched again for these travellers, keeping the same flight and the same hotel and room.
+    const fresh = {
+      async trip() {
+        const want = liveOut(d), r = await A.flights({ from: d.from, destination: d.live.key, depart: d.dep, return: d.ret, infants: d.pax.i, cabin: "economy", flexibleDays: 0 }, d.pax, ids);
+        const o = r.options.find((x) => sameFlight(x, want)) || r.options[0]; if (!o) throw new A.ApiError("GONE", t("liveFlightsNone"));
+        d.live.flights = r; d.live.outId = o.id; return { kind: "trip", flightOfferId: o.id, bundle: false, travellerIds: ids };
+      },
+      async stay() {
+        const want = liveStay(d), r = await A.stays({ destination: d.live.key || "other", place: d.live.key ? null : { name: D.byCode[d.to].city }, checkIn: d.dep, nights }, d.pax, ids);
+        let o = r.options.find((x) => x.hotel && want.hotel && x.hotel.code === want.hotel.code); if (!o) throw new A.ApiError("GONE", t("liveStaysNone"));
+        if (want.hotel.room && o.hotel.room !== want.hotel.room) { try { const rm = (await A.rooms(o.id)).options.find((x) => x.hotel && x.hotel.room === want.hotel.room && (x.facts || {}).board === (want.facts || {}).board); if (rm) o = rm; } catch {} }
+        d.live.stays = r; d.live.stayId = o.id; d.live.stayPick = o; return { kind: "stay", stayOfferId: o.id, travellerIds: ids };
+      },
+    };
+    const drafts = [];
+    if (on("flight") && liveOut(d)) drafts.push({ kind: "trip", flightOfferId: d.live.outId, bundle: false, travellerIds: ids });
+    if (on("stay") && liveStay(d)) drafts.push({ kind: "stay", stayOfferId: d.live.stayId, travellerIds: ids });
+    if (on("esim")) { const e = liveEsim(d); if (e) drafts.push({ kind: "esim", count: ids.length, packageId: e.id, travellerIds: ids, days: d.live.esim.days }); }
+    if (!drafts.length) return page(errBox(t("liveNothing")));
+    try {
+      co.previews = await Promise.all(drafts.map(async (x, i) => {
+        try { return (await A.preview({ draft: x })).preview; }
+        catch (e) { if (!fresh[x.kind] || e.status === 401) throw e; drafts[i] = await fresh[x.kind](); return (await A.preview({ draft: drafts[i] })).preview; }
+      }));
+      co.drafts = drafts; saveDraft();
+    } catch (e) { return page(errBox(e.message || t("liveFlightsDown"), true)); }
+    if (route().name !== "pay") return;
+    renderPayLive();
+  }
+  function renderPayLive() {
+    const d = draft, pv = co.previews, total = pv.reduce((s, p) => s + sar(p.total), 0);
+    const holds = pv.map((p) => p.holdExpiresAt).filter(Boolean).sort()[0];
+    const tabby = pv.every((p) => p.instalments) ? pv.reduce((s, p) => s + sar(p.instalments.tabby), 0) : null, tamara = pv.every((p) => p.instalments) ? pv.reduce((s, p) => s + sar(p.instalments.tamara), 0) : null;
+    if (!co.method || co.method === "apple" || co.method === "hold") co.method = "mada";
+    const m = (k, b, small, badge) => `<label class="${co.method === k ? "on" : ""}"><input type="radio" name="pm" value="${k}" ${co.method === k ? "checked" : ""} /><div><b>${esc(b)}</b>${small ? `<small>${esc(small)}</small>` : ""}</div>${badge ? `<i>${esc(badge)}</i>` : "<span></span>"}</label>`;
+    page(`<div class="wrap pg">
+      ${backLink("#/travelers")}${steps(2)}
+      <h1 class="pg__h">${esc(t("payTitle"))}</h1>
+      ${pv.some((p) => p.demoFare) ? `<div class="nudge" style="margin-top:18px">${esc(t("demoNote"))}</div>` : ""}
+      <div class="pg__grid"><form id="payForm" novalidate>
+        ${pv.map((p) => `<div class="box"><h2 class="box__h">${esc(t("payFor")(p.kind))} · ${esc(p.title)}</h2>
+          <div class="sum__rows" style="margin:0">${p.lines.map((l) => `<div><span>${esc(l.text)}</span><span>${esc(money(l.amount / 100))}</span></div>`).join("")}</div>
+          <p class="note-s">${esc(p.rule.length > 180 ? p.rule.slice(0, p.rule.indexOf(".") + 1 || 180) : p.rule)}</p>${p.rule.length > 180 ? `<details class="fine"><summary>${esc(t("hotelNotes"))}</summary><p class="note-s">${esc(p.rule)}</p></details>` : ""}${p.stay && p.stay.payAtHotel ? `<p class="note-s">${esc(t("payAtHotel")(money(sar(p.stay.payAtHotel))))}</p>` : ""}
+          ${p.missingPassports && p.missingPassports.length ? `<p class="note-s">${esc(t("passportLater"))}</p>` : ""}</div>`).join("")}
+        <div class="box"><h2 class="box__h">${esc(t("payHow"))}</h2><div class="pm" id="pm">
+          ${m("mada", t("mada"), "", "mada")}${m("card", t("card"), "", "VISA · MC")}
+          ${tabby ? m("tabby", t("tabby"), t("tabbySub")(money(tabby)), "4×") : ""}${tamara ? m("tamara", t("tamara"), t("tamaraSub")(money(tamara)), "3×") : ""}
+        </div>
+        <div class="cardf"><label class="fld full" id="fCard"><span>${esc(t("cardNo"))}</span><input name="cno" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" /><em>${esc(t("errCard"))}</em></label><label class="fld"><span>${esc(t("exp"))}</span><input name="cexp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" /></label><label class="fld"><span>${esc(t("cvc"))}</span><input name="ccvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" /></label></div>
+        ${holds ? `<p class="hold-line" id="holdLine"></p>` : ""}
+        <p class="note-s">${esc(t("terms"))}</p></div>
+        <p class="note-s err-line" id="payErr" hidden></p>
+        <button type="submit" class="primary" id="payBtn">${esc(t("payBtn")(money(total)))}</button>
+      </form><aside class="pg__side">${sumCard(d, total)}</aside></div></div>`);
+    if (holds) { const tick = () => { const el = $("#holdLine"); if (!el) return; const mins = Math.max(0, Math.ceil((new Date(holds) - Date.now()) / 60000)); el.textContent = mins ? t("priceHeld")(mins) : t("priceGone"); if (mins) setTimeout(tick, 15000); }; tick(); }
+    $("#pm").addEventListener("change", (e) => { co.method = e.target.value; $$("#pm label").forEach((l) => l.classList.toggle("on", $("input", l).checked)); });
+    $("#payForm").addEventListener("input", (e) => e.target.closest(".fld")?.classList.remove("err"));
+    $("#payForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const no = ($('[name="cno"]').value || "").replace(/\D/g, ""), exp = $('[name="cexp"]').value.trim(), cvc = $('[name="ccvc"]').value.trim();
+      if (no.length < 15 || !/^\d{2}\/?\d{2}$/.test(exp) || !/^\d{3,4}$/.test(cvc)) { $("#fCard").classList.add("err"); $("#fCard input").focus(); return; }
+      busyOn(t("processing"));
+      try {
+        const card = await A.tokenizeCard(no);
+        const plan = co.method === "tabby" ? "tabby" : co.method === "tamara" ? "tamara" : "full";
+        const orders = [];
+        for (let i = 0; i < co.drafts.length; i++) {
+          let r = await A.createOrder({ draft: co.drafts[i], payment: { method: "new_card", token: card.token, brand: card.brand, last4: card.last4 }, plan, expectedTotal: co.previews[i].total.amount, idempotencyKey: A.newKey(), contactPhone: undefined });
+          if (r.outcome === "price_changed") {
+            busyOff();
+            if (!(await ask({ title: t("priceChangedH"), text: t("priceUp")(money(sar(r.previousTotal)), money(sar(r.preview.total))), ok: t("keepGoing"), cancel: t("stopIt") }))) return;
+            busyOn(t("processing")); co.previews[i] = r.preview;
+            r = await A.createOrder({ draft: co.drafts[i], payment: { method: "new_card", token: card.token, brand: card.brand, last4: card.last4 }, plan, expectedTotal: r.preview.total.amount, idempotencyKey: A.newKey() });
+          }
+          if (r.outcome === "hold_ended") { busyOff(); co.previews[i] = r.preview; toast(t("priceGone")); return renderPayLive(); }
+          if (r.outcome === "declined" || r.outcome === "blocked") { busyOff(); const el = $("#payErr"); el.hidden = false; el.textContent = r.message; return; }
+          if (r.outcome === "requires_action") {
+            busyOff();
+            const code = await ask({ title: t("otpTitle"), text: t("otpHint"), code: true, hint: /staging|localhost/.test(location.host) ? t("demoCode") : "", ok: t("otpGo"), cancel: t("stopIt") });
+            if (!code) return;
+            busyOn(t("processing")); r = { order: (await A.threeDs(r.order.id, code.trim())).order };
+          }
+          orders.push(r.order.id);
+        }
+        busyOff();
+        co.orders = orders; store.set("checkout", co);
+        location.hash = `#/wait/${orders.join(",")}`;
+      } catch (err) { busyOff(); const el = $("#payErr"); el.hidden = false; el.textContent = err.message; }
+    });
+  }
+
+  // A sheet on the page for a question in the middle of paying: big text, one clear choice, nothing hidden.
+  function ask(opts) {
+    return new Promise((resolve) => {
+      const el = document.createElement("div");
+      el.className = "sheet";
+      el.innerHTML = `<div class="sheet__card" role="dialog" aria-modal="true"><h2>${esc(opts.title)}</h2>${opts.text ? `<p>${esc(opts.text)}</p>` : ""}
+        ${opts.code ? `<input class="sheet__code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="••••••" />${opts.hint ? `<small>${esc(opts.hint)}</small>` : ""}` : ""}
+        <div class="sheet__go"><button type="button" class="btn btn--main" data-ok>${esc(opts.ok)}</button>${opts.cancel ? `<button type="button" class="btn btn--plain" data-no>${esc(opts.cancel)}</button>` : ""}</div></div>`;
+      document.body.append(el);
+      const input = $(".sheet__code", el); (input || $("[data-ok]", el)).focus();
+      const close = (v) => { el.remove(); resolve(v); };
+      $("[data-ok]", el).addEventListener("click", () => { if (input && input.value.replace(/\D/g, "").length !== 6) { input.focus(); return; } close(input ? input.value.replace(/\D/g, "") : true); });
+      $("[data-no]", el)?.addEventListener("click", () => close(null));
+      input?.addEventListener("keydown", (e) => { if (e.key === "Enter") $("[data-ok]", el).click(); });
+    });
+  }
+
+  // ----- with Mada: the desk confirms (the same screen as the app's "With Faisal") -----
+  let waitTimer = null;
+  async function viewWait(idsCsv) {
+    clearTimeout(waitTimer);
+    const ids = (idsCsv || "").split(",").filter(Boolean);
+    if (!ids.length || !A.signedIn) return location.replace("#/trips");
+    let orders;
+    try { orders = (await Promise.all(ids.map((id) => A.order(id)))).map((r) => r.order); } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "wait") return;
+    const main = orders.find((o) => o.kind === "trip") || orders[0];
+    const done = orders.every((o) => ["confirmed", "cancelled", "declined"].includes(o.status));
+    const ok = orders.every((o) => o.status === "confirmed");
+    const agent = (main.confirmedBy || main.agent || {}).name || "Mada";
+    const q = orders.find((o) => o.question);
+    const failed = orders.find((o) => o.status === "ticketing_failed" || o.status === "declined" || o.status === "cancelled");
+    page(`<div class="wrap pg pg--narrow wait">
+      <span class="status${ok ? "" : " held"}">${esc(ok ? t("waitDone") : t("waitTitle"))}</span>
+      <h1 class="pg__h" style="margin-top:12px">${esc(main.place || main.title)}</h1>
+      <p class="pg__sub">${esc(ok ? t("sentTo")(main.ref ? `${t("refL")} ${main.ref}` : agent) : t("waitSub")(agent))}</p>
+      ${main.photo ? "" : ""}
+      <div class="box"><ol class="tl">${t("waitSteps").map((s, i) => `<li class="${main.step >= i || ok ? "done" : ""}">${esc(s)}</li>`).join("")}</ol></div>
+      ${orders.map((o) => `<div class="box st-rows"><div>${ico(o.kind === "trip" ? "flights" : o.kind === "stay" ? "stays" : "esim")}<span><b class="st-t">${esc(o.title)}</b><small class="dim">${esc(o.lines.map((l) => l.text).join(" · "))}</small></span><em class="${o.status === "confirmed" ? "" : "held"}">${esc(o.status === "confirmed" ? o.ref || t("waitDone") : (t("orderStatus") || {})[o.status] || o.status.replace(/_/g, " "))}</em></div></div>`).join("")}
+      ${q ? `<div class="box"><h2 class="box__h">${esc(t("waitQuestion"))}</h2><p>${esc(q.question.text)}</p><div class="actions"><button type="button" class="btn btn--main" data-ans="yes">${esc(t("waitYes"))}</button><button type="button" class="btn btn--plain" data-ans="call">${esc(t("waitCall"))}</button></div></div>` : ""}
+      ${failed && !ok ? `<div class="nudge">${esc((failed.result && failed.result.reason) || failed.problem || t("waitFailed"))}</div>` : ""}
+      ${main.tripId && ok ? `<a class="primary primary--link" href="#/t/${main.tripId}">${esc(t("waitOpen"))}</a>` : ""}
+    </div>`);
+    $$("[data-ans]").forEach((b) => b.addEventListener("click", async () => { try { await A.answer(q.id, b.dataset.ans); } catch (e) { toast(e.message); } viewWait(idsCsv); }));
+    if (ok) { draft = null; store.set("draft", null); co = {}; store.set("checkout", null); }
+    if (!done) waitTimer = setTimeout(() => { if (route().name === "wait") viewWait(idsCsv); }, 1500);
+  }
+
+  // ----- trips from the account (booked on the web or in the app) -----
+  async function viewTripsLive() {
+    if (!A.signedIn) return viewTrips();
+    page(loading(t("tripsTitle")));
+    let r;
+    try { r = await A.trips(); } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "trips") return;
+    const card = (x) => `<a class="tcard" href="#/t/${x.id}">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" />` : `<span class="tcard__ph"></span>`}<div><b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellerNames.join(", "))}</span></div><span><em class="status">${esc(x.flight ? x.flight.code : (lang === "ar" ? "رحلة" : "Trip"))}</em></span></a>`;
+    page(`<div class="wrap pg"><h1 class="pg__h">${esc(t("tripsTitle"))}</h1>
+      ${r.upcoming.length || r.past.length ? `<div class="tlist">${r.upcoming.map(card).join("")}</div>${r.past.length ? `<div class="bar"><h2>${esc(t("past"))}</h2></div><div class="tlist tlist--past">${r.past.map(card).join("")}</div>` : ""}`
+        : `<div class="empty"><p>${esc(t("tripsNone"))}</p><a class="btn btn--main" href="#/">${esc(t("tripsPlan"))}</a></div>`}</div>`);
+  }
+  async function viewTripLive(id) {
+    page(loading(t("tripsTitle")));
+    let x;
+    try { x = (await A.trip(id)).trip; } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "t") return;
+    const st = t("statusL");
+    page(`<div class="wrap pg">
+      ${backLink("#/trips", t("tripsTitle"))}
+      <span class="status">${esc(t("confirmed"))}</span>
+      <h1 class="pg__h" style="margin-top:12px">${esc(t("tripTo")(x.city))}</h1>
+      ${x.bookingRef ? `<p class="pg__sub">${esc(t("refL"))} <span class="ref">${esc(x.bookingRef)}</span></p>` : ""}
+      <div class="trip-hero">${x.imageUrl ? `<img src="${esc(x.imageUrl)}" alt="" />` : ""}<b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellers.map((p) => p.firstName || p.name || "").filter(Boolean).join(", "))}</span></div>
+      <div class="pg__grid"><div>
+        ${x.segments.map((s) => `<div class="box seg-live"><div class="seg-live__top"><b>${esc(s.carrierName)} ${esc(s.flightNumber)}</b><span class="status${/delay|cancel/.test(s.status) ? " held" : ""}">${esc(st[s.status] || s.status)}</span></div>
+          <div class="fl__times"><b>${esc(s.departLocal.slice(11, 16))}</b><div class="fl__line">${esc(hrs(s.durationMin))}<i></i>${esc(s.from)} → ${esc(s.to)}</div><b>${esc(s.arriveLocal.slice(11, 16))}</b></div>
+          <p class="note-s">${esc(day(s.departLocal.slice(0, 10)))}${s.terminal ? ` · ${esc(t("terminal"))} ${esc(s.terminal)}` : ""}${s.gate ? ` · ${esc(t("gate"))} ${esc(s.gate)}` : ""}${s.seats.length ? ` · ${esc(t("seats"))} ${esc(s.seats.join(", "))}` : ""}${s.baggage ? ` · ${esc(s.baggage)}` : ""}</p></div>`).join("")}
+        ${x.stays.map((s) => `<div class="box st-rows"><div>${ico("stays")}<span><b class="st-t">${esc(s.name)}</b><small class="dim">${esc(day(s.checkIn))} · ${esc(t("forStay")(s.nights, s.rooms))}${s.cancellation ? " · " + esc(s.cancellation) : ""}</small></span><em>${esc(s.confirmation || s.status)}</em></div></div>`).join("")}
+      </div><aside class="pg__side"><div class="box"><h2 class="box__h">${esc(t("advIntro"))}${x.agent && x.agent.name ? ` · ${esc(x.agent.name)}` : ""}</h2><p class="note-s" style="margin-top:0">${esc(t("advLine"))}</p>
+        <div class="actions" style="margin-top:14px"><a class="btn btn--main" href="${wa(t("waHi")(x.bookingRef || x.id.slice(0, 8)))}" target="_blank" rel="noopener">${esc(t("msgAdv"))}</a><a class="btn btn--plain" href="${wa(t("waChange")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqChange"))}</a><a class="btn btn--plain" href="${wa(t("waCancel")(x.bookingRef || ""))}" target="_blank" rel="noopener">${esc(t("reqCancel"))}</a></div></div>
+        <p class="note-s">${esc(t("appSync"))}</p></aside></div></div>`);
+  }
 
   // ---------- popovers on the plan: dates, travelers, origin ----------
   let open = null, calMonth = null, calMode = "ret", popChanged = false, popFromChat = false;
@@ -863,12 +1522,23 @@
       else { d.dep = v; d.ret = null; drawPop(); if (calMode === "one") { afterPlanEdit(); setTimeout(finishPop, 260); } }
     }
   }
-  function afterPlanEdit() { saveDraft(); if (draft.plan && route().name === "plan") { renderPlanPane(true); renderThread(false); } }
+  function afterPlanEdit() {
+    saveDraft();
+    if (!draft.plan || route().name !== "plan") return;
+    if (LIVE && draft.live && draft.live.sig !== searchSig(draft)) {
+      $("#planPane").classList.add("is-loading");
+      clearTimeout(afterPlanEdit.t);
+      afterPlanEdit.t = setTimeout(async () => { try { await liveSearch(draft); } catch {} saveDraft(); $("#planPane").classList.remove("is-loading"); renderPlanPane(true); renderThread(false); }, 500);
+      return;
+    }
+    renderPlanPane(true); renderThread(false);
+  }
   // Dates picked from a chat chip go back to Mada as an answer, so the plan follows from the conversation.
   function finishPop() {
     const was = open; if (!was) return; closePop();
-    if (!popChanged) return; popChanged = false;
+    if (!popChanged && !(popFromChat && was === "who")) return; popChanged = false;
     if (popFromChat && was === "when" && draft.dep) { popFromChat = false; return send(range(draft.dep, draft.ret), true); }
+    if (popFromChat && was === "who") { popFromChat = false; return send(paxText(draft.pax), true); }
     afterPlanEdit();
   }
 
@@ -902,6 +1572,7 @@
 
   // Preview only: switch between a first-time visitor and a returning traveler with one upcoming trip.
   function demo(as) {
+    if (LIVE) { toast(t("liveNoDemo")); return; }
     for (const k of ["user", "trips", "travelers", "draft", "checkout", "watch", "known"]) store.set(k, null);
     user = null; trips = []; saved = []; draft = null; co = {};
     if (as === "back") {
@@ -937,6 +1608,8 @@
     if (a === "wk") { const w = weekend(+v); draft.dep = w.dep; draft.ret = w.ret; return send(range(w.dep, w.ret), true); }
     if (a === "in2") { const x = addDays(todayIso(), 14); draft.dep = x; draft.ret = addDays(x, 3); return send(range(draft.dep, draft.ret), true); }
     if (a === "cal") { popFromChat = true; return openPop("when", b); }
+    if (a === "who") { const [ad, ch] = v.split(",").map(Number); draft.pax = { a: ad, c: ch, i: 0 }; draft.paxSaid = true; store.set("pax", draft.pax); return send(paxText(draft.pax), true); }
+    if (a === "whoPick") { popFromChat = true; draft.paxSaid = true; return openPop("who", b); }
     if (a === "pp") {
       const to = draft.visa.to, c = country(D.byCode[to].country), saudi = +v === 0, gcc = D.GCC.has(D.byCode[to].country);
       you(b.textContent); say(esc(saudi && gcc ? t("visaFree")(c) : t("visaDo")(c)), saudi && gcc ? chips([{ a: "go", v: to, l: city(to) }]) : "");
@@ -963,14 +1636,26 @@
     addEventListener("keydown", (e) => { if (e.key === "Escape") { finishPop(); $("#acctMenu").hidden = true; } });
     $("#track").addEventListener("scroll", railArrows, { passive: true });
     $$(".rail__arrow").forEach((b) => b.addEventListener("click", () => { const tr = $("#track"); tr.scrollBy({ left: +b.dataset.dir * (lang === "ar" ? -1 : 1) * tr.clientWidth * 0.8, behavior: "smooth" }); }));
-    $("#langBtn").addEventListener("click", () => { lang = lang === "en" ? "ar" : "en"; store.set("lang", lang); render(); });
+    $("#langBtn").addEventListener("click", () => { lang = lang === "en" ? "ar" : "en"; store.set("lang", lang); A.setLang(lang); render(); });
     $("#acct").addEventListener("click", () => { if (!user) { location.hash = "#/signin"; return; } $("#acctMenu").hidden = !$("#acctMenu").hidden; });
     $("#signOut").addEventListener("click", signOut);
     $("#newTrip").addEventListener("click", () => { draft = null; store.set("draft", null); tab = "chat"; location.hash = "#/"; });
     $$(".demo button").forEach((b) => b.addEventListener("click", () => demo(b.dataset.as)));
     addEventListener("hashchange", render);
-    setupMic(); render();
-    if (params.get("q")) startOrSend(params.get("q"));
+    setupMic();
+    A.setLang(lang);
+    // Live when the Core API answers next to us; signed-in state then comes from the API session, not this browser.
+    A.detect().then(async (live) => {
+      LIVE = live;
+      document.documentElement.classList.toggle("is-live", live);
+      if (live) {
+        if (A.signedIn) { try { await A.me(); } catch { /* offline: keep what we had */ } }
+        await afterSignIn();
+        if (draft && draft.plan && !draft.live) draft.plan = false; // a preview plan has no real offers to book
+      }
+      render();
+      if (params.get("q")) startOrSend(params.get("q"));
+    });
   }
   document.addEventListener("DOMContentLoaded", init);
 })();

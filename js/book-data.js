@@ -287,5 +287,22 @@
   const hotelPhoto = (h, i = 0, small) => `/assets/img/hotels/h${h.photos}-${i}${small ? "-s" : ""}.jpg`;
   const HOTEL_CREDIT = "Sample photos: Basile Morin, PPR 19, Johann Jaritz, Bernard Gagnon (CC BY-SA 4.0, Wikimedia Commons)";
 
-  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, options, hotels, hotelPhoto, HOTEL_CREDIT, holdUntil, hm, priceContext, km, iso };
+  // The places people judge a hotel's location by, per destination, with the airport last. [en, ar, lat, lng]
+  const LANDMARKS = {
+    DXB: [["Dubai Mall and Burj Khalifa", "دبي مول وبرج خليفة", 25.1972, 55.2744], ["Dubai Marina", "دبي مارينا", 25.0805, 55.1403], ["Jumeirah Beach", "شاطئ جميرا", 25.2048, 55.2390]],
+    JED: [["Masjid al-Haram, Makkah", "المسجد الحرام، مكة", 21.4225, 39.8262], ["Jeddah Corniche", "كورنيش جدة", 21.5433, 39.1728], ["Al-Balad", "البلد", 21.4858, 39.1925]],
+    IST: [["Hagia Sophia, Sultanahmet", "آيا صوفيا، السلطان أحمد", 41.0086, 28.9802], ["Taksim Square", "ميدان تقسيم", 41.0370, 28.9850], ["Galata Tower", "برج غلطة", 41.0256, 28.9744]],
+    CAI: [["The Pyramids of Giza", "أهرامات الجيزة", 29.9792, 31.1342], ["Egyptian Museum, Tahrir", "المتحف المصري، التحرير", 30.0478, 31.2336], ["Khan el-Khalili", "خان الخليلي", 30.0477, 31.2623]],
+    LHR: [["Oxford Circus", "أكسفورد سيركس", 51.5154, -0.1410], ["Hyde Park", "هايد بارك", 51.5073, -0.1657], ["Big Ben", "ساعة بيغ بن", 51.5007, -0.1246]],
+    GYD: [["Old City (Icherisheher)", "المدينة القديمة", 40.3662, 49.8352], ["Flame Towers", "أبراج اللهب", 40.3594, 49.8265], ["Baku Boulevard", "كورنيش باكو", 40.3666, 49.8432]],
+    TBS: [["Old Tbilisi", "تبليسي القديمة", 41.6894, 44.8090], ["Rustaveli Avenue", "شارع روستافيلي", 41.6990, 44.7980]],
+    ULH: [["AlUla Old Town", "البلدة القديمة", 26.6167, 37.9181], ["Hegra", "الحجر", 26.7922, 37.9530], ["Elephant Rock", "جبل الفيل", 26.6600, 37.9670]],
+    AHB: [["Abha centre", "وسط أبها", 18.2164, 42.5053], ["Al Soudah", "السودة", 18.2689, 42.3667]],
+    CDG: [["Eiffel Tower", "برج إيفل", 48.8584, 2.2945], ["The Louvre", "متحف اللوفر", 48.8606, 2.3376], ["Champs-Élysées", "الشانزليزيه", 48.8698, 2.3075]],
+    DPS: [["Seminyak Beach", "شاطئ سيمينياك", -8.6914, 115.1588], ["Ubud centre", "وسط أوبود", -8.5069, 115.2625]],
+    MLE: [["Velana Airport, Malé", "مطار فيلانا، ماليه", 4.1918, 73.5290]],
+  };
+  const kmBetween = (a, b) => km({ lat: a[0], lon: a[1] }, { lat: b[0], lon: b[1] });
+
+  window.MadaData = { LANDMARKS, kmBetween, AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, options, hotels, hotelPhoto, HOTEL_CREDIT, holdUntil, hm, priceContext, km, iso };
 })();
