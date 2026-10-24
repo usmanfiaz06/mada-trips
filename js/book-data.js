@@ -78,22 +78,20 @@
   const AIRPORTS = A.map(([code, city, cityAr, country, lat, lon, tz, alias]) => ({ code, city, cityAr, country, lat, lon, tz, alias }));
   const byCode = Object.fromEntries(AIRPORTS.map((a) => [a.code, a]));
 
-  // Visual identity for destination postcards: two tones and a one-line reason to go.
-  const LOOKS = {
-    DXB: ["#c9773b", "#3a1d14", "Skyline weekends", "عطلة,بين,الأبراج"],
-    JED: ["#2f7d7a", "#0f2a2b", "Red Sea and Umrah", "البحر,الأحمر,والعمرة"],
-    ULH: ["#b7603a", "#2d140c", "Desert under stars", "صحراء,تحت,النجوم"],
-    CAI: ["#c9a25d", "#3b2a12", "Pyramids and the Nile", "الأهرامات,والنيل"],
-    IST: ["#a8435a", "#2a0f19", "Two continents, one trip", "قارتان,في,رحلة"],
-    GYD: ["#5a6fa8", "#141c33", "Cool air, old city", "جو,بارد,ومدينة,عريقة"],
-    MLE: ["#2aa3a8", "#0a2e33", "Water villas", "فلل,فوق,الماء"],
-    LHR: ["#56627a", "#151a24", "Shopping and parks", "تسوّق,وحدائق"],
-    AHB: ["#4f8a5b", "#11261a", "Green mountains", "جبال,خضراء"],
-    TBS: ["#8a6aa8", "#211833", "Wine-red hills", "تلال,ومدن,قديمة"],
-    KUL: ["#3e8a6b", "#0d261c", "Rainforest and towers", "غابات,وأبراج"],
-    GVA: ["#6b8fb3", "#14202e", "Lakes and Alps", "بحيرات,وجبال,الألب"],
+  // Destinations we feature, with a photo, where to anchor it when cropped, a short line, and the photo credit.
+  const DEST = {
+    DXB: { pos: "62% 40%", en: "Skyline weekends", ar: "عطلة بين الأبراج", credit: "Tim Reckmann, CC BY 2.0", src: "https://commons.wikimedia.org/wiki/File:Dubai_skyline_2015.jpg" },
+    IST: { pos: "50% 50%", en: "Two continents, one city", ar: "مدينة على قارتين", credit: "Arild Vågen, CC BY-SA 3.0", src: "https://commons.wikimedia.org/wiki/File:Hagia_Sophia_Mars_2013.jpg" },
+    ULH: { pos: "40% 50%", en: "Sandstone and silence", ar: "صخور وسكون", credit: "Mada Trips" },
+    CAI: { pos: "45% 50%", en: "Pyramids before breakfast", ar: "الأهرامات قبل الفطور", credit: "Ricardo Liberato, CC BY-SA 2.0", src: "https://commons.wikimedia.org/wiki/File:All_Gizah_Pyramids.jpg" },
+    MLE: { pos: "50% 60%", en: "Water, and nothing else", ar: "ماء ولا شيء غيره", credit: "Mada Trips" },
+    LHR: { pos: "50% 50%", en: "Autumn by the river", ar: "خريف على النهر", credit: "Colin, CC BY-SA 4.0", src: "https://commons.wikimedia.org/wiki/File:Tower_Bridge_from_Shad_Thames.jpg" },
+    KUL: { pos: "50% 30%", en: "Towers and rainforest", ar: "أبراج وغابات", credit: "Someformofhuman, CC BY-SA 4.0", src: "https://commons.wikimedia.org/wiki/File:Petronas_Panorama_II.jpg" },
+    GVA: { pos: "30% 50%", en: "Lake air in winter", ar: "هواء البحيرة شتاءً", credit: "Daniel Culsan, CC BY-SA 4.0", src: "https://commons.wikimedia.org/wiki/File:Jet_d%27eau_de_Gen%C3%A8ve.jpg" },
+    RUH: { pos: "50% 50%", en: "Home", ar: "الرياض", credit: "B.alotaby, CC BY-SA 4.0", src: "https://commons.wikimedia.org/wiki/File:Riyadh_Skyline.jpg" },
   };
-  const POPULAR = ["DXB", "JED", "ULH", "CAI", "IST", "GYD", "MLE", "LHR", "AHB", "TBS", "KUL", "GVA"];
+  const POPULAR = ["DXB", "IST", "ULH", "CAI", "MLE", "LHR", "KUL", "GVA"];
+  const photo = (code, small) => (DEST[code] ? `/assets/img/dest/${code.toLowerCase()}${small ? "-s" : ""}.jpg` : null);
 
   const AIRLINES = {
     SV: { name: "Saudia", nameAr: "السعودية", tier: 1.12, bag: 23 },
@@ -194,5 +192,5 @@
     return { q, rank, cheaper };
   }
 
-  window.MadaData = { AIRPORTS, byCode, LOOKS, POPULAR, AIRLINES, quote, priceContext, km, iso };
+  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, AIRLINES, quote, priceContext, km, iso };
 })();
