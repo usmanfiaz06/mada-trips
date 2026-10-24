@@ -77,7 +77,19 @@
 
     // hotels
     stTitle: (c) => `Where you'll stay in ${c}`, stSub: (n, r) => `${n} ${n === 1 ? "night" : "nights"} · ${r} · total price for the stay`, allStars: "All", noHotel: "I don't need a hotel",
-    rating: "Guest rating", sample: "Sample hotels for this preview",
+    rating: "Guest rating", sample: "Sample hotels and photos for this preview. Live listings come from the hotel supplier.",
+
+    // hotels, richer
+    stSort: { rec: "Recommended", price: "Lowest price", rating: "Top rated" }, fBreakfast: "Breakfast", fCancel: "Free cancellation", fPool: "Pool",
+    ratingWord: (r) => (r >= 9 ? "Exceptional" : r >= 8.5 ? "Excellent" : r >= 8 ? "Very good" : "Good"), reviews: (n) => `${n.toLocaleString("en-US")} reviews`,
+    walk: (m, l) => `${m} min to ${l}`, perNight: (a) => `${a} a night`, forStay: (n, r) => `${n} ${n === 1 ? "night" : "nights"}, ${r} ${r === 1 ? "room" : "rooms"}`,
+    cancelBy: (d) => `Free cancellation until ${d}`, nonRef: "Non-refundable", bfast: "Breakfast included", noBfast: "Room only",
+    viewHotel: "View hotel", takeL: "Mada's take", photosN: (n) => `${n} photos`,
+    takeFamily: "Good for your family: family rooms and space for the kids.", takeWalk: (m, l) => `You can walk to ${l} in ${m} minutes.`, takeTop: (c) => `One of the best-reviewed stays in ${c}.`, takeQuiet: (l) => `Quieter streets, a short ride from ${l}.`, takeValue: (a) => `The best value we found in ${a}.`,
+    amen: { wifi: "Free Wi-Fi", pool: "Pool", gym: "Gym", spa: "Spa", parking: "Parking", prayer: "Prayer room", halal: "Halal dining", kids: "Kids' club", shuttle: "Airport shuttle" },
+    roomsH: "Choose your room", sleeps: (n) => `Sleeps ${n}`, m2: (n) => `${n} m²`, amenH: "What's there", policyH: "Good to know",
+    checkin: "Check-in from 3 pm", checkout: "Check-out until 12 noon", idNote: "Bring the passport or ID used for booking",
+    photosNote: "Sample photos for this preview. Live listings show each hotel's own photos.", selectRoom: "Choose this room", chosenRoom: "Your room", inPlan: "In your plan",
 
     // checkout
     steps: ["Plan", "Travelers", "Payment"],
@@ -198,7 +210,18 @@
     select: "اختر", selected: "مختارة", changeOk: "تغيير التاريخ مجانًا", changeFee: "التغيير برسوم", noFlights: "ما فيه رحلات مطابقة. جرّب إلغاء «مباشر فقط».",
 
     stTitle: (c) => `وين بتسكن في ${c}`, stSub: (n, r) => `${n} ${n === 1 ? "ليلة" : "ليالٍ"} · ${r} · السعر إجمالي الإقامة`, allStars: "الكل", noHotel: "ما أحتاج فندق",
-    rating: "تقييم النزلاء", sample: "فنادق تجريبية لهذه النسخة",
+    rating: "تقييم النزلاء", sample: "فنادق وصور تجريبية لهذه النسخة. القوائم الفعلية من مزوّد الفنادق.",
+
+    stSort: { rec: "الأنسب", price: "الأقل سعرًا", rating: "الأعلى تقييمًا" }, fBreakfast: "الإفطار", fCancel: "إلغاء مجاني", fPool: "مسبح",
+    ratingWord: (r) => (r >= 9 ? "استثنائي" : r >= 8.5 ? "ممتاز" : r >= 8 ? "جيد جدًا" : "جيد"), reviews: (n) => `${n.toLocaleString("en-US")} تقييم`,
+    walk: (m, l) => `${m} دقيقة إلى ${l}`, perNight: (a) => `${a} لليلة`, forStay: (n, r) => `${n} ${n === 1 ? "ليلة" : "ليالٍ"}، ${r} غرفة`,
+    cancelBy: (d) => `إلغاء مجاني حتى ${d}`, nonRef: "غير قابل للاسترداد", bfast: "الإفطار مشمول", noBfast: "بدون إفطار",
+    viewHotel: "تفاصيل الفندق", takeL: "رأي مادا", photosN: (n) => `${n} صور`,
+    takeFamily: "مناسب لعائلتك: غرف عائلية ومساحة للأطفال.", takeWalk: (m, l) => `تقدر تمشي إلى ${l} في ${m} دقيقة.`, takeTop: (c) => `من أعلى الفنادق تقييمًا في ${c}.`, takeQuiet: (l) => `شوارع أهدأ، وقريب بالسيارة من ${l}.`, takeValue: (a) => `أفضل قيمة لقيناها في ${a}.`,
+    amen: { wifi: "واي فاي مجاني", pool: "مسبح", gym: "نادي رياضي", spa: "سبا", parking: "مواقف", prayer: "مصلى", halal: "طعام حلال", kids: "نادي أطفال", shuttle: "نقل من المطار" },
+    roomsH: "اختر غرفتك", sleeps: (n) => `تتسع لـ ${n}`, m2: (n) => `${n} م²`, amenH: "المرافق", policyH: "معلومات مهمة",
+    checkin: "الدخول من ٣ العصر", checkout: "الخروج حتى ١٢ الظهر", idNote: "أحضر الجواز أو الهوية المستخدمة في الحجز",
+    photosNote: "صور تجريبية لهذه النسخة. القوائم الفعلية تعرض صور كل فندق.", selectRoom: "اختر هذه الغرفة", chosenRoom: "غرفتك", inPlan: "في خطتك",
 
     steps: ["الخطة", "المسافرون", "الدفع"],
     trvTitle: "مين المسافرين؟", trvSub: "الأسماء بالضبط مثل ما هي في الجواز.",

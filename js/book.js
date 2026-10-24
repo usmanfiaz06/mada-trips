@@ -68,6 +68,16 @@
     cal: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
     ppl: '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c.6-3.6 3-5.5 6-5.5s5.4 1.9 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.6c2.6.1 4.4 1.8 5 4.9"/>',
     pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    wifi: '<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r=".8"/>',
+    pool: '<path d="M3 17c2 0 2-1.2 4.5-1.2S9.5 17 12 17s2-1.2 4.5-1.2S18.5 17 21 17M3 20.5c2 0 2-1.2 4.5-1.2s2 1.2 4.5 1.2 2-1.2 4.5-1.2 2 1.2 4.5 1.2M8 14V5.5a2 2 0 0 1 4 0M16 14V5.5a2 2 0 0 0-4 0M8 9h8"/>',
+    gym: '<path d="M3 9.5v5M6 7.5v9M18 7.5v9M21 9.5v5M6 12h12"/>',
+    spa: '<path d="M12 20c-4.5 0-8-3.2-8-7.5 3 0 5.5 1.3 8 4 2.5-2.7 5-4 8-4 0 4.3-3.5 7.5-8 7.5zM12 16.5c-2-2.5-2-6.5 0-10 2 3.5 2 7.5 0 10z"/>',
+    parking: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M10 16.5v-9h3a2.7 2.7 0 0 1 0 5.4h-3"/>',
+    prayer: '<path d="M15.5 4.5a7.5 7.5 0 1 0 4 12.8A6 6 0 0 1 15.5 4.5z"/>',
+    halal: '<path d="M7 3v8M5 3v4.5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1.5-3 4-3 7h3"/>',
+    kids: '<circle cx="12" cy="6" r="2.5"/><path d="M7 11l5-1.5 5 1.5M12 9.5V15l-3 5M12 15l3 5"/>',
+    shuttle: '<rect x="4" y="4" width="16" height="12" rx="3"/><path d="M4 11h16M7 19v-3M17 19v-3"/><circle cx="8" cy="13.5" r=".6"/><circle cx="16" cy="13.5" r=".6"/>',
+    star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8L3.5 9.7l5.9-.8z"/>',
   };
   const ico = (k) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k] || ""}</svg>`;
   const SUN = '<svg viewBox="0 0 132 89"><path d="M73.3 0 68.4 41.7a17 17 0 0 0-4.5 0L59 0zM74.1 43.4a17 17 0 0 1 4.2 2.8l25.4-23.5-10.2-8.5zM114.3 35.4 81.8 50.4c.6 1.1 1.2 2.2 1.6 3.4l37.7-6.4zM84.4 60.2l47.9 9.3-4.8-11.4-43.2.5zM58.2 43.4a17 17 0 0 0-4.2 2.8L28.6 22.7l10.2-8.5zM18.1 35.4l32.4 15c-.6 1.1-1.2 2.2-1.6 3.4L11.2 47.4zM48 60.2 0 69.5l4.8-11.4 43.2.5z"/></svg>';
@@ -92,14 +102,15 @@
     const nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
     const list = D.hotels(d.to);
     const hotel = list.find((h) => h.id === d.hotelId) || list.find((h) => h.tier === d.tier) || list[0];
-    return { out, back, nights, hotel };
+    const room = (hotel && hotel.rooms.find((r) => r.id === d.roomId)) || (hotel && (d.pax.c && d.pax.a >= 2 ? hotel.rooms[2] : hotel.rooms[0]));
+    return { out, back, nights, hotel, room };
   }
 
   // Everything the plan shows, priced. Items that are off stay listed so they can be switched back on.
   function buildPlan(d) {
     const cc = D.byCode[d.to].country, umrah = d.umrah;
-    const { out, back, nights, hotel } = chosen(d);
-    const people = d.pax.a + d.pax.c, rooms = Math.max(1, Math.ceil(d.pax.a / 2));
+    const { out, back, nights, hotel, room } = chosen(d);
+    const people = d.pax.a + d.pax.c, rooms = roomsFor(room, d.pax);
     const al = (o) => (lang === "ar" ? D.AIRLINES[o.al].nameAr : D.AIRLINES[o.al].name);
     const items = [];
     if (out) items.push({
@@ -109,7 +120,7 @@
       price: out.total + (back ? back.total : 0),
     });
     if (hotel && !(cc === "SA" && !umrah && D.byCode[d.from].country === "SA" && nights < 1)) {
-      items.push({ k: "stay", icon: "stays", go: "#/stay", title: t("stay")(hotel.stars, hotel.area[lang === "ar" ? 1 : 0], nights), sub: t("rooms")(rooms, paxText(d.pax)), price: hotel.rate * nights * rooms });
+      items.push({ k: "stay", icon: "stays", go: "#/stay", title: `${hotel.stars}★ ${L(hotel.kind)}, ${L(hotel.area)}`, sub: `${lang === "ar" ? room.ar : room.en} · ${t("forStay")(nights, rooms)} · ${hotel.breakfast ? t("bfast") : t("noBfast")}`, price: stayPrice(hotel, room, nights, d.pax) });
     }
     if (D.ESIM[cc]) items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: t("esimSub"), price: D.ESIM[cc] * people });
     const pk = umrah ? 260 : D.PICKUP[d.to];
@@ -120,6 +131,9 @@
     const total = items.reduce((s, it) => s + (it.on ? it.price : 0), 0);
     return { items, total, nights, out, back, hotel };
   }
+  const L = (pair) => pair[lang === "ar" ? 1 : 0];
+  const roomsFor = (room, pax) => (room && room.sleeps >= 4 ? Math.max(1, Math.ceil((pax.a + pax.c) / 4)) : Math.max(1, Math.ceil(pax.a / 2)));
+  const stayPrice = (h, room, nights, pax) => Math.round(h.rate * room.mult * nights * roomsFor(room, pax) / 5) * 5;
   const tripTotal = (f, to, dep, ret, pax) => {
     const o = D.quote(f, to, dep, pax), r = ret && D.quote(to, f, ret, pax); if (!o) return null;
     const rooms = Math.max(1, Math.ceil(pax.a / 2)), n = ret ? nightsOf(dep, ret) : 0;
@@ -265,6 +279,7 @@
     if (r.name === "plan") return viewStudio();
     if (r.name === "flights") return needPlan() && viewFlights(r.a === "back" && draft.ret ? "back" : "out");
     if (r.name === "stay") return needPlan() && viewStay();
+    if (r.name === "hotel") return needPlan() && viewHotel(decodeURIComponent(r.a || ""));
     if (r.name === "travelers") return needPlan() && viewTravelers();
     if (r.name === "pay") return r.a ? viewPay(r.a) : needPlan() && viewPay();
     if (r.name === "trip") return viewTrip(r.a);
@@ -285,7 +300,7 @@
     acct.classList.toggle("is-in", !!user);
     acct.innerHTML = user ? `<i>${esc((user.name || "?")[0])}</i><span>${esc(user.name)}</span>` : esc(t("signIn"));
     $$(".demo button").forEach((b) => b.classList.toggle("on", b.dataset.as === (user ? "back" : "new")));
-    $("#credits").innerHTML = Object.entries(D.DEST).filter(([, x]) => x.src).map(([c, x]) => `<li>${esc(city(c))}: <a href="${x.src}" target="_blank" rel="noopener">${esc(x.credit)}</a></li>`).join("");
+    $("#credits").innerHTML = Object.entries(D.DEST).filter(([, x]) => x.src).map(([c, x]) => `<li>${esc(city(c))}: <a href="${x.src}" target="_blank" rel="noopener">${esc(x.credit)}</a></li>`).join("") + `<li>${esc(D.HOTEL_CREDIT)}</li>`;
   }
   const toolsHtml = () => { const tools = t("tools"); return Object.keys(tools).map((k) => `<button type="button" class="tool" data-tool="${k}">${ico(k)}${esc(tools[k])}</button>`).join(""); };
 
@@ -416,26 +431,115 @@
   }
 
   // ---------- hotels ----------
-  let stFilter = "all";
+  let stSort = "rec", stStars = "all", stF = { breakfast: false, cancel: false, pool: false };
+  const cancelDate = (d) => fmt(addDays(d.dep, -3), { day: "numeric", month: "short" });
+  // One honest line on why this hotel suits this trip: family, walkability, reviews, quiet, or value.
+  function take(h, d, cheapestId) {
+    const c = d.umrah ? (lang === "ar" ? "مكة" : "Makkah") : city(d.to);
+    if (d.pax.c && h.amen.includes("kids")) return t("takeFamily");
+    if (h.rating >= 9) return t("takeTop")(c);
+    if (h.walk <= 7) return t("takeWalk")(h.walk, L(h.landmark));
+    if (h.id === cheapestId) return t("takeValue")(L(h.area));
+    return t("takeQuiet")(L(h.landmark));
+  }
+  const ratingBadge = (h) => `<span class="ht__rate"><b>${h.rating}</b><span>${esc(t("ratingWord")(h.rating))}</span><small>${esc(t("reviews")(h.reviews))}</small></span>`;
+  const amenRow = (h, n = 6) => `<div class="amen">${h.amen.slice(0, n).map((a) => `<span title="${esc(t("amen")[a])}">${ico(a)}<em>${esc(t("amen")[a])}</em></span>`).join("")}</div>`;
+  const gallery = (h, id) => `<div class="gal" data-gal="${id}"><div class="gal__track">${[0, 1, 2, 3].map((i) => `<img src="${D.hotelPhoto(h, i, true)}" alt="" loading="lazy" />`).join("")}</div>
+      <button type="button" class="gal__b gal__prev" aria-label="Previous photo">${ico("back")}</button><button type="button" class="gal__b gal__next" aria-label="Next photo">${ico("back")}</button>
+      <span class="gal__dots">${[0, 1, 2, 3].map((i) => `<i class="${i ? "" : "on"}"></i>`).join("")}</span></div>`;
+  function wireGalleries(root) {
+    $$(".gal", root).forEach((g) => {
+      const tr = $(".gal__track", g), dots = $$(".gal__dots i", g), dir = lang === "ar" ? -1 : 1;
+      const go = (n) => tr.scrollBy({ left: n * dir * tr.clientWidth, behavior: "smooth" });
+      $(".gal__prev", g).addEventListener("click", (e) => { e.stopPropagation(); go(-1); });
+      $(".gal__next", g).addEventListener("click", (e) => { e.stopPropagation(); go(1); });
+      tr.addEventListener("scroll", () => { const i = Math.round(Math.abs(tr.scrollLeft) / tr.clientWidth); dots.forEach((d, k) => d.classList.toggle("on", k === i)); }, { passive: true });
+    });
+  }
   function viewStay() {
-    const d = draft, { hotel: cur, nights } = chosen(d), rooms = Math.max(1, Math.ceil(d.pax.a / 2));
-    const list = D.hotels(d.to).filter((h) => stFilter === "all" || h.stars === +stFilter);
+    const d = draft, { hotel: cur, nights, room } = chosen(d);
+    const all = D.hotels(d.to);
+    const cheapestId = [...all].sort((a, b) => a.rate - b.rate)[0].id;
+    let list = all.filter((h) => (stStars === "all" || h.stars === +stStars) && (!stF.breakfast || h.breakfast) && (!stF.cancel || h.freeCancel) && (!stF.pool || h.amen.includes("pool")));
+    const score = (h) => h.rating * 10 - h.rate / 60 + (d.pax.c && h.family ? 8 : 0) + (h.walk <= 7 ? 3 : 0);
+    list.sort(stSort === "price" ? (a, b) => a.rate - b.rate : stSort === "rating" ? (a, b) => b.rating - a.rating : (a, b) => score(b) - score(a));
     const stayOn = d.items.stay !== false && !d.flightsOnly;
+    const where = d.umrah ? (lang === "ar" ? "مكة" : "Makkah") : city(d.to);
     page(`<div class="wrap pg">
       ${backLink("#/plan")}
-      <h1 class="pg__h">${esc(t("stTitle")(d.umrah ? (lang === "ar" ? "مكة" : "Makkah") : city(d.to)))}</h1>
-      <p class="pg__sub">${esc(t("stSub")(nights, t("rooms")(rooms, paxText(d.pax))))}</p>
-      <div class="bar"><span class="seg2">${["all", "3", "4", "5"].map((k) => `<button type="button" data-st="${k}" class="${stFilter === k ? "on" : ""}">${esc(k === "all" ? t("allStars") : k + "★")}</button>`).join("")}</span><button type="button" class="link" id="noHotel">${esc(t("noHotel"))}</button></div>
-      ${list.map((h) => { const on = stayOn && cur && cur.id === h.id; return `<div class="ht${on ? " on" : ""}">
-        <div><span class="ht__stars">${"★".repeat(h.stars)}</span><b class="ht__t">${esc(h.area[lang === "ar" ? 1 : 0])}</b><span class="ht__r"><b>${h.rating}</b>${esc(t("rating"))}</span>
-        <div class="ht__perks">${h.perks.map((p) => `<span>${esc(p[lang === "ar" ? 1 : 0])}</span>`).join("")}</div></div>
-        <div class="ht__pr"><div><small>${esc(t("stSub")(nights, "").split(" · ")[0])}</small><b>${esc(money(h.rate * nights * rooms))}</b></div><button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-ht="${h.id}">${esc(on ? t("selected") : t("select"))}</button></div>
-      </div>`; }).join("")}
-      <p class="note-s">${esc(t("sample"))}</p>
+      <h1 class="pg__h">${esc(t("stTitle")(where))}</h1>
+      <p class="pg__sub">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))}</p>
+      <div class="bar ht-bar">
+        <div class="bar__r">
+          <span class="seg2">${["all", "3", "4", "5"].map((k) => `<button type="button" data-st="${k}" class="${stStars === k ? "on" : ""}">${esc(k === "all" ? t("allStars") : k + "★")}</button>`).join("")}</span>
+          ${[["breakfast", "fBreakfast"], ["cancel", "fCancel"], ["pool", "fPool"]].map(([k, w]) => `<button type="button" class="fchip${stF[k] ? " on" : ""}" data-f="${k}">${esc(t(w))}</button>`).join("")}
+        </div>
+        <div class="bar__r"><span class="seg2">${Object.keys(t("stSort")).map((k) => `<button type="button" data-sort="${k}" class="${stSort === k ? "on" : ""}">${esc(t("stSort")[k])}</button>`).join("")}</span></div>
+      </div>
+      ${list.map((h) => {
+        const on = stayOn && cur && cur.id === h.id, r0 = h.rooms[d.pax.c && d.pax.a >= 2 ? 2 : 0], price = stayPrice(h, on ? room : r0, nights, d.pax), rooms = roomsFor(on ? room : r0, d.pax);
+        return `<article class="ht${on ? " on" : ""}">
+          ${gallery(h, h.id)}
+          <a class="ht__body" href="#/hotel/${encodeURIComponent(h.id)}">
+            <span class="ht__top"><span class="ht__stars">${"★".repeat(h.stars)}</span>${on ? `<span class="ht__in">${esc(t("inPlan"))}</span>` : ""}</span>
+            <b class="ht__t">${esc(L(h.kind))}, ${esc(L(h.area))}</b>
+            <span class="ht__loc">${ico("pin")}${esc(t("walk")(h.walk, L(h.landmark)))}</span>
+            ${ratingBadge(h)}
+            <p class="ht__take"><span>${SUN}</span>${esc(take(h, d, cheapestId))}</p>
+            <span class="ht__perks"><span class="${h.breakfast ? "" : "no"}">${esc(h.breakfast ? t("bfast") : t("noBfast"))}</span><span class="${h.freeCancel ? "" : "no"}">${esc(h.freeCancel ? t("cancelBy")(cancelDate(d)) : t("nonRef"))}</span></span>
+            ${amenRow(h, 5)}
+          </a>
+          <div class="ht__pr">
+            <small>${esc(t("forStay")(nights, rooms))}</small>
+            <b>${esc(money(price))}</b>
+            <span class="ht__night">${esc(t("perNight")(money(price / nights / rooms)))}</span>
+            <button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-ht="${h.id}">${esc(on ? t("selected") : t("select"))}</button>
+            <a class="link ht__more" href="#/hotel/${encodeURIComponent(h.id)}">${esc(t("viewHotel"))} →</a>
+          </div>
+        </article>`; }).join("") || `<p class="empty">${esc(t("noFlights").split(".")[0])}.</p>`}
+      <div class="bar"><button type="button" class="link" id="noHotel">${esc(t("noHotel"))}</button><p class="note-s" style="margin:0">${esc(t("sample"))}</p></div>
     </div>`);
-    $$("[data-ht]").forEach((b) => b.addEventListener("click", () => { const h = D.hotels(d.to).find((x) => x.id === b.dataset.ht); d.hotelId = h.id; d.tier = h.tier; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
-    $$("[data-st]").forEach((b) => b.addEventListener("click", () => { stFilter = b.dataset.st; viewStay(); }));
+    wireGalleries($("#page"));
+    $$("[data-ht]").forEach((b) => b.addEventListener("click", () => { const h = all.find((x) => x.id === b.dataset.ht); d.hotelId = h.id; d.tier = h.tier; d.roomId = null; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
+    $$("[data-st]").forEach((b) => b.addEventListener("click", () => { stStars = b.dataset.st; viewStay(); }));
+    $$("[data-f]").forEach((b) => b.addEventListener("click", () => { stF[b.dataset.f] = !stF[b.dataset.f]; viewStay(); }));
+    $$(".ht-bar [data-sort]").forEach((b) => b.addEventListener("click", () => { stSort = b.dataset.sort; viewStay(); }));
     $("#noHotel").addEventListener("click", () => { d.items.stay = false; saveDraft(); location.hash = "#/plan"; });
+  }
+
+  function viewHotel(id) {
+    const d = draft, all = D.hotels(d.to), h = all.find((x) => x.id === id);
+    if (!h) return location.replace("#/stay");
+    const { hotel: cur, room: curRoom, nights } = chosen(d);
+    const inPlan = d.items.stay !== false && !d.flightsOnly && cur && cur.id === h.id;
+    const cheapestId = [...all].sort((a, b) => a.rate - b.rate)[0].id;
+    page(`<div class="wrap pg">
+      ${backLink("#/stay")}
+      <div class="hd-gal">${[0, 1, 2, 3].map((i) => `<img src="${D.hotelPhoto(h, i, i > 0)}" alt="" ${i ? 'loading="lazy"' : ""} />`).join("")}<span class="hd-gal__n">${esc(t("photosN")(4))}</span></div>
+      <div class="pg__grid">
+        <div>
+          <span class="ht__stars">${"★".repeat(h.stars)}</span>
+          <h1 class="pg__h" style="margin-top:6px">${esc(L(h.kind))}, ${esc(L(h.area))}</h1>
+          <p class="ht__loc" style="margin-top:10px">${ico("pin")}${esc(t("walk")(h.walk, L(h.landmark)))}</p>
+          ${ratingBadge(h)}
+          <div class="box hd-take"><span class="say__mark">${SUN}</span><div><b>${esc(t("takeL"))}</b><p>${esc(take(h, d, cheapestId))}</p></div></div>
+          <h2 class="hd-h">${esc(t("roomsH"))}</h2>
+          ${h.rooms.map((r) => { const on = inPlan && curRoom && curRoom.id === r.id, n = roomsFor(r, d.pax), price = stayPrice(h, r, nights, d.pax); return `<div class="room${on ? " on" : ""}">
+            <img src="${D.hotelPhoto(h, 1, true)}" alt="" loading="lazy" />
+            <div class="room__t"><b>${esc(lang === "ar" ? r.ar : r.en)}</b>
+              <span>${esc(t("m2")(r.size))} · ${esc(lang === "ar" ? r.bedAr : r.bedEn)} · ${esc(t("sleeps")(r.sleeps))}</span>
+              <span class="ht__perks"><span class="${h.breakfast ? "" : "no"}">${esc(h.breakfast ? t("bfast") : t("noBfast"))}</span><span class="${h.freeCancel ? "" : "no"}">${esc(h.freeCancel ? t("cancelBy")(cancelDate(d)) : t("nonRef"))}</span></span></div>
+            <div class="room__pr"><small>${esc(t("forStay")(nights, n))}</small><b>${esc(money(price))}</b><button type="button" class="btn btn--sm ${on ? "btn--plain" : "btn--main"}" data-room="${r.id}">${esc(on ? t("chosenRoom") : t("selectRoom"))}</button></div>
+          </div>`; }).join("")}
+          <h2 class="hd-h">${esc(t("amenH"))}</h2>
+          <div class="amen amen--full">${h.amen.map((a) => `<span>${ico(a)}<em>${esc(t("amen")[a])}</em></span>`).join("")}</div>
+          <h2 class="hd-h">${esc(t("policyH"))}</h2>
+          <ul class="pol"><li>${esc(t("checkin"))}</li><li>${esc(t("checkout"))}</li><li>${esc(h.freeCancel ? t("cancelBy")(cancelDate(d)) : t("nonRef"))}</li><li>${esc(t("idNote"))}</li></ul>
+          <p class="note-s">${esc(t("photosNote"))}</p>
+        </div>
+        <aside class="pg__side">${sumCard(d)}</aside>
+      </div></div>`);
+    $$("[data-room]").forEach((b) => b.addEventListener("click", () => { d.hotelId = h.id; d.tier = h.tier; d.roomId = b.dataset.room; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; }));
   }
 
   // ---------- checkout: travelers ----------

@@ -243,30 +243,49 @@
   }
 
   // Sample hotels: two per star level, described rather than named until the hotel supplier is connected.
+  // Each area carries the landmark people judge location by. Photos are sample sets (assets/img/hotels).
   const HOTEL_AREAS = {
-    DXB: [["Downtown", "داون تاون"], ["Dubai Marina", "دبي مارينا"], ["Jumeirah Beach", "شاطئ جميرا"]],
-    IST: [["Sultanahmet", "السلطان أحمد"], ["Taksim", "تقسيم"], ["Bosphorus, Beşiktaş", "البوسفور، بشكتاش"]],
-    ULH: [["Old Town", "البلدة القديمة"], ["Ashar Valley", "وادي عشار"], ["Hegra road", "طريق الحجر"]],
-    CAI: [["Zamalek", "الزمالك"], ["Giza, pyramids view", "الجيزة، إطلالة الأهرامات"], ["Nile Corniche", "كورنيش النيل"]],
-    MLE: [["North Malé Atoll", "أتول ماليه الشمالي"], ["South Ari Atoll", "أتول آري الجنوبي"], ["Baa Atoll", "أتول با"]],
-    LHR: [["Mayfair", "مايفير"], ["Kensington", "كنسينغتون"], ["South Bank", "ساوث بانك"]],
-    KUL: [["KLCC", "وسط المدينة"], ["Bukit Bintang", "بوكيت بينتانغ"], ["Bangsar", "بانغسار"]],
-    GVA: [["Lakefront", "على البحيرة"], ["Old Town", "البلدة القديمة"], ["Pâquis", "باكي"]],
-    JED: [["Makkah, near the Haram", "مكة، قرب الحرم"], ["Makkah, Ajyad", "مكة، أجياد"], ["Makkah, Aziziyah", "مكة، العزيزية"]],
+    DXB: [["Downtown", "داون تاون", "Dubai Mall", "دبي مول"], ["Dubai Marina", "دبي مارينا", "Marina Walk", "ممشى المارينا"], ["Jumeirah Beach", "شاطئ جميرا", "the beach", "الشاطئ"]],
+    IST: [["Sultanahmet", "السلطان أحمد", "Hagia Sophia", "آيا صوفيا"], ["Taksim", "تقسيم", "Istiklal Street", "شارع الاستقلال"], ["Beşiktaş, on the Bosphorus", "بشكتاش على البوسفور", "the ferry pier", "رصيف العبّارات"]],
+    ULH: [["Old Town", "البلدة القديمة", "AlUla Old Town", "البلدة القديمة"], ["Ashar Valley", "وادي عشار", "Maraya", "مرايا"], ["Hegra road", "طريق الحجر", "Hegra", "الحجر"]],
+    CAI: [["Zamalek", "الزمالك", "the Nile", "النيل"], ["Giza", "الجيزة", "the Pyramids", "الأهرامات"], ["Garden City", "جاردن سيتي", "Tahrir Square", "ميدان التحرير"]],
+    MLE: [["North Malé Atoll", "أتول ماليه الشمالي", "the airport, by speedboat", "المطار بالقارب"], ["South Ari Atoll", "أتول آري الجنوبي", "the house reef", "الشعاب المرجانية"], ["Baa Atoll", "أتول با", "Hanifaru Bay", "خليج هانيفارو"]],
+    LHR: [["Mayfair", "مايفير", "Oxford Street", "شارع أكسفورد"], ["Kensington", "كنسينغتون", "Hyde Park", "هايد بارك"], ["South Bank", "ساوث بانك", "the London Eye", "عين لندن"]],
+    KUL: [["KLCC", "وسط المدينة", "Petronas Towers", "برجي بتروناس"], ["Bukit Bintang", "بوكيت بينتانغ", "Pavilion mall", "مول بافيليون"], ["Bangsar", "بانغسار", "Bangsar Village", "بانغسار فيليج"]],
+    GVA: [["Lakefront", "على البحيرة", "the Jet d'Eau", "نافورة جنيف"], ["Old Town", "البلدة القديمة", "St. Pierre Cathedral", "كاتدرائية القديس بطرس"], ["Pâquis", "باكي", "Cornavin station", "محطة كورنافان"]],
+    JED: [["Makkah, near the Haram", "مكة، قرب الحرم", "the Haram", "الحرم"], ["Makkah, Ajyad", "مكة، أجياد", "the Haram", "الحرم"], ["Makkah, Aziziyah", "مكة، العزيزية", "the Haram, by shuttle", "الحرم بالحافلة"]],
   };
-  const PERKS = [["Breakfast included", "الإفطار مشمول"], ["Free cancellation until 3 days before", "إلغاء مجاني حتى ٣ أيام قبل الوصول"], ["Family rooms", "غرف عائلية"], ["Pool", "مسبح"], ["Airport shuttle", "نقل من المطار"], ["Prayer room nearby", "مصلى قريب"]];
+  const KINDS = [[["City hotel", "فندق المدينة"], ["Boutique hotel", "فندق بوتيك"]], [["Garden hotel", "فندق الحديقة"], ["Hotel and residences", "فندق وشقق فندقية"]], [["Grand hotel", "الفندق الكبير"], ["Resort and spa", "منتجع وسبا"]]];
+  const AMENITIES = ["wifi", "pool", "gym", "spa", "parking", "prayer", "halal", "kids", "shuttle"];
+  const ROOMS = [
+    { id: "std", en: "Standard room", ar: "غرفة قياسية", size: 24, bedEn: "1 king or 2 single beds", bedAr: "سرير كبير أو سريران", sleeps: 2, mult: 1 },
+    { id: "dlx", en: "Deluxe room with a view", ar: "غرفة ديلوكس بإطلالة", size: 32, bedEn: "1 king bed", bedAr: "سرير كبير", sleeps: 2, mult: 1.28 },
+    { id: "fam", en: "Family suite", ar: "جناح عائلي", size: 58, bedEn: "1 king and 2 single beds", bedAr: "سرير كبير وسريران", sleeps: 4, mult: 1.85 },
+  ];
   function hotels(code) {
-    const areas = HOTEL_AREAS[code] || [["City centre", "وسط المدينة"], ["Old town", "البلدة القديمة"], ["Waterfront", "الواجهة"]];
+    const areas = HOTEL_AREAS[code] || [["City centre", "وسط المدينة", "the centre", "المركز"], ["Old town", "البلدة القديمة", "the old town", "البلدة القديمة"], ["Waterfront", "الواجهة", "the water", "الماء"]];
     const rates = STAY[code] || [250, 450, 950];
     const out = [];
     for (let tier = 0; tier < 3; tier++) for (let k = 0; k < 2; k++) {
       const r = rng(hash(code + tier + k));
       const area = areas[(tier + k) % areas.length];
-      const perks = PERKS.filter((_, i) => r() > 0.45 || i === (tier + k) % PERKS.length).slice(0, 3);
-      out.push({ id: `${code}-${tier}${k}`, tier, stars: tier + 3, area, rating: (7.8 + tier * 0.5 + r() * 0.6).toFixed(1), perks, rate: Math.round(rates[tier] * (0.9 + r() * 0.25) / 5) * 5 });
+      const breakfast = tier > 0 || r() > 0.5, freeCancel = r() > 0.3;
+      const amen = AMENITIES.filter((a, i) => i === 0 || (a === "pool" && tier > 0) || (a === "spa" && tier === 2) || (a === "prayer") || r() > 0.5);
+      const walk = 3 + Math.floor(r() * 14);
+      const rating = +(7.8 + tier * 0.5 + r() * 0.6).toFixed(1);
+      out.push({
+        id: `${code}-${tier}${k}`, tier, stars: tier + 3, photos: tier * 2 + k,
+        kind: KINDS[tier][k], area, landmark: [area[2], area[3]], walk,
+        rating, reviews: 180 + Math.floor(r() * 2400), breakfast, freeCancel, amen,
+        rate: Math.round(rates[tier] * (0.9 + r() * 0.25) / 5) * 5,
+        rooms: ROOMS.map((x) => ({ ...x, size: x.size + tier * 8 })),
+        family: amen.includes("kids") || k === 1, quiet: walk > 9,
+      });
     }
     return out;
   }
+  const hotelPhoto = (h, i = 0, small) => `/assets/img/hotels/h${h.photos}-${i}${small ? "-s" : ""}.jpg`;
+  const HOTEL_CREDIT = "Sample photos: Basile Morin, PPR 19, Johann Jaritz, Bernard Gagnon (CC BY-SA 4.0, Wikimedia Commons)";
 
-  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, options, hotels, holdUntil, hm, priceContext, km, iso };
+  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, options, hotels, hotelPhoto, HOTEL_CREDIT, holdUntil, hm, priceContext, km, iso };
 })();
