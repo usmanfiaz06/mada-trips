@@ -53,6 +53,10 @@ const config: NextConfig = {
   },
   async rewrites() {
     return {
+      // travel.madatrips.sa is the booking site: its home is /book (book.html), on the same origin as /api/app/v1.
+      beforeFiles: [
+        { source: "/", has: [{ type: "host", value: "travel\\..+" }], destination: "/book.html" },
+      ],
       // After real files and app routes. "/" is served from site-home.html, a copy of index.html:
       // Vercel won't rewrite to a file named index.html. /about → about.html, and so on.
       fallback: [
