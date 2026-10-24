@@ -198,5 +198,75 @@
     return { q, rank, cheaper };
   }
 
-  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, priceContext, km, iso };
+  // Every bookable flight for a day, with the price already including a checked bag (low-cost fares add one),
+  // so the number on each option is the number paid. Two departures a day for nonstop carriers, one for connections.
+  const BAG_FEE = 90;
+  function options(from, to, dateIso, pax) {
+    if (!byCode[from] || !byCode[to] || from === to) return [];
+    const { dist, list } = carriers(from, to);
+    const people = pax.a + pax.c;
+    const fly = Math.round(dist / 820 * 60 + 35);
+    const out = [];
+    for (const c of list) {
+      const slots = c.direct ? 2 : 1;
+      for (let k = 0; k < slots; k++) {
+        const r = rng(hash(from + to + dateIso + c.al + k));
+        const dep = (k === 0 ? 6 * 60 : 15 * 60) + Math.floor(r() * 30) * 15;
+        const lay = c.direct ? 0 : 70 + Math.floor(r() * 8) * 15;
+        const minutes = fly + (c.direct ? 0 : lay + 25);
+        const base = fare(from, to, c.al, dateIso, c.direct) * (k === 0 ? 1 : 0.93 + r() * 0.14);
+        const bagAdded = AIRLINES[c.al].bag === 0;
+        const total = Math.round((paxTotal(base, pax) + (bagAdded ? BAG_FEE * people : 0)) / 5) * 5;
+        const arrAbs = dep + minutes + Math.round((byCode[to].tz - byCode[from].tz) * 60);
+        out.push({
+          id: `${c.al}${k}`, al: c.al, no: `${c.al} ${100 + (hash(from + to + c.al + k) % 800)}`, direct: c.direct, via: c.via, lay,
+          minutes, dep, arr: ((arrAbs % 1440) + 1440) % 1440, plusDay: Math.floor(arrAbs / 1440), total, bagAdded,
+          bag: bagAdded ? 23 : AIRLINES[c.al].bag, change: AIRLINES[c.al].tier >= 1, hold: AIRLINES[c.al].tier >= 0.9,
+        });
+      }
+    }
+    // "Best" weighs price against time and stops, the way people actually choose.
+    for (const o of out) o.score = o.total / Math.max(1, people) + o.minutes * 1.4 + (o.direct ? 0 : 160);
+    return out;
+  }
+  const hm = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+  // How long an unpaid booking can be held. Airlines set this per fare; the preview uses a rule of thumb
+  // (full-service carriers, not inside 3 days of departure). The live version reads the PNR's ticketing limit.
+  function holdUntil(opt, dateIso) {
+    if (!opt || !opt.hold) return null;
+    const dep = new Date(dateIso + "T12:00:00");
+    if ((dep - new Date()) / 864e5 < 3) return null;
+    const until = new Date(Date.now() + 24 * 3600e3);
+    until.setMinutes(Math.floor(until.getMinutes() / 5) * 5, 0, 0);
+    return until.toISOString();
+  }
+
+  // Sample hotels: two per star level, described rather than named until the hotel supplier is connected.
+  const HOTEL_AREAS = {
+    DXB: [["Downtown", "داون تاون"], ["Dubai Marina", "دبي مارينا"], ["Jumeirah Beach", "شاطئ جميرا"]],
+    IST: [["Sultanahmet", "السلطان أحمد"], ["Taksim", "تقسيم"], ["Bosphorus, Beşiktaş", "البوسفور، بشكتاش"]],
+    ULH: [["Old Town", "البلدة القديمة"], ["Ashar Valley", "وادي عشار"], ["Hegra road", "طريق الحجر"]],
+    CAI: [["Zamalek", "الزمالك"], ["Giza, pyramids view", "الجيزة، إطلالة الأهرامات"], ["Nile Corniche", "كورنيش النيل"]],
+    MLE: [["North Malé Atoll", "أتول ماليه الشمالي"], ["South Ari Atoll", "أتول آري الجنوبي"], ["Baa Atoll", "أتول با"]],
+    LHR: [["Mayfair", "مايفير"], ["Kensington", "كنسينغتون"], ["South Bank", "ساوث بانك"]],
+    KUL: [["KLCC", "وسط المدينة"], ["Bukit Bintang", "بوكيت بينتانغ"], ["Bangsar", "بانغسار"]],
+    GVA: [["Lakefront", "على البحيرة"], ["Old Town", "البلدة القديمة"], ["Pâquis", "باكي"]],
+    JED: [["Makkah, near the Haram", "مكة، قرب الحرم"], ["Makkah, Ajyad", "مكة، أجياد"], ["Makkah, Aziziyah", "مكة، العزيزية"]],
+  };
+  const PERKS = [["Breakfast included", "الإفطار مشمول"], ["Free cancellation until 3 days before", "إلغاء مجاني حتى ٣ أيام قبل الوصول"], ["Family rooms", "غرف عائلية"], ["Pool", "مسبح"], ["Airport shuttle", "نقل من المطار"], ["Prayer room nearby", "مصلى قريب"]];
+  function hotels(code) {
+    const areas = HOTEL_AREAS[code] || [["City centre", "وسط المدينة"], ["Old town", "البلدة القديمة"], ["Waterfront", "الواجهة"]];
+    const rates = STAY[code] || [250, 450, 950];
+    const out = [];
+    for (let tier = 0; tier < 3; tier++) for (let k = 0; k < 2; k++) {
+      const r = rng(hash(code + tier + k));
+      const area = areas[(tier + k) % areas.length];
+      const perks = PERKS.filter((_, i) => r() > 0.45 || i === (tier + k) % PERKS.length).slice(0, 3);
+      out.push({ id: `${code}-${tier}${k}`, tier, stars: tier + 3, area, rating: (7.8 + tier * 0.5 + r() * 0.6).toFixed(1), perks, rate: Math.round(rates[tier] * (0.9 + r() * 0.25) / 5) * 5 });
+    }
+    return out;
+  }
+
+  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, options, hotels, holdUntil, hm, priceContext, km, iso };
 })();

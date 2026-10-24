@@ -110,3 +110,22 @@ topic by copying an existing block. Test in the browser console with `MadaConcie
 - Photography: [Unsplash](https://unsplash.com) (Unsplash License).
 - Videos: [Mixkit](https://mixkit.co) (Mixkit free license): dunes, festival stage, fireworks.
 - Fonts: Inter Tight, Instrument Serif, JetBrains Mono, Reem Kufi and Mrs Saint Delafield, from Google Fonts.
+
+## Booking platform (/book)
+
+`book.html` is the customer booking app: one page, hash routes so Back always works. Not linked from the site yet and marked `noindex` while it's a preview.
+
+| Route | What it is |
+|---|---|
+| `#/` | Home: ask Mada, your trips (returning travelers), destination ideas, the promises |
+| `#/plan` | Studio: chat on the left, the live plan on the right (tabs on phones) |
+| `#/flights/out`, `#/flights/back` | Choose flights: Best / Cheapest / Fastest, then the full list |
+| `#/stay` | Choose the hotel, or none |
+| `#/travelers` | Names as on passports, contact, seat together |
+| `#/pay`, `#/pay/REF` | Review and pay (Apple Pay, mada, card, Tabby, Tamara), or hold seats when the airline allows; pay later for a held trip |
+| `#/trip/REF` | Booked or held trip: status, what happens next, calendar file, advisor on WhatsApp |
+| `#/trips`, `#/signin`, `#/account` | Trips list, phone-code sign in, profile and saved travelers |
+
+Files: `js/book-data.js` (airports, fares, flights, hotels, hold rule), `js/book-parse.js` (reads a sentence in English or Arabic), `js/book-i18n.js` (all words), `js/book.js` (the app), `css/book.css`.
+
+In this preview the assistant, fares, hotels, holds and payments are simulated in the browser and saved in `localStorage`; no payment is taken. The footer's "Preview as" switch shows a first-time visitor or a returning traveler. To go live: an assistant service (LLM with tools for fares, hotels, eSIMs, visas), a fare/hotel supplier, a payment gateway, and server-side accounts and trips.
