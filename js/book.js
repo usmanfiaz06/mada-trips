@@ -29,7 +29,7 @@
   const params = new URLSearchParams(location.search);
 
   // ---------- language + formatting ----------
-  let lang = params.get("lang") || store.get("lang") || "en";
+  let lang = params.get("lang") || store.get("lang") || (/^ar\b/i.test(navigator.language || "") ? "ar" : "en");
   const t = (k) => W[lang][k];
   const nf = new Intl.NumberFormat("en-US");
   const money = (n) => (lang === "ar" ? `${nf.format(Math.round(n))} ر.س` : `SAR ${nf.format(Math.round(n))}`);
@@ -236,7 +236,7 @@
     else items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t("liveByHand"), price: null, info: true });
     if (stay) {
       const f = stay.facts || {};
-      items.push({ k: "stay", icon: "stays", go: "#/stay", title: stay.name, sub: [f.stars ? `${f.stars}★` : "", stay.roomsLabel, f.board && BOARD[f.board] ? L(BOARD[f.board]) : "", stay.freeCancelUntil ? t("cancelBy")(fmt(stay.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef")].filter(Boolean).join(" · "), price: sar(stay.total) });
+      items.push({ k: "stay", icon: "stays", go: "#/stay", title: stay.name, sub: [f.stars ? `${f.stars}★` : "", stay.roomsLabel, f.board && BOARD[f.board] ? L(BOARD[f.board]) : "", stay.freeCancelUntil ? t("cancelBy")(fmt(stay.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"), f.payAtHotel ? t("uxAtHotel")(money(f.payAtHotel / 100)) : ""].filter(Boolean).join(" · "), price: sar(stay.total) });
     } else if (!d.flightsOnly) items.push({ k: "stay", icon: "stays", title: lang === "ar" ? "الفندق" : "Hotel", sub: t(lv.err.stays ? "liveStaysDown" : "liveStaysNone"), price: null, info: true });
     if (cc !== "SA") {
       if (esim) items.push({ k: "esim", icon: "esim", title: t("esimLive")(esim.coverage.name, esim.gb, esim.days), sub: `${esim.operator || ""}${esim.operator ? " · " : ""}${t("esimSub")}`, price: sar(esim.price) * people });
@@ -1000,7 +1000,7 @@
         <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
         <div class="lfo__legs"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div>${o.back ? `<div><small>${esc(day(o.back.date))}</small>${leg(o.back)}</div>` : ""}</div>
         <p class="lfo__why">${esc(o.reason)}</p>
-        <ul class="lfo__rules"><li>${esc(o.stop || t("direct"))}</li><li>${esc(o.bags)}</li><li>${esc(o.changeRule)}</li><li>${esc(o.refundRule)}</li></ul>
+        <ul class="lfo__rules"><li><small>${esc(t("uxStops"))}</small>${esc(o.stop || t("direct"))}</li><li><small>${esc(t("uxBags"))}</small>${esc(o.bags)}</li><li><small>${esc(t("uxChange"))}</small>${esc(o.changeRule)}</li><li class="${o.refundable ? "" : "warn"}"><small>${esc(t("uxRefund"))}</small>${esc(o.refundRule)}</li></ul>
         <div class="lfo__pr"><div><b>${esc(money(sar(o.total)))}</b><small>${esc(t("totalFor")(paxText(d.pax)))}</small></div>
           <button type="button" class="btn ${on ? "btn--plain" : "btn--main"}" data-lf="${o.id}">${esc(on ? t("selected") : t("select"))}</button></div>
       </article>`; }).join("")}</div>
@@ -1224,7 +1224,10 @@
     const rooms = roomsR.length ? roomsR : [o];
     const imgs = (h && h.images && h.images.length ? h.images : [o.hotel.imageUrl]).filter(Boolean);
     const fa = o.facts || {}, nights = d.ret ? nightsOf(d.dep, d.ret) : 3;
-    if (!hdPick || !rooms.some((r) => r.id === hdPick)) hdPick = (rooms.find((r) => r.id === d.live.stayId) || rooms[0]).id;
+    // The room picked for you fits the party: non-smoking, and beds for everyone (a single bed never for two), cheapest of those.
+    const adults = d.pax.a, fitPenalty = (r) => { const rf = roomFacts((r.hotel && r.hotel.room) || (r.facts || {}).room || r.name), beds = rf.beds.reduce((n, [c, k]) => n + c * (["king", "queen", "double"].includes(k) ? 2 : 1), 0); return (rf.smoke === "yes" ? 1e7 : 0) + (beds && beds < Math.min(adults, 2) ? 1e7 : 0); };
+    const bestFit = rooms.slice().sort((a, b) => fitPenalty(a) + a.total.amount - (fitPenalty(b) + b.total.amount))[0];
+    if (!hdPick || !rooms.some((r) => r.id === hdPick)) { const cur = rooms.find((r) => r.id === d.live.stayId); hdPick = (cur && !fitPenalty(cur) ? cur : bestFit).id; }
     // Rooms that differ only by board, refund or smoking are one room with choices under it.
     const groups = [];
     for (const r of rooms) {
@@ -1235,7 +1238,8 @@
       g.opts.push({ r, rf });
     }
     groups.forEach((g) => g.opts.sort((a, b) => a.r.total.amount - b.r.total.amount));
-    groups.sort((a, b) => a.opts[0].r.total.amount - b.opts[0].r.total.amount);
+    groups.forEach((g) => g.opts.sort((a, b) => fitPenalty(a.r) + a.r.total.amount - (fitPenalty(b.r) + b.r.total.amount)));
+    groups.sort((a, b) => fitPenalty(a.opts[0].r) + a.opts[0].r.total.amount - (fitPenalty(b.opts[0].r) + b.opts[0].r.total.amount));
     const cheapest = Math.min(...rooms.map((r) => r.total.amount));
     const facs = rankFacilities(h && h.facilities);
     const amen = (fa.amenities || []).filter((k) => AMEN_ICON[k]);
@@ -1245,9 +1249,9 @@
     const optRow = ({ r, rf }, g) => {
       const f = r.facts || {}, on = r.id === hdPick, extra = r.total.amount - g.opts[0].r.total.amount;
       const bits = [f.board && BOARD[f.board] ? L(BOARD[f.board]) : t("noBfast"), r.freeCancelUntil ? t("cancelBy")(fmt(r.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef")];
-      if (rf.smoke === "yes") bits.push(t("smoking")); else if (rf.smoke === "no") bits.push(t("nonSmoking"));
+      if (rf.smoke === "no") bits.push(t("nonSmoking"));
       return `<label class="ro${on ? " on" : ""}"><input type="radio" name="room" value="${r.id}" ${on ? "checked" : ""} />
-        <span class="ro__w"><span class="ro__b">${["BB", "HB", "FB", "AI"].includes(f.board) ? ico("cup") : ""}${esc(bits[0])}</span><small>${bits.slice(1).map(esc).join(" · ")}</small></span>
+        <span class="ro__w"><span class="ro__b">${["BB", "HB", "FB", "AI"].includes(f.board) ? ico("cup") : ""}${esc(bits[0])}</span><small>${bits.slice(1).map(esc).join(" · ")}${rf.smoke === "yes" ? ` · <em class="smk">${esc(t("smoking"))}</em>` : ""}</small></span>
         <span class="ro__p"><b>${esc(money(sar(r.total)))}</b><small>${extra > 0 ? esc(t("plusAmt")(money(extra / 100))) : esc(t("perNightAmt")(money(Math.round(sar(r.total) / nights))))}</small></span></label>`;
     };
     page(`<div class="wrap pg hd">
@@ -1262,7 +1266,7 @@
 
         <h2 class="hd-h" id="roomsH">${esc(t("roomsH"))}<small>${esc(t("roomsFor")(nights, paxText(d.pax)))}</small></h2>
         <div class="rgs" id="rooms">${groups.slice(0, 10).map((g, gi) => `<section class="rg">
-          <div class="rg__h"><b>${esc(roomName(g.rf.base))}</b>${gi === 0 && groups.length > 1 && g.opts[0].r.total.amount === cheapest ? `<span class="tagg">${esc(t("lowestHere"))}</span>` : ""}</div>
+          <div class="rg__h"><b>${esc(roomName(g.rf.base))}${g.rf.beds.length ? ` · ${esc(bedText(g.rf.beds))}` : ""}</b>${gi === 0 && groups.length > 1 && g.opts[0].r.total.amount === cheapest ? `<span class="tagg">${esc(t("lowestHere"))}</span>` : ""}</div>
           <ul class="rg__f">${g.rf.bedrooms ? `<li>${ico("stays")}${esc(t("bedroomsN")(g.rf.bedrooms))}</li>` : ""}${g.rf.beds.length ? `<li>${ico("bed")}${esc(bedText(g.rf.beds))}</li>` : ""}${g.rf.view ? `<li>${ico("view")}${esc(viewText(g.rf.view))}</li>` : ""}${g.rf.access ? `<li>${ico("access")}${esc(t("accessibleRoom"))}</li>` : ""}<li>${ico("ppl")}${esc(g.opts[0].r.roomsLabel)}</li></ul>
           <div class="rg__o">${g.opts.slice(0, 4).map((x) => optRow(x, g)).join("")}</div>
         </section>`).join("")}</div>
@@ -1283,7 +1287,7 @@
         <div class="choose__p"><b>${esc(money(sar(r.total)))}</b><button type="button" class="btn btn--main" id="chooseGo">${esc(same ? t("keepRoom") : t("selectRoom"))}</button></div></div>`;
       $("#chooseGo").addEventListener("click", () => { d.live.stayId = r.id; d.live.stayPick = r; d.items.stay = true; d.flightsOnly = false; saveDraft(); location.hash = "#/plan"; });
     };
-    bar();
+    bar(); placeFab();
     $("#rooms").addEventListener("change", (e) => { hdPick = e.target.value; $$("#rooms .ro").forEach((l) => l.classList.toggle("on", $("input", l).checked)); bar(); });
     $("#moreDesc")?.addEventListener("click", () => { $("#allDesc").hidden = false; $("#moreDesc").closest("p").hidden = true; });
     // Every photo, one at a time, with the arrows and the keyboard.
@@ -1360,7 +1364,7 @@
     let people = [];
     try { people = (await A.people()).people; } catch (e) { if (e.status === 401) { await A.signOut(); return location.replace("#/signin?next=travelers"); } return page(errBox(e.message, true)); }
     if (route().name !== "travelers") return;
-    const ks = kinds(d.pax), self = people.find((p) => p.isSelf), others = people.filter((p) => !p.isSelf);
+    const ks = kinds(d.pax), self = people.find((p) => p.isSelf), seen = new Set(), others = people.filter((p) => { const k = `${p.givenNames || p.firstName} ${p.surname}`.toUpperCase(); if (p.isSelf || seen.has(k)) return false; seen.add(k); return true; });
     co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k) return prev; return i === 0 && k === "a" && self ? { k, personId: self.id, first: self.givenNames || (user && user.name) || "", last: self.surname || "", dob: "" } : { k, personId: null, first: "", last: "", dob: "" }; });
     co.contact = co.contact || { phone: (A.user && A.user.phone || "").replace(/^\+966/, ""), email: (A.user && A.user.email) || "" };
     const label = { a: t("tAdult"), c: t("tChild"), i: t("tInfant") };
@@ -1383,7 +1387,7 @@
         <button type="submit" class="primary">${esc(t("toPay"))}</button>
       </form><aside class="pg__side">${sumCard(d)}${helpLine(helpContextFor("travelers", d))}</aside></div></div>`);
     const form = $("#trvForm");
-    const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? `${(x.last || "").toUpperCase()}/${(x.first || "").toUpperCase()}` : ""; };
+    const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? t("uxOnTicket")(`${(x.first || "").toUpperCase()} ${(x.last || "").toUpperCase()}`.trim()) : ""; };
     co.lt.forEach((_, i) => tag(i));
     form.addEventListener("input", (e) => {
       const row = e.target.closest(".trv");
@@ -1507,12 +1511,13 @@
         </div>
         <div class="cardf"><label class="fld full" id="fCard"><span>${esc(t("cardNo"))}</span><input name="cno" inputmode="numeric" autocomplete="cc-number" placeholder="0000 0000 0000 0000" /><em>${esc(t("errCard"))}</em></label><label class="fld"><span>${esc(t("exp"))}</span><input name="cexp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" /></label><label class="fld"><span>${esc(t("cvc"))}</span><input name="ccvc" inputmode="numeric" autocomplete="cc-csc" placeholder="123" /></label></div>
         ${holds ? `<p class="hold-line" id="holdLine"></p>` : ""}
+        ${pv.length > 1 ? `<p class="note-s twocodes">${ico("shield")}${esc(t("uxTwoCodes")(pv.map((p) => `${money(sar(p.total))} ${t("payFor")(p.kind).toLowerCase()}`).join(lang === "ar" ? "، " : ", ")))}</p>` : ""}
         <p class="note-s">${esc(t("terms"))}</p></div>
         <p class="note-s err-line" id="payErr" hidden></p>
         <button type="submit" class="primary" id="payBtn">${esc(t("payBtn")(money(total)))}</button>
         <div class="trust">${ico("lock")}<p>${esc(t("hlp").secure)}</p></div>
       </form><aside class="pg__side">${sumCard(d, total, co.drafts.map((x) => (x.kind === "trip" ? "flight" : x.kind)))}${helpLine(helpContextFor("pay", d))}</aside></div></div>`);
-    if (holds) { const tick = () => { const el = $("#holdLine"); if (!el) return; const mins = Math.max(0, Math.ceil((new Date(holds) - Date.now()) / 60000)); el.textContent = mins ? t("priceHeld")(mins) : t("priceGone"); if (mins) setTimeout(tick, 15000); }; tick(); }
+    if (holds) { const tick = () => { const el = $("#holdLine"); if (!el) return; const mins = Math.max(0, Math.ceil((new Date(holds) - Date.now()) / 60000)); el.textContent = mins ? t("uxHoldUntil")(new Date(holds).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-GB", { hour: "numeric", minute: "2-digit" })) : t("uxHoldGone"); if (mins) setTimeout(tick, 30000); }; tick(); }
     $("#pm").addEventListener("change", (e) => { co.method = e.target.value; $$("#pm label").forEach((l) => l.classList.toggle("on", $("input", l).checked)); });
     $("#payForm").addEventListener("input", (e) => e.target.closest(".fld")?.classList.remove("err"));
     $("#payForm").addEventListener("submit", async (e) => {
@@ -1972,7 +1977,7 @@
       const reacts = m.reactions.filter((x) => x.ids.length).map((x) => `<button type="button" class="cm-r${x.ids.includes(me) ? " on" : ""}" data-react="${m.id}|${x.emoji}|${x.ids.includes(me) ? 0 : 1}">${x.emoji} ${x.ids.length}</button>`).join("");
       return sep + `<div class="cm${mine ? " cm--me" : ""}${mada ? " cm--mada" : ""}">${mine ? "" : mada ? `<span class="av av--mada">${SUN}</span>` : av({ initial: (who || "?")[0], tone: "default", name: who })}
         <div class="cm__b">${mine ? "" : `<small class="cm__who">${esc(who)}</small>`}<div class="cm__bub">${inner}</div>
-          ${m.held ? `<small class="cm-held">${esc(m.held.status === "removed" ? S().heldOff : S().held)}</small>` : ""}
+          ${m.held ? `<small class="cm-held">${esc(m.held.status === "removed" ? S().heldOff : t("uxHeld"))}</small>` : ""}
           <div class="cm__meta"><small>${esc(new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-GB", { hour: "2-digit", minute: "2-digit" }))}</small>${reacts}<span class="cm__add">${REACTS.filter((e) => !m.reactions.some((x) => x.emoji === e && x.ids.includes(me))).map((e) => `<button type="button" data-react="${m.id}|${e}|1" aria-label="${e}">${e}</button>`).join("")}</span></div></div></div>`;
     }).join("");
   }

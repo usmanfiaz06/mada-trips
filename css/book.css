@@ -1416,3 +1416,20 @@ html.is-live .demo { display: none; }
   .srch input, .codebox input { min-height: 44px; }
 }
 :focus-visible { outline: 3px solid #2f6f57; outline-offset: 2px; border-radius: 6px; }
+.smk { font-style: normal; color: #a4561a; font-weight: 600; }
+.twocodes { display: flex; gap: 8px; align-items: flex-start; }
+.twocodes .ico { width: 17px; height: 17px; flex: none; color: var(--good); margin-top: 2px; }
+.hold-line { color: var(--ink-2); font-weight: 400; }
+.lfo__rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; }
+.lfo__rules li::before { content: none; }
+.lfo__rules li { display: grid; gap: 1px; }
+.lfo__rules small { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); font-weight: 600; }
+.lfo__rules li.warn { color: #a4561a; }
+@media (max-width: 640px) { .ask__tools { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; padding-inline-end: 0; } }
+/* Between phone and very wide screens the button is a round mark (its name on hover), clear of the side panels. */
+@media (min-width: 641px) and (max-width: 1599px) {
+  .fab { width: 56px; height: 56px; padding: 0; justify-content: center; }
+  .fab b { position: absolute; inset-inline-end: 64px; white-space: nowrap; background: var(--green); padding: 8px 14px; border-radius: 99px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  .fab:hover b, .fab:focus-visible b { opacity: 1; }
+  .fab__mark { background: none; }
+}
