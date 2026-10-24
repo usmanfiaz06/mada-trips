@@ -125,6 +125,10 @@ topic by copying an existing block. Test in the browser console with `MadaConcie
 | `#/pay`, `#/pay/REF` | Review and pay (Apple Pay, mada, card, Tabby, Tamara), or hold seats when the airline allows; pay later for a held trip |
 | `#/trip/REF` | Booked or held trip: status, what happens next, calendar file, advisor on WhatsApp |
 | `#/trips`, `#/signin`, `#/account` | Trips list, phone-code sign in, profile and saved travelers |
+| `#/discover` | What's on in a city, trips Mada planned, tips from people who went (open to guests) |
+| `#/circles`, `#/circles/new`, `#/circle/ID` | Your circles, a new circle (name, cover, who's in), a circle's chat with @Mada |
+| `#/people`, `#/friend/ID`, `#/join/CODE` | Find and add friends, requests, invite links; a person; an invite link's page |
+| `#/app` | The app's store links (the header's "Get the app" opens them, with a code to scan on a computer) |
 
 Files: `js/book-data.js` (airports, fares, flights, hotels, hold rule), `js/book-parse.js` (reads a sentence in English or Arabic), `js/book-i18n.js` (all words), `js/book.js` (the app), `css/book.css`.
 

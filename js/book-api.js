@@ -30,7 +30,12 @@
       const r = await fetch(BASE + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: ctl.signal });
       const text = await r.text();
       const data = text ? JSON.parse(text) : null;
-      if (!r.ok) { const e = (data && data.error) || {}; throw new ApiError(e.code || "HTTP_" + r.status, e.message, r.status, e); }
+      if (!r.ok) {
+        const e = (data && data.error) || {};
+        // "Wait 3600 seconds" reads like a machine: say it in minutes.
+        if (e.code === "RATE_LIMITED" && e.retryAfter) { const m = Math.max(1, Math.ceil(e.retryAfter / 60)); e.message = lang === "ar" ? `محاولات كثيرة ورا بعض. جرّب بعد ${m} دقيقة تقريبًا.` : `That's a lot in a row. Try again in about ${m} min.`; }
+        throw new ApiError(e.code || "HTTP_" + r.status, e.message, r.status, e);
+      }
       return data;
     } catch (e) {
       if (e instanceof ApiError) throw e;
@@ -120,6 +125,34 @@
     trips: () => call("GET", "/trips"),
     trip: (id) => call("GET", `/trips/${id}`),
     flightStatus: (no, date) => call("GET", `/flights/${encodeURIComponent(no.replace(/\s+/g, ""))}/status?date=${date}`),
+    // ----- circles, friends, discover: the same endpoints as the app's Circles tab -----
+    circles: () => call("GET", "/circles"),
+    circle: (id) => call("GET", `/circles/${id}`),
+    createCircle: (b) => call("POST", "/circles", b),
+    updateCircle: (id, b) => call("PATCH", `/circles/${id}`, b),
+    leaveCircle: (id) => call("POST", `/circles/${id}/leave`, {}),
+    messages: (id, q = "") => call("GET", `/circles/${id}/messages${q}`),
+    say: (id, body) => call("POST", `/circles/${id}/messages`, { body }),
+    react: (id, mid, emoji, on) => call("POST", `/circles/${id}/messages/${mid}/reactions`, { emoji, on }),
+    circleLink: (id, opts = {}) => call("POST", `/circles/${id}/link`, opts),
+    inviteToCircle: (id, userIds) => call("POST", `/circles/${id}/invites`, { userIds }),
+    dm: (userId) => call("POST", "/circles/dm", { userId }),
+    invitePreview: (code) => call("GET", `/invites/${encodeURIComponent(code)}`, undefined, { auth: !!session }),
+    acceptInvite: (codeOrId) => call("POST", `/invites/${encodeURIComponent(codeOrId)}/accept`, {}),
+    declineInvite: (id) => call("POST", `/invites/${id}/decline`, {}),
+    myLink: () => call("POST", "/invites", { link: true }),
+    friends: () => call("GET", "/friends"),
+    findPeople: (q) => call("GET", `/friends/search?q=${encodeURIComponent(q)}`),
+    addFriend: (userId) => call("POST", "/friends", { userId }),
+    acceptFriend: (id) => call("POST", `/friends/${id}/accept`, {}),
+    dropFriend: (id) => call("DELETE", `/friends/${id}`),
+    profile: (id) => call("GET", `/friends/${id}`),
+    discover: (city) => call("GET", `/discover${city ? `?city=${encodeURIComponent(city)}` : ""}`, undefined, { auth: !!session }),
+    notifyCity: (city) => call("POST", "/discover/notify", { city }),
+    posts: (city, kind) => call("GET", `/posts?city=${encodeURIComponent(city)}${kind ? `&kind=${kind}` : ""}`),
+    knownPosts: () => call("GET", "/posts?scope=known"),
+    addPost: (b) => call("POST", "/posts", b),
+    thank: (id) => call("POST", `/posts/${id}/thanks`, {}),
     newKey: () => `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
 
     /**

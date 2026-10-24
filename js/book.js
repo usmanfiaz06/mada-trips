@@ -413,7 +413,15 @@
       if (r.name === "t") return viewTripLive(r.a);
       if (r.name === "trips") return viewTripsLive();
       if (r.name === "signin") return viewSigninLive();
+      if (r.name === "discover") return viewDiscover();
+      if (r.name === "circles") return r.a === "new" ? viewNewCircle() : viewCircles();
+      if (r.name === "circle") return viewCircle(r.a);
+      if (r.name === "people") return viewPeople();
+      if (r.name === "friend") return viewFriend(r.a);
+      if (r.name === "join") return viewJoin(r.a);
     }
+    if (r.name === "app") return viewApp();
+    if (["discover", "circles", "circle", "people", "friend", "join"].includes(r.name)) { page(needIn(r.name, S().circlesOutH, S().previewOnly)); return wireCommon(); }
     if (r.name === "flights") return needPlan() && viewFlights(r.a === "back" && draft.ret ? "back" : "out");
     if (r.name === "stay") return needPlan() && viewStay();
     if (r.name === "hotel") return needPlan() && viewHotel(decodeURIComponent(r.a || ""));
@@ -437,7 +445,7 @@
     acct.classList.toggle("is-in", !!user);
     acct.innerHTML = user ? `<i>${esc((user.name || "?")[0])}</i><span>${esc(user.name)}</span>` : esc(t("signIn"));
     $$(".demo button").forEach((b) => b.classList.toggle("on", b.dataset.as === (user ? "back" : "new")));
-    $("#credits").innerHTML = Object.entries(D.DEST).filter(([, x]) => x.src).map(([c, x]) => `<li>${esc(city(c))}: <a href="${x.src}" target="_blank" rel="noopener">${esc(x.credit)}</a></li>`).join("") + `<li>${esc(D.HOTEL_CREDIT)}</li>`;
+    $("#credits").innerHTML = Object.entries(D.DEST).filter(([, x]) => x.src).map(([c, x]) => `<li>${esc(city(c))}: <a href="${x.src}" target="_blank" rel="noopener">${esc(x.credit)}</a></li>`).join("") + `<li>${esc(D.HOTEL_CREDIT)}</li>` + Object.values((window.MadaCover || {}).COVER_PHOTOS || {}).filter((x) => x.credit).map((x) => `<li>${esc(x.city)}: <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.credit)}</a></li>`).join("");
   }
   const toolsHtml = () => { const tools = t("tools"); return Object.keys(tools).map((k) => `<button type="button" class="tool" data-tool="${k}">${ico(k)}${esc(tools[k])}</button>`).join(""); };
 
@@ -1619,6 +1627,439 @@
         <p class="note-s">${esc(t("appSync"))}</p></aside></div></div></div>`);
   }
 
+  // =========================================================
+  // Circles, friends and Discover: the app's Circles tab on the web (same API, same covers, same rules)
+  // =========================================================
+  const S = () => t("soc");
+  const C = window.MadaCover;
+  const av = (p, cls = "") => `<span class="av av--${esc((p && p.tone) || "default")}${cls ? " " + cls : ""}" title="${esc(p && p.name)}">${esc((p && p.initial) || "?")}</span>`;
+  const PHOTO_KEYS = new Set(["istanbul", "alula", "riyadh", "dubai-skyline", "desert-camp", "maldives-overwater", "jeddah-al-balad", "abha-mountains", "baku-old-city"]);
+  const photoOf = (key) => (PHOTO_KEYS.has(key) ? `/assets/img/cover/${key}.jpg` : null);
+  // A cover as the app draws it: a photo, an upload once it's checked, or a drawing on a colour; nothing is plain green.
+  function coverHtml(cover, layout = "banner") {
+    if (cover && cover.kind === "photo" && photoOf(cover.id)) return `<img class="cv__img" src="${photoOf(cover.id)}" alt="" />`;
+    if (cover && cover.kind === "upload" && cover.url) return `<img class="cv__img" src="${esc(cover.url)}" alt="" />`;
+    const w = layout === "badge" ? 120 : layout === "tile" ? 320 : 900, h = layout === "badge" ? 120 : layout === "tile" ? 220 : 300;
+    const art = cover && cover.kind === "icon" ? cover : { icon: "heart", color: "green" };
+    try { return C.coverArtSvg(art, { width: w, height: h, layout, fill: true, side: lang === "ar" ? "left" : "right" }); } catch { return ""; }
+  }
+  const coverInk = (cover) => (cover && cover.kind === "icon" && C.coverTextTone(cover.color) === "ink" ? " cv--ink" : "");
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso)) / 60000);
+    if (m < 1) return S().now; if (m < 60) return S().mins(m); const h = Math.round(m / 60); if (h < 24) return S().hrs(h);
+    return fmt(iso.slice(0, 10), { day: "numeric", month: "short" });
+  };
+  const needIn = (next, title, sub) => `<div class="wrap pg"><div class="soc-out"><span class="soc-out__art">${coverHtml({ kind: "icon", icon: "family", color: "sand" }, "badge")}</span><h1 class="pg__h">${esc(title)}</h1><p class="pg__sub">${esc(sub)}</p>
+    <div class="soc-out__go"><a class="btn btn--main" href="#/signin?next=${next}">${esc(t("signIn"))}</a><button type="button" class="btn btn--plain" data-app>${esc(S().getApp)}</button></div>${codeBox()}</div></div>`;
+  const codeBox = () => `<form class="codebox" id="codeBox"><label for="codeIn">${esc(S().haveCode)}</label><div><input id="codeIn" placeholder="madatrips.sa/join/…" autocomplete="off" /><button class="btn btn--plain">${esc(S().open)}</button></div></form>`;
+  function wireCommon() {
+    $$("#page [data-app]").forEach((b) => b.addEventListener("click", appSheet));
+    $("#codeBox")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const m = ($("#codeIn").value || "").toLowerCase().match(/[a-z0-9]{8}-[a-z0-9]{6}/);
+      if (m) location.hash = `#/join/${m[0]}`; else toast(S().badCode);
+    });
+  }
+  const socTabs = (on) => `<nav class="soc-tabs" aria-label="${esc(S().circles)}"><a href="#/discover" class="${on === "discover" ? "on" : ""}">${esc(S().discover)}</a><a href="#/circles" class="${on === "circles" ? "on" : ""}">${esc(S().circles)}</a><a href="#/people" class="${on === "people" ? "on" : ""}">${esc(S().people)}</a></nav>`;
+
+  // ----- Discover: what's on in a city, trips Mada planned, and tips from people who went -----
+  let dsKind = "";
+  async function viewDiscover() {
+    const want = decodeURIComponent((location.hash.split("?city=")[1] || "").split("&")[0]);
+    page(loading(S().discover));
+    let r;
+    try { r = await A.discover(want); } catch (e) {
+      if (e.status === 404) {
+        page(`<div class="wrap pg">${socTabs("discover")}<div class="empty"><p>${esc(S().notHere(want))}</p><button type="button" class="btn btn--main" id="notify">${esc(S().tellMe)}</button> <a class="btn btn--plain" href="#/discover">${esc(S().seeCovered)}</a></div></div>`);
+        return $("#notify").addEventListener("click", async () => { try { await A.notifyCity(want); toast(S().willTell); } catch (x) { toast(x.message); } });
+      }
+      return page(errBox(e.message, true));
+    }
+    if (route().name !== "discover") return;
+    let posts = null;
+    if (A.signedIn) { try { posts = (await A.posts(r.city, dsKind)).posts; } catch { posts = []; } }
+    const evCard = (e) => `<article class="ev"><img src="${esc(photoOf(e.photoKey) || D.photo("RUH"))}" alt="" loading="lazy" /><div class="ev__in"><span class="ev__tag">${esc(e.tag)}</span><b>${esc(e.title)}</b><small>${esc(e.when)} · ${esc(e.where)}</small><button type="button" class="btn btn--sm ev__go" data-ask="${esc(S().askFor(e.title, r.city))}">${esc(S().planIt)}</button></div></article>`;
+    const planCard = (p) => `<article class="pc2"><img src="${esc(photoOf(p.photoKey) || D.photo("IST"))}" alt="" loading="lazy" /><div><span class="pc2__d">${esc(S().days(p.days))} · ${esc(p.city)}</span><b>${esc(p.title)}</b><small>${esc(p.sub)}</small><button type="button" class="link" data-ask="${esc(p.title)}">${esc(S().planThis)} →</button></div></article>`;
+    const tip = (p) => `<article class="tip">
+      <header>${av(p.author)}<div><b>${esc(p.author.short || p.author.name)}</b><small>${esc(S().rel[p.relation] || "")}${p.authorTrips ? ` · ${esc(S().trips(p.authorTrips))}` : ""}</small></div><span class="tip__k">${esc(p.kind === "food" ? S().food : S().todo)}</span></header>
+      ${p.photoUrl ? `<img src="${esc(p.photoUrl)}" alt="" loading="lazy" />` : ""}
+      <p>“${esc(p.text)}”</p>
+      <footer><span>${ico("pin")}${esc(p.place)}</span>${p.status === "pending" ? `<em class="tip__p">${esc(S().pending)}</em>` : `<button type="button" class="link" data-thank="${p.id}" ${p.thanked ? "disabled" : ""}>${esc(p.thanked ? S().thanked : S().thanks)}${p.thanks ? ` · ${p.thanks}` : ""}</button>`}</footer></article>`;
+    page(`<div class="wrap pg ds">
+      ${socTabs("discover")}
+      <header class="ds__h"><h1 class="pg__h">${esc(S().onIn)} <span class="ds__city"><select id="dsCity" aria-label="${esc(S().city)}">${r.covered.map((c) => `<option ${c.city === r.city ? "selected" : ""}>${esc(c.city)}</option>`).join("")}</select>${ico("back")}</span></h1>
+        ${r.tripDates ? `<p class="pg__sub">${esc(S().whileThere(r.tripDates))}</p>` : `<p class="pg__sub">${esc(S().dsSub)}</p>`}</header>
+      ${r.events.length ? `<div class="srail ev-rail">${r.events.map(evCard).join("")}</div>` : ""}
+      ${r.plans.length ? `<h2 class="hd-h">${esc(S().planned)}</h2><div class="srail pc2-rail">${r.plans.map(planCard).join("")}</div>` : ""}
+      <div class="ds__tips-h"><h2 class="hd-h">${esc(S().fromPeople)}</h2>${A.signedIn ? `<button type="button" class="btn btn--plain btn--sm" id="addTip">+ ${esc(S().shareTip)}</button>` : ""}</div>
+      ${A.signedIn ? `<div class="seg2 ds__f">${[["", S().all], ["food", S().food], ["todo", S().todo]].map(([k, l]) => `<button type="button" data-kind="${k}" class="${dsKind === k ? "on" : ""}">${esc(l)}</button>`).join("")}</div>
+        <div id="tipForm"></div>
+        ${posts.length ? `<div class="tips">${posts.map(tip).join("")}</div>` : `<div class="empty empty--soft"><p>${esc(S().noTips(r.city))}</p><button type="button" class="btn btn--main" id="addTip2">${esc(S().firstTip)}</button></div>`}`
+        : `<div class="empty empty--soft"><p>${esc(S().tipsSignIn)}</p><a class="btn btn--main" href="#/signin?next=discover">${esc(t("signIn"))}</a></div>`}
+      ${appBand()}
+    </div>`);
+    $("#dsCity").addEventListener("change", (e) => { location.hash = `#/discover?city=${encodeURIComponent(e.target.value)}`; });
+    $$("[data-kind]").forEach((b) => b.addEventListener("click", () => { dsKind = b.dataset.kind; viewDiscover(); }));
+    $$("[data-ask]").forEach((b) => b.addEventListener("click", () => askFromSocial(b.dataset.ask)));
+    $$("[data-thank]").forEach((b) => b.addEventListener("click", async () => { try { await A.thank(b.dataset.thank); b.textContent = S().thanked; b.disabled = true; } catch (e) { toast(e.message); } }));
+    [$("#addTip"), $("#addTip2")].forEach((b) => b && b.addEventListener("click", () => tipForm(r.city)));
+    wireCommon();
+  }
+  // From an idea to the plan: the same one box, with the sentence already in it.
+  function askFromSocial(text) { location.hash = "#/"; setTimeout(() => { const q = $("#q"); if (q) { q.value = text; q.focus(); q.dispatchEvent(new Event("input")); } }, 60); }
+  function tipForm(city) {
+    const el = $("#tipForm"); if (!el) return;
+    el.innerHTML = `<form class="box tipf" id="tipF" novalidate><h3 class="box__h">${esc(S().tipH(city))}</h3>
+      <div class="seg2" id="tipKind"><button type="button" data-k="food" class="on">${esc(S().food)}</button><button type="button" data-k="todo">${esc(S().todo)}</button></div>
+      <label class="fld"><span>${esc(S().tipPlace)}</span><input name="place" maxlength="80" placeholder="${esc(S().tipPlaceEg)}" /></label>
+      <label class="fld"><span>${esc(S().tipText)}</span><textarea name="text" rows="3" maxlength="600" placeholder="${esc(S().tipTextEg)}"></textarea><em>${esc(S().tipShort)}</em></label>
+      <label class="chk"><input type="checkbox" name="everyone" /> ${esc(S().tipEveryone)}</label>
+      <p class="note-s">${esc(S().tipChecked)}</p>
+      <div class="actions"><button class="btn btn--main">${esc(S().post)}</button><button type="button" class="btn btn--plain" id="tipX">${esc(S().cancel)}</button></div></form>`;
+    let kind = "food";
+    $$("#tipKind button").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.k; $$("#tipKind button").forEach((x) => x.classList.toggle("on", x === b)); }));
+    $("#tipX").addEventListener("click", () => { el.innerHTML = ""; });
+    $('[name="place"]', el).focus();
+    $("#tipF").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const place = $('[name="place"]', el).value.trim(), text = $('[name="text"]', el).value.trim();
+      if (place.length < 3 || text.length < 11) { $('[name="text"]', el).closest(".fld").classList.toggle("err", text.length < 11); $('[name="place"]', el).focus(); return; }
+      try { await A.addPost({ city, place, text, kind, audience: $('[name="everyone"]', el).checked ? "everyone" : "friends" }); toast(S().tipSent); viewDiscover(); } catch (x) { toast(x.message); }
+    });
+  }
+
+  // ----- Circles: your people in one place -----
+  async function viewCircles() {
+    if (!A.signedIn) { page(needIn("circles", S().circlesOutH, S().circlesOutSub)); return wireCommon(); }
+    page(loading(S().circles));
+    let r, fr;
+    try { [r, fr] = await Promise.all([A.circles(), A.friends().catch(() => ({ friends: [], requests: [] }))]); } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "circles") return;
+    const list = r.circles.filter((c) => !c.dm), dms = r.circles.filter((c) => c.dm);
+    const tile = (c) => `<a class="ctile${coverInk(c.cover)}" href="#/circle/${c.id}"><span class="ctile__cv">${coverHtml(c.cover, "tile")}</span>${c.unread ? `<i class="ctile__n">${c.unread}</i>` : ""}
+      <span class="ctile__in"><b>${esc(c.name)}</b><small>${esc(c.trip || c.dest || S().members(c.memberCount))}</small>
+      <span class="ctile__ppl">${c.preview.slice(0, 4).map((p) => av(p)).join("")}${c.memberCount > 4 ? `<em>+${c.memberCount - 4}</em>` : ""}</span>
+      ${c.last ? `<span class="ctile__last">${esc(lastLine(c.last))}</span>` : ""}</span></a>`;
+    page(`<div class="wrap pg soc">
+      ${socTabs("circles")}
+      <div class="soc__h"><h1 class="pg__h">${esc(S().circles)}</h1><a class="btn btn--main" href="#/circles/new">+ ${esc(S().newCircle)}</a></div>
+      <p class="pg__sub">${esc(S().circlesSub)}</p>
+      ${r.limited ? `<div class="nudge">${esc(S().limited)}</div>` : ""}
+      ${r.incoming.length ? `<h2 class="hd-h">${esc(S().invitedYou)}</h2><div class="incs">${r.incoming.map((x) => `<article class="inc${coverInk(x.circle.cover)}"><span class="inc__cv">${coverHtml(x.circle.cover, "badge")}</span><div><b>${esc(x.circle.name)}</b><small>${esc(S().fromX(x.from.short || x.from.name))} · ${esc(S().members(x.circle.memberCount))}</small></div><div class="actions"><button type="button" class="btn btn--main btn--sm" data-join="${x.inviteId}">${esc(S().join)}</button><button type="button" class="btn btn--plain btn--sm" data-decline="${x.inviteId}">${esc(S().notNow)}</button></div></article>`).join("")}</div>` : ""}
+      <h2 class="hd-h">${esc(S().yourCircles)}${list.length ? ` <span class="hd-n">${list.length}</span>` : ""}</h2>
+      ${list.length ? `<div class="ctiles">${list.map(tile).join("")}<a class="ctile ctile--new" href="#/circles/new"><span>+</span><b>${esc(S().newCircle)}</b><small>${esc(S().newCircleSub)}</small></a></div>`
+        : `<div class="soc-empty"><span class="soc-empty__art">${coverHtml({ kind: "icon", icon: "family", color: "sand" }, "badge")}</span><div><b>${esc(S().emptyH)}</b><p>${esc(S().emptySub)}</p><a class="btn btn--main" href="#/circles/new">${esc(S().startCircle)}</a></div></div>`}
+      <div class="soc__row"><h2 class="hd-h">${esc(S().friends)}${fr.requests.length ? ` <i class="badge">${fr.requests.length}</i>` : ""}</h2><a class="link" href="#/people">${esc(fr.friends.length ? S().seeAll : S().addFriends)} →</a></div>
+      ${fr.friends.length ? `<div class="frow">${fr.friends.slice(0, 12).map((p) => `<a href="#/friend/${p.id}" class="frow__p">${av(p, "av--lg")}<span>${esc(p.short || p.name)}</span>${p.going ? `<small>${esc(p.going)}</small>` : ""}</a>`).join("")}</div>`
+        : `<div class="soc-empty soc-empty--row"><p>${esc(S().noFriends)}</p><a class="btn btn--plain" href="#/people">${esc(S().addFriends)}</a></div>`}
+      ${dms.length ? `<h2 class="hd-h">${esc(S().messages)}</h2><div class="dms">${dms.map((c) => `<a class="dm" href="#/circle/${c.id}">${av(c.preview[0] || { initial: c.name[0] })}<div><b>${esc(c.name)}</b><small>${esc(c.last ? lastLine(c.last) : S().sayHi)}</small></div>${c.unread ? `<i class="badge">${c.unread}</i>` : `<small>${c.last ? esc(ago(c.last.createdAt)) : ""}</small>`}</a>`).join("")}</div>` : ""}
+      ${codeBox()}
+      ${appBand()}
+    </div>`);
+    $$("[data-join]").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { const x = await A.acceptInvite(b.dataset.join); location.hash = x.circleId ? `#/circle/${x.circleId}` : "#/circles"; } catch (e) { b.disabled = false; toast(e.message); } }));
+    $$("[data-decline]").forEach((b) => b.addEventListener("click", async () => { try { await A.declineInvite(b.dataset.decline); viewCircles(); } catch (e) { toast(e.message); } }));
+    wireCommon();
+  }
+  function lastLine(m) {
+    const who = m.author && m.author.kind === "user" ? (m.author.id === (A.user || {}).id ? S().you : (m.author.name || "").split(" ")[0]) : "Mada";
+    if (m.kind === "sys" && m.sys) return sysLine(m, (A.user || {}).id, new Map()).slice(0, 90);
+    const what = m.kind === "vote" && m.vote ? `📊 ${m.vote.q}` : m.kind === "split" ? S().aSplit : m.kind === "card" ? S().aCard : m.kind === "mada" && m.mada && m.mada.kind === "welcome" ? CC("circles.mada") : m.body;
+    return `${who}: ${what || ""}`.slice(0, 90);
+  }
+
+  // ----- one circle: the chat, who's in, the link -----
+  let chatTimer = null, chatLast = "";
+  async function viewCircle(id) {
+    clearTimeout(chatTimer);
+    if (!A.signedIn) return location.replace(`#/signin?next=circle/${id}`);
+    page(loading(S().circles));
+    let det, msgs;
+    try { [det, msgs] = await Promise.all([A.circle(id), A.messages(id)]); } catch (e) { return page(e.status === 404 ? `<div class="wrap pg"><div class="empty"><p>${esc(S().noCircle)}</p><a class="btn btn--main" href="#/circles">${esc(S().circles)}</a></div></div>` : errBox(e.message, true)); }
+    if (route().name !== "circle") return;
+    const c = det.circle, me = (A.user || {}).id, admin = c.role === "admin";
+    A.updateCircle(id, { read: true }).catch(() => {});
+    page(`<div class="chat${coverInk(c.cover)}">
+      <header class="chat__cv">${coverHtml(c.cover, "header")}<div class="wrap chat__cvin">${backLink("#/circles", S().circles)}<h1>${esc(c.name)}</h1><p>${esc([c.trip || c.dest, S().members(c.memberCount), det.invited.length ? S().invitedN(det.invited.length) : "", c.muted ? S().muted : ""].filter(Boolean).join(" · "))}</p></div></header>
+      <div class="wrap chat__grid">
+        <section class="chat__main">
+          <div class="chat__log" id="log" aria-live="polite"></div>
+          <form class="chat__say" id="say"><button type="button" class="chat__mada" id="askMada" title="${esc(S().askMadaT)}"><span>${SUN}</span></button><textarea id="sayIn" rows="1" maxlength="2000" placeholder="${esc(S().sayPh)}"></textarea><button class="btn btn--main" id="sayGo">${esc(S().send)}</button></form>
+          <p class="note-s chat__hint">${esc(S().madaHint)}</p>
+        </section>
+        <aside class="chat__side">
+          <div class="box"><h2 class="box__h">${esc(S().whoIn)} <span class="hd-n">${c.memberCount}</span></h2>
+            <ul class="mem">${det.members.map((p) => `<li>${av(p)}<a href="${p.id === me ? "#/account" : `#/friend/${p.id}`}"><b>${esc(p.id === me ? S().you : p.short || p.name)}</b><small>${esc(p.role === "admin" ? S().admin : S().rel[p.relation] || "")}</small></a></li>`).join("")}
+              ${det.invited.map((x) => `<li class="mem--inv">${av(x.person)}<span><b>${esc(x.person.short || x.person.name)}</b><small>${esc(S().invitedOn(ago(x.sentAt)))}</small></span></li>`).join("")}</ul>
+            ${admin ? `<button type="button" class="btn btn--plain btn--full" id="addPpl">+ ${esc(S().addPeople)}</button>` : ""}
+            <div id="addBox"></div></div>
+          <div class="box"><h2 class="box__h">${esc(S().inviteLink)}</h2><p class="note-s" style="margin-top:0">${esc(S().inviteLinkSub)}</p><div id="linkBox"><button type="button" class="btn btn--plain btn--full" id="getLink">${esc(S().makeLink)}</button></div></div>
+          <div class="box chat__opts"><label class="chk"><input type="checkbox" id="mute" ${c.muted ? "checked" : ""} /> ${esc(S().mute)}</label><button type="button" class="link link--warn" id="leave">${esc(S().leave)}</button></div>
+        </aside>
+      </div></div>`);
+    const log = $("#log");
+    const draw = (items, keep) => {
+      const near = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+      log.innerHTML = items.length ? msgsHtml(items, me, det) : `<div class="chat__empty"><b>${esc(S().startsHere(c.name))}</b><p>${esc(S().startsSub)}</p><div class="chips">${S().ideas.map((x) => `<button type="button" class="chip" data-idea="${esc(x)}">${esc(x)}</button>`).join("")}</div></div>`;
+      if (!keep || near) log.scrollTop = log.scrollHeight;
+      $$("[data-madaask]", log).forEach((b) => b.addEventListener("click", () => askFromSocial(b.dataset.madaask)));
+      $$("[data-idea]", log).forEach((b) => b.addEventListener("click", () => { $("#sayIn").value = b.dataset.idea; $("#sayIn").focus(); }));
+      $$("[data-react]", log).forEach((b) => b.addEventListener("click", async () => { const [mid, emoji, on] = b.dataset.react.split("|"); try { await A.react(id, mid, emoji, on === "1"); refresh(); } catch (e) { toast(e.message); } }));
+    };
+    let items = msgs.items.slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    chatLast = JSON.stringify(items.map((m) => [m.id, m.reactions.length]));
+    draw(items, false);
+    const refresh = async () => {
+      try {
+        const r = await A.messages(id); if (route().name !== "circle" || route().a !== id) return;
+        const next = r.items.slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)), sig = JSON.stringify(next.map((m) => [m.id, m.reactions.length]));
+        if (sig !== chatLast) { chatLast = sig; items = next; draw(items, true); A.updateCircle(id, { read: true }).catch(() => {}); }
+      } catch {}
+    };
+    const poll = () => { chatTimer = setTimeout(async () => { if (route().name !== "circle" || route().a !== id) return; if (!document.hidden) await refresh(); poll(); }, 5000); };
+    poll();
+    const ta = $("#sayIn");
+    ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(160, ta.scrollHeight) + "px"; });
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#say").requestSubmit(); } });
+    $("#askMada").addEventListener("click", () => { if (!/@mada/i.test(ta.value)) ta.value = "@Mada " + ta.value; ta.focus(); });
+    $("#say").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const body = ta.value.trim(); if (!body) return;
+      $("#sayGo").disabled = true;
+      ta.value = ""; ta.style.height = "auto";
+      try { await A.say(id, body); await refresh(); log.scrollTop = log.scrollHeight; } catch (x) { ta.value = body; toast(x.message); }
+      $("#sayGo").disabled = false; ta.focus();
+    });
+    $("#getLink").addEventListener("click", async () => {
+      try { const l = await A.circleLink(id); $("#linkBox").innerHTML = linkHtml(l, S().waCircle(c.name)); wireLink(); } catch (x) { toast(x.message); }
+    });
+    $("#mute").addEventListener("change", async (e) => { try { await A.updateCircle(id, { muted: e.target.checked }); toast(e.target.checked ? S().mutedOn : S().mutedOff); } catch (x) { toast(x.message); } });
+    $("#leave").addEventListener("click", async () => {
+      if (!(await ask({ title: S().leaveH(c.name), text: S().leaveT, ok: S().leave, cancel: S().stay }))) return;
+      try { await A.leaveCircle(id); location.hash = "#/circles"; } catch (x) { toast(x.message); }
+    });
+    $("#addPpl")?.addEventListener("click", async () => {
+      let fr; try { fr = await A.friends(); } catch (x) { return toast(x.message); }
+      const inIds = new Set([...det.members.map((p) => p.id), ...det.invited.map((x) => x.person.id)]), can = fr.friends.filter((p) => !inIds.has(p.id));
+      $("#addBox").innerHTML = can.length ? `<form id="addF" class="pick">${can.map((p) => `<label>${av(p)}<span>${esc(p.short || p.name)}</span><input type="checkbox" value="${p.id}" /></label>`).join("")}<button class="btn btn--main btn--full">${esc(S().invite)}</button></form>` : `<p class="note-s">${esc(S().allFriendsIn)} <a class="link" href="#/people">${esc(S().addFriends)}</a></p>`;
+      $("#addF")?.addEventListener("submit", async (e) => { e.preventDefault(); const ids = $$("#addF input:checked").map((x) => x.value); if (!ids.length) return; try { await A.inviteToCircle(id, ids); toast(S().invitesSent); viewCircle(id); } catch (x) { toast(x.message); } });
+    });
+  }
+  // The app's own words (packages/shared/src/copy), so a line reads the same on the web and in the app.
+  const CC = (k, v = {}) => { const all = window.MadaCircleCopy || {}, s = (all[lang] || {})[k] ?? (all.en || {})[k] ?? k; return String(s).replace(/\{(\w+)\}/g, (_, x) => (v[x] != null ? v[x] : "")); };
+  const joinNames = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(lang === "ar" ? "، " : ", ")} ${CC("circles.and")} ${xs[xs.length - 1]}`);
+  function sysLine(m, me, ppl) {
+    const s = m.sys, nm = (id) => (!id ? CC("circles.someone") : id === me ? CC("circles.you") : (ppl.get(id) || {}).short || CC("circles.someone"));
+    const v = { name: nm(s.actor), names: joinNames(s.users.map(nm)), text: s.text || "", amount: s.amount != null ? money(s.amount / 100) : "" }, mine = s.actor === me;
+    const k = (e) => CC(`circles.sys.${e}${mine ? ".you" : ""}`, v);
+    switch (s.event) {
+      case "created": case "invited": case "joined": case "left": case "removed": case "renamed": case "pinned": case "cancelledInvite": case "paid": case "reminded": return k(s.event);
+      case "joinedByLink": return mine ? CC("circles.sys.joinedByLink.you", { name: nm(s.users[0]) }) : CC("circles.sys.joinedByLink", v);
+      case "admin": return s.users[0] === me ? CC("circles.sys.admin.you") : CC("circles.sys.admin", v);
+      case "markedPaid": { const own = s.users.length === 1 && s.users[0] === s.actor; return own ? CC(mine ? "circles.sys.markedPaid.self" : "circles.sys.markedPaid.theirs", v) : k("markedPaid"); }
+      case "dm": return CC("circles.sys.dm", { name: joinNames(s.users.filter((u) => u !== me).map(nm)) });
+      default: return s.text || m.body;
+    }
+  }
+  function madaWelcome(det, me) {
+    const others = det.members.filter((p) => p.id !== me), inv = det.invited.map((x) => x.person.short || x.person.name), name = det.circle.name;
+    return others.length ? CC("circles.mada.welcomeOthers", { name }) : inv.length ? CC(inv.length === 1 ? "circles.mada.welcomeInvited.one" : "circles.mada.welcomeInvited.other", { name, names: joinNames(inv) }) : CC("circles.mada.welcomeAlone", { name });
+  }
+  const REACTS = ["👍", "❤️", "😂", "🙏"];
+  function msgsHtml(items, me, det) {
+    const ppl = new Map([...det.members, ...det.invited.map((x) => x.person)].map((p) => [p.id, p]));
+    let lastDay = "";
+    return items.map((m) => {
+      const d = m.createdAt.slice(0, 10), sep = d !== lastDay ? `<p class="cm-day">${esc(day(d))}</p>` : ""; lastDay = d;
+      if (m.kind === "sys") return sep + `<p class="cm-sys">${esc(m.sys ? sysLine(m, me, ppl) : m.body)}</p>`;
+      const mine = m.author.kind === "user" && m.author.id === me, mada = m.author.kind !== "user";
+      const who = mada ? (m.author.kind === "agent" ? m.author.name : CC("circles.mada")) : m.author.name;
+      const acts = m.kind === "mada" && m.mada && !m.mada.done ? (m.mada.actions || []).filter((a) => a.ask).map((a) => `<button type="button" class="chip cm-act" data-madaask="${esc(a.ask)}">${esc(a.label)}</button>`).join("") : "";
+      let inner = `<p>${esc(m.kind === "mada" && m.mada && m.mada.kind === "welcome" ? madaWelcome(det, me) : m.body)}</p>`;
+      if (m.kind === "vote" && m.vote) inner = `<b class="cm-q">📊 ${esc(m.vote.q)}</b><ul class="cm-vote">${m.vote.options.map((o) => `<li class="${m.vote.winner === o.id ? "win" : ""}"><span>${esc(o.label)}</span><em>${o.votes.length}</em></li>`).join("")}</ul><small class="cm-note">${esc(m.vote.closed ? S().voteClosed : S().voteInApp)}</small>`;
+      else if (m.kind === "card" && m.card && m.card.kind === "place" && m.card.post) inner = `<div class="cm-card">${ico("pin")}<div><b>${esc(m.card.post.place)}</b><small>“${esc(m.card.post.text)}”</small></div></div>${m.body ? `<p>${esc(m.body)}</p>` : ""}`;
+      else if (m.kind === "card") inner = `<div class="cm-card">${ico("cal")}<div><b>${esc(S().sharedPlan)}</b><small>${esc(m.body || "")}</small></div></div>`;
+      else if (m.kind === "split") inner = `<div class="cm-card">${ico("card")}<div><b>${esc(S().aSplit)}</b><small>${esc(m.body || "")} · ${esc(S().splitInApp)}</small></div></div>`;
+      else if (m.kind === "mada" && m.mada && m.mada.list && m.mada.list.length) inner = `<p>${esc(m.body)}</p><ul class="cm-list">${m.mada.list.map((x) => `<li>${esc(typeof x === "string" ? x : x.title || x.text || x.name || "")}</li>`).join("")}</ul>${m.mada.foot ? `<small class="cm-note">${esc(m.mada.foot)}</small>` : ""}`;
+      if (acts) inner += `<div class="cm-acts">${acts}</div>`;
+      const reacts = m.reactions.filter((x) => x.ids.length).map((x) => `<button type="button" class="cm-r${x.ids.includes(me) ? " on" : ""}" data-react="${m.id}|${x.emoji}|${x.ids.includes(me) ? 0 : 1}">${x.emoji} ${x.ids.length}</button>`).join("");
+      return sep + `<div class="cm${mine ? " cm--me" : ""}${mada ? " cm--mada" : ""}">${mine ? "" : mada ? `<span class="av av--mada">${SUN}</span>` : av({ initial: (who || "?")[0], tone: "default", name: who })}
+        <div class="cm__b">${mine ? "" : `<small class="cm__who">${esc(who)}</small>`}<div class="cm__bub">${inner}</div>
+          ${m.held ? `<small class="cm-held">${esc(m.held.status === "removed" ? S().heldOff : S().held)}</small>` : ""}
+          <div class="cm__meta"><small>${esc(new Date(m.createdAt).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-GB", { hour: "2-digit", minute: "2-digit" }))}</small>${reacts}<span class="cm__add">${REACTS.filter((e) => !m.reactions.some((x) => x.emoji === e && x.ids.includes(me))).map((e) => `<button type="button" data-react="${m.id}|${e}|1" aria-label="${e}">${e}</button>`).join("")}</span></div></div></div>`;
+    }).join("");
+  }
+  const linkHtml = (l, waText) => `<div class="lnk"><input readonly value="${esc(l.url)}" id="lnkUrl" /><div class="actions"><button type="button" class="btn btn--main btn--sm" id="lnkCopy">${esc(S().copy)}</button><a class="btn btn--plain btn--sm" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(waText + " " + l.url)}">WhatsApp</a></div><small class="note-s">${esc(S().linkLasts(fmt(l.expiresAt.slice(0, 10), { day: "numeric", month: "short" })))}</small></div>`;
+  function wireLink() { $("#lnkCopy")?.addEventListener("click", async () => { const v = $("#lnkUrl").value; try { await navigator.clipboard.writeText(v); } catch { $("#lnkUrl").select(); document.execCommand("copy"); } toast(S().copied); }); }
+
+  // ----- a new circle: a name, a cover, who's in -----
+  let nc = null;
+  async function viewNewCircle() {
+    if (!A.signedIn) return location.replace("#/signin?next=circles/new");
+    nc = nc || { name: "", cover: { kind: "icon", icon: "plane", color: "sand" }, dest: "", invite: [] };
+    let fr = { friends: [] }; try { fr = await A.friends(); } catch {}
+    if (route().name !== "circles") return;
+    const ICONS = ["plane", "suitcase", "palm", "camel", "tent", "beach", "mountain", "ship", "camera", "family", "kids", "cake", "heart", "football", "lantern", "sun"];
+    const draw = () => {
+      $("#ncPrev").className = "nc-prev" + coverInk(nc.cover);
+      $("#ncPrev").innerHTML = `${coverHtml(nc.cover, "banner")}<b>${esc(nc.name || S().ncNamePh)}</b><small>${esc(S().members(1 + nc.invite.length))}</small>`;
+    };
+    page(`<div class="wrap pg pg--narrow nc">
+      ${backLink("#/circles", S().circles)}
+      <h1 class="pg__h">${esc(S().newCircle)}</h1><p class="pg__sub">${esc(S().ncSub)}</p>
+      <div class="nc-prev" id="ncPrev"></div>
+      <form id="ncF" novalidate>
+        <label class="fld"><span>${esc(S().ncName)}</span><input name="name" maxlength="40" value="${esc(nc.name)}" placeholder="${esc(S().ncNamePh)}" /><em>${esc(S().ncNameErr)}</em></label>
+        <label class="fld"><span>${esc(S().ncWhere)}</span><input name="dest" maxlength="40" value="${esc(nc.dest)}" placeholder="${esc(S().ncWherePh)}" /></label>
+        <div class="fld"><span>${esc(S().ncCover)}</span>
+          <div class="nc-col">${C.COVER_COLORS.map((k) => `<button type="button" data-col="${k}" style="background:${C.COVER_COLOR_INFO[k].bg}" class="${nc.cover.kind === "icon" && nc.cover.color === k ? "on" : ""}" aria-label="${k}"></button>`).join("")}</div>
+          <div class="nc-ico">${ICONS.map((k) => `<button type="button" data-ico="${k}" class="${nc.cover.kind === "icon" && nc.cover.icon === k ? "on" : ""}" aria-label="${k}">${C.coverIconSvg(k, 40)}</button>`).join("")}</div>
+          <div class="nc-ph">${[...PHOTO_KEYS].map((k) => `<button type="button" data-ph="${k}" class="${nc.cover.kind === "photo" && nc.cover.id === k ? "on" : ""}"><img src="${photoOf(k)}" alt="${esc(k)}" loading="lazy" /></button>`).join("")}</div></div>
+        <div class="fld"><span>${esc(S().whoIn)}</span>
+          ${fr.friends.length ? `<div class="pick pick--grid">${fr.friends.map((p) => `<label>${av(p)}<span>${esc(p.short || p.name)}</span><input type="checkbox" value="${p.id}" ${nc.invite.includes(p.id) ? "checked" : ""} /></label>`).join("")}</div><p class="note-s">${esc(S().ncInviteNote)}</p>`
+            : `<p class="note-s">${esc(S().ncNoFriends)}</p>`}</div>
+        <button class="primary">${esc(S().create)}</button>
+      </form></div>`);
+    draw();
+    const f = $("#ncF");
+    f.addEventListener("input", (e) => { if (e.target.name === "name") nc.name = e.target.value; if (e.target.name === "dest") nc.dest = e.target.value; e.target.closest(".fld")?.classList.remove("err"); draw(); });
+    f.addEventListener("change", (e) => { if (e.target.type === "checkbox") { nc.invite = $$(".pick input:checked", f).map((x) => x.value); draw(); } });
+    f.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-col],[data-ico],[data-ph]"); if (!b) return;
+      if (b.dataset.ph) nc.cover = { kind: "photo", id: b.dataset.ph };
+      else nc.cover = { kind: "icon", icon: b.dataset.ico || (nc.cover.icon || "plane"), color: b.dataset.col || (nc.cover.color || "sand") };
+      $$("[data-col]", f).forEach((x) => x.classList.toggle("on", nc.cover.kind === "icon" && x.dataset.col === nc.cover.color));
+      $$("[data-ico]", f).forEach((x) => x.classList.toggle("on", nc.cover.kind === "icon" && x.dataset.ico === nc.cover.icon));
+      $$("[data-ph]", f).forEach((x) => x.classList.toggle("on", nc.cover.kind === "photo" && x.dataset.ph === nc.cover.id));
+      draw();
+    });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (nc.name.trim().length < 2) { $('[name="name"]').closest(".fld").classList.add("err"); $('[name="name"]').focus(); return; }
+      const btn = $(".primary", f); btn.disabled = true;
+      try { const r = await A.createCircle({ name: nc.name.trim(), cover: nc.cover, dest: nc.dest.trim() || null, invite: nc.invite }); nc = null; location.hash = `#/circle/${r.circle.id}`; } catch (x) { btn.disabled = false; toast(x.message); }
+    });
+  }
+
+  // ----- people: find friends by name or number, requests, an invite link for anyone not on Mada -----
+  let pplQ = "";
+  async function viewPeople() {
+    if (!A.signedIn) { page(needIn("people", S().peopleOutH, S().peopleOutSub)); return wireCommon(); }
+    page(loading(S().people));
+    let fr; try { fr = await A.friends(); } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "people") return;
+    const row = (p, act) => `<li class="prow">${av(p, "av--md")}<a href="#/friend/${p.id}"><b>${esc(p.name)}</b><small>${esc([S().rel[p.relation] || "", p.mutual ? S().mutual(p.mutual) : "", p.going || ""].filter(Boolean).join(" · "))}</small></a>${act}</li>`;
+    page(`<div class="wrap pg pg--narrow ppl">
+      ${socTabs("people")}
+      <h1 class="pg__h">${esc(S().peopleH)}</h1><p class="pg__sub">${esc(S().peopleSub)}</p>
+      <form class="srch" id="srch" role="search"><span>${ico("ppl")}</span><input id="srchIn" value="${esc(pplQ)}" placeholder="${esc(S().searchPh)}" autocomplete="off" inputmode="search" /></form>
+      <ul class="plist" id="hits"></ul>
+      ${fr.requests.length ? `<h2 class="hd-h">${esc(S().requests)} <i class="badge">${fr.requests.length}</i></h2><ul class="plist">${fr.requests.map((p) => row(p, `<span class="actions"><button type="button" class="btn btn--main btn--sm" data-acc="${p.id}">${esc(S().accept)}</button><button type="button" class="btn btn--plain btn--sm" data-drop="${p.id}">${esc(S().decline)}</button></span>`)).join("")}</ul>` : ""}
+      <h2 class="hd-h">${esc(S().friends)} <span class="hd-n">${fr.friends.length}</span></h2>
+      ${fr.friends.length ? `<ul class="plist">${fr.friends.map((p) => row(p, `<button type="button" class="btn btn--plain btn--sm" data-dm="${p.id}">${esc(S().message)}</button>`)).join("")}</ul>` : `<p class="note-s">${esc(S().noFriendsYet)}</p>`}
+      <div class="box invite"><span class="invite__art">${coverHtml({ kind: "icon", icon: "gift", color: "gold" }, "badge")}</span><div><h2 class="box__h">${esc(S().inviteH)}</h2><p class="note-s" style="margin-top:0">${esc(S().inviteSub)}</p><div id="myLink"><button type="button" class="btn btn--main" id="getMyLink">${esc(S().makeLink)}</button></div></div></div>
+    </div>`);
+    const hits = $("#hits"); let tmr = null, seq = 0;
+    const asked = new Set(fr.asked), friendIds = new Set(fr.friends.map((p) => p.id));
+    const search = async () => {
+      const q = pplQ.trim(), my = ++seq;
+      if (q.length < 2) { hits.innerHTML = ""; return; }
+      hits.innerHTML = `<li class="note-s">${esc(S().searching)}</li>`;
+      let r; try { r = await A.findPeople(q); } catch (e) { hits.innerHTML = `<li class="note-s">${esc(e.message)}</li>`; return; }
+      if (my !== seq) return;
+      const me = (A.user || {}).id;
+      hits.innerHTML = r.people.filter((p) => p.id !== me).map((p) => row(p, friendIds.has(p.id) ? `<span class="tagg">${esc(S().rel.friend)}</span>` : asked.has(p.id) ? `<span class="tagg tagg--q">${esc(S().asked)}</span>` : `<button type="button" class="btn btn--main btn--sm" data-add="${p.id}">${esc(S().add)}</button>`)).join("")
+        || `<li class="note-s">${esc(r.byPhone ? S().noOneNumber : S().noOneName)} <button type="button" class="link" id="inviteInstead">${esc(S().sendLink)}</button></li>`;
+      $$("[data-add]", hits).forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { const x = await A.addFriend(b.dataset.add); asked.add(b.dataset.add); b.outerHTML = `<span class="tagg${x.status === "friends" ? "" : " tagg--q"}">${esc(x.status === "friends" ? S().rel.friend : S().asked)}</span>`; } catch (e) { b.disabled = false; toast(e.message); } }));
+      $("#inviteInstead")?.addEventListener("click", () => $("#getMyLink")?.click());
+    };
+    $("#srchIn").addEventListener("input", (e) => { pplQ = e.target.value; clearTimeout(tmr); tmr = setTimeout(search, 300); });
+    $("#srch").addEventListener("submit", (e) => { e.preventDefault(); search(); });
+    if (pplQ) search();
+    $$("[data-acc]").forEach((b) => b.addEventListener("click", async () => { try { await A.acceptFriend(b.dataset.acc); viewPeople(); } catch (e) { toast(e.message); } }));
+    $$("[data-drop]").forEach((b) => b.addEventListener("click", async () => { try { await A.dropFriend(b.dataset.drop); viewPeople(); } catch (e) { toast(e.message); } }));
+    $$("[data-dm]").forEach((b) => b.addEventListener("click", async () => { try { const x = await A.dm(b.dataset.dm); location.hash = `#/circle/${x.circleId}`; } catch (e) { toast(e.message); } }));
+    $("#getMyLink").addEventListener("click", async () => { try { const x = await A.myLink(); $("#myLink").innerHTML = linkHtml(x.link, S().waMe); wireLink(); } catch (e) { toast(e.message); } });
+  }
+
+  // ----- a person: what you share, and one clear next step -----
+  async function viewFriend(id) {
+    if (!A.signedIn) return location.replace(`#/signin?next=friend/${id}`);
+    page(loading(S().people));
+    let r; try { r = await A.profile(id); } catch (e) { return page(errBox(e.status === 404 ? S().noPerson : e.message)); }
+    if (route().name !== "friend") return;
+    const p = r.person;
+    const act = r.isFriend ? `<button type="button" class="btn btn--main" id="fMsg">${esc(S().message)}</button><button type="button" class="btn btn--plain" id="fPlan">${esc(S().planTogether)}</button>`
+      : r.askedMe ? `<button type="button" class="btn btn--main" id="fAcc">${esc(S().accept)}</button><button type="button" class="btn btn--plain" id="fDrop">${esc(S().decline)}</button>`
+      : r.asked ? `<span class="tagg tagg--q">${esc(S().asked)}</span><button type="button" class="link" id="fDrop">${esc(S().takeBack)}</button>`
+      : `<button type="button" class="btn btn--main" id="fAdd">${esc(S().addFriend)}</button>`;
+    page(`<div class="wrap pg pg--narrow prof">
+      ${backLink("#/people", S().people)}
+      <header class="prof__h">${av(p, "av--xl")}<div><h1 class="pg__h">${esc(p.name)}</h1><p class="pg__sub">${esc([p.places ? S().placesN(p.places) : "", p.trips ? S().trips(p.trips) : "", r.thanks ? S().thanksN(r.thanks) : "", p.mutual ? S().mutual(p.mutual) : ""].filter(Boolean).join(" · ") || S().rel[p.relation] || "")}</p>${p.going ? `<p class="prof__go">${ico("flights")}${esc(p.going)}</p>` : ""}</div></header>
+      <div class="actions prof__act">${act}</div>
+      ${r.circles.length ? `<h2 class="hd-h">${esc(S().inCommon)}</h2><ul class="plist">${r.circles.map((c) => `<li class="prow"><a href="#/circle/${c.id}"><b>${esc(c.name)}</b><small>${esc(S().members(c.memberCount))}</small></a></li>`).join("")}</ul>` : ""}
+      ${r.posts.length ? `<h2 class="hd-h">${esc(S().theirTips)}</h2><div class="tips">${r.posts.map((x) => `<article class="tip"><header><span class="tip__k">${esc(x.kind === "food" ? S().food : S().todo)}</span><small>${esc(x.city)}</small></header><p>“${esc(x.text)}”</p><footer><span>${ico("pin")}${esc(x.place)}</span></footer></article>`).join("")}</div>` : ""}
+    </div>`);
+    $("#fMsg")?.addEventListener("click", async () => { try { const x = await A.dm(id); location.hash = `#/circle/${x.circleId}`; } catch (e) { toast(e.message); } });
+    $("#fPlan")?.addEventListener("click", () => { nc = { name: "", cover: { kind: "icon", icon: "plane", color: "sand" }, dest: "", invite: [id] }; location.hash = "#/circles/new"; });
+    $("#fAdd")?.addEventListener("click", async () => { try { await A.addFriend(id); viewFriend(id); } catch (e) { toast(e.message); } });
+    $("#fAcc")?.addEventListener("click", async () => { try { await A.acceptFriend(id); viewFriend(id); } catch (e) { toast(e.message); } });
+    $("#fDrop")?.addEventListener("click", async () => { try { await A.dropFriend(id); viewFriend(id); } catch (e) { toast(e.message); } });
+  }
+
+  // ----- an invite link: who asked, which circle, then join (signing in first if needed) -----
+  async function viewJoin(code) {
+    page(loading(S().join));
+    let r; try { r = await A.invitePreview(code); } catch (e) { return page(`<div class="wrap pg pg--narrow"><div class="empty"><p>${esc(e.status === 404 ? S().badLink : e.message)}</p><a class="btn btn--main" href="#/circles">${esc(S().circles)}</a></div></div>`); }
+    if (route().name !== "join") return;
+    const c = r.circle, open = r.status === "open";
+    page(`<div class="wrap pg pg--narrow join${c ? coverInk(c.cover) : ""}">
+      <div class="join__cv">${c ? coverHtml(c.cover, "banner") : coverHtml({ kind: "icon", icon: "heart", color: "gold" }, "banner")}<div><small>${esc(S().invitedBy(r.from.short || r.from.name))}</small><h1>${esc(c ? c.name : S().beFriends(r.from.short || r.from.name))}</h1>${c && c.trip ? `<p>${esc(c.trip)}</p>` : ""}</div></div>
+      ${c ? `<div class="join__ppl">${c.members.slice(0, 8).map((p) => av(p, "av--md")).join("")}<span>${esc(S().members(c.memberCount))}</span></div>` : `<p class="pg__sub">${esc(S().beFriendsSub)}</p>`}
+      ${open ? `<button type="button" class="primary" id="joinGo">${esc(A.signedIn ? S().join : S().joinWith)}</button>${A.signedIn ? "" : `<p class="note-s" style="text-align:center">${esc(S().joinSignNote)}</p>`}`
+        : `<div class="nudge">${esc(S().linkState[r.status] || S().badLink)}</div>`}
+      <div class="join__app"><p>${esc(S().joinApp)}</p><button type="button" class="btn btn--plain" data-app>${esc(S().getApp)}</button></div>
+    </div>`);
+    $("#joinGo")?.addEventListener("click", async () => {
+      if (!A.signedIn) return (location.hash = `#/signin?next=join/${code}`);
+      $("#joinGo").disabled = true;
+      try { const x = await A.acceptInvite(code); toast(x.already ? S().already : S().joined); location.hash = x.circleId ? `#/circle/${x.circleId}` : x.friendId ? `#/friend/${x.friendId}` : "#/circles"; } catch (e) { $("#joinGo").disabled = false; toast(e.message); }
+    });
+    wireCommon();
+  }
+
+  // ----- the app: store buttons from the API's config, and a code to scan from a computer -----
+  const storeUrls = () => (A.config && A.config.storeUrls) || { ios: "https://apps.apple.com/app/mada-trips", android: "https://play.google.com/store/apps/details?id=sa.madatrips.app" };
+  const APPLE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.2 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8 1.5 0 1.9.8 3.2.8 1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8 0 0-2.5-1-2.5-3.9zM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>';
+  const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2.8v18.4c0 .3.3.5.6.4l10.6-9.6L4.6 2.4c-.3-.1-.6.1-.6.4z" opacity=".85"/><path d="M15.2 12l3.3-3-12.9-7.1 9.6 10.1z" opacity=".6"/><path d="M15.2 12l-9.6 10.1 12.9-7.1-3.3-3z" opacity=".7"/><path d="M18.5 9l-3.3 3 3.3 3 2.9-1.6c.8-.5.8-1.3 0-1.8L18.5 9z"/></svg>';
+  const storeBtns = () => { const u = storeUrls(); return `<div class="stores"><a class="store" href="${esc(u.ios)}" target="_blank" rel="noopener">${APPLE}<span><small>${esc(S().dlOn)}</small><b>App Store</b></span></a><a class="store" href="${esc(u.android)}" target="_blank" rel="noopener">${PLAY}<span><small>${esc(S().getOn)}</small><b>Google Play</b></span></a></div>`; };
+  const appBand = () => `<section class="appband"><div><small>${esc(S().theApp)}</small><h2>${esc(S().appH)}</h2><p>${esc(S().appSub)}</p>${storeBtns()}</div><ul>${S().appPts.map((x, i) => `<li>${ico(["flights", "chat", "ppl", "esim"][i] || "check")}<span>${esc(x)}</span></li>`).join("")}</ul></section>`;
+  let qrP = null;
+  const qrLib = () => (qrP ??= new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"; s.onload = () => res(window.qrcode); s.onerror = rej; document.head.append(s); }).catch((e) => { qrP = null; throw e; }));
+  async function appSheet() {
+    // On a phone, straight to its own store; the code to scan is for a computer.
+    const ua = navigator.userAgent, u = storeUrls();
+    if (/iPhone|iPad|iPod/.test(ua)) return void (location.href = u.ios);
+    if (/Android/.test(ua)) return void (location.href = u.android);
+    const el = document.createElement("div");
+    el.className = "sheet";
+    el.innerHTML = `<div class="sheet__card appsheet" role="dialog" aria-modal="true" aria-label="${esc(S().getApp)}"><button type="button" class="lb__x appsheet__x" aria-label="${esc(t("close"))}">×</button>
+      <span class="appsheet__mark">${SUN}</span><h2>${esc(S().appH)}</h2><p>${esc(S().appSheetSub)}</p>
+      <div class="appsheet__qr" id="qr"><span class="spin"></span></div><small class="note-s">${esc(S().scan)}</small>${storeBtns()}</div>`;
+    document.body.append(el);
+    const close = () => el.remove();
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest(".appsheet__x")) close(); });
+    document.addEventListener("keydown", function esc1(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc1); } });
+    try {
+      const qrcode = await qrLib(), q = qrcode(0, "M");
+      q.addData(`${location.origin}${location.pathname}#/app`); q.make();
+      $("#qr", el).innerHTML = q.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+    } catch { $("#qr", el).remove(); }
+  }
+  function viewApp() {
+    page(`<div class="wrap pg pg--narrow apppg"><span class="appsheet__mark">${SUN}</span><h1 class="pg__h">${esc(S().appH)}</h1><p class="pg__sub">${esc(S().appSub)}</p>${storeBtns()}
+      <ul class="gk apppg__pts">${S().appPts.map((x, i) => `<li>${ico(["flights", "chat", "ppl", "esim"][i] || "check")}<span>${esc(x)}</span></li>`).join("")}</ul><p class="note-s">${esc(t("appSync"))}</p></div>`);
+  }
+
   // ---------- popovers on the plan: dates, travelers, origin ----------
   let open = null, calMonth = null, calMode = "ret", popChanged = false, popFromChat = false;
   function openPop(kind, anchor) {
@@ -1787,6 +2228,7 @@
     addEventListener("keydown", (e) => { if (e.key === "Escape") { finishPop(); $("#acctMenu").hidden = true; } });
     $("#track").addEventListener("scroll", railArrows, { passive: true });
     $$(".rail__arrow").forEach((b) => b.addEventListener("click", () => { const tr = $("#track"); tr.scrollBy({ left: +b.dataset.dir * (lang === "ar" ? -1 : 1) * tr.clientWidth * 0.8, behavior: "smooth" }); }));
+    $$(".nav [data-app]").forEach((b) => b.addEventListener("click", appSheet));
     $("#langBtn").addEventListener("click", () => { lang = lang === "en" ? "ar" : "en"; store.set("lang", lang); A.setLang(lang); render(); });
     $("#acct").addEventListener("click", () => { if (!user) { location.hash = "#/signin"; return; } $("#acctMenu").hidden = !$("#acctMenu").hidden; });
     $("#signOut").addEventListener("click", signOut);
