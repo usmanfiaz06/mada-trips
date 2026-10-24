@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  arabicForRules,
   DESTINATIONS, MemoryKind, ageOn, formatSar, landmarkById, nameIn, parseStayWishes, refineStays, isIsoDay,
   type ChatCard, type ChatPay, type DemoFlag, type EsimPlan, type FlightOption, type Person, type StayOption,
 } from "@mada/shared";
@@ -144,7 +145,8 @@ const RUN: Record<string, Run> = {
 
   async search_stays(ctx, a) {
     // One of our keys, or a place anywhere in the world in words ("Lahore, Pakistan"); a place that is a key reads as it.
-    const said = typeof a.place === "string" ? a.place.trim().slice(0, 80) : "";
+    // A place said in Arabic («دبي»، «لاهور») reads as its English name, so it matches a key or the map.
+    const said = typeof a.place === "string" ? arabicForRules(a.place.trim()).trim().slice(0, 80) : "";
     const key = typeof a.destination === "string" && DESTINATIONS[a.destination] ? a.destination : said ? destinationIn(said)?.key ?? null : null;
     const checkIn = iso(a.check_in);
     const nights = Number.isInteger(a.nights) ? Math.min(60, Math.max(1, a.nights as number)) : 0;

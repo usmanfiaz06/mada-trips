@@ -141,7 +141,7 @@ function Turn({ turn, stamp, still, onOpen, onSay, found, onY }: { turn: ChatTur
             {turn.by ? <T v="tiny" color={colors.ink3} style={{ paddingHorizontal: 4 }} testID="chat-by">{turn.by}</T> : null}
             <View style={[s.bubble, found && !turn.me ? s.found : null]} accessible
               accessibilityLabel={turn.text ? (turn.by ? t('chat.a11y.agent', { agent: turn.by, text: turn.text }) : t('chat.a11y.mada', { text: turn.text })) : (turn.status ?? t('chat.working'))}>
-              {turn.text ? <T v="body" color={colors.green} style={{ lineHeight: 22 }} testID="chat-text" accessibilityLiveRegion="polite">{turn.text}</T> : <Dots still={still} />}
+              {turn.text ? <ReplyText text={turn.text} /> : <Dots still={still} />}
             </View>
             {writing && turn.status ? <StatusLine turn={turn} /> : null}
           </View>
@@ -201,6 +201,26 @@ function StatusLine({ turn }: { turn: ChatTurn }) {
     <Appear key={line.index} enter="fade" ms={320}>
       <T v="tiny" color={colors.muted} style={{ paddingHorizontal: 4 }} testID="chat-status" accessibilityLiveRegion="polite">{`${line.text}…`}</T>
     </Appear>
+  );
+}
+
+/** Mada's words as she wrote them: short lines, and a "• " list one point per line (ASSISTANT.md §1). */
+function ReplyText({ text }: { text: string }) {
+  const lines = text.split('\n');
+  if (lines.length === 1) return <T v="body" color={colors.green} style={{ lineHeight: 22 }} testID="chat-text" accessibilityLiveRegion="polite">{text}</T>;
+  return (
+    <View style={{ gap: 4 }} testID="chat-text" accessibilityLiveRegion="polite">
+      {lines.map((line, i) => {
+        const point = /^\s*[•\-*]\s+/.exec(line);
+        if (!line.trim()) return <View key={i} style={{ height: 4 }} />;
+        return point ? (
+          <View key={i} style={{ flexDirection: 'row', gap: 8 }}>
+            <T v="body" color={colors.goldInk} style={{ lineHeight: 22 }}>•</T>
+            <T v="body" color={colors.green} style={{ lineHeight: 22, flex: 1 }}>{line.slice(point[0].length)}</T>
+          </View>
+        ) : <T key={i} v="body" color={colors.green} style={{ lineHeight: 22 }}>{line}</T>;
+      })}
+    </View>
   );
 }
 

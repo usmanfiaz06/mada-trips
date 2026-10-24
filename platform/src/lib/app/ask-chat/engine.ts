@@ -132,7 +132,8 @@ export class SentenceGate {
     }
   }
 
-  text() { return this.kept.join("").replace(/\s+/g, " ").trim(); }
+  /** The reply as said: spaces tidied, its line breaks (a "• " list) kept. */
+  text() { return this.kept.join("").replace(/[ \t]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{3,}/g, "\n\n").trim(); }
 }
 
 export type TurnInput = {
