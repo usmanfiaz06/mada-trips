@@ -83,6 +83,7 @@
     phone: '<path d="M6.6 3.5h2.6l1.4 4.1-2 1.4a12 12 0 0 0 6.4 6.4l1.4-2 4.1 1.4v2.6a2 2 0 0 1-2.1 2A16.4 16.4 0 0 1 4.6 5.6a2 2 0 0 1 2-2.1z"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7l8.5 6 8.5-6"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+    camera: '<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3a1 1 0 0 1 1 1V18a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.3" r="3.4"/>',
     bed: '<path d="M3 18V7M3 14h18v4M21 14v-2.5A2.5 2.5 0 0 0 18.5 9H11v5"/><circle cx="7" cy="11" r="1.8"/>',
     view: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 15l4.5-4 3.5 3 3-2.5 6 4.5"/>',
     cup: '<path d="M5 9h12v4a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H16.5M8 3.5v2.5M12 3.5v2.5"/>',
@@ -1357,6 +1358,66 @@
   }
 
   // ----- travellers: the account's household (the same people as in the app) -----
+  // ----- passports: read from a photo in the browser (the picture never leaves the device), or typed -----
+  const A3A2 = { SAU: "SA", ARE: "AE", KWT: "KW", QAT: "QA", BHR: "BH", OMN: "OM", YEM: "YE", JOR: "JO", EGY: "EG", LBN: "LB", SYR: "SY", IRQ: "IQ", PSE: "PS", SDN: "SD", MAR: "MA", DZA: "DZ", TUN: "TN", LBY: "LY", TUR: "TR", IRN: "IR", PAK: "PK", IND: "IN", BGD: "BD", LKA: "LK", NPL: "NP", PHL: "PH", IDN: "ID", MYS: "MY", THA: "TH", VNM: "VN", CHN: "CN", JPN: "JP", KOR: "KR", SGP: "SG", AUS: "AU", NZL: "NZ", ETH: "ET", KEN: "KE", NGA: "NG", ZAF: "ZA", GBR: "GB", IRL: "IE", USA: "US", CAN: "CA", MEX: "MX", BRA: "BR", FRA: "FR", DEU: "DE", ITA: "IT", ESP: "ES", PRT: "PT", NLD: "NL", BEL: "BE", CHE: "CH", AUT: "AT", SWE: "SE", NOR: "NO", DNK: "DK", FIN: "FI", POL: "PL", GRC: "GR", RUS: "RU", UKR: "UA" };
+  const FIRST_NATS = ["SAU", "ARE", "KWT", "QAT", "BHR", "OMN", "EGY", "JOR", "PAK", "IND"];
+  function natName(code) {
+    try { if (A3A2[code]) return new Intl.DisplayNames([lang], { type: "region" }).of(A3A2[code]); } catch {}
+    return (window.MadaMRZ && window.MadaMRZ.COUNTRIES[code]) || code;
+  }
+  const natOptions = (sel) => { const all = Object.keys(A3A2).sort((a, b) => natName(a).localeCompare(natName(b), lang)); const opt = (c) => `<option value="${c}" ${c === sel ? "selected" : ""}>${esc(natName(c))}</option>`; return `<option value="">${esc(t("pp").pick)}</option>${FIRST_NATS.map(opt).join("")}<option disabled>──────────</option>${all.filter((c) => !FIRST_NATS.includes(c)).map(opt).join("")}`; };
+  let ocrP = null;
+  const ocrLib = () => (ocrP ??= new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"; s.onload = () => (window.Tesseract ? res(window.Tesseract) : rej(new Error("no ocr"))); s.onerror = rej; document.head.append(s); }).catch((e) => { ocrP = null; throw e; }));
+  // The machine-readable lines sit at the bottom of the photo page: read that strip, enlarged and in black and white.
+  function mrzCanvas(bmp, part) {
+    const w = 1800, sy = bmp.height * (1 - part), sh = bmp.height * part, h = Math.round(w * sh / bmp.width);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const x = c.getContext("2d"); x.filter = "grayscale(1) contrast(1.6) brightness(1.05)"; x.drawImage(bmp, 0, sy, bmp.width, sh, 0, 0, w, h);
+    return c;
+  }
+  async function readPassport(file, onStep) {
+    const M = window.MadaMRZ, T = await ocrLib();
+    onStep && onStep(t("pp").reading);
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => createImageBitmap(file));
+    const worker = await T.createWorker("eng");
+    try {
+      await worker.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<", tessedit_pageseg_mode: "6", preserve_interword_spaces: "0" });
+      for (const part of [0.32, 0.5, 1]) {
+        const { data } = await worker.recognize(mrzCanvas(bmp, part));
+        const r = M.findMrz(data.text.replace(/ /g, ""));
+        if (r.ok && r.fields) return r;
+      }
+      return null;
+    } finally { worker.terminate(); }
+  }
+  const ppBlank = () => ({ number: "", nat: "", dob: "", sex: "", issued: "", expiry: "", later: false, source: "manual", check: [] });
+  function ppHtml(x, i) {
+    const P = t("pp"), pp = x.pp || (x.pp = ppBlank()), ck = (f) => (pp.check.includes(f) ? " fld--check" : "");
+    if (pp.have && !pp.replace) return `<div class="pp"><div class="pp__have">${ico("check")}<div><b>${esc(P.have(pp.have.numberMasked))}</b><small>${esc(natName(pp.have.nationality))} · ${esc(P.expires(fmt(pp.have.expiry, { day: "numeric", month: "short", year: "numeric" })))}</small></div><button type="button" class="link" data-ppreplace="${i}">${esc(P.other)}</button></div>${pp.expiryWarn ? `<p class="pp__warn">${esc(pp.expiryWarn)}</p>` : ""}</div>`;
+    return `<div class="pp${pp.later ? " pp--later" : ""}">
+      <div class="pp__h"><b>${esc(P.h)}</b><label class="btn btn--plain btn--sm pp__scan">${ico("camera")}<span>${esc(P.scan)}</span><input type="file" accept="image/*" data-scan="${i}" hidden /></label></div>
+      <p class="pp__status${pp.scanMsg ? ` pp__status--${pp.scanMsg.k}` : ""}" id="ppS${i}" ${pp.scanMsg ? "" : "hidden"}>${pp.scanMsg ? esc(pp.scanMsg.text) : ""}</p>
+      <div class="fgrid pp__f">
+        <label class="fld${ck("number")}"><span>${esc(P.number)}</span><input name="pp.number" value="${esc(pp.number)}" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="12" placeholder="A12345678" /><em>${esc(P.errNumber)}</em></label>
+        <label class="fld${ck("nationality")}"><span>${esc(P.nat)}</span><select name="pp.nat">${natOptions(pp.nat)}</select><em>${esc(P.errNat)}</em></label>
+        <label class="fld${ck("dob")}"><span>${esc(t("dob"))}</span><input name="pp.dob" type="date" value="${esc(pp.dob || x.dob || "")}" max="${todayIso()}" /><em>${esc(x.k === "c" ? t("errChildAge") : x.k === "i" ? t("errInfAge") : P.errDob)}</em></label>
+        <div class="fld"><span>${esc(P.sex)}</span><span class="seg2 pp__sex">${["M", "F"].map((s) => `<button type="button" data-sex="${i}|${s}" class="${pp.sex === s ? "on" : ""}">${esc(P.sexes[s])}</button>`).join("")}</span></div>
+        <label class="fld"><span>${esc(P.issued)}</span><input name="pp.issued" type="date" value="${esc(pp.issued)}" max="${todayIso()}" /><em>${esc(P.errIssued)}</em></label>
+        <label class="fld${ck("expiry")}"><span>${esc(P.expiry)}</span><input name="pp.expiry" type="date" value="${esc(pp.expiry)}" min="${todayIso()}" /><em>${esc(P.errExpiry)}</em></label>
+      </div>
+      ${pp.expiryWarn ? `<p class="pp__warn">${esc(pp.expiryWarn)}</p>` : ""}
+      <label class="chk pp__later"><input type="checkbox" data-later="${i}" ${pp.later ? "checked" : ""} /> ${esc(P.later)}</label>
+    </div>`;
+  }
+  // Six months left on the day home is what most countries ask; before the trip ends is a hard stop.
+  function expiryCheck(iso, d) {
+    if (!iso) return { ok: true };
+    const end = d.ret || d.dep, six = addDays(end, 182);
+    if (iso <= end) return { ok: false, msg: t("pp").expiredTrip };
+    if (iso < six) return { ok: true, warn: t("pp").sixMonths(fmt(iso, { day: "numeric", month: "short", year: "numeric" })) };
+    return { ok: true };
+  }
+
   async function viewTravelersLive() {
     const d = draft;
     if (!A.signedIn) return location.replace("#/signin?next=travelers");
@@ -1365,21 +1426,26 @@
     try { people = (await A.people()).people; } catch (e) { if (e.status === 401) { await A.signOut(); return location.replace("#/signin?next=travelers"); } return page(errBox(e.message, true)); }
     if (route().name !== "travelers") return;
     const ks = kinds(d.pax), self = people.find((p) => p.isSelf), seen = new Set(), others = people.filter((p) => { const k = `${p.givenNames || p.firstName} ${p.surname}`.toUpperCase(); if (p.isSelf || seen.has(k)) return false; seen.add(k); return true; });
-    co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k) return prev; return i === 0 && k === "a" && self ? { k, personId: self.id, first: self.givenNames || (user && user.name) || "", last: self.surname || "", dob: "" } : { k, personId: null, first: "", last: "", dob: "" }; });
+    const fromPerson = (k, p) => ({ k, personId: p.id, first: p.givenNames || p.firstName || "", last: p.surname || "", dob: p.dateOfBirth || "", pp: { ...ppBlank(), dob: p.dateOfBirth || "", sex: p.sex || "", nat: p.nationality || "", have: p.passport || null } });
+    co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k && prev.pp) return prev; return i === 0 && k === "a" && self ? { ...fromPerson(k, self), first: self.givenNames || (user && user.name) || "" } : { k, personId: null, first: "", last: "", dob: "", pp: ppBlank() }; });
+    co.lt.forEach((x) => { if (x.pp && x.pp.have) x.pp.expiryWarn = expiryCheck(x.pp.have.expiry, d).warn || (!expiryCheck(x.pp.have.expiry, d).ok ? t("pp").expiredTrip : ""); });
     co.contact = co.contact || { phone: (A.user && A.user.phone || "").replace(/^\+966/, ""), email: (A.user && A.user.email) || "" };
     const label = { a: t("tAdult"), c: t("tChild"), i: t("tInfant") };
+    const P = t("pp");
     page(`<div class="wrap pg">
       ${backLink("#/plan")}${steps(1)}
-      <h1 class="pg__h">${esc(t("trvTitle"))}</h1><p class="pg__sub">${esc(t("trvSub"))}</p>
+      <h1 class="pg__h">${esc(t("trvTitle"))}</h1><p class="pg__sub">${esc(P.sub)}</p>
       <div class="pg__grid"><form id="trvForm" novalidate>
-        ${others.length ? `<div class="box"><h2 class="box__h">${esc(t("savedPick"))}</h2><div class="saved">${others.map((p) => `<button type="button" class="chip" data-person="${p.id}">${esc(p.givenNames || p.firstName)} ${esc(p.surname)}</button>`).join("")}</div></div>` : ""}
-        <div class="box">${co.lt.map((x, i) => `<div class="trv" data-i="${i}">
+        ${others.length ? `<div class="box"><h2 class="box__h">${esc(t("savedPick"))}</h2><div class="saved">${others.map((p) => `<button type="button" class="chip" data-person="${p.id}">${esc(p.givenNames || p.firstName)} ${esc(p.surname)}${p.passport ? ` ${ico("check")}` : ""}</button>`).join("")}</div></div>` : ""}
+        ${co.lt.map((x, i) => `<div class="box trv" data-i="${i}">
           <div class="trv__h"><b>${esc(t("travelerN")(i + 1, label[x.k]))}${x.personId && self && x.personId === self.id ? ` · ${esc(t("you"))}` : ""}</b><span class="tagname" data-tag="${i}"></span></div>
           <div class="fgrid">
             <label class="fld"><span>${esc(t("first"))}</span><input name="first" value="${esc(x.first)}" autocomplete="given-name" autocapitalize="characters" ${x.personId && x.personId !== (self && self.id) ? "readonly" : ""} /><em>${esc(t("errName"))}</em></label>
             <label class="fld"><span>${esc(t("last"))}</span><input name="last" value="${esc(x.last)}" autocomplete="family-name" autocapitalize="characters" ${x.personId && x.personId !== (self && self.id) ? "readonly" : ""} /><em>${esc(t("errName"))}</em></label>
-            ${x.k !== "a" ? `<label class="fld"><span>${esc(t("dob"))}</span><input name="dob" type="date" value="${esc(x.dob)}" max="${todayIso()}" /><em>${esc(x.k === "c" ? t("errChildAge") : t("errInfAge"))}</em></label>` : ""}
-          </div></div>`).join("")}<p class="note-s">${esc(t("passportLater"))}</p></div>
+          </div>
+          ${ppHtml(x, i)}
+        </div>`).join("")}
+        <p class="note-s pp__private">${ico("lock")}${esc(P.private)}</p>
         <div class="box"><h2 class="box__h">${esc(t("contactH"))}</h2><div class="fgrid">
           <label class="fld" id="fPhone"><span>${esc(t("phone"))}</span><div class="phone"><b>+966</b><input name="phone" inputmode="tel" value="${esc(co.contact.phone)}" placeholder="5X XXX XXXX" /></div><em>${esc(t("errPhone"))}</em></label>
           <label class="fld" id="fEmail"><span>${esc(t("email"))}</span><input name="email" type="email" value="${esc(co.contact.email)}" /><em>${esc(t("errEmail"))}</em></label></div></div>
@@ -1389,43 +1455,83 @@
     const form = $("#trvForm");
     const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? t("uxOnTicket")(`${(x.first || "").toUpperCase()} ${(x.last || "").toUpperCase()}`.trim()) : ""; };
     co.lt.forEach((_, i) => tag(i));
+    // The full passport number is kept in memory only, never in this browser's storage.
+    const save = () => store.set("checkout", { ...co, lt: co.lt.map((x) => ({ ...x, pp: x.pp && { ...x.pp, number: "" } })) });
     form.addEventListener("input", (e) => {
-      const row = e.target.closest(".trv");
-      if (row) { const i = +row.dataset.i; co.lt[i][e.target.name] = e.target.value; tag(i); } else if (e.target.name) co.contact[e.target.name] = e.target.value;
-      e.target.closest(".fld")?.classList.remove("err"); store.set("checkout", co);
+      const row = e.target.closest(".trv"), n = e.target.name || "";
+      if (row) {
+        const i = +row.dataset.i, x = co.lt[i];
+        if (n.startsWith("pp.")) { const f = n.slice(3); x.pp[f] = f === "number" ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") : e.target.value; if (f === "number") e.target.value = x.pp[f]; if (f === "dob") x.dob = e.target.value; x.pp.check = x.pp.check.filter((c) => c !== (f === "nat" ? "nationality" : f)); e.target.closest(".fld")?.classList.remove("fld--check"); }
+        else if (n) { x[n] = e.target.value; tag(i); }
+      } else if (n) co.contact[n] = e.target.value;
+      e.target.closest(".fld")?.classList.remove("err"); save();
+    });
+    form.addEventListener("change", async (e) => {
+      if (e.target.dataset.later != null) { const x = co.lt[+e.target.dataset.later]; x.pp.later = e.target.checked; save(); return viewTravelersLive(); }
+      if (e.target.dataset.scan == null || !e.target.files[0]) return;
+      const i = +e.target.dataset.scan, x = co.lt[i], st = $(`#ppS${i}`);
+      st.hidden = false; st.className = "pp__status"; st.innerHTML = `<span class="spin spin--sm"></span>${esc(P.loading)}`;
+      try {
+        const r = await readPassport(e.target.files[0], (msg) => { st.innerHTML = `<span class="spin spin--sm"></span>${esc(msg)}`; });
+        if (!r) { st.className = "pp__status pp__status--no"; st.textContent = P.noRead; return; }
+        const f = r.fields, M = window.MadaMRZ, saved = x.personId && x.personId !== (self && self.id);
+        if (!saved) { x.first = f.given || x.first; x.last = f.surname || x.last; }
+        Object.assign(x.pp, { number: f.number || x.pp.number, nat: M.countryCode(f.nationalityCode || f.nationality) || x.pp.nat, dob: M.dmyToIso(f.dob) || x.pp.dob, expiry: M.dmyToIso(f.expiry) || x.pp.expiry, sex: /^[MF]$/.test(f.sex) ? f.sex : x.pp.sex, source: "scan", check: r.doubtful || [] });
+        x.dob = x.pp.dob; x.pp.scanMsg = { k: "ok", text: (r.doubtful || []).length ? P.readCheck : P.readOk }; save(); viewTravelersLive();
+      } catch { st.className = "pp__status pp__status--no"; st.textContent = P.noOcr; }
     });
     form.addEventListener("click", (e) => {
+      const sx = e.target.closest("[data-sex]"); if (sx) { const [i, s] = sx.dataset.sex.split("|"); co.lt[+i].pp.sex = s; $$(`[data-sex^="${i}|"]`).forEach((b) => b.classList.toggle("on", b === sx)); save(); return; }
+      const rp = e.target.closest("[data-ppreplace]"); if (rp) { co.lt[+rp.dataset.ppreplace].pp.replace = true; save(); return viewTravelersLive(); }
       const b = e.target.closest("[data-person]"); if (!b) return;
       const p = people.find((x) => x.id === b.dataset.person); if (co.lt.some((x) => x.personId === p.id)) return;
       const j = co.lt.findIndex((x, i) => i > 0 && !x.personId && !x.first); if (j < 0) return;
-      co.lt[j] = { ...co.lt[j], personId: p.id, first: p.givenNames || p.firstName, last: p.surname, dob: p.dateOfBirth || "" }; store.set("checkout", co); viewTravelersLive();
+      co.lt[j] = fromPerson(co.lt[j].k, p); save(); viewTravelersLive();
     });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      let firstBad = null; const bad = (el) => { el.classList.add("err"); firstBad = firstBad || el; };
+      let firstBad = null; const bad = (el) => { if (!el) return; el.classList.add("err"); firstBad = firstBad || el; };
       const latin = /^[A-Za-z][A-Za-z' -]*$/;
       co.lt.forEach((x, i) => {
-        const row = $(`.trv[data-i="${i}"]`);
-        if (!latin.test((x.first || "").trim())) bad($('[name="first"]', row).closest(".fld"));
-        if (!latin.test((x.last || "").trim())) bad($('[name="last"]', row).closest(".fld"));
-        if (x.k !== "a") { const age = x.dob ? (new Date(d.dep) - new Date(x.dob)) / (365.25 * 864e5) : -1; if (x.k === "c" ? age < 2 || age >= 12 : age < 0 || age >= 2) bad($('[name="dob"]', row).closest(".fld")); }
+        const row = $(`.trv[data-i="${i}"]`), fld = (n) => $(`[name="${n}"]`, row)?.closest(".fld");
+        if (!latin.test((x.first || "").trim())) bad(fld("first"));
+        if (!latin.test((x.last || "").trim())) bad(fld("last"));
+        const pp = x.pp, dob = pp.dob || x.dob;
+        if (x.k !== "a") { const age = dob ? (new Date(d.dep) - new Date(dob)) / (365.25 * 864e5) : -1; if (x.k === "c" ? age < 2 || age >= 12 : age < 0 || age >= 2) bad(fld("pp.dob")); }
+        if (pp.have && !pp.replace) { if (!expiryCheck(pp.have.expiry, d).ok) { const w = $(".pp__have", row); if (w) { w.classList.add("err"); firstBad = firstBad || w; } } return; }
+        if (pp.later) return;
+        if (!/^[A-Z0-9]{5,12}$/.test(pp.number)) bad(fld("pp.number"));
+        if (!pp.nat) bad(fld("pp.nat"));
+        if (!dob) bad(fld("pp.dob"));
+        if (pp.issued && pp.issued > todayIso()) bad(fld("pp.issued"));
+        const ex = expiryCheck(pp.expiry, d);
+        if (!pp.expiry || !ex.ok) bad(fld("pp.expiry"));
+        pp.expiryWarn = ex.warn || (!ex.ok ? ex.msg : "");
       });
       const ph = String(co.contact.phone || "").replace(/\D/g, "").replace(/^966/, "").replace(/^0/, "");
       if (!/^5\d{8}$/.test(ph)) bad($("#fPhone")); else co.contact.phone = ph;
       if (co.contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(co.contact.email)) bad($("#fEmail"));
       if (firstBad) { firstBad.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-      const btn = $(".primary", form); btn.disabled = true;
+      const btn = $(".primary", form); btn.disabled = true; btn.textContent = P.saving;
       try {
-        // New people join the household on the account, so the app shows them too.
+        // Everyone joins the household on the account with their passport, so the app has them too; the full number is
+        // stored encrypted and only ever shown masked.
         for (const x of co.lt) {
-          if (x.personId) continue;
-          const body = { givenNames: x.first.trim().toUpperCase(), surname: x.last.trim().toUpperCase(), relation: x.k === "a" ? "family" : "child", ...(x.dob ? { dateOfBirth: x.dob } : {}) };
-          x.personId = (await A.addPerson(body)).person.id;
+          const pp = x.pp, given = x.first.trim().toUpperCase(), surname = x.last.trim().toUpperCase(), dob = pp.dob || x.dob || undefined;
+          const passport = !pp.later && !(pp.have && !pp.replace) && pp.number ? { number: pp.number, issuingCountry: pp.nat, nationality: pp.nat, expiry: pp.expiry, ...(pp.issued ? { issued: pp.issued } : {}), source: pp.source || "manual" } : null;
+          if (!x.personId) {
+            const body = { givenNames: given, surname, relation: x.k === "a" ? "family" : "child", ...(dob ? { dateOfBirth: dob } : {}), ...(pp.sex ? { sex: pp.sex } : {}), ...(pp.nat ? { nationality: pp.nat } : {}), ...(passport ? { passport } : {}) };
+            x.personId = (await A.addPerson(body)).person.id;
+          } else if (passport) {
+            await A.savePassport(x.personId === (self && self.id) ? null : x.personId, { givenNames: given, surname, dateOfBirth: dob, ...(pp.sex ? { sex: pp.sex } : {}), passport });
+          }
+          if (passport) { pp.have = { numberMasked: pp.number.slice(0, 3) + "•••" + pp.number.slice(-2), nationality: pp.nat, expiry: pp.expiry }; pp.replace = false; pp.number = ""; }
         }
-        store.set("checkout", co); location.hash = "#/pay";
-      } catch (err) { btn.disabled = false; const el = $("#trvErr"); el.hidden = false; el.textContent = err.message; }
+        save(); location.hash = "#/pay";
+      } catch (err) { btn.disabled = false; btn.textContent = t("toPay"); const el = $("#trvErr"); el.hidden = false; el.textContent = err.message; }
     });
   }
+
 
   // ----- pay: the same offers priced again for these travellers, the API's order sheet, then the orders -----
   async function viewPayLive() {
