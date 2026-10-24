@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, TextInput, View, Platform } from 'react-native';
 import { addDays, dayLabel, daysBetween, formatSar, nameIn, rangeLabel, type Plan, type PlanCheck, type PlanItem, type PlanPlace } from '@mada/shared';
 import { Button } from '@/components/Button';
@@ -150,42 +150,45 @@ export function ItemRow({ item, prices, onPress, testID, act, line }: { item: Pl
   );
 }
 
-/** The trip page's photo header for the plan: "Riyadh → AlUla", the dates and who's going over the city's photo. */
-export function PlanHero({ plan, people, photo, onBack }: { plan: Plan; people: { name: string; initial: string }[]; photo?: string | null; onBack: () => void }) {
-  const locale = getLocale();
+/** A quiet chip in the header: the app's chip (mist pill), a size smaller so the three sit on one line. */
+function MetaChip({ label, icon, onPress, testID }: { label: string; icon: ReactNode; onPress?: () => void; testID?: string }) {
   return (
-    <TripHero photo={photo} title={routeTitle(plan.title)} onBack={onBack} shadeId="plan-top" titleTestID="plan-title"
-      sub={<T v="small" color="rgba(255,253,249,0.9)" testID="plan-dates">{rangeLabel(plan.startDate, plan.endDate, locale)}</T>}>
-      {people.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }} testID="plan-people">
-          {people.map((p, i) => (
-            <View key={`${p.name}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Initial letter={p.initial} size={22} gold={i === 0} />
-              <T v="small" color={colors.paper}>{nameIn(p.name, locale)}</T>
-            </View>
-          ))}
-        </View>
-      ) : null}
-    </TripHero>
+    <Pressable onPress={onPress ? () => { buzz('select'); onPress(); } : undefined} disabled={!onPress} accessibilityRole={onPress ? 'button' : undefined} accessibilityLabel={label} hitSlop={{ top: 6, bottom: 6 }} testID={testID}
+      style={({ pressed }) => [st.chip, pressed ? { transform: [{ scale: 0.97 }] } : null]}>
+      {icon}
+      <T v="small" color={colors.green} style={{ fontFamily: ff.ui600 }} numberOfLines={1}>{label}</T>
+    </Pressable>
   );
 }
 
-/** Where it starts (and Change, for the owner), under the photo header. */
-export function PlanHeader({ plan, canEdit, onOrigin }: { plan: Plan; canEdit: boolean; onOrigin: () => void }) {
+/**
+ * The trip page's photo header for the plan: "Riyadh → AlUla" over the city's photo, and under it one row of quiet
+ * chips (dates, who's going, where it starts), each opening its own edit.
+ */
+export function PlanHero({ plan, people, photo, onBack, onDates, onPeople, onOrigin }: {
+  plan: Plan; people: { name: string; initial: string }[]; photo?: string | null; onBack: () => void; onDates?: () => void; onPeople?: () => void; onOrigin?: () => void;
+}) {
+  const locale = getLocale();
+  const first = people[0] ? nameIn(people[0].name, locale) : null;
+  const who = first ? (people.length > 1 ? t('plan.meta.people', { name: first, n: people.length - 1 }) : first) : null;
   return (
-    <View style={{ gap: 10 }}>
-      <View style={st.line} testID="plan-origin">
-        <Icon name="pin" size={16} color={plan.origin ? colors.ink3 : colors.goldInk} />
-        <T v="small" color={plan.origin ? colors.ink2 : colors.goldInk} style={{ flexShrink: 1, fontFamily: plan.origin ? undefined : ff.ui600 }}>
-          {plan.origin ? t('plan.screen.from', { place: placeName(plan.origin) }) : t('plan.screen.startNeeded')}
-        </T>
-        {canEdit ? (
-          <Pressable onPress={() => { buzz('tap'); onOrigin(); }} hitSlop={10} accessibilityRole="button" testID="plan-origin-change">
-            <T v="small" color={colors.green} style={{ fontFamily: ff.ui600, textDecorationLine: 'underline' }}>{t('plan.screen.change')}</T>
-          </Pressable>
+    <TripHero photo={photo} title={routeTitle(plan.title)} onBack={onBack} shadeId="plan-top" titleTestID="plan-title" height={250}>
+      <View style={st.meta} testID="plan-meta">
+        <MetaChip label={rangeLabel(plan.startDate, plan.endDate, locale)} icon={<Icon name="calendar" size={14} color={colors.green} />} onPress={onDates} testID="plan-dates" />
+        {who ? (
+          <MetaChip label={who} onPress={onPeople} testID="plan-people" icon={(
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Icon name="user" size={14} color={colors.green} />
+              <View style={{ flexDirection: 'row' }}>
+                {people.slice(0, 3).map((p, i) => <View key={`${p.name}-${i}`} style={i ? { marginStart: -5 } : null}><Initial letter={p.initial} size={16} gold={i === 0} /></View>)}
+              </View>
+            </View>
+          )} />
         ) : null}
+        <MetaChip label={plan.origin ? t('plan.screen.from', { place: placeName(plan.origin) }) : t('plan.screen.startNeeded')} onPress={onOrigin} testID="plan-origin"
+          icon={<Icon name="pin" size={14} color={plan.origin ? colors.green : colors.goldInk} />} />
       </View>
-    </View>
+    </TripHero>
   );
 }
 
@@ -301,6 +304,8 @@ export function Banner({ icon, text, tone = 'well', onClose, testID }: { icon: I
 export const st = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, minHeight: 48 },
   time: { width: 40, fontVariant: ['tabular-nums'] },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, paddingHorizontal: 11, borderRadius: 999, backgroundColor: colors.mist },
   // The day's dotted thread through the icons: it runs into the row's padding and half the gap so the rows join.
   thread: { alignSelf: 'stretch', alignItems: 'center', marginTop: -10, marginBottom: -10 },
   dots: { flex: 1, width: 0, minHeight: 10, borderWidth: 1, borderStyle: 'dotted', borderColor: 'rgba(30, 53, 45, 0.26)', borderRadius: 1 },

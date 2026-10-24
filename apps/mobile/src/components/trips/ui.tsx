@@ -68,15 +68,15 @@ export const Veil = ({ id }: { id: string }) => <VGradient id={id} stops={[[0, '
 export const Shade = ({ id }: { id: string }) => <VGradient id={id} stops={[[0.25, 'rgba(15,26,22,0.05)'], [1, 'rgba(15,26,22,0.78)']]} />;
 
 /** A trip's photo header (the trip page's and the plan's): the city photo, Back over it, the title and a line under it. */
-export function TripHero({ photo, title, sub, onBack, shadeId = 'trip-top', children, titleTestID }: { photo?: string | null; title: string; sub: ReactNode; onBack: () => void; shadeId?: string; children?: ReactNode; titleTestID?: string }) {
+export function TripHero({ photo, title, sub, onBack, shadeId = 'trip-top', children, titleTestID, height = 230 }: { height?: number; photo?: string | null; title: string; sub?: ReactNode; onBack: () => void; shadeId?: string; children?: ReactNode; titleTestID?: string }) {
   return (
-    <Photo k={photo} style={{ height: 230, borderRadius: 0 }}>
+    <Photo k={photo} style={{ height, borderRadius: 0 }}>
       <Shade id={shadeId} />
       <View style={{ position: 'absolute', top: 0, start: 0, end: 0, zIndex: 2 }}><TopBar onBack={onBack} dark /></View>
       <View style={{ flex: 1, justifyContent: 'flex-end', padding: 16, gap: 4 }}>
         {titleTestID ? <View testID={titleTestID} accessibilityRole="header"><Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display></View>
           : <Display size={title.length > 18 ? 30 : 40} color={colors.paper}>{title}</Display>}
-        <T v="small" color="rgba(255,253,249,0.9)">{sub}</T>
+        {sub != null ? <T v="small" color="rgba(255,253,249,0.9)">{sub}</T> : null}
         {children}
       </View>
     </Photo>

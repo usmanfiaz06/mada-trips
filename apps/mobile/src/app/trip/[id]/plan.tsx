@@ -10,7 +10,7 @@ import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
 import { DemoFare } from '@/components/booking/DemoFare';
 import { Rise, SmallButton, TripScreen } from '@/components/trips/ui';
-import { AddForm, Banner, DaySection, OriginForm, PlanHeader, PlanHero, RowActTag, StatusTag, TodoCard, itemWords, placeName, rowActKind, rowActLabel, type RowAct } from '@/components/plan/PlanParts';
+import { AddForm, Banner, DaySection, OriginForm, PlanHero, RowActTag, StatusTag, TodoCard, itemWords, placeName, rowActKind, rowActLabel, type RowAct } from '@/components/plan/PlanParts';
 import { ApiError } from '@/lib/api';
 import { bookingApi, usePayDraft } from '@/lib/booking';
 import { buzz } from '@/lib/haptics';
@@ -119,16 +119,21 @@ export default function PlanScreen() {
     <TripScreen
       title={t('plan.screen.title')}
       onBack={onBack}
-      hero={<PlanHero plan={plan} people={data?.people ?? []} photo={photo} onBack={onBack} />}
+      hero={(
+        <PlanHero plan={plan} people={data?.people ?? []} photo={photo} onBack={onBack}
+          onDates={owner ? () => askAbout(t('plan.meta.datesSay')) : undefined}
+          onPeople={() => router.push(`/trip/${id}/travellers` as Href)}
+          onOrigin={owner ? () => setSheet({ kind: 'origin' }) : undefined} />
+      )}
       act={(
         <View style={{ gap: 8 }}>
           {ready ? (
             <>
               {ready.demo ? <DemoFare testID="plan-demo-fare" /> : null}
-              <Button label={t('plan.screen.bookReady', { amount: formatSar(ready.priced) })} onPress={() => { buzz('tap'); router.push({ pathname: '/pay', params: { plan: id } }); }} testID="plan-book-ready" />
+              <Button variant="gold" label={t('plan.screen.bookReady', { amount: formatSar(ready.priced) })} onPress={() => { buzz('tap'); router.push({ pathname: '/pay', params: { plan: id } }); }} testID="plan-book-ready" />
             </>
           ) : null}
-          <Button variant={ready ? 'secondary' : 'primary'} label={t('plan.screen.ask')} onPress={() => { buzz('tap'); router.push({ pathname: '/ask', params: { tripId: id } }); }} testID="plan-ask" />
+          <Button variant={ready ? 'ghost' : 'primary'} label={t('plan.screen.askPlan')} onPress={() => { buzz('tap'); router.push({ pathname: '/ask', params: { tripId: id } }); }} testID="plan-ask" />
         </View>
       )}
     >
@@ -144,7 +149,6 @@ export default function PlanScreen() {
           <Banner icon="lock" testID="plan-role"
             text={access.role === 'view' ? t('plan.role.view') : access.role === 'edit' ? t('plan.role.edit', { name: access.ownerName ?? '' }) : t('plan.role.suggest', { name: access.ownerName ?? '' })} />
         ) : null}
-        <Rise><PlanHeader plan={plan} canEdit={owner} onOrigin={() => setSheet({ kind: 'origin' })} /></Rise>
         <Rise step={1}><TodoCard checks={plan.checks} /></Rise>
         {/* Whole-trip items (an eSIM, insurance) before the days. */}
         {plan.items.some((i) => i.day == null) ? (

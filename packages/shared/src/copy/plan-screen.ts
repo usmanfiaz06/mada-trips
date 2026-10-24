@@ -135,4 +135,8 @@ export const planScreenCopy = {
   'trip.stay.manage': 'Manage',
   'trip.stay.voucher': 'Hotel voucher',
   'trip.stay.directions': 'Directions',
+  // The plan's header chips and its ask (design v3).
+  'plan.screen.askPlan': 'Ask about this plan',
+  'plan.meta.people': '{name} +{n}',
+  'plan.meta.datesSay': 'Change the dates of this plan',
 } as const;

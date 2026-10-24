@@ -4,7 +4,7 @@
 //   EXPO_PUBLIC_API_MODE=mock npx expo export --platform web --output-dir <dir>
 //   DIST=<dir> node test/e2e-design-v3.mjs [shot-dir]          (default docs/app/screens)
 //
-// Screens: design-v3-plan-en/ar, design-v3-trip-en/ar, design-v3-manage-en.
+// Screens: design-v3-plan-en/ar, design-v3-plan-header-en, design-v3-trip-en/ar, design-v3-manage-en.
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
@@ -41,11 +41,21 @@ async function start(locale) {
   await byTest('welcome-start').waitFor({ timeout: 20000 });
   await page.evaluate(() => document.fonts.ready);
   await byTest('welcome-start').click();
+  // Phone or email, whichever this build's sign-in has ready.
   await byTest('signin-phone').click();
-  await byTest('phone-input').fill('500004127');
-  await byTest('phone-send').click();
-  await byTest('otp-input').waitFor({ timeout: 10000 });
-  await byTest('otp-input').fill('123456');
+  const phone = await byTest('phone-input').waitFor({ timeout: 4000 }).then(() => true, () => false);
+  if (phone) {
+    await byTest('phone-input').fill('500004127');
+    await byTest('phone-send').click();
+    await byTest('otp-input').waitFor({ timeout: 10000 });
+    await byTest('otp-input').fill('123456');
+  } else {
+    await byTest('signin-email').click();
+    await byTest('email-input').fill('omar@example.com');
+    await byTest('email-send').click();
+    await byTest('email-code-input').waitFor({ timeout: 10000 });
+    await byTest('email-code-input').fill('123456');
+  }
   await byTest('welcome-back-open').waitFor({ timeout: 10000 });
   await byTest('welcome-back-open').click();
   await page.waitForTimeout(1200);
@@ -116,6 +126,8 @@ async function run(locale, words, suffix) {
   await page.waitForTimeout(800);
   check(await s.visible('plan-item-act-booked'), `${suffix}: the booked stay says Booked`);
   check(await s.visible('topbar-back'), `${suffix}: Back on the photo`);
+  check(await s.visible('plan-dates') && await s.visible('plan-people') && await s.visible('plan-origin'), `${suffix}: dates, travellers and start as chips`);
+  check(await s.visible('plan-ask'), `${suffix}: Ask about this plan`);
   await s.top();
   await s.shot(`design-v3-plan-${suffix}`);
   await page.goBack();
@@ -128,6 +140,22 @@ async function run(locale, words, suffix) {
     await s.shot('design-v3-manage-en');
     await byTest('cancel-stay').click();
     check(await s.visible('cancel-stay-confirm', 5000), 'Cancel goes through its confirmation');
+    // Something priced (the flight at a sample fare, mock only): gold Book first, Ask about this plan under it.
+    check(await page.evaluate((id) => window.__madaMockPlan.price(id, 124000), tripId), 'the flight priced (sample fare)');
+    await page.locator('[role="button"][aria-label="Close"]').filter({ visible: true }).last().click();
+    await page.waitForTimeout(600);
+    await s.go(`/trip/${tripId}`);
+    await byTest('trip-plan-open').click();
+    await s.visible('plan-screen');
+    check(await s.visible('plan-book-ready', 15000), 'priced: Book what’s ready');
+    check(/Book what’s ready · SAR 1,240/.test(await byTest('plan-book-ready').innerText()), 'with the total');
+    check(await s.visible('plan-item-act-price'), 'priced: the row shows its price');
+    check((await byTest('plan-ask').innerText()).trim() === 'Ask about this plan', 'Ask about this plan under it');
+    await page.waitForTimeout(800);
+    await s.top();
+    await s.shot('design-v3-plan-header-en');
+    await byTest('plan-origin').click();
+    check(await s.visible('plan-origin-form', 5000), 'the start chip opens the origin edit');
   }
   await s.context.close();
 }

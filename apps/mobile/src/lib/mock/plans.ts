@@ -17,7 +17,8 @@ import { mockTripChat, setMockTripChat } from './ask-threads';
  * drive interface's fixture is on the server.
  *
  * Mock only, for e2e and screenshots: `__MADA_DEMO__.planRole = 'suggest' | 'edit' | 'view'` reads the plan as a
- * companion; `__madaMockPlan.bump(tripId)` changes the plan "on another phone" (its version moves on).
+ * companion; `__madaMockPlan.bump(tripId)` changes the plan "on another phone" (its version moves on);
+ * `__madaMockPlan.price(tripId, amount)` prices its first flight idea at a sample fare (screenshots).
  */
 
 type Stored = { plan: Plan; owner: string };
@@ -160,7 +161,18 @@ function apply(user: MockUser, s: Stored, version: number, ops: PlanOp[]): WireR
 }
 
 /** Mock only: the plan changed on another phone (its version moves on, nothing else). */
-(globalThis as { __madaMockPlan?: unknown }).__madaMockPlan = { bump: (tripId: string) => { const s = plans.get(tripId); if (s) s.plan = { ...s.plan, version: s.plan.version + 1 }; return !!s; } };
+(globalThis as { __madaMockPlan?: unknown }).__madaMockPlan = {
+  bump: (tripId: string) => { const s = plans.get(tripId); if (s) s.plan = { ...s.plan, version: s.plan.version + 1 }; return !!s; },
+  /** Screenshots only: the plan's first flight idea priced at a sample fare, as a chosen search result would price it. */
+  price: (tripId: string, amount: number) => {
+    const s = plans.get(tripId);
+    const leg = s?.plan.items.find((i) => i.kind === 'leg' && i.mode === 'flight' && i.status === 'idea');
+    if (!s || !leg) return false;
+    const price = { amount, currency: 'SAR' as const, asOf: new Date().toISOString(), expiresAt: null, demo: true };
+    s.plan = { ...s.plan, items: s.plan.items.map((i) => (i.id === leg.id ? { ...i, status: 'priced' as const, price } : i)), totals: { priced: amount, booked: 0, currency: 'SAR', demo: true, ready: 1 } };
+    return true;
+  },
+};
 
 /** The plan card the demo conversation shows for a plan (the server's tools-plan.ts card, a few rows a day). */
 export function mockPlanCard(user: MockUser, plan: Plan): ChatCard {

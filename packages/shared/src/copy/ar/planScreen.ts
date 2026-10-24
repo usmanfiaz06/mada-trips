@@ -125,4 +125,7 @@ export const arPlanScreen: ArSection<typeof planScreenCopy> = {
   'trip.stay.manage': 'إدارة',
   'trip.stay.voucher': 'قسيمة الفندق',
   'trip.stay.directions': 'الاتجاهات',
+  'plan.screen.askPlan': 'اسأل عن هذي الخطة',
+  'plan.meta.people': '{name} +{n}',
+  'plan.meta.datesSay': 'أبي أغيّر تواريخ هالخطة',
 };
