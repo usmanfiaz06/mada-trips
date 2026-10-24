@@ -76,7 +76,8 @@ const TONE: Record<string, { fg: string; bg: string }> = {
 };
 
 export function StatusTag({ status, testID }: { status: PlanItem['status']; testID?: string }) {
-  if (status === 'idea') return <T v="tiny" color={colors.ink3} testID={testID}>{t('chat.plan.status.idea')}</T>;
+  // A plain idea carries no label (design v3: the row's own action or nothing, never "Idea").
+  if (status === 'idea') return null;
   const tone = TONE[status] ?? TONE.priced!;
   return (
     <View style={[st.tag, { backgroundColor: tone.bg }]} testID={testID}>
