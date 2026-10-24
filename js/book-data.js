@@ -91,6 +91,12 @@
     RUH: { pos: "50% 50%", en: "Home", ar: "الرياض", credit: "B.alotaby, CC BY-SA 4.0", src: "https://commons.wikimedia.org/wiki/File:Riyadh_Skyline.jpg" },
   };
   const POPULAR = ["DXB", "IST", "ULH", "CAI", "MLE", "LHR", "KUL", "GVA"];
+  // Rough nightly rates (SAR) for a good 3★ / 4★ / 5★ room, the eSIM we'd sell for that country, and an airport pickup.
+  // Estimates for the preview; the live version reads these from the hotel and eSIM suppliers.
+  const STAY = { DXB: [320, 620, 1350], IST: [280, 520, 1100], ULH: [450, 900, 2200], CAI: [220, 450, 950], MLE: [900, 1800, 4200], LHR: [520, 900, 1900], KUL: [190, 380, 800], GVA: [600, 1050, 2100], JED: [260, 480, 1100] };
+  const ESIM = { AE: 39, TR: 45, EG: 39, MV: 59, GB: 49, MY: 35, CH: 55, SA: 0 };
+  const PICKUP = { DXB: 140, IST: 160, ULH: 180, CAI: 120, MLE: 0, LHR: 260, KUL: 110, GVA: 240, JED: 110 };
+  const GCC = new Set(["SA", "AE", "QA", "BH", "KW", "OM"]);
   const photo = (code, small) => (DEST[code] ? `/assets/img/dest/${code.toLowerCase()}${small ? "-s" : ""}.jpg` : null);
 
   const AIRLINES = {
@@ -192,5 +198,5 @@
     return { q, rank, cheaper };
   }
 
-  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, AIRLINES, quote, priceContext, km, iso };
+  window.MadaData = { AIRPORTS, byCode, DEST, POPULAR, photo, STAY, ESIM, PICKUP, GCC, AIRLINES, quote, priceContext, km, iso };
 })();

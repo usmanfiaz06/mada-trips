@@ -43,7 +43,7 @@
       if (taken(m.index, m.index + m[0].length) || STOP.has(m[0])) continue;
       let best = null;
       for (const { n, code } of NAMES) {
-        if (/[^a-z]/.test(n) || Math.abs(n.length - m[0].length) > 2) continue;
+        if (/[^a-z]/.test(n) || n.length < 5 || Math.abs(n.length - m[0].length) > 2) continue;
         const d = lev(m[0], n);
         if (d <= (n.length >= 7 ? 2 : 1) && (!best || d < best.d)) best = { code, d, n };
       }
@@ -51,7 +51,7 @@
     }
     return hits.sort((a, b) => a.start - b.start);
   }
-  const STOP = new Set(["this", "next", "week", "weekend", "with", "wife", "husband", "kids", "children", "family", "people", "adults", "under", "below", "direct", "nonstop", "from", "days", "nights", "month", "return", "back", "cheap", "somewhere", "anywhere", "friday", "monday", "sunday", "tuesday", "thursday", "saturday", "wednesday", "baby", "babies", "today", "tomorrow", "trip", "flight", "flights", "honeymoon", "couple", "friend", "friends", "mother", "father", "november", "december", "january", "october"]);
+  const STOP = new Set(["make", "take", "more", "less", "cheaper", "hotel", "hotels", "star", "stars", "just", "only", "earlier", "later", "traveler", "traveller", "need", "visa", "umrah", "want", "please", "book", "plan", "show", "same", "long", "luxury", "stay", "rental", "pickup", "esim", "this", "next", "week", "weekend", "with", "wife", "husband", "kids", "children", "family", "people", "adults", "under", "below", "direct", "nonstop", "from", "days", "nights", "month", "return", "back", "cheap", "somewhere", "anywhere", "friday", "monday", "sunday", "tuesday", "thursday", "saturday", "wednesday", "baby", "babies", "today", "tomorrow", "trip", "flight", "flights", "honeymoon", "couple", "friend", "friends", "mother", "father", "november", "december", "january", "october"]);
 
   function nextDow(from, dow, strict = true) {
     const d = new Date(from); const diff = (dow - d.getDay() + 7) % 7 || (strict ? 7 : 0);
