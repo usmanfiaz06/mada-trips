@@ -1621,3 +1621,10 @@ html[dir="rtl"] .svc__art--car svg { transform: scaleX(-1); }
   .svc__t--visa::after { background: linear-gradient(180deg, rgba(10, 16, 13, 0) 30%, rgba(10, 16, 13, .8)) !important; }
 }
 @media (max-width: 560px) { .svc__art { height: 46%; } .svc__art--esim .sig { height: 32px; } .svc__art--esim b { font-size: 26px; } .svc__art--car svg { width: 84%; } }
+.say__book { margin: 4px 0 10px; }
+/* In the conversation the words are the interface: no service buttons in the box. */
+.studio__dock .ask__tools { display: none; }
+.studio__dock .ask__bar { justify-content: flex-end; margin-top: -44px; pointer-events: none; }
+.studio__dock .ask__act { pointer-events: auto; }
+.studio__dock .ask__in { padding-inline-end: 96px; }
+.studio__dock .ask__in::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

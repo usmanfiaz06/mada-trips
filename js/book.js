@@ -106,7 +106,7 @@
     tamara: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Tamara"><rect width="48" height="30" rx="5" fill="#fff4ee"/><rect x="8" y="21.2" width="32" height="2" rx="1" fill="#e98ab7"/><text x="24" y="18.2" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="10.5" font-weight="700" fill="#1d1d1b">tamara</text></svg>',
     apple: '<svg class="pl-logo" viewBox="0 0 48 30" role="img" aria-label="Apple Pay"><rect width="48" height="30" rx="5" fill="#000"/><path d="M15.6 10.6c.5-.6.8-1.4.7-2.2-.7 0-1.5.5-2 1-.4.5-.8 1.3-.7 2.1.8.1 1.5-.4 2-.9zm.7 1.1c-1.1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2-.3 5.1.9 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.1-.5 1 0 1.3.5 2.2.5s1.4-.8 2-1.7c.6-.9.9-1.8.9-1.9 0 0-1.8-.7-1.8-2.7 0-1.7 1.4-2.5 1.4-2.5-.8-1.2-2-1.3-2.3-1.4z" fill="#fff"/><text x="20.5" y="19.6" font-family="-apple-system,Helvetica,Arial,sans-serif" font-size="10.5" font-weight="600" fill="#fff">Pay</text></svg>',
   };
-  const acceptRow = (cls = "") => `<span class="accept ${cls}">${LOGO.mada}${LOGO.visa}${LOGO.mc}${LOGO.tabby}${LOGO.tamara}</span>`;
+  const acceptRow = (cls = "") => `<span class="accept ${cls}">${LOGO.mada}${LOGO.visa}${LOGO.mc}${LOGO.apple}</span>`;
   // Where to reach a person, the same everywhere: the number on the website, WhatsApp, email, and the hours.
   const PHONE = "+966566682662", PHONE_TXT = "+966 56 668 2662", MAIL = "support@madatrips.sa";
   const helpLine = (ctx) => `<div class="box helpbox"><b>${esc(t("hlp").stuck)}</b><p>${esc(t("hlp").hours)}</p>
@@ -245,7 +245,7 @@
     else if (out) items.push({
       k: "flight", icon: "flights", go: "#/flights/out", demo: !!out.demo,
       title: `${out.airline} ${out.out.flightNumber}${out.back && out.back.flightNumber.slice(0, 2) !== out.out.flightNumber.slice(0, 2) ? " · " + out.back.flightNumber : ""}`,
-      sub: `${day(out.out.date)} ${out.out.dep} → ${out.out.arr} · ${hrs(out.out.durationMin)} ${out.stop ? out.stop : t("direct")}${out.back ? ` · ${t("ret")} ${day(out.back.date)} ${out.back.dep}` : ""} · ${out.bags}`,
+      sub: `${day(out.out.date)} ${out.out.dep} → ${out.out.arr} · ${hrs(out.out.durationMin)} ${out.stop ? out.stop : t("direct")}${out.back ? ` · ${t("ret")} ${day(out.back.date)} ${out.back.dep}` : ""} · ${out.bags}${people > 1 ? ` · ${t("eachP")(money(Math.round(sar(out.total) / people)))}` : ""}`,
       price: sar(out.total),
     });
     else if (lv.key && HOME.has(d.from)) items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t(lv.err.flights ? "liveFlightsDown" : "liveFlightsNone"), price: null, info: true });
@@ -349,7 +349,13 @@
     if (route().name !== "plan") location.hash = "#/plan"; else renderThread(true);
     if (!LIVE) await new Promise((r) => setTimeout(r, reduce ? 0 : 650));
     // Live: the same understanding as the app (/ask/parse), then real searches before Mada says anything about prices.
-    if (LIVE && !raw && A.canChat && await chatTurn(text)) { busy = false; setWork(null); saveDraft(); if (route().name === "plan") { renderThread(false); renderPlanPane(true); } return; }
+    if (LIVE && !raw && A.canChat) {
+      const had = !!draft.chatThread;
+      const ok = await chatTurn(text);
+      // Once she is talking, the page never answers in her place: an honest "a moment" and the same words to send again.
+      if (!ok && had) say(esc(t("chatBusy")), chips([{ a: "say", v: text, l: t("tryAgain") }]));
+      if (ok || had) { busy = false; setWork(null); saveDraft(); if (route().name === "plan") { renderThread(false); renderPlanPane(true); } return; }
+    }
     let intent = null;
     if (LIVE && !raw) { try { intent = (await A.parse(text, null)).intent; } catch { /* the rules here still read it */ } }
     reply(text, raw, intent);
@@ -368,7 +374,7 @@
   // next steps become the chips. False when the conversation couldn't start, so the page answers with its own flow.
   async function chatTurn(text) {
     const d = draft, m = { who: "mada", html: "", extra: "" };
-    let words = "", intent = null, next = null, started = false, failed = false, person = null;
+    let words = "", intent = null, next = null, started = false, failed = false, person = null, cards = [];
     const clean = (s) => s.replace(/<next>[\s\S]*?(<\/next>|$)/g, "").replace(/<[^>]*$/, "").trim();
     const show = () => { m.html = esc(clean(words)).replace(/\n+/g, "<br>"); if (route().name === "plan") renderThread(true); };
     try {
@@ -378,6 +384,8 @@
         else if (e.type === "text") { if (!started) { started = true; d.msgs.push(m); } words += e.delta; show(); }
         else if (e.type === "replace") { if (!started) { started = true; d.msgs.push(m); } words = e.text; show(); }
         else if (e.type === "intent") intent = e.intent;
+        else if (e.type === "cards") cards = cards.concat(e.cards || []);
+        else if (e.type === "pay") m.book = true;
         else if (e.type === "next") next = e.choices;
         else if (e.type === "handoff" || e.type === "agent") person = e.name || e.agent || "";
         else if (e.type === "done" && e.text) words = e.text;
@@ -387,20 +395,29 @@
     if (failed && !clean(words)) { if (started) d.msgs.splice(d.msgs.indexOf(m), 1); return false; }
     if (!started) d.msgs.push(m);
     show();
-    // The plan beside the chat: the sentence as Mada read it, the page's own questions left out (she asked hers).
-    if (intent) {
-      const n = d.msgs.length;
-      reply(text, false, intent);
-      d.msgs.splice(n).forEach((x) => x.who === "you" && d.msgs.push(x));
-      if (d.pendingSay) {
-        setWork(t("liveChecking")); if (route().name === "plan") renderThread(true);
-        try { await liveSearch(d); } catch { /* each part says for itself what failed */ }
-        d.pendingSay = null;
-        if (buildPlan(d).items.some((i) => !i.info)) m.extra = "plan";
-      }
+    // The plan beside the chat follows what Mada actually searched (her flight and hotel cards: the place, the days,
+    // who), never a guess of its own, so the two never disagree. Until she has searched, it waits with her.
+    const fc = cards.find((c) => c.type === "flights"), sc = cards.find((c) => c.type === "stays"), srch = (fc || sc || {}).search;
+    const code = srch && FROM_KEY[srch.destination];
+    if (code && D.byCode[code]) {
+      if (code !== d.to) { d.items = {}; d.flightsOnly = false; d.outId = d.backId = d.hotelId = null; d.tier = 1; }
+      d.to = code; if (srch.from) d.from = srch.from;
+      d.dep = srch.depart; d.ret = srch.return || (sc ? addDays(srch.depart, sc.nights) : null);
+      const p = fromIntent(intent, P.parse(text)); if (p.pax) { d.pax = p.pax; store.set("pax", p.pax); d.paxSaid = true; }
+      if (sc && !fc && !d.plan) d.items = { ...d.items, flight: false };
+      d.plan = true;
+      setWork(t("liveChecking")); if (route().name === "plan") renderThread(true);
+      try { await liveSearch(d); } catch { /* each part says for itself what failed */ }
+      // Mada's own first pick leads the plan when the same option came back here.
+      const fo = fc && fc.options[0], so = sc && sc.options[0], lv = d.live;
+      // Her own option, not a look-alike, so the plan carries the very room and fare (and price) she named.
+      if (fo && lv && lv.flights) { if (!lv.flights.options.some((o) => o.id === fo.id)) lv.flights.options.unshift(fo); lv.outId = fo.id; }
+      if (so && lv && lv.stays) { if (!lv.stays.options.some((o) => o.id === so.id)) lv.stays.options.unshift(so); lv.stayId = so.id; lv.stayPick = null; }
+      if (buildPlan(d).items.some((i) => !i.info)) m.extra = "plan";
     }
+    m.next = next && next.length ? next : null;
     if (person !== null) m.extra = helpLine(helpContext());
-    else if (m.extra !== "plan" && next && next.length) m.extra = chips(next.map((c) => ({ a: "say", v: c, l: c })));
+    else if (m.extra !== "plan" && m.next) m.extra = chips(m.next.map((c) => ({ a: "say", v: c, l: c })));
     return true;
   }
   let workText = null;
@@ -415,7 +432,7 @@
       let extra = "";
       if (last && m.extra === "plan" && draft.plan) {
         const pl = buildPlan(draft);
-        extra = `<div class="say__mini"><span>${esc(t("totalFor")(paxText(draft.pax)))} · <b>${esc(money(pl.total))}</b></span><button type="button" class="link" data-a="tab" data-v="plan">${esc(t("viewPlan"))} →</button></div>` + followChips();
+        extra = `<div class="say__mini"><span>${esc(t("totalFor")(paxText(draft.pax)))} · <b>${esc(money(pl.total))}</b></span><button type="button" class="link" data-a="tab" data-v="plan">${esc(t("viewPlan"))} →</button></div>${m.book ? `<a class="btn btn--main say__book" href="#/travelers">${esc(t("cont"))}</a>` : ""}` + (m.next ? chips(m.next.map((c) => ({ a: "say", v: c, l: c }))) : followChips());
       } else if (last) extra = m.extra;
       html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><p class="say__text">${m.html}</p>${extra}</div></div>`;
     });
