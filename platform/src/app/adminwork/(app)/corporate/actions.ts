@@ -11,7 +11,7 @@ import { audit } from "@/lib/audit";
 import { toHalalas, sar } from "@/lib/money";
 import { detectFileType, isUuid } from "@/lib/security";
 import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
-import { billNextMonth, freeSlug, LEASE_TERMS, postMessage, refreshCosts, SERVICES, siteOrigin, SLUG_RE, workspaceLink, type Line } from "@/lib/portal";
+import { ALWAYS_HIDDEN, billNextMonth, freeSlug, LEASE_TERMS, postMessage, refreshCosts, SERVICES, siteOrigin, SLUG_RE, workspaceLink, type Line } from "@/lib/portal";
 
 const tempPassword = () => `Mada-${randomBytes(10).toString("hex").match(/.{4}/g)!.join("-")}`;
 const done = (path: string) => { revalidatePath("/adminwork", "layout"); revalidatePath(path); };
@@ -33,7 +33,9 @@ export async function enableWorkspace(_: ActionState, fd: FormData): Promise<Act
       }
       if (!c) throw new Error("Choose a client or type a new company name");
       if (c.type === "retail") throw new Error("Workspaces are for companies. Change this client's type first");
-      await tx.update(schema.clients).set({ portalEnabled: true, portalSlug: c.portalSlug ?? (await freeSlug(tx, c.name)), portalServices: Object.keys(c.portalServices as object).length ? c.portalServices : { lease: "price" }, accountManagerId: c.accountManagerId ?? u.id })
+      // Mada's rule: these partners' names never reach any client. Staff can add more per client.
+      const hiddenNames = [...new Set([...c.hiddenNames, ...ALWAYS_HIDDEN])];
+      await tx.update(schema.clients).set({ portalEnabled: true, hiddenNames, portalSlug: c.portalSlug ?? (await freeSlug(tx, c.name)), portalServices: Object.keys(c.portalServices as object).length ? c.portalServices : { lease: "price" }, accountManagerId: c.accountManagerId ?? u.id })
         .where(eq(schema.clients.id, c.id));
       await audit(tx, { actorId: u.id, action: "portal.enabled", entityType: "client", entityId: c.id, entityRef: c.name, summary: `Opened a corporate workspace for ${c.name}` });
       return c.id;

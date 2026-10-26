@@ -125,7 +125,14 @@
       "idx": 17,
       "version": "7",
       "when": 1790851555234,
-      "tag": "0017_letters",
+      "tag": "0017_hidden_partner_names",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790851556234,
+      "tag": "0018_letters",
       "breakpoints": true
     }
   ]

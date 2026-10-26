@@ -1511,4 +1511,5 @@ export const AR: Record<string, string> = {
   "Copy link": "نسخ الرابط",
   "Copied": "تم النسخ",
   "Link name": "اسم الرابط",
+  "Mada team": "فريق مدى",
 };

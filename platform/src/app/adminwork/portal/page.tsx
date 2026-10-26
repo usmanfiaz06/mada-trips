@@ -20,7 +20,7 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
   const { s: tab } = await searchParams;
   const [c] = await db.select().from(schema.clients).where(eq(schema.clients.id, u.clientId));
   const requester = alias(schema.users, "requester");
-  const [cat, requests, msgs, manager] = await Promise.all([
+  const [cat, requests, msgs] = await Promise.all([
     clientCatalog(c),
     db.select({ r: schema.portalRequests, by: requester.name }).from(schema.portalRequests)
       .innerJoin(requester, eq(requester.id, schema.portalRequests.requestedBy))
@@ -29,7 +29,6 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
     db.select({ m: schema.portalMessages, author: schema.users.name }).from(schema.portalMessages)
       .leftJoin(schema.users, eq(schema.users.id, schema.portalMessages.authorId))
       .where(eq(schema.portalMessages.clientId, c.id)).orderBy(desc(schema.portalMessages.createdAt)).limit(40),
-    c.accountManagerId ? db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, c.accountManagerId)).then((r) => r[0]?.name ?? null) : Promise.resolve(null),
   ]);
   const services = c.portalServices as Record<string, string>;
   const offered = SERVICES.filter((s) => services[s.key]);
@@ -42,7 +41,6 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
   // Everything below is what this client sees: hidden names are replaced before anything leaves the server,
   // and nobody at Mada is ever shown by name.
   const view = scrub({
-    manager: manager ?? "Mada team",
     msgs: msgs.reverse().map(({ m, author }) => ({ id: m.id, side: m.side, kind: m.kind, body: m.body, at: m.createdAt, who: m.side === "client" ? author ?? "" : m.side === "system" ? "Mada" : "Mada team" })),
     pending: pending.map(({ r, by }) => ({ id: r.id, ref: r.ref, lines: linesText(r.lines as Line[]), term: r.term, monthly: r.monthly, by, mine: r.requestedBy === u.id })),
     latest: latest ? { ref: latest.r.ref, lines: linesText(latest.r.lines as Line[]), status: latest.r.status, term: latest.r.term } : null,
@@ -135,7 +133,7 @@ export default async function PortalHome({ searchParams }: { searchParams: Promi
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={`${BASE}/symbol-gold.svg`} alt="" className="h-5" />
           </span>
-          <div><div className="text-[15px] font-medium">{t("Mada desk")}</div><div className="text-[12px] text-ink-3">{view.manager} · {t("8am–10pm")}</div></div>
+          <div><div className="text-[15px] font-medium">{t("Mada desk")}</div><div className="text-[12px] text-ink-3">{t("Mada team")} · {t("8am–10pm")}</div></div>
         </div>
         <details className="border-b border-line px-5 py-3">
           <summary className="cursor-pointer text-[13px] font-medium">{t("Book a call")}</summary>

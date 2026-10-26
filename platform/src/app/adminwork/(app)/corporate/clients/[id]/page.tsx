@@ -91,7 +91,7 @@ export default async function WorkspaceSettings({ params }: { params: Promise<{ 
               <input type="checkbox" name="needsApproval" defaultChecked={c.portalNeedsApproval} className="size-5 accent-[var(--brand)]" />
             </label>
             <Field label={<span className="flex items-center gap-1.5"><EyeOff className="size-3.5" />{t("Names never shown to this client")}</span>}
-              hint={t("Comma or one per line. Wherever these appear (messages, updates, documents) the client sees “Mada team”. Spelling variants and Arabic are caught.")}>
+              hint={t("Comma or one per line. Wherever these appear (messages, updates, documents) the client sees “Mada team”. Spelling variants and Arabic are caught. Haneef and Abdulaziz are always hidden from every client.")}>
               <Textarea name="hiddenNames" rows={2} defaultValue={c.hiddenNames.join(", ")} placeholder={t("e.g. names of Mada partners or staff")} />
             </Field>
             <SubmitButton>{t("Save workspace")}</SubmitButton>
