@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Check, CircleAlert, Clock3, FileWarning, ListChecks, Ticket, Stamp, MoonStar, Plus, Wallet } from "lucide-react";
+import { ArrowUpRight, Check, CircleAlert, Clock3, FileText, FileWarning, ListChecks, Ticket, Stamp, MoonStar, Plus, Wallet } from "lucide-react";
 import { requireUser, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { dashboardData } from "@/lib/dashboard";
@@ -76,6 +76,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <h1 className="mt-1 text-[38px] font-[350] leading-none tracking-[-0.04em]">{greeting(t)}, {u.name.split(" ")[0]}</h1>
         </div>
         <div className="flex gap-2">
+          {can(u, "letters.manage") && <LinkButton href="/adminwork/letters/new" variant="outline"><FileText className="size-4" />{t("New letter")}</LinkButton>}
           {can(u, "expenses.create") && <LinkButton href="/adminwork/expenses/new" variant="outline"><Wallet className="size-4" />{t("Add expense")}</LinkButton>}
           {can(u, "sales.create") && <LinkButton href="/adminwork/sales/new" variant="primary"><Plus className="size-4" />{t("New sale")}</LinkButton>}
         </div>
