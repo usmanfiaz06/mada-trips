@@ -45,7 +45,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ] : []),
       { href: "/adminwork/partners", label: t("Partners"), icon: "Handshake" as const },
     ] }] : []),
-    ...(can(u, "team.manage") || can(u, "roles.manage") || can(u, "activity.view") || can(u, "settings.manage") ? [{ label: t("Admin"), items: [
+    ...(can(u, "team.manage") || can(u, "roles.manage") || can(u, "activity.view") || can(u, "settings.manage") || can(u, "letters.manage") ? [{ label: t("Admin"), items: [
+      ...(can(u, "letters.manage") ? [{ href: "/adminwork/letters", label: t("Letters"), icon: "FileText" as const }] : []),
       ...(can(u, "team.manage") ? [{ href: "/adminwork/team", label: t("Team"), icon: "UserCog" as const }] : []),
       ...(can(u, "roles.manage") ? [{ href: "/adminwork/team/roles", label: t("Roles & access"), icon: "ShieldCheck" as const }] : []),
       ...(can(u, "activity.view") ? [{ href: "/adminwork/activity", label: t("Activity log"), icon: "History" as const }] : []),
