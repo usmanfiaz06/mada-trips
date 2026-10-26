@@ -25,6 +25,7 @@ export const PERMISSIONS = {
   "roles.manage":        { group: "admin",     en: "Create & edit roles",                ar: "إنشاء وتعديل الأدوار" },
   "activity.view":       { group: "admin",     en: "See the full activity log",          ar: "عرض سجل النشاط الكامل" },
   "settings.manage":     { group: "admin",     en: "Change limits & rules",              ar: "تعديل الحدود والقواعد" },
+  "letters.manage":      { group: "admin",     en: "Write & issue letterhead letters",   ar: "كتابة وإصدار الخطابات الرسمية" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;

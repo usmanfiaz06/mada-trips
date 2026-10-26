@@ -553,3 +553,19 @@ export const portalMessages = pgTable("portal_messages", {
   handledAt: timestamp("handled_at", { withTimezone: true }), // client messages: when Mada answered or closed it
   createdAt: createdAt(),
 }, (t) => [index("portal_messages_client_idx").on(t.clientId, t.createdAt)]);
+
+/* ───────────── Letterhead letters ───────────── */
+// Official letters written on the company letterhead, stamped and signed, then printed/saved as PDF.
+// bodyHtml is the sanitised rich-text body; design holds the placed stamp and signature (positions as
+// percentages of the page, so they survive any screen size and print true to the A4 layout).
+export const letters = pgTable("letters", {
+  id: id(),
+  ref: text("ref").notNull().unique(),             // LH-1001, …
+  subject: text("subject").notNull(),
+  recipient: text("recipient"),
+  letterDate: date("letter_date").notNull(),
+  bodyHtml: text("body_html").notNull().default(""),
+  design: jsonb("design").notNull().default({}),   // { stamp?: {x,y,w}, signature?: {x,y,w,kind,src?,text?,font?} }
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("letters_created_idx").on(t.createdAt)]);
