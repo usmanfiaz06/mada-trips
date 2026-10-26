@@ -50,10 +50,13 @@
   <main>
     <!-- Home: the landing page -->
     <div id="home" class="view">
-      <section class="hero wrap" id="heroSlot">
+      <section class="hero" id="heroSlot">
+        <div class="hero__bg" id="heroBg" aria-hidden="true"></div>
+        <div class="hero__in">
         <p class="hero__hi" id="hi"></p>
         <h1 class="hero__title" id="title"></h1>
         <p class="hero__sub" id="sub"></p>
+        <div class="hero__modes" id="modes" role="group" aria-label="What you need"></div>
         <form class="ask" id="ask" autocomplete="off" novalidate>
           <label class="sr" for="q" data-t="askLabel">Tell Mada about your trip</label>
           <textarea id="q" class="ask__in" rows="1" spellcheck="false" enterkeyhint="send"></textarea>
@@ -66,6 +69,13 @@
           </div>
         </form>
         <div class="ask__hints" id="hints"></div>
+        <div class="hero__trust" id="heroTrust"></div>
+        </div>
+        <p class="hero__cap" id="heroCap" aria-hidden="true"></p>
+      </section>
+      <section class="svc wrap" aria-labelledby="svcT">
+        <h2 class="why__title" id="svcT"><span data-t="svcH"></span> <span class="dim" data-t="svcH2"></span></h2>
+        <div class="svc__grid" id="svc"></div>
       </section>
       <section class="wrap cont" id="cont"></section>
       <section class="mine wrap" id="mine"></section>

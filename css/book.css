@@ -1508,3 +1508,116 @@ body:has(.sheet) .fab { display: none; }
 .fmode { margin-top: 20px; }
 .fmode button { min-height: 42px; padding: 8px 18px; }
 .fmode__note { margin: 12px 0 0; max-width: 70ch; }
+
+/* ---------- home hero: one calm night photo, the box in front of it ---------- */
+.hero { position: relative; isolation: isolate; max-width: none; margin: 12px clamp(10px, 1.4vw, 20px) 0; min-height: min(88svh, 800px); border-radius: clamp(22px, 2.6vw, 36px); overflow: hidden; display: flex; align-items: center; justify-content: center; padding: clamp(64px, 11vh, 120px) var(--pad) clamp(76px, 10vh, 108px); color: #fff; background: #0e1512; }
+.hero__bg { position: absolute; inset: 0; z-index: -1; }
+.hero__bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(1.06); transition: opacity 1.8s var(--ease), transform 9s linear; }
+.hero__bg img.on { opacity: 1; transform: scale(1); }
+.hero__bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 45%, rgba(8, 14, 11, .38), rgba(8, 14, 11, .7)), linear-gradient(180deg, rgba(8, 14, 11, .25), rgba(8, 14, 11, 0) 30%, rgba(8, 14, 11, .55)); }
+.hero__in { width: 100%; max-width: var(--narrow); text-align: center; }
+.hero .hero__hi { color: rgba(255, 255, 255, .82); }
+.hero .hero__title { color: #fff; text-shadow: 0 2px 30px rgba(0, 0, 0, .25); }
+.hero .hero__sub { color: rgba(255, 255, 255, .86); }
+.hero__modes { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: clamp(26px, 4vh, 40px) 0 0; }
+.mode { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 16px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #fff; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: background .2s, color .2s, transform .2s var(--ease-out); }
+.mode svg { width: 17px; height: 17px; }
+.mode:hover { background: rgba(255, 255, 255, .22); }
+.mode.on { background: #fff; color: var(--ink); border-color: #fff; }
+.mode:active { transform: scale(.96); }
+.hero .ask { margin-top: 14px; border: 0; box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .55), 0 2px 0 rgba(255, 255, 255, .3) inset; color: var(--ink); }
+.hero .ask:focus-within { box-shadow: 0 0 0 4px rgba(255, 255, 255, .28), 0 30px 80px -30px rgba(0, 0, 0, .6); }
+.hero .ask__tools { display: none; }
+.hero .ask__bar { justify-content: flex-end; }
+.hero .ask__hints { color: rgba(255, 255, 255, .7); }
+.hero .ask__hints button { color: #fff; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .18); border-radius: 999px; padding: 6px 13px; text-decoration: none; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.hero .ask__hints button:hover { background: rgba(255, 255, 255, .2); }
+.hero .ask__hints { gap: 8px; align-items: center; }
+.hero__trust { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 22px; margin-top: clamp(26px, 4vh, 40px); font-size: 14px; color: rgba(255, 255, 255, .85); }
+.hero__trust > span:not(.accept) { display: inline-flex; align-items: center; gap: 6px; }
+.hero__trust svg { width: 16px; height: 16px; color: #9fe0bd; }
+.hero__trust .accept { opacity: .95; }
+.hero__cap { position: absolute; inset-inline-start: clamp(18px, 2.4vw, 32px); bottom: 18px; margin: 0; font-size: 13px; color: rgba(255, 255, 255, .7); letter-spacing: .01em; }
+.hero__cap::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #9fe0bd; margin-inline-end: 8px; vertical-align: 1px; }
+@media (max-width: 640px) {
+  .hero { margin: 8px 8px 0; min-height: auto; padding: 44px 16px 64px; border-radius: 24px; }
+  .hero .hero__title { font-size: 54px; }
+  .hero .hero__sub { font-size: 17px; }
+  .hero__modes { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: -16px; padding: 2px 16px; scrollbar-width: none; }
+  .hero__modes::-webkit-scrollbar { display: none; }
+  .mode { flex: none; }
+  .hero .ask { padding: 16px 14px 12px 18px; }
+  .hero .ask__in { font-size: 19px; }
+  .hero .ask__hints { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding: 0 16px; scrollbar-width: none; }
+  .hero .ask__hints > * { flex: none; }
+  .hero__trust { gap: 8px 14px; font-size: 13px; }
+}
+
+/* ---------- services: the six things we book, as doors into the box ---------- */
+.svc { padding-top: clamp(72px, 10vh, 120px); }
+.svc__grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 290px; gap: 16px; }
+.svc__t { position: relative; overflow: hidden; border-radius: 26px; text-align: start; color: #fff; background: #17211c; display: flex; align-items: flex-end; isolation: isolate; transition: transform .35s var(--ease-out), box-shadow .35s var(--ease-out); }
+.svc__t:hover { transform: translateY(-3px); box-shadow: 0 24px 50px -28px rgba(17, 24, 21, .5); }
+.svc__t:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+.svc__t > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform .8s var(--ease-out); }
+.svc__t:hover > img { transform: scale(1.04); }
+.svc__t:not(.svc__t--art)::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(10, 16, 13, 0) 35%, rgba(10, 16, 13, .78)); }
+.svc__txt { display: grid; gap: 6px; padding: 24px; max-width: 30em; }
+.svc__ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; background: rgba(255, 255, 255, .16); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); margin-bottom: 4px; }
+.svc__ic svg { width: 19px; height: 19px; }
+.svc__txt b { font-size: 26px; line-height: 1.1; letter-spacing: -.025em; font-weight: 600; }
+.svc__txt > span:not(.svc__ic) { font-size: 15.5px; line-height: 1.4; color: rgba(255, 255, 255, .86); }
+.svc__txt em { font-style: normal; font-weight: 600; font-size: 15px; margin-top: 6px; }
+.svc__t--flights { grid-column: span 7; }
+.svc__t--stays { grid-column: span 5; }
+.svc__t--umrah, .svc__t--esim, .svc__t--car { grid-column: span 4; }
+.svc__t--visa { grid-column: span 12; }
+.svc__t--visa > img { object-position: 50% 60%; }
+.svc__t--visa .svc__txt { margin-inline-start: auto; }
+.svc__t--visa::after { background: linear-gradient(90deg, rgba(10, 16, 13, 0) 30%, rgba(10, 16, 13, .8)) !important; }
+html[dir="rtl"] .svc__t--visa::after { background: linear-gradient(270deg, rgba(10, 16, 13, 0) 30%, rgba(10, 16, 13, .8)) !important; }
+.svc__t--umrah > img { object-position: 50% 25%; }
+/* the two drawn ones */
+.svc__t--art { color: var(--ink); background: var(--paper-2); }
+.svc__t--art .svc__ic { background: var(--white); color: var(--green); }
+.svc__t--art .svc__txt > span:not(.svc__ic) { color: var(--ink-2); }
+.svc__t--art .svc__txt em { color: var(--green); }
+.svc__t--esim { background: #1e352d; color: #fff; }
+.svc__t--esim .svc__ic { background: rgba(255, 255, 255, .14); color: #fff; }
+.svc__t--esim .svc__txt > span:not(.svc__ic) { color: rgba(255, 255, 255, .82); }
+.svc__t--esim .svc__txt em { color: #9fe0bd; }
+.svc__art { position: absolute; inset: 0 0 auto; height: 52%; display: grid; place-items: center; z-index: -1; }
+.svc__art--esim { grid-template-columns: auto auto; align-content: center; justify-content: center; column-gap: 12px; }
+.svc__art--esim .sig { display: flex; align-items: flex-end; gap: 5px; height: 46px; grid-row: span 2; }
+.svc__art--esim .sig i { width: 9px; border-radius: 3px; background: #9fe0bd; animation: sig 2.4s var(--ease) infinite; }
+.svc__art--esim .sig i:nth-child(1) { height: 25%; } .svc__art--esim .sig i:nth-child(2) { height: 50%; animation-delay: .15s; } .svc__art--esim .sig i:nth-child(3) { height: 75%; animation-delay: .3s; } .svc__art--esim .sig i:nth-child(4) { height: 100%; animation-delay: .45s; }
+.svc__art--esim b { font-size: 34px; letter-spacing: -.03em; line-height: 1; }
+.svc__art--esim small { font-size: 13px; color: #9fe0bd; }
+@keyframes sig { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.svc__art--car svg { width: 78%; max-width: 260px; overflow: visible; }
+.svc__art--car .road { stroke: rgba(17, 24, 21, .16); stroke-width: 2; }
+.svc__art--car .dash { stroke: var(--ink-3); stroke-width: 2; stroke-dasharray: 10 12; animation: road 1.2s linear infinite; }
+.svc__art--car .car .body { fill: var(--green); }
+.svc__art--car .car .win { fill: rgba(255, 255, 255, .78); }
+.svc__art--car .car circle { fill: var(--ink); stroke: var(--paper-2); stroke-width: 3; }
+.svc__art--car .car { animation: bob 1.2s var(--ease) infinite; }
+@keyframes road { to { stroke-dashoffset: -22; } }
+@keyframes bob { 50% { transform: translateY(-1.5px); } }
+html[dir="rtl"] .svc__art--car svg { transform: scaleX(-1); }
+@media (prefers-reduced-motion: reduce) { .svc__art--esim .sig i, .svc__art--car .dash, .svc__art--car .car { animation: none; } .hero__bg img { transition: none; transform: none; } }
+@media (max-width: 900px) {
+  .svc__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 250px; gap: 12px; }
+  .svc__t--flights, .svc__t--visa { grid-column: span 2; }
+  .svc__t--stays, .svc__t--umrah, .svc__t--esim, .svc__t--car { grid-column: span 1; }
+}
+@media (max-width: 560px) {
+  .svc__grid { grid-auto-rows: 236px; }
+  .svc__txt { padding: 16px; gap: 4px; }
+  .svc__txt b { font-size: 20px; }
+  .svc__txt > span:not(.svc__ic) { font-size: 13.5px; }
+  .svc__t--stays .svc__txt > span:not(.svc__ic), .svc__t--umrah .svc__txt > span:not(.svc__ic), .svc__t--esim .svc__txt > span:not(.svc__ic), .svc__t--car .svc__txt > span:not(.svc__ic) { display: none; }
+  .svc__art { height: 50%; }
+  .svc__t--visa { min-height: 236px; }
+  .svc__t--visa::after { background: linear-gradient(180deg, rgba(10, 16, 13, 0) 30%, rgba(10, 16, 13, .8)) !important; }
+}
+@media (max-width: 560px) { .svc__art { height: 46%; } .svc__art--esim .sig { height: 32px; } .svc__art--esim b { font-size: 26px; } .svc__art--car svg { width: 84%; } }

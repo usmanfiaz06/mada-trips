@@ -537,7 +537,45 @@
     $("#tools").innerHTML = toolsHtml();
     $("#hints").innerHTML = `<span>${esc(t("tryL"))}</span>` + t("ph").slice(0, 3).map((s) => `<button type="button" data-a="say" data-v="${esc(s)}">${esc(s)}</button>`).join("");
     $("#cont").innerHTML = draft && draft.plan ? `<button type="button" class="cont__card" data-a="open">${D.DEST[draft.to] ? `<img src="${D.photo(draft.to, true)}" alt="" />` : ""}<div><small>${esc(t("contH"))}</small><b>${esc(placeName(draft))} · ${esc(range(draft.dep, draft.ret))}</b><span>${esc(paxText(draft.pax))} · ${esc(money(buildPlan(draft).total))}</span></div><em>${esc(t("contGo"))} →</em></button>` : "";
+    renderModes(); renderSvc(); heroBg();
+    $("#heroTrust").innerHTML = t("heroTrust").map((x) => `<span>${ico("check")}${esc(x)}</span>`).join("") + acceptRow("accept--sm");
     renderMine(); renderRail(); renderReceipt(); typePlaceholder();
+  }
+  // What you need, said once above the box: each fills the start of the sentence, the whole trip leaves it open.
+  let mode = "all";
+  function renderModes() {
+    const tools = t("tools");
+    $("#modes").innerHTML = [["all", t("modeAll")], ...Object.keys(tools).map((k) => [k, tools[k]])].map(([k, l]) => `<button type="button" class="mode${k === mode ? " on" : ""}" data-mode="${k}" aria-pressed="${k === mode}">${k === "all" ? "" : ico(k)}${esc(l)}</button>`).join("");
+  }
+  function pickMode(k, focus = true) {
+    mode = k; renderModes();
+    const q = $("#q"); q.value = k === "all" ? "" : t("starts")[k]; grow();
+    if (focus) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  }
+  // The services, each as a door into the same box: a tap fills the sentence and puts the cursor there.
+  function renderSvc() {
+    const S = t("svc"), art = {
+      esim: `<div class="svc__art svc__art--esim" aria-hidden="true"><span class="sig"><i></i><i></i><i></i><i></i></span><b>5G</b><small>${esc(lang === "ar" ? "متصل" : "Connected")}</small></div>`,
+      car: `<div class="svc__art svc__art--car" aria-hidden="true"><svg viewBox="0 0 200 90"><path class="road" d="M0 75 H200"/><path class="dash" d="M0 75 H200"/><g class="car"><path class="body" d="M30 62V51q0-6 8-7l22-3 18-13q4-3 10-3h40q6 0 10 4l14 12 16 3q8 2 8 10v8z"/><path class="win" d="M84 31 72 41h36V31zM114 31v10h32l-10-9q-1-1-4-1z"/><circle cx="62" cy="63" r="10"/><circle cx="146" cy="63" r="10"/></g></svg></div>`,
+    };
+    $("#svc").innerHTML = ["flights", "stays", "umrah", "esim", "car", "visa"].map((k) => {
+      const [h, p, go] = S[k];
+      const bg = art[k] || `<img src="assets/img/svc/${k}.jpg" alt="" loading="lazy" />`;
+      return `<button type="button" class="svc__t svc__t--${k}${art[k] ? " svc__t--art" : ""}" data-a="svc" data-v="${k}">${bg}<span class="svc__txt"><span class="svc__ic">${ico(k)}</span><b>${esc(h)}</b><span>${esc(p)}</span><em>${esc(go)} ${lang === "ar" ? "←" : "→"}</em></span></button>`;
+    }).join("");
+  }
+  // The hero's photo: three calm night scenes, one after another, slowly. Still when motion is reduced.
+  let bgTimer = null, bgI = 0;
+  function heroBg() {
+    const el = $("#heroBg"), caps = t("heroCaps"), files = ["alula-night", "desert-camp", "riyadh-night"];
+    if (!el.children.length) el.innerHTML = files.map((f, i) => `<img src="assets/img/hero/${f}.jpg" alt="" ${i ? 'loading="lazy"' : 'fetchpriority="high"'} class="${i === bgI ? "on" : ""}" />`).join("");
+    const cap = () => { $("#heroCap").textContent = caps[bgI]; };
+    cap(); clearInterval(bgTimer);
+    if (reduce) return;
+    bgTimer = setInterval(() => {
+      if (document.hidden || route().name !== "home") return;
+      const imgs = el.children; imgs[bgI].classList.remove("on"); bgI = (bgI + 1) % imgs.length; imgs[bgI].classList.add("on"); cap();
+    }, 8000);
   }
   function renderMine() {
     const el = $("#mine"), next = upcoming()[0];
@@ -2534,6 +2572,7 @@
   function onAction(b) {
     const a = b.dataset.a, v = b.dataset.v;
     if (a === "say") return route().name === "plan" ? send(v) : startOrSend(v);
+    if (a === "svc") { scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" }); return pickMode(v); }
     if (a === "open") return (location.hash = "#/plan");
     if (a === "tab") return setTab(v);
     if (a === "go" || a === "goWk") {
@@ -2564,6 +2603,7 @@
     $("#ask").addEventListener("submit", (e) => { e.preventDefault(); const v = q.value; if (!v.trim()) return q.focus(); q.value = ""; grow(); startOrSend(v); });
     document.addEventListener("click", (e) => {
       if (!e.target.closest("#acctWrap")) $("#acctMenu").hidden = true;
+      const md = e.target.closest("[data-mode]"); if (md) return pickMode(md.dataset.mode);
       const tool = e.target.closest("[data-tool]"); if (tool) { q.value = t("starts")[tool.dataset.tool]; grow(); q.focus(); q.setSelectionRange(q.value.length, q.value.length); return; }
       const tg = e.target.closest("[data-tog]"); if (tg && draft) { const k = tg.dataset.tog, on = tg.getAttribute("aria-pressed") === "true"; if (k === "flight" || !on) draft.flightsOnly = false; draft.items[k] = !on; if (k === "flight" && !on) draft.items.flight = true; afterPlanEdit(); return; }
       const pp = e.target.closest(".plan [data-pop]"); if (pp) { popFromChat = false; return openPop(pp.dataset.pop, pp); }
