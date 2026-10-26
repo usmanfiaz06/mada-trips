@@ -13,6 +13,23 @@ const FONTS = [
   { label: "Signature 3", css: "'Sacramento', cursive" },
 ];
 
+// Starter drafts. [square brackets] mark the bits to fill in.
+const TEMPLATES: { key: string; label: string; subject: string; recipient: string; body: string }[] = [
+  { key: "blank", label: "Blank letter", subject: "", recipient: "", body: "" },
+  {
+    key: "concern", label: "To whom it may concern", subject: "To whom it may concern", recipient: "To whom it may concern",
+    body: "<p>To whom it may concern,</p><p>This is to certify that [subject of the letter].</p><p>This letter is issued upon request for [purpose] and may be relied upon for that purpose only.</p><p>For any verification, please contact us using the details on this letterhead.</p><p>Sincerely,</p>",
+  },
+  {
+    key: "auth", label: "Authorisation letter", subject: "Authorisation letter", recipient: "",
+    body: "<p>Dear Sir/Madam,</p><p>We, <b>Mada Trips</b> (C.R. No. 7055256312), Riyadh, Kingdom of Saudi Arabia, hereby authorise <b>[full name]</b>, holder of ID / Iqama No. <b>[number]</b>, to act on behalf of the company for the purpose of <b>[purpose]</b>.</p><p>This authorisation is valid [from [date] until [date] / until further notice].</p><p>Yours faithfully,</p>",
+  },
+  {
+    key: "employment", label: "Employment / salary certificate", subject: "Employment certificate", recipient: "To whom it may concern",
+    body: "<p>To whom it may concern,</p><p>This is to certify that <b>[full name]</b>, holder of ID / Iqama No. <b>[number]</b>, has been employed with <b>Mada Trips</b> as <b>[job title]</b> since <b>[start date]</b>.</p><p>[Optional: Their current total monthly salary is SAR [amount].]</p><p>This certificate is issued upon the employee's request without any liability on the company.</p><p>Sincerely,</p>",
+  },
+];
+
 export function LetterEditor({ today, stampSrc }: { today: string; stampSrc: string }) {
   const t = useT();
   const [state, action, pending] = useActionState(createLetter, {} as { error?: string });
@@ -30,6 +47,14 @@ export function LetterEditor({ today, stampSrc }: { today: string; stampSrc: str
   const [sigPanel, setSigPanel] = useState(false);
 
   const cmd = (c: string, v?: string) => { document.execCommand(c, false, v); bodyRef.current?.focus(); };
+
+  function applyTemplate(key: string) {
+    const tpl = TEMPLATES.find((x) => x.key === key);
+    if (!tpl) return;
+    if (bodyRef.current?.innerHTML.trim() && !window.confirm(t("Replace the current letter with this template?"))) return;
+    setSubject(tpl.subject); setRecipient(tpl.recipient);
+    if (bodyRef.current) bodyRef.current.innerHTML = tpl.body;
+  }
 
   function drag(e: RPointerEvent, get: () => Box, set: (b: Box) => void) {
     e.preventDefault();
@@ -75,7 +100,12 @@ export function LetterEditor({ today, stampSrc }: { today: string; stampSrc: str
     <div className="mx-auto max-w-[900px]">
       {/* Toolbar — never printed */}
       <div className="no-print sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface/90 p-2 backdrop-blur">
-        <div className="flex items-center gap-0.5 pe-2">
+        <select onChange={(e) => { applyTemplate(e.target.value); e.target.selectedIndex = 0; }} defaultValue="" title={t("Start from a template")}
+          className="h-9 rounded-lg border border-line bg-surface-2 px-2.5 text-[12.5px] font-medium text-ink-2 outline-none">
+          <option value="" disabled>{t("Template…")}</option>
+          {TEMPLATES.map((tp) => <option key={tp.key} value={tp.key}>{t(tp.label)}</option>)}
+        </select>
+        <div className="flex items-center gap-0.5 border-s border-line ps-2">
           <Tool onClick={() => cmd("bold")} title={t("Bold")}><Bold className="size-4" /></Tool>
           <Tool onClick={() => cmd("italic")} title={t("Italic")}><Italic className="size-4" /></Tool>
           <Tool onClick={() => cmd("underline")} title={t("Underline")}><Underline className="size-4" /></Tool>
