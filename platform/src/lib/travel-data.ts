@@ -183,6 +183,7 @@ export const AIRLINES: Airline[] = [
   { code: "XY", name: "flynas", nameAr: "طيران ناس", country: "SA" },
   { code: "F3", name: "flyadeal", nameAr: "طيران أديل", country: "SA" },
   { code: "RX", name: "Riyadh Air", nameAr: "طيران الرياض", country: "SA" },
+  { code: "NE", name: "Nesma Airlines", nameAr: "نسما للطيران", country: "SA" },
   { code: "EK", name: "Emirates", nameAr: "طيران الإمارات", country: "AE" },
   { code: "FZ", name: "flydubai", nameAr: "فلاي دبي", country: "AE" },
   { code: "EY", name: "Etihad Airways", nameAr: "الاتحاد للطيران", country: "AE" },
@@ -195,6 +196,9 @@ export const AIRLINES: Airline[] = [
   { code: "OV", name: "SalamAir", nameAr: "طيران السلام", country: "OM" },
   // Middle East & Africa
   { code: "MS", name: "EgyptAir", nameAr: "مصر للطيران", country: "EG" },
+  { code: "SM", name: "Air Cairo", nameAr: "طيران القاهرة", country: "EG" },
+  { code: "NP", name: "Nile Air", nameAr: "طيران النيل", country: "EG" },
+  { code: "IY", name: "Yemenia", nameAr: "اليمنية", country: "YE" },
   { code: "RJ", name: "Royal Jordanian", nameAr: "الملكية الأردنية", country: "JO" },
   { code: "ME", name: "Middle East Airlines", nameAr: "طيران الشرق الأوسط", country: "LB" },
   { code: "IA", name: "Iraqi Airways", nameAr: "الخطوط الجوية العراقية", country: "IQ" },
