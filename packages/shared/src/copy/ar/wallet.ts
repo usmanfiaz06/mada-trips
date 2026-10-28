@@ -112,6 +112,7 @@ export const arWallet: ArSection<typeof walletCopy> = {
   'money.credit.emptyTitle': 'ما تحرّك شي بعد.',
   'money.credit.emptyBody': 'المبالغ المستردة اللي تحطها في محفظة مادا تطلع هنا مع التاريخ. وتنخصم من حجزك الجاي أول.',
   'money.credit.line': '{what} · {detail}',
+  'money.credit.seeAll': 'شوف الكل',
   'money.credit.refund': 'استرداد',
   'money.credit.goodwill': 'من مادا',
   'money.credit.spend': 'انستخدم',

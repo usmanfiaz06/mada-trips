@@ -119,7 +119,7 @@ async function start(locale) {
   await s.page.waitForTimeout(800);
   await s.byTest('wallet-credit').evaluate((el) => el.scrollIntoView({ block: 'center' }));
   check(await s.visible('wallet-credit-line'), 'en: movement lines on the Wallet tab');
-  check(await s.see('Used · Dubai, 2–5 Dec'), 'en: used line');
+  check(await s.see('Dubai, 2–5 Dec'), 'en: used line, the place on top');
   check((await s.page.locator('[data-testid="credit-move"]').count()) === 0, 'en: nothing moves the wallet to a card');
   await s.shot('refund-v2-wallet-tab-en');
   await s.context.close();

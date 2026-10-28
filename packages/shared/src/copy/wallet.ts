@@ -109,6 +109,7 @@ export const walletCopy = {
   'money.credit.emptyTitle': 'Nothing has moved yet.',
   'money.credit.emptyBody': 'Refunds you take to your Mada Wallet show here, with the date. They come off your next booking first.',
   'money.credit.line': '{what} · {detail}',
+  'money.credit.seeAll': 'See all',
   'money.credit.refund': 'Refund',
   'money.credit.goodwill': 'From Mada',
   'money.credit.spend': 'Used',

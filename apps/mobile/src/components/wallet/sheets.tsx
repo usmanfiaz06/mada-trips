@@ -228,6 +228,13 @@ export const walletLineText = (e: { kind: string; note: string | null }) => {
   return l.detail ? t('money.credit.line', { what, detail: l.detail }) : what;
 };
 
+/** The same line split for a two-line row: the place on top, "Refund" under it (with the date). */
+export const walletLineHead = (e: { kind: string; note: string | null }) => {
+  const l = walletLine(e.kind, e.note);
+  const what = t(`money.credit.${l.what}`);
+  return l.detail ? { title: l.detail, sub: what } : { title: what, sub: '' };
+};
+
 /** The Mada Wallet: the balance and every movement. For bookings only: nothing here moves it to a card. */
 export function CreditSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const credit = useCredit();
