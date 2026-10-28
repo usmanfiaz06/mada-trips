@@ -17,7 +17,7 @@ const SPRING = Easing.bezier(0.2, 0.9, 0.25, 1.15);
  * Slide to confirm (EXPERIENCE.md §4.2): the commitment gesture for anything that costs money. Drag the sun across;
  * ticks strengthen at 25/50/75%, a firm thunk on release past 90%. Screen readers get a single "activate" action.
  */
-export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: { label: string; busyLabel?: string; busy?: boolean; disabled?: boolean; onConfirm: () => void }) {
+export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm, compact }: { label: string; busyLabel?: string; busy?: boolean; disabled?: boolean; onConfirm: () => void; /** A smaller label, for a slider inside a card (narrower than the screen's). */ compact?: boolean }) {
   const [width, setWidth] = useState(0);
   const x = useSharedValue(0);
   const ticks = useSharedValue(0);
@@ -55,7 +55,7 @@ export function SlideToConfirm({ label, busyLabel, busy, disabled, onConfirm }: 
       <Animated.View style={[styles.fill, fill]} />
       <Animated.View style={[styles.labelWrap, busy ? null : { paddingStart: 44 }, text]} pointerEvents="none">
         {busy ? <ActivityIndicator color={colors.green} style={{ marginEnd: 10 }} /> : null}
-        <T style={font('button', busy ? colors.green : colors.mist)}>{busy ? busyLabel ?? label : label}</T>
+        <T style={[font('button', busy ? colors.green : colors.mist), compact ? { fontSize: 15 } : null]} numberOfLines={1}>{busy ? busyLabel ?? label : label}</T>
       </Animated.View>
       {!busy && (
         <GestureDetector gesture={pan}>

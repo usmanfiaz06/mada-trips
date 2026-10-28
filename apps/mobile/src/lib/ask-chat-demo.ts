@@ -1,4 +1,4 @@
-import { addDays, languageOfText, rangeLabel, t, todayIn, type AskChatEvent, type ChatCard } from '@mada/shared';
+import { addDays, formatSar, languageOfText, rangeLabel, t, todayIn, type AskChatEvent, type ChatCard } from '@mada/shared';
 import { api } from './api';
 import { bookingApi } from './booking';
 import { getLocale } from './i18n';
@@ -116,6 +116,33 @@ const PLACES_LINES = {
   ar: { status: 'نشوف الأماكن القريبة', list: 'لقيت لك ثلاث مطاعم مندي مفتوحة الحين قريبة من فندقك. بيت المندي أقربها، على بعد 350 م.', next: ['تفاصيل مطعم بيت المندي', 'الاتجاهات', 'أضفه لخطتي'], detailStatus: 'نشوف أوقات الدوام', detail: 'بيت المندي مفتوح لين 01:00 الليلة، على بعد 350 م من فندقك.', detailNext: ['الاتجاهات', 'أضفه لخطتي', 'حلا بعده'] },
 } as const;
 
+/** Cancel and refund (refund_quote, docs/app/ASK-REFUND.md): the mock trip's own refund quote, as the server's card. */
+const REFUND_WORDS = /\b(?:cancel|refund)\b|ألغ|إلغاء|رجّع|استرداد/i;
+const REFUND_LINES = {
+  en: { status: 'Checking what comes back', text: 'You get {amount} back for {what} under the rules. Pick where it goes and slide on the card; nothing is cancelled until you do.', next: ['What are the rules?', 'Keep it'] },
+  ar: { status: 'نشوف كم يرجع لك', text: 'يرجع لك {amount} عن {what} حسب القواعد. اختر وين يروح واسحب على البطاقة، وما ينلغي شي لين تسحب.', next: ['وش القواعد؟', 'خلّه'] },
+} as const;
+async function demoRefund(text: string, lang: 'en' | 'ar', tripId: string): Promise<{ card: ChatCard; text: string } | null> {
+  const { tripsApi } = await import('./trips');
+  const q = await tripsApi.refundQuote(tripId);
+  const item = /pickup|airport|توصيل|المطار/i.test(text) ? 'pickup' : /flight|طيران|الرحلة/i.test(text) ? 'flight' : 'stay';
+  const pick = q.items.filter((i) => i.item === item && !i.alreadyRefunded && (i.back.amount > 0 || i.askAnyway));
+  if (!pick.length) return null;
+  const paid = pick.reduce((a, i) => a + i.paid.amount, 0);
+  const back = pick.reduce((a, i) => a + i.cash.amount, 0);
+  const kept = pick.reduce((a, i) => a + i.paid.amount - i.back.amount, 0);
+  const instal = pick.every((i) => i.method === 'tabby' || i.method === 'tamara') ? (pick[0]!.method as 'tabby' | 'tamara') : null;
+  const clear = pick.every((i) => !i.askAnyway && i.back.amount === i.paid.amount);
+  const sar = (amount: number) => ({ amount, currency: 'SAR' as const });
+  const card: ChatCard = {
+    type: 'refund_quote', tripId, title: pick.map((i) => i.title).join(' · '), city: 'Istanbul', paymentIds: pick.map((i) => i.paymentId), items: [item], reason: 'plans',
+    clientKey: `ask-demo-${pick[0]!.paymentId}`, paid: sar(paid), back: sar(back), kept: kept > 0 ? sar(kept) : null, keptBy: kept > 0 ? ({ stay: 'hotel', flight: 'airline', pickup: 'driver' } as const)[item] : null,
+    rule: pick.map((i) => i.rule).join(' · '), anyway: back === 0, instalments: instal, card: q.card, walletInstant: !instal && clear && back <= (q.autoMax?.amount ?? 500_00), refund: null,
+  };
+  const what = lang === 'ar' ? ({ stay: 'الفندق', flight: 'الطيران', pickup: 'التوصيل من وإلى المطار' } as const)[item] : ({ stay: 'the hotel', flight: 'the flights', pickup: 'the airport pickup' } as const)[item];
+  return { card, text: REFUND_LINES[lang].text.replace('{amount}', formatSar(back, { locale: lang })).replace('{what}', what) };
+}
+
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
 /** Companions (ASK-INTEGRATED.md §5): two Abdullahs, someone not in the circle, a change asked by a companion. */
@@ -174,6 +201,22 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
       onEvent({ type: 'done', text });
       keep(text);
       return 'done';
+    }
+    if (REFUND_WORDS.test(body.text) && user) {
+      const R = REFUND_LINES[lang];
+      onEvent({ type: 'status', text: R.status, tool: 'refund_quote' });
+      const { mockTripsOf } = await import('./mock-api');
+      const trip = mockTripsOf(user).find((x) => x.status !== 'cancelled' && x.status !== 'completed');
+      const got = trip ? await demoRefund(body.text, lang, trip.id) : null;
+      await wait(900, signal);
+      if (got) {
+        for (const word of got.text.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
+        onEvent({ type: 'cards', cards: [got.card] });
+        onEvent({ type: 'next', choices: [...R.next] });
+        onEvent({ type: 'done', text: got.text });
+        keep(got.text);
+        return 'done';
+      }
     }
     if (PLACES_WORDS.test(body.text) || PLACE_MORE.test(body.text)) {
       const P = PLACES_LINES[lang];

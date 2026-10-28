@@ -58,7 +58,8 @@ provider (the finance job confirms it sent, as for any approved refund); if the 
 back to To decide with a note. Every auto-approval writes the rule that allowed it to `app_refunds.auto_rule`, to the app
 audit (`refund.auto_approved`) and to the Ops audit (`desk.refund.auto_approved`); the desk Refunds list and detail show an
 **Auto** tag with the rule. The refund screen says "Mada Wallet · instantly" only when the pick will be approved at once
-(the quote carries `autoMax`); otherwise it says the wallet is ready once checked, usually within a day.
+(the quote carries `autoMax`); otherwise it says the wallet is ready once checked, usually within a day. The Ask chat's
+`refund_quote` card (ASK-REFUND.md) shows the same numbers and choice and calls the same POST.
 
 ## The Mada Wallet («محفظة مادا»)
 

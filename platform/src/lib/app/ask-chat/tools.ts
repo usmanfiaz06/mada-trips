@@ -25,6 +25,7 @@ import { esimOffer, priceItems, resolveItemIds } from "../plans/booking";
 import { homeAirport } from "../plans/plans";
 import { DOC_RUN } from "./tools-docs";
 import { PLACES_RUN, PLACES_STATUS } from "./tools-places";
+import { REFUND_RUN, REFUND_STATUS } from "./tools-refund";
 
 /*
  * The tools, run on the server as the signed-in traveller, through the same functions the app's own routes call (so
@@ -319,6 +320,8 @@ const RUN: Record<string, Run> = {
   ...PEOPLE_RUN,
   // Places from Google (tools-places.ts): restaurants, sights, open now, near the hotel.
   ...PLACES_RUN,
+  // Cancel and refund (tools-refund.ts): the quote and its card; only the traveller's slide cancels.
+  ...REFUND_RUN,
 };
 
 export function personLine(p: Person, today: string): string {
@@ -367,7 +370,7 @@ export function statusFor(name: string, input: Record<string, unknown>, lang: "e
     remember: "نسجّلها للمرة الجاية",
     documents_on_file: "نشوف مستنداتك", use_document: "نشوف مستنداتك", request_document_share: "نجهّز الطلب",
   };
-  return (lang === "ar" ? ar : en)[name] ?? (PLAN_STATUS[lang] as Record<string, string>)[name] ?? (PLACES_STATUS[lang] as Record<string, string>)[name] ?? peopleStatus(name, input, lang) ?? (lang === "ar" ? "لحظة" : "One moment");
+  return (lang === "ar" ? ar : en)[name] ?? (PLAN_STATUS[lang] as Record<string, string>)[name] ?? (PLACES_STATUS[lang] as Record<string, string>)[name] ?? (REFUND_STATUS[lang] as Record<string, string>)[name] ?? peopleStatus(name, input, lang) ?? (lang === "ar" ? "لحظة" : "One moment");
 }
 
 /** Run one tool call. Expected failures (a gone offer, a person not in the household) come back as a sentence. */

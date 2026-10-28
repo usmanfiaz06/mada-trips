@@ -215,7 +215,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   // provider (a free tier, counted in tokens per minute) reads the compact prompt, the shorter tool words, only the
   // tools this turn can need and a lighter history (providers-openai.ts): about half the tokens of every call.
   const usedBefore = input.history.flatMap((m) => (typeof m.content === "string" ? [] : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : []))));
-  const onlyTools = leanToolsFor(input.intent ?? null, usedBefore);
+  const onlyTools = leanToolsFor(input.intent ?? null, usedBefore, input.text);
   const leanBefore = leanHistory(input.history);
 
   for (let step = 0; step < MAX_STEPS; step++) {

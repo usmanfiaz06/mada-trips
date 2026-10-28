@@ -59,6 +59,12 @@ details and are kept on plan items as `place.gid`): they are Google's public ids
 `platform/test/app/places-google.test.ts` checks a whole chat turn with the leak scan and that no key, mask or Google
 host reaches the app.
 
+## Cancel and refund in Ask
+
+`refund_quote` (ASK-REFUND.md) reads the trip's own payments and rules: the model and the card get item titles, amounts,
+the rule in words and the card label, never a supplier name, booking reference or net price.
+`platform/test/app/ask-refund.test.ts` runs the tool's text and card through the denylist.
+
 ## Adding a partner
 
 Add its image hosts to `PARTNER_IMAGE_HOSTS` and its name to `PARTNER_NAMES` (shield.ts) and `PARTNERS`

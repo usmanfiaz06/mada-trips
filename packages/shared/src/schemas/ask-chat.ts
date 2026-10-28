@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { Id, IsoDateTime, IsoDay } from './common';
+import { Id, IsoDateTime, IsoDay, Money } from './common';
 import { AskIntent, EntryCheckResponse, FlightOption, HomeAirport, OrderDraft, StayOption } from './booking';
 import { EsimPlan } from './esim';
-import { TripCard } from './trips';
+import { RefundReason, RefundView, TripCard, TripPaymentItem } from './trips';
 import { ChangeRequestView, PeopleMatch } from './trip-travellers';
 import { ChatDocCard, ChatShareCard } from './ask-docs';
 import { StayQuoteOption } from './stay-quote';
@@ -193,6 +193,29 @@ export const ChatCard = z.discriminatedUnion('type', [
   z.object({ type: z.literal('places'), query: z.string().max(200), near: z.string().max(120).nullable(), tripId: Id.nullable(), places: z.array(ChatPlace).min(1).max(5) }),
   /** One place in full (place_details): Directions, Call, Website, Add to plan. */
   z.object({ type: z.literal('place'), tripId: Id.nullable(), place: ChatPlace }),
+  /**
+   * Cancel and refund from the chat (refund_quote, docs/app/ASK-REFUND.md): what comes back under the same rules as the
+   * refund screen, what the hotel or airline keeps, and the same two places for it (the Mada Wallet first and marked
+   * Recommended, "instantly" only when the rules approve it at once; or back to the card). Nothing is cancelled until the
+   * traveller slides: that calls the refund screen's own POST /trips/{id}/refunds with `clientKey`, so a second slide or
+   * a retried turn finds the same refund. `refund` is set when it was already asked for: the card shows the tracker.
+   */
+  z.object({
+    type: z.literal('refund_quote'), tripId: Id, title: z.string().max(200), city: z.string().max(80),
+    paymentIds: z.array(Id).min(1).max(10), items: z.array(TripPaymentItem).max(10), reason: RefundReason, clientKey: z.string().min(8).max(64),
+    paid: Money, back: Money,
+    /** What the hotel, airline or driver keeps under the rules; null when it all comes back. */
+    kept: Money.nullable(), keptBy: z.enum(['hotel', 'airline', 'driver', 'supplier']).nullable(),
+    rule: z.string().max(300),
+    /** Nothing comes back by the rules: the slide asks the team anyway. */
+    anyway: z.boolean(),
+    /** Paid with instalments: it goes back through Tabby or Tamara, no choice to make. */
+    instalments: z.enum(['tabby', 'tamara']).nullable(),
+    card: z.string().max(80),
+    /** The Mada Wallet pick is approved at once by the rules (APP_REFUND_AUTO_MAX); else "once we've checked it". */
+    walletInstant: z.boolean(),
+    refund: RefundView.nullable(),
+  }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;
 

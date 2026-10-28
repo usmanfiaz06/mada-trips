@@ -80,3 +80,23 @@ describe('refund and wallet copy (owner decisions)', () => {
     expect(arabic['rf.toCardSub']).toBe('يوصلك خلال 5–10 أيام عمل حسب بنكك.');
   });
 });
+
+describe('the refund_quote chat card (ASK-REFUND.md)', () => {
+  it('parses with the refund screen’s fields and the tracker state, and every word is in both languages', async () => {
+    const { ChatCard } = await import('../src/schemas/ask-chat');
+    const { en } = await import('../src/copy/en');
+    const { arSections } = await import('../src/copy/ar');
+    const id = '11111111-1111-4111-8111-111111111111';
+    const sar = (amount: number) => ({ amount, currency: 'SAR' as const });
+    const card = {
+      type: 'refund_quote', tripId: id, title: 'Rove Downtown · 4 nights', city: 'Dubai', paymentIds: [id], items: ['stay'], reason: 'plans', clientKey: 'ask-0123456789abcdef',
+      paid: sar(2300_00), back: sar(1840_00), kept: sar(460_00), keptBy: 'hotel', rule: 'One night kept inside 7 days', anyway: false, instalments: null, card: 'Visa ending 41', walletInstant: false, refund: null,
+    };
+    expect(ChatCard.parse(card)).toMatchObject({ type: 'refund_quote', back: { amount: 1840_00 } });
+    expect(() => ChatCard.parse({ ...card, clientKey: 'short' })).toThrow();
+    const keys = Object.keys(en).filter((k) => k.startsWith('chat.refund.'));
+    expect(keys.length).toBeGreaterThan(10);
+    for (const k of keys) expect(arSections[k], k).toBeTruthy();
+    expect(arSections['chat.refund.state.wallet']).toBe('في محفظة مادا');
+  });
+});
