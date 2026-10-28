@@ -38,7 +38,6 @@ export const WALLET_ROUTES = {
   card: '/cards/:id',
   cardsDefault: '/cards/default',
   credit: '/credit',
-  creditMove: '/credit/move',
   supportThreads: '/support/threads',
   supportThread: '/support/threads/:id',
   supportMessages: '/support/threads/:id/messages',
@@ -321,8 +320,6 @@ export type AddCardRequest = z.input<typeof AddCardRequest>;
 export const SetDefaultCardRequest = z.object({ id: DefaultMethod });
 
 export const CreditResponse = z.object({ credit: Credit });
-export const MoveCreditRequest = z.object({ cardId: Id });
-export const MoveCreditResponse = z.object({ credit: Credit, moved: HalalasAmount, to: z.string() });
 
 /* ───────────── support ───────────── */
 

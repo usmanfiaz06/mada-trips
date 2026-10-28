@@ -114,6 +114,9 @@ export const appRefundGroups = pgTable("app_refund_groups", {
   cancelledAmount: money("cancelled_amount").notNull().default(0),
   expectedBy: timestamp("expected_by", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }),
+  // drizzle/0049_refund_wallet.sql: the bank's reference shown on the tracker, and approved by the rules at once.
+  bankReference: text("bank_reference"),
+  auto: boolean("auto").notNull().default(false),
   clientKey: text("client_key").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

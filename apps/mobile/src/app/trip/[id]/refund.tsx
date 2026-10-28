@@ -34,7 +34,8 @@ export default function Refund() {
     const list = useTrips();
   const [chosen, setChosen] = useState<string[]>(keys ? keys.split(',') : []);
   const [reason, setReason] = useState<RefundReason | null>(null);
-  const [dest, setDest] = useState<'original' | 'credit'>('original');
+  // The Mada Wallet first and chosen (owner decision): instant and never expires; the card is one tap away for cash.
+  const [dest, setDest] = useState<'original' | 'credit'>('credit');
   const [sent, setSent] = useState<RefundView | null>(null);
   const [clientKey] = useState(newKey);
   const create = useTripMutation((r: RefundReason) => tripsApi.refund(id, { paymentIds: chosen, reason: r, destination: dest, clientKey }));
@@ -46,16 +47,23 @@ export default function Refund() {
 
   if (sent) {
     const live = list.data?.refunds.find((r) => r.id === sent.id) ?? sent;
+    // Said as it is: in the Mada Wallet now, on its way to the card, or with a person to check first.
+    const inWallet = !live.anyway && live.destination === 'credit' && live.stage === 'sent';
+    const waiting = !live.anyway && live.stage === 'requested';
+    const amount = formatSar(live.amount.amount);
     return (
-      <TripScreen title={t('rf.title')} act={<>
+      <TripScreen title={t('rf.title')} act={inWallet ? <>
+        <Button testID="open-wallet" label={t('rf.openWallet')} onPress={() => toTab(router, '/wallet?credit=1')} />
+        <Button label={t('rf.done')} variant="ghost" onPress={() => router.back()} />
+      </> : <>
         <Button testID="see-in-trips" label={t('rf.seeTrips')} onPress={() => toTab(router, '/trips?tab=requests')} />
         <Button label={t('rf.done')} variant="ghost" onPress={() => router.back()} />
       </>}>
         <Rise style={{ marginTop: 30 }}><BigCheck /></Rise>
-        <Rise step={1}><T v="h1" accessibilityRole="header">{live.anyway ? t('rf.sent.anyway') : live.destination === 'credit' ? t('rf.sent.credit', { amount: formatSar(live.amount.amount) }) : t('rf.sent.card', { amount: formatSar(live.amount.amount) })}</T></Rise>
-        <Rise step={2}><T v="body">{live.anyway ? t('rf.sent.anywayBody', { agent }) : live.destination === 'credit' ? t('rf.sent.creditBody') : live.destination === 'instalments' ? t('rf.sent.tabbyBody', { provider: live.provider === 'tamara' ? 'Tamara' : 'Tabby' }) : t('rf.sent.cardBody', { card: live.card })}</T></Rise>
+        <Rise step={1}><T v="h1" accessibilityRole="header" testID="refund-sent-title">{live.anyway ? t('rf.sent.anyway') : waiting ? t('rf.sent.looking') : inWallet ? t('rf.sent.credit', { amount }) : t('rf.sent.card', { amount })}</T></Rise>
+        <Rise step={2}><T v="body">{live.anyway ? t('rf.sent.anywayBody', { agent }) : waiting ? t('rf.sent.lookingBody', { agent }) : inWallet ? t('rf.sent.creditBody') : live.destination === 'instalments' ? t('rf.sent.tabbyBody', { provider: live.provider === 'tamara' ? 'Tamara' : 'Tabby' }) : t('rf.sent.cardBody', { card: live.card })}</T></Rise>
         <Box><RefundTracker r={live} /></Box>
-        <AgentNote initial={trip.agent.initial}>{live.anyway ? t('rf.sent.lineAnyway') : live.destination === 'credit' ? t('rf.sent.lineCredit') : t('rf.sent.line')}</AgentNote>
+        <AgentNote initial={trip.agent.initial}>{live.anyway || waiting ? t('rf.sent.lineAnyway') : inWallet ? t('rf.sent.lineCredit') : t('rf.sent.line')}</AgentNote>
       </TripScreen>
     );
   }
@@ -76,6 +84,9 @@ export default function Refund() {
   const allInstal = instal.length > 0 && instal.length === picked.length;
   const ready = picked.length > 0 && !!effReason;
   const card = data.card;
+  // "Instantly" only when the rules will approve it at once: all back with no fee, within the auto limit (the server
+  // also checks the account; if it waits after all, the next screen says so).
+  const instant = picked.length > 0 && picked.every((i) => !i.askAnyway && i.back.amount === i.paid.amount) && back <= (data.autoMax?.amount ?? 500_00);
   const toggle = (pid: string) => setChosen(chosen.includes(pid) ? chosen.filter((k) => k !== pid) : [...chosen, pid]);
   return (
     <TripScreen title={t('rf.askTitle')} act={
@@ -111,8 +122,8 @@ export default function Refund() {
             </Box>
           ) : (
             <View style={{ gap: 10 }} accessibilityRole="radiogroup">
-              <PickCard radio testID="dest-card" on={dest === 'original'} onPress={() => setDest('original')} title={t('rf.toCard', { card })} sub={pm.isCard(card) ? `${t('rf.toCardSub')} · ${pm.isSaved(card) ? t('pm.saved') : t('pm.usedHere')}` : t('rf.toCardSub')} />
-              <PickCard radio testID="dest-credit" on={dest === 'credit'} onPress={() => setDest('credit')} title={t('rf.toCredit')} sub={t('rf.toCreditSub')} />
+              <PickCard radio testID="dest-credit" on={dest === 'credit'} onPress={() => setDest('credit')} title={instant ? t('rf.toCredit') : t('rf.toCreditWait')} sub={instant ? t('rf.toCreditSub') : t('rf.toCreditWaitSub')} badge={t('rf.recommended')} />
+              <PickCard radio testID="dest-card" on={dest === 'original'} onPress={() => setDest('original')} title={t('rf.toCard', { card })} sub={pm.isCard(card) ? `${t('rf.toCardSub')} ${pm.isSaved(card) ? t('pm.saved') : t('pm.usedHere')}.` : t('rf.toCardSub')} />
               {instal.length ? <Small>{t('rf.mixed', { provider: instal[0]!.method === 'tamara' ? 'Tamara' : 'Tabby' })}</Small> : null}
             </View>
           )}

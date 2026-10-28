@@ -193,10 +193,10 @@ if (ONLY !== 'pages') {
   await expectText(page, 'it went through twice');
   await shot(page, 'flow-chat-replied');
 
-  // Refunds: approve one to credit, decline one.
+  // Refunds: approve one to the Mada Wallet, decline one.
   await go(page, '/adminwork/desk/refunds');
   const first = page.locator('form:has(input[name=destination])').first();
-  await first.locator('text=Mada credit').click();
+  await first.locator('text=Mada Wallet').click();
   await first.getByRole('button', { name: 'Approve refund' }).click();
   await settle();
   const decline = page.locator('form:has(textarea[name=reason])').first();

@@ -66,6 +66,8 @@ The shared copy catalogue (`packages/shared/src/copy/en.ts`) holds these pattern
 | change | modify, amend |
 | cancel | void, terminate |
 | refund | reimbursement, credit |
+| Mada Wallet («محفظة مادا») | Mada credit, balance, store credit, voucher (for the money Mada keeps for a traveller) |
+| Your bank shows it in 5–10 working days | 7–14 days, up to two weeks, any other range (card refunds; one range everywhere) |
 | price | rate, fare (except in "fare rules") |
 | your Visa ending 41 | your saved payment instrument |
 | Faisal | our team, an agent, customer support |
@@ -191,7 +193,11 @@ Every string here was chosen deliberately. They are the reference that every new
 | Card declined | **Your bank said no.** | Nothing was charged. | Use another card |
 | Offline | **You're offline.** | Everything for this trip is on your phone. | — |
 | Our fault, unknown cause | **That didn't work, and it's on us.** | Try once more, or ask Faisal. | Try again |
-| Refund | **Your refund is on its way.** | Requested · Approved by Saudia · Sent to your Visa. Usually there by 14 Mar. | — |
+| Refund | **Your refund is on its way.** | Requested · Approved by Saudia · Sent to your Visa ending 41 · 12 Nov · Reference 7438… Show this to your bank if it isn't there after 10 working days. | — |
+| Refund choice | **Where should it go?** | Mada Wallet · instantly *(Recommended, chosen)*: Ready now for your next booking. Never expires. · Back to your Visa ending 41: Your bank shows it in 5–10 working days. | Slide to ask for SAR 440 |
+| Refund to the wallet | **SAR 440 is in your Mada Wallet.** | Ready now for your next booking. Never expires. | Open Wallet |
+| Refund with a person | **We're looking at your refund.** | Faisal checks it, usually within a day. We'll tell you the moment it's approved. | See it in Trips |
+| Refund not arrived | — | Still not there? Tell us *(after 10 working days; opens a chat with the amount, card and reference written out)* | — |
 
 ### 5.7 Documents
 
@@ -212,7 +218,10 @@ Every string here was chosen deliberately. They are the reference that every new
 | Driver | Your driver is here | Ahmet is at Door 3 with your name on a sign. |
 | Confirmed | You're going to Istanbul | Confirmed by Faisal. Booking X7K2QD. |
 | Connection risk | Your connection is at risk | SV263 is 3 hours late. We're holding two ways to get there. |
-| Refund | Refund sent | SAR 640 is on its way to your Visa ending 41. |
+| Refund, waiting for a person | We're looking at your refund | SAR 640: usually within a day. We'll tell you the moment it's approved. |
+| Refund approved (card) | Refund approved | SAR 640 goes back to your Visa ending 41. Your bank shows it in 5–10 working days. |
+| Refund sent | Refund sent | SAR 640 sent to your Visa ending 41. Reference 7438…. *(without a reference: "SAR 640 is on its way to your Visa ending 41.")* |
+| Refund to the wallet | In your Mada Wallet | SAR 640 is ready now for your next booking. |
 | Evening digest | Tomorrow | Pickup 06:40 · Check-in closes 08:10 · 24° in Istanbul |
 
 **Live Activity on the lock screen**

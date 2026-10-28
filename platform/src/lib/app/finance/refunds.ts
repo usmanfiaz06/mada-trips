@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { REFUND_BANK_WORKING_DAYS, addWorkingDays, type RefundClear } from "@mada/shared";
 import { db, schema, type Tx } from "@/db";
 import { appPayments, appRefunds } from "@/db/app-schema";
 import { appOrders } from "@/db/app-schema-booking";
@@ -14,6 +15,8 @@ import { notify } from "@/lib/app/trips/notify";
 import { approveRefund, refundableLeft } from "@/lib/app/desk/adapters";
 import { assertCap, deskAudit, DeskError, sarText, shortRef, type DeskActor } from "@/lib/app/desk/core";
 import { postAppRefund } from "./ops-posting";
+import { auditAuto, notifyGroupStep, sendAutoCardRefunds, syncRefundGroup } from "./refund-groups";
+import { decideAuto } from "./auto-approve";
 import { CAPTURED } from "./costs";
 
 /*
@@ -21,10 +24,14 @@ import { CAPTURED } from "./costs";
  * approval) is approveRefund in lib/app/desk/adapters.ts; this file moves a refund on from there:
  *
  *   requested ─approve (within limits)──▶ approved (card) ─provider confirms──▶ sent ─settlement file──▶ settled
- *       │                               └▶ sent (Mada credit, at once)
+ *       │                               └▶ sent (Mada Wallet, at once)
  *       └─approve (over a limit)──▶ awaiting_lead ─lead approves in Ops Approvals──▶ lead_approved ─sent by the job──▶ approved/sent
  *                                                  └─lead declines──▶ requested (the desk decides again)
- *   approved ─provider says failed──▶ requested (with a note: refund to credit, or try again)
+ *   approved ─provider says failed──▶ requested (with a note: refund to the Mada Wallet, or try again)
+ *
+ * When the rules are clear a trip refund skips the decision (auto-approve.ts): straight to approved (card) or sent
+ * (Mada Wallet), tagged Auto with the rule that allowed it. Every move here also moves the traveller's refund group
+ * (refund-groups.ts), which is what the Requests tracker shows and what the one push per step follows.
  *
  * The finance job (lib/app/jobs.ts "finance", every 5 minutes) runs sendLeadApproved and refundsSentJob. Card refunds
  * are confirmed with the provider's refund status (MyFatoorah GetRefundStatus; the mock answers at once). Instalment
@@ -117,11 +124,15 @@ async function markSent(actor: DeskActor | null, id: string, v: { reference?: st
     const [x] = await tx.select({ f: appRefunds, p: appPayments }).from(appRefunds).innerJoin(appPayments, eq(appPayments.id, appRefunds.paymentId))
       .where(eq(appRefunds.id, id)).for("update", { of: appRefunds });
     if (!x || x.f.stage !== "approved") return null;
-    await tx.update(appRefunds).set({ stage: "sent", sentAt: at, checkedAt: at, checks: sql`${appRefunds.checks} + 1`, providerRef: v.reference?.trim() || x.f.providerRef, updatedAt: at }).where(eq(appRefunds.id, id));
+    const bankRef = v.reference?.trim() || null;
+    await tx.update(appRefunds).set({ stage: "sent", sentAt: at, checkedAt: at, checks: sql`${appRefunds.checks} + 1`, providerRef: bankRef || x.f.providerRef, bankReference: bankRef ?? x.f.bankReference, updatedAt: at }).where(eq(appRefunds.id, id));
     const summary = `The card refund of ${sarText(x.f.amount)} reached ${x.p.label ?? "the card"}${actor ? ` (marked by hand${v.reference ? `, reference ${v.reference}` : ""})` : " (the provider confirmed it)"}`;
     if (actor) await deskAudit(tx, actor, { action: "desk.refund.sent", entityType: "refund", entityId: id, ref: shortRef(id, "F"), summary });
     else await tx.insert(schema.auditEvents).values({ actorId: null, action: "desk.refund.sent", entityType: "desk", entityId: id, entityRef: shortRef(id, "F"), summary });
-    await notify(x.p.ownerId, { kind: "refund_moved", level: "active", copy: "notify.refund", vars: { amount: sarText(x.f.amount), card: x.p.label ?? "card" }, href: x.p.requestId ? `/requests/${x.p.requestId}` : null, data: { refundId: id } }, tx);
+    // A trip refund tells the traveller once for the whole refund (with the bank's reference); an order's refund once for itself.
+    const step = await syncRefundGroup(tx, id, at);
+    if (step) { if (step.changed) await notifyGroupStep(tx, step.group); }
+    else await notify(x.p.ownerId, { kind: "refund_moved", level: "active", copy: bankRef ? "notify.refundRef" : "notify.refund", vars: { amount: sarText(x.f.amount), card: x.p.label ?? "card", ...(bankRef ? { ref: bankRef } : {}) }, href: x.p.requestId ? `/requests/${x.p.requestId}` : null, data: { refundId: id } }, tx);
     return x;
   });
   if (done) await postAppRefund(id).catch((e) => console.error("[finance] refund not posted to Ops", id, e instanceof Error ? e.message : ""));
@@ -140,7 +151,8 @@ async function refundFailed(id: string, at: Date) {
   await db.transaction(async (tx) => {
     const [f] = await tx.select().from(appRefunds).where(eq(appRefunds.id, id)).for("update");
     if (!f || f.stage !== "approved") return;
-    await tx.update(appRefunds).set({ stage: "requested", note: "The card refund failed at the provider. Refund to Mada credit, or approve again", decidedBy: null, decidedAt: null, checkedAt: at, updatedAt: at }).where(eq(appRefunds.id, id));
+    await tx.update(appRefunds).set({ stage: "requested", note: "The card refund failed at the provider. Refund to the Mada Wallet, or approve again", decidedBy: null, decidedAt: null, autoRule: null, checkedAt: at, updatedAt: at }).where(eq(appRefunds.id, id));
+    await syncRefundGroup(tx, id, at);
     const [p] = await tx.select().from(appPayments).where(eq(appPayments.id, f.paymentId));
     const [s] = await tx.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds).where(and(eq(appRefunds.paymentId, f.paymentId), inArray(appRefunds.stage, ["approved", "sent", "settled"])));
     if (p) await tx.update(appPayments).set({ status: Number(s?.s ?? 0) === 0 ? "captured" : Number(s!.s) >= p.amount ? "refunded" : "partially_refunded", updatedAt: at }).where(eq(appPayments.id, p.id));
@@ -178,13 +190,15 @@ export async function refundTarget(ref: string) {
 export type DeskRefundInput = { orderRef: string; cancel: string; amount?: number | null; reason: string; confirm: boolean };
 export type DeskRefundResult =
   | { preview: true; fee: number; supplierFee: { amount: number; currency: string | null } | null; refund: number; note: string }
-  | { preview: false; refundId: string; refund: number; note: string };
+  | { preview: false; refundId: string; refund: number; note: string; auto?: boolean };
 
 /**
  * Cancel an app booking with its supplier and open the refund, from the desk. Hotelbeds: simulate first (what the hotel
  * keeps), then cancel; the refund is what was paid less that fee, in proportion. TBO: release the hold or ask for the
  * refund (the airline's rules decide what comes back), and the desk enters the amount to give back. The refund then
- * goes through the same decision as any other (limits, lead approval, card or credit). `flightSupplier` is for tests.
+ * goes through the same decision as any other (limits, lead approval, card or Mada Wallet), unless the supplier cancelled
+ * it free or released the hold and all of it comes back: then the rules approve it at once (auto-approve.ts).
+ * `flightSupplier` is for tests.
  */
 export async function startDeskRefund(actor: DeskActor, v: DeskRefundInput, deps: { flightSupplier?: TicketingFlightSupplier } = {}): Promise<DeskRefundResult> {
   assertCap(actor, "desk.refund");
@@ -198,6 +212,7 @@ export async function startDeskRefund(actor: DeskActor, v: DeskRefundInput, deps
 
   let refund = v.amount ?? null;
   let note = "";
+  let clear: RefundClear = null;
   if (opt.kind === "hotelbeds") {
     const [row] = await db.select().from(appSupplierBookings).where(eq(appSupplierBookings.id, opt.id));
     const sim = await cancelSupplierBooking(opt.id, { name: actor.name, opsUserId: actor.id }, { confirm: false }).catch((e) => { throw new DeskError(e instanceof Error ? e.message : "Hotelbeds didn't answer", "CONFLICT"); });
@@ -208,6 +223,7 @@ export async function startDeskRefund(actor: DeskActor, v: DeskRefundInput, deps
     if (!v.confirm) return { preview: true, fee, supplierFee: { amount: sim.amount, currency: sim.currency }, refund: back, note: sim.amount > 0 ? `Hotelbeds keeps ${sim.amount} ${sim.currency ?? ""}`.trim() : "Free to cancel" };
     const done = await cancelSupplierBooking(opt.id, { name: actor.name, opsUserId: actor.id }, { confirm: true }).catch((e) => { throw new DeskError(e instanceof Error ? e.message : "Hotelbeds didn't cancel it", "CONFLICT"); });
     refund = refund ?? back;
+    if (done.amount === 0 && refund === back) clear = "free";
     note = `Cancelled on Hotelbeds ${opt.supplierRef}${done.amount > 0 ? ` (fee ${done.amount} ${done.currency ?? ""})` : " (free)"}`;
   } else if (opt.kind === "tbo") {
     if (!v.confirm) return { preview: true, fee: 0, supplierFee: null, refund: refund ?? t.left, note: "TBO asks the airline: what comes back follows the fare rules. Enter what to refund." };
@@ -216,6 +232,7 @@ export async function startDeskRefund(actor: DeskActor, v: DeskRefundInput, deps
     const ref = flightBookingOf(t.order);
     if (!supplier || !ref) throw new DeskError("This flight isn't booked with TBO from the app", "CONFLICT");
     const r = await supplier.cancel(ref, `Mada desk: ${reason}`.slice(0, 120)).catch((e) => { throw new DeskError(e instanceof Error ? e.message : "TBO didn't answer", "CONFLICT"); });
+    if (r.released && refund === t.left) clear = "supplier_confirmed";
     note = r.released ? `Released the hold on TBO${ref.parts[0]?.pnr ? ` ${ref.parts[0].pnr}` : ""}` : `Refund asked of TBO${r.changeRequestIds.length ? ` (change request ${r.changeRequestIds.join(", ")})` : ""}`;
   } else if (!v.confirm) {
     return { preview: true, fee: 0, supplierFee: null, refund: refund ?? t.left, note: "Nothing is cancelled with a supplier." };
@@ -223,11 +240,19 @@ export async function startDeskRefund(actor: DeskActor, v: DeskRefundInput, deps
   if (!refund || !Number.isInteger(refund) || refund <= 0) throw new DeskError("Enter the amount to refund");
   if (refund > t.left) throw new DeskError(`Only ${sarText(t.left)} is left to refund on this booking`);
 
+  // The supplier cancelled it free (or released the hold) and the amount is all of it: the rules approve it at once.
+  const auto = await decideAuto(db, { userId: t.payment.ownerId, clear, destination: "original", amount: refund });
   const id = await db.transaction(async (tx) => {
-    const [f] = await tx.insert(appRefunds).values({ paymentId: t.payment!.id, amount: refund!, stage: "requested", origin: "desk", reason, note: note || null }).returning({ id: appRefunds.id });
+    const now = new Date();
+    const [f] = await tx.insert(appRefunds).values({ paymentId: t.payment!.id, amount: refund!, stage: auto.ok ? "approved" : "requested", origin: "desk", reason, note: note || null,
+      autoRule: auto.ok ? auto.rule : null, decidedAt: auto.ok ? now : null, expectedBy: auto.ok ? addWorkingDays(now, REFUND_BANK_WORKING_DAYS) : null }).returning({ id: appRefunds.id });
     await deskAudit(tx, actor, { action: "desk.refund.started", entityType: "refund", entityId: f!.id, ref: t.order.ref ?? shortRef(f!.id, "F"),
       summary: `Started a refund of ${sarText(refund!)} on ${t.order.ref ?? "an app booking"}${note ? `: ${note}` : ""}`, data: { amount: refund, cancel: v.cancel } });
+    if (auto.ok) await auditAuto(tx, { ownerId: t.payment!.ownerId, groupId: null, refundIds: [f!.id], amount: refund!, rule: auto.rule, destination: "original" });
     return f!.id;
   });
-  return { preview: false, refundId: id, refund, note };
+  if (auto.ok && (await sendAutoCardRefunds([id]))) {
+    await notify(t.payment.ownerId, { kind: "refund_moved", level: "active", copy: "notify.refundApproved", vars: { amount: sarText(refund), card: t.payment.label ?? "card" }, href: t.payment.requestId ? `/requests/${t.payment.requestId}` : null, data: { refundId: id } });
+  }
+  return { preview: false, refundId: id, refund, note, auto: auto.ok };
 }

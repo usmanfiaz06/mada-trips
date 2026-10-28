@@ -19,13 +19,13 @@ export const deskCopy = {
   'desk.checklist.title': 'What we need from you',
 
   // ───────────── desk: refunds ─────────────
-  'desk.refund.approved.card': 'Your refund of {amount} is approved. It goes back to your {card}, usually in 5 to 10 days.',
-  'desk.refund.approved.credit': 'Your refund of {amount} is approved and is in your Mada credit now.',
+  'desk.refund.approved.card': 'Your refund of {amount} is approved. It goes back to your {card}, and your bank shows it in 5–10 working days.',
+  'desk.refund.approved.credit': 'Your refund of {amount} is approved and is in your Mada Wallet now.',
   'desk.refund.rejected': "We can't refund this one. {reason}",
   'desk.refund.instalments': 'Paid with {provider}: the remaining payments are cancelled, and what you paid comes back to your card.',
 
   // ───────────── desk: disruption ─────────────
-  'desk.disruption.voucher': '{amount} in Mada credit for the trouble. It is in your account now.',
+  'desk.disruption.voucher': '{amount} in your Mada Wallet for the trouble. It is there now.',
 
   // ───────────── desk: notifications ─────────────
   'notify.desk.question.title': 'Mada needs an answer',

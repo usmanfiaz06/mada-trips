@@ -105,7 +105,7 @@ export async function disruptionBoard(now = new Date()): Promise<BoardFlight[]> 
 
 /**
  * Push a rebooking plan to everyone on a disrupted flight: a time-sensitive notification signed by the agent,
- * and, when given, a voucher as Mada credit for each account (needs desk.refund).
+ * and, when given, a voucher into the Mada Wallet for each account (needs desk.refund).
  */
 export async function pushPlan(actor: DeskActor, v: { flightNumber: string; date: string; status: string; plan: string; options: { label: string; detail: string }[]; voucher: number }) {
   assertCap(actor, "desk.act");

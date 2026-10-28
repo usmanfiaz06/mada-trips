@@ -251,7 +251,7 @@ export const arTripsUi2: ArSection<typeof enTripsUi2> = {
   'money.items': 'وش اندفع',
   'money.paidBy': 'دفعها {name}',
   'money.back': 'رجع {amount}',
-  'money.creditLeft': '{amount} رصيد مادا في حسابك',
+  'money.creditLeft': '{amount} في محفظة مادا',
   'money.splits': 'التقسيمات في دوائرك',
   'money.splitPaid': 'دفع',
   'money.splitOwes': 'عليه',

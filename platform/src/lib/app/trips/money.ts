@@ -2,8 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
-  SELLER, creditLines, formatSar, invoiceHtml, refundResult, invoiceLinesFor, invoiceNumber, outSegment, refundQuoteItems, zatcaQr, addDays,
-  type Company, type CreateRefundRequest, type InvoiceDoc, type RefundView, type TripDetail, type TripPayment, type TripPaymentItem,
+  SELLER, REFUND_BANK_WORKING_DAYS, addWorkingDays, creditLines, formatSar, timing, invoiceHtml, refundResult, invoiceLinesFor, invoiceNumber, outSegment, refundQuoteItems, zatcaQr, addDays,
+  type AutoApproveDecision, type Company, type CreateRefundRequest, type InvoiceDoc, type RefundView, type TripDetail, type TripPayment, type TripPaymentItem,
 } from "@mada/shared";
 import { db, type Tx } from "@/db";
 import { appInvoices, appPayments, appRefunds, appStays, appUsers } from "@/db/app-schema";
@@ -15,7 +15,8 @@ import { supplierMode } from "../config";
 import { AppError } from "../http";
 import type { Exec } from "./core";
 import { insertRequest } from "./requests";
-import { notify } from "./notify";
+import { auditAuto, notifyGroupStep, notifyLooking, sendAutoCardRefunds } from "../finance/refund-groups";
+import { clearOf, decideAuto } from "../finance/auto-approve";
 
 /*
  * The money side of a trip: one charge per thing paid for (flight, stay, pickups, a change, an extra), each with its
@@ -81,7 +82,7 @@ export async function createCharge(tx: Exec, trip: TripDetail, c: ChargeInput): 
 }
 
 const paidWith = (method: string, label: string | null, plan: string, credit: number) =>
-  (plan === "tabby" ? "Tabby · 4 payments" : plan === "tamara" ? "Tamara · 3 payments" : label ?? method) + (credit ? ` and ${formatSar(credit)} Mada credit` : "");
+  (plan === "tabby" ? "Tabby · 4 payments" : plan === "tamara" ? "Tamara · 3 payments" : label ?? method) + (credit ? ` and ${formatSar(credit)} from Mada Wallet` : "");
 
 export function customerOf(trip: TripDetail, fallback = "The traveller") {
   return trip.travellers[0]?.fullName || fallback;
@@ -218,7 +219,7 @@ export function toRefundView(g: GroupRow): RefundView {
     withdrawn: g.stage === "withdrawn", canTakeBack: g.anyway && g.stage === "requested",
     provider: g.provider, card: g.card, anyway: g.anyway, reject: g.stage === "rejected" ? g.reject : null, alt: g.stage === "rejected" ? g.alt : null, law: g.law, airline: g.airline,
     cancelledInstalments: g.cancelledCount ? { count: g.cancelledCount, amount: SAR(g.cancelledAmount) } : null,
-    expectedBy: g.expectedBy?.toISOString() ?? null, sentAt: g.sentAt?.toISOString() ?? null, createdAt: g.createdAt.toISOString(), updatedAt: g.updatedAt.toISOString(),
+    expectedBy: g.expectedBy?.toISOString() ?? null, sentAt: g.sentAt?.toISOString() ?? null, reference: g.bankReference ?? null, auto: g.auto, createdAt: g.createdAt.toISOString(), updatedAt: g.updatedAt.toISOString(),
     result: refundResult({ stage: g.stage === "withdrawn" ? "rejected" : g.stage, withdrawn: g.stage === "withdrawn", destination: g.destination, amount: SAR(g.amount), reject: g.reject, expectedBy: g.expectedBy?.toISOString() ?? null, airline: g.airline, updatedAt: g.updatedAt.toISOString(), tripId: g.tripId }),
   };
 }
@@ -252,7 +253,9 @@ export async function getRefund(ownerId: string, id: string): Promise<RefundView
 
 export const REASON_TEXT: Record<CreateRefundRequest["reason"], string> = { plans: "Plans changed", ill: "Someone is ill", docs: "Visa or passport problem", airline: "The airline changed it", else: "Found something else", other: "Other" };
 
-/** Ask for a refund: the amount is worked out from the rules, never sent by the phone. */
+/** Ask for a refund: the amount is worked out from the rules, never sent by the phone. When the rules are clear it is
+ * approved at once (finance/auto-approve.ts): the Mada Wallet is credited now, a card refund goes straight to the
+ * provider. Everything else waits at the desk, and the traveller hears "We're looking at your refund". */
 export async function createRefund(ownerId: string, trip: TripDetail, input: CreateRefundRequest, ipHash: string | null, opts: { titleOverride?: string } = {}): Promise<RefundView> {
   const [existing] = await db.select().from(appRefundGroups).where(and(eq(appRefundGroups.ownerId, ownerId), eq(appRefundGroups.clientKey, input.clientKey)));
   if (existing) return toRefundView(existing);
@@ -274,31 +277,41 @@ export async function createRefund(ownerId: string, trip: TripDetail, input: Cre
   const law = quotes.some((q) => q.law);
   const out = outSegment(trip);
   const pickupDriver = trip.pickups.find((p) => p.direction === "to_airport")?.driverName ?? "The driver";
+  // A part paid with instalments always goes to a person; the rest is decided by the rules when they are clear.
+  const auto: AutoApproveDecision = anyway || instal.length ? { ok: false, why: anyway ? "not_clear" : "destination" }
+    : await decideAuto(db, { userId: ownerId, clear: clearOf(quotes, timing(trip.clock.phase).airlineCancelled), destination, amount });
+  const toWallet = destination === "credit";
+  const stage = auto.ok ? (toWallet ? "sent" : "approved") : "requested";
+  // The Wallet line names what it was for: "Refund · Bereketzade Hotel, Istanbul".
+  const walletNote = `${chosen.map((p) => p.title).join(", ")}, ${trip.city}`.slice(0, 200);
 
-  const group = await db.transaction(async (tx) => {
+  const done = await db.transaction(async (tx) => {
     const req = await insertRequest(tx, {
       ownerId, tripId: trip.id, kind: "refund", summary: title, ipHash, agentName: trip.agent.name,
-      status: destination === "credit" ? "done" : "sent",
+      status: toWallet && auto.ok ? "done" : "sent",
       details: { area: "refund", short: "Refund", detail: REASON_TEXT[input.reason], withWhom: "faisal", outcome: null, clientKey: input.clientKey },
     });
     const now = new Date();
+    const expectedBy = stage === "sent" ? now : toWallet ? new Date(now.getTime() + 86_400_000) : addWorkingDays(now, REFUND_BANK_WORKING_DAYS);
     const [g] = await tx.insert(appRefundGroups).values({
-      ownerId, tripId: trip.id, title, amount, stage: anyway ? "requested" : destination === "credit" ? "sent" : "requested", destination,
-      provider: destination === "instalments" ? instal[0]!.method : destination === "credit" ? "mada_credit" : null, card, reason: input.reason, anyway,
+      ownerId, tripId: trip.id, title, amount, stage, destination, auto: auto.ok,
+      provider: destination === "instalments" ? instal[0]!.method : toWallet ? "mada_credit" : null, card, reason: input.reason, anyway,
       reject: anyway ? (chosen[0]?.item === "pickup" ? REJECT_PICKUP.replace("{driver}", pickupDriver) : REJECT_OTHER) : null,
       alt: anyway ? (chosen[0]?.item === "pickup" ? "I can move the ride to another day in the next 3 months instead, free." : "I can move it to another day this trip, free.") : null,
       law, airline: out?.carrierName ?? null, cancelledCount: instal.reduce((a, q) => a + (q.cancelled?.count ?? 0), 0), cancelledAmount: instal.reduce((a, q) => a + (q.cancelled?.amount.amount ?? 0), 0),
-      expectedBy: destination === "credit" ? now : new Date(now.getTime() + (law ? 7 : 14) * 86_400_000), sentAt: destination === "credit" ? now : null, clientKey: input.clientKey,
+      expectedBy, sentAt: stage === "sent" ? now : null, clientKey: input.clientKey,
     }).returning();
     const charges = await tx.select().from(appTripCharges).where(inArray(appTripCharges.id, chosen.map((p) => p.id)));
+    const refundIds: string[] = [];
     for (const q of quotes) {
       const charge = charges.find((c) => c.id === q.paymentId)!;
       if (!charge.paymentId) throw new AppError("VALIDATION", { message: "This payment can’t be refunded here. Mada can do it by hand." });
       const credited = anyway ? 0 : q.back.amount;
       const [r] = await tx.insert(appRefunds).values({
-        paymentId: charge.paymentId, amount: anyway ? 0 : q.cash.amount, stage: g!.stage, destination: destination === "credit" ? "credit" : "original", reason: REASON_TEXT[input.reason],
-        expectedBy: g!.expectedBy,
+        paymentId: charge.paymentId, amount: anyway ? 0 : q.cash.amount, stage, destination: toWallet ? "credit" : "original", reason: REASON_TEXT[input.reason],
+        expectedBy, autoRule: auto.ok ? auto.rule : null, decidedAt: auto.ok ? now : null, sentAt: stage === "sent" ? now : null,
       }).returning();
+      refundIds.push(r!.id);
       let creditNoteId: string | null = null;
       if (credited > 0 && charge.invoiceId) {
         const cn = await issueInvoice(tx, {
@@ -308,16 +321,23 @@ export async function createRefund(ownerId: string, trip: TripDetail, input: Cre
         creditNoteId = cn.id;
       }
       await tx.insert(appRefundItems).values({ refundId: r!.id, groupId: g!.id, chargeId: charge.id, credited, creditNoteId });
-      if (destination === "credit" && q.cash.amount > 0) await addCredit(tx, { userId: ownerId, amount: q.cash.amount, kind: "refund", note: `Refund · ${title}`, refundId: r!.id, actor: { kind: "user", id: ownerId }, ipHash });
+      if (toWallet && auto.ok && q.cash.amount > 0) await addCredit(tx, { userId: ownerId, amount: q.cash.amount, kind: "refund", note: walletNote, refundId: r!.id, actor: { kind: "system", id: null }, ipHash });
       if (q.item === "stay" && !anyway) await tx.update(appStays).set({ status: "cancelled", updatedAt: now }).where(eq(appStays.tripId, trip.id));
     }
     await appAuditLog(tx, {
       actorKind: "user", actorId: ownerId, action: "refund.requested", entityType: "app_refund_group", entityId: g!.id,
-      summary: `Asked for a refund of ${formatSar(amount)} (${title})${anyway ? ", nothing due by the rules" : ""}`, data: { destination, amount, anyway, items: chosen.map((p) => p.item), requestId: req.id }, ipHash,
+      summary: `Asked for a refund of ${formatSar(amount)} (${title})${anyway ? ", nothing due by the rules" : ""}`, data: { destination, amount, anyway, items: chosen.map((p) => p.item), requestId: req.id, auto: auto.ok ? auto.rule : auto.why }, ipHash,
     });
-    return g!;
+    if (auto.ok) await auditAuto(tx, { ownerId, groupId: g!.id, refundIds, amount, rule: auto.rule, destination });
+    return { group: g!, refundIds };
   });
-  if (destination === "credit" && amount > 0) await notify(ownerId, { kind: "refund_moved", level: "active", copy: "notify.trip.credit", vars: { amount: formatSar(amount) }, href: "/trips?tab=requests" });
+  let group = done.group;
+  if (auto.ok && !toWallet && !(await sendAutoCardRefunds(done.refundIds))) {
+    // The provider turned it down: it waits for a person after all.
+    [group] = await db.select().from(appRefundGroups).where(eq(appRefundGroups.id, group.id)) as [GroupRow];
+  }
+  if (group.stage === "requested") await notifyLooking(ownerId, group);
+  else if (amount > 0) await notifyGroupStep(db, group);
   return toRefundView(group);
 }
 
@@ -341,7 +361,7 @@ export async function partialRefund(tx: Tx, ownerId: string, trip: TripDetail, i
   const now = new Date();
   const [g] = await tx.insert(appRefundGroups).values({
     ownerId, tripId: trip.id, title, amount, stage: "requested", destination: "original", card: charge.label ?? "your card", reason: "plans",
-    expectedBy: new Date(now.getTime() + 14 * 86_400_000), clientKey,
+    expectedBy: addWorkingDays(now, REFUND_BANK_WORKING_DAYS), clientKey,
   }).returning();
   const [r] = await tx.insert(appRefunds).values({ paymentId: charge.paymentId, amount, stage: "requested", destination: "original", reason: title, expectedBy: g!.expectedBy }).returning();
   const cn = charge.invoiceId ? await issueInvoice(tx, {

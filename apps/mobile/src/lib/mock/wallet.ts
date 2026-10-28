@@ -444,14 +444,7 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
     return ok(cardsJson(s, user.id));
   }
   if (key === 'GET /credit') return ok({ credit: creditJson(s) });
-  if (key === 'POST /credit/move') {
-    const card = s.cards.find((c) => c.id === body.cardId);
-    if (!card) return err('NOT_FOUND');
-    const b = balance(s);
-    if (b <= 0) return err('VALIDATION', { copy: 'money.credit.nothing' });
-    s.credit.push({ id: uuid(), amount: -b, kind: 'adjustment', note: `Moved to ${card.label}`, createdAt: now() });
-    return ok({ credit: creditJson(s), moved: b, to: card.label });
-  }
+
 
   /* support */
   if (key === 'GET /support/presence') return ok(presence());
@@ -537,9 +530,13 @@ export const walletMock: AreaMock = async (w: Wire, mctx) => {
 
 /** For the demo and the web e2e (mock mode only): what the desk or a refund would normally do. */
 export const walletMockTools = {
-  /** Mada credit for every signed-in mock account, as a refund taken as credit. */
+  /** Into the Mada Wallet of every signed-in mock account, as a refund taken to the wallet. */
   addCredit(amount: number, note: string) {
     for (const s of states.values()) s.credit.push({ id: uuid(), amount, kind: 'refund', note, createdAt: now() });
+  },
+  /** Out of the Mada Wallet, used on a booking (the demo's "Used · …" line). */
+  spendCredit(amount: number, note: string) {
+    for (const s of states.values()) s.credit.push({ id: uuid(), amount: -amount, kind: 'spend', note, createdAt: now() });
   },
   /** A reply from a named person at the desk, in the newest conversation. */
   agentReply(name: string, body: string) {

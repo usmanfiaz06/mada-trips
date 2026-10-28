@@ -6,7 +6,7 @@
 // Walks: the Wallet lock (Face ID, then Face ID fails → passcode, a wrong passcode, lockout), the demo family's
 // passports and validity, a new account's empty Wallet, "Add your passport" (camera → wrong file → demo passport →
 // doubtful fields → by hand → expired warning → save), documents (wrong type, too big, scan fails, upload, share,
-// delete), Mada credit and cards (default, remove the default), Profile and every account screen (details, email,
+// delete), the Mada Wallet and cards (default, remove the default), Profile and every account screen (details, email,
 // phone, sign-in methods, preferences and loyalty, household with the helper's iqama and exit visa, security and
 // devices, privacy with the copy and deletion, help and legal, sign-out), support (topics, the bag form, urgent help,
 // offline queue with call and SMS, attachments) and the inbox. Passports inside a booking (ONLY=booking): a new
@@ -168,7 +168,7 @@ async function walletDemo() {
   step('wallet: money');
   await page.mouse.move(195, 400);
   await page.mouse.wheel(0, 1200);
-  await see('Mada credit', 'credit card');
+  await see('Mada Wallet', 'wallet card');
   await shot('wallet-money');
   await press(byTest('wallet-credit'));
   await see('Nothing has moved yet.', 'credit empty');
@@ -193,15 +193,13 @@ async function walletDemo() {
   await byTest('card-use').click();
   await see('Default card updated.', 'card added');
   await see('3 saved · default Visa ending 42', 'default label');
-  // Credit lands (a refund taken as credit), then moves to the card.
-  await page.evaluate(() => window.__madaWallet?.addCredit(64000, 'Galata rooms refund'));
+  // A refund lands in the Mada Wallet. It stays for bookings: nothing offers to move it to a card.
+  await page.evaluate(() => window.__madaWallet?.addCredit(64000, 'Galata rooms, Istanbul'));
   await press(byTest('wallet-credit'));
-  await see('Mada credit · SAR 640', 'credit balance', 10000);
-  await see('Galata rooms refund', 'credit history');
+  await see('Mada Wallet · SAR 640', 'wallet balance', 10000);
+  await see('Refund · Galata rooms, Istanbul', 'wallet history');
   await shot('wallet-credit-history');
-  await byTest('credit-move').click();
-  await see('SAR 640 is on its way to your Visa ending 42. 5 to 10 working days.', 'credit moved');
-  await shot('wallet-credit-moved');
+  if (await page.locator('[data-testid="credit-move"]').count()) errors.push('wallet: a button still offers to move the Mada Wallet to a card');
   await context.close();
 }
 
@@ -681,7 +679,7 @@ async function support() {
   await see('Updates', 'inbox');
   await shot('inbox');
   await byTest('inbox-money').click();
-  await see('Payments, refunds and Mada credit land here', 'money filter');
+  await see('Payments, refunds and your Mada Wallet land here', 'money filter');
   await byTest('inbox-circles').click();
   await see('Votes, splits and new people in your circles land here.', 'circles empty');
   await shot('inbox-empty-circles');

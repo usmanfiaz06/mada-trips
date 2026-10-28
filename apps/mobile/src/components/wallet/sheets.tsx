@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View, useWindowDimensions } f
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { checkUpload, dmyToIso, formatSar, type CardBrand, type DocumentKind, type Person, type WalletDocument } from '@mada/shared';
+import { checkUpload, dmyToIso, formatSar, walletLine, type CardBrand, type DocumentKind, type Person, type WalletDocument } from '@mada/shared';
 import { ApiError } from '@/lib/api';
 import { API_MODE } from '@/lib/config';
 import { buzz } from '@/lib/haptics';
@@ -30,7 +30,7 @@ import { ZoomImage } from './ZoomImage';
 import { HAS_APPLE_PAY } from '@/lib/device';
 
 /* The Wallet's sheets (prototype Wallet.jsx): add a document, upload it, a document's actions, a boarding pass,
-   Mada credit, and cards. */
+   the Mada Wallet, and cards. */
 
 /** A tappable well card with an icon, a title and a line under it. */
 export function WellRow({ icon, title, sub, onPress, testID, danger }: { icon?: IconName; title: string; sub?: string; onPress: () => void; testID?: string; danger?: boolean }) {
@@ -219,30 +219,21 @@ export function DocSheet({ doc, ask, onClose, onAdd, onReplace, tripId, onChange
   );
 }
 
-/* ───────────── Mada credit ───────────── */
+/* ───────────── Mada Wallet ───────────── */
 
-const KIND_NOTE = { refund: 'money.credit.refund', goodwill: 'money.credit.goodwill', spend: 'money.credit.spend', adjustment: 'money.credit.adjustment', expiry: 'money.credit.expiry' } as const;
+/** One movement, the way the Wallet says it: "Refund · Garden hotel, Istanbul", "Used · Istanbul, 9–15 Mar". */
+export const walletLineText = (e: { kind: string; note: string | null }) => {
+  const l = walletLine(e.kind, e.note);
+  const what = t(`money.credit.${l.what}`);
+  return l.detail ? t('money.credit.line', { what, detail: l.detail }) : what;
+};
 
+/** The Mada Wallet: the balance and every movement. For bookings only: nothing here moves it to a card. */
 export function CreditSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const qc = useQueryClient();
   const credit = useCredit();
-  const cards = useCards();
-  const [busy, setBusy] = useState(false);
   const { refetch } = credit;
   useEffect(() => { if (visible) refetch(); }, [visible, refetch]);
   const bal = credit.data?.balance.amount ?? 0;
-  const card = cards.data?.cards.find((c) => c.id === cards.data?.defaultId) ?? cards.data?.cards[0];
-  const move = async () => {
-    if (!card) return;
-    setBusy(true);
-    try {
-      const r = await walletApi.moveCredit(card.id);
-      qc.setQueryData(walletKeys.credit, r.credit);
-      buzz('success');
-      toast(t('money.credit.moved', { amount: formatSar(r.moved), card: r.to }));
-      onClose();
-    } catch (e) { toast(e instanceof ApiError ? e.message : t('error.internal')); } finally { setBusy(false); }
-  };
   return (
     <Sheet visible={visible} onClose={onClose} label={t('money.credit')}>
       <T v="h2" accessibilityRole="header">{t('money.credit.title', { amount: formatSar(bal) })}</T>
@@ -250,12 +241,11 @@ export function CreditSheet({ visible, onClose }: { visible: boolean; onClose: (
       {(credit.data?.entries ?? []).length === 0 ? (
         <EmptyState compact art={<ArtReceipt width={100} height={75} />} title={t('money.credit.emptyTitle')} body={t('money.credit.emptyBody')} />
       ) : credit.data!.entries.map((e) => (
-        <View key={e.id} style={styles.spread}>
-          <View style={{ flex: 1 }}><T v="body" color={colors.green} style={{ fontSize: 15 }}>{e.note ?? t(KIND_NOTE[e.kind])}</T><T v="tiny">{fmtDate(e.createdAt)}</T></View>
+        <View key={e.id} style={styles.spread} testID="credit-line">
+          <View style={{ flex: 1 }}><T v="body" color={colors.green} style={{ fontSize: 15 }}>{walletLineText(e)}</T><T v="tiny">{fmtDate(e.createdAt)}</T></View>
           <T style={{ fontFamily: ff.ui600, fontSize: 15, color: e.amount > 0 ? colors.ok : colors.green, fontVariant: ['tabular-nums'] }}>{formatSar(e.amount, { sign: true })}</T>
         </View>
       ))}
-      {bal > 0 && card ? <Button variant="secondary" style={well} label={t('money.credit.move')} busy={busy} onPress={move} testID="credit-move" /> : null}
     </Sheet>
   );
 }

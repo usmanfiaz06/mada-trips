@@ -16,7 +16,7 @@ import { T } from '@/components/Text';
 import { LockScreen } from '@/components/wallet/LockScreen';
 import { PassportCard } from '@/components/wallet/PassportCard';
 import { PassportCopyRow } from '@/components/passport/PassportCopy';
-import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, UploadSheet, copyMasked, type AddKind } from '@/components/wallet/sheets';
+import { AddDocSheet, CardsSheet, CreditSheet, DocSheet, UploadSheet, copyMasked, walletLineText, type AddKind } from '@/components/wallet/sheets';
 import { BoardingPasses } from '@/components/wallet/BoardingPasses';
 import { WalletEsims } from '@/components/esim/parts';
 import { buzz } from '@/lib/haptics';
@@ -85,7 +85,9 @@ function Unlocked() {
 
   const scan = (p = who) => router.push({ pathname: '/passport', params: p && !p.isSelf ? { person: p.id } : {} });
   // Trips › "Upload a booking" opens straight on the upload, for the account holder.
-  const params = useLocalSearchParams<{ upload?: string }>();
+  const params = useLocalSearchParams<{ upload?: string; credit?: string }>();
+  // "Open Wallet" after a refund (and the push that says it's there) opens on the Mada Wallet.
+  useEffect(() => { if (params.credit) { setSheet('credit'); router.setParams({ credit: undefined }); } }, [params.credit, router]);
   const self = list.find((p) => p.isSelf);
   const [opened, setOpened] = useState(false);
   if (params.upload === 'booking' && self && !opened) { setOpened(true); setWho(self.id); setUpload({ kind: 'other' }); }
@@ -184,6 +186,13 @@ function Unlocked() {
             <View style={styles.spread}><T v="eyebrow" color={colors.gold}>{t('money.credit')}</T><PayMark brand="credit" size={22} /></View>
             <T style={{ fontFamily: ff.ui600, fontSize: 34, lineHeight: 40, letterSpacing: -1, color: colors.mist, fontVariant: ['tabular-nums'] }}>{formatSar(bal)}</T>
             <T v="tiny" color={colors.onDark2}>{bal ? t('money.credit.used') : t('money.credit.zero')}</T>
+            {/* The latest movements, one line each: "Refund · Garden hotel, Istanbul  +SAR 1,840". The sheet has them all. */}
+            {(credit.data?.entries ?? []).slice(0, 3).map((e) => (
+              <View key={e.id} style={[styles.spread, styles.creditLine]} testID="wallet-credit-line">
+                <T v="small" color={colors.mist} numberOfLines={1} style={{ flex: 1 }}>{walletLineText(e)}</T>
+                <T v="small" color={e.amount > 0 ? colors.okBright : colors.onDark2} style={{ fontFamily: ff.ui600, fontVariant: ['tabular-nums'] }}>{formatSar(e.amount, { sign: true })}</T>
+              </View>
+            ))}
           </Pressable>
         </View>
         <Card onPress={() => setSheet('cards')} accessibilityLabel={dt('money.cards')} style={styles.rowCard}>
@@ -255,6 +264,7 @@ const styles = StyleSheet.create({
   dashed: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(30,53,45,0.18)', borderRadius: 22 },
   airline: { width: 32, height: 32, borderRadius: 9, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   credit: { borderRadius: 24, padding: 18, gap: 6, backgroundColor: colors.green },
+  creditLine: { gap: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.14)', paddingTop: 8 },
   spread: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   track: { position: 'absolute', start: 0, top: 8, height: 6, borderRadius: 999 },
   tick: { position: 'absolute', top: 4, width: 2, height: 14 },

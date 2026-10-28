@@ -236,7 +236,7 @@ export const enTripsUi2 = {
   'money.items': 'What was paid',
   'money.paidBy': 'Paid by {name}',
   'money.back': '{amount} back',
-  'money.creditLeft': '{amount} Mada credit on your account',
+  'money.creditLeft': '{amount} in your Mada Wallet',
   'money.splits': 'Splits in your circles',
   'money.splitPaid': 'paid',
   'money.splitOwes': 'owes',

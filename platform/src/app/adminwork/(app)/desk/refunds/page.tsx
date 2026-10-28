@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Undo2, Wallet, CreditCard, Gift, Plus } from "lucide-react";
 import { can, requirePerm } from "@/lib/auth";
@@ -6,10 +7,11 @@ import { fmtDate, timeAgo } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { isUuid } from "@/lib/security";
 import { getSettings } from "@/lib/settings";
+import { autoApproveMax } from "@/lib/app/finance/auto-approve";
 import { REFUND_STAGE } from "@/lib/labels";
 import { getRefund, pageRefunds, PAGE_SIZE } from "@/lib/app/desk/adapters";
 import { slaFor } from "@/lib/app/desk/sla";
-import { Card, CardHead, Empty, Input, KV, LinkButton, Money, PageHeader, Table, Tabs, Td, Textarea, Th, cx } from "@/components/ui";
+import { Badge, Card, CardHead, Empty, Input, KV, LinkButton, Money, PageHeader, Table, Tabs, Td, Textarea, Th, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { StatusBadge } from "@/components/desk/parts";
 import { AutoRefresh, SlaClock } from "@/components/desk/live";
@@ -22,7 +24,7 @@ export const metadata = { title: "Refunds & credits · Desk" };
 
 /*
  * Refunds and credits (DESK-PLAN U6, screen 7). Stages: To decide → (With a lead) → On its way → Sent → Settled, or
- * Declined. Approve all or part, to the card or to Mada credit; over the agent's limits it goes to a lead in Approvals.
+ * Declined. Approve all or part, to the card or to the Mada Wallet; over the agent's limits it goes to a lead in Approvals.
  * A card refund moves to Sent when the provider confirms (the finance job), to Settled when the settlement file
  * matches it. Goodwill credit and desk-started cancel-and-refund sit beside it.
  */
@@ -45,7 +47,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const tab = TABS.find((x) => x.key === sp.s) ?? TABS[0]!;
   const { page, offset } = pageParam(sp, PAGE_SIZE);
-  const [data, s] = await Promise.all([pageRefunds({ stage: tab.stages, q: sp.q, offset }), getSettings()]);
+  const [data, s, autoMax] = await Promise.all([pageRefunds({ stage: tab.stages, q: sp.q, offset }), getSettings(), autoApproveMax()]);
   const href = listHref("/adminwork/desk/refunds", { s: sp.s, q: sp.q, page: sp.page });
   // The rail shows the refund picked in the table (or sent from the inbox), else the oldest one waiting in this tab.
   const focused = sp.focus && isUuid(sp.focus) ? data.rows.find((f) => f.id === sp.focus) ?? await getRefund(sp.focus) : null;
@@ -59,7 +61,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
     <>
       <AutoRefresh every={30} />
       <PageHeader eyebrow={t("App bookings")} title={t("Refunds & credits")}
-        subtitle={t("Approve all or part, to the card it came from or to Mada credit, which is instant. A card refund shows Sent once the provider confirms it.")}
+        subtitle={t("Approve all or part, to the card it came from or to the Mada Wallet, which is instant and for bookings only. Refunds the rules give back in full, up to {max}, are approved at once and tagged Auto. A card refund shows Sent once the provider confirms it.", { max: `SAR ${sar(autoMax)}` })}
         actions={decide ? <LinkButton href="/adminwork/desk/refunds/new" variant="outline" size="sm"><Plus className="size-4" />{t("Cancel & refund a booking")}</LinkButton> : null} />
       <Tabs active={tab.key} items={TABS.map((x) => ({ key: x.key, label: t(x.label), href: listHref("/adminwork/desk/refunds", { q: sp.q })({ s: x.key === "requested" ? undefined : x.key }), count: x.key === "requested" || x.key === "lead" ? count(x) : undefined }))} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -80,7 +82,8 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                     <tr key={r.id} className={cx("group transition hover:bg-surface-2", f?.id === r.id && "bg-gold-soft/40")}>
                       <Td><Link href={href({ focus: r.id })} scroll={false} className="block" aria-current={f?.id === r.id ? "true" : undefined}>
                         <span className="block max-w-[240px] truncate text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{r.summary ?? (r.orderRef ? t("Booking {ref}", { ref: r.orderRef }) : t("Refund"))}</span>
-                        <span className="block text-[12px] text-ink-3"><span className="num">{r.ref}</span> · {timeAgo(r.createdAt, L)}{r.origin === "desk" ? ` · ${t("started by the desk")}` : ""}</span></Link></Td>
+                        <span className="block text-[12px] text-ink-3"><span className="num">{r.ref}</span> · {timeAgo(r.createdAt, L)}{r.origin === "desk" ? ` · ${t("started by the desk")}` : ""}</span></Link>
+                        {r.autoRule ? <Badge tone="info" className="mt-1">{t("Auto")}</Badge> : null}</Td>
                       <Td className="whitespace-nowrap"><CustomerLink id={r.userId} className="block text-ink">{r.userName}</CustomerLink><span className="block text-[12px] text-ink-3">{provider(r.payment.method) ?? r.payment.label ?? r.payment.method}</span></Td>
                       <Td><StatusBadge map={REFUND_STAGE} value={r.stage} /></Td>
                       <Td className="whitespace-nowrap">{sl ? <SlaClock due={sl.dueAt.toISOString()} opened={sl.openedAt.toISOString()} /> : <span className="text-[12.5px] text-ink-3">{fmtDate(r.updatedAt, L, true)}</span>}</Td>
@@ -111,13 +114,15 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                 [t("Booking"), f.requestId ? <Link key="o" href={`/adminwork/desk/orders/${f.requestId}`} className="underline decoration-gold decoration-2 underline-offset-2">{f.orderRef ?? t("Open the order")}</Link> : f.orderRef ?? "—"],
                 ...(f.origin === "desk" ? [[t("Started by"), t("the desk")] as [string, string]] : []),
                 ...(f.decidedAt ? [[t("Decided"), fmtDate(f.decidedAt, L, true)] as [string, string]] : []),
+                ...(f.autoRule ? [[t("Approved by"), <span key="a"><Badge tone="info">{t("Auto")}</Badge> <span className="text-[12px] text-ink-3">{f.autoRule}</span></span>] as [string, ReactNode]] : []),
+                ...(f.bankReference ? [[t("Bank reference"), <span key="r" className="num" dir="ltr">{f.bankReference}</span>] as [string, ReactNode]] : []),
                 ...(f.sentAt ? [[t("Sent"), fmtDate(f.sentAt, L, true)] as [string, string]] : []),
                 ...(f.settledAt ? [[t("Settled"), fmtDate(f.settledAt, L, true)] as [string, string]] : []),
               ]} />
               {f.note && <p className="mt-4 rounded-2xl bg-sunken px-3.5 py-2.5 text-[12.5px] text-ink-2">{f.note}</p>}
-              {inst && f.stage === "requested" && <p className="mt-4 rounded-2xl bg-info-soft px-3.5 py-2.5 text-[12.5px] text-info">{t("Paid with {provider}. Refunding to the card cancels the remaining payments with {provider}, and what was paid goes back to their card. Mada credit is instant instead.", { provider: inst })}</p>}
+              {inst && f.stage === "requested" && <p className="mt-4 rounded-2xl bg-info-soft px-3.5 py-2.5 text-[12.5px] text-info">{t("Paid with {provider}. Refunding to the card cancels the remaining payments with {provider}, and what was paid goes back to their card. The Mada Wallet is instant instead.", { provider: inst })}</p>}
               {f.stage === "rejected" && <p className="mt-4 rounded-2xl bg-bad-soft px-3.5 py-2.5 text-[13px] text-bad">{t("Traveller reads:")} {f.reason}</p>}
-              {["approved", "sent", "settled"].includes(f.stage) && <p className="mt-4 text-[12.5px] text-ink-3">{f.destination === "credit" ? t("To Mada credit") : t("To {card}", { card: f.payment.label ?? t("the card") })}{f.stage === "approved" && f.expectedBy ? ` · ${t("expected by {date}", { date: fmtDate(f.expectedBy, L) })}` : ""}{f.stage === "approved" && f.checkedAt ? ` · ${t("asked the provider {when}", { when: timeAgo(f.checkedAt, L) })}` : ""}</p>}
+              {["approved", "sent", "settled"].includes(f.stage) && <p className="mt-4 text-[12.5px] text-ink-3">{f.destination === "credit" ? t("To the Mada Wallet") : t("To {card}", { card: f.payment.label ?? t("the card") })}{f.stage === "approved" && f.expectedBy ? ` · ${t("expected by {date}", { date: fmtDate(f.expectedBy, L) })}` : ""}{f.stage === "approved" && f.checkedAt ? ` · ${t("asked the provider {when}", { when: timeAgo(f.checkedAt, L) })}` : ""}</p>}
 
               {f.stage === "awaiting_lead" && (
                 <div className="mt-4 rounded-2xl bg-warn-soft px-3.5 py-2.5 text-[12.5px] text-warn">
@@ -136,7 +141,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                 <ActionForm action={markRefundSentAction} className="mt-5 space-y-2 border-t border-line pt-4">
                   <input type="hidden" name="id" value={f.id} />
                   <p className="text-[12.5px] text-ink-3">{inst ? t("{provider} doesn't confirm refunds to us yet. When their portal shows it done, mark it sent.", { provider: inst }) : t("Moves to Sent by itself when the provider confirms. If their portal already shows it done, mark it sent.")}</p>
-                  <Input name="reference" required minLength={3} maxLength={80} placeholder={t("The provider's refund reference")} dir="ltr" />
+                  <Input name="reference" required minLength={3} maxLength={80} placeholder={t("The bank's reference (ARN) or the provider's refund reference")} dir="ltr" />
                   <SubmitButton variant="outline" className="w-full">{t("Mark sent")}</SubmitButton>
                 </ActionForm>
               )}
@@ -149,11 +154,11 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
                     <Input id={`amt-${f.id}`} name="amount" inputMode="decimal" defaultValue={amountInput(f.amount)} dir="ltr" className="num" />
                     <p className="text-[11.5px] text-ink-3">{t("Less than asked is a partial refund; the traveller sees the amount you approve.")}</p>
                     <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-sunken p-1">
-                      {[["original", inst ?? t("Card"), CreditCard], ["credit", t("Mada credit"), Wallet]].map(([v, l, I]) => {
+                      {[["original", inst ?? t("Card"), CreditCard], ["credit", t("Mada Wallet"), Wallet]].map(([v, l, I]) => {
                         const Icon = I as typeof Wallet;
                         return (
                           <label key={String(v)} className="block">
-                            <input type="radio" name="destination" value={String(v)} defaultChecked={v === "original"} className="peer sr-only" />
+                            <input type="radio" name="destination" value={String(v)} defaultChecked={v === (f.destination === "credit" ? "credit" : "original")} className="peer sr-only" />
                             <span className="flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-[12.5px] text-ink-3 transition peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-card"><Icon className="size-3.5" />{String(l)}</span>
                           </label>
                         );
@@ -173,7 +178,7 @@ export default async function RefundsPage({ searchParams }: { searchParams: Prom
 
           {f && can(u, "desk.act") && (
             <Card>
-              <CardHead title={<span className="inline-flex items-center gap-2"><Gift className="size-4 text-gold" />{t("Goodwill credit")}</span>} hint={t("For {name}, to Mada credit at once", { name: f.userName })} />
+              <CardHead title={<span className="inline-flex items-center gap-2"><Gift className="size-4 text-gold" />{t("Goodwill credit")}</span>} hint={t("For {name}, to the Mada Wallet at once", { name: f.userName })} />
               <ActionForm action={refundsGoodwillAction} className="space-y-2" resetOnOk>
                 <input type="hidden" name="userId" value={f.userId} />
                 <Input name="amount" inputMode="decimal" required placeholder={t("Amount (SAR)")} dir="ltr" className="num" />

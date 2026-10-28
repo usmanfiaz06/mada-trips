@@ -134,7 +134,7 @@ function FlightCard({ f, focus, act, voucher, t, L }: { f: BoardFlight; focus: b
                 <div className="grid gap-2 sm:grid-cols-2">
                   {[1, 2].map((i) => <div key={i} className="grid gap-1.5"><Input name="optionLabel" maxLength={60} placeholder={t("Option {n}", { n: i })} /><Input name="optionDetail" maxLength={140} placeholder={t("What it means for them")} /></div>)}
                 </div>
-                {voucher && <Field label={t("Voucher per account, as Mada credit (SAR, optional)")}><Input name="voucher" inputMode="decimal" placeholder="0" className="num w-40" dir="ltr" /></Field>}
+                {voucher && <Field label={t("Voucher per account, into the Mada Wallet (SAR, optional)")}><Input name="voucher" inputMode="decimal" placeholder="0" className="num w-40" dir="ltr" /></Field>}
                 <SubmitButton variant="gold" className="w-full sm:w-auto"><Send className="size-4 rtl:-scale-x-100" />{f.travellers.length === 1 ? t("Send to 1 account") : t("Send to {n} accounts", { n: f.travellers.length })}</SubmitButton>
               </ActionForm>
             </details>
