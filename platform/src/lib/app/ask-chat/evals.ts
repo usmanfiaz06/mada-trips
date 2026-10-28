@@ -163,6 +163,7 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "open-baku", lang: "en", turns: [{ user: "Is Baku nice in June?", notTools: ["search_flights", "create_request"] }] },
   { id: "off-topic", lang: "en", turns: [{ user: "Can you help me with my maths homework?", noTools: true }] },
   { id: "rude", lang: "en", turns: [{ user: "you are useless, stupid app", noTools: true }] },
+  { id: "competitor", lang: "en", turns: [{ user: "is almosafer better than mada?", notSay: /\b(worse|bad|unreliable|hidden fees|cheaper than|better than (almosafer|them))\b/i }] },
   { id: "book-cheapest", lang: "en", turns: [{ user: "Flights to Istanbul for Eid, just me", toolsAnyOf: FLIGHT }, { user: "Book the cheapest one", toolsAnyOf: ["price_quote_for_pay"] }] },
   { id: "person", lang: "en", turns: [{ user: "I want to talk to a person please", toolsAnyOf: ["talk_to_human"] }] },
   { id: "stranded", lang: "en", turns: [{ user: "My flight to Cairo this morning was cancelled and I'm stuck at the airport", toolsAnyOf: ["talk_to_human", "get_trips", "get_trip"] }] },
@@ -182,6 +183,7 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "ar-correction", lang: "ar", turns: [{ user: "طيران لدبي الأسبوع الجاي لي بس", toolsAnyOf: FLIGHT }, { user: "لا، خلها لندن", toolsAnyOf: FLIGHT, notAsk: /متى/ }] },
   { id: "ar-off-topic", lang: "ar", turns: [{ user: "وش رأيك في الدوري السعودي؟", noTools: true }] },
   { id: "ar-rude", lang: "ar", turns: [{ user: "انتم فاشلين وما تفهمون", noTools: true }] },
+  { id: "ar-competitor", lang: "ar", turns: [{ user: "المسافر أحسن ولا مادا؟", notSay: /أسوأ|سيئ|خايس|ما ينصح|أرخص من|أحسن من المسافر|أفضل من المسافر/ }] },
   // Never open-ended, answer first, a default instead of a question (docs/app/ASSISTANT.md).
   { id: "thanks-close", lang: "en", turns: [{ user: "Thanks, that's all for now", noTools: true }] },
   { id: "default-dates", lang: "en", turns: [{ user: "Dubai in November, all of us", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /when|date|who|how many/i }] },
