@@ -5,7 +5,7 @@ import { t, weekendLine, type AskChatEvent, type AskIntent, type AskKind, type C
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { isCloser, lastBreak, outgoingProblems, saudiWords, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
-import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, compactPromptFor, leanToolsFor } from "./prompt";
+import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, activeTools, compactPromptFor, leanToolsFor } from "./prompt";
 import { leanHistory } from "./fold";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
 import { schemaProblems, toolNameFor, withNulls } from "./schema";
@@ -228,7 +228,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       output_config: { effort: "low" },
       cache_control: { type: "ephemeral" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: TOOLS,
+      tools: activeTools(),
       only_tools: onlyTools,
       lean: { system: compactPromptFor(onlyTools), tools: LEAN_TOOLS, messages: [...leanBefore, ...added] },
       tool_choice: { type: "auto" },

@@ -89,6 +89,33 @@ const ISTANBUL_LINES = {
   ar: { status: 'نجهّز الخطة', text: 'هذي خطة ٣ أيام في إسطنبول، البداية من الرياض. شوفها.', next: ['دوّر سكن', 'أضف شريحة نت', 'ابدأ من جدة'] },
 } as const;
 
+/** Places (find_places / place_details): a list near the hotel, and one in full ("More about …"). */
+const PLACES_WORDS = /shawarma|mandi|near (?:our|my|the) hotel|open now|شاورما|مندي|قريب من فندق|مفتوح الحين/i;
+const PLACE_MORE = /^(?:more about|تفاصيل) /i;
+const week = (line: string) => ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((d) => `${d}: ${line}`);
+const demoPlace = (id: string, name: string, type: string, rating: number, ratings: number, price: number, closes: string, distanceM: number, address: string, photo: string, extra: Partial<import('@mada/shared').ChatPlace> = {}): import('@mada/shared').ChatPlace => ({
+  id, name, type, rating, ratings, price, open: { now: true, closes, opens: null }, today: null, address, lat: 41.0336, lng: 28.9768, distanceM,
+  photo: { url: `photo:${photo}`, credit: [{ name: 'Ayşe K.', url: null }] }, ...extra,
+});
+const DEMO_PLACES = {
+  en: [
+    demoPlace('demo-ist-1', 'Taksim Şam Shawarma', 'Shawarma restaurant', 4.4, 3210, 1, '02:00', 400, 'Sıraselviler Cd. 12, Beyoğlu, İstanbul', 'turkish-breakfast'),
+    demoPlace('demo-ist-2', 'Dürümzade Beyoğlu', 'Shawarma restaurant', 4.6, 18420, 1, '03:00', 650, 'Hamalbaşı Cd. 26/B, Beyoğlu, İstanbul', 'istanbul-sultanahmet'),
+    demoPlace('demo-ist-3', 'Karadeniz Döner Asım Usta', 'Turkish restaurant', 4.7, 9870, 2, '21:30', 2400, 'Beşiktaş Cd. 1, Beşiktaş, İstanbul', 'istanbul-bosphorus'),
+  ],
+  ar: [
+    demoPlace('demo-dxb-1', 'مطعم بيت المندي', 'مطعم يمني', 4.5, 6420, 2, '01:00', 350, 'شارع المطينة، ديرة، دبي', 'dubai-creek'),
+    demoPlace('demo-dxb-2', 'مندي هاوس داون تاون', 'مطعم عربي', 4.1, 870, 3, '23:00', 900, 'بوليفارد محمد بن راشد، وسط دبي', 'desert-camp'),
+    demoPlace('demo-dxb-3', 'الروشة للمندي', 'مطعم يمني', 4.3, 2980, 2, '00:30', 1400, 'شارع الشيخ زايد، الوصل، دبي', 'dubai-skyline'),
+  ],
+} as const;
+/** Today's hours as Google writes them, for each demo place's closing time. */
+const TODAY: Record<string, string> = { '02:00': '11:00 AM – 2:00 AM', '03:00': '11:00 AM – 3:00 AM', '21:30': '10:30 AM – 9:30 PM', '01:00': '12:00 PM – 1:00 AM', '23:00': '1:00 PM – 11:00 PM', '00:30': '11:30 AM – 12:30 AM' };
+const PLACES_LINES = {
+  en: { status: 'Looking at places nearby', list: 'Three good shawarma places open now near your hotel. Taksim Şam is the closest, 400 m away.', next: ['More about Taksim Şam Shawarma', 'Directions', 'Add to my plan'], detailStatus: 'Checking the opening hours', detail: 'Taksim Şam is open until 02:00 tonight, 400 m from your hotel.', detailNext: ['Directions', 'Add to my plan', 'Something sweet after'] },
+  ar: { status: 'نشوف الأماكن القريبة', list: 'لقيت لك ثلاث مطاعم مندي مفتوحة الحين قريبة من فندقك. بيت المندي أقربها، على بعد 350 م.', next: ['تفاصيل مطعم بيت المندي', 'الاتجاهات', 'أضفه لخطتي'], detailStatus: 'نشوف أوقات الدوام', detail: 'بيت المندي مفتوح لين 01:00 الليلة، على بعد 350 م من فندقك.', detailNext: ['الاتجاهات', 'أضفه لخطتي', 'حلا بعده'] },
+} as const;
+
 /** A table, a request, the team: the words the demo answers with a request card. */
 const REQUEST_WORDS = /table|restaurant|dinner|book .* for us|طاولة|مطعم|عشاء/i;
 /** Companions (ASK-INTEGRATED.md §5): two Abdullahs, someone not in the circle, a change asked by a companion. */
@@ -144,6 +171,26 @@ export async function demoAskChat(body: { text: string; threadId?: string | null
       for (const word of text.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
       onEvent({ type: 'cards', cards: [card] });
       onEvent({ type: 'next', choices: [...(start ? P.startNext : P.next)] });
+      onEvent({ type: 'done', text });
+      keep(text);
+      return 'done';
+    }
+    if (PLACES_WORDS.test(body.text) || PLACE_MORE.test(body.text)) {
+      const P = PLACES_LINES[lang];
+      const more = PLACE_MORE.test(body.text);
+      onEvent({ type: 'status', text: more ? P.detailStatus : P.status, tool: more ? 'place_details' : 'find_places' });
+      // The mock's own trip, so Add to plan has a plan to go on (mock/plans.ts).
+      const { mockTripsOf } = await import('./mock-api');
+      const trip = user ? mockTripsOf(user).find((x) => x.status !== 'cancelled' && x.status !== 'completed') : undefined;
+      await wait(900, signal);
+      const list = DEMO_PLACES[lang];
+      const named = list.find((x) => body.text.includes(x.name)) ?? list[0];
+      const one = { ...named, today: TODAY[named.open?.closes ?? ''] ?? null, week: week(TODAY[named.open?.closes ?? ''] ?? ''), phone: '+90 212 249 0147', website: 'https://example.com', mapsUrl: null };
+      const card: ChatCard = more ? { type: 'place', tripId: trip?.id ?? null, place: one } : { type: 'places', query: lang === 'ar' ? 'مندي' : 'shawarma', near: lang === 'ar' ? 'فندقك' : 'your hotel', tripId: trip?.id ?? null, places: [...list] };
+      const text = more ? P.detail : P.list;
+      for (const word of text.split(/(?<= )/)) { onEvent({ type: 'text', delta: word }); await wait(45, signal); }
+      onEvent({ type: 'cards', cards: [card] });
+      onEvent({ type: 'next', choices: [...(more ? P.detailNext : P.next)] });
       onEvent({ type: 'done', text });
       keep(text);
       return 'done';

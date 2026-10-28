@@ -76,6 +76,9 @@ const PARTNER_IMAGE_HOSTS = [
   "hotelbeds.com", "hotelbeds.net", "hbg.com", "hbx.com", "activitiesbank.com", "giata.com", "giatamedia.com", "tboholidays.com", "tbo.com", "tboair.com",
   "esimaccess.com", "airalo.com", "airalo.net", "viator.com", "tripadvisor.com", "getyourguide.com", "gyg.com", "worldota.net", "ratehawk.com", "emergingtravel.com",
   "duffel.com", "cartrawler.com", "klook.com", "klookcdn.com", "joinsherpa.com", "sherpa.com", "xcover.com", "aerodatabox.com", "webbeds.com", "dotwconnect.com",
+  // Google Places photos (CONNECT.md §32): not a hidden partner (the cards credit Google), but the media URL needs our
+  // key, which only the image route adds on the server.
+  "places.googleapis.com",
 ];
 const hostIs = (host: string, base: string) => host === base || host.endsWith(`.${base}`);
 export const isPartnerHost = (host: string) => PARTNER_IMAGE_HOSTS.some((b) => hostIs(host.toLowerCase(), b));

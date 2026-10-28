@@ -27,6 +27,7 @@ import { ChangeRequestCard, PayChangeCard } from './ChangeRequestCard';
 import { StayQuoteCard } from './StayQuoteCard';
 import { LinkCard, PlanCard as LivingPlanCard, PlanDiffCard } from './PlanCards';
 import { DocumentCard, ShareCard } from './DocCards';
+import { PlaceCard, PlacesCard } from './PlaceCards';
 import { riseStyle, useReduceMotion } from '@/lib/motion';
 import { colors, ff, font, radii } from '@/theme';
 
@@ -361,6 +362,11 @@ function CardFor({ card, turn, onOpen, onSay }: { card: ChatCard; turn: ChatTurn
       return <DocumentCard card={card} turnId={turn.id} />;
     case 'doc_share':
       return <ShareCard card={card} turnId={turn.id} />;
+    // Places from Google (PlaceCards.tsx): the list, and one in full with Directions, Call, Website, Add to plan.
+    case 'places':
+      return <PlacesCard card={card} onSay={onSay} />;
+    case 'place':
+      return <PlaceCard card={card} onSay={onSay} />;
     default:
       return null;
   }

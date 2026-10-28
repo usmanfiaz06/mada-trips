@@ -60,7 +60,9 @@ export function applyLocal(plan: Plan, ops: PlanOp[]): Plan {
       const sort = after ? after.sort + 0.5 : (same.at(-1)?.sort ?? 0) + 10;
       const dayDate = op.day != null ? addDay(plan.startDate, op.day) : null;
       items.push({
-        id: tempId(), day: op.day, sort, kind: op.item.kind, mode: op.item.mode ?? null, title: op.item.title, note: op.item.note ?? null, place: null, from: null, to: null,
+        id: tempId(), day: op.day, sort, kind: op.item.kind, mode: op.item.mode ?? null, title: op.item.title, note: op.item.note ?? null,
+        // A place from Ask's place cards keeps where it is and Google's id; others are named by the server.
+        place: op.item.place?.gid ? { name: op.item.place.name, kind: 'place', code: null, lat: op.item.place.lat ?? null, lng: op.item.place.lng ?? null, gid: op.item.place.gid } : null, from: null, to: null,
         startsAt: op.item.at && dayDate ? `${dayDate}T${op.item.at}` : null, endsAt: null, tz: null, nights: op.item.nights ?? null, status: 'idea', statusLine: null, booking: null,
         requestId: null, offerId: null, drive: null, source: 'manual', price: null, quote: null,
       });

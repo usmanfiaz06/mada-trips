@@ -15,7 +15,7 @@ const id = () => uuid("id").primaryKey().defaultRandom();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp("updated_at", { withTimezone: true }).notNull().defaultNow();
 
-export type PlanPlaceJson = { name: string; kind: "airport" | "city" | "place"; code?: string | null; city?: string | null; country?: string | null; lat?: number | null; lng?: number | null };
+export type PlanPlaceJson = { name: string; kind: "airport" | "city" | "place"; code?: string | null; city?: string | null; country?: string | null; lat?: number | null; lng?: number | null; gid?: string | null };
 export type PlanDriveJson = {
   km: number | null; minutes: number | null; tolls: boolean | null; borders: string[]; source: string | null; asOf: string | null; estimate?: boolean;
   // Written by lib/app/drive (U4): ferries, named crossings, "no road", when to ask again, and the line to show.

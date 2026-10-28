@@ -49,6 +49,16 @@ Three-letter names that are also airport codes (TBO, HBX, HBG) count only in low
 - `npm run export:web` (apps/mobile) ends with `npm run leak:scan` (`tools/leak-scan/scan.mjs dist --allow-mock`): the
   export fails on a finding. `--allow-mock` lets the mock API's own chunk keep the mock supplier's sample prices.
 
+## Google Places (a source we credit, not a hidden partner)
+
+Places in Ask (CONNECT.md §32) come from Google and the cards say so ("Google Maps", the photo's author), as Google's
+terms require. What stays on the server: the API key (header only), the field masks, the photo media URLs (a card's
+photo is `places.googleapis.com/v1/{photo}/media…` without any key; the scrub turns it into our `/img/{token}` link, and
+the image route adds the key and fetches the image server to server). Google's place ids go to the app (they open the
+details and are kept on plan items as `place.gid`): they are Google's public ids, not a partner's reference.
+`platform/test/app/places-google.test.ts` checks a whole chat turn with the leak scan and that no key, mask or Google
+host reaches the app.
+
 ## Adding a partner
 
 Add its image hosts to `PARTNER_IMAGE_HOSTS` and its name to `PARTNER_NAMES` (shield.ts) and `PARTNERS`

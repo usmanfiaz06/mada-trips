@@ -63,7 +63,9 @@ describe("ask chat: tokens per call for openai-compatible providers", () => {
   afterEach(() => setChatApi(null));
 
   it("every call of the eval set fits a free tier's minute (was about 4,400 a call)", async () => {
-    const calls = await measure();
+    // Measured with places on (the places tools and their rule ride along on the turns that need them).
+    process.env.SUPPLIER_MODE_PLACES = "mock";
+    const calls = await measure().finally(() => { delete process.env.SUPPLIER_MODE_PLACES; });
     const rows = table(calls);
     // ASK_TOKENS_TABLE=/path/rows.json writes the table by kind and step (docs/app/ASK-CHAT.md §6).
     if (process.env.ASK_TOKENS_TABLE) (await import("node:fs")).writeFileSync(process.env.ASK_TOKENS_TABLE, JSON.stringify(rows, null, 1));

@@ -29,6 +29,8 @@ function byName(name: string) {
 
 export function resolvePlace(input: PlaceInput | null | undefined): PlanPlaceJson | null {
   if (!input) return null;
+  // A place from Ask's place cards (Google): kept as given, never matched to a city or an airport ("Dubai Mall" isn't Dubai).
+  if (input.gid) return { name: input.name.trim(), kind: "place", code: null, city: null, country: null, lat: input.lat ?? null, lng: input.lng ?? null, gid: input.gid };
   const a = (input.code ? airport(input.code.toUpperCase()) : null) ?? byName(input.name);
   if (!a) return { name: input.name.trim(), kind: input.kind ?? "place", code: input.code ?? null, city: null, country: null };
   const asAirport = input.kind === "airport" || (!!input.code && input.kind !== "city");

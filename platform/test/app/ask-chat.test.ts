@@ -82,7 +82,8 @@ describe("a conversation", () => {
     expect(sent.model).toBe("claude-sonnet-5-5");
     expect((sent as unknown as { output_config: { effort: string } }).output_config.effort).toBe("low");
     expect((sent.system as { cache_control?: unknown }[])[0]!.cache_control).toEqual({ type: "ephemeral" });
-    expect(sent.tools!.map((t) => (t as { name: string }).name)).toEqual(TOOL_NAMES);
+    // Every tool but the places ones, which are listed only while places are on (no key in the tests).
+    expect(sent.tools!.map((t) => (t as { name: string }).name)).toEqual(TOOL_NAMES.filter((n) => !["find_places", "place_details"].includes(n)));
     expect(sent.tools!.every((t) => (t as { strict?: boolean }).strict)).toBe(true);
     // The second request replays the first reply unchanged, with the tool result after it.
     expect(api.requests[1]!.messages.length).toBe(sent.messages.length + 2);
