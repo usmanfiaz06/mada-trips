@@ -506,6 +506,7 @@
       if (r.name === "travelers") return needPlan() && viewTravelersLive();
       if (r.name === "pay") return needPlan() && (REQ_MODE() ? location.replace("#/send") : viewPayLive());
       if (r.name === "send") return needPlan() && viewSend();
+      if (r.name === "family") return viewFamily();
       if (r.name === "req") return viewRequest(r.a);
       if (r.name === "wait") return viewWait(r.a);
       if (r.name === "t") return viewTripLive(r.a);
@@ -1641,7 +1642,7 @@
       ${backLink("#/plan")}${steps(1)}
       <h1 class="pg__h">${esc(t("trvTitle"))}</h1><p class="pg__sub">${esc(P.sub)}</p>
       <div class="pg__grid"><form id="trvForm" novalidate>
-        ${others.length ? `<div class="box"><h2 class="box__h">${esc(t("savedPick"))}</h2><div class="saved">${others.map((p) => `<button type="button" class="chip" data-person="${p.id}">${esc(p.givenNames || p.firstName)} ${esc(p.surname)}${p.passport ? ` ${ico("check")}` : ""}</button>`).join("")}</div></div>` : ""}
+        ${others.length ? `<div class="box"><h2 class="box__h">${esc(t("savedPick"))}</h2><div class="saved">${others.map((p) => `<button type="button" class="chip" data-person="${p.id}">${esc(p.givenNames || p.firstName)} ${esc(p.surname)}${p.passport ? ` ${ico("check")}` : ""}</button>`).join("")}</div><a class="link fm-link" href="#/family">${esc(FM().h)} →</a></div>` : ""}
         ${co.lt.map((x, i) => `<div class="box trv" data-i="${i}">
           <div class="trv__h"><b>${esc(t("travelerN")(i + 1, label[x.k]))}${x.personId && self && x.personId === self.id ? ` · ${esc(t("you"))}` : ""}</b><span class="tagname" data-tag="${i}"></span></div>
           <div class="fgrid">
@@ -1737,6 +1738,114 @@
     });
   }
 
+
+  // ----- Family: everyone who travels with this account, saved once (the app's household, GET/POST /people) -----
+  const FM = () => t("fam");
+  const ageOf = (dob) => { if (!dob) return null; const b = new Date(dob), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; };
+  let famEdit = null; // null, "new", or a person's id (their passport)
+  async function viewFamily() {
+    const F = FM(), P = t("pp");
+    if (!A.signedIn) return location.replace("#/signin?next=family");
+    if (!$("#famPage")) page(loading(F.h));
+    let people;
+    try { people = (await A.people()).people; } catch (e) { return page(errBox(e.message, true)); }
+    if (route().name !== "family") return;
+    const self = people.find((p) => p.isSelf), others = people.filter((p) => !p.isSelf);
+    const soon = (p) => p.passport && nightsOf(todayIso(), p.passport.expiry) < 183;
+    const nice = (x) => x.trim().toLowerCase().replace(/(^|[\s'-])\S/g, (c) => c.toUpperCase());
+    const card = (p) => {
+      const age = ageOf(p.dateOfBirth), rel = p.isSelf ? F.you : F.rel[p.relation] || "";
+      const pass = p.passport ? `<span class="fm__pp${soon(p) ? " warn" : " ok"}">${ico(soon(p) ? "clock" : "check")}${esc(soon(p) ? F.ppSoon(fmt(p.passport.expiry, { month: "short", year: "numeric" })) : F.ppOk(p.passport.numberMasked, fmt(p.passport.expiry, { month: "short", year: "numeric" })))}</span>` : `<span class="fm__pp">${esc(F.ppNone)}</span>`;
+      return `<article class="fm">
+        <span class="wa__av">${esc((p.firstName || p.givenNames || (user && user.name) || F.you)[0].toUpperCase())}</span>
+        <div class="fm__b"><b>${esc(nice(`${p.givenNames || p.firstName} ${p.surname}`) || (p.isSelf ? (user && user.name) || F.you : ""))}</b><small>${esc([rel, age != null ? F.age(age) : ""].filter(Boolean).join(" · "))}</small>${pass}</div>
+        <div class="fm__act"><button type="button" class="btn btn--plain btn--sm" data-fm-pp="${p.id}">${esc(p.passport ? F.ppUpdate : p.isSelf && !p.surname ? F.selfAdd : F.ppAdd)}</button>${p.isSelf ? "" : `<button type="button" class="link link--danger" data-fm-rm="${p.id}">${esc(F.remove)}</button>`}</div>
+      </article>${famEdit === p.id ? famForm(p) : ""}`;
+    };
+    const n = people.length;
+    page(`<div class="wrap pg pg--narrow" id="famPage">
+      <h1 class="pg__h">${esc(F.h)}</h1>
+      <p class="pg__sub">${esc(F.sub)}</p>
+      <div class="fms">${self ? card(self) : ""}${others.map(card).join("")}</div>
+      ${famEdit === "new" ? famForm(null) : `<button type="button" class="fm-add" id="fmAdd">${ico("ppl")}<span><b>${esc(F.add)}</b><small>${esc(F.addSub)}</small></span><em>+</em></button>`}
+      ${n > 1 ? `<section class="box fm-next"><h2 class="box__h">${esc(F.nextH)}</h2><div class="mws">
+        <button type="button" class="mw" data-a="say" data-v="${esc(F.planFor(n))}">${ico("flights")}<span><b>${esc(F.planH(n))}</b><small>${esc(F.planSub)}</small></span></button>
+        <a class="mw" href="#/circles/new">${ico("chat")}<span><b>${esc(F.circleH)}</b><small>${esc(F.circleSub)}</small></span></a>
+        <a class="mw" href="#/people">${ico("ppl")}<span><b>${esc(F.friendsH)}</b><small>${esc(F.friendsSub)}</small></span></a></div></section>` : ""}
+      <p class="note-s fm-safe">${ico("lock")}${esc(F.safe)}</p>
+    </div>`);
+    $("#fmAdd")?.addEventListener("click", () => { famEdit = "new"; viewFamily().then(() => $("#fmF [name=first]")?.focus()); });
+    $$("[data-fm-pp]").forEach((b) => b.addEventListener("click", () => { famEdit = famEdit === b.dataset.fmPp ? null : b.dataset.fmPp; viewFamily(); }));
+    $$("[data-fm-rm]").forEach((b) => b.addEventListener("click", () => {
+      const p = people.find((x) => x.id === b.dataset.fmRm);
+      confirmSheet(F.removeQ(p.firstName || p.givenNames), F.removeSub, F.remove, F.keep, async () => { try { await A.removePerson(p.id); toast(F.removed); viewFamily(); } catch (x) { toast(x.message); } });
+    }));
+    const f = $("#fmF"); if (!f) return;
+    f.querySelector("[data-cancel]").addEventListener("click", () => { famEdit = null; viewFamily(); });
+    f.querySelector("#fmScan")?.addEventListener("change", async (e) => {
+      if (!e.target.files[0]) return;
+      const st = $("#fmScanSt"); st.hidden = false; st.className = "pp__status";
+      try {
+        const r = await readPassport(e.target.files[0], (msg) => { st.innerHTML = `<span class="spin spin--sm"></span>${esc(msg)}`; });
+        if (!r) { st.className = "pp__status pp__status--no"; st.textContent = P.noRead; return; }
+        const x = r.fields, M = window.MadaMRZ, set = (k, v) => { if (v && f[k] && !f[k].readOnly) f[k].value = v; };
+        set("first", x.given); set("last", x.surname); set("number", x.number); set("dob", M.dmyToIso(x.dob)); set("expiry", M.dmyToIso(x.expiry));
+        const nat = M.countryCode(x.nationalityCode || x.nationality); if (nat) f.nat.value = nat;
+        if (/^[MF]$/.test(x.sex)) f.sex.value = x.sex;
+        st.className = "pp__status pp__status--ok"; st.textContent = (r.doubtful || []).length ? P.readCheck : P.readOk;
+      } catch { st.className = "pp__status pp__status--no"; st.textContent = P.noOcr; }
+    });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const v = (k) => (f[k] ? f[k].value.trim() : ""), err = $("#fmErr"), bad = (msg, el) => { err.hidden = false; err.textContent = msg; el && el.focus(); };
+      err.hidden = true;
+      const first = v("first").toUpperCase(), last = v("last").toUpperCase(), num = v("number").toUpperCase().replace(/\s/g, "");
+      if (!/^[A-Z][A-Z' -]*$/.test(first)) return bad(F.errName, f.first);
+      if (!/^[A-Z][A-Z' -]*$/.test(last)) return bad(F.errName, f.last);
+      if (num && !/^[A-Z0-9]{5,12}$/.test(num)) return bad(P.errNumber || F.errNumber, f.number);
+      if (num && (!v("nat") || !v("expiry"))) return bad(F.errPassport, !v("nat") ? f.nat : f.expiry);
+      if (num && v("expiry") <= todayIso()) return bad(F.errExpired, f.expiry);
+      if (num && !v("dob")) return bad(F.errDob, f.dob);
+      const passport = num ? { number: num, issuingCountry: v("nat"), nationality: v("nat"), expiry: v("expiry"), source: f.dataset.scanned ? "scan" : "manual" } : null;
+      const btn = $(".primary", f); btn.disabled = true;
+      try {
+        if (famEdit === "new") {
+          await A.addPerson({ givenNames: first, surname: last, relation: v("rel") || "family", ...(v("dob") ? { dateOfBirth: v("dob") } : {}), ...(v("sex") ? { sex: v("sex") } : {}), ...(v("nat") ? { nationality: v("nat") } : {}), ...(passport ? { passport } : {}) });
+          toast(F.added(first.charAt(0) + first.slice(1).toLowerCase()));
+        } else {
+          const p = people.find((x) => x.id === famEdit);
+          if (!passport) return bad(F.errPassport, f.number), (btn.disabled = false);
+          await A.savePassport(p.isSelf ? null : p.id, { givenNames: first, surname: last, dateOfBirth: v("dob"), ...(v("sex") ? { sex: v("sex") } : {}), passport });
+          toast(F.ppSaved);
+        }
+        famEdit = null; viewFamily();
+      } catch (x) { btn.disabled = false; bad(x.message); }
+    });
+  }
+  function famForm(p) {
+    const F = FM(), P = t("pp"), isNew = !p;
+    const rels = ["spouse", "child", "parent", "family", "friend", "helper", "colleague"];
+    return `<form class="box fm-form" id="fmF" novalidate>
+      <div class="fm-form__top"><h2 class="box__h">${esc(isNew ? F.add : F.ppFor(p.firstName || p.givenNames))}</h2>
+        <label class="btn btn--plain btn--sm pp__scan">${ico("camera")}${esc(P.scan)}<input type="file" id="fmScan" accept="image/*" capture="environment" hidden /></label></div>
+      <p class="pp__status" id="fmScanSt" hidden></p>
+      <div class="grid2">
+        <label class="fld"><span>${esc(t("first"))}</span><input name="first" autocomplete="off" value="${esc(p ? p.givenNames : "")}" /></label>
+        <label class="fld"><span>${esc(t("last"))}</span><input name="last" autocomplete="off" value="${esc(p ? p.surname : "")}" /></label>
+        ${isNew ? `<label class="fld"><span>${esc(F.relL)}</span><select name="rel">${rels.map((r) => `<option value="${r}">${esc(F.rel[r])}</option>`).join("")}</select></label>` : ""}
+        <label class="fld"><span>${esc(P.dob)}</span><input type="date" name="dob" max="${todayIso()}" value="${esc(p && p.dateOfBirth || "")}" /></label>
+        <label class="fld"><span>${esc(P.sex)}</span><select name="sex"><option value="">${esc(P.pick)}</option><option value="M" ${p && p.sex === "M" ? "selected" : ""}>${esc(P.sexes.M)}</option><option value="F" ${p && p.sex === "F" ? "selected" : ""}>${esc(P.sexes.F)}</option></select></label>
+        <label class="fld"><span>${esc(P.nat)}</span><select name="nat">${natOptions(p && p.nationality || "")}</select></label>
+      </div>
+      <h3 class="fm-form__h">${esc(F.ppH)}${isNew ? ` <small>${esc(F.optional)}</small>` : ""}</h3>
+      <div class="grid2">
+        <label class="fld"><span>${esc(P.number)}</span><input name="number" autocomplete="off" placeholder="A12345678" /></label>
+        <label class="fld"><span>${esc(P.expiry)}</span><input type="date" name="expiry" min="${todayIso()}" /></label>
+      </div>
+      <p class="nudge" id="fmErr" hidden></p>
+      <div class="actions"><button class="btn btn--main primary" type="submit">${esc(F.save)}</button><button type="button" class="btn btn--plain" data-cancel>${esc(F.cancel)}</button></div>
+    </form>`;
+  }
 
   // ----- requests: until payments are on, a booking goes to the team as a request; a person books it and comes back -----
   // Payments on the web are behind GET /config features.webPay; until then every booking is a request (the desk's list).

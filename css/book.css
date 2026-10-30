@@ -1693,3 +1693,31 @@ html[dir="rtl"] .send__in { padding: 22px 0 22px 22px; }
 .status--go { background: rgba(31, 122, 77, .12); color: var(--good); }
 .bar small { color: var(--ink-3); font-size: 13.5px; }
 @media (max-width: 640px) { .send__trip { grid-template-columns: 1fr; } .send__img { min-height: 150px; max-height: 170px; } .send__in { padding: 0 18px 20px; } html[dir="rtl"] .send__in { padding: 0 18px 20px; } }
+
+/* ---------- family ---------- */
+.fms { display: grid; gap: 10px; margin-top: 8px; }
+.fm { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 16px 18px; background: var(--white); border: 1px solid var(--hair); border-radius: 18px; }
+.fm__b b { display: block; font-size: 16px; }
+.fm__b small { display: block; color: var(--ink-2); font-size: 13.5px; }
+.fm__pp { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font-size: 13px; color: var(--ink-3); }
+.fm__pp .ico { width: 15px; height: 15px; }
+.fm__pp.ok { color: var(--good); }
+.fm__pp.warn { color: #9a6a00; }
+.fm__act { display: flex; align-items: center; gap: 12px; }
+.fm-add { width: 100%; display: flex; align-items: center; gap: 14px; margin-top: 10px; padding: 16px 18px; border: 1.5px dashed rgba(17, 24, 21, .22); border-radius: 18px; text-align: start; color: var(--ink); transition: border-color .2s, background .2s; }
+.fm-add:hover { border-color: var(--green); background: rgba(30, 53, 45, .03); }
+.fm-add .ico { width: 22px; height: 22px; color: var(--green); }
+.fm-add b { display: block; font-size: 16px; }
+.fm-add small { color: var(--ink-2); font-size: 13.5px; }
+.fm-add em { margin-inline-start: auto; font-style: normal; font-size: 26px; line-height: 1; color: var(--green); }
+.fm-form { margin-top: 10px; }
+.fm-form__top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.fm-form__h { margin: 18px 0 8px; font-size: 16px; }
+.fm-form__h small { font-weight: 400; color: var(--ink-3); font-size: 13px; }
+.fm-next { margin-top: 22px; }
+.fm-safe { display: flex; align-items: center; gap: 6px; margin-top: 18px; }
+.fm-safe .ico { width: 15px; height: 15px; }
+.fm-link { display: inline-block; margin-top: 10px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+@media (max-width: 560px) { .grid2 { grid-template-columns: 1fr; } .fm { grid-template-columns: auto 1fr; } .fm__act { grid-column: 1 / -1; justify-content: space-between; } }
+.mw { text-align: start; font: inherit; }

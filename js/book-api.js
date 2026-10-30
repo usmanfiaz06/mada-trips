@@ -104,6 +104,7 @@
     updateMe: (b) => call("PATCH", "/me", b),
     people: () => call("GET", "/people"),
     addPerson: (b) => call("POST", "/people", b),
+    removePerson: (id) => call("DELETE", `/people/${id}`),
     // A passport: the account holder's own (no id) or a household member's. The full number is stored encrypted.
     savePassport: (personId, b) => call("PUT", personId ? `/people/${personId}/passport` : "/passport", b),
 
