@@ -26,7 +26,9 @@ describe('screenText: contact, links, addresses', () => {
   });
   it("lets Mada's own links through, and still holds anyone else's next to them", () => {
     expect(screenText('Trip to Istanbul, 14–18 Nov\nhttps://travel.madatrips.sa/#/p/eyJmIjoiUlVIIiwidCI6IklTVCJ9')).toBeNull();
-    expect(screenText('see https://www.madatrips.sa/circles')).toBeNull();
+    expect(screenText('Join us: https://travel.madatrips.sa/#/join/abcd1234-xyz123')).toBeNull();
+    expect(code('https://madatrips.sa/call-me-0501234567')).toBe('contact');
+    expect(code('https://madatrips.sa/r?to=https://evil.xyz')).toBe('link');
     expect(code('https://travel.madatrips.sa/#/p/x and https://bit.ly/x')).toBe('link');
     expect(code('http://madatrips.sa.evil.io/x')).toBe('link');
     expect(code('https://madatrips.sa.evil.io/x')).toBe('link');

@@ -47,8 +47,8 @@ const LINK: [RegExp, string][] = [
   [/\b[\w-]+\.(?:com|net|org|sa|io|co|me|link|xyz|ly|tv)\b(?:\/\S*)?/i, 'domain'],
   [/\bt\.me\/|\bwa\.me\/|\bbit\.ly\//i, 'short link'],
 ];
-/** A link to Mada's own site (a shared trip plan, a circle invite): ours, so it never needs a person first. */
-const OWN_LINK = /\bhttps:\/\/(?:[\w-]+\.)*madatrips\.sa(?![\w.-])(?:[/?#]\S*)?/gi;
+/** Mada's own link shapes only (a shared trip plan, a circle invite), nothing else in the path, so nothing can ride along unscreened. */
+const OWN_LINK = /\bhttps:\/\/(?:[\w-]+\.)*madatrips\.sa(?:\/join\/[a-z0-9]{8}-[a-z0-9]{6}|(?:\/(?:book(?:\.html)?)?)?#\/(?:p|join)\/[A-Za-z0-9_-]+)(?=\s|$)/g;
 const ADDRESS: [RegExp, string][] = [
   [/\b(?:room|flat|apartment|apt|house|villa|unit)\s*(?:no\.?|number|#)?\s*\d+\b/i, 'a room or flat number'],
   [/(?:شقة|شقه|فيلا|بيت|غرفة|غرفه|عمارة|عماره|وحدة|وحده)\s*(?:رقم)?\s*\d+/, 'a room or flat number'],

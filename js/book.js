@@ -467,7 +467,7 @@
       </div>
       ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t(REQ_MODE() ? "estFare" : "demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
       <div class="plan__foot"><div class="plan__total"><small>${esc(t("totalFor")(paxText(d.pax)))}</small><b>${esc(money(plan.total))}</b></div>
-        ${d.sentReq ? `<div class="plan__sent">${ico("check")}<span><b>${esc(RQ().planSent)}</b><small>${esc(RQ().planSentSub)}</small></span></div><div class="plan__go"><a class="btn btn--main" href="#/req/${d.sentReq}">${esc(RQ().planSentGo)}</a></div>` : `<div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div>`}<div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
+        ${sentFor(d) ? `<div class="plan__sent">${ico("check")}<span><b>${esc(RQ().planSent)}</b><small>${esc(RQ().planSentSub)}</small></span></div><div class="plan__go"><a class="btn btn--main" href="#/req/${d.sentReq}">${esc(RQ().planSentGo)}</a></div>` : `<div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div>`}<div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
     </div>`;
   }
   function renderPlanPane(flash) {
@@ -679,6 +679,7 @@
     $$("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
     $("#tools").innerHTML = toolsHtml();
     renderThread(busy); renderPlanPane(false); typePlaceholder();
+    if (LIVE && A.signedIn && draft.visaPending && draft.visaPending.to && D.byCode[draft.visaPending.to]) sendVisa(draft.visaPending.to, draft.visaPending.passport || "");
   }
   function setTab(v) { tab = v; viewStudio(); scrollTo(0, 0); }
 
@@ -1647,7 +1648,7 @@
     if (route().name !== "travelers") return;
     const ks = kinds(d.pax), self = people.find((p) => p.isSelf), seen = new Set(), others = people.filter((p) => { const k = `${p.givenNames || p.firstName} ${p.surname}`.toUpperCase(); if (p.isSelf || seen.has(k)) return false; seen.add(k); return true; });
     const fromPerson = (k, p) => ({ k, personId: p.id, first: p.givenNames || p.firstName || "", last: p.surname || "", dob: p.dateOfBirth || "", pp: { ...ppBlank(), dob: p.dateOfBirth || "", sex: p.sex || "", nat: p.nationality || "", have: p.passport || null } });
-    co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k && prev.pp) return prev; return i === 0 && k === "a" && self ? { ...fromPerson(k, self), first: self.givenNames || (user && user.name) || "" } : { k, personId: null, first: "", last: "", dob: "", pp: ppBlank() }; });
+    co.lt = ks.map((k, i) => { const prev = (co.lt || [])[i]; if (prev && prev.k === k && prev.pp && (!prev.personId || people.some((p) => p.id === prev.personId))) return prev; return i === 0 && k === "a" && self ? { ...fromPerson(k, self), first: self.givenNames || (user && user.name) || "" } : { k, personId: null, first: "", last: "", dob: "", pp: ppBlank() }; });
     co.lt.forEach((x) => { if (x.pp && x.pp.have) x.pp.expiryWarn = expiryCheck(x.pp.have.expiry, d).warn || (!expiryCheck(x.pp.have.expiry, d).ok ? t("pp").expiredTrip : ""); });
     co.contact = co.contact || { phone: (A.user && A.user.phone || "").replace(/^\+966/, ""), email: (A.user && A.user.email) || "" };
     const label = { a: t("tAdult"), c: t("tChild"), i: t("tInfant") };
@@ -1757,12 +1758,19 @@
   const b64u = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
   // A plan link in a circle's chat reads as the trip itself, with one tap to open it.
+  // A shared plan's payload, only when every part has the right shape (anyone can post a link, so never trusted).
+  const ISO = /^\d{4}-\d{2}-\d{2}$/;
+  function sharedPlan(code) {
+    let x; try { x = JSON.parse(unb64u(code || "")); } catch { return null; }
+    if (!x || typeof x !== "object" || !D.byCode[x.t] || !ISO.test(x.d || "") || !(x.r == null || ISO.test(x.r)) || isNaN(Date.parse(x.d))) return null;
+    const p = Array.isArray(x.p) ? x.p.map((n) => Math.max(0, Math.min(9, Math.floor(+n) || 0))) : [1, 0, 0];
+    return { f: D.byCode[x.f] ? x.f : null, t: x.t, d: x.d, r: x.r && x.r > x.d ? x.r : null, p: [Math.max(1, p[0] || 1), p[1] || 0, p[2] || 0], o: Array.isArray(x.o) ? x.o.filter((k) => typeof k === "string" && /^[a-z]{2,8}$/.test(k)) : [], fo: !!x.fo, u: !!x.u, n: typeof x.n === "string" ? x.n.slice(0, 40) : "" };
+  }
   function planCardOf(body) {
     const mm = /https?:\/\/\S*#\/p\/([\w-]+)/.exec(body || ""); if (!mm) return "";
-    let x; try { x = JSON.parse(unb64u(mm[1])); } catch { return ""; }
-    if (!x || !D.byCode[x.t]) return "";
+    const x = sharedPlan(mm[1]); if (!x) return "";
     const note = body.replace(mm[0], "").trim(), dd = D.DEST[x.t];
-    return `<a class="cm-trip" href="#/p/${mm[1]}">${dd ? `<img src="${D.photo(x.t, true)}" alt="" style="object-position:${dd.pos}" />` : ""}<span><b>${esc(city(x.t))}</b><small>${esc(range(x.d, x.r))} · ${esc(paxText({ a: +x.p[0] || 1, c: +x.p[1] || 0, i: +x.p[2] || 0 }))}</small><em>${esc(t("openTrip"))} →</em></span></a>${note && !/^Trip to |^رحلة إلى /.test(note) ? `<p>${esc(note)}</p>` : ""}`;
+    return `<a class="cm-trip" href="#/p/${mm[1]}">${dd ? `<img src="${D.photo(x.t, true)}" alt="" style="object-position:${dd.pos}" />` : ""}<span><b>${esc(city(x.t))}</b><small>${esc(range(x.d, x.r))} · ${esc(paxText({ a: x.p[0], c: x.p[1], i: x.p[2] }))}</small><em>${esc(t("openTrip"))} →</em></span></a>${note && !/^Trip to |^رحلة إلى /.test(note) ? `<p>${esc(note)}</p>` : ""}`;
   }
   function planLink(d) {
     const off = Object.keys(d.items || {}).filter((k) => d.items[k] === false);
@@ -1770,12 +1778,11 @@
     return `${location.origin}${location.pathname}#/p/${b64u(JSON.stringify(x))}`;
   }
   async function openShared(code) {
-    let x;
-    try { x = JSON.parse(unb64u(code || "")); } catch { x = null; }
-    if (!x || !D.byCode[x.t] || !x.d) return location.replace("#/");
+    const x = sharedPlan(code);
+    if (!x) return location.replace("#/");
     const d = freshDraft();
-    Object.assign(d, { from: D.byCode[x.f] ? x.f : from, to: x.t, dep: x.d < todayIso() ? null : x.d, ret: x.r && x.r > x.d ? x.r : null, pax: { a: Math.max(1, +x.p[0] || 1), c: +x.p[1] || 0, i: +x.p[2] || 0 }, flightsOnly: !!x.fo, umrah: !!x.u, paxSaid: true, sharedBy: String(x.n || "").slice(0, 40) });
-    (x.o || []).forEach((k) => { d.items[k] = false; });
+    Object.assign(d, { from: x.f || from, to: x.t, dep: x.d < todayIso() ? null : x.d, ret: x.r, pax: { a: x.p[0], c: x.p[1], i: x.p[2] }, flightsOnly: x.fo, umrah: x.u, paxSaid: true, sharedBy: x.n });
+    x.o.forEach((k) => { d.items[k] = false; });
     draft = d;
     if (!d.dep) { saveDraft(); location.replace("#/plan"); return send(t("sharedOld")(placeName(d)), true); }
     d.plan = true;
@@ -1865,7 +1872,7 @@
         set("first", x.given); set("last", x.surname); set("number", x.number); set("dob", M.dmyToIso(x.dob)); set("expiry", M.dmyToIso(x.expiry));
         const nat = M.countryCode(x.nationalityCode || x.nationality); if (nat) f.nat.value = nat;
         if (/^[MF]$/.test(x.sex)) f.sex.value = x.sex;
-        st.className = "pp__status pp__status--ok"; st.textContent = (r.doubtful || []).length ? P.readCheck : P.readOk;
+        f.dataset.scanned = "1"; st.className = "pp__status pp__status--ok"; st.textContent = (r.doubtful || []).length ? P.readCheck : P.readOk;
       } catch { st.className = "pp__status pp__status--no"; st.textContent = P.noOcr; }
     });
     f.addEventListener("submit", async (e) => {
@@ -1923,6 +1930,13 @@
   // ----- requests: until payments are on, a booking goes to the team as a request; a person books it and comes back -----
   // Payments on the web are behind GET /config features.webPay; until then every booking is a request (the desk's list).
   const REQ_MODE = () => !(A.config && A.config.features && A.config.features.webPay);
+  // A sent request belongs to this exact trip (place, days, people): change any of them and the plan is free to send again.
+  const tripSig = (d) => [d.to, d.dep, d.ret, d.pax.a, d.pax.c, d.pax.i, d.flightsOnly ? 1 : 0].join("|");
+  function sentFor(d) {
+    if (d && d.sentReq && d.sentSig !== tripSig(d)) { d.sentReq = null; d.reqClient = null; d.sentSig = null; }
+    return d && d.sentReq;
+  }
+  const forgetSent = (d) => { if (d) { d.sentReq = null; d.reqClient = null; d.sentSig = null; } };
   const RQ = () => t("rq");
   const clock = (iso) => new Date(iso).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-GB", { hour: "numeric", minute: "2-digit" });
   const dueText = (iso) => { const d = new Date(iso); return d.toDateString() === new Date().toDateString() ? clock(iso) : when(iso); };
@@ -1932,7 +1946,7 @@
     const lv = d.live || {}, out = liveOut(d), st = liveStay(d);
     const lines = [RQ().noteHead(placeName(d), range(d.dep, d.ret), paxText(d.pax))]
       .concat(on.map((i) => `• ${i.title}${i.sub ? ` (${String(i.sub).replace(/<[^>]+>/g, "")})` : ""} · ${money(i.price)}`))
-      .concat(pl.items.filter((i) => i.team && !(d.flightsOnly && i.k !== "flight")).map((i) => `• ${RQ().pleaseFind(i.title)}`))
+      .concat(pl.items.filter((i) => i.team && d.items[i.k] !== false && !(d.flightsOnly && i.k !== "flight")).map((i) => `• ${RQ().pleaseFind(i.title)}`))
       .concat([`${RQ().estTotal}: ${money(pl.total)}`]);
     const refs = [out && `flight ${out.id}`, st && `stay ${st.id}`, lv.esimId && `esim ${lv.esimId}`].filter(Boolean);
     if (refs.length) lines.push(`Ref: ${refs.join(", ")}`);
@@ -1943,7 +1957,7 @@
     const d = draft, R = RQ();
     if (!A.signedIn) return location.replace("#/signin?next=send");
     if (!co.lt || !co.lt.length || co.lt.some((x) => !x.personId)) return location.replace("#/travelers");
-    if (d.sentReq) return location.replace(`#/req/${d.sentReq}`);
+    if (sentFor(d)) return location.replace(`#/req/${d.sentReq}`);
     const pl = buildPlan(d), on = pl.items.filter((i) => i.on && !i.info);
     // Kept left to right inside Arabic, and spaced the way people read it: +966 5X XXX XXXX.
     const phone = co.contact && co.contact.phone ? `\u2066+966 ${String(co.contact.phone).replace(/^(\d{2})(\d{3})(\d{4})$/, "$1 $2 $3")}\u2069` : "";
@@ -2004,7 +2018,9 @@
       };
       try {
         const r = (await A.createRequest(body)).request;
-        d.sentReq = r.id; saveDraft();
+        d.sentReq = r.id; d.sentSig = tripSig(d); saveDraft();
+        // The next trip starts with an empty note and call time.
+        co.note = ""; co.window = "";
         store.set("reqMeta:" + r.id, { to: d.to, dep: d.dep, ret: d.ret, pax: d.pax, total: pl.total, items: on.map((i) => ({ icon: i.icon, title: i.title, sub: String(i.sub || "").replace(/<[^>]+>/g, ""), price: i.price })) });
         save(); location.hash = `#/req/${r.id}?new=1`;
       } catch (err) { btn.disabled = false; btn.textContent = R.sendBtn; const el = $("#sendErr"); el.hidden = false; el.textContent = err.message; }
@@ -2013,20 +2029,23 @@
   }
 
   // One request: where it is, who has it and by when, the team's options, a conversation with them, and what to do meanwhile.
-  let reqTimer = null;
+  let reqTimer = null, reqGen = 0;
   async function viewRequest(id) {
     clearTimeout(reqTimer);
+    const gen = ++reqGen;
     const R = RQ();
     if (!A.signedIn) return location.replace(`#/signin?next=req/${id}`);
     let r, th;
     try { [r, th] = await Promise.all([A.request(id).then((x) => x.request), A.reqMessages(id).catch(() => ({ messages: [] }))]); }
     catch (e) { return page(`<div class="wrap pg"><div class="empty"><p>${esc(e.status === 404 ? R.gone : e.message)}</p><a class="btn btn--main" href="#/trips">${esc(R.allReqs)}</a></div></div>`); }
-    if (route().name !== "req" || route().a !== id) return;
+    if (gen !== reqGen || route().name !== "req" || route().a !== id) return;
+    if (draft && draft.sentReq === id && r.status === "cancelled") { forgetSent(draft); saveDraft(); }
     const meta = store.get("reqMeta:" + id) || {};
     const fresh = /[?&]new=1/.test(location.hash);
     const closed = ["done", "cancelled", "paid"].includes(r.status);
     const stepNow = { queued: 0, sent: 1, reviewing: 1, quoted: 2, paid: 3, done: 3, cancelled: -1 }[r.status] ?? 1;
     const agent = (r.agent && r.agent.name) || (r.progress && r.progress.with) || "";
+    const agentPicked = r.status !== "sent" && r.status !== "queued";
     const due = (r.progress && r.progress.dueAt) || r.promisedBy;
     const late = !closed && r.status !== "quoted" && due && new Date(due) < new Date();
     const to = meta.to;
@@ -2055,7 +2074,7 @@
           ${quote.breakdown.map((p) => `<div class="rq-q__p"><b>${esc(p.name)}</b>${p.lines.map((l) => `<div><span>${esc(l.label)}</span><span>${esc(money(l.amount / 100))}</span></div>`).join("")}</div>`).join("")}
           <div class="send__total"><span>${esc(R.total)}</span><b>${esc(money(quote.total.amount / 100))}</b></div>
           ${quote.expiresAt ? `<p class="note-s">${esc(R.quoteUntil(dueText(quote.expiresAt)))}</p>` : ""}
-          <div class="actions"><button type="button" class="btn btn--main" id="goAhead">${esc(R.goAhead)}</button><button type="button" class="btn btn--plain" data-focus-say>${esc(R.askAbout)}</button></div></section>` : ""}
+          <div class="actions">${store.get("goAhead:" + quote.id) ? `<span class="wc__st">${ico("check")}${esc(R.goAheadSent)}</span>` : `<button type="button" class="btn btn--main" id="goAhead">${esc(R.goAhead)}</button>`}<button type="button" class="btn btn--plain" data-focus-say>${esc(R.askAbout)}</button></div></section>` : ""}
         <h2 class="hd-h">${esc(R.asked)}</h2>
         ${meta.items ? `<div class="wcs">${meta.items.map((i) => `<article class="wc"><span class="pc__ic">${ico(i.icon)}</span><div class="wc__b"><b>${esc(i.title)}</b><small>${esc(i.sub)}</small></div><span class="wc__st">${esc(money(i.price))}</span></article>`).join("")}</div><p class="note-s">${esc(R.estTotal)} · ${esc(money(meta.total))}</p>` : `<section class="wbox"><b>${esc(r.title)}</b><p>${esc([r.summary, r.detail].filter(Boolean).join(" · "))}</p></section>`}
         <h2 class="hd-h">${esc(R.talkH)}</h2>
@@ -2065,37 +2084,47 @@
         </section>
         ${!closed ? `<h2 class="hd-h">${esc(R.meanH)}</h2><div class="mws">${meanwhile}</div>` : ""}
         ${helpLine(R.waAbout(r.title))}
-        <div class="rq-foot"><a class="link" href="#/trips">${esc(R.allReqs)}</a>${!closed ? `<button type="button" class="link link--danger" id="withdraw">${esc(R.withdraw)}</button>` : ""}</div>
+        <div class="rq-foot"><a class="link" href="#/trips">${esc(R.allReqs)}</a>${["sent", "queued"].includes(r.status) && !agentPicked ? `<button type="button" class="link link--danger" id="withdraw">${esc(R.withdraw)}</button>` : ""}</div>
       </div></div>`);
     const box = $("#rqMsgs"); if (box) box.scrollTop = box.scrollHeight;
     $("#nudge")?.addEventListener("click", async (e) => { e.target.disabled = true; try { await A.nudge(id); toast(R.nudged); } catch (x) { toast(x.message); e.target.disabled = false; } });
-    $("#goAhead")?.addEventListener("click", async (e) => { e.target.disabled = true; try { await A.reqSay(id, R.goAheadMsg); toast(R.goAheadSent); viewRequest(id); } catch (x) { toast(x.message); e.target.disabled = false; } });
+    $("#goAhead")?.addEventListener("click", async (e) => { e.target.disabled = true; try { await A.reqSay(id, R.goAheadMsg); store.set("goAhead:" + quote.id, 1); toast(R.goAheadSent); viewRequest(id); } catch (x) { toast(x.message); e.target.disabled = false; } });
     $("[data-focus-say]")?.addEventListener("click", () => $("#rqQ")?.focus());
     const sf = $("#rqSay");
     if (sf) {
       const q = $("#rqQ");
       q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sf.requestSubmit(); } });
+      let sending = false;
       sf.addEventListener("submit", async (e) => {
-        e.preventDefault(); const v = q.value.trim(); if (!v) return q.focus();
-        const b = $("button", sf); b.disabled = true;
+        e.preventDefault(); const v = q.value.trim(); if (!v || sending) return q.focus();
+        sending = true; const b = $("button", sf); b.disabled = true;
         try { await A.reqSay(id, v); q.value = ""; const t2 = await A.reqMessages(id); box.innerHTML = t2.messages.map(msgHtml).join(""); box.scrollTop = box.scrollHeight; } catch (x) { toast(x.message); }
-        b.disabled = false; q.focus();
+        sending = false; b.disabled = false; q.focus();
       });
     }
     $("#withdraw")?.addEventListener("click", () => confirmSheet(R.withdrawQ, R.withdrawSub, R.withdraw, R.keep, async () => {
-      try { await A.withdraw(id); if (draft && draft.sentReq === id) { draft.sentReq = null; saveDraft(); } toast(R.withdrawn); viewRequest(id); } catch (x) { toast(x.message); }
+      try { await A.withdraw(id); if (draft && draft.sentReq === id) { forgetSent(draft); saveDraft(); } toast(R.withdrawn); viewRequest(id); } catch (x) { toast(x.message); }
     }));
     // The team's replies come in while the page is open (every 15 s; the thread and the status).
     const poll = async () => {
-      if (route().name !== "req" || route().a !== id) return;
+      if (gen !== reqGen || route().name !== "req" || route().a !== id) return;
       if ($("#rqQ") && $("#rqQ").value) { reqTimer = setTimeout(poll, 15000); return; }
       try {
         const [r2, t2] = await Promise.all([A.request(id), A.reqMessages(id)]);
+        if (gen !== reqGen) return;
         if (r2.request.status !== r.status || (t2.messages || []).length !== msgs.length || !!r2.request.quote !== !!r.quote) return viewRequest(id);
         reqTimer = setTimeout(poll, 15000);
       } catch { reqTimer = setTimeout(poll, 30000); }
     };
     if (!closed) reqTimer = setTimeout(poll, 15000);
+  }
+  function sendVisa(to, passport) {
+    const c = country(D.byCode[to].country);
+    draft.visaPending = null; renderThread(true);
+    A.createRequest({ kind: "visa", query: `${t("visa")}: ${c}`, note: RQ().visaNote(c, passport), answers: { where: [c], passport: [passport.slice(0, 80)] }, contactPreference: "whatsapp", clientId: `web-visa-${to}-${Date.now().toString(36)}` })
+      .then((x) => { draft.msgs.push({ who: "mada", html: esc(t("visaDo")(c)), extra: "", req: { id: x.request.id, title: x.request.title } }); })
+      .catch((e) => say(esc(e.message)))
+      .finally(() => { saveDraft(); if (route().name === "plan") renderThread(false); });
   }
   // A small yes/no sheet, in the page's own words.
   function confirmSheet(h, sub, yes, no, onYes) {
@@ -2990,13 +3019,10 @@
       const to = draft.visa.to, c = country(D.byCode[to].country), saudi = +v === 0, gcc = D.GCC.has(D.byCode[to].country);
       you(b.textContent);
       if (saudi && gcc) { say(esc(t("visaFree")(c)), chips([{ a: "go", v: to, l: city(to) }])); draft.visa = null; saveDraft(); renderThread(false); return; }
-      // The promise is kept: the visa goes to the team as a request (signed in), or after signing in.
-      if (!(LIVE && A.signedIn)) { say(esc(t("visaDo")(c)) + ` <a class="link" href="#/signin?next=plan">${esc(t("trvSigninGo"))} →</a>`); draft.visa = null; saveDraft(); renderThread(false); return; }
-      const passport = b.textContent.trim(); draft.visa = null; renderThread(true);
-      A.createRequest({ kind: "visa", query: `${t("visa")}: ${c}`, note: RQ().visaNote(c, passport), answers: { where: [c], passport: [passport.slice(0, 80)] }, contactPreference: "whatsapp", clientId: `web-visa-${to}-${Date.now().toString(36)}` })
-        .then((x) => { const m = { who: "mada", html: esc(t("visaDo")(c)), extra: "", req: { id: x.request.id, title: x.request.title } }; draft.msgs.push(m); })
-        .catch((e) => say(esc(e.message), chips([{ a: "say", v: `${t("visa")} ${c}`, l: t("tryAgain") }])))
-        .finally(() => { saveDraft(); renderThread(false); });
+      // The visa goes to the team as a request now, or straight after signing in (kept on the draft till then).
+      draft.visa = null;
+      if (!(LIVE && A.signedIn)) { draft.visaPending = { to, passport: b.textContent.trim() }; say(esc(t("visaSignIn")(c)) + ` <a class="link" href="#/signin?next=plan">${esc(t("trvSigninGo"))} →</a>`); saveDraft(); renderThread(false); return; }
+      sendVisa(to, b.textContent.trim());
       return;
     }
     if (a === "share") return shareSheet();
