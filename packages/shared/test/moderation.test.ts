@@ -24,6 +24,13 @@ describe('screenText: contact, links, addresses', () => {
       'كنافة قرب برج غلطة. روحوا قبل الثامنة.', 'المكان هادي والجلسات العائلية فوق، اطلبوا الجريش.', 'الأطفال حبّوا العبّارة، عشرين دقيقة.', 'Sushi at 7, sunset at 6.',
     ]) expect(screenText(s), s).toBeNull();
   });
+  it("lets Mada's own links through, and still holds anyone else's next to them", () => {
+    expect(screenText('Trip to Istanbul, 14–18 Nov\nhttps://travel.madatrips.sa/#/p/eyJmIjoiUlVIIiwidCI6IklTVCJ9')).toBeNull();
+    expect(screenText('see https://www.madatrips.sa/circles')).toBeNull();
+    expect(code('https://travel.madatrips.sa/#/p/x and https://bit.ly/x')).toBe('link');
+    expect(code('http://madatrips.sa.evil.io/x')).toBe('link');
+    expect(code('https://madatrips.sa.evil.io/x')).toBe('link');
+  });
 });
 
 describe('screenText: abuse and profanity', () => {

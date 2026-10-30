@@ -498,6 +498,7 @@
     renderHeader();
     if (r.name === "home") return viewHome();
     if (r.name === "plan") return viewStudio();
+    if (r.name === "p") return openShared(r.a);
     if (LIVE) {
       // The live pages: same API as the app. Trips booked in this browser before going live still open from #/trip.
       if (r.name === "flights") return needPlan() && (draft.live ? viewFlightsLive(r.a) : location.replace("#/plan"));
@@ -1739,6 +1740,65 @@
   }
 
 
+  // ----- a plan, shared: a link that opens the same trip for whoever gets it, priced again for them -----
+  const b64u = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unb64u = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+  // A plan link in a circle's chat reads as the trip itself, with one tap to open it.
+  function planCardOf(body) {
+    const mm = /https?:\/\/\S*#\/p\/([\w-]+)/.exec(body || ""); if (!mm) return "";
+    let x; try { x = JSON.parse(unb64u(mm[1])); } catch { return ""; }
+    if (!x || !D.byCode[x.t]) return "";
+    const note = body.replace(mm[0], "").trim(), dd = D.DEST[x.t];
+    return `<a class="cm-trip" href="#/p/${mm[1]}">${dd ? `<img src="${D.photo(x.t, true)}" alt="" style="object-position:${dd.pos}" />` : ""}<span><b>${esc(city(x.t))}</b><small>${esc(range(x.d, x.r))} · ${esc(paxText({ a: +x.p[0] || 1, c: +x.p[1] || 0, i: +x.p[2] || 0 }))}</small><em>${esc(t("openTrip"))} →</em></span></a>${note && !/^Trip to |^رحلة إلى /.test(note) ? `<p>${esc(note)}</p>` : ""}`;
+  }
+  function planLink(d) {
+    const off = Object.keys(d.items || {}).filter((k) => d.items[k] === false);
+    const x = { f: d.from, t: d.to, d: d.dep, r: d.ret, p: [d.pax.a, d.pax.c, d.pax.i], o: off, fo: d.flightsOnly ? 1 : 0, u: d.umrah ? 1 : 0, n: (user && user.name) || "" };
+    return `${location.origin}${location.pathname}#/p/${b64u(JSON.stringify(x))}`;
+  }
+  async function openShared(code) {
+    let x;
+    try { x = JSON.parse(unb64u(code || "")); } catch { x = null; }
+    if (!x || !D.byCode[x.t] || !x.d) return location.replace("#/");
+    const d = freshDraft();
+    Object.assign(d, { from: D.byCode[x.f] ? x.f : from, to: x.t, dep: x.d < todayIso() ? null : x.d, ret: x.r && x.r > x.d ? x.r : null, pax: { a: Math.max(1, +x.p[0] || 1), c: +x.p[1] || 0, i: +x.p[2] || 0 }, flightsOnly: !!x.fo, umrah: !!x.u, paxSaid: true, sharedBy: String(x.n || "").slice(0, 40) });
+    (x.o || []).forEach((k) => { d.items[k] = false; });
+    draft = d;
+    if (!d.dep) { saveDraft(); location.replace("#/plan"); return send(t("sharedOld")(placeName(d)), true); }
+    d.plan = true;
+    if (LIVE) { page(loading(t("liveChecking"))); try { await liveSearch(d); } catch { /* each part says what failed */ } }
+    say(esc(t("sharedIntro")(d.sharedBy, placeName(d), range(d.dep, d.ret), paxText(d.pax))), "plan");
+    saveDraft(); location.replace("#/plan");
+  }
+  // Share: WhatsApp, the link itself, or straight into one of your circles.
+  async function shareSheet() {
+    const d = draft; if (!d || !d.plan) return;
+    const pl = buildPlan(d), link = planLink(d), text = t("shareText")(placeName(d), range(d.dep, d.ret), paxText(d.pax), money(pl.total));
+    $(".sheet--share")?.remove();
+    const el = document.createElement("div");
+    el.className = "sheet sheet--share";
+    el.innerHTML = `<div class="sheet__card hs" role="dialog" aria-modal="true" aria-labelledby="shH"><button type="button" class="lb__x appsheet__x" aria-label="${esc(t("close"))}">×</button>
+      <h2 id="shH">${esc(t("shareH"))}</h2><p class="note-s">${esc(t("shareSub"))}</p>
+      <div class="hs__ppl">
+        <a class="hb" href="https://wa.me/?text=${encodeURIComponent(text + "\n" + link)}" target="_blank" rel="noopener">${ico("chat")}<span><small>WhatsApp</small><b>${esc(t("shareWa"))}</b></span></a>
+        <button type="button" class="hb" id="shCopy">${ico("check")}<span><small>${esc(t("shareLinkL"))}</small><b>${esc(t("shareCopy"))}</b></span></button>
+      </div>
+      <div id="shCircles"></div></div>`;
+    document.body.append(el);
+    const close = () => el.remove();
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest(".appsheet__x")) close(); });
+    $("#shCopy", el).addEventListener("click", async () => { try { await navigator.clipboard.writeText(link); toast(t("shareCopied")); } catch { prompt(t("shareCopy"), link); } });
+    if (!(LIVE && A.signedIn)) { $("#shCircles", el).innerHTML = `<p class="note-s">${esc(t("shareCircleIn"))} <a class="link" href="#/signin?next=plan">${esc(t("trvSigninGo"))}</a></p>`; return; }
+    let cs = [];
+    try { cs = (await A.circles()).circles.filter((c) => !c.dm); } catch { /* the other two ways still work */ }
+    const box = $("#shCircles", el); if (!box) return;
+    box.innerHTML = `<p class="hs__or"><span>${esc(t("shareCircleH"))}</span></p>${cs.length ? `<div class="sh-cs">${cs.slice(0, 6).map((c) => `<button type="button" class="sh-c${coverInk(c.cover)}" data-sc="${c.id}"><span class="sh-c__cv">${coverHtml(c.cover, "badge")}</span><b>${esc(c.name)}</b><small>${esc(S().members(c.memberCount))}</small></button>`).join("")}</div>` : ""}<a class="link" href="#/circles/new">+ ${esc(S().newCircle)}</a>`;
+    $$("[data-sc]", box).forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await A.say(b.dataset.sc, `${text}\n${link}`); close(); toast(t("shareSent")); location.hash = `#/circle/${b.dataset.sc}`; } catch (x) { b.disabled = false; toast(x.message); }
+    }));
+  }
+
   // ----- Family: everyone who travels with this account, saved once (the app's household, GET/POST /people) -----
   const FM = () => t("fam");
   const ageOf = (dob) => { if (!dob) return null; const b = new Date(dob), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; };
@@ -2462,7 +2522,8 @@
       ${codeBox()}
       ${appBand()}
     </div>`);
-    $$("[data-join]").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { const x = await A.acceptInvite(b.dataset.join); location.hash = x.circleId ? `#/circle/${x.circleId}` : "#/circles"; } catch (e) { b.disabled = false; toast(e.message); } }));
+    // Joining opens the circle straight away (the reply may not name it: the invite does).
+    $$("[data-join]").forEach((b) => b.addEventListener("click", async () => { b.disabled = true; try { const x = await A.acceptInvite(b.dataset.join), inv = r.incoming.find((y) => y.inviteId === b.dataset.join), cid = x.circleId || (inv && inv.circle.id); toast(S().joined); if (cid) location.hash = `#/circle/${cid}`; else viewCircles(); } catch (e) { b.disabled = false; toast(e.message); } }));
     $$("[data-decline]").forEach((b) => b.addEventListener("click", async () => { try { await A.declineInvite(b.dataset.decline); viewCircles(); } catch (e) { toast(e.message); } }));
     wireCommon();
   }
@@ -2555,7 +2616,7 @@
   const joinNames = (xs) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(lang === "ar" ? "، " : ", ")} ${CC("circles.and")} ${xs[xs.length - 1]}`);
   function sysLine(m, me, ppl) {
     const s = m.sys, nm = (id) => (!id ? CC("circles.someone") : id === me ? CC("circles.you") : (ppl.get(id) || {}).short || CC("circles.someone"));
-    const v = { name: nm(s.actor), names: joinNames(s.users.map(nm)), text: s.text || "", amount: s.amount != null ? money(s.amount / 100) : "" }, mine = s.actor === me;
+    const v = { name: nm(s.actor), names: joinNames(s.users.map((id) => (id === me && lang !== "ar" ? "you" : nm(id)))), text: s.text || "", amount: s.amount != null ? money(s.amount / 100) : "" }, mine = s.actor === me;
     const k = (e) => CC(`circles.sys.${e}${mine ? ".you" : ""}`, v);
     switch (s.event) {
       case "created": case "invited": case "joined": case "left": case "removed": case "renamed": case "pinned": case "cancelledInvite": case "paid": case "reminded": return k(s.event);
@@ -2581,6 +2642,7 @@
       const who = mada ? (m.author.kind === "agent" ? m.author.name : CC("circles.mada")) : m.author.name;
       const acts = m.kind === "mada" && m.mada && !m.mada.done ? (m.mada.actions || []).filter((a) => a.ask).map((a) => `<button type="button" class="chip cm-act" data-madaask="${esc(a.ask)}">${esc(a.label)}</button>`).join("") : "";
       let inner = `<p>${esc(m.kind === "mada" && m.mada && m.mada.kind === "welcome" ? madaWelcome(det, me) : m.body)}</p>`;
+      const pc = m.kind === "text" && planCardOf(m.body); if (pc) inner = pc;
       if (m.kind === "vote" && m.vote) inner = `<b class="cm-q">📊 ${esc(m.vote.q)}</b><ul class="cm-vote">${m.vote.options.map((o) => `<li class="${m.vote.winner === o.id ? "win" : ""}"><span>${esc(o.label)}</span><em>${o.votes.length}</em></li>`).join("")}</ul><small class="cm-note">${esc(m.vote.closed ? S().voteClosed : S().voteInApp)}</small>`;
       else if (m.kind === "card" && m.card && m.card.kind === "place" && m.card.post) inner = `<div class="cm-card">${ico("pin")}<div><b>${esc(m.card.post.place)}</b><small>“${esc(m.card.post.text)}”</small></div></div>${m.body ? `<p>${esc(m.body)}</p>` : ""}`;
       else if (m.kind === "card") inner = `<div class="cm-card">${ico("cal")}<div><b>${esc(S().sharedPlan)}</b><small>${esc(m.body || "")}</small></div></div>`;
@@ -2914,7 +2976,7 @@
       you(b.textContent); say(esc(saudi && gcc ? t("visaFree")(c) : t("visaDo")(c)), saudi && gcc ? chips([{ a: "go", v: to, l: city(to) }]) : "");
       draft.visa = null; saveDraft(); renderThread(false); return;
     }
-    if (a === "share") { const pl = buildPlan(draft); window.open("https://wa.me/?text=" + encodeURIComponent(t("shareText")(placeName(draft), range(draft.dep, draft.ret), paxText(draft.pax), money(pl.total)) + " " + location.origin + "/book"), "_blank", "noopener"); return; }
+    if (a === "share") return shareSheet();
     if (a === "addEsim") { const x = trips.find((y) => y.ref === v), cc = D.byCode[x.to].country, people = x.pax.a + x.pax.c; x.plan.items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: t("esimSub"), price: D.ESIM[cc] * people, on: true }); x.total += D.ESIM[cc] * people; saveTrips(); toast("✓ " + t("esim")(country(cc))); renderMine(); }
   }
 

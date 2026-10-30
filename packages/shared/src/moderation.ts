@@ -47,6 +47,8 @@ const LINK: [RegExp, string][] = [
   [/\b[\w-]+\.(?:com|net|org|sa|io|co|me|link|xyz|ly|tv)\b(?:\/\S*)?/i, 'domain'],
   [/\bt\.me\/|\bwa\.me\/|\bbit\.ly\//i, 'short link'],
 ];
+/** A link to Mada's own site (a shared trip plan, a circle invite): ours, so it never needs a person first. */
+const OWN_LINK = /\bhttps:\/\/(?:[\w-]+\.)*madatrips\.sa(?![\w.-])(?:[/?#]\S*)?/gi;
 const ADDRESS: [RegExp, string][] = [
   [/\b(?:room|flat|apartment|apt|house|villa|unit)\s*(?:no\.?|number|#)?\s*\d+\b/i, 'a room or flat number'],
   [/(?:شقة|شقه|فيلا|بيت|غرفة|غرفه|عمارة|عماره|وحدة|وحده)\s*(?:رقم)?\s*\d+/, 'a room or flat number'],
@@ -94,7 +96,7 @@ const ARABIZI_RULES = ABUSE_ARABIZI.map((w) => [latinBoundary(w), w] as const);
 
 /** Why a text needs a person first, or null when it is clean. The first thing found wins; contact details before abuse. */
 export function screenText(text: string): Hold | null {
-  const raw = text;
+  const raw = text.replace(OWN_LINK, ' ');
   for (const [re, what] of CONTACT) if (re.test(raw)) return { code: 'contact', match: what };
   for (const [re, what] of LINK) if (re.test(raw)) return { code: 'link', match: what };
   for (const [re, what] of ADDRESS) if (re.test(raw)) return { code: 'address', match: what };
