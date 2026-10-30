@@ -597,6 +597,8 @@ export const RefundQuoteResponse = z.object({
   partlyUsed: z.boolean(),
   allUsed: z.boolean(),
   card: z.string(),
+  /** Refunds up to this much, all given back by the rules with no fee, are approved at once (APP_REFUND_AUTO_MAX). Older servers send none. */
+  autoMax: Money.optional(),
 });
 
 export const CreateRefundRequest = z.object({
@@ -613,7 +615,7 @@ export const RefundView = z.object({
   title: z.string(),
   amount: Money,
   stage: RefundStage,
-  /** card: back to the card. credit: Mada credit, instant. instalments: back through Tabby or Tamara. */
+  /** original: back to the card. credit: the Mada Wallet (bookings only, never expires). instalments: back through Tabby or Tamara. */
   destination: z.enum(['original', 'credit', 'instalments']),
   provider: z.string().nullable(),
   card: z.string(),
@@ -626,6 +628,10 @@ export const RefundView = z.object({
   cancelledInstalments: z.object({ count: z.number().int(), amount: Money }).nullable(),
   expectedBy: IsoDateTime.nullable(),
   sentAt: IsoDateTime.nullable(),
+  /** The bank's reference for a card refund (the ARN the provider gives, or the one the desk typed when it marked it sent). */
+  reference: z.string().nullable().optional(),
+  /** Approved by the rules at once, without a person (lib/app/finance/auto-approve.ts). */
+  auto: z.boolean().optional(),
   /** Taken back by the traveller (stage reads 'rejected' for older apps). canTakeBack: an "ask anyway" the desk hasn't decided. */
   withdrawn: z.boolean().optional(),
   canTakeBack: z.boolean().optional(),
@@ -668,10 +674,13 @@ export const DisruptionResponse = z.object({
   refundAmount: Money,
   /** Seats stay held until this time. */
   heldUntil: z.string(),
+  /** The most the rules approve at once (APP_REFUND_AUTO_MAX); above it a refund to the Mada Wallet waits for a person. */
+  autoMax: Money.optional(),
 });
 export type DisruptionResponse = z.infer<typeof DisruptionResponse>;
 
-export const DisruptionChoiceRequest = z.object({ kind: DisruptionKind, optionId: z.string().max(20), clientKey: z.string().min(8).max(64) });
+/** `destination` for a refund option: the Mada Wallet or the card (older apps send none: the card). */
+export const DisruptionChoiceRequest = z.object({ kind: DisruptionKind, optionId: z.string().max(20), clientKey: z.string().min(8).max(64), destination: z.enum(['original', 'credit']).optional() });
 export const DisruptionChoiceResponse = z.object({
   optionId: z.string(),
   kind: z.enum(['rebook', 'stay', 'refund']),

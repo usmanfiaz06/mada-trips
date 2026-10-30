@@ -9,7 +9,7 @@ import { personLine, requestModeText, type ToolCtx, type ToolOut } from "./tools
 import type Anthropic from "@anthropic-ai/sdk";
 
 /*
- * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 51 conversations in English and spoken Saudi Arabic,
+ * The conversation's eval set (docs/app/ASK-CHAT.md §Evals): 57 conversations in English and spoken Saudi Arabic,
  * run turn by turn through the real engine (the same prompt, tools, gate and slots) with fixed tool results, so the
  * checks are about the model and nothing else. Each turn is held to:
  *   prices   the model wrote no price or time that no tool returned (checked on its raw words, before the gate)
@@ -76,6 +76,21 @@ export async function fixtureTool(name: string, input: unknown, flights: "live" 
       return { text: `Pay sheet opened in the app: Riyadh → Istanbul, ${fmt(each * n)} all in. Free to cancel within 24 hours. Nothing is charged until the traveller slides to pay.`, pay: { draft: { kind: "trip", flightOfferId: SELF, bundle: false, travellerIds: [SELF] }, title: "Riyadh → Istanbul" } };
     case "create_plan": case "get_plan": case "update_plan": case "set_origin": case "find_for_item": case "open_in_app":
       return planFixture(name, a);
+    case "find_places": {
+      const dubai = /mandi|مندي|dubai|دبي/i.test(`${a.query} ${a.city}`);
+      const hotel = a.near === "hotel" ? ` near their hotel (${dubai ? "Rove Downtown" : "Pera Palace"})` : "";
+      return dubai
+        ? { text: `Places from Google for "${a.query}"${hotel || " in Dubai"}, local time 21:40:\n1. id=mock-dxb-mandi-03 · Mandi House Downtown · Arabic restaurant · 4.1★ (870) · pricey · open now, closes 23:00 · 350 m from the hotel · Mohammed Bin Rashid Blvd\n2. id=mock-dxb-mandi-02 · Bait Al Mandi · Yemeni restaurant · 4.3★ (2,980) · mid-range · open now, closes 00:30 · 1.4 km from the hotel · Sheikh Zayed Rd\nHours, ratings, open now and addresses only as written here. Offer Directions and Add to my plan as choices.` }
+        : { text: `Places from Google for "${a.query}"${hotel || " in Istanbul"}, local time 21:40:\n1. id=mock-ist-shawarma-02 · Taksim Şam Shawarma · Shawarma restaurant · 4.4★ (3,210) · low prices · open now, closes 02:00 · 400 m from the hotel · Sıraselviler Cd. 12\n2. id=mock-ist-durum-01 · Dürümzade Beyoğlu · Shawarma restaurant · 4.6★ (18,420) · low prices · open now, closes 03:00 · 650 m from the hotel · Hamalbaşı Cd. 26/B\nHours, ratings, open now and addresses only as written here. Offer Directions and Add to my plan as choices.` };
+    }
+    case "place_details":
+      return { text: `Dürümzade Beyoğlu (id=${a.place_id}) · Shawarma restaurant · 4.6★ from 18,420 reviews · low prices\nopen now, closes 03:00 (local time 21:40) · today 11:00 AM – 3:00 AM\nAddress: Kamer Hatun, Hamalbaşı Cd. 26/B, Beyoğlu, İstanbul\nOn the card: Directions, Call, Add to plan.` };
+    case "refund_quote": {
+      const ar = /دبي|dubai/i.test(String(a.city ?? "")) || !a.city;
+      return {
+        text: `Cancelling on the ${ar ? "Dubai" : String(a.city)} trip (trip_id=${SELF}): back SAR 1,840 of SAR 2,300 paid; the hotel keeps SAR 460.\n- Rove Downtown · 4 nights: paid SAR 2,300, back SAR 1,840 (One night is kept inside 7 days of check-in)\nTo the Mada Wallet (bookings only, never expires, Recommended): after the team checks it, usually within a day. Back to Visa ending 41: after the team checks it, then 5–10 working days. They choose on the card.\nNothing is cancelled or refunded yet: only their slide on the card does that. Never say it is cancelled or refunded.\nSay what comes back and what's kept in one or two lines and point to the card (slide "Cancel and refund"). If they're unsure, explain the rule plainly. Don't push the Mada Wallet beyond the Recommended tag.`,
+      };
+    }
     case "talk_to_human":
       return { text: "Handed to the desk: Noura is on duty and has the summary. Say that Noura at Mada can take it from here, in one sentence.", handoff: { threadId: SELF, agent: "Noura" } };
     default:
@@ -127,6 +142,8 @@ export type EvalTurn = {
   reachChips?: boolean;
   /** It must make the request with how they asked to be reached. */
   requestWithContact?: boolean;
+  /** Words it must not say (a cancel or a refund claimed done before the traveller's slide). */
+  notSay?: RegExp;
   /** A tool it must call with this field matching (a named hotel goes in hotel_name). */
   inputHas?: { tool: string; field: string; match: RegExp };
 };
@@ -146,6 +163,7 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "open-baku", lang: "en", turns: [{ user: "Is Baku nice in June?", notTools: ["search_flights", "create_request"] }] },
   { id: "off-topic", lang: "en", turns: [{ user: "Can you help me with my maths homework?", noTools: true }] },
   { id: "rude", lang: "en", turns: [{ user: "you are useless, stupid app", noTools: true }] },
+  { id: "competitor", lang: "en", turns: [{ user: "is almosafer better than mada?", notSay: /\b(worse|bad|unreliable|hidden fees|cheaper than|better than (almosafer|them))\b/i }] },
   { id: "book-cheapest", lang: "en", turns: [{ user: "Flights to Istanbul for Eid, just me", toolsAnyOf: FLIGHT }, { user: "Book the cheapest one", toolsAnyOf: ["price_quote_for_pay"] }] },
   { id: "person", lang: "en", turns: [{ user: "I want to talk to a person please", toolsAnyOf: ["talk_to_human"] }] },
   { id: "stranded", lang: "en", turns: [{ user: "My flight to Cairo this morning was cancelled and I'm stuck at the airport", toolsAnyOf: ["talk_to_human", "get_trips", "get_trip"] }] },
@@ -165,6 +183,7 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "ar-correction", lang: "ar", turns: [{ user: "طيران لدبي الأسبوع الجاي لي بس", toolsAnyOf: FLIGHT }, { user: "لا، خلها لندن", toolsAnyOf: FLIGHT, notAsk: /متى/ }] },
   { id: "ar-off-topic", lang: "ar", turns: [{ user: "وش رأيك في الدوري السعودي؟", noTools: true }] },
   { id: "ar-rude", lang: "ar", turns: [{ user: "انتم فاشلين وما تفهمون", noTools: true }] },
+  { id: "ar-competitor", lang: "ar", turns: [{ user: "المسافر أحسن ولا مادا؟", notSay: /أسوأ|سيئ|خايس|ما ينصح|أرخص من|أحسن من المسافر|أفضل من المسافر/ }] },
   // Never open-ended, answer first, a default instead of a question (docs/app/ASSISTANT.md).
   { id: "thanks-close", lang: "en", turns: [{ user: "Thanks, that's all for now", noTools: true }] },
   { id: "default-dates", lang: "en", turns: [{ user: "Dubai in November, all of us", toolsAnyOf: ["search_flights", "search_stays"], notAsk: /when|date|who|how many/i }] },
@@ -207,6 +226,12 @@ export const EVAL_CASES: EvalCase[] = [
   { id: "driver-alula", lang: "en", turns: [{ user: "A driver for the day in AlUla on 20 November", notTools: ["price_quote_for_pay", "create_request"], reachChips: true }] },
   { id: "train-kl-penang", lang: "en", turns: [{ user: "Train from KL to Penang on 15 December for me and Hessa", notTools: ["search_flights", "create_request"], reachChips: true }] },
   { id: "ar-car-permit", lang: "ar", turns: [{ user: "أبي أدخل سنغافورة بسيارة مستأجرة من ماليزيا، وش أحتاج تصريح؟", notTools: ["price_quote_for_pay"], reachChips: true }] },
+  // Places from Google (CONNECT.md §32): open now, ratings and hours only from the tool, never a request on the first message.
+  { id: "places-shawarma", lang: "en", turns: [{ user: "Good shawarma near our hotel in Istanbul, open now", toolsAnyOf: ["find_places"], notTools: ["create_request", "search_stays"] }] },
+  { id: "places-mandi-ar", lang: "ar", turns: [{ user: "مطعم مندي قريب من فندقنا في دبي مفتوح الحين", toolsAnyOf: ["find_places"], notTools: ["create_request", "search_stays"] }] },
+  // Cancel and refund (ASK-REFUND.md): the quote and its card, never "cancelled" or "refunded" before the slide.
+  { id: "refund-dubai-hotel", lang: "en", turns: [{ user: "Cancel my Dubai hotel and refund me", toolsAnyOf: ["refund_quote"], notTools: ["open_in_app", "create_request", "search_stays"], inputHas: { tool: "refund_quote", field: "items", match: /stay/ }, notSay: /\b(?:has been|have been|is now|it's|it is) (?:cancell?ed|refunded)\b|\bI(?:'ve| have) (?:cancell?ed|refunded)\b/i }] },
+  { id: "refund-dubai-hotel-ar", lang: "ar", turns: [{ user: "ألغِ فندق دبي ورجّع فلوسي", toolsAnyOf: ["refund_quote"], notTools: ["open_in_app", "create_request", "search_stays"], inputHas: { tool: "refund_quote", field: "items", match: /stay/ }, notSay: /(?:تم|انلغى|ألغيت|لغيت|رجّعت|رجعت) (?:الحجز|الفندق|فلوسك|المبلغ)|تم الإلغاء|تم الاسترداد/ }] },
 ];
 
 /** The cases for the living plan and "never no" (ASK-INTEGRATED.md §8.2): eight conversations. */
@@ -256,6 +281,7 @@ export function checkTurn(t: EvalTurn, lang: "en" | "ar", r: { raw: string; text
     const req = (r.calls ?? []).find((x) => x.name === "create_request");
     if (!req || !req.input.contact_preference) out.push(`reach: create_request without contact_preference`);
   }
+  if (t.notSay && t.notSay.test(r.text)) out.push(`claims: said ${t.notSay}`);
   if (t.inputHas) {
     const want = t.inputHas;
     if (!(r.calls ?? []).some((x) => x.name === want.tool && want.match.test(String(x.input[want.field] ?? "")))) out.push(`input: ${want.tool} without ${want.field} ${want.match}`);

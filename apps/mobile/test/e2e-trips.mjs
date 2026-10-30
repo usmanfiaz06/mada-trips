@@ -6,7 +6,7 @@
 // Signs in as the demo account (+966 50 000 4127, which has the Istanbul family trip), then walks Today through every
 // phase of the trip clock with the demo panel (Booked → Day before → Travel day → Delayed → Cancelled → In the air →
 // Landed → Home), the Trips tab (Upcoming, Requests, Past), the trip detail and its Manage screens (itinerary with its
-// sheets, payments, an invoice and the company tax invoice, a refund to Mada credit, flight change, hotel options,
+// sheets, payments, an invoice and the company tax invoice, a refund to the Mada Wallet, flight change, hotel options,
 // special requests), the disruption screens (delay, cancellation, and a choice made offline that waits in the outbox),
 // screenshotting each at 390×844. Fails on any page error or missing text.
 import { createServer } from 'node:http';
@@ -214,7 +214,7 @@ try {
   await closeSheet();
   await back(); await back();
 
-  step('refund to Mada credit');
+  step('refund to the Mada Wallet');
   await tapText('Ask for a refund');
   await page.waitForTimeout(1000);
   await see('What should we refund?', 'refund');

@@ -5,7 +5,7 @@ import { GET as configGet } from "@/app/api/app/v1/config/route";
 import { GET as peopleGet } from "@/app/api/app/v1/people/route";
 import { GET as requestGet } from "@/app/api/app/v1/requests/[id]/route";
 import { setChatApi } from "@/lib/app/ask-chat/engine";
-import { SYSTEM_PROMPT, TOOLS, toolsFor } from "@/lib/app/ask-chat/prompt";
+import { SYSTEM_PROMPT, TOOLS, activeTools, toolsFor } from "@/lib/app/ask-chat/prompt";
 import { chainApi, cooldowns, resetCooldowns } from "@/lib/app/ask-chat/providers";
 import { ProviderHttpError, toChatCompletion } from "@/lib/app/ask-chat/providers-openai";
 import { askChatModel, askChatOn, providerChain } from "@/lib/app/ask-chat/config";
@@ -133,7 +133,7 @@ describe("fewer tokens per turn", () => {
     await chat(token, { text: "eSIM for Pakistan for 10 days" });
     const sent = api.requests[0] as unknown as { tools: unknown[]; only_tools?: string[] };
     // The hint rides along; the list itself (Claude's cached prefix) never changes.
-    expect(sent.tools.length).toBe(TOOLS.length);
+    expect(sent.tools.length).toBe(activeTools().length);
     expect(sent.only_tools).toContain("esim_plans");
     expect(sent.only_tools).not.toContain("search_flights");
   });

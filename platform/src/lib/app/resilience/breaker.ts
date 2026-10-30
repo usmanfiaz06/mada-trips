@@ -31,6 +31,8 @@ export const SUPPLIER_TIMEOUTS: Record<string, number> = {
   flightStatus: 6_000, flightPositions: 6_000, ai: 20_000, identity: 8_000, esim: 25_000,
   // Keyed suppliers (config.ts KEYED_SUPPLIERS).
   routes: 8_000, carHire: 20_000, klook: 10_000, sherpa: 8_000, insurance: 15_000, tabby: 15_000, tamara: 15_000, duffel: 30_000, ratehawk: 20_000,
+  // Google Places (suppliers/places): Ask waits 5 s for a list of restaurants, no longer.
+  places: 5_000,
 };
 
 /** The traveller-facing name of each supplier slot (copy catalogue). */

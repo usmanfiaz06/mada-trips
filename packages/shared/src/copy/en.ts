@@ -30,6 +30,8 @@ import { askPlanCopy } from './ask-plan';
 import { planScreenCopy } from './plan-screen';
 import { askPolishCopy } from './ask-polish';
 import { stayQuoteCopy } from './stay-quote';
+import { placesChatCopy } from './places-chat';
+import { askRefundCopy } from './ask-refund';
 import { bookReadyCopy } from './book-ready';
 import { askDocsCopy } from './ask-docs';
 import { todayIdeasCopy } from './today-ideas';
@@ -98,6 +100,9 @@ export const en = {
   ...askPolishCopy,
   // Rooms the team priced by hand (desk hotel quotes): packages/shared/src/copy/stay-quote.ts
   ...stayQuoteCopy,
+  ...placesChatCopy,
+  // Cancel and refund in Ask: packages/shared/src/copy/ask-refund.ts
+  ...askRefundCopy,
   // Booking from the plan: "Book what's ready", request and quote lines: packages/shared/src/copy/book-ready.ts
   ...bookReadyCopy,
   // Documents in chat: packages/shared/src/copy/ask-docs.ts

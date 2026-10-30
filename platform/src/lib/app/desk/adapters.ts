@@ -23,6 +23,8 @@ import { contactOf } from "./flight-quotes";
 import { inRequestOwnerLocale, inUserLocale, localeOfUser } from "@/lib/app/locale";
 import { withCopy } from "@/lib/app/notify-copy";
 import { getSettings } from "@/lib/settings";
+import { appRefundGroups, appRefundItems } from "@/db/app-schema-trips";
+import { notifyGroupStep, syncRefundGroup, WALLET_HREF } from "@/lib/app/finance/refund-groups";
 
 /*
  * Thin adapters for the desk. They read and write the M0 app_ tables directly, so the desk works today.
@@ -878,7 +880,7 @@ const instalmentProvider = (m: string) => (m === "tabby" ? "Tabby" : m === "tama
 export type RefundDecision = { status: "approved" | "sent" } | { status: "awaiting_lead"; approvalRef: string; reason: RefundLimitReason };
 
 /**
- * Approve a refund to the card it came from, or to Mada credit (instant). Credit goes in as a ledger entry.
+ * Approve a refund to the card it came from, or to the Mada Wallet (instant). Credit goes in as a ledger entry.
  * `amount` approves part of what was asked (amount then becomes what moves; requested_amount keeps the ask). Above the
  * agent's limits (Rules & limits: per refund and per day, DESK-PLAN §7 default 2) the refund waits for a support lead
  * in Ops Approvals instead (stage awaiting_lead); `viaApproval` is the lead's yes coming back (finance/refunds.ts).
@@ -907,7 +909,7 @@ async function approveRefundHere(actor: DeskActor, id: string, v: { destination:
         const note = v.note?.trim() || null;
         let req;
         try {
-          req = await createApproval(tx, { kind: "app_refund", entityType: "app_refund", entityId: id, title: `App refund of ${sarText(amount)} to ${v.destination === "credit" ? "Mada credit" : pre.p.label ?? "the card"} (${shortRef(id, "F")})`,
+          req = await createApproval(tx, { kind: "app_refund", entityType: "app_refund", entityId: id, title: `App refund of ${sarText(amount)} to ${v.destination === "credit" ? "the Mada Wallet" : pre.p.label ?? "the card"} (${shortRef(id, "F")})`,
             amount, reason: note, requestedBy: actor.id, payload: { refundId: id, destination: v.destination, amount, note } });
         } catch (e) { throw new DeskError(e instanceof Error ? e.message : "No lead is available to approve this", "CONFLICT"); }
         await tx.update(appRefunds).set({ stage: "awaiting_lead", approvalId: req.id, note, updatedAt: new Date() }).where(eq(appRefunds.id, id));
@@ -922,7 +924,7 @@ async function approveRefundHere(actor: DeskActor, id: string, v: { destination:
   if (v.destination === "original" && pre.p.providerRef && pre.p.method !== "credit") {
     if (!(supplierMode("payments") === "mock" && SEEDED.test(pre.p.providerRef))) {
       const res = await bookingSuppliers.payments().refund(pre.p.providerRef, amount, `refund:${id}`).catch(() => null);
-      if (!res || (res.status !== "refunded" && res.status !== "partially_refunded")) throw new DeskError("The card refund didn't go through. Try again, or refund to Mada credit", "CONFLICT");
+      if (!res || (res.status !== "refunded" && res.status !== "partially_refunded")) throw new DeskError("The card refund didn't go through. Try again, or refund to the Mada Wallet", "CONFLICT");
       providerRef = res.providerRef;
     } else providerRef = `${pre.p.providerRef}_rf${id.slice(0, 6)}`;
   }
@@ -937,7 +939,8 @@ async function approveRefundHere(actor: DeskActor, id: string, v: { destination:
       requestedAmount: amount !== f.amount ? (f.requestedAmount ?? f.amount) : f.requestedAmount, note: v.note?.trim() || f.note,
       decidedBy: actor.id, decidedAt: now, sentAt: toCredit ? now : null, updatedAt: now,
     }).where(eq(appRefunds.id, id));
-    if (toCredit) await creditEntry(tx, actor, { userId: pre.p.ownerId, amount, kind: "refund", note: v.note?.trim() || "Refund to Mada credit", refundId: id });
+    const [grp] = await tx.select({ title: appRefundGroups.title }).from(appRefundItems).innerJoin(appRefundGroups, eq(appRefundGroups.id, appRefundItems.groupId)).where(eq(appRefundItems.refundId, id));
+    if (toCredit) await creditEntry(tx, actor, { userId: pre.p.ownerId, amount, kind: "refund", note: v.note?.trim() || grp?.title || pre.p.label || "Refund", refundId: id });
     const total = (await tx.select({ s: sql<number>`coalesce(sum(${appRefunds.amount}),0)::bigint` }).from(appRefunds).where(and(eq(appRefunds.paymentId, f.paymentId), inArray(appRefunds.stage, ["approved", "sent", "settled"]))))[0]!.s;
     await tx.update(appPayments).set({ status: Number(total) >= pre.p.amount ? "refunded" : "partially_refunded", updatedAt: new Date() }).where(eq(appPayments.id, f.paymentId));
     const money = sarText(amount);
@@ -945,10 +948,14 @@ async function approveRefundHere(actor: DeskActor, id: string, v: { destination:
     const line = toCredit ? copy("desk.refund.approved.credit", { amount: money }) : copy("desk.refund.approved.card", { amount: money, card: pre.p.label ?? "card" });
     const body = provider && !toCredit ? `${line} ${copy("desk.refund.instalments", { provider })}` : line;
     if (pre.p.requestId) await agentMessage(tx, "request", pre.p.requestId, actor, body, { refund: { amount, stage: toCredit ? "sent" : "approved", destination: v.destination } });
-    await notify(tx, pre.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refund.title", body: "notify.desk.refund.body", vars: { amount: money }, href: pre.p.requestId ? `/requests/${pre.p.requestId}` : null });
+    // A trip refund moves its group and the traveller hears once per step of the whole refund; an order's refund, once.
+    const step = await syncRefundGroup(tx, id, now);
+    if (step) { if (step.changed) await notifyGroupStep(tx, step.group); }
+    else if (toCredit) await notify(tx, pre.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.trip.credit.title", body: "notify.trip.credit.body", vars: { amount: money }, href: WALLET_HREF });
+    else await notify(tx, pre.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refund.title", body: "notify.desk.refund.body", vars: { amount: money }, href: pre.p.requestId ? `/requests/${pre.p.requestId}` : null });
     const part = amount !== f.amount ? ` (${sarText(f.amount)} asked)` : "";
     await deskAudit(tx, actor, { action: "desk.refund.approved", entityType: "refund", entityId: id, ref: shortRef(id, "F"),
-      summary: `Approved a refund of ${money}${part} to ${toCredit ? "Mada credit" : pre.p.label ?? "the card"}${provider ? ` (${provider} instalments cancelled)` : ""}${v.viaApproval ? " after a lead's approval" : ""}`,
+      summary: `Approved a refund of ${money}${part} to ${toCredit ? "the Mada Wallet" : pre.p.label ?? "the card"}${provider ? ` (${provider} instalments cancelled)` : ""}${v.viaApproval ? " after a lead's approval" : ""}`,
       data: { amount, asked: f.amount, destination: v.destination, providerRef, approvalId: v.viaApproval ?? null } });
     return { status: toCredit ? "sent" as const : "approved" as const };
   });
@@ -989,17 +996,18 @@ async function rejectRefundHere(actor: DeskActor, id: string, v: { reason: strin
     if (x.f.stage !== "requested") throw new DeskError("This refund has already been decided", "CONFLICT");
     await tx.update(appRefunds).set({ stage: "rejected", reason, updatedAt: new Date() }).where(eq(appRefunds.id, id));
     if (x.p.requestId) await agentMessage(tx, "request", x.p.requestId, actor, copy("desk.refund.rejected", { reason }), { refund: { amount: x.f.amount, stage: "rejected" } });
-    await notify(tx, x.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refundNo.title", body: "notify.desk.refundNo.body", href: x.p.requestId ? `/requests/${x.p.requestId}` : null });
+    const step = await syncRefundGroup(tx, id);
+    if (!step || step.changed) await notify(tx, x.p.ownerId, { kind: "refund_moved", level: "active", title: "notify.desk.refundNo.title", body: "notify.desk.refundNo.body", href: x.p.requestId ? `/requests/${x.p.requestId}` : step ? "/trips?tab=requests" : null });
     await deskAudit(tx, actor, { action: "desk.refund.rejected", entityType: "refund", entityId: id, ref: shortRef(id, "F"), summary: `Declined a refund of ${sarText(x.f.amount)}: ${clip(reason, 140)}` });
   });
 }
 
-/** One line on the traveller's Mada credit ledger (append-only; corrections are new lines). */
+/** One line on the traveller's Mada Wallet ledger (append-only; corrections are new lines). */
 export async function creditEntry(tx: Tx, actor: DeskActor, v: { userId: string; amount: number; kind: "refund" | "goodwill" | "adjustment"; note: string; refundId?: string | null }) {
   if (!Number.isInteger(v.amount) || v.amount <= 0) throw new DeskError("Enter an amount");
   // lib/app/credit.ts keeps the ledger (and writes its own app audit row); the desk adds the Ops log line.
   await addCredit(tx, { userId: v.userId, amount: v.amount, kind: v.kind, note: v.note.slice(0, 200), refundId: v.refundId ?? null, actor: { kind: "agent", id: actor.id } });
-  await deskAudit(tx, actor, { action: "desk.credit.added", entityType: "app_user", entityId: v.userId, ref: "Mada credit", summary: `Added ${sarText(v.amount)} Mada credit (${v.kind})`, data: { amount: v.amount, kind: v.kind } }, { app: false });
+  await deskAudit(tx, actor, { action: "desk.credit.added", entityType: "app_user", entityId: v.userId, ref: "Mada Wallet", summary: `Added ${sarText(v.amount)} to the Mada Wallet (${v.kind})`, data: { amount: v.amount, kind: v.kind } }, { app: false });
 }
 
 /* ═════════════ moderation ═════════════ */

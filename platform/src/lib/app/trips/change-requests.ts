@@ -75,7 +75,7 @@ export type Asked = { change: ChangeRequestView | null; applied: boolean; text: 
  * Booked items can't be moved or removed from here (that's the change flow); a booked stay asked for more nights is
  * kept as a request that costs money, so it goes to the payer.
  */
-export async function requestChange(userId: string, tripId: string, input: ChangeAsk, opts: { threadId?: string | null } = {}): Promise<Asked> {
+export async function requestChange(userId: string, tripId: string, input: ChangeAsk, opts: { threadId?: string | null; /** Always to the owner, even for an editor (a cancel and refund only the owner can do). */ ask?: boolean } = {}): Promise<Asked> {
   const b = ChangeAsk.parse(input);
   const who = await roleOf(userId, tripId);
   if (!who) throw new AppError("NOT_FOUND");
@@ -103,7 +103,7 @@ export async function requestChange(userId: string, tripId: string, input: Chang
   }
   const summary = redact(b.summary).text.slice(0, 200);
   const lines = linesOf(b.ops, items);
-  if (who.role === "edit" && !costs) {
+  if (who.role === "edit" && !costs && !opts.ask) {
     await applyOps(who.trip.ownerId, tripId, { version: plan.version, ops: b.ops }, "traveller");
     return { change: null, applied: true, text: `Done: ${lines.map((l) => l.text).join("; ")}.` };
   }

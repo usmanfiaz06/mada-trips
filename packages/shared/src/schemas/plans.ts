@@ -37,6 +37,8 @@ export const PlanPlace = z.object({
   country: z.string().regex(/^[A-Z]{2}$/).nullable().optional(),
   lat: z.number().min(-90).max(90).nullable().optional(),
   lng: z.number().min(-180).max(180).nullable().optional(),
+  /** Google's place id, for a place added from Ask's place cards: the plan screen can read its hours later. */
+  gid: z.string().max(300).nullable().optional(),
 });
 export type PlanPlace = z.infer<typeof PlanPlace>;
 
@@ -51,6 +53,10 @@ export const PlaceInput = z.object({
   name: z.string().trim().min(1).max(120),
   kind: z.enum(['airport', 'city', 'place']).optional(),
   code: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).nullable().optional(),
+  /** A place from Ask's place cards: where it is and Google's place id, kept as given (never matched to a city). */
+  lat: z.number().min(-90).max(90).nullable().optional(),
+  lng: z.number().min(-180).max(180).nullable().optional(),
+  gid: z.string().trim().min(1).max(300).nullable().optional(),
 });
 export type PlaceInput = z.infer<typeof PlaceInput>;
 

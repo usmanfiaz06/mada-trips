@@ -39,7 +39,7 @@ export const AR_DESK_OUTCOMES: Record<string, string> = {
   "Sorting the refund": "ترتيب الاسترداد",
   "Nothing charged": "لم يُخصم شيء",
   "Refund to the card": "استرداد إلى البطاقة",
-  "Back as Mada credit": "رصيد في مادا",
+  "Into the Mada Wallet": "في محفظة مادا",
   "Kept for the part done": "محتسب عن الجزء المنجز",
   "Paid in full": "مدفوع بالكامل",
   "Try other dates": "تواريخ أخرى",

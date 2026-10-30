@@ -197,7 +197,7 @@ export async function PaymentsTab({ userId }: { userId: string }) {
               {refunds.map((f) => (
                 <tr key={f.id} className="group transition hover:bg-surface-2">
                   <Td className="whitespace-nowrap"><Link href={`/adminwork/desk/refunds?s=${f.stage}&focus=${f.id}`} className={linkCls}>{fmtDate(f.createdAt, L)}</Link></Td>
-                  <Td className="whitespace-nowrap">{f.destination === "credit" ? t("Mada credit") : t("The card")}</Td>
+                  <Td className="whitespace-nowrap">{f.destination === "credit" ? t("Mada Wallet") : t("The card")}</Td>
                   <Td><StatusBadge map={REFUND_STAGE} value={f.stage} /></Td>
                   <Td className="whitespace-nowrap">{f.expectedBy ? fmtDate(f.expectedBy, L) : "—"}</Td>
                   <Td align="end"><Money v={f.amount} /></Td>
@@ -236,8 +236,8 @@ export async function CreditTab({ userId }: { userId: string }) {
   const c = await customerCredit(userId);
   return (
     <Card pad={false}>
-      <div className="flex items-baseline justify-between px-6 pt-6"><CardHead title={t("Credit ledger")} hint={t("Every movement on their Mada credit. Corrections are new lines; nothing is edited.")} /><Money v={c.balance.amount} className="text-[26px] font-[350] tracking-[-0.03em]" /></div>
-      {c.entries.length === 0 ? <Empty icon={<Wallet className="size-5" />} title={t("No Mada credit yet")} /> : (
+      <div className="flex items-baseline justify-between px-6 pt-6"><CardHead title={t("Credit ledger")} hint={t("Every movement in their Mada Wallet. Corrections are new lines; nothing is edited.")} /><Money v={c.balance.amount} className="text-[26px] font-[350] tracking-[-0.03em]" /></div>
+      {c.entries.length === 0 ? <Empty icon={<Wallet className="size-5" />} title={t("Nothing in their Mada Wallet yet")} /> : (
         <Table>
           <thead><tr><Th>{t("When")}</Th><Th>{t("Type")}</Th><Th>{t("Note")}</Th><Th align="end">{t("Amount")}</Th></tr></thead>
           <tbody>

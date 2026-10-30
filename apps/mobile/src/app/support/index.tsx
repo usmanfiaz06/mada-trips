@@ -65,7 +65,8 @@ function GuestSupport() {
 
 function SupportChat() {
   const router = useRouter();
-  const { trip: tripParam, topic, thread: threadParam } = useLocalSearchParams<{ trip?: string; topic?: string; thread?: string }>();
+  // `text` starts the message box with words to send ("Still not there? Tell us" on a refund passes its amount and reference).
+  const { trip: tripParam, topic, thread: threadParam, text: textParam } = useLocalSearchParams<{ trip?: string; topic?: string; thread?: string; text?: string }>();
   const user = useSession((s) => s.user);
   const trips = useTrips();
   const trip = nextTrip(trips.data);
@@ -83,7 +84,7 @@ function SupportChat() {
   const offline = useNet((s) => s.online === false) || demo('offline');
   const pending = useOutbox(SUPPORT_KIND, (i) => i.meta?.threadId === th?.id);
   const { send: post, sending } = useSendToMada(key, th?.id, t('action.send'));
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(textParam ?? '');
   const scroll = useRef<ScrollView>(null);
   const bottom = useBottomInset();
   const started = useRef(false);

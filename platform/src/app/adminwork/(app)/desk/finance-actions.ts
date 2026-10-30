@@ -24,13 +24,13 @@ const uuid = (fd: FormData, k: string) => { const v = str(fd, k); if (!isUuid(v)
 const amountOf = (fd: FormData, k: string) => { const raw = str(fd, k); if (!raw) return null; try { return toHalalas(raw); } catch { throw new DeskError("Check the amount"); } };
 const refunds = (ok: string): ActionState => { revalidatePath("/adminwork/desk/refunds"); return { ok }; };
 
-/** Approve all or part of a refund, to the card or to Mada credit. Over the agent's limits it goes to a lead. */
+/** Approve all or part of a refund, to the card or to the Mada Wallet. Over the agent's limits it goes to a lead. */
 export async function decideRefundAction(_: ActionState, fd: FormData): Promise<ActionState> {
   try {
     const u = await requirePerm("desk.refund");
     const r = await approveRefund(u, uuid(fd, "id"), { destination: str(fd, "destination") === "credit" ? "credit" : "original", amount: amountOf(fd, "amount"), note: str(fd, "note") || null });
     if (r.status === "awaiting_lead") return refunds(`Over your limit, so a support lead approves it in Approvals (${r.approvalRef})`);
-    return refunds(r.status === "sent" ? "Refunded to Mada credit" : "Refund approved. It moves to Sent when the provider confirms");
+    return refunds(r.status === "sent" ? "Refunded to the Mada Wallet" : "Refund approved. It moves to Sent when the provider confirms");
   } catch (e) { return toState(e); }
 }
 

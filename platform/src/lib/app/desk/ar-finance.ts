@@ -1,8 +1,12 @@
 // Arabic for refunds, credits and App finance on the desk (DESK-PLAN.md U6). Merged into src/lib/i18n/ar.ts.
 export const AR_DESK_FINANCE: Record<string, string> = {
   // refunds and credits
-  "Approve all or part, to the card it came from or to Mada credit, which is instant. A card refund shows Sent once the provider confirms it.":
-    "اعتمد المبلغ كاملًا أو جزءًا منه، إلى البطاقة التي دُفع بها أو إلى رصيد مادا وهو فوري. استرداد البطاقة يظهر «أُرسل» عندما يؤكده مزوّد الدفع.",
+  "Approve all or part, to the card it came from or to the Mada Wallet, which is instant and for bookings only. Refunds the rules give back in full, up to {max}, are approved at once and tagged Auto. A card refund shows Sent once the provider confirms it.":
+    "اعتمد المبلغ كاملًا أو جزءًا منه، إلى البطاقة التي دُفع بها أو إلى محفظة مادا، وهي فورية وللحجوزات فقط. ما تعيده القواعد كاملًا حتى {max} يُعتمد فورًا ويُوسم «تلقائي». استرداد البطاقة يظهر «أُرسل» عندما يؤكده مزوّد الدفع.",
+  "Auto": "تلقائي",
+  "Approved by": "اعتمده",
+  "Bank reference": "مرجع البنك",
+  "The bank's reference (ARN) or the provider's refund reference": "مرجع البنك (ARN) أو مرجع الاسترداد لدى المزوّد",
   "Cancel & refund a booking": "إلغاء حجز واسترداده",
   "With a lead": "لدى المشرف",
   "On its way": "في الطريق",
@@ -24,7 +28,7 @@ export const AR_DESK_FINANCE: Record<string, string> = {
   "The provider's refund reference": "مرجع الاسترداد لدى المزوّد",
   "Mark sent": "علّمه كمُرسل",
   "Give goodwill credit": "منح رصيد ترضية",
-  "For {name}, to Mada credit at once": "لـ{name}، إلى رصيد مادا فورًا",
+  "For {name}, to the Mada Wallet at once": "لـ{name}، إلى محفظة مادا فورًا",
   "Leads give any amount.": "المشرفون يمنحون أي مبلغ.",
   "App refund": "استرداد من التطبيق",
   "Refund an agent approves alone (SAR)": "الاسترداد الذي يعتمده الموظف وحده (ريال)",

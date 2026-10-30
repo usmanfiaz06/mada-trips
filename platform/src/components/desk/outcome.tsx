@@ -20,7 +20,7 @@ export const OUTCOME_REASONS = [
   ["other", "Something else (say in the note)"],
 ] as const;
 const STEPS = [["reading", "Reading the request"], ["asking_airline", "Asking the airline"], ["asking_hotel", "Asking the hotel"], ["asking_embassy", "Checking visa rules"], ["applying", "Filling in the application"], ["renewing", "Booking the passport renewal"], ["searching", "Finding options"], ["pricing", "Pricing it"], ["booking", "Booking it"], ["issuing", "Issuing tickets"], ["refunding", "Sorting the refund"]] as const;
-const MONEY = [["none", "Nothing charged"], ["refund", "Refund to the card"], ["credit", "Back as Mada credit"], ["kept", "Kept for the part done"], ["charged", "Paid in full"]] as const;
+const MONEY = [["none", "Nothing charged"], ["refund", "Refund to the card"], ["credit", "Into the Mada Wallet"], ["kept", "Kept for the part done"], ["charged", "Paid in full"]] as const;
 const NEXT = [["other_dates", "Try other dates"], ["book_again", "Book another"], ["talk", "Talk to Mada"], ["see_trip", "See the trip"], ["appeal", "Appeal"], ["reapply", "Apply again"], ["trip_options", "Change or refund the trip"]] as const;
 const COST = [["later", "Price comes with the answer"], ["free", "No cost"], ["quoted", "Quoted"], ["paid", "Paid"]] as const;
 

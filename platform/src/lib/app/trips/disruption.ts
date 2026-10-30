@@ -59,7 +59,8 @@ export function disruptionFor(trip: TripDetail, kind: DisruptionKind): Disruptio
 
 export type ChoiceResult = { optionId: string; kind: "rebook" | "stay" | "refund"; headline: string; body: string; agentLine: string; refund: RefundView | null };
 
-export async function chooseDisruption(ownerId: string, trip: TripDetail, kind: DisruptionKind, optionId: string, clientKey: string, ipHash: string | null): Promise<ChoiceResult> {
+/** `destination` for the refund option: the Mada Wallet or the card (older apps send none: the card). */
+export async function chooseDisruption(ownerId: string, trip: TripDetail, kind: DisruptionKind, optionId: string, clientKey: string, ipHash: string | null, destination: "original" | "credit" = "original"): Promise<ChoiceResult> {
   const opt = disruptionOptions(kind, trip).find((o) => o.id === optionId);
   if (!opt) throw new AppError("NOT_FOUND");
   const out = outSegment(trip)!;
@@ -72,7 +73,7 @@ export async function chooseDisruption(ownerId: string, trip: TripDetail, kind: 
     await ensureCharges(trip);
     const charges = await db.select({ id: appTripCharges.id }).from(appTripCharges).where(eq(appTripCharges.tripId, trip.id));
     const refund = charges.length
-      ? await createRefund(ownerId, trip, { paymentIds: charges.map((c) => c.id), reason: "airline", destination: "original", clientKey }, ipHash, { titleOverride: tk("dz.refundTitle", { code: out.flightNumber }) })
+      ? await createRefund(ownerId, trip, { paymentIds: charges.map((c) => c.id), reason: "airline", destination, clientKey }, ipHash, { titleOverride: tk("dz.refundTitle", { code: out.flightNumber }) })
       : null;
     await db.transaction(async (tx) => {
       await tx.update(appTrips).set({ status: "cancelled", updatedAt: new Date() }).where(eq(appTrips.id, trip.id));
@@ -82,8 +83,13 @@ export async function chooseDisruption(ownerId: string, trip: TripDetail, kind: 
       await appAuditLog(tx, { actorKind: "user", actorId: ownerId, action: "trip.disruption_refund", entityType: "app_trip", entityId: trip.id, summary: `Took a refund after ${out.flightNumber} was ${kind === "delay" ? "delayed" : "cancelled"}`, data: { kind, amount: refund?.amount.amount ?? 0 }, ipHash });
     });
     const amount = formatSar(refund?.amount.amount ?? tripRefundAmount(trip));
+    // Said as it is: in the Mada Wallet now, on its way to the card, or with a person to check.
+    const waiting = refund?.stage === "requested";
+    const wallet = refund?.destination === "credit";
     return {
-      optionId, kind: "refund", headline: tk("dz.done.refund", { amount }), body: tk(night ? "dz.done.refundBodyNight" : "dz.done.refundBody", { card: refund?.card ?? "your card", airline: out.carrierName }),
+      optionId, kind: "refund",
+      headline: tk(waiting ? "dz.done.looking" : wallet ? "dz.done.wallet" : "dz.done.refund", { amount }),
+      body: waiting ? tk("dz.done.lookingBody") : wallet ? tk(night ? "dz.done.walletBodyNight" : "dz.done.walletBody", { airline: out.carrierName }) : tk(night ? "dz.done.refundBodyNight" : "dz.done.refundBody", { card: refund?.card ?? "your card", airline: out.carrierName }),
       agentLine: tk("dz.done.refundLine", { airline: out.carrierName }), refund,
     };
   }

@@ -6,7 +6,7 @@ import { Button } from '@/components/Button';
 import { Icon, type IconName } from '@/components/Icon';
 import { Act, Screen, Scroll, TopBar } from '@/components/Layout';
 import { T } from '@/components/Text';
-import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, Rise, Row, Small, Steps, Tiny } from '@/components/trips/ui';
+import { AgentFace, AirlineMark, BigCheck, Box, Eyebrow, Grow, H3, PickCard, Rise, Row, Small, Steps, Tiny } from '@/components/trips/ui';
 import { buzz } from '@/lib/haptics';
 import { isRTL, t } from '@/lib/i18n';
 import { toast } from '@/lib/toast';
@@ -44,10 +44,12 @@ export default function Disruption() {
   const offline = useOffline();
   const queued = useTripOutbox(id, OUTBOX_DISRUPTION)[0];
   const [pick, setPick] = useState<string | null>(null);
+  // Where a refund goes: the Mada Wallet first and chosen (owner decision), or back to the card.
+  const [dest, setDest] = useState<'original' | 'credit'>('credit');
   const [stage, setStage] = useState<Stage>(queued ? 'queued' : 'choose');
   const [result, setResult] = useState<DisruptionChoiceResponse | null>(null);
   const [clientKey] = useState(newKey);
-  const choose = useTripMutation((b: { kind: DisruptionKind; optionId: string }) => tripsApi.choose(id, { ...b, clientKey }));
+  const choose = useTripMutation((b: { kind: DisruptionKind; optionId: string; destination?: 'original' | 'credit' }) => tripsApi.choose(id, { ...b, clientKey }));
   const home = () => toTab(router, '/today');
   const d = q.data;
   /* The outbox sent the queued choice once the phone reconnected: show it as done. */
@@ -65,12 +67,14 @@ export default function Disruption() {
     );
   }
   const night = d.kind === 'night';
+  // "Instantly" only within what the rules approve at once; above it a person checks first, and the option says so.
+  const instant = d.refundAmount.amount <= (d.autoMax?.amount ?? 500_00);
   const cur: DisruptionOption = d.options.find((o) => o.id === (pick ?? queued?.meta?.optionId)) ?? d.options[0]!;
 
   const send = () => {
     buzz('knock');
     setStage('working');
-    choose.mutate({ kind: d.kind, optionId: cur.id }, {
+    choose.mutate({ kind: d.kind, optionId: cur.id, ...(cur.kind === 'refund' ? { destination: dest } : {}) }, {
       onSuccess: (r) => { setTimeout(() => { setResult(r); setStage('done'); buzz('success'); }, 1600); },
       onError: (e) => {
         if (isOfflineError(e)) { queue(); return; }
@@ -79,7 +83,7 @@ export default function Disruption() {
     });
   };
   const queue = () => {
-    queueDisruption(id, { kind: d.kind, optionId: cur.id, clientKey }, cur.title);
+    queueDisruption(id, { kind: d.kind, optionId: cur.id, clientKey, ...(cur.kind === 'refund' ? { destination: dest } : {}) }, cur.title);
     setStage('queued');
     buzz('soft');
   };
@@ -169,6 +173,13 @@ export default function Disruption() {
             );
           })}
         </View>
+        {cur.kind === 'refund' ? (
+          <View accessibilityRole="radiogroup" accessibilityLabel={t('dz.refundWhere')} style={{ gap: 10 }} testID="dz-refund-where">
+            <H3 size={15}>{t('dz.refundWhere')}</H3>
+            <PickCard radio testID="dz-dest-credit" on={dest === 'credit'} onPress={() => setDest('credit')} title={instant ? t('rf.toCredit') : t('rf.toCreditWait')} sub={instant ? t('rf.toCreditSub') : t('rf.toCreditWaitSub')} badge={t('rf.recommended')} />
+            <PickCard radio testID="dz-dest-card" on={dest === 'original'} onPress={() => setDest('original')} title={t('rf.toYourCard')} sub={t('rf.toCardSub')} />
+          </View>
+        ) : null}
         {night ? (
           <Rise><Box>
             <H3 size={16}>{t('dz.rights.title')}</H3>

@@ -7,6 +7,7 @@ import {
   outSegment, rangeLong, rebookPatch, refundQuoteItems, sameTimeAsHome, shareText, stayEnd, switchCredit, t, timing, todayIn, tripRefundAmount, zatcaQr, zonedToInstant,
   type CopyKey, type DisruptionKind, type ErrorCode, type InvoiceDoc, type InvoiceLine, type Notification, type RefundView, type TrackedFlightView, type TripCard,
   splitEven, statementText, type TripMoney, type TripMoneyItem, type TripMoneyPending, type TripMoneySplit,
+  REFUND_BANK_WORKING_DAYS, addWorkingDays, autoApproveRefund,
   canNudge, outcomeNotifyKey, outcomeWhy, partialResult, progressFromStatus, refundResult, resultFromLegacy, type RequestResult,
   type FareOption, type FlightOption, type OrderLine, type Person, type StayOption, type TripDetail, type TripPayment, type TripPhase as Phase, type TripRequestView, type TripTraveller, type Vars,
 } from '@mada/shared';
@@ -26,7 +27,9 @@ import { circlesHooks, circlesMock } from './circles';
 type Charge = TripPayment & { lines: InvoiceLine[]; tripId: string; /** A friend in a circle paid this (owner audit item 31). */ friend?: string | null };
 type Doc = { id: string; number: string; tripId: string; chargeId: string; kind: 'simplified' | 'tax' | 'credit_note'; status: 'draft' | 'issued'; customer: string; company: TripDetail['company']; lines: InvoiceLine[]; againstId: string | null; paidWith: string | null; issuedAt: string };
 type Req = TripRequestView & { scripted: 'yes' | 'no' | null; clientKey: string | null; withdrawn?: boolean; partial?: string | null; nudgedAt?: string | null };
-type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string; withdrawn?: boolean };
+type Ref = RefundView & { items: { chargeId: string; credited: number; creditNoteId: string | null }[]; clientKey: string; withdrawn?: boolean; walletNote?: string };
+/** The agent's single-refund limit, the server's default for APP_REFUND_AUTO_MAX. */
+const MOCK_AUTO_MAX = 500_00;
 type State = {
   trips: Omit<TripDetail, 'clock'>[];
   charges: Charge[];
@@ -108,7 +111,7 @@ function issueDoc(s: State, d: Omit<Doc, 'id' | 'number'> & { number?: string })
 }
 
 const customerOf = (trip: Omit<TripDetail, 'clock'>) => trip.travellers[0]?.fullName ?? 'The traveller';
-const paidWith = (c: Pick<Charge, 'method' | 'label' | 'plan' | 'creditUsed'>) => (c.method === 'tabby' ? 'Tabby · 4 payments' : c.method === 'tamara' ? 'Tamara · 3 payments' : c.label ?? c.method) + (c.creditUsed.amount ? ` and ${formatSar(c.creditUsed.amount)} Mada credit` : '');
+const paidWith = (c: Pick<Charge, 'method' | 'label' | 'plan' | 'creditUsed'>) => (c.method === 'tabby' ? 'Tabby · 4 payments' : c.method === 'tamara' ? 'Tamara · 3 payments' : c.label ?? c.method) + (c.creditUsed.amount ? ` and ${formatSar(c.creditUsed.amount)} from Mada Wallet` : '');
 
 function addCharge(s: State, trip: Omit<TripDetail, 'clock'>, c: Omit<Charge, 'id' | 'invoiceId' | 'invoiceNumber' | 'creditNoteId' | 'refunded' | 'lines' | 'tripId'> & { discount?: number; label: string | null }): Charge {
   const lines = invoiceLinesFor(c.item, c.amount.amount, { trip: { ...trip, clock: clockFor(trip, null) }, title: c.title, discount: c.discount });
@@ -353,6 +356,16 @@ function progressDesk(s: State) {
   }
   for (const f of s.refunds) {
     if (f.anyway && f.stage === 'requested' && !f.withdrawn && now - Date.parse(f.createdAt) > 7000) { f.stage = 'rejected'; f.updatedAt = nowIso(); }
+    // The mock desk approves a waiting refund after 10 seconds, and the provider sends a card refund 6 seconds after
+    // approval with the bank's reference: one notification per step, as on the server (finance/refund-groups.ts).
+    else if (!f.anyway && f.stage === 'requested' && !f.withdrawn && f.destination !== 'instalments' && now - Date.parse(f.createdAt) > 10_000) {
+      f.stage = f.destination === 'credit' ? 'sent' : 'approved'; f.updatedAt = nowIso();
+      if (f.destination === 'credit') { f.sentAt = f.updatedAt; creditWallet(s, f); }
+      else notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.refundApproved', vars: { amount: formatSar(f.amount.amount), card: f.card }, href: '/trips?tab=requests' });
+    } else if (f.stage === 'approved' && f.destination === 'original' && now - Date.parse(f.updatedAt) > 6000) {
+      f.stage = 'sent'; f.sentAt = nowIso(); f.updatedAt = f.sentAt; f.reference = `7438${f.id.replace(/\D/g, '').padEnd(19, '0').slice(0, 19)}`;
+      notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.refundRef', vars: { amount: formatSar(f.amount.amount), card: f.card, ref: f.reference }, href: '/trips?tab=requests' });
+    }
   }
 }
 
@@ -458,15 +471,20 @@ function createRefund(s: State, trip: TripDetail, input: { paymentIds: string[];
   const amount = anyway ? chosen.reduce((a, p) => a + p.amount.amount, 0) : quotes.reduce((a, q) => a + q.cash.amount, 0);
   const now = nowIso();
   const driver = homePickup(trip)?.driverName ?? 'The driver';
+  // The server's rule (finance/auto-approve.ts): all back with no fee, wallet or card, up to SAR 500, no open flag.
+  const clear = anyway || quotes.some((q) => q.askAnyway || q.back.amount !== q.paid.amount) ? null : quotes.some((q) => q.law) || timing(trip.clock.phase).airlineCancelled ? 'supplier_confirmed' as const : 'free' as const;
+  const auto = instal.length ? { ok: false as const } : autoApproveRefund({ clear, destination, amount, max: MOCK_AUTO_MAX, flagged: false });
+  const stage = auto.ok ? (destination === 'credit' ? 'sent' as const : 'approved' as const) : 'requested' as const;
   const r: Ref = {
     id: uuid(), tripId: trip.id, title: title ?? `${trip.city} · ${what.length < 2 ? what.join('') : `${what.slice(0, -1).join(', ')} and ${what[what.length - 1]}`}`, amount: SAR(amount),
-    stage: anyway ? 'requested' : destination === 'credit' ? 'sent' : 'requested', destination, provider: destination === 'instalments' ? instal[0]!.method : null,
+    stage, destination, provider: destination === 'instalments' ? instal[0]!.method : null, auto: auto.ok, reference: null,
+    walletNote: `${chosen.map((p) => p.title).join(', ')}, ${trip.city}`,
     card: chosen.find((p) => p.method !== 'tabby')?.label ?? 'your card', anyway,
     reject: anyway ? (chosen[0]?.item === 'pickup' ? `${driver}’s company charges in full inside 24 hours, and he has turned down other work for your morning. I asked twice.` : 'The place is already holding the booking for you and won’t release it this close. I asked twice.') : null,
     alt: anyway ? (chosen[0]?.item === 'pickup' ? 'I can move the ride to another day in the next 3 months instead, free.' : 'I can move it to another day this trip, free.') : null,
     law: quotes.some((q) => q.law), airline: outSegment(trip)?.carrierName ?? null,
     cancelledInstalments: instal.length ? { count: instal.reduce((a, q) => a + (q.cancelled?.count ?? 0), 0), amount: SAR(instal.reduce((a, q) => a + (q.cancelled?.amount.amount ?? 0), 0)) } : null,
-    expectedBy: destination === 'credit' ? now : new Date(Date.now() + 14 * 86_400_000).toISOString(), sentAt: destination === 'credit' ? now : null, createdAt: now, updatedAt: now,
+    expectedBy: stage === 'sent' ? now : addWorkingDays(new Date(), REFUND_BANK_WORKING_DAYS).toISOString(), sentAt: stage === 'sent' ? now : null, createdAt: now, updatedAt: now,
     items: [], clientKey: input.clientKey,
   };
   for (const q of quotes) {
@@ -477,10 +495,19 @@ function createRefund(s: State, trip: TripDetail, input: { paymentIds: string[];
     r.items.push({ chargeId: c.id, credited, creditNoteId: cn });
     if (q.item === 'stay' && !anyway) trip.stays.forEach((st) => { const base = s.trips.find((x) => x.id === trip.id)!; base.stays = base.stays.map((x) => (x.id === st.id ? { ...x, status: 'cancelled' } : x)); });
   }
-  if (destination === 'credit') { s.credit += amount; notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.trip.credit', vars: { amount: formatSar(amount) }, href: '/trips?tab=requests' }); }
-  s.requests.unshift(reqOf({ tripId: trip.id, kind: 'refund', area: 'refund', status: destination === 'credit' ? 'done' : 'sent', title: r.title, short: 'Refund', detail: input.reason, withWhom: 'faisal', scripted: null }));
+  if (stage === 'sent') creditWallet(s, r);
+  else if (stage === 'approved') notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.refundApproved', vars: { amount: formatSar(amount), card: r.card }, href: '/trips?tab=requests' });
+  else notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.refundLooking', vars: { amount: formatSar(amount) }, href: '/trips?tab=requests' });
+  s.requests.unshift(reqOf({ tripId: trip.id, kind: 'refund', area: 'refund', status: stage === 'sent' && destination === 'credit' ? 'done' : 'sent', title: r.title, short: 'Refund', detail: input.reason, withWhom: 'faisal', scripted: null }));
   s.refunds.unshift(r);
   return r;
+}
+
+/** The refund lands in the Mada Wallet (mock/wallet.ts keeps the ledger; reached through its demo hook, no import cycle). */
+function creditWallet(s: State, r: Ref) {
+  s.credit += r.amount.amount;
+  (globalThis as { __madaWallet?: { addCredit(amount: number, note: string): void } }).__madaWallet?.addCredit(r.amount.amount, r.walletNote ?? r.title);
+  notify(s, { kind: 'refund_moved', level: 'active', copy: 'notify.trip.credit', vars: { amount: formatSar(r.amount.amount) }, href: '/wallet?credit=1' });
 }
 
 function reqOf(o: Partial<Req> & Pick<Req, 'tripId' | 'kind' | 'area' | 'title' | 'withWhom'>): Req {
@@ -510,7 +537,7 @@ const resultOf = (r: Req): RequestResult | null => r.result ?? resultFromLegacy(
 const progressOf = (r: Req) => { if (r.withdrawn) return null; const p = progressFromStatus({ ...r, kind: r.kind, area: r.area }); return p ? { ...p, nudgedAt: r.nudgedAt ?? null } : null; };
 const pub = (r: Req): TripRequestView => { const { scripted: _s, clientKey: _c, partial: _p, nudgedAt: _n, ...v } = r; return { ...v, withdrawn: !!r.withdrawn, canTakeBack: canTakeBackReq(r), result: resultOf(r), progress: progressOf(r) }; };
 const pubRefund = (r: Ref): RefundView => {
-  const base = ((r: Ref): RefundView => { const { items: _i, clientKey: _c, ...v } = r; return { ...v, reject: r.stage === 'rejected' ? r.reject : null, alt: r.stage === 'rejected' ? r.alt : null }; })(r);
+  const base = ((r: Ref): RefundView => { const { items: _i, clientKey: _c, walletNote: _w, ...v } = r; return { ...v, reject: r.stage === 'rejected' ? r.reject : null, alt: r.stage === 'rejected' ? r.alt : null }; })(r);
   const v = { ...base, stage: r.withdrawn ? 'rejected' as const : base.stage, reject: r.withdrawn ? null : base.reject, alt: r.withdrawn ? null : base.alt, withdrawn: !!r.withdrawn, canTakeBack: r.anyway && r.stage === 'requested' && !r.withdrawn };
   return { ...v, result: refundResult(v) };
 };
@@ -691,7 +718,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
   if (sub === 'refunds' && parts[3] === 'quote') {
     const p = payments(s, trip.id);
     const tm = timing(trip.clock.phase);
-    return ok({ items: refundQuoteItems(trip, p), airlineCancelled: tm.airlineCancelled, partlyUsed: tm.outUsed && !tm.allUsed, allUsed: tm.allUsed, card: p.find((x) => x.method !== 'tabby')?.label ?? 'your card' });
+    return ok({ items: refundQuoteItems(trip, p), airlineCancelled: tm.airlineCancelled, partlyUsed: tm.outUsed && !tm.allUsed, allUsed: tm.allUsed, card: p.find((x) => x.method !== 'tabby')?.label ?? 'your card', autoMax: SAR(MOCK_AUTO_MAX) });
   }
   if (sub === 'refunds') {
     if (w.method === 'GET') return ok({ refunds: s.refunds.filter((r) => r.tripId === trip.id).map(pubRefund) });
@@ -748,7 +775,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
         const r = reqOf({ tripId: trip.id, kind: input.kind, area: 'change', status: 'awaiting_payment', title: say, short: 'Flight changed', detail: formatSar(total), withWhom: 'airline', withName: out.carrierName, quote: SAR(total), quoteText: `${say}. Change fee and price difference: ${formatSar(total)}. Pay and we change it with ${out.carrierName}.` });
         res = { result: 'quoted', say, total, request: r };
       } else {
-        const r = reqOf({ tripId: trip.id, kind: input.kind, area: 'change', status: input.kind === 'one' ? 'sent' : 'done', outcome: input.kind === 'one' ? null : 'yes', scripted: 'yes', title: say, short: 'Flight changed', detail: total < 0 ? `${formatSar(-total)} back as Mada credit` : 'No cost', withWhom: 'airline', withName: out.carrierName });
+        const r = reqOf({ tripId: trip.id, kind: input.kind, area: 'change', status: input.kind === 'one' ? 'sent' : 'done', outcome: input.kind === 'one' ? null : 'yes', scripted: 'yes', title: say, short: 'Flight changed', detail: total < 0 ? `${formatSar(-total)} back to your Mada Wallet` : 'No cost', withWhom: 'airline', withName: out.carrierName });
         if (input.kind !== 'one') {
           const patch = applyChange(input.kind, input.optionId, trip);
           if (patch) {
@@ -828,7 +855,7 @@ export const tripsMock: AreaMock = async (w: Wire, { user }) => {
     if (!b.success) return err('VALIDATION');
     const cached = s.idem.get(`dz:${b.data.clientKey}`);
     if (cached) return ok(cached);
-    const res = choose(s, base, trip, b.data.kind, b.data.optionId, b.data.clientKey);
+    const res = choose(s, base, trip, b.data.kind, b.data.optionId, b.data.clientKey, b.data.destination);
     if ('status' in res && typeof res.status === 'number') return res as WireResponse;
     s.idem.set(`dz:${b.data.clientKey}`, res);
     return ok(res);
@@ -859,11 +886,11 @@ function disruptionView(trip: TripDetail, kind: DisruptionKind) {
       { icon: 'flight', title: tk('dz.night.next', { time: '07:15' }), body: tk('dz.night.nextBody', { airline: out.carrierName, code: `${out.carrier}${Number(out.flightNumber.slice(2)) - 2}` }) },
     ] : [],
     agent: { name: agent.name, initial: agent.initial, line: tk(night ? 'dz.agent.night' : 'dz.agent.day', { agent: agent.name }) },
-    source: trip.disruption?.source ?? tk(`dz.${kind}.source`, { airline: out.carrierName }), refundAmount: SAR(tripRefundAmount(trip)), heldUntil: night ? '05:30' : '09:30',
+    source: trip.disruption?.source ?? tk(`dz.${kind}.source`, { airline: out.carrierName }), refundAmount: SAR(tripRefundAmount(trip)), heldUntil: night ? '05:30' : '09:30', autoMax: SAR(MOCK_AUTO_MAX),
   };
 }
 
-function choose(s: State, base: Omit<TripDetail, 'clock'>, trip: TripDetail, kind: DisruptionKind, optionId: string, clientKey: string) {
+function choose(s: State, base: Omit<TripDetail, 'clock'>, trip: TripDetail, kind: DisruptionKind, optionId: string, clientKey: string, destination: 'original' | 'credit' = 'original') {
   const opt = disruptionOptions(kind, trip).find((o) => o.id === optionId);
   if (!opt) return err('NOT_FOUND');
   const out = outSegment(trip)!;
@@ -872,13 +899,16 @@ function choose(s: State, base: Omit<TripDetail, 'clock'>, trip: TripDetail, kin
   const agentName = night ? (trip.agent.covering?.name ?? 'Noura') : trip.agent.name;
   if (opt.kind === 'refund') {
     const p = payments(s, trip.id);
-    const r = createRefund(s, trip, { paymentIds: p.filter((x) => !x.refunded).map((x) => x.id), reason: 'airline', destination: 'original', clientKey }, tk('dz.refundTitle', { code: out.flightNumber }));
+    const r = createRefund(s, trip, { paymentIds: p.filter((x) => !x.refunded).map((x) => x.id), reason: 'airline', destination, clientKey }, tk('dz.refundTitle', { code: out.flightNumber }));
     if ('status' in r && typeof r.status === 'number') return r as WireResponse;
     base.status = 'cancelled';
     base.stays = base.stays.map((x) => ({ ...x, status: 'cancelled' }));
     base.pickups = base.pickups.map((x) => ({ ...x, status: 'cancelled' }));
     const ref = r as Ref;
-    return { optionId, kind: 'refund', headline: tk('dz.done.refund', { amount: formatSar(ref.amount.amount) }), body: tk(night ? 'dz.done.refundBodyNight' : 'dz.done.refundBody', { card: ref.card, airline: out.carrierName }), agentLine: tk('dz.done.refundLine', { airline: out.carrierName }), trip: null, refund: pubRefund(ref) };
+    const waiting = ref.stage === 'requested';
+    const wallet = ref.destination === 'credit';
+    return { optionId, kind: 'refund', headline: tk(waiting ? 'dz.done.looking' : wallet ? 'dz.done.wallet' : 'dz.done.refund', { amount: formatSar(ref.amount.amount) }),
+      body: waiting ? tk('dz.done.lookingBody') : wallet ? tk(night ? 'dz.done.walletBodyNight' : 'dz.done.walletBody', { airline: out.carrierName }) : tk(night ? 'dz.done.refundBodyNight' : 'dz.done.refundBody', { card: ref.card, airline: out.carrierName }), agentLine: tk('dz.done.refundLine', { airline: out.carrierName }), trip: null, refund: pubRefund(ref) };
   }
   if (opt.kind === 'stay') {
     base.segments = base.segments.map((x) => (x.id === out.id ? { ...x, delayMin: 180, predictedDelay: false, status: 'delayed' } : x));

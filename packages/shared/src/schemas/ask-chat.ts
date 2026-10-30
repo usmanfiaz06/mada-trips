@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { Id, IsoDateTime, IsoDay } from './common';
+import { Id, IsoDateTime, IsoDay, Money } from './common';
 import { AskIntent, EntryCheckResponse, FlightOption, HomeAirport, OrderDraft, StayOption } from './booking';
 import { EsimPlan } from './esim';
-import { TripCard } from './trips';
+import { RefundReason, RefundView, TripCard, TripPaymentItem } from './trips';
 import { ChangeRequestView, PeopleMatch } from './trip-travellers';
 import { ChatDocCard, ChatShareCard } from './ask-docs';
 import { StayQuoteOption } from './stay-quote';
@@ -68,6 +68,39 @@ export const ChatPlanRow = z.object({
   booking: z.string().nullable(),
 });
 export type ChatPlanRow = z.infer<typeof ChatPlanRow>;
+
+/**
+ * A place from Google Places (CONNECT.md §32) as a chat card draws it: restaurants, cafés, sights, malls, mosques,
+ * pharmacies. Open now and today's hours are worked out by the server from the weekly hours when the card is made
+ * (never a cached "open"). The photo is our own image link (the key never leaves the server) with its author's credit,
+ * shown under the photo as Google requires. `id` is Google's place id: it opens the details and goes on the plan.
+ */
+export const ChatPlace = z.object({
+  id: z.string().min(1).max(300),
+  name: z.string().min(1).max(160),
+  /** "Shawarma restaurant", "Mosque", in the reader's language when Google has it. */
+  type: z.string().max(80).nullable(),
+  rating: z.number().min(0).max(5).nullable(),
+  ratings: z.number().int().min(0).nullable(),
+  /** 1 (inexpensive) to 4 (very expensive); null when Google doesn't say. */
+  price: z.number().int().min(0).max(4).nullable(),
+  /** Open right now, and when it next closes or opens ("23:00", local time); null when Google has no hours. */
+  open: z.object({ now: z.boolean(), closes: z.string().nullable(), opens: z.string().nullable() }).nullable(),
+  /** Today's hours as Google writes them ("12:00 – 11:00 PM"), the day name left off. */
+  today: z.string().max(160).nullable(),
+  address: z.string().max(300).nullable(),
+  lat: z.number().min(-90).max(90).nullable(),
+  lng: z.number().min(-180).max(180).nullable(),
+  /** Metres from the trip's hotel (or the point searched around), when we know where that is. */
+  distanceM: z.number().int().min(0).nullable(),
+  photo: z.object({ url: z.string(), credit: z.array(z.object({ name: z.string().max(120), url: z.string().nullable() })).max(3) }).nullable(),
+  /** The details only (place_details): the week's hours, the phone, the website, Google's map link. */
+  week: z.array(z.string().max(160)).max(7).optional(),
+  phone: z.string().max(40).nullable().optional(),
+  website: z.string().max(500).nullable().optional(),
+  mapsUrl: z.string().max(500).nullable().optional(),
+});
+export type ChatPlace = z.infer<typeof ChatPlace>;
 
 export const ChatCard = z.discriminatedUnion('type', [
   z.object({ type: z.literal('flights'), search: ChatSearch, options: z.array(FlightOption).max(3) }),
@@ -151,6 +184,37 @@ export const ChatCard = z.discriminatedUnion('type', [
    */
   z.object({
     type: z.literal('stay_quote'), requestId: Id, quoteId: Id, options: z.array(StayQuoteOption).min(1).max(3), expiresAt: IsoDateTime.nullable(),
+  }),
+  /**
+   * Places (find_places, CONNECT.md §32): up to 5, each with its photo, kind, rating, price level, open now and how far
+   * from the hotel. `near` names where they were searched around ("your hotel", "Taksim"); `tripId` is the trip whose
+   * plan "Add to plan" goes on. Tapping one opens its details.
+   */
+  z.object({ type: z.literal('places'), query: z.string().max(200), near: z.string().max(120).nullable(), tripId: Id.nullable(), places: z.array(ChatPlace).min(1).max(5) }),
+  /** One place in full (place_details): Directions, Call, Website, Add to plan. */
+  z.object({ type: z.literal('place'), tripId: Id.nullable(), place: ChatPlace }),
+  /**
+   * Cancel and refund from the chat (refund_quote, docs/app/ASK-REFUND.md): what comes back under the same rules as the
+   * refund screen, what the hotel or airline keeps, and the same two places for it (the Mada Wallet first and marked
+   * Recommended, "instantly" only when the rules approve it at once; or back to the card). Nothing is cancelled until the
+   * traveller slides: that calls the refund screen's own POST /trips/{id}/refunds with `clientKey`, so a second slide or
+   * a retried turn finds the same refund. `refund` is set when it was already asked for: the card shows the tracker.
+   */
+  z.object({
+    type: z.literal('refund_quote'), tripId: Id, title: z.string().max(200), city: z.string().max(80),
+    paymentIds: z.array(Id).min(1).max(10), items: z.array(TripPaymentItem).max(10), reason: RefundReason, clientKey: z.string().min(8).max(64),
+    paid: Money, back: Money,
+    /** What the hotel, airline or driver keeps under the rules; null when it all comes back. */
+    kept: Money.nullable(), keptBy: z.enum(['hotel', 'airline', 'driver', 'supplier']).nullable(),
+    rule: z.string().max(300),
+    /** Nothing comes back by the rules: the slide asks the team anyway. */
+    anyway: z.boolean(),
+    /** Paid with instalments: it goes back through Tabby or Tamara, no choice to make. */
+    instalments: z.enum(['tabby', 'tamara']).nullable(),
+    card: z.string().max(80),
+    /** The Mada Wallet pick is approved at once by the rules (APP_REFUND_AUTO_MAX); else "once we've checked it". */
+    walletInstant: z.boolean(),
+    refund: RefundView.nullable(),
   }),
 ]);
 export type ChatCard = z.infer<typeof ChatCard>;

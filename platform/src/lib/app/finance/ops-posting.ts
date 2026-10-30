@@ -14,7 +14,7 @@ import { CAPTURED, recordCosts } from "./costs";
  * Captured app sales in Ops finance (DESK-PLAN U6, §7 default 3). Each captured app payment becomes one Ops sale
  * (bookings, channel "app") and one Ops payment, written once (app_payments.ops_payment_id), so the dashboard and
  * the daily close show app money beside retail and corporate. A partial card refund lowers the sale and its payment
- * (what stays in the bank); a full refund marks the sale refunded; a refund to Mada credit only lowers the sale.
+ * (what stays in the bank); a full refund marks the sale refunded; a refund to the Mada Wallet only lowers the sale.
  *
  *   client       one Ops client "Mada app travellers" (contract ref mada-app); the traveller's name is on the sale
  *   prepared by  an inactive Ops user "Mada app" that can't sign in; commission 0
@@ -129,7 +129,7 @@ export async function postAppRefund(refundId: string): Promise<boolean> {
     await tx.update(schema.bookings).set({ sellPrice: sell, vatAmount: vat, status: full ? "refunded" : b.status, details: { ...details, app: { ...details.app, refunds: [...done, refundId] } }, updatedAt: new Date() }).where(eq(schema.bookings.id, b.id));
     if (toCard) await tx.update(appRefunds).set({ opsPaymentId: op.id }).where(eq(appRefunds.id, refundId));
     await tx.insert(schema.auditEvents).values({ actorId: null, action: "app.refund.posted", entityType: "booking", entityId: b.id, entityRef: b.ref,
-      summary: `App refund of SAR ${(amount / 100).toFixed(2)} posted to ${b.ref}${full ? " (refunded in full)" : ""}${toCard ? "" : " (to Mada credit: no money left the bank)"}` });
+      summary: `App refund of SAR ${(amount / 100).toFixed(2)} posted to ${b.ref}${full ? " (refunded in full)" : ""}${toCard ? "" : " (to the Mada Wallet: no money left the bank)"}` });
     return true;
   });
 }

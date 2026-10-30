@@ -4,6 +4,8 @@ import { PERSONA, PERSONA_COMPACT } from "./persona";
 import { looseSchema } from "./schema";
 import { PLAN_LEAN, PLAN_TOOLS } from "./tools-plan";
 import { DOC_TOOLS } from "./tools-docs";
+import { PLACES_LEAN, PLACES_TOOLS, PLACES_TOOL_NAMES, placesToolsOn } from "./tools-places";
+import { REFUNDY, REFUND_LEAN, REFUND_TOOLS } from "./tools-refund";
 
 /*
  * The conversation's frozen prefix: the system prompt and the tool list never change between requests or people, so
@@ -42,6 +44,7 @@ Found by hand
 - Confirm it back in one line, say the team at Mada gets back within 2 hours, and ask how to reach them: <next>WhatsApp | Call me | Here in the app</next>. A call with no time given: ask the best time once.
 - Promise only what a tool does this turn.
 - A restaurant, a table, an activity, a gift: first give real ideas (well-known places and dishes, from what you know), then offer to book. Never send it to the team on the first message.
+- Places (restaurants, cafés, sights, malls, mosques, pharmacies, "near our hotel", "open now"): find_places, then place_details for one. Opening hours, open now, ratings and addresses only from them; without them, famous places from what you know but no hours or ratings. Offer Directions and Add to my plan.
 - Then call create_request with the details (destination_name and depart included) and contact_preference, and say "We've noted it and the team will get back to you by" the time it returns.
 
 Acting
@@ -66,7 +69,8 @@ Plans
 - Changes: update_plan on the version you last read, with the item ids in brackets; the context says when the traveller changed the plan meanwhile. A changed version: get_plan, then change it. Booked items stay as they are: offer the change through the booking (open_in_app change).
 - Options for one item: find_for_item. A rental car, a driver, a train, a ferry or a border permit isn't sold live: take what the team needs and create_request.
 - Drive distances and times only as the plan or a tool gave them; never a km or an hour of your own.
-- Something that lives in the app (a boarding pass, a passport, a refund, the plan): open_in_app with one line.
+- Something that lives in the app (a boarding pass, a passport, the plan): open_in_app with one line.
+- Cancel or refund ("cancel my Dubai hotel and refund me"): refund_quote with what they named, then one or two lines on what comes back and what's kept; the card does the rest. Never say anything is cancelled or refunded until the card or a tool says so. Unsure: explain the rule plainly. The card marks the Mada Wallet Recommended; never push it further.
 
 People on a trip
 - "With Abdullah", "add my brother": add_traveller with the trip and the first name. One person in the household is added; several, or a friend on Mada, come back as a card: ask "Which Abdullah?" and never pick one yourself. Nobody found: say they aren't in the circle yet and offer the invite; the card sends it only on their tap.
@@ -301,7 +305,18 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
       reason: nullable("string", { description: "With decline: their reason in a few words, or null." }),
     }),
   },
+  // Cancel and refund (tools-refund.ts): after every everyday tool, so their cached prefix stays as it was.
+  ...REFUND_TOOLS,
+  // Places from Google (tools-places.ts): last, so the cached prefix of the tools above stays as it was. Sent only
+  // while places are on (activeTools).
+  ...PLACES_TOOLS,
 ];
+
+/**
+ * The tools this deployment offers: every tool, without the places tools while places are off (no key). Fixed for a
+ * deployment, so Claude's cached prefix holds; the places tools are last, so the rest of the prefix is the same.
+ */
+export const activeTools = (): Anthropic.Beta.BetaTool[] => (placesToolsOn() ? TOOLS : TOOLS.filter((t) => !PLACES_TOOL_NAMES.has(t.name)));
 
 /**
  * The tools a turn can need once the sentence is read (slots.ts), in the fixed order of TOOLS; null (send them all)
@@ -316,7 +331,7 @@ const BY_KIND: Partial<Record<AskKind, string[]>> = {
   visa: ["entry_rules", "get_household", "create_request", "talk_to_human", "remember"],
   umrah: ["search_stays", "get_hotel", "entry_rules", "create_request", "price_quote_for_pay", "talk_to_human", "remember"],
   car: ["plan_car_now", "create_request", "get_trips", "talk_to_human", "remember"],
-  food: ["create_request", "get_trips", "talk_to_human", "remember"],
+  food: ["create_request", "get_trips", "talk_to_human", "remember", "find_places", "place_details"],
   plan: ["create_request", "create_plan", "get_plan", "update_plan", "set_origin", "find_for_item", "open_in_app"],
 };
 /** An open or unknown kind: the everyday tools (a turn that needs another reads its kind, or used it before). */
@@ -331,15 +346,21 @@ export function toolsFor(kind: AskKind | null): string[] | null {
  * plus every tool used earlier in the thread. The pay sheet and hotel facts only once a search has run in the thread
  * (a booking or a hotel question follows a card, never comes before one). Always a list, in the fixed order of TOOLS.
  */
-const AFTER_SEARCH = ["price_quote_for_pay", "get_hotel"];
-export function leanToolsFor(kind: AskKind | null, usedBefore: Iterable<string> = []): string[] {
+const AFTER_SEARCH = ["price_quote_for_pay", "get_hotel", "place_details"];
+const REFUND_SET = ["get_trips", "talk_to_human", "refund_quote"];
+export function leanToolsFor(kind: AskKind | null, usedBefore: Iterable<string> = [], text = ""): string[] {
   const used = new Set(usedBefore);
-  const want = new Set([...(toolsFor(kind) ?? DEFAULT_TOOLS).filter((n) => !AFTER_SEARCH.includes(n) && !(kind === "flight" && n === "get_trip")), ...used]);
+  // A cancel or a refund ("cancel my Dubai hotel and refund me") needs the quote, not the search its words read as.
+  const refundy = REFUNDY.test(text);
+  const want = new Set([...(refundy ? REFUND_SET : toolsFor(kind) ?? DEFAULT_TOOLS).filter((n) => !AFTER_SEARCH.includes(n) && !(kind === "flight" && n === "get_trip")), ...used]);
   if (used.has("search_flights") || used.has("search_stays") || used.has("esim_plans")) want.add("price_quote_for_pay");
   if (used.has("search_stays")) want.add("get_hotel");
   // A chat with a plan keeps the plan's tools: a change, a new start, an item to find.
   if (used.has("create_plan") || used.has("get_plan")) for (const n of ["get_plan", "update_plan", "set_origin", "find_for_item"]) want.add(n);
-  return TOOLS.map((t) => t.name).filter((n) => want.has(n));
+  // Places only while they are on; place_details once find_places has run in the thread.
+  if (used.has("find_places")) want.add("place_details");
+  const on = placesToolsOn();
+  return TOOLS.map((t) => t.name).filter((n) => want.has(n) && (on || !PLACES_TOOL_NAMES.has(n)));
 }
 
 /**
@@ -358,7 +379,16 @@ export function kindFor(text: string, kind: AskKind | null, hasPlan = false): As
 const COMPACT_PLAN = `
 
 Plans: several days or places: create_plan (stops in order with nights; drive for a road trip), then one sentence and "Review it". Origin null unless said; start unknown: ask once, <next>Riyadh | Jeddah | Somewhere else</next>. New start: set_origin. Changes: update_plan on the version read, [ids] from the plan; booked items stay. One item: find_for_item. Car, driver, train, ferry, permit: create_request. Km and drive times only from the plan.`;
-export const compactPromptFor = (tools: readonly string[] | null) => (tools?.some((n) => PLAN_TOOL_NAMES.has(n)) ? `${COMPACT_SYSTEM_PROMPT}${COMPACT_PLAN}` : COMPACT_SYSTEM_PROMPT);
+/** The places rule likewise, only on a turn sent find_places. */
+const COMPACT_PLACES = `
+
+Places (near the hotel, open now): find_places, then place_details. Hours, open now and ratings only from them. Offer Directions and Add to my plan.`;
+/** The cancel and refund rule, only on a turn sent refund_quote. */
+const COMPACT_REFUND = `
+
+Cancel or refund: refund_quote, then what comes back and what's kept in a line or two; the card's slide cancels. Never say cancelled or refunded before that. Unsure: the rule in plain words. No push to the Wallet.`;
+export const compactPromptFor = (tools: readonly string[] | null) =>
+  `${COMPACT_SYSTEM_PROMPT}${tools?.some((n) => PLAN_TOOL_NAMES.has(n)) ? COMPACT_PLAN : ""}${tools?.includes("find_places") ? COMPACT_PLACES : ""}${tools?.includes("refund_quote") ? COMPACT_REFUND : ""}`;
 const PLAN_TOOL_NAMES = new Set(PLAN_TOOLS.map((t) => t.name));
 
 /*
@@ -385,6 +415,8 @@ const LEAN: Record<string, { d: string; p?: Record<string, string | null> }> = {
   shared_trip: { d: "Trips others organised for them: null → list; id → plan, item ids, role, no prices." },
   request_change: { d: "A companion asks for a change; the organiser approves it.", p: { summary: "One sentence, their language." } },
   decide_change: { d: "The organiser approves or declines a companion's change." },
+  ...PLACES_LEAN,
+  ...REFUND_LEAN,
 };
 const LEAN_IDS = "Household ids; unsaid: the account holder.";
 /** Fields whose enum the lean list leaves out (the keys are in the prompt and in search_flights; the server checks them). */

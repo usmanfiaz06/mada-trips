@@ -5,7 +5,7 @@ import { t, weekendLine, type AskChatEvent, type AskIntent, type AskKind, type C
 import { askChatModel, costMicros, noUsage, type Usage } from "./config";
 import { isCloser, lastBreak, outgoingProblems, saudiWords, tidy, trimCloser, unbacked } from "./guard";
 import { NEXT_CLOSE, NEXT_OPEN, parseNext, resolveNext } from "./next";
-import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, compactPromptFor, leanToolsFor } from "./prompt";
+import { LEAN_TOOLS, SYSTEM_PROMPT, TOOLS, activeTools, compactPromptFor, leanToolsFor } from "./prompt";
 import { leanHistory } from "./fold";
 import { runTool, statusFor, type ToolCtx, type ToolOut } from "./tools";
 import { schemaProblems, toolNameFor, withNulls } from "./schema";
@@ -215,7 +215,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
   // provider (a free tier, counted in tokens per minute) reads the compact prompt, the shorter tool words, only the
   // tools this turn can need and a lighter history (providers-openai.ts): about half the tokens of every call.
   const usedBefore = input.history.flatMap((m) => (typeof m.content === "string" ? [] : m.content.flatMap((b) => (b.type === "tool_use" ? [b.name] : []))));
-  const onlyTools = leanToolsFor(input.intent ?? null, usedBefore);
+  const onlyTools = leanToolsFor(input.intent ?? null, usedBefore, input.text);
   const leanBefore = leanHistory(input.history);
 
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -228,7 +228,7 @@ export async function runTurn(input: TurnInput, emit: (e: AskChatEvent) => void,
       output_config: { effort: "low" },
       cache_control: { type: "ephemeral" },
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
-      tools: TOOLS,
+      tools: activeTools(),
       only_tools: onlyTools,
       lean: { system: compactPromptFor(onlyTools), tools: LEAN_TOOLS, messages: [...leanBefore, ...added] },
       tool_choice: { type: "auto" },

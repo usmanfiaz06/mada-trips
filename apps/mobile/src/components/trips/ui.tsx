@@ -157,8 +157,10 @@ export function ListRow({ icon, title, sub, right, onPress, tone, first, testID 
 }
 
 /** A selectable card with a tick or a radio (.tm-pick). */
-export function PickCard({ on, onPress, title, sub, right, disabled, note, radio, inSheet, testID }: {
-  on: boolean; onPress: () => void; title: string; sub?: string | null; right?: string | null; disabled?: boolean; note?: ReactNode; radio?: boolean; inSheet?: boolean; testID?: string;
+export function PickCard({ on, onPress, title, sub, right, disabled, note, radio, inSheet, badge, testID }: {
+  on: boolean; onPress: () => void; title: string; sub?: string | null; right?: string | null; disabled?: boolean; note?: ReactNode; radio?: boolean; inSheet?: boolean;
+  /** A small tag beside the title ("Recommended"). */
+  badge?: string | null; testID?: string;
 }) {
   return (
     <Pressable testID={testID} accessibilityRole={radio ? 'radio' : 'checkbox'} accessibilityState={{ checked: on, disabled: !!disabled }} accessibilityLabel={title} disabled={disabled}
@@ -167,7 +169,7 @@ export function PickCard({ on, onPress, title, sub, right, disabled, note, radio
       <Spread align="flex-start">
         <Row align="flex-start" gap={12} style={{ flex: 1 }}>
           <View style={[styles.tick, radio ? { borderRadius: 99 } : null, on ? styles.tickOn : null]}>{on ? <Icon name="check" size={14} color={colors.mist} width={2.6} /> : null}</View>
-          <Grow><H3 size={15}>{title}</H3>{sub ? <Tiny>{sub}</Tiny> : null}</Grow>
+          <Grow>{badge ? <Row gap={8} style={{ flexWrap: 'wrap' }}><H3 size={15}>{title}</H3><Tag tone="ok" label={badge} /></Row> : <H3 size={15}>{title}</H3>}{sub ? <Tiny>{sub}</Tiny> : null}</Grow>
         </Row>
         {right ? <Num size={15}>{right}</Num> : null}
       </Spread>

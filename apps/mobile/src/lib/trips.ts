@@ -124,7 +124,7 @@ export const tripsApi = {
   requests: (id: string) => get(TRIP_ROUTES.asks(id), RequestsResponse),
   ask: (id: string, body: CreateTripAskRequest) => send('POST', TRIP_ROUTES.asks(id), body, TripAskResponse),
   disruption: (id: string, kind?: DisruptionKind) => get(TRIP_ROUTES.disruption(id, kind), DisruptionResponse),
-  choose: (id: string, body: { kind: DisruptionKind; optionId: string; clientKey: string }) => send('POST', TRIP_ROUTES.disruption(id), body, DisruptionChoiceResponse),
+  choose: (id: string, body: { kind: DisruptionKind; optionId: string; clientKey: string; destination?: 'original' | 'credit' }) => send('POST', TRIP_ROUTES.disruption(id), body, DisruptionChoiceResponse),
   demo: () => send('POST', TRIP_ROUTES.demo, {}, z.object({ tripId: z.string() })),
   refunds: () => get('/refunds', RefundsResponse),
   refundOne: (id: string) => get(TRIP_ROUTES.refund(id), RefundResponse),
@@ -237,7 +237,7 @@ registerOutboxKind(OUTBOX_DISRUPTION, { invalidate: () => [tk.all] });
 registerOutboxKind(OUTBOX_ASK, { invalidate: () => [tk.all] });
 
 /** A disruption choice made offline. The latest choice for a trip replaces an earlier one still waiting. */
-export function queueDisruption(tripId: string, body: { kind: DisruptionKind; optionId: string; clientKey: string }, label: string) {
+export function queueDisruption(tripId: string, body: { kind: DisruptionKind; optionId: string; clientKey: string; destination?: 'original' | 'credit' }, label: string) {
   return enqueue({ kind: OUTBOX_DISRUPTION, label, method: 'POST', path: withPhase(TRIP_ROUTES.disruption(tripId)), body, dedupe: `disruption:${tripId}`, meta: { tripId, optionId: body.optionId } });
 }
 /** A request to Mada made offline (special requests, hotel options). */

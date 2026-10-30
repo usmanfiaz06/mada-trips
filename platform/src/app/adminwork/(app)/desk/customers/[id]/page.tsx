@@ -51,7 +51,7 @@ export default async function CustomerPage({ params, searchParams }: { params: P
       <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label={t("Lifetime value")} value={<Money v={stats.lifetime} muted compact />} sub={t("Paid, less refunds")} />
         <Stat label={t("Bookings")} value={<span className="num">{stats.bookings}</span>} href={`${base}?tab=bookings`} />
-        <Stat label={t("Mada credit")} value={<Money v={stats.credit} muted />} href={`${base}?tab=credit`} tone={stats.credit > 0 ? "ok" : undefined} />
+        <Stat label={t("Mada Wallet")} value={<Money v={stats.credit} muted />} href={`${base}?tab=credit`} tone={stats.credit > 0 ? "ok" : undefined} />
         <Stat label={t("Open items")} value={<span className="num">{stats.open}</span>} tone={stats.open ? "gold" : undefined} sub={stats.open ? t("Oldest {ago}", { ago: timeAgo(c.open[0]!.at, L) }) : t("Nothing waiting on us")} />
       </div>
 
@@ -89,9 +89,9 @@ export default async function CustomerPage({ params, searchParams }: { params: P
           {can(u, "desk.act") && !flags.deleted && (
             <Card>
               <CardHead title={<span className="inline-flex items-center gap-2"><Gift className="size-4 text-gold" />{t("Goodwill credit")}</span>}
-                hint={lead ? t("Goes on their Mada credit at once. The traveller sees the reason.") : alone
+                hint={lead ? t("Goes in their Mada Wallet at once. The traveller sees the reason.") : alone
                   ? t("Up to {limit} at once, {daily} a day. More goes to a support lead in Approvals.", { limit: `SAR ${sar(s.deskGoodwillLimit)}`, daily: `SAR ${sar(s.deskAgentDailyLimit)}` })
-                  : t("A support lead approves it in Approvals, then it lands on their Mada credit.")} />
+                  : t("A support lead approves it in Approvals, then it lands in their Mada Wallet.")} />
               <ActionForm action={goodwillAction} className="space-y-2" resetOnOk>
                 <input type="hidden" name="userId" value={id} />
                 <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} required dir="ltr" className="num" aria-label={t("Amount (SAR)")} />

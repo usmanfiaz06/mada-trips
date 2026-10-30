@@ -60,7 +60,7 @@ Groq (free backup), Neon database through the pooler (`dbPooled: true`).
 | 29 | Tabby and Tamara | pay later in 4 (backend) | Ready (mock until keys); app pay sheet to do | Owner + code |
 | 30 | Duffel | second flight source next to TBO (NDC airlines, low-cost) | Ready (mock until key) | Owner |
 | 31 | RateHawk (ETG / WorldOTA) | second hotel source next to Hotelbeds, cheapest per hotel | Ready (mock until keys) | Owner |
-| 32 | Google Places API (New) | Places in Ask: hours, ratings, photos with credit | Ready to build on key | Owner |
+| 32 | Google Places API (New) | Places in Ask: hours, ratings, photos with credit | Built; live when the key is set | Owner (key) |
 | 33 | Tavily (web search) | Current information in Ask | Ready to build on key | Owner |
 | 34 | Amazon Bedrock (Claude) | Ask's model, billed to AWS credits | Connected (Haiku 4.5) | Owner (newer models) |
 
@@ -486,6 +486,33 @@ residents may only be sold to Saudi residents (residency must match the guest).
 3. Vercel → mada-staging → `GOOGLE_PLACES_API_KEY` (Sensitive). Google bills per call above a free monthly allowance
    per call type; set a budget alert in Billing.
 Photos from Places may be shown only with their credit line; hotel photos stay the supplier's (licensed for selling).
+
+**Switch.** `SUPPLIER_MODE_PLACES` = `google` (or `live`) | `mock` | `off`. Unset: on with the key, off without it. The
+global `SUPPLIER_MODE=mock` never turns it on (sample restaurants must not answer a traveller on a copy with no key);
+`mock` is for tests and demos only (refused on production unless `APP_ALLOW_MOCKS=yes`). Off: Ask isn't given
+`find_places` / `place_details` and suggests famous places from what it knows, never hours or ratings.
+
+**What we call** (`platform/src/lib/app/suppliers/places/google.ts`; key in the `X-Goog-Api-Key` header only, never in a
+URL, a log or an app payload; 5 s timeout; `places` breaker):
+
+| Call | Field mask | SKU (tier set by the mask) | List price, approx. |
+|---|---|---|---|
+| Text Search `POST /v1/places:searchText` (≤ 5 results, `languageCode` en/ar, `locationBias` circle around the hotel, `openNow` when asked) | `places.id, displayName, formattedAddress, location, rating, userRatingCount, priceLevel, primaryTypeDisplayName, regularOpeningHours.periods, regularOpeningHours.weekdayDescriptions, utcOffsetMinutes, photos` | Text Search **Enterprise** (rating and hours are Enterprise fields; no reviews or "serves…" fields, so not Atmosphere) | ~USD 35 / 1,000 calls (≈ 0.035 a search), 1,000 free a month |
+| Place Details `GET /v1/places/{id}` | the same fields + `internationalPhoneNumber, websiteUri, googleMapsUri` | Place Details **Enterprise** | ~USD 20 / 1,000 (≈ 0.02 a place), 1,000 free a month |
+| Place Photo `GET /v1/{photo}/media?maxWidthPx=640&skipHttpRedirect=true` | — | Place Details Photos | ~USD 7 / 1,000 (≈ 0.007 a photo), 1,000 free a month |
+| Hotel's point when our hotel content has none: Text Search for "{hotel}, {city}", 1 result | as Text Search | Text Search Enterprise | as above (cached an hour) |
+
+Prices are Google's global list as of Oct 2026, before volume discounts; the owner confirms them on the pricing page
+for the billing account. A typical "shawarma near our hotel" turn is one search (≈ USD 0.035) plus up to five photos
+the first time they're seen (≈ USD 0.035); details only when the traveller opens one.
+
+**Cost cutting.** Cached on each server instance: a search for 1 hour, a place's details for 24 hours (by language), a
+photo's bytes 6 hours in memory and a day in browsers and the CDN. `currentOpeningHours.openNow` is not asked for: open
+now and today's hours are worked out from the weekly hours and the place's UTC offset each time a card is made
+(`suppliers/places/hours.ts`), so a cached answer never says "open" when it isn't. Google's terms: place ids may be
+kept (plan items keep `place.gid`); coordinates on a plan item came with the traveller's tap.
+
+**Attribution.** Every places card shows "Google Maps" and the photo's author ("Photo: Ayşe K."), as Google requires.
 
 ### 33. Tavily — web search in Ask
 1. tavily.com → sign up with the company email → API keys → create a key.

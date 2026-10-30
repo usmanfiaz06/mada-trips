@@ -84,7 +84,7 @@ export async function changeFlight(ownerId: string, trip: TripDetail, input: Cha
     const kid = who?.birthYear && who.birthYear > new Date(trip.clock.now).getUTCFullYear() - 12;
     const total = R.changeFee * count + opt.diffPerPerson * count + (kid ? ESCORT : 0);
     const say = input.kind === "one" ? `${who!.firstName} flies home ${opt.say}` : opt.say;
-    const details = { ...base, askKind: input.kind, change: { kind: input.kind, optionId: input.optionId, travellerId: who?.id ?? null }, short: "Flight changed", detail: total < 0 ? `${formatSar(-total)} back as Mada credit` : total > 0 ? formatSar(total) : "No cost", scriptedOutcome: "yes" as const };
+    const details = { ...base, askKind: input.kind, change: { kind: input.kind, optionId: input.optionId, travellerId: who?.id ?? null }, short: "Flight changed", detail: total < 0 ? `${formatSar(-total)} back to your Mada Wallet` : total > 0 ? formatSar(total) : "No cost", scriptedOutcome: "yes" as const };
     if (total > 0) {
       const r = await insertRequest(tx, { ownerId, tripId: trip.id, kind: "change", summary: say, ipHash, agentName: trip.agent.name, details: { ...details, quote: total, quoteText: `${say}. Change fee and price difference: ${formatSar(total)}. Pay and we change it with ${out.carrierName}.` }, status: "awaiting_payment" });
       return { result: "quoted", say, total, request: toRequestView(r) } as unknown as Record<string, unknown>;

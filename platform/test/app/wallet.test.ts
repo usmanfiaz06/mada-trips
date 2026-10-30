@@ -20,7 +20,6 @@ import { GET as cardsGet, POST as cardsPost } from "@/app/api/app/v1/cards/route
 import { DELETE as cardDelete } from "@/app/api/app/v1/cards/[id]/route";
 import { PUT as cardsDefault } from "@/app/api/app/v1/cards/default/route";
 import { GET as creditGet } from "@/app/api/app/v1/credit/route";
-import { POST as creditMove } from "@/app/api/app/v1/credit/move/route";
 import { call } from "./helpers";
 import { EXE, JPEG, PDF, callP, form, signIn } from "./wallet-helpers";
 
@@ -201,18 +200,15 @@ describe("Mada credit", () => {
     expect((await call(creditGet, { method: "GET" })).status).toBe(401);
   });
 
-  it("moves the balance to a saved card", async () => {
-    const { token, user } = await signIn();
-    await db.transaction((tx) => addCredit(tx, { userId: user.id, amount: 64_000, kind: "refund" }));
-    const cards = CardsResponse.parse((await call(cardsPost, { token, body: { token: "tok_mock_visa", brand: "visa", last4: "4141", exp: "08/30" } })).json);
-    const r = await call(creditMove, { token, body: { cardId: cards.cards[0]!.id } });
-    expect(r.status, JSON.stringify(r.json)).toBe(200);
-    expect(r.json).toMatchObject({ moved: 64_000, to: "Visa ending 41" });
-    expect(r.json.credit.balance.amount).toBe(0);
-    expect(r.json.credit.entries[0].note).toBe("Moved to Visa ending 41");
-    expect((await call(creditMove, { token, body: { cardId: cards.cards[0]!.id } })).status).toBe(400);
-    const other = await signIn();
-    expect((await call(creditMove, { token: other.token, body: { cardId: cards.cards[0]!.id } })).status).toBe(404);
+  it("keeps the Mada Wallet for bookings: no route or helper moves it to a card", async () => {
+    // Owner decision (APP-FINANCE.md "Mada Wallet"): a traveller who wants cash picks the card at refund time.
+    const { existsSync, readdirSync } = await import("node:fs");
+    expect(existsSync("src/app/api/app/v1/credit/move")).toBe(false);
+    expect(readdirSync("src/app/api/app/v1/credit").filter((f) => f !== "route.ts")).toEqual([]);
+    const credit = await import("@/lib/app/credit");
+    expect(Object.keys(credit).filter((k) => /move|cash|payout|card/i.test(k))).toEqual([]);
+    const { WALLET_ROUTES } = await import("@mada/shared");
+    expect(Object.values(WALLET_ROUTES as Record<string, string>).filter((p) => /credit\/(move|cash|payout)/.test(p))).toEqual([]);
   });
 });
 

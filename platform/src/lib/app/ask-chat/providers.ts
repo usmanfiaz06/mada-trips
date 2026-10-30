@@ -425,7 +425,8 @@ export async function probeChain(): Promise<{ name: string; model: string; ok: b
  * real system prompt and tools, reporting how it ended, which blocks came back and the start of any text.
  */
 export async function probeTurn(): Promise<{ name: string; model: string; ok: boolean; ms: number; stop: string | null; blocks: string[]; text: string; error: string | null }[]> {
-  const { SYSTEM_PROMPT, TOOLS } = await import("./prompt");
+  const { SYSTEM_PROMPT, activeTools } = await import("./prompt");
+  const TOOLS = activeTools();
   const chain = providerChain() ?? [];
   return Promise.all(chain.map(async (l) => {
     const t0 = Date.now();

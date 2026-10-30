@@ -318,6 +318,9 @@ export const appRefunds = pgTable("app_refunds", {
   sentAt: timestamp("sent_at", { withTimezone: true }),
   settledAt: timestamp("settled_at", { withTimezone: true }),
   opsPaymentId: uuid("ops_payment_id").references(() => opsPayments.id, { onDelete: "set null" }),
+  // drizzle/0049_refund_wallet.sql: the bank's reference (ARN) once sent, and the rule that approved it without a person.
+  bankReference: text("bank_reference"),
+  autoRule: text("auto_rule"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (t) => [index("app_refunds_payment_idx").on(t.paymentId), index("app_refunds_stage_idx").on(t.stage, t.updatedAt)]);

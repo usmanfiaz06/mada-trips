@@ -2,6 +2,7 @@ import { DisruptionChoiceRequest } from "@mada/shared";
 import { requestContext } from "@/lib/app/context";
 import { AppError, body, json } from "@/lib/app/http";
 import { chooseDisruption, disruptionFor, disruptionKind } from "@/lib/app/trips/disruption";
+import { autoApproveMax } from "@/lib/app/finance/auto-approve";
 import { tripDetail } from "@/lib/app/trips/core";
 import { loadTrip, withParams } from "@/lib/app/trips/route";
 
@@ -14,13 +15,13 @@ export const GET = withParams<{ id: string }>(async (req, { id }, { userId }) =>
   const trip = await loadTrip(req, userId, id);
   const kind = disruptionKind(trip, new URL(req.url).searchParams.get("kind"));
   if (!kind) throw new AppError("NOT_FOUND", { message: "Nothing has gone wrong with this flight." });
-  return json(disruptionFor(trip, kind));
+  return json({ ...disruptionFor(trip, kind), autoMax: { amount: await autoApproveMax(), currency: "SAR" as const } });
 });
 
 export const POST = withParams<{ id: string }>(async (req, { id }, { userId }) => {
   const input = await body(req, DisruptionChoiceRequest);
   const trip = await loadTrip(req, userId, id);
-  const r = await chooseDisruption(userId, trip, input.kind, input.optionId, input.clientKey, requestContext(req).ipHash);
+  const r = await chooseDisruption(userId, trip, input.kind, input.optionId, input.clientKey, requestContext(req).ipHash, input.destination ?? "original");
   const after = r.kind === "refund" ? null : await tripDetail(userId, id, null);
   return json({ ...r, trip: after });
 });

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import {
   labelLast2,
   API_PREFIX, AccountResponse, CardsResponse, CodeSentResponse, ConsentsResponse, CreditResponse, DeletionResponse, DevicesResponse, FX_FALLBACK, FxResponse, type FxRates,
-  DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, MoveCreditResponse, PeopleResponse,
+  DocumentGrantResponse, DocumentResponse, DocumentsResponse, ExportResponse, MeResponse, PeopleResponse,
   PersonDetailResponse, PresenceResponse, SendSupportMessageResponse, SupportThreadResponse, SupportUnreadResponse, walletPath, type TripDetail, type Notification,
   type AddCardRequest, type CreateDocumentMeta, type CreatePersonRequest, type SavePassportRequest, type SendSupportMessageRequest,
   type UpdateAccountRequest, type UpdatePersonRequest,
@@ -102,7 +102,6 @@ export const walletApi = {
   removeCard: (id: string, newDefault?: string) => request({ method: 'DELETE', path: `${P('card', { id })}${newDefault ? `?newDefault=${newDefault}` : ''}` }, CardsResponse),
   setDefaultCard: (id: string) => request({ method: 'PUT', path: P('cardsDefault'), body: { id } }, CardsResponse),
   credit: () => request({ method: 'GET', path: P('credit') }, CreditResponse),
-  moveCredit: (cardId: string) => request({ method: 'POST', path: P('creditMove'), body: { cardId } }, MoveCreditResponse),
   openThread: (opts: { tripId?: string; about?: string } = {}) => request({ method: 'POST', path: P('supportThreads'), body: opts }, SupportThreadResponse),
   thread: (id: string) => request({ method: 'GET', path: P('supportThread', { id }) }, SupportThreadResponse),
   // The demo phase rides along, so urgent help on a demo travel day opens the trip's disruption card.

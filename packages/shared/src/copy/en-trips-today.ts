@@ -497,7 +497,7 @@ export const enTripsToday = {
   'td.home.refund': 'Refund on its way · {amount}',
   'td.home.refundAsked': 'Requested from {airline}',
   'td.home.refundApproved': 'Approved. Sent to {card} next.',
-  'td.home.credit': '{amount} Mada credit',
+  'td.home.credit': '{amount} in Mada Wallet',
   'td.home.creditSub': 'Unused. It comes off your next booking by itself.',
   'td.home.receipts': 'Receipts in Trips',
   'td.home.planNext': 'Plan the next one',
