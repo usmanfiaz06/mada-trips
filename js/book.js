@@ -256,7 +256,7 @@
     } else if (!d.flightsOnly) items.push({ k: "stay", icon: "stays", title: lang === "ar" ? "الفندق" : "Hotel", sub: REQ_MODE() ? t("teamFinds").stay : t(lv.err.stays ? "liveStaysDown" : "liveStaysNone"), price: null, info: true, team: true });
     if (d.items.car) items.push({ k: "car", icon: "car", title: t("carTeam"), sub: t("carTeamSub"), price: null, info: true, team: true });
     if (cc !== "SA") {
-      if (esim) items.push({ k: "esim", icon: "esim", title: t("esimLive")(esim.coverage.name, esim.gb, esim.days), sub: `${esim.operator || ""}${esim.operator ? " · " : ""}${t("esimSub")}`, price: sar(esim.price) * people });
+      if (esim) items.push({ k: "esim", icon: "esim", title: t("esimLive")(lang === "ar" ? country(cc) : esim.coverage.name, esim.gb, esim.days), sub: `${esim.operator || ""}${esim.operator ? " · " : ""}${t("esimSub")}`, price: sar(esim.price) * people });
       else items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: !A.signedIn ? t("liveEsimSignin") : REQ_MODE() ? t("teamFinds").esim : t("liveEsimNone"), price: null, info: true, team: A.signedIn });
       items.push({ k: "visa", icon: "visa", title: t("visa"), sub: D.GCC.has(cc) ? t("visaNo") : t("visaYes"), price: null, info: true });
     }
@@ -1945,7 +1945,8 @@
     if (!co.lt || !co.lt.length || co.lt.some((x) => !x.personId)) return location.replace("#/travelers");
     if (d.sentReq) return location.replace(`#/req/${d.sentReq}`);
     const pl = buildPlan(d), on = pl.items.filter((i) => i.on && !i.info);
-    const phone = co.contact && co.contact.phone ? `+966 ${co.contact.phone}` : "";
+    // Kept left to right inside Arabic, and spaced the way people read it: +966 5X XXX XXXX.
+    const phone = co.contact && co.contact.phone ? `\u2066+966 ${String(co.contact.phone).replace(/^(\d{2})(\d{3})(\d{4})$/, "$1 $2 $3")}\u2069` : "";
     const ways = ["whatsapp", "call", "in_app"];
     co.reach = co.reach || "whatsapp";
     const dd = D.DEST[d.to];
