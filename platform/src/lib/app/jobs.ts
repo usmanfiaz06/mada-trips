@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, inArray, isNotNull, lte, ne } from "drizzle-orm";
 import { t } from "@mada/shared";
+import { isProductionDeploy } from "./config";
 import { db } from "@/db";
 import { appMessages, appQuotes, appRequests, appUsers } from "@/db/app-schema";
 import { appAccounts, appDataExports } from "@/db/app-schema-wallet";
@@ -168,6 +169,17 @@ export async function runJobs(names: readonly JobName[]): Promise<Record<string,
     }
   }
   return out;
+}
+
+/**
+ * APP_CRONS=quiet (staging, a free database): the every-few-minutes jobs run only in the first 10 minutes of the
+ * hour, so the database sleeps the rest of it instead of being woken every 5 minutes all month. Hourly and daily
+ * jobs run as scheduled. Never on production.
+ */
+const FREQUENT: readonly JobName[] = ["exports", "quotes", "flights", "live", "esim", "desk", "finance"];
+export function quietSkip(names: readonly JobName[], now = new Date()): boolean {
+  if (process.env.APP_CRONS?.toLowerCase() !== "quiet" || isProductionDeploy()) return false;
+  return now.getUTCMinutes() >= 10 && names.every((n) => FREQUENT.includes(n));
 }
 
 /** Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. Without a secret set, only outside production. */
