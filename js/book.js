@@ -465,7 +465,7 @@
         <button type="button" data-pop="who">${ico("ppl")}<span>${esc(paxText(d.pax))}</span></button>
         <button type="button" data-pop="from">${ico("pin")}<span>${esc(city(d.from))}</span></button>
       </div>
-      ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t("demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
+      ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t(REQ_MODE() ? "estFare" : "demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
       <div class="plan__foot"><div class="plan__total"><small>${esc(t("totalFor")(paxText(d.pax)))}</small><b>${esc(money(plan.total))}</b></div>
         ${d.sentReq ? `<div class="plan__sent">${ico("check")}<span><b>${esc(RQ().planSent)}</b><small>${esc(RQ().planSentSub)}</small></span></div><div class="plan__go"><a class="btn btn--main" href="#/req/${d.sentReq}">${esc(RQ().planSentGo)}</a></div>` : `<div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div>`}<div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
     </div>`;
@@ -1137,7 +1137,7 @@
     const leg = (l) => `<div class="fl__times"><b>${esc(l.dep)}</b><div class="fl__line">${esc(hrs(l.durationMin))}<i></i>${esc(l.from)} → ${esc(l.to)}</div><b>${esc(l.arr)}</b></div>`;
     const first = back ? w.out.options.find((o) => o.id === w.outId) : null;
     const cards = list.length ? list.map((o) => { const on = o.id === chosenId; return `<article class="lfo${on ? " on" : ""}">
-        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t(REQ_MODE() ? "estFare" : "demoFare"))}</span>` : ""}</div>
         <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
         <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div></div>
         <ul class="lfo__rules"><li><small>${esc(t("uxStops"))}</small>${esc(o.stop || t("direct"))}</li><li><small>${esc(t("uxBags"))}</small>${esc(o.bags)}</li><li><small>${esc(t("uxChange"))}</small>${esc(o.changeRule)}</li><li class="${o.refundable ? "" : "warn"}"><small>${esc(t("uxRefund"))}</small>${esc(o.refundRule)}</li></ul>
@@ -1177,7 +1177,7 @@
     let body;
     if (!pickBack) {
       body = outs.map((g) => { const o = g.fares[0], lab = g.fares.find((x) => x.label === "best") || o, on = cur && legKey(cur.out) === g.k; return `<article class="lfo${on ? " on" : ""}">
-        <div class="lfo__top"><span class="pick__k">${esc(LABEL(lab.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(lab.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t(REQ_MODE() ? "estFare" : "demoFare"))}</span>` : ""}</div>
         <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.out.flightNumber)}</b>
         <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.out.date))}</small>${leg(o.out)}</div></div>
         <p class="lfo__why">${esc(o.reason)}</p>
@@ -1188,7 +1188,7 @@
       const g = outs.find((x) => x.k === d.live.lfOut) || outs[0], low = g.fares[0].total.amount, o0 = g.fares[0];
       body = `<div class="lfo-chosen">${ico("check")}<div><small>${esc(F.goingOn(day(o0.out.date)))}</small><b>${esc(o0.airline)} · ${esc(o0.out.flightNumber)} · ${esc(o0.out.dep)} → ${esc(o0.out.arr)}</b></div><a class="link" href="#/flights/out">${esc(F.changeOut)}</a></div>`
         + g.fares.map((o) => { const on = cur && cur.id === o.id, extra = o.total.amount - low; return `<article class="lfo${on ? " on" : ""}">
-        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t("demoFare"))}</span>` : ""}</div>
+        <div class="lfo__top"><span class="pick__k">${esc(LABEL(o.label))}</span>${o.demo ? `<span class="demo-tag">${esc(t(REQ_MODE() ? "estFare" : "demoFare"))}</span>` : ""}</div>
         <b class="lfo__al" style="--brand:${esc(o.brand)}"><i></i>${esc(o.airline)} · ${esc(o.back.flightNumber)}</b>
         <div class="lfo__legs lfo__legs--one"><div><small>${esc(day(o.back.date))}</small>${leg(o.back)}</div></div>
         ${rules(o)}
