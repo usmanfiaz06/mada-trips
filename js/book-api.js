@@ -154,6 +154,14 @@
     esimPlans: (countries, days) => call("GET", `/esim/plans?countries=${encodeURIComponent(countries)}&days=${days}`),
 
     // ----- booking (signed in) -----
+    // Requests: the team books by hand and comes back (GET/POST /requests, the thread, a nudge, taking one back).
+    requests: () => call("GET", "/requests"),
+    request: (id) => call("GET", `/requests/${id}`),
+    createRequest: (b) => call("POST", "/requests", b, { timeout: 30000 }),
+    reqMessages: (id) => call("GET", `/requests/${id}/messages`),
+    reqSay: (id, text) => call("POST", `/requests/${id}/messages`, { text, clientId: uuid() }),
+    nudge: (id) => call("POST", `/requests/${id}/nudge`, {}),
+    withdraw: (id) => call("POST", `/requests/${id}/withdraw`, {}),
     preview: (b) => call("POST", "/orders/preview", b, { timeout: 30000 }),
     createOrder: (b) => call("POST", "/orders", b, { timeout: 40000, idem: b.idempotencyKey }),
     order: (id) => call("GET", `/orders/${id}`),

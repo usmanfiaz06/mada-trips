@@ -415,6 +415,9 @@
       if (so && lv && lv.stays) { if (!lv.stays.options.some((o) => o.id === so.id)) lv.stays.options.unshift(so); lv.stayId = so.id; lv.stayPick = null; }
       if (buildPlan(d).items.some((i) => !i.info)) m.extra = "plan";
     }
+    // Mada sent something to the team herself (a car, a visa, a city we don't sell): the card opens that request.
+    const rc = cards.find((c) => c.type === "request");
+    if (rc) m.req = { id: rc.requestId, title: rc.title };
     m.next = next && next.length ? next : null;
     if (person !== null) m.extra = helpLine(helpContext());
     else if (m.extra !== "plan" && m.next) m.extra = chips(m.next.map((c) => ({ a: "say", v: c, l: c })));
@@ -434,6 +437,7 @@
         const pl = buildPlan(draft);
         extra = `<div class="say__mini"><span>${esc(t("totalFor")(paxText(draft.pax)))} · <b>${esc(money(pl.total))}</b></span><button type="button" class="link" data-a="tab" data-v="plan">${esc(t("viewPlan"))} →</button></div>${m.book ? `<a class="btn btn--main say__book" href="#/travelers">${esc(t("cont"))}</a>` : ""}` + (m.next ? chips(m.next.map((c) => ({ a: "say", v: c, l: c }))) : followChips());
       } else if (last) extra = m.extra;
+      if (m.req) extra = `<a class="reqcard" href="#/req/${esc(m.req.id)}">${ico("check")}<span><b>${esc(m.req.title)}</b><small>${esc(RQ().sentH)}</small></span><em>${esc(RQ().open)} →</em></a>` + extra;
       html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><p class="say__text">${m.html}</p>${extra}</div></div>`;
     });
     if (working || busy) html += `<div class="say"><span class="say__mark">${SUN}</span><div class="say__body"><span class="say__work">${esc(workText || t("working"))} <i></i><i></i><i></i></span></div></div>`;
@@ -461,7 +465,7 @@
       </div>
       ${plan.items.map((it) => `<div class="item${it.info ? " info" : it.on ? "" : " off"}" data-k="${it.k}">${ico(it.icon)}<div class="item__t"><b>${esc(it.title)}</b><span>${esc(it.sub)}</span>${it.go && it.on ? `<a class="item__chg" href="${it.go}">${esc(t("change"))}</a>` : ""}</div><span class="item__p">${it.info ? (it.k === "visa" ? esc(t("visaChk")) : "") : esc(money(it.price))}${it.demo ? `<small class="demo-tag">${esc(t("demoFare"))}</small>` : ""}</span><button type="button" class="tog" data-tog="${it.k}" ${it.info ? "disabled" : ""} aria-pressed="${!!it.on}" aria-label="${esc(it.title)}"></button></div>`).join("")}
       <div class="plan__foot"><div class="plan__total"><small>${esc(t("totalFor")(paxText(d.pax)))}</small><b>${esc(money(plan.total))}</b></div>
-        <div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div><div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
+        ${d.sentReq ? `<div class="plan__sent">${ico("check")}<span><b>${esc(RQ().planSent)}</b><small>${esc(RQ().planSentSub)}</small></span></div><div class="plan__go"><a class="btn btn--main" href="#/req/${d.sentReq}">${esc(RQ().planSentGo)}</a></div>` : `<div class="plan__go"><button type="button" class="btn btn--plain" data-a="share">${esc(t("share"))}</button><a class="btn btn--main" href="#/travelers">${esc(t("cont"))}</a></div>`}<div class="plan__trust">${acceptRow("accept--sm")}<span>${esc(t("hlp").planTrust)}</span></div></div>
     </div>`;
   }
   function renderPlanPane(flash) {
@@ -500,7 +504,9 @@
       if (r.name === "stay") return needPlan() && (draft.live ? viewStayLive() : location.replace("#/plan"));
       if (r.name === "hotel") return needPlan() && (draft.live ? viewHotelLive(decodeURIComponent(r.a || "")) : location.replace("#/plan"));
       if (r.name === "travelers") return needPlan() && viewTravelersLive();
-      if (r.name === "pay") return needPlan() && viewPayLive();
+      if (r.name === "pay") return needPlan() && (REQ_MODE() ? location.replace("#/send") : viewPayLive());
+      if (r.name === "send") return needPlan() && viewSend();
+      if (r.name === "req") return viewRequest(r.a);
       if (r.name === "wait") return viewWait(r.a);
       if (r.name === "t") return viewTripLive(r.a);
       if (r.name === "trips") return viewTripsLive();
@@ -527,7 +533,7 @@
   }
   function page(html) { show("page"); $("#page").innerHTML = html; scrollTo(0, 0); }
   const backLink = (href, label = t("back")) => `<a class="link pg__back" href="${href}">${ico("back")}${esc(label)}</a>`;
-  const steps = (n) => `<div class="steps">${t("steps").map((s, i) => `<span class="${i === n ? "on" : i < n ? "ok" : ""}"><i>${i < n ? "✓" : i + 1}</i>${esc(s)}</span>`).join("")}</div>`;
+  const steps = (n) => `<div class="steps">${(LIVE && REQ_MODE() ? RQ().steps3 : t("steps")).map((s, i) => `<span class="${i === n ? "on" : i < n ? "ok" : ""}"><i>${i < n ? "✓" : i + 1}</i>${esc(s)}</span>`).join("")}</div>`;
 
   function renderHeader() {
     document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
@@ -1649,7 +1655,7 @@
           <label class="fld" id="fPhone"><span>${esc(t("phone"))}</span><div class="phone"><b>+966</b><input name="phone" inputmode="tel" value="${esc(co.contact.phone)}" placeholder="5X XXX XXXX" /></div><em>${esc(t("errPhone"))}</em></label>
           <label class="fld" id="fEmail"><span>${esc(t("email"))}</span><input name="email" type="email" value="${esc(co.contact.email)}" /><em>${esc(t("errEmail"))}</em></label></div></div>
         <p class="note-s err-line" id="trvErr" hidden></p>
-        <button type="submit" class="primary">${esc(t("toPay"))}</button>
+        <button type="submit" class="primary">${esc(REQ_MODE() ? RQ().toSend : t("toPay"))}</button>
       </form><aside class="pg__side">${sumCard(d)}${helpLine(helpContextFor("travelers", d))}</aside></div></div>`);
     const form = $("#trvForm");
     const tag = (i) => { const x = co.lt[i]; $(`[data-tag="${i}"]`).textContent = x.last || x.first ? t("uxOnTicket")(`${(x.first || "").toUpperCase()} ${(x.last || "").toUpperCase()}`.trim()) : ""; };
@@ -1726,11 +1732,197 @@
           }
           if (passport) { pp.have = { numberMasked: pp.number.slice(0, 3) + "•••" + pp.number.slice(-2), nationality: pp.nat, expiry: pp.expiry }; pp.replace = false; pp.number = ""; }
         }
-        save(); location.hash = "#/pay";
-      } catch (err) { btn.disabled = false; btn.textContent = t("toPay"); const el = $("#trvErr"); el.hidden = false; el.textContent = err.message; }
+        save(); location.hash = REQ_MODE() ? "#/send" : "#/pay";
+      } catch (err) { btn.disabled = false; btn.textContent = REQ_MODE() ? RQ().toSend : t("toPay"); const el = $("#trvErr"); el.hidden = false; el.textContent = err.message; }
     });
   }
 
+
+  // ----- requests: until payments are on, a booking goes to the team as a request; a person books it and comes back -----
+  // Payments on the web are behind GET /config features.webPay; until then every booking is a request (the desk's list).
+  const REQ_MODE = () => !(A.config && A.config.features && A.config.features.webPay);
+  const RQ = () => t("rq");
+  const clock = (iso) => new Date(iso).toLocaleTimeString(lang === "ar" ? "ar-SA" : "en-GB", { hour: "numeric", minute: "2-digit" });
+  const dueText = (iso) => { const d = new Date(iso); return d.toDateString() === new Date().toDateString() ? clock(iso) : when(iso); };
+  // What the team needs to book it, in one note: each part as it was chosen, its price, and the offer it came from.
+  function requestNote(d, extra) {
+    const pl = buildPlan(d), on = pl.items.filter((i) => i.on && !i.info);
+    const lv = d.live || {}, out = liveOut(d), st = liveStay(d);
+    const lines = [RQ().noteHead(placeName(d), range(d.dep, d.ret), paxText(d.pax))]
+      .concat(on.map((i) => `• ${i.title}${i.sub ? ` (${String(i.sub).replace(/<[^>]+>/g, "")})` : ""} · ${money(i.price)}`))
+      .concat([`${RQ().estTotal}: ${money(pl.total)}`]);
+    const refs = [out && `flight ${out.id}`, st && `stay ${st.id}`, lv.esimId && `esim ${lv.esimId}`].filter(Boolean);
+    if (refs.length) lines.push(`Ref: ${refs.join(", ")}`);
+    if (extra) lines.push("", extra);
+    return lines.join("\n").slice(0, 1000);
+  }
+  function viewSend() {
+    const d = draft, R = RQ();
+    if (!A.signedIn) return location.replace("#/signin?next=send");
+    if (!co.lt || !co.lt.length || co.lt.some((x) => !x.personId)) return location.replace("#/travelers");
+    if (d.sentReq) return location.replace(`#/req/${d.sentReq}`);
+    const pl = buildPlan(d), on = pl.items.filter((i) => i.on && !i.info);
+    const phone = co.contact && co.contact.phone ? `+966 ${co.contact.phone}` : "";
+    const ways = ["whatsapp", "call", "in_app"];
+    co.reach = co.reach || "whatsapp";
+    const dd = D.DEST[d.to];
+    page(`<div class="wrap pg pg--narrow send">
+      ${steps(2)}
+      <h1 class="pg__h">${esc(R.sendH)}</h1>
+      <p class="pg__sub">${esc(R.sendSub)}</p>
+      <section class="box send__trip">
+        ${dd ? `<img class="send__img" src="${D.photo(d.to)}" alt="" style="object-position:${dd.pos}" />` : ""}
+        <div class="send__in">
+          <b class="send__place">${esc(placeName(d))}</b>
+          <span class="send__meta">${esc(range(d.dep, d.ret))} · ${esc(paxText(d.pax))}</span>
+          <ul class="send__items">${on.map((i) => `<li>${ico(i.icon)}<span><b>${esc(i.title)}</b><small>${esc(String(i.sub || "").replace(/<[^>]+>/g, ""))}</small></span><em>${esc(money(i.price))}</em></li>`).join("")}</ul>
+          <div class="send__total"><span>${esc(R.estTotal)}</span><b>${esc(money(pl.total))}</b></div>
+          <p class="note-s">${esc(R.estNote)}</p>
+          <a class="link" href="#/plan">${esc(t("change"))}</a>
+        </div>
+      </section>
+      <section class="box">
+        <h2 class="box__h">${esc(R.whoGoing)}</h2>
+        <ul class="send__who">${co.lt.map((x) => `<li><span class="wa__av">${esc((x.first || "?")[0])}</span><b>${esc(`${x.first} ${x.last}`.trim())}</b>${x.pp && (x.pp.have || x.pp.number) ? `<small class="ok">${ico("check")}${esc(R.ppIn)}</small>` : `<small>${esc(R.ppLater)}</small>`}</li>`).join("")}</ul>
+        <a class="link" href="#/travelers">${esc(t("change"))}</a>
+      </section>
+      <form class="box" id="sendF" novalidate>
+        <h2 class="box__h">${esc(R.reachH)}</h2>
+        <div class="reach" role="radiogroup" aria-label="${esc(R.reachH)}">${ways.map((w) => `<label class="reach__o${co.reach === w ? " on" : ""}"><input type="radio" name="reach" value="${w}" ${co.reach === w ? "checked" : ""} />${ico(w === "whatsapp" ? "chat" : w === "call" ? "phone" : "mail")}<span><b>${esc(R.reach[w])}</b><small>${esc(R.reachSub[w](phone))}</small></span></label>`).join("")}</div>
+        <label class="fld" id="callWhen" ${co.reach === "call" ? "" : "hidden"}><span>${esc(R.callWhen)}</span><input name="window" maxlength="60" placeholder="${esc(R.callWhenPh)}" value="${esc(co.window || "")}" /></label>
+        <label class="fld"><span>${esc(R.noteH)}</span><textarea name="note" rows="3" maxlength="400" placeholder="${esc(R.notePh)}">${esc(co.note || "")}</textarea></label>
+        <p class="nudge" id="sendErr" hidden></p>
+        <button class="btn btn--main btn--block primary" type="submit">${esc(R.sendBtn)}</button>
+        <p class="send__fine">${ico("lock")}${esc(R.sendFine)}</p>
+      </form>
+      ${helpLine(helpContext())}
+    </div>`);
+    const f = $("#sendF");
+    f.addEventListener("change", (e) => {
+      if (e.target.name !== "reach") return;
+      co.reach = e.target.value; $$(".reach__o", f).forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+      $("#callWhen").hidden = co.reach !== "call";
+    });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      co.note = f.note.value.trim(); co.window = f.window.value.trim();
+      const btn = $(".primary", f); btn.disabled = true; btn.textContent = R.sending;
+      const flightOn = pl.items.some((i) => i.k === "flight" && i.on), stayOn = pl.items.some((i) => i.k === "stay" && i.on);
+      const body = {
+        kind: d.umrah ? "umrah" : flightOn ? "flight" : stayOn ? "stay" : "general",
+        query: ((d.msgs.find((m) => m.who === "you") || {}).text || placeName(d)).slice(0, 500),
+        travellerIds: co.lt.map((x) => x.personId),
+        note: requestNote(d, co.note),
+        search: { destination: KEY[d.to] || null, destinationName: city(d.to) || placeName(d), from: HOME.has(d.from) ? d.from : null, depart: d.dep, return: d.ret || null, cabin: null, carrier: null },
+        contactPreference: co.reach,
+        ...(co.reach === "call" && co.window ? { contactWindow: co.window } : {}),
+        clientId: d.reqClient || (d.reqClient = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`),
+      };
+      try {
+        const r = (await A.createRequest(body)).request;
+        d.sentReq = r.id; saveDraft();
+        store.set("reqMeta:" + r.id, { to: d.to, dep: d.dep, ret: d.ret, pax: d.pax, total: pl.total, items: on.map((i) => ({ icon: i.icon, title: i.title, sub: String(i.sub || "").replace(/<[^>]+>/g, ""), price: i.price })) });
+        save(); location.hash = `#/req/${r.id}?new=1`;
+      } catch (err) { btn.disabled = false; btn.textContent = R.sendBtn; const el = $("#sendErr"); el.hidden = false; el.textContent = err.message; }
+    });
+    const save = () => store.set("checkout", { ...co, lt: co.lt.map((x) => ({ ...x, pp: x.pp && { ...x.pp, number: "" } })) });
+  }
+
+  // One request: where it is, who has it and by when, the team's options, a conversation with them, and what to do meanwhile.
+  let reqTimer = null;
+  async function viewRequest(id) {
+    clearTimeout(reqTimer);
+    const R = RQ();
+    if (!A.signedIn) return location.replace(`#/signin?next=req/${id}`);
+    let r, th;
+    try { [r, th] = await Promise.all([A.request(id).then((x) => x.request), A.reqMessages(id).catch(() => ({ messages: [] }))]); }
+    catch (e) { return page(`<div class="wrap pg"><div class="empty"><p>${esc(e.status === 404 ? R.gone : e.message)}</p><a class="btn btn--main" href="#/trips">${esc(R.allReqs)}</a></div></div>`); }
+    if (route().name !== "req" || route().a !== id) return;
+    const meta = store.get("reqMeta:" + id) || {};
+    const fresh = /[?&]new=1/.test(location.hash);
+    const closed = ["done", "cancelled", "paid"].includes(r.status);
+    const stepNow = { queued: 0, sent: 1, reviewing: 1, quoted: 2, paid: 3, done: 3, cancelled: -1 }[r.status] ?? 1;
+    const agent = (r.agent && r.agent.name) || (r.progress && r.progress.with) || "";
+    const due = (r.progress && r.progress.dueAt) || r.promisedBy;
+    const late = !closed && due && new Date(due) < new Date();
+    const to = meta.to;
+    const quote = r.quote && r.quote.status === "open" ? r.quote : null;
+    const msgs = th.messages || [];
+    const msgHtml = (m) => `<div class="rqm rqm--${m.from}"><small>${esc(m.from === "me" ? R.you : m.authorName || (m.from === "mada" ? "Mada" : agent || R.team))} · ${esc(clock(m.createdAt))}</small><p>${esc(m.text)}</p>${m.offer ? `<span class="rqm__offer">${esc(m.offer.label)} · ${esc(money(m.offer.perPerson.amount / 100))} ${esc(R.each)}</span>` : ""}${m.attachment && m.attachment.url ? `<a class="link" href="${esc(m.attachment.url)}" target="_blank" rel="noopener">${esc(m.attachment.name || R.file)}</a>` : ""}</div>`;
+    const meanwhile = [
+      co.lt && co.lt.some((x) => x.pp && !x.pp.have && !x.pp.number) ? `<a class="mw" href="#/travelers">${ico("visa")}<span><b>${esc(R.mwPassH)}</b><small>${esc(R.mwPass)}</small></span></a>` : "",
+      to && D.byCode[to] && D.byCode[to].country !== "SA" ? `<a class="mw" href="#/plan">${ico("esim")}<span><b>${esc(R.mwEsimH)}</b><small>${esc(R.mwEsim)}</small></span></a>` : "",
+      `<a class="mw" href="#/family">${ico("ppl")}<span><b>${esc(R.mwFamH)}</b><small>${esc(R.mwFam)}</small></span></a>`,
+      `<a class="mw" href="#/circles">${ico("chat")}<span><b>${esc(R.mwCircleH)}</b><small>${esc(R.mwCircle)}</small></span></a>`,
+    ].filter(Boolean).join("");
+    page(`<div class="wait2 req">
+      <header class="wh">${to && D.DEST[to] ? `<img src="${esc(D.photo(to))}" alt="" />` : ""}<div class="wrap wh__in">
+        <span class="wh__pill${r.status === "done" ? " ok" : ""}">${r.status === "done" ? ico("check") : r.status === "cancelled" ? "" : "<i></i>"}${esc(R.status[r.status] || r.status)}</span>
+        <h1>${esc(fresh && !closed ? R.sentH : r.title)}</h1>
+        <p>${esc(meta.dep ? `${to ? placeName({ to }) + " · " : ""}${range(meta.dep, meta.ret)} · ${paxText(meta.pax)}` : r.summary || r.detail)}</p></div></header>
+      <div class="wrap pg pg--narrow wait2__body">
+        ${r.status === "cancelled" ? `<section class="wbox"><p>${esc(R.cancelled)}</p><a class="btn btn--main" href="#/">${esc(R.planAgain)}</a></section>` : `
+        <section class="wbox">
+          <div class="wa"><span class="wa__av">${esc((agent || "M")[0].toUpperCase())}</span><div><b>${esc(closed ? R.doneH : agent ? R.onIt(agent) : R.teamOnIt)}</b><p>${esc(closed ? R.doneSub : due ? (late ? R.late : R.backBy(dueText(due), r.contact ? R.reachVia[r.contact.preference] : "")) : R.soon)}</p></div></div>
+          <ol class="wsteps">${R.steps.map((x, i) => `<li class="${i < stepNow ? "done" : i === stepNow ? "now" : ""}"><span>${i < stepNow ? ico("check") : i + 1}</span><b>${esc(x)}</b></li>`).join("")}</ol>
+          ${late ? `<button type="button" class="btn btn--plain" id="nudge">${esc(R.nudge)}</button>` : ""}
+        </section>`}
+        ${quote ? `<section class="wbox rq-quote"><h2 class="box__h">${esc(R.quoteH)}</h2>${quote.text ? `<p>${esc(quote.text)}</p>` : ""}
+          ${quote.breakdown.map((p) => `<div class="rq-q__p"><b>${esc(p.name)}</b>${p.lines.map((l) => `<div><span>${esc(l.label)}</span><span>${esc(money(l.amount / 100))}</span></div>`).join("")}</div>`).join("")}
+          <div class="send__total"><span>${esc(R.total)}</span><b>${esc(money(quote.total.amount / 100))}</b></div>
+          ${quote.expiresAt ? `<p class="note-s">${esc(R.quoteUntil(dueText(quote.expiresAt)))}</p>` : ""}
+          <div class="actions"><button type="button" class="btn btn--main" id="goAhead">${esc(R.goAhead)}</button><button type="button" class="btn btn--plain" data-focus-say>${esc(R.askAbout)}</button></div></section>` : ""}
+        <h2 class="hd-h">${esc(R.asked)}</h2>
+        ${meta.items ? `<div class="wcs">${meta.items.map((i) => `<article class="wc"><span class="pc__ic">${ico(i.icon)}</span><div class="wc__b"><b>${esc(i.title)}</b><small>${esc(i.sub)}</small></div><span class="wc__st">${esc(money(i.price))}</span></article>`).join("")}</div><p class="note-s">${esc(R.estTotal)} · ${esc(money(meta.total))}</p>` : `<section class="wbox"><b>${esc(r.title)}</b><p>${esc([r.summary, r.detail].filter(Boolean).join(" · "))}</p></section>`}
+        <h2 class="hd-h">${esc(R.talkH)}</h2>
+        <section class="wbox rq-thread">
+          <div class="rq-msgs" id="rqMsgs">${msgs.length ? msgs.map(msgHtml).join("") : `<p class="note-s">${esc(R.noMsgs)}</p>`}${th.agentTyping ? `<p class="note-s">${esc(R.typing(agent || R.team))}</p>` : ""}</div>
+          ${r.status === "cancelled" ? "" : `<form class="rq-say" id="rqSay"><textarea id="rqQ" rows="1" maxlength="2000" placeholder="${esc(R.sayPh)}"></textarea><button class="btn btn--main">${esc(R.sayBtn)}</button></form>`}
+        </section>
+        ${!closed ? `<h2 class="hd-h">${esc(R.meanH)}</h2><div class="mws">${meanwhile}</div>` : ""}
+        ${helpLine(R.waAbout(r.title))}
+        <div class="rq-foot"><a class="link" href="#/trips">${esc(R.allReqs)}</a>${!closed ? `<button type="button" class="link link--danger" id="withdraw">${esc(R.withdraw)}</button>` : ""}</div>
+      </div></div>`);
+    const box = $("#rqMsgs"); if (box) box.scrollTop = box.scrollHeight;
+    $("#nudge")?.addEventListener("click", async (e) => { e.target.disabled = true; try { await A.nudge(id); toast(R.nudged); } catch (x) { toast(x.message); e.target.disabled = false; } });
+    $("#goAhead")?.addEventListener("click", async (e) => { e.target.disabled = true; try { await A.reqSay(id, R.goAheadMsg); toast(R.goAheadSent); viewRequest(id); } catch (x) { toast(x.message); e.target.disabled = false; } });
+    $("[data-focus-say]")?.addEventListener("click", () => $("#rqQ")?.focus());
+    const sf = $("#rqSay");
+    if (sf) {
+      const q = $("#rqQ");
+      q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sf.requestSubmit(); } });
+      sf.addEventListener("submit", async (e) => {
+        e.preventDefault(); const v = q.value.trim(); if (!v) return q.focus();
+        const b = $("button", sf); b.disabled = true;
+        try { await A.reqSay(id, v); q.value = ""; const t2 = await A.reqMessages(id); box.innerHTML = t2.messages.map(msgHtml).join(""); box.scrollTop = box.scrollHeight; } catch (x) { toast(x.message); }
+        b.disabled = false; q.focus();
+      });
+    }
+    $("#withdraw")?.addEventListener("click", () => confirmSheet(R.withdrawQ, R.withdrawSub, R.withdraw, R.keep, async () => {
+      try { await A.withdraw(id); if (draft && draft.sentReq === id) { draft.sentReq = null; saveDraft(); } toast(R.withdrawn); viewRequest(id); } catch (x) { toast(x.message); }
+    }));
+    // The team's replies come in while the page is open (every 15 s; the thread and the status).
+    const poll = async () => {
+      if (route().name !== "req" || route().a !== id) return;
+      if ($("#rqQ") && $("#rqQ").value) { reqTimer = setTimeout(poll, 15000); return; }
+      try {
+        const [r2, t2] = await Promise.all([A.request(id), A.reqMessages(id)]);
+        if (r2.request.status !== r.status || (t2.messages || []).length !== msgs.length || !!r2.request.quote !== !!r.quote) return viewRequest(id);
+        reqTimer = setTimeout(poll, 15000);
+      } catch { reqTimer = setTimeout(poll, 30000); }
+    };
+    if (!closed) reqTimer = setTimeout(poll, 15000);
+  }
+  // A small yes/no sheet, in the page's own words.
+  function confirmSheet(h, sub, yes, no, onYes) {
+    const el = document.createElement("div");
+    el.className = "sheet";
+    el.innerHTML = `<div class="sheet__card" role="alertdialog" aria-modal="true" aria-labelledby="cfH"><h2 id="cfH">${esc(h)}</h2>${sub ? `<p>${esc(sub)}</p>` : ""}<div class="actions"><button type="button" class="btn btn--main" data-no>${esc(no)}</button><button type="button" class="btn btn--plain link--danger" data-yes>${esc(yes)}</button></div></div>`;
+    document.body.append(el);
+    const close = () => el.remove();
+    el.addEventListener("click", (e) => { if (e.target === el || e.target.closest("[data-no]")) close(); if (e.target.closest("[data-yes]")) { close(); onYes(); } });
+    $("[data-no]", el).focus();
+  }
 
   // ----- pay: the same offers priced again for these travellers, the API's order sheet, then the orders -----
   async function viewPayLive() {
@@ -1939,13 +2131,17 @@
   async function viewTripsLive() {
     if (!A.signedIn) return viewTrips();
     page(loading(t("tripsTitle")));
-    let r;
-    try { r = await A.trips(); } catch (e) { return page(errBox(e.message, true)); }
+    let r, rq = [];
+    try { [r, rq] = await Promise.all([A.trips(), A.requests().then((x) => x.requests).catch(() => [])]); } catch (e) { return page(errBox(e.message, true)); }
     if (route().name !== "trips") return;
+    const R = RQ(), openReq = rq.filter((x) => x.status !== "cancelled" && x.status !== "done");
+    const reqCard = (x) => { const m = store.get("reqMeta:" + x.id) || {}, img = m.to && D.DEST[m.to] ? D.photo(m.to, true) : null; return `<a class="tcard" href="#/req/${x.id}">${img ? `<img src="${esc(img)}" alt="" />` : `<span class="tcard__ph"></span>`}<div><b>${esc(x.title)}</b><span>${esc([x.summary, x.detail].filter(Boolean).join(" · "))}</span></div><span><em class="status${x.status === "quoted" ? " status--go" : ""}">${esc(R.status[x.status] || x.status)}</em></span></a>`; };
+    const reqHtml = openReq.length ? `<div class="bar"><h2>${esc(R.reqsH)}</h2><small>${esc(R.reqsSub)}</small></div><div class="tlist">${openReq.map(reqCard).join("")}</div>` : "";
     const card = (x) => `<a class="tcard" href="#/t/${x.id}">${tripImg(x) ? `<img src="${esc(tripImg(x))}" alt="" />` : `<span class="tcard__ph"></span>`}<div><b>${esc(x.city)}</b><span>${esc(range(x.startDate, x.endDate))} · ${esc(x.travellerNames.join(", "))}</span></div><span><em class="status">${esc(x.flight ? x.flight.code : (lang === "ar" ? "رحلة" : "Trip"))}</em></span></a>`;
     page(`<div class="wrap pg"><h1 class="pg__h">${esc(t("tripsTitle"))}</h1>
-      ${r.upcoming.length || r.past.length ? `<div class="tlist">${r.upcoming.map(card).join("")}</div>${r.past.length ? `<div class="bar"><h2>${esc(t("past"))}</h2></div><div class="tlist tlist--past">${r.past.map(card).join("")}</div>` : ""}`
-        : `<div class="empty"><p>${esc(t("tripsNone"))}</p><a class="btn btn--main" href="#/">${esc(t("tripsPlan"))}</a></div>`}</div>`);
+      ${reqHtml}
+      ${r.upcoming.length || r.past.length ? `${reqHtml && r.upcoming.length ? `<div class="bar"><h2>${esc(t("tripsUp"))}</h2></div>` : ""}<div class="tlist">${r.upcoming.map(card).join("")}</div>${r.past.length ? `<div class="bar"><h2>${esc(t("past"))}</h2></div><div class="tlist tlist--past">${r.past.map(card).join("")}</div>` : ""}`
+        : reqHtml ? "" : `<div class="empty"><p>${esc(t("tripsNone"))}</p><a class="btn btn--main" href="#/">${esc(t("tripsPlan"))}</a></div>`}</div>`);
   }
   // The API names its own photos ("dubai-skyline"); the site has the city's photo.
   const tripImg = (x) => (x.imageUrl && /^(https?:)?\//.test(x.imageUrl) ? x.imageUrl : (() => { const c = Object.keys(KEY).find((k) => D.byCode[k] && D.byCode[k].city === x.city); return c ? D.photo(c) : null; })());
