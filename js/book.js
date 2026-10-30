@@ -248,15 +248,16 @@
       sub: `${day(out.out.date)} ${out.out.dep} → ${out.out.arr} · ${hrs(out.out.durationMin)} ${out.stop ? out.stop : t("direct")}${out.back ? ` · ${t("ret")} ${day(out.back.date)} ${out.back.dep}` : ""} · ${out.bags}${people > 1 ? ` · ${t("eachP")(money(Math.round(sar(out.total) / people)))}` : ""}`,
       price: sar(out.total),
     });
-    else if (lv.key && HOME.has(d.from)) items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t(lv.err.flights ? "liveFlightsDown" : "liveFlightsNone"), price: null, info: true });
-    else items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t("liveByHand"), price: null, info: true });
+    else if (lv.key && HOME.has(d.from)) items.push({ k: "flight", icon: "flights", title: t("flight"), sub: REQ_MODE() ? t("teamFinds").flight : t(lv.err.flights ? "liveFlightsDown" : "liveFlightsNone"), price: null, info: true, team: true });
+    else items.push({ k: "flight", icon: "flights", title: t("flight"), sub: t("liveByHand"), price: null, info: true, team: true });
     if (stay) {
       const f = stay.facts || {};
       items.push({ k: "stay", icon: "stays", go: "#/stay", title: stay.name, sub: [f.stars ? `${f.stars}★` : "", stay.roomsLabel, f.board && BOARD[f.board] ? L(BOARD[f.board]) : "", stay.freeCancelUntil ? t("cancelBy")(fmt(stay.freeCancelUntil, { day: "numeric", month: "short" })) : t("nonRef"), f.payAtHotel ? t("uxAtHotel")(money(f.payAtHotel / 100)) : ""].filter(Boolean).join(" · "), price: sar(stay.total) });
-    } else if (!d.flightsOnly) items.push({ k: "stay", icon: "stays", title: lang === "ar" ? "الفندق" : "Hotel", sub: t(lv.err.stays ? "liveStaysDown" : "liveStaysNone"), price: null, info: true });
+    } else if (!d.flightsOnly) items.push({ k: "stay", icon: "stays", title: lang === "ar" ? "الفندق" : "Hotel", sub: REQ_MODE() ? t("teamFinds").stay : t(lv.err.stays ? "liveStaysDown" : "liveStaysNone"), price: null, info: true, team: true });
+    if (d.items.car) items.push({ k: "car", icon: "car", title: t("carTeam"), sub: t("carTeamSub"), price: null, info: true, team: true });
     if (cc !== "SA") {
       if (esim) items.push({ k: "esim", icon: "esim", title: t("esimLive")(esim.coverage.name, esim.gb, esim.days), sub: `${esim.operator || ""}${esim.operator ? " · " : ""}${t("esimSub")}`, price: sar(esim.price) * people });
-      else items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: A.signedIn ? t("liveEsimNone") : t("liveEsimSignin"), price: null, info: true });
+      else items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: !A.signedIn ? t("liveEsimSignin") : REQ_MODE() ? t("teamFinds").esim : t("liveEsimNone"), price: null, info: true, team: A.signedIn });
       items.push({ k: "visa", icon: "visa", title: t("visa"), sub: D.GCC.has(cc) ? t("visaNo") : t("visaYes"), price: null, info: true });
     }
     for (const it of items) if (!it.info) it.on = d.items[it.k] !== false && !(d.flightsOnly && it.k !== "flight");
@@ -309,9 +310,10 @@
       if (has(/just the flight|only the flight|flight only|الطيران بس|طيران فقط/)) { d.flightsOnly = true; changed = true; }
       if (has(/add a traveler|one more|another person|اضف مسافر|شخص زياده/)) { d.pax = { ...d.pax, a: Math.min(9, d.pax.a + 1) }; changed = true; }
     }
-    if (has(/\bcar\b|سياره/)) { d.items.car = true; d.flightsOnly = false; changed = true; }
     if (p.from) d.from = p.from;
     if (p.to && p.to !== d.to) { d.to = p.to; d.tier = 1; d.items = {}; d.flightsOnly = false; d.outId = d.backId = d.hotelId = null; d.plan = false; changed = true; }
+    // After a new place resets the choices, so "Dubai with a car" keeps its car.
+    if (has(/\bcar\b|سياره/)) { d.items.car = true; d.flightsOnly = false; changed = true; }
     d.umrah = d.to === "JED" && (p.makkah || d.umrah);
     if (p.dates.length) { d.dep = p.dates[0]; d.ret = p.oneWay ? null : p.dates[1] || (p.nights ? addDays(p.dates[0], p.nights) : null); d.outId = d.backId = null; changed = true; }
     else if (p.nights && d.dep) { d.ret = addDays(d.dep, p.nights); changed = true; }
@@ -562,9 +564,19 @@
     $("#tools").innerHTML = toolsHtml();
     $("#hints").innerHTML = `<span>${esc(t("tryL"))}</span>` + t("ph").slice(0, 3).map((s) => `<button type="button" data-a="say" data-v="${esc(s)}">${esc(s)}</button>`).join("");
     $("#cont").innerHTML = draft && draft.plan ? `<button type="button" class="cont__card" data-a="open">${D.DEST[draft.to] ? `<img src="${D.photo(draft.to, true)}" alt="" />` : ""}<div><small>${esc(t("contH"))}</small><b>${esc(placeName(draft))} · ${esc(range(draft.dep, draft.ret))}</b><span>${esc(paxText(draft.pax))} · ${esc(money(buildPlan(draft).total))}</span></div><em>${esc(t("contGo"))} →</em></button>` : "";
+    if (LIVE && A.signedIn) homeRequests();
     renderModes(); renderSvc(); heroBg();
     $("#heroTrust").innerHTML = t("heroTrust").map((x) => `<span>${ico("check")}${esc(x)}</span>`).join("") + acceptRow("accept--sm");
     renderMine(); renderRail(); renderReceipt(); typePlaceholder();
+  }
+  // What the team is doing for you, first thing on home: each open request, who has it and when they're back.
+  async function homeRequests() {
+    let rq; try { rq = (await A.requests()).requests.filter((x) => !["cancelled", "done"].includes(x.status)); } catch { return; }
+    if (route().name !== "home" || !rq.length) return;
+    const R = RQ(), el = $("#cont");
+    const card = (x) => { const m = store.get("reqMeta:" + x.id) || {}, due = (x.progress && x.progress.dueAt) || x.promisedBy, who = (x.agent && x.agent.name) || "";
+      return `<a class="cont__card" href="#/req/${x.id}">${m.to && D.DEST[m.to] ? `<img src="${D.photo(m.to, true)}" alt="" />` : `<span class="cont__ic">${ico("check")}</span>`}<div><small>${esc(R.status[x.status] || x.status)}</small><b>${esc(x.title)}</b><span>${esc(x.status === "quoted" ? R.quoteH : who ? R.onIt(who) + (due ? ` · ${dueText(due)}` : "") : R.teamOnIt)}</span></div><em>${esc(R.open)} →</em></a>`; };
+    el.innerHTML = rq.slice(0, 2).map(card).join("") + el.innerHTML.replace(/<button type="button" class="cont__card" data-a="open">[\s\S]*$/, (x) => (draft && draft.sentReq ? "" : x));
   }
   // What you need, said once above the box: each fills the start of the sentence, the whole trip leaves it open.
   let mode = "all";
@@ -1103,7 +1115,8 @@
   const LABEL = (k) => (t("labels") || {})[k] || k;
   const AMEN_ICON = { pool: "pool", beach: "pool", kidsClub: "kids", gym: "gym", spa: "spa", parking: "parking", connecting: "ppl", accessible: "ppl", familyRooms: "ppl", wifi: "wifi" };
   const loading = (txt) => `<div class="wrap pg"><div class="empty"><span class="spin"></span><p>${esc(txt)}</p></div></div>`;
-  const errBox = (txt, retry) => `<div class="wrap pg"><div class="empty"><p>${esc(txt)}</p>${retry ? `<button type="button" class="btn btn--main" onclick="location.reload()">${esc(t("tryAgain"))}</button>` : ""}</div></div>`;
+  // Something didn't load: try again, go home, or reach a person. Never a page with nowhere to go.
+  const errBox = (txt, retry) => `<div class="wrap pg"><div class="empty"><p>${esc(txt)}</p><div class="actions" style="justify-content:center">${retry ? `<button type="button" class="btn btn--main" onclick="location.reload()">${esc(t("tryAgain"))}</button>` : ""}<a class="btn btn--${retry ? "plain" : "main"}" href="#/">${esc(t("goHome"))}</a></div></div>${helpLine(t("hlp").waHi)}</div>`;
 
   // ----- flights: the options the API found (best fit first), each with its rules in plain words -----
   // ----- flights: the way out first, then the ways back the airline sells with it (a return is priced as a pair) -----
@@ -1919,6 +1932,7 @@
     const lv = d.live || {}, out = liveOut(d), st = liveStay(d);
     const lines = [RQ().noteHead(placeName(d), range(d.dep, d.ret), paxText(d.pax))]
       .concat(on.map((i) => `• ${i.title}${i.sub ? ` (${String(i.sub).replace(/<[^>]+>/g, "")})` : ""} · ${money(i.price)}`))
+      .concat(pl.items.filter((i) => i.team && !(d.flightsOnly && i.k !== "flight")).map((i) => `• ${RQ().pleaseFind(i.title)}`))
       .concat([`${RQ().estTotal}: ${money(pl.total)}`]);
     const refs = [out && `flight ${out.id}`, st && `stay ${st.id}`, lv.esimId && `esim ${lv.esimId}`].filter(Boolean);
     if (refs.length) lines.push(`Ref: ${refs.join(", ")}`);
@@ -2013,7 +2027,7 @@
     const stepNow = { queued: 0, sent: 1, reviewing: 1, quoted: 2, paid: 3, done: 3, cancelled: -1 }[r.status] ?? 1;
     const agent = (r.agent && r.agent.name) || (r.progress && r.progress.with) || "";
     const due = (r.progress && r.progress.dueAt) || r.promisedBy;
-    const late = !closed && due && new Date(due) < new Date();
+    const late = !closed && r.status !== "quoted" && due && new Date(due) < new Date();
     const to = meta.to;
     const quote = r.quote && r.quote.status === "open" ? r.quote : null;
     const msgs = th.messages || [];
@@ -2032,7 +2046,7 @@
       <div class="wrap pg pg--narrow wait2__body">
         ${r.status === "cancelled" ? `<section class="wbox"><p>${esc(R.cancelled)}</p><a class="btn btn--main" href="#/">${esc(R.planAgain)}</a></section>` : `
         <section class="wbox">
-          <div class="wa"><span class="wa__av">${esc((agent || "M")[0].toUpperCase())}</span><div><b>${esc(closed ? R.doneH : agent ? R.onIt(agent) : R.teamOnIt)}</b><p>${esc(closed ? R.doneSub : due ? (late ? R.late : R.backBy(dueText(due), r.contact ? R.reachVia[r.contact.preference] : "")) : R.soon)}</p></div></div>
+          <div class="wa"><span class="wa__av">${esc((agent || "M")[0].toUpperCase())}</span><div><b>${esc(closed ? R.doneH : agent ? R.onIt(agent) : R.teamOnIt)}</b><p>${esc(closed ? R.doneSub : quote ? R.quotedSub : due ? (late ? R.late : R.backBy(dueText(due), r.contact ? R.reachVia[r.contact.preference] : "")) : R.soon)}</p></div></div>
           <ol class="wsteps">${R.steps.map((x, i) => `<li class="${i < stepNow ? "done" : i === stepNow ? "now" : ""}"><span>${i < stepNow ? ico("check") : i + 1}</span><b>${esc(x)}</b></li>`).join("")}</ol>
           ${late ? `<button type="button" class="btn btn--plain" id="nudge">${esc(R.nudge)}</button>` : ""}
         </section>`}
@@ -2973,8 +2987,16 @@
     if (a === "whoPick") { popFromChat = true; draft.paxSaid = true; return openPop("who", b); }
     if (a === "pp") {
       const to = draft.visa.to, c = country(D.byCode[to].country), saudi = +v === 0, gcc = D.GCC.has(D.byCode[to].country);
-      you(b.textContent); say(esc(saudi && gcc ? t("visaFree")(c) : t("visaDo")(c)), saudi && gcc ? chips([{ a: "go", v: to, l: city(to) }]) : "");
-      draft.visa = null; saveDraft(); renderThread(false); return;
+      you(b.textContent);
+      if (saudi && gcc) { say(esc(t("visaFree")(c)), chips([{ a: "go", v: to, l: city(to) }])); draft.visa = null; saveDraft(); renderThread(false); return; }
+      // The promise is kept: the visa goes to the team as a request (signed in), or after signing in.
+      if (!(LIVE && A.signedIn)) { say(esc(t("visaDo")(c)) + ` <a class="link" href="#/signin?next=plan">${esc(t("trvSigninGo"))} →</a>`); draft.visa = null; saveDraft(); renderThread(false); return; }
+      const passport = b.textContent.trim(); draft.visa = null; renderThread(true);
+      A.createRequest({ kind: "visa", query: `${t("visa")}: ${c}`, note: RQ().visaNote(c, passport), answers: { where: [c], passport: [passport.slice(0, 80)] }, contactPreference: "whatsapp", clientId: `web-visa-${to}-${Date.now().toString(36)}` })
+        .then((x) => { const m = { who: "mada", html: esc(t("visaDo")(c)), extra: "", req: { id: x.request.id, title: x.request.title } }; draft.msgs.push(m); })
+        .catch((e) => say(esc(e.message), chips([{ a: "say", v: `${t("visa")} ${c}`, l: t("tryAgain") }])))
+        .finally(() => { saveDraft(); renderThread(false); });
+      return;
     }
     if (a === "share") return shareSheet();
     if (a === "addEsim") { const x = trips.find((y) => y.ref === v), cc = D.byCode[x.to].country, people = x.pax.a + x.pax.c; x.plan.items.push({ k: "esim", icon: "esim", title: t("esim")(country(cc)), sub: t("esimSub"), price: D.ESIM[cc] * people, on: true }); x.total += D.ESIM[cc] * people; saveTrips(); toast("✓ " + t("esim")(country(cc))); renderMine(); }

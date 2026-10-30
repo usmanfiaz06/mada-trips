@@ -1734,3 +1734,5 @@ html[dir="rtl"] .send__in { padding: 22px 0 22px 22px; }
 .cm-trip b { font-size: 15px; }
 .cm-trip small { font-size: 12.5px; color: var(--ink-2); }
 .cm-trip em { font-style: normal; font-weight: 600; font-size: 13px; color: var(--green); margin-top: 2px; }
+.cont__ic { width: 64px; height: 64px; border-radius: 14px; display: grid; place-items: center; background: rgba(31, 122, 77, .1); color: var(--good); flex: none; } .cont__ic .ico { width: 24px; height: 24px; } #cont { display: grid; gap: 10px; }
+#cont:not(:empty) { margin-top: 28px; }

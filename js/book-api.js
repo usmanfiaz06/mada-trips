@@ -15,6 +15,8 @@
   }
 
   let session = read(KEY); // { tokens: { accessToken, refreshToken, accessExpiresAt }, user }
+  // A saved session without its tokens (an old or damaged copy) is no session: the page asks to sign in again.
+  if (session && !(session.tokens && session.tokens.accessToken && session.tokens.refreshToken)) { session = null; write(KEY, null); }
   let lang = "en";
   let refreshing = null;
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
