@@ -2,13 +2,13 @@ import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
-import { pendingForUser } from "./approvals";
+import { pendingApprovalsFor } from "./approvals";
 import { canSeeIssuance } from "./issuance";
 import { myUrgentTasks } from "./tasks";
 
 export async function navCounts(u: CurrentUser) {
   const [approvals, issuance, closes, expenses, tasks, leads, corporate, inbox] = await Promise.all([
-    db.transaction((tx) => pendingForUser(tx, u.id)).then((r) => r.length),
+    pendingApprovalsFor(u.id).then((r) => r.length),
     canSeeIssuance(u).then(async (ok) => ok
       ? (await db.select({ n: sql<number>`count(*)::int` }).from(schema.bookings).where(eq(schema.bookings.status, "pending_issue")))[0].n : 0),
     u.permissions.has("close.verify")

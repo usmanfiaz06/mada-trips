@@ -4,6 +4,7 @@ import { navCounts } from "@/lib/counts";
 import { canSeeIssuance } from "@/lib/issuance";
 import { whatsDue } from "@/lib/briefing";
 import { getSettings } from "@/lib/settings";
+import { observe } from "@/lib/perf";
 import { Sidebar, type NavSection } from "@/components/shell/sidebar";
 import { CommandPalette, CommandTrigger } from "@/components/shell/command";
 import { CloseClock, LocaleSwitch, ThemeToggle } from "@/components/client";
@@ -13,7 +14,8 @@ import { logout } from "../login/actions";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const u = await requireUser();
   const t = await getT();
-  const [counts, issuer, s, alerts] = await Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u)]);
+  const [counts, issuer, s, alerts] = await observe("app-shell", () =>
+    Promise.all([navCounts(u), canSeeIssuance(u), getSettings(), whatsDue(u)]));
 
   const sections: NavSection[] = [
     { label: t("Workspace"), items: [

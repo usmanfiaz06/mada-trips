@@ -2,7 +2,7 @@ import "server-only";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
-import { pendingForUser } from "./approvals";
+import { pendingApprovalsFor } from "./approvals";
 import { canSeeIssuance } from "./issuance";
 import { myUrgentTasks } from "./tasks";
 import { getT } from "./i18n";
@@ -31,8 +31,8 @@ export async function whatsDue(u: CurrentUser): Promise<Alert[]> {
   const today = riyadhDate();
 
   const [approvals, tasks, leads, issuance, closes, flightReview] = await Promise.all([
-    db.transaction((tx) => pendingForUser(tx, u.id)),
-    myUrgentTasks(u.id, today),
+    pendingApprovalsFor(u.id),
+    myUrgentTasks(u.id),
     u.permissions.has("leads.view")
       ? db.select({ n: sql<number>`count(*)::int` }).from(schema.leads).where(eq(schema.leads.status, "new")).then((r) => r[0].n)
       : Promise.resolve(0),

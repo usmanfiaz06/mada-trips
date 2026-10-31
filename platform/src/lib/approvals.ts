@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { and, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
-import { schema, type Tx } from "@/db";
+import { db, schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { nextRef } from "./refs";
 import { getSettings } from "./settings";
@@ -343,4 +344,12 @@ export async function pendingForUser(tx: Tx, userId: string) {
   }
   return out;
 }
+
+/**
+ * Request-deduped view of "approvals waiting on me". The app shell asks this twice per page (nav
+ * badges + the briefing bell) and the dashboard asks a third time; React's cache() collapses all of
+ * them to a single set of queries for the duration of one request, so the hot path never repeats work.
+ */
+export const pendingApprovalsFor = cache((userId: string) =>
+  db.transaction((tx) => pendingForUser(tx, userId)));
 
