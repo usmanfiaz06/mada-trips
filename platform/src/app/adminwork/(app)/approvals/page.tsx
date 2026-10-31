@@ -4,7 +4,7 @@ import { ArrowUpRight, Stamp } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
-import { pendingForUser } from "@/lib/approvals";
+import { pendingApprovalsFor } from "@/lib/approvals";
 import { voteBoard } from "@/lib/approval-view";
 import { APPROVAL_KIND, APPROVAL_STATUS } from "@/lib/labels";
 import { timeAgo } from "@/lib/dates";
@@ -19,7 +19,7 @@ export default async function ApprovalsPage({ searchParams }: { searchParams: Pr
   const u = await requireUser();
   const t = await getT();
   const { tab: rawTab } = await searchParams;
-  const mineWaiting = await db.transaction((tx) => pendingForUser(tx, u.id));
+  const mineWaiting = await pendingApprovalsFor(u.id);
   const oversight = isOversight(u);
   const tab = oversight ? rawTab ?? (mineWaiting.length ? "mine" : "requests") : "requests";
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { and, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { CurrentUser } from "./auth";
@@ -78,11 +79,15 @@ export async function workload(today = riyadhDate()) {
 }
 
 /** Open tasks assigned to this person that are late or due today: the sidebar badge and dashboard list. */
-export async function myUrgentTasks(userId: string, today = riyadhDate()) {
+// Request-deduped: the nav badges, the briefing bell and the dashboard all ask for this in one page
+// render. cache() keyed only by userId collapses them to a single query. "today" is resolved inside so
+// every caller shares the same cache key (all three previously passed the same Riyadh day anyway).
+export const myUrgentTasks = cache(async (userId: string) => {
+  const today = riyadhDate();
   return db.select().from(schema.tasks)
     .where(and(eq(schema.tasks.assigneeId, userId), inArray(schema.tasks.status, [...OPEN_STATUSES]), sql`${schema.tasks.dueDate} <= ${today}`))
     .orderBy(schema.tasks.dueDate).limit(20);
-}
+});
 
 /** The record a task is about, with a readable label and a link. */
 export async function linkedRecord(type: string | null, id: string | null) {

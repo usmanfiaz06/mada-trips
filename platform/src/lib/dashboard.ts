@@ -6,7 +6,7 @@ import { addDays, businessDate, cycleFor, daysBetween, riyadhDate } from "./date
 import { myUrgentTasks } from "./tasks";
 import { cashPosition, computeSettlement, receivables } from "./finance";
 import { getSettings } from "./settings";
-import { pendingForUser } from "./approvals";
+import { pendingApprovalsFor } from "./approvals";
 import { canSeeIssuance, issueCheck } from "./issuance";
 
 export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "current") {
@@ -44,7 +44,7 @@ export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "
   const todayRows = cycleBookings.filter((b) => b.businessDate === today);
 
   const [waiting, issuer, finance] = await Promise.all([
-    db.transaction((tx) => pendingForUser(tx, u.id)),
+    pendingApprovalsFor(u.id),
     canSeeIssuance(u),
     u.permissions.has("finance.view") ? (async () => {
       const [cash, rec, est] = await Promise.all([
@@ -97,7 +97,7 @@ export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "
     WHERE b.prepared_by = ${u.id} AND b.status IN ('issued','pending_issue') AND b.recognized_cycle_id IS NULL AND b.commission_bps > 0`);
   const commission = { rate: me?.rate ?? 0, earned: Number(comm[0]?.earned ?? 0), pending: Number(comm[0]?.pending ?? 0), sales: comm[0]?.n ?? 0 };
 
-  const myTasks = await myUrgentTasks(u.id, riyadhDate());
+  const myTasks = await myUrgentTasks(u.id);
 
   const myExpenses = await db.select({ n: sql<number>`count(*)::int` }).from(schema.expenses)
     .where(and(eq(schema.expenses.submittedBy, u.id), inArray(schema.expenses.status, ["pending"])));
