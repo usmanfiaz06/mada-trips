@@ -14,14 +14,19 @@ const HINTS: Record<string, string> = {
 };
 
 export async function GET() {
+  // The region this function runs in, and how long one database round trip takes. When compute is
+  // co-located with the database (both in Frankfurt) dbMs is a few ms; a transatlantic gap shows ~100ms.
+  const region = process.env.VERCEL_REGION ?? "local";
   if (!process.env.DATABASE_URL && process.env.VERCEL) {
-    return Response.json({ ok: false, db: "error", code: "NO_URL", hint: HINTS.NO_URL }, { status: 503 });
+    return Response.json({ ok: false, db: "error", code: "NO_URL", hint: HINTS.NO_URL, region }, { status: 503 });
   }
   try {
+    const t = Date.now();
     const [{ n }] = await sql<{ n: number }[]>`SELECT count(*)::int AS n FROM users`;
-    return Response.json({ ok: true, db: "ok", users: n > 0 ? "set up" : "no users yet (set SEED_PASSWORD and redeploy)" });
+    const dbMs = Date.now() - t;
+    return Response.json({ ok: true, db: "ok", region, dbMs, users: n > 0 ? "set up" : "no users yet (set SEED_PASSWORD and redeploy)" });
   } catch (e) {
     const code = (e as { code?: string }).code ?? "UNKNOWN";
-    return Response.json({ ok: false, db: "error", code, hint: HINTS[code] ?? "See Vercel function logs" }, { status: 503 });
+    return Response.json({ ok: false, db: "error", code, hint: HINTS[code] ?? "See Vercel function logs", region }, { status: 503 });
   }
 }
