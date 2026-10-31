@@ -30,28 +30,40 @@ async function conflictedPartner(tx: Tx, r: ReqLike): Promise<string | null> {
  * own request (except the Day-25 settlement, which every director signs), nor does anyone linked to the same partner,
  * nor a partner who personally benefits from it.
  */
-export async function eligibleApprovers(tx: Tx, r: ReqLike) {
-  const selfAllowed = r.kind === "settlement";
-  const users = await tx.select({ id: schema.users.id, name: schema.users.name, partnerId: schema.users.partnerId, perms: schema.roles.permissions, isDirector: schema.partners.isDirector })
+type ApproverUser = { id: string; name: string; partnerId: string | null; perms: string[]; isDirector: boolean | null };
+
+// All the active staff who could ever vote — fetched once, then filtered per request in memory.
+const activeStaffApprovers = (tx: Tx) =>
+  tx.select({ id: schema.users.id, name: schema.users.name, partnerId: schema.users.partnerId, perms: schema.roles.permissions, isDirector: schema.partners.isDirector })
     .from(schema.users)
     .innerJoin(schema.roles, eq(schema.roles.id, schema.users.roleId))
     .leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId))
-    .where(and(eq(schema.users.active, true), isNull(schema.users.clientId))); // client logins never vote
-  const requester = users.find((u) => u.id === r.requestedBy);
-  const [{ p: requesterPartner } = { p: null }] = requester ? [{ p: requester.partnerId }]
-    : await tx.select({ p: schema.users.partnerId }).from(schema.users).where(eq(schema.users.id, r.requestedBy));
-  const conflict = await conflictedPartner(tx, r);
+    .where(and(eq(schema.users.active, true), isNull(schema.users.clientId))) as Promise<ApproverUser[]>;
+
+// Pure: who may vote on one request, given the already-fetched staff, the requester's partner and any conflict.
+export function eligibleFrom(users: ApproverUser[], r: ReqLike, requesterPartner: string | null, conflict: string | null): ApproverUser[] {
+  const selfAllowed = r.kind === "settlement";
   const seenPartner = new Set<string>();
   return users.filter((u) => {
     if (!selfAllowed && (u.id === r.requestedBy || (requesterPartner && u.partnerId === requesterPartner))) return false;
     if (conflict && u.partnerId === conflict) return false;
     let ok = false;
-    if (r.approverPool === "directors") ok = !!u.isDirector && (u.perms as string[]).includes("approvals.decide");
-    else if (r.approverPool.startsWith("permission:")) ok = (u.perms as string[]).includes(r.approverPool.slice(11) as Permission);
+    if (r.approverPool === "directors") ok = !!u.isDirector && u.perms.includes("approvals.decide");
+    else if (r.approverPool.startsWith("permission:")) ok = u.perms.includes(r.approverPool.slice(11) as Permission);
     // One vote per partner, however many logins might point at them.
     if (ok && u.partnerId) { if (seenPartner.has(u.partnerId)) return false; seenPartner.add(u.partnerId); }
     return ok;
   });
+}
+
+export async function eligibleApprovers(tx: Tx, r: ReqLike) {
+  const users = await activeStaffApprovers(tx);
+  let requesterPartner = users.find((u) => u.id === r.requestedBy)?.partnerId ?? null;
+  if (!users.some((u) => u.id === r.requestedBy)) {
+    const [row] = await tx.select({ p: schema.users.partnerId }).from(schema.users).where(eq(schema.users.id, r.requestedBy));
+    requesterPartner = row?.p ?? null;
+  }
+  return eligibleFrom(users, r, requesterPartner, await conflictedPartner(tx, r));
 }
 
 /** For "all directors must agree": every director partner who is allowed to vote on it, counted from the partners table. */
@@ -307,14 +319,27 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
 export async function pendingForUser(tx: Tx, userId: string) {
   const pending = await tx.select().from(schema.approvalRequests).where(eq(schema.approvalRequests.status, "pending"));
   if (!pending.length) return [];
-  const voted = await tx.select({ requestId: schema.approvalDecisions.requestId }).from(schema.approvalDecisions)
-    .where(and(eq(schema.approvalDecisions.userId, userId), inArray(schema.approvalDecisions.requestId, pending.map((p) => p.id))));
+  // Fetch everything eligibility needs ONCE, then decide each request in memory — no per-request queries.
+  const expenseIds = pending.filter((p) => p.kind === "expense").map((p) => p.entityId);
+  const [voted, users, expRows] = await Promise.all([
+    tx.select({ requestId: schema.approvalDecisions.requestId }).from(schema.approvalDecisions)
+      .where(and(eq(schema.approvalDecisions.userId, userId), inArray(schema.approvalDecisions.requestId, pending.map((p) => p.id)))),
+    activeStaffApprovers(tx),
+    expenseIds.length
+      ? tx.select({ id: schema.expenses.id, p: schema.expenses.partnerId, by: schema.expenses.paidBy }).from(schema.expenses).where(inArray(schema.expenses.id, expenseIds))
+      : Promise.resolve([] as { id: string; p: string | null; by: string }[]),
+  ]);
+  if (!users.some((u) => u.id === userId)) return []; // only active staff vote
   const votedSet = new Set(voted.map((v) => v.requestId));
+  const partnerOf = new Map(users.map((u) => [u.id, u.partnerId] as const));
+  const expenseConflict = new Map(expRows.map((e) => [e.id, e.by === "partner" ? e.p : null] as const));
   const out: Req[] = [];
   for (const p of pending) {
     if (votedSet.has(p.id)) continue;
-    const el = await eligibleApprovers(tx, p);
-    if (el.some((e) => e.id === userId)) out.push(p);
+    let conflict: string | null = null;
+    if (p.kind === "expense") conflict = expenseConflict.get(p.entityId) ?? null;
+    else if (p.kind === "governance" || p.kind === "supplier" || p.kind === "bsp") conflict = (p.payload as { partnerId?: string } | null)?.partnerId ?? null;
+    if (eligibleFrom(users, p, partnerOf.get(p.requestedBy) ?? null, conflict).some((e) => e.id === userId)) out.push(p);
   }
   return out;
 }
