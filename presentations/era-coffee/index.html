@@ -220,6 +220,60 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
 .closing .contacts span{direction:ltr;unicode-bidi:isolate}
 .closing .contacts i{font-style:normal;color:#cdb99d;font-size:20px;display:block;margin-bottom:6px;font-family:var(--f-body)}
 .closing .logo{margin-top:70px;height:64px;opacity:.95}
+
+/* ===== about ===== */
+.about .arch{position:absolute;left:150px;top:140px;width:520px;height:720px}
+.about .arch img{object-position:50% 20%;filter:sepia(.2) contrast(1.03)}
+.about .cap{position:absolute;left:150px;width:520px;top:885px;text-align:center;display:flex;flex-direction:column;gap:6px}
+.about .cap b{font-family:var(--f-title);font-size:40px;color:var(--cream);font-weight:700}
+.about .cap span{font-family:var(--f-kufi);font-size:20px;color:var(--gold)}
+.about .txt{position:absolute;right:150px;top:150px;width:1000px}
+.about p.lead{margin-top:24px}
+.vals{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:56px}
+.vals div{padding:30px 28px;border-radius:18px;background:rgba(201,160,99,.08);border:1px solid rgba(226,196,142,.3)}
+.vals b{display:block;font-family:var(--f-kufi);font-size:28px;color:var(--gold-soft);font-weight:600;margin-bottom:10px}
+.vals span{font-size:21px;line-height:1.6;color:#cdb99d}
+.near{display:inline-flex;align-items:center;gap:14px;margin-top:48px;font-family:var(--f-kufi);font-size:23px;color:var(--cream);padding:14px 26px;border-radius:999px;background:rgba(201,160,99,.14)}
+.near svg{width:28px;height:28px;stroke:var(--gold);fill:none;stroke-width:1.8}
+
+/* ===== leave ===== */
+.leave .head{top:140px}
+.cal{position:absolute;left:150px;right:150px;top:370px;background:rgba(255,250,242,.75);border:1px solid rgba(107,67,48,.16);border-radius:24px;padding:30px 40px 26px;box-shadow:0 24px 50px -30px rgba(59,36,24,.45)}
+.cal-h{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-kufi);font-size:24px;color:var(--roast);margin-bottom:22px}
+.legend{display:flex;align-items:center;gap:12px;font-size:19px;color:var(--muted)}
+.legend i{width:18px;height:18px;border-radius:5px;display:inline-block;margin-inline-start:18px}
+.low{--c:#5f7d4f}.mid{--c:#d9b77a}.peak{--c:#a33c28}
+.legend i{background:var(--c)}
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+.m{text-align:center;display:flex;flex-direction:column;justify-content:flex-end}
+.months{align-items:end;height:190px}
+.m .bar{display:block;height:64px;border-radius:12px;background:var(--c);margin-bottom:12px}
+.m.low .bar{height:44px}.m.mid .bar{height:80px}.m.peak .bar{height:124px}
+.m b{display:block;font-family:var(--f-kufi);font-size:21px;color:var(--roast);font-weight:500}
+.m small{display:block;font-size:15px;color:#a33c28;min-height:20px}
+.cards3{position:absolute;left:150px;right:150px;top:720px;display:grid;grid-template-columns:repeat(3,1fr);gap:36px}
+.lc{display:flex;gap:24px;align-items:flex-start}
+.lc .ic{flex:none;width:76px;height:76px;border-radius:50%;background:var(--roast);display:grid;place-items:center}
+.lc .ic svg{width:38px;height:38px;stroke:var(--gold-soft);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.lc h3{font-family:var(--f-kufi);font-size:30px;color:var(--roast);font-weight:600;margin:6px 0 8px}
+.lc p{font-size:22px;line-height:1.6;color:var(--muted)}
+.cal-note{position:absolute;right:150px;bottom:60px;font-size:17px;color:#a08a76}
+
+/* ===== 360 ===== */
+.full .txt{position:absolute;right:150px;top:220px;width:720px}
+.full p.lead{margin-top:28px}
+.pills{display:flex;gap:16px;margin-top:44px;flex-wrap:wrap}
+.pills span{font-family:var(--f-kufi);font-size:22px;color:var(--gold-soft);border:1.5px solid rgba(226,196,142,.55);border-radius:999px;padding:10px 24px}
+.ringwrap{position:absolute;left:150px;top:110px;width:820px;height:820px}
+.orbit{position:absolute;inset:80px;border-radius:50%;border:1.5px dashed rgba(226,196,142,.45)}
+.orbit.o2{inset:250px;border:1px solid rgba(226,196,142,.2)}
+.core{position:absolute;left:50%;top:50%;width:250px;height:250px;margin:-125px 0 0 -125px;border-radius:50%;background:radial-gradient(circle,#4a2d1d,#2a1a11);border:2px solid var(--gold);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;box-shadow:0 0 0 14px rgba(201,160,99,.1),0 0 80px rgba(201,160,99,.25)}
+.core img{width:110px}
+.core b{font-family:var(--f-kufi);font-size:46px;color:var(--cream);font-weight:600;direction:ltr}
+.node{position:absolute;left:calc(50% + 330px * sin(var(--a)));top:calc(50% - 330px * cos(var(--a)));transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:10px;width:200px;text-align:center}
+.node .ic{width:92px;height:92px;border-radius:50%;background:var(--cream);display:grid;place-items:center;box-shadow:0 0 0 6px rgba(201,160,99,.25)}
+.node .ic svg{width:44px;height:44px;stroke:var(--roast);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.node span{font-family:var(--f-kufi);font-size:21px;color:var(--cream);line-height:1.3;background:rgba(31,20,14,.7);padding:2px 8px;border-radius:8px}
 </style>
 </head>
 <body>
@@ -266,7 +320,7 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
   </defs>
 </svg>
 
-<!-- ============ 1. COVER ============ -->
+<!-- ============ COVER ============ -->
 <section class="slide dark cover">
   <div class="glow"></div>
   <div class="arch"><img src="img/wing.jpg" alt=""></div>
@@ -282,8 +336,25 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
   </div>
   <div class="sadu bottom"></div>
 </section>
+<!-- ============ ABOUT MADA ============ -->
+<section class="slide dark about">
+  <div class="arch"><img src="img/founder.jpg" alt="بدر السليمان"></div>
+  <div class="cap"><b>بدر السليمان</b><span>المؤسس والرئيس التنفيذي</span></div>
+  <div class="txt">
+    <div class="eyebrow">من نحن</div>
+    <h2>مادا… يعني <span class="gold">المدى</span></h2>
+    <p class="lead">شركة سعودية من قلب الرياض. فريق واحد يرتّب السفر والإقامة والتأشيرات، ويوفّر الكفاءات، ويقيم الفعاليات، ويُبقي أعمالكم تمشي بلا انقطاع.</p>
+    <div class="vals">
+      <div><b>الضيافة أولاً</b><span>كل موظف عندكم ضيفنا، من أول اتصال لين يرجع</span></div>
+      <div><b>فريق واحد، خط واحد</b><span>لا تحويلات ولا ملاحقة؛ جهة وحدة مسؤولة عن النتيجة</span></div>
+      <div><b>نعرف المملكة</b><span>معرفة محلية ومعايير عالمية، على خطى رؤية ٢٠٣٠</span></div>
+    </div>
+    <div class="near"><svg viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>جيرانكم في حطين · طريق الأمير محمد بن سعد، الرياض</div>
+  </div>
+  <div class="sadu bottom thin"></div>
+</section>
 
-<!-- ============ 2. OPENING ============ -->
+<!-- ============ OPENING ============ -->
 <section class="slide opening">
   <div class="bg"><img src="img/heritage.jpg" alt=""></div>
   <div class="chip"><img src="img/symbol-gold.svg" alt="">مادا تربس × قهوة إرا</div>
@@ -293,10 +364,8 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
     <p>القهوة عندنا كرم وضيافة وأصالة، وأنتم أهلها. ونحن في مادا تربس نؤمن إن الضيافة ما تكمل إلا بالاهتمام؛ اهتمام بالموظف قبل ما يسافر، وهو مسافر، ولين يرجع لعمله مرتاح وفي موعده.</p>
   </div>
   <svg class="dallah" viewBox="0 0 220 300"><use href="#dallah"/></svg>
-  <div class="pg">٠٢</div>
 </section>
-
-<!-- ============ 3. CHALLENGE ============ -->
+<!-- ============ CHALLENGE ============ -->
 <section class="slide light challenge">
   <div class="chip"><img src="img/symbol-gold.svg" alt="" style="filter:brightness(.6)">نفهم يومكم</div>
   <div class="head">
@@ -326,10 +395,8 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
       <p>حجوزات من أكثر من جهة، وفواتير متفرقة، وبدون صورة واضحة.</p>
     </div>
   </div>
-  <div class="pg">٠٣</div>
 </section>
-
-<!-- ============ 4. PROMISE ============ -->
+<!-- ============ PROMISE ============ -->
 <section class="slide dark promise">
   <div class="chip"><img src="img/symbol-gold.svg" alt="">وعدنا لكم</div>
   <div class="head">
@@ -355,29 +422,27 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
   </div>
   <div class="sadu bottom thin"></div>
 </section>
-
-<!-- ============ 5. SERVICES ============ -->
-<section class="slide light services">
-  <div class="side">
-    <div class="eyebrow" style="color:var(--gold)">خدماتنا لموظفيكم</div>
-    <h2>كل احتياجهم<br>من باب واحد</h2>
-    <p class="lead">جهة وحدة تتعاملون معها، وفاتورة وحدة كل شهر، وفريق يعرف موظفيكم بالاسم.</p>
-    <svg class="finjan" viewBox="0 0 200 150"><use href="#finjan"/></svg>
+<!-- ============ LEAVE MANAGEMENT ============ -->
+<section class="slide light leave">
+  <div class="chip"><img src="img/symbol-gold.svg" alt="" style="filter:brightness(.6)">مشمول في الشراكة</div>
+  <div class="head">
+    <div class="eyebrow">نظام إدارة الإجازات</div>
+    <h2>ندير إجازاتكم… على أرخص المواسم</h2>
   </div>
-  <div class="grid8">
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M2 16l20-6-3-3-7 2-6-5-2 1 4 6-4 1-2-2-1 1 2 4z"/><path d="M3 21h18"/></svg></div><div><h3>تذاكر الإجازات السنوية</h3><p>ذهاب وعودة مؤكدة لبلد الموظف</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg></div><div><h3>رحلات العمل والتدريب</h3><p>للإدارة والفرق بين الفروع والمدن</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M9 16h6"/></svg></div><div><h3>تأشيرات الخروج والعودة</h3><p>تجهيز ومتابعة المواعيد والتمديد</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M19 8v6M16 11h6"/></svg></div><div><h3>وصول الموظفين الجدد</h3><p>تذكرة القدوم والاستقبال في المطار</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/></svg></div><div><h3>الفنادق والسكن</h3><p>إقامة مريحة بأسعار الشركات</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/><path d="M5 12h14"/></svg></div><div><h3>التنقّل والاستقبال</h3><p>توصيل من وإلى المطار في الوقت</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></div><div><h3>التعديل والطوارئ</h3><p>تغيير الحجز أو الرجعة المبكرة بسرعة</p></div></div>
-    <div class="svc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div><div><h3>تقارير شهرية</h3><p>المصاريف والإجازات والالتزام بالعودة</p></div></div>
+  <div class="cal">
+    <div class="cal-h"><span>تقويم أسعار السفر · مثال لعام ٢٠٢٧</span>
+      <span class="legend"><i class="low"></i>نافذة سفر مثالية<i class="mid"></i>متوسط<i class="peak"></i>موسم ذروة</span></div>
+    <div class="months"><div class="m low"><span class="bar"></span><b>يناير</b><small></small></div><div class="m low"><span class="bar"></span><b>فبراير</b><small></small></div><div class="m peak"><span class="bar"></span><b>مارس</b><small>عيد الفطر</small></div><div class="m low"><span class="bar"></span><b>أبريل</b><small></small></div><div class="m peak"><span class="bar"></span><b>مايو</b><small>عيد الأضحى</small></div><div class="m peak"><span class="bar"></span><b>يونيو</b><small>الصيف</small></div><div class="m peak"><span class="bar"></span><b>يوليو</b><small></small></div><div class="m peak"><span class="bar"></span><b>أغسطس</b><small></small></div><div class="m mid"><span class="bar"></span><b>سبتمبر</b><small></small></div><div class="m low"><span class="bar"></span><b>أكتوبر</b><small></small></div><div class="m low"><span class="bar"></span><b>نوفمبر</b><small></small></div><div class="m mid"><span class="bar"></span><b>ديسمبر</b><small></small></div></div>
   </div>
-  <div class="pg">٠٥</div>
+  <div class="cards3">
+    <div class="lc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><div><h3>نوافذ السفر الأرخص</h3><p>نوزّع إجازات الفريق على الفترات الأقل سعراً، ونحجز قبلها بوقت كافٍ.</p></div></div>
+    <div class="lc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg></div><div><h3>كل موظف ياخذ إجازته</h3><p>نتابع رصيد الإجازات، فما تتراكم ولا تنسى، والموظف يرجع مرتاح.</p></div></div>
+    <div class="lc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6M16 14c3 0 6 2 6 5"/></svg></div><div><h3>الفرع دايماً مكتمل</h3><p>جدول متوازن يضمن ما يسافر أكثر من العدد المسموح من كل فرع بنفس الوقت.</p></div></div>
+  </div>
+  <div class="cal-note">* الفترات توضيحية، ونحدّثها لكم كل سنة حسب وجهات موظفيكم والمواسم.</div>
 </section>
 
-<!-- ============ 6. JOURNEY ============ -->
+<!-- ============ JOURNEY ============ -->
 <section class="slide dark journey">
   <div class="arch"><img src="img/passport.jpg" alt=""></div>
   <div class="head">
@@ -394,8 +459,7 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
   </div>
   <div class="sadu bottom thin"></div>
 </section>
-
-<!-- ============ 7. ON TIME ============ -->
+<!-- ============ ON TIME ============ -->
 <section class="slide light ontime">
   <div class="board">
     <div class="bh"><h4>لوحة متابعة الإجازات · قهوة إرا</h4><span>نوفمبر ٢٠٢٦</span></div>
@@ -421,44 +485,39 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
     <li><svg viewBox="0 0 24 24" fill="none" stroke="#a8774e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3 3 7-7"/></svg><span><b>تنبيه فوري لكم</b> عند أي تأخير أو إلغاء، مع البديل جاهز.</span></li>
     <li><svg viewBox="0 0 24 24" fill="none" stroke="#a8774e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3 3 7-7"/></svg><span><b>تقرير أسبوعي</b> بمن هو مسافر ومن راجع ومتى.</span></li>
   </ul>
-  <div class="pg">٠٧</div>
 </section>
-
-<!-- ============ 8. BEST RATE ============ -->
+<!-- ============ BEST RATE ============ -->
 <section class="slide dark rate">
   <div class="photo"><img src="img/kingdom-tower.jpg" alt=""></div>
-  <div class="stamp"><div><b>بدون<br>رسوم خفية</b><small>سعر واضح من أول مرة</small></div></div>
+  <div class="stamp"><div><b>١٠ أيام</b><small>آجل بعد الفاتورة</small></div></div>
   <div class="head">
-    <div class="eyebrow">أفضل سعر</div>
-    <h2>نوفّر عليكم… بدون ما تتعبون</h2>
+    <div class="eyebrow">الأسعار والشروط</div>
+    <h2>أرخص تذكرة… وتدفعون براحتكم</h2>
   </div>
   <div class="list">
-    <div class="it"><h3>الحجز المبكر</h3><p>نخطط مع جدول إجازاتكم ونحجز قبل ارتفاع أسعار المواسم.</p></div>
-    <div class="it"><h3>مقارنة شاملة</h3><p>نراجع أكثر من شركة طيران ومسار، ونرشّح الأنسب سعراً ووقتاً.</p></div>
-    <div class="it"><h3>أسعار الشركات</h3><p>نستفيد من علاقاتنا مع شركات الطيران والفنادق لصالحكم.</p></div>
-    <div class="it"><h3>فاتورة شهرية وحدة</h3><p>كل الحجوزات في كشف واحد واضح، يسهّل على المالية والمراجعة.</p></div>
+    <div class="it"><h3>أرخص سعر متاح</h3><p>نحجز في نوافذ السفر الأرخص ونقارن بين أكثر من شركة طيران ومسار.</p></div>
+    <div class="it"><h3>أسعار الشركات</h3><p>علاقاتنا مع شركات الطيران والفنادق تشتغل لصالحكم، وبدون رسوم خفية.</p></div>
+    <div class="it"><h3>آجل ١٠ أيام</h3><p>حدّ ائتماني لقهوة إرا؛ تسافرون اليوم وتسددون خلال ١٠ أيام من الفاتورة.</p></div>
+    <div class="it"><h3>فاتورة شهرية وحدة</h3><p>كل الحجوزات في كشف واحد واضح، ومدير حساب متواجد ٢٤/٧.</p></div>
   </div>
-  <div class="pg">٠٨</div>
 </section>
-
-<!-- ============ 9. ONE CONTACT ============ -->
-<section class="slide light contact1">
-  <div class="chip"><img src="img/symbol-gold.svg" alt="" style="filter:brightness(.6)">مادا تربس × قهوة إرا</div>
-  <div class="head">
-    <div class="eyebrow">خدمة شخصية</div>
-    <h2>شخص واحد يعرفكم… ويرد عليكم</h2>
-    <p class="lead">ما تحتاجون تشرحون من جديد كل مرة؛ مدير حسابكم يعرف فروعكم وموظفيكم وطريقة شغلكم.</p>
+<!-- ============ 360 ============ -->
+<section class="slide dark full">
+  <div class="ringwrap">
+    <div class="orbit"></div><div class="orbit o2"></div>
+    <div class="core"><img src="img/symbol-gold.svg" alt=""><b>٣٦٠°</b></div>
+    <div class="node" style="--a:0.0deg"><div class="ic"><svg viewBox="0 0 24 24"><path d="M2 16l20-6-3-3-7 2-6-5-2 1 4 6-4 1-2-2-1 1 2 4z"/></svg></div><span>السفر والتذاكر</span></div><div class="node" style="--a:40.0deg"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 15l2 2 4-4"/></svg></div><span>إدارة الإجازات</span></div><div class="node" style="--a:80.0deg"><div class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M9 16h6"/></svg></div><span>التأشيرات</span></div><div class="node" style="--a:120.0deg"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 18V8M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/></svg></div><span>الفنادق والسكن</span></div><div class="node" style="--a:160.0deg"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M19 8v6M16 11h6"/></svg></div><span>القوى العاملة</span></div><div class="node" style="--a:200.0deg"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 21l4-12 7 7z"/><path d="M14 4v2M19 9h2M17 6l1.5-1.5M12 9c1-2 3-3 5-2"/></svg></div><span>الفعاليات والافتتاحات</span></div><div class="node" style="--a:240.0deg"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1"/></svg></div><span>السوشال ميديا والمحتوى</span></div><div class="node" style="--a:280.0deg"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 0 0 1 1h3l6 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M17 8a5 5 0 0 1 0 8M20 5a9 9 0 0 1 0 14"/></svg></div><span>العلاقات العامة والإعلام</span></div><div class="node" style="--a:320.0deg"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div><span>الحلول التقنية</span></div>
   </div>
-  <div class="stats">
-    <div class="stat"><b>١</b><h3>مدير حساب مخصّص</h3><p>نقطة تواصل وحدة لكل طلباتكم</p></div>
-    <div class="stat"><b>٢٤/٧</b><h3>متواجدين دائماً</h3><p>واتساب واتصال حتى في الطوارئ والليل</p></div>
-    <div class="stat"><b>١</b><h3>فاتورة كل شهر</h3><p>بدل عشرات الإيصالات المتفرقة</p></div>
-    <div class="stat"><b>٠</b><h3>رسوم خفية</h3><p>السعر اللي يوصلكم هو السعر النهائي</p></div>
+  <div class="txt">
+    <div class="eyebrow">أكثر من وكالة سفر</div>
+    <h2>شريك واحد<br><span class="gold">لكل احتياجكم</span></h2>
+    <p class="lead">من تذكرة الموظف، إلى افتتاح فرعكم الجديد، إلى حضوركم في السوشال ميديا والإعلام. كل شيء عند فريق واحد يعرفكم، وبنفس مستوى الخدمة.</p>
+    <div class="pills"><span>فاتورة وحدة</span><span>مدير حساب واحد</span><span>جودة وحدة</span></div>
   </div>
   <div class="sadu bottom thin"></div>
 </section>
 
-<!-- ============ 10. START ============ -->
+<!-- ============ START ============ -->
 <section class="slide light start">
   <div class="chip"><img src="img/symbol-gold.svg" alt="" style="filter:brightness(.6)">الخطوة الجاية</div>
   <div class="head">
@@ -470,10 +529,8 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
     <div class="pstep"><div class="n">٢</div><div class="when">الأسبوع الثاني</div><h3>جدول الإجازات</h3><p>نستلم قائمة الموظفين وإجازاتهم القادمة، ونرتّب خطة الحجز المبكر.</p></div>
     <div class="pstep"><div class="n">٣</div><div class="when">أول شهر</div><h3>نشتغل وتحكمون</h3><p>نبدأ بأول الحجوزات والمتابعة، وتشوفون الفرق في التقرير الشهري.</p></div>
   </div>
-  <div class="pg">١٠</div>
 </section>
-
-<!-- ============ 11. CLOSING ============ -->
+<!-- ============ CLOSING ============ -->
 <section class="slide dark closing">
   <div class="bg"><img src="img/alula-stars.jpg" alt=""></div>
   <div class="center">
@@ -490,5 +547,12 @@ p.lead{font-size:30px;line-height:1.75;color:var(--muted);font-weight:400}
   <div class="sadu bottom"></div>
 </section>
 
+<script>
+document.querySelectorAll('.slide').forEach((el,i,all)=>{
+  if(i===0||i===all.length-1)return;
+  const d=document.createElement('div');d.className='pg';
+  d.textContent=String(i+1).padStart(2,'0').replace(/\d/g,c=>'٠١٢٣٤٥٦٧٨٩'[c]);el.appendChild(d);
+});
+</script>
 </body>
 </html>
