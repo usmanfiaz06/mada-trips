@@ -1,8 +1,9 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { StampImg } from "./stamp-img";
+import { AirlineLogo } from "./airline-logo";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData,
-  receiptTotals, money2, nights,
+  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Segment,
+  receiptTotals, money2, nights, layoverMinutes, fmtDuration,
 } from "./types";
 
 const GREEN = "#1e352d", GOLD = "#d9b77a", INK = "#14211c", SUB = "#6b7a71", HAIR = "#e6e9e6";
@@ -130,31 +131,70 @@ function Itinerary({ d, locale }: { d: ItineraryData; locale: string }) {
       </div>
 
       <SectionTitle>Flights</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {d.segments.map((s, i) => (
-          <div key={i} style={{ border: `1px solid ${HAIR}`, borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>{[s.airline, s.flightNo].filter(Boolean).join(" ") || "Flight"}</div>
-              <div style={{ fontSize: 11, color: SUB }}>{[s.cabin, s.baggage && `${s.baggage} bags`].filter(Boolean).join(" · ")}</div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.fromCode || "—"}</div>
-                <div style={{ fontSize: 11, color: SUB }}>{s.fromCity}</div>
-                <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.departDate, locale)} {s.departTime}</div>
-              </div>
-              <div style={{ color: GOLD, fontSize: 18 }}>→</div>
-              <div style={{ textAlign: "end" }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.toCode || "—"}</div>
-                <div style={{ fontSize: 11, color: SUB }}>{s.toCity}</div>
-                <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.arriveDate, locale)} {s.arriveTime}</div>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {d.segments.map((s, i) => {
+          const prev = i > 0 ? d.segments[i - 1] : null;
+          return (
+            <Fragment key={i}>
+              {prev && (s.newJourney ? <JourneyDivider /> : <LayoverBar prev={prev} next={s} locale={locale} />)}
+              <FlightCard s={s} locale={locale} />
+            </Fragment>
+          );
+        })}
       </div>
 
       {d.notes.trim() && <Notes text={d.notes} />}
+    </div>
+  );
+}
+
+function FlightCard({ s, locale }: { s: Segment; locale: string }) {
+  return (
+    <div style={{ border: `1px solid ${HAIR}`, borderRadius: 12, padding: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <AirlineLogo code={s.airlineCode} name={s.airline} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: GREEN }}>{[s.airline, s.flightNo].filter(Boolean).join(" ") || "Flight"}</div>
+        </div>
+        <div style={{ fontSize: 11, color: SUB, whiteSpace: "nowrap" }}>{[s.cabin, s.baggage && `${s.baggage} bags`].filter(Boolean).join(" · ")}</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.fromCode || "—"}</div>
+          <div style={{ fontSize: 11, color: SUB }}>{s.fromCity}</div>
+          <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.departDate, locale)} {s.departTime}</div>
+        </div>
+        <div style={{ color: GOLD, fontSize: 18 }}>→</div>
+        <div style={{ textAlign: "end" }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.toCode || "—"}</div>
+          <div style={{ fontSize: 11, color: SUB }}>{s.toCity}</div>
+          <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.arriveDate, locale)} {s.arriveTime}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LayoverBar({ prev, next }: { prev: Segment; next: Segment; locale: string }) {
+  const mins = layoverMinutes(prev, next);
+  const place = prev.toCity || prev.toCode || next.fromCity || next.fromCode;
+  const changed = prev.toCode && next.fromCode && prev.toCode !== next.fromCode;
+  const text = ["Layover", place && `in ${place}`, mins != null && fmtDuration(mins), changed && `change to ${next.fromCode}`].filter(Boolean).join(" · ");
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "1px 10px" }}>
+      <div style={{ flex: 1, height: 1, background: HAIR }} />
+      <div style={{ fontSize: 10, color: SUB, whiteSpace: "nowrap", letterSpacing: "0.02em" }}>{text}</div>
+      <div style={{ flex: 1, height: 1, background: HAIR }} />
+    </div>
+  );
+}
+
+function JourneyDivider() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 2px" }}>
+      <div style={{ flex: 1, height: 1, background: HAIR }} />
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: "0.12em", textTransform: "uppercase", whiteSpace: "nowrap" }}>Return / onward</div>
+      <div style={{ flex: 1, height: 1, background: HAIR }} />
     </div>
   );
 }
