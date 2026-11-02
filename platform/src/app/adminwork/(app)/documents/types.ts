@@ -1,5 +1,6 @@
 // Shared shapes for the three branded document types. Kept framework-free (no server-only imports) so the
 // same types and helpers are used by the client builder, the presentational sheet and the server action.
+import { AIRLINES } from "@/lib/travel-data";
 
 export type DocType = "itinerary" | "voucher" | "receipt";
 export const DOC_TYPES: DocType[] = ["itinerary", "voucher", "receipt"];
@@ -7,10 +8,13 @@ export const REF_PREFIX: Record<DocType, string> = { itinerary: "TKT", voucher: 
 
 export type Pax = { name: string; kind: string }; // kind: Adult | Child | Infant
 export type Segment = {
-  airline: string; flightNo: string;
+  airline: string; airlineCode: string; flightNo: string;
   fromCode: string; fromCity: string; toCode: string; toCity: string;
   departDate: string; departTime: string; arriveDate: string; arriveTime: string;
   cabin: string; baggage: string;
+  // True when this leg begins a new journey (e.g. the return), so a "Return / onward" divider is shown
+  // before it instead of a layover. Left off for connecting legs within the same journey.
+  newJourney?: boolean;
 };
 export type ItineraryData = {
   bookingRef: string;        // airline PNR / booking reference
@@ -56,7 +60,7 @@ export const DEFAULT_COMPANY: Company = {
 export function blankData(type: DocType): DocData {
   if (type === "itinerary") return {
     bookingRef: "", passengers: [{ name: "", kind: "Adult" }],
-    segments: [{ airline: "", flightNo: "", fromCode: "", fromCity: "", toCode: "", toCity: "", departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "" }],
+    segments: [{ airline: "", airlineCode: "", flightNo: "", fromCode: "", fromCity: "", toCode: "", toCity: "", departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "" }],
     ticketNumbers: "", notes: "", authorisedBy: "", stamp: false,
   };
   if (type === "voucher") return {
@@ -86,4 +90,29 @@ export function nights(checkIn: string, checkOut: string): number | null {
   const a = Date.parse(checkIn + "T00:00:00Z"), b = Date.parse(checkOut + "T00:00:00Z");
   if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return null;
   return Math.round((b - a) / 86_400_000);
+}
+
+/* ─── Airlines & layovers ─── */
+
+// Resolve a typed/selected airline name to its IATA code (for the logo). Empty string when unknown.
+export const AIRLINE_BY_NAME = new Map(AIRLINES.map((a) => [a.name.toLowerCase(), a.code] as const));
+// Airline logos, keyed by IATA code, from a stable public logo CDN. Name is shown as the fallback.
+export const airlineLogoUrl = (code: string) => `https://pics.avs.io/120/40/${code}.png`;
+
+function stamp(date: string, time: string): number | null {
+  if (!date) return null;
+  const t = /^\d{1,2}:\d{2}$/.test(time) ? time.padStart(5, "0") : "00:00";
+  const ms = Date.parse(`${date}T${t}:00`);
+  return Number.isFinite(ms) ? ms : null;
+}
+// Minutes of layover between landing on `prev` and taking off on `next`, or null if times are missing/odd.
+export function layoverMinutes(prev: Segment, next: Segment): number | null {
+  const a = stamp(prev.arriveDate, prev.arriveTime), b = stamp(next.departDate, next.departTime);
+  if (a == null || b == null) return null;
+  const m = Math.round((b - a) / 60_000);
+  return m > 0 && m < 7 * 24 * 60 ? m : null; // ignore gaps over a week (that's a trip, not a layover)
+}
+export function fmtDuration(mins: number): string {
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`;
 }

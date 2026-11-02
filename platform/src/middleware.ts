@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://pics.avs.io",
     "font-src 'self' data:",
     `connect-src 'self'${dev ? " ws:" : ""}`,
     "frame-src 'self'",
