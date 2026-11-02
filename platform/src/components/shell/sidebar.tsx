@@ -6,12 +6,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange,
   Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart, Menu, X, LogOut,
-  Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen,
+  Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen, FileBadge,
 } from "lucide-react";
 import { cx } from "../ui";
 import { useT } from "@/lib/i18n/client";
 
-const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart, Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen };
+const ICONS = { LayoutDashboard, Plus, ReceiptText, Ticket, Users2, MoonStar, Stamp, Wallet, Landmark, CalendarRange, Handshake, UserCog, ShieldCheck, History, SlidersHorizontal, ListChecks, Coins, PhoneCall, Inbox, LineChart, Building2, CarFront, MessagesSquare, Home, FileText, FolderOpen, FileBadge };
 export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; count?: number; accent?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 

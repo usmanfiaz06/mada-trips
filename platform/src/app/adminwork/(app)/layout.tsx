@@ -26,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ] },
     { label: t("Operations"), items: [
       { href: "/adminwork/sales", label: t("Sales & bookings"), icon: "ReceiptText" as const },
+      ...(can(u, "documents.issue") ? [{ href: "/adminwork/documents", label: t("Tickets & receipts"), icon: "FileBadge" as const }] : []),
       ...(issuer ? [{ href: "/adminwork/issuance", label: t("Issuance"), icon: "Ticket" as const, count: counts.issuance }] : []),
       ...(can(u, "leads.view") ? [{ href: "/adminwork/leads", label: t("Leads"), icon: "Inbox" as const, count: counts.leads }] : []),
       { href: "/adminwork/clients", label: t("Clients & credit"), icon: "Users2" as const },
