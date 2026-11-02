@@ -569,3 +569,18 @@ export const letters = pgTable("letters", {
   createdBy: uuid("created_by").notNull().references(() => users.id),
   createdAt: createdAt(),
 }, (t) => [index("letters_created_idx").on(t.createdAt)]);
+
+/* ───────────── Branded customer documents ───────────── */
+// Mada-branded itineraries / e-tickets, hotel vouchers and payment receipts, filled in by hand and
+// printed or saved as PDF. The type-specific fields live in `data`; a ledger row is kept for every one.
+export const documents = pgTable("documents", {
+  id: id(),
+  ref: text("ref").notNull().unique(),               // TKT-1001 | VCHR-1001 | RCPT-1001
+  type: text("type").notNull(),                       // itinerary | voucher | receipt
+  title: text("title").notNull(),                     // short label for the ledger
+  forName: text("for_name"),                          // passenger / guest / client — who it's for
+  docDate: date("doc_date").notNull(),
+  data: jsonb("data").notNull().default({}),          // all the type-specific fields
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("documents_created_idx").on(t.createdAt), index("documents_type_idx").on(t.type)]);

@@ -44,3 +44,8 @@ export const CLOSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   submitted: { label: "Waiting for verification", tone: "gold" }, verified: { label: "Verified", tone: "ok" }, flagged: { label: "Flagged", tone: "bad" },
 };
 export const LEDGER_TYPE: Record<string, string> = { advance: "Capital advance", expense: "Expense paid personally", repayment: "Repayment", dividend: "Dividend", deposit: "Cash deposited", withdrawal: "Cash withdrawn" };
+export const DOCUMENT_TYPE: Record<string, { label: string; tone: Tone }> = {
+  itinerary: { label: "Flight itinerary", tone: "info" },
+  voucher: { label: "Hotel voucher", tone: "gold" },
+  receipt: { label: "Payment receipt", tone: "ok" },
+};

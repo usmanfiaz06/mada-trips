@@ -26,6 +26,7 @@ export const PERMISSIONS = {
   "activity.view":       { group: "admin",     en: "See the full activity log",          ar: "عرض سجل النشاط الكامل" },
   "settings.manage":     { group: "admin",     en: "Change limits & rules",              ar: "تعديل الحدود والقواعد" },
   "letters.manage":      { group: "admin",     en: "Write & issue letterhead letters",   ar: "كتابة وإصدار الخطابات الرسمية" },
+  "documents.issue":     { group: "sales",     en: "Issue branded tickets & receipts",   ar: "إصدار التذاكر والإيصالات الرسمية" },
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -50,6 +51,6 @@ export const PARTNER_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== "issue.un
 export const SYSTEM_ROLES: { key: string; name: string; nameAr: string; description: string; permissions: Permission[] }[] = [
   { key: "partner", name: "Partner", nameAr: "شريك", description: "Full access: team, roles, approvals, finance, settlement and settings.", permissions: PARTNER_PERMISSIONS },
   { key: "partner_issuer", name: "Partner · Issuing authority", nameAr: "شريك · صلاحية الإصدار", description: "Full partner access, plus ticket issuing (TTP) and delegating it to staff.", permissions: ALL_PERMISSIONS },
-  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit"] },
-  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit"] },
+  { key: "retail_agent", name: "Retail agent (Riyadh)", nameAr: "موظف مبيعات التجزئة (الرياض)", description: "Serves walk-in and online customers, takes payment, submits the 10 PM close.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "expenses.create", "close.submit", "documents.issue"] },
+  { key: "corporate_agent", name: "Corporate desk (Pakistan)", nameAr: "فريق الشركات (باكستان)", description: "Prepares corporate bookings and invoices. Cannot issue tickets.", permissions: ["sales.create", "clients.manage", "leads.view", "leads.manage", "close.submit", "documents.issue"] },
 ];
