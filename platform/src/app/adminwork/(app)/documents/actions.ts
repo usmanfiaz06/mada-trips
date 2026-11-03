@@ -6,8 +6,8 @@ import { audit } from "@/lib/audit";
 import { nextRef } from "@/lib/refs";
 import { str, toState, type ActionState } from "@/lib/actions";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData,
-  DOC_TYPES, REF_PREFIX, receiptTotals, money2,
+  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type FlightItem,
+  DOC_TYPES, REF_PREFIX, receiptTotals, money2, itineraryItems,
 } from "./types";
 
 const MAX_DATA = 200_000;
@@ -16,8 +16,8 @@ const MAX_DATA = 200_000;
 function summarize(type: DocType, data: ItineraryData | VoucherData | ReceiptData): { title: string; forName: string | null } {
   if (type === "itinerary") {
     const d = data as ItineraryData;
-    const seg = d.segments[0];
-    const route = seg && (seg.fromCode || seg.toCode) ? `${seg.fromCode || "?"} → ${seg.toCode || "?"}` : "Itinerary";
+    const first = itineraryItems(d).find((x) => x.kind === "flight") as FlightItem | undefined;
+    const route = first && (first.fromCode || first.toCode) ? `${first.fromCode || "?"} → ${first.toCode || "?"}` : "Itinerary";
     return { title: route, forName: d.passengers.find((p) => p.name.trim())?.name ?? null };
   }
   if (type === "voucher") {
