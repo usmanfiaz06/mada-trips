@@ -7,23 +7,29 @@ export const DOC_TYPES: DocType[] = ["itinerary", "voucher", "receipt"];
 export const REF_PREFIX: Record<DocType, string> = { itinerary: "TKT", voucher: "VCHR", receipt: "RCPT" };
 
 export type Pax = { name: string; kind: string }; // kind: Adult | Child | Infant
-export type Segment = {
+// A flight leg. The itinerary is an ordered list of these interleaved with explicit layovers and dividers.
+export type FlightItem = {
+  kind: "flight";
   airline: string; airlineCode: string; flightNo: string;
   fromCode: string; fromCity: string; toCode: string; toCity: string;
   departDate: string; departTime: string; arriveDate: string; arriveTime: string;
   cabin: string; baggage: string;
-  // True when this leg begins a new journey (e.g. the return), so a "Return / onward" divider is shown
-  // before it instead of a layover. Left off for connecting legs within the same journey.
-  newJourney?: boolean;
 };
+// A layover is its own explicit step between flights: where, how long, and an optional note.
+export type LayoverItem = { kind: "layover"; place: string; duration: string; note: string };
+// A labelled break between journeys (e.g. "Return"), inserted explicitly for round trips.
+export type DividerItem = { kind: "divider"; label: string };
+export type ItItem = FlightItem | LayoverItem | DividerItem;
+
 export type ItineraryData = {
   bookingRef: string;        // airline PNR / booking reference
   passengers: Pax[];
-  segments: Segment[];
+  items: ItItem[];           // ordered flights, layovers and journey dividers
   ticketNumbers: string;     // free text, one per line
   notes: string;
   authorisedBy: string;
   stamp: boolean;
+  segments?: FlightItem[];   // legacy: documents issued before layovers became explicit items
 };
 export type VoucherData = {
   guest: string;
@@ -54,13 +60,28 @@ export type DocData = ItineraryData | VoucherData | ReceiptData;
 export const VAT_RATE = 0.15;
 
 export const DEFAULT_COMPANY: Company = {
-  name: "Mada Trips", cr: "7055256312", vat: "", address: "Riyadh, Kingdom of Saudi Arabia", phone: "", email: "",
+  name: "Mada Trips", cr: "7055256312", vat: "", address: "Riyadh, Kingdom of Saudi Arabia",
+  phone: "+966 59 305 4981", email: "info@madatrips.sa",
 };
+
+export const blankFlight = (): FlightItem => ({
+  kind: "flight", airline: "", airlineCode: "", flightNo: "", fromCode: "", fromCity: "", toCode: "", toCity: "",
+  departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "",
+});
+export const blankLayover = (place = ""): LayoverItem => ({ kind: "layover", place, duration: "", note: "" });
+export const returnDivider = (): DividerItem => ({ kind: "divider", label: "Return" });
+
+// The ordered itinerary items, reading legacy `segments` as flights for documents issued before layovers existed.
+export function itineraryItems(d: ItineraryData): ItItem[] {
+  if (d.items?.length) return d.items;
+  if (d.segments?.length) return d.segments.map((s) => ({ ...s, kind: "flight" as const }));
+  return [];
+}
 
 export function blankData(type: DocType): DocData {
   if (type === "itinerary") return {
     bookingRef: "", passengers: [{ name: "", kind: "Adult" }],
-    segments: [{ airline: "", airlineCode: "", flightNo: "", fromCode: "", fromCity: "", toCode: "", toCity: "", departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "" }],
+    items: [blankFlight()],
     ticketNumbers: "", notes: "", authorisedBy: "", stamp: false,
   };
   if (type === "voucher") return {
@@ -98,6 +119,10 @@ export function nights(checkIn: string, checkOut: string): number | null {
 export const AIRLINE_BY_NAME = new Map(AIRLINES.map((a) => [a.name.toLowerCase(), a.code] as const));
 // Airline logos, keyed by IATA code, from a stable public logo CDN. Name is shown as the fallback.
 export const airlineLogoUrl = (code: string) => `https://pics.avs.io/120/40/${code}.png`;
+// Codes whose IATA code was reassigned, so the logo CDN still serves the previous airline's brand. We show
+// the airline name only for these rather than a wrong logo (OV: SalamAir shows old Estonian Air; RX: Riyadh
+// Air shows Regent Airways; 9P: Fly Jinnah shows Air Arabia). Re-check and trim as the CDN updates.
+export const LOGO_EXCLUDE = new Set(["OV", "RX", "9P"]);
 
 function stamp(date: string, time: string): number | null {
   if (!date) return null;
@@ -106,7 +131,7 @@ function stamp(date: string, time: string): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 // Minutes of layover between landing on `prev` and taking off on `next`, or null if times are missing/odd.
-export function layoverMinutes(prev: Segment, next: Segment): number | null {
+export function layoverMinutes(prev: FlightItem, next: FlightItem): number | null {
   const a = stamp(prev.arriveDate, prev.arriveTime), b = stamp(next.departDate, next.departTime);
   if (a == null || b == null) return null;
   const m = Math.round((b - a) / 60_000);

@@ -1,13 +1,14 @@
 "use client";
 import { useActionState, useRef, useState, type ReactNode } from "react";
-import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock } from "lucide-react";
+import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2 } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
 import { createDocument } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Pax, type Segment, type LineItem,
-  blankData, AIRLINE_BY_NAME, layoverMinutes, fmtDuration,
+  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Pax, type LineItem,
+  type ItItem, type FlightItem,
+  blankData, blankFlight, blankLayover, returnDivider, AIRLINE_BY_NAME, layoverMinutes, fmtDuration,
 } from "./types";
 
 const PAX_KINDS = ["Adult", "Child", "Infant"];
@@ -120,26 +121,35 @@ const AddBtn = ({ onClick, label }: { onClick: () => void; label: string }) => (
 const DelBtn = ({ onClick }: { onClick: () => void }) => (
   <button type="button" onClick={onClick} className="grid size-8 place-items-center rounded-lg text-ink-4 hover:bg-sunken hover:text-bad"><Trash2 className="size-4" /></button>
 );
-
-function LayoverHint({ prev, next }: { prev: Segment; next: Segment }) {
-  const t = useT();
-  const m = layoverMinutes(prev, next);
-  const place = prev.toCity || prev.toCode;
-  return (
-    <div className="flex items-center gap-1.5 ps-1 text-[11.5px] text-ink-3">
-      <Clock className="size-3.5" />
-      {t("Layover")}{place ? ` · ${place}` : ""}{m != null ? ` · ${fmtDuration(m)}` : ""}
-    </div>
-  );
-}
+const AddPill = ({ onClick, label, icon }: { onClick: () => void; label: string; icon: ReactNode }) => (
+  <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3.5 py-2 text-[12.5px] font-medium text-ink-2 hover:border-ink/40 hover:text-ink">{icon}{label}</button>
+);
 
 /* ─────────── Itinerary form ─────────── */
+// Suggested layover duration for the layover at index i, computed from the flights either side of it.
+function suggestDuration(items: ItItem[], i: number): string | null {
+  const prev = [...items.slice(0, i)].reverse().find((x) => x.kind === "flight") as FlightItem | undefined;
+  const next = items.slice(i + 1).find((x) => x.kind === "flight") as FlightItem | undefined;
+  if (!prev || !next) return null;
+  const m = layoverMinutes(prev, next);
+  return m != null ? fmtDuration(m) : null;
+}
+
 function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryData) => ItineraryData) => void }) {
   const t = useT();
   const patchPax = (i: number, k: keyof Pax, v: string) => set((p) => ({ ...p, passengers: p.passengers.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
-  const patchSeg = (i: number, k: keyof Segment, v: string) => set((p) => ({ ...p, segments: p.segments.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
-  const mergeSeg = (i: number, obj: Partial<Segment>) => set((p) => ({ ...p, segments: p.segments.map((x, j) => j === i ? { ...x, ...obj } : x) }));
-  const pickAirline = (i: number, name: string) => mergeSeg(i, { airline: name, airlineCode: AIRLINE_BY_NAME.get(name.toLowerCase().trim()) ?? "" });
+  const setItems = (f: (arr: ItItem[]) => ItItem[]) => set((p) => ({ ...p, items: f(p.items) }));
+  const patchItem = (i: number, obj: Record<string, string>) => setItems((arr) => arr.map((x, j) => (j === i ? ({ ...x, ...obj } as ItItem) : x)));
+  const removeItem = (i: number) => setItems((arr) => arr.filter((_, j) => j !== i));
+  const pickAirline = (i: number, name: string) => patchItem(i, { airline: name, airlineCode: AIRLINE_BY_NAME.get(name.toLowerCase().trim()) ?? "" });
+  const addFlight = () => setItems((arr) => [...arr, blankFlight()]);
+  const addLayover = () => setItems((arr) => {
+    const last = [...arr].reverse().find((x) => x.kind === "flight") as FlightItem | undefined;
+    return [...arr, blankLayover(last ? (last.toCity || last.toCode) : "")];
+  });
+  const addReturn = () => setItems((arr) => [...arr, returnDivider()]);
+  const flightCount = d.items.filter((x) => x.kind === "flight").length;
+
   return (
     <>
       <Card title={t("Booking")}>
@@ -155,40 +165,66 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
           </div>
         ))}
       </Card>
-      <Card title={t("Flights")} action={<AddBtn onClick={() => set((p) => ({ ...p, segments: [...p.segments, { ...(blankData("itinerary") as ItineraryData).segments[0] }] }))} label={t("Add flight")} />}>
+      <Card title={t("Itinerary")}>
         <datalist id="mada-airlines">{AIRLINES.map((a) => <option key={a.code} value={a.name} />)}</datalist>
-        {d.segments.map((s, i) => {
-          const prev = i > 0 ? d.segments[i - 1] : null;
-          return (
-            <div key={i} className="space-y-2">
-              {prev && !s.newJourney && <LayoverHint prev={prev} next={s} />}
-              {prev && s.newJourney && <div className="pt-1 text-center text-[11px] font-semibold uppercase tracking-wider text-gold">{t("Return / onward journey")}</div>}
-              <div className="rounded-xl border border-line bg-surface-2 p-3 space-y-2">
-                <div className="flex items-center justify-between"><span className="text-[11.5px] font-medium text-ink-3">{t("Flight")} {i + 1}</span>{d.segments.length > 1 && <DelBtn onClick={() => set((q) => ({ ...q, segments: q.segments.filter((_, j) => j !== i) }))} />}</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="block"><Lab>{t("Airline")}</Lab><input list="mada-airlines" value={s.airline} onChange={(e) => pickAirline(i, e.target.value)} placeholder="Saudia" className="field h-10" /></label>
-                  <Txt label={t("Flight no.")} value={s.flightNo} onChange={(v) => patchSeg(i, "flightNo", v)} placeholder="SV1020" />
-                  <Txt label={t("From (code)")} value={s.fromCode} onChange={(v) => patchSeg(i, "fromCode", v.toUpperCase())} placeholder="RUH" />
-                  <Txt label={t("To (code)")} value={s.toCode} onChange={(v) => patchSeg(i, "toCode", v.toUpperCase())} placeholder="JED" />
-                  <Txt label={t("From city")} value={s.fromCity} onChange={(v) => patchSeg(i, "fromCity", v)} placeholder="Riyadh" />
-                  <Txt label={t("To city")} value={s.toCity} onChange={(v) => patchSeg(i, "toCity", v)} placeholder="Jeddah" />
-                  <Txt label={t("Departs — date")} value={s.departDate} onChange={(v) => patchSeg(i, "departDate", v)} placeholder="2026-11-20" />
-                  <Txt label={t("Departs — time")} value={s.departTime} onChange={(v) => patchSeg(i, "departTime", v)} placeholder="08:30" />
-                  <Txt label={t("Arrives — date")} value={s.arriveDate} onChange={(v) => patchSeg(i, "arriveDate", v)} placeholder="2026-11-20" />
-                  <Txt label={t("Arrives — time")} value={s.arriveTime} onChange={(v) => patchSeg(i, "arriveTime", v)} placeholder="10:15" />
-                  <Sel label={t("Cabin")} value={s.cabin} onChange={(v) => patchSeg(i, "cabin", v)} options={CABINS} />
-                  <Txt label={t("Baggage")} value={s.baggage} onChange={(v) => patchSeg(i, "baggage", v)} placeholder="2 × 23kg" />
+        <div className="space-y-2">
+          {d.items.map((it, i) => {
+            if (it.kind === "layover") {
+              const sug = suggestDuration(d.items, i);
+              return (
+                <div key={i} className="rounded-xl border border-dashed border-line-strong bg-sunken/40 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-ink-3"><Clock className="size-3.5" />{t("Layover")}</span>
+                    <DelBtn onClick={() => removeItem(i)} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Txt label={t("Where")} value={it.place} onChange={(v) => patchItem(i, { place: v })} placeholder="Istanbul (IST)" />
+                    <div>
+                      <Txt label={t("How long")} value={it.duration} onChange={(v) => patchItem(i, { duration: v })} placeholder="2h 10m" />
+                      {sug && sug !== it.duration && <button type="button" onClick={() => patchItem(i, { duration: sug })} className="mt-1 text-[11px] font-medium text-gold hover:underline">{t("Use")} {sug}</button>}
+                    </div>
+                  </div>
+                  <Txt label={t("Note (optional)")} value={it.note} onChange={(v) => patchItem(i, { note: v })} placeholder={t("e.g. terminal change, visa needed")} />
                 </div>
-                {i > 0 && (
-                  <label className="flex items-center gap-2 pt-1 text-[12px] text-ink-2">
-                    <input type="checkbox" checked={!!s.newJourney} onChange={(e) => mergeSeg(i, { newJourney: e.target.checked })} />
-                    {t("Starts a new journey (e.g. return) — not a connection")}
-                  </label>
-                )}
+              );
+            }
+            if (it.kind === "divider") {
+              return (
+                <div key={i} className="flex items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3"><Undo2 className="size-3.5" />{t("New journey")}</span>
+                  <input value={it.label} onChange={(e) => patchItem(i, { label: e.target.value })} placeholder="Return" className="field h-9 flex-1" />
+                  <DelBtn onClick={() => removeItem(i)} />
+                </div>
+              );
+            }
+            const fn = d.items.slice(0, i + 1).filter((x) => x.kind === "flight").length;
+            return (
+              <div key={i} className="rounded-xl border border-line bg-surface-2 p-3 space-y-2">
+                <div className="flex items-center justify-between"><span className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-ink-3"><Plane className="size-3.5" />{t("Flight")} {fn}</span>{flightCount > 1 && <DelBtn onClick={() => removeItem(i)} />}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block"><Lab>{t("Airline")}</Lab><input list="mada-airlines" value={it.airline} onChange={(e) => pickAirline(i, e.target.value)} placeholder="Saudia" className="field h-10" /></label>
+                  <Txt label={t("Flight no.")} value={it.flightNo} onChange={(v) => patchItem(i, { flightNo: v })} placeholder="SV1020" />
+                  <Txt label={t("From (code)")} value={it.fromCode} onChange={(v) => patchItem(i, { fromCode: v.toUpperCase() })} placeholder="RUH" />
+                  <Txt label={t("To (code)")} value={it.toCode} onChange={(v) => patchItem(i, { toCode: v.toUpperCase() })} placeholder="JED" />
+                  <Txt label={t("From city")} value={it.fromCity} onChange={(v) => patchItem(i, { fromCity: v })} placeholder="Riyadh" />
+                  <Txt label={t("To city")} value={it.toCity} onChange={(v) => patchItem(i, { toCity: v })} placeholder="Jeddah" />
+                  <Txt label={t("Departs — date")} value={it.departDate} onChange={(v) => patchItem(i, { departDate: v })} placeholder="2026-11-20" />
+                  <Txt label={t("Departs — time")} value={it.departTime} onChange={(v) => patchItem(i, { departTime: v })} placeholder="08:30" />
+                  <Txt label={t("Arrives — date")} value={it.arriveDate} onChange={(v) => patchItem(i, { arriveDate: v })} placeholder="2026-11-20" />
+                  <Txt label={t("Arrives — time")} value={it.arriveTime} onChange={(v) => patchItem(i, { arriveTime: v })} placeholder="10:15" />
+                  <Sel label={t("Cabin")} value={it.cabin} onChange={(v) => patchItem(i, { cabin: v })} options={CABINS} />
+                  <Txt label={t("Baggage")} value={it.baggage} onChange={(v) => patchItem(i, { baggage: v })} placeholder="2 × 23kg" />
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-2 pt-3">
+          <AddPill onClick={addFlight} icon={<Plane className="size-3.5" />} label={t("Add flight")} />
+          <AddPill onClick={addLayover} icon={<Clock className="size-3.5" />} label={t("Add layover")} />
+          <AddPill onClick={addReturn} icon={<Undo2 className="size-3.5" />} label={t("Add return")} />
+        </div>
+        <p className="pt-2 text-[11.5px] text-ink-4">{t("Build the trip top to bottom — add each flight, add a layover between connections, and add a return divider for round trips.")}</p>
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={(v) => set((p) => ({ ...p, notes: v }))} />

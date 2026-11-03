@@ -1,9 +1,9 @@
-import { Fragment, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { StampImg } from "./stamp-img";
 import { AirlineLogo } from "./airline-logo";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Segment,
-  receiptTotals, money2, nights, layoverMinutes, fmtDuration,
+  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type FlightItem, type LayoverItem,
+  receiptTotals, money2, nights, itineraryItems,
 } from "./types";
 
 const GREEN = "#1e352d", GOLD = "#d9b77a", INK = "#14211c", SUB = "#6b7a71", HAIR = "#e6e9e6";
@@ -93,7 +93,7 @@ function Footer({ type, data }: { type: DocType; data: ItineraryData | VoucherDa
   const c = type === "receipt" ? (data as ReceiptData).company : null;
   const parts = c
     ? [c.address, c.phone, c.email, c.cr && `C.R. ${c.cr}`, c.vat && `VAT ${c.vat}`].filter(Boolean)
-    : ["Mada Trips · Riyadh, Kingdom of Saudi Arabia", "madatrips.sa"];
+    : ["Mada Trips · Riyadh, Kingdom of Saudi Arabia", "+966 59 305 4981", "info@madatrips.sa", "madatrips.sa"];
   const note = type === "itinerary"
     ? "This itinerary reflects your confirmed booking. Please carry a valid passport/ID and arrive at the airport at least 3 hours before departure."
     : type === "voucher"
@@ -132,15 +132,11 @@ function Itinerary({ d, locale }: { d: ItineraryData; locale: string }) {
 
       <SectionTitle>Flights</SectionTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {d.segments.map((s, i) => {
-          const prev = i > 0 ? d.segments[i - 1] : null;
-          return (
-            <Fragment key={i}>
-              {prev && (s.newJourney ? <JourneyDivider /> : <LayoverBar prev={prev} next={s} locale={locale} />)}
-              <FlightCard s={s} locale={locale} />
-            </Fragment>
-          );
-        })}
+        {itineraryItems(d).map((it, i) =>
+          it.kind === "flight" ? <FlightCard key={i} s={it} locale={locale} />
+          : it.kind === "layover" ? <LayoverBar key={i} lay={it} />
+          : <JourneyDivider key={i} label={it.label} />
+        )}
       </div>
 
       {d.notes.trim() && <Notes text={d.notes} />}
@@ -148,7 +144,7 @@ function Itinerary({ d, locale }: { d: ItineraryData; locale: string }) {
   );
 }
 
-function FlightCard({ s, locale }: { s: Segment; locale: string }) {
+function FlightCard({ s, locale }: { s: FlightItem; locale: string }) {
   return (
     <div style={{ border: `1px solid ${HAIR}`, borderRadius: 12, padding: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
@@ -175,11 +171,8 @@ function FlightCard({ s, locale }: { s: Segment; locale: string }) {
   );
 }
 
-function LayoverBar({ prev, next }: { prev: Segment; next: Segment; locale: string }) {
-  const mins = layoverMinutes(prev, next);
-  const place = prev.toCity || prev.toCode || next.fromCity || next.fromCode;
-  const changed = prev.toCode && next.fromCode && prev.toCode !== next.fromCode;
-  const text = ["Layover", place && `in ${place}`, mins != null && fmtDuration(mins), changed && `change to ${next.fromCode}`].filter(Boolean).join(" · ");
+function LayoverBar({ lay }: { lay: LayoverItem }) {
+  const text = ["Layover", lay.place && `in ${lay.place}`, lay.duration, lay.note].filter(Boolean).join(" · ");
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "1px 10px" }}>
       <div style={{ flex: 1, height: 1, background: HAIR }} />
@@ -189,11 +182,11 @@ function LayoverBar({ prev, next }: { prev: Segment; next: Segment; locale: stri
   );
 }
 
-function JourneyDivider() {
+function JourneyDivider({ label }: { label: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px 2px" }}>
       <div style={{ flex: 1, height: 1, background: HAIR }} />
-      <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: "0.12em", textTransform: "uppercase", whiteSpace: "nowrap" }}>Return / onward</div>
+      <div style={{ fontSize: 9.5, fontWeight: 700, color: GREEN, letterSpacing: "0.12em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label || "Return"}</div>
       <div style={{ flex: 1, height: 1, background: HAIR }} />
     </div>
   );
