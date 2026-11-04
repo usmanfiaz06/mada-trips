@@ -137,6 +137,8 @@ const RUN: Record<string, Run> = {
     }, ctx.demo);
     const options = r.options.slice(0, 3);
     const search = { destination, destinationName: r.destinationName, from, depart, return: r.return, travellerIds };
+    // Not shown in the app this time (a route or a moment the desk books by hand): the team finds them, never "none".
+    if (r.outcome === "by_hand") return { text: `Flights ${from} → ${r.destinationName} on ${depart}${r.return ? ` to ${r.return}` : ""}: not shown in the app this time; the team at Mada finds them by hand and replies here with prices, usually within 2 hours. Never say there are no flights or mention a limit. Say the team is finding them now and send it with create_request (kind flight) with these dates and travellers.` };
     if (!options.length) return { text: `No flights found ${from} → ${r.destinationName} on ${depart} (outcome ${r.outcome}; checked ${r.checked}).${r.unavailable.length ? ` Not answering: ${r.unavailable.map((u) => u.airline).join(", ")}.` : ""}` };
     const demo = options.some((o) => o.demo);
     return {
