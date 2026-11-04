@@ -13,6 +13,7 @@ import type {
 import { costHalalas, UnknownCurrency } from "../hotelbeds/money";
 import { AIRPORT_TZ } from "../mock/data";
 import { notConfigured, requireEnv } from "./not-configured";
+import { paceLook } from "../../booking/pace";
 
 /*
  * Flights through TBO Air (TBO Holidays' air API, "Travel Boutique Online"): search, fare rules, price check, hold
@@ -392,6 +393,7 @@ function combine(groups: TboResult[][]): TboResult[][] {
 async function searchRaw(q: Query): Promise<{ traceId: string; combos: TboResult[][] }> {
   const at = (d: string) => `${d}T00:00:00`;
   const seg = (o: string, d: string, day: string) => ({ Origin: o, Destination: d, FlightCabinClass: CABIN[q.cabin], PreferredDepartureTime: at(day), PreferredArrivalTime: at(day) });
+  void paceLook();
   const r = await air<SearchResponse>("Search", {
     AdultCount: q.adults, ChildCount: q.children, InfantCount: q.infants, DirectFlight: false, OneStopFlight: false, JourneyType: q.ret ? 2 : 1, PreferredAirlines: null,
     Segments: [seg(q.from, q.to, q.depart), ...(q.ret ? [seg(q.to, q.from, q.ret)] : [])], Sources: null,

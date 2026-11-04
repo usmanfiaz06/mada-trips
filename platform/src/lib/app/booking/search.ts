@@ -18,6 +18,7 @@ import { entryRulesSupplier, withEntryRequirements } from "../suppliers/sherpa";
 import { duffelSource } from "../suppliers/duffel";
 import { rateHawkSource } from "../suppliers/ratehawk";
 import { destinationIn, resolveStayPlace } from "./stay-place";
+import { PACE_STALE_MS, paceCall, paceMine } from "./pace";
 
 /*
  * Search: flights and stays through the supplier interfaces, cached for 10 minutes; each option the traveller sees is
@@ -35,13 +36,13 @@ const cache = (g.__madaSearchCache ??= new Map());
  * The supplier's answer for this key: this instance's copy, else (shared) the database's, else the supplier's.
  * `saved` settles when a new answer is in the database; callers await it with their own writes (no extra wait).
  */
-export async function cached<T>(key: string, run: () => Promise<T>, shared = false): Promise<{ value: T; at: number; saved: Promise<void> }> {
+export async function cached<T>(key: string, run: () => Promise<T>, shared = false, pace: { freshMs: number; live: boolean } = { freshMs: CACHE_MS, live: true }): Promise<{ value: T; at: number; saved: Promise<void> }> {
   const done = Promise.resolve();
   const hit = cache.get(key) as CacheEntry<T> | undefined;
-  if (hit && Date.now() - hit.at < CACHE_MS) return { value: hit.value, at: hit.at, saved: done };
+  if (hit && Date.now() - hit.at < pace.freshMs) return { value: hit.value, at: hit.at, saved: done };
   if (shared) {
     const row = await db.select({ value: appSearchCache.value, at: appSearchCache.createdAt }).from(appSearchCache)
-      .where(and(eq(appSearchCache.key, key), sql`${appSearchCache.createdAt} > now() - interval '10 minutes'`)).limit(1)
+      .where(and(eq(appSearchCache.key, key), sql`${appSearchCache.createdAt} > now() - make_interval(secs => ${Math.round(pace.freshMs / 1000)})`)).limit(1)
       .then((r) => r[0], () => undefined);
     if (row) {
       const at = Math.min(row.at.getTime(), Date.now());
@@ -49,12 +50,14 @@ export async function cached<T>(key: string, run: () => Promise<T>, shared = fal
       return { value: row.value as T, at, saved: done };
     }
   }
+  // Held back (booking/pace.ts) and nothing made earlier to show: the caller sends it to the desk.
+  if (!pace.live) throw new PaceHeld();
   const value = await run();
   const at = Date.now();
   remember(key, { at, value });
-  // One statement: this answer in, answers over an hour old out. A failure only costs the next instance a search.
+  // One statement: this answer in, answers over an hour old out (flights: 12 hours, for pace.ts to reuse). A failure only costs the next instance a search.
   const saved = shared
-    ? db.execute(sql`WITH gone AS (DELETE FROM app_search_cache WHERE created_at < now() - interval '1 hour')
+    ? db.execute(sql`WITH gone AS (DELETE FROM app_search_cache WHERE created_at < now() - interval '1 hour' AND (key NOT LIKE '["f"%' OR created_at < now() - interval '12 hours'))
         INSERT INTO app_search_cache (key, value, created_at) VALUES (${key}, ${JSON.stringify(value)}::jsonb, now())
         ON CONFLICT (key) DO UPDATE SET value = excluded.value, created_at = excluded.created_at`).then(() => undefined, (e) => { console.warn("[search] cache not saved", e instanceof Error ? e.message : ""); })
     : done;
@@ -63,8 +66,11 @@ export async function cached<T>(key: string, run: () => Promise<T>, shared = fal
 
 function remember(key: string, entry: CacheEntry<unknown>) {
   cache.set(key, entry);
-  if (cache.size > 500) for (const [k, v] of cache) if (Date.now() - v.at > CACHE_MS) cache.delete(k);
+  if (cache.size > 500) for (const [k, v] of cache) if (Date.now() - v.at > PACE_STALE_MS) cache.delete(k);
 }
+
+/** No new supplier search right now, and no earlier answer to reuse. */
+export class PaceHeld extends Error { constructor() { super("held back"); } }
 export const clearSearchCache = () => cache.clear();
 
 const hhmm = (local: string) => local.slice(11, 16);
@@ -139,8 +145,14 @@ export async function searchFlights(ownerId: string | null, input: FlightSearchR
   let at: number;
   let saved: Promise<void>;
   try {
-    ({ value: offers, at, saved } = await cached(key, () => bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin }), supplierMode("flights") === "live"));
+    const live = supplierMode("flights") === "live";
+    const pace = live ? await paceCall(ownerId) : undefined;
+    ({ value: offers, at, saved } = await cached(key, () => {
+      if (live) void paceMine(ownerId);
+      return bookingSuppliers.flights().search({ from, to: dest.code, depart, return: q.return, adults: Math.max(1, n - kids), children: Math.min(kids, n - 1), infants: q.infants, cabin: q.cabin });
+    }, live, pace));
   } catch (e) {
+    if (e instanceof PaceHeld) return { ...base, depart, outcome: "by_hand", checked: 0, options: [], cachedUntil: until(Date.now()) };
     if (e instanceof SupplierDown) return { ...base, depart, outcome: "partial", checked: 0, options: [], unavailable: [{ carrier: "*", airline: "The airline" }], cachedUntil: until(Date.now()) };
     // A live supplier (TBO) that can't answer this route: the desk books it by hand, as a request (never an error screen).
     if (supplierMode("flights") === "live" && !(e instanceof AppError && e.code === "VALIDATION")) {

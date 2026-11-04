@@ -18,6 +18,7 @@ import { canTicket } from "../suppliers/flight-ticketing";
 import { reauthorize } from "./payments";
 import { markPaid } from "../circles/messages";
 import { emit as emitPlanEvent } from "../plans/events";
+import { paceBook } from "./pace";
 
 /*
  * The agent desk's actions on an order. The desk UI (Mada Ops) calls these; in mock mode the autopilot in orders.ts
@@ -235,6 +236,8 @@ export async function confirmOrder(orderId: string, agent: DeskAgent, opts: { fr
         href: tripId ? `/trip/${tripId}` : "/trips", data: withCopy({ orderId: o.id, ref }, { title: [`${tk}.title`, vars], body: [`${tk}.body`, { agent: agent.name, ref }] }),
       });
     }
+    // A flight booked: room for more searches this month (pace.ts).
+    if ((o.snapshot as { flight?: unknown }).flight) void paceBook();
     await orderEvent(tx, o.id, "confirmed", { kind: "agent", name: agent.name }, { ref });
     await audit(tx, o, agent, "order.confirmed", `${agent.name} confirmed booking ${ref}`, { ref, total: o.total + o.extra });
     const [u] = await tx.update(appOrders).set({ status: "confirmed", step: 3, ref, tripId, confirmedByName: agent.name, confirmedAt: now, updatedAt: now }).where(eq(appOrders.id, o.id)).returning();

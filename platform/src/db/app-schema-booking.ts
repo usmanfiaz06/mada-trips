@@ -26,6 +26,13 @@ export const appSearchCache = pgTable("app_search_cache", {
   createdAt: createdAt(),
 }, (t) => [index("app_search_cache_created_idx").on(t.createdAt)]);
 
+/** Running counts (booking/pace.ts): one row per key, a number that only goes up within its period. */
+export const appPace = pgTable("app_pace", {
+  key: text("key").primaryKey(),
+  n: integer("n").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index("app_pace_updated_idx").on(t.updatedAt)]);
+
 /** A supplier offer shown to one traveller: our id, the supplier's id, the snapshot the price came from, its hold. */
 export const appOffers = pgTable("app_offers", {
   id: id(),
