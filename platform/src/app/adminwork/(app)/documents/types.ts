@@ -12,6 +12,7 @@ export type FlightItem = {
   kind: "flight";
   airline: string; airlineCode: string; flightNo: string;
   fromCode: string; fromCity: string; toCode: string; toCity: string;
+  fromTerminal: string; toTerminal: string;   // optional departure / arrival terminal
   departDate: string; departTime: string; arriveDate: string; arriveTime: string;
   cabin: string; baggage: string;
 };
@@ -66,7 +67,7 @@ export const DEFAULT_COMPANY: Company = {
 
 export const blankFlight = (): FlightItem => ({
   kind: "flight", airline: "", airlineCode: "", flightNo: "", fromCode: "", fromCity: "", toCode: "", toCity: "",
-  departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "",
+  fromTerminal: "", toTerminal: "", departDate: "", departTime: "", arriveDate: "", arriveTime: "", cabin: "Economy", baggage: "",
 });
 export const blankLayover = (place = ""): LayoverItem => ({ kind: "layover", place, duration: "", note: "" });
 export const returnDivider = (): DividerItem => ({ kind: "divider", label: "Return" });

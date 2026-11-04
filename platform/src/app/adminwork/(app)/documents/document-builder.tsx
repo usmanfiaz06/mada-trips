@@ -208,6 +208,8 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
                   <Txt label={t("To (code)")} value={it.toCode} onChange={(v) => patchItem(i, { toCode: v.toUpperCase() })} placeholder="JED" />
                   <Txt label={t("From city")} value={it.fromCity} onChange={(v) => patchItem(i, { fromCity: v })} placeholder="Riyadh" />
                   <Txt label={t("To city")} value={it.toCity} onChange={(v) => patchItem(i, { toCity: v })} placeholder="Jeddah" />
+                  <Txt label={t("From terminal (optional)")} value={it.fromTerminal} onChange={(v) => patchItem(i, { fromTerminal: v })} placeholder="e.g. 3" />
+                  <Txt label={t("To terminal (optional)")} value={it.toTerminal} onChange={(v) => patchItem(i, { toTerminal: v })} placeholder="e.g. 1" />
                   <Txt label={t("Departs — date")} value={it.departDate} onChange={(v) => patchItem(i, { departDate: v })} placeholder="2026-11-20" />
                   <Txt label={t("Departs — time")} value={it.departTime} onChange={(v) => patchItem(i, { departTime: v })} placeholder="08:30" />
                   <Txt label={t("Arrives — date")} value={it.arriveDate} onChange={(v) => patchItem(i, { arriveDate: v })} placeholder="2026-11-20" />
