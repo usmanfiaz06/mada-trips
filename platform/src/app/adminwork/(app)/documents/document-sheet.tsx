@@ -157,13 +157,13 @@ function FlightCard({ s, locale }: { s: FlightItem; locale: string }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12 }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.fromCode || "—"}</div>
-          <div style={{ fontSize: 11, color: SUB }}>{s.fromCity}</div>
+          <div style={{ fontSize: 11, color: SUB }}>{[s.fromCity, s.fromTerminal && `Terminal ${s.fromTerminal}`].filter(Boolean).join(" · ")}</div>
           <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.departDate, locale)} {s.departTime}</div>
         </div>
         <div style={{ color: GOLD, fontSize: 18 }}>→</div>
         <div style={{ textAlign: "end" }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: INK }}>{s.toCode || "—"}</div>
-          <div style={{ fontSize: 11, color: SUB }}>{s.toCity}</div>
+          <div style={{ fontSize: 11, color: SUB }}>{[s.toCity, s.toTerminal && `Terminal ${s.toTerminal}`].filter(Boolean).join(" · ")}</div>
           <div style={{ fontSize: 11, color: INK, marginTop: 4 }}>{fmtD(s.arriveDate, locale)} {s.arriveTime}</div>
         </div>
       </div>
