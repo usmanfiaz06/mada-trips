@@ -39,7 +39,8 @@ export default async function DocumentView({ params }: { params: Promise<{ id: s
           body * { visibility: hidden !important; }
           .print-area, .print-area * { visibility: visible !important; }
           .print-area { position: absolute; inset: 0; overflow: visible !important; }
-          .sheet { box-shadow: none !important; margin: 0 !important; }
+          /* Only as tall as the content when printing, so a one-page ticket never bleeds onto a 2nd page. */
+          .sheet { box-shadow: none !important; margin: 0 !important; min-height: auto !important; }
           .no-print { display: none !important; }
         }
       `}</style>
