@@ -53,7 +53,7 @@ export default async function CloseDay({ params, searchParams }: { params: Promi
           )}
           {c && c.status === "submitted" && can(u, "close.verify") && c.submittedBy !== u.id && (
             <Card className="ring-2 ring-gold/30 print:hidden">
-              <CardHead title={t("Verify against the bank")} hint={t("Tick it off once receipts match both bank accounts.")} />
+              <CardHead title={t("Verify against the bank")} hint={t("Tick it off once receipts match the bank accounts.")} />
               <ActionForm action={verifyClose} className="space-y-3">
                 <input type="hidden" name="id" value={c.id} /><input type="hidden" name="date" value={date} /><input type="hidden" name="team" value={team} />
                 <textarea name="verifyNote" rows={2} className="field" placeholder={t("Note (required to flag)")} />

@@ -19,7 +19,7 @@ import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/a
 import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
 import { cleanDetails, cleanTravellers, describeService, type Traveller } from "@/lib/services";
 import { riyadhDate } from "@/lib/dates";
-import { ACCOUNT } from "@/lib/labels";
+import { ACCOUNT, isAccountKey } from "@/lib/labels";
 import { recordSupplierPayment } from "@/lib/suppliers";
 
 const money = z.string().transform((v, ctx) => {
@@ -43,9 +43,9 @@ const SaleSchema = z.object({
   sellPrice: money.refine((v) => v > 0, "Selling price must be more than zero"),
   paidNow: money,
   method: z.enum(["cash", "mada", "card", "transfer"]),
-  account: z.enum(["retail", "corporate"]).catch("retail"), // which company bank account received the money
+  account: z.enum(["retail", "alrajhi", "corporate"]).catch("retail"), // which company bank account received the money
   supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
-  supplierAccount: z.enum(["retail", "corporate"]).catch("retail"),
+  supplierAccount: z.enum(["retail", "alrajhi", "corporate"]).catch("retail"),
   supplierPartnerId: z.string().optional(),
   viaBsp: z.string().optional(),
 
@@ -330,7 +330,7 @@ export async function recordPayment(_: ActionState, fd: FormData): Promise<Actio
       if (b.status === "awaiting_credit") throw new Error("Wait for the credit decision before taking more payments");
       const paid = await paidOn(tx, id);
       if (paid + amount > b.sellPrice) throw new Error(`Only ${sar(b.sellPrice - paid)} is still owed`);
-      const acct = ["retail", "corporate"].includes(str(fd, "account")) ? str(fd, "account") : b.account;
+      const acct = isAccountKey(str(fd, "account")) ? str(fd, "account") : b.account;
       await tx.insert(schema.payments).values({ bookingId: id, clientId: b.clientId, account: acct, method, amount, reference: optStr(fd, "reference")?.slice(0, 60) ?? null, businessDate: businessDate(new Date(), s.closeHour), recordedBy: u.id });
       await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: id, entityRef: b.ref, summary: `Received ${sar(amount)} by ${method} for ${b.ref} into ${ACCOUNT[acct]}` });
     });

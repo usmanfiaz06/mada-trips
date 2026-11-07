@@ -11,7 +11,7 @@ import { getSettings, setSetting } from "@/lib/settings";
 import { proposeGovernance } from "@/lib/governance";
 import { isIsoDate, isUuid } from "@/lib/security";
 import { settleBspClosing } from "@/lib/bsp";
-import { ACCOUNT } from "@/lib/labels";
+import { ACCOUNT, isAccountKey } from "@/lib/labels";
 import { proposeCashMove } from "@/lib/cash";
 
 /** Validate an optional "which partner did this" id — must be a real partner, or nothing. */
@@ -68,7 +68,7 @@ export async function addBsp(_: ActionState, fd: FormData): Promise<ActionState>
     const amount = toHalalas(str(fd, "amount"));
     const period = str(fd, "period").slice(0, 40), dueDate = str(fd, "dueDate");
     if (!period || !isIsoDate(dueDate) || amount <= 0) throw new Error("Fill period, due date and amount");
-    const account = str(fd, "account") === "retail" ? "retail" : "corporate";
+    const account = isAccountKey(str(fd, "account")) ? str(fd, "account") : "corporate";
     await db.transaction(async (tx) => {
       const [b] = await tx.insert(schema.bspObligations).values({ period, dueDate, amount, account, note: optStr(fd, "note"), createdBy: u.id }).returning();
       await audit(tx, { actorId: u.id, action: "bsp.added", entityType: "bsp", entityId: b.id, entityRef: period, summary: `Added BSP debit ${period}: SAR ${sar(amount)} due ${dueDate}` });
@@ -149,7 +149,7 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
   const u = await requirePerm("finance.reconcile");
   const account = str(fd, "account"), kind = str(fd, "kind");
   const date = str(fd, "date") || riyadhDate();
-  if (!["retail", "corporate"].includes(account)) return { error: "Choose the bank account" };
+  if (!isAccountKey(account)) return { error: "Choose the bank account" };
   if (!["deposit", "withdrawal", "adjustment"].includes(kind)) return { error: "Choose deposit or withdrawal" };
   if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
   try {
@@ -170,7 +170,7 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
   const u = await requirePerm("finance.reconcile");
   const from = str(fd, "from"), to = str(fd, "to");
   const date = str(fd, "date") || riyadhDate();
-  if (!["retail", "corporate"].includes(from) || !["retail", "corporate"].includes(to)) return { error: "Choose both accounts" };
+  if (!isAccountKey(from) || !isAccountKey(to)) return { error: "Choose both accounts" };
   if (from === to) return { error: "Choose two different accounts" };
   if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
   try {

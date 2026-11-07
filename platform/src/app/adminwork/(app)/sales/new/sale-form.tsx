@@ -1,7 +1,7 @@
 "use client";
 import { useActionState, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { PendingContext, useSubmit } from "@/components/client";
-import { ACCOUNT, ACCOUNTS } from "@/lib/labels";
+import { ACCOUNT, ACCOUNTS, type AccountKey } from "@/lib/labels";
 import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Landmark, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
@@ -71,9 +71,9 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [paid, setPaid] = useState<string | null>(null);
   const [method, setMethod] = useState("mada");
   const [issueNow, setIssueNow] = useState(true);
-  const [account, setAccount] = useState<"retail" | "corporate">("retail");
+  const [account, setAccount] = useState<AccountKey>("retail");
   const [supplierPay, setSupplierPay] = useState("unpaid");
-  const [supplierAccount, setSupplierAccount] = useState<"retail" | "corporate">("retail");
+  const [supplierAccount, setSupplierAccount] = useState<AccountKey>("retail");
   // How a flight's cost is settled. Empty until the salesperson picks — nothing lands in the IATA
   // balance by default; only a ticket explicitly bought through BSP rolls into the closing.
   const [settle, setSettle] = useState<"bsp" | "direct" | "">("");

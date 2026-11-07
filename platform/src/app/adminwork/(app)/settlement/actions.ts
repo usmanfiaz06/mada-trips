@@ -10,6 +10,7 @@ import { getSettings } from "@/lib/settings";
 import { createApproval } from "@/lib/approvals";
 import { addDays, cycleFor, fmtDate, businessDate } from "@/lib/dates";
 import { isIsoDate } from "@/lib/security";
+import { isAccountKey } from "@/lib/labels";
 import { toHalalas, sar } from "@/lib/money";
 import { flash, str, toState, type ActionState } from "@/lib/actions";
 
@@ -51,7 +52,7 @@ export async function recompute(_: ActionState, fd: FormData): Promise<ActionSta
       if (!c || c.status !== "draft") throw new Error("Only a draft can be changed");
       const pct = Number(str(fd, "repaymentPct"));
       if (!(pct >= 0 && pct <= 100)) throw new Error("Repayment share must be between 0 and 100%");
-      const inputs: SettlementInputs = { reserveTopUp: toHalalas(str(fd, "reserveTopUp")), repaymentPctBps: Math.round(pct * 100), payoutAccount: str(fd, "payoutAccount") === "corporate" ? "corporate" : "retail" };
+      const inputs: SettlementInputs = { reserveTopUp: toHalalas(str(fd, "reserveTopUp")), repaymentPctBps: Math.round(pct * 100), payoutAccount: isAccountKey(str(fd, "payoutAccount")) ? str(fd, "payoutAccount") : "retail" };
       if (inputs.reserveTopUp < 0) throw new Error("Reserve can't be negative");
       const figures = await computeSettlement(tx, c.startDate, c.endDate, inputs, s.iataReserveHeld, s.repaymentPctBps, s.iataBuffer, c.id);
       await tx.update(schema.settlementCycles).set({ inputs, figures }).where(eq(schema.settlementCycles.id, id));

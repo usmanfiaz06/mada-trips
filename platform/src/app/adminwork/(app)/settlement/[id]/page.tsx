@@ -52,10 +52,11 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
       <div className="grid gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-4">
           <CardHead title={t("1 · Cleared funds")} hint={t("Deposits cleared by {d}", { d: fmtDate(c.endDate, L) })} />
-          <div className="figure text-[40px]" dir="ltr">{sar(f.clearedByAccount.retail + f.clearedByAccount.corporate, { compact: true })}<span className="figure-unit">SAR</span></div>
+          <div className="figure text-[40px]" dir="ltr">{sar(Object.values(f.clearedByAccount).reduce((s, v) => s + (v ?? 0), 0), { compact: true })}<span className="figure-unit">SAR</span></div>
           <div className="mt-5 space-y-2.5 text-[13px]">
-            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT.retail)}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.retail)}</span></div>
-            <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT.corporate)}</span><span className="num" dir="ltr">{sar(f.clearedByAccount.corporate)}</span></div>
+            {Object.entries(f.clearedByAccount).map(([k, v]) => (
+              <div key={k} className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT[k] ?? k)}</span><span className="num" dir="ltr">{sar(v)}</span></div>
+            ))}
             <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t("Rolls to next cycle")}</span><span className="num text-ink-3" dir="ltr">{sar(f.rolledOver)}</span></div>
           </div>
           <p className="mt-4 text-[12px] text-ink-3">{t("Most of this belongs to IATA and airlines. Profit is below.")}</p>

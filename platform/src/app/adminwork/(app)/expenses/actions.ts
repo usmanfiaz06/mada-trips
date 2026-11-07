@@ -24,7 +24,7 @@ const S = z.object({
   description: z.string().trim().min(3, "Describe what was paid for").max(200, "Keep the description under 200 characters"),
   justification: z.string().trim().min(5, "Explain the business reason").max(1000, "Keep the justification under 1,000 characters"),
   vendor: z.string().trim().max(120).optional(),
-  paidBy: z.enum(["retail", "corporate", "partner"]),
+  paidBy: z.enum(["retail", "alrajhi", "corporate", "partner"]),
   isStartup: z.string().optional(),
 });
 

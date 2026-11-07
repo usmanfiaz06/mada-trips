@@ -141,6 +141,13 @@
       "when": 1790851557234,
       "tag": "0019_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790851558234,
+      "tag": "0020_alrajhi_bank",
+      "breakpoints": true
     }
   ]
 }
