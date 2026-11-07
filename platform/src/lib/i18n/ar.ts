@@ -733,7 +733,7 @@ export const AR: Record<string, string> = {
   "Travellers": "المسافرون",
   "Treasury": "الخزينة",
   "Try a different filter or search.": "جرّب تصفية أو بحثًا مختلفًا.",
-  "The two accounts stay separate. Receipts count toward the Day-25 settlement only after they clear in the bank.": "الحسابان يبقيان منفصلين. تُحتسب الإيصالات في تسوية اليوم 25 فقط بعد تحصيلها في البنك.",
+  "Each account is tracked separately. Receipts count toward the Day-25 settlement only after they clear in the bank.": "يُتابَع كل حساب على حدة. تُحتسب الإيصالات في تسوية اليوم 25 فقط بعد تحصيلها في البنك.",
   "Type": "النوع",
   "Under your delegated limit": "ضمن حد التفويض الخاص بك",
   "Unknown account": "حساب غير معروف",
