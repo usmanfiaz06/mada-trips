@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { createApproval } from "./approvals";
-import { ACCOUNT } from "./labels";
+import { ACCOUNT, isAccountKey } from "./labels";
 import { sar } from "./money";
 import { riyadhDate } from "./dates";
 
@@ -25,7 +25,7 @@ export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
   const method = opts.method === "cash" ? "cash" : "transfer";
 
   if (opts.source === "bank") {
-    if (!opts.account || !["retail", "corporate"].includes(opts.account)) throw new Error("Choose which bank paid the supplier");
+    if (!opts.account || !isAccountKey(opts.account)) throw new Error("Choose which bank paid the supplier");
     await tx.insert(schema.supplierPayments).values({ bookingId: b.id, supplier: b.supplier ?? "—", amount, source: "bank", account: opts.account, method, reference: opts.reference ?? null, status: "settled", paidOn: riyadhDate(), recordedBy: opts.recordedBy });
     await tx.update(schema.bookings).set({ supplierPaid: true, updatedAt: new Date() }).where(eq(schema.bookings.id, b.id));
     await audit(tx, { actorId: opts.recordedBy, action: "supplier.paid", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Paid supplier ${b.supplier ?? ""} SAR ${sar(amount)} for ${b.ref} from ${ACCOUNT[opts.account]}` });

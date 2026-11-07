@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { openBspTotal } from "./bsp";
+import { ACCOUNT_KEYS } from "./labels";
 
 type Q = Tx | typeof db;
 
@@ -158,10 +159,10 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
 
 /* ─────────────── Day-25 settlement ─────────────── */
 
-export type SettlementInputs = { reserveTopUp: number; repaymentPctBps: number; payoutAccount: "retail" | "corporate" };
+export type SettlementInputs = { reserveTopUp: number; repaymentPctBps: number; payoutAccount: string };
 export type SettlementFigures = {
   start: string; end: string;
-  clearedByAccount: { retail: number; corporate: number };
+  clearedByAccount: Record<string, number>;
   rolledOver: number;
   bookingIds: string[]; bookingCount: number; expenseIds?: string[];
   revenue: number; directCost: number; grossProfit: number;
@@ -173,7 +174,7 @@ export type SettlementFigures = {
   repayments: { partnerId: string; name: string; amount: number; outstandingBefore: number }[];
   dividends: { partnerId: string; name: string; equityBps: number; amount: number }[];
   shortfall: number;
-  payoutAccount: "retail" | "corporate";
+  payoutAccount: string;
 };
 
 /** Split `pool` by equity among partners still owed money, never paying anyone more than they're owed. */
@@ -275,7 +276,7 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
 
   const pickAcc = (k: string) => cleared.find((c) => c.account === k)?.total ?? 0;
   return {
-    start, end, clearedByAccount: { retail: pickAcc("retail"), corporate: pickAcc("corporate") },
+    start, end, clearedByAccount: Object.fromEntries(ACCOUNT_KEYS.map((k) => [k, pickAcc(k)])),
     rolledOver: rolled[0]?.total ?? 0,
     bookingIds: settled.map((b) => b.id), bookingCount: settled.length, expenseIds: expRows.map((e) => e.id),
     revenue, directCost, grossProfit, overheads,

@@ -143,7 +143,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       {f && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-12 stagger">
           <Card className="flex flex-col lg:col-span-4">
-            <CardHead title={t("Cash in banks")} hint={t("Cleared funds, both accounts")} action={<Link href="/adminwork/finance" className="text-[12.5px] text-ink-3 hover:text-ink">{t("Details")}</Link>} />
+            <CardHead title={t("Cash in banks")} hint={t("Cleared funds, all accounts")} action={<Link href="/adminwork/finance" className="text-[12.5px] text-ink-3 hover:text-ink">{t("Details")}</Link>} />
             <div className="figure text-[48px]"><Money v={f.cash.total} compact muted /><span className="figure-unit">SAR</span></div>
             <div className="mt-auto space-y-3 pt-6">
               {f.cash.accounts.map((a) => (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useT } from "@/lib/i18n/client";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { cx } from "@/components/ui";
+import { ACCOUNT, ACCOUNT_KEYS } from "@/lib/labels";
 import { clearPayments } from "./actions";
 
 type Row = { id: string; ref: string | null; bookingId: string | null; client: string; method: string; account: string; amount: number; date: string; methodLabel: string; accountLabel: string; dateLabel: string };
@@ -11,7 +12,7 @@ const show = (h: number) => (h / 100).toLocaleString("en-US", { minimumFractionD
 
 export function ClearTable({ rows, today }: { rows: Row[]; today: string }) {
   const t = useT();
-  const [acc, setAcc] = useState<"all" | "retail" | "corporate">("all");
+  const [acc, setAcc] = useState<string>("all");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const list = useMemo(() => rows.filter((r) => acc === "all" || r.account === acc), [rows, acc]);
   const total = list.filter((r) => sel.has(r.id)).reduce((s, r) => s + r.amount, 0);
@@ -19,9 +20,9 @@ export function ClearTable({ rows, today }: { rows: Row[]; today: string }) {
   return (
     <ActionForm action={clearPayments}>
       <div className="flex flex-wrap items-center gap-2 px-6 pb-4">
-        {(["all", "retail", "corporate"] as const).map((k) => (
+        {["all", ...ACCOUNT_KEYS].map((k) => (
           <button key={k} type="button" onClick={() => setAcc(k)} className={cx("h-8 rounded-full px-3.5 text-[13px]", acc === k ? "bg-ink text-bg" : "bg-surface-2 text-ink-2 ring-1 ring-line")}>
-            {t(k === "all" ? "Both accounts" : k === "retail" ? "BSF (B2C)" : "Alinma")}
+            {t(k === "all" ? "All accounts" : ACCOUNT[k] ?? k)}
           </button>
         ))}
         <button type="button" onClick={() => setSel(new Set(list.map((r) => r.id)))} className="ms-auto text-[13px] text-ink-3 hover:text-ink">{t("Select all")}</button>
