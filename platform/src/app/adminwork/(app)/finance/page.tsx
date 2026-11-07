@@ -120,7 +120,7 @@ export default async function FinancePage() {
 
       {canRec && (
         <Card className="mt-4">
-          <CardHead title={t("Move money")} hint={t("Deposits, withdrawals and transfers that aren't a sale or expense. A director approves each one.")} />
+          <CardHead title={t("Move money")} hint={t("Money that isn't a sale or expense. Deposits and withdrawals go to a director to approve; transfers between your own banks apply right away.")} />
           <div className="grid gap-4 md:grid-cols-3">
             <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
               <div className="text-[13px] font-[450]">{t("Deposit")}</div>

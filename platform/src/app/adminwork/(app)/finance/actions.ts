@@ -178,10 +178,19 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
     if (amount <= 0) return { error: "Enter an amount" };
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
     const partnerId = await validPartner(optStr(fd, "partnerId"));
-    const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
-      `Transfer ${ACCOUNT[from]} → ${ACCOUNT[to]} · SAR ${sar(amount)}`,
-      { op: "transfer", from, to, amount, note, date, partnerId }, amount));
-    revalidatePath("/adminwork", "layout");
-    return { ok: `Sent to the directors to approve (${ref.ref})` };
+    // A transfer only moves money between the company's own banks — total cash is unchanged and no outside
+    // party is involved — so it applies immediately. (Deposits and withdrawals bring money in or out, so those
+    // still go through a director's approval.) Recorded as two matching bank movements, out of one and into
+    // the other, and audited.
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.bankTransactions).values([
+        { account: from, direction: "out", kind: "transfer", amount, counterparty: to, note, partnerId, txnDate: date, recordedBy: u.id },
+        { account: to, direction: "in", kind: "transfer", amount, counterparty: from, note, partnerId, txnDate: date, recordedBy: u.id },
+      ]);
+      await audit(tx, { actorId: u.id, action: "bank.transfer", entityType: "bank", entityRef: `${ACCOUNT[from]} → ${ACCOUNT[to]}`,
+        summary: `Transferred SAR ${sar(amount)} from ${ACCOUNT[from]} to ${ACCOUNT[to]}${note ? ` · ${note}` : ""}` });
+    });
+    revalidatePath("/adminwork/finance");
+    return { ok: `Transferred SAR ${sar(amount)} from ${ACCOUNT[from]} to ${ACCOUNT[to]}` };
   } catch (e) { return toState(e); }
 }
