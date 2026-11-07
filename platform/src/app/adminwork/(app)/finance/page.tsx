@@ -37,7 +37,7 @@ export default async function FinancePage() {
 
   return (
     <>
-      <PageHeader eyebrow={t("Treasury")} title={t("Banks & cash")} subtitle={t("The two accounts stay separate. Receipts count toward the Day-25 settlement only after they clear in the bank.")} />
+      <PageHeader eyebrow={t("Treasury")} title={t("Banks & cash")} subtitle={t("Each account is tracked separately. Receipts count toward the Day-25 settlement only after they clear in the bank.")} />
       <div className="grid gap-4 lg:grid-cols-3">
         {cash.accounts.map((a, i) => {
           const Tile = i === 0 ? InkCard : Card;
