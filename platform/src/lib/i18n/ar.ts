@@ -1306,6 +1306,7 @@ export const AR: Record<string, string> = {
   "Record transfer": "تسجيل تحويل",
   "Transfer between banks": "تحويل بين البنوك",
   "Deposits, withdrawals and transfers that aren't a sale or expense. A director approves each one.": "إيداعات وسحوبات وتحويلات ليست بيعًا أو مصروفًا. يعتمد كلًا منها مدير.",
+  "Money that isn't a sale or expense. Deposits and withdrawals go to a director to approve; transfers between your own banks apply right away.": "أموال ليست بيعًا أو مصروفًا. الإيداعات والسحوبات تُرسل إلى مدير للاعتماد؛ أما التحويلات بين حساباتكم فتُنفّذ فورًا.",
   "Bank move one director can approve up to (SAR)": "تحريك بنكي يعتمده مدير واحد حتى (ريال)",
   "Deposits, withdrawals and transfers. Above this, all directors must agree.": "الإيداعات والسحوبات والتحويلات. فوق ذلك يجب موافقة جميع المديرين.",
   "Bank movement": "حركة بنكية",
