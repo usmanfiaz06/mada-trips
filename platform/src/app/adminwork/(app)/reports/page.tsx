@@ -6,7 +6,6 @@ import { getSettings } from "@/lib/settings";
 import { periodReport, balanceSheet, monthlyTrend } from "@/lib/reports";
 import { addDays, businessDate, cycleFor, fmtDate, riyadhDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
-import { ACCOUNT } from "@/lib/labels";
 import { Card, CardHead, Money, PageHeader, cx } from "@/components/ui";
 
 export const metadata = { title: "Overview" };
@@ -88,7 +87,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     </div>
   );
 
-  const bankSub = bs.cash.map((a) => `${t(ACCOUNT[a.account] ?? a.account).split(" ")[0]} ${sar(a.balance, { compact: true })}`).join(" · ");
+  const bankSub = bs.cash.map((a) => `${(a.name ?? a.account).split(" ")[0]} ${sar(a.balance, { compact: true })}`).join(" · ");
 
   return (
     <div className="space-y-5">
@@ -128,7 +127,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <Card>
           <CardHead title={t("Where the money stands")} hint={t("Right now")} />
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we have")}</div>
-          {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${t(ACCOUNT[a.account] ?? a.account)}`} v={a.balance} />)}
+          {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${a.name ?? a.account}`} v={a.balance} />)}
           <Row label={t("Clients still owe us")} v={bs.receivable} />
           <Row label={t("Total we have")} v={bs.assets} strong />
           <div className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we owe")}</div>

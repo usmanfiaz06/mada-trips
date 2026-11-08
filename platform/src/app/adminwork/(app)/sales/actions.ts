@@ -19,7 +19,7 @@ import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/a
 import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
 import { cleanDetails, cleanTravellers, describeService, type Traveller } from "@/lib/services";
 import { riyadhDate } from "@/lib/dates";
-import { ACCOUNT, isAccountKey } from "@/lib/labels";
+import { accountNames, isValidAccount, primaryAccountKey } from "@/lib/accounts";
 import { recordSupplierPayment } from "@/lib/suppliers";
 
 const money = z.string().transform((v, ctx) => {
@@ -43,9 +43,9 @@ const SaleSchema = z.object({
   sellPrice: money.refine((v) => v > 0, "Selling price must be more than zero"),
   paidNow: money,
   method: z.enum(["cash", "mada", "card", "transfer"]),
-  account: z.enum(["retail", "alrajhi", "corporate"]).catch("retail"), // which company bank account received the money
+  account: z.string().optional(), // which company bank account received the money (validated against the live bank list)
   supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
-  supplierAccount: z.enum(["retail", "alrajhi", "corporate"]).catch("retail"),
+  supplierAccount: z.string().optional(),
   supplierPartnerId: z.string().optional(),
   viaBsp: z.string().optional(),
 
@@ -113,7 +113,9 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       if (!client) throw new Error("Choose a client or add a new one");
 
       const channel = client.type === "retail" ? "retail" : "corporate"; // for reporting and issuing scope
-      const account = v.account; // which bank account the money lands in — either bank, chosen on the sale
+      // Which bank account the money lands in — chosen on the sale, validated against the live bank list.
+      const account = (v.account && await isValidAccount(v.account)) ? v.account : await primaryAccountKey();
+      const acctNames = await accountNames();
       const bdate = businessDate(new Date(), s.closeHour);
       const unpaid = v.sellPrice - v.paidNow;
 
@@ -149,7 +151,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
 
       if (v.paidNow > 0) {
         await tx.insert(schema.payments).values({ bookingId: b.id, clientId: client.id, account, method: v.method, amount: v.paidNow, reference: v.paymentRef || null, businessDate: bdate, recordedBy: u.id });
-        await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: b.id, entityRef: ref, summary: `Received ${sar(v.paidNow)} by ${v.method} into ${ACCOUNT[account]}` });
+        await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: b.id, entityRef: ref, summary: `Received ${sar(v.paidNow)} by ${v.method} into ${acctNames[account] ?? account}` });
       }
       if (v.note) {
         await tx.insert(schema.remarks).values({ entityType: "booking", entityId: b.id, userId: u.id, body: v.note });
@@ -330,9 +332,10 @@ export async function recordPayment(_: ActionState, fd: FormData): Promise<Actio
       if (b.status === "awaiting_credit") throw new Error("Wait for the credit decision before taking more payments");
       const paid = await paidOn(tx, id);
       if (paid + amount > b.sellPrice) throw new Error(`Only ${sar(b.sellPrice - paid)} is still owed`);
-      const acct = isAccountKey(str(fd, "account")) ? str(fd, "account") : b.account;
+      const acct = (await isValidAccount(str(fd, "account"))) ? str(fd, "account") : b.account;
       await tx.insert(schema.payments).values({ bookingId: id, clientId: b.clientId, account: acct, method, amount, reference: optStr(fd, "reference")?.slice(0, 60) ?? null, businessDate: businessDate(new Date(), s.closeHour), recordedBy: u.id });
-      await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: id, entityRef: b.ref, summary: `Received ${sar(amount)} by ${method} for ${b.ref} into ${ACCOUNT[acct]}` });
+      const acctNames = await accountNames();
+      await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: id, entityRef: b.ref, summary: `Received ${sar(amount)} by ${method} for ${b.ref} into ${acctNames[acct] ?? acct}` });
     });
   } catch (e) { return toState(e); }
   await flash("Payment recorded");

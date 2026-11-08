@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
 import { audit } from "@/lib/audit";
@@ -11,7 +11,7 @@ import { getSettings, setSetting } from "@/lib/settings";
 import { proposeGovernance } from "@/lib/governance";
 import { isIsoDate, isUuid } from "@/lib/security";
 import { settleBspClosing } from "@/lib/bsp";
-import { ACCOUNT, isAccountKey } from "@/lib/labels";
+import { accountNames, isValidAccount, primaryAccountKey, uniqueAccountKey } from "@/lib/accounts";
 import { proposeCashMove } from "@/lib/cash";
 
 /** Validate an optional "which partner did this" id — must be a real partner, or nothing. */
@@ -51,9 +51,10 @@ export async function clearPayments(_: ActionState, fd: FormData): Promise<Actio
       if (bookingIds.length) {
         for (const bk of await tx.select({ id: schema.bookings.id, ref: schema.bookings.ref }).from(schema.bookings).where(inArray(schema.bookings.id, bookingIds))) refs.set(bk.id, bk.ref);
       }
+      const names = await accountNames();
       for (const r of rows) {
         const ref = r.bookingId ? refs.get(r.bookingId) ?? null : null;
-        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.bookingId, entityRef: ref, summary: `Marked ${sar(r.amount)} for ${ref ?? "receipt"} as cleared in the ${r.account} account on ${date}` });
+        await audit(tx, { actorId: u.id, action: "payment.cleared", entityType: "booking", entityId: r.bookingId, entityRef: ref, summary: `Marked ${sar(r.amount)} for ${ref ?? "receipt"} as cleared in the ${names[r.account] ?? r.account} account on ${date}` });
       }
       return rows.length;
     });
@@ -68,7 +69,7 @@ export async function addBsp(_: ActionState, fd: FormData): Promise<ActionState>
     const amount = toHalalas(str(fd, "amount"));
     const period = str(fd, "period").slice(0, 40), dueDate = str(fd, "dueDate");
     if (!period || !isIsoDate(dueDate) || amount <= 0) throw new Error("Fill period, due date and amount");
-    const account = isAccountKey(str(fd, "account")) ? str(fd, "account") : "corporate";
+    const account = (await isValidAccount(str(fd, "account"))) ? str(fd, "account") : await primaryAccountKey();
     await db.transaction(async (tx) => {
       const [b] = await tx.insert(schema.bspObligations).values({ period, dueDate, amount, account, note: optStr(fd, "note"), createdBy: u.id }).returning();
       await audit(tx, { actorId: u.id, action: "bsp.added", entityType: "bsp", entityId: b.id, entityRef: period, summary: `Added BSP debit ${period}: SAR ${sar(amount)} due ${dueDate}` });
@@ -149,7 +150,7 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
   const u = await requirePerm("finance.reconcile");
   const account = str(fd, "account"), kind = str(fd, "kind");
   const date = str(fd, "date") || riyadhDate();
-  if (!isAccountKey(account)) return { error: "Choose the bank account" };
+  if (!(await isValidAccount(account))) return { error: "Choose the bank account" };
   if (!["deposit", "withdrawal", "adjustment"].includes(kind)) return { error: "Choose deposit or withdrawal" };
   if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
   try {
@@ -158,8 +159,9 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
     const direction = kind === "deposit" ? "in" as const : "out" as const;
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
     const partnerId = await validPartner(optStr(fd, "partnerId"));
+    const names = await accountNames();
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
-      `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${ACCOUNT[account]} · SAR ${sar(amount)}`,
+      `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${names[account] ?? account} · SAR ${sar(amount)}`,
       { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
@@ -170,7 +172,7 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
   const u = await requirePerm("finance.reconcile");
   const from = str(fd, "from"), to = str(fd, "to");
   const date = str(fd, "date") || riyadhDate();
-  if (!isAccountKey(from) || !isAccountKey(to)) return { error: "Choose both accounts" };
+  if (!(await isValidAccount(from)) || !(await isValidAccount(to))) return { error: "Choose both accounts" };
   if (from === to) return { error: "Choose two different accounts" };
   if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
   try {
@@ -178,6 +180,8 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
     if (amount <= 0) return { error: "Enter an amount" };
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
     const partnerId = await validPartner(optStr(fd, "partnerId"));
+    const names = await accountNames();
+    const fromName = names[from] ?? from, toName = names[to] ?? to;
     // A transfer only moves money between the company's own banks — total cash is unchanged and no outside
     // party is involved — so it applies immediately. (Deposits and withdrawals bring money in or out, so those
     // still go through a director's approval.) Recorded as two matching bank movements, out of one and into
@@ -187,10 +191,39 @@ export async function transferFunds(_: ActionState, fd: FormData): Promise<Actio
         { account: from, direction: "out", kind: "transfer", amount, counterparty: to, note, partnerId, txnDate: date, recordedBy: u.id },
         { account: to, direction: "in", kind: "transfer", amount, counterparty: from, note, partnerId, txnDate: date, recordedBy: u.id },
       ]);
-      await audit(tx, { actorId: u.id, action: "bank.transfer", entityType: "bank", entityRef: `${ACCOUNT[from]} → ${ACCOUNT[to]}`,
-        summary: `Transferred SAR ${sar(amount)} from ${ACCOUNT[from]} to ${ACCOUNT[to]}${note ? ` · ${note}` : ""}` });
+      await audit(tx, { actorId: u.id, action: "bank.transfer", entityType: "bank", entityRef: `${fromName} → ${toName}`,
+        summary: `Transferred SAR ${sar(amount)} from ${fromName} to ${toName}${note ? ` · ${note}` : ""}` });
     });
     revalidatePath("/adminwork/finance");
-    return { ok: `Transferred SAR ${sar(amount)} from ${ACCOUNT[from]} to ${ACCOUNT[to]}` };
+    return { ok: `Transferred SAR ${sar(amount)} from ${fromName} to ${toName}` };
   } catch (e) { return toState(e); }
+}
+
+/**
+ * Add a new company bank account. Directors can do this from Banks & cash — the account then flows
+ * automatically to every money surface (sales, receipts, supplier/BSP payouts, deposits, withdrawals,
+ * transfers, expenses, settlement and reports) with no code change. A stable internal key is derived
+ * from the name, and the account sorts after the existing ones.
+ */
+export async function addBankAccount(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("settings.manage");
+  const name = str(fd, "name").slice(0, 80).trim();
+  if (!name) return { error: "Name the account", fields: { name: "x" } };
+  const bank = optStr(fd, "bank")?.slice(0, 80) ?? null;
+  const iban = optStr(fd, "iban")?.replace(/\s/g, "").toUpperCase().slice(0, 34) ?? null;
+  if (iban && !/^SA\d{22}$/.test(iban)) return { error: "Enter a Saudi IBAN (SA followed by 22 digits)", fields: { iban: "x" } };
+  const openingDate = str(fd, "openingDate") && isIsoDate(str(fd, "openingDate")) ? str(fd, "openingDate") : riyadhDate();
+  try {
+    let openingBalance = 0;
+    if (str(fd, "openingBalance")) openingBalance = toHalalas(str(fd, "openingBalance"));
+    const key = await uniqueAccountKey(name);
+    await db.transaction(async (tx) => {
+      const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${schema.bankAccounts.sort}),0)::int`.mapWith(Number) }).from(schema.bankAccounts);
+      await tx.insert(schema.bankAccounts).values({ key, name, bank, iban, openingBalance, openingDate, sort: max + 1 });
+      await audit(tx, { actorId: u.id, action: "bank.added", entityType: "bank", entityRef: name,
+        summary: `Added bank account ${name}${bank ? ` · ${bank}` : ""}${openingBalance ? ` · opening balance SAR ${sar(openingBalance)}` : ""}` });
+    });
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  return { ok: `${name} added. It's now available everywhere money moves` };
 }

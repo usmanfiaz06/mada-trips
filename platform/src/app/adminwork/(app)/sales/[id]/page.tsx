@@ -6,7 +6,8 @@ import { db, schema } from "@/db";
 import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { issueCheck } from "@/lib/issuance";
-import { ACCOUNT, ACCOUNTS, BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
+import { BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
+import { accountNames, accountOptions } from "@/lib/accounts";
 import { fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/components/ui";
@@ -47,6 +48,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   const margin = b.sellPrice - b.netCost;
   const st = BOOKING_STATUS[b.status];
   const closed = b.status === "void" || b.status === "refunded";
+  const accName = await accountNames();
+  const accOpts = await accountOptions();
   const issuable = b.status === "pending_issue" && (await issueCheck(db, u, b));
   const credit = approvals.find((a) => a.kind === "credit");
   const refund = approvals.find((a) => a.kind === "refund" && a.status === "pending");
@@ -71,7 +74,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
       <Link href="/adminwork/sales" className="mb-4 inline-flex items-center gap-1.5 text-[13px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4 rtl:rotate-180" />{t("Sales & bookings")}</Link>
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4 animate-rise">
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2"><Badge tone={st.tone} dot>{t(st.label)}</Badge><Badge>{t(SERVICE[b.serviceType])}</Badge><Badge>{t(ACCOUNT[b.account])}</Badge></div>
+          <div className="mb-2 flex flex-wrap items-center gap-2"><Badge tone={st.tone} dot>{t(st.label)}</Badge><Badge>{t(SERVICE[b.serviceType])}</Badge><Badge>{accName[b.account] ?? b.account}</Badge></div>
           <h1 className="text-[34px] font-[380] leading-none tracking-[-0.035em]"><span className="num">{b.ref}</span> <span className="text-ink-3">· {b.paxCount > 2 ? t("{name} and {n} others", { name: b.passengers.split(",")[0], n: b.paxCount - 1 }) : b.passengers}</span></h1>
           <p className="mt-2 text-[14px] text-ink-3">{b.description ?? ""}{b.pnr && <> · PNR <span className="num tracking-wider text-ink" dir="ltr">{b.pnr}</span></>}</p>
         </div>
@@ -142,7 +145,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                   {payments.map(({ p, name }) => (
                     <tr key={p.id}>
                       <Td>{fmtDate(p.collectedAt, L, true)}</Td><Td>{t(METHOD[p.method])}{p.reference && <span className="block text-[12px] text-ink-3" dir="ltr">{p.reference}</span>}</Td>
-                      <Td>{t(ACCOUNT[p.account])}</Td><Td>{name}</Td>
+                      <Td>{accName[p.account] ?? p.account}</Td><Td>{name}</Td>
                       <Td>{p.clearedOn ? <Badge tone="ok" dot>{t("Cleared")} {fmtDate(p.clearedOn, L)}</Badge> : <Badge tone="neutral" dot>{t("Not cleared yet")}</Badge>}</Td>
                       <Td align="end"><Money v={p.amount} /></Td>
                     </tr>
@@ -158,7 +161,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                   {Object.entries(METHOD).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}
                 </select>
                 <select name="account" className="field" defaultValue={b.account} aria-label={t("Into which bank account?")}>
-                  {ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}
+                  {accOpts.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
                 </select>
                 <input name="reference" className="field" placeholder={t("Reference (optional)")} dir="ltr" />
                 <SubmitButton>{t("Record payment")}</SubmitButton>
@@ -196,7 +199,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               ) : b.supplierPaid ? (
                 <p className="flex items-center gap-2 text-[13.5px] text-ok"><Check className="size-4" />{supplierPay?.sp.source === "partner"
                   ? t("Paid by {name} (on their ledger)", { name: supplierPay.partner ?? "—" })
-                  : t("Paid from {bank}", { bank: supplierPay?.sp.account ? t(ACCOUNT[supplierPay.sp.account]) : t("a company bank") })}</p>
+                  : t("Paid from {bank}", { bank: supplierPay?.sp.account ? (accName[supplierPay.sp.account] ?? supplierPay.sp.account) : t("a company bank") })}</p>
               ) : supplierPay?.sp.status === "pending_approval" ? (
                 <p className="flex items-center gap-2 text-[13.5px] text-warn"><Clock className="size-4" />{t("{name} paid it — waiting for the other directors to approve", { name: supplierPay.partner ?? "—" })}</p>
               ) : (
@@ -207,7 +210,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                       <ActionForm action={paySupplier} className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-3 ring-1 ring-line">
                         <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="bank" />
                         <span className="text-[12.5px] text-ink-2">{t("Pay from a company bank")}</span>
-                        <select name="account" className="field h-10" defaultValue={b.account}>{ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}</select>
+                        <select name="account" className="field h-10" defaultValue={b.account}>{accOpts.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</select>
                         <SubmitButton variant="outline" size="sm">{t("Mark paid")}</SubmitButton>
                       </ActionForm>
                       {u.partnerId && (

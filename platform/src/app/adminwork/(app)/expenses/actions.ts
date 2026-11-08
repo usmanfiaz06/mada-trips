@@ -12,6 +12,7 @@ import { toHalalas, sar } from "@/lib/money";
 import { flash, str, toState, zodError, type ActionState } from "@/lib/actions";
 import { riyadhDate } from "@/lib/dates";
 import { EXPENSE_CATEGORY } from "@/lib/labels";
+import { isValidAccount } from "@/lib/accounts";
 import { partnerBalances } from "@/lib/finance";
 import { detectFileType, isIsoDate, isUuid } from "@/lib/security";
 
@@ -24,7 +25,7 @@ const S = z.object({
   description: z.string().trim().min(3, "Describe what was paid for").max(200, "Keep the description under 200 characters"),
   justification: z.string().trim().min(5, "Explain the business reason").max(1000, "Keep the justification under 1,000 characters"),
   vendor: z.string().trim().max(120).optional(),
-  paidBy: z.enum(["retail", "alrajhi", "corporate", "partner"]),
+  paidBy: z.string().min(1, "Choose who paid"), // "partner" or a live bank-account key — validated below
   isStartup: z.string().optional(),
 });
 
@@ -33,6 +34,7 @@ export async function submitExpense(_: ActionState, fd: FormData): Promise<Actio
   const p = S.safeParse(Object.fromEntries(fd));
   if (!p.success) return zodError(p.error);
   const v = p.data;
+  if (v.paidBy !== "partner" && !(await isValidAccount(v.paidBy))) return { error: "Choose who paid", fields: { paidBy: "x" } };
   const file = fd.get("proof");
   if (!(file instanceof File) || file.size === 0) return { error: "Attach the proof of payment (transfer confirmation or tax invoice)", fields: { proof: "x" } };
   if (file.size > 6 * 1024 * 1024) return { error: "Proof must be under 6 MB" };

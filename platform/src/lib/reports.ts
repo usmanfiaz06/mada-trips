@@ -11,7 +11,7 @@ type Q = DB | Tx;
  * — negative means the company hasn't yet earned back everything the partners put in.
  */
 export type BalanceSheet = {
-  cash: { account: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
+  cash: { account: string; name: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
   owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
 };
 
@@ -40,7 +40,7 @@ export async function monthlyTrend(q: Q = db, months = 6): Promise<{ ym: string;
 
 export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
   const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
-  const cash = cashPos.accounts.map((a) => ({ account: a.key, balance: a.balance }));
+  const cash = cashPos.accounts.map((a) => ({ account: a.key, name: a.name, balance: a.balance }));
   const receivable = recv.reduce((s, r) => s + r.owed, 0);
   const assets = cashPos.total + receivable;
   const owedSuppliers = pay.reduce((s, r) => s + r.net_cost, 0);

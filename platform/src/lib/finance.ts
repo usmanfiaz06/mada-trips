@@ -1,8 +1,7 @@
 import "server-only";
-import { and, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { openBspTotal } from "./bsp";
-import { ACCOUNT_KEYS } from "./labels";
 
 type Q = Tx | typeof db;
 
@@ -37,7 +36,7 @@ export async function partnerBalances(q: Q = db) {
 
 /** Cash in each bank account from what the platform knows has cleared or been paid out. */
 export async function cashPosition(q: Q = db) {
-  const accounts = await q.select().from(schema.bankAccounts);
+  const accounts = await q.select().from(schema.bankAccounts).orderBy(asc(schema.bankAccounts.sort), asc(schema.bankAccounts.name));
   // A voided or refunded sale leaves the books: its received money no longer counts as cash on hand.
   const notVoided = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
   const inflow = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
@@ -275,8 +274,9 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   waterfall.push({ key: "dividend", amount: divPool, remainingAfter: remaining - divPool });
 
   const pickAcc = (k: string) => cleared.find((c) => c.account === k)?.total ?? 0;
+  const acctKeys = (await q.select({ key: schema.bankAccounts.key }).from(schema.bankAccounts).orderBy(schema.bankAccounts.sort)).map((a) => a.key);
   return {
-    start, end, clearedByAccount: Object.fromEntries(ACCOUNT_KEYS.map((k) => [k, pickAcc(k)])),
+    start, end, clearedByAccount: Object.fromEntries(acctKeys.map((k) => [k, pickAcc(k)])),
     rolledOver: rolled[0]?.total ?? 0,
     bookingIds: settled.map((b) => b.id), bookingCount: settled.length, expenseIds: expRows.map((e) => e.id),
     revenue, directCost, grossProfit, overheads,

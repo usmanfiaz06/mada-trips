@@ -313,12 +313,13 @@ export const bspObligations = pgTable("bsp_obligations", {
 });
 
 export const bankAccounts = pgTable("bank_accounts", {
-  key: text("key").primaryKey(), // retail | corporate
-  name: text("name").notNull(),
+  key: text("key").primaryKey(), // stable internal id; directors add accounts in Banks & cash
+  name: text("name").notNull(),  // display label, e.g. "BSF (B2C)"
   bank: text("bank"),
   iban: text("iban"),
   openingBalance: money("opening_balance").notNull().default(0),
   openingDate: date("opening_date").notNull(),
+  sort: integer("sort").notNull().default(0),
 });
 
 // A 15-day IATA/BSP closing: the total owed to IATA for flights issued in the window, and how it was settled.

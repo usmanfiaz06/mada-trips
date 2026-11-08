@@ -4,6 +4,7 @@ import { requirePerm, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
 import { activeDelegation, issuedTodayBy } from "@/lib/issuance";
+import { accountOptions } from "@/lib/accounts";
 import { PageHeader } from "@/components/ui";
 import { SaleForm } from "./sale-form";
 
@@ -27,11 +28,12 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
     const used = await issuedTodayBy(db, u.id, s.closeHour);
     delegation = { scope: d.scope, maxTicket: d.maxTicket, dailyLeft: Math.max(0, d.dailyCap - used) };
   }
+  const accounts = await accountOptions();
   return (
     <>
       <PageHeader eyebrow={t("Point of sale")} title={t("New sale")} subtitle={t("Four quick steps. The summary tells you exactly what will happen when you save.")} />
       <SaleForm clients={rows.map((r) => ({ id: r.id, name: r.name, type: r.type, phone: r.phone, creditLimit: Number(r.credit_limit), exposure: Number(r.exposure), terms: r.terms }))}
-        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} />
+        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} accounts={accounts} />
     </>
   );
 }

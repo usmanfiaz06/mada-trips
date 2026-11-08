@@ -6,14 +6,15 @@ import { getT } from "@/lib/i18n";
 import { bankMovements, cashPosition } from "@/lib/finance";
 import { bspClosings } from "@/lib/bsp";
 import { getSettings } from "@/lib/settings";
-import { ACCOUNT, ACCOUNTS, METHOD } from "@/lib/labels";
+import { METHOD } from "@/lib/labels";
+import { accountOptions, accountNames } from "@/lib/accounts";
 import { daysBetween, fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
-import { addBankTxn, settleBsp, transferFunds, updateBank } from "./actions";
+import { addBankAccount, addBankTxn, settleBsp, transferFunds, updateBank } from "./actions";
 
 const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense", deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
 export const metadata = { title: "Banks & cash" };
@@ -32,6 +33,8 @@ export default async function FinancePage() {
   ]);
   const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 12) })));
   const canRec = can(u, "finance.reconcile");
+  const accOpts = await accountOptions();
+  const accName = await accountNames();
   const bspRows = await bspClosings(db, s, 6);
   const partnerList = canRec ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
 
@@ -43,7 +46,7 @@ export default async function FinancePage() {
           const Tile = i === 0 ? InkCard : Card;
           return (
             <Tile key={a.key} className="flex flex-col">
-              <div className="flex items-center justify-between"><span className={cx("text-[13px]", i === 0 ? "text-tile-ink-3" : "text-ink-3")}>{t(ACCOUNT[a.key])}</span><Landmark className="size-4 opacity-50" /></div>
+              <div className="flex items-center justify-between"><span className={cx("text-[13px]", i === 0 ? "text-tile-ink-3" : "text-ink-3")}>{a.name}</span><Landmark className="size-4 opacity-50" /></div>
               <div className="figure mt-8 text-[48px]" dir="ltr">{sar(a.balance, { compact: true })}<span className="figure-unit">SAR</span></div>
               <div className={cx("mt-auto grid grid-cols-2 gap-3 border-t pt-4 text-[12.5px]", i === 0 ? "border-tile-line text-tile-ink-3" : "border-line text-ink-3")}>
                 <div>{a.bank ?? "—"}<div className="num mt-0.5 truncate" dir="ltr">{a.iban ?? ""}</div></div>
@@ -67,8 +70,8 @@ export default async function FinancePage() {
           {canRec ? (
             <ClearTable today={today} rows={uncleared.map(({ p, ref, client }) => ({
               id: p.id, ref, bookingId: p.bookingId, client, method: p.method, account: p.account, amount: p.amount, date: p.businessDate,
-              methodLabel: t(METHOD[p.method]), accountLabel: t(ACCOUNT[p.account]), dateLabel: fmtDate(p.businessDate, L),
-            }))} />
+              methodLabel: t(METHOD[p.method]), accountLabel: accName[p.account] ?? p.account, dateLabel: fmtDate(p.businessDate, L),
+            }))} accounts={accOpts} />
           ) : <p className="px-6 pb-6 text-[13px] text-ink-3">{t("{n} receipts waiting.", { n: uncleared.length })}</p>}
         </Card>
 
@@ -91,14 +94,14 @@ export default async function FinancePage() {
                     <span className="num text-[15px]" dir="ltr">{sar(c.unsettled > 0 ? c.unsettled : settled?.amount ?? pending?.amount ?? 0)}</span>
                   </div>
                   {settled ? (
-                    <p className="mt-2 flex items-center gap-1.5 text-[12px] text-ok"><Check className="size-3.5" />{settled.source === "partner" ? t("Paid by {name}", { name: settled.partner ?? "—" }) : t("Paid from {bank}", { bank: settled.account ? t(ACCOUNT[settled.account]) : t("a company bank") })}</p>
+                    <p className="mt-2 flex items-center gap-1.5 text-[12px] text-ok"><Check className="size-3.5" />{settled.source === "partner" ? t("Paid by {name}", { name: settled.partner ?? "—" }) : t("Paid from {bank}", { bank: settled.account ? (accName[settled.account] ?? settled.account) : t("a company bank") })}</p>
                   ) : pending ? (
                     <p className="mt-2 flex items-center gap-1.5 text-[12px] text-warn"><Clock className="size-3.5" />{t("{name} paid it — waiting for the other directors to approve", { name: pending.partner ?? "—" })}</p>
                   ) : canRec && c.unsettled > 0 ? (
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <ActionForm action={settleBsp} className="flex flex-col gap-2 rounded-xl bg-surface p-2.5 ring-1 ring-line">
                         <input type="hidden" name="start" value={c.start} /><input type="hidden" name="end" value={c.end} /><input type="hidden" name="source" value="bank" />
-                        <select name="account" className="field h-9" defaultValue="corporate">{ACCOUNTS.map((a) => <option key={a.value} value={a.value}>{t(a.label)}</option>)}</select>
+                        <select name="account" className="field h-9">{accOpts.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}</select>
                         <SubmitButton size="sm" variant="outline">{t("Pay IATA")}</SubmitButton>
                       </ActionForm>
                       {u.partnerId && (
@@ -125,7 +128,7 @@ export default async function FinancePage() {
             <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
               <div className="text-[13px] font-[450]">{t("Deposit")}</div>
               <input type="hidden" name="kind" value="deposit" />
-              <Select name="account" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+              <Select name="account" options={accOpts} />
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
@@ -135,7 +138,7 @@ export default async function FinancePage() {
             <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
               <div className="text-[13px] font-[450]">{t("Withdrawal")}</div>
               <input type="hidden" name="kind" value="withdrawal" />
-              <Select name="account" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+              <Select name="account" options={accOpts} />
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
@@ -145,8 +148,8 @@ export default async function FinancePage() {
             <ActionForm action={transferFunds} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
               <div className="text-[13px] font-[450]">{t("Transfer between banks")}</div>
               <div className="grid grid-cols-2 gap-2">
-                <Select name="from" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
-                <Select name="to" defaultValue="corporate" options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} />
+                <Select name="from" options={accOpts} />
+                <Select name="to" defaultValue={accOpts[1]?.value} options={accOpts} />
               </div>
               <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
               <Input name="note" placeholder={t("Note (optional)")} />
@@ -161,7 +164,7 @@ export default async function FinancePage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {movements.map(({ key, rows }) => (
           <Card key={key} pad={false}>
-            <div className="p-6 pb-3"><CardHead className="mb-0" title={t(ACCOUNT[key])} hint={t("Recent money in and out")} /></div>
+            <div className="p-6 pb-3"><CardHead className="mb-0" title={accName[key] ?? key} hint={t("Recent money in and out")} /></div>
             {rows.length === 0 ? <p className="px-6 pb-6 text-[13px] text-ink-3">{t("No movements yet.")}</p> : (
               <ul className="px-3 pb-3">
                 {rows.map((m, i) => (
@@ -189,13 +192,24 @@ export default async function FinancePage() {
             {cash.accounts.map((a) => (
               <ActionForm key={a.key} action={updateBank} className="grid grid-cols-2 gap-3">
                 <input type="hidden" name="key" value={a.key} />
-                <div className="col-span-2 flex items-center gap-2 text-[14px]">{t(ACCOUNT[a.key])}<Badge>{t("since {d}", { d: fmtDate(a.openingDate, L) })}</Badge></div>
+                <div className="col-span-2 flex items-center gap-2 text-[14px]">{a.name}<Badge>{t("since {d}", { d: fmtDate(a.openingDate, L) })}</Badge></div>
                 <Field label={t("Bank")}><Input name="bank" defaultValue={a.bank ?? ""} /></Field>
                 <Field label={t("Opening balance")}><Input name="openingBalance" defaultValue={amountInput(a.openingBalance)} dir="ltr" /></Field>
                 <Field label="IBAN" className="col-span-2"><Input name="iban" defaultValue={a.iban ?? ""} dir="ltr" /></Field>
                 <div className="col-span-2"><SubmitButton variant="outline" size="sm">{t("Save")}</SubmitButton></div>
               </ActionForm>
             ))}
+          </div>
+          <div className="mt-6 border-t border-line pt-6">
+            <CardHead title={t("Add a bank account")} hint={t("New accounts appear automatically everywhere money moves — sales, receipts, supplier and IATA payouts, deposits, withdrawals, transfers, expenses, settlement and reports.")} />
+            <ActionForm action={addBankAccount} resetOnOk className="grid gap-3 sm:grid-cols-2">
+              <Field label={t("Account name")}><Input name="name" placeholder={t("e.g. Alrajhi (B2B)")} /></Field>
+              <Field label={t("Bank")}><Input name="bank" placeholder={t("e.g. Al Rajhi Bank")} /></Field>
+              <Field label={t("Opening balance")}><Input name="openingBalance" defaultValue="0" dir="ltr" /></Field>
+              <Field label={t("Tracking since")}><Input type="date" name="openingDate" defaultValue={today} /></Field>
+              <Field label="IBAN" className="sm:col-span-2"><Input name="iban" dir="ltr" placeholder="SA…" /></Field>
+              <div className="sm:col-span-2"><SubmitButton variant="primary" size="sm">{t("Add account")}</SubmitButton></div>
+            </ActionForm>
           </div>
         </Card>
       )}
