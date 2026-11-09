@@ -94,7 +94,7 @@ export async function dashboardData(u: CurrentUser, view: "current" | "prev" = "
       count(*) FILTER (WHERE p.paid >= b.sell_price AND p.last_cleared BETWEEN ${current.start} AND ${current.end})::int AS n
     FROM bookings b
     LEFT JOIN (SELECT booking_id, SUM(amount) FILTER (WHERE cleared_on IS NOT NULL) AS paid, MAX(cleared_on) AS last_cleared FROM payments GROUP BY booking_id) p ON p.booking_id = b.id
-    WHERE b.prepared_by = ${u.id} AND b.status IN ('issued','pending_issue') AND b.recognized_cycle_id IS NULL AND b.commission_bps > 0`);
+    WHERE COALESCE(b.sold_by, b.prepared_by) = ${u.id} AND b.status IN ('issued','pending_issue') AND b.recognized_cycle_id IS NULL AND b.commission_bps > 0`);
   const commission = { rate: me?.rate ?? 0, earned: Number(comm[0]?.earned ?? 0), pending: Number(comm[0]?.pending ?? 0), sales: comm[0]?.n ?? 0 };
 
   const myTasks = await myUrgentTasks(u.id);

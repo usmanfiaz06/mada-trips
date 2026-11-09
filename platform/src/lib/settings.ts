@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   bspGraceDays: 1,                  // one grace day the partners may use before a BSP payment counts as overdue
   cashMoveLimit: 2_000_000,         // SAR 20,000: a bank deposit/withdrawal/transfer under this needs 1 director, at or above it all directors
   refundApprovals: 1,
+  saleEditMarginLimit: 500_00,      // SAR 500: a manager may correct an issued sale outright if it moves the margin by less than this; a bigger change needs a director's approval
 };
 export type Settings = typeof DEFAULT_SETTINGS;
 

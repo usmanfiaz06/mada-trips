@@ -25,6 +25,7 @@ type Props = {
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
   partners: { id: string; name: string }[]; myPartnerId: string | null;
   accounts: { value: string; label: string }[];
+  sellers: { id: string; name: string }[]; myUserId: string;
 };
 
 const SERVICES = [
@@ -57,10 +58,11 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId, accounts }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId, accounts, sellers, myUserId }: Props) {
   const t = useT();
   const defaultAccount = accounts[0]?.value ?? "retail";
   const accountName = (k: string) => accounts.find((a) => a.value === k)?.label ?? k;
+  const [soldBy, setSoldBy] = useState<string>(myUserId);
   const [state, action, pending] = useActionState(createSale, null);
   const onSubmit = useSubmit(action);
   const [q, setQ] = useState("");
@@ -339,6 +341,14 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
               ))}
             </div>
             <input type="hidden" name="account" value={account} />
+          </div>
+
+          <div className="mt-4">
+            <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Sold by")}</span>
+            <select name="soldBy" value={soldBy} onChange={(e) => setSoldBy(e.target.value)} className="field h-10">
+              {sellers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === myUserId ? ` (${t("me")})` : ""}</option>)}
+            </select>
+            {soldBy !== myUserId && <p className="mt-1.5 text-[12px] text-ink-3">{t("The sale and its commission are credited to the person you picked, not to you.")}</p>}
           </div>
 
           {creditNeeded && ctype !== "contracted" && (

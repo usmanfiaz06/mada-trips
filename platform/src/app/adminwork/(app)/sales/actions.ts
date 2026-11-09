@@ -47,6 +47,7 @@ const SaleSchema = z.object({
   supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
   supplierAccount: z.string().optional(),
   supplierPartnerId: z.string().optional(),
+  soldBy: z.string().optional(), // which team member made the sale (gets the credit + commission); defaults to preparer
   viaBsp: z.string().optional(),
 
   paymentRef: z.string().trim().max(60).optional(),
@@ -136,15 +137,22 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
         }
       }
 
-      const [{ rate: preparerRate }] = await tx.select({ rate: schema.users.commissionBps }).from(schema.users).where(eq(schema.users.id, u.id));
+      // Who made the sale (gets the credit + commission). The preparer can record it for another active
+      // team member; the commission rate is frozen from that salesperson, not whoever typed it in.
+      let sellerId = u.id;
+      if (v.soldBy && isUuid(v.soldBy) && v.soldBy !== u.id) {
+        const [seller] = await tx.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.id, v.soldBy), eq(schema.users.active, true)));
+        if (seller) sellerId = seller.id;
+      }
+      const [{ rate: sellerRate }] = await tx.select({ rate: schema.users.commissionBps }).from(schema.users).where(eq(schema.users.id, sellerId));
       const ref = await nextRef(tx, "S", 10000);
       const [b] = await tx.insert(schema.bookings).values({
         ref, channel, account, serviceType: v.serviceType, clientId: client.id, passengers, paxCount: travellers.length, travellers,
         description: v.description || null, details, supplier: v.supplier || null, pnr: v.pnr?.toUpperCase() || null, travelDate: v.travelDate || null,
-        commissionBps: preparerRate, viaBsp: v.serviceType === "flight" && v.viaBsp === "1", supplierReviewed: true,
+        commissionBps: sellerRate, viaBsp: v.serviceType === "flight" && v.viaBsp === "1", supplierReviewed: true,
         netCost: v.netCost, sellPrice: v.sellPrice, status: needsCredit ? "awaiting_credit" : "pending_issue",
         onCredit: unpaid > 0, dueDate: unpaid > 0 ? addDays(bdate, client.paymentTermsDays || 14) : null,
-        businessDate: bdate, preparedBy: u.id,
+        businessDate: bdate, preparedBy: u.id, soldBy: sellerId,
       }).returning();
       await audit(tx, { actorId: u.id, action: "booking.created", entityType: "booking", entityId: b.id, entityRef: ref,
         summary: `Created ${ref} · ${travellers.length > 1 ? `${travellers.length} × ` : ""}${passengers}${v.description ? ` · ${v.description}` : ""} · sell ${sar(v.sellPrice)}, margin ${sar(v.sellPrice - v.netCost)}` });
@@ -484,6 +492,61 @@ export async function paySupplier(_: ActionState, fd: FormData): Promise<ActionS
       await recordSupplierPayment(tx, b, { source: source === "partner" ? "partner" : "bank", account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id });
     });
     await flash(source === "partner" ? "Sent to the other directors to approve" : "Supplier marked paid");
+  } catch (e) { return toState(e); }
+  revalidatePath("/adminwork", "layout");
+  redirect(`/adminwork/sales/${id}`);
+}
+
+/**
+ * Correct an issued sale's figures and details (net cost, selling price, supplier, PNR, ticket numbers,
+ * traveller names/passports) without a full refund. Manager-only. A small change (margin moves less than the
+ * settings limit) applies immediately and is audited; a bigger change is proposed to a director to approve.
+ * Blocked once the sale is inside a signed Day-25 settlement.
+ */
+export async function correctSale(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requireUser();
+  if (!can(u, "sales.edit")) return { error: "Only a manager can correct an issued sale" };
+  const id = str(fd, "id");
+  const { assertCorrectable, applySaleEdit, marginDelta } = await import("@/lib/sale-edit");
+  try {
+    await loadScopedBooking(u, id);
+    const s = await getSettings();
+    // Build the patch from whichever fields were submitted. A money field left blank means "leave it".
+    const patch: import("@/lib/sale-edit").SaleEditPatch = {};
+    if (optStr(fd, "netCost")) patch.netCost = toHalalas(str(fd, "netCost"));
+    if (optStr(fd, "sellPrice")) patch.sellPrice = toHalalas(str(fd, "sellPrice"));
+    if (fd.has("supplier")) patch.supplier = optStr(fd, "supplier")?.slice(0, 100) ?? null;
+    if (fd.has("pnr")) patch.pnr = optStr(fd, "pnr")?.slice(0, 20).toUpperCase() ?? null;
+    if (fd.has("ticketNumbers")) patch.ticketNumbers = optStr(fd, "ticketNumbers")?.slice(0, 1000) ?? null;
+    const reason = optStr(fd, "reason")?.slice(0, 1000) ?? "";
+
+    let outcome = "";
+    await db.transaction(async (tx) => {
+      const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
+      if (!b) throw new Error("Sale not found");
+      // Traveller edits (names/passports) use the same validation as a new sale.
+      if (optStr(fd, "travellers")) {
+        let raw: unknown = null;
+        try { raw = JSON.parse(str(fd, "travellers")); } catch { throw new Error("Something went wrong with the traveller details. Reload and try again"); }
+        const r = cleanTravellers(b.serviceType, raw, riyadhDate());
+        if (!r.ok) throw new Error(r.error);
+        patch.travellers = r.travellers;
+      }
+      await assertCorrectable(tx, b, patch);
+      const delta = Math.abs(marginDelta(b, patch));
+      const touchesMoney = patch.netCost !== undefined || patch.sellPrice !== undefined;
+      if (touchesMoney && delta >= s.saleEditMarginLimit) {
+        // Big change: a director signs off before it lands. The sale keeps its current figures until then.
+        const r = await createApproval(tx, { kind: "sale_edit", entityType: "booking", entityId: b.id,
+          title: `Correct ${b.ref} · margin ${sar(b.sellPrice - b.netCost)} → ${sar((patch.sellPrice ?? b.sellPrice) - (patch.netCost ?? b.netCost))}`,
+          amount: patch.sellPrice ?? b.sellPrice, reason: reason || `Correction to ${b.ref}`, requestedBy: u.id, payload: patch });
+        outcome = `Correction sent to a director to approve (${r.ref})`;
+        return;
+      }
+      const changed = await applySaleEdit(tx, b, patch, u.id, "direct");
+      outcome = changed ? "Sale corrected" : "Nothing to change";
+    });
+    await flash(outcome);
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);

@@ -148,7 +148,7 @@ export const bookings = pgTable("bookings", {
   bspClosingId: uuid("bsp_closing_id"),
   sellPrice: money("sell_price").notNull(),
   vatAmount: money("vat_amount").notNull().default(0),
-  // The preparer's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
+  // The salesperson's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
   commissionBps: integer("commission_bps").notNull().default(0),
   status: text("status").notNull().default("pending_issue"), // draft | pending_issue | issued | returned | void | refunded
   onCredit: boolean("on_credit").notNull().default(false),
@@ -156,6 +156,9 @@ export const bookings = pgTable("bookings", {
   dueDate: date("due_date"),
   businessDate: date("business_date").notNull(), // Riyadh calendar day it belongs to
   preparedBy: uuid("prepared_by").notNull().references(() => users.id),
+  // Who actually made the sale (gets the credit and commission). Defaults to the preparer; a sale entered on
+  // someone else's behalf is credited to the person picked here. Falls back to preparedBy where null.
+  soldBy: uuid("sold_by").references(() => users.id),
   issuedBy: uuid("issued_by").references(() => users.id),
   issuedAt: timestamp("issued_at", { withTimezone: true }),
   issuedUnderDelegation: uuid("issued_under_delegation"),

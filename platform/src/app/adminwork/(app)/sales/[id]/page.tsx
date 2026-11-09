@@ -15,6 +15,8 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
 import { issueBooking, paySupplier, recordPayment, requestRefund, requestVoid, resubmitBooking, returnBooking, reviewFlightSettlement } from "../actions";
+import { CorrectSaleForm } from "./correct-sale";
+import { getSettings } from "@/lib/settings";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
 import { NATIONALITIES, expiresSoon, type Traveller } from "@/lib/services";
@@ -50,6 +52,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   const closed = b.status === "void" || b.status === "refunded";
   const accName = await accountNames();
   const accOpts = await accountOptions();
+  const settings = await getSettings();
+  // A manager can correct an issued sale's figures/details until it's locked into a signed settlement.
+  const canCorrect = b.status === "issued" && !b.recognizedCycleId && can(u, "sales.edit");
   const issuable = b.status === "pending_issue" && (await issueCheck(db, u, b));
   const credit = approvals.find((a) => a.kind === "credit");
   const refund = approvals.find((a) => a.kind === "refund" && a.status === "pending");
@@ -108,10 +113,19 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               [t("Supplier"), b.supplier],
               [t("Travel date"), fmtDate(b.travelDate, L)],
               [t("Ticket no."), b.ticketNumbers ? <span key="tk" className="num" dir="ltr">{b.ticketNumbers}</span> : "—"],
+              [t("Sold by"), who(b.soldBy ?? b.preparedBy)],
               [t("Prepared by"), who(b.preparedBy)],
               [t("Business day"), fmtDate(b.businessDate, L)],
               [t("Due date"), b.onCredit ? fmtDate(b.dueDate, L) : t("Paid at sale")],
             ]} />
+            {canCorrect && (
+              <div className="mt-4 border-t border-line pt-4">
+                <CorrectSaleForm id={b.id} serviceType={b.serviceType}
+                  netCost={amountInput(b.netCost)} sellPrice={amountInput(b.sellPrice)}
+                  supplier={b.supplier ?? ""} pnr={b.pnr ?? ""} ticketNumbers={b.ticketNumbers ?? ""}
+                  travellers={travellers} marginLimitLabel={sar(settings.saleEditMarginLimit)} />
+              </div>
+            )}
           </Card>
           {travellers.length > 0 && (travellers.length > 1 || travellers.some((x) => x.passport)) && (
             <Card pad={false}>

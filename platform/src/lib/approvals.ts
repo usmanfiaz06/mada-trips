@@ -9,7 +9,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "sale_edit";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -119,6 +119,8 @@ export async function createApproval(tx: Tx, input: CreateInput) {
     else { requiresAll = true; rule = `SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
   } else if (input.kind === "void") {
     pool = "directors"; required = 1; rule = "Voiding a sale: one director approves";
+  } else if (input.kind === "sale_edit") {
+    pool = "directors"; required = 1; rule = "Correcting an issued sale's figures: one director approves";
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -311,6 +313,13 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       const { finalizeSettlement, reopenSettlement } = await import("./settlement");
       if (ok) await finalizeSettlement(tx, req.entityId, actorId);
       else await reopenSettlement(tx, req.entityId);
+      return;
+    }
+    case "sale_edit": {
+      if (!ok) return;
+      const { applySaleEditApproval } = await import("./sale-edit");
+      const p = req.payload as import("./sale-edit").SaleEditPatch | null;
+      if (p) await applySaleEditApproval(tx, req.entityId, p, actorId);
       return;
     }
   }

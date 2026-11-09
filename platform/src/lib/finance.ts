@@ -209,9 +209,10 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   // A booking is counted in the first cycle after it is issued, fully paid and cleared by the cut-off, whenever that happens
   // (paid in one cycle and issued in the next still counts, in the next). Each booking is counted exactly once.
   const mine = excludeCycleId ? sql`OR b.recognized_cycle_id = ${excludeCycleId}` : sql``;
-  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; prepared_by: string; commission_bps: number; preparer: string }>(sql`
-    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, b.prepared_by, b.commission_bps, u.name AS preparer FROM bookings b
-    JOIN users u ON u.id = b.prepared_by
+  // Commission is credited to the salesperson (sold_by), falling back to the preparer for older sales.
+  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; seller_id: string; commission_bps: number; seller: string }>(sql`
+    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, COALESCE(b.sold_by, b.prepared_by) AS seller_id, b.commission_bps, u.name AS seller FROM bookings b
+    JOIN users u ON u.id = COALESCE(b.sold_by, b.prepared_by)
     JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL AND cleared_on <= ${end} GROUP BY booking_id) p ON p.booking_id = b.id
     WHERE b.status = 'issued' AND p.paid >= b.sell_price AND (b.recognized_cycle_id IS NULL ${mine})`);
   void cycleOnly;
@@ -232,9 +233,9 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   for (const b of settled) {
     const amount = Math.floor((Math.max(0, Number(b.sell_price) - Number(b.net_cost)) * Number(b.commission_bps)) / 10000);
     if (amount <= 0) continue;
-    const c = commissionMap.get(b.prepared_by) ?? { userId: b.prepared_by, name: b.preparer, amount: 0, bookings: 0 };
+    const c = commissionMap.get(b.seller_id) ?? { userId: b.seller_id, name: b.seller, amount: 0, bookings: 0 };
     c.amount += amount; c.bookings += 1;
-    commissionMap.set(b.prepared_by, c);
+    commissionMap.set(b.seller_id, c);
   }
   const commissions = [...commissionMap.values()].sort((a, b) => b.amount - a.amount);
   const commissionTotal = commissions.reduce((s, c) => s + c.amount, 0);

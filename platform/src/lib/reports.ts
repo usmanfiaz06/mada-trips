@@ -209,3 +209,28 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     flow: { in: inRows, out: outRows, totalIn, totalOut, net: totalIn - totalOut, byAccount },
   };
 }
+
+export type MemberSales = {
+  userId: string; name: string; count: number; revenue: number; margin: number; commission: number;
+}[];
+
+/**
+ * Sales credited to each team member over a business-day window [start, end]. A sale is credited to its
+ * salesperson (sold_by, falling back to the preparer for older sales). Live issued/pending sales only —
+ * void and refunded drop out. "margin" is sell − cost; "commission" is what they'd earn at the rate frozen
+ * on each sale.
+ */
+export async function salesByMember(q: Q = db, start: string, end: string): Promise<MemberSales> {
+  const rows = await q.execute<{ user_id: string; name: string; count: number; revenue: number; margin: number; commission: number }>(sql`
+    SELECT COALESCE(b.sold_by, b.prepared_by) AS user_id, u.name,
+      count(*)::int AS count,
+      coalesce(sum(b.sell_price),0)::bigint AS revenue,
+      coalesce(sum(b.sell_price - b.net_cost),0)::bigint AS margin,
+      coalesce(sum(floor(GREATEST(b.sell_price - b.net_cost, 0) * b.commission_bps / 10000)),0)::bigint AS commission
+    FROM bookings b
+    JOIN users u ON u.id = COALESCE(b.sold_by, b.prepared_by)
+    WHERE b.business_date BETWEEN ${start} AND ${end} AND b.status NOT IN ('void','refunded','draft')
+    GROUP BY COALESCE(b.sold_by, b.prepared_by), u.name
+    ORDER BY revenue DESC`);
+  return rows.map((r) => ({ userId: r.user_id, name: r.name, count: Number(r.count), revenue: Number(r.revenue), margin: Number(r.margin), commission: Number(r.commission) }));
+}

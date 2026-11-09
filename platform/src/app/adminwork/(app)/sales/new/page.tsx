@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -22,6 +22,9 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
     FROM clients c ORDER BY (SELECT max(created_at) FROM bookings b WHERE b.client_id = c.id) DESC NULLS LAST, c.name LIMIT 500`);
   const partnerRows = u.partnerId ? await db.select({ id: schema.partners.id, name: schema.partners.name, nameAr: schema.partners.nameAr }).from(schema.partners).orderBy(schema.partners.sort) : [];
   const partners = partnerRows.map((p) => ({ id: p.id, name: t.locale === "ar" ? p.nameAr : p.name }));
+  // Who can be credited with the sale: any active team member, with the current user first.
+  const sellerRows = await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(eq(schema.users.active, true)).orderBy(schema.users.name);
+  const sellers = [...sellerRows.filter((r) => r.id === u.id), ...sellerRows.filter((r) => r.id !== u.id)];
   const d = await activeDelegation(db, u.id);
   let delegation = null;
   if (d) {
@@ -33,7 +36,7 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
     <>
       <PageHeader eyebrow={t("Point of sale")} title={t("New sale")} subtitle={t("Four quick steps. The summary tells you exactly what will happen when you save.")} />
       <SaleForm clients={rows.map((r) => ({ id: r.id, name: r.name, type: r.type, phone: r.phone, creditLimit: Number(r.credit_limit), exposure: Number(r.exposure), terms: r.terms }))}
-        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} accounts={accounts} />
+        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} accounts={accounts} sellers={sellers} myUserId={u.id} />
     </>
   );
 }

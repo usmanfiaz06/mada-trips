@@ -3,7 +3,7 @@ import { Landmark, TrendingUp, Handshake, Scale } from "lucide-react";
 import { requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
-import { periodReport, balanceSheet, monthlyTrend } from "@/lib/reports";
+import { periodReport, balanceSheet, monthlyTrend, salesByMember } from "@/lib/reports";
 import { addDays, businessDate, cycleFor, fmtDate, riyadhDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { Card, CardHead, Money, PageHeader, cx } from "@/components/ui";
@@ -46,7 +46,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     title = `${fmtDate(start, L)} – ${fmtDate(end, L)}`;
   }
 
-  const [bs, { pl }, trend] = await Promise.all([balanceSheet(), periodReport(undefined, start, end), monthlyTrend(undefined, 6)]);
+  const [bs, { pl }, trend, members] = await Promise.all([balanceSheet(), periodReport(undefined, start, end), monthlyTrend(undefined, 6), salesByMember(undefined, start, end)]);
 
   const H = 116;
   const vals = trend.map((x) => x.profit);
@@ -166,6 +166,40 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </form>
         </Card>
       </div>
+
+      {/* Sales credited to each team member over the chosen window */}
+      <Card pad={false}>
+        <div className="p-6 pb-3">
+          <CardHead className="mb-0" title={t("Sales by team member")} hint={t("Who made the sales in {range}. Credited to the salesperson picked on each sale.", { range: title })} />
+        </div>
+        {members.length === 0 ? (
+          <p className="px-6 pb-6 text-[13px] text-ink-3">{t("No sales in this period.")}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
+              <div className="grid grid-cols-[1.6fr_repeat(4,1fr)] gap-3 border-y border-line px-6 py-2.5 text-[11.5px] font-semibold uppercase tracking-wide text-ink-4">
+                <span>{t("Team member")}</span><span className="text-end">{t("Sales")}</span><span className="text-end">{t("Revenue")}</span><span className="text-end">{t("Margin")}</span><span className="text-end">{t("Commission")}</span>
+              </div>
+              {members.map((m) => (
+                <div key={m.userId} className="grid grid-cols-[1.6fr_repeat(4,1fr)] items-center gap-3 border-b border-line/60 px-6 py-3 text-[13.5px] last:border-0">
+                  <span className="truncate text-ink">{m.name}</span>
+                  <span className="num text-end text-ink-2" dir="ltr">{m.count}</span>
+                  <span className="num text-end" dir="ltr">{sar(m.revenue)}</span>
+                  <span className="num text-end" dir="ltr">{sar(m.margin)}</span>
+                  <span className="num text-end text-ink-2" dir="ltr">{sar(m.commission)}</span>
+                </div>
+              ))}
+              <div className="grid grid-cols-[1.6fr_repeat(4,1fr)] items-center gap-3 px-6 py-3 text-[13.5px] font-semibold">
+                <span>{t("Total")}</span>
+                <span className="num text-end" dir="ltr">{members.reduce((s, m) => s + m.count, 0)}</span>
+                <span className="num text-end" dir="ltr">{sar(members.reduce((s, m) => s + m.revenue, 0))}</span>
+                <span className="num text-end" dir="ltr">{sar(members.reduce((s, m) => s + m.margin, 0))}</span>
+                <span className="num text-end" dir="ltr">{sar(members.reduce((s, m) => s + m.commission, 0))}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
 
       <p className="text-[12px] leading-relaxed text-ink-4">
         {t("“Owners' capital” is money the partners put in (startup costs and advances), repaid from profit over time. The overall position only turns positive once the business has earned it back — so a negative figure early on is normal.")}
