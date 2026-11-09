@@ -228,18 +228,11 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   const expByCat = new Map<string, number>();
   for (const e of expRows) expByCat.set(e.category, (expByCat.get(e.category) ?? 0) + Number(e.amount));
   const exp = [...expByCat].map(([category, total]) => ({ category, total }));
-  // Team commission: a share of the margin on each settled sale, at the rate frozen on the sale.
-  const commissionMap = new Map<string, { userId: string; name: string; amount: number; bookings: number }>();
-  for (const b of settled) {
-    const amount = Math.floor((Math.max(0, Number(b.sell_price) - Number(b.net_cost)) * Number(b.commission_bps)) / 10000);
-    if (amount <= 0) continue;
-    const c = commissionMap.get(b.seller_id) ?? { userId: b.seller_id, name: b.seller, amount: 0, bookings: 0 };
-    c.amount += amount; c.bookings += 1;
-    commissionMap.set(b.seller_id, c);
-  }
-  const commissions = [...commissionMap.values()].sort((a, b) => b.amount - a.amount);
-  const commissionTotal = commissions.reduce((s, c) => s + c.amount, 0);
-  const overheads = exp.reduce((s, e) => s + e.total, 0) + commissionTotal;
+  // Commission is no longer an automatic company cost in the settlement — salespeople's sales are only
+  // recorded (see salesByMember), and a partner works out any commission ad-hoc in the commission calculator.
+  // The settlement therefore deducts overheads only, so nobody is auto-paid a commission here.
+  const commissions: { userId: string; name: string; amount: number; bookings: number }[] = [];
+  const overheads = exp.reduce((s, e) => s + e.total, 0);
   const netProfit = grossProfit - overheads;
 
   const upcoming = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -281,7 +274,7 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
     rolledOver: rolled[0]?.total ?? 0,
     bookingIds: settled.map((b) => b.id), bookingCount: settled.length, expenseIds: expRows.map((e) => e.id),
     revenue, directCost, grossProfit, overheads,
-    overheadsByCategory: { ...Object.fromEntries(exp.map((e) => [e.category, e.total])), ...(commissionTotal ? { commission: commissionTotal } : {}) },
+    overheadsByCategory: Object.fromEntries(exp.map((e) => [e.category, e.total])),
     commissions,
     netProfit, waterfall, suggestedReserve, upcomingBsp, reserveHeldBefore: reserveHeld,
     repayments, dividends, shortfall: netProfit < 0 ? -netProfit : 0, payoutAccount,

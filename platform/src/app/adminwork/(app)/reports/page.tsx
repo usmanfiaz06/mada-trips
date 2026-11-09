@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Landmark, TrendingUp, Handshake, Scale } from "lucide-react";
 import { requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -182,7 +183,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </div>
               {members.map((m) => (
                 <div key={m.userId} className="grid grid-cols-[1.6fr_repeat(4,1fr)] items-center gap-3 border-b border-line/60 px-6 py-3 text-[13.5px] last:border-0">
-                  <span className="truncate text-ink">{m.name}</span>
+                  <Link href={`/adminwork/team/${m.userId}/commission`} className="truncate text-ink hover:underline decoration-gold decoration-2 underline-offset-4">{m.name}</Link>
                   <span className="num text-end text-ink-2" dir="ltr">{m.count}</span>
                   <span className="num text-end" dir="ltr">{sar(m.revenue)}</span>
                   <span className="num text-end" dir="ltr">{sar(m.margin)}</span>

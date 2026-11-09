@@ -74,16 +74,18 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
             </ActionForm>
             )}
           </Card>
-          {!isPartner && !isSelf && <Card>
-            <CardHead title={t("Commission")} hint={t("Share of the margin on sales this person makes, paid at Day-25 once the money has cleared.")} />
-            <ActionForm action={setCommission} className="flex items-end gap-2">
-              <input type="hidden" name="id" value={m.id} />
-              <label className="flex-1"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("% of margin")}</span>
-                <input name="rate" type="number" min={0} max={50} step="0.5" defaultValue={m.commissionBps / 100} className="field num" /></label>
-              <SubmitButton variant="outline">{t("Save")}</SubmitButton>
-            </ActionForm>
-            <p className="mt-2 text-[12px] text-ink-3">{t("A new rate applies to sales made from now on. Earlier sales keep the rate they were made at.")}</p>
-          </Card>}
+          <Card>
+            <CardHead title={t("Commission")} hint={t("Commission isn't paid automatically. Open the calculator to work out this person's commission on their sales and save or print it.")}
+              action={<Link href={`/adminwork/team/${m.id}/commission`} className="text-[13px] underline decoration-gold decoration-2 underline-offset-4">{t("Open calculator")}</Link>} />
+            {!isPartner && !isSelf && (
+              <ActionForm action={setCommission} className="flex items-end gap-2">
+                <input type="hidden" name="id" value={m.id} />
+                <label className="flex-1"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Default rate to prefill the calculator (% )")}</span>
+                  <input name="rate" type="number" min={0} max={50} step="0.5" defaultValue={m.commissionBps / 100} className="field num" /></label>
+                <SubmitButton variant="outline">{t("Save")}</SubmitButton>
+              </ActionForm>
+            )}
+          </Card>
           <Card>
             <CardHead title={t("Sign-in & security")} hint={t("{n} active sessions", { n: sessions.length })} />
             <ul className="mb-4 space-y-2 text-[12.5px] text-ink-3">

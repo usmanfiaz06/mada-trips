@@ -95,7 +95,8 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const revenue = sales.reduce((s, r) => s + Number(r.sell), 0);
   const directCost = sales.reduce((s, r) => s + Number(r.net), 0);
   const grossProfit = revenue - directCost;
-  const commissions = sales.reduce((s, r) => s + Math.floor((Math.max(0, Number(r.sell) - Number(r.net)) * Number(r.bps)) / 10000), 0);
+  // Commission is no longer an automatic company cost; it's worked out ad-hoc in the commission calculator.
+  const commissions = 0;
 
   // Cancellation fees realised in the window.
   const feeIn = (await q.select({ total: sum }).from(schema.bankTransactions)
@@ -233,4 +234,18 @@ export async function salesByMember(q: Q = db, start: string, end: string): Prom
     GROUP BY COALESCE(b.sold_by, b.prepared_by), u.name
     ORDER BY revenue DESC`);
   return rows.map((r) => ({ userId: r.user_id, name: r.name, count: Number(r.count), revenue: Number(r.revenue), margin: Number(r.margin), commission: Number(r.commission) }));
+}
+
+export type MemberSaleRow = { id: string; ref: string; date: string; serviceType: string; client: string; revenue: number; cost: number; margin: number };
+
+/** Every live sale credited to one team member in [start, end] — the rows the commission calculator totals. */
+export async function memberSalesDetail(q: Q = db, userId: string, start: string, end: string): Promise<MemberSaleRow[]> {
+  const rows = await q.execute<{ id: string; ref: string; business_date: string; service_type: string; client: string; sell_price: number; net_cost: number }>(sql`
+    SELECT b.id, b.ref, b.business_date, b.service_type, cl.name AS client, b.sell_price::bigint, b.net_cost::bigint
+    FROM bookings b JOIN clients cl ON cl.id = b.client_id
+    WHERE COALESCE(b.sold_by, b.prepared_by) = ${userId} AND b.business_date BETWEEN ${start} AND ${end}
+      AND b.status NOT IN ('void','refunded','draft')
+    ORDER BY b.business_date, b.ref`);
+  return rows.map((r) => ({ id: r.id, ref: r.ref, date: r.business_date, serviceType: r.service_type, client: r.client,
+    revenue: Number(r.sell_price), cost: Number(r.net_cost), margin: Number(r.sell_price) - Number(r.net_cost) }));
 }
