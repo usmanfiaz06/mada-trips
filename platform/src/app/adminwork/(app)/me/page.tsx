@@ -8,6 +8,8 @@ import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { Avatar, Badge, Card, CardHead, Field, Input } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { ActivityList } from "@/components/activity-list";
+import { fmtDate } from "@/lib/dates";
+import { commissionHistory } from "@/lib/commission";
 import { changePassword, setLanguage } from "./actions";
 
 export const metadata = { title: "My profile" };
@@ -16,11 +18,7 @@ export default async function MePage() {
   const u = await requireUser();
   const t = await getT();
   const L = t.locale;
-  const cycles = await db.select({ label: schema.settlementCycles.label, figures: schema.settlementCycles.figures, status: schema.settlementCycles.status }).from(schema.settlementCycles).orderBy(desc(schema.settlementCycles.endDate)).limit(12);
-  const myComm = cycles.flatMap((c) => {
-    const row = ((c.figures as { commissions?: { userId: string; amount: number; bookings: number }[] }).commissions ?? []).find((x) => x.userId === u.id);
-    return row ? [{ label: c.label, status: c.status, ...row }] : [];
-  });
+  const myComm = await commissionHistory(db, u.id);
   const events = await db.select().from(schema.auditEvents).where(eq(schema.auditEvents.actorId, u.id)).orderBy(desc(schema.auditEvents.at)).limit(25);
   return (
     <>
@@ -43,11 +41,12 @@ export default async function MePage() {
         </div>
         <aside className="space-y-4">
           {myComm.length > 0 && (
-            <Card><CardHead title={t("Commission history")} />
+            <Card><CardHead title={t("My commission")} hint={t("Total paid: {v}", { v: sar(myComm.filter((c) => c.status === "paid").reduce((s, c) => s + c.amount, 0)) })} />
               <ul className="space-y-2.5">
                 {myComm.map((c) => (
-                  <li key={c.label} className="flex items-center justify-between gap-3 text-[13.5px]">
-                    <span className="min-w-0"><span className="block truncate">{c.label}</span><span className="block text-[12px] text-ink-3">{t("{n} settled sales", { n: c.bookings })} · {t(c.status === "paid" ? "Paid" : "Approved")}</span></span>
+                  <li key={c.id} className="flex items-center justify-between gap-3 text-[13.5px]">
+                    <span className="min-w-0"><span className="block truncate"><span className="num">{c.ref}</span> · {fmtDate(c.periodStart, L)} – {fmtDate(c.periodEnd, L)}</span>
+                      <span className="block text-[12px] text-ink-3">{t("{n} sales", { n: c.salesCount })} · {c.status === "paid" ? t("Paid") : c.status === "pending_approval" ? t("Waiting approval") : t("Cancelled")}</span></span>
                     <span className="num shrink-0" dir="ltr">{sar(c.amount)}</span>
                   </li>
                 ))}

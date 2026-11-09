@@ -32,7 +32,7 @@ export const EXPENSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   withdrawn: { label: "Withdrawn", tone: "neutral" },
   void: { label: "Void", tone: "neutral" },
 };
-export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale", sale_edit: "Sale correction" };
+export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale", sale_edit: "Sale correction", commission: "Commission payout" };
 export const APPROVAL_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Pending", tone: "gold" }, approved: { label: "Approved", tone: "ok" }, rejected: { label: "Rejected", tone: "bad" }, cancelled: { label: "Withdrawn", tone: "neutral" },
 };

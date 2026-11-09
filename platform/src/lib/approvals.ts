@@ -9,7 +9,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "sale_edit";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "sale_edit" | "commission";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -121,6 +121,8 @@ export async function createApproval(tx: Tx, input: CreateInput) {
     pool = "directors"; required = 1; rule = "Voiding a sale: one director approves";
   } else if (input.kind === "sale_edit") {
     pool = "directors"; required = 1; rule = "Correcting an issued sale's figures: one director approves";
+  } else if (input.kind === "commission") {
+    pool = "directors"; required = 1; rule = "Paying a team member's commission: one director approves";
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -320,6 +322,11 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       const { applySaleEditApproval } = await import("./sale-edit");
       const p = req.payload as import("./sale-edit").SaleEditPatch | null;
       if (p) await applySaleEditApproval(tx, req.entityId, p, actorId);
+      return;
+    }
+    case "commission": {
+      const { finalizeCommissionPayment } = await import("./commission");
+      await finalizeCommissionPayment(tx, req, ok, actorId);
       return;
     }
   }

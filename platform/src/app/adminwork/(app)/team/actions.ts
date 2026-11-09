@@ -206,25 +206,44 @@ export async function deleteRole(fd: FormData) {
   redirect("/adminwork/team/roles");
 }
 
-export async function setCommission(_: ActionState, fd: FormData): Promise<ActionState> {
+/** Turn commission on/off for a member and set the default rate, basis and the date they start earning it. */
+export async function saveCommissionConfig(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("team.manage");
   const id = str(fd, "id");
+  const enabled = str(fd, "enabled") === "on";
   const pct = Number(str(fd, "rate"));
-  if (!/^\d{1,2}(\.\d{1,2})?$/.test(str(fd, "rate")) || !(pct >= 0 && pct <= 50)) return { error: "Commission must be between 0% and 50% of margin" };
-  if (id === u.id) return { error: "Someone else sets your commission" };
-  const bps = Math.round(pct * 100);
+  if (!/^\d{1,2}(\.\d{1,2})?$/.test(str(fd, "rate") || "0") || !(pct >= 0 && pct <= 50)) return { error: "Commission rate must be between 0% and 50%" };
+  const basis = str(fd, "basis") === "revenue" ? "revenue" : "profit";
+  const fromRaw = str(fd, "from");
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(fromRaw) ? fromRaw : null;
   try {
     const [m] = await db.select().from(schema.users).where(eq(schema.users.id, id));
     if (!m || m.clientId) throw new Error("Not found");
-    if (m.partnerId) throw new Error("Partners are paid through dividends, not commission");
-    if (m.commissionBps === bps) return { ok: "No change" };
-    await db.transaction(async (tx) => {
-      await tx.update(schema.users).set({ commissionBps: bps }).where(eq(schema.users.id, id));
-      await audit(tx, { actorId: u.id, action: "user.commission_changed", entityType: "user", entityId: id, entityRef: m.name,
-        summary: `Changed ${m.name}'s commission from ${m.commissionBps / 100}% to ${pct}% of margin (applies to new sales)`,
-        changes: { commission: { from: `${m.commissionBps / 100}%`, to: `${pct}%` } } });
-    });
+    const { setMemberCommission } = await import("@/lib/commission");
+    await db.transaction((tx) => setMemberCommission(tx, id, { enabled, rateBps: Math.round(pct * 100), basis, from }, u.id));
   } catch (e) { return toState(e); }
   revalidatePath(`/adminwork/team/${id}`);
-  return { ok: "Commission rate saved. It applies to sales made from now on" };
+  return { ok: enabled ? "Commission settings saved" : "Commission turned off for this person" };
 }
+
+/** Record a commission payout for a member over a period → sends it to a director to approve. */
+export async function payCommission(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const id = str(fd, "id");
+  const periodStart = str(fd, "from"), periodEnd = str(fd, "to");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(periodStart) || !/^\d{4}-\d{2}-\d{2}$/.test(periodEnd) || periodStart > periodEnd) return { error: "Pick a valid date range" };
+  const basis = str(fd, "basis") === "revenue" ? "revenue" : "profit";
+  const pct = Number(str(fd, "rate"));
+  if (!(pct > 0 && pct <= 50)) return { error: "Enter a commission rate between 0% and 50%" };
+  try {
+    const { recordCommissionPayment } = await import("@/lib/commission");
+    const r = await db.transaction((tx) => recordCommissionPayment(tx, {
+      memberId: id, periodStart, periodEnd, basis, rateBps: Math.round(pct * 100),
+      account: str(fd, "account"), note: str(fd, "note") || null, requestedBy: u.id,
+    }));
+    revalidatePath("/adminwork", "layout");
+    return { ok: `Commission ${r.ref} for ${r.count} sales (${sarInline(r.amount)}) sent to the directors to approve` };
+  } catch (e) { return toState(e); }
+}
+
+const sarInline = (h: number) => `SAR ${(h / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;

@@ -95,8 +95,9 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const revenue = sales.reduce((s, r) => s + Number(r.sell), 0);
   const directCost = sales.reduce((s, r) => s + Number(r.net), 0);
   const grossProfit = revenue - directCost;
-  // Commission is no longer an automatic company cost; it's worked out ad-hoc in the commission calculator.
-  const commissions = 0;
+  // Commission is a real cost when a payout is approved and paid — counted by the day it was paid.
+  const commissions = (await q.select({ total: sum }).from(schema.commissionPayments)
+    .where(and(eq(schema.commissionPayments.status, "paid"), gte(schema.commissionPayments.paidOn, start), lte(schema.commissionPayments.paidOn, end))))[0].total;
 
   // Cancellation fees realised in the window.
   const feeIn = (await q.select({ total: sum }).from(schema.bankTransactions)
@@ -161,10 +162,11 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const txns = await q.select({ account: schema.bankTransactions.account, direction: schema.bankTransactions.direction, kind: schema.bankTransactions.kind, total: sum })
     .from(schema.bankTransactions).where(and(gte(schema.bankTransactions.txnDate, start), lte(schema.bankTransactions.txnDate, end)))
     .groupBy(schema.bankTransactions.account, schema.bankTransactions.direction, schema.bankTransactions.kind);
-  let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0;
+  let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0, commissionsPaid = 0;
   for (const r of txns) {
     add(r.account, r.direction as "in" | "out", r.total);
     if (r.kind === "refund_fee") continue; // counted as fees below
+    if (r.kind === "commission") { commissionsPaid += r.total; continue; } // its own out row
     if (r.direction === "in") { if (r.kind === "transfer") transfersIn += r.total; else deposits += r.total; }
     else { if (r.kind === "transfer") transfersOut += r.total; else withdrawals += r.total; }
   }
@@ -196,6 +198,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     { key: "withdrawals", amount: withdrawals },
     { key: "transfersOut", amount: transfersOut },
     { key: "supplierFees", amount: feeOutBank },
+    { key: "commissions", amount: commissionsPaid },
     { key: "payouts", amount: payouts },
   ].filter((r) => r.amount > 0);
   const totalIn = inRows.reduce((s, r) => s + r.amount, 0);

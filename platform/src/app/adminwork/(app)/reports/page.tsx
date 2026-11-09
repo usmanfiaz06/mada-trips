@@ -151,7 +151,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <Row label={t("Supplier cost")} v={-pl.directCost} />
           <Row label={t("Gross profit")} v={pl.grossProfit} strong />
           {pl.feesEarned - pl.feesLost !== 0 && <Row label={t("Cancellation fees (net)")} v={pl.feesEarned - pl.feesLost} />}
-          {pl.commissions > 0 && <Row label={t("Team commission")} v={-pl.commissions} />}
+          {pl.commissions > 0 && <Row label={t("Commission paid")} v={-pl.commissions} />}
           {pl.expensesTotal > 0 && <Row label={t("Expenses")} v={-pl.expensesTotal} />}
           <Row label={t("Net profit")} v={pl.netProfit} strong />
           {pl.startupCosts > 0 && <>

@@ -12,7 +12,7 @@ import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { Avatar, Badge, Card, CardHead, Field, Input, Select } from "@/components/ui";
 import { ActionForm, ConfirmAction, SubmitButton } from "@/components/client";
 import { ActivityList } from "@/components/activity-list";
-import { resetPassword, setActive, setCommission, updateMember } from "../actions";
+import { resetPassword, setActive, saveCommissionConfig, updateMember } from "../actions";
 
 export default async function MemberPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -75,16 +75,24 @@ export default async function MemberPage({ params }: { params: Promise<{ id: str
             )}
           </Card>
           <Card>
-            <CardHead title={t("Commission")} hint={t("Commission isn't paid automatically. Open the calculator to work out this person's commission on their sales and save or print it.")}
-              action={<Link href={`/adminwork/team/${m.id}/commission`} className="text-[13px] underline decoration-gold decoration-2 underline-offset-4">{t("Open calculator")}</Link>} />
-            {!isPartner && !isSelf && (
-              <ActionForm action={setCommission} className="flex items-end gap-2">
-                <input type="hidden" name="id" value={m.id} />
-                <label className="flex-1"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Default rate to prefill the calculator (% )")}</span>
+            <CardHead title={t("Commission")} hint={t("Commission is never paid automatically. Turn it on, set a rate, then pay a period in the calculator — a director approves each payout.")}
+              action={m.commissionEnabled ? <Link href={`/adminwork/team/${m.id}/commission`} className="text-[13px] underline decoration-gold decoration-2 underline-offset-4">{t("Open calculator")}</Link> : undefined} />
+            <ActionForm action={saveCommissionConfig} className="space-y-3">
+              <input type="hidden" name="id" value={m.id} />
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3">
+                <span className="text-[13.5px]">{t("Commission enabled")}</span>
+                <input type="checkbox" name="enabled" defaultChecked={m.commissionEnabled} className="size-4 accent-[var(--gold)]" />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Default rate (%)")}</span>
                   <input name="rate" type="number" min={0} max={50} step="0.5" defaultValue={m.commissionBps / 100} className="field num" /></label>
-                <SubmitButton variant="outline">{t("Save")}</SubmitButton>
-              </ActionForm>
-            )}
+                <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("On")}</span>
+                  <select name="basis" defaultValue={m.commissionBasis} className="field h-10"><option value="profit">{t("Profit (margin)")}</option><option value="revenue">{t("Revenue (sales)")}</option></select></label>
+              </div>
+              <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Earns commission from (leave blank = from the beginning)")}</span>
+                <input name="from" type="date" defaultValue={m.commissionFrom ?? ""} className="field" /></label>
+              <SubmitButton variant="outline" className="w-full">{t("Save commission settings")}</SubmitButton>
+            </ActionForm>
           </Card>
           <Card>
             <CardHead title={t("Sign-in & security")} hint={t("{n} active sessions", { n: sessions.length })} />
