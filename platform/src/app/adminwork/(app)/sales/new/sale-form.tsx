@@ -1,11 +1,12 @@
 "use client";
 import { useActionState, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { PendingContext, useSubmit } from "@/components/client";
-import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Landmark, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
+import { AlertCircle, ArrowRight, Building2, Check, Landmark, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
 import { createSale } from "../actions";
-import { Picker, type PickerItem } from "@/components/picker";
+import { type PickerItem } from "@/components/picker";
+import { FlightItinerary } from "./flight-itinerary";
 import { ServiceDetails } from "./service-details";
 import { Travellers } from "./travellers";
 import { AIRLINES, AIRPORTS, airlineLabel } from "@/lib/travel-data";
@@ -87,11 +88,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const onNames = useCallback((n: string[], c: number) => { setNames((old) => (old.join("|") === n.join("|") ? old : n)); setCount(c); }, []);
   const pax = names.join(", ");
   const [pnr, setPnr] = useState("");
-  const [from, setFrom] = useState("RUH");
-  const [to, setTo] = useState("");
-  const [trip, setTrip] = useState<"oneway" | "return">("return");
-  const [airline, setAirline] = useState("");
-  const route = from && to ? `${from} ${trip === "return" ? "⇄" : "→"} ${to}` : "";
+  const [airline, setAirline] = useState(""); // primary carrier, reported by the itinerary builder (for the "how did we buy" label)
   const searchRef = useRef<HTMLInputElement>(null);
 
   const ctype = client?.type ?? (newClient ? newClient.type : null);
@@ -203,34 +200,12 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <Travellers service={service} invalid={!!state?.fields?.travellers} onNames={onNames} />
             {service === "flight" ? (
               <>
-                <div className="sm:col-span-6">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <span className="text-[12.5px] text-ink-3">{t("Route")} <span className="text-gold-2">*</span></span>
-                    <div className="flex rounded-full bg-sunken p-0.5 text-[12px]">
-                      {(["return", "oneway"] as const).map((k) => (
-                        <button key={k} type="button" onClick={() => setTrip(k)} className={cx("h-7 rounded-full px-3 transition", trip === k ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{k === "return" ? t("Return") : t("One way")}</button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid items-center gap-2 sm:grid-cols-[1fr_auto_1fr]">
-                    <Picker items={AIRPORT_ITEMS} value={from} onChange={setFrom} label={t("From")} placeholder={t("From: city or code, e.g. Riyadh")} invalid={!!state?.fields?.description && !from} />
-                    <button type="button" onClick={() => { setFrom(to); setTo(from); }} className="mx-auto grid size-9 place-items-center rounded-full text-ink-3 ring-1 ring-line transition hover:bg-surface-2 hover:text-ink" aria-label={t("Swap")} title={t("Swap")}><ArrowLeftRight className="size-4" /></button>
-                    <Picker items={AIRPORT_ITEMS} value={to} onChange={setTo} label={t("To")} placeholder={t("To: city or code, e.g. Dubai")} invalid={!!state?.fields?.description && !to} />
-                  </div>
-                  {from && to && from === to && <p className="mt-1.5 text-[12.5px] text-bad">{t("From and To can't be the same airport")}</p>}
-                  <input type="hidden" name="description" value={route} />
-                </div>
-                <div className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Airline")} <span className="text-gold-2">*</span></span>
-                  <Picker items={AIRLINE_ITEMS} value={airline} onChange={setAirline} label={t("Airline")} placeholder={t("Airline name or code, e.g. flynas")} invalid={!!state?.fields?.supplier && !airline} />
-                  <input type="hidden" name="supplier" value={airline} />
-                </div>
+                <FlightItinerary airports={AIRPORT_ITEMS} airlines={AIRLINE_ITEMS} invalid={!!state?.fields?.description} onPrimaryAirline={setAirline} />
+                <label className="sm:col-span-6"><span className="mb-1.5 block text-[12.5px] text-ink-3">PNR <span className="text-gold-2">*</span></span>
+                  <input name="pnr" value={pnr} onChange={(e) => setPnr(e.target.value.toUpperCase())} maxLength={8} className="field num uppercase tracking-[0.2em] sm:max-w-xs" placeholder="ABC123" dir="ltr" aria-invalid={!!state?.fields?.pnr} /></label>
               </>
             ) : (
               <ServiceDetails key={service} service={service} invalid={!!state?.fields?.details} />
-            )}
-            {service === "flight" && (
-              <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">PNR <span className="text-gold-2">*</span></span>
-                <input name="pnr" value={pnr} onChange={(e) => setPnr(e.target.value.toUpperCase())} maxLength={8} className="field num uppercase tracking-[0.2em]" placeholder="ABC123" dir="ltr" aria-invalid={!!state?.fields?.pnr} /></label>
             )}
 {service !== "hotel" && (
             <label className="sm:col-span-3"><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Travel date")}</span>

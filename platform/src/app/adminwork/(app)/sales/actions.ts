@@ -16,7 +16,7 @@ import { issueCheck } from "@/lib/issuance";
 import { canViewRecord } from "@/lib/access";
 import { isUuid, safeNext } from "@/lib/security";
 import { flash, optStr, str, toState, zodError, type ActionState } from "@/lib/actions";
-import { AIRLINE_LABELS, AIRPORT_CODES } from "@/lib/travel-data";
+import { validateItinerary, fullRoute } from "@/lib/itinerary";
 import { cleanDetails, cleanTravellers, describeService, type Traveller } from "@/lib/services";
 import { riyadhDate } from "@/lib/dates";
 import { accountNames, isValidAccount, primaryAccountKey } from "@/lib/accounts";
@@ -49,6 +49,8 @@ const SaleSchema = z.object({
   supplierPartnerId: z.string().optional(),
   soldBy: z.string().optional(), // which team member made the sale (gets the credit + commission); defaults to preparer
   viaBsp: z.string().optional(),
+  itinerary: z.string().optional(), // flights: JSON of the multi-leg route { outbound: [...], return?: [...] }
+  trip: z.string().optional(),      // flights: "oneway" | "return"
 
   paymentRef: z.string().trim().max(60).optional(),
   issueNow: z.string().optional(),
@@ -90,10 +92,16 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
     if (r.travelDate) v.travelDate = r.travelDate;
   }
   if (v.serviceType === "flight") {
-    const m = /^([A-Z]{3}) (→|⇄) ([A-Z]{3})$/.exec(v.description ?? "");
-    if (!m || !AIRPORT_CODES.has(m[1]) || !AIRPORT_CODES.has(m[3])) return { error: "Pick both airports from the list", fields: { description: "x" } };
-    if (m[1] === m[3]) return { error: "From and To can't be the same airport", fields: { description: "x" } };
-    if (!v.supplier || !AIRLINE_LABELS.has(v.supplier)) return { error: "Pick the airline from the list", fields: { supplier: "x" } };
+    // The flight route is now a multi-leg itinerary (each leg has its own airline, flight no. and times, with
+    // transit stops in between). The whole route, airline and details are derived from it, not trusted from the client.
+    let rawItin: unknown = null;
+    try { rawItin = v.itinerary ? JSON.parse(v.itinerary) : null; } catch { return { error: "Something went wrong with the flight route. Reload and try again", fields: { description: "x" } }; }
+    const r = validateItinerary(rawItin, v.trip === "return");
+    if (!r.ok) return { error: r.error, fields: { description: "x" } };
+    v.description = fullRoute(r.itinerary);
+    v.supplier = r.itinerary.outbound[0].airline; // primary carrier, for BSP/display
+    details = { itinerary: r.itinerary };
+    if (!v.travelDate) v.travelDate = undefined;
     // No silent IATA: a flight only lands in the IATA balance when it was explicitly bought through BSP.
     if (v.viaBsp !== "1" && v.viaBsp !== "0") return { error: "Choose how this ticket was bought — IATA (BSP) or direct from the airline", fields: { viaBsp: "x" } };
   }

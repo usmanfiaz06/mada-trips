@@ -7,6 +7,8 @@ import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { issueCheck } from "@/lib/issuance";
 import { BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
+import { layoverMinutes, fmtDuration, type Itinerary, type FlightLeg } from "@/lib/itinerary";
+import { Plane } from "lucide-react";
 import { accountNames, accountOptions } from "@/lib/accounts";
 import { fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
@@ -72,6 +74,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
   ];
 
   const travellers = (Array.isArray(b.travellers) ? b.travellers : []) as Traveller[];
+  const itinerary = (b.serviceType === "flight" ? (b.details as { itinerary?: Itinerary } | null)?.itinerary : null) ?? null;
   const tickets = (b.ticketNumbers ?? "").split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
   const natName = (code?: string) => { const n = NATIONALITIES.find((x) => x.code === code); return n ? (L === "ar" ? n.ar : n.en) : "—"; };
   return (
@@ -127,6 +130,35 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               </div>
             )}
           </Card>
+          {itinerary && (
+            <Card>
+              <CardHead title={t("Flight itinerary")} hint={itinerary.return?.length ? t("Return trip") : t("One way")} />
+              {([["outbound", itinerary.outbound], ...(itinerary.return?.length ? [["return", itinerary.return]] as const : [])] as [string, FlightLeg[]][]).map(([dir, legs]) => (
+                <div key={dir} className="mb-4 last:mb-0">
+                  {itinerary.return?.length ? <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-wide text-ink-4">{dir === "outbound" ? t("Outbound") : t("Return")}</div> : null}
+                  <ol className="space-y-1.5">
+                    {legs.map((leg, i) => (
+                      <li key={i}>
+                        <div className="flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 ring-1 ring-line">
+                          <Plane className="size-4 shrink-0 text-ink-3" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-baseline gap-x-2 text-[14px]">
+                              <span className="num font-medium" dir="ltr">{leg.from} → {leg.to}</span>
+                              {(leg.dep || leg.arr) && <span className="num text-[12.5px] text-ink-3" dir="ltr">{leg.dep || "—"}–{leg.arr || "—"}</span>}
+                            </div>
+                            <div className="text-[12px] text-ink-3">{leg.airline}{leg.flightNo ? <span className="num"> · {leg.flightNo}</span> : ""}</div>
+                          </div>
+                        </div>
+                        {i < legs.length - 1 && (() => { const m = layoverMinutes(leg.arr, legs[i + 1].dep); return (
+                          <div className="flex items-center gap-2 py-1 ps-4 text-[12px] text-ink-3"><span className="h-3 w-px bg-line" />{t("Layover in {a}", { a: leg.to })}{m != null ? <span className="font-medium text-ink-2">· {fmtDuration(m)}</span> : null}</div>
+                        ); })()}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
+            </Card>
+          )}
           {travellers.length > 0 && (travellers.length > 1 || travellers.some((x) => x.passport)) && (
             <Card pad={false}>
               <div className="px-6 pt-6"><CardHead title={t("Travellers")} hint={t("{n} on this sale", { n: travellers.length })} /></div>
