@@ -1,9 +1,11 @@
 "use server";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
-import { audit } from "@/lib/audit";
+import { audit, diff } from "@/lib/audit";
 import { nextRef } from "@/lib/refs";
+import { isUuid } from "@/lib/security";
 import { str, toState, type ActionState } from "@/lib/actions";
 import {
   type DocType, type ItineraryData, type VoucherData, type ReceiptData, type FlightItem,
@@ -49,6 +51,34 @@ export async function createDocument(_: ActionState, fd: FormData): Promise<Acti
       const [row] = await tx.insert(schema.documents).values({ ref, type, title, forName, docDate: date, data, createdBy: u.id }).returning();
       await audit(tx, { actorId: u.id, action: "document.issued", entityType: "document", entityId: row.id, entityRef: ref, summary: `Issued ${type} ${ref}${forName ? ` for ${forName}` : ""}` });
       return row.id;
+    });
+  } catch (e) { return toState(e); }
+  redirect(`/adminwork/documents/${id}`);
+}
+
+/**
+ * Edit a document in place. The same record (and ref) is kept and its printed/saved PDF updates — so fixing
+ * a mistake no longer means creating a duplicate. The document type never changes on an edit.
+ */
+export async function updateDocument(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("documents.issue");
+  const id = str(fd, "id");
+  if (!isUuid(id)) return { error: "Document not found" };
+  const date = str(fd, "date");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Pick a valid date" };
+  const raw = str(fd, "data");
+  if (!raw) return { error: "Nothing to save yet — fill in the document first" };
+  if (raw.length > MAX_DATA) return { error: "This document is too large to save" };
+  let data: ItineraryData | VoucherData | ReceiptData;
+  try { data = JSON.parse(raw); } catch { return { error: "Couldn't read the document — please try again" }; }
+  try {
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(schema.documents).where(eq(schema.documents.id, id)).for("update");
+      if (!before) throw new Error("Document not found");
+      const { title, forName } = summarize(before.type as DocType, data); // type is fixed; derive labels from the edited content
+      await tx.update(schema.documents).set({ title, forName, docDate: date, data }).where(eq(schema.documents.id, id));
+      await audit(tx, { actorId: u.id, action: "document.updated", entityType: "document", entityId: id, entityRef: before.ref,
+        summary: `Edited ${before.type} ${before.ref}${forName ? ` for ${forName}` : ""}`, changes: diff({ title: before.title, date: before.docDate }, { title, date }) });
     });
   } catch (e) { return toState(e); }
   redirect(`/adminwork/documents/${id}`);
