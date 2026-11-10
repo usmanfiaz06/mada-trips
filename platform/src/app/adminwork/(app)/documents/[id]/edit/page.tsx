@@ -9,7 +9,7 @@ import { riyadhDate } from "@/lib/dates";
 import { isUuid } from "@/lib/security";
 import { PageHeader } from "@/components/ui";
 import { DocumentBuilder } from "../../document-builder";
-import type { DocType, ItineraryData, VoucherData, ReceiptData } from "../../types";
+import type { DocType, ItineraryData, TransportData, VoucherData, ReceiptData } from "../../types";
 
 export const metadata = { title: "Edit document" };
 
@@ -28,7 +28,7 @@ export default async function EditDocumentPage({ params }: { params: Promise<{ i
         <PageHeader eyebrow={t("Documents")} title={t("Edit document")}
           subtitle={t("Fix anything and save — the same document ({ref}) is updated, so there's no duplicate. Every change is logged.", { ref: d.ref })} />
       </div>
-      <DocumentBuilder today={riyadhDate()} edit={{ id: d.id, type: d.type as DocType, date: d.docDate, data: d.data as ItineraryData | VoucherData | ReceiptData }} />
+      <DocumentBuilder today={riyadhDate()} edit={{ id: d.id, type: d.type as DocType, date: d.docDate, data: d.data as ItineraryData | TransportData | VoucherData | ReceiptData }} />
     </div>
   );
 }

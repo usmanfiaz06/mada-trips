@@ -2,8 +2,8 @@ import { type ReactNode } from "react";
 import { StampImg } from "./stamp-img";
 import { AirlineLogo } from "./airline-logo";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type FlightItem, type LayoverItem,
-  receiptTotals, money2, nights, itineraryItems,
+  type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type FlightItem, type LayoverItem,
+  TRANSPORT_LABEL, receiptTotals, money2, nights, itineraryItems,
 } from "./types";
 
 const GREEN = "#1e352d", GOLD = "#d9b77a", INK = "#14211c", SUB = "#6b7a71", HAIR = "#e6e9e6";
@@ -17,6 +17,7 @@ function fmtD(iso: string, locale: string): string {
 
 function titleFor(type: DocType, data: unknown): string {
   if (type === "itinerary") return "E-Ticket · Itinerary";
+  if (type === "transport") return `${TRANSPORT_LABEL[(data as TransportData).mode]} Ticket`;
   if (type === "voucher") return "Hotel Voucher";
   return (data as ReceiptData).invoice ? "Tax Invoice" : "Payment Receipt";
 }
@@ -35,7 +36,7 @@ const SectionTitle = ({ children }: { children: ReactNode }) => (
 );
 
 export function DocumentSheet({ type, refNo, date, data, locale = "en" }: {
-  type: DocType; refNo: string; date: string; data: ItineraryData | VoucherData | ReceiptData; locale?: string;
+  type: DocType; refNo: string; date: string; data: ItineraryData | TransportData | VoucherData | ReceiptData; locale?: string;
 }) {
   return (
     <div className="sheet relative mx-auto flex flex-col bg-white shadow-card" style={{ color: INK }}>
@@ -58,6 +59,7 @@ export function DocumentSheet({ type, refNo, date, data, locale = "en" }: {
       {/* Body */}
       <div className="flex-1" style={{ padding: "22px 16mm 0" }}>
         {type === "itinerary" && <Itinerary d={data as ItineraryData} locale={locale} />}
+        {type === "transport" && <Transport d={data as TransportData} locale={locale} />}
         {type === "voucher" && <Voucher d={data as VoucherData} locale={locale} />}
         {type === "receipt" && <Receipt d={data as ReceiptData} locale={locale} />}
       </div>
@@ -89,13 +91,48 @@ function AuthorisedBy({ name }: { name: string }) {
   );
 }
 
-function Footer({ type, data }: { type: DocType; data: ItineraryData | VoucherData | ReceiptData }) {
+function Transport({ d, locale }: { d: TransportData; locale: string }) {
+  return (
+    <div>
+      <div style={{ marginBottom: 18 }}>
+        <Label>{TRANSPORT_LABEL[d.mode]}</Label>
+        <div style={{ fontSize: 22, fontWeight: 700, color: GREEN, marginTop: 2 }}>{(d.operator || "—")}{d.serviceNo ? ` · ${d.serviceNo}` : ""}</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px 16px", marginBottom: 20 }}>
+        <Field label="From">{d.fromPlace}</Field>
+        <Field label="To">{d.toPlace}</Field>
+        <Field label="Date">{fmtD(d.date, locale)}</Field>
+        <Field label="Departs">{d.departTime}</Field>
+        <Field label="Arrives">{d.arriveTime}</Field>
+        <Field label="Class">{d.travelClass}</Field>
+        <Field label="Seat">{d.seat}</Field>
+        <Field label="Coach / platform">{d.coach}</Field>
+        <Field label="Booking ref">{d.bookingRef}</Field>
+      </div>
+      {d.passengers.some((p) => p.name.trim()) && (
+        <div style={{ marginBottom: 18 }}>
+          <SectionTitle>Passengers</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+            {d.passengers.filter((p) => p.name.trim()).map((p, i) => (
+              <div key={i} style={{ fontSize: 13, color: INK }}>{p.name} <span style={{ color: SUB, fontSize: 11 }}>· {p.kind}</span></div>
+            ))}
+          </div>
+        </div>
+      )}
+      {d.notes.trim() && <Notes text={d.notes} />}
+    </div>
+  );
+}
+
+function Footer({ type, data }: { type: DocType; data: ItineraryData | TransportData | VoucherData | ReceiptData }) {
   const c = type === "receipt" ? (data as ReceiptData).company : null;
   const parts = c
     ? [c.address, c.phone, c.email, c.cr && `C.R. ${c.cr}`, c.vat && `VAT ${c.vat}`].filter(Boolean)
     : ["Mada Trips · Riyadh, Kingdom of Saudi Arabia", "+966 59 305 4981", "info@madatrips.sa", "madatrips.sa"];
   const note = type === "itinerary"
     ? "This itinerary reflects your confirmed booking. Please carry a valid passport/ID and arrive at the airport at least 3 hours before departure."
+    : type === "transport"
+    ? "Please carry a valid ID and arrive at the station/terminal in good time before departure. Keep this ticket for inspection."
     : type === "voucher"
     ? "Please present this voucher at check-in. Charges beyond those stated are settled directly with the hotel."
     : "Thank you for your business.";
