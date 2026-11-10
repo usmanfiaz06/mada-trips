@@ -94,9 +94,12 @@ function AuthorisedBy({ name }: { name: string }) {
 function Transport({ d, locale }: { d: TransportData; locale: string }) {
   return (
     <div>
-      <div style={{ marginBottom: 18 }}>
-        <Label>{TRANSPORT_LABEL[d.mode]}</Label>
-        <div style={{ fontSize: 22, fontWeight: 700, color: GREEN, marginTop: 2 }}>{(d.operator || "—")}{d.serviceNo ? ` · ${d.serviceNo}` : ""}</div>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 18 }}>
+        <div>
+          <Label>{TRANSPORT_LABEL[d.mode]}</Label>
+          <div style={{ fontSize: 22, fontWeight: 700, color: GREEN, marginTop: 2 }}>{(d.operator || "—")}{d.serviceNo ? ` · ${d.serviceNo}` : ""}</div>
+        </div>
+        {d.qrImage && <img src={d.qrImage} alt="QR" style={{ width: 96, height: 96, flexShrink: 0 }} />}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px 16px", marginBottom: 20 }}>
         <Field label="From">{d.fromPlace}</Field>

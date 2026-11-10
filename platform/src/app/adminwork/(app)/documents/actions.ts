@@ -12,6 +12,7 @@ import {
   type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type FlightItem,
   DOC_TYPES, REF_PREFIX, TRANSPORT_LABEL, receiptTotals, money2, itineraryItems,
 } from "./types";
+import { parseBusTicket } from "@/lib/ticket-import";
 
 const MAX_DATA = 200_000;
 
@@ -95,6 +96,28 @@ export async function attachDocumentFile(_: ActionState, fd: FormData): Promise<
   } catch (e) { return toState(e); }
   revalidatePath(`/adminwork/documents/${id}`);
   return { ok: "File attached" };
+}
+
+/**
+ * Read an uploaded carrier ticket PDF (SAPTCO/SAT) and return a pre-filled Transport ticket for the builder.
+ * Nothing is saved — the user reviews and saves. Returns the parsed data plus a regenerated QR image.
+ */
+export async function importTicketPdf(fd: FormData): Promise<{ ok: true; data: TransportData } | { ok: false; error: string }> {
+  await requirePerm("documents.issue");
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose a ticket PDF to import" };
+  if (file.size > 10 * 1024 * 1024) return { ok: false, error: "The PDF must be under 10 MB" };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const r = await parseBusTicket(bytes);
+  if (!r.ok) return { ok: false, error: "Couldn't read this ticket PDF. Fill the ticket in manually" };
+  const p = r.data;
+  const data: TransportData = {
+    mode: "bus", operator: p.operator, serviceNo: p.serviceNo, fromPlace: p.from, toPlace: p.to,
+    date: p.date, departTime: p.departTime, arriveTime: p.arriveTime, travelClass: p.travelClass, seat: p.seat, coach: "",
+    bookingRef: p.bookingRef, passengers: [{ name: p.passenger, kind: "Adult" }], notes: "", authorisedBy: "", stamp: false,
+    qrImage: p.qrImage || undefined,
+  };
+  return { ok: true, data };
 }
 
 /**

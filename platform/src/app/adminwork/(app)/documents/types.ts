@@ -76,6 +76,7 @@ export type TransportData = {
   notes: string;
   authorisedBy: string;
   stamp: boolean;
+  qrImage?: string; // data URL of the ticket's QR (regenerated from an imported carrier PDF)
 };
 
 export type DocData = ItineraryData | TransportData | VoucherData | ReceiptData;
