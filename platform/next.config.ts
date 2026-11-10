@@ -10,6 +10,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "madatrips.sa,www.madatri
 
 const config: NextConfig = {
   experimental: { serverActions: { bodySizeLimit: "8mb", allowedOrigins } },
+  // Native / large packages used only on the server (reading a ticket PDF and its QR). Keep them out of the
+  // bundle so their binaries and worker files load at runtime instead.
+  serverExternalPackages: ["@napi-rs/canvas", "pdfjs-dist", "jsqr", "qrcode"],
   poweredByHeader: false,
   devIndicators: false,
   async redirects() {

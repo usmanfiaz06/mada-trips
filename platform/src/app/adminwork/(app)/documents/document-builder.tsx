@@ -3,7 +3,7 @@ import { useActionState, useRef, useState, type ReactNode } from "react";
 import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
-import { createDocument, updateDocument } from "./actions";
+import { createDocument, updateDocument, importTicketPdf } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
   type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type Pax, type LineItem,
@@ -252,8 +252,27 @@ function TransportForm({ d, set }: { d: TransportData; set: (f: (p: TransportDat
   const t = useT();
   const on = <K extends keyof TransportData>(k: K) => (v: string) => set((p) => ({ ...p, [k]: v }));
   const patchPax = (i: number, k: keyof Pax, v: string) => set((p) => ({ ...p, passengers: p.passengers.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
+  const [importing, setImporting] = useState(false);
+  const [importErr, setImportErr] = useState("");
+  const onImport = async (file: File) => {
+    setImporting(true); setImportErr("");
+    try { const fd = new FormData(); fd.append("file", file); const r = await importTicketPdf(fd); if (r.ok) set(() => r.data); else setImportErr(r.error); }
+    catch { setImportErr(t("Couldn't read this ticket PDF. Fill it in manually.")); }
+    finally { setImporting(false); }
+  };
   return (
     <>
+      <div className="rounded-2xl border border-dashed border-line-strong bg-sunken/40 p-3.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-bg hover:opacity-85">
+            {importing ? t("Reading…") : t("Import ticket PDF")}
+            <input type="file" accept="application/pdf" className="sr-only" disabled={importing} onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
+          </label>
+          <span className="text-[12px] text-ink-3">{t("Upload a SAPTCO/SAT bus PDF to auto-fill this ticket and carry its QR over. Review before saving.")}</span>
+        </div>
+        {importErr && <p className="mt-2 text-[12px] text-bad">{t(importErr)}</p>}
+        {d.qrImage && <p className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-ok">{t("QR code imported and placed on the ticket.")}</p>}
+      </div>
       <Card title={t("Journey")}>
         <div>
           <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Mode")}</span>
