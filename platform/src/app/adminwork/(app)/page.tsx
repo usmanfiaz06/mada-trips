@@ -182,19 +182,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      {(d.commission.rate > 0 || d.commission.earned > 0) && (
-        <div className="grid gap-4 md:grid-cols-3 stagger">
-          <InkCard className="md:col-span-1">
-            <div className="text-[13px] text-tile-ink-3">{t("Your commission this cycle")}</div>
-            <div className="figure mt-6 text-[48px]" dir="ltr">{sar(d.commission.earned)}<span className="figure-unit">SAR</span></div>
-            <div className="mt-2 text-[12.5px] text-tile-ink-3">{t("{n} sales fully paid and cleared · {p}% of margin", { n: d.commission.sales, p: d.commission.rate / 100 })}</div>
-          </InkCard>
-          <Card className="flex flex-col md:col-span-2">
-            <CardHead title={t("On the way")} hint={t("Commission on your sales that aren't fully paid or cleared yet. It counts once the money is in the bank.")} />
-            <div className="figure mt-auto text-[36px]" dir="ltr">{sar(d.commission.pending)}<span className="figure-unit">SAR</span></div>
-            <p className="mt-3 text-[12.5px] text-ink-3">{t("Paid with salaries after the {d} cut-off.", { d: fmtDate(d.current.end, L) })}</p>
-          </Card>
-        </div>
+      {d.commission.sales > 0 && (
+        <InkCard>
+          <div className="text-[13px] text-tile-ink-3">{t("Your sales this cycle")}</div>
+          <div className="figure mt-6 text-[48px]" dir="ltr">{sar(d.commission.revenue)}<span className="figure-unit">SAR</span></div>
+          <div className="mt-2 text-[12.5px] text-tile-ink-3">{t("{n} sales credited to you · margin {m}", { n: d.commission.sales, m: sar(d.commission.margin) })}</div>
+        </InkCard>
       )}
 
       {/* Row 3 · work */}

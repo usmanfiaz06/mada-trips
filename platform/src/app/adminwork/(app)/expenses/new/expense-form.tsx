@@ -11,12 +11,12 @@ function Submit({ ready, label }: { ready: boolean; label: string }) {
   return <button type="submit" disabled={pending || !ready} className={btn("gold", "lg", "w-full")}>{pending && <Loader2 className="size-4 animate-spin" />}{label}</button>;
 }
 
-export function ExpenseForm({ categories, isPartner, myPartnerId, partners, today }: { categories: [string, string][]; isPartner: boolean; myPartnerId: string | null; partners: { id: string; name: string }[]; today: string }) {
+export function ExpenseForm({ categories, isPartner, myPartnerId, partners, today, accounts }: { categories: [string, string][]; isPartner: boolean; myPartnerId: string | null; partners: { id: string; name: string }[]; today: string; accounts: { value: string; label: string }[] }) {
   const t = useT();
   const [state, action, pending] = useActionState(submitExpense, null);
   const onSubmit = useSubmit(action);
   const [cat, setCat] = useState("");
-  const [paidBy, setPaidBy] = useState(isPartner ? "partner" : "retail");
+  const [paidBy, setPaidBy] = useState(isPartner ? "partner" : (accounts[0]?.value ?? "retail"));
   const [payer, setPayer] = useState(myPartnerId ?? "");
   const payerName = partners.find((p) => p.id === payer)?.name ?? "";
   const forSelf = payer === myPartnerId;
@@ -65,10 +65,8 @@ export function ExpenseForm({ categories, isPartner, myPartnerId, partners, toda
         <section className="rounded-card bg-surface p-6 shadow-card">
           <span className="mb-3 block text-[12.5px] text-ink-3">{t("Who paid?")}</span>
           <div className="grid gap-2 sm:grid-cols-3">
-            {[...(isPartner ? [["partner", t("A partner paid personally"), t("Added to that partner's ledger once verified"), UserRound] as const] : []),
-              ["retail", t("BSF (B2C)"), t("Company account"), Building2] as const,
-              ["alrajhi", t("Alrajhi (B2C)"), t("Company account"), Building2] as const,
-              ["corporate", t("Alinma"), t("Company account"), Building2] as const].map(([k, title, sub, Icon]) => (
+            {[...(isPartner ? [{ k: "partner", title: t("A partner paid personally"), sub: t("Added to that partner's ledger once verified"), Icon: UserRound }] : []),
+              ...accounts.map((a) => ({ k: a.value, title: a.label, sub: t("Company account"), Icon: Building2 }))].map(({ k, title, sub, Icon }) => (
               <button key={k} type="button" onClick={() => setPaidBy(k)} className={cx("rounded-2xl p-4 text-start ring-1 transition", paidBy === k ? "bg-ink text-bg ring-ink" : "bg-surface-2 ring-line hover:ring-line-strong")}>
                 <Icon className="size-4 opacity-70" /><div className="mt-3 text-[14px]">{title}</div><div className={cx("mt-0.5 text-[12px]", paidBy === k ? "opacity-60" : "text-ink-3")}>{sub}</div>
               </button>

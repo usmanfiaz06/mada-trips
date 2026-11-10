@@ -1,7 +1,6 @@
 "use client";
 import { useActionState, useContext, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { PendingContext, useSubmit } from "@/components/client";
-import { ACCOUNT, ACCOUNTS, type AccountKey } from "@/lib/labels";
 import { AlertCircle, ArrowLeftRight, ArrowRight, Building2, Check, Landmark, Loader2, Plane, Hotel, Stamp, Package, Car, Sparkles, MoreHorizontal, Search, UserPlus, X, Ticket, Hourglass, ShieldCheck } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { cx, btn } from "@/components/ui";
@@ -25,6 +24,8 @@ type Props = {
   clients: Client[]; targetBps: number; canIssueAll: boolean; creditDualLimit: number; showRules: boolean;
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
   partners: { id: string; name: string }[]; myPartnerId: string | null;
+  accounts: { value: string; label: string }[];
+  sellers: { id: string; name: string }[]; myUserId: string;
 };
 
 const SERVICES = [
@@ -57,8 +58,11 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId, accounts, sellers, myUserId }: Props) {
   const t = useT();
+  const defaultAccount = accounts[0]?.value ?? "retail";
+  const accountName = (k: string) => accounts.find((a) => a.value === k)?.label ?? k;
+  const [soldBy, setSoldBy] = useState<string>(myUserId);
   const [state, action, pending] = useActionState(createSale, null);
   const onSubmit = useSubmit(action);
   const [q, setQ] = useState("");
@@ -71,9 +75,9 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [paid, setPaid] = useState<string | null>(null);
   const [method, setMethod] = useState("mada");
   const [issueNow, setIssueNow] = useState(true);
-  const [account, setAccount] = useState<AccountKey>("retail");
+  const [account, setAccount] = useState<string>(defaultAccount);
   const [supplierPay, setSupplierPay] = useState("unpaid");
-  const [supplierAccount, setSupplierAccount] = useState<AccountKey>("retail");
+  const [supplierAccount, setSupplierAccount] = useState<string>(defaultAccount);
   // How a flight's cost is settled. Empty until the salesperson picks — nothing lands in the IATA
   // balance by default; only a ticket explicitly bought through BSP rolls into the closing.
   const [settle, setSettle] = useState<"bsp" | "direct" | "">("");
@@ -283,8 +287,8 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
               {supplierPay === "bank" && (
                 <div className="mt-3">
                   <span className="mb-1.5 block text-[12px] text-ink-3">{t("From which bank?")}</span>
-                  <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-xs">
-                    {ACCOUNTS.map((a) => <button key={a.value} type="button" onClick={() => setSupplierAccount(a.value)} className={cx("h-9 rounded-full text-[13px] transition", supplierAccount === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t(a.label)}</button>)}
+                  <div className="flex flex-wrap gap-1 rounded-[20px] bg-sunken p-1">
+                    {accounts.map((a) => <button key={a.value} type="button" onClick={() => setSupplierAccount(a.value)} className={cx("h-9 rounded-full px-3.5 text-[13px] transition", supplierAccount === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>)}
                   </div>
                   <input type="hidden" name="supplierAccount" value={supplierAccount} />
                 </div>
@@ -331,12 +335,20 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
 
           <div className="mt-4">
             <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Into which bank account?")}</span>
-            <div className="grid grid-cols-2 gap-1 rounded-full bg-sunken p-1 sm:max-w-xs">
-              {ACCOUNTS.map((a) => (
-                <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{t(a.label)}</button>
+            <div className="flex flex-wrap gap-1 rounded-[22px] bg-sunken p-1">
+              {accounts.map((a) => (
+                <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full px-4 text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>
               ))}
             </div>
             <input type="hidden" name="account" value={account} />
+          </div>
+
+          <div className="mt-4">
+            <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Sold by")}</span>
+            <select name="soldBy" value={soldBy} onChange={(e) => setSoldBy(e.target.value)} className="field h-10">
+              {sellers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === myUserId ? ` (${t("me")})` : ""}</option>)}
+            </select>
+            {soldBy !== myUserId && <p className="mt-1.5 text-[12px] text-ink-3">{t("The sale and its commission are credited to the person you picked, not to you.")}</p>}
           </div>
 
           {creditNeeded && ctype !== "contracted" && (
@@ -373,7 +385,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
         <div className="night relative overflow-hidden rounded-card p-6">
           <div className="night-grid pointer-events-none absolute inset-0 opacity-40" />
           <div className="relative">
-            <div className="flex items-center justify-between text-[12.5px] text-tile-ink-3"><span>{t("Summary")}</span>{ctype && <span>{ACCOUNT[account]}</span>}</div>
+            <div className="flex items-center justify-between text-[12.5px] text-tile-ink-3"><span>{t("Summary")}</span>{ctype && <span>{accountName(account)}</span>}</div>
             <div className="mt-4 min-h-[44px]">
               <div className="truncate text-[18px] font-[420]">{client?.name ?? newClient?.name ?? <span className="text-tile-ink-3">{t("No client yet")}</span>}</div>
               <div className="truncate text-[13px] text-tile-ink-3">{count > 1 && <span className="num">{count} × </span>}{pax || "—"} {pnr && <span dir="ltr">· {pnr}</span>}</div>

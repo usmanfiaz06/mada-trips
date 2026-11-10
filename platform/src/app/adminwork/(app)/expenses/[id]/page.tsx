@@ -6,7 +6,8 @@ import { db, schema } from "@/db";
 import { requireUser, can, isOversight } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { voteBoard } from "@/lib/approval-view";
-import { EXPENSE_CATEGORY, EXPENSE_STATUS, PAID_BY } from "@/lib/labels";
+import { EXPENSE_CATEGORY, EXPENSE_STATUS } from "@/lib/labels";
+import { accountNames } from "@/lib/accounts";
 import { fmtDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { Badge, Card, CardHead, InkCard, KV } from "@/components/ui";
@@ -35,6 +36,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
   const canVote = req?.status === "pending" && me && !me.decision;
   const [proof] = await db.select({ id: schema.attachments.id, mime: schema.attachments.mime }).from(schema.attachments).where(and(eq(schema.attachments.entityType, "expense"), eq(schema.attachments.entityId, id))).orderBy(schema.attachments.createdAt).limit(1);
   const st = EXPENSE_STATUS[e.status];
+  const accName = await accountNames();
   const path = `/adminwork/expenses/${id}`;
 
   return (
@@ -54,7 +56,7 @@ export default async function ExpensePage({ params }: { params: Promise<{ id: st
           ]} /></Card>
           <Card><CardHead title={t("Details")} /><KV cols={2} items={[
             [t("Business justification"), e.justification], [t("Vendor"), e.vendor],
-            [t("Date paid"), fmtDate(e.expenseDate, L)], [t("Paid by"), e.paidBy === "partner" ? `${row.partner} · ${t("personally")}` : t(PAID_BY[e.paidBy])],
+            [t("Date paid"), fmtDate(e.expenseDate, L)], [t("Paid by"), e.paidBy === "partner" ? `${row.partner} · ${t("personally")}` : (accName[e.paidBy] ?? e.paidBy)],
             [t("VAT"), <span key="v" className="num" dir="ltr">{sar(e.vatAmount)}</span>], [t("Type"), e.isStartup ? t("Capital advance (startup)") : t("Operating overhead")],
           ]} /></Card>
           {proof && proof.mime.startsWith("image/") && (

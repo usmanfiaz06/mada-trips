@@ -4,25 +4,26 @@ import Link from "next/link";
 import { useT } from "@/lib/i18n/client";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { cx } from "@/components/ui";
-import { ACCOUNT, ACCOUNT_KEYS } from "@/lib/labels";
 import { clearPayments } from "./actions";
 
 type Row = { id: string; ref: string | null; bookingId: string | null; client: string; method: string; account: string; amount: number; date: string; methodLabel: string; accountLabel: string; dateLabel: string };
+type Acct = { value: string; label: string };
 const show = (h: number) => (h / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
 
-export function ClearTable({ rows, today }: { rows: Row[]; today: string }) {
+export function ClearTable({ rows, today, accounts }: { rows: Row[]; today: string; accounts: Acct[] }) {
   const t = useT();
   const [acc, setAcc] = useState<string>("all");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const list = useMemo(() => rows.filter((r) => acc === "all" || r.account === acc), [rows, acc]);
   const total = list.filter((r) => sel.has(r.id)).reduce((s, r) => s + r.amount, 0);
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const tabs: Acct[] = [{ value: "all", label: t("All accounts") }, ...accounts];
   return (
     <ActionForm action={clearPayments}>
       <div className="flex flex-wrap items-center gap-2 px-6 pb-4">
-        {["all", ...ACCOUNT_KEYS].map((k) => (
-          <button key={k} type="button" onClick={() => setAcc(k)} className={cx("h-8 rounded-full px-3.5 text-[13px]", acc === k ? "bg-ink text-bg" : "bg-surface-2 text-ink-2 ring-1 ring-line")}>
-            {t(k === "all" ? "All accounts" : ACCOUNT[k] ?? k)}
+        {tabs.map((k) => (
+          <button key={k.value} type="button" onClick={() => setAcc(k.value)} className={cx("h-8 rounded-full px-3.5 text-[13px]", acc === k.value ? "bg-ink text-bg" : "bg-surface-2 text-ink-2 ring-1 ring-line")}>
+            {k.label}
           </button>
         ))}
         <button type="button" onClick={() => setSel(new Set(list.map((r) => r.id)))} className="ms-auto text-[13px] text-ink-3 hover:text-ink">{t("Select all")}</button>

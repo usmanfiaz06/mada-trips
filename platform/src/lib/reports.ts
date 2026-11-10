@@ -11,7 +11,7 @@ type Q = DB | Tx;
  * — negative means the company hasn't yet earned back everything the partners put in.
  */
 export type BalanceSheet = {
-  cash: { account: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
+  cash: { account: string; name: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
   owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
 };
 
@@ -40,7 +40,7 @@ export async function monthlyTrend(q: Q = db, months = 6): Promise<{ ym: string;
 
 export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
   const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
-  const cash = cashPos.accounts.map((a) => ({ account: a.key, balance: a.balance }));
+  const cash = cashPos.accounts.map((a) => ({ account: a.key, name: a.name, balance: a.balance }));
   const receivable = recv.reduce((s, r) => s + r.owed, 0);
   const assets = cashPos.total + receivable;
   const owedSuppliers = pay.reduce((s, r) => s + r.net_cost, 0);
@@ -95,7 +95,9 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const revenue = sales.reduce((s, r) => s + Number(r.sell), 0);
   const directCost = sales.reduce((s, r) => s + Number(r.net), 0);
   const grossProfit = revenue - directCost;
-  const commissions = sales.reduce((s, r) => s + Math.floor((Math.max(0, Number(r.sell) - Number(r.net)) * Number(r.bps)) / 10000), 0);
+  // Commission is a real cost when a payout is approved and paid — counted by the day it was paid.
+  const commissions = (await q.select({ total: sum }).from(schema.commissionPayments)
+    .where(and(eq(schema.commissionPayments.status, "paid"), gte(schema.commissionPayments.paidOn, start), lte(schema.commissionPayments.paidOn, end))))[0].total;
 
   // Cancellation fees realised in the window.
   const feeIn = (await q.select({ total: sum }).from(schema.bankTransactions)
@@ -160,10 +162,11 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const txns = await q.select({ account: schema.bankTransactions.account, direction: schema.bankTransactions.direction, kind: schema.bankTransactions.kind, total: sum })
     .from(schema.bankTransactions).where(and(gte(schema.bankTransactions.txnDate, start), lte(schema.bankTransactions.txnDate, end)))
     .groupBy(schema.bankTransactions.account, schema.bankTransactions.direction, schema.bankTransactions.kind);
-  let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0;
+  let deposits = 0, withdrawals = 0, transfersIn = 0, transfersOut = 0, commissionsPaid = 0;
   for (const r of txns) {
     add(r.account, r.direction as "in" | "out", r.total);
     if (r.kind === "refund_fee") continue; // counted as fees below
+    if (r.kind === "commission") { commissionsPaid += r.total; continue; } // its own out row
     if (r.direction === "in") { if (r.kind === "transfer") transfersIn += r.total; else deposits += r.total; }
     else { if (r.kind === "transfer") transfersOut += r.total; else withdrawals += r.total; }
   }
@@ -195,6 +198,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     { key: "withdrawals", amount: withdrawals },
     { key: "transfersOut", amount: transfersOut },
     { key: "supplierFees", amount: feeOutBank },
+    { key: "commissions", amount: commissionsPaid },
     { key: "payouts", amount: payouts },
   ].filter((r) => r.amount > 0);
   const totalIn = inRows.reduce((s, r) => s + r.amount, 0);
@@ -208,4 +212,43 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     pl: { revenue, directCost, grossProfit, feesEarned, feesLost, expenses, expensesTotal, commissions, netProfit, startupCosts, afterStartup, salesCount: sales.length, refundCount },
     flow: { in: inRows, out: outRows, totalIn, totalOut, net: totalIn - totalOut, byAccount },
   };
+}
+
+export type MemberSales = {
+  userId: string; name: string; count: number; revenue: number; margin: number; commission: number;
+}[];
+
+/**
+ * Sales credited to each team member over a business-day window [start, end]. A sale is credited to its
+ * salesperson (sold_by, falling back to the preparer for older sales). Live issued/pending sales only —
+ * void and refunded drop out. "margin" is sell − cost; "commission" is what they'd earn at the rate frozen
+ * on each sale.
+ */
+export async function salesByMember(q: Q = db, start: string, end: string): Promise<MemberSales> {
+  const rows = await q.execute<{ user_id: string; name: string; count: number; revenue: number; margin: number; commission: number }>(sql`
+    SELECT COALESCE(b.sold_by, b.prepared_by) AS user_id, u.name,
+      count(*)::int AS count,
+      coalesce(sum(b.sell_price),0)::bigint AS revenue,
+      coalesce(sum(b.sell_price - b.net_cost),0)::bigint AS margin,
+      coalesce(sum(floor(GREATEST(b.sell_price - b.net_cost, 0) * b.commission_bps / 10000)),0)::bigint AS commission
+    FROM bookings b
+    JOIN users u ON u.id = COALESCE(b.sold_by, b.prepared_by)
+    WHERE b.business_date BETWEEN ${start} AND ${end} AND b.status NOT IN ('void','refunded','draft')
+    GROUP BY COALESCE(b.sold_by, b.prepared_by), u.name
+    ORDER BY revenue DESC`);
+  return rows.map((r) => ({ userId: r.user_id, name: r.name, count: Number(r.count), revenue: Number(r.revenue), margin: Number(r.margin), commission: Number(r.commission) }));
+}
+
+export type MemberSaleRow = { id: string; ref: string; date: string; serviceType: string; client: string; revenue: number; cost: number; margin: number };
+
+/** Every live sale credited to one team member in [start, end] — the rows the commission calculator totals. */
+export async function memberSalesDetail(q: Q = db, userId: string, start: string, end: string): Promise<MemberSaleRow[]> {
+  const rows = await q.execute<{ id: string; ref: string; business_date: string; service_type: string; client: string; sell_price: number; net_cost: number }>(sql`
+    SELECT b.id, b.ref, b.business_date, b.service_type, cl.name AS client, b.sell_price::bigint, b.net_cost::bigint
+    FROM bookings b JOIN clients cl ON cl.id = b.client_id
+    WHERE COALESCE(b.sold_by, b.prepared_by) = ${userId} AND b.business_date BETWEEN ${start} AND ${end}
+      AND b.status NOT IN ('void','refunded','draft')
+    ORDER BY b.business_date, b.ref`);
+  return rows.map((r) => ({ id: r.id, ref: r.ref, date: r.business_date, serviceType: r.service_type, client: r.client,
+    revenue: Number(r.sell_price), cost: Number(r.net_cost), margin: Number(r.sell_price) - Number(r.net_cost) }));
 }

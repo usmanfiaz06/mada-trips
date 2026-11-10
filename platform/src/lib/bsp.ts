@@ -4,7 +4,7 @@ import { db, schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { createApproval } from "./approvals";
 import { getSettings, setSetting, type Settings } from "./settings";
-import { ACCOUNT, isAccountKey } from "./labels";
+import { accountNameTx, isValidAccount } from "./accounts";
 import { sar } from "./money";
 import { addDays, riyadhDate } from "./dates";
 
@@ -82,11 +82,11 @@ export async function settleBspClosing(tx: Tx, opts: {
   const label = `BSP ${opts.periodStart} → ${opts.periodEnd}`;
 
   if (opts.source === "bank") {
-    if (!opts.account || !isAccountKey(opts.account)) throw new Error("Choose which bank paid IATA");
+    if (!opts.account || !(await isValidAccount(opts.account))) throw new Error("Choose which bank paid IATA");
     const [c] = await tx.insert(schema.bspClosings).values({ periodStart: opts.periodStart, periodEnd: opts.periodEnd, dueDate, amount, status: "paid", source: "bank", account: opts.account, reference: opts.reference ?? null, paidOn: riyadhDate(), settledBy: opts.settledBy }).returning();
     await tx.update(schema.bookings).set({ bspClosingId: c.id, supplierPaid: true, updatedAt: new Date() }).where(inArray(schema.bookings.id, bookings.map((b) => b.id)));
     await reduceReserve(tx, amount, opts.settledBy);
-    await audit(tx, { actorId: opts.settledBy, action: "bsp.paid", entityType: "bsp", entityId: c.id, entityRef: label, summary: `Paid IATA SAR ${sar(amount)} for ${label} from ${ACCOUNT[opts.account]}` });
+    await audit(tx, { actorId: opts.settledBy, action: "bsp.paid", entityType: "bsp", entityId: c.id, entityRef: label, summary: `Paid IATA SAR ${sar(amount)} for ${label} from ${await accountNameTx(tx, opts.account)}` });
     return { pending: false };
   }
 

@@ -47,8 +47,14 @@ export const users = pgTable("users", {
   team: text("team").notNull().default("management"), // management | riyadh | pakistan
   locale: text("locale").notNull().default("en"),
   active: boolean("active").notNull().default(true),
-  // Commission as a share of margin, in basis points (1000 = 10%). Only managers and the person see it.
+  // Commission: paid only when a partner enables it for this member, worked out in the commission calculator
+  // and paid out via an approved payout (never automatically). commissionBps is the default rate (1000 = 10%),
+  // commissionBasis whether it's on profit (margin) or revenue, commissionFrom the first date they earn it.
+  commissionEnabled: boolean("commission_enabled").notNull().default(false),
   commissionBps: integer("commission_bps").notNull().default(0),
+  commissionBasis: text("commission_basis").notNull().default("profit"), // profit | revenue
+  commissionFrom: date("commission_from"), // null = from the beginning
+
   // Set when someone else chose the password (new member, reset): they must pick their own before doing anything.
   mustChangePassword: boolean("must_change_password").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
@@ -148,7 +154,7 @@ export const bookings = pgTable("bookings", {
   bspClosingId: uuid("bsp_closing_id"),
   sellPrice: money("sell_price").notNull(),
   vatAmount: money("vat_amount").notNull().default(0),
-  // The preparer's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
+  // The salesperson's commission rate when the sale was made, frozen so later rate changes don't rewrite history.
   commissionBps: integer("commission_bps").notNull().default(0),
   status: text("status").notNull().default("pending_issue"), // draft | pending_issue | issued | returned | void | refunded
   onCredit: boolean("on_credit").notNull().default(false),
@@ -156,6 +162,11 @@ export const bookings = pgTable("bookings", {
   dueDate: date("due_date"),
   businessDate: date("business_date").notNull(), // Riyadh calendar day it belongs to
   preparedBy: uuid("prepared_by").notNull().references(() => users.id),
+  // Who actually made the sale (gets the credit and commission). Defaults to the preparer; a sale entered on
+  // someone else's behalf is credited to the person picked here. Falls back to preparedBy where null.
+  soldBy: uuid("sold_by").references(() => users.id),
+  // Set once a commission payout covering this sale is recorded, so the same sale is never paid twice.
+  commissionPaymentId: uuid("commission_payment_id"),
   issuedBy: uuid("issued_by").references(() => users.id),
   issuedAt: timestamp("issued_at", { withTimezone: true }),
   issuedUnderDelegation: uuid("issued_under_delegation"),
@@ -207,6 +218,28 @@ export const supplierPayments = pgTable("supplier_payments", {
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),
 }, (t) => [index("supplier_payments_booking_idx").on(t.bookingId), index("supplier_payments_account_idx").on(t.account)]);
+
+// A commission payout to one team member for the sales they made in a period. Decided by a director, then
+// paid out of a company bank. Every sale it covers is stamped (bookings.commissionPaymentId) so it's paid once.
+export const commissionPayments = pgTable("commission_payments", {
+  id: id(),
+  ref: text("ref").notNull().unique(),
+  memberId: uuid("member_id").notNull().references(() => users.id),
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  basis: text("basis").notNull(),            // profit | revenue
+  rateBps: integer("rate_bps").notNull(),    // the rate applied (500 = 5%)
+  baseAmount: money("base_amount").notNull(),// the revenue or margin it was computed on
+  amount: money("amount").notNull(),         // the commission itself
+  salesCount: integer("sales_count").notNull().default(0),
+  account: text("account"),                  // which company bank it's paid from
+  status: text("status").notNull().default("pending_approval"), // pending_approval | paid | cancelled
+  approvalId: uuid("approval_id"),
+  note: text("note"),
+  requestedBy: uuid("requested_by").notNull().references(() => users.id),
+  paidOn: date("paid_on"),
+  createdAt: createdAt(),
+}, (t) => [index("commission_payments_member_idx").on(t.memberId), index("commission_payments_status_idx").on(t.status)]);
 
 /* ───────────── Approvals ───────────── */
 
@@ -313,12 +346,13 @@ export const bspObligations = pgTable("bsp_obligations", {
 });
 
 export const bankAccounts = pgTable("bank_accounts", {
-  key: text("key").primaryKey(), // retail | corporate
-  name: text("name").notNull(),
+  key: text("key").primaryKey(), // stable internal id; directors add accounts in Banks & cash
+  name: text("name").notNull(),  // display label, e.g. "BSF (B2C)"
   bank: text("bank"),
   iban: text("iban"),
   openingBalance: money("opening_balance").notNull().default(0),
   openingDate: date("opening_date").notNull(),
+  sort: integer("sort").notNull().default(0),
 });
 
 // A 15-day IATA/BSP closing: the total owed to IATA for flights issued in the window, and how it was settled.

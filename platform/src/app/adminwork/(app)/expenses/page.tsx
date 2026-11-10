@@ -4,7 +4,8 @@ import { Plus, Wallet } from "lucide-react";
 import { db, schema } from "@/db";
 import { requireUser, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
-import { EXPENSE_CATEGORY, EXPENSE_STATUS, PAID_BY } from "@/lib/labels";
+import { EXPENSE_CATEGORY, EXPENSE_STATUS } from "@/lib/labels";
+import { accountNames } from "@/lib/accounts";
 import { businessDate, cycleFor, fmtDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { getSettings } from "@/lib/settings";
@@ -31,6 +32,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
     .where(and(eq(schema.expenses.status, "approved"), eq(schema.expenses.isStartup, false), gte(schema.expenses.expenseDate, cyc.start), lte(schema.expenses.expenseDate, cyc.end))).groupBy(schema.expenses.category) : [];
   const cycleTotal = byCat.reduce((a, b) => a + b.total, 0);
   const pendingN = all ? (await db.select({ n: sql<number>`count(*)::int` }).from(schema.expenses).where(eq(schema.expenses.status, "pending")))[0].n : 0;
+  const accName = await accountNames();
 
   return (
     <>
@@ -71,7 +73,7 @@ export default async function ExpensesPage({ searchParams }: { searchParams: Pro
                   <Td><Link href={`/adminwork/expenses/${e.id}`} className="block"><span className="text-ink group-hover:underline group-hover:decoration-gold group-hover:decoration-2 group-hover:underline-offset-4">{e.description}</span>
                     <span className="block text-[12px] text-ink-3"><span className="num">{e.ref}</span> · {fmtDate(e.expenseDate, L)}</span></Link></Td>
                   <Td>{t(EXPENSE_CATEGORY[e.category])}{e.isStartup && <Badge tone="info" className="ms-2">{t("Startup")}</Badge>}</Td>
-                  <Td>{e.paidBy === "partner" ? `${partner} · ${t("personally")}` : t(PAID_BY[e.paidBy])}</Td>
+                  <Td>{e.paidBy === "partner" ? `${partner} · ${t("personally")}` : (accName[e.paidBy] ?? e.paidBy)}</Td>
                   <Td>{name}</Td>
                   <Td align="end"><span className="num text-ink" dir="ltr">{sar(e.amount)}</span></Td>
                   <Td><Badge tone={EXPENSE_STATUS[e.status].tone}>{t(EXPENSE_STATUS[e.status].label)}</Badge></Td>

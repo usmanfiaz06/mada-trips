@@ -71,9 +71,10 @@ async function main() {
 
   const openingDate = riyadhDay(at(60, 12));
   await db.insert(schema.bankAccounts).values([
-    { key: "retail", name: "BSF (B2C)", bank: "Banque Saudi Fransi", iban: "SA00 1000 0000 6080 1016 7519", openingBalance: 0, openingDate },
-    { key: "alrajhi", name: "Alrajhi (B2C)", bank: "Al Rajhi Bank", iban: null, openingBalance: 0, openingDate },
-    { key: "corporate", name: "Alinma", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate },
+    { key: "retail", name: "BSF (B2C)", bank: "Banque Saudi Fransi", iban: "SA00 1000 0000 6080 1016 7519", openingBalance: 0, openingDate, sort: 0 },
+    { key: "alrajhi", name: "Alrajhi (B2C)", bank: "Al Rajhi Bank", iban: null, openingBalance: 0, openingDate, sort: 1 },
+    { key: "corporate", name: "Alinma (B2B Account)", bank: "Alinma Bank", iban: "SA00 0500 0000 1234 5678 9012", openingBalance: 0, openingDate, sort: 2 },
+    { key: "alrajhi_b2b", name: "Alrajhi (B2B)", bank: "Al Rajhi Bank", iban: null, openingBalance: 0, openingDate, sort: 3 },
   ]);
 
   if (args.has("--bootstrap")) { console.log("Bootstrap done. Partners sign in with the SEED_PASSWORD you set and must choose their own password on first sign-in."); return; }

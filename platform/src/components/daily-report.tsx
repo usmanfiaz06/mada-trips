@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getT } from "@/lib/i18n";
 import { sar } from "@/lib/money";
-import { BOOKING_STATUS, METHOD, ACCOUNT } from "@/lib/labels";
+import { BOOKING_STATUS, METHOD } from "@/lib/labels";
+import { accountNames } from "@/lib/accounts";
 import type { dailyReport } from "@/lib/daily";
 import { Badge, Table, Td, Th, cx } from "./ui";
 
@@ -24,6 +25,7 @@ export async function ReportTotals({ r }: { r: R }) {
 
 export async function ReportTable({ r }: { r: R }) {
   const t = await getT();
+  const accName = await accountNames();
   return (
     <>
       <Table>
@@ -49,7 +51,7 @@ export async function ReportTable({ r }: { r: R }) {
       </Table>
       {r.methods.length > 0 && (
         <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-line px-6 py-4 text-[13px]">
-          {r.methods.map((m) => <span key={m.method + m.account} className="text-ink-3">{t(METHOD[m.method])} · {t(ACCOUNT[m.account])} <span className="num ms-1 text-ink" dir="ltr">{sar(m.total)}</span></span>)}
+          {r.methods.map((m) => <span key={m.method + m.account} className="text-ink-3">{t(METHOD[m.method])} · {accName[m.account] ?? m.account} <span className="num ms-1 text-ink" dir="ltr">{sar(m.total)}</span></span>)}
         </div>
       )}
     </>

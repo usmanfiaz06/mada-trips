@@ -1,8 +1,7 @@
 import "server-only";
-import { and, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { openBspTotal } from "./bsp";
-import { ACCOUNT_KEYS } from "./labels";
 
 type Q = Tx | typeof db;
 
@@ -37,7 +36,7 @@ export async function partnerBalances(q: Q = db) {
 
 /** Cash in each bank account from what the platform knows has cleared or been paid out. */
 export async function cashPosition(q: Q = db) {
-  const accounts = await q.select().from(schema.bankAccounts);
+  const accounts = await q.select().from(schema.bankAccounts).orderBy(asc(schema.bankAccounts.sort), asc(schema.bankAccounts.name));
   // A voided or refunded sale leaves the books: its received money no longer counts as cash on hand.
   const notVoided = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
   const inflow = await q.select({ account: schema.payments.account, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
@@ -210,9 +209,10 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   // A booking is counted in the first cycle after it is issued, fully paid and cleared by the cut-off, whenever that happens
   // (paid in one cycle and issued in the next still counts, in the next). Each booking is counted exactly once.
   const mine = excludeCycleId ? sql`OR b.recognized_cycle_id = ${excludeCycleId}` : sql``;
-  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; prepared_by: string; commission_bps: number; preparer: string }>(sql`
-    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, b.prepared_by, b.commission_bps, u.name AS preparer FROM bookings b
-    JOIN users u ON u.id = b.prepared_by
+  // Commission is credited to the salesperson (sold_by), falling back to the preparer for older sales.
+  const settled = await q.execute<{ id: string; sell_price: number; net_cost: number; seller_id: string; commission_bps: number; seller: string }>(sql`
+    SELECT b.id, b.sell_price::bigint, b.net_cost::bigint, COALESCE(b.sold_by, b.prepared_by) AS seller_id, b.commission_bps, u.name AS seller FROM bookings b
+    JOIN users u ON u.id = COALESCE(b.sold_by, b.prepared_by)
     JOIN (SELECT booking_id, SUM(amount) AS paid, MAX(cleared_on) AS last_cleared FROM payments WHERE cleared_on IS NOT NULL AND cleared_on <= ${end} GROUP BY booking_id) p ON p.booking_id = b.id
     WHERE b.status = 'issued' AND p.paid >= b.sell_price AND (b.recognized_cycle_id IS NULL ${mine})`);
   void cycleOnly;
@@ -228,18 +228,11 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   const expByCat = new Map<string, number>();
   for (const e of expRows) expByCat.set(e.category, (expByCat.get(e.category) ?? 0) + Number(e.amount));
   const exp = [...expByCat].map(([category, total]) => ({ category, total }));
-  // Team commission: a share of the margin on each settled sale, at the rate frozen on the sale.
-  const commissionMap = new Map<string, { userId: string; name: string; amount: number; bookings: number }>();
-  for (const b of settled) {
-    const amount = Math.floor((Math.max(0, Number(b.sell_price) - Number(b.net_cost)) * Number(b.commission_bps)) / 10000);
-    if (amount <= 0) continue;
-    const c = commissionMap.get(b.prepared_by) ?? { userId: b.prepared_by, name: b.preparer, amount: 0, bookings: 0 };
-    c.amount += amount; c.bookings += 1;
-    commissionMap.set(b.prepared_by, c);
-  }
-  const commissions = [...commissionMap.values()].sort((a, b) => b.amount - a.amount);
-  const commissionTotal = commissions.reduce((s, c) => s + c.amount, 0);
-  const overheads = exp.reduce((s, e) => s + e.total, 0) + commissionTotal;
+  // Commission is no longer an automatic company cost in the settlement — salespeople's sales are only
+  // recorded (see salesByMember), and a partner works out any commission ad-hoc in the commission calculator.
+  // The settlement therefore deducts overheads only, so nobody is auto-paid a commission here.
+  const commissions: { userId: string; name: string; amount: number; bookings: number }[] = [];
+  const overheads = exp.reduce((s, e) => s + e.total, 0);
   const netProfit = grossProfit - overheads;
 
   const upcoming = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -275,12 +268,13 @@ export async function computeSettlement(q: Q, start: string, end: string, inputs
   waterfall.push({ key: "dividend", amount: divPool, remainingAfter: remaining - divPool });
 
   const pickAcc = (k: string) => cleared.find((c) => c.account === k)?.total ?? 0;
+  const acctKeys = (await q.select({ key: schema.bankAccounts.key }).from(schema.bankAccounts).orderBy(schema.bankAccounts.sort)).map((a) => a.key);
   return {
-    start, end, clearedByAccount: Object.fromEntries(ACCOUNT_KEYS.map((k) => [k, pickAcc(k)])),
+    start, end, clearedByAccount: Object.fromEntries(acctKeys.map((k) => [k, pickAcc(k)])),
     rolledOver: rolled[0]?.total ?? 0,
     bookingIds: settled.map((b) => b.id), bookingCount: settled.length, expenseIds: expRows.map((e) => e.id),
     revenue, directCost, grossProfit, overheads,
-    overheadsByCategory: { ...Object.fromEntries(exp.map((e) => [e.category, e.total])), ...(commissionTotal ? { commission: commissionTotal } : {}) },
+    overheadsByCategory: Object.fromEntries(exp.map((e) => [e.category, e.total])),
     commissions,
     netProfit, waterfall, suggestedReserve, upcomingBsp, reserveHeldBefore: reserveHeld,
     repayments, dividends, shortfall: netProfit < 0 ? -netProfit : 0, payoutAccount,

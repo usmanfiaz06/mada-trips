@@ -17,7 +17,7 @@ import { Waterfall } from "@/components/waterfall";
 import { VoteDots } from "@/components/votes";
 import { Timeline } from "@/components/record";
 import { markPaid, recompute, submitSettlement } from "../actions";
-import { ACCOUNT, ACCOUNTS } from "@/lib/labels";
+import { accountNames, accountOptions } from "@/lib/accounts";
 
 export default async function SettlementPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,6 +33,8 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
   const board = req ? (await voteBoard([req])).get(req.id) : undefined;
   const partners = await db.select().from(schema.partners).orderBy(schema.partners.sort);
   const draft = c.status === "draft" && can(u, "settlement.run");
+  const accName = await accountNames();
+  const accOpts = await accountOptions();
   const labels = { gross: t("Gross profit"), overheads: t("P1 · Overheads"), reserve: t("P2 · IATA reserve"), repayment: t("P3 · Repayments"), dividend: t("P4 · Dividends") };
 
   return (
@@ -55,7 +57,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
           <div className="figure text-[40px]" dir="ltr">{sar(Object.values(f.clearedByAccount).reduce((s, v) => s + (v ?? 0), 0), { compact: true })}<span className="figure-unit">SAR</span></div>
           <div className="mt-5 space-y-2.5 text-[13px]">
             {Object.entries(f.clearedByAccount).map(([k, v]) => (
-              <div key={k} className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t(ACCOUNT[k] ?? k)}</span><span className="num" dir="ltr">{sar(v)}</span></div>
+              <div key={k} className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{accName[k] ?? k}</span><span className="num" dir="ltr">{sar(v)}</span></div>
             ))}
             <div className="flex justify-between border-t border-line pt-2.5"><span className="text-ink-3">{t("Rolls to next cycle")}</span><span className="num text-ink-3" dir="ltr">{sar(f.rolledOver)}</span></div>
           </div>
@@ -104,7 +106,7 @@ export default async function SettlementPage({ params }: { params: Promise<{ id:
             <Field label={t("P2 · IATA reserve top-up (SAR)")} hint={t("Suggested {v}: upcoming BSP {b} + buffer − held {h}", { v: sar(f.suggestedReserve), b: sar(f.upcomingBsp), h: sar(f.reserveHeldBefore) })}>
               <Input name="reserveTopUp" defaultValue={amountInput(inp.reserveTopUp)} disabled={!draft} dir="ltr" /></Field>
             <Field label={t("P3 · Share of the rest for repayments (%)")}><Input name="repaymentPct" type="number" min={0} max={100} step="1" defaultValue={inp.repaymentPctBps / 100} disabled={!draft} /></Field>
-            <Field label={t("Pay partners from")}><Select name="payoutAccount" defaultValue={inp.payoutAccount} disabled={!draft} options={ACCOUNTS.map((a) => ({ value: a.value, label: t(a.label) }))} /></Field>
+            <Field label={t("Pay partners from")}><Select name="payoutAccount" defaultValue={inp.payoutAccount} disabled={!draft} options={accOpts} /></Field>
             {draft && <SubmitButton variant="outline" className="w-full">{t("Recalculate")}</SubmitButton>}
           </ActionForm>
         </Card>

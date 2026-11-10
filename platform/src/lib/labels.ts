@@ -13,17 +13,8 @@ export const BOOKING_STATUS: Record<string, { label: string; tone: Tone }> = {
 export const SERVICE: Record<string, string> = { flight: "Flight", hotel: "Hotel", visa: "Visa", package: "Package", transport: "Transport", event: "Event", other: "Other" };
 export const METHOD: Record<string, string> = { cash: "Cash", mada: "mada", card: "Credit card", transfer: "Bank transfer" };
 // The company's two bank accounts. Either can be used for any sale. The keys are internal; the labels are the banks.
-// The company's bank accounts. Any can be used for any sale. The keys are internal; the labels are the banks.
-export const ACCOUNT: Record<string, string> = { retail: "BSF (B2C)", alrajhi: "Alrajhi (B2C)", corporate: "Alinma (B2B Account)" };
-export const ACCOUNTS = [
-  { value: "retail", label: "BSF (B2C)" },
-  { value: "alrajhi", label: "Alrajhi (B2C)" },
-  { value: "corporate", label: "Alinma (B2B Account)" },
-] as const;
-export type AccountKey = (typeof ACCOUNTS)[number]["value"];
-export const ACCOUNT_KEYS = ACCOUNTS.map((a) => a.value) as readonly AccountKey[];
-// Single source of truth for validating a submitted bank-account key anywhere in the money flow.
-export const isAccountKey = (v: string): v is AccountKey => (ACCOUNT_KEYS as readonly string[]).includes(v);
+// Bank accounts are data, not code — see src/lib/accounts.ts (backed by the bank_accounts table). Directors
+// add them in Banks & cash and they flow everywhere. Nothing about accounts is hardcoded here.
 export const CLIENT_TYPE: Record<string, { label: string; tone: Tone }> = {
   retail: { label: "Retail", tone: "neutral" },
   contracted: { label: "Contracted corporate", tone: "ok" },
@@ -41,8 +32,7 @@ export const EXPENSE_STATUS: Record<string, { label: string; tone: Tone }> = {
   withdrawn: { label: "Withdrawn", tone: "neutral" },
   void: { label: "Void", tone: "neutral" },
 };
-export const PAID_BY: Record<string, string> = { retail: "Company · BSF (B2C)", alrajhi: "Company · Alrajhi (B2C)", corporate: "Company · Alinma (B2B Account)", partner: "Partner, personally" };
-export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale" };
+export const APPROVAL_KIND: Record<string, string> = { credit: "Credit", expense: "Expense", refund: "Refund", credit_limit: "Credit limit", settlement: "Day-25 settlement", governance: "Governance change", supplier: "Supplier payment", bsp: "IATA BSP", cash: "Bank movement", void: "Void sale", sale_edit: "Sale correction", commission: "Commission payout" };
 export const APPROVAL_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Pending", tone: "gold" }, approved: { label: "Approved", tone: "ok" }, rejected: { label: "Rejected", tone: "bad" }, cancelled: { label: "Withdrawn", tone: "neutral" },
 };
