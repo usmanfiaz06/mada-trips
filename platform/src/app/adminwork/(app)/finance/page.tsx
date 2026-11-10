@@ -10,13 +10,13 @@ import { METHOD } from "@/lib/labels";
 import { accountOptions, accountNames } from "@/lib/accounts";
 import { daysBetween, fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
-import { Badge, Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } from "@/components/ui";
+import { Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
-import { addBankAccount, addBankTxn, settleBsp, transferFunds, updateBank } from "./actions";
+import { AccountEditor, MovementsList } from "./finance-ui";
+import { addBankAccount, addBankTxn, settleBsp, transferFunds } from "./actions";
 
-const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense", deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
 export const metadata = { title: "Banks & cash" };
 
 export default async function FinancePage() {
@@ -31,7 +31,7 @@ export default async function FinancePage() {
       // A voided or refunded sale's receipt can't be cleared — it's off the books.
       .where(and(isNull(schema.payments.clearedOn), sql`(${schema.payments.bookingId} IS NULL OR ${schema.bookings.status} NOT IN ('void','refunded'))`)).orderBy(schema.payments.collectedAt),
   ]);
-  const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 12) })));
+  const movements = await Promise.all(cash.accounts.map(async (a) => ({ key: a.key, rows: await bankMovements(db, a.key, 60) })));
   const canRec = can(u, "finance.reconcile");
   const accOpts = await accountOptions();
   const accName = await accountNames();
@@ -165,22 +165,7 @@ export default async function FinancePage() {
         {movements.map(({ key, rows }) => (
           <Card key={key} pad={false}>
             <div className="p-6 pb-3"><CardHead className="mb-0" title={accName[key] ?? key} hint={t("Recent money in and out")} /></div>
-            {rows.length === 0 ? <p className="px-6 pb-6 text-[13px] text-ink-3">{t("No movements yet.")}</p> : (
-              <ul className="px-3 pb-3">
-                {rows.map((m, i) => (
-                  <li key={i} className="flex items-center gap-3 rounded-2xl px-3 py-2.5 hover:bg-surface-2">
-                    <span className={cx("grid size-7 shrink-0 place-items-center rounded-full text-[11px]", m.amount >= 0 ? "bg-ok-soft text-ok" : "bg-surface-2 text-ink-3")}>
-                      {m.amount >= 0 ? "＋" : "－"}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13.5px]">{MOVE_LABEL[m.kind] ? t(MOVE_LABEL[m.kind]) : m.kind}{m.label ? ` · ${m.label}` : ""}</span>
-                      <span className="block text-[11.5px] text-ink-3">{fmtDate(m.date, L)}{m.ref ? ` · ${m.ref}` : ""}{m.by ? ` · ${t("by {name}", { name: m.by })}` : ""}{m.kind === "receipt" && !m.cleared ? ` · ${t("not cleared")}` : ""}</span>
-                    </span>
-                    <span className={cx("num shrink-0 text-[13.5px]", m.amount >= 0 ? "text-ok" : "text-ink-2")} dir="ltr">{sar(Math.abs(m.amount))}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <MovementsList rows={rows.map((m) => ({ positive: m.amount >= 0, kind: m.kind, label: m.label, ref: m.ref, by: m.by, cleared: m.cleared, dateLabel: fmtDate(m.date, L), amount: m.amount }))} />
           </Card>
         ))}
       </div>
@@ -188,16 +173,9 @@ export default async function FinancePage() {
       {can(u, "settings.manage") && (
         <Card className="mt-4">
           <CardHead title={t("Account setup")} hint={t("Opening balance is the balance on the day the platform started tracking.")} />
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-2.5 md:grid-cols-2">
             {cash.accounts.map((a) => (
-              <ActionForm key={a.key} action={updateBank} className="grid grid-cols-2 gap-3">
-                <input type="hidden" name="key" value={a.key} />
-                <div className="col-span-2 flex items-center gap-2 text-[14px]">{a.name}<Badge>{t("since {d}", { d: fmtDate(a.openingDate, L) })}</Badge></div>
-                <Field label={t("Bank")}><Input name="bank" defaultValue={a.bank ?? ""} /></Field>
-                <Field label={t("Opening balance")}><Input name="openingBalance" defaultValue={amountInput(a.openingBalance)} dir="ltr" /></Field>
-                <Field label="IBAN" className="col-span-2"><Input name="iban" defaultValue={a.iban ?? ""} dir="ltr" /></Field>
-                <div className="col-span-2"><SubmitButton variant="outline" size="sm">{t("Save")}</SubmitButton></div>
-              </ActionForm>
+              <AccountEditor key={a.key} a={{ key: a.key, name: a.name, bank: a.bank, iban: a.iban, since: fmtDate(a.openingDate, L), openingInput: amountInput(a.openingBalance) }} />
             ))}
           </div>
           <div className="mt-6 border-t border-line pt-6">
