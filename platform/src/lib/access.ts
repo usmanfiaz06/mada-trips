@@ -53,6 +53,11 @@ export async function canViewRecord(u: CurrentUser, type: string, id: string): P
       const [l] = await db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.id, id));
       return !!l;
     }
+    case "document": {
+      if (!p.has("documents.issue")) return false;
+      const [d] = await db.select({ id: schema.documents.id }).from(schema.documents).where(eq(schema.documents.id, id));
+      return !!d;
+    }
     default:
       return false;
   }

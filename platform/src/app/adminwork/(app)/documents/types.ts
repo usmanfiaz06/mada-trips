@@ -2,9 +2,15 @@
 // same types and helpers are used by the client builder, the presentational sheet and the server action.
 import { AIRLINES } from "@/lib/travel-data";
 
-export type DocType = "itinerary" | "voucher" | "receipt";
-export const DOC_TYPES: DocType[] = ["itinerary", "voucher", "receipt"];
-export const REF_PREFIX: Record<DocType, string> = { itinerary: "TKT", voucher: "VCHR", receipt: "RCPT" };
+export type DocType = "itinerary" | "transport" | "voucher" | "receipt";
+export const DOC_TYPES: DocType[] = ["itinerary", "transport", "voucher", "receipt"];
+export const REF_PREFIX: Record<DocType, string> = { itinerary: "TKT", transport: "TRN", voucher: "VCHR", receipt: "RCPT" };
+
+export type TransportMode = "train" | "bus" | "ferry" | "car";
+export const TRANSPORT_MODES: { key: TransportMode; label: string }[] = [
+  { key: "train", label: "Train" }, { key: "bus", label: "Bus" }, { key: "ferry", label: "Ferry" }, { key: "car", label: "Car / transfer" },
+];
+export const TRANSPORT_LABEL: Record<TransportMode, string> = { train: "Train", bus: "Bus", ferry: "Ferry", car: "Car / transfer" };
 
 export type Pax = { name: string; kind: string }; // kind: Adult | Child | Infant
 // A flight leg. The itinerary is an ordered list of these interleaved with explicit layovers and dividers.
@@ -56,7 +62,23 @@ export type ReceiptData = {
   authorisedBy: string;
   stamp: boolean;
 };
-export type DocData = ItineraryData | VoucherData | ReceiptData;
+// A bus / train / ferry / car ticket — a single journey from one stop to another, with the operator's details.
+export type TransportData = {
+  mode: TransportMode;
+  operator: string;          // carrier / company (e.g. SAR, SAPTCO)
+  serviceNo: string;         // train / bus / service number
+  fromPlace: string; toPlace: string;   // stations or stops (free text)
+  date: string; departTime: string; arriveTime: string;
+  travelClass: string;       // e.g. Economy, Business, First
+  seat: string; coach: string;          // seat, and coach / platform / gate
+  bookingRef: string;
+  passengers: Pax[];
+  notes: string;
+  authorisedBy: string;
+  stamp: boolean;
+};
+
+export type DocData = ItineraryData | TransportData | VoucherData | ReceiptData;
 
 export const VAT_RATE = 0.15;
 
@@ -84,6 +106,10 @@ export function blankData(type: DocType): DocData {
     bookingRef: "", passengers: [{ name: "", kind: "Adult" }],
     items: [blankFlight()],
     ticketNumbers: "", notes: "", authorisedBy: "", stamp: false,
+  };
+  if (type === "transport") return {
+    mode: "train", operator: "", serviceNo: "", fromPlace: "", toPlace: "", date: "", departTime: "", arriveTime: "",
+    travelClass: "Economy", seat: "", coach: "", bookingRef: "", passengers: [{ name: "", kind: "Adult" }], notes: "", authorisedBy: "", stamp: false,
   };
   if (type === "voucher") return {
     guest: "", hotel: "", city: "", address: "", checkIn: "", checkOut: "",

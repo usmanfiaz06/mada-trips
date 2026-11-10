@@ -1,14 +1,14 @@
 "use client";
 import { useActionState, useRef, useState, type ReactNode } from "react";
-import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2 } from "lucide-react";
+import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
 import { createDocument, updateDocument } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
-  type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Pax, type LineItem,
+  type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type Pax, type LineItem,
   type ItItem, type FlightItem,
-  blankData, blankFlight, blankLayover, returnDivider, AIRLINE_BY_NAME, layoverMinutes, fmtDuration,
+  blankData, blankFlight, blankLayover, returnDivider, AIRLINE_BY_NAME, layoverMinutes, fmtDuration, TRANSPORT_MODES,
 } from "./types";
 
 const PAX_KINDS = ["Adult", "Child", "Infant"];
@@ -16,7 +16,7 @@ const CABINS = ["Economy", "Premium economy", "Business", "First"];
 const BOARDS = ["Room only", "Bed & breakfast", "Half board", "Full board", "All inclusive"];
 const METHODS = ["Cash", "mada", "Credit card", "Bank transfer"];
 
-export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: string; type: DocType; date: string; data: ItineraryData | VoucherData | ReceiptData } }) {
+export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: string; type: DocType; date: string; data: ItineraryData | TransportData | VoucherData | ReceiptData } }) {
   const t = useT();
   const [state, action, pending] = useActionState(edit ? updateDocument : createDocument, {} as { error?: string });
   const dataHidden = useRef<HTMLInputElement>(null);
@@ -24,14 +24,16 @@ export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: s
   const [type, setType] = useState<DocType>(edit?.type ?? "itinerary");
   const [date, setDate] = useState(edit?.date ?? today);
   const [itin, setItin] = useState(() => (edit?.type === "itinerary" ? edit.data : blankData("itinerary")) as ItineraryData);
+  const [trans, setTrans] = useState(() => (edit?.type === "transport" ? edit.data : blankData("transport")) as TransportData);
   const [vouch, setVouch] = useState(() => (edit?.type === "voucher" ? edit.data : blankData("voucher")) as VoucherData);
   const [rcpt, setRcpt] = useState(() => (edit?.type === "receipt" ? edit.data : blankData("receipt")) as ReceiptData);
-  const data = type === "itinerary" ? itin : type === "voucher" ? vouch : rcpt;
+  const data = type === "itinerary" ? itin : type === "transport" ? trans : type === "voucher" ? vouch : rcpt;
 
   function onSave() { if (dataHidden.current) dataHidden.current.value = JSON.stringify(data); }
 
   const TABS: { key: DocType; label: string; icon: ReactNode }[] = [
     { key: "itinerary", label: t("Flight ticket"), icon: <Plane className="size-4" /> },
+    { key: "transport", label: t("Transport ticket"), icon: <Bus className="size-4" /> },
     { key: "voucher", label: t("Hotel voucher"), icon: <Hotel className="size-4" /> },
     { key: "receipt", label: t("Receipt / invoice"), icon: <ReceiptText className="size-4" /> },
   ];
@@ -72,6 +74,7 @@ export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: s
         {/* The form */}
         <div className="no-print space-y-5">
           {type === "itinerary" && <ItineraryForm d={itin} set={setItin} />}
+          {type === "transport" && <TransportForm d={trans} set={setTrans} />}
           {type === "voucher" && <VoucherForm d={vouch} set={setVouch} />}
           {type === "receipt" && <ReceiptForm d={rcpt} set={setRcpt} />}
         </div>
@@ -244,6 +247,55 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
 }
 
 /* ─────────── Voucher form ─────────── */
+/* ─────────── Transport form (bus / train / ferry / car) ─────────── */
+function TransportForm({ d, set }: { d: TransportData; set: (f: (p: TransportData) => TransportData) => void }) {
+  const t = useT();
+  const on = <K extends keyof TransportData>(k: K) => (v: string) => set((p) => ({ ...p, [k]: v }));
+  const patchPax = (i: number, k: keyof Pax, v: string) => set((p) => ({ ...p, passengers: p.passengers.map((x, j) => j === i ? { ...x, [k]: v } : x) }));
+  return (
+    <>
+      <Card title={t("Journey")}>
+        <div>
+          <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Mode")}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {TRANSPORT_MODES.map((m) => (
+              <button key={m.key} type="button" onClick={() => set((p) => ({ ...p, mode: m.key }))}
+                className={`h-9 rounded-full px-4 text-[13px] font-medium ${d.mode === m.key ? "bg-ink text-bg" : "bg-sunken text-ink-2 ring-1 ring-line hover:text-ink"}`}>{t(m.label)}</button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Txt label={t("Operator / company")} value={d.operator} onChange={on("operator")} placeholder="e.g. SAR, SAPTCO" />
+          <Txt label={t("Service / train no.")} value={d.serviceNo} onChange={on("serviceNo")} placeholder="e.g. 711" />
+          <Txt label={t("From (station / stop)")} value={d.fromPlace} onChange={on("fromPlace")} placeholder="Riyadh" />
+          <Txt label={t("To (station / stop)")} value={d.toPlace} onChange={on("toPlace")} placeholder="Dammam" />
+          <Txt label={t("Date")} value={d.date} onChange={on("date")} placeholder="2026-12-01" />
+          <Txt label={t("Class")} value={d.travelClass} onChange={on("travelClass")} placeholder="Economy" />
+          <Txt label={t("Departs (time)")} value={d.departTime} onChange={on("departTime")} placeholder="08:30" />
+          <Txt label={t("Arrives (time)")} value={d.arriveTime} onChange={on("arriveTime")} placeholder="12:05" />
+          <Txt label={t("Seat")} value={d.seat} onChange={on("seat")} placeholder="24A" />
+          <Txt label={t("Coach / platform")} value={d.coach} onChange={on("coach")} placeholder="Coach 3" />
+          <Txt label={t("Booking ref")} value={d.bookingRef} onChange={on("bookingRef")} />
+        </div>
+      </Card>
+      <Card title={t("Passengers")} action={<AddBtn onClick={() => set((p) => ({ ...p, passengers: [...p.passengers, { name: "", kind: "Adult" }] }))} label={t("Add")} />}>
+        {d.passengers.map((p, i) => (
+          <div key={i} className="flex items-end gap-2">
+            <div className="flex-1"><Txt label={i === 0 ? t("Full name") : ""} value={p.name} onChange={(v) => patchPax(i, "name", v)} placeholder={t("As on ID")} /></div>
+            <div className="w-28"><Sel label={i === 0 ? t("Type") : ""} value={p.kind} onChange={(v) => patchPax(i, "kind", v)} options={PAX_KINDS} /></div>
+            {d.passengers.length > 1 && <DelBtn onClick={() => set((q) => ({ ...q, passengers: q.passengers.filter((_, j) => j !== i) }))} />}
+          </div>
+        ))}
+      </Card>
+      <Card title={t("More")}>
+        <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
+        <Txt label={t("Authorised by (optional)")} value={d.authorisedBy} onChange={on("authorisedBy")} />
+        <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
+      </Card>
+    </>
+  );
+}
+
 function VoucherForm({ d, set }: { d: VoucherData; set: (f: (p: VoucherData) => VoucherData) => void }) {
   const t = useT();
   const on = <K extends keyof VoucherData>(k: K) => (v: string) => set((p) => ({ ...p, [k]: v }));
