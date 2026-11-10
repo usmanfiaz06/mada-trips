@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { sar } from "./money";
@@ -50,6 +50,32 @@ export async function assertCorrectable(tx: Tx, b: Booking, patch: SaleEditPatch
   if (sellPrice < received) throw new Error(`SAR ${sar(received)} was already received. The selling price can't be lower than that`);
 }
 
+/**
+ * A supplier payment records the exact cost being settled (its amount is captured from the booking's netCost
+ * at payment time). The bank's cash balance sums those amounts, and a partner who fronted the cost is owed
+ * that amount back — so when the cost is corrected the payment has to move with it, or the bank statement and
+ * partner ledger stay on the stale figure. Keeps every downstream money flow in sync with the corrected cost.
+ */
+async function syncSupplierCost(tx: Tx, b: Booking, newCost: number, actorId: string | null) {
+  // At most one live payment per booking (recordSupplierPayment blocks a second while one is open/settled).
+  const [sp] = await tx.select().from(schema.supplierPayments)
+    .where(and(eq(schema.supplierPayments.bookingId, b.id), inArray(schema.supplierPayments.status, ["settled", "pending_approval"])));
+  if (!sp || sp.amount === newCost) return;
+  const old = sp.amount;
+  await tx.update(schema.supplierPayments).set({ amount: newCost }).where(eq(schema.supplierPayments.id, sp.id));
+  // Partner-fronted cost already posted to that partner's ledger: move the ledger entry too.
+  if (sp.source === "partner" && sp.status === "settled") {
+    await tx.update(schema.ledgerEntries).set({ amount: newCost })
+      .where(and(eq(schema.ledgerEntries.sourceType, "supplier"), eq(schema.ledgerEntries.sourceId, b.id), eq(schema.ledgerEntries.type, "expense")));
+  }
+  // Still waiting on the other directors: keep the amount they'll approve honest.
+  if (sp.status === "pending_approval" && sp.approvalId) {
+    await tx.update(schema.approvalRequests).set({ amount: newCost }).where(eq(schema.approvalRequests.id, sp.approvalId));
+  }
+  await audit(tx, { actorId, action: "supplier.adjusted", entityType: "booking", entityId: b.id, entityRef: b.ref,
+    summary: `Supplier payment for ${b.ref} adjusted ${sar(old)}→${sar(newCost)} to match the corrected cost` });
+}
+
 /** Apply a validated correction to a booking and write an audit entry describing exactly what changed. */
 export async function applySaleEdit(tx: Tx, b: Booking, patch: SaleEditPatch, actorId: string | null, via: "direct" | "approved") {
   const set: Partial<Booking> & { updatedAt: Date } = { updatedAt: new Date() };
@@ -68,6 +94,8 @@ export async function applySaleEdit(tx: Tx, b: Booking, patch: SaleEditPatch, ac
   }
   if (Object.keys(changes).length === 0) return false;
   await tx.update(schema.bookings).set(set).where(eq(schema.bookings.id, b.id));
+  // A changed cost has to flow to the supplier payment (bank cash) and any partner who fronted it.
+  if (set.netCost !== undefined) await syncSupplierCost(tx, b, set.netCost, actorId);
   await audit(tx, { actorId, action: "booking.corrected", entityType: "booking", entityId: b.id, entityRef: b.ref,
     summary: `Corrected ${b.ref}${note.length ? ` · ${note.join(", ")}` : ""}${via === "approved" ? " (director-approved)" : ""}`, changes });
   return true;
