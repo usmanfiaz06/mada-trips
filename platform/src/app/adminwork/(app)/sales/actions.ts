@@ -39,7 +39,7 @@ const SaleSchema = z.object({
   supplier: z.string().trim().max(100).optional(),
   pnr: z.string().trim().max(20).optional(),
   travelDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("").transform(() => undefined)),
-  netCost: money.refine((v) => v > 0, "Net cost must be more than zero"),
+  netCost: money.refine((v) => v >= 0, "Net cost can't be negative"), // may be zero: a free/award ticket or a service we provide ourselves (full margin)
   sellPrice: money.refine((v) => v > 0, "Selling price must be more than zero"),
   paidNow: money,
   method: z.enum(["cash", "mada", "card", "transfer"]),
@@ -295,7 +295,8 @@ export async function resubmitBooking(_: ActionState, fd: FormData): Promise<Act
       if (!b || b.status !== "returned") throw new Error("Only sent-back sales can be resubmitted");
       if (b.preparedBy !== u.id && !can(u, "sales.edit")) throw new Error("Only the preparer can resubmit");
       const patch = { pnr: optStr(fd, "pnr")?.slice(0, 20).toUpperCase() ?? b.pnr, netCost: num("netCost", b.netCost), sellPrice: num("sellPrice", b.sellPrice) };
-      if (patch.netCost <= 0 || patch.sellPrice <= 0) throw new Error("Prices must be more than zero");
+      if (patch.netCost < 0) throw new Error("Net cost can't be negative");
+      if (patch.sellPrice <= 0) throw new Error("Selling price must be more than zero");
       // Lowering the cost raises the margin (and commission), so only managers may do that after a sale was sent back.
       if (patch.netCost < b.netCost && !can(u, "sales.edit")) throw new Error("Only a manager can lower the net cost. Add a remark explaining the right cost");
       const paid = await paidOn(tx, id);

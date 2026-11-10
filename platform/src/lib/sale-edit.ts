@@ -42,7 +42,10 @@ export async function assertCorrectable(tx: Tx, b: Booking, patch: SaleEditPatch
   if (b.recognizedCycleId) throw new Error("This sale is part of a signed Day-25 settlement and can't be edited. Make a correcting entry in the next cycle");
   const netCost = patch.netCost ?? b.netCost;
   const sellPrice = patch.sellPrice ?? b.sellPrice;
-  if (netCost <= 0 || sellPrice <= 0) throw new Error("Net cost and selling price must be more than zero");
+  // Net cost may be zero (a free/award ticket, or a service we provide ourselves — full margin). The selling
+  // price still has to be above zero.
+  if (netCost < 0) throw new Error("Net cost can't be negative");
+  if (sellPrice <= 0) throw new Error("Selling price must be more than zero");
   const received = await receivedOn(tx, b.id);
   if (sellPrice < received) throw new Error(`SAR ${sar(received)} was already received. The selling price can't be lower than that`);
 }

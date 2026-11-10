@@ -214,7 +214,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
           </div>
         </Step>
 
-        <Step n={3} title={t("Price")} done={sellH > 0 && netH > 0}>
+        <Step n={3} title={t("Price")} done={sellH > 0}>
           <div className="grid gap-4 sm:grid-cols-2">
             <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Net cost (what we pay)")} <span className="text-gold-2">*</span></span>
               <div className="relative" dir="ltr"><input name="netCost" inputMode="decimal" value={net} onChange={(e) => setNet(e.target.value)} className="field field-lg pe-14" placeholder="0.00" dir="ltr" aria-invalid={!!state?.fields?.netCost} />
@@ -227,7 +227,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             <p className="mt-3 text-[13px] text-ink-3">{t("{n} × SAR {v} each", { n: count, v: show(Math.round(sellH / count)) })}{netH > 0 ? ` · ${t("cost SAR {v} each", { v: show(Math.round(netH / count)) })}` : ""}</p>
           )}
 
-          {netH > 0 && (
+          {sellH > 0 && (
             <div className="mt-4 rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
               {service === "flight" && (
                 <div className="mb-3">
@@ -251,7 +251,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
               <input type="hidden" name="viaBsp" value={service === "flight" ? (settle === "bsp" ? "1" : settle === "direct" ? "0" : "") : ""} />
               {service === "flight" && settle === "bsp" ? (
                 <p className="flex items-start gap-2 text-[12.5px] text-ink-3"><Landmark className="mt-0.5 size-3.5 shrink-0" />{t("Billed by IATA — this cost rolls into the 15-day BSP closing, not “Money we owe”.")}</p>
-              ) : (service !== "flight" || settle === "direct") ? (<>
+              ) : (netH > 0 && (service !== "flight" || settle === "direct")) ? (<>
               <span className="mb-2 block text-[12.5px] text-ink-3">{t("Supplier cost — have we paid it?")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
