@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
@@ -25,7 +25,10 @@ export default async function DocumentView({ params }: { params: Promise<{ id: s
       <div className="no-print flex flex-wrap items-center gap-3">
         <Link href="/adminwork/documents" className="inline-flex items-center gap-1.5 text-[13.5px] text-ink-3 hover:text-ink"><ArrowLeft className="size-4" />{t("All documents")}</Link>
         <div className="text-[13.5px] text-ink-2"><span className="num font-medium text-ink">{d.ref}</span> · {d.title}</div>
-        <div className="ms-auto"><PrintButton /></div>
+        <div className="ms-auto flex items-center gap-2">
+          <Link href={`/adminwork/documents/${id}/edit`} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-ink/40 hover:text-ink"><Pencil className="size-3.5" />{t("Edit")}</Link>
+          <PrintButton />
+        </div>
       </div>
 
       <div className="print-area overflow-auto">

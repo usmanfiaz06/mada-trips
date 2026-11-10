@@ -3,7 +3,7 @@ import { useActionState, useRef, useState, type ReactNode } from "react";
 import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2 } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
-import { createDocument } from "./actions";
+import { createDocument, updateDocument } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
   type DocType, type ItineraryData, type VoucherData, type ReceiptData, type Pax, type LineItem,
@@ -16,16 +16,16 @@ const CABINS = ["Economy", "Premium economy", "Business", "First"];
 const BOARDS = ["Room only", "Bed & breakfast", "Half board", "Full board", "All inclusive"];
 const METHODS = ["Cash", "mada", "Credit card", "Bank transfer"];
 
-export function DocumentBuilder({ today }: { today: string }) {
+export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: string; type: DocType; date: string; data: ItineraryData | VoucherData | ReceiptData } }) {
   const t = useT();
-  const [state, action, pending] = useActionState(createDocument, {} as { error?: string });
+  const [state, action, pending] = useActionState(edit ? updateDocument : createDocument, {} as { error?: string });
   const dataHidden = useRef<HTMLInputElement>(null);
 
-  const [type, setType] = useState<DocType>("itinerary");
-  const [date, setDate] = useState(today);
-  const [itin, setItin] = useState(() => blankData("itinerary") as ItineraryData);
-  const [vouch, setVouch] = useState(() => blankData("voucher") as VoucherData);
-  const [rcpt, setRcpt] = useState(() => blankData("receipt") as ReceiptData);
+  const [type, setType] = useState<DocType>(edit?.type ?? "itinerary");
+  const [date, setDate] = useState(edit?.date ?? today);
+  const [itin, setItin] = useState(() => (edit?.type === "itinerary" ? edit.data : blankData("itinerary")) as ItineraryData);
+  const [vouch, setVouch] = useState(() => (edit?.type === "voucher" ? edit.data : blankData("voucher")) as VoucherData);
+  const [rcpt, setRcpt] = useState(() => (edit?.type === "receipt" ? edit.data : blankData("receipt")) as ReceiptData);
   const data = type === "itinerary" ? itin : type === "voucher" ? vouch : rcpt;
 
   function onSave() { if (dataHidden.current) dataHidden.current.value = JSON.stringify(data); }
@@ -41,7 +41,11 @@ export function DocumentBuilder({ today }: { today: string }) {
       {/* Toolbar — never printed */}
       <div className="no-print sticky top-2 z-20 mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-surface/90 p-2 backdrop-blur">
         <div className="flex items-center gap-1">
-          {TABS.map((tb) => (
+          {edit ? (
+            (() => { const tb = TABS.find((x) => x.key === type)!; return (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-sunken px-3 py-2 text-[13px] font-medium text-ink">{tb.icon}{tb.label} · {t("editing")}</span>
+            ); })()
+          ) : TABS.map((tb) => (
             <button key={tb.key} type="button" onClick={() => setType(tb.key)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-medium ${type === tb.key ? "bg-ink text-bg" : "text-ink-2 hover:bg-sunken"}`}>
               {tb.icon}{tb.label}
@@ -53,11 +57,12 @@ export function DocumentBuilder({ today }: { today: string }) {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="field h-9" />
         </label>
         <button type="button" onClick={() => window.print()} className="ms-auto inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-ink/40"><Printer className="size-4" />{t("Print / PDF")}</button>
-        <button type="submit" form="doc-form" onClick={onSave} disabled={pending} className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-bg hover:opacity-85 disabled:opacity-50">{pending ? t("Saving…") : t("Issue & save")}</button>
+        <button type="submit" form="doc-form" onClick={onSave} disabled={pending} className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-bg hover:opacity-85 disabled:opacity-50">{pending ? t("Saving…") : edit ? t("Save changes") : t("Issue & save")}</button>
       </div>
       {state?.error && <div className="no-print mb-3 rounded-xl border border-bad/30 bg-bad-soft px-4 py-2.5 text-[13px] text-bad">{state.error}</div>}
 
       <form id="doc-form" action={action} className="hidden">
+        {edit && <input name="id" value={edit.id} readOnly />}
         <input name="type" value={type} readOnly />
         <input name="date" value={date} readOnly />
         <input ref={dataHidden} name="data" type="hidden" />
