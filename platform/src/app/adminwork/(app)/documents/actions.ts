@@ -50,6 +50,21 @@ export async function createDocument(_: ActionState, fd: FormData): Promise<Acti
   let data: ItineraryData | TransportData | VoucherData | ReceiptData;
   try { data = JSON.parse(raw); } catch { return { error: "Couldn't read the document — please try again" }; }
 
+  // Optional: attach the carrier's original ticket/voucher PDF (or image) at creation time. Validate it up
+  // front so a bad file never leaves a half-made document behind.
+  const file = fd.get("file");
+  const hasFile = file instanceof File && file.size > 0;
+  let bytes: Buffer | null = null, mime: string | null = null, filename = "";
+  if (hasFile) {
+    if (file.size > 10 * 1024 * 1024) return { error: "The attached file must be under 10 MB", fields: { file: "x" } };
+    bytes = Buffer.from(await file.arrayBuffer());
+    mime = detectFileType(bytes); // from the file's own bytes, not the browser's claim
+    if (!mime) return { error: "Attach a PDF or an image", fields: { file: "x" } };
+    filename = file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 200) || "ticket";
+  }
+  const hasQr = hasFile && str(fd, "hasQr") === "on";
+  if (hasQr) (data as { hasQr?: boolean }).hasQr = true;
+
   const { title, forName } = summarize(type, data);
   let id = "";
   try {
@@ -57,6 +72,10 @@ export async function createDocument(_: ActionState, fd: FormData): Promise<Acti
       const ref = await nextRef(tx, REF_PREFIX[type]);
       const [row] = await tx.insert(schema.documents).values({ ref, type, title, forName, docDate: date, data, createdBy: u.id }).returning();
       await audit(tx, { actorId: u.id, action: "document.issued", entityType: "document", entityId: row.id, entityRef: ref, summary: `Issued ${type} ${ref}${forName ? ` for ${forName}` : ""}` });
+      if (bytes && mime) {
+        await tx.insert(schema.attachments).values({ entityType: "document", entityId: row.id, mime, size: bytes.length, data: bytes, uploadedBy: u.id, filename });
+        await audit(tx, { actorId: u.id, action: "document.attached", entityType: "document", entityId: row.id, entityRef: ref, summary: `Attached ${hasQr ? "QR original" : "the original"} to ${ref}` });
+      }
       return row.id;
     });
   } catch (e) { return toState(e); }

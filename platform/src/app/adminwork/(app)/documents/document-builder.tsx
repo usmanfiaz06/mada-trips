@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useRef, useState, type ReactNode } from "react";
-import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus } from "lucide-react";
+import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus, Paperclip, FileText } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
 import { createDocument, updateDocument, importTicketPdf } from "./actions";
@@ -77,6 +77,7 @@ export function DocumentBuilder({ today, edit }: { today: string; edit?: { id: s
           {type === "transport" && <TransportForm d={trans} set={setTrans} />}
           {type === "voucher" && <VoucherForm d={vouch} set={setVouch} />}
           {type === "receipt" && <ReceiptForm d={rcpt} set={setRcpt} />}
+          {!edit && <AttachOriginal />}
         </div>
 
         {/* Live preview — this is what prints */}
@@ -122,6 +123,28 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
       <div className="mb-3 flex items-center justify-between"><h3 className="text-[13px] font-semibold text-ink">{title}</h3>{action}</div>
       <div className="space-y-3">{children}</div>
     </div>
+  );
+}
+// Attach the carrier's original ticket / e-voucher PDF (or image) to the document being issued. It submits
+// with the main form (form="doc-form"), so the file is stored on the record the moment the document is saved.
+function AttachOriginal() {
+  const t = useT();
+  const [name, setName] = useState("");
+  return (
+    <Card title={t("Original ticket / document (optional)")}>
+      <p className="-mt-1 text-[12px] text-ink-3">{t("Attach the carrier's own ticket or e-voucher PDF (e.g. the airline e-ticket or hotel confirmation). It's kept on this record and stays intact.")}</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-ink/40 hover:text-ink">
+          <Paperclip className="size-4" />{t("Choose a PDF or image")}
+          <input type="file" form="doc-form" name="file" accept="application/pdf,image/*" className="sr-only" onChange={(e) => setName(e.target.files?.[0]?.name ?? "")} />
+        </label>
+        {name && <span className="inline-flex min-w-0 items-center gap-1.5 text-[12.5px] text-ink-2"><FileText className="size-3.5 shrink-0 text-ink-3" /><span className="truncate">{name}</span></span>}
+      </div>
+      <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
+        <input type="checkbox" form="doc-form" name="hasQr" className="size-4 accent-[var(--gold)]" />
+        {t("The original has a QR code (flag it on this document)")}
+      </label>
+    </Card>
   );
 }
 const AddBtn = ({ onClick, label }: { onClick: () => void; label: string }) => (
