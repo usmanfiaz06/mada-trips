@@ -239,7 +239,6 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={(v) => set((p) => ({ ...p, notes: v }))} />
-        <Txt label={t("Authorised by (optional)")} value={d.authorisedBy} onChange={(v) => set((p) => ({ ...p, authorisedBy: v }))} placeholder={t("Name on the signature line")} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
@@ -308,7 +307,6 @@ function TransportForm({ d, set }: { d: TransportData; set: (f: (p: TransportDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
-        <Txt label={t("Authorised by (optional)")} value={d.authorisedBy} onChange={on("authorisedBy")} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
@@ -341,7 +339,6 @@ function VoucherForm({ d, set }: { d: VoucherData; set: (f: (p: VoucherData) => 
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
-        <Txt label={t("Authorised by (optional)")} value={d.authorisedBy} onChange={on("authorisedBy")} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
@@ -394,7 +391,6 @@ function ReceiptForm({ d, set }: { d: ReceiptData; set: (f: (p: ReceiptData) => 
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={(v) => set((p) => ({ ...p, notes: v }))} />
-        <Txt label={t("Authorised by (optional)")} value={d.authorisedBy} onChange={(v) => set((p) => ({ ...p, authorisedBy: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
