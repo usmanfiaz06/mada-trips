@@ -205,6 +205,51 @@ function QrField({ value, onChange }: { value?: string; onChange: (v: string | u
     </div>
   );
 }
+// Add a destination photo shown behind the document header (airline-app style). Downscaled and JPEG-compressed
+// so it stays light on the record.
+function HeroField({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  const t = useT();
+  const [err, setErr] = useState("");
+  const onFile = (file: File) => {
+    setErr("");
+    if (!file.type.startsWith("image/")) { setErr(t("Upload a photo (PNG/JPG).")); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 1100, scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!ctx) { setErr(t("Couldn't read that image")); return; }
+      ctx.drawImage(img, 0, 0, w, h);
+      onChange(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setErr(t("Couldn't read that image")); };
+    img.src = url;
+  };
+  return (
+    <div>
+      <Lab>{t("Destination photo (optional)")}</Lab>
+      {value ? (
+        <div className="flex items-center gap-3">
+          <img src={value} alt="" className="h-12 w-20 rounded-lg border border-line object-cover" />
+          <span className="text-[12.5px] text-ink-3">{t("Shown behind the header.")}</span>
+          <button type="button" onClick={() => onChange(undefined)} className="ms-auto text-[12.5px] font-medium text-ink-3 hover:text-bad">{t("Remove")}</button>
+        </div>
+      ) : (
+        <>
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-medium text-ink-2 hover:border-ink/40 hover:text-ink">
+            <Plus className="size-4" />{t("Add destination photo")}
+            <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+          </label>
+          <p className="mt-1.5 text-[12px] text-ink-3">{t("A landscape photo of the destination — it sits behind the header under a brand tint.")}</p>
+        </>
+      )}
+      {err && <p className="mt-1.5 text-[12px] text-bad">{t(err)}</p>}
+    </div>
+  );
+}
 const AddBtn = ({ onClick, label }: { onClick: () => void; label: string }) => (
   <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2 hover:text-ink"><Plus className="size-3.5" />{label}</button>
 );
@@ -320,6 +365,7 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={(v) => set((p) => ({ ...p, notes: v }))} />
+        <HeroField value={d.heroImage} onChange={(v) => set((p) => ({ ...p, heroImage: v }))} />
         <QrField value={d.qrImage} onChange={(v) => set((p) => ({ ...p, qrImage: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
@@ -389,6 +435,7 @@ function TransportForm({ d, set }: { d: TransportData; set: (f: (p: TransportDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
+        <HeroField value={d.heroImage} onChange={(v) => set((p) => ({ ...p, heroImage: v }))} />
         <QrField value={d.qrImage} onChange={(v) => set((p) => ({ ...p, qrImage: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
@@ -422,6 +469,7 @@ function VoucherForm({ d, set }: { d: VoucherData; set: (f: (p: VoucherData) => 
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
+        <HeroField value={d.heroImage} onChange={(v) => set((p) => ({ ...p, heroImage: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>

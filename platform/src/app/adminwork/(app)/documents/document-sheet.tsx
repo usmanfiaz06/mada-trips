@@ -89,48 +89,65 @@ function RouteHero({ left, leftSub, leftTime, right, rightSub, rightTime, pill, 
 export function DocumentSheet({ type, refNo, date, data, locale = "en" }: {
   type: DocType; refNo: string; date: string; data: ItineraryData | TransportData | VoucherData | ReceiptData; locale?: string;
 }) {
-  const qr = (type === "itinerary" || type === "transport") ? (data as { qrImage?: string }).qrImage : "";
+  const d = data as { qrImage?: string; heroImage?: string };
+  const qr = (type === "itinerary" || type === "transport") ? d.qrImage : "";
+  const hero = (type === "itinerary" || type === "transport" || type === "voucher") ? d.heroImage : "";
+  const tShadow = hero ? "0 1px 3px rgba(0,0,0,0.55)" : "none";
   return (
-    <div className="sheet relative mx-auto flex flex-col bg-white shadow-card" style={{ color: INK }}>
-      {/* Header band */}
-      <div style={{ background: GREEN, padding: "15mm 16mm 13mm", color: "#fff", position: "relative", overflow: "hidden" }}>
-        {/* faint brand symbol watermark */}
-        <img src="/adminwork/symbol-sand.svg" alt="" style={{ position: "absolute", top: -46, insetInlineEnd: -40, height: 190, opacity: 0.05, pointerEvents: "none" }} />
-        <div className="flex items-center justify-between" style={{ gap: 20, position: "relative" }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img src="/adminwork/symbol-sand.svg" alt="" style={{ height: 42, width: "auto" }} />
-              <img src="/adminwork/wordmark-sand.svg" alt="Mada Trips" style={{ height: 31, width: "auto" }} />
-            </div>
-            <div style={{ marginTop: 14, fontSize: 15, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: GOLD }}>{titleFor(type, data)}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexShrink: 0 }}>
-            <div style={{ textAlign: "end" }}>
-              <HLabel>Reference</HLabel>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 2 }}>{refNo}</div>
-              <div style={{ marginTop: 9 }}><HLabel>Issued</HLabel></div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.86)", marginTop: 2 }}>{fmtD(date, locale)}</div>
-            </div>
-            {qr && (
-              <div style={{ background: "#fff", borderRadius: 10, padding: 6, flexShrink: 0 }}>
-                <img src={qr} alt="QR" style={{ width: 70, height: 70, display: "block" }} />
-                <div style={{ fontSize: 7, color: SUB, textAlign: "center", marginTop: 2, letterSpacing: "0.04em" }}>SCAN TO VERIFY</div>
+    <div className="sheet relative mx-auto flex flex-col bg-white shadow-card" style={{ color: INK, WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}>
+      {/* Header — a destination photo (when added) under a deep-green scrim, else a branded green gradient */}
+      <div style={{ position: "relative", overflow: "hidden", color: "#fff", background: "linear-gradient(130deg, #16281f 0%, #1e352d 52%, #2a473c 100%)" }}>
+        {hero && <img src={hero} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+        <div style={{ position: "absolute", inset: 0, background: hero
+          ? "linear-gradient(100deg, rgba(16,26,21,0.93) 0%, rgba(16,26,21,0.72) 52%, rgba(16,26,21,0.48) 100%)"
+          : "linear-gradient(135deg, rgba(255,255,255,0.03), rgba(0,0,0,0.14))" }} />
+        {/* brand sunburst motif, bleeding off the corner */}
+        <img src="/adminwork/symbol-sand.svg" alt="" style={{ position: "absolute", top: -58, insetInlineEnd: -52, height: 230, opacity: hero ? 0.06 : 0.09, pointerEvents: "none" }} />
+        <div style={{ position: "relative", padding: "15mm 16mm 13mm" }}>
+          <div className="flex items-center justify-between" style={{ gap: 20 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <img src="/adminwork/symbol-sand.svg" alt="" style={{ height: 42, width: "auto", filter: tShadow !== "none" ? "drop-shadow(0 1px 3px rgba(0,0,0,0.5))" : undefined }} />
+                <img src="/adminwork/wordmark-sand.svg" alt="Mada Trips" style={{ height: 31, width: "auto", filter: tShadow !== "none" ? "drop-shadow(0 1px 3px rgba(0,0,0,0.5))" : undefined }} />
               </div>
-            )}
+              <div style={{ marginTop: 14, display: "inline-block" }}>
+                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: GOLD, textShadow: tShadow }}>{titleFor(type, data)}</div>
+                <div style={{ height: 2, width: 34, background: GOLD, borderRadius: 2, marginTop: 6 }} />
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexShrink: 0 }}>
+              <div style={{ textAlign: "end", textShadow: tShadow }}>
+                <HLabel>Reference</HLabel>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 2 }}>{refNo}</div>
+                <div style={{ marginTop: 9 }}><HLabel>Issued</HLabel></div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", marginTop: 2 }}>{fmtD(date, locale)}</div>
+              </div>
+              {qr && (
+                <div style={{ background: "#fff", borderRadius: 10, padding: 6, flexShrink: 0, boxShadow: hero ? "0 2px 10px rgba(0,0,0,0.35)" : "none" }}>
+                  <img src={qr} alt="QR" style={{ width: 70, height: 70, display: "block" }} />
+                  <div style={{ fontSize: 7, color: SUB, textAlign: "center", marginTop: 2, letterSpacing: "0.04em" }}>SCAN TO VERIFY</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-      <div style={{ height: 3, background: GOLD }} />
+      {/* gold rule with two punched ticket notches */}
+      <div style={{ position: "relative", height: 3, background: `linear-gradient(90deg, ${GOLD}, #e3c488 50%, ${GOLD})` }}>
+        <span style={{ position: "absolute", top: -8, insetInlineStart: -9, width: 18, height: 18, borderRadius: 999, background: "#fff" }} />
+        <span style={{ position: "absolute", top: -8, insetInlineEnd: -9, width: 18, height: 18, borderRadius: 999, background: "#fff" }} />
+      </div>
+      {/* faint brand watermark for texture */}
+      <img src="/adminwork/symbol-green.svg" alt="" style={{ position: "absolute", insetInlineEnd: "-11%", bottom: "9%", height: 360, opacity: 0.028, pointerEvents: "none", zIndex: 0 }} />
 
       {/* Body */}
-      <div className="flex-1" style={{ padding: "22px 16mm 0" }}>
+      <div className="flex-1" style={{ padding: "22px 16mm 0", position: "relative", zIndex: 1 }}>
         {type === "itinerary" && <Itinerary d={data as ItineraryData} locale={locale} />}
         {type === "transport" && <Transport d={data as TransportData} locale={locale} />}
         {type === "voucher" && <Voucher d={data as VoucherData} locale={locale} />}
         {type === "receipt" && <Receipt d={data as ReceiptData} locale={locale} />}
       </div>
 
-      <Authorisation />
       {stampOn(type, data) && <StampImg />}
       <Footer type={type} data={data} />
     </div>
@@ -139,18 +156,6 @@ export function DocumentSheet({ type, refNo, date, data, locale = "en" }: {
 
 function stampOn(type: DocType, data: unknown): boolean {
   return !!(data as { stamp?: boolean }).stamp;
-}
-
-// Branded authorisation — the document is issued by the company, never a named individual.
-function Authorisation() {
-  return (
-    <div style={{ padding: "0 16mm", marginTop: 24 }}>
-      <div style={{ display: "inline-block" }}>
-        <div style={{ fontSize: 9, color: SUB, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase" }}>Issued &amp; authorised by</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: GREEN, marginTop: 3 }}>Mada Trips</div>
-      </div>
-    </div>
-  );
 }
 
 function Transport({ d, locale }: { d: TransportData; locale: string }) {
@@ -208,7 +213,7 @@ function Footer({ type, data }: { type: DocType; data: ItineraryData | Transport
     ? "Please present this voucher at check-in. Charges beyond those stated are settled directly with the hotel."
     : "Thank you for your business.";
   return (
-    <div style={{ marginTop: "auto", padding: "18px 16mm 16mm" }}>
+    <div style={{ marginTop: "auto", padding: "18px 16mm 16mm", position: "relative", zIndex: 1 }}>
       <div style={{ borderTop: `1px solid ${HAIR}`, paddingTop: 12, fontSize: 10, color: SUB, lineHeight: 1.7, textAlign: "center" }}>
         <div style={{ fontStyle: "italic", marginBottom: 7 }}>{note}</div>
         <span style={{ fontWeight: 600, color: GREEN }}>Mada Trips</span>{"  ·  "}{parts.join("  ·  ")}
