@@ -33,6 +33,33 @@ async function pdfModules() {
 type Item = { x: number; w: number; s: string };
 const lineOf = (arr: Item[]) => { arr.sort((a, b) => a.x - b.x); let o = "", pe: number | null = null; for (const it of arr) { if (pe !== null && it.x - pe > 1.5) o += " "; o += it.s; pe = it.x + it.w; } return o.replace(/\s+/g, " ").trim(); };
 
+/**
+ * Pull a QR code out of any ticket PDF (airline e-ticket, boarding pass, bus/train ticket): render page 1,
+ * decode a QR on it and regenerate a crisp QR encoding the same value. Returns empty strings when none is
+ * found. Used so the team can drop a carrier PDF in and have its QR carried onto the Mada ticket.
+ */
+export async function extractQrFromPdf(bytes: Uint8Array): Promise<{ value: string; image: string }> {
+  try {
+    const { pdfjs, createCanvas, CanvasFactory } = await pdfModules();
+    const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: true, CanvasFactory, isEvalSupported: false }).promise;
+    const jsQR = (await import("jsqr")).default;
+    const QRCode = (await import("qrcode")).default;
+    // Scan every page — the barcode can sit on a later page of a multi-page e-ticket.
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const vp = page.getViewport({ scale: 2 });
+      const canvas = createCanvas(Math.ceil(vp.width), Math.ceil(vp.height));
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx as unknown as CanvasRenderingContext2D, viewport: vp }).promise;
+      const idata = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const found = jsQR(idata.data as unknown as Uint8ClampedArray, idata.width, idata.height, { inversionAttempts: "attemptBoth" });
+      if (found?.data) return { value: found.data, image: await QRCode.toDataURL(found.data, { margin: 1, width: 240 }) };
+    }
+    return { value: "", image: "" };
+  } catch { return { value: "", image: "" }; }
+}
+
 export async function parseBusTicket(bytes: Uint8Array): Promise<{ ok: true; data: ParsedTicket } | { ok: false; error: string }> {
   try {
     const { pdfjs, createCanvas, CanvasFactory } = await pdfModules();

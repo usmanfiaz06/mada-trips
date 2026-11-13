@@ -28,6 +28,10 @@ const MODE_ICON: Record<TransportMode, typeof Bus> = { train: TrainFront, bus: B
 const Label = ({ children, tone = SUB }: { children: ReactNode; tone?: string }) => (
   <div style={{ color: tone, fontSize: 9, fontWeight: 600, letterSpacing: "0.09em", textTransform: "uppercase" }}>{children}</div>
 );
+// Muted caption inside the dark header band.
+const HLabel = ({ children }: { children: ReactNode }) => (
+  <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 8.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{children}</div>
+);
 const Val = ({ children }: { children: ReactNode }) => (
   <div style={{ color: INK, fontSize: 13, fontWeight: 500, marginTop: 3 }}>{children || "—"}</div>
 );
@@ -85,20 +89,34 @@ function RouteHero({ left, leftSub, leftTime, right, rightSub, rightTime, pill, 
 export function DocumentSheet({ type, refNo, date, data, locale = "en" }: {
   type: DocType; refNo: string; date: string; data: ItineraryData | TransportData | VoucherData | ReceiptData; locale?: string;
 }) {
+  const qr = (type === "itinerary" || type === "transport") ? (data as { qrImage?: string }).qrImage : "";
   return (
     <div className="sheet relative mx-auto flex flex-col bg-white shadow-card" style={{ color: INK }}>
       {/* Header band */}
-      <div style={{ background: GREEN, padding: "14mm 16mm 12mm", color: "#fff" }}>
-        <div className="flex items-start justify-between">
-          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-            <img src="/adminwork/symbol-sand.svg" alt="" style={{ height: 40, width: "auto" }} />
-            <img src="/adminwork/wordmark-sand.svg" alt="Mada Trips" style={{ height: 30, width: "auto" }} />
-          </div>
-          <div style={{ textAlign: "end" }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: GOLD }}>{titleFor(type, data)}</div>
-            <div style={{ fontSize: 11, marginTop: 5, color: "rgba(255,255,255,0.78)" }}>
-              <span style={{ fontWeight: 600, color: "#fff" }}>{refNo}</span> · {fmtD(date, locale)}
+      <div style={{ background: GREEN, padding: "15mm 16mm 13mm", color: "#fff", position: "relative", overflow: "hidden" }}>
+        {/* faint brand symbol watermark */}
+        <img src="/adminwork/symbol-sand.svg" alt="" style={{ position: "absolute", top: -46, insetInlineEnd: -40, height: 190, opacity: 0.05, pointerEvents: "none" }} />
+        <div className="flex items-center justify-between" style={{ gap: 20, position: "relative" }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img src="/adminwork/symbol-sand.svg" alt="" style={{ height: 42, width: "auto" }} />
+              <img src="/adminwork/wordmark-sand.svg" alt="Mada Trips" style={{ height: 31, width: "auto" }} />
             </div>
+            <div style={{ marginTop: 14, fontSize: 15, fontWeight: 700, letterSpacing: "0.11em", textTransform: "uppercase", color: GOLD }}>{titleFor(type, data)}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexShrink: 0 }}>
+            <div style={{ textAlign: "end" }}>
+              <HLabel>Reference</HLabel>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginTop: 2 }}>{refNo}</div>
+              <div style={{ marginTop: 9 }}><HLabel>Issued</HLabel></div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.86)", marginTop: 2 }}>{fmtD(date, locale)}</div>
+            </div>
+            {qr && (
+              <div style={{ background: "#fff", borderRadius: 10, padding: 6, flexShrink: 0 }}>
+                <img src={qr} alt="QR" style={{ width: 70, height: 70, display: "block" }} />
+                <div style={{ fontSize: 7, color: SUB, textAlign: "center", marginTop: 2, letterSpacing: "0.04em" }}>SCAN TO VERIFY</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -140,17 +158,12 @@ function Transport({ d, locale }: { d: TransportData; locale: string }) {
   const pill = [TRANSPORT_LABEL[d.mode], d.operator].filter(Boolean).join(" · ") || TRANSPORT_LABEL[d.mode];
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 18 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <RouteHero
-            left={d.fromPlace || "—"} leftTime={d.departTime ? `Departs ${d.departTime}` : ""}
-            right={d.toPlace || "—"} rightTime={d.arriveTime ? `Arrives ${d.arriveTime}` : ""}
-            leftSub={fmtD(d.date, locale)} rightSub={d.serviceNo ? `Service ${d.serviceNo}` : ""}
-            pill={pill} Icon={Icon}
-          />
-        </div>
-        {d.qrImage && <img src={d.qrImage} alt="QR" style={{ width: 92, height: 92, flexShrink: 0, border: `1px solid ${HAIR}`, borderRadius: 10, padding: 4 }} />}
-      </div>
+      <RouteHero
+        left={d.fromPlace || "—"} leftTime={d.departTime ? `Departs ${d.departTime}` : ""}
+        right={d.toPlace || "—"} rightTime={d.arriveTime ? `Arrives ${d.arriveTime}` : ""}
+        leftSub={fmtD(d.date, locale)} rightSub={d.serviceNo ? `Service ${d.serviceNo}` : ""}
+        pill={pill} Icon={Icon}
+      />
 
       <InfoStrip cells={[
         { label: "Class", value: d.travelClass },

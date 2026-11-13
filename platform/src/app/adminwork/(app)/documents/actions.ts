@@ -12,7 +12,7 @@ import {
   type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type FlightItem,
   DOC_TYPES, REF_PREFIX, TRANSPORT_LABEL, receiptTotals, money2, itineraryItems,
 } from "./types";
-import { parseBusTicket } from "@/lib/ticket-import";
+import { parseBusTicket, extractQrFromPdf } from "@/lib/ticket-import";
 
 const MAX_DATA = 200_000;
 
@@ -137,6 +137,21 @@ export async function importTicketPdf(fd: FormData): Promise<{ ok: true; data: T
     qrImage: p.qrImage || undefined,
   };
   return { ok: true, data };
+}
+
+/**
+ * Pull the QR code out of an uploaded ticket PDF (airline e-ticket, boarding pass, etc.) so it can be placed
+ * on the Mada ticket. Nothing is saved — the builder holds the returned image until the document is saved.
+ */
+export async function extractTicketQr(fd: FormData): Promise<{ ok: true; qrImage: string } | { ok: false; error: string }> {
+  await requirePerm("documents.issue");
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose a ticket PDF" };
+  if (file.size > 10 * 1024 * 1024) return { ok: false, error: "The PDF must be under 10 MB" };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const { image } = await extractQrFromPdf(bytes);
+  if (!image) return { ok: false, error: "No QR code found in this PDF — upload the QR as an image instead" };
+  return { ok: true, qrImage: image };
 }
 
 /**

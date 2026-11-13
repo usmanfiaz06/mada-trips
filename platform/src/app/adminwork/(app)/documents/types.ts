@@ -36,6 +36,7 @@ export type ItineraryData = {
   notes: string;
   authorisedBy: string;
   stamp: boolean;
+  qrImage?: string;          // data URL of a QR — extracted from an uploaded ticket, or uploaded by the team
   segments?: FlightItem[];   // legacy: documents issued before layovers became explicit items
 };
 export type VoucherData = {

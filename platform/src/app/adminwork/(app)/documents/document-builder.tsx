@@ -3,7 +3,7 @@ import { useActionState, useRef, useState, type ReactNode } from "react";
 import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus, Paperclip, FileText } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
-import { createDocument, updateDocument, importTicketPdf } from "./actions";
+import { createDocument, updateDocument, importTicketPdf, extractTicketQr } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
   type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type Pax, type LineItem,
@@ -147,6 +147,64 @@ function AttachOriginal() {
     </Card>
   );
 }
+// Add a QR code to a ticket by uploading an image of it (e.g. the one on the airline's e-ticket). The image
+// is downscaled to a small PNG data URL so it stays light on the record, then placed on the document.
+function QrField({ value, onChange }: { value?: string; onChange: (v: string | undefined) => void }) {
+  const t = useT();
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fromImage = (file: File) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 320, scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const ctx = c.getContext("2d");
+      URL.revokeObjectURL(url);
+      if (!ctx) { setErr(t("Couldn't read that image")); return; }
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+      onChange(c.toDataURL("image/png"));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setErr(t("Couldn't read that image")); };
+    img.src = url;
+  };
+  const onFile = async (file: File) => {
+    setErr("");
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (isPdf) {
+      // A carrier PDF (e.g. an airline e-ticket): pull the QR out of it on the server.
+      setBusy(true);
+      try { const fd = new FormData(); fd.append("file", file); const r = await extractTicketQr(fd); if (r.ok) onChange(r.qrImage); else setErr(r.error); }
+      catch { setErr(t("Couldn't read that PDF")); }
+      finally { setBusy(false); }
+      return;
+    }
+    if (!file.type.startsWith("image/")) { setErr(t("Upload a QR image (PNG/JPG) or a ticket PDF.")); return; }
+    fromImage(file);
+  };
+  return (
+    <div>
+      <Lab>{t("QR code (optional)")}</Lab>
+      {value ? (
+        <div className="flex items-center gap-3">
+          <img src={value} alt="QR" className="size-14 rounded-lg border border-line bg-white object-contain p-1" />
+          <span className="text-[12.5px] text-ink-3">{t("Shown on the ticket header.")}</span>
+          <button type="button" onClick={() => onChange(undefined)} className="ms-auto text-[12.5px] font-medium text-ink-3 hover:text-bad">{t("Remove")}</button>
+        </div>
+      ) : (
+        <>
+          <label className={`inline-flex items-center gap-2 rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-medium ${busy ? "opacity-60" : "cursor-pointer text-ink-2 hover:border-ink/40 hover:text-ink"}`}>
+            <Plus className="size-4" />{busy ? t("Reading…") : t("Add QR code")}
+            <input type="file" accept="image/*,application/pdf" disabled={busy} className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+          </label>
+          <p className="mt-1.5 text-[12px] text-ink-3">{t("Upload the QR as an image, or a ticket PDF (e.g. an airline e-ticket) and we'll pull the QR out.")}</p>
+        </>
+      )}
+      {err && <p className="mt-1.5 text-[12px] text-bad">{t(err)}</p>}
+    </div>
+  );
+}
 const AddBtn = ({ onClick, label }: { onClick: () => void; label: string }) => (
   <button type="button" onClick={onClick} className="inline-flex items-center gap-1 text-[12.5px] font-medium text-ink-2 hover:text-ink"><Plus className="size-3.5" />{label}</button>
 );
@@ -262,6 +320,7 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={(v) => set((p) => ({ ...p, notes: v }))} />
+        <QrField value={d.qrImage} onChange={(v) => set((p) => ({ ...p, qrImage: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
@@ -330,6 +389,7 @@ function TransportForm({ d, set }: { d: TransportData; set: (f: (p: TransportDat
       </Card>
       <Card title={t("More")}>
         <Area label={t("Notes (optional)")} value={d.notes} onChange={on("notes")} />
+        <QrField value={d.qrImage} onChange={(v) => set((p) => ({ ...p, qrImage: v }))} />
         <StampToggle on={d.stamp} set={(v) => set((p) => ({ ...p, stamp: v }))} />
       </Card>
     </>
