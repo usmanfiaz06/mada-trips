@@ -37,6 +37,7 @@ export type ItineraryData = {
   authorisedBy: string;
   stamp: boolean;
   qrImage?: string;          // data URL of a QR — extracted from an uploaded ticket, or uploaded by the team
+  heroImage?: string;        // data URL of a destination photo shown behind the header
   segments?: FlightItem[];   // legacy: documents issued before layovers became explicit items
 };
 export type VoucherData = {
@@ -48,6 +49,7 @@ export type VoucherData = {
   notes: string;
   authorisedBy: string;
   stamp: boolean;
+  heroImage?: string;        // data URL of a destination photo shown behind the header
 };
 export type LineItem = { description: string; amount: string }; // amount: SAR as typed
 export type Company = { name: string; cr: string; vat: string; address: string; phone: string; email: string };
@@ -78,6 +80,7 @@ export type TransportData = {
   authorisedBy: string;
   stamp: boolean;
   qrImage?: string; // data URL of the ticket's QR (regenerated from an imported carrier PDF)
+  heroImage?: string; // data URL of a destination photo shown behind the header
 };
 
 export type DocData = ItineraryData | TransportData | VoucherData | ReceiptData;
