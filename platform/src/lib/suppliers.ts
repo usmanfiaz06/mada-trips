@@ -4,6 +4,7 @@ import { schema, type Tx } from "@/db";
 import { audit } from "./audit";
 import { createApproval } from "./approvals";
 import { accountNameTx, isValidAccount } from "./accounts";
+import { portalById } from "./portals";
 import { sar } from "./money";
 import { riyadhDate } from "./dates";
 
@@ -13,9 +14,10 @@ type Booking = typeof schema.bookings.$inferSelect;
  * Record how a booking's supplier cost is being settled.
  *  - bank: paid from a company account now → cash out of that bank, booking marked paid.
  *  - partner: a partner fronted it → the other directors must approve; once they do, it's owed back to that partner.
+ *  - portal: drawn from a B2B platform's balance (TBO, iTrip) → a director must approve before it draws the portal.
  */
 export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
-  source: "bank" | "partner"; account?: string | null; partnerId?: string | null; method?: string; reference?: string | null; recordedBy: string;
+  source: "bank" | "partner" | "portal"; account?: string | null; partnerId?: string | null; portalId?: string | null; method?: string; reference?: string | null; recordedBy: string;
 }) {
   if (b.netCost <= 0) throw new Error("This booking has no supplier cost to pay");
   if (b.supplierPaid) throw new Error("The supplier is already paid for this booking");
@@ -23,6 +25,16 @@ export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
   if (openSp) throw new Error("A supplier payment for this booking is already waiting for approval");
   const amount = b.netCost;
   const method = opts.method === "cash" ? "cash" : "transfer";
+
+  if (opts.source === "portal") {
+    const portal = opts.portalId ? await portalById(tx, opts.portalId) : undefined;
+    if (!portal || !portal.active) throw new Error("Choose which portal the cost was booked through");
+    const [sp] = await tx.insert(schema.supplierPayments).values({ bookingId: b.id, supplier: b.supplier ?? "—", amount, source: "portal", portalId: portal.id, method, reference: opts.reference ?? null, status: "pending_approval", paidOn: riyadhDate(), recordedBy: opts.recordedBy }).returning();
+    const req = await createApproval(tx, { kind: "supplier", entityType: "booking", entityId: b.id, title: `Pay supplier ${b.supplier ?? ""} from ${portal.name} · ${b.ref}`, amount, reason: `Supplier cost for ${b.ref} drawn from ${portal.name}`, requestedBy: opts.recordedBy, payload: { portalId: portal.id } });
+    await tx.update(schema.supplierPayments).set({ approvalId: req.id }).where(eq(schema.supplierPayments.id, sp.id));
+    await audit(tx, { actorId: opts.recordedBy, action: "supplier.requested", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Recorded that ${b.ref} was booked through ${portal.name} (SAR ${sar(amount)}); sent for approval` });
+    return { pending: true };
+  }
 
   if (opts.source === "bank") {
     if (!opts.account || !(await isValidAccount(opts.account))) throw new Error("Choose which bank paid the supplier");

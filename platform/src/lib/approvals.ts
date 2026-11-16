@@ -9,7 +9,7 @@ import { sar } from "./money";
 import { riyadhDate } from "./dates";
 import type { Permission } from "./permissions";
 
-export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "sale_edit" | "commission";
+export type ApprovalKind = "credit" | "expense" | "refund" | "credit_limit" | "settlement" | "governance" | "supplier" | "bsp" | "cash" | "void" | "sale_edit" | "commission" | "portal";
 
 type ReqLike = { approverPool: string; requestedBy: string; kind: string; entityId: string; payload?: unknown };
 
@@ -23,7 +23,7 @@ async function conflictedPartner(tx: Tx, r: ReqLike): Promise<string | null> {
     return e?.by === "partner" ? e.p : null;
   }
   const p = r.payload as { partnerId?: string } | null | undefined;
-  return (r.kind === "governance" || r.kind === "supplier" || r.kind === "bsp") && p?.partnerId ? p.partnerId : null;
+  return (r.kind === "governance" || r.kind === "supplier" || r.kind === "bsp" || r.kind === "portal") && p?.partnerId ? p.partnerId : null;
 }
 
 /**
@@ -123,6 +123,10 @@ export async function createApproval(tx: Tx, input: CreateInput) {
     pool = "directors"; required = 1; rule = "Correcting an issued sale's figures: one director approves";
   } else if (input.kind === "commission") {
     pool = "directors"; required = 1; rule = "Paying a team member's commission: one director approves";
+  } else if (input.kind === "portal") {
+    pool = "directors";
+    if (input.amount < s.cashMoveLimit) { required = 1; rule = `Portal deposit/adjustment under SAR ${sar(s.cashMoveLimit)}: one director approves`; }
+    else { requiresAll = true; rule = `Portal deposit/adjustment of SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
@@ -130,7 +134,7 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   if (requiresAll) required = await allDirectorsRequired(tx, probe);
   // A partner reimbursement recorded by another partner leaves fewer uninvolved directors (neither the one who
   // recorded it nor the one being repaid may vote). Then every director who isn't involved must approve.
-  if ((input.kind === "expense" || input.kind === "supplier" || input.kind === "bsp") && pool === "directors" && eligible.length >= 1 && eligible.length < required) {
+  if ((input.kind === "expense" || input.kind === "supplier" || input.kind === "bsp" || input.kind === "portal") && pool === "directors" && eligible.length >= 1 && eligible.length < required) {
     required = eligible.length;
     rule = "Partner reimbursement: every director not involved approves";
   }
@@ -267,6 +271,10 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
         } else if (sp?.source === "partner" && sp.partnerId) {
           // The partner fronted the cost; the supplier kept this much, so the partner is still owed it.
           await tx.insert(schema.ledgerEntries).values({ partnerId: sp.partnerId, type: "expense", amount: supplierFee, description: `Supplier cancellation fee · ${b.ref}`, sourceType: "refund_fee", sourceId: b.id, entryDate: riyadhDate(), createdBy: actorId });
+        } else if (sp?.source === "portal" && sp.portalId) {
+          // The cost was drawn from a B2B portal; the platform kept this much, so it stays out of the portal balance.
+          const { recordPortalPenalty } = await import("./portals");
+          await recordPortalPenalty(tx, { id: b.id, ref: b.ref }, supplierFee, actorId, req.requestedBy);
         }
         await audit(tx, { actorId: null, action: "refund.supplier_fee", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Supplier kept SAR ${sar(supplierFee)} on ${b.ref}` });
       }
@@ -329,6 +337,11 @@ async function applyOutcome(tx: Tx, req: Req, outcome: "approved" | "rejected" |
       await finalizeCommissionPayment(tx, req, ok, actorId);
       return;
     }
+    case "portal": {
+      const { finalizePortalEntry } = await import("./portals");
+      await finalizePortalEntry(tx, req, ok, actorId);
+      return;
+    }
   }
 }
 
@@ -355,7 +368,7 @@ export async function pendingForUser(tx: Tx, userId: string) {
     if (votedSet.has(p.id)) continue;
     let conflict: string | null = null;
     if (p.kind === "expense") conflict = expenseConflict.get(p.entityId) ?? null;
-    else if (p.kind === "governance" || p.kind === "supplier" || p.kind === "bsp") conflict = (p.payload as { partnerId?: string } | null)?.partnerId ?? null;
+    else if (p.kind === "governance" || p.kind === "supplier" || p.kind === "bsp" || p.kind === "portal") conflict = (p.payload as { partnerId?: string } | null)?.partnerId ?? null;
     if (eligibleFrom(users, p, partnerOf.get(p.requestedBy) ?? null, conflict).some((e) => e.id === userId)) out.push(p);
   }
   return out;

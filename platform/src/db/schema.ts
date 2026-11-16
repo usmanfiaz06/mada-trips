@@ -207,9 +207,10 @@ export const supplierPayments = pgTable("supplier_payments", {
   bookingId: uuid("booking_id").notNull().references(() => bookings.id),
   supplier: text("supplier").notNull(),
   amount: money("amount").notNull(),
-  source: text("source").notNull(), // bank | partner
-  account: text("account"),         // retail | corporate, when source = bank
+  source: text("source").notNull(), // bank | partner | portal
+  account: text("account"),         // bank key, when source = bank
   partnerId: uuid("partner_id").references(() => partners.id), // when source = partner
+  portalId: uuid("portal_id").references((): AnyPgColumn => portals.id), // when source = portal (a B2B platform)
   method: text("method").notNull().default("transfer"), // cash | transfer
   status: text("status").notNull().default("settled"),  // settled | pending_approval
   approvalId: uuid("approval_id"),
@@ -217,7 +218,44 @@ export const supplierPayments = pgTable("supplier_payments", {
   paidOn: date("paid_on").notNull(),
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),
-}, (t) => [index("supplier_payments_booking_idx").on(t.bookingId), index("supplier_payments_account_idx").on(t.account)]);
+}, (t) => [index("supplier_payments_booking_idx").on(t.bookingId), index("supplier_payments_account_idx").on(t.account), index("supplier_payments_portal_idx").on(t.portalId)]);
+
+// A B2B supplier platform we buy travel through (TBO, iTrip, …). It behaves like an account with a running
+// balance (derived, never stored): positive = prepaid funds we hold with the platform, negative = credit
+// we've used and owe them. creditLimit caps how far negative the balance may go.
+export const portals = pgTable("portals", {
+  id: id(),
+  name: text("name").notNull(),
+  creditLimit: money("credit_limit").notNull().default(0), // how much credit the platform extends (0 = prepaid only)
+  active: boolean("active").notNull().default(true),
+  notes: text("notes"),
+  sort: integer("sort").notNull().default(0),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+});
+
+// Every money event on a portal except a sale's usage (that lives on supplier_payments with source=portal):
+//  - fund:       a deposit from a company bank or a partner, or a repayment of used credit (+balance).
+//  - penalty:    a cancellation fee the platform kept on a refunded booking (−balance; a real cost).
+//  - adjustment: a manual correction (±balance).
+export const portalLedger = pgTable("portal_ledger", {
+  id: id(),
+  portalId: uuid("portal_id").notNull().references(() => portals.id),
+  kind: text("kind").notNull(),             // fund | penalty | adjustment
+  direction: text("direction").notNull(),   // in (+balance) | out (−balance)
+  amount: money("amount").notNull(),
+  source: text("source"),                   // bank | partner, for a fund
+  account: text("account"),                 // bank key, when source = bank
+  partnerId: uuid("partner_id").references(() => partners.id), // when source = partner
+  bookingId: uuid("booking_id").references(() => bookings.id), // the refunded booking, for a penalty
+  status: text("status").notNull().default("settled"), // settled | pending_approval | cancelled
+  approvalId: uuid("approval_id"),
+  reference: text("reference"),
+  note: text("note"),
+  entryDate: date("entry_date").notNull(),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("portal_ledger_portal_idx").on(t.portalId), index("portal_ledger_status_idx").on(t.status)]);
 
 // A commission payout to one team member for the sales they made in a period. Decided by a director, then
 // paid out of a company bank. Every sale it covers is stamped (bookings.commissionPaymentId) so it's paid once.

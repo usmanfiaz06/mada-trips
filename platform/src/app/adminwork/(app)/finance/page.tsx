@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { Check, Clock, Landmark } from "lucide-react";
 import { db, schema } from "@/db";
 import { requirePerm, can } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { bankMovements, cashPosition } from "@/lib/finance";
+import { portalBalances } from "@/lib/portals";
 import { bspClosings } from "@/lib/bsp";
 import { getSettings } from "@/lib/settings";
 import { METHOD } from "@/lib/labels";
@@ -37,6 +39,7 @@ export default async function FinancePage() {
   const accName = await accountNames();
   const bspRows = await bspClosings(db, s, 6);
   const partnerList = canRec ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
+  const portals = await portalBalances();
 
   return (
     <>
@@ -63,6 +66,21 @@ export default async function FinancePage() {
           </SunGauge>
         </Card>
       </div>
+
+      {portals.length > 0 && (
+        <Card className="mt-4">
+          <CardHead title={t("B2B portals")} hint={t("Prepaid funds and credit lines held with supplier platforms (TBO, iTrip).")} action={<Link href="/adminwork/portals" className="text-[13px] text-ink-3 hover:text-ink">{t("Manage")}</Link>} />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {portals.map((p) => (
+              <div key={p.id} className="rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
+                <div className="flex items-center justify-between text-[13px]"><span>{p.name}</span>{p.balance < 0 ? <span className="text-[11px] text-warn">{t("credit used")}</span> : null}</div>
+                <div className="num mt-1 text-[22px]" dir="ltr">{sar(Math.abs(p.balance))}</div>
+                <div className="mt-1 text-[11.5px] text-ink-3">{p.creditLimit ? t("{v} credit line · {h} spendable", { v: sar(p.creditLimit), h: sar(p.headroom) }) : t("prepaid")}{p.pending > 0 ? ` · ${t("{v} pending", { v: sar(p.pending) })}` : ""}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
         <Card pad={false}>
