@@ -158,10 +158,10 @@ export async function parseAirlineTicket(bytes: Uint8Array): Promise<{ ok: true;
       lastArr = f.arriveDate || lastArr;
     }
 
-    if (!items.length && !bookingRef) return { ok: false, error: "Couldn't read this e-ticket. Fill it in manually" };
+    if (!items.length && !bookingRef) return { ok: false, error: `Couldn't read this e-ticket (read ${lines.length} lines of text). Fill it in manually` };
     return { ok: true, data: { bookingRef, ticketNumbers: tickets.join("\n"), passengers, items } };
-  } catch {
-    return { ok: false, error: "Couldn't read this e-ticket. Fill it in manually" };
+  } catch (e) {
+    return { ok: false, error: `Couldn't read this e-ticket: ${e instanceof Error ? e.message : String(e)}. Fill it in manually` };
   }
 }
 
