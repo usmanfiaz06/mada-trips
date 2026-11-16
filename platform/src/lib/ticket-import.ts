@@ -76,8 +76,10 @@ export type ParsedItinerary = { bookingRef: string; ticketNumbers: string; passe
 
 // Reconstruct positioned text lines across every page of a PDF (top-to-bottom, gap-aware left-to-right).
 async function pdfLines(bytes: Uint8Array): Promise<string[]> {
-  const { pdfjs } = await pdfModules();
-  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: true, isEvalSupported: false }).promise;
+  const { pdfjs, CanvasFactory } = await pdfModules();
+  // Pass our CanvasFactory even for text-only extraction: pdfjs's default factory needs a browser `document`
+  // and throws in the serverless build, which is why this worked in dev but failed in production.
+  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: true, isEvalSupported: false, CanvasFactory }).promise;
   const lines: string[] = [];
   for (let pi = 1; pi <= doc.numPages; pi++) {
     const page = await doc.getPage(pi);
