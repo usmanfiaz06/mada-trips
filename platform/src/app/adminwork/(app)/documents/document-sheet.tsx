@@ -228,7 +228,9 @@ function Itinerary({ d, locale }: { d: ItineraryData; locale: string }) {
   const items = itineraryItems(d);
   const flights = items.filter((it): it is FlightItem => it.kind === "flight");
   const first = flights[0], last = flights[flights.length - 1];
+  const roundTrip = items.some((it) => it.kind === "divider") || (!!first && !!last && !!first.fromCode && first.fromCode === last.toCode && flights.length > 1);
   const stops = Math.max(0, flights.length - 1);
+  const pill = roundTrip ? "Round trip" : stops === 0 ? "Direct" : `${stops} stop${stops > 1 ? "s" : ""}`;
   return (
     <div>
       {first && (
@@ -236,7 +238,7 @@ function Itinerary({ d, locale }: { d: ItineraryData; locale: string }) {
           big
           left={first.fromCode || "—"} leftSub={[first.fromCity, fmtD(first.departDate, locale)].filter(Boolean).join(" · ")} leftTime={first.departTime}
           right={last.toCode || "—"} rightSub={[last.toCity, fmtD(last.arriveDate, locale)].filter(Boolean).join(" · ")} rightTime={last.arriveTime}
-          pill={stops === 0 ? "Direct" : `${stops} stop${stops > 1 ? "s" : ""}`} Icon={Plane}
+          pill={pill} Icon={Plane}
         />
       )}
 
