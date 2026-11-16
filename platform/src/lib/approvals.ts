@@ -124,9 +124,7 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   } else if (input.kind === "commission") {
     pool = "directors"; required = 1; rule = "Paying a team member's commission: one director approves";
   } else if (input.kind === "portal") {
-    pool = "directors";
-    if (input.amount < s.cashMoveLimit) { required = 1; rule = `Portal deposit/adjustment under SAR ${sar(s.cashMoveLimit)}: one director approves`; }
-    else { requiresAll = true; rule = `Portal deposit/adjustment of SAR ${sar(s.cashMoveLimit)} or more: all directors must agree`; }
+    pool = "directors"; required = 1; rule = "Portal deposit/adjustment: one director approves";
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
