@@ -148,20 +148,24 @@ export async function settleBsp(_: ActionState, fd: FormData): Promise<ActionSta
 
 export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await requirePerm("finance.reconcile");
-  const account = str(fd, "account"), kind = str(fd, "kind");
+  const account = str(fd, "account");
+  // A deposit the bank gave us (card/account cashback or reward) is money in, but it's income — not a
+  // partner's cash — so it's recorded as its own kind and the partner attribution is dropped.
+  const isCashback = str(fd, "kind") === "deposit" && str(fd, "cashback") === "on";
+  const kind = isCashback ? "cashback" : str(fd, "kind");
   const date = str(fd, "date") || riyadhDate();
   if (!(await isValidAccount(account))) return { error: "Choose the bank account" };
-  if (!["deposit", "withdrawal", "adjustment"].includes(kind)) return { error: "Choose deposit or withdrawal" };
+  if (!["deposit", "withdrawal", "adjustment", "cashback"].includes(kind)) return { error: "Choose deposit or withdrawal" };
   if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
   try {
     const amount = toHalalas(str(fd, "amount"));
     if (amount <= 0) return { error: "Enter an amount" };
-    const direction = kind === "deposit" ? "in" as const : "out" as const;
+    const direction = kind === "withdrawal" || kind === "adjustment" ? "out" as const : "in" as const;
     const note = optStr(fd, "note")?.slice(0, 200) ?? null;
-    const partnerId = await validPartner(optStr(fd, "partnerId"));
+    const partnerId = isCashback ? null : await validPartner(optStr(fd, "partnerId"));
     const names = await accountNames();
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
-      `${kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${names[account] ?? account} · SAR ${sar(amount)}`,
+      `${isCashback ? "Cashback into" : kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${names[account] ?? account} · SAR ${sar(amount)}`,
       { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };

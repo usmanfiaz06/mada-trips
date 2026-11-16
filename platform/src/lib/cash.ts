@@ -29,7 +29,7 @@ export async function applyCashMove(tx: Tx, req: Req, actorId: string) {
   if (p.op === "txn") {
     await tx.insert(schema.bankTransactions).values({ account: p.account, direction: p.direction, kind: p.kind, amount: p.amount, note: p.note, partnerId: p.partnerId ?? null, txnDate: p.date, recordedBy: req.requestedBy });
     await audit(tx, { actorId: null, action: `bank.${p.kind}`, entityType: "bank", entityRef: nm(p.account),
-      summary: `${req.ref} approved: ${p.kind === "deposit" ? "deposit into" : "withdrawal from"} ${nm(p.account)} SAR ${sar(p.amount)}${by}${p.note ? ` · ${p.note}` : ""}` });
+      summary: `${req.ref} approved: ${p.kind} ${p.direction === "in" ? "into" : "from"} ${nm(p.account)} SAR ${sar(p.amount)}${by}${p.note ? ` · ${p.note}` : ""}` });
     return;
   }
   await tx.insert(schema.bankTransactions).values([

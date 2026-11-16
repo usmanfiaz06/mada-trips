@@ -55,7 +55,7 @@ export type PeriodReport = {
   start: string; end: string;
   pl: {
     revenue: number; directCost: number; grossProfit: number;
-    feesEarned: number; feesLost: number;
+    feesEarned: number; feesLost: number; cashback: number;
     expenses: { category: string; total: number }[]; expensesTotal: number;
     commissions: number;
     netProfit: number;
@@ -111,6 +111,9 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     .where(and(eq(schema.portalLedger.kind, "penalty"), eq(schema.portalLedger.status, "settled"), gte(schema.portalLedger.entryDate, start), lte(schema.portalLedger.entryDate, end))))[0].total;
   const feesEarned = feeIn;
   const feesLost = feeOutBank + feeOutLedger + feeOutPortal;
+  // Cashback / bank rewards credited in the window — real income, not a deposit.
+  const cashback = (await q.select({ total: sum }).from(schema.bankTransactions)
+    .where(and(eq(schema.bankTransactions.kind, "cashback"), eq(schema.bankTransactions.direction, "in"), gte(schema.bankTransactions.txnDate, start), lte(schema.bankTransactions.txnDate, end))))[0].total;
 
   // Overheads: approved, non-startup expenses dated in the window (partner-paid included — still a cost).
   const expRows = await q.select({ category: schema.expenses.category, total: sum })
@@ -128,7 +131,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
   const refundCount = (await q.select({ n: sql<number>`count(*)::int` }).from(schema.approvalRequests)
     .where(and(eq(schema.approvalRequests.kind, "refund"), eq(schema.approvalRequests.status, "approved"), gte(schema.approvalRequests.decidedAt, sql`${start}::date`), lte(schema.approvalRequests.decidedAt, sql`${end}::date + 1`))))[0].n;
 
-  const netProfit = grossProfit + feesEarned - feesLost - expensesTotal - commissions;
+  const netProfit = grossProfit + feesEarned + cashback - feesLost - expensesTotal - commissions;
   const afterStartup = netProfit - startupCosts;
 
   // ── Cash flow ──────────────────────────────────────────────────────────────
@@ -170,6 +173,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     add(r.account, r.direction as "in" | "out", r.total);
     if (r.kind === "refund_fee") continue; // counted as fees below
     if (r.kind === "commission") { commissionsPaid += r.total; continue; } // its own out row
+    if (r.kind === "cashback") continue; // counted as income above, shown as its own flow row
     if (r.direction === "in") { if (r.kind === "transfer") transfersIn += r.total; else deposits += r.total; }
     else { if (r.kind === "transfer") transfersOut += r.total; else withdrawals += r.total; }
   }
@@ -193,6 +197,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     { key: "deposits", amount: deposits },
     { key: "transfersIn", amount: transfersIn },
     { key: "feesKept", amount: feeIn },
+    { key: "cashback", amount: cashback },
   ].filter((r) => r.amount > 0);
   const outRows = [
     { key: "supplier", amount: supplierTotal },
@@ -212,7 +217,7 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
 
   return {
     start, end,
-    pl: { revenue, directCost, grossProfit, feesEarned, feesLost, expenses, expensesTotal, commissions, netProfit, startupCosts, afterStartup, salesCount: sales.length, refundCount },
+    pl: { revenue, directCost, grossProfit, feesEarned, feesLost, cashback, expenses, expensesTotal, commissions, netProfit, startupCosts, afterStartup, salesCount: sales.length, refundCount },
     flow: { in: inRows, out: outRows, totalIn, totalOut, net: totalIn - totalOut, byAccount },
   };
 }

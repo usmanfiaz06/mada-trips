@@ -131,7 +131,7 @@ export async function collections(q: Q, opts: { team?: string } = {}) {
   return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
 }
 
-export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer" | "portal"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer" | "portal" | "cashback"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
 
 /** Money in and out of one bank account, most recent first — the account's statement. */
 export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
