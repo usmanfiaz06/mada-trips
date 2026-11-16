@@ -12,7 +12,7 @@ export async function addPortalAction(_: ActionState, fd: FormData): Promise<Act
   try {
     await db.transaction((tx) => addPortal(tx, { name: str(fd, "name"), creditLimit: toHalalas(str(fd, "creditLimit") || "0"), notes: optStr(fd, "notes"), createdBy: u.id }));
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/portals");
+  revalidatePath("/adminwork", "layout");
   return { ok: "Portal added" };
 }
 
@@ -28,7 +28,7 @@ export async function editPortalAction(_: ActionState, fd: FormData): Promise<Ac
       notes: optStr(fd, "notes"),
     }, u.id));
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/portals");
+  revalidatePath("/adminwork", "layout");
   return { ok: "Saved" };
 }
 
@@ -43,7 +43,7 @@ export async function depositAction(_: ActionState, fd: FormData): Promise<Actio
       amount: toHalalas(str(fd, "amount")), reference: optStr(fd, "reference"), note: optStr(fd, "note"), recordedBy: u.id,
     }));
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/portals");
+  revalidatePath("/adminwork", "layout");
   return { ok: "Deposit recorded — sent to the directors to approve" };
 }
 
@@ -55,6 +55,6 @@ export async function adjustAction(_: ActionState, fd: FormData): Promise<Action
   try {
     await db.transaction((tx) => recordAdjustment(tx, { portalId, direction, amount: toHalalas(str(fd, "amount")), note: str(fd, "note"), recordedBy: u.id }));
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork/portals");
+  revalidatePath("/adminwork", "layout");
   return { ok: "Adjustment recorded — sent to the directors to approve" };
 }
