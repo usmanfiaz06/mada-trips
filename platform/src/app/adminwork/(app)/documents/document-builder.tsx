@@ -3,7 +3,7 @@ import { useActionState, useRef, useState, type ReactNode } from "react";
 import { Plane, Hotel, ReceiptText, Printer, Plus, Trash2, Clock, Undo2, Bus, Paperclip, FileText } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { AIRLINES } from "@/lib/travel-data";
-import { createDocument, updateDocument, importTicketPdf, extractTicketQr } from "./actions";
+import { createDocument, updateDocument, importTicketPdf, importAirlinePdf, extractTicketQr } from "./actions";
 import { DocumentSheet } from "./document-sheet";
 import {
   type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type Pax, type LineItem,
@@ -285,8 +285,37 @@ function ItineraryForm({ d, set }: { d: ItineraryData; set: (f: (p: ItineraryDat
   const addReturn = () => setItems((arr) => [...arr, returnDivider()]);
   const flightCount = d.items.filter((x) => x.kind === "flight").length;
 
+  const [importing, setImporting] = useState(false);
+  const [importErr, setImportErr] = useState("");
+  const onImport = async (file: File) => {
+    setImporting(true); setImportErr("");
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const r = await importAirlinePdf(fd);
+      if (r.ok) set((p) => ({
+        ...p,
+        bookingRef: r.data.bookingRef || p.bookingRef,
+        ticketNumbers: r.data.ticketNumbers || p.ticketNumbers,
+        passengers: r.data.passengers?.length ? r.data.passengers : p.passengers,
+        items: r.data.items?.length ? r.data.items : p.items,
+      }));
+      else setImportErr(r.error);
+    } catch { setImportErr(t("Couldn't read this e-ticket. Fill it in manually.")); }
+    finally { setImporting(false); }
+  };
+
   return (
     <>
+      <div className="rounded-2xl border border-dashed border-line-strong bg-sunken/40 p-3.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-bg hover:opacity-85">
+            {importing ? t("Reading…") : t("Import e-ticket PDF")}
+            <input type="file" accept="application/pdf" className="sr-only" disabled={importing} onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
+          </label>
+          <span className="text-[12px] text-ink-3">{t("Upload an airline e-ticket PDF (iTrip / CheckMyTrip and similar) to auto-fill passengers, flights, PNR and ticket numbers. Review before saving.")}</span>
+        </div>
+        {importErr && <p className="mt-2 text-[12px] text-bad">{t(importErr)}</p>}
+      </div>
       <Card title={t("Booking")}>
         <Txt label={t("Booking reference (PNR)")} value={d.bookingRef} onChange={(v) => set((p) => ({ ...p, bookingRef: v }))} placeholder="e.g. QX7F2P" />
         <Area label={t("Ticket number(s) — one per line")} value={d.ticketNumbers} onChange={(v) => set((p) => ({ ...p, ticketNumbers: v }))} placeholder="065-1234567890" />

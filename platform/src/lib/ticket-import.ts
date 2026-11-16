@@ -1,4 +1,5 @@
 import "server-only";
+import { AIRPORTS, AIRLINES } from "@/lib/travel-data";
 
 // Read a SAPTCO / SAT bus e-ticket PDF: pull out the trip details and the QR code, so a Mada-branded
 // transport ticket can be pre-filled (the user reviews and saves). SAT-templated for now; other operators
@@ -58,6 +59,108 @@ export async function extractQrFromPdf(bytes: Uint8Array): Promise<{ value: stri
     }
     return { value: "", image: "" };
   } catch { return { value: "", image: "" }; }
+}
+
+/* ───────────────────────── Airline e-ticket import ───────────────────────── */
+
+// A flight leg / journey divider parsed from an e-ticket, shaped to the itinerary builder's items.
+export type ParsedFlight = {
+  kind: "flight"; airline: string; airlineCode: string; flightNo: string;
+  fromCode: string; fromCity: string; toCode: string; toCity: string;
+  fromTerminal: string; toTerminal: string;
+  departDate: string; departTime: string; arriveDate: string; arriveTime: string;
+  cabin: string; baggage: string;
+};
+export type ParsedItItem = ParsedFlight | { kind: "divider"; label: string };
+export type ParsedItinerary = { bookingRef: string; ticketNumbers: string; passengers: { name: string; kind: string }[]; items: ParsedItItem[] };
+
+// Reconstruct positioned text lines across every page of a PDF (top-to-bottom, gap-aware left-to-right).
+async function pdfLines(bytes: Uint8Array): Promise<string[]> {
+  const { pdfjs } = await pdfModules();
+  const doc = await pdfjs.getDocument({ data: bytes, useSystemFonts: true, isEvalSupported: false }).promise;
+  const lines: string[] = [];
+  for (let pi = 1; pi <= doc.numPages; pi++) {
+    const page = await doc.getPage(pi);
+    const tc = await page.getTextContent();
+    const rows = new Map<number, Item[]>();
+    for (const it of tc.items as { str?: string; transform: number[]; width: number }[]) {
+      if (!it.str) continue;
+      const y = Math.round(it.transform[5]);
+      (rows.get(y) ?? rows.set(y, []).get(y)!).push({ x: it.transform[4], w: it.width, s: it.str });
+    }
+    for (const y of [...rows.keys()].sort((a, b) => b - a)) { const l = lineOf(rows.get(y)!); if (l) lines.push(l); }
+  }
+  return lines;
+}
+
+const norm = (s: string) => (s || "").toLowerCase().replace(/international|intl|airport|[().]/g, "").replace(/\s+/g, " ").trim();
+// Resolve a city + airport name (as printed on the ticket) to an IATA code using the app's airport list.
+function airportCode(city: string, apName: string): string {
+  const c = (city || "").trim().toLowerCase();
+  const cands = AIRPORTS.filter((a) => a.city.toLowerCase() === c);
+  if (cands.length === 1) return cands[0].code;
+  const n = norm(apName);
+  if (cands.length > 1) {
+    const m = cands.find((a) => norm(a.name).split(" ").some((t) => t.length > 3 && n.includes(t)));
+    return (m ?? cands[0]).code;
+  }
+  const byName = AIRPORTS.find((a) => { const an = norm(a.name); return an && an.split(" ").filter((t) => t.length > 3).some((t) => n.includes(t)); });
+  return byName?.code ?? "";
+}
+
+/**
+ * Read an airline e-ticket / itinerary PDF (Amadeus "CheckMyTrip" style, as issued by iTrip and many B2B
+ * agencies) and return a pre-filled itinerary for the builder: PNR, ticket numbers, passengers and each
+ * flight leg. Nothing is saved — the user reviews and saves. Other layouts return what can be read.
+ */
+export async function parseAirlineTicket(bytes: Uint8Array): Promise<{ ok: true; data: ParsedItinerary } | { ok: false; error: string }> {
+  try {
+    const lines = await pdfLines(bytes);
+    const all = lines.join("\n");
+
+    const bookingRef = (all.match(/Booking ref:\s*([A-Z0-9]{5,7})/i) || all.match(/Booking Reference[\s\S]{0,40}?:\s*([A-Z0-9]{5,7})/i) || all.match(/\bPNR[:\s]+([A-Z0-9]{6})\b/i) || [])[1] || "";
+    const tickets = [...new Set([...all.matchAll(/\b(\d{3}-\d{10})\b/g)].map((m) => m[1]))];
+
+    const stripTitle = (s: string) => s.replace(/^(Mr|Mrs|Ms|Mstr|Master|Miss|Dr)\.?\s+/i, "").trim();
+    const pax = new Set<string>();
+    const trav = all.match(/^Traveler\s+(.+?)(?:\s+Agency)?$/mi); if (trav) pax.add(trav[1]);
+    for (const m of all.matchAll(/\bfor\s+(Mr|Mrs|Ms|Mstr|Master|Miss|Dr)\.?\s+([A-Z][A-Za-z .'-]+?)(?:\s*$|\s{2})/gmi)) pax.add(`${m[1]} ${m[2]}`.trim());
+    const passengers = [...pax].map((n) => ({ name: stripTitle(n), kind: "Adult" })).filter((p) => p.name.length > 1);
+
+    const items: ParsedItItem[] = [];
+    let lastArr: string | null = null, curYear = new Date().getFullYear();
+    const dateHdr = /^(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\s+\d{1,2}\s+[A-Za-z]+\s+(\d{4})$/i;
+    const segLine = /^(.+?)\s+([A-Z][A-Z0-9])\s?(\d{1,4})$/;
+    const legRe = (label: string) => new RegExp(`^${label}\\s+(\\d{1,2})\\s+([A-Za-z]+)\\s+(\\d{2}:\\d{2})\\s+(.+?),\\s*\\(([^)]+)\\)(?:[^T]*Terminal:\\s*(\\S+))?`);
+    const mk = (d: RegExpMatchArray | null | undefined) => d ? `${curYear}-${String(MONTHS[d[2].toLowerCase()] ?? 0).padStart(2, "0")}-${String(+d[1]).padStart(2, "0")}` : "";
+    for (let i = 0; i < lines.length; i++) {
+      const dh = lines[i].match(dateHdr); if (dh) { curYear = +dh[1]; continue; }
+      const sl = lines[i].match(segLine);
+      if (!sl || !lines.slice(i + 1, i + 4).some((l) => /^Departure /.test(l))) continue;
+      const [, airlineText, code, num] = sl;
+      const win = lines.slice(i, i + 12);
+      const dep = (win.find((l) => /^Departure /.test(l)) || "").match(legRe("Departure"));
+      const arr = (win.find((l) => /^Arrival /.test(l)) || "").match(legRe("Arrival"));
+      const cabin = (win.find((l) => /^Class /.test(l)) || "").replace(/^Class\s+/, "").replace(/\s*\([A-Z]\)\s*$/, "").trim();
+      const baggage = ((win.find((l) => /^Baggage allowance /.test(l)) || "").match(/^Baggage allowance\s+(.+?)\s+for\b/) || [])[1] || "";
+      const al = AIRLINES.find((a) => a.code === code);
+      const f: ParsedFlight = {
+        kind: "flight", airline: al?.name ?? airlineText, airlineCode: code, flightNo: `${code} ${num}`,
+        fromCode: dep ? airportCode(dep[4], dep[5]) : "", fromCity: dep?.[4] ?? "", toCode: arr ? airportCode(arr[4], arr[5]) : "", toCity: arr?.[4] ?? "",
+        fromTerminal: dep?.[6] ?? "", toTerminal: arr?.[6] ?? "",
+        departDate: mk(dep), departTime: dep?.[3] ?? "", arriveDate: mk(arr), arriveTime: arr?.[3] ?? "",
+        cabin: cabin || "Economy", baggage,
+      };
+      if (lastArr && f.departDate && f.departDate > lastArr && (Date.parse(f.departDate) - Date.parse(lastArr)) / 864e5 >= 1) items.push({ kind: "divider", label: "Return" });
+      items.push(f);
+      lastArr = f.arriveDate || lastArr;
+    }
+
+    if (!items.length && !bookingRef) return { ok: false, error: "Couldn't read this e-ticket. Fill it in manually" };
+    return { ok: true, data: { bookingRef, ticketNumbers: tickets.join("\n"), passengers, items } };
+  } catch {
+    return { ok: false, error: "Couldn't read this e-ticket. Fill it in manually" };
+  }
 }
 
 export async function parseBusTicket(bytes: Uint8Array): Promise<{ ok: true; data: ParsedTicket } | { ok: false; error: string }> {

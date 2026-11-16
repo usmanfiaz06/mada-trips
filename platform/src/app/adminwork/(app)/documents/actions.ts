@@ -9,10 +9,10 @@ import { nextRef } from "@/lib/refs";
 import { isUuid, detectFileType } from "@/lib/security";
 import { str, toState, type ActionState } from "@/lib/actions";
 import {
-  type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type FlightItem,
+  type DocType, type ItineraryData, type TransportData, type VoucherData, type ReceiptData, type FlightItem, type ItItem,
   DOC_TYPES, REF_PREFIX, TRANSPORT_LABEL, receiptTotals, money2, itineraryItems,
 } from "./types";
-import { parseBusTicket, extractQrFromPdf } from "@/lib/ticket-import";
+import { parseBusTicket, parseAirlineTicket, extractQrFromPdf } from "@/lib/ticket-import";
 
 const MAX_DATA = 200_000;
 
@@ -152,6 +152,21 @@ export async function extractTicketQr(fd: FormData): Promise<{ ok: true; qrImage
   const { image } = await extractQrFromPdf(bytes);
   if (!image) return { ok: false, error: "No QR code found in this PDF — upload the QR as an image instead" };
   return { ok: true, qrImage: image };
+}
+
+/**
+ * Read an uploaded airline e-ticket PDF (Amadeus/CheckMyTrip style, as issued by iTrip and many agencies) and
+ * return a pre-filled itinerary for the builder. Nothing is saved — the user reviews and saves.
+ */
+export async function importAirlinePdf(fd: FormData): Promise<{ ok: true; data: Partial<ItineraryData> } | { ok: false; error: string }> {
+  await requirePerm("documents.issue");
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose an e-ticket PDF to import" };
+  if (file.size > 10 * 1024 * 1024) return { ok: false, error: "The PDF must be under 10 MB" };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const r = await parseAirlineTicket(bytes);
+  if (!r.ok) return r;
+  return { ok: true, data: { bookingRef: r.data.bookingRef, ticketNumbers: r.data.ticketNumbers, passengers: r.data.passengers, items: r.data.items as ItItem[] } };
 }
 
 /**
