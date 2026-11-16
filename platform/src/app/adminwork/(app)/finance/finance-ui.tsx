@@ -39,7 +39,7 @@ export function AccountEditor({ a }: { a: Acct }) {
   );
 }
 
-const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense", deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer" };
+const MOVE_LABEL: Record<string, string> = { receipt: "Client payment", supplier: "Supplier paid", bsp: "BSP debit", expense: "Expense", deposit: "Deposit", withdrawal: "Withdrawal", transfer: "Transfer", portal: "Portal deposit" };
 export type Move = { positive: boolean; kind: string; label: string | null; ref: string | null; by: string | null; cleared: boolean; dateLabel: string; amount: number };
 
 /** One account's statement: searchable, and capped in height with its own scroll so the card can't keep growing. */

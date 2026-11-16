@@ -57,6 +57,9 @@ export async function cashPosition(q: Q = db) {
   // IATA BSP closings paid out of a company bank.
   const bspPaid = await q.select({ account: schema.bspClosings.account, total: sql<number>`coalesce(sum(${schema.bspClosings.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspClosings).where(and(eq(schema.bspClosings.status, "paid"), eq(schema.bspClosings.source, "bank"))).groupBy(schema.bspClosings.account);
+  // Money deposited from a company bank into a B2B portal: it left the bank and now sits as a portal balance.
+  const portalFund = await q.select({ account: schema.portalLedger.account, total: sql<number>`coalesce(sum(${schema.portalLedger.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.portalLedger).where(and(eq(schema.portalLedger.kind, "fund"), eq(schema.portalLedger.source, "bank"), eq(schema.portalLedger.status, "settled"))).groupBy(schema.portalLedger.account);
   // Manual deposits / withdrawals / transfers.
   const txnIn = await q.select({ account: schema.bankTransactions.account, total: sql<number>`coalesce(sum(${schema.bankTransactions.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bankTransactions).where(eq(schema.bankTransactions.direction, "in")).groupBy(schema.bankTransactions.account);
@@ -70,7 +73,7 @@ export async function cashPosition(q: Q = db) {
       const f = p.figures as SettlementFigures;
       return s + (f.payoutAccount === a.key ? f.repayments.reduce((x, r) => x + r.amount, 0) + f.dividends.reduce((x, d) => x + d.amount, 0) : 0);
     }, 0);
-    const balance = a.openingBalance + pick(inflow, a.key) + pick(txnIn, a.key) - pick(txnOut, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - paidOut;
+    const balance = a.openingBalance + pick(inflow, a.key) + pick(txnIn, a.key) - pick(txnOut, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - pick(portalFund, a.key) - paidOut;
     return { ...a, balance, uncleared: pick(uncleared, a.key) };
   });
   const legacyBsp = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
@@ -128,7 +131,7 @@ export async function collections(q: Q, opts: { team?: string } = {}) {
   return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
 }
 
-export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer" | "portal"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
 
 /** Money in and out of one bank account, most recent first — the account's statement. */
 export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
@@ -152,6 +155,10 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
     UNION ALL
     (SELECT bt.txn_date::text, bt.kind, coalesce(bt.note, bt.kind), NULL, (CASE WHEN bt.direction='in' THEN bt.amount ELSE -bt.amount END)::bigint, true, pt.name
        FROM bank_transactions bt LEFT JOIN partners pt ON pt.id = bt.partner_id WHERE bt.account = ${account})
+    UNION ALL
+    (SELECT l.entry_date::text, 'portal', pl.name, NULL, -l.amount::bigint, true, u.name
+       FROM portal_ledger l JOIN portals pl ON pl.id = l.portal_id LEFT JOIN users u ON u.id = l.recorded_by
+       WHERE l.kind='fund' AND l.source='bank' AND l.account = ${account} AND l.status='settled')
     ORDER BY date DESC LIMIT ${limit}`);
   return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
 }

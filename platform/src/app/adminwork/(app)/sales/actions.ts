@@ -495,12 +495,13 @@ export async function paySupplier(_: ActionState, fd: FormData): Promise<ActionS
   try {
     await loadScopedBooking(u, id);
     if (source === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
+    const normSource = source === "partner" ? "partner" : source === "portal" ? "portal" : "bank";
     await db.transaction(async (tx) => {
       const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
       if (!b) throw new Error("Sale not found");
-      await recordSupplierPayment(tx, b, { source: source === "partner" ? "partner" : "bank", account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id });
+      await recordSupplierPayment(tx, b, { source: normSource, account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), portalId: optStr(fd, "portalId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id });
     });
-    await flash(source === "partner" ? "Sent to the other directors to approve" : "Supplier marked paid");
+    await flash(normSource === "bank" ? "Supplier marked paid" : "Sent to the directors to approve");
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);

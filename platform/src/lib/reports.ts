@@ -106,8 +106,11 @@ export async function periodReport(q: Q = db, start: string, end: string): Promi
     .where(and(eq(schema.bankTransactions.kind, "refund_fee"), eq(schema.bankTransactions.direction, "out"), gte(schema.bankTransactions.txnDate, start), lte(schema.bankTransactions.txnDate, end))))[0].total;
   const feeOutLedger = (await q.select({ total: sum }).from(schema.ledgerEntries)
     .where(and(eq(schema.ledgerEntries.sourceType, "refund_fee"), gte(schema.ledgerEntries.entryDate, start), lte(schema.ledgerEntries.entryDate, end))))[0].total;
+  // A cancellation fee a B2B portal kept is a real loss too (it reduced the portal balance, not a bank).
+  const feeOutPortal = (await q.select({ total: sum }).from(schema.portalLedger)
+    .where(and(eq(schema.portalLedger.kind, "penalty"), eq(schema.portalLedger.status, "settled"), gte(schema.portalLedger.entryDate, start), lte(schema.portalLedger.entryDate, end))))[0].total;
   const feesEarned = feeIn;
-  const feesLost = feeOutBank + feeOutLedger;
+  const feesLost = feeOutBank + feeOutLedger + feeOutPortal;
 
   // Overheads: approved, non-startup expenses dated in the window (partner-paid included — still a cost).
   const expRows = await q.select({ category: schema.expenses.category, total: sum })

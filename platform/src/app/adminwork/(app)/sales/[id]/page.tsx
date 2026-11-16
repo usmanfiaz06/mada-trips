@@ -10,6 +10,7 @@ import { BOOKING_STATUS, CLIENT_TYPE, METHOD, SERVICE } from "@/lib/labels";
 import { layoverMinutes, fmtDuration, type Itinerary, type FlightLeg } from "@/lib/itinerary";
 import { Plane } from "lucide-react";
 import { accountNames, accountOptions } from "@/lib/accounts";
+import { portalBalances } from "@/lib/portals";
 import { fmtDate, riyadhDate } from "@/lib/dates";
 import { amountInput, sar } from "@/lib/money";
 import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/components/ui";
@@ -40,8 +41,9 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
     db.select().from(schema.approvalRequests).where(eq(schema.approvalRequests.entityId, id)).orderBy(desc(schema.approvalRequests.createdAt)),
     b.recognizedCycleId ? db.select().from(schema.settlementCycles).where(eq(schema.settlementCycles.id, b.recognizedCycleId)).then((r) => r[0]) : Promise.resolve(undefined),
   ]);
-  const [supplierPay] = await db.select({ sp: schema.supplierPayments, partner: schema.partners.name }).from(schema.supplierPayments).leftJoin(schema.partners, eq(schema.partners.id, schema.supplierPayments.partnerId)).where(eq(schema.supplierPayments.bookingId, id)).orderBy(desc(schema.supplierPayments.createdAt)).limit(1);
+  const [supplierPay] = await db.select({ sp: schema.supplierPayments, partner: schema.partners.name, portal: schema.portals.name }).from(schema.supplierPayments).leftJoin(schema.partners, eq(schema.partners.id, schema.supplierPayments.partnerId)).leftJoin(schema.portals, eq(schema.portals.id, schema.supplierPayments.portalId)).where(eq(schema.supplierPayments.bookingId, id)).orderBy(desc(schema.supplierPayments.createdAt)).limit(1);
   const partnerList = can(u, "finance.reconcile") ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
+  const portalList = can(u, "finance.reconcile") ? (await portalBalances()).filter((p) => p.active) : [];
   const who = (uid: string | null) => people.find((p) => p.id === uid)?.name ?? "—";
   const preparer = people.find((p) => p.id === b.preparedBy);
   if (!can(u, "sales.view_all") && preparer?.team !== u.team) notFound();
@@ -245,9 +247,13 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               ) : b.supplierPaid ? (
                 <p className="flex items-center gap-2 text-[13.5px] text-ok"><Check className="size-4" />{supplierPay?.sp.source === "partner"
                   ? t("Paid by {name} (on their ledger)", { name: supplierPay.partner ?? "—" })
+                  : supplierPay?.sp.source === "portal"
+                  ? t("Paid via {name} (B2B portal)", { name: supplierPay.portal ?? "—" })
                   : t("Paid from {bank}", { bank: supplierPay?.sp.account ? (accName[supplierPay.sp.account] ?? supplierPay.sp.account) : t("a company bank") })}</p>
               ) : supplierPay?.sp.status === "pending_approval" ? (
-                <p className="flex items-center gap-2 text-[13.5px] text-warn"><Clock className="size-4" />{t("{name} paid it — waiting for the other directors to approve", { name: supplierPay.partner ?? "—" })}</p>
+                <p className="flex items-center gap-2 text-[13.5px] text-warn"><Clock className="size-4" />{supplierPay.sp.source === "portal"
+                  ? t("Booked through {name} — waiting for a director to approve", { name: supplierPay.portal ?? "—" })
+                  : t("{name} paid it — waiting for the other directors to approve", { name: supplierPay.partner ?? "—" })}</p>
               ) : (
                 <>
                   <p className="mb-3 text-[13.5px] text-ink-3">{t("Not paid yet — in “Money we owe”.")}</p>
@@ -264,6 +270,14 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                           <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="partner" />
                           <span className="text-[12.5px] text-ink-2">{t("A partner paid it in cash")}</span>
                           <select name="partnerId" className="field h-10" defaultValue={u.partnerId}>{partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                          <SubmitButton variant="outline" size="sm">{t("Send for approval")}</SubmitButton>
+                        </ActionForm>
+                      )}
+                      {portalList.length > 0 && (
+                        <ActionForm action={paySupplier} className="flex flex-col gap-2 rounded-2xl bg-surface-2 p-3 ring-1 ring-line">
+                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="portal" />
+                          <span className="text-[12.5px] text-ink-2">{t("Booked through a B2B portal")}</span>
+                          <select name="portalId" className="field h-10">{portalList.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.headroom >= b.netCost ? t("{v} spendable", { v: sar(p.headroom) }) : t("over limit")}</option>)}</select>
                           <SubmitButton variant="outline" size="sm">{t("Send for approval")}</SubmitButton>
                         </ActionForm>
                       )}

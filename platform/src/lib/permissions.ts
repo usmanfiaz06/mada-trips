@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   "finance.view":        { group: "finance",   en: "See banks, cash & profit",           ar: "عرض البنوك والنقد والأرباح" },
   "finance.reconcile":   { group: "finance",   en: "Clear receipts & manage BSP",        ar: "مطابقة المقبوضات وإدارة BSP" },
   "settlement.run":      { group: "finance",   en: "Prepare the Day-25 settlement",      ar: "إعداد تسوية اليوم ٢٥" },
+  "portals.manage":      { group: "finance",   en: "Manage B2B portals (TBO, iTrip)",     ar: "إدارة بوابات الموردين (TBO، iTrip)" },
   "ledger.view_all":     { group: "partners",  en: "See all partner ledgers",            ar: "عرض دفاتر جميع الشركاء" },
   "ledger.manage":       { group: "partners",  en: "Record partner advances",            ar: "تسجيل سلف الشركاء" },
   "tasks.manage":        { group: "admin",     en: "See & assign everyone's tasks",      ar: "عرض مهام الجميع وإسنادها" },
