@@ -17,8 +17,9 @@ import { Badge, Card, CardHead, InkCard, KV, Money, Table, Td, Th, cx } from "@/
 import { ActionForm, SubmitButton } from "@/components/client";
 import { Journey, type JourneyStep } from "@/components/journey";
 import { Attachments, Timeline } from "@/components/record";
-import { issueBooking, paySupplier, recordPayment, requestRefund, requestVoid, resubmitBooking, returnBooking, reviewFlightSettlement } from "../actions";
+import { issueBooking, paySupplier, requestRefund, requestVoid, resubmitBooking, returnBooking, reviewFlightSettlement } from "../actions";
 import { CorrectSaleForm } from "./correct-sale";
+import { PayForm } from "./pay-form";
 import { getSettings } from "@/lib/settings";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
@@ -202,18 +203,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
               </Table>
             )}
             {owed > 0 && !closed && b.status !== "awaiting_credit" && (
-              <ActionForm action={recordPayment} resetOnOk className="grid gap-2 border-t border-line p-6 sm:grid-cols-[1fr_130px_150px_1fr_auto]">
-                <input type="hidden" name="id" value={b.id} />
-                <input name="amount" defaultValue={amountInput(owed)} inputMode="decimal" className="field num" dir="ltr" aria-label={t("Amount")} />
-                <select name="method" className="field" defaultValue={b.channel === "corporate" ? "transfer" : "mada"} aria-label={t("Method")}>
-                  {Object.entries(METHOD).map(([k, v]) => <option key={k} value={k}>{t(v)}</option>)}
-                </select>
-                <select name="account" className="field" defaultValue={b.account} aria-label={t("Into which bank account?")}>
-                  {accOpts.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                </select>
-                <input name="reference" className="field" placeholder={t("Reference (optional)")} dir="ltr" />
-                <SubmitButton>{t("Record payment")}</SubmitButton>
-              </ActionForm>
+              <PayForm id={b.id} owedInput={amountInput(owed)} defaultMethod={b.channel === "corporate" ? "transfer" : "mada"} defaultAccount={b.account}
+                methods={Object.entries(METHOD).map(([k, v]) => ({ k, label: v }))} accounts={accOpts} staff={people} myUserId={u.id} />
             )}
           </Card>
 
