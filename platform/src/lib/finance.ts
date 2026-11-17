@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db, schema, type Tx } from "@/db";
 import { openBspTotal } from "./bsp";
 
@@ -60,6 +60,9 @@ export async function cashPosition(q: Q = db) {
   // Money deposited from a company bank into a B2B portal: it left the bank and now sits as a portal balance.
   const portalFund = await q.select({ account: schema.portalLedger.account, total: sql<number>`coalesce(sum(${schema.portalLedger.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.portalLedger).where(and(eq(schema.portalLedger.kind, "fund"), eq(schema.portalLedger.source, "bank"), eq(schema.portalLedger.status, "settled"))).groupBy(schema.portalLedger.account);
+  // Cash deposited by staff into a company bank: it moves from cash-on-hand into that bank.
+  const cashDeposit = await q.select({ account: schema.cashLedger.toAccount, total: sql<number>`coalesce(sum(${schema.cashLedger.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.cashLedger).where(eq(schema.cashLedger.kind, "deposit")).groupBy(schema.cashLedger.toAccount);
   // Manual deposits / withdrawals / transfers.
   const txnIn = await q.select({ account: schema.bankTransactions.account, total: sql<number>`coalesce(sum(${schema.bankTransactions.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bankTransactions).where(eq(schema.bankTransactions.direction, "in")).groupBy(schema.bankTransactions.account);
@@ -73,13 +76,39 @@ export async function cashPosition(q: Q = db) {
       const f = p.figures as SettlementFigures;
       return s + (f.payoutAccount === a.key ? f.repayments.reduce((x, r) => x + r.amount, 0) + f.dividends.reduce((x, d) => x + d.amount, 0) : 0);
     }, 0);
-    const balance = a.openingBalance + pick(inflow, a.key) + pick(txnIn, a.key) - pick(txnOut, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - pick(portalFund, a.key) - paidOut;
+    const balance = a.openingBalance + pick(inflow, a.key) + pick(txnIn, a.key) + pick(cashDeposit, a.key) - pick(txnOut, a.key) - pick(exp, a.key) - pick(bsp, a.key) - pick(supp, a.key) - pick(bspPaid, a.key) - pick(portalFund, a.key) - paidOut;
     return { ...a, balance, uncleared: pick(uncleared, a.key) };
   });
   const legacyBsp = await q.select({ total: sql<number>`coalesce(sum(${schema.bspObligations.amount}),0)::bigint`.mapWith(Number) })
     .from(schema.bspObligations).where(eq(schema.bspObligations.status, "upcoming"));
   const openBsp = await openBspTotal(q);
-  return { accounts: out, total: out.reduce((s, a) => s + a.balance, 0), upcomingBsp: (legacyBsp[0]?.total ?? 0) + openBsp };
+  const onHand = await cashOnHand(q);
+  const cashOnHandTotal = onHand.reduce((s, h) => s + h.balance, 0);
+  return { accounts: out, total: out.reduce((s, a) => s + a.balance, 0), upcomingBsp: (legacyBsp[0]?.total ?? 0) + openBsp, cashOnHand: onHand, cashOnHandTotal };
+}
+
+/**
+ * Physical cash held by each staff member, realised on receipt. A person's cash on hand is the cash sale
+ * receipts attributed to them, plus cash handed to them, minus cash they handed on or deposited into a bank.
+ * Voided/refunded sales' cash drops off (mirrors the bank side). Only people with a non-zero balance (or who
+ * ever touched cash) are returned.
+ */
+export async function cashOnHand(q: Q = db) {
+  const notVoided = sql`(${schema.payments.bookingId} IS NULL OR NOT EXISTS (SELECT 1 FROM ${schema.bookings} bx WHERE bx.id = ${schema.payments.bookingId} AND bx.status IN ('void','refunded')))`;
+  const received = await q.select({ userId: schema.payments.cashHolder, total: sql<number>`coalesce(sum(${schema.payments.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.payments).where(and(eq(schema.payments.method, "cash"), isNotNull(schema.payments.cashHolder), isNotNull(schema.payments.clearedOn), notVoided)).groupBy(schema.payments.cashHolder);
+  const inTo = await q.select({ userId: schema.cashLedger.toUser, total: sql<number>`coalesce(sum(${schema.cashLedger.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.cashLedger).where(isNotNull(schema.cashLedger.toUser)).groupBy(schema.cashLedger.toUser);
+  const outFrom = await q.select({ userId: schema.cashLedger.fromUser, total: sql<number>`coalesce(sum(${schema.cashLedger.amount}),0)::bigint`.mapWith(Number) })
+    .from(schema.cashLedger).where(isNotNull(schema.cashLedger.fromUser)).groupBy(schema.cashLedger.fromUser);
+  const ids = new Set<string>();
+  for (const r of [...received, ...inTo, ...outFrom]) if (r.userId) ids.add(r.userId);
+  if (!ids.size) return [] as { userId: string; name: string; balance: number }[];
+  const users = await q.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(inArray(schema.users.id, [...ids]));
+  const amt = (list: { userId: string | null; total: number }[], id: string) => list.find((r) => r.userId === id)?.total ?? 0;
+  return users
+    .map((u) => ({ userId: u.id, name: u.name, balance: amt(received, u.id) + amt(inTo, u.id) - amt(outFrom, u.id) }))
+    .sort((a, b) => b.balance - a.balance);
 }
 
 /** Money owed by clients: issued bookings not yet fully paid. */
@@ -131,7 +160,7 @@ export async function collections(q: Q, opts: { team?: string } = {}) {
   return rows.map((r) => ({ ...r, owed: Number(r.owed) }));
 }
 
-export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer" | "portal" | "cashback"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
+export type Movement = { date: string; kind: "receipt" | "supplier" | "bsp" | "expense" | "deposit" | "withdrawal" | "transfer" | "portal" | "cashback" | "cashdeposit"; label: string; ref: string | null; amount: number; cleared: boolean; by: string | null };
 
 /** Money in and out of one bank account, most recent first — the account's statement. */
 export async function bankMovements(q: Q, account: string, limit = 40): Promise<Movement[]> {
@@ -159,6 +188,10 @@ export async function bankMovements(q: Q, account: string, limit = 40): Promise<
     (SELECT l.entry_date::text, 'portal', pl.name, NULL, -l.amount::bigint, true, u.name
        FROM portal_ledger l JOIN portals pl ON pl.id = l.portal_id LEFT JOIN users u ON u.id = l.recorded_by
        WHERE l.kind='fund' AND l.source='bank' AND l.account = ${account} AND l.status='settled')
+    UNION ALL
+    (SELECT cl.entry_date::text, 'cashdeposit', coalesce(fu.name, 'Cash'), NULL, cl.amount::bigint, true, u.name
+       FROM cash_ledger cl LEFT JOIN users fu ON fu.id = cl.from_user LEFT JOIN users u ON u.id = cl.recorded_by
+       WHERE cl.kind='deposit' AND cl.to_account = ${account})
     ORDER BY date DESC LIMIT ${limit}`);
   return rows.map((r) => ({ ...r, amount: Number(r.amount) }));
 }

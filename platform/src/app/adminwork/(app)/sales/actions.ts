@@ -48,6 +48,7 @@ const SaleSchema = z.object({
   supplierAccount: z.string().optional(),
   supplierPartnerId: z.string().optional(),
   soldBy: z.string().optional(), // which team member made the sale (gets the credit + commission); defaults to preparer
+  cashHolder: z.string().optional(), // for a cash payment: who physically received and now holds the cash
   viaBsp: z.string().optional(),
   itinerary: z.string().optional(), // flights: JSON of the multi-leg route { outbound: [...], return?: [...] }
   trip: z.string().optional(),      // flights: "oneway" | "return"
@@ -166,8 +167,22 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
         summary: `Created ${ref} · ${travellers.length > 1 ? `${travellers.length} × ` : ""}${passengers}${v.description ? ` · ${v.description}` : ""} · sell ${sar(v.sellPrice)}, margin ${sar(v.sellPrice - v.netCost)}` });
 
       if (v.paidNow > 0) {
-        await tx.insert(schema.payments).values({ bookingId: b.id, clientId: client.id, account, method: v.method, amount: v.paidNow, reference: v.paymentRef || null, businessDate: bdate, recordedBy: u.id });
-        await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: b.id, entityRef: ref, summary: `Received ${sar(v.paidNow)} by ${v.method} into ${acctNames[account] ?? account}` });
+        // Cash doesn't land in a bank: it's realised on receipt and held by a staff member. We store the
+        // sentinel account "cash" (never counted toward a bank balance), clear it immediately, and record
+        // who holds it. Everything else lands in the chosen bank and waits to clear as before.
+        const isCash = v.method === "cash";
+        let cashHolder: string | null = null;
+        if (isCash) {
+          cashHolder = u.id;
+          if (v.cashHolder && isUuid(v.cashHolder) && v.cashHolder !== u.id) {
+            const [h] = await tx.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.id, v.cashHolder), eq(schema.users.active, true)));
+            if (h) cashHolder = h.id;
+          }
+        }
+        const payAccount = isCash ? "cash" : account;
+        await tx.insert(schema.payments).values({ bookingId: b.id, clientId: client.id, account: payAccount, method: v.method, amount: v.paidNow, reference: v.paymentRef || null, businessDate: bdate, clearedOn: isCash ? bdate : null, cashHolder, recordedBy: u.id });
+        const holderName = cashHolder ? (await tx.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, cashHolder)))[0]?.name : null;
+        await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: b.id, entityRef: ref, summary: isCash ? `Received ${sar(v.paidNow)} in cash${holderName ? ` · held by ${holderName}` : ""}` : `Received ${sar(v.paidNow)} by ${v.method} into ${acctNames[account] ?? account}` });
       }
       if (v.note) {
         await tx.insert(schema.remarks).values({ entityType: "booking", entityId: b.id, userId: u.id, body: v.note });
@@ -349,10 +364,22 @@ export async function recordPayment(_: ActionState, fd: FormData): Promise<Actio
       if (b.status === "awaiting_credit") throw new Error("Wait for the credit decision before taking more payments");
       const paid = await paidOn(tx, id);
       if (paid + amount > b.sellPrice) throw new Error(`Only ${sar(b.sellPrice - paid)} is still owed`);
-      const acct = (await isValidAccount(str(fd, "account"))) ? str(fd, "account") : b.account;
-      await tx.insert(schema.payments).values({ bookingId: id, clientId: b.clientId, account: acct, method, amount, reference: optStr(fd, "reference")?.slice(0, 60) ?? null, businessDate: businessDate(new Date(), s.closeHour), recordedBy: u.id });
+      const isCash = method === "cash";
+      let cashHolder: string | null = null;
+      if (isCash) {
+        cashHolder = u.id;
+        const picked = optStr(fd, "cashHolder");
+        if (picked && isUuid(picked) && picked !== u.id) {
+          const [h] = await tx.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.id, picked), eq(schema.users.active, true)));
+          if (h) cashHolder = h.id;
+        }
+      }
+      const bdate = businessDate(new Date(), s.closeHour);
+      const acct = isCash ? "cash" : ((await isValidAccount(str(fd, "account"))) ? str(fd, "account") : b.account);
+      await tx.insert(schema.payments).values({ bookingId: id, clientId: b.clientId, account: acct, method, amount, reference: optStr(fd, "reference")?.slice(0, 60) ?? null, businessDate: bdate, clearedOn: isCash ? bdate : null, cashHolder, recordedBy: u.id });
       const acctNames = await accountNames();
-      await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: id, entityRef: b.ref, summary: `Received ${sar(amount)} by ${method} for ${b.ref} into ${acctNames[acct] ?? acct}` });
+      const holderName = cashHolder ? (await tx.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, cashHolder)))[0]?.name : null;
+      await audit(tx, { actorId: u.id, action: "payment.recorded", entityType: "booking", entityId: id, entityRef: b.ref, summary: isCash ? `Received ${sar(amount)} in cash for ${b.ref}${holderName ? ` · held by ${holderName}` : ""}` : `Received ${sar(amount)} by ${method} for ${b.ref} into ${acctNames[acct] ?? acct}` });
     });
   } catch (e) { return toState(e); }
   await flash("Payment recorded");

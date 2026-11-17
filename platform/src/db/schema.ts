@@ -196,9 +196,12 @@ export const payments = pgTable("payments", {
   businessDate: date("business_date").notNull(),
   clearedOn: date("cleared_on"), // date funds cleared in the bank; drives the Day-25 cut-off
   clearedBy: uuid("cleared_by").references(() => users.id),
+  // Cash receipts don't land in a bank — they're physically held by a staff member. For a cash payment
+  // `account` is the sentinel "cash" (so it never counts toward a bank balance) and this names who holds it.
+  cashHolder: uuid("cash_holder").references(() => users.id),
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),
-}, (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_cleared_idx").on(t.clearedOn)]);
+}, (t) => [index("payments_booking_idx").on(t.bookingId), index("payments_cleared_idx").on(t.clearedOn), index("payments_cash_holder_idx").on(t.cashHolder)]);
 
 // Money paid OUT to a supplier for a booking's cost. Source is a company bank, or a partner's own cash
 // (which then becomes owed back to that partner, after the other directors approve).
@@ -426,6 +429,24 @@ export const bankTransactions = pgTable("bank_transactions", {
   recordedBy: uuid("recorded_by").notNull().references(() => users.id),
   createdAt: createdAt(),
 }, (t) => [index("bank_txn_account_idx").on(t.account)]);
+
+/* ───────────── Cash custody ───────────── */
+// Physical cash held by staff. Cash sale receipts are attributed to a holder (payments.cashHolder); this
+// ledger records what happens to that cash afterwards — handed from one person to another, deposited into a
+// company bank, or corrected. Cash-on-hand per person = their cash receipts + ledger in − ledger out.
+export const cashLedger = pgTable("cash_ledger", {
+  id: id(),
+  kind: text("kind").notNull(),                       // handover | deposit | adjustment
+  // handover: fromUser → toUser. deposit: fromUser → toAccount (a company bank). adjustment: one side set.
+  fromUser: uuid("from_user").references(() => users.id),
+  toUser: uuid("to_user").references(() => users.id),
+  toAccount: text("to_account"),                      // bank key, for a deposit
+  amount: money("amount").notNull(),
+  note: text("note"),
+  entryDate: date("entry_date").notNull(),
+  recordedBy: uuid("recorded_by").notNull().references(() => users.id),
+  createdAt: createdAt(),
+}, (t) => [index("cash_ledger_from_idx").on(t.fromUser), index("cash_ledger_to_idx").on(t.toUser)]);
 
 export const settlementCycles = pgTable("settlement_cycles", {
   id: id(),
