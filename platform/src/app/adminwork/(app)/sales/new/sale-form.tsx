@@ -77,6 +77,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [method, setMethod] = useState("mada");
   const [issueNow, setIssueNow] = useState(true);
   const [account, setAccount] = useState<string>(defaultAccount);
+  const [cashHolder, setCashHolder] = useState<string>(myUserId);
   const [supplierPay, setSupplierPay] = useState("unpaid");
   const [supplierAccount, setSupplierAccount] = useState<string>(defaultAccount);
   // How a flight's cost is settled. Empty until the salesperson picks — nothing lands in the IATA
@@ -308,15 +309,25 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
             </div>
           </div>
 
-          <div className="mt-4">
-            <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Into which bank account?")}</span>
-            <div className="flex flex-wrap gap-1 rounded-[22px] bg-sunken p-1">
-              {accounts.map((a) => (
-                <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full px-4 text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>
-              ))}
+          {method === "cash" ? (
+            <div className="mt-4 animate-rise">
+              <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Who received the cash?")}</span>
+              <select name="cashHolder" value={cashHolder} onChange={(e) => setCashHolder(e.target.value)} className="field h-10">
+                {sellers.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === myUserId ? ` (${t("me")})` : ""}</option>)}
+              </select>
+              <p className="mt-1.5 text-[12px] text-ink-3">{t("Cash is counted as received right away and tracked as held by this person until it's deposited or handed over.")}</p>
             </div>
-            <input type="hidden" name="account" value={account} />
-          </div>
+          ) : (
+            <div className="mt-4">
+              <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Into which bank account?")}</span>
+              <div className="flex flex-wrap gap-1 rounded-[22px] bg-sunken p-1">
+                {accounts.map((a) => (
+                  <button key={a.value} type="button" onClick={() => setAccount(a.value)} className={cx("h-10 rounded-full px-4 text-[13.5px] transition", account === a.value ? "bg-ink text-bg" : "text-ink-3 hover:text-ink")}>{a.label}</button>
+                ))}
+              </div>
+              <input type="hidden" name="account" value={account} />
+            </div>
+          )}
 
           <div className="mt-4">
             <span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Sold by")}</span>

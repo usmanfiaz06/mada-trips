@@ -152,6 +152,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   <span className="num text-ink" dir="ltr">{sar(a.balance)}</span>
                 </div>
               ))}
+              {f.cash.cashOnHandTotal > 0 && (
+                <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-[13px]">
+                  <span className="flex items-center gap-2 text-ink-2"><i className="size-2 rounded-full bg-[var(--gold)]" />{t("Cash on hand (staff)")}</span>
+                  <span className="num text-ink" dir="ltr">{sar(f.cash.cashOnHandTotal)}</span>
+                </div>
+              )}
               <p className="text-[12px] text-ink-3">{t("Cash is not profit: most of it is owed to IATA and airlines.")}</p>
             </div>
           </Card>

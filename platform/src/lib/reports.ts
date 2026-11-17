@@ -11,7 +11,9 @@ type Q = DB | Tx;
  * — negative means the company hasn't yet earned back everything the partners put in.
  */
 export type BalanceSheet = {
-  cash: { account: string; name: string; balance: number }[]; cashTotal: number; receivable: number; assets: number;
+  cash: { account: string; name: string; balance: number }[]; cashTotal: number;
+  cashOnHand: { userId: string; name: string; balance: number }[]; cashOnHandTotal: number;
+  receivable: number; assets: number;
   owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
 };
 
@@ -42,12 +44,13 @@ export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
   const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
   const cash = cashPos.accounts.map((a) => ({ account: a.key, name: a.name, balance: a.balance }));
   const receivable = recv.reduce((s, r) => s + r.owed, 0);
-  const assets = cashPos.total + receivable;
+  // Cash on hand is realised company money too (just held by staff, not a bank), so it's an asset.
+  const assets = cashPos.total + cashPos.cashOnHandTotal + receivable;
   const owedSuppliers = pay.reduce((s, r) => s + r.net_cost, 0);
   const owedBsp = cashPos.upcomingBsp;
   const owedPartners = partners.reduce((s, p) => s + Math.max(0, p.outstanding), 0);
   const liabilities = owedSuppliers + owedBsp + owedPartners;
-  return { cash, cashTotal: cashPos.total, receivable, assets, owedSuppliers, owedBsp, owedPartners, liabilities, netWorth: assets - liabilities };
+  return { cash, cashTotal: cashPos.total, cashOnHand: cashPos.cashOnHand, cashOnHandTotal: cashPos.cashOnHandTotal, receivable, assets, owedSuppliers, owedBsp, owedPartners, liabilities, netWorth: assets - liabilities };
 }
 const sum = sql<number>`coalesce(sum(amount),0)::bigint`.mapWith(Number);
 

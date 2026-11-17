@@ -129,6 +129,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <CardHead title={t("Where the money stands")} hint={t("Right now")} />
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we have")}</div>
           {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${a.name ?? a.account}`} v={a.balance} />)}
+          {bs.cashOnHandTotal > 0 && <Row label={t("Cash on hand (staff)")} v={bs.cashOnHandTotal} />}
           <Row label={t("Clients still owe us")} v={bs.receivable} />
           <Row label={t("Total we have")} v={bs.assets} strong />
           <div className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we owe")}</div>

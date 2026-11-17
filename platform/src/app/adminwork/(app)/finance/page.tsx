@@ -17,7 +17,7 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
 import { AccountEditor, MovementsList } from "./finance-ui";
-import { addBankAccount, addBankTxn, settleBsp, transferFunds } from "./actions";
+import { addBankAccount, addBankTxn, depositCash, handCash, settleBsp, transferFunds } from "./actions";
 
 export const metadata = { title: "Banks & cash" };
 
@@ -39,6 +39,7 @@ export default async function FinancePage() {
   const accName = await accountNames();
   const bspRows = await bspClosings(db, s, 6);
   const partnerList = canRec ? await db.select({ id: schema.partners.id, name: schema.partners.name }).from(schema.partners).orderBy(schema.partners.sort) : [];
+  const staff = canRec ? await db.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(eq(schema.users.active, true)).orderBy(schema.users.name) : [];
   const portals = await portalBalances();
 
   return (
@@ -79,6 +80,54 @@ export default async function FinancePage() {
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {(cash.cashOnHand.length > 0 || canRec) && (
+        <Card className="mt-4">
+          <CardHead title={t("Cash on hand")} hint={t("Physical cash held by staff from cash sales. It's realised money — deposit it into a bank or hand it to someone else.")} />
+          {cash.cashOnHand.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {cash.cashOnHand.map((h) => (
+                <div key={h.userId} className="rounded-2xl bg-surface-2 p-4 ring-1 ring-line">
+                  <div className="text-[13px] text-ink-2">{h.name}</div>
+                  <div className="num mt-1 text-[22px]" dir="ltr">{sar(h.balance)}</div>
+                </div>
+              ))}
+              <div className="rounded-2xl bg-ink p-4 text-bg">
+                <div className="text-[13px] opacity-70">{t("Total cash on hand")}</div>
+                <div className="num mt-1 text-[22px]" dir="ltr">{sar(cash.cashOnHandTotal)}</div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[13px] text-ink-3">{t("No cash held right now. Cash taken on a sale shows up here against whoever received it.")}</p>
+          )}
+          {canRec && staff.length > 0 && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <ActionForm action={handCash} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
+                <div className="text-[13px] font-[450]">{t("Hand cash to someone")}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select name="fromUser" placeholder={t("From")} options={staff.map((x) => ({ value: x.id, label: x.name }))} />
+                  <Select name="toUser" placeholder={t("To")} options={staff.map((x) => ({ value: x.id, label: x.name }))} />
+                </div>
+                <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
+                <Input name="note" placeholder={t("Note (optional)")} />
+                <Input type="date" name="date" defaultValue={today} />
+                <SubmitButton size="sm" variant="outline" className="w-full">{t("Record handover")}</SubmitButton>
+              </ActionForm>
+              <ActionForm action={depositCash} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
+                <div className="text-[13px] font-[450]">{t("Deposit cash into a bank")}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select name="fromUser" placeholder={t("From")} options={staff.map((x) => ({ value: x.id, label: x.name }))} />
+                  <Select name="account" options={accOpts} />
+                </div>
+                <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
+                <Input name="note" placeholder={t("Note (optional)")} />
+                <Input type="date" name="date" defaultValue={today} />
+                <SubmitButton size="sm" variant="outline" className="w-full">{t("Record deposit")}</SubmitButton>
+              </ActionForm>
+            </div>
+          )}
         </Card>
       )}
 

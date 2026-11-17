@@ -13,6 +13,7 @@ import { isIsoDate, isUuid } from "@/lib/security";
 import { settleBspClosing } from "@/lib/bsp";
 import { accountNames, isValidAccount, primaryAccountKey, uniqueAccountKey } from "@/lib/accounts";
 import { proposeCashMove } from "@/lib/cash";
+import { cashOnHand } from "@/lib/finance";
 
 /** Validate an optional "which partner did this" id — must be a real partner, or nothing. */
 async function validPartner(id: string | null): Promise<string | null> {
@@ -169,6 +170,65 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
       { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
     revalidatePath("/adminwork", "layout");
     return { ok: `Sent to the directors to approve (${ref.ref})` };
+  } catch (e) { return toState(e); }
+}
+
+/** Validate a "which staff member" id — must be a real, active user. */
+async function validUser(id: string | null): Promise<string> {
+  if (!id || !isUuid(id)) throw new Error("Choose the staff member");
+  const [uu] = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.id, id), eq(schema.users.active, true)));
+  if (!uu) throw new Error("Choose the staff member");
+  return uu.id;
+}
+
+/** Hand physical cash from one staff member to another. Realised money just changes hands; fully logged. */
+export async function handCash(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const date = str(fd, "date") || riyadhDate();
+  if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
+  try {
+    const fromUser = await validUser(str(fd, "fromUser"));
+    const toUser = await validUser(str(fd, "toUser"));
+    if (fromUser === toUser) return { error: "Hand the cash to a different person" };
+    const amount = toHalalas(str(fd, "amount"));
+    if (amount <= 0) return { error: "Enter the amount handed over" };
+    const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    await db.transaction(async (tx) => {
+      const held = (await cashOnHand(tx)).find((h) => h.userId === fromUser)?.balance ?? 0;
+      if (amount > held) throw new Error(`They only hold ${sar(held)} in cash`);
+      const names = Object.fromEntries((await tx.select({ id: schema.users.id, name: schema.users.name }).from(schema.users).where(inArray(schema.users.id, [fromUser, toUser]))).map((x) => [x.id, x.name]));
+      await tx.insert(schema.cashLedger).values({ kind: "handover", fromUser, toUser, amount, note, entryDate: date, recordedBy: u.id });
+      await audit(tx, { actorId: u.id, action: "cash.handover", entityType: "cash", entityRef: names[fromUser] ?? fromUser,
+        summary: `Cash handover · SAR ${sar(amount)} from ${names[fromUser]} to ${names[toUser]}${note ? ` · ${note}` : ""}` });
+    });
+    revalidatePath("/adminwork", "layout");
+    return { ok: "Cash handover recorded" };
+  } catch (e) { return toState(e); }
+}
+
+/** Deposit a staff member's physical cash into a company bank. Moves it from cash-on-hand into the bank. */
+export async function depositCash(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await requirePerm("finance.reconcile");
+  const account = str(fd, "account");
+  const date = str(fd, "date") || riyadhDate();
+  if (!(await isValidAccount(account))) return { error: "Choose the bank account" };
+  if (!isIsoDate(date) || date > riyadhDate()) return { error: "Pick a valid date (not in the future)" };
+  try {
+    const fromUser = await validUser(str(fd, "fromUser"));
+    const amount = toHalalas(str(fd, "amount"));
+    if (amount <= 0) return { error: "Enter the amount deposited" };
+    const note = optStr(fd, "note")?.slice(0, 200) ?? null;
+    const names = await accountNames();
+    await db.transaction(async (tx) => {
+      const held = (await cashOnHand(tx)).find((h) => h.userId === fromUser)?.balance ?? 0;
+      if (amount > held) throw new Error(`They only hold ${sar(held)} in cash`);
+      const [who] = await tx.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, fromUser));
+      await tx.insert(schema.cashLedger).values({ kind: "deposit", fromUser, toAccount: account, amount, note, entryDate: date, recordedBy: u.id });
+      await audit(tx, { actorId: u.id, action: "cash.deposit", entityType: "cash", entityRef: names[account] ?? account,
+        summary: `Cash deposit · SAR ${sar(amount)} from ${who?.name ?? "staff"} into ${names[account] ?? account}${note ? ` · ${note}` : ""}` });
+    });
+    revalidatePath("/adminwork", "layout");
+    return { ok: "Cash deposit recorded" };
   } catch (e) { return toState(e); }
 }
 
