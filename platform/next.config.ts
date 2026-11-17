@@ -13,6 +13,15 @@ const config: NextConfig = {
   // Native / large packages used only on the server (reading a ticket PDF and its QR). Keep them out of the
   // bundle so their binaries and worker files load at runtime instead.
   serverExternalPackages: ["@napi-rs/canvas", "pdfjs-dist", "jsqr", "qrcode"],
+  // pdfjs loads its worker via a path it computes at runtime, which Vercel's file tracer can't follow, so the
+  // worker file gets pruned from the serverless bundle and reading a ticket PDF fails ("Cannot find module
+  // pdf.worker.mjs"). Force it (and the canvas font data) into the bundle for the route that reads PDFs.
+  outputFileTracingIncludes: {
+    "/adminwork/**": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    ],
+  },
   poweredByHeader: false,
   devIndicators: false,
   async redirects() {

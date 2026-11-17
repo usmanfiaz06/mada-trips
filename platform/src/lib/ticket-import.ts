@@ -22,6 +22,17 @@ async function pdfModules() {
   g.Path2D ??= napi.Path2D;
   g.ImageData ??= napi.ImageData;
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  // Point pdfjs at the worker file explicitly. On Vercel the default (a path pdfjs computes relative to its
+  // own module) can resolve to a file that was pruned from the bundle; resolving it ourselves and handing it
+  // over as a file URL uses the copy we force-bundle in next.config. Falls back to the default if unresolved.
+  if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+    try {
+      const { createRequire } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+      const req = createRequire(import.meta.url);
+      pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(req.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs")).href;
+    } catch { /* keep pdfjs's default worker resolution */ }
+  }
   const { createCanvas } = napi;
   class CanvasFactory {
     create(w: number, h: number) { const c = createCanvas(Math.max(1, Math.ceil(w)), Math.max(1, Math.ceil(h))); return { canvas: c, context: c.getContext("2d") }; }
