@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, gte, lte, ne, sql } from "drizzle-orm";
 import { db, schema, type DB, type Tx } from "@/db";
 import { cashPosition, receivables, payables, partnerBalances } from "./finance";
+import { portalBalances } from "./portals";
 
 type Q = DB | Tx;
 
@@ -13,8 +14,9 @@ type Q = DB | Tx;
 export type BalanceSheet = {
   cash: { account: string; name: string; balance: number }[]; cashTotal: number;
   cashOnHand: { userId: string; name: string; balance: number }[]; cashOnHandTotal: number;
+  portalPrepaid: number; // prepaid funds we hold with B2B portals (an asset — credit we have)
   receivable: number; assets: number;
-  owedSuppliers: number; owedBsp: number; owedPartners: number; liabilities: number; netWorth: number;
+  owedSuppliers: number; owedBsp: number; owedPartners: number; portalOwed: number; liabilities: number; netWorth: number;
 };
 
 /** Net profit (recognised margin − operating expenses) for each of the last `months` calendar months. */
@@ -41,16 +43,20 @@ export async function monthlyTrend(q: Q = db, months = 6): Promise<{ ym: string;
 }
 
 export async function balanceSheet(q: Q = db): Promise<BalanceSheet> {
-  const [cashPos, recv, pay, partners] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q)]);
+  const [cashPos, recv, pay, partners, portals] = await Promise.all([cashPosition(q), receivables(q), payables(q), partnerBalances(q), portalBalances(q)]);
   const cash = cashPos.accounts.map((a) => ({ account: a.key, name: a.name, balance: a.balance }));
   const receivable = recv.reduce((s, r) => s + r.owed, 0);
+  // Prepaid funds sitting with a B2B portal are money we can still spend — an asset. A portal we've overdrawn
+  // on its credit line is money we owe — a liability. Split the two sides.
+  const portalPrepaid = portals.reduce((s, p) => s + Math.max(0, p.balance), 0);
+  const portalOwed = portals.reduce((s, p) => s + Math.max(0, -p.balance), 0);
   // Cash on hand is realised company money too (just held by staff, not a bank), so it's an asset.
-  const assets = cashPos.total + cashPos.cashOnHandTotal + receivable;
+  const assets = cashPos.total + cashPos.cashOnHandTotal + portalPrepaid + receivable;
   const owedSuppliers = pay.reduce((s, r) => s + r.net_cost, 0);
   const owedBsp = cashPos.upcomingBsp;
   const owedPartners = partners.reduce((s, p) => s + Math.max(0, p.outstanding), 0);
-  const liabilities = owedSuppliers + owedBsp + owedPartners;
-  return { cash, cashTotal: cashPos.total, cashOnHand: cashPos.cashOnHand, cashOnHandTotal: cashPos.cashOnHandTotal, receivable, assets, owedSuppliers, owedBsp, owedPartners, liabilities, netWorth: assets - liabilities };
+  const liabilities = owedSuppliers + owedBsp + owedPartners + portalOwed;
+  return { cash, cashTotal: cashPos.total, cashOnHand: cashPos.cashOnHand, cashOnHandTotal: cashPos.cashOnHandTotal, portalPrepaid, receivable, assets, owedSuppliers, owedBsp, owedPartners, portalOwed, liabilities, netWorth: assets - liabilities };
 }
 const sum = sql<number>`coalesce(sum(amount),0)::bigint`.mapWith(Number);
 

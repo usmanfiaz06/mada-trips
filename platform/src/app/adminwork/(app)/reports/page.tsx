@@ -130,10 +130,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we have")}</div>
           {bs.cash.map((a) => <Row key={a.account} label={`${t("Cash")} · ${a.name ?? a.account}`} v={a.balance} />)}
           {bs.cashOnHandTotal > 0 && <Row label={t("Cash on hand (staff)")} v={bs.cashOnHandTotal} />}
+          {bs.portalPrepaid > 0 && <Row label={t("Credit with portals (TBO, iTrip…)")} v={bs.portalPrepaid} />}
           <Row label={t("Clients still owe us")} v={bs.receivable} />
           <Row label={t("Total we have")} v={bs.assets} strong />
           <div className="mb-1 mt-6 text-[11px] font-semibold uppercase tracking-wide text-ink-4">{t("What we owe")}</div>
           <Row label={t("Suppliers & IATA to pay")} v={bs.owedSuppliers + bs.owedBsp} />
+          {bs.portalOwed > 0 && <Row label={t("Portal credit used")} v={bs.portalOwed} />}
           <Row label={t("Owners' capital to repay")} v={bs.owedPartners} />
           <Row label={t("Total we owe")} v={bs.liabilities} strong />
           <Row label={t("Overall position")} v={bs.netWorth} strong />
