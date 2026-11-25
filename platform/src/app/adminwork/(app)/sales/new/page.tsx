@@ -5,6 +5,7 @@ import { getT } from "@/lib/i18n";
 import { getSettings } from "@/lib/settings";
 import { activeDelegation, issuedTodayBy } from "@/lib/issuance";
 import { accountOptions } from "@/lib/accounts";
+import { portalBalances } from "@/lib/portals";
 import { PageHeader } from "@/components/ui";
 import { SaleForm } from "./sale-form";
 
@@ -32,11 +33,13 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
     delegation = { scope: d.scope, maxTicket: d.maxTicket, dailyLeft: Math.max(0, d.dailyCap - used) };
   }
   const accounts = await accountOptions();
+  // Portals we can book a supplier cost through (prepaid or on a credit line). Only active ones.
+  const portals = (await portalBalances()).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name, headroom: p.headroom, balance: p.balance, creditLimit: p.creditLimit }));
   return (
     <>
       <PageHeader eyebrow={t("Point of sale")} title={t("New sale")} subtitle={t("Four quick steps. The summary tells you exactly what will happen when you save.")} />
       <SaleForm clients={rows.map((r) => ({ id: r.id, name: r.name, type: r.type, phone: r.phone, creditLimit: Number(r.credit_limit), exposure: Number(r.exposure), terms: r.terms }))}
-        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} accounts={accounts} sellers={sellers} myUserId={u.id} />
+        targetBps={s.targetMarginBps} creditDualLimit={isOversight(u) ? s.creditDualLimit : 0} showRules={isOversight(u)} canIssueAll={can(u, "issue.unlimited")} delegation={delegation} defaultClientId={client} partners={partners} myPartnerId={u.partnerId} accounts={accounts} portals={portals} sellers={sellers} myUserId={u.id} />
     </>
   );
 }

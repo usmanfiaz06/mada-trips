@@ -44,9 +44,10 @@ const SaleSchema = z.object({
   paidNow: money,
   method: z.enum(["cash", "mada", "card", "transfer"]),
   account: z.string().optional(), // which company bank account received the money (validated against the live bank list)
-  supplierPay: z.enum(["unpaid", "bank", "partner"]).catch("unpaid"), // has the supplier been paid, and how
+  supplierPay: z.enum(["unpaid", "bank", "partner", "portal"]).catch("unpaid"), // has the supplier been paid, and how
   supplierAccount: z.string().optional(),
   supplierPartnerId: z.string().optional(),
+  supplierPortalId: z.string().optional(), // which B2B portal (TBO, iTrip…) the cost was booked through
   soldBy: z.string().optional(), // which team member made the sale (gets the credit + commission); defaults to preparer
   cashHolder: z.string().optional(), // for a cash payment: who physically received and now holds the cash
   viaBsp: z.string().optional(),
@@ -192,7 +193,7 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       const viaBsp = v.serviceType === "flight" && v.viaBsp === "1";
       if (!viaBsp && v.supplierPay !== "unpaid" && v.netCost > 0) {
         if (v.supplierPay === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
-        await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, recordedBy: u.id });
+        await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, portalId: v.supplierPortalId || null, recordedBy: u.id });
       }
 
       if (needsCredit) {
