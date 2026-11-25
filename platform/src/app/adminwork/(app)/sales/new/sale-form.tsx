@@ -26,6 +26,7 @@ type Props = {
   delegation: { scope: string; maxTicket: number; dailyLeft: number } | null; defaultClientId?: string;
   partners: { id: string; name: string }[]; myPartnerId: string | null;
   accounts: { value: string; label: string }[];
+  portals: { id: string; name: string; headroom: number; balance: number; creditLimit: number }[];
   sellers: { id: string; name: string }[]; myUserId: string;
 };
 
@@ -59,7 +60,7 @@ function Submit({ label }: { label: string }) {
   );
 }
 
-export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId, accounts, sellers, myUserId }: Props) {
+export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, showRules, delegation, defaultClientId, partners, myPartnerId, accounts, portals, sellers, myUserId }: Props) {
   const t = useT();
   const defaultAccount = accounts[0]?.value ?? "retail";
   const accountName = (k: string) => accounts.find((a) => a.value === k)?.label ?? k;
@@ -80,6 +81,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
   const [cashHolder, setCashHolder] = useState<string>(myUserId);
   const [supplierPay, setSupplierPay] = useState("unpaid");
   const [supplierAccount, setSupplierAccount] = useState<string>(defaultAccount);
+  const [supplierPortalId, setSupplierPortalId] = useState<string>(portals[0]?.id ?? "");
   // How a flight's cost is settled. Empty until the salesperson picks — nothing lands in the IATA
   // balance by default; only a ticket explicitly bought through BSP rolls into the closing.
   const [settle, setSettle] = useState<"bsp" | "direct" | "">("");
@@ -255,7 +257,7 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
               ) : (netH > 0 && (service !== "flight" || settle === "direct")) ? (<>
               <span className="mb-2 block text-[12.5px] text-ink-3">{t("Supplier cost — have we paid it?")}</span>
               <div className="flex flex-wrap gap-1.5">
-                {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
+                {([["unpaid", t("Not paid yet")], ["bank", t("Paid from a bank")], ...(portals.length > 0 ? [["portal", t("Pay from a portal")]] : []), ...(myPartnerId ? [["partner", t("A partner paid it")]] : [])] as [string, string][]).map(([k, label]) => (
                   <button key={k} type="button" onClick={() => setSupplierPay(k)} className={cx("h-9 rounded-full px-4 text-[13px] transition", supplierPay === k ? "bg-ink text-bg" : "bg-surface text-ink-2 ring-1 ring-line hover:ring-line-strong")}>{label}</button>
                 ))}
               </div>
@@ -278,6 +280,25 @@ export function SaleForm({ clients, targetBps, canIssueAll, creditDualLimit, sho
                   <p className="mt-1.5 text-[12px] text-ink-3">{t("Goes to that partner's ledger once the other directors approve.")}</p>
                 </div>
               )}
+              {supplierPay === "portal" && (() => {
+                const picked = portals.find((p) => p.id === supplierPortalId);
+                const over = picked ? netH > picked.headroom : false;
+                return (
+                  <div className="mt-3">
+                    <span className="mb-1.5 block text-[12px] text-ink-3">{t("Which portal was it booked through?")}</span>
+                    <select name="supplierPortalId" value={supplierPortalId} onChange={(e) => setSupplierPortalId(e.target.value)} className="field h-10 sm:max-w-xs">
+                      {portals.map((p) => <option key={p.id} value={p.id}>{p.name} · {t("{v} available", { v: show(p.headroom) })}</option>)}
+                    </select>
+                    {picked && (
+                      <p className={cx("mt-1.5 text-[12px]", over ? "text-gold-2" : "text-ink-3")}>
+                        {over
+                          ? t("This cost is more than {name}'s {v} available — recording it will push the portal past its limit.", { name: picked.name, v: show(picked.headroom) })
+                          : t("Draws {v} from {name} once the directors approve.", { v: show(netH), name: picked.name })}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               {supplierPay === "unpaid" && <p className="mt-2 text-[12px] text-ink-3">{t("It will show in “Money we owe” until you mark it paid.")}</p>}
               </>) : null}
             </div>
