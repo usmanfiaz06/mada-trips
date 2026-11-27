@@ -193,14 +193,14 @@ export async function createSale(_: ActionState, fd: FormData): Promise<ActionSt
       const viaBsp = v.serviceType === "flight" && v.viaBsp === "1";
       if (!viaBsp && v.supplierPay !== "unpaid" && v.netCost > 0) {
         if (v.supplierPay === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
-        await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, portalId: v.supplierPortalId || null, recordedBy: u.id });
+        await recordSupplierPayment(tx, b, { source: v.supplierPay, account: v.supplierAccount, partnerId: v.supplierPartnerId || null, portalId: v.supplierPortalId || null, recordedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
       }
 
       if (needsCredit) {
         // The approval route looks at everything this client would owe, so splitting a sale can't dodge the all-directors rule.
-        const req = await createApproval(tx, { kind: "credit", entityType: "booking", entityId: b.id, title: `Credit for ${client.name} · ${ref}`, amount: unpaid, routeAmount: exposure + unpaid, reason: creditReason, requestedBy: u.id });
+        const req = await createApproval(tx, { kind: "credit", entityType: "booking", entityId: b.id, title: `Credit for ${client.name} · ${ref}`, amount: unpaid, routeAmount: exposure + unpaid, reason: creditReason, requestedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
         await tx.update(schema.bookings).set({ creditApprovalId: req.id }).where(eq(schema.bookings.id, b.id));
-        await flash(`${ref} saved. Credit request ${req.ref} sent to directors`);
+        await flash(req.status === "approved" ? `${ref} saved · credit approved, ready to issue` : `${ref} saved. Credit request ${req.ref} sent to directors`);
         return b.id;
       }
 
@@ -329,8 +329,10 @@ export async function resubmitBooking(_: ActionState, fd: FormData): Promise<Act
         } else { needsCredit = true; reason = `Price changed on resubmit: client now owes ${sar(newUnpaid)} instead of ${sar(oldUnpaid)}`; }
         if (needsCredit) {
           await tx.update(schema.approvalRequests).set({ status: "cancelled", decidedAt: new Date() }).where(and(eq(schema.approvalRequests.entityId, id), eq(schema.approvalRequests.status, "pending")));
-          const req = await createApproval(tx, { kind: "credit", entityType: "booking", entityId: id, title: `Credit for ${client.name} · ${b.ref}`, amount: newUnpaid, routeAmount: exposure + newUnpaid, reason, requestedBy: u.id });
+          const req = await createApproval(tx, { kind: "credit", entityType: "booking", entityId: id, title: `Credit for ${client.name} · ${b.ref}`, amount: newUnpaid, routeAmount: exposure + newUnpaid, reason, requestedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
           await tx.update(schema.bookings).set({ creditApprovalId: req.id }).where(eq(schema.bookings.id, id));
+          // A director's credit is granted on the spot, so the sale goes straight to issuing instead of waiting.
+          if (req.status === "approved") needsCredit = false;
         }
       }
       const bdate = b.businessDate;
@@ -411,8 +413,8 @@ export async function requestVoid(_: ActionState, fd: FormData): Promise<ActionS
         throw new Error("Issued tickets can only be voided on the day they were issued. Request a refund instead");
       const [open] = await tx.select().from(schema.approvalRequests).where(and(eq(schema.approvalRequests.entityId, id), eq(schema.approvalRequests.kind, "void"), eq(schema.approvalRequests.status, "pending")));
       if (open) throw new Error(`A void request (${open.ref}) is already open`);
-      const r = await createApproval(tx, { kind: "void", entityType: "booking", entityId: id, title: `Void ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id });
-      await flash(`Void request ${r.ref} sent to a director`);
+      const r = await createApproval(tx, { kind: "void", entityType: "booking", entityId: id, title: `Void ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason, requestedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
+      await flash(r.status === "approved" ? `${b.ref} voided` : `Void request ${r.ref} sent to a director`);
     });
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
@@ -477,8 +479,8 @@ export async function requestRefund(_: ActionState, fd: FormData): Promise<Actio
       if (supplierFee > 0) notes.push(`Supplier keeps SAR ${sar(supplierFee)}`);
       if (clientFee > 0) notes.push(`We keep SAR ${sar(clientFee)} from the client`);
       const fullReason = notes.length ? `${reason}\n\n${notes.join(" · ")}.` : reason;
-      const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason: fullReason, requestedBy: u.id, payload: { supplierFee, clientFee } });
-      await flash(`Refund request ${r.ref} sent`);
+      const r = await createApproval(tx, { kind: "refund", entityType: "booking", entityId: id, title: `Refund ${b.ref} · ${b.passengers}`, amount: b.sellPrice, reason: fullReason, requestedBy: u.id, payload: { supplierFee, clientFee }, forceApproval: str(fd, "sendForApproval") === "on" });
+      await flash(r.status === "approved" ? `${b.ref} refunded` : `Refund request ${r.ref} sent`);
     });
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
@@ -524,12 +526,14 @@ export async function paySupplier(_: ActionState, fd: FormData): Promise<ActionS
     await loadScopedBooking(u, id);
     if (source === "partner" && !u.partnerId) throw new Error("Only a partner can record a partner-paid supplier cost");
     const normSource = source === "partner" ? "partner" : source === "portal" ? "portal" : "bank";
+    let pending = false;
     await db.transaction(async (tx) => {
       const [b] = await tx.select().from(schema.bookings).where(eq(schema.bookings.id, id)).for("update");
       if (!b) throw new Error("Sale not found");
-      await recordSupplierPayment(tx, b, { source: normSource, account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), portalId: optStr(fd, "portalId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id });
+      const r = await recordSupplierPayment(tx, b, { source: normSource, account: str(fd, "account") || "retail", partnerId: optStr(fd, "partnerId"), portalId: optStr(fd, "portalId"), method: str(fd, "method") || "transfer", reference: optStr(fd, "reference"), recordedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
+      pending = r.pending;
     });
-    await flash(normSource === "bank" ? "Supplier marked paid" : "Sent to the directors to approve");
+    await flash(!pending ? "Supplier marked paid" : "Sent to the directors to approve");
   } catch (e) { return toState(e); }
   revalidatePath("/adminwork", "layout");
   redirect(`/adminwork/sales/${id}`);
@@ -577,8 +581,8 @@ export async function correctSale(_: ActionState, fd: FormData): Promise<ActionS
         // Big change: a director signs off before it lands. The sale keeps its current figures until then.
         const r = await createApproval(tx, { kind: "sale_edit", entityType: "booking", entityId: b.id,
           title: `Correct ${b.ref} · margin ${sar(b.sellPrice - b.netCost)} → ${sar((patch.sellPrice ?? b.sellPrice) - (patch.netCost ?? b.netCost))}`,
-          amount: patch.sellPrice ?? b.sellPrice, reason: reason || `Correction to ${b.ref}`, requestedBy: u.id, payload: patch });
-        outcome = `Correction sent to a director to approve (${r.ref})`;
+          amount: patch.sellPrice ?? b.sellPrice, reason: reason || `Correction to ${b.ref}`, requestedBy: u.id, payload: patch, forceApproval: str(fd, "sendForApproval") === "on" });
+        outcome = r.status === "approved" ? "Sale corrected" : `Correction sent to a director to approve (${r.ref})`;
         return;
       }
       const changed = await applySaleEdit(tx, b, patch, u.id, "direct");

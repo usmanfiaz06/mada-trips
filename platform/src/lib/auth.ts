@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { PARTNER_PERMISSIONS, type Permission } from "./permissions";
+import { ALL_PERMISSIONS, type Permission } from "./permissions";
 import { BASE } from "./base";
 
 export const SESSION_COOKIE = "mada_session";
@@ -65,12 +65,12 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     partnerId: row.u.partnerId, isDirector: !!row.p?.isDirector, mustChangePassword: row.u.mustChangePassword,
     clientId: row.u.clientId, clientRole: (row.u.clientRole as ClientRole | null) ?? null,
     role: { id: row.r.id, key: row.r.key, name: row.r.name, nameAr: row.r.nameAr },
-    // Directors share one level of access: they always have every capability, so a new permission reaches
-    // them automatically without a role edit. Ticket issuing (TTP) is the only exception — it stays with the
-    // issuing partner, so issue.* comes only from the user's actual role, never from being a director.
+    // Directors share one level of access: they always have every capability (ticket issuing included), so a
+    // new permission reaches them automatically without a role edit. Their actions are also final on their own
+    // (see createApproval) — the authority a director holds here is what lets them self-authorise.
     permissions: new Set<Permission>([
       ...(row.r.permissions as Permission[]),
-      ...(row.p?.isDirector ? PARTNER_PERMISSIONS : []),
+      ...(row.p?.isDirector ? ALL_PERMISSIONS : []),
     ]),
   };
 });

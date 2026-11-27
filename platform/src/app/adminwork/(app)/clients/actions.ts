@@ -35,8 +35,8 @@ export async function createClient(_: ActionState, fd: FormData): Promise<Action
       await audit(tx, { actorId: u.id, action: "client.created", entityType: "client", entityId: c.id, entityRef: c.name, summary: `Added client ${c.name}` });
       const limit = str(fd, "creditLimit");
       if (p.data.type === "contracted" && limit && toHalalas(limit) > 0) {
-        const r = await createApproval(tx, { kind: "credit_limit", entityType: "client", entityId: c.id, title: `Credit limit for ${c.name}: SAR ${sar(toHalalas(limit))}`, amount: toHalalas(limit), reason: `New contract ${p.data.contractRef ?? ""}`.trim(), requestedBy: u.id });
-        await flash(`${c.name} added. Credit limit sent for approval (${r.ref})`);
+        const r = await createApproval(tx, { kind: "credit_limit", entityType: "client", entityId: c.id, title: `Credit limit for ${c.name}: SAR ${sar(toHalalas(limit))}`, amount: toHalalas(limit), reason: `New contract ${p.data.contractRef ?? ""}`.trim(), requestedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
+        await flash(r.status === "approved" ? `${c.name} added · credit limit set` : `${c.name} added. Credit limit sent for approval (${r.ref})`);
       } else await flash(`${c.name} added`);
       return c.id;
     });

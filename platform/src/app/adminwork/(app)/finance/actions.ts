@@ -167,9 +167,9 @@ export async function addBankTxn(_: ActionState, fd: FormData): Promise<ActionSt
     const names = await accountNames();
     const ref = await db.transaction((tx) => proposeCashMove(tx, u.id,
       `${isCashback ? "Cashback into" : kind === "deposit" ? "Deposit into" : "Withdrawal from"} ${names[account] ?? account} · SAR ${sar(amount)}`,
-      { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount));
+      { op: "txn", account, direction, kind, amount, note, date, partnerId }, amount, str(fd, "sendForApproval") === "on"));
     revalidatePath("/adminwork", "layout");
-    return { ok: `Sent to the directors to approve (${ref.ref})` };
+    return { ok: ref.status === "approved" ? `Recorded (${ref.ref})` : `Sent to the directors to approve (${ref.ref})` };
   } catch (e) { return toState(e); }
 }
 

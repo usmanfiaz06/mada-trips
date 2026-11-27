@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useContext, useState } from "react";
 import { PendingContext, useSubmit } from "@/components/client";
+import { ApprovalToggle } from "@/components/approval-toggle";
 import { AlertCircle, Building2, Check, FileUp, Loader2, UserRound } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 import { btn, cx } from "@/components/ui";
@@ -11,7 +12,7 @@ function Submit({ ready, label }: { ready: boolean; label: string }) {
   return <button type="submit" disabled={pending || !ready} className={btn("gold", "lg", "w-full")}>{pending && <Loader2 className="size-4 animate-spin" />}{label}</button>;
 }
 
-export function ExpenseForm({ categories, isPartner, myPartnerId, partners, today, accounts }: { categories: [string, string][]; isPartner: boolean; myPartnerId: string | null; partners: { id: string; name: string }[]; today: string; accounts: { value: string; label: string }[] }) {
+export function ExpenseForm({ categories, isPartner, myPartnerId, partners, today, accounts, isDirector }: { categories: [string, string][]; isPartner: boolean; myPartnerId: string | null; partners: { id: string; name: string }[]; today: string; accounts: { value: string; label: string }[]; isDirector: boolean }) {
   const t = useT();
   const [state, action, pending] = useActionState(submitExpense, null);
   const onSubmit = useSubmit(action);
@@ -116,8 +117,9 @@ export function ExpenseForm({ categories, isPartner, myPartnerId, partners, toda
               </li>
             ))}
           </ul>
-          <div className="mt-5 rounded-2xl bg-surface-2 p-3.5 text-[12.5px] text-ink-3">{t("Next: someone other than you verifies it. If you paid personally, it's added to your partner ledger and repaid from the Day-25 waterfall.")}</div>
-          <div className="mt-5"><Submit ready={ready} label={t("Submit for verification")} /></div>
+          <div className="mt-5 rounded-2xl bg-surface-2 p-3.5 text-[12.5px] text-ink-3">{isDirector ? t("As a director this is approved as soon as you submit, unless you tick to send it for a second check. If you paid personally, it's added to your partner ledger and repaid from the Day-25 waterfall.") : t("Next: someone other than you verifies it. If you paid personally, it's added to your partner ledger and repaid from the Day-25 waterfall.")}</div>
+          {isDirector && <div className="mt-3"><ApprovalToggle /></div>}
+          <div className="mt-5"><Submit ready={ready} label={isDirector ? t("Record expense") : t("Submit for verification")} /></div>
         </div>
       </aside>
     </form>

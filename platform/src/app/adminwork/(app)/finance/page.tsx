@@ -17,6 +17,7 @@ import { ActionForm, SubmitButton } from "@/components/client";
 import { SunGauge } from "@/components/charts";
 import { ClearTable } from "./clear-table";
 import { AccountEditor, MovementsList } from "./finance-ui";
+import { ApprovalToggle } from "@/components/approval-toggle";
 import { addBankAccount, addBankTxn, depositCash, handCash, settleBsp, transferFunds } from "./actions";
 
 export const metadata = { title: "Banks & cash" };
@@ -204,6 +205,7 @@ export default async function FinancePage() {
                 <input type="checkbox" name="cashback" className="size-4 accent-[var(--gold)]" />
                 {t("This is a cashback (bank reward — counts as income)")}
               </label>
+              {u.isDirector && <ApprovalToggle />}
               <SubmitButton size="sm" variant="outline" className="w-full">{t("Record deposit")}</SubmitButton>
             </ActionForm>
             <ActionForm action={addBankTxn} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
@@ -214,6 +216,7 @@ export default async function FinancePage() {
               <Input name="note" placeholder={t("Note (optional)")} />
               <Input type="date" name="date" defaultValue={today} />
               <Select name="partnerId" defaultValue={u.partnerId ?? ""} placeholder={t("Who made it? (optional)")} options={partnerList.map((p) => ({ value: p.id, label: p.name }))} />
+              {u.isDirector && <ApprovalToggle />}
               <SubmitButton size="sm" variant="outline" className="w-full">{t("Record withdrawal")}</SubmitButton>
             </ActionForm>
             <ActionForm action={transferFunds} resetOnOk className="space-y-2 rounded-2xl bg-surface-2 p-3.5">

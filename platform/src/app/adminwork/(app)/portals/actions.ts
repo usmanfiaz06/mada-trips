@@ -38,13 +38,13 @@ export async function depositAction(_: ActionState, fd: FormData): Promise<Actio
   if (!isUuid(portalId)) return { error: "Choose a portal" };
   const source = str(fd, "source") === "partner" ? "partner" : "bank";
   try {
-    await db.transaction((tx) => recordFund(tx, {
+    const r = await db.transaction((tx) => recordFund(tx, {
       portalId, source, account: optStr(fd, "account"), partnerId: optStr(fd, "partnerId"),
-      amount: toHalalas(str(fd, "amount")), reference: optStr(fd, "reference"), note: optStr(fd, "note"), recordedBy: u.id,
+      amount: toHalalas(str(fd, "amount")), reference: optStr(fd, "reference"), note: optStr(fd, "note"), recordedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on",
     }));
+    revalidatePath("/adminwork", "layout");
+    return { ok: r.pending ? "Deposit recorded — sent to the directors to approve" : "Deposit recorded and applied" };
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork", "layout");
-  return { ok: "Deposit recorded — sent to the directors to approve" };
 }
 
 export async function adjustAction(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -53,8 +53,8 @@ export async function adjustAction(_: ActionState, fd: FormData): Promise<Action
   if (!isUuid(portalId)) return { error: "Choose a portal" };
   const direction = str(fd, "direction") === "out" ? "out" : "in";
   try {
-    await db.transaction((tx) => recordAdjustment(tx, { portalId, direction, amount: toHalalas(str(fd, "amount")), note: str(fd, "note"), recordedBy: u.id }));
+    const r = await db.transaction((tx) => recordAdjustment(tx, { portalId, direction, amount: toHalalas(str(fd, "amount")), note: str(fd, "note"), recordedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" }));
+    revalidatePath("/adminwork", "layout");
+    return { ok: r.pending ? "Adjustment recorded — sent to the directors to approve" : "Adjustment recorded and applied" };
   } catch (e) { return toState(e); }
-  revalidatePath("/adminwork", "layout");
-  return { ok: "Adjustment recorded — sent to the directors to approve" };
 }

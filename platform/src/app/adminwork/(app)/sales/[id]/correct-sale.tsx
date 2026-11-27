@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useT } from "@/lib/i18n/client";
 import { ActionForm, SubmitButton } from "@/components/client";
+import { ApprovalToggle } from "@/components/approval-toggle";
 import { PASSPORT_RULE, type Traveller } from "@/lib/services";
 import { correctSale } from "../actions";
 
@@ -10,12 +11,13 @@ type Props = {
   netCost: string; sellPrice: string; supplier: string; pnr: string; ticketNumbers: string;
   travellers: Traveller[];
   marginLimitLabel: string;
+  isDirector: boolean;
 };
 
 const toH = (v: string) => { const n = Number(String(v).replace(/,/g, "")); return Number.isFinite(n) ? Math.round(n * 100) : 0; };
 const show = (h: number) => (h / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function CorrectSaleForm({ id, serviceType, netCost, sellPrice, supplier, pnr, ticketNumbers, travellers, marginLimitLabel }: Props) {
+export function CorrectSaleForm({ id, serviceType, netCost, sellPrice, supplier, pnr, ticketNumbers, travellers, marginLimitLabel, isDirector }: Props) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [cost, setCost] = useState(netCost);
@@ -74,6 +76,7 @@ export function CorrectSaleForm({ id, serviceType, netCost, sellPrice, supplier,
       <label><span className="mb-1.5 block text-[12.5px] text-ink-3">{t("Reason (shown to the director if approval is needed)")}</span>
         <textarea name="reason" rows={2} className="field" placeholder={t("e.g. Net cost was entered as 200 instead of 250")} /></label>
 
+      {isDirector && <ApprovalToggle className="mt-1" />}
       <div className="flex items-center gap-2">
         <SubmitButton variant="primary">{t("Save correction")}</SubmitButton>
         <button type="button" onClick={() => setOpen(false)} className="text-[13px] text-ink-3 hover:text-ink">{t("Cancel")}</button>
