@@ -80,6 +80,7 @@ type CreateInput = {
   amount: number; reason?: string | null; requestedBy: string;
   routeAmount?: number;  // the amount the rules look at, when it differs from the amount shown (e.g. the client's total exposure)
   payload?: unknown;     // governance changes: what will be applied
+  forceApproval?: boolean; // a director chose to send it for approval anyway, instead of applying it on their own authority
 };
 
 /** Open an approval request, choosing the route from the governance rules. */
@@ -128,6 +129,34 @@ export async function createApproval(tx: Tx, input: CreateInput) {
   }
 
   const probe = { approverPool: pool, requestedBy: input.requestedBy, kind: input.kind, entityId: input.entityId, payload: input.payload };
+
+  // ── Director self-authority ───────────────────────────────────────────────
+  // A director's action is final on its own — applied immediately, with no pending request. The exceptions:
+  //  • the two deliberate multi-director ceremonies (the Day-25 settlement and governance changes),
+  //  • an action the director chose to send for approval anyway (forceApproval),
+  //  • anything that pays the director's own partner (self-reimbursement, a bank move or a cost they fronted),
+  //    which still needs another director — the one separation-of-duties guard we keep.
+  const [reqUser] = await tx.select({ partnerId: schema.users.partnerId, isDirector: schema.partners.isDirector })
+    .from(schema.users).leftJoin(schema.partners, eq(schema.partners.id, schema.users.partnerId)).where(eq(schema.users.id, input.requestedBy));
+  let beneficiary = await conflictedPartner(tx, probe);
+  if (!beneficiary && input.kind === "cash") beneficiary = (input.payload as { partnerId?: string } | null)?.partnerId ?? null;
+  const selfBenefit = !!reqUser?.partnerId && beneficiary === reqUser.partnerId;
+  const ceremonial = input.kind === "settlement" || input.kind === "governance";
+  if (reqUser?.isDirector && !input.forceApproval && !selfBenefit && !ceremonial) {
+    const ref = await nextRef(tx, "AP");
+    const [req] = await tx.insert(schema.approvalRequests).values({
+      ref, kind: input.kind, entityType: input.entityType, entityId: input.entityId,
+      title: input.title, amount: input.amount, reason: input.reason ?? null, requestedBy: input.requestedBy,
+      requiredApprovals: 1, requiresAll: false, approverPool: pool, rule: `${rule} · applied under director authority`,
+      payload: input.payload ?? null, status: "approved", decidedAt: new Date(),
+    }).returning();
+    await tx.insert(schema.approvalDecisions).values({ requestId: req.id, userId: input.requestedBy, decision: "approve", remark: "Director authority" });
+    await audit(tx, { actorId: input.requestedBy, action: "approval.auto_approved", entityType: "approval", entityId: req.id, entityRef: ref,
+      summary: `${ref} applied under director authority: ${input.title}`, changes: { rule, amount: input.amount } });
+    await applyOutcome(tx, req, "approved", input.requestedBy);
+    return req;
+  }
+
   const eligible = await eligibleApprovers(tx, probe);
   if (requiresAll) required = await allDirectorsRequired(tx, probe);
   // A partner reimbursement recorded by another partner leaves fewer uninvolved directors (neither the one who

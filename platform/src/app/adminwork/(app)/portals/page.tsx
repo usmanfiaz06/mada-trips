@@ -8,6 +8,7 @@ import { fmtDate } from "@/lib/dates";
 import { sar } from "@/lib/money";
 import { Badge, Card, CardHead, Field, InkCard, Input, PageHeader, Select, cx } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/client";
+import { ApprovalToggle } from "@/components/approval-toggle";
 import { addPortalAction, depositAction, adjustAction } from "./actions";
 
 export const metadata = { title: "B2B portals" };
@@ -70,6 +71,7 @@ export default async function PortalsPage() {
             <Select name="partnerId" options={partners.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("Partner (if fronted)")} />
             <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
             <Input name="reference" placeholder={t("Reference (optional)")} />
+            {u.isDirector && <ApprovalToggle />}
             <SubmitButton size="sm" variant="outline" className="w-full">{t("Record deposit")}</SubmitButton>
           </ActionForm>
         </Card>
@@ -81,6 +83,7 @@ export default async function PortalsPage() {
             <Select name="direction" options={[{ value: "in", label: t("Increase (+)") }, { value: "out", label: t("Decrease (−)") }]} />
             <Input name="amount" inputMode="decimal" placeholder={t("Amount (SAR)")} dir="ltr" />
             <Input name="note" placeholder={t("Reason") } />
+            {u.isDirector && <ApprovalToggle />}
             <SubmitButton size="sm" variant="outline" className="w-full">{t("Record adjustment")}</SubmitButton>
           </ActionForm>
         </Card>

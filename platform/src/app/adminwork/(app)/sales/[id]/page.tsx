@@ -20,6 +20,7 @@ import { Attachments, Timeline } from "@/components/record";
 import { issueBooking, paySupplier, requestRefund, requestVoid, resubmitBooking, returnBooking, reviewFlightSettlement } from "../actions";
 import { CorrectSaleForm } from "./correct-sale";
 import { PayForm } from "./pay-form";
+import { ApprovalToggle } from "@/components/approval-toggle";
 import { getSettings } from "@/lib/settings";
 import { LinkedTasks } from "@/components/tasks";
 import { TicketInputs } from "@/components/tickets";
@@ -129,7 +130,7 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                 <CorrectSaleForm id={b.id} serviceType={b.serviceType}
                   netCost={amountInput(b.netCost)} sellPrice={amountInput(b.sellPrice)}
                   supplier={b.supplier ?? ""} pnr={b.pnr ?? ""} ticketNumbers={b.ticketNumbers ?? ""}
-                  travellers={travellers} marginLimitLabel={sar(settings.saleEditMarginLimit)} />
+                  travellers={travellers} marginLimitLabel={sar(settings.saleEditMarginLimit)} isDirector={u.isDirector} />
               </div>
             )}
           </Card>
@@ -261,7 +262,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                           <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="partner" />
                           <span className="text-[12.5px] text-ink-2">{t("A partner paid it in cash")}</span>
                           <select name="partnerId" className="field h-10" defaultValue={u.partnerId}>{partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-                          <SubmitButton variant="outline" size="sm">{t("Send for approval")}</SubmitButton>
+                          {u.isDirector && <ApprovalToggle />}
+                          <SubmitButton variant="outline" size="sm">{u.isDirector ? t("Record") : t("Send for approval")}</SubmitButton>
                         </ActionForm>
                       )}
                       {portalList.length > 0 && (
@@ -269,7 +271,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                           <input type="hidden" name="id" value={b.id} /><input type="hidden" name="source" value="portal" />
                           <span className="text-[12.5px] text-ink-2">{t("Booked through a B2B portal")}</span>
                           <select name="portalId" className="field h-10">{portalList.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.headroom >= b.netCost ? t("{v} spendable", { v: sar(p.headroom) }) : t("over limit")}</option>)}</select>
-                          <SubmitButton variant="outline" size="sm">{t("Send for approval")}</SubmitButton>
+                          {u.isDirector && <ApprovalToggle />}
+                          <SubmitButton variant="outline" size="sm">{u.isDirector ? t("Record") : t("Send for approval")}</SubmitButton>
                         </ActionForm>
                       )}
                     </div>
@@ -344,7 +347,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                           <input name="clientFee" inputMode="decimal" placeholder="0.00" className="field h-10" dir="ltr" />
                         </label>
                       )}
-                      <SubmitButton variant="outline" size="sm">{t("Send refund request")}</SubmitButton></ActionForm></details>
+                      {u.isDirector && <ApprovalToggle />}
+                      <SubmitButton variant="outline" size="sm">{u.isDirector ? t("Refund") : t("Send refund request")}</SubmitButton></ActionForm></details>
                 )}
                 {refund && <Link href={`/adminwork/approvals/${refund.id}`} className="flex items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><RotateCcw className="size-4" />{t("Refund requested")} · {refund.ref}</Link>}
                 {voidReq ? (
@@ -354,7 +358,8 @@ export default async function SalePage({ params }: { params: Promise<{ id: strin
                     <ActionForm action={requestVoid} className="mt-3 space-y-2"><input type="hidden" name="id" value={b.id} />
                       <textarea name="reason" rows={2} className="field" placeholder={t("Why void it? A director must approve")} />
                       <p className="text-[12px] text-ink-3">{t("Kept on record but removed from the books once a director approves. Any money recorded against it comes back out of the balance.")}</p>
-                      <SubmitButton variant="danger" size="sm">{t("Send void request")}</SubmitButton></ActionForm></details>
+                      {u.isDirector && <ApprovalToggle />}
+                      <SubmitButton variant="danger" size="sm">{u.isDirector ? t("Void this sale") : t("Send void request")}</SubmitButton></ActionForm></details>
                 )}
                 <Link href={`/adminwork/sales/new?client=${c.id}`} className="flex items-center gap-2 text-[13.5px] text-ink-2 hover:text-ink"><Receipt className="size-4" />{t("New sale for this client")}</Link>
               </div>

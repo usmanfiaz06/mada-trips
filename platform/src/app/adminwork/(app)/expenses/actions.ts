@@ -66,9 +66,9 @@ export async function submitExpense(_: ActionState, fd: FormData): Promise<Actio
       const payerName = payerId ? (await tx.select({ n: schema.partners.name }).from(schema.partners).where(eq(schema.partners.id, payerId)))[0]?.n : null;
       await audit(tx, { actorId: u.id, action: "expense.submitted", entityType: "expense", entityId: e.id, entityRef: ref,
         summary: `Submitted ${ref} · ${v.description} · SAR ${sar(v.amount)}${payerId ? (payerId === u.partnerId ? " (paid personally)" : ` (paid personally by ${payerName})`) : ""}` });
-      const r = await createApproval(tx, { kind: "expense", entityType: "expense", entityId: e.id, title: `${ref} · ${v.description}`, amount: v.amount, reason: v.justification, requestedBy: u.id });
+      const r = await createApproval(tx, { kind: "expense", entityType: "expense", entityId: e.id, title: `${ref} · ${v.description}`, amount: v.amount, reason: v.justification, requestedBy: u.id, forceApproval: str(fd, "sendForApproval") === "on" });
       await tx.update(schema.expenses).set({ approvalId: r.id }).where(eq(schema.expenses.id, e.id));
-      await flash(`${ref} submitted for verification`);
+      await flash(r.status === "approved" ? `${ref} recorded and approved` : `${ref} submitted for verification`);
       return e.id;
     });
   } catch (e) { return toState(e); }

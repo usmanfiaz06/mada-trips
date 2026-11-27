@@ -43,7 +43,7 @@ export async function memberCommissionView(q: Q, userId: string, from: string, t
 /** Record a commission payout for a member over a period. Pays only the sales not already covered, reserving
  *  them at once so they can't be double-paid, and sends it to a director to approve before any money moves. */
 export async function recordCommissionPayment(tx: Tx, opts: {
-  memberId: string; periodStart: string; periodEnd: string; basis: "profit" | "revenue"; rateBps: number; account: string; note?: string | null; requestedBy: string;
+  memberId: string; periodStart: string; periodEnd: string; basis: "profit" | "revenue"; rateBps: number; account: string; note?: string | null; requestedBy: string; forceApproval?: boolean;
 }) {
   const [m] = await tx.select().from(schema.users).where(eq(schema.users.id, opts.memberId));
   if (!m) throw new Error("Team member not found");
@@ -77,7 +77,7 @@ export async function recordCommissionPayment(tx: Tx, opts: {
   const req = await createApproval(tx, { kind: "commission", entityType: "commission", entityId: pay.id,
     title: `Commission to ${m.name} · ${sar(amount)}`, amount,
     reason: `${rateBps / 100}% of ${opts.basis} on ${bookings.length} sales (${start} → ${opts.periodEnd})${opts.note ? ` · ${opts.note}` : ""}`,
-    requestedBy: opts.requestedBy, payload: { memberId: opts.memberId } });
+    requestedBy: opts.requestedBy, payload: { memberId: opts.memberId }, forceApproval: opts.forceApproval });
   await tx.update(schema.commissionPayments).set({ approvalId: req.id }).where(eq(schema.commissionPayments.id, pay.id));
   await audit(tx, { actorId: opts.requestedBy, action: "commission.requested", entityType: "commission", entityId: pay.id, entityRef: ref,
     summary: `Recorded commission ${ref} for ${m.name}: ${sar(amount)} (${rateBps / 100}% of ${opts.basis}, ${bookings.length} sales); sent to the directors` });

@@ -17,7 +17,7 @@ type Booking = typeof schema.bookings.$inferSelect;
  *  - portal: drawn from a B2B platform's balance (TBO, iTrip) → a director must approve before it draws the portal.
  */
 export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
-  source: "bank" | "partner" | "portal"; account?: string | null; partnerId?: string | null; portalId?: string | null; method?: string; reference?: string | null; recordedBy: string;
+  source: "bank" | "partner" | "portal"; account?: string | null; partnerId?: string | null; portalId?: string | null; method?: string; reference?: string | null; recordedBy: string; forceApproval?: boolean;
 }) {
   if (b.netCost <= 0) throw new Error("This booking has no supplier cost to pay");
   if (b.supplierPaid) throw new Error("The supplier is already paid for this booking");
@@ -30,10 +30,11 @@ export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
     const portal = opts.portalId ? await portalById(tx, opts.portalId) : undefined;
     if (!portal || !portal.active) throw new Error("Choose which portal the cost was booked through");
     const [sp] = await tx.insert(schema.supplierPayments).values({ bookingId: b.id, supplier: b.supplier ?? "—", amount, source: "portal", portalId: portal.id, method, reference: opts.reference ?? null, status: "pending_approval", paidOn: riyadhDate(), recordedBy: opts.recordedBy }).returning();
-    const req = await createApproval(tx, { kind: "supplier", entityType: "booking", entityId: b.id, title: `Pay supplier ${b.supplier ?? ""} from ${portal.name} · ${b.ref}`, amount, reason: `Supplier cost for ${b.ref} drawn from ${portal.name}`, requestedBy: opts.recordedBy, payload: { portalId: portal.id } });
+    const req = await createApproval(tx, { kind: "supplier", entityType: "booking", entityId: b.id, title: `Pay supplier ${b.supplier ?? ""} from ${portal.name} · ${b.ref}`, amount, reason: `Supplier cost for ${b.ref} drawn from ${portal.name}`, requestedBy: opts.recordedBy, payload: { portalId: portal.id }, forceApproval: opts.forceApproval });
     await tx.update(schema.supplierPayments).set({ approvalId: req.id }).where(eq(schema.supplierPayments.id, sp.id));
-    await audit(tx, { actorId: opts.recordedBy, action: "supplier.requested", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Recorded that ${b.ref} was booked through ${portal.name} (SAR ${sar(amount)}); sent for approval` });
-    return { pending: true };
+    const pending = req.status !== "approved";
+    await audit(tx, { actorId: opts.recordedBy, action: "supplier.requested", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Recorded that ${b.ref} was booked through ${portal.name} (SAR ${sar(amount)})${pending ? "; sent for approval" : "; drawn on director authority"}` });
+    return { pending };
   }
 
   if (opts.source === "bank") {
@@ -49,10 +50,11 @@ export async function recordSupplierPayment(tx: Tx, b: Booking, opts: {
   const [p] = await tx.select().from(schema.partners).where(eq(schema.partners.id, opts.partnerId));
   if (!p) throw new Error("Choose which partner paid");
   const [sp] = await tx.insert(schema.supplierPayments).values({ bookingId: b.id, supplier: b.supplier ?? "—", amount, source: "partner", partnerId: p.id, method: "cash", reference: opts.reference ?? null, status: "pending_approval", paidOn: riyadhDate(), recordedBy: opts.recordedBy }).returning();
-  const req = await createApproval(tx, { kind: "supplier", entityType: "booking", entityId: b.id, title: `${p.name} paid supplier ${b.supplier ?? ""} · ${b.ref}`, amount, reason: `Supplier cost for ${b.ref} fronted by ${p.name}`, requestedBy: opts.recordedBy, payload: { partnerId: p.id } });
+  const req = await createApproval(tx, { kind: "supplier", entityType: "booking", entityId: b.id, title: `${p.name} paid supplier ${b.supplier ?? ""} · ${b.ref}`, amount, reason: `Supplier cost for ${b.ref} fronted by ${p.name}`, requestedBy: opts.recordedBy, payload: { partnerId: p.id }, forceApproval: opts.forceApproval });
   await tx.update(schema.supplierPayments).set({ approvalId: req.id }).where(eq(schema.supplierPayments.id, sp.id));
-  await audit(tx, { actorId: opts.recordedBy, action: "supplier.requested", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Recorded that ${p.name} paid supplier ${b.supplier ?? ""} SAR ${sar(amount)} for ${b.ref}; sent to the other directors` });
-  return { pending: true };
+  const pending = req.status !== "approved";
+  await audit(tx, { actorId: opts.recordedBy, action: "supplier.requested", entityType: "booking", entityId: b.id, entityRef: b.ref, summary: `Recorded that ${p.name} paid supplier ${b.supplier ?? ""} SAR ${sar(amount)} for ${b.ref}${pending ? "; sent to the other directors" : "; applied on director authority"}` });
+  return { pending };
 }
 
 type Req = typeof schema.approvalRequests.$inferSelect;

@@ -12,8 +12,8 @@ export type CashPayload =
   | { op: "txn"; account: string; direction: "in" | "out"; kind: string; amount: number; note: string | null; date: string; partnerId?: string | null }
   | { op: "transfer"; from: string; to: string; amount: number; note: string | null; date: string; partnerId?: string | null };
 
-export async function proposeCashMove(tx: Tx, requestedBy: string, title: string, payload: CashPayload, amount: number) {
-  return createApproval(tx, { kind: "cash", entityType: "cash", entityId: randomUUID(), title, amount, requestedBy, payload });
+export async function proposeCashMove(tx: Tx, requestedBy: string, title: string, payload: CashPayload, amount: number, forceApproval = false) {
+  return createApproval(tx, { kind: "cash", entityType: "cash", entityId: randomUUID(), title, amount, requestedBy, payload, forceApproval });
 }
 
 type Req = typeof schema.approvalRequests.$inferSelect;

@@ -19,7 +19,7 @@ export default async function NewExpense() {
   return (
     <>
       <PageHeader eyebrow={t("Expenses")} title={t("Add expense")} subtitle={t("Enter the amount, attach proof, and add a reason. That's all a verifier needs.")} />
-      <ExpenseForm categories={Object.entries(EXPENSE_CATEGORY).filter(([k]) => k !== "commission")} isPartner={!!u.partnerId} myPartnerId={u.partnerId} partners={partners} today={riyadhDate()} accounts={accounts} />
+      <ExpenseForm categories={Object.entries(EXPENSE_CATEGORY).filter(([k]) => k !== "commission")} isPartner={!!u.partnerId} myPartnerId={u.partnerId} partners={partners} today={riyadhDate()} accounts={accounts} isDirector={u.isDirector} />
     </>
   );
 }

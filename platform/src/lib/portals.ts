@@ -93,7 +93,7 @@ export async function updatePortal(tx: Tx, id: string, opts: { name?: string; cr
  * or a partner fronts it; the portal's balance goes up). Recorded as pending and settled once a director
  * approves it. A partner-funded deposit is owed back to that partner, like a partner-fronted supplier cost.
  */
-export async function recordFund(tx: Tx, opts: { portalId: string; source: "bank" | "partner"; account?: string | null; partnerId?: string | null; amount: number; reference?: string | null; note?: string | null; recordedBy: string }) {
+export async function recordFund(tx: Tx, opts: { portalId: string; source: "bank" | "partner"; account?: string | null; partnerId?: string | null; amount: number; reference?: string | null; note?: string | null; recordedBy: string; forceApproval?: boolean }) {
   const p = await portalById(tx, opts.portalId);
   if (!p || !p.active) throw new Error("Choose a portal");
   if (!Number.isFinite(opts.amount) || opts.amount <= 0) throw new Error("Enter how much is being deposited");
@@ -114,14 +114,16 @@ export async function recordFund(tx: Tx, opts: { portalId: string; source: "bank
     kind: "portal", entityType: "portal", entityId: p.id, title: `Deposit SAR ${sar(opts.amount)} to ${p.name} from ${from}`,
     amount: opts.amount, reason: opts.note ?? null, requestedBy: opts.recordedBy,
     payload: { ledgerId: entry.id, partnerId: opts.source === "partner" ? opts.partnerId : undefined },
+    forceApproval: opts.forceApproval,
   });
   await tx.update(schema.portalLedger).set({ approvalId: req.id }).where(eq(schema.portalLedger.id, entry.id));
-  await audit(tx, { actorId: opts.recordedBy, action: "portal.fund_requested", entityType: "portal", entityId: p.id, entityRef: p.name, summary: `Recorded a SAR ${sar(opts.amount)} deposit to ${p.name} from ${from}; sent for approval` });
-  return { pending: true };
+  const pending = req.status !== "approved";
+  await audit(tx, { actorId: opts.recordedBy, action: "portal.fund_requested", entityType: "portal", entityId: p.id, entityRef: p.name, summary: `Recorded a SAR ${sar(opts.amount)} deposit to ${p.name} from ${from}${pending ? "; sent for approval" : "; applied on director authority"}` });
+  return { pending };
 }
 
 /** A manual correction to a portal's balance (reconciliation), director-approved. */
-export async function recordAdjustment(tx: Tx, opts: { portalId: string; direction: "in" | "out"; amount: number; note: string; recordedBy: string }) {
+export async function recordAdjustment(tx: Tx, opts: { portalId: string; direction: "in" | "out"; amount: number; note: string; recordedBy: string; forceApproval?: boolean }) {
   const p = await portalById(tx, opts.portalId);
   if (!p) throw new Error("Choose a portal");
   if (!Number.isFinite(opts.amount) || opts.amount <= 0) throw new Error("Enter an amount");
@@ -134,10 +136,12 @@ export async function recordAdjustment(tx: Tx, opts: { portalId: string; directi
     kind: "portal", entityType: "portal", entityId: p.id,
     title: `Adjust ${p.name} ${opts.direction === "in" ? "+" : "−"}SAR ${sar(opts.amount)}`, amount: opts.amount, reason: opts.note.trim(), requestedBy: opts.recordedBy,
     payload: { ledgerId: entry.id },
+    forceApproval: opts.forceApproval,
   });
   await tx.update(schema.portalLedger).set({ approvalId: req.id }).where(eq(schema.portalLedger.id, entry.id));
-  await audit(tx, { actorId: opts.recordedBy, action: "portal.adjust_requested", entityType: "portal", entityId: p.id, entityRef: p.name, summary: `Requested a ${opts.direction === "in" ? "+" : "−"}SAR ${sar(opts.amount)} adjustment to ${p.name}` });
-  return { pending: true };
+  const pending = req.status !== "approved";
+  await audit(tx, { actorId: opts.recordedBy, action: "portal.adjust_requested", entityType: "portal", entityId: p.id, entityRef: p.name, summary: `${pending ? "Requested" : "Applied"} a ${opts.direction === "in" ? "+" : "−"}SAR ${sar(opts.amount)} adjustment to ${p.name}` });
+  return { pending };
 }
 
 type Req = typeof schema.approvalRequests.$inferSelect;
